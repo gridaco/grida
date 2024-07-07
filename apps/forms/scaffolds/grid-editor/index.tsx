@@ -52,6 +52,13 @@ import clsx from "clsx";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { XSupabaseQuery } from "@/lib/supabase-postgrest/builder";
 import { Spinner } from "@/components/spinner";
+import { SearchInput } from "@/components/extension/search-input";
+import { useDebounceCallback } from "usehooks-ts";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export function GridEditor() {
   const [state, dispatch] = useEditorState();
@@ -183,7 +190,7 @@ export function GridEditor() {
             </>
           ) : (
             <>
-              <div className="px-2 flex justify-center items-center">
+              <div className="px-2 flex justify-center items-center gap-4">
                 <Tabs
                   value={state.datagrid_table}
                   onValueChange={(value) => {
@@ -206,6 +213,7 @@ export function GridEditor() {
                     })}
                   </TabsList>
                 </Tabs>
+                <DataGridLocalSearch />
               </div>
             </>
           )}
@@ -279,6 +287,31 @@ export function GridEditor() {
         <DataLoadingIndicator />
       </footer>
     </div>
+  );
+}
+
+function DataGridLocalSearch() {
+  const [state, dispatch] = useEditorState();
+
+  const onSearchChange = useDebounceCallback((txt: string) => {
+    dispatch({
+      type: "editor/data-grid/filter",
+      localsearch: txt,
+    });
+  }, 250);
+
+  return (
+    <Tooltip>
+      <TooltipTrigger>
+        <SearchInput
+          placeholder="Search in table"
+          onChange={(e) => onSearchChange(e.target.value)}
+        />
+      </TooltipTrigger>
+      <TooltipContent>
+          Local search - Search within loaded data
+      </TooltipContent>
+    </Tooltip>
   );
 }
 

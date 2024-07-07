@@ -117,6 +117,7 @@ function xsbmtinit(conn?: GridaSupabase.SupabaseConnectionState) {
 }
 
 export interface DataGridFilterSettings {
+  localsearch?: string; // local search uses fuse.js to available data
   masking_enabled: boolean;
   empty_data_hidden: boolean;
 }

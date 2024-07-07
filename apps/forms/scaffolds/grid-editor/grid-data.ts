@@ -12,6 +12,7 @@ import type { DataGridFilterSettings } from "../editor/state";
 import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";
 import { FieldSupports } from "@/k/supported_field_types";
 import { PrivateEditorApi } from "@/lib/private";
+import { GridFilter } from "../grid-filter";
 
 export namespace GridData {
   type DataGridInput = {
@@ -103,10 +104,16 @@ export namespace GridData {
       case "response": {
         return input.responses
           ? rows_from_responses(
-              input.responses,
-              // TODO:
-              // applyFilter(data.responses, data.filter),
-
+              {
+                rows: GridFilter.filter(
+                  input.responses.rows,
+                  input.filter,
+                  "raw",
+                  // response raw is saved with name: value
+                  input.fields.map((f) => f.name)
+                ),
+                fields: input.responses.fields,
+              },
               input.fields
             )
           : [];
@@ -114,7 +121,13 @@ export namespace GridData {
       case "session": {
         return input.sessions
           ? rows_from_sessions(
-              applyFilter(input.sessions, input.filter),
+              GridFilter.filter(
+                input.sessions,
+                input.filter,
+                "raw",
+                // session raw is saved with id: value
+                input.fields.map((f) => f.id)
+              ),
               input.fields
             )
           : [];
@@ -182,7 +195,12 @@ export namespace GridData {
           }
         };
 
-        return input.data.rows.reduce((acc, row, index) => {
+        return GridFilter.filter(
+          input.data.rows,
+          input.filter,
+          undefined,
+          input.fields.map((f) => f.name)
+        ).reduce((acc, row, index) => {
           // TODO: support multiple PKs
           const pk = input.data.pks.length > 0 ? input.data.pks[0] : null;
           const gfRow: GFResponseRow = {
@@ -330,33 +348,5 @@ export namespace GridData {
         return row;
       }) ?? []
     );
-  }
-
-  function applyFilter<
-    T extends FormResponse | FormResponseSession =
-      | FormResponse
-      | FormResponseSession,
-  >(
-    rows: Array<T>,
-    filter: DataGridFilterSettings,
-    datakey: keyof T = "raw"
-  ): Array<T> {
-    const { empty_data_hidden } = filter;
-    return rows.filter((row) => {
-      if (empty_data_hidden) {
-        if (row === null) return false;
-        if (row === undefined) return false;
-
-        const v = row[datakey];
-        return (
-          v !== null &&
-          v !== undefined &&
-          v !== "" &&
-          JSON.stringify(v) !== "{}" &&
-          JSON.stringify(v) !== "[]"
-        );
-      }
-      return true;
-    });
   }
 }
