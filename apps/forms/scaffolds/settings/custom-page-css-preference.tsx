@@ -39,6 +39,7 @@ export function CustomPageCssPreferences({
           <input type="hidden" name="form_id" value={form_id} />
           <input type="hidden" name="css" value={css} />
           <Editor
+            className="rounded overflow-hidden border"
             onChange={setCss}
             width="100%"
             height={500}
