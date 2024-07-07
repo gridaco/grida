@@ -5,6 +5,7 @@ type Pricing = {
   support: PricingCategory;
   ticketing: PricingCategory;
   commerce: PricingCategory;
+  channels: PricingCategory;
   commingsoon: PricingCategory;
 };
 
@@ -31,7 +32,7 @@ type PricingFeature = {
 };
 
 export const pricing: Pricing = {
-  storage: {
+  highlight: {
     title: "Features",
     features: [
       {
@@ -165,6 +166,16 @@ export const pricing: Pricing = {
         usage_based: false,
       },
       {
+        title: "Build forms with AI",
+        plans: {
+          free: true,
+          pro: true,
+          team: true,
+          enterprise: true,
+        },
+        usage_based: false,
+      },
+      {
         title: "Advanced Analytics",
         plans: {
           free: false,
@@ -211,7 +222,7 @@ export const pricing: Pricing = {
       },
     ],
   },
-  highlight: {
+  storage: {
     title: "File Response & Storage",
     features: [
       {
@@ -306,6 +317,16 @@ export const pricing: Pricing = {
         },
         usage_based: true,
       },
+      {
+        title: "Simulator",
+        plans: {
+          free: false,
+          pro: false,
+          team: false,
+          enterprise: true,
+        },
+        usage_based: true,
+      },
     ],
   },
   commerce: {
@@ -353,7 +374,7 @@ export const pricing: Pricing = {
       },
     ],
   },
-  commingsoon: {
+  channels: {
     title: "Channels",
     features: [
       {
@@ -397,5 +418,9 @@ export const pricing: Pricing = {
         usage_based: false,
       },
     ],
+  },
+  commingsoon: {
+    title: "Comming Soon",
+    features: [],
   },
 };
