@@ -306,6 +306,7 @@ function DataGridLocalSearch() {
         <SearchInput
           placeholder="Search in table"
           onChange={(e) => onSearchChange(e.target.value)}
+          className="max-w-sm"
         />
       </TooltipTrigger>
       <TooltipContent>Local search - Search within loaded data</TooltipContent>
