@@ -6,7 +6,6 @@ import {
   PreferenceBox,
   PreferenceBoxFooter,
   PreferenceBoxHeader,
-  cls_save_button,
 } from "@/components/preferences";
 import {
   Select,
@@ -18,20 +17,20 @@ import {
 import { section_style_glass_morphism } from "@/theme/section/css";
 import { Button } from "@/components/ui/button";
 
-export function CustomSectionStylePreferences({
+export function CustomPageCssPreferences({
   form_id,
   init,
 }: {
   form_id: string;
   init: {
-    section?: string;
+    custom?: string;
   };
 }) {
-  const [css, setCss] = useState(init.section);
+  const [css, setCss] = useState(init.custom);
 
   return (
     <PreferenceBox>
-      <PreferenceBoxHeader heading={<>Section Style</>} />
+      <PreferenceBoxHeader heading={<>Custom CSS</>} />
       <PreferenceBody>
         <form
           id="/private/editor/settings/page-section-style"

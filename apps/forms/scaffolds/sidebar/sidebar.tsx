@@ -1,10 +1,24 @@
 "use client";
 
 import React, { useCallback } from "react";
-import { AvatarIcon, PieChartIcon, PlusIcon } from "@radix-ui/react-icons";
+import {
+  AvatarIcon,
+  GlobeIcon,
+  PieChartIcon,
+  PlusIcon,
+  ArchiveIcon,
+  CodeIcon,
+  EnvelopeClosedIcon,
+  Link2Icon,
+  GearIcon,
+  MagicWandIcon,
+  LockClosedIcon,
+} from "@radix-ui/react-icons";
 import Link from "next/link";
 import { useEditorState } from "../editor";
 import { Table2Icon, TabletSmartphoneIcon } from "lucide-react";
+import { StripeLogo1, SupabaseLogo, TossLogo } from "@/components/logos";
+import { Badge } from "@/components/ui/badge";
 import {
   SidebarMenuGrid,
   SidebarMenuGridItem,
@@ -28,7 +42,11 @@ import { blocklabels, supported_block_types } from "@/k/supported_block_types";
 import { BlockTypeIcon } from "@/components/form-blcok-type-icon";
 import type { FormBlockType, FormInputType } from "@/types";
 
-export function Siebar({ mode }: { mode: "data" | "blocks" }) {
+export function Siebar({
+  mode,
+}: {
+  mode: "data" | "blocks" | "connect" | "settings";
+}) {
   const [state] = useEditorState();
 
   const { form_id } = state;
@@ -37,6 +55,8 @@ export function Siebar({ mode }: { mode: "data" | "blocks" }) {
       <div className="h-5" />
       {mode === "data" && <ModeData />}
       {mode === "blocks" && <ModeBlocks />}
+      {mode === "connect" && <ModeConnect />}
+      {mode === "settings" && <ModeSettings />}
     </SidebarRoot>
   );
 }
@@ -270,6 +290,211 @@ function ModeBlocks() {
             </HoverCard>
           ))}
         </SidebarMenuGrid>
+      </SidebarSection>
+    </>
+  );
+}
+
+function ModeConnect() {
+  const [state] = useEditorState();
+  const { form_id } = state;
+  return (
+    <>
+      <SidebarSection>
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>
+            <span>Share</span>
+          </SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuList>
+          <Link href={`/d/${form_id}/connect/share`}>
+            <SidebarMenuItem>
+              <Link2Icon className="inline align-middle w-4 h-4 me-2" />
+              Share
+            </SidebarMenuItem>
+          </Link>
+          {/* <Link href={`/d/${form_id}/connect/domain`}> */}
+          <SidebarMenuItem disabled>
+            <GlobeIcon className="inline align-middle w-4 h-4 me-2" />
+            Domain
+            <Badge variant="outline" className="ms-auto">
+              enterprise
+            </Badge>
+          </SidebarMenuItem>
+          {/* </Link> */}
+        </SidebarMenuList>
+      </SidebarSection>
+      <SidebarSection>
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>
+            <span>Customer</span>
+          </SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuList>
+          <Link href={`/d/${form_id}/connect/channels`}>
+            <SidebarMenuItem>
+              <EnvelopeClosedIcon className="inline align-middle w-4 h-4 me-2" />
+              Channels
+            </SidebarMenuItem>
+          </Link>
+          <Link href={`/d/${form_id}/connect/customer`}>
+            <SidebarMenuItem>
+              <AvatarIcon className="inline align-middle w-4 h-4 me-2" />
+              Customer Identity
+            </SidebarMenuItem>
+          </Link>
+        </SidebarMenuList>
+      </SidebarSection>
+      <SidebarSection>
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>
+            <span>Commerce</span>
+          </SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuList>
+          <Link href={`/d/${form_id}/connect/store`}>
+            <SidebarMenuItem>
+              <ArchiveIcon className="inline align-middle w-4 h-4 me-2" />
+              Store
+            </SidebarMenuItem>
+          </Link>
+
+          {/* <Link href={`/d/${id}/connect/pg/stripe`}> */}
+          <SidebarMenuItem disabled>
+            <StripeLogo1 className="inline align-middle w-4 h-4 me-2" />
+            Stripe
+            <Badge variant="outline" className="ms-auto">
+              soon
+            </Badge>
+          </SidebarMenuItem>
+          {/* </Link> */}
+          {/* <Link href={`/d/${id}/connect/pg/tosspayments`}> */}
+          <SidebarMenuItem disabled>
+            <TossLogo className="inline align-middle w-4 h-4 me-2" />
+            Toss
+            <Badge variant="outline" className="ms-auto">
+              enterprise
+            </Badge>
+          </SidebarMenuItem>
+          {/* </Link> */}
+        </SidebarMenuList>
+      </SidebarSection>
+      <SidebarSection>
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>
+            <span>Database</span>
+          </SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuList>
+          <Link href={`/d/${form_id}/connect/database/supabase`}>
+            <SidebarMenuItem>
+              <SupabaseLogo className="inline align-middle w-4 h-4 me-2" />
+              Supabase
+              <Badge variant="outline" className="ms-auto">
+                alpha
+              </Badge>
+            </SidebarMenuItem>
+          </Link>
+        </SidebarMenuList>
+      </SidebarSection>
+      <SidebarSection>
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>
+            <span>Developer</span>
+          </SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuList>
+          {/* <Link href={`/d/${id}/connect/parameters`}> */}
+          <SidebarMenuItem disabled>
+            <CodeIcon className="inline align-middle w-4 h-4 me-2" />
+            URL parameters
+            <Badge variant="outline" className="ms-auto">
+              soon
+            </Badge>
+          </SidebarMenuItem>
+          {/* </Link> */}
+          {/* <Link href={`/d/${id}/connect/webhooks`}> */}
+          <SidebarMenuItem disabled>
+            <CodeIcon className="inline align-middle w-4 h-4 me-2" />
+            Webhooks
+            <Badge variant="outline" className="ms-auto">
+              soon
+            </Badge>{" "}
+          </SidebarMenuItem>
+          {/* </Link> */}
+          {/* <Link href={`/d/${id}/connect/integrations`}> */}
+          <SidebarMenuItem disabled>
+            <CodeIcon className="inline align-middle w-4 h-4 me-2" />
+            Integrations
+            <Badge variant="outline" className="ms-auto">
+              soon
+            </Badge>{" "}
+          </SidebarMenuItem>
+          {/* </Link> */}
+          {/* <Link href={`/d/${form_id}/connect/import`}> */}
+          <SidebarMenuItem disabled>
+            <CodeIcon className="inline align-middle w-4 h-4 me-2" />
+            Import Data
+            <Badge variant="outline" className="ms-auto">
+              soon
+            </Badge>{" "}
+          </SidebarMenuItem>
+          {/* </Link> */}
+        </SidebarMenuList>
+      </SidebarSection>
+    </>
+  );
+}
+
+function ModeSettings() {
+  const [state] = useEditorState();
+  const { form_id } = state;
+  return (
+    <>
+      <SidebarSection>
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>
+            <span>Settings</span>
+          </SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuList>
+          <Link href={`/d/${form_id}/settings/general`}>
+            <SidebarMenuItem>
+              <GearIcon className="inline align-middle w-4 h-4 me-2" />
+              General
+            </SidebarMenuItem>
+          </Link>
+          <Link href={`/d/${form_id}/settings/customize`}>
+            <SidebarMenuItem>
+              <MagicWandIcon className="inline align-middle w-4 h-4 me-2" />
+              Customize
+            </SidebarMenuItem>
+          </Link>
+        </SidebarMenuList>
+      </SidebarSection>
+      <SidebarSection>
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>
+            <span>Developers</span>
+          </SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuList>
+          <Link href={`/d/${form_id}/settings/security`}>
+            <SidebarMenuItem>
+              <LockClosedIcon className="inline align-middle w-4 h-4 me-2" />
+              Data & Security
+            </SidebarMenuItem>
+          </Link>
+          {/* <Link href={`/d/${id}/settings/api`}> */}
+          <SidebarMenuItem disabled>
+            <CodeIcon className="inline align-middle w-4 h-4 me-2" />
+            API Keys
+            <Badge variant="outline" className="ms-auto">
+              enterprise
+            </Badge>
+          </SidebarMenuItem>
+          {/* </Link> */}
+        </SidebarMenuList>
       </SidebarSection>
     </>
   );
