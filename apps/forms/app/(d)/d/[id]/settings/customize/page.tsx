@@ -17,6 +17,7 @@ import { CustomPageBackgroundPreferences } from "@/scaffolds/settings/custom-pag
 import { EndingPageI18nOverrides, FormPage } from "@/types";
 import { EndingPagePreferences } from "@/scaffolds/settings/ending-page-preferences";
 import { CustomPagePalettePreferences } from "@/scaffolds/settings/custom-page-palette-preference";
+import { CustomPageCssPreferences } from "@/scaffolds/settings/custom-page-css-preference";
 
 export default async function FormsCustomizeSettingsPage({
   params,
@@ -142,6 +143,12 @@ export default async function FormsCustomizeSettingsPage({
               section: stylesheet?.section,
             }}
           />
+          {/* <CustomPageCssPreferences
+            form_id={form_id}
+            init={{
+              custom: stylesheet?.custom,
+            }}
+          /> */}
         </SectorBlocks>
       </Sector>
     </main>

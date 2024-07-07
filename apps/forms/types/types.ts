@@ -354,6 +354,7 @@ export type FormPageBackgroundSchema = FormPageThemeEmbeddedBackgroundData;
 export type FormStyleSheetV1Schema = {
   section?: string;
   palette?: keyof typeof palettes;
+  custom?: string;
 };
 
 interface FormPageThemeEmbeddedBackgroundData {

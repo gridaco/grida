@@ -17,8 +17,6 @@ import { useEditorState } from "../editor";
 // exclude default
 const { default: _, ...variants } = _variants;
 
-const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
-
 export function CustomPagePalettePreferences({
   form_id,
   init,
@@ -49,16 +47,14 @@ export function CustomPagePalettePreferences({
         >
           <input type="hidden" name="form_id" value={form_id} />
           <input type="hidden" name="palette" value={palette} />
-          {palette && (
-            <div className="py-4">
-              <Badge variant="outline">{palette}</Badge>
-            </div>
-          )}
+          <div className="py-4">
+            <Badge variant="outline">{palette ?? "default"}</Badge>
+          </div>
           <div className="flex flex-col gap-4">
             {Object.keys(variants).map((variant) => {
               const palettes = variants[variant as keyof typeof variants];
               return (
-                <>
+                <div key={variant} className="flex flex-col gap-2">
                   <h2 className="text-sm font-mono text-muted-foreground">
                     {variant}
                   </h2>
@@ -72,8 +68,11 @@ export function CustomPagePalettePreferences({
                           key={key}
                           data-selected={key === palette}
                           onClick={() => {
-                            setPalette(key as keyof typeof palettes);
-                            // onPresetChange?.(key);
+                            setPalette((prev) =>
+                              prev === key
+                                ? undefined
+                                : (key as keyof typeof palettes)
+                            );
                           }}
                           className={clsx(
                             "w-6 h-6 border-2 rounded-full",
@@ -86,45 +85,11 @@ export function CustomPagePalettePreferences({
                       );
                     })}
                   </div>
-                </>
+                </div>
               );
             })}
           </div>
-
-          {/* <div className="flex flex-wrap gap-1">
-            {Object.keys(palettes).map((key) => {
-              const colors = palettes[key as keyof typeof palettes];
-              const primary = colors["light"]["--primary"];
-              return (
-                <button
-                  type="button"
-                  key={key}
-                  data-selected={key === palette}
-                  onClick={() => {
-                    setPalette(key as keyof typeof palettes);
-                    // onPresetChange?.(key);
-                  }}
-                  className={clsx(
-                    "w-6 h-6 border-2 rounded-full",
-                    "data-[selected='true']:outline data-[selected='true']:outline-foreground data-[selected='true']:border-background"
-                  )}
-                  style={{
-                    backgroundColor: `hsl(${primary.h}, ${primary.s}%, ${primary.l}%)`,
-                  }}
-                />
-              );
-            })}
-          </div> */}
         </form>
-        {/* {palette && (
-          <div className="mt-4 flex items-center justify-center select-none">
-            <PlaygroundPreview
-              schema={"{}" || ""}
-              css={("" || "") + "\n" + ("" || "")}
-              // dark={}
-            />
-          </div>
-        )} */}
       </PreferenceBody>
       <PreferenceBoxFooter>
         <Button form="/private/editor/settings/page-palette" type="submit">

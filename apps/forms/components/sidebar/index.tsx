@@ -45,21 +45,26 @@ export function SidebarMenuItem({
   muted,
   selected,
   className,
+  disabled,
   children,
 }: React.PropsWithChildren<{
   level?: number;
   muted?: boolean;
   selected?: boolean;
   className?: string;
+  disabled?: boolean;
 }>) {
   return (
-    <div
+    <button
       data-level={level}
       data-muted={muted}
+      disabled={disabled}
       className={cn(
+        "flex items-center",
         "relative group",
         "w-full px-2 py-1 rounded hover:bg-accent text-sm font-medium text-foreground data-[muted='true']:text-muted-foreground",
         "text-ellipsis whitespace-nowrap overflow-hidden",
+        "disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-background",
         className
       )}
       style={{
@@ -67,7 +72,7 @@ export function SidebarMenuItem({
       }}
     >
       {children}
-    </div>
+    </button>
   );
 }
 
