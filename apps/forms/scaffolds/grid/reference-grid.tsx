@@ -4,12 +4,14 @@ import React from "react";
 import DataGrid, { Column, RenderCellProps } from "react-data-grid";
 import { XSupabaseReferenceTableRow } from "./types";
 import { EmptyRowsRenderer } from "./empty";
+import Highlight from "@/components/highlight";
 import "./grid.css";
 
 export function ReferenceTableGrid({
   columns: _columns,
   rows: _rows,
   rowKey,
+  tokens,
   onSelected,
 }: {
   columns: {
@@ -19,6 +21,7 @@ export function ReferenceTableGrid({
   }[];
   rows: XSupabaseReferenceTableRow[];
   rowKey?: string;
+  tokens?: string[];
   onSelected?: (key: string, row: XSupabaseReferenceTableRow) => void;
 }) {
   const columns = _columns.map(
@@ -31,6 +34,17 @@ export function ReferenceTableGrid({
         editable: false,
         // frozen: col.key === rowKey,
         width: undefined,
+        renderCell: ({ row, column }: RenderCellProps<any>) => {
+          const val = row[col.key as keyof XSupabaseReferenceTableRow];
+
+          return (
+            <Highlight
+              text={val.toString()}
+              tokens={tokens}
+              className="bg-foreground text-background"
+            />
+          );
+        },
         maxWidth: 300,
       }) as Column<any>
   );

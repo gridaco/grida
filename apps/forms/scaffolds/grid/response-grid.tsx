@@ -476,6 +476,7 @@ function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
             <Highlight
               text={unwrapped?.toString()}
               tokens={datagrid_filter.localsearch}
+              className="bg-foreground text-background"
             />
           </span>
         </div>
@@ -493,7 +494,11 @@ function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
                 className="inline w-4 h-4 align-middle me-2"
               />
               <span>
-                <Highlight text={f.name} tokens={datagrid_filter.localsearch} />
+                <Highlight
+                  text={f.name}
+                  tokens={datagrid_filter.localsearch}
+                  className="bg-foreground text-background"
+                />
               </span>
             </span>
           ))}
