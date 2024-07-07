@@ -55,16 +55,16 @@ export function SidebarMenuItem({
   disabled?: boolean;
 }>) {
   return (
-    <button
+    <div
       data-level={level}
       data-muted={muted}
-      disabled={disabled}
+      data-disabled={disabled}
       className={cn(
         "flex items-center",
         "relative group",
         "w-full px-2 py-1 rounded hover:bg-accent text-sm font-medium text-foreground data-[muted='true']:text-muted-foreground",
         "text-ellipsis whitespace-nowrap overflow-hidden",
-        "disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-background",
+        "data-[disabled='true']:cursor-not-allowed data-[disabled='true']:opacity-50 data-[disabled='true']:bg-background",
         className
       )}
       style={{
@@ -72,7 +72,7 @@ export function SidebarMenuItem({
       }}
     >
       {children}
-    </button>
+    </div>
   );
 }
 
