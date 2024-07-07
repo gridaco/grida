@@ -74,7 +74,7 @@ export default async function Layout({
     .single();
 
   if (!data) {
-    console.error(id, error);
+    console.error("editorinit", id, error);
     return notFound();
   }
 
