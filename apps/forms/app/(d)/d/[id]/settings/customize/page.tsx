@@ -19,6 +19,8 @@ import { EndingPagePreferences } from "@/scaffolds/settings/ending-page-preferen
 import { CustomPagePalettePreferences } from "@/scaffolds/settings/custom-page-palette-preference";
 import { CustomPageCssPreferences } from "@/scaffolds/settings/custom-page-css-preference";
 import { CustomPageFontFamilyPreferences } from "@/scaffolds/settings/custom-page-font-family-preference";
+import Link from "next/link";
+import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
 
 export default async function FormsCustomizeSettingsPage({
   params,
@@ -150,12 +152,29 @@ export default async function FormsCustomizeSettingsPage({
               section: stylesheet?.section,
             }}
           />
-          {/* <CustomPageCssPreferences
+        </SectorBlocks>
+      </Sector>
+      <Sector>
+        <SectorHeader>
+          <SectorHeading>Advanced</SectorHeading>
+          <SectorDescription>
+            Customize Page CSS (only available through built-in pages).
+            <br />
+            You can Use{" "}
+            <Link className="underline" href="/playground" target="_blank">
+              Playground
+              <OpenInNewWindowIcon className="w-4 h-4 inline align-middle ms-1" />
+            </Link>{" "}
+            to test your CSS
+          </SectorDescription>
+        </SectorHeader>
+        <SectorBlocks>
+          <CustomPageCssPreferences
             form_id={form_id}
             init={{
               custom: stylesheet?.custom,
             }}
-          /> */}
+          />
         </SectorBlocks>
       </Sector>
     </main>
