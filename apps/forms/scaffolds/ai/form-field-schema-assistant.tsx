@@ -70,9 +70,7 @@ export function FormFieldAssistant({
     <div className="w-full border dark:border-neutral-700 rounded-lg p-4 shadow-sm bg-white dark:bg-black">
       <div className="flex items-center mb-4">
         <LightningBoltIcon className="w-4 h-4 mr-2" />
-        <span className="font-semibold text-neutral-800 dark:text-neutral-200">
-          Ask AI
-        </span>
+        <span className="font-semibold">Ask AI</span>
       </div>
       <div className="grid gap-3">
         <Textarea
