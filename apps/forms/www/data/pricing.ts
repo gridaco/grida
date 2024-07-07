@@ -301,9 +301,19 @@ export const pricing: Pricing = {
         title: "Custom Domain",
         plans: {
           free: false,
-          pro: "$9 / domain / mo",
-          team: "$9 / domain / mo",
-          enterprise: "$9 / domain / mo",
+          pro: "$10 / domain / mo",
+          team: "$10 / domain / mo",
+          enterprise: "$10 / domain / mo, + $0.5 per 100,000 views",
+        },
+        usage_based: false,
+      },
+      {
+        title: "Concurrent Users",
+        plans: {
+          free: "Up to 50 concurrencies",
+          pro: "Up to 100 concurrencies",
+          team: "Up to 250 concurrencies",
+          enterprise: "$100 / 500 concurrencies",
         },
         usage_based: false,
       },
