@@ -10,6 +10,8 @@ import {
   CodeIcon,
   EnvelopeClosedIcon,
   Link2Icon,
+  GearIcon,
+  MagicWandIcon,
 } from "@radix-ui/react-icons";
 import Link from "next/link";
 import { useEditorState } from "../editor";
@@ -44,7 +46,11 @@ import { blocklabels, supported_block_types } from "@/k/supported_block_types";
 import { BlockTypeIcon } from "@/components/form-blcok-type-icon";
 import type { FormBlockType, FormInputType } from "@/types";
 
-export function Siebar({ mode }: { mode: "data" | "blocks" | "connect" }) {
+export function Siebar({
+  mode,
+}: {
+  mode: "data" | "blocks" | "connect" | "settings";
+}) {
   const [state] = useEditorState();
 
   const { form_id } = state;
@@ -54,6 +60,7 @@ export function Siebar({ mode }: { mode: "data" | "blocks" | "connect" }) {
       {mode === "data" && <ModeData />}
       {mode === "blocks" && <ModeBlocks />}
       {mode === "connect" && <ModeConnect />}
+      {mode === "settings" && <ModeSettings />}
     </SidebarRoot>
   );
 }
@@ -435,6 +442,45 @@ function ModeConnect() {
             <Badge variant="outline" className="ms-auto">
               soon
             </Badge>{" "}
+          </SidebarMenuItem>
+          {/* </Link> */}
+        </SidebarMenuList>
+      </SidebarSection>
+    </>
+  );
+}
+
+function ModeSettings() {
+  const [state] = useEditorState();
+  const { form_id } = state;
+  return (
+    <>
+      <SidebarSection>
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>
+            <span>Settings</span>
+          </SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuList>
+          <Link href={`/d/${form_id}/settings/general`}>
+            <SidebarMenuItem>
+              <GearIcon className="inline align-middle w-4 h-4 me-2" />
+              General
+            </SidebarMenuItem>
+          </Link>
+          <Link href={`/d/${form_id}/settings/customize`}>
+            <SidebarMenuItem>
+              <MagicWandIcon className="inline align-middle w-4 h-4 me-2" />
+              Customize
+            </SidebarMenuItem>
+          </Link>
+          {/* <Link href={`/d/${id}/settings/api`}> */}
+          <SidebarMenuItem disabled>
+            <CodeIcon className="inline align-middle w-4 h-4 me-2" />
+            API Keys
+            <Badge variant="outline" className="ms-auto">
+              soon
+            </Badge>
           </SidebarMenuItem>
           {/* </Link> */}
         </SidebarMenuList>
