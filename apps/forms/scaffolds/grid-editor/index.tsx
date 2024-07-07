@@ -308,9 +308,7 @@ function DataGridLocalSearch() {
           onChange={(e) => onSearchChange(e.target.value)}
         />
       </TooltipTrigger>
-      <TooltipContent>
-          Local search - Search within loaded data
-      </TooltipContent>
+      <TooltipContent>Local search - Search within loaded data</TooltipContent>
     </Tooltip>
   );
 }
