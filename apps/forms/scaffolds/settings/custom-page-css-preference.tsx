@@ -7,15 +7,10 @@ import {
   PreferenceBoxFooter,
   PreferenceBoxHeader,
 } from "@/components/preferences";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { section_style_glass_morphism } from "@/theme/section/css";
 import { Button } from "@/components/ui/button";
+import { Editor, useMonaco } from "@monaco-editor/react";
+import { useMonacoTheme } from "@/components/monaco";
+import { useTheme } from "next-themes";
 
 export function CustomPageCssPreferences({
   form_id,
@@ -28,45 +23,47 @@ export function CustomPageCssPreferences({
 }) {
   const [css, setCss] = useState(init.custom);
 
+  const monaco = useMonaco();
+  const { resolvedTheme } = useTheme();
+  useMonacoTheme(monaco, resolvedTheme ?? "light");
+
   return (
     <PreferenceBox>
       <PreferenceBoxHeader heading={<>Custom CSS</>} />
       <PreferenceBody>
         <form
-          id="/private/editor/settings/page-section-style"
-          action="/private/editor/settings/page-section-style"
+          id="/private/editor/settings/page-custom-css"
+          action="/private/editor/settings/page-custom-css"
           method="POST"
         >
           <input type="hidden" name="form_id" value={form_id} />
-          <Select
-            name="css"
-            value={css}
-            onValueChange={(value) => setCss(value)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select Section Style" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={""}>None</SelectItem>
-              <SelectItem value={section_style_glass_morphism}>
-                Glass Morphism
-              </SelectItem>
-            </SelectContent>
-          </Select>
+          <input type="hidden" name="css" value={css} />
+          <Editor
+            onChange={setCss}
+            width="100%"
+            height={500}
+            defaultLanguage="css"
+            defaultValue={css}
+            options={{
+              // top padding
+              padding: {
+                top: 10,
+              },
+              tabSize: 2,
+              fontSize: 13,
+              minimap: {
+                enabled: false,
+              },
+              glyphMargin: false,
+              folding: false,
+              scrollBeyondLastLine: false,
+              wordWrap: "on",
+            }}
+          />
         </form>
-        {css && (
-          <div className="mt-4 flex items-center justify-center select-none">
-            <section className={css}>
-              <p>This is a sample section with the selected style.</p>
-            </section>
-          </div>
-        )}
       </PreferenceBody>
       <PreferenceBoxFooter>
-        <Button
-          form="/private/editor/settings/page-section-style"
-          type="submit"
-        >
+        <Button form="/private/editor/settings/page-custom-css" type="submit">
           Save
         </Button>
       </PreferenceBoxFooter>

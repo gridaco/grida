@@ -76,7 +76,8 @@ export function CustomPageBackgroundPreferences({
             <iframe
               key={src}
               src={src}
-              allowTransparency
+              // @ts-ignore
+              allowtransparency="true"
               className="w-full h-96 rounded-md overflow-hidden"
               style={{ border: 0 }}
             />
