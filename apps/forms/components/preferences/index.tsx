@@ -1,3 +1,4 @@
+import { cn } from "@/utils";
 import clsx from "clsx";
 
 export const cls_input =
@@ -106,8 +107,16 @@ export function SectorHeader({ children }: React.PropsWithChildren<{}>) {
   return <header className="flex flex-col gap-1 mb-4">{children}</header>;
 }
 
-export function SectorHeading({ children }: React.PropsWithChildren<{}>) {
-  return <h1 className="text-xl font-medium py-2">{children}</h1>;
+export function SectorHeading({
+  className,
+  children,
+  ...props
+}: React.PropsWithChildren<React.HTMLAttributes<HTMLHeadingElement>>) {
+  return (
+    <h1 {...props} className={cn("text-xl font-medium py-2", className)}>
+      {children}
+    </h1>
+  );
 }
 
 export function SectorDescription({ children }: React.PropsWithChildren<{}>) {
