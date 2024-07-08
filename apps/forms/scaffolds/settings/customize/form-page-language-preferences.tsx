@@ -46,8 +46,8 @@ export function FormPageLanguagePreferences({
       />
       <PreferenceBody>
         <form
-          id="/private/editor/settings/default-language"
-          action="/private/editor/settings/default-language"
+          id="/private/editor/customize/default-language"
+          action="/private/editor/customize/default-language"
           method="POST"
         >
           <input type="hidden" name="form_id" value={form_id} />
@@ -84,7 +84,7 @@ export function FormPageLanguagePreferences({
         </form>
       </PreferenceBody>
       <PreferenceBoxFooter>
-        <Button form="/private/editor/settings/default-language" type="submit">
+        <Button form="/private/editor/customize/default-language" type="submit">
           Save
         </Button>
       </PreferenceBoxFooter>

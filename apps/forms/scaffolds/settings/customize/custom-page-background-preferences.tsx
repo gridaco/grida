@@ -87,8 +87,8 @@ export function CustomPageBackgroundPreferences({
       <PreferenceBoxHeader heading={<>Dynamic Backgrounds</>} />
       <PreferenceBody>
         <form
-          id="/private/editor/settings/page-background"
-          action="/private/editor/settings/page-background"
+          id="/private/editor/customize/page-background"
+          action="/private/editor/customize/page-background"
           method="POST"
         >
           <input type="hidden" name="form_id" value={form_id} />
@@ -123,7 +123,7 @@ export function CustomPageBackgroundPreferences({
         )}
       </PreferenceBody>
       <PreferenceBoxFooter>
-        <Button form="/private/editor/settings/page-background" type="submit">
+        <Button form="/private/editor/customize/page-background" type="submit">
           Save
         </Button>
       </PreferenceBoxFooter>

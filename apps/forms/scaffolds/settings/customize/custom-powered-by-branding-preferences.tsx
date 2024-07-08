@@ -28,8 +28,8 @@ export function CustomPoweredByBrandingPreferences({
       <PreferenceBoxHeader heading={<>{`"Powered by Grida" Branding`}</>} />
       <PreferenceBody>
         <form
-          id="/private/editor/settings/powered-by-branding"
-          action="/private/editor/settings/powered-by-branding"
+          id="/private/editor/customize/powered-by-branding"
+          action="/private/editor/customize/powered-by-branding"
           method="POST"
         >
           <input type="hidden" name="form_id" value={form_id} />
@@ -46,14 +46,14 @@ export function CustomPoweredByBrandingPreferences({
           </div>
         </form>
         {enabled && (
-          <div className="mt-10 flex items-center justify-center select-none p-2 bg-neutral-500/10">
+          <div className="mt-10 flex items-center justify-center select-none p-4 border rounded-sm">
             <PoweredByGridaWaterMark />
           </div>
         )}
       </PreferenceBody>
       <PreferenceBoxFooter>
         <Button
-          form="/private/editor/settings/powered-by-branding"
+          form="/private/editor/customize/powered-by-branding"
           type="submit"
         >
           Save

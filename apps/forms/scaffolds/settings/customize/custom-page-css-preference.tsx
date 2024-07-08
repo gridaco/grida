@@ -32,8 +32,8 @@ export function CustomPageCssPreferences({
       <PreferenceBoxHeader heading={<>Custom CSS</>} />
       <PreferenceBody>
         <form
-          id="/private/editor/settings/page-custom-css"
-          action="/private/editor/settings/page-custom-css"
+          id="/private/editor/customize/page-custom-css"
+          action="/private/editor/customize/page-custom-css"
           method="POST"
         >
           <input type="hidden" name="form_id" value={form_id} />
@@ -64,7 +64,7 @@ export function CustomPageCssPreferences({
         </form>
       </PreferenceBody>
       <PreferenceBoxFooter>
-        <Button form="/private/editor/settings/page-custom-css" type="submit">
+        <Button form="/private/editor/customize/page-custom-css" type="submit">
           Save
         </Button>
       </PreferenceBoxFooter>

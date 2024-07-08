@@ -89,8 +89,8 @@ export function EndingPagePreferences({
       <PreferenceBoxHeader heading={<>Ending Page Template</>} />
       <PreferenceBody>
         <form
-          id="/private/editor/settings/ending-page"
-          action="/private/editor/settings/ending-page"
+          id="/private/editor/customize/ending-page"
+          action="/private/editor/customize/ending-page"
           method="POST"
         >
           <input type="hidden" name="form_id" value={form_id} />
@@ -169,7 +169,7 @@ export function EndingPagePreferences({
           Customize
         </Button>
         {!overrides && (
-          <Button form="/private/editor/settings/ending-page" type="submit">
+          <Button form="/private/editor/customize/ending-page" type="submit">
             Save
           </Button>
         )}

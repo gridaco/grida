@@ -39,8 +39,8 @@ export function CustomPageFontFamilyPreferences({
       <PreferenceBoxHeader heading={<>Type Style</>} />
       <PreferenceBody>
         <form
-          id="/private/editor/settings/page-font-family"
-          action="/private/editor/settings/page-font-family"
+          id="/private/editor/customize/page-font-family"
+          action="/private/editor/customize/page-font-family"
           method="POST"
         >
           <input type="hidden" name="form_id" value={form_id} />
@@ -94,7 +94,7 @@ export function CustomPageFontFamilyPreferences({
         </div>
       </PreferenceBody>
       <PreferenceBoxFooter>
-        <Button form="/private/editor/settings/page-font-family" type="submit">
+        <Button form="/private/editor/customize/page-font-family" type="submit">
           Save
         </Button>
       </PreferenceBoxFooter>

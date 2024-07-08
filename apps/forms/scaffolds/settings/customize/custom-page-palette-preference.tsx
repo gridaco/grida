@@ -41,8 +41,8 @@ export function CustomPagePalettePreferences({
       <PreferenceBoxHeader heading={<>Color Palette</>} />
       <PreferenceBody>
         <form
-          id="/private/editor/settings/page-palette"
-          action="/private/editor/settings/page-palette"
+          id="/private/editor/customize/page-palette"
+          action="/private/editor/customize/page-palette"
           method="POST"
         >
           <input type="hidden" name="form_id" value={form_id} />
@@ -92,7 +92,7 @@ export function CustomPagePalettePreferences({
         </form>
       </PreferenceBody>
       <PreferenceBoxFooter>
-        <Button form="/private/editor/settings/page-palette" type="submit">
+        <Button form="/private/editor/customize/page-palette" type="submit">
           Save
         </Button>
       </PreferenceBoxFooter>
