@@ -2,18 +2,7 @@
 
 import React, { useCallback } from "react";
 import { useEditorState } from "../editor";
-import {
-  CodeIcon,
-  DividerHorizontalIcon,
-  HeadingIcon,
-  ImageIcon,
-  PlusCircledIcon,
-  PlusIcon,
-  ReaderIcon,
-  SectionIcon,
-  VideoIcon,
-} from "@radix-ui/react-icons";
-import { FormBlockType } from "@/types";
+import { PlusIcon } from "@radix-ui/react-icons";
 import { Button } from "@/components/ui/button";
 import {
   Command,
@@ -28,6 +17,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import type { FormBlockType } from "@/types";
+import { BlockTypeIcon } from "@/components/form-blcok-type-icon";
 
 export function NewBlockButton() {
   const [state, dispatch] = useEditorState();
@@ -79,35 +70,35 @@ export function NewBlockButton() {
             <CommandEmpty>No results.</CommandEmpty>
             <CommandGroup>
               <Item onSelect={addFieldBlock} value="field" key="field">
-                <PlusCircledIcon className="me-2 align-middle" />
+                <BlockTypeIcon type="field" className="me-2 align-middle" />
                 Field
               </Item>
               <Item onSelect={addImageBlock} value="image" key="image">
-                <ImageIcon className="me-2 align-middle" />
+                <BlockTypeIcon type="image" className="me-2 align-middle" />
                 Image
               </Item>
               <Item onSelect={addVideoBlock} value="video" key="video">
-                <VideoIcon className="me-2 align-middle" />
+                <BlockTypeIcon type="video" className="me-2 align-middle" />
                 Video
               </Item>
               <Item onSelect={addHtmlBlock} value="html" key="html">
-                <CodeIcon className="me-2 align-middle" />
+                <BlockTypeIcon type="html" className="me-2 align-middle" />
                 HTML
               </Item>
               <Item onSelect={addPdfBlock} value="pdf" key="pdf">
-                <ReaderIcon className="me-2 align-middle" />
+                <BlockTypeIcon type="pdf" className="me-2 align-middle" />
                 Pdf
               </Item>
               <Item onSelect={addDividerBlock} value="divider" key="divider">
-                <DividerHorizontalIcon className="me-2 align-middle" />
+                <BlockTypeIcon type="divider" className="me-2 align-middle" />
                 Divider
               </Item>
               <Item onSelect={addSectionBlock} value="section" key="section">
-                <SectionIcon className="me-2 align-middle" />
+                <BlockTypeIcon type="section" className="me-2 align-middle" />
                 Section
               </Item>
               <Item onSelect={addHeaderBlock} value="header" key="header">
-                <HeadingIcon className="me-2 align-middle" />
+                <BlockTypeIcon type="header" className="me-2 align-middle" />
                 Header
               </Item>
             </CommandGroup>

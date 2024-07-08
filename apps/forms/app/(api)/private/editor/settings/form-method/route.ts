@@ -2,30 +2,24 @@ import { createRouteHandlerClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
-import type { FormMethod } from "@/types";
-
-export const revalidate = 0;
+import type {
+  EditorApiResponseOk,
+  UpdateFormMethodRequest,
+} from "@/types/private/api";
+import assert from "assert";
 
 export async function POST(req: NextRequest) {
-  const origin = req.nextUrl.origin;
-  const formdata = await req.formData();
+  const data: UpdateFormMethodRequest = await req.json();
 
   const cookieStore = cookies();
 
-  const form_id = String(formdata.get("form_id"));
+  const { form_id, method } = data;
 
-  const __raw_method = formdata.get("method");
-  const method = __raw_method
-    ? (String(__raw_method) as FormMethod)
-    : undefined;
-
-  if (!form_id) {
-    return notFound();
-  }
+  assert(form_id, "form_id is required");
 
   const supabase = createRouteHandlerClient(cookieStore);
 
-  await supabase
+  const { error } = await supabase
     .from("form")
     .update({
       method: method,
@@ -33,8 +27,13 @@ export async function POST(req: NextRequest) {
     .eq("id", form_id)
     .single();
 
-  // redirect to the page requested
-  return NextResponse.redirect(origin + `/d/${form_id}/settings/general`, {
-    status: 301,
-  });
+  if (error) {
+    console.error(error);
+    return notFound();
+  }
+
+  return NextResponse.json({
+    data: null,
+    error: null,
+  } satisfies EditorApiResponseOk);
 }

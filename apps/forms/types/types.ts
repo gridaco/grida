@@ -1,5 +1,6 @@
 import { IpInfo } from "@/lib/ipinfo";
 import type { JSONBooleanValueDescriptor } from "./logic";
+import palettes from "@/theme/palettes";
 
 type UUID = string;
 
@@ -218,7 +219,7 @@ export interface FormPage {
   name: string;
   blocks: FormBlock[];
   background?: FormPageBackgroundSchema;
-  stylesheet?: any;
+  stylesheet?: FormStyleSheetV1Schema;
 }
 
 export interface IFormBlock<T = FormBlockType> {
@@ -350,6 +351,13 @@ export interface PaymentFieldData {
 
 export type FormPageBackgroundSchema = FormPageThemeEmbeddedBackgroundData;
 
+export type FormStyleSheetV1Schema = {
+  section?: string;
+  "font-family"?: "inter" | "lora" | "inconsolata";
+  palette?: keyof typeof palettes;
+  custom?: string;
+};
+
 interface FormPageThemeEmbeddedBackgroundData {
   type: "background";
   element: "iframe" | "img" | "div";
@@ -391,6 +399,9 @@ export interface Organization {
   avatar_path: string | null;
   created_at: string;
   email: string | null;
+  blog: string | null;
+  description: string | null;
+  display_name: string;
   id: number;
   name: string;
   owner_id: string;

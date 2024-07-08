@@ -20,6 +20,7 @@ import type {
   FormClientFetchResponseError,
 } from "@/app/(api)/v1/[id]/route";
 import { FormPageBackground } from "./background";
+import { PaletteProvider } from "@/scaffolds/agent/theme";
 
 const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
 
@@ -184,6 +185,7 @@ export function Form({
         stylesheet={stylesheet}
         afterSubmit={onAfterSubmit}
       />
+      {stylesheet?.palette && <PaletteProvider palette={stylesheet.palette} />}
       {background && (
         <FormPageBackground {...(background as FormPageBackgroundSchema)} />
       )}

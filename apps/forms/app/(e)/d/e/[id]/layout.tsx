@@ -2,15 +2,22 @@ import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { client, createServerComponentClient } from "@/lib/supabase/server";
 import { Metadata } from "next";
-import { Inter } from "next/font/google";
-import i18next from "i18next";
-import resources from "@/i18n";
+import { Inconsolata, Inter, Lora } from "next/font/google";
 import { FormPage } from "@/types";
 import { ThemeProvider } from "@/components/theme-provider";
+import Head from "next/head";
 
 export const revalidate = 0;
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin"], display: "swap" });
+const lora = Lora({ subsets: ["latin"], display: "swap" });
+const inconsolata = Inconsolata({ subsets: ["latin"], display: "swap" });
+
+const fonts = {
+  inter,
+  lora,
+  inconsolata,
+};
 
 const IS_PRODUTION = process.env.NODE_ENV === "production";
 
@@ -58,7 +65,10 @@ export default async function Layout({
     .from("form")
     .select(
       `
-        default_form_page_language
+        default_form_page_language,
+        default_form_page:form_page!default_form_page_id(
+          stylesheet
+        )
       `
     )
     .eq("id", id)
@@ -68,11 +78,29 @@ export default async function Layout({
     return notFound();
   }
 
-  const { default_form_page_language } = data;
+  const { default_form_page_language, default_form_page: default_form_pages } =
+    data;
+
+  // this is safe to cast this way - typegen has a bug
+  const default_form_page = default_form_pages as unknown as FormPage;
+  const { stylesheet } = default_form_page;
+
+  const font =
+    fonts[stylesheet?.["font-family"] as keyof typeof fonts] || fonts.inter;
+
+  const customcss = stylesheet?.custom;
 
   return (
     <html lang={default_form_page_language} suppressHydrationWarning>
-      <body className={inter.className}>
+      <body className={font.className}>
+        <style
+          id="customcss"
+          dangerouslySetInnerHTML={{
+            __html: `
+              ${customcss}
+            `,
+          }}
+        />
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

@@ -1,10 +1,10 @@
-import {
+import type {
   FormBlockType,
   FormFieldDefinition,
-  FormFieldInit,
+  FormInputType,
   FormResponse,
-  FormResponseField,
   FormResponseWithFields,
+  FormStyleSheetV1Schema,
   GridaSupabase,
 } from "@/types";
 import type { EditorFlatFormBlock, FormEditorState } from "./state";
@@ -46,12 +46,21 @@ export type BlocksEditorAction =
   | DataTableRefreshAction
   | DataTableLoadingAction
   | DataGridCellChangeAction
-  | FeedXSupabaseMainTableRowsAction;
+  | FeedXSupabaseMainTableRowsAction
+  | EditorThemePaletteAction;
 
-export interface CreateNewPendingBlockAction {
-  type: "blocks/new";
-  block: FormBlockType;
-}
+export type CreateNewPendingBlockAction =
+  | {
+      type: "blocks/new";
+      block: FormBlockType;
+    }
+  | {
+      type: "blocks/new";
+      block: "field";
+      init: {
+        type: FormInputType;
+      };
+    };
 
 export interface ResolvePendingBlockAction {
   type: "blocks/resolve";
@@ -243,4 +252,9 @@ export interface DataGridCellChangeAction {
 export interface FeedXSupabaseMainTableRowsAction {
   type: "editor/x-supabase/main-table/feed";
   data: GridaSupabase.XDataRow[];
+}
+
+export interface EditorThemePaletteAction {
+  type: "editor/theme/palette";
+  palette?: FormStyleSheetV1Schema["palette"];
 }

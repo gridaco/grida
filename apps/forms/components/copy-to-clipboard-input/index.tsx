@@ -25,7 +25,7 @@ export function CopyToClipboardInput({ value }: { value: string }) {
         readOnly
       />
       <Button
-        variant="secondary"
+        variant="outline"
         size="icon"
         onClick={onCopyClick}
         data-copy-to-clipboard-target="npm-install-copy-text"

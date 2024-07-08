@@ -52,6 +52,7 @@ import {
   FieldSupports,
   supported_field_autocomplete_types,
   supported_field_types,
+  fieldlabels,
 } from "@/k/supported_field_types";
 import {
   payments_service_providers,
@@ -199,7 +200,7 @@ export function TypeSelect({
                   />
                   <div className="flex items-center gap-2">
                     <FormFieldTypeIcon type={t} className="w-4 h-4" />
-                    <span className="capitalize">{t}</span>
+                    <span className="capitalize">{fieldlabels[t]}</span>
                   </div>
                 </CommandItem>
               ))}
@@ -247,6 +248,20 @@ export function FieldEditPanel({
   const [step, setStep] = useState<number | undefined>(init?.step);
   const [min, setMin] = useState<number | undefined>(init?.min);
   const [max, setMax] = useState<number | undefined>(init?.max);
+
+  useEffect(() => {
+    setType(init?.type || "text");
+    setName(init?.name || "");
+    setLabel(init?.label || "");
+    setPlaceholder(init?.placeholder || "");
+    setHelpText(init?.help_text || "");
+    setRequired(init?.required || false);
+    setReadonly(init?.readonly || false);
+    setPattern(init?.pattern);
+    setStep(init?.step);
+    setMin(init?.min);
+    setMax(init?.max);
+  }, [init]);
 
   // options
   const [options, setOptions] = useState<Option[]>(

@@ -20,6 +20,10 @@ import {
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
 import { InfoCircledIcon } from "@radix-ui/react-icons";
+import { useForm, Controller } from "react-hook-form";
+import toast from "react-hot-toast";
+import { PrivateEditorApi } from "@/lib/private";
+import { Spinner } from "@/components/spinner";
 
 export function RestrictNumberOfResponseByCustomer({
   form_id,
@@ -31,84 +35,77 @@ export function RestrictNumberOfResponseByCustomer({
     max_form_responses_by_customer?: number | null;
   };
 }) {
-  const [enabled, setEnabled] = useState(
-    init.is_max_form_responses_by_customer_enabled
-  );
-  const [n, setN] = useState(init.max_form_responses_by_customer || 1);
+  const {
+    handleSubmit,
+    control,
+    formState: { isSubmitting, isDirty },
+    reset,
+    watch,
+  } = useForm({
+    defaultValues: {
+      enabled: init.is_max_form_responses_by_customer_enabled,
+      max: init.max_form_responses_by_customer || 1,
+    },
+  });
+
+  const onSubmit = async (data: { enabled: boolean; max: number }) => {
+    const req =
+      PrivateEditorApi.Settings.updateFormAccessMaxResponsesByCustomer({
+        form_id,
+        ...data,
+      });
+
+    try {
+      await toast.promise(req, {
+        loading: "Saving...",
+        success: "Saved",
+        error: "Failed",
+      });
+      reset(data); // Reset form state to the new values after successful submission
+    } catch (error) {}
+  };
+
+  const enabled = watch("enabled");
+  const n = watch("max");
 
   return (
     <PreferenceBox>
       <PreferenceBoxHeader
         heading={<>Limit number of responses by customer</>}
-        description={
-          <>
-            Make sure you have{" "}
-            <Link href={`/d/${form_id}/connect/customer`}>
-              <u>customer identity</u>
-            </Link>{" "}
-            configured or login page enabled.
-            <br />
-            Otherwise this feature may not work as intended.{" "}
-            <HoverCard>
-              <HoverCardTrigger>
-                <u>
-                  <InfoCircledIcon className="inline me-0.5 align-middle" />
-                  Lean more
-                </u>
-              </HoverCardTrigger>
-              <HoverCardContent>
-                <article className="prose prose-sm dark:prose-invert">
-                  Fingerprint generation for some platform/environment may
-                  confict customer identity, thus this feature may not work as
-                  intended.
-                  <br />
-                  <br />
-                  <strong>Vunarable platforms:</strong>
-                  <ul>
-                    <li>
-                      <a href="https://fingerprint.com/blog/ios15-icloud-private-relay-vulnerability/">
-                        iOS 15+ with iCloud Private Relay
-                      </a>
-                    </li>
-                    <li>iOS / Android Webviews</li>
-                  </ul>
-                  Please note that setting up customer identity or having a
-                  login page will resolve this issue.
-                </article>
-              </HoverCardContent>
-            </HoverCard>
-            <br />
-          </>
-        }
+        description={<MaxResponsesByCustomerHelpWarning form_id={form_id} />}
       />
       <PreferenceBody>
-        <form
-          id="/private/editor/settings/max-responses-by-customer"
-          action="/private/editor/settings/max-responses-by-customer"
-          method="POST"
-        >
+        <form id="max-responses-by-customer" onSubmit={handleSubmit(onSubmit)}>
           <input type="hidden" name="form_id" value={form_id} />
           <div className="flex flex-col gap-2">
             <div className="flex items-center space-x-2">
-              <Switch
-                id="is_max_form_responses_by_customer_enabled"
-                name="is_max_form_responses_by_customer_enabled"
-                checked={enabled}
-                onCheckedChange={setEnabled}
+              <Controller
+                name="enabled"
+                control={control}
+                render={({ field }) => (
+                  <Switch
+                    id="max-responses-by-customer-enabled"
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                )}
               />
-              <Label htmlFor="is_max_form_responses_by_customer_enabled">
+              <Label htmlFor="max-responses-by-customer-enabled">
                 {enabled ? "Enabled" : "Disabled"}
               </Label>
             </div>
             <div className={clsx(!enabled && "hidden")}>
-              <Input
-                name="max_form_responses_by_customer"
-                type="number"
-                min={1}
-                value={n}
-                onChange={(e) => {
-                  setN(parseInt(e.target.value));
-                }}
+              <Controller
+                name="max"
+                control={control}
+                render={({ field }) => (
+                  <Input
+                    type="number"
+                    min={1}
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                )}
               />
             </div>
             {enabled && n ? (
@@ -126,13 +123,56 @@ export function RestrictNumberOfResponseByCustomer({
       </PreferenceBody>
       <PreferenceBoxFooter>
         <Button
-          form="/private/editor/settings/max-responses-by-customer"
+          form="max-responses-by-customer"
           type="submit"
+          disabled={isSubmitting || !isDirty}
         >
-          Save
+          {isSubmitting ? <Spinner /> : "Save"}
         </Button>
       </PreferenceBoxFooter>
     </PreferenceBox>
+  );
+}
+
+function MaxResponsesByCustomerHelpWarning({ form_id }: { form_id: string }) {
+  return (
+    <>
+      Make sure you have{" "}
+      <Link href={`/d/${form_id}/connect/customer`}>
+        <u>customer identity</u>
+      </Link>{" "}
+      configured or login page enabled.
+      <br />
+      Otherwise this feature may not work as intended.{" "}
+      <HoverCard>
+        <HoverCardTrigger>
+          <u>
+            <InfoCircledIcon className="inline me-0.5 align-middle" />
+            Lean more
+          </u>
+        </HoverCardTrigger>
+        <HoverCardContent>
+          <article className="prose prose-sm dark:prose-invert">
+            Fingerprint generation for some platform/environment may confict
+            customer identity, thus this feature may not work as intended.
+            <br />
+            <br />
+            <strong>Vunarable platforms:</strong>
+            <ul>
+              <li>
+                <a href="https://fingerprint.com/blog/ios15-icloud-private-relay-vulnerability/">
+                  iOS 15+ with iCloud Private Relay
+                </a>
+              </li>
+              <li>iOS / Android Webviews</li>
+            </ul>
+            Please note that setting up customer identity or having a login page
+            will resolve this issue.
+          </article>
+        </HoverCardContent>
+      </HoverCard>
+      <br />
+    </>
   );
 }
 
@@ -146,10 +186,36 @@ export function MaxRespoonses({
     max_form_responses_in_total: number | null;
   };
 }) {
-  const [enabled, setEnabled] = useState(
-    init.is_max_form_responses_in_total_enabled
-  );
-  const [n, setN] = useState(init.max_form_responses_in_total || 100);
+  const {
+    handleSubmit,
+    control,
+    formState: { isSubmitting, isDirty },
+    reset,
+    watch,
+  } = useForm({
+    defaultValues: {
+      enabled: init.is_max_form_responses_in_total_enabled,
+      max: init.max_form_responses_in_total || 100,
+    },
+  });
+
+  const onSubmit = async (data: { enabled: boolean; max: number }) => {
+    const req = PrivateEditorApi.Settings.updateFormAccessMaxResponsesInTotal({
+      form_id,
+      ...data,
+    });
+
+    try {
+      await toast.promise(req, {
+        loading: "Saving...",
+        success: "Saved",
+        error: "Failed",
+      });
+      reset(data); // Reset form state to the new values after successful submission
+    } catch (error) {}
+  };
+
+  const enabled = watch("enabled");
 
   return (
     <PreferenceBox>
@@ -158,43 +224,47 @@ export function MaxRespoonses({
         description={
           <>
             Set maximum number of responses allowed. This is useful when you
-            have limited number of offers, inventory or tickets.
+            have limited number of offers, inventory, or tickets.
           </>
         }
       />
       <PreferenceBody>
-        <form
-          id="/private/editor/settings/max-responses-in-total"
-          action="/private/editor/settings/max-responses-in-total"
-          method="POST"
-        >
+        <form id="max-responses-in-total" onSubmit={handleSubmit(onSubmit)}>
           <input type="hidden" name="form_id" value={form_id} />
           <div className="flex flex-col">
             <div className="flex items-center space-x-2">
-              <Switch
-                id="is_max_form_responses_in_total_enabled"
-                name="is_max_form_responses_in_total_enabled"
-                checked={enabled}
-                onCheckedChange={setEnabled}
+              <Controller
+                name="enabled"
+                control={control}
+                render={({ field }) => (
+                  <Switch
+                    id="max-responses-in-total-enabled"
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                )}
               />
-              <Label htmlFor="is_max_form_responses_in_total_enabled">
+              <Label htmlFor="max-responses-in-total-enabled">
                 {enabled ? "Enabled" : "Disabled"}
               </Label>
             </div>
-            <div className={clsx(!enabled && "hidden")}>
+            <div className={!enabled ? "hidden" : ""}>
               <label className="flex flex-col gap-2 cursor-pointer">
                 <PreferenceDescription>
                   Maximum number of responses allowed
                 </PreferenceDescription>
-                <Input
-                  name="max_form_responses_in_total"
-                  type="number"
-                  placeholder="Leave empty for unlimited responses"
-                  min={1}
-                  value={n}
-                  onChange={(e) => {
-                    setN(parseInt(e.target.value));
-                  }}
+                <Controller
+                  name="max"
+                  control={control}
+                  render={({ field }) => (
+                    <Input
+                      type="number"
+                      placeholder="Leave empty for unlimited responses"
+                      min={1}
+                      value={field.value}
+                      onChange={field.onChange}
+                    />
+                  )}
                 />
               </label>
             </div>
@@ -203,10 +273,11 @@ export function MaxRespoonses({
       </PreferenceBody>
       <PreferenceBoxFooter>
         <Button
-          form="/private/editor/settings/max-responses-in-total"
+          form="max-responses-in-total"
           type="submit"
+          disabled={isSubmitting || !isDirty}
         >
-          Save
+          {isSubmitting ? <Spinner /> : "Save"}
         </Button>
       </PreferenceBoxFooter>
     </PreferenceBox>

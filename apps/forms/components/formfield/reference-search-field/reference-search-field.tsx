@@ -13,10 +13,10 @@ import {
 import { useFormAgentState } from "@/lib/formstate";
 import { ReferenceTableGrid } from "@/scaffolds/grid/reference-grid";
 import { GridaSupabase } from "@/types";
-import { Search } from "lucide-react";
 import useSWR from "swr";
 import { useMemo, useState } from "react";
 import Fuse from "fuse.js";
+import { SearchInput } from "@/components/extension/search-input";
 import "react-data-grid/lib/styles.css";
 
 /**
@@ -41,20 +41,6 @@ const sort_by_priorities = (a: string, b: string) => {
 
   return _a - _b;
 };
-
-function SearchInput(props: React.ComponentProps<typeof Input>) {
-  return (
-    <div className="relative ml-auto flex-1 md:grow-0">
-      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-      <Input
-        type="search"
-        placeholder="Search"
-        className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[320px]"
-        {...props}
-      />
-    </div>
-  );
-}
 
 export function ReferenceSearchPreview(
   props: React.ComponentProps<typeof SearchInput>
@@ -136,6 +122,7 @@ export function ReferenceSearch({
         <div className="flex-1">
           <div className="flex flex-col w-full h-full">
             <ReferenceTableGrid
+              tokens={localSearch ? [localSearch] : undefined}
               onSelected={(key, row) => {
                 setValue(key);
                 setOpen(false);

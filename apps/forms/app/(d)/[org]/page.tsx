@@ -9,28 +9,50 @@ import {
 import {
   CaretDownIcon,
   DotIcon,
+  DotsHorizontalIcon,
   FileIcon,
   GearIcon,
   HomeIcon,
   MagnifyingGlassIcon,
+  PlusIcon,
   ViewGridIcon,
   ViewHorizontalIcon,
 } from "@radix-ui/react-icons";
 import { CreateNewFormButton } from "@/components/create-form-button";
-import { Form } from "@/types";
+import { ConnectionSupabaseJoint, Form } from "@/types";
 import { ProjectStats } from "@/scaffolds/analytics/stats";
 import { PoweredByGridaFooter } from "@/scaffolds/e/form/powered-by-brand-footer";
 import { OrganizationAvatar } from "@/components/organization-avatar";
 import { GridCard, RowCard } from "@/components/site/form-card";
-import { cn } from "@/utils";
-import { PanelsTopLeftIcon } from "lucide-react";
+import { BoxSelectIcon, FolderDotIcon, PanelsTopLeftIcon } from "lucide-react";
 import { WorkspaceMenu } from "./org-menu";
 import { PublicUrls } from "@/services/public-urls";
+import {
+  SidebarMenuItem,
+  SidebarMenuList,
+  SidebarSectionHeaderItem,
+  SidebarSectionHeaderAction,
+  SidebarMenuItemActions,
+  SidebarSectionHeaderLabel,
+  SidebarRoot,
+  SidebarSection,
+} from "@/components/sidebar";
+import { CreateNewProjectDialog } from "./new-project-dialog";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { SupabaseLogo } from "@/components/logos";
+import { ResourceTypeIcon } from "@/components/resource-type-icon";
 
 export const revalidate = 0;
 
 interface FormDashboardItem extends Form {
   responses: number;
+  supabase_connection: ConnectionSupabaseJoint | null;
 }
 
 export default async function DashboardProjectsPage({
@@ -72,7 +94,13 @@ export default async function DashboardProjectsPage({
   // fetch forms with responses count
   const { data: __forms, error } = await supabase
     .from("form")
-    .select("*, response(count) ")
+    .select(
+      `
+        *,
+        response(count),
+        supabase_connection:connection_supabase(*)
+      `
+    )
     .in(
       "project_id",
       organization.projects.map((p) => p.id)
@@ -94,10 +122,10 @@ export default async function DashboardProjectsPage({
 
   return (
     <div className="h-full flex flex-1 w-full">
-      <nav className="relative w-60 h-full shrink-0 overflow-y-auto border-e">
-        <header className="sticky top-0 mx-2 pt-4 py-2 bg-background border-b">
+      <SidebarRoot>
+        <header className="sticky top-0 mx-2 pt-4 py-2 bg-background border-b z-10">
           <WorkspaceMenu current={organization.id}>
-            <MenuItem className="py-2">
+            <SidebarMenuItem className="py-2">
               <OrganizationAvatar
                 className="inline-flex align-middle w-6 h-6 me-2 border rounded"
                 avatar_url={
@@ -105,19 +133,19 @@ export default async function DashboardProjectsPage({
                     ? avatar_url(organization.avatar_path)
                     : undefined
                 }
-                alt={organization?.name}
+                alt={organization.display_name}
               />
-              <span>{organization.name}</span>
+              <span>{organization.display_name}</span>
               <CaretDownIcon className="inline w-4 h-4 ms-2 text-muted-foreground" />
-            </MenuItem>
+            </SidebarMenuItem>
           </WorkspaceMenu>
           <section className="my-2">
             <ul className="flex flex-col gap-0.5">
               <li>
-                <MenuItem muted>
+                <SidebarMenuItem muted>
                   <HomeIcon className="inline align-middle me-2 w-4 h-4" />
                   <Link href="/dashboard">Home</Link>
-                </MenuItem>
+                </SidebarMenuItem>
               </li>
               {/* <li>
                 <MenuItem muted>
@@ -125,30 +153,49 @@ export default async function DashboardProjectsPage({
                   <Link href="/dashboard/settings">Search</Link>
                 </MenuItem>
               </li> */}
-              {/* <li>
-                <MenuItem muted>
+              <li>
+                <SidebarMenuItem muted>
                   <GearIcon className="inline align-middle me-2 w-4 h-4" />
-                  <Link href="/dashboard/settings">Settings</Link>
-                </MenuItem>
-              </li> */}
+                  <Link href={`/organizations/${organization.name}/settings`}>
+                    Settings
+                  </Link>
+                </SidebarMenuItem>
+              </li>
             </ul>
           </section>
         </header>
         <div className="h-full">
-          <section className="mx-2 mb-2">
-            <SectionHeader>
-              <span>Projects</span>
-            </SectionHeader>
-            <MenuList>
+          <SidebarSection>
+            <SidebarSectionHeaderItem>
+              <SidebarSectionHeaderLabel>
+                <span>Projects</span>
+              </SidebarSectionHeaderLabel>
+              <SidebarMenuItemActions>
+                <CreateNewProjectDialog org={organization.name}>
+                  <SidebarSectionHeaderAction>
+                    <PlusIcon className="w-4 h-4" />
+                  </SidebarSectionHeaderAction>
+                </CreateNewProjectDialog>
+              </SidebarMenuItemActions>
+            </SidebarSectionHeaderItem>
+            <SidebarMenuList>
               {organization.projects.map((p) => {
                 const projectforms = forms.filter((f) => f.project_id === p.id);
                 return (
                   <>
                     <Link href={`/${organization.name}/${p.name}`}>
-                      <MenuItem key={p.name} muted>
-                        <PanelsTopLeftIcon className="inline align-middle me-2 w-4 h-4" />
+                      <SidebarMenuItem key={p.name} muted>
+                        <ResourceTypeIcon
+                          type="project"
+                          className="inline align-middle me-2 w-4 h-4"
+                        />
                         {p.name}
-                      </MenuItem>
+                        <SidebarMenuItemActions>
+                          <SidebarSectionHeaderAction>
+                            <DotsHorizontalIcon className="w-4 h-4" />
+                          </SidebarSectionHeaderAction>
+                        </SidebarMenuItemActions>
+                      </SidebarMenuItem>
                     </Link>
 
                     {projectforms.map((form, i) => (
@@ -157,19 +204,26 @@ export default async function DashboardProjectsPage({
                         href={`/d/${form.id}`}
                         prefetch={false}
                       >
-                        <MenuItem level={1} muted>
-                          <DotIcon className="inline align-middle w-4 h-4 me-2" />
+                        <SidebarMenuItem level={1} muted>
+                          <ResourceTypeIcon
+                            type={
+                              form.supabase_connection
+                                ? "form-x-supabase"
+                                : "form"
+                            }
+                            className="inline align-middle w-4 h-4 me-2"
+                          />
                           {form.title}
-                        </MenuItem>
+                        </SidebarMenuItem>
                       </Link>
                     ))}
                   </>
                 );
               })}
-            </MenuList>
-          </section>
+            </SidebarMenuList>
+          </SidebarSection>
         </div>
-      </nav>
+      </SidebarRoot>
       <main className="w-full h-full overflow-y-scroll">
         <div className="container mx-auto">
           <header className="py-10">
@@ -186,10 +240,28 @@ export default async function DashboardProjectsPage({
             </Link>
           </section>
           <hr className="mb-10 mt-5 dark:border-neutral-700" />
+          {organization.projects.length === 0 && (
+            <Card>
+              <CardContent>
+                <CardHeader />
+                <div className="flex flex-col items-center justify-center gap-4">
+                  <BoxSelectIcon className="w-12 h-12 text-muted-foreground" />
+                  <h2 className="text-lg font-bold mt-4">No project yet</h2>
+                  <CreateNewProjectDialog org={organization.name}>
+                    <Button variant="secondary">
+                      <PlusIcon className="inline w-4 h-4 me-2" />
+                      Create your first project
+                    </Button>
+                  </CreateNewProjectDialog>
+                </div>
+                <CardFooter />
+              </CardContent>
+            </Card>
+          )}
           {organization.projects.map((p) => {
             const projectforms = forms.filter((f) => f.project_id === p.id);
             return (
-              <div key={p.id} className="mb-10">
+              <div key={p.id} className="mb-40">
                 <header className="py-4 mb-2 flex justify-between items-center">
                   <div>
                     <h2 className="text-2xl font-bold">{p.name}</h2>
@@ -246,56 +318,6 @@ function FormsGrid({
           <RowCard {...form} />
         </Link>
       ))}
-    </div>
-  );
-}
-
-// function Sidebar() {
-//   return (
-
-//   );
-// }
-
-function MenuList({ children }: React.PropsWithChildren<{}>) {
-  return <ul className="flex flex-col gap-0.5">{children}</ul>;
-}
-
-function MenuItem({
-  level,
-  muted,
-  selected,
-  className,
-  children,
-}: React.PropsWithChildren<{
-  level?: number;
-  muted?: boolean;
-  selected?: boolean;
-  className?: string;
-}>) {
-  return (
-    <div
-      data-level={level}
-      data-muted={muted}
-      className={cn(
-        "w-full px-2 py-1 rounded hover:bg-accent text-sm font-medium text-foreground data-[muted='true']:text-muted-foreground",
-        "text-ellipsis whitespace-nowrap overflow-hidden",
-        className
-      )}
-      style={{
-        paddingLeft: level ? `${level * 1}rem` : undefined,
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-function SectionHeader({ children }: React.PropsWithChildren<{}>) {
-  return (
-    <div className="w-full px-2 py-2">
-      <span className="text-xs font-normal text-muted-foreground">
-        {children}
-      </span>
     </div>
   );
 }

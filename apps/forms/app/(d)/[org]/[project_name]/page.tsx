@@ -150,7 +150,11 @@ function FormsGrid({
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         {forms?.map((form, i) => (
           <Link key={i} href={`/d/${form.id}`} prefetch={false}>
-            <GridCard {...form} />
+            <GridCard
+              // TODO:
+              supabase_connection={null}
+              {...form}
+            />
           </Link>
         ))}
       </div>
@@ -169,7 +173,11 @@ function FormsGrid({
       </header>
       {forms?.map((form, i) => (
         <Link key={i} href={`/d/${form.id}`} prefetch={false}>
-          <RowCard {...form} />
+          <RowCard
+            // TODO:
+            supabase_connection={null}
+            {...form}
+          />
         </Link>
       ))}
     </div>

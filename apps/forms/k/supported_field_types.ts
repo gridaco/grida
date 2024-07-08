@@ -1,5 +1,40 @@
 import { FormFieldAutocompleteType, FormInputType } from "@/types";
 
+export const fieldlabels: Record<FormInputType, string> = {
+  number: "Number",
+  text: "Text",
+  textarea: "Textarea",
+  richtext: "Rich Text",
+  tel: "Phone",
+  url: "URL",
+  checkbox: "Checkbox",
+  checkboxes: "Checkboxes",
+  switch: "Switch",
+  toggle: "Toggle",
+  "toggle-group": "Toggle Group",
+  radio: "Radio",
+  date: "Date",
+  "datetime-local": "Date & Time",
+  month: "Month",
+  week: "Week",
+  time: "Time",
+  email: "Email",
+  file: "File Upload",
+  image: "Image Upload",
+  audio: "Audio Upload",
+  video: "Video Upload",
+  select: "Select",
+  latlng: "Location",
+  password: "Password",
+  color: "Color Picker",
+  country: "Country",
+  payment: "Payment",
+  hidden: "Hidden",
+  signature: "Signature",
+  range: "Range",
+  search: "Search for Reference",
+};
+
 export const supported_field_types: FormInputType[] = [
   "text",
   "textarea",
@@ -29,6 +64,7 @@ export const supported_field_types: FormInputType[] = [
 ];
 
 if (process.env.NODE_ENV === "development") {
+  // @ts-ignore
   const dev: FormInputType[] = [
     //
     "checkboxes",

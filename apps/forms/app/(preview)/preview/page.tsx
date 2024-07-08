@@ -1,6 +1,6 @@
 "use client";
 
-import { PlaygroundPreviSlave } from "@/scaffolds/playground/preview";
+import { PlaygroundPreviewSlave } from "@/scaffolds/playground/preview";
 import clsx from "clsx";
 import { ThemeProvider } from "@/components/theme-provider";
 
@@ -16,7 +16,7 @@ export default function PlaygroundPreview() {
         enableSystem
         disableTransitionOnChange
       >
-        <PlaygroundPreviSlave />
+        <PlaygroundPreviewSlave />
       </ThemeProvider>
     </main>
   );

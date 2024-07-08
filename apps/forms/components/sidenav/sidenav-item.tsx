@@ -1,6 +1,10 @@
 import clsx from "clsx";
 import React from "react";
 
+/**
+ * @deprecated
+ * @returns
+ */
 export function SideNavItem({
   disabled,
   children,
