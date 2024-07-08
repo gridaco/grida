@@ -38,12 +38,10 @@ export async function POST(req: NextRequest) {
     return notFound();
   }
 
-  const stylesheet = palette
-    ? ({
-        ...((old.stylesheet as {}) || {}),
-        palette: palette as FormStyleSheetV1Schema["palette"],
-      } satisfies FormStyleSheetV1Schema)
-    : old;
+  const stylesheet = {
+    ...((old.stylesheet as {}) || {}),
+    palette: (palette as FormStyleSheetV1Schema["palette"]) || undefined,
+  } satisfies FormStyleSheetV1Schema;
 
   await supabase
     .from("form_page")

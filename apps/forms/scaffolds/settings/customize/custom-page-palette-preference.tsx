@@ -46,7 +46,7 @@ export function CustomPagePalettePreferences({
           method="POST"
         >
           <input type="hidden" name="form_id" value={form_id} />
-          <input type="hidden" name="palette" value={palette} />
+          <input type="hidden" name="palette" value={palette || ""} />
           <div className="py-4">
             <Badge variant="outline">{palette ?? "default"}</Badge>
           </div>
