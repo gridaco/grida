@@ -12,7 +12,7 @@ export const GridaLogo = ({
       width={size}
       height={size}
       viewBox="0 0 42 42"
-      className={clsx("fill-black dark:fill-white", className)}
+      className={clsx("fill-foreground", className)}
       xmlns="http://www.w3.org/2000/svg"
     >
       <path
