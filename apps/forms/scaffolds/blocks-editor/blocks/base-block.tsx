@@ -85,8 +85,8 @@ export function FlatBlockBase({
       data-focused={focused}
       className={clsx(
         "rounded-md flex flex-col gap-4 border w-full p-4 shadow-md",
-        'data-[invalid="true"]:border-red-500/50 data-[invalid="true"]:bg-red-500/10 dark:data-[invalid="true"]:border-red-500/50 dark:data-[invalid="true"]:bg-red-500/10',
-        'data-[focused="true"]:border-blue-500/50 data-[focused="true"]:bg-blue-500/10 data-[focused="true"]:dark:border-blue-400/50 data-[focused="true"]:dark:bg-blue-400/10'
+        'data-[invalid="true"]:border-destructive/50 data-[invalid="true"]:bg-destructive/10 dark:data-[invalid="true"]:border-destructive/50 dark:data-[invalid="true"]:bg-destructive-500/10',
+        'data-[focused="true"]:border-foreground/50 data-[focused="true"]:bg-foreground/10 data-[focused="true"]:dark:border-foreground/50 data-[focused="true"]:dark:bg-foreground/10'
       )}
       onPointerDown={onPointerDown}
     >
