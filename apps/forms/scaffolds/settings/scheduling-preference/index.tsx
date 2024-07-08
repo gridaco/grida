@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useMemo, useEffect } from "react";
+import React, { useMemo } from "react";
 import {
   PreferenceBody,
   PreferenceBox,
@@ -65,6 +65,7 @@ export function SchedulingPreferences({
   const synchronizeTimezones = (newTz: string) => {
     setOpenTimezone(newTz);
     setCloseTimezone(newTz);
+    setValue("scheduling_tz", newTz, { shouldDirty: true });
   };
 
   const {
@@ -125,22 +126,6 @@ export function SchedulingPreferences({
     control,
     name: "is_scheduling_enabled",
   });
-
-  // Update form values and reset the form once initial values are fully loaded
-  useEffect(() => {
-    reset({
-      is_scheduling_enabled: init.is_scheduling_enabled,
-      scheduling_open_at: scheduling_open_at,
-      scheduling_close_at: scheduling_close_at,
-      scheduling_tz: initialTZ,
-    });
-  }, [
-    init.is_scheduling_enabled,
-    scheduling_open_at,
-    scheduling_close_at,
-    initialTZ,
-    reset,
-  ]);
 
   return (
     <PreferenceBox>
