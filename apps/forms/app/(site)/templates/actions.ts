@@ -9,5 +9,16 @@ export async function fetchTemplates() {
 
   const { data } = await supabase.from("form_template").select();
 
-  return data || [];
+  if (data) {
+    return data.map((template) => {
+      return {
+        ...template,
+        preview_url: supabase.storage
+          .from("grida-forms-template")
+          .getPublicUrl(template.preview_path).data.publicUrl,
+      };
+    });
+  }
+
+  return [];
 }

@@ -1287,6 +1287,7 @@ export type Database = {
           form_id: string
           id: number
           is_public: boolean
+          preview_path: string
           title: string
         }
         Insert: {
@@ -1295,6 +1296,7 @@ export type Database = {
           form_id: string
           id?: number
           is_public?: boolean
+          preview_path: string
           title: string
         }
         Update: {
@@ -1303,6 +1305,7 @@ export type Database = {
           form_id?: string
           id?: number
           is_public?: boolean
+          preview_path?: string
           title?: string
         }
         Relationships: [

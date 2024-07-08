@@ -65,6 +65,7 @@ export default async function TemplatesPage() {
                   form_id={item.form_id}
                   title={item.title}
                   description={item.description}
+                  preview={item.preview_url}
                 />
               ))}
             </div>
@@ -80,10 +81,12 @@ function ItemCard({
   form_id,
   title,
   description,
+  preview,
 }: {
   form_id: string;
   title: string;
   description: string;
+  preview: string;
 }) {
   return (
     <Card className="group overflow-hidden">
@@ -94,11 +97,11 @@ function ItemCard({
       >
         <div className="overflow-hidden">
           <Image
-            src="/images/abstract-placeholder.jpg"
-            width={400}
-            height={300}
-            alt="Order Form"
-            className="rounded-t-lg h-auto w-full object-cover group-hover:scale-105 transition-transform"
+            src={preview}
+            width={600}
+            height={450}
+            alt={title}
+            className="rounded-t-lg aspect-[4/3] object-cover group-hover:scale-105 transition-transform"
           />
         </div>
         <CardContent className="p-4">
