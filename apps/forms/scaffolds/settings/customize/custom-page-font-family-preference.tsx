@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Inconsolata, Inter, Lora } from "next/font/google";
 import type { FormStyleSheetV1Schema } from "@/types";
-import { cn } from "@/utils";
+import { Ag } from "@/components/design/ag";
 
 const inter = Inter({ subsets: ["latin"], display: "swap" });
 const lora = Lora({ subsets: ["latin"], display: "swap" });
@@ -99,25 +99,5 @@ export function CustomPageFontFamilyPreferences({
         </Button>
       </PreferenceBoxFooter>
     </PreferenceBox>
-  );
-}
-
-function Ag({
-  fontFamily,
-  className,
-  fontClassName,
-  children = "Ag",
-}: React.PropsWithChildren<{
-  fontFamily?: string;
-  fontClassName?: string;
-  className?: string;
-}>) {
-  return (
-    <span
-      style={{ fontFamily }}
-      className={cn("text-center text-3xl", fontClassName, className)}
-    >
-      {children}
-    </span>
   );
 }
