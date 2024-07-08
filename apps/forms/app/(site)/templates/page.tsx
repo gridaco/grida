@@ -1,18 +1,22 @@
-"use client";
 import Link from "next/link";
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select";
+// import {
+//   Select,
+//   SelectTrigger,
+//   SelectValue,
+//   SelectContent,
+//   SelectItem,
+// } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import Header from "@/www/header";
 import Footer from "@/www/footer";
 import Image from "next/image";
+import { fetchTemplates } from "./actions";
+import { formlink } from "@/lib/forms/url";
 
-export default function TemplatesPage() {
+const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
+
+export default async function TemplatesPage() {
+  const data = await fetchTemplates();
   return (
     <div className="flex flex-col min-h-[100dvh]">
       <Header />
@@ -29,7 +33,7 @@ export default function TemplatesPage() {
                   kickstart your next project.
                 </p>
               </div>
-              <div className="flex flex-col gap-2 min-[400px]:flex-row">
+              {/* <div className="flex flex-col gap-2 min-[400px]:flex-row">
                 <Select>
                   <SelectTrigger className="h-10 w-full sm:w-auto">
                     <SelectValue placeholder="Filter by category" />
@@ -52,19 +56,17 @@ export default function TemplatesPage() {
                     <SelectItem value="rating">Highest Rated</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
+              </div> */}
             </div>
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 mt-16">
-              <ItemCard />
-              <ItemCard />
-              <ItemCard />
-              <ItemCard />
-              <ItemCard />
-              <ItemCard />
-              <ItemCard />
-              <ItemCard />
-              <ItemCard />
-              <ItemCard />
+              {data.map((item, i) => (
+                <ItemCard
+                  key={i}
+                  form_id={item.form_id}
+                  title={item.title}
+                  description={item.description}
+                />
+              ))}
             </div>
           </div>
         </section>
@@ -74,10 +76,22 @@ export default function TemplatesPage() {
   );
 }
 
-function ItemCard() {
+function ItemCard({
+  form_id,
+  title,
+  description,
+}: {
+  form_id: string;
+  title: string;
+  description: string;
+}) {
   return (
     <Card className="group overflow-hidden">
-      <Link href="#" prefetch={false}>
+      <Link
+        href={formlink(HOST_NAME, form_id)}
+        target="_blank"
+        prefetch={false}
+      >
         <div className="overflow-hidden">
           <Image
             src="/images/abstract-placeholder.jpg"
@@ -88,9 +102,9 @@ function ItemCard() {
           />
         </div>
         <CardContent className="p-4">
-          <h3 className="text-md font-semibold">Order Form</h3>
+          <h3 className="text-md font-semibold">{title}</h3>
           <p className="text-muted-foreground line-clamp-2 text-sm">
-            A customizable order form template for your e-commerce website.
+            {description}
           </p>
         </CardContent>
       </Link>
