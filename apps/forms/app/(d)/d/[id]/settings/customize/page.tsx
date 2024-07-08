@@ -1,7 +1,7 @@
 import React from "react";
 import { createServerComponentClient } from "@/lib/supabase/server";
-import { FormPageLanguagePreferences } from "@/scaffolds/settings/customize/form-page-language-preferences";
-import { EndingRedirectPreferences } from "@/scaffolds/settings/customize/ending-redirect-preferences";
+import { FormPageLanguagePreferences } from "@/scaffolds/settings/customize/custom-form-page-language-preferences";
+import { EndingRedirectPreferences } from "@/scaffolds/settings/customize/custom-ending-redirect-preferences";
 import { cookies } from "next/headers";
 import {
   Sector,
@@ -15,7 +15,7 @@ import { CustomPoweredByBrandingPreferences } from "@/scaffolds/settings/customi
 import { CustomSectionStylePreferences } from "@/scaffolds/settings/customize/custom-section-style-preferences";
 import { CustomPageBackgroundPreferences } from "@/scaffolds/settings/customize/custom-page-background-preferences";
 import { EndingPageI18nOverrides, FormPage } from "@/types";
-import { EndingPagePreferences } from "@/scaffolds/settings/customize/ending-page-preferences";
+import { EndingPagePreferences } from "@/scaffolds/settings/customize/custom-ending-page-preferences";
 import { CustomPagePalettePreferences } from "@/scaffolds/settings/customize/custom-page-palette-preference";
 import { CustomPageCssPreferences } from "@/scaffolds/settings/customize/custom-page-css-preference";
 import { CustomPageFontFamilyPreferences } from "@/scaffolds/settings/customize/custom-page-font-family-preference";
