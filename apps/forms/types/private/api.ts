@@ -73,3 +73,9 @@ export type UpdateFormAccessMaxResponseByCustomerRequest = {
   enabled: boolean;
   max?: number;
 };
+
+export type UpdateFormAccessMaxResponseInTotalRequest = {
+  form_id: string;
+  enabled: boolean;
+  max?: number;
+};

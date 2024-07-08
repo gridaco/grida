@@ -60,8 +60,8 @@ export function RestrictNumberOfResponseByCustomer({
     try {
       await toast.promise(req, {
         loading: "Saving...",
-        success: "Settings saved",
-        error: "Failed to save settings",
+        success: "Saved",
+        error: "Failed",
       });
       reset(data); // Reset form state to the new values after successful submission
     } catch (error) {}
@@ -86,13 +86,13 @@ export function RestrictNumberOfResponseByCustomer({
                 control={control}
                 render={({ field }) => (
                   <Switch
-                    id="enabled"
+                    id="max-responses-by-customer-enabled"
                     checked={field.value}
                     onCheckedChange={field.onChange}
                   />
                 )}
               />
-              <Label htmlFor="enabled">
+              <Label htmlFor="max-responses-by-customer-enabled">
                 {enabled ? "Enabled" : "Disabled"}
               </Label>
             </div>
@@ -188,10 +188,36 @@ export function MaxRespoonses({
     max_form_responses_in_total: number | null;
   };
 }) {
-  const [enabled, setEnabled] = useState(
-    init.is_max_form_responses_in_total_enabled
-  );
-  const [n, setN] = useState(init.max_form_responses_in_total || 100);
+  const {
+    handleSubmit,
+    control,
+    formState: { isSubmitting, isDirty },
+    reset,
+    watch,
+  } = useForm({
+    defaultValues: {
+      enabled: init.is_max_form_responses_in_total_enabled,
+      max: init.max_form_responses_in_total || 100,
+    },
+  });
+
+  const onSubmit = async (data: { enabled: boolean; max: number }) => {
+    const req = PrivateEditorApi.Settings.updateFormAccessMaxResponsesInTotal({
+      form_id,
+      ...data,
+    });
+
+    try {
+      await toast.promise(req, {
+        loading: "Saving...",
+        success: "Saved",
+        error: "Failed",
+      });
+      reset(data); // Reset form state to the new values after successful submission
+    } catch (error) {}
+  };
+
+  const enabled = watch("enabled");
 
   return (
     <PreferenceBox>
@@ -200,43 +226,47 @@ export function MaxRespoonses({
         description={
           <>
             Set maximum number of responses allowed. This is useful when you
-            have limited number of offers, inventory or tickets.
+            have limited number of offers, inventory, or tickets.
           </>
         }
       />
       <PreferenceBody>
-        <form
-          id="/private/editor/settings/max-responses-in-total"
-          action="/private/editor/settings/max-responses-in-total"
-          method="POST"
-        >
+        <form id="max-responses-in-total" onSubmit={handleSubmit(onSubmit)}>
           <input type="hidden" name="form_id" value={form_id} />
           <div className="flex flex-col">
             <div className="flex items-center space-x-2">
-              <Switch
-                id="is_max_form_responses_in_total_enabled"
-                name="is_max_form_responses_in_total_enabled"
-                checked={enabled}
-                onCheckedChange={setEnabled}
+              <Controller
+                name="enabled"
+                control={control}
+                render={({ field }) => (
+                  <Switch
+                    id="max-responses-in-total-enabled"
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                )}
               />
-              <Label htmlFor="is_max_form_responses_in_total_enabled">
+              <Label htmlFor="max-responses-in-total-enabled">
                 {enabled ? "Enabled" : "Disabled"}
               </Label>
             </div>
-            <div className={clsx(!enabled && "hidden")}>
+            <div className={!enabled ? "hidden" : ""}>
               <label className="flex flex-col gap-2 cursor-pointer">
                 <PreferenceDescription>
                   Maximum number of responses allowed
                 </PreferenceDescription>
-                <Input
-                  name="max_form_responses_in_total"
-                  type="number"
-                  placeholder="Leave empty for unlimited responses"
-                  min={1}
-                  value={n}
-                  onChange={(e) => {
-                    setN(parseInt(e.target.value));
-                  }}
+                <Controller
+                  name="max"
+                  control={control}
+                  render={({ field }) => (
+                    <Input
+                      type="number"
+                      placeholder="Leave empty for unlimited responses"
+                      min={1}
+                      value={field.value}
+                      onChange={field.onChange}
+                    />
+                  )}
                 />
               </label>
             </div>
@@ -245,10 +275,11 @@ export function MaxRespoonses({
       </PreferenceBody>
       <PreferenceBoxFooter>
         <Button
-          form="/private/editor/settings/max-responses-in-total"
+          form="max-responses-in-total"
           type="submit"
+          disabled={isSubmitting || !isDirty}
         >
-          Save
+          {isSubmitting ? <Spinner /> : "Save"}
         </Button>
       </PreferenceBoxFooter>
     </PreferenceBox>

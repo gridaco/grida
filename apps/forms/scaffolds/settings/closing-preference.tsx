@@ -44,8 +44,8 @@ export function ClosingFormPreferences({
     try {
       await toast.promise(req, {
         loading: "Saving...",
-        success: "Form closed",
-        error: "Failed to close form",
+        success: "Saved",
+        error: "Failed",
       });
 
       // Reset form state to the new values after successful submission

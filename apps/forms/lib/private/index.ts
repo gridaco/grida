@@ -7,6 +7,7 @@ import {
   StoragePublicUrlData,
   UpdateFormAccessForceClosedRequest,
   UpdateFormAccessMaxResponseByCustomerRequest,
+  UpdateFormAccessMaxResponseInTotalRequest,
 } from "@/types/private/api";
 import Axios from "axios";
 
@@ -106,7 +107,14 @@ export namespace PrivateEditorApi {
         data
       );
     }
-    export function updateFormAccessMaxResponsesInTotal() {}
+    export function updateFormAccessMaxResponsesInTotal(
+      data: UpdateFormAccessMaxResponseInTotalRequest
+    ) {
+      return Axios.post<EditorApiResponseOk>(
+        `/private/editor/settings/max-responses-in-total`,
+        data
+      );
+    }
     export function updateFormMethod() {}
     export function updateUnknownFieldsHandlingStrategy() {}
   }
