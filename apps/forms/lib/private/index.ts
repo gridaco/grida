@@ -8,7 +8,9 @@ import {
   UpdateFormAccessForceClosedRequest,
   UpdateFormAccessMaxResponseByCustomerRequest,
   UpdateFormAccessMaxResponseInTotalRequest,
+  UpdateFormMethodRequest,
   UpdateFormScheduleRequest,
+  UpdateFormUnknownFieldsHandlingStrategyRequest,
 } from "@/types/private/api";
 import Axios from "axios";
 
@@ -126,8 +128,21 @@ export namespace PrivateEditorApi {
       );
     }
 
-    export function updateFormMethod() {}
-    export function updateUnknownFieldsHandlingStrategy() {}
+    export function updateFormMethod(data: UpdateFormMethodRequest) {
+      return Axios.post<EditorApiResponseOk>(
+        `/private/editor/settings/form-method`,
+        data
+      );
+    }
+
+    export function updateUnknownFieldsHandlingStrategy(
+      data: UpdateFormUnknownFieldsHandlingStrategyRequest
+    ) {
+      return Axios.post<EditorApiResponseOk>(
+        `/private/editor/settings/unknown-fields`,
+        data
+      );
+    }
   }
 
   export namespace SupabaseConnection {

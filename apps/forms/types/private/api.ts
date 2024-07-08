@@ -1,5 +1,9 @@
-import type { IFormField } from "../index";
-import { InventoryLevelCommit } from "../inventory";
+import type {
+  FormMethod,
+  FormResponseUnknownFieldHandlingStrategyType,
+  IFormField,
+} from "../index";
+import type { InventoryLevelCommit } from "../inventory";
 import * as ERR from "@/k/error";
 
 export type FormSubmitErrorCode =
@@ -86,4 +90,14 @@ export type UpdateFormScheduleRequest = {
   open_at?: string | null;
   close_at?: string | null;
   scheduling_tz?: string | null;
+};
+
+export type UpdateFormMethodRequest = {
+  form_id: string;
+  method: FormMethod;
+};
+
+export type UpdateFormUnknownFieldsHandlingStrategyRequest = {
+  form_id: string;
+  strategy?: FormResponseUnknownFieldHandlingStrategyType;
 };

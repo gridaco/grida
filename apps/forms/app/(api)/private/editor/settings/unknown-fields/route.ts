@@ -1,44 +1,42 @@
 import { createRouteHandlerClient } from "@/lib/supabase/server";
-import { FormResponseUnknownFieldHandlingStrategyType } from "@/types";
+import type {
+  EditorApiResponseOk,
+  UpdateFormUnknownFieldsHandlingStrategyRequest,
+} from "@/types/private/api";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
+import assert from "assert";
 
 export const revalidate = 0;
 
 export async function POST(req: NextRequest) {
   const origin = req.nextUrl.origin;
-  const formdata = await req.formData();
+  const data: UpdateFormUnknownFieldsHandlingStrategyRequest = await req.json();
 
   const cookieStore = cookies();
 
-  const form_id = String(formdata.get("form_id"));
+  const { form_id, strategy } = data;
 
-  const __raw_unknown_field_handling_strategy = formdata.get(
-    "unknown_field_handling_strategy"
-  );
-  const unknown_field_handling_strategy = __raw_unknown_field_handling_strategy
-    ? (String(
-        __raw_unknown_field_handling_strategy
-      ) as FormResponseUnknownFieldHandlingStrategyType)
-    : undefined;
-
-  if (!form_id) {
-    return notFound();
-  }
+  assert(form_id, "form_id is required");
 
   const supabase = createRouteHandlerClient(cookieStore);
 
-  await supabase
+  const { error } = await supabase
     .from("form")
     .update({
-      unknown_field_handling_strategy: unknown_field_handling_strategy,
+      unknown_field_handling_strategy: strategy,
     })
     .eq("id", form_id)
     .single();
 
-  // redirect to the page requested
-  return NextResponse.redirect(origin + `/d/${form_id}/settings/security`, {
-    status: 301,
-  });
+  if (error) {
+    console.error(error);
+    return notFound();
+  }
+
+  return NextResponse.json({
+    data: null,
+    error: null,
+  } satisfies EditorApiResponseOk);
 }
