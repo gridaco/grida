@@ -55,8 +55,6 @@ export function RestrictNumberOfResponseByCustomer({
         ...data,
       });
 
-    console.log("aaa", data);
-
     try {
       await toast.promise(req, {
         loading: "Saving...",
