@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import * as _variants from "@/theme/palettes";
 import clsx from "clsx";
 import { Badge } from "@/components/ui/badge";
-import { useEditorState } from "../editor";
+import { useEditorState } from "../../editor";
 
 // exclude default
 const { default: _, ...variants } = _variants;
