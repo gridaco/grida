@@ -50,4 +50,24 @@ export const backgrounds = [
     name: "Shader Gradient 09 Cotton candy",
     value: `${HOST_NAME}/theme/embed/backgrounds/shadergradient/09`,
   },
+  {
+    name: "Shader Gradient 95 X",
+    value: `${HOST_NAME}/theme/embed/backgrounds/shadergradient/95`,
+  },
+  {
+    name: "Shader Gradient 96 X",
+    value: `${HOST_NAME}/theme/embed/backgrounds/shadergradient/96`,
+  },
+  {
+    name: "Shader Gradient 97 X",
+    value: `${HOST_NAME}/theme/embed/backgrounds/shadergradient/97`,
+  },
+  {
+    name: "Shader Gradient 98 Spring",
+    value: `${HOST_NAME}/theme/embed/backgrounds/shadergradient/98`,
+  },
+  {
+    name: "Shader Gradient 99 X",
+    value: `${HOST_NAME}/theme/embed/backgrounds/shadergradient/99`,
+  },
 ] as const;
