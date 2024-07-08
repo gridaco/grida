@@ -79,7 +79,6 @@ export function ClosingFormPreferences({
           form="force-close-form"
           type="submit"
           disabled={isSubmitting || !isDirty}
-          className={isDirty ? "highlight-button-class" : ""}
         >
           {isSubmitting ? <Spinner /> : "Save"}
         </Button>

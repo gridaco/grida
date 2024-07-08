@@ -67,3 +67,9 @@ export type UpdateFormAccessForceClosedRequest = {
   form_id: string;
   closed: boolean;
 };
+
+export type UpdateFormAccessMaxResponseByCustomerRequest = {
+  form_id: string;
+  enabled: boolean;
+  max?: number;
+};

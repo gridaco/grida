@@ -6,6 +6,7 @@ import {
   SignedUploadUrlData,
   StoragePublicUrlData,
   UpdateFormAccessForceClosedRequest,
+  UpdateFormAccessMaxResponseByCustomerRequest,
 } from "@/types/private/api";
 import Axios from "axios";
 
@@ -88,20 +89,23 @@ export namespace PrivateEditorApi {
   }
 
   export namespace Settings {
-    export function updateFormAccessForceClose({
-      form_id,
-      closed,
-    }: UpdateFormAccessForceClosedRequest) {
+    export function updateFormAccessForceClose(
+      data: UpdateFormAccessForceClosedRequest
+    ) {
       return Axios.post<EditorApiResponseOk>(
         `/private/editor/settings/force-close-form`,
-        {
-          form_id,
-          closed,
-        }
+        data
       );
     }
 
-    export function updateFormAccessMaxResponsesByCustomer() {}
+    export function updateFormAccessMaxResponsesByCustomer(
+      data: UpdateFormAccessMaxResponseByCustomerRequest
+    ) {
+      return Axios.post<EditorApiResponseOk>(
+        `/private/editor/settings/max-responses-by-customer`,
+        data
+      );
+    }
     export function updateFormAccessMaxResponsesInTotal() {}
     export function updateFormMethod() {}
     export function updateUnknownFieldsHandlingStrategy() {}
