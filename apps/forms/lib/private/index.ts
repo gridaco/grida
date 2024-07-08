@@ -2,8 +2,10 @@ import type { GridaSupabase } from "@/types";
 import {
   CreateSignedUploadUrlRequest,
   EditorApiResponse,
+  EditorApiResponseOk,
   SignedUploadUrlData,
   StoragePublicUrlData,
+  UpdateFormAccessForceClosedRequest,
 } from "@/types/private/api";
 import Axios from "axios";
 
@@ -83,6 +85,26 @@ export namespace PrivateEditorApi {
 
       return base;
     }
+  }
+
+  export namespace Settings {
+    export function updateFormAccessForceClose({
+      form_id,
+      closed,
+    }: UpdateFormAccessForceClosedRequest) {
+      return Axios.post<EditorApiResponseOk>(
+        `/private/editor/settings/force-close-form`,
+        {
+          form_id,
+          closed,
+        }
+      );
+    }
+
+    export function updateFormAccessMaxResponsesByCustomer() {}
+    export function updateFormAccessMaxResponsesInTotal() {}
+    export function updateFormMethod() {}
+    export function updateUnknownFieldsHandlingStrategy() {}
   }
 
   export namespace SupabaseConnection {

@@ -28,6 +28,12 @@ export type EditorApiResponse<T, E = any> = (
   | { data: T; error?: E | null }
 ) & { message?: string };
 
+/**
+ * use this type when api returns ok without data or throws error
+ * 200 or 500 without additional data
+ */
+export type EditorApiResponseOk<E = any> = EditorApiResponse<null, E>;
+
 export type FormsApiResponse<T, E = any> = (
   | {
       data: null;
@@ -55,4 +61,9 @@ export type SessionSignedUploadUrlData = SignedUploadUrlData;
 
 export type StoragePublicUrlData = {
   publicUrl: string;
+};
+
+export type UpdateFormAccessForceClosedRequest = {
+  form_id: string;
+  closed: boolean;
 };
