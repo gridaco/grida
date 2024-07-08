@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import * as _variants from "@/theme/palettes";
 import clsx from "clsx";
 import { Badge } from "@/components/ui/badge";
-import { useEditorState } from "../editor";
+import { useEditorState } from "../../editor";
 
 // exclude default
 const { default: _, ...variants } = _variants;
@@ -41,12 +41,12 @@ export function CustomPagePalettePreferences({
       <PreferenceBoxHeader heading={<>Color Palette</>} />
       <PreferenceBody>
         <form
-          id="/private/editor/settings/page-palette"
-          action="/private/editor/settings/page-palette"
+          id="/private/editor/customize/page-palette"
+          action="/private/editor/customize/page-palette"
           method="POST"
         >
           <input type="hidden" name="form_id" value={form_id} />
-          <input type="hidden" name="palette" value={palette} />
+          <input type="hidden" name="palette" value={palette || ""} />
           <div className="py-4">
             <Badge variant="outline">{palette ?? "default"}</Badge>
           </div>
@@ -92,7 +92,7 @@ export function CustomPagePalettePreferences({
         </form>
       </PreferenceBody>
       <PreferenceBoxFooter>
-        <Button form="/private/editor/settings/page-palette" type="submit">
+        <Button form="/private/editor/customize/page-palette" type="submit">
           Save
         </Button>
       </PreferenceBoxFooter>

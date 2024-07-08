@@ -102,7 +102,9 @@ export default async function FormGeneralSettingsPage({
       </Sector>
       <Sector>
         <SectorHeader>
-          <SectorHeading>Delete Form</SectorHeading>
+          <SectorHeading className="text-destructive">
+            Danger Zone
+          </SectorHeading>
         </SectorHeader>
         <DeleteFormSection />
       </Sector>

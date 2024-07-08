@@ -34,8 +34,8 @@ export function CustomSectionStylePreferences({
       <PreferenceBoxHeader heading={<>Section Style</>} />
       <PreferenceBody>
         <form
-          id="/private/editor/settings/page-section-style"
-          action="/private/editor/settings/page-section-style"
+          id="/private/editor/customize/page-section-style"
+          action="/private/editor/customize/page-section-style"
           method="POST"
         >
           <input type="hidden" name="form_id" value={form_id} />
@@ -65,7 +65,7 @@ export function CustomSectionStylePreferences({
       </PreferenceBody>
       <PreferenceBoxFooter>
         <Button
-          form="/private/editor/settings/page-section-style"
+          form="/private/editor/customize/page-section-style"
           type="submit"
         >
           Save

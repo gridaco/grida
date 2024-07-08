@@ -2,8 +2,15 @@ import type { GridaSupabase } from "@/types";
 import {
   CreateSignedUploadUrlRequest,
   EditorApiResponse,
+  EditorApiResponseOk,
   SignedUploadUrlData,
   StoragePublicUrlData,
+  UpdateFormAccessForceClosedRequest,
+  UpdateFormAccessMaxResponseByCustomerRequest,
+  UpdateFormAccessMaxResponseInTotalRequest,
+  UpdateFormMethodRequest,
+  UpdateFormScheduleRequest,
+  UpdateFormUnknownFieldsHandlingStrategyRequest,
 } from "@/types/private/api";
 import Axios from "axios";
 
@@ -82,6 +89,59 @@ export namespace PrivateEditorApi {
       }
 
       return base;
+    }
+  }
+
+  export namespace Settings {
+    export function updateFormAccessForceClose(
+      data: UpdateFormAccessForceClosedRequest
+    ) {
+      return Axios.post<EditorApiResponseOk>(
+        `/private/editor/settings/force-close-form`,
+        data
+      );
+    }
+
+    export function updateFormAccessMaxResponsesByCustomer(
+      data: UpdateFormAccessMaxResponseByCustomerRequest
+    ) {
+      return Axios.post<EditorApiResponseOk>(
+        `/private/editor/settings/max-responses-by-customer`,
+        data
+      );
+    }
+    export function updateFormAccessMaxResponsesInTotal(
+      data: UpdateFormAccessMaxResponseInTotalRequest
+    ) {
+      return Axios.post<EditorApiResponseOk>(
+        `/private/editor/settings/max-responses-in-total`,
+        data
+      );
+    }
+
+    export function updateFormAccessScheduling(
+      data: UpdateFormScheduleRequest
+    ) {
+      return Axios.post<EditorApiResponseOk>(
+        `/private/editor/settings/form-schedule`,
+        data
+      );
+    }
+
+    export function updateFormMethod(data: UpdateFormMethodRequest) {
+      return Axios.post<EditorApiResponseOk>(
+        `/private/editor/settings/form-method`,
+        data
+      );
+    }
+
+    export function updateUnknownFieldsHandlingStrategy(
+      data: UpdateFormUnknownFieldsHandlingStrategyRequest
+    ) {
+      return Axios.post<EditorApiResponseOk>(
+        `/private/editor/settings/unknown-fields`,
+        data
+      );
     }
   }
 

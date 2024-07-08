@@ -1,12 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import {
   PreferenceBody,
   PreferenceBox,
   PreferenceBoxFooter,
   PreferenceBoxHeader,
-  PreferenceDescription,
 } from "@/components/preferences";
 import {
   Select,
@@ -16,7 +15,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import type { FormMethod } from "@/types";
+import { useForm, Controller } from "react-hook-form";
+import toast from "react-hot-toast";
+import { PrivateEditorApi } from "@/lib/private";
+import { FormMethod } from "@/types";
+import { Spinner } from "@/components/spinner";
 
 export function FormMethodPreference({
   form_id,
@@ -27,7 +30,35 @@ export function FormMethodPreference({
     method: FormMethod;
   };
 }) {
-  const [method, setMethod] = useState<FormMethod>(init.method);
+  const {
+    handleSubmit,
+    control,
+    formState: { isSubmitting, isDirty },
+    reset,
+    watch,
+  } = useForm({
+    defaultValues: {
+      method: init.method,
+    },
+  });
+
+  const onSubmit = async (data: { method: FormMethod }) => {
+    const req = PrivateEditorApi.Settings.updateFormMethod({
+      form_id,
+      ...data,
+    });
+
+    try {
+      await toast.promise(req, {
+        loading: "Saving...",
+        success: "Saved",
+        error: "Failed",
+      });
+      reset(data); // Reset form state to the new values after successful submission
+    } catch (error) {}
+  };
+
+  const method = watch("method");
 
   return (
     <PreferenceBox>
@@ -41,33 +72,35 @@ export function FormMethodPreference({
         }
       />
       <PreferenceBody>
-        <form
-          id="/private/editor/settings/form-method"
-          action="/private/editor/settings/form-method"
-          method="POST"
-        >
+        <form id="form-method" onSubmit={handleSubmit(onSubmit)}>
           <input type="hidden" name="form_id" value={form_id} />
           <div className="flex flex-col gap-8">
             <section>
               <div className="mt-4 flex flex-col gap-1">
-                <Select
+                <Controller
                   name="method"
-                  value={method}
-                  onValueChange={(value) => {
-                    setMethod(value as any);
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="post">post</SelectItem>
-                    <SelectItem value="get">get</SelectItem>
-                    <SelectItem value="dialog" disabled>
-                      dialog (not supported)
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+                  control={control}
+                  render={({ field }) => (
+                    <Select
+                      name="method"
+                      value={field.value}
+                      onValueChange={(value) => {
+                        field.onChange(value as FormMethod);
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="post">post</SelectItem>
+                        <SelectItem value="get">get</SelectItem>
+                        <SelectItem value="dialog" disabled>
+                          dialog (not supported)
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
                 <article className="my-2 prose prose-sm dark:prose-invert">
                   {method_descriptions[method]}
                 </article>
@@ -77,8 +110,12 @@ export function FormMethodPreference({
         </form>
       </PreferenceBody>
       <PreferenceBoxFooter>
-        <Button form="/private/editor/settings/form-method" type="submit">
-          Save
+        <Button
+          form="form-method"
+          type="submit"
+          disabled={isSubmitting || !isDirty}
+        >
+          {isSubmitting ? <Spinner /> : "Save"}
         </Button>
       </PreferenceBoxFooter>
     </PreferenceBox>

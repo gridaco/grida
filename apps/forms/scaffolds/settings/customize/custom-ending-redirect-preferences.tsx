@@ -33,8 +33,8 @@ export function EndingRedirectPreferences({
       <PreferenceBoxHeader heading={<>Custom Redirect URI</>} />
       <PreferenceBody>
         <form
-          id="/private/editor/settings/redirect-uri"
-          action="/private/editor/settings/redirect-uri"
+          id="/private/editor/customize/redirect-uri"
+          action="/private/editor/customize/redirect-uri"
           method="POST"
         >
           <input type="hidden" name="form_id" value={form_id} />
@@ -69,7 +69,7 @@ export function EndingRedirectPreferences({
         </form>
       </PreferenceBody>
       <PreferenceBoxFooter>
-        <Button form="/private/editor/settings/redirect-uri" type="submit">
+        <Button form="/private/editor/customize/redirect-uri" type="submit">
           Save
         </Button>
       </PreferenceBoxFooter>

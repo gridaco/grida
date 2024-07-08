@@ -20,12 +20,13 @@ export function DeleteFormSection() {
   const confirmationText = "DELETE " + state.form_title;
 
   return (
-    <div className="bg-destructive/20 border border-destructive/30 text-sm rounded-lg p-4">
+    <div className="border border-destructive/30 text-sm rounded-lg p-4">
       <div className="flex flex-col gap-4">
         <article className="prose prose-sm dark:prose-invert">
-          <h4>Deleting this form will also remove collected responses</h4>
+          <h4>Delete this form</h4>
           <p>
-            Ensure you&apos;ve backed up your data if you wish to preserve it.
+            Deleting this form will also remove collected responses. Ensure
+            you&apos;ve backed up your data if you wish to preserve it.
           </p>
         </article>
         <AlertDialog>

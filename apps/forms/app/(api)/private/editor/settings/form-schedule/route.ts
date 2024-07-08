@@ -1,19 +1,19 @@
 import { createRouteHandlerClient } from "@/lib/supabase/server";
+import {
+  EditorApiResponseOk,
+  UpdateFormScheduleRequest,
+} from "@/types/private/api";
+import assert from "assert";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
-import type {
-  EditorApiResponseOk,
-  UpdateFormMethodRequest,
-} from "@/types/private/api";
-import assert from "assert";
 
 export async function POST(req: NextRequest) {
-  const data: UpdateFormMethodRequest = await req.json();
+  const data: UpdateFormScheduleRequest = await req.json();
 
   const cookieStore = cookies();
 
-  const { form_id, method } = data;
+  const { form_id, enabled, open_at, close_at, scheduling_tz } = data;
 
   assert(form_id, "form_id is required");
 
@@ -22,7 +22,10 @@ export async function POST(req: NextRequest) {
   const { error } = await supabase
     .from("form")
     .update({
-      method: method,
+      is_scheduling_enabled: enabled,
+      scheduling_open_at: open_at,
+      scheduling_close_at: close_at,
+      scheduling_tz: scheduling_tz,
     })
     .eq("id", form_id)
     .single();

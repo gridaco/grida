@@ -1,7 +1,7 @@
 import React from "react";
 import { createServerComponentClient } from "@/lib/supabase/server";
-import { FormPageLanguagePreferences } from "@/scaffolds/settings/form-page-language-preferences";
-import { EndingRedirectPreferences } from "@/scaffolds/settings/ending-redirect-preferences";
+import { FormPageLanguagePreferences } from "@/scaffolds/settings/customize/custom-form-page-language-preferences";
+import { EndingRedirectPreferences } from "@/scaffolds/settings/customize/custom-ending-redirect-preferences";
 import { cookies } from "next/headers";
 import {
   Sector,
@@ -11,14 +11,14 @@ import {
   SectorHeading,
 } from "@/components/preferences";
 import { notFound } from "next/navigation";
-import { CustomPoweredByBrandingPreferences } from "@/scaffolds/settings/custom-powered-by-branding-preferences";
-import { CustomSectionStylePreferences } from "@/scaffolds/settings/custom-section-style-preferences";
-import { CustomPageBackgroundPreferences } from "@/scaffolds/settings/custom-page-background-preferences";
+import { CustomPoweredByBrandingPreferences } from "@/scaffolds/settings/customize/custom-powered-by-branding-preferences";
+import { CustomSectionStylePreferences } from "@/scaffolds/settings/customize/custom-section-style-preferences";
+import { CustomPageBackgroundPreferences } from "@/scaffolds/settings/customize/custom-page-background-preferences";
 import { EndingPageI18nOverrides, FormPage } from "@/types";
-import { EndingPagePreferences } from "@/scaffolds/settings/ending-page-preferences";
-import { CustomPagePalettePreferences } from "@/scaffolds/settings/custom-page-palette-preference";
-import { CustomPageCssPreferences } from "@/scaffolds/settings/custom-page-css-preference";
-import { CustomPageFontFamilyPreferences } from "@/scaffolds/settings/custom-page-font-family-preference";
+import { EndingPagePreferences } from "@/scaffolds/settings/customize/custom-ending-page-preferences";
+import { CustomPagePalettePreferences } from "@/scaffolds/settings/customize/custom-page-palette-preference";
+import { CustomPageCssPreferences } from "@/scaffolds/settings/customize/custom-page-css-preference";
+import { CustomPageFontFamilyPreferences } from "@/scaffolds/settings/customize/custom-page-font-family-preference";
 import Link from "next/link";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
 

@@ -1,5 +1,9 @@
-import type { IFormField } from "../index";
-import { InventoryLevelCommit } from "../inventory";
+import type {
+  FormMethod,
+  FormResponseUnknownFieldHandlingStrategyType,
+  IFormField,
+} from "../index";
+import type { InventoryLevelCommit } from "../inventory";
 import * as ERR from "@/k/error";
 
 export type FormSubmitErrorCode =
@@ -28,6 +32,12 @@ export type EditorApiResponse<T, E = any> = (
   | { data: T; error?: E | null }
 ) & { message?: string };
 
+/**
+ * use this type when api returns ok without data or throws error
+ * 200 or 500 without additional data
+ */
+export type EditorApiResponseOk<E = any> = EditorApiResponse<null, E>;
+
 export type FormsApiResponse<T, E = any> = (
   | {
       data: null;
@@ -55,4 +65,39 @@ export type SessionSignedUploadUrlData = SignedUploadUrlData;
 
 export type StoragePublicUrlData = {
   publicUrl: string;
+};
+
+export type UpdateFormAccessForceClosedRequest = {
+  form_id: string;
+  closed: boolean;
+};
+
+export type UpdateFormAccessMaxResponseByCustomerRequest = {
+  form_id: string;
+  enabled: boolean;
+  max?: number;
+};
+
+export type UpdateFormAccessMaxResponseInTotalRequest = {
+  form_id: string;
+  enabled: boolean;
+  max?: number;
+};
+
+export type UpdateFormScheduleRequest = {
+  form_id: string;
+  enabled: boolean;
+  open_at?: string | null;
+  close_at?: string | null;
+  scheduling_tz?: string | null;
+};
+
+export type UpdateFormMethodRequest = {
+  form_id: string;
+  method: FormMethod;
+};
+
+export type UpdateFormUnknownFieldsHandlingStrategyRequest = {
+  form_id: string;
+  strategy?: FormResponseUnknownFieldHandlingStrategyType;
 };
