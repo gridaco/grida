@@ -5,7 +5,7 @@ import Link from "next/link";
 
 export default function Header() {
   return (
-    <header className="absolute top-0 left-0 right-0 py-4 px-4 md:py-8 md:px-24 flex justify-between items-center z-50">
+    <header className="absolute top-0 left-0 right-0 py-4 px-4 lg:py-8 lg:px-24 flex justify-between items-center z-50">
       <div className="flex">
         <span className="flex items-center gap-2">
           <Link href="https://grida.co" target="_blank">
@@ -28,6 +28,9 @@ export default function Header() {
         </Link>
         <Link href="/playground" className="hidden md:block">
           <Button variant="link">Playground</Button>
+        </Link>
+        <Link href="/templates" className="hidden md:block">
+          <Button variant="link">Templates</Button>
         </Link>
         <div className="flex-1 h-8 border-r mx-4" />
         <Link href="/sign-in" className="hidden md:block">
