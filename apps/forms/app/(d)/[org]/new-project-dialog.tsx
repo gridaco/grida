@@ -59,7 +59,7 @@ export function CreateNewProjectDialog({
           setPending(false);
         });
     }
-  }, [value]);
+  }, [value, org]);
 
   useEffect(() => {
     if (!name) return;
