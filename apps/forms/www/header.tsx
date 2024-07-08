@@ -1,10 +1,9 @@
-"use server";
 import { GridaLogo } from "@/components/grida-logo";
 import { Button } from "@/components/ui/button";
 import { GitHubLogoIcon, SlashIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
 
-export async function Header() {
+export default function Header() {
   return (
     <header className="absolute top-0 left-0 right-0 py-4 px-4 md:py-8 md:px-24 flex justify-between items-center z-50">
       <div className="flex">
