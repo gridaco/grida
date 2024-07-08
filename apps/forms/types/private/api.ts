@@ -79,3 +79,11 @@ export type UpdateFormAccessMaxResponseInTotalRequest = {
   enabled: boolean;
   max?: number;
 };
+
+export type UpdateFormScheduleRequest = {
+  form_id: string;
+  enabled: boolean;
+  open_at?: string | null;
+  close_at?: string | null;
+  scheduling_tz?: string | null;
+};

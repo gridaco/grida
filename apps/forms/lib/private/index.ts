@@ -8,6 +8,7 @@ import {
   UpdateFormAccessForceClosedRequest,
   UpdateFormAccessMaxResponseByCustomerRequest,
   UpdateFormAccessMaxResponseInTotalRequest,
+  UpdateFormScheduleRequest,
 } from "@/types/private/api";
 import Axios from "axios";
 
@@ -115,6 +116,16 @@ export namespace PrivateEditorApi {
         data
       );
     }
+
+    export function updateFormAccessScheduling(
+      data: UpdateFormScheduleRequest
+    ) {
+      return Axios.post<EditorApiResponseOk>(
+        `/private/editor/settings/form-schedule`,
+        data
+      );
+    }
+
     export function updateFormMethod() {}
     export function updateUnknownFieldsHandlingStrategy() {}
   }
