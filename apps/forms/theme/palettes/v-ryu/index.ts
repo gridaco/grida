@@ -5,6 +5,7 @@ import _004_mint_chocolate from "./004-mint-chocolate";
 import _005_dark_lavender from "./005-dark-lavender";
 import _006_sage_blush from "./006-sage-blush";
 import _007_midnight_blue from "./007-midnight-blue";
+import _008_blue_steel from "./008-blue-steel";
 
 export {
   _001_monochrome,
@@ -14,4 +15,5 @@ export {
   _005_dark_lavender,
   _006_sage_blush,
   _007_midnight_blue,
+  _008_blue_steel,
 };

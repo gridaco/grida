@@ -71,6 +71,7 @@ const ryu_004_mint_chocolate = designer_ryu._004_mint_chocolate;
 const ryu_005_dark_lavender = designer_ryu._005_dark_lavender;
 const ryu_006_sage_blush = designer_ryu._006_sage_blush;
 const ryu_007_midnight_blue = designer_ryu._007_midnight_blue;
+const ryu_008_blue_steel = designer_ryu._008_blue_steel;
 
 // NOTE: do not change the export name as this name is saved in the database
 export const ryu = {
@@ -81,6 +82,7 @@ export const ryu = {
   ryu_005_dark_lavender,
   ryu_006_sage_blush,
   ryu_007_midnight_blue,
+  ryu_008_blue_steel,
 };
 
 // NOTE: do not change the export name as this name is saved in the database
