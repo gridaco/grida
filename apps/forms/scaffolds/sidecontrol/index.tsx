@@ -1,20 +1,12 @@
 "use client";
 
 import { SidebarRoot, SidebarSection } from "@/components/sidebar";
-import { Inconsolata, Inter, Lora } from "next/font/google";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Ag } from "@/components/design/ag";
-
-const inter = Inter({ subsets: ["latin"], display: "swap" });
-const lora = Lora({ subsets: ["latin"], display: "swap" });
-const inconsolata = Inconsolata({ subsets: ["latin"], display: "swap" });
-
-const fonts = {
-  inter,
-  lora,
-  inconsolata,
-};
+import { fonts } from "@/theme/font-family";
+import { useEditorState } from "../editor";
+import { FormStyleSheetV1Schema } from "@/types";
 
 export function SideControl({ mode }: { mode: "blocks" }) {
   return (
@@ -34,34 +26,43 @@ function ModeBlocks() {
 }
 
 function FontFamily() {
-  const [font, setFont] = useState("inter");
+  const [state, dispatch] = useEditorState();
+
+  const onFontChange = useCallback(
+    (fontFamily: FormStyleSheetV1Schema["font-family"]) => {
+      dispatch({
+        type: "editor/theme/font-family",
+        fontFamily,
+      });
+    },
+    [dispatch]
+  );
 
   return (
     <ToggleGroup
       type="single"
-      defaultValue={font}
-      value={font}
-      onValueChange={(value) => setFont(value as any)}
+      value={state.theme.fontFamily}
+      onValueChange={(value) => onFontChange(value as any)}
     >
-      <ToggleGroupItem value={"inter"} className="h-full w-24">
+      <ToggleGroupItem value={"inter"} className="h-full w-1/3">
         <div className="flex flex-col items-center justify-center gap-2 p-1">
           <Ag className="text-2xl" fontClassName={fonts.inter.className} />
-          Default
+          <span className="text-xs">Default</span>
         </div>
       </ToggleGroupItem>
-      <ToggleGroupItem value={"lora"} className="h-full w-24">
+      <ToggleGroupItem value={"lora"} className="h-full w-1/3">
         <div className="flex flex-col items-center justify-center gap-2 p-1">
           <Ag className="text-2xl" fontClassName={fonts.lora.className} />
-          Serif
+          <span className="text-xs">Serif</span>
         </div>
       </ToggleGroupItem>
-      <ToggleGroupItem value={"inconsolata"} className="h-full w-24">
+      <ToggleGroupItem value={"inconsolata"} className="h-full w-1/3">
         <div className="flex flex-col items-center justify-center gap-2 p-1">
           <Ag
             className="text-2xl"
             fontClassName={fonts.inconsolata.className}
           />
-          Mono
+          <span className="text-xs">Mono</span>
         </div>
       </ToggleGroupItem>
     </ToggleGroup>

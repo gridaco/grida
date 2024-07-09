@@ -19,12 +19,15 @@ import {
 import { createClientFormsClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
 import { NewBlockButton } from "./new-block-button";
+import { AgentThemeProvider } from "../agent/theme";
 
 export default function BlocksEditorRoot() {
   return (
-    <DndContextProvider>
-      <BlocksEditor />
-    </DndContextProvider>
+    <AgentThemeProvider>
+      <DndContextProvider>
+        <BlocksEditor />
+      </DndContextProvider>
+    </AgentThemeProvider>
   );
 }
 
@@ -206,7 +209,7 @@ function BlocksEditor() {
   const [state, dispatch] = useEditorState();
 
   return (
-    <div>
+    <div className="container mx-auto max-w-screen-sm">
       <PendingBlocksResolver />
       <OptimisticBlocksSyncProvider />
       <div className="sticky top-20 z-10">

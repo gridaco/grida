@@ -38,6 +38,7 @@ import type {
   DataTableRefreshAction,
   DataTableLoadingAction,
   EditorThemePaletteAction,
+  EditorThemeFontFamilyAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { blockstreeflat } from "@/lib/forms/tree";
@@ -781,6 +782,12 @@ export function reducer(
       const { palette } = <EditorThemePaletteAction>action;
       return produce(state, (draft) => {
         draft.theme.palette = palette;
+      });
+    }
+    case "editor/theme/font-family": {
+      const { fontFamily } = <EditorThemeFontFamilyAction>action;
+      return produce(state, (draft) => {
+        draft.theme.fontFamily = fontFamily || "inter";
       });
     }
     default:

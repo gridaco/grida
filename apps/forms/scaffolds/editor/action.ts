@@ -47,7 +47,8 @@ export type BlocksEditorAction =
   | DataTableLoadingAction
   | DataGridCellChangeAction
   | FeedXSupabaseMainTableRowsAction
-  | EditorThemePaletteAction;
+  | EditorThemePaletteAction
+  | EditorThemeFontFamilyAction;
 
 export type CreateNewPendingBlockAction =
   | {
@@ -257,4 +258,9 @@ export interface FeedXSupabaseMainTableRowsAction {
 export interface EditorThemePaletteAction {
   type: "editor/theme/palette";
   palette?: FormStyleSheetV1Schema["palette"];
+}
+
+export interface EditorThemeFontFamilyAction {
+  type: "editor/theme/font-family";
+  fontFamily?: FormStyleSheetV1Schema["font-family"];
 }

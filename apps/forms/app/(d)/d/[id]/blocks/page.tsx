@@ -9,7 +9,7 @@ export default async function EditFormPage() {
         <Siebar mode="blocks" />
       </aside>
       <div className="overflow-y-auto w-full">
-        <div className="py-4 px-8 md:py-10 md:px-16 container mx-auto max-w-screen-md">
+        <div className="py-4 px-8 md:py-10 md:px-16">
           <BlocksEditor />
           <div
             style={{
