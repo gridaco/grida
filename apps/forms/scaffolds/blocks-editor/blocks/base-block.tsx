@@ -84,9 +84,9 @@ export function FlatBlockBase({
       data-invalid={invalid}
       data-focused={focused}
       className={clsx(
-        "rounded-md flex flex-col gap-4 border w-full p-4 shadow-md",
-        'data-[invalid="true"]:border-destructive/50 data-[invalid="true"]:bg-destructive/10 dark:data-[invalid="true"]:border-destructive/50 dark:data-[invalid="true"]:bg-destructive-500/10',
-        'data-[focused="true"]:border-foreground/50 data-[focused="true"]:bg-foreground/10 data-[focused="true"]:dark:border-foreground/50 data-[focused="true"]:dark:bg-foreground/10'
+        "rounded-md flex flex-col gap-4 border w-full p-4 bg-background shadow-md",
+        'data-[invalid="true"]:border-destructive data-[invalid="true"]:border-2',
+        'data-[focused="true"]:border-foreground data-[focused="true"]:bg-secondary'
       )}
       onPointerDown={onPointerDown}
     >

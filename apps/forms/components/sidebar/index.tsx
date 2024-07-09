@@ -11,7 +11,7 @@ export function SidebarRoot({
   return (
     <nav
       className={cn(
-        "relative w-60 h-full shrink-0 overflow-y-auto",
+        "relative w-60 h-full shrink-0 bg-background overflow-y-auto",
         side === "left" ? "border-e" : "border-s"
       )}
     >
