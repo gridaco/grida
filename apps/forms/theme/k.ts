@@ -51,23 +51,31 @@ export const backgrounds = [
     value: `${HOST_NAME}/theme/embed/backgrounds/shadergradient/09`,
   },
   {
-    name: "Shader Gradient 95 X",
+    name: "Shader Gradient 93 Twilight blue",
+    value: `${HOST_NAME}/theme/embed/backgrounds/shadergradient/93`,
+  },
+  {
+    name: "Shader Gradient 94 Abyss blue",
+    value: `${HOST_NAME}/theme/embed/backgrounds/shadergradient/94`,
+  },
+  {
+    name: "Shader Gradient 95 Lavender mist",
     value: `${HOST_NAME}/theme/embed/backgrounds/shadergradient/95`,
   },
   {
-    name: "Shader Gradient 96 X",
+    name: "Shader Gradient 96 Aqua noir",
     value: `${HOST_NAME}/theme/embed/backgrounds/shadergradient/96`,
   },
   {
-    name: "Shader Gradient 97 X",
+    name: "Shader Gradient 97 Electric violet ",
     value: `${HOST_NAME}/theme/embed/backgrounds/shadergradient/97`,
   },
   {
-    name: "Shader Gradient 98 Spring",
+    name: "Shader Gradient 98 Pastel dream",
     value: `${HOST_NAME}/theme/embed/backgrounds/shadergradient/98`,
   },
   {
-    name: "Shader Gradient 99 X",
+    name: "Shader Gradient 99 Skyline gradient",
     value: `${HOST_NAME}/theme/embed/backgrounds/shadergradient/99`,
   },
 ] as const;
