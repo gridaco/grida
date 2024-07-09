@@ -1,4 +1,8 @@
-import { section_style_basic, section_style_glass_morphism } from "./css";
+import {
+  section_style_basic,
+  section_style_glass_morphism,
+  section_style_backdrop_invert,
+} from "./css";
 
 export const sections = [
   {
@@ -8,5 +12,9 @@ export const sections = [
   {
     name: "Glass Morphism",
     css: section_style_glass_morphism,
+  },
+  {
+    name: "Backdrop Invert",
+    css: section_style_backdrop_invert,
   },
 ] as const;
