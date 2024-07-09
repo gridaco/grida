@@ -315,7 +315,7 @@ function CustomCSS() {
             className="rounded overflow-hidden border"
             width="100%"
             height={500}
-            defaultLanguage="css"
+            defaultLanguage="scss"
             onChange={setCss}
             defaultValue={css}
             options={{

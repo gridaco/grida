@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 import palettes from "@/theme/palettes";
 import useVariablesCSS from "../playground/use-variables-css";
 import { stringfyThemeVariables } from "@/theme/palettes/utils";
@@ -11,6 +11,7 @@ import type { NextFont } from "@next/font/dist/types";
 import type { FormPageBackgroundSchema, FormStyleSheetV1Schema } from "@/types";
 import { cn } from "@/utils";
 import Head from "next/head";
+import { CustomCSS } from "@/theme/customcss";
 
 export function AgentThemeProvider({ children }: React.PropsWithChildren<{}>) {
   const [state] = useEditorState();
@@ -50,17 +51,27 @@ export function CustomCSSProvider({
   css,
   children,
 }: React.PropsWithChildren<{ css?: string }>) {
-  const iscustomized = !!css;
+  const compiledcss = useMemo(
+    () => (css ? CustomCSS.vanilla(css) : undefined),
+    [css]
+  );
+
+  const iscustomized = !!compiledcss;
+
+  const props = {
+    [CustomCSS.DATA_CUSTOM_CSS_KEY]: iscustomized,
+  };
+
   return (
     <>
       {iscustomized && (
         <style
           key="customcss"
           id="customcss"
-          dangerouslySetInnerHTML={{ __html: css }}
+          dangerouslySetInnerHTML={{ __html: compiledcss }}
         />
       )}
-      <div data-custom-css={iscustomized}>{children}</div>
+      <div {...props}>{children}</div>
     </>
   );
 }
