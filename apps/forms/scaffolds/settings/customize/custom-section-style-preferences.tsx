@@ -6,7 +6,6 @@ import {
   PreferenceBox,
   PreferenceBoxFooter,
   PreferenceBoxHeader,
-  cls_save_button,
 } from "@/components/preferences";
 import {
   Select,
@@ -15,8 +14,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { section_style_glass_morphism } from "@/theme/section/css";
 import { Button } from "@/components/ui/button";
+import { sections } from "@/theme/section";
 
 export function CustomSectionStylePreferences({
   form_id,
@@ -49,9 +48,9 @@ export function CustomSectionStylePreferences({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={""}>None</SelectItem>
-              <SelectItem value={section_style_glass_morphism}>
-                Glass Morphism
-              </SelectItem>
+              {sections.map((section, i) => (
+                <SelectItem value={section.css}>{section.name}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </form>

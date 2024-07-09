@@ -19,12 +19,19 @@ import {
 import { createClientFormsClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
 import { NewBlockButton } from "./new-block-button";
+import { AgentThemeProvider, SectionStyle } from "../agent/theme";
 
 export default function BlocksEditorRoot() {
   return (
-    <DndContextProvider>
-      <BlocksEditor />
-    </DndContextProvider>
+    <div className="w-full overflow-y-auto">
+      <AgentThemeProvider>
+        <DndContextProvider>
+          <div className="py-20">
+            <BlocksEditor />
+          </div>
+        </DndContextProvider>
+      </AgentThemeProvider>
+    </div>
   );
 }
 
@@ -206,7 +213,7 @@ function BlocksEditor() {
   const [state, dispatch] = useEditorState();
 
   return (
-    <div>
+    <div className="container mx-auto max-w-screen-sm">
       <PendingBlocksResolver />
       <OptimisticBlocksSyncProvider />
       <div className="sticky top-20 z-10">
@@ -214,18 +221,20 @@ function BlocksEditor() {
           <NewBlockButton />
         </div>
       </div>
-      <BlocksCanvas id="root" className="flex flex-col gap-4 mt-10">
+      <BlocksCanvas id="root" className="mt-10">
         <SortableContext
           items={state.blocks.map((b) => b.id)}
           strategy={verticalListSortingStrategy}
         >
-          {state.blocks.map((block) => {
-            return (
-              <div key={block.id}>
-                <Block {...block} />
-              </div>
-            );
-          })}
+          <SectionStyle className="flex flex-col gap-4 ">
+            {state.blocks.map((block) => {
+              return (
+                <div key={block.id}>
+                  <Block {...block} />
+                </div>
+              );
+            })}
+          </SectionStyle>
         </SortableContext>
       </BlocksCanvas>
     </div>

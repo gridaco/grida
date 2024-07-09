@@ -5,6 +5,7 @@ import type {
   FormBlockType,
   FormFieldDefinition,
   FormFieldInit,
+  FormPageBackgroundSchema,
   FormResponse,
   FormResponseField,
   FormResponseSession,
@@ -160,6 +161,10 @@ export interface FormEditorState {
   sessions?: FormResponseSession[];
   theme: {
     palette?: FormStyleSheetV1Schema["palette"];
+    fontFamily?: FormStyleSheetV1Schema["font-family"];
+    customCSS?: FormStyleSheetV1Schema["custom"];
+    section?: FormStyleSheetV1Schema["section"];
+    background?: FormPageBackgroundSchema;
   };
   tables: GFTable[];
   datagrid_rows_per_page: number;

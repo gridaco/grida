@@ -2,6 +2,7 @@ import type {
   FormBlockType,
   FormFieldDefinition,
   FormInputType,
+  FormPageBackgroundSchema,
   FormResponse,
   FormResponseWithFields,
   FormStyleSheetV1Schema,
@@ -47,7 +48,10 @@ export type BlocksEditorAction =
   | DataTableLoadingAction
   | DataGridCellChangeAction
   | FeedXSupabaseMainTableRowsAction
-  | EditorThemePaletteAction;
+  | EditorThemePaletteAction
+  | EditorThemeFontFamilyAction
+  | EditorThemeSectionStyleAction
+  | EditorThemeBackgroundAction;
 
 export type CreateNewPendingBlockAction =
   | {
@@ -257,4 +261,19 @@ export interface FeedXSupabaseMainTableRowsAction {
 export interface EditorThemePaletteAction {
   type: "editor/theme/palette";
   palette?: FormStyleSheetV1Schema["palette"];
+}
+
+export interface EditorThemeFontFamilyAction {
+  type: "editor/theme/font-family";
+  fontFamily?: FormStyleSheetV1Schema["font-family"];
+}
+
+export interface EditorThemeSectionStyleAction {
+  type: "editor/theme/section";
+  section?: FormStyleSheetV1Schema["section"];
+}
+
+export interface EditorThemeBackgroundAction {
+  type: "editor/theme/background";
+  background?: FormPageBackgroundSchema;
 }

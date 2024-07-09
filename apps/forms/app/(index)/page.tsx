@@ -1,6 +1,5 @@
 import { GridaLogo } from "@/components/grida-logo";
 import { Pricing } from "@/www/pricing/pricing";
-import { GitHubLogoIcon, SlashIcon } from "@radix-ui/react-icons";
 import {
   AccountTreeIcon,
   ApiIcon,
@@ -9,13 +8,12 @@ import {
   AnalysisIcon,
   VisualStudioIcon,
 } from "@/www/icons";
-import { plans } from "@/www/data/plans";
-import { Header } from "../(site)/header";
 import Hero from "./sections/hero";
 import Demo from "./sections/demo";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import Footer from "@/www/footer/footer";
+import Header from "@/www/header";
+import Footer from "@/www/footer";
 import { FAQ } from "./sections/faq";
 
 export default function Home() {

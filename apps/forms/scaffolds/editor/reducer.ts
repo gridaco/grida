@@ -38,6 +38,9 @@ import type {
   DataTableRefreshAction,
   DataTableLoadingAction,
   EditorThemePaletteAction,
+  EditorThemeFontFamilyAction,
+  EditorThemeBackgroundAction,
+  EditorThemeSectionStyleAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { blockstreeflat } from "@/lib/forms/tree";
@@ -781,6 +784,24 @@ export function reducer(
       const { palette } = <EditorThemePaletteAction>action;
       return produce(state, (draft) => {
         draft.theme.palette = palette;
+      });
+    }
+    case "editor/theme/font-family": {
+      const { fontFamily } = <EditorThemeFontFamilyAction>action;
+      return produce(state, (draft) => {
+        draft.theme.fontFamily = fontFamily || "inter";
+      });
+    }
+    case "editor/theme/background": {
+      const { background } = <EditorThemeBackgroundAction>action;
+      return produce(state, (draft) => {
+        draft.theme.background = background;
+      });
+    }
+    case "editor/theme/section": {
+      const { section } = <EditorThemeSectionStyleAction>action;
+      return produce(state, (draft) => {
+        draft.theme.section = section || undefined;
       });
     }
     default:

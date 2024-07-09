@@ -2,9 +2,19 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/utils";
 
-export function SidebarRoot({ children }: React.PropsWithChildren<{}>) {
+export function SidebarRoot({
+  side = "left",
+  children,
+}: React.PropsWithChildren<{
+  side?: "left" | "right";
+}>) {
   return (
-    <nav className="relative w-60 h-full shrink-0 overflow-y-auto border-e">
+    <nav
+      className={cn(
+        "relative w-60 h-full shrink-0 bg-background overflow-y-auto",
+        side === "left" ? "border-e" : "border-s"
+      )}
+    >
       {children}
     </nav>
   );
@@ -18,6 +28,12 @@ export function SidebarMenuGrid({ children }: React.PropsWithChildren<{}>) {
   return <div className="grid grid-cols-3 gap-2">{children}</div>;
 }
 
+export function SidebarMenuSectionContent({
+  children,
+}: React.PropsWithChildren<{}>) {
+  return <div className="w-full px-2 py-1">{children}</div>;
+}
+
 export function SidebarMenuGridItem({
   children,
   className,
@@ -28,7 +44,7 @@ export function SidebarMenuGridItem({
       className={cn(
         "aspect-square",
         "relative group",
-        "w-full px-2 py-1 rounded hover:bg-accent text-sm font-medium text-foreground data-[muted='true']:text-muted-foreground",
+        "w-full px-2 py-1 rounded hover:bg-secondary text-sm font-medium text-foreground data-[muted='true']:text-muted-foreground",
         "text-ellipsis whitespace-nowrap overflow-hidden",
         "flex flex-col items-center justify-center",
         className
@@ -76,8 +92,16 @@ export function SidebarMenuItem({
   );
 }
 
-export function SidebarSection({ children }: React.PropsWithChildren<{}>) {
-  return <section className="mx-2 mb-2">{children}</section>;
+export function SidebarSection({
+  children,
+  className,
+  ...props
+}: React.PropsWithChildren<React.HtmlHTMLAttributes<HTMLDivElement>>) {
+  return (
+    <section className={cn("mx-2 mb-2", className)} {...props}>
+      {children}
+    </section>
+  );
 }
 
 export function SidebarSectionHeaderItem({
