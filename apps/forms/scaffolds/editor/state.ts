@@ -151,7 +151,7 @@ export interface FormEditorState {
   focus_field_id?: string | null;
   focus_response_id?: string;
   focus_customer_id?: string;
-  focus_block_id?: string;
+  focus_block_id?: string | null;
   available_field_ids: string[];
   selected_rows: Set<string>;
   responses: {

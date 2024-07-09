@@ -212,31 +212,39 @@ function OptimisticBlocksSyncProvider({
 function BlocksEditor() {
   const [state, dispatch] = useEditorState();
 
+  const blur = useCallback(() => {
+    dispatch({
+      type: "blocks/blur",
+    });
+  }, [dispatch]);
+
   return (
-    <div className="container mx-auto max-w-screen-sm">
-      <PendingBlocksResolver />
-      <OptimisticBlocksSyncProvider />
-      <div className="sticky top-20 z-10">
-        <div className="absolute -left-6">
-          <NewBlockButton />
+    <div onPointerDown={blur}>
+      <div className="container mx-auto max-w-screen-sm">
+        <PendingBlocksResolver />
+        <OptimisticBlocksSyncProvider />
+        <div className="sticky top-20 z-10">
+          <div className="absolute -left-6">
+            <NewBlockButton />
+          </div>
         </div>
+        <BlocksCanvas id="root" className="mt-10">
+          <SortableContext
+            items={state.blocks.map((b) => b.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <SectionStyle className="flex flex-col gap-4 ">
+              {state.blocks.map((block) => {
+                return (
+                  <div key={block.id}>
+                    <Block {...block} />
+                  </div>
+                );
+              })}
+            </SectionStyle>
+          </SortableContext>
+        </BlocksCanvas>
       </div>
-      <BlocksCanvas id="root" className="mt-10">
-        <SortableContext
-          items={state.blocks.map((b) => b.id)}
-          strategy={verticalListSortingStrategy}
-        >
-          <SectionStyle className="flex flex-col gap-4 ">
-            {state.blocks.map((block) => {
-              return (
-                <div key={block.id}>
-                  <Block {...block} />
-                </div>
-              );
-            })}
-          </SectionStyle>
-        </SortableContext>
-      </BlocksCanvas>
     </div>
   );
 }

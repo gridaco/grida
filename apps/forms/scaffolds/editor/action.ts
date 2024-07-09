@@ -19,6 +19,7 @@ export type BlocksEditorAction =
   | OpenEditFieldAction
   | SortBlockAction
   | FocusBlockAction
+  | BlurBlockAction
   | FocusFieldAction
   | ChangeBlockFieldAction
   | CreateFielFromBlockdAction
@@ -134,6 +135,10 @@ export interface BlockDescriptionAction {
 export interface FocusBlockAction {
   type: "blocks/focus";
   block_id: string;
+}
+
+export interface BlurBlockAction {
+  type: "blocks/blur";
 }
 
 export interface FocusFieldAction {

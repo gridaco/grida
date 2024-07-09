@@ -397,6 +397,11 @@ export function reducer(
         draft.focus_block_id = block_id;
       });
     }
+    case "blocks/blur": {
+      return produce(state, (draft) => {
+        draft.focus_block_id = null;
+      });
+    }
     case "editor/field/focus": {
       const { field_id } = <FocusFieldAction>action;
       return produce(state, (draft) => {
