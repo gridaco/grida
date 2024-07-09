@@ -100,6 +100,10 @@ export default async function Layout({
           },
           theme: {
             palette: default_page?.stylesheet?.palette,
+            fontFamily: default_page.stylesheet?.["font-family"],
+            section: default_page.stylesheet?.section,
+            customCSS: default_page.stylesheet?.custom,
+            background: default_page.background,
           },
           form_id: id,
           form_title: data.title,

@@ -20,6 +20,9 @@ import { createClientFormsClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
 import { NewBlockButton } from "./new-block-button";
 import { AgentThemeProvider, SectionStyle } from "../agent/theme";
+import { usePrevious } from "@uidotdev/usehooks";
+import equal from "deep-equal";
+import { FormPageBackgroundSchema, FormStyleSheetV1Schema } from "@/types";
 
 export default function BlocksEditorRoot() {
   return (
@@ -209,6 +212,54 @@ function OptimisticBlocksSyncProvider({
   return <>{children}</>;
 }
 
+function AgentThemeSyncProvider({ children }: React.PropsWithChildren<{}>) {
+  const [state] = useEditorState();
+  const { page_id, theme } = state;
+  const prev = usePrevious(state.theme);
+  const supabase = createClientFormsClient();
+
+  useEffect(() => {
+    if (!prev) {
+      return;
+    }
+
+    // sync theme to server
+
+    if (!equal(prev, state.theme)) {
+      supabase
+        .from("form_page")
+        .update({
+          stylesheet: {
+            custom: theme.customCSS,
+            "font-family": theme.fontFamily,
+            palette: theme.palette,
+            section: theme.section,
+          } satisfies FormStyleSheetV1Schema,
+          background: theme.background satisfies
+            | FormPageBackgroundSchema
+            | undefined as {},
+        })
+        .eq("id", page_id!)
+        .then(({ error }) => {
+          if (error) console.error(error);
+        });
+      return;
+    }
+  }, [
+    state.theme,
+    prev,
+    supabase,
+    page_id,
+    theme.customCSS,
+    theme.fontFamily,
+    theme.palette,
+    theme.section,
+    theme.background,
+  ]);
+
+  return <>{children}</>;
+}
+
 function BlocksEditor() {
   const [state, dispatch] = useEditorState();
 
@@ -223,6 +274,7 @@ function BlocksEditor() {
       <div className="container mx-auto max-w-screen-sm">
         <PendingBlocksResolver />
         <OptimisticBlocksSyncProvider />
+        <AgentThemeSyncProvider />
         <div className="sticky top-20 z-10">
           <div className="absolute -left-6">
             <NewBlockButton />
