@@ -51,6 +51,7 @@ export type BlocksEditorAction =
   | EditorThemePaletteAction
   | EditorThemeFontFamilyAction
   | EditorThemeSectionStyleAction
+  | EditorThemeCustomCSSAction
   | EditorThemeBackgroundAction;
 
 export type CreateNewPendingBlockAction =
@@ -271,6 +272,11 @@ export interface EditorThemeFontFamilyAction {
 export interface EditorThemeSectionStyleAction {
   type: "editor/theme/section";
   section?: FormStyleSheetV1Schema["section"];
+}
+
+export interface EditorThemeCustomCSSAction {
+  type: "editor/theme/custom-css";
+  custom?: FormStyleSheetV1Schema["custom"];
 }
 
 export interface EditorThemeBackgroundAction {

@@ -41,6 +41,7 @@ import type {
   EditorThemeFontFamilyAction,
   EditorThemeBackgroundAction,
   EditorThemeSectionStyleAction,
+  EditorThemeCustomCSSAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { blockstreeflat } from "@/lib/forms/tree";
@@ -802,6 +803,12 @@ export function reducer(
       const { section } = <EditorThemeSectionStyleAction>action;
       return produce(state, (draft) => {
         draft.theme.section = section || undefined;
+      });
+    }
+    case "editor/theme/custom-css": {
+      const { custom } = <EditorThemeCustomCSSAction>action;
+      return produce(state, (draft) => {
+        draft.theme.customCSS = custom;
       });
     }
     default:
