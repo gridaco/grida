@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   SidebarMenuSectionContent,
   SidebarRoot,
@@ -24,6 +24,23 @@ import * as _variants from "@/theme/palettes";
 import { PaletteColorChip } from "@/components/design/palette-color-chip";
 import { backgrounds } from "@/theme/k";
 import { sections } from "@/theme/section";
+import { Button } from "@/components/ui/button";
+import { OpenInNewWindowIcon, Pencil2Icon } from "@radix-ui/react-icons";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import Link from "next/link";
+import { Editor, useMonaco } from "@monaco-editor/react";
+import { useTheme } from "next-themes";
+import { useMonacoTheme } from "@/components/monaco";
+import { customcss_starter_template } from "@/theme/customcss/k";
 
 const { default: _, ...variants } = _variants;
 
@@ -67,6 +84,14 @@ function ModeBlocks() {
         </SidebarSectionHeaderItem>
         <SidebarMenuSectionContent>
           <SectionStyle />
+        </SidebarMenuSectionContent>
+      </SidebarSection>
+      <SidebarSection className="border-b pb-4">
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>Custom CSS</SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuSectionContent>
+          <CustomCSS />
         </SidebarMenuSectionContent>
       </SidebarSection>
     </>
@@ -229,10 +254,96 @@ function SectionStyle() {
         <SelectContent>
           <SelectItem value={""}>None</SelectItem>
           {sections.map((section, i) => (
-            <SelectItem value={section.css}>{section.name}</SelectItem>
+            <SelectItem key={i} value={section.css}>
+              {section.name}
+            </SelectItem>
           ))}
         </SelectContent>
       </Select>
     </>
+  );
+}
+
+function CustomCSS() {
+  const [state, dispatch] = useEditorState();
+  const monaco = useMonaco();
+  const { resolvedTheme } = useTheme();
+  useMonacoTheme(monaco, resolvedTheme ?? "light");
+
+  const [css, setCss] = useState<string | undefined>(
+    state.theme.customCSS || customcss_starter_template
+  );
+
+  const setCustomCss = useCallback(
+    (css?: string) => {
+      dispatch({
+        type: "editor/theme/custom-css",
+        custom: css,
+      });
+    },
+    [dispatch]
+  );
+
+  const onSaveClick = useCallback(() => {
+    setCustomCss(css);
+  }, [setCustomCss, css]);
+
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="outline" className="w-full">
+          <Pencil2Icon className="w-4 h-4 inline me-2 align-middle" />
+          Custom CSS
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Custom CSS</DialogTitle>
+          <DialogDescription>
+            Customize Page CSS (only available through built-in pages).
+            <br />
+            You can Use{" "}
+            <Link className="underline" href="/playground" target="_blank">
+              Playground
+              <OpenInNewWindowIcon className="w-4 h-4 inline align-middle ms-1" />
+            </Link>{" "}
+            to test your CSS
+          </DialogDescription>
+        </DialogHeader>
+        <div>
+          <Editor
+            className="rounded overflow-hidden border"
+            width="100%"
+            height={500}
+            defaultLanguage="scss"
+            onChange={setCss}
+            defaultValue={css}
+            options={{
+              // top padding
+              padding: {
+                top: 10,
+              },
+              tabSize: 2,
+              fontSize: 13,
+              minimap: {
+                enabled: false,
+              },
+              glyphMargin: false,
+              folding: false,
+              scrollBeyondLastLine: false,
+              wordWrap: "on",
+            }}
+          />
+        </div>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="secondary">Cancel</Button>
+          </DialogClose>
+          <DialogClose asChild>
+            <Button onClick={onSaveClick}>Save</Button>
+          </DialogClose>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

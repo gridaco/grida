@@ -88,7 +88,10 @@ export function FlatBlockBase({
         'data-[invalid="true"]:border-destructive data-[invalid="true"]:border-2',
         'data-[focused="true"]:border-foreground data-[focused="true"]:bg-secondary'
       )}
-      onPointerDown={onPointerDown}
+      onPointerDown={(e) => {
+        e.stopPropagation();
+        onPointerDown?.(e);
+      }}
     >
       {children}
     </div>

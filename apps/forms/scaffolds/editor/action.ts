@@ -19,6 +19,7 @@ export type BlocksEditorAction =
   | OpenEditFieldAction
   | SortBlockAction
   | FocusBlockAction
+  | BlurBlockAction
   | FocusFieldAction
   | ChangeBlockFieldAction
   | CreateFielFromBlockdAction
@@ -51,6 +52,7 @@ export type BlocksEditorAction =
   | EditorThemePaletteAction
   | EditorThemeFontFamilyAction
   | EditorThemeSectionStyleAction
+  | EditorThemeCustomCSSAction
   | EditorThemeBackgroundAction;
 
 export type CreateNewPendingBlockAction =
@@ -133,6 +135,10 @@ export interface BlockDescriptionAction {
 export interface FocusBlockAction {
   type: "blocks/focus";
   block_id: string;
+}
+
+export interface BlurBlockAction {
+  type: "blocks/blur";
 }
 
 export interface FocusFieldAction {
@@ -271,6 +277,11 @@ export interface EditorThemeFontFamilyAction {
 export interface EditorThemeSectionStyleAction {
   type: "editor/theme/section";
   section?: FormStyleSheetV1Schema["section"];
+}
+
+export interface EditorThemeCustomCSSAction {
+  type: "editor/theme/custom-css";
+  custom?: FormStyleSheetV1Schema["custom"];
 }
 
 export interface EditorThemeBackgroundAction {

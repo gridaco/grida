@@ -41,6 +41,7 @@ import type {
   EditorThemeFontFamilyAction,
   EditorThemeBackgroundAction,
   EditorThemeSectionStyleAction,
+  EditorThemeCustomCSSAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { blockstreeflat } from "@/lib/forms/tree";
@@ -394,6 +395,11 @@ export function reducer(
       const { block_id } = <FocusBlockAction>action;
       return produce(state, (draft) => {
         draft.focus_block_id = block_id;
+      });
+    }
+    case "blocks/blur": {
+      return produce(state, (draft) => {
+        draft.focus_block_id = null;
       });
     }
     case "editor/field/focus": {
@@ -802,6 +808,12 @@ export function reducer(
       const { section } = <EditorThemeSectionStyleAction>action;
       return produce(state, (draft) => {
         draft.theme.section = section || undefined;
+      });
+    }
+    case "editor/theme/custom-css": {
+      const { custom } = <EditorThemeCustomCSSAction>action;
+      return produce(state, (draft) => {
+        draft.theme.customCSS = custom;
       });
     }
     default:
