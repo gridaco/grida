@@ -7,6 +7,10 @@ import { Ag } from "@/components/design/ag";
 import { fonts } from "@/theme/font-family";
 import { useEditorState } from "../editor";
 import { FormStyleSheetV1Schema } from "@/types";
+import * as _variants from "@/theme/palettes";
+import { PaletteColorChip } from "@/components/design/palette-color-chip";
+
+const { default: _, ...variants } = _variants;
 
 export function SideControl({ mode }: { mode: "blocks" }) {
   return (
@@ -19,9 +23,14 @@ export function SideControl({ mode }: { mode: "blocks" }) {
 
 function ModeBlocks() {
   return (
-    <SidebarSection>
-      <FontFamily />
-    </SidebarSection>
+    <>
+      <SidebarSection>
+        <FontFamily />
+      </SidebarSection>
+      <SidebarSection>
+        <Palette />
+      </SidebarSection>
+    </>
   );
 }
 
@@ -66,5 +75,52 @@ function FontFamily() {
         </div>
       </ToggleGroupItem>
     </ToggleGroup>
+  );
+}
+
+function Palette() {
+  const [state, dispatch] = useEditorState();
+
+  const palette = state.theme.palette;
+
+  const onPaletteChange = useCallback(
+    (palette: FormStyleSheetV1Schema["palette"]) => {
+      dispatch({
+        type: "editor/theme/palette",
+        palette,
+      });
+    },
+    [dispatch]
+  );
+
+  return (
+    <div className="flex flex-col gap-4">
+      {Object.keys(variants).map((variant) => {
+        const palettes = variants[variant as keyof typeof variants];
+        return (
+          <div key={variant} className="flex flex-col gap-2">
+            <h2 className="text-sm font-mono text-muted-foreground">
+              {variant}
+            </h2>
+            <div className="flex flex-wrap gap-1">
+              {Object.keys(palettes).map((key) => {
+                const colors = palettes[key as keyof typeof palettes];
+                const primary: any = colors["light"]["--primary"];
+                return (
+                  <PaletteColorChip
+                    key={key}
+                    primary={primary}
+                    onClick={() => {
+                      onPaletteChange(key as any);
+                    }}
+                    selected={key === palette}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 }

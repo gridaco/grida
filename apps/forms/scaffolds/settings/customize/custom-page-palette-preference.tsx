@@ -10,9 +10,9 @@ import {
 import { FormStyleSheetV1Schema } from "@/types";
 import { Button } from "@/components/ui/button";
 import * as _variants from "@/theme/palettes";
-import clsx from "clsx";
 import { Badge } from "@/components/ui/badge";
 import { useEditorState } from "../../editor";
+import { PaletteColorChip } from "@/components/design/palette-color-chip";
 
 // exclude default
 const { default: _, ...variants } = _variants;
@@ -63,10 +63,9 @@ export function CustomPagePalettePreferences({
                       const colors = palettes[key as keyof typeof palettes];
                       const primary: any = colors["light"]["--primary"];
                       return (
-                        <button
-                          type="button"
+                        <PaletteColorChip
                           key={key}
-                          data-selected={key === palette}
+                          primary={primary}
                           onClick={() => {
                             setPalette((prev) =>
                               prev === key
@@ -74,13 +73,7 @@ export function CustomPagePalettePreferences({
                                 : (key as keyof typeof palettes)
                             );
                           }}
-                          className={clsx(
-                            "w-6 h-6 border-2 rounded-full",
-                            "data-[selected='true']:outline data-[selected='true']:outline-foreground data-[selected='true']:border-background"
-                          )}
-                          style={{
-                            backgroundColor: `hsl(${primary.h}, ${primary.s}%, ${primary.l}%)`,
-                          }}
+                          selected={key === palette}
                         />
                       );
                     })}
