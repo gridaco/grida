@@ -1280,6 +1280,44 @@ export type Database = {
           },
         ]
       }
+      form_template: {
+        Row: {
+          created_at: string
+          description: string
+          form_id: string
+          id: number
+          is_public: boolean
+          preview_path: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          form_id: string
+          id?: number
+          is_public?: boolean
+          preview_path: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          form_id?: string
+          id?: number
+          is_public?: boolean
+          preview_path?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_template_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "form"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gist: {
         Row: {
           created_at: string

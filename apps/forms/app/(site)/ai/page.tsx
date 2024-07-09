@@ -2,8 +2,9 @@ import { Metadata } from "next";
 import Prompt from "./prompt";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { Header } from "@/app/(site)/header";
 import { FormPageBackground } from "@/scaffolds/e/form/background";
+import Header from "@/www/header";
+
 export const metadata: Metadata = {
   title: "AI Forms Builder | Grida Forms",
   description: "Grida Forms AI Forms Builder",
