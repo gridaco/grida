@@ -23,11 +23,15 @@ import { AgentThemeProvider } from "../agent/theme";
 
 export default function BlocksEditorRoot() {
   return (
-    <AgentThemeProvider>
-      <DndContextProvider>
-        <BlocksEditor />
-      </DndContextProvider>
-    </AgentThemeProvider>
+    <div className="w-full overflow-y-auto">
+      <AgentThemeProvider>
+        <DndContextProvider>
+          <div className="py-20">
+            <BlocksEditor />
+          </div>
+        </DndContextProvider>
+      </AgentThemeProvider>
+    </div>
   );
 }
 

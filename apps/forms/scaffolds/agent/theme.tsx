@@ -4,10 +4,11 @@ import React from "react";
 import palettes from "@/theme/palettes";
 import useVariablesCSS from "../playground/use-variables-css";
 import { stringfyThemeVariables } from "@/theme/palettes/utils";
-import { FormStyleSheetV1Schema } from "@/types";
+import { FormPageBackground } from "../e/form/background";
 import { useEditorState } from "../editor";
 import { fonts } from "@/theme/font-family";
-import type { NextFont } from "next/dist/compiled/@next/font";
+import type { NextFont } from "@next/font";
+import type { FormPageBackgroundSchema, FormStyleSheetV1Schema } from "@/types";
 
 export function AgentThemeProvider({ children }: React.PropsWithChildren<{}>) {
   const [state] = useEditorState();
@@ -20,8 +21,27 @@ export function AgentThemeProvider({ children }: React.PropsWithChildren<{}>) {
   // 2. palette
   // 3. custom css
 
-  return <FontFamilyProvider font={font}>{children}</FontFamilyProvider>;
+  return (
+    <div id="agent-theme-provider" className="relative">
+      <FontFamilyProvider font={font}>{children}</FontFamilyProvider>;
+      <BackgroundProvider background={state.theme.background} />;
+    </div>
+  );
   //
+}
+
+export function BackgroundProvider({
+  background,
+}: {
+  background?: FormPageBackgroundSchema;
+}) {
+  return (
+    <>
+      {background && (
+        <FormPageBackground {...(background as FormPageBackgroundSchema)} />
+      )}
+    </>
+  );
 }
 
 export function FontFamilyProvider({

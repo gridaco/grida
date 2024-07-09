@@ -1,14 +1,22 @@
 "use client";
 
+import React, { useCallback, useState } from "react";
 import { SidebarRoot, SidebarSection } from "@/components/sidebar";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { useCallback, useState } from "react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Ag } from "@/components/design/ag";
 import { fonts } from "@/theme/font-family";
 import { useEditorState } from "../editor";
 import { FormStyleSheetV1Schema } from "@/types";
 import * as _variants from "@/theme/palettes";
 import { PaletteColorChip } from "@/components/design/palette-color-chip";
+import { backgrounds } from "@/theme/k";
 
 const { default: _, ...variants } = _variants;
 
@@ -29,6 +37,9 @@ function ModeBlocks() {
       </SidebarSection>
       <SidebarSection>
         <Palette />
+      </SidebarSection>
+      <SidebarSection>
+        <Background />
       </SidebarSection>
     </>
   );
@@ -122,5 +133,46 @@ function Palette() {
         );
       })}
     </div>
+  );
+}
+
+function Background() {
+  const [state, dispatch] = useEditorState();
+
+  const background = state.theme.background;
+
+  const onBackgroundSrcChange = useCallback(
+    (src: string) => {
+      dispatch({
+        type: "editor/theme/background",
+        background: {
+          type: "background",
+          element: "iframe",
+          src,
+        },
+      });
+    },
+    [dispatch]
+  );
+
+  return (
+    <>
+      <Select
+        name="src"
+        value={background?.src}
+        onValueChange={onBackgroundSrcChange}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="None" />
+        </SelectTrigger>
+        <SelectContent>
+          {backgrounds.map((background, i) => (
+            <SelectItem key={i} value={background.value}>
+              {background.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </>
   );
 }
