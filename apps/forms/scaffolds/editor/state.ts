@@ -163,6 +163,7 @@ export interface FormEditorState {
     palette?: FormStyleSheetV1Schema["palette"];
     fontFamily?: FormStyleSheetV1Schema["font-family"];
     customCSS?: FormStyleSheetV1Schema["custom"];
+    section?: FormStyleSheetV1Schema["section"];
     background?: FormPageBackgroundSchema;
   };
   tables: GFTable[];

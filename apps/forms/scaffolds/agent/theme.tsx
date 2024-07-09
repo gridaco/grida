@@ -9,6 +9,7 @@ import { useEditorState } from "../editor";
 import { fonts } from "@/theme/font-family";
 import type { NextFont } from "@next/font";
 import type { FormPageBackgroundSchema, FormStyleSheetV1Schema } from "@/types";
+import { cn } from "@/utils";
 
 export function AgentThemeProvider({ children }: React.PropsWithChildren<{}>) {
   const [state] = useEditorState();
@@ -62,4 +63,16 @@ export function PaletteProvider({
   );
 
   return <>{children}</>;
+}
+
+export function SectionStyle({
+  className,
+  children,
+}: React.PropsWithChildren<{
+  className?: string;
+}>) {
+  const [state] = useEditorState();
+  const sectioncss = state.theme.section;
+
+  return <section className={cn(sectioncss, className)}>{children}</section>;
 }

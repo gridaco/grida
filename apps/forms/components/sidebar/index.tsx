@@ -28,6 +28,12 @@ export function SidebarMenuGrid({ children }: React.PropsWithChildren<{}>) {
   return <div className="grid grid-cols-3 gap-2">{children}</div>;
 }
 
+export function SidebarMenuSectionContent({
+  children,
+}: React.PropsWithChildren<{}>) {
+  return <div className="w-full px-2 py-1">{children}</div>;
+}
+
 export function SidebarMenuGridItem({
   children,
   className,
@@ -86,8 +92,16 @@ export function SidebarMenuItem({
   );
 }
 
-export function SidebarSection({ children }: React.PropsWithChildren<{}>) {
-  return <section className="mx-2 mb-2">{children}</section>;
+export function SidebarSection({
+  children,
+  className,
+  ...props
+}: React.PropsWithChildren<React.HtmlHTMLAttributes<HTMLDivElement>>) {
+  return (
+    <section className={cn("mx-2 mb-2", className)} {...props}>
+      {children}
+    </section>
+  );
 }
 
 export function SidebarSectionHeaderItem({

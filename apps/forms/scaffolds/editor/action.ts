@@ -50,6 +50,7 @@ export type BlocksEditorAction =
   | FeedXSupabaseMainTableRowsAction
   | EditorThemePaletteAction
   | EditorThemeFontFamilyAction
+  | EditorThemeSectionStyleAction
   | EditorThemeBackgroundAction;
 
 export type CreateNewPendingBlockAction =
@@ -265,6 +266,11 @@ export interface EditorThemePaletteAction {
 export interface EditorThemeFontFamilyAction {
   type: "editor/theme/font-family";
   fontFamily?: FormStyleSheetV1Schema["font-family"];
+}
+
+export interface EditorThemeSectionStyleAction {
+  type: "editor/theme/section";
+  section?: FormStyleSheetV1Schema["section"];
 }
 
 export interface EditorThemeBackgroundAction {

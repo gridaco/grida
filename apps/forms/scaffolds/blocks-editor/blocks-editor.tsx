@@ -19,7 +19,7 @@ import {
 import { createClientFormsClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
 import { NewBlockButton } from "./new-block-button";
-import { AgentThemeProvider } from "../agent/theme";
+import { AgentThemeProvider, SectionStyle } from "../agent/theme";
 
 export default function BlocksEditorRoot() {
   return (
@@ -221,18 +221,20 @@ function BlocksEditor() {
           <NewBlockButton />
         </div>
       </div>
-      <BlocksCanvas id="root" className="flex flex-col gap-4 mt-10">
+      <BlocksCanvas id="root" className="mt-10">
         <SortableContext
           items={state.blocks.map((b) => b.id)}
           strategy={verticalListSortingStrategy}
         >
-          {state.blocks.map((block) => {
-            return (
-              <div key={block.id}>
-                <Block {...block} />
-              </div>
-            );
-          })}
+          <SectionStyle className="flex flex-col gap-4 ">
+            {state.blocks.map((block) => {
+              return (
+                <div key={block.id}>
+                  <Block {...block} />
+                </div>
+              );
+            })}
+          </SectionStyle>
         </SortableContext>
       </BlocksCanvas>
     </div>

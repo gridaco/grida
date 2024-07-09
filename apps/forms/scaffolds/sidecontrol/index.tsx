@@ -1,7 +1,13 @@
 "use client";
 
 import React, { useCallback, useState } from "react";
-import { SidebarRoot, SidebarSection } from "@/components/sidebar";
+import {
+  SidebarMenuSectionContent,
+  SidebarRoot,
+  SidebarSection,
+  SidebarSectionHeaderItem,
+  SidebarSectionHeaderLabel,
+} from "@/components/sidebar";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Select,
@@ -17,6 +23,7 @@ import { FormStyleSheetV1Schema } from "@/types";
 import * as _variants from "@/theme/palettes";
 import { PaletteColorChip } from "@/components/design/palette-color-chip";
 import { backgrounds } from "@/theme/k";
+import { sections } from "@/theme/section";
 
 const { default: _, ...variants } = _variants;
 
@@ -32,14 +39,35 @@ export function SideControl({ mode }: { mode: "blocks" }) {
 function ModeBlocks() {
   return (
     <>
-      <SidebarSection>
+      <SidebarSection className="border-b pb-4">
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>Type</SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
         <FontFamily />
       </SidebarSection>
-      <SidebarSection>
-        <Palette />
+      <SidebarSection className="border-b pb-4">
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>Palette</SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuSectionContent>
+          <Palette />
+        </SidebarMenuSectionContent>
       </SidebarSection>
-      <SidebarSection>
-        <Background />
+      <SidebarSection className="border-b pb-4">
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>Background</SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuSectionContent>
+          <Background />
+        </SidebarMenuSectionContent>
+      </SidebarSection>
+      <SidebarSection className="border-b pb-4">
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>Section Style</SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuSectionContent>
+          <SectionStyle />
+        </SidebarMenuSectionContent>
       </SidebarSection>
     </>
   );
@@ -170,6 +198,38 @@ function Background() {
             <SelectItem key={i} value={background.value}>
               {background.name}
             </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </>
+  );
+}
+
+function SectionStyle() {
+  const [state, dispatch] = useEditorState();
+
+  const css = state.theme.section;
+
+  const onSectionStyleChange = useCallback(
+    (css: string) => {
+      dispatch({
+        type: "editor/theme/section",
+        section: css,
+      });
+    },
+    [dispatch]
+  );
+
+  return (
+    <>
+      <Select name="css" value={css} onValueChange={onSectionStyleChange}>
+        <SelectTrigger>
+          <SelectValue placeholder="Select Section Style" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={""}>None</SelectItem>
+          {sections.map((section, i) => (
+            <SelectItem value={section.css}>{section.name}</SelectItem>
           ))}
         </SelectContent>
       </Select>
