@@ -67,12 +67,18 @@ export const saturation = {
 const ryu_001_teal = designer_ryu._001_teal;
 const ryu_002_soft_nuetrals = designer_ryu._002_soft_nuetrals;
 const ryu_003_lemon_blue = designer_ryu._003_lemon_blue;
+const ryu_004_mint_chocolate = designer_ryu._004_mint_chocolate;
+const ryu_005_dark_lavender = designer_ryu._005_dark_lavender;
+const ryu_006_sage_blush = designer_ryu._006_sage_blush;
 
 // NOTE: do not change the export name as this name is saved in the database
 export const ryu = {
   ryu_001_teal,
   ryu_002_soft_nuetrals,
   ryu_003_lemon_blue,
+  ryu_004_mint_chocolate,
+  ryu_005_dark_lavender,
+  ryu_006_sage_blush,
 };
 
 // NOTE: do not change the export name as this name is saved in the database
