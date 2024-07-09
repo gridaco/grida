@@ -2,6 +2,7 @@ import type {
   FormBlockType,
   FormFieldDefinition,
   FormInputType,
+  FormPageBackgroundSchema,
   FormResponse,
   FormResponseWithFields,
   FormStyleSheetV1Schema,
@@ -18,6 +19,7 @@ export type BlocksEditorAction =
   | OpenEditFieldAction
   | SortBlockAction
   | FocusBlockAction
+  | BlurBlockAction
   | FocusFieldAction
   | ChangeBlockFieldAction
   | CreateFielFromBlockdAction
@@ -47,7 +49,11 @@ export type BlocksEditorAction =
   | DataTableLoadingAction
   | DataGridCellChangeAction
   | FeedXSupabaseMainTableRowsAction
-  | EditorThemePaletteAction;
+  | EditorThemePaletteAction
+  | EditorThemeFontFamilyAction
+  | EditorThemeSectionStyleAction
+  | EditorThemeCustomCSSAction
+  | EditorThemeBackgroundAction;
 
 export type CreateNewPendingBlockAction =
   | {
@@ -129,6 +135,10 @@ export interface BlockDescriptionAction {
 export interface FocusBlockAction {
   type: "blocks/focus";
   block_id: string;
+}
+
+export interface BlurBlockAction {
+  type: "blocks/blur";
 }
 
 export interface FocusFieldAction {
@@ -257,4 +267,24 @@ export interface FeedXSupabaseMainTableRowsAction {
 export interface EditorThemePaletteAction {
   type: "editor/theme/palette";
   palette?: FormStyleSheetV1Schema["palette"];
+}
+
+export interface EditorThemeFontFamilyAction {
+  type: "editor/theme/font-family";
+  fontFamily?: FormStyleSheetV1Schema["font-family"];
+}
+
+export interface EditorThemeSectionStyleAction {
+  type: "editor/theme/section";
+  section?: FormStyleSheetV1Schema["section"];
+}
+
+export interface EditorThemeCustomCSSAction {
+  type: "editor/theme/custom-css";
+  custom?: FormStyleSheetV1Schema["custom"];
+}
+
+export interface EditorThemeBackgroundAction {
+  type: "editor/theme/background";
+  background?: FormPageBackgroundSchema;
 }

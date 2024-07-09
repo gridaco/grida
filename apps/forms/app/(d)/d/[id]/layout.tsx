@@ -100,6 +100,10 @@ export default async function Layout({
           },
           theme: {
             palette: default_page?.stylesheet?.palette,
+            fontFamily: default_page.stylesheet?.["font-family"],
+            section: default_page.stylesheet?.section,
+            customCSS: default_page.stylesheet?.custom,
+            background: default_page.background,
           },
           form_id: id,
           form_title: data.title,
@@ -117,7 +121,7 @@ export default async function Layout({
 
 function Header({ form_id, title }: { form_id: string; title: string }) {
   return (
-    <header className="flex flex-col w-full gap-4 border-b z-10">
+    <header className="flex flex-col w-full gap-4 bg-background border-b z-10">
       <div className="w-full flex gap-4">
         <div className="w-1/3">
           <div className="h-full px-4 min-w-60 w-min flex items-center lg:border-e">

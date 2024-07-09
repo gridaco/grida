@@ -121,6 +121,7 @@
     "resend": "^3.2.0",
     "shadergradient": "^1.2.14",
     "signature_pad": "^4.2.0",
+    "stylis": "^4.3.2",
     "swr": "^2.2.5",
     "tailwind-merge": "^2.2.2",
     "three": "^0.150.1",
@@ -133,6 +134,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@next/font": "^14.2.4",
     "@supabase/storage-js": "^2.6.0",
     "@tailwindcss/typography": "^0.5.10",
     "@types/core-js": "^2.5.8",
@@ -143,6 +145,7 @@
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@types/stylis": "^4.2.6",
     "@types/uuid": "^9.0.8",
     "@types/validator": "^13.12.0",
     "autoprefixer": "^10.0.1",

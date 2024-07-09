@@ -254,7 +254,7 @@ export function FieldBlock({
           </DropdownMenu>
         </div>
       </BlockHeader>
-      <div className={clsx("w-full bg-card rounded px-4 py-10")}>
+      <div className={clsx("w-full bg-background rounded px-4 py-10")}>
         {is_hidden_field ? (
           <div>
             <p className="text-xs opacity-50">

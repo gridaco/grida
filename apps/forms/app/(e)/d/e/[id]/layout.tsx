@@ -5,7 +5,9 @@ import { Metadata } from "next";
 import { Inconsolata, Inter, Lora } from "next/font/google";
 import { FormPage } from "@/types";
 import { ThemeProvider } from "@/components/theme-provider";
-import Head from "next/head";
+import { stringfyThemeVariables } from "@/theme/palettes/utils";
+import palettes from "@/theme/palettes";
+import { CustomCSS } from "@/theme/customcss";
 
 export const revalidate = 0;
 
@@ -88,16 +90,37 @@ export default async function Layout({
   const font =
     fonts[stylesheet?.["font-family"] as keyof typeof fonts] || fonts.inter;
 
-  const customcss = stylesheet?.custom;
+  const customcss = stylesheet?.custom
+    ? CustomCSS.vanilla(stylesheet?.custom)
+    : undefined;
+  const palettecss = stylesheet?.palette
+    ? stringfyThemeVariables(palettes[stylesheet.palette] as any)
+    : undefined;
+
+  const iscsscustomized = !!customcss;
+
+  const props = {
+    [CustomCSS.DATA_CUSTOM_CSS_KEY]: iscsscustomized,
+  };
 
   return (
     <html lang={default_form_page_language} suppressHydrationWarning>
-      <body className={font.className}>
+      <body className={font.className} {...props}>
+        {iscsscustomized && (
+          <style
+            id="customcss"
+            dangerouslySetInnerHTML={{
+              __html: `
+              ${customcss}
+            `,
+            }}
+          />
+        )}
         <style
-          id="customcss"
+          id="custompalette"
           dangerouslySetInnerHTML={{
             __html: `
-              ${customcss}
+              ${palettecss}
             `,
           }}
         />

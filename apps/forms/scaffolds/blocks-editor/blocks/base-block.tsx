@@ -84,11 +84,14 @@ export function FlatBlockBase({
       data-invalid={invalid}
       data-focused={focused}
       className={clsx(
-        "rounded-md flex flex-col gap-4 border w-full p-4 shadow-md",
-        'data-[invalid="true"]:border-red-500/50 data-[invalid="true"]:bg-red-500/10 dark:data-[invalid="true"]:border-red-500/50 dark:data-[invalid="true"]:bg-red-500/10',
-        'data-[focused="true"]:border-blue-500/50 data-[focused="true"]:bg-blue-500/10 data-[focused="true"]:dark:border-blue-400/50 data-[focused="true"]:dark:bg-blue-400/10'
+        "rounded-md flex flex-col gap-4 border w-full p-4 bg-background shadow-md",
+        'data-[invalid="true"]:border-destructive data-[invalid="true"]:border-2',
+        'data-[focused="true"]:border-foreground data-[focused="true"]:bg-secondary'
       )}
-      onPointerDown={onPointerDown}
+      onPointerDown={(e) => {
+        e.stopPropagation();
+        onPointerDown?.(e);
+      }}
     >
       {children}
     </div>

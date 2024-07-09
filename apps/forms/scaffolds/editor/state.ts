@@ -5,6 +5,7 @@ import type {
   FormBlockType,
   FormFieldDefinition,
   FormFieldInit,
+  FormPageBackgroundSchema,
   FormResponse,
   FormResponseField,
   FormResponseSession,
@@ -150,7 +151,7 @@ export interface FormEditorState {
   focus_field_id?: string | null;
   focus_response_id?: string;
   focus_customer_id?: string;
-  focus_block_id?: string;
+  focus_block_id?: string | null;
   available_field_ids: string[];
   selected_rows: Set<string>;
   responses: {
@@ -160,6 +161,10 @@ export interface FormEditorState {
   sessions?: FormResponseSession[];
   theme: {
     palette?: FormStyleSheetV1Schema["palette"];
+    fontFamily?: FormStyleSheetV1Schema["font-family"];
+    customCSS?: FormStyleSheetV1Schema["custom"];
+    section?: FormStyleSheetV1Schema["section"];
+    background?: FormPageBackgroundSchema;
   };
   tables: GFTable[];
   datagrid_rows_per_page: number;
