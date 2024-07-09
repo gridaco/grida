@@ -2,9 +2,19 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/utils";
 
-export function SidebarRoot({ children }: React.PropsWithChildren<{}>) {
+export function SidebarRoot({
+  side = "left",
+  children,
+}: React.PropsWithChildren<{
+  side?: "left" | "right";
+}>) {
   return (
-    <nav className="relative w-60 h-full shrink-0 overflow-y-auto border-e">
+    <nav
+      className={cn(
+        "relative w-60 h-full shrink-0 overflow-y-auto",
+        side === "left" ? "border-e" : "border-s"
+      )}
+    >
       {children}
     </nav>
   );

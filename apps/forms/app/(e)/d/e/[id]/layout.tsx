@@ -5,7 +5,8 @@ import { Metadata } from "next";
 import { Inconsolata, Inter, Lora } from "next/font/google";
 import { FormPage } from "@/types";
 import { ThemeProvider } from "@/components/theme-provider";
-import Head from "next/head";
+import { stringfyThemeVariables } from "@/theme/palettes/utils";
+import palettes from "@/theme/palettes";
 
 export const revalidate = 0;
 
@@ -89,6 +90,9 @@ export default async function Layout({
     fonts[stylesheet?.["font-family"] as keyof typeof fonts] || fonts.inter;
 
   const customcss = stylesheet?.custom;
+  const palettecss = stylesheet?.palette
+    ? stringfyThemeVariables(palettes[stylesheet.palette] as any)
+    : undefined;
 
   return (
     <html lang={default_form_page_language} suppressHydrationWarning>
@@ -98,6 +102,14 @@ export default async function Layout({
           dangerouslySetInnerHTML={{
             __html: `
               ${customcss}
+            `,
+          }}
+        />
+        <style
+          id="custompalette"
+          dangerouslySetInnerHTML={{
+            __html: `
+              ${palettecss}
             `,
           }}
         />

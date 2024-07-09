@@ -1,5 +1,6 @@
 import BlocksEditor from "@/scaffolds/blocks-editor";
 import { Siebar } from "@/scaffolds/sidebar/sidebar";
+import { SideControl } from "@/scaffolds/sidecontrol";
 
 export default async function EditFormPage() {
   return (
@@ -17,6 +18,9 @@ export default async function EditFormPage() {
           />
         </div>
       </div>
+      <aside className="hidden lg:flex h-full">
+        <SideControl mode="blocks" />
+      </aside>
     </main>
   );
 }

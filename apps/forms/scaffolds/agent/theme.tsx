@@ -1,3 +1,5 @@
+"use client";
+
 import palettes from "@/theme/palettes";
 import useVariablesCSS from "../playground/use-variables-css";
 import { stringfyThemeVariables } from "@/theme/palettes/utils";
