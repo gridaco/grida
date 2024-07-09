@@ -191,7 +191,7 @@ function ModeBlocks() {
                 <SidebarMenuGridItem
                   onClick={addBlock.bind(null, block_type)}
                   key={block_type}
-                  className="border rounded-md shadow-sm cursor-pointer text-muted-foreground hover:text-foreground"
+                  className="border rounded-md shadow-sm cursor-pointer text-foreground/50 hover:text-foreground"
                 >
                   <BlockTypeIcon
                     type={block_type}
@@ -235,7 +235,7 @@ function ModeBlocks() {
                 <SidebarMenuGridItem
                   onClick={addFieldBlock.bind(null, field_type)}
                   key={field_type}
-                  className="border rounded-md shadow-sm cursor-pointer text-muted-foreground hover:text-foreground"
+                  className="border rounded-md shadow-sm cursor-pointer text-foreground/50 hover:text-foreground"
                 >
                   <FormFieldTypeIcon
                     type={field_type}

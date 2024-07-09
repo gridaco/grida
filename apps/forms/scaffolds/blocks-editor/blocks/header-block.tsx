@@ -82,17 +82,17 @@ export function HeaderBlock({
         </div>
       </BlockHeader>
       <div>
-        <div className="bg-card rounded overflow-hidden border aspect-auto">
+        <div className="bg-background rounded overflow-hidden border aspect-auto">
           <input
             type="text"
-            className="w-full p-4 text-2xl font-bold outline-none"
+            className="bg-background w-full p-4 text-2xl font-bold outline-none"
             placeholder="Heading"
             value={title_html ?? ""}
             onChange={(e) => onEditTitle(e.target.value)}
           />
           <TextareaAutosize
             minRows={1}
-            className="w-full p-4 text-lg outline-none"
+            className="bg-background w-full p-4 text-lg outline-none"
             placeholder="Description"
             value={description_html ?? ""}
             onChange={(e) => onEditDescription(e.target.value)}
