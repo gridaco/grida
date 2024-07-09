@@ -39,7 +39,7 @@ export function ReferenceTableGrid({
 
           return (
             <Highlight
-              text={val.toString()}
+              text={val?.toString()}
               tokens={tokens}
               className="bg-foreground text-background"
             />

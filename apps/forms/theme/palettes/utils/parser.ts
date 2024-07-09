@@ -1,3 +1,8 @@
+//
+// NOTE - this file is not used and has a issue on deployment
+// css-tree will complain about the following error:
+// Error: Cannot find module '../data/patch.json'
+//
 import * as csstree from "css-tree";
 
 export function parseThemeVariables(css: string) {
