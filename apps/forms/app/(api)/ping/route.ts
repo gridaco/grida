@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export function GET(req: NextRequest) {
-  const geo = req.geo;
+  const geo = {
+    country: req.geo?.country,
+    latitude: req.geo?.latitude,
+  };
   const xforwardedfor = req.headers.get("x-forwarded-for");
   return NextResponse.json({
     geo,
