@@ -1,12 +1,12 @@
 const monochrome = {
   light: {
-    "--background": { h: 0, s: 0, l: 100 },
+    "--background": { h: 0, s: 0, l: 96.86 },
     "--foreground": { h: 196.73, s: 0, l: 0 },
     "--muted": { h: 0, s: 0, l: 96.86 },
     "--muted-foreground": { h: 109, s: 0, l: 40.77 },
     "--popover": { h: 0, s: 0, l: 96.86 },
     "--popover-foreground": { h: 0, s: 0, l: 12.94 },
-    "--card": { h: 349, s: 0, l: 96.92 },
+    "--card": { h: 349, s: 0, l: 100 },
     "--card-foreground": { h: 196.73, s: 0, l: 0 },
     "--border": { h: 0, s: 0, l: 96.86 },
     "--input": { h: 0, s: 0, l: 87.69 },

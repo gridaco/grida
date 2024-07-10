@@ -12,7 +12,7 @@ export const backgrounds = [
   { name: "Globe", value: `${HOST_NAME}/theme/embed/backgrounds/globe` },
   {
     name: "Shader Gradient 00 Halo",
-    value: `${HOST_NAME}/theme/embed/backgrounds/shadergradient/01`,
+    value: `${HOST_NAME}/theme/embed/backgrounds/shadergradient/00`,
   },
   {
     name: "Shader Gradient 01 Pensive",
