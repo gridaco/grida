@@ -51,6 +51,10 @@ export const backgrounds = [
     value: `${HOST_NAME}/theme/embed/backgrounds/shadergradient/09`,
   },
   {
+    name: "Shader Gradient 91 Lunar wave",
+    value: `${HOST_NAME}/theme/embed/backgrounds/shadergradient/91`,
+  },
+  {
     name: "Shader Gradient 92 Lemon glow",
     value: `${HOST_NAME}/theme/embed/backgrounds/shadergradient/92`,
   },
