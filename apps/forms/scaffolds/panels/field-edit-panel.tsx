@@ -29,7 +29,9 @@ import { FormFieldAssistant } from "../ai/form-field-schema-assistant";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -1220,16 +1222,28 @@ function SupabaseReferencesSettings({
                   <SelectValue placeholder={"Select Table"} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="auth.users">
-                    <span>auth.users</span>
-                  </SelectItem>
-                  {Object.keys(supabase_project.sb_public_schema!)?.map(
-                    (key) => {
-                      const fulltable = `public.${key}`;
+                  <SelectGroup>
+                    <SelectLabel>auth</SelectLabel>
+                    <SelectItem value="auth.users">
+                      <span>auth.users</span>
+                    </SelectItem>
+                  </SelectGroup>
+                  {Object.keys(supabase_project.sb_schema_definitions).map(
+                    (schemaName) => {
                       return (
-                        <SelectItem key={fulltable} value={fulltable}>
-                          <span>{fulltable}</span>
-                        </SelectItem>
+                        <SelectGroup key={schemaName}>
+                          <SelectLabel>{schemaName}</SelectLabel>
+                          {Object.keys(
+                            supabase_project.sb_schema_definitions[schemaName]
+                          ).map((tableName) => {
+                            const fulltable = `${schemaName}.${tableName}`;
+                            return (
+                              <SelectItem key={fulltable} value={fulltable}>
+                                <span>{fulltable}</span>
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectGroup>
                       );
                     }
                   )}
@@ -1249,7 +1263,8 @@ function SupabaseReferencesSettings({
                   <SelectValue placeholder={"Select Column"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {table &&
+                  {schema &&
+                    table &&
                     (schema === "auth" && table === "users" ? (
                       <>
                         {Object.keys(
@@ -1276,12 +1291,13 @@ function SupabaseReferencesSettings({
                     ) : (
                       <>
                         {Object.keys(
-                          supabase_project.sb_public_schema![table]
+                          supabase_project.sb_schema_definitions[schema][table]
                             ?.properties ?? {}
                         )?.map((key) => {
                           const property =
-                            supabase_project.sb_public_schema![table]
-                              .properties?.[key];
+                            supabase_project.sb_schema_definitions[schema][
+                              table
+                            ].properties?.[key];
                           return (
                             <SelectItem
                               disabled={format !== property.format}

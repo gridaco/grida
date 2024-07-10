@@ -157,6 +157,9 @@ async function get_forms_x_supabase_table_connector({
   const x_client = await createXSupabaseClient(
     supabase_connection.supabase_project_id,
     {
+      db: {
+        schema: main_supabase_table?.sb_schema_name,
+      },
       service_role: true,
     }
   );

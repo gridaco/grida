@@ -45,6 +45,9 @@ export async function sbconn_insert({
   const row = asTableRowData(data, { schema });
 
   const sbclient = await createXSupabaseClient(connection.supabase_project_id, {
+    db: {
+      schema: sb_schema_name,
+    },
     // TODO: use service key only if configured to do so
     service_role: true,
   });
@@ -87,11 +90,12 @@ export async function sbconn_update(
   if (!connection_table) {
     throw new Error("connection_table not found");
   }
-  const { sb_table_name, sb_schema_name, sb_table_schema } = connection_table;
-
-  const schema = sb_table_schema as GridaSupabase.JSONSChema;
+  const { sb_table_name, sb_schema_name } = connection_table;
 
   const sbclient = await createXSupabaseClient(connection.supabase_project_id, {
+    db: {
+      schema: sb_schema_name,
+    },
     // TODO: use service key only if configured to do so
     service_role: true,
   });

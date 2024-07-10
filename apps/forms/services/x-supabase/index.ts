@@ -1,7 +1,11 @@
 import { grida_xsupabase_client } from "@/lib/supabase/server";
 import { secureformsclient } from "@/lib/supabase/vault";
 import { ConnectionSupabaseJoint, GridaSupabase } from "@/types";
-import { SupabaseClient, createClient } from "@supabase/supabase-js";
+import {
+  SupabaseClient,
+  SupabaseClientOptions,
+  createClient,
+} from "@supabase/supabase-js";
 import { SupabaseStorageExtensions } from "@/lib/supabase/storage-ext";
 import { render } from "@/lib/templating/template";
 import type { XSupabaseStorageSchema } from "@/types";
@@ -12,7 +16,7 @@ import "core-js/features/map/group-by";
 
 export async function createXSupabaseClient(
   supabase_project_id: number,
-  config?: { service_role?: boolean }
+  config?: SupabaseClientOptions<any> & { service_role?: boolean }
 ): Promise<SupabaseClient<any, any>> {
   // fetch connection table
   const { data: supabase_project, error: supabase_project_err } =
@@ -36,7 +40,9 @@ export async function createXSupabaseClient(
 
   const apiKey = serviceRoleKey || sb_anon_key;
 
-  const sbclient = createClient(sb_project_url, apiKey);
+  const sbclient = createClient(sb_project_url, apiKey, {
+    db: config?.db,
+  });
 
   return sbclient;
 }
@@ -85,7 +91,8 @@ export class GridaXSupabaseService {
 
     return {
       ...conn,
-      supabase_project: supabase_project! as GridaSupabase.SupabaseProject,
+      supabase_project:
+        supabase_project! as {} as GridaSupabase.SupabaseProject,
       main_supabase_table_id,
       tables: supabase_project!.tables as any as GridaSupabase.SupabaseTable[],
       main_supabase_table:
