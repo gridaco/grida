@@ -107,4 +107,8 @@ export namespace XSupabasePrivateApiTypes {
     schema_name: string;
     table_name: string;
   }
+
+  export interface AddSchemaNameRequestData {
+    schema_name: string;
+  }
 }

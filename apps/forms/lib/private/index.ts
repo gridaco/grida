@@ -187,6 +187,16 @@ export namespace PrivateEditorApi {
       );
     }
 
+    export async function addCustomSchema(
+      form_id: string,
+      data: XSupabasePrivateApiTypes.AddSchemaNameRequestData
+    ) {
+      return Axios.post(
+        `/private/editor/connect/${form_id}/supabase/custom-schema`,
+        data
+      );
+    }
+
     export async function createConnectionTable(
       form_id: string,
       data: XSupabasePrivateApiTypes.CreateConnectionTableRequestData
