@@ -103,14 +103,16 @@ function xsbmtinit(conn?: GridaSupabase.SupabaseConnectionState) {
   // TODO: need inspection - will supbaseconn present even when main table is not present?
   // if yes, we need to adjust the state to be nullable
   if (!conn) return undefined;
-  const parsed = conn.main_supabase_table?.sb_table_schema
+  if (!conn.main_supabase_table) return undefined;
+
+  const parsed = conn.main_supabase_table.sb_table_schema
     ? SupabasePostgRESTOpenApi.parse_supabase_postgrest_schema_definition(
         conn.main_supabase_table?.sb_table_schema
       )
     : undefined;
 
   return {
-    schema: conn.main_supabase_table!.sb_table_schema,
+    schema: conn.main_supabase_table.sb_table_schema,
     pks: parsed?.pks || [],
     gfpk: (parsed?.pks?.length || 0) > 0 ? parsed?.pks[0] : undefined,
     rows: [],

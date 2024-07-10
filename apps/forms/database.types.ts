@@ -1788,6 +1788,8 @@ export type Database = {
           sb_project_reference_id: string
           sb_project_url: string
           sb_public_schema: Json
+          sb_schema_definitions: Json
+          sb_schema_names: string[]
           sb_service_key_id: string | null
           updated_at: string
         }
@@ -1799,6 +1801,8 @@ export type Database = {
           sb_project_reference_id: string
           sb_project_url: string
           sb_public_schema: Json
+          sb_schema_definitions: Json
+          sb_schema_names?: string[]
           sb_service_key_id?: string | null
           updated_at?: string
         }
@@ -1810,6 +1814,8 @@ export type Database = {
           sb_project_reference_id?: string
           sb_project_url?: string
           sb_public_schema?: Json
+          sb_schema_definitions?: Json
+          sb_schema_names?: string[]
           sb_service_key_id?: string | null
           updated_at?: string
         }

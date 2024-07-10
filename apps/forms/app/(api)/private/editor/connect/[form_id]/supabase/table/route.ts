@@ -2,6 +2,7 @@ import {
   createRouteHandlerClient,
   grida_xsupabase_client,
 } from "@/lib/supabase/server";
+import { XSupabasePrivateApiTypes } from "@/types/private/api";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
@@ -10,10 +11,6 @@ interface Context {
   params: {
     form_id: string;
   };
-}
-
-interface CreateConnectionTableRequestData {
-  table: string;
 }
 
 export async function GET(req: NextRequest, context: Context) {
@@ -57,7 +54,11 @@ export async function PUT(req: NextRequest, context: Context) {
   const cookieStore = cookies();
   const supabase = createRouteHandlerClient(cookieStore);
 
-  const data = (await req.json()) as CreateConnectionTableRequestData;
+  const {
+    schema_name,
+    table_name,
+  }: XSupabasePrivateApiTypes.CreateConnectionTableRequestData =
+    await req.json();
 
   const { data: conn_ref, error: conn_ref_error } = await supabase
     .from("connection_supabase")
@@ -74,20 +75,22 @@ export async function PUT(req: NextRequest, context: Context) {
 
   const { data: supabase_project } = await grida_xsupabase_client
     .from("supabase_project")
-    .select("*, tables:supabase_table(*)")
+    .select("sb_schema_definitions, tables:supabase_table(*)")
     .eq("id", conn_ref.supabase_project_id)
     .single();
 
-  const schema = (supabase_project!.sb_public_schema as any)[data.table];
+  const table_schema = (supabase_project!.sb_schema_definitions as any)[
+    schema_name
+  ][table_name];
 
   const { data: upserted_supabase_table, error } = await grida_xsupabase_client
     .from("supabase_table")
     .upsert(
       {
         supabase_project_id: conn_ref!.supabase_project_id,
-        sb_table_name: data.table,
-        sb_schema_name: "public",
-        sb_table_schema: schema,
+        sb_table_name: table_name,
+        sb_schema_name: schema_name,
+        sb_table_schema: table_schema,
       },
       {
         onConflict: "supabase_project_id, sb_table_name, sb_schema_name",
@@ -96,7 +99,10 @@ export async function PUT(req: NextRequest, context: Context) {
     .select()
     .single();
 
-  if (error) return NextResponse.error();
+  if (error) {
+    console.error(error);
+    return NextResponse.error();
+  }
 
   // update connection_supabase
   await supabase

@@ -11,6 +11,7 @@ import {
   UpdateFormMethodRequest,
   UpdateFormScheduleRequest,
   UpdateFormUnknownFieldsHandlingStrategyRequest,
+  XSupabasePrivateApiTypes,
 } from "@/types/private/api";
 import Axios from "axios";
 
@@ -157,7 +158,9 @@ export namespace PrivateEditorApi {
     }
 
     export async function refreshConnection(form_id: string) {
-      return Axios.patch(`/private/editor/connect/${form_id}/supabase`);
+      return Axios.patch<EditorApiResponse<GridaSupabase.SupabaseProject>>(
+        `/private/editor/connect/${form_id}/supabase`
+      );
     }
 
     export async function getConnection(form_id: string) {
@@ -186,9 +189,19 @@ export namespace PrivateEditorApi {
       );
     }
 
+    export async function addCustomSchema(
+      form_id: string,
+      data: XSupabasePrivateApiTypes.AddSchemaNameRequestData
+    ) {
+      return Axios.post<EditorApiResponse<GridaSupabase.SupabaseProject>>(
+        `/private/editor/connect/${form_id}/supabase/custom-schema`,
+        data
+      );
+    }
+
     export async function createConnectionTable(
       form_id: string,
-      data: { table: string }
+      data: XSupabasePrivateApiTypes.CreateConnectionTableRequestData
     ) {
       return Axios.put(
         `/private/editor/connect/${form_id}/supabase/table`,

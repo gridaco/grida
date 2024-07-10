@@ -36,9 +36,18 @@ export class FieldStorageService {
     }
 
     assert(this.supabase_connection, "supabase_connection not found");
+
+    // can be optimized with the query
+    const conn = await new GridaXSupabaseService().getConnection(
+      this.supabase_connection
+    );
+
     this._m_xsupabaseclient = await createXSupabaseClient(
       this.supabase_connection.supabase_project_id,
       {
+        db: {
+          schema: conn?.main_supabase_table?.sb_schema_name,
+        },
         service_role: true,
       }
     );

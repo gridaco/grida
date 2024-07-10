@@ -41,44 +41,62 @@ export namespace SupabasePostgRESTOpenApi {
   export async function fetch_supabase_postgrest_swagger({
     url,
     anonKey,
+    schemas = ["public"],
   }: {
     url: string;
     anonKey: string;
+    schemas?: string[];
   }): Promise<{
     sb_anon_key: string;
     sb_project_reference_id: string;
-    sb_public_schema: { [key: string]: any };
+    sb_schema_names: string[];
+    sb_schema_definitions: { [schema: string]: { [key: string]: any } };
     sb_project_url: string;
   }> {
     return new Promise(async (resolve, reject) => {
       try {
         const u = new URL(url);
         const projectref = u.hostname.split(".")[0];
+        const route = build_supabase_openapi_url(url, anonKey);
 
-        const res = await fetch(build_supabase_openapi_url(url, anonKey));
-        const api = await res.json();
+        const schema_definitions: { [schema: string]: any } = {};
 
-        if (!res.ok || !api) {
-          return reject();
+        // can be optimized
+        for (const schema of schemas) {
+          const apidoc = await fetch_swagger(route, schema);
+          // validate
+          if (!apidoc || !("definitions" in apidoc)) {
+            return reject();
+          }
+          schema_definitions[schema] = apidoc.definitions;
         }
 
-        const apidoc = api as SupabaseOpenAPIDocument;
-
-        // validate
-        if ("definitions" in apidoc) {
-          return resolve({
-            sb_anon_key: anonKey,
-            sb_project_reference_id: projectref,
-            sb_public_schema: apidoc.definitions,
-            sb_project_url: url,
-          });
-        }
-
-        reject("Invalid URL");
+        return resolve({
+          sb_anon_key: anonKey,
+          sb_project_reference_id: projectref,
+          sb_schema_definitions: schema_definitions,
+          sb_schema_names: schemas,
+          sb_project_url: url,
+        });
       } catch (e) {
         reject(e);
       }
     });
+  }
+
+  async function fetch_swagger(url: string, schema = "public") {
+    const res = await fetch(url, {
+      headers: {
+        // https://postgrest.org/en/stable/references/api/schemas.html
+        "Accept-Profile": schema,
+      },
+    });
+    const apidoc: SupabaseOpenAPIDocument = await res.json();
+    if (!res.ok || !apidoc) {
+      return undefined;
+    }
+
+    return apidoc;
   }
 
   export type FKMeta = {

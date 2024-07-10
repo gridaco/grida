@@ -4,6 +4,7 @@ import {
   grida_xsupabase_client,
 } from "@/lib/supabase/server";
 import { GridaXSupabaseService } from "@/services/x-supabase";
+import assert from "assert";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
@@ -67,32 +68,44 @@ export async function PATCH(req: NextRequest, context: Context) {
 
   const { data: supabase_project } = await grida_xsupabase_client
     .from("supabase_project")
-    .select(`*`)
+    .select(
+      `
+        sb_project_url,
+        sb_anon_key,
+        sb_schema_names
+      `
+    )
     .eq("id", supabase_project_id)
     .single();
 
-  const { sb_public_schema } =
+  const { sb_schema_definitions } =
     await SupabasePostgRESTOpenApi.fetch_supabase_postgrest_swagger({
       url: supabase_project!.sb_project_url,
       anonKey: supabase_project!.sb_anon_key,
+      schemas: supabase_project!.sb_schema_names,
     });
 
   if (conn.main_supabase_table_id) {
     const { data: main_table } = await grida_xsupabase_client
       .from("supabase_table")
-      .select(`sb_table_name`)
+      .select(`sb_table_name, sb_schema_name`)
       .eq("id", conn.main_supabase_table_id)
       .single();
 
+    assert(main_table, "Main table not found");
+
+    const { sb_schema_name, sb_table_name } = main_table;
+
     await grida_xsupabase_client.from("supabase_table").update({
-      sb_table_schema: sb_public_schema[main_table!.sb_table_name],
+      sb_table_schema: sb_schema_definitions[sb_schema_name][sb_table_name],
     });
   }
 
   const { data: patch, error: patch_error } = await grida_xsupabase_client
     .from("supabase_project")
     .update({
-      sb_public_schema: sb_public_schema,
+      sb_public_schema: sb_schema_definitions["public"],
+      sb_schema_definitions,
     })
     .eq("id", supabase_project_id)
     .select(`*, tables:supabase_table(*)`)
@@ -114,10 +127,11 @@ export async function POST(req: NextRequest, context: Context) {
   const data = await req.json();
   const { sb_project_url, sb_anon_key } = data;
 
-  const { sb_project_reference_id, sb_public_schema } =
+  const { sb_project_reference_id, sb_schema_definitions } =
     await SupabasePostgRESTOpenApi.fetch_supabase_postgrest_swagger({
       url: sb_project_url,
       anonKey: sb_anon_key,
+      schemas: ["public"],
     });
 
   const { data: form_ref, error: form_ref_err } = await supabase
@@ -136,7 +150,9 @@ export async function POST(req: NextRequest, context: Context) {
       project_id: form_ref.project_id,
       sb_anon_key,
       sb_project_reference_id,
-      sb_public_schema,
+      sb_public_schema: sb_schema_definitions["public"],
+      sb_schema_definitions,
+      sb_schema_names: ["public"],
       sb_project_url,
     })
     .select()

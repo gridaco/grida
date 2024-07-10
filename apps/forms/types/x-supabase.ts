@@ -29,7 +29,12 @@ export namespace GridaSupabase {
     project_id: number;
     sb_anon_key: string;
     sb_project_reference_id: string;
-    sb_public_schema: SchemaDefinitions | null;
+    /**
+     * @deprecated use `sb_schema_definitions["public"]` instead
+     */
+    sb_public_schema: SchemaDefinitions;
+    sb_schema_definitions: { [schema: string]: SchemaDefinitions };
+    sb_schema_names: string[];
     sb_project_url: string;
     sb_service_key_id: string | null;
   }

@@ -101,3 +101,14 @@ export type UpdateFormUnknownFieldsHandlingStrategyRequest = {
   form_id: string;
   strategy?: FormResponseUnknownFieldHandlingStrategyType;
 };
+
+export namespace XSupabasePrivateApiTypes {
+  export interface CreateConnectionTableRequestData {
+    schema_name: string;
+    table_name: string;
+  }
+
+  export interface AddSchemaNameRequestData {
+    schema_name: string;
+  }
+}

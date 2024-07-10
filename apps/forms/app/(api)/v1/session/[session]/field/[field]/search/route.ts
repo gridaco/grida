@@ -64,13 +64,16 @@ export async function GET(
         const conn = await xsupabase.getConnection(supabase_connection);
         assert(conn, "connection fetch failed");
         const {
-          supabase_project: { sb_public_schema },
+          supabase_project: { sb_schema_definitions },
         } = conn;
 
         const client = await createXSupabaseClient(
           supabase_connection?.supabase_project_id,
           {
             service_role: true,
+            db: {
+              schema: schema,
+            },
           }
         );
 
@@ -99,7 +102,8 @@ export async function GET(
               } satisfies SearchRes,
             });
           }
-          case "public": {
+          case "public":
+          default: {
             const { data, error } = await client.from(table).select();
 
             if (error || !data) {
@@ -112,15 +116,12 @@ export async function GET(
                 schema_name: schema,
                 table_name: table,
                 column: column,
-                table_schema: sb_public_schema![table],
+                table_schema: sb_schema_definitions[schema][table],
                 rows: data,
               } satisfies SearchRes,
             });
 
             break;
-          }
-          default: {
-            throw new Error(`Unsupported schema: ${schema}`);
           }
         }
       }
