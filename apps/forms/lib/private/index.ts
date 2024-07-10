@@ -158,7 +158,9 @@ export namespace PrivateEditorApi {
     }
 
     export async function refreshConnection(form_id: string) {
-      return Axios.patch(`/private/editor/connect/${form_id}/supabase`);
+      return Axios.patch<EditorApiResponse<GridaSupabase.SupabaseProject>>(
+        `/private/editor/connect/${form_id}/supabase`
+      );
     }
 
     export async function getConnection(form_id: string) {
@@ -191,7 +193,7 @@ export namespace PrivateEditorApi {
       form_id: string,
       data: XSupabasePrivateApiTypes.AddSchemaNameRequestData
     ) {
-      return Axios.post(
+      return Axios.post<EditorApiResponse<GridaSupabase.SupabaseProject>>(
         `/private/editor/connect/${form_id}/supabase/custom-schema`,
         data
       );

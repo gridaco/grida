@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
@@ -17,29 +17,16 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
-  CodeIcon,
   EyeNoneIcon,
   EyeOpenIcon,
   LockClosedIcon,
   OpenInNewWindowIcon,
+  PlusIcon,
   QuestionMarkCircledIcon,
 } from "@radix-ui/react-icons";
 import toast from "react-hot-toast";
 import { SupabaseLogo } from "@/components/logos";
 import Link from "next/link";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import {
   Select,
   SelectContent,
@@ -64,7 +51,16 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Spinner } from "@/components/spinner";
 import { PrivateEditorApi } from "@/lib/private";
-import { KeyIcon, LinkIcon } from "lucide-react";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { SupabaseTableInfo } from "@/scaffolds/x-supabase/supabase-table-info";
 
 export default function ConnectDB({
   params,
@@ -86,15 +82,18 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
   const [url, setUrl] = useState("");
   const [anonKey, setAnonKey] = useState("");
   const [serviceKey, setServiceKey] = useState("");
-  const [schema, setSchema] =
-    useState<SupabasePostgRESTOpenApi.SupabasePublicSchema | null>(null);
-  const [table, setTable] = useState<string | undefined>(undefined);
+  const [schemaNames, setSchemaNames] = useState<string[]>(["public"]);
+  const [schemaName, setSchemaName] = useState<string>("public");
+  const [schema_definitions, set_schema_definitions] = useState<{
+    [schema: string]: SupabasePostgRESTOpenApi.SupabasePublicSchema;
+  } | null>(null);
+  const [tableName, setTableName] = useState<string | undefined>(undefined);
 
   const [project, setProject] = useState<
     GridaSupabase.SupabaseProject | null | undefined
   >(undefined);
 
-  const is_loaded = schema !== null;
+  const is_loaded = schema_definitions !== null;
   const is_connected = !!project;
   const is_service_key_set = !!project?.sb_service_key_id;
 
@@ -107,41 +106,98 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
         setProject(data.supabase_project);
         setUrl(data.supabase_project.sb_project_url);
         setAnonKey(data.supabase_project.sb_anon_key);
-        setSchema(data.supabase_project.sb_public_schema as {});
-        setTable(
+        setSchemaNames(data.supabase_project.sb_schema_names);
+        if (data.main_supabase_table?.sb_schema_name) {
+          setSchemaName(data.main_supabase_table.sb_schema_name as string);
+        }
+        set_schema_definitions(
+          data.supabase_project.sb_schema_definitions as {}
+        );
+        setTableName(
           data.tables.find((t) => t.id === data.main_supabase_table_id)
             ?.sb_table_name
         );
-        console.log(data);
       })
       .catch((err) => {
         setProject(null);
       });
   }, [form_id]);
 
+  useEffect(() => {
+    setTableName(undefined);
+  }, [schemaName]);
+
   const onClearClick = () => {
     setUrl("");
     setAnonKey("");
-    setSchema(null);
-    setTable(undefined);
+    set_schema_definitions(null);
+    setTableName(undefined);
     setProject(null);
   };
 
-  const onTestConnectionClick = async () => {
+  const testConnection = async ({
+    url,
+    anonKey,
+    schema,
+  }: {
+    url: string;
+    anonKey: string;
+    schema: string;
+  }) => {
+    //
     const parsing = SupabasePostgRESTOpenApi.fetch_supabase_postgrest_swagger({
       url,
       anonKey,
-    }).then((res) => {
-      setSchema(res.sb_public_schema);
+      schemas: [schema],
     });
 
-    toast
-      .promise(parsing, {
-        loading: "Parsing OpenAPI...",
-        success: "Valid Connection",
-        error: "Failed to connect to Supabase",
-      })
-      .catch(console.error);
+    try {
+      await toast
+        .promise(parsing, {
+          loading: "Testing...",
+          success: "Valid Connection",
+          error: "Failed to connect to Supabase",
+        })
+        .catch(console.error);
+
+      return await parsing;
+    } catch (e) {
+      return false;
+    }
+  };
+
+  const onTestConnectionClick = async () => {
+    await testConnection({
+      url,
+      anonKey,
+      schema: "public",
+    }).then((res) => {
+      if (res) set_schema_definitions(res.sb_schema_definitions as {});
+    });
+  };
+
+  const onTestCustomSchemaConnection = async (schema: string) => {
+    return await testConnection({
+      url,
+      anonKey,
+      schema: schema,
+    });
+  };
+
+  const onUseCustomSchema = async (schema: string) => {
+    const { data } = await PrivateEditorApi.SupabaseConnection.addCustomSchema(
+      form_id,
+      {
+        schema_name: schema,
+      }
+    );
+
+    if (data.data) {
+      setSchemaName(schema);
+      setSchemaNames(data.data.sb_schema_names);
+      set_schema_definitions(data.data.sb_schema_definitions as {});
+      return data.data;
+    }
   };
 
   const onRefreshSchemaClick = async () => {
@@ -153,7 +209,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
     });
 
     res.then((res) => {
-      setSchema(res.data.data.sb_public_schema);
+      set_schema_definitions(res.data.data?.sb_schema_definitions as {});
     });
   };
 
@@ -192,8 +248,8 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
         setProject(null);
         setUrl("");
         setAnonKey("");
-        setSchema(null);
-        setTable(undefined);
+        set_schema_definitions(null);
+        setTableName(undefined);
       });
   };
 
@@ -235,10 +291,13 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
   };
 
   const onSaveMainTableClick = async () => {
-    assert(table);
+    assert(tableName);
     const res = PrivateEditorApi.SupabaseConnection.createConnectionTable(
       form_id,
-      { table }
+      {
+        table_name: tableName,
+        schema_name: schemaName,
+      }
     );
 
     toast.promise(res, {
@@ -247,8 +306,6 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
       error: "Failed to save main table",
     });
   };
-
-  console.log(schema, table);
 
   return (
     <div className="space-y-10">
@@ -476,30 +533,57 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {schema && (
-            <div>
-              <Select value={table} onValueChange={(value) => setTable(value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select main datasource" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.keys(schema).map((key) => (
-                    <SelectItem key={key} value={key}>
-                      {key}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {table && (
-                <SupabaseTableInfo
-                  table={schema[table] as GridaSupabase.JSONSChema}
-                />
-              )}
-            </div>
-          )}
+          <div className="space-y-4">
+            <Label>
+              Schema
+              <DBSchemaSelect
+                onTestConnection={onTestCustomSchemaConnection}
+                value={schemaName}
+                options={schemaNames}
+                onChange={setSchemaName}
+                onUse={onUseCustomSchema}
+              />
+            </Label>
+            {schema_definitions && (
+              <div>
+                <Label>
+                  Table
+                  <Select
+                    value={tableName}
+                    onValueChange={(value) => setTableName(value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue
+                        placeholder={`Select table from schema: ${schemaName}`}
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.keys(schema_definitions[schemaName]).map(
+                        (key) => (
+                          <SelectItem key={key} value={key}>
+                            {schemaName}.{key}
+                          </SelectItem>
+                        )
+                      )}
+                    </SelectContent>
+                  </Select>
+                </Label>
+
+                {tableName && schema_definitions[schemaName][tableName] && (
+                  <SupabaseTableInfo
+                    table={
+                      schema_definitions[schemaName][
+                        tableName
+                      ] as GridaSupabase.JSONSChema
+                    }
+                  />
+                )}
+              </div>
+            )}
+          </div>
         </CardContent>
         <CardFooter className="flex justify-end">
-          <Button disabled={!table} onClick={onSaveMainTableClick}>
+          <Button disabled={!tableName} onClick={onSaveMainTableClick}>
             Save
           </Button>
         </CardFooter>
@@ -508,68 +592,126 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
   );
 }
 
-function SupabaseTableInfo({ table }: { table: GridaSupabase.JSONSChema }) {
-  const { properties } = useMemo(
-    () =>
-      SupabasePostgRESTOpenApi.parse_supabase_postgrest_schema_definition(
-        table
-      ),
-    [table]
-  );
+function DBSchemaSelect({
+  value,
+  options,
+  onChange,
+  onTestConnection,
+  onUse,
+}: {
+  value: string;
+  options: string[];
+  onTestConnection: (schema: string) => Promise<false | any>;
+  onChange: (schema: string) => void;
+  onUse: (schema: string) => Promise<false | any>;
+}) {
+  const [isvalid, setIsValid] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [custom, setCustom] = useState("");
+  const [open, setOpen] = useState(false);
+
+  const __add_custom = "__add_custom";
+
+  useEffect(() => {
+    setIsValid(false);
+  }, [custom]);
+
+  const onTest = () => {
+    setTesting(true);
+    onTestConnection(custom)
+      .then((res) => {
+        setIsValid(!!res);
+      })
+      .finally(() => {
+        setTesting(false);
+      });
+  };
+
+  const onUseClick = () => {
+    setTesting(true);
+    onUse(custom)
+      .then((res) => {
+        if (!!res) {
+          setOpen(false);
+        }
+      })
+      .finally(() => {
+        setTesting(false);
+      });
+  };
 
   return (
     <>
-      <hr className="my-4" />
-      <Table className="font-mono">
-        <TableHeader>
-          <TableRow>
-            <TableHead></TableHead>
-            <TableHead>Column</TableHead>
-            <TableHead>Data Type</TableHead>
-            <TableHead>PostgreSQL Type</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {Object.entries(properties).map(
-            ([prop, { pk, fk, type, format, required, name }]) => {
-              return (
-                <TableRow key={prop}>
-                  <TableCell>
-                    {pk && (
-                      <KeyIcon className="me-1 inline align-middle w-4 h-4" />
-                    )}
-                    {fk && (
-                      <LinkIcon className="me-1 inline align-middle w-4 h-4" />
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {name}{" "}
-                    {required && (
-                      <span className="text-xs text-foreground-muted text-red-500">
-                        *
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell>{type}</TableCell>
-                  <TableCell>{format}</TableCell>
-                </TableRow>
-              );
-            }
-          )}
-        </TableBody>
-      </Table>
-      <Collapsible className="mt-4">
-        <CollapsibleTrigger>
-          <Button variant="link" size="sm">
-            <CodeIcon className="me-2 align-middle" /> Raw JSON
-          </Button>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <article className="prose dark:prose-invert">
-            <pre>{JSON.stringify(table, null, 2)}</pre>
-          </article>
-        </CollapsibleContent>
-      </Collapsible>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              <SupabaseLogo className="inline me-2 align-middle" size={20} />
+              Enter Custom Schema
+            </DialogTitle>
+            <DialogDescription>
+              Enter the schema name to connect to.{" "}
+              <Link
+                href="https://supabase.com/docs/guides/api/using-custom-schemas"
+                target="_blank"
+                className="underline"
+              >
+                Learn More
+              </Link>
+            </DialogDescription>
+          </DialogHeader>
+          <div>
+            <Input
+              value={custom}
+              onChange={(e) => setCustom(e.target.value)}
+              disabled={testing}
+              placeholder="schema_name"
+            />
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="secondary">Cancel</Button>
+            </DialogClose>
+            {isvalid ? (
+              <Button disabled={testing} onClick={onUseClick}>
+                {testing && <Spinner className="w-4 h-4 me-2 align-middle" />}
+                Add this schema
+              </Button>
+            ) : (
+              <Button disabled={testing || !custom} onClick={onTest}>
+                {testing && <Spinner className="w-4 h-4 me-2 align-middle" />}
+                Test Connection
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Select
+        value={value}
+        onValueChange={(v) => {
+          if (v === __add_custom) {
+            setOpen(true);
+            return;
+          }
+          onChange(v);
+        }}
+        defaultValue="public"
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="schema" />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((name) => (
+            <SelectItem key={name} value={name}>
+              {name}
+            </SelectItem>
+          ))}
+          <SelectItem value={__add_custom}>
+            <PlusIcon className="me-2 inline align-middle w-4 h-4" />
+            Add Custom
+          </SelectItem>
+        </SelectContent>
+      </Select>
     </>
   );
 }

@@ -34,6 +34,7 @@ export namespace GridaSupabase {
      */
     sb_public_schema: SchemaDefinitions;
     sb_schema_definitions: { [schema: string]: SchemaDefinitions };
+    sb_schema_names: string[];
     sb_project_url: string;
     sb_service_key_id: string | null;
   }
