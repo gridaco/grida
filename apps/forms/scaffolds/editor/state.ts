@@ -52,9 +52,7 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
       store_id: init.connections?.store_id,
       supabase: init.connections?.supabase,
     },
-    theme: {
-      palette: init.theme.palette,
-    },
+    theme: init.theme,
     form_id: init.form_id,
     form_title: init.form_title,
     tables: init.connections?.supabase?.main_supabase_table
