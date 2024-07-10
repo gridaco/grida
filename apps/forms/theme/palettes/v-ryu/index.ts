@@ -9,6 +9,7 @@ import _008_blue_steel from "./008-blue-steel";
 import _009_neon_yellow from "./009-neon-yellow";
 import _010_cherry_blossom from "./010-cherry-blossom";
 import _011_peach_sorbet from "./011-peach-sorbet";
+import _012_cotton_candy from "./012-cotton-candy";
 
 export {
   _001_monochrome,
@@ -22,4 +23,5 @@ export {
   _009_neon_yellow,
   _010_cherry_blossom,
   _011_peach_sorbet,
+  _012_cotton_candy,
 };
