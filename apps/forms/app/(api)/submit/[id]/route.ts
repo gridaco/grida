@@ -46,7 +46,10 @@ import {
   SessionStagedFileStorage,
   parse_tmp_storage_object_path,
 } from "@/services/form/session-storage";
-import { createXSupabaseClient } from "@/services/x-supabase";
+import {
+  GridaXSupabaseService,
+  createXSupabaseClient,
+} from "@/services/x-supabase";
 import { FormValue } from "@/services/form";
 import { XSupabase } from "@/services/x-supabase";
 import { TemplateVariables } from "@/lib/templating";
@@ -701,91 +704,106 @@ async function submit({
   // post-upload processing - x-supabase
   // ==================================================
 
-  const x_supabase_row_with_resolved_file_upate_data = Object.keys(
-    field_file_uploads
-  ).reduce(
-    (acc, field_id) => {
-      const field = v_form_fields!.find((f) => f.id === field_id);
-
-      if (!field) {
-        throw new Error(
-          "field not found - unknown fields are not allowed with x-supabase connection"
-        );
-      }
-
-      const success_results = field_file_upload_results[field_id].filter(
-        (res) => !!res.data
-      );
-
-      // this is partially implemented. case handling and errors are incomplete.
-      // update object_path columns (only supports 'text' else will be thrown with unhandled error)
-      if (FieldSupports.file_alias(field.type) && field.storage) {
-        const paths = success_results.map((res) => res.data!.path);
-
-        // TODO: support array
-        if (paths.length > 1) {
-          throw new Error(
-            "file alias object_path with multiple is not supported yet"
-          );
-        }
-
-        return {
-          ...acc,
-          [field.name]: paths[0] || undefined,
-        };
-      }
-
-      // this is partially implemented only for 'richtext' cms implementation
-      if (FieldSupports.richtext(field.type)) {
-        // const value = RECORD![field.name]; // -> this can cause side effects with user's db trugger. (but also makes sence to use the updated one?)
-        const { value } = FormValue.parse(
-          (formdata as FormData).get(field.name),
-          {
-            utc_offset: meta.utc_offset,
-            enums: field.options,
-            type: field.type,
-          }
-        );
-
-        const document = value
-          ? RichTextStagedFileUtils.renderDocument(value, {
-              files: field_file_processor.file_commits[field_id],
-            })
-          : undefined;
-
-        return {
-          ...acc,
-          [field.name]: document,
-        };
-      }
-
-      return acc;
-    },
-    {} as Record<string, any>
-  );
-
-  if (
-    supabase_connection &&
-    // only update if changes are present
-    Object.keys(x_supabase_row_with_resolved_file_upate_data).length > 0
-  ) {
-    const xsupabasepostfileuploadupdate = await sbconn_update(
-      {
-        OLD: RECORD!,
-        NEW: x_supabase_row_with_resolved_file_upate_data,
-        pks: X_SUPABASE_MAIN_TABLE_PKS,
-      },
+  if (supabase_connection) {
+    const conn = await new GridaXSupabaseService().getConnection(
       supabase_connection
     );
 
-    if (xsupabasepostfileuploadupdate.error) {
-      console.error(
-        "submit/err/post-upload/sbconn",
-        xsupabasepostfileuploadupdate.error
-      );
-    }
+    assert(conn?.main_supabase_table);
 
-    // do not throw since the response / row is already created
+    const {
+      main_supabase_table: { sb_table_schema },
+    } = conn;
+
+    const x_supabase_row_with_resolved_file_upate_data = Object.keys(
+      field_file_uploads
+    ).reduce(
+      (acc, field_id) => {
+        const field = v_form_fields!.find((f) => f.id === field_id);
+
+        if (!field) {
+          throw new Error(
+            "field not found - unknown fields are not allowed with x-supabase connection"
+          );
+        }
+
+        // check if the field is a valid table field not a abstract render-only field
+        // TODO: this is also a good place to validate type - only `text` or `text[]` is supported
+        if (!!!sb_table_schema.properties[field.name]) {
+          return acc;
+        }
+
+        const success_results = field_file_upload_results[field_id].filter(
+          (res) => !!res.data
+        );
+
+        // this is partially implemented. case handling and errors are incomplete.
+        // update object_path columns (only supports 'text' else will be thrown with unhandled error)
+        if (FieldSupports.file_alias(field.type) && field.storage) {
+          const paths = success_results.map((res) => res.data!.path);
+
+          // TODO: support array
+          if (paths.length > 1) {
+            throw new Error(
+              "file alias object_path with multiple is not supported yet"
+            );
+          }
+
+          return {
+            ...acc,
+            [field.name]: paths[0] || undefined,
+          };
+        }
+
+        // this is partially implemented only for 'richtext' cms implementation
+        if (FieldSupports.richtext(field.type)) {
+          // const value = RECORD![field.name]; // -> this can cause side effects with user's db trugger. (but also makes sence to use the updated one?)
+          const { value } = FormValue.parse(
+            (formdata as FormData).get(field.name),
+            {
+              utc_offset: meta.utc_offset,
+              enums: field.options,
+              type: field.type,
+            }
+          );
+
+          const document = value
+            ? RichTextStagedFileUtils.renderDocument(value, {
+                files: field_file_processor.file_commits[field_id],
+              })
+            : undefined;
+
+          return {
+            ...acc,
+            [field.name]: document,
+          };
+        }
+
+        return acc;
+      },
+      {} as Record<string, any>
+    );
+
+    // only update if changes are present
+    if (Object.keys(x_supabase_row_with_resolved_file_upate_data).length > 0) {
+      const xsupabasepostfileuploadupdate = await sbconn_update(
+        {
+          OLD: RECORD!,
+          NEW: x_supabase_row_with_resolved_file_upate_data,
+          pks: X_SUPABASE_MAIN_TABLE_PKS,
+        },
+        supabase_connection
+      );
+
+      if (xsupabasepostfileuploadupdate.error) {
+        console.error(
+          "submit/err/post-upload/sbconn",
+          xsupabasepostfileuploadupdate.error
+        );
+      }
+
+      // do not throw since the response / row is already created
+    }
   }
 
   //
