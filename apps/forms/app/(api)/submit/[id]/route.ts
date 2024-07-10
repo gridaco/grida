@@ -717,11 +717,24 @@ async function submit({
         (res) => !!res.data
       );
 
-      const uploadedfileval = success_results.map((res) => {
-        return filename(res.data!.path);
-      }) as string[];
+      // this is partially implemented. case handling and errors are incomplete.
+      // update object_path columns (only supports 'text' else will be thrown with unhandled error)
+      if (FieldSupports.file_alias(field.type) && field.storage) {
+        const paths = success_results.map((res) => res.data!.path);
 
-      // TODO: this not yet supports object_path columns
+        // TODO: support array
+        if (paths.length > 1) {
+          throw new Error(
+            "file alias object_path with multiple is not supported yet"
+          );
+        }
+
+        return {
+          ...acc,
+          [field.name]: paths[0] || undefined,
+        };
+      }
+
       // this is partially implemented only for 'richtext' cms implementation
       if (FieldSupports.richtext(field.type)) {
         // const value = RECORD![field.name]; // -> this can cause side effects with user's db trugger. (but also makes sence to use the updated one?)
