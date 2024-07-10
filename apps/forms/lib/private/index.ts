@@ -11,6 +11,7 @@ import {
   UpdateFormMethodRequest,
   UpdateFormScheduleRequest,
   UpdateFormUnknownFieldsHandlingStrategyRequest,
+  XSupabasePrivateApiTypes,
 } from "@/types/private/api";
 import Axios from "axios";
 
@@ -188,7 +189,7 @@ export namespace PrivateEditorApi {
 
     export async function createConnectionTable(
       form_id: string,
-      data: { table: string }
+      data: XSupabasePrivateApiTypes.CreateConnectionTableRequestData
     ) {
       return Axios.put(
         `/private/editor/connect/${form_id}/supabase/table`,
