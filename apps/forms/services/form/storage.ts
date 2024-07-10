@@ -37,6 +37,7 @@ export class FieldStorageService {
 
     assert(this.supabase_connection, "supabase_connection not found");
 
+    // can be optimized with the query
     const conn = await new GridaXSupabaseService().getConnection(
       this.supabase_connection
     );
