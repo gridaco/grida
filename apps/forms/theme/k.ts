@@ -12,7 +12,7 @@ export const backgrounds = [
   { name: "Globe", value: `${HOST_NAME}/theme/embed/backgrounds/globe` },
   {
     name: "Shader Gradient 00 Halo",
-    value: `${HOST_NAME}/theme/embed/backgrounds/shadergradient/01`,
+    value: `${HOST_NAME}/theme/embed/backgrounds/shadergradient/00`,
   },
   {
     name: "Shader Gradient 01 Pensive",
@@ -49,5 +49,41 @@ export const backgrounds = [
   {
     name: "Shader Gradient 09 Cotton candy",
     value: `${HOST_NAME}/theme/embed/backgrounds/shadergradient/09`,
+  },
+  {
+    name: "Shader Gradient 91 Lunar wave",
+    value: `${HOST_NAME}/theme/embed/backgrounds/shadergradient/91`,
+  },
+  {
+    name: "Shader Gradient 92 Lemon glow",
+    value: `${HOST_NAME}/theme/embed/backgrounds/shadergradient/92`,
+  },
+  {
+    name: "Shader Gradient 93 Twilight blue",
+    value: `${HOST_NAME}/theme/embed/backgrounds/shadergradient/93`,
+  },
+  {
+    name: "Shader Gradient 94 Abyss blue",
+    value: `${HOST_NAME}/theme/embed/backgrounds/shadergradient/94`,
+  },
+  {
+    name: "Shader Gradient 95 Lavender mist",
+    value: `${HOST_NAME}/theme/embed/backgrounds/shadergradient/95`,
+  },
+  {
+    name: "Shader Gradient 96 Aqua noir",
+    value: `${HOST_NAME}/theme/embed/backgrounds/shadergradient/96`,
+  },
+  {
+    name: "Shader Gradient 97 Electric violet ",
+    value: `${HOST_NAME}/theme/embed/backgrounds/shadergradient/97`,
+  },
+  {
+    name: "Shader Gradient 98 Pastel dream",
+    value: `${HOST_NAME}/theme/embed/backgrounds/shadergradient/98`,
+  },
+  {
+    name: "Shader Gradient 99 Skyline gradient",
+    value: `${HOST_NAME}/theme/embed/backgrounds/shadergradient/99`,
   },
 ] as const;

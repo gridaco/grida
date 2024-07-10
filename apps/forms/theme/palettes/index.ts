@@ -64,13 +64,33 @@ export const saturation = {
   saturation_yellow,
 };
 
-const ryu_001_teal = designer_ryu._001_teal;
+const ryu_001_monochrome = designer_ryu._001_monochrome;
 const ryu_002_soft_nuetrals = designer_ryu._002_soft_nuetrals;
+const ryu_003_lemon_blue = designer_ryu._003_lemon_blue;
+const ryu_004_mint_chocolate = designer_ryu._004_mint_chocolate;
+const ryu_005_dark_lavender = designer_ryu._005_dark_lavender;
+const ryu_006_sage_blush = designer_ryu._006_sage_blush;
+const ryu_007_midnight_blue = designer_ryu._007_midnight_blue;
+const ryu_008_blue_steel = designer_ryu._008_blue_steel;
+const ryu_009_neon_yellow = designer_ryu._009_neon_yellow;
+const ryu_010_cherry_blossom = designer_ryu._010_cherry_blossom;
+const ryu_011_peach_sorbet = designer_ryu._011_peach_sorbet;
+const ryu_012_cotton_candy = designer_ryu._012_cotton_candy;
 
 // NOTE: do not change the export name as this name is saved in the database
 export const ryu = {
-  ryu_001_teal,
+  ryu_001_monochrome,
   ryu_002_soft_nuetrals,
+  ryu_003_lemon_blue,
+  ryu_004_mint_chocolate,
+  ryu_005_dark_lavender,
+  ryu_006_sage_blush,
+  ryu_007_midnight_blue,
+  ryu_008_blue_steel,
+  ryu_009_neon_yellow,
+  ryu_010_cherry_blossom,
+  ryu_011_peach_sorbet,
+  ryu_012_cotton_candy,
 };
 
 // NOTE: do not change the export name as this name is saved in the database
