@@ -1,17 +1,30 @@
 import {
-  FormResponsesProvider,
-  InitialResponsesProvider,
-} from "@/scaffolds/editor";
+  ResponseFeedProvider,
+  ResponseSessionFeedProvider,
+  ResponseSyncProvider,
+  XSupabaseMainTableFeedProvider,
+  XSupabaseMainTableSyncProvider,
+} from "@/scaffolds/editor/feed";
 import { GridEditor } from "@/scaffolds/grid-editor";
+import { Siebar } from "@/scaffolds/sidebar/sidebar";
 
-export default async function FormResponsesPage() {
+export default function FormResponsesPage() {
   return (
     <>
-      <InitialResponsesProvider>
-        <FormResponsesProvider>
+      <ResponseFeedProvider />
+      <ResponseSyncProvider />
+      <ResponseSessionFeedProvider />
+      <XSupabaseMainTableFeedProvider />
+      <XSupabaseMainTableSyncProvider />
+      <div className="h-full flex flex-1 w-full">
+        {/* side */}
+        <aside className="hidden lg:flex h-full">
+          <Siebar mode="data" />
+        </aside>
+        <div className="w-full h-full overflow-x-hidden">
           <GridEditor />
-        </FormResponsesProvider>
-      </InitialResponsesProvider>
+        </div>
+      </div>
     </>
   );
 }

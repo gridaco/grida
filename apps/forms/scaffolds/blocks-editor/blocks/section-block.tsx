@@ -1,19 +1,17 @@
 "use client";
 
-import { useCallback } from "react";
 import {
-  CodeIcon,
   DotsHorizontalIcon,
   SectionIcon,
   TrashIcon,
-  VideoIcon,
 } from "@radix-ui/react-icons";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@editor-ui/dropdown-menu";
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
 import { EditorFlatFormBlock } from "@/scaffolds/editor/state";
 import { BlockHeader, useDeleteBlock } from "./base-block";
 import { useEditorState } from "@/scaffolds/editor";
@@ -30,7 +28,7 @@ export function SectionBlock({ id }: EditorFlatFormBlock) {
 
   return (
     <div>
-      <div className="p-4 rounded-md border-black dark:border-white/50 border-2 bg-white dark:bg-neutral-900 shadow-md">
+      <div className="p-4 rounded-md border-primary border-2 bg-background shadow-md">
         <BlockHeader>
           <span className="flex flex-row gap-2 items-center">
             <SectionIcon />
@@ -43,13 +41,13 @@ export function SectionBlock({ id }: EditorFlatFormBlock) {
           <div>
             <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
-                <button>
+                <Button variant="ghost" size="icon">
                   <DotsHorizontalIcon />
-                </button>
+                </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
                 <DropdownMenuItem onClick={() => deleteBlock(id)}>
-                  <TrashIcon />
+                  <TrashIcon className="me-2 align-middle" />
                   Delete Section
                 </DropdownMenuItem>
               </DropdownMenuContent>

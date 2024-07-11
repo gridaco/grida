@@ -1,4 +1,4 @@
-import { Database } from "@/types/supabase";
+import type { Database } from "@/database.types";
 import { SupabaseClient } from "@supabase/supabase-js";
 import assert from "assert";
 
@@ -34,23 +34,61 @@ export class GridaCommerceClient {
   async upsertInventoryItem({
     sku,
     level,
+    config,
   }: {
     sku: string;
     level?: {
       diff: number;
       reason?: "admin" | "order" | "other" | "initialize";
     };
+    config?: {
+      /**
+       * @default false
+       */
+      upsert?: boolean;
+      /**
+       * @default true
+       */
+      allow_negative_inventory?: boolean;
+    };
   }) {
+    let is_upserted = false;
     assert(this.store_id, "store_id is required");
     //
 
-    const upsert_result = await this.client.from("inventory_item").upsert(
-      {
-        store_id: this.store_id,
-        sku: sku,
-      },
-      { onConflict: "store_id, sku" }
-    );
+    const upsert = async (store_id: number) => {
+      const { error: upsertion_error } = await this.client
+        .from("inventory_item")
+        .upsert(
+          {
+            store_id: store_id,
+            sku: sku,
+            is_negative_level_allowed:
+              config?.allow_negative_inventory ?? undefined,
+          },
+          { onConflict: "store_id, sku" }
+        );
+
+      assert(!upsertion_error, "failed to upsert inventory item");
+      is_upserted = true;
+    };
+
+    if (config?.upsert) {
+      // although it's an upsert, we first will check if the inventory item exists.
+      // this is because, the constraint on the table - is_negative_level_allowed
+      // when user tries to update inverntory item 'available' from negative to possitive via commit, this will fail, because the upsertion places before the commit.
+      // to address this, we first check if the inventory item exists, if not, we create it at the end of the function.
+      const { data: existing } = await this.client
+        .from("inventory_item")
+        .select("id")
+        .eq("store_id", this.store_id)
+        .eq("sku", sku)
+        .single();
+
+      if (!existing) {
+        await upsert(this.store_id);
+      }
+    }
 
     if (level) {
       const { diff, reason } = level;
@@ -74,10 +112,20 @@ export class GridaCommerceClient {
 
       const { id: lowest_level_id } = _sorted_levels[0];
 
-      await this.adjustInventoryLevel(lowest_level_id, diff, reason);
+      const { error: commit_error } = await this.adjustInventoryLevel(
+        lowest_level_id,
+        diff,
+        reason
+      );
+
+      if (commit_error) return { error: commit_error };
     }
 
-    return upsert_result;
+    if (config?.upsert && !is_upserted) {
+      await upsert(this.store_id);
+    }
+
+    return { error: null };
   }
 
   async adjustInventoryLevel(
@@ -85,7 +133,7 @@ export class GridaCommerceClient {
     diff: number,
     reason?: "admin" | "order" | "other" | "initialize"
   ) {
-    return await this.client.from("inventory_level_commit").insert({
+    return this.client.from("inventory_level_commit").insert({
       inventory_level_id,
       diff,
       reason: reason,

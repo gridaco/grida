@@ -1,6 +1,6 @@
 import { produce } from "immer";
 import { EditorFlatFormBlock, FormEditorState } from "./state";
-import {
+import type {
   BlockDescriptionAction,
   BlockTitleAction,
   BlockVHiddenAction,
@@ -12,7 +12,7 @@ import {
   DeleteBlockAction,
   DeleteFieldAction,
   DeleteResponseAction,
-  DeleteSelectedResponsesAction,
+  DataGridDeleteSelectedRows,
   FeedResponseAction,
   FocusBlockAction,
   FocusFieldAction,
@@ -23,11 +23,25 @@ import {
   OpenEditFieldAction,
   OpenResponseEditAction,
   ResolvePendingBlockAction,
-  ResponseFeedRowsAction,
+  DataGridRowsAction,
   SaveFieldAction,
   SelectResponse,
+  DataGridTableAction,
   SortBlockAction,
   VideoBlockSrcAction,
+  FeedResponseSessionsAction,
+  DataGridDateFormatAction,
+  DataGridDateTZAction,
+  DataGridFilterAction,
+  DataGridCellChangeAction,
+  FeedXSupabaseMainTableRowsAction,
+  DataTableRefreshAction,
+  DataTableLoadingAction,
+  EditorThemePaletteAction,
+  EditorThemeFontFamilyAction,
+  EditorThemeBackgroundAction,
+  EditorThemeSectionStyleAction,
+  EditorThemeCustomCSSAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { blockstreeflat } from "@/lib/forms/tree";
@@ -36,7 +50,8 @@ import { VIDEO_BLOCK_SRC_DEFAULT_VALUE } from "@/k/video_block_defaults";
 import { IMAGE_BLOCK_SRC_DEFAULT_VALUE } from "@/k/image_block_defaults";
 import { PDF_BLOCK_SRC_DEFAULT_VALUE } from "@/k/pdf_block_defaults";
 import { draftid } from "@/utils/id";
-import { FormBlockType } from "@/types";
+import type { FormBlockType, FormInputType, GridaSupabase } from "@/types";
+import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";
 
 export function reducer(
   state: FormEditorState,
@@ -54,11 +69,22 @@ export function reducer(
       const focus_index =
         focus_block_index >= 0 ? focus_block_index + 1 : old_index;
 
-      // find the last parent section
-      const parent_section = state.blocks
-        .filter((block) => block.type === "section")
-        .sort((a, b) => b.local_index - a.local_index)[0];
-      const parent_id = parent_section?.id ?? null;
+      // Get the parent section of the focus block
+      const focus_block = state.blocks[focus_block_index];
+      let parent_id = focus_block?.parent_id ?? null;
+
+      if (block === "section") {
+        parent_id = null; // Sections are always at root level
+      } else {
+        if (!parent_id) {
+          // Find the last parent section if no focus block or parent_id is null
+          const parent_section = state.blocks
+            .filter((block) => block.type === "section")
+            .sort((a, b) => b.local_index - a.local_index)[0];
+          parent_id = parent_section?.id ?? null;
+        }
+      }
+
       const id = draftid();
 
       const __shared: EditorFlatFormBlock = {
@@ -101,11 +127,30 @@ export function reducer(
           });
         }
         case "field": {
+          let init: { type: FormInputType } | null = null;
+          if ("init" in action) {
+            init = action.init;
+          }
+
           return produce(state, (draft) => {
             const { available_field_ids } = state;
 
-            // find unused field id (if any)
-            const field_id = available_field_ids[0] ?? null;
+            let field_id: string | null = null;
+
+            if (init) {
+              // if init provided, always create new.
+              draft.field_draft_init = init;
+            } else {
+              draft.field_draft_init = null;
+              // find unused field id (if any)
+              field_id = available_field_ids[0] ?? null;
+              if (field_id) {
+                // remove the field id from available_field_ids
+                draft.available_field_ids = available_field_ids.filter(
+                  (id) => id !== field_id
+                );
+              }
+            }
 
             draft.blocks.push({
               ...__shared,
@@ -120,11 +165,6 @@ export function reducer(
               })
             );
             // ========
-
-            // remove the field id from available_field_ids
-            draft.available_field_ids = available_field_ids.filter(
-              (id) => id !== field_id
-            );
 
             // update focus block id
             draft.focus_block_id = id;
@@ -168,11 +208,11 @@ export function reducer(
       const { block_id } = <CreateFielFromBlockdAction>action;
       // trigger new field from empty field block
       return produce(state, (draft) => {
+        draft.field_draft_init = null;
         // update focus block id
         draft.focus_block_id = block_id;
-
-        // if no available field, but field block provided, open a field editor panel
         draft.focus_field_id = null;
+        // open a field editor panel
         draft.is_field_edit_panel_open = true;
       });
     }
@@ -357,6 +397,11 @@ export function reducer(
         draft.focus_block_id = block_id;
       });
     }
+    case "blocks/blur": {
+      return produce(state, (draft) => {
+        draft.focus_block_id = null;
+      });
+    }
     case "editor/field/focus": {
       const { field_id } = <FocusFieldAction>action;
       return produce(state, (draft) => {
@@ -379,19 +424,8 @@ export function reducer(
       return produce(state, (draft) => {
         const field = draft.fields.find((f) => f.id === field_id);
         if (field) {
+          Object.assign(field, { ...data });
           field.id = field_id;
-          field.name = data.name;
-          field.label = data.label;
-          field.placeholder = data.placeholder;
-          field.help_text = data.help_text;
-          field.type = data.type;
-          field.required = data.required;
-          field.pattern = data.pattern;
-          field.options = data.options;
-          field.autocomplete = data.autocomplete;
-          field.data = data.data;
-          field.accept = data.accept;
-          field.multiple = data.multiple;
         } else {
           // create new field
           draft.fields.push({
@@ -399,6 +433,9 @@ export function reducer(
           });
 
           let unused_field_id: string | null = field_id;
+
+          // clear init
+          draft.field_draft_init = null;
 
           // if new field, and focus block has no assigned field, use this.
           if (draft.focus_block_id) {
@@ -441,63 +478,49 @@ export function reducer(
     case "editor/response/select": {
       const { selection } = <SelectResponse>action;
       return produce(state, (draft) => {
-        draft.selected_responses = new Set(selection);
-      });
-    }
-    case "editor/response/delete/selected": {
-      const {} = <DeleteSelectedResponsesAction>action;
-      return produce(state, (draft) => {
-        const ids = Array.from(state.selected_responses);
-
-        draft.responses = draft.responses?.filter(
-          (response) => !ids.includes(response.id)
-        );
-
-        // also remove from selected_responses
-        const new_selected_responses = new Set(state.selected_responses);
-        ids.forEach((id) => {
-          new_selected_responses.delete(id);
-        });
-
-        draft.selected_responses = new_selected_responses;
+        draft.selected_rows = new Set(selection);
       });
     }
     case "editor/response/delete": {
       const { id } = <DeleteResponseAction>action;
       return produce(state, (draft) => {
-        draft.responses = draft.responses?.filter(
+        draft.responses.rows = draft.responses.rows.filter(
           (response) => response.id !== id
         );
 
         // also remove from selected_responses
-        const new_selected_responses = new Set(state.selected_responses);
+        const new_selected_responses = new Set(state.selected_rows);
         new_selected_responses.delete(id);
 
-        draft.selected_responses = new_selected_responses;
+        draft.selected_rows = new_selected_responses;
       });
     }
-    case "editor/responses/pagination/rows": {
-      const { max } = <ResponseFeedRowsAction>action;
+    case "editor/data-grid/rows": {
+      const { rows: max } = <DataGridRowsAction>action;
       return produce(state, (draft) => {
-        draft.responses_pagination_rows = max;
+        draft.datagrid_rows_per_page = max;
       });
     }
     case "editor/response/feed": {
       const { data, reset } = <FeedResponseAction>action;
-      return produce(state, (draft) => {
-        // Initialize draft.responses if it's not already an array
-        if (!Array.isArray(draft.responses)) {
-          draft.responses = [];
-        }
 
+      const responses = {
+        rows: data,
+        fields: data.reduce((acc: any, response) => {
+          acc[response.id] = response.fields;
+          return acc;
+        }, {}),
+      };
+
+      return produce(state, (draft) => {
         if (reset) {
-          draft.responses = data;
+          draft.responses = responses;
           return;
         }
 
         // Merge & Add new responses to the existing responses
         // Map of ids to responses for the existing responses
-        const existingResponsesById = draft.responses.reduce(
+        const existingResponsesById = draft.responses.rows.reduce(
           (acc: any, response) => {
             acc[response.id] = response;
             return acc;
@@ -505,7 +528,7 @@ export function reducer(
           {}
         );
 
-        data.forEach((newResponse) => {
+        responses.rows.forEach((newResponse) => {
           if (existingResponsesById.hasOwnProperty(newResponse.id)) {
             // Update existing response
             Object.assign(
@@ -514,8 +537,11 @@ export function reducer(
             );
           } else {
             // Add new response if id does not exist
-            draft.responses!.push(newResponse);
+            draft.responses.rows.push(newResponse);
           }
+
+          // Update fields
+          draft.responses.fields[newResponse.id] = newResponse.fields;
         });
       });
     }
@@ -524,6 +550,85 @@ export function reducer(
       return produce(state, (draft) => {
         draft.is_response_edit_panel_open = open ?? true;
         draft.focus_response_id = response_id;
+      });
+    }
+    case "editor/data/sessions/feed": {
+      const { data, reset } = <FeedResponseSessionsAction>action;
+      return produce(state, (draft) => {
+        // Initialize draft.sessions if it's not already an array
+        if (!Array.isArray(draft.sessions)) {
+          draft.sessions = [];
+        }
+
+        if (reset) {
+          draft.sessions = data;
+          return;
+        }
+
+        // Merge & Add new responses to the existing responses
+        // Map of ids to responses for the existing responses
+        const existingSessionsById = draft.sessions.reduce(
+          (acc: any, session) => {
+            acc[session.id] = session;
+            return acc;
+          },
+          {}
+        );
+
+        data.forEach((newSession) => {
+          if (existingSessionsById.hasOwnProperty(newSession.id)) {
+            // Update existing response
+            Object.assign(
+              (existingSessionsById as any)[newSession.id],
+              newSession
+            );
+          } else {
+            // Add new response if id does not exist
+            draft.sessions!.push(newSession);
+          }
+        });
+      });
+    }
+    case "editor/data-grid/table": {
+      const { table } = <DataGridTableAction>action;
+      return produce(state, (draft) => {
+        draft.datagrid_table = table;
+
+        draft.realtime_sessions_enabled = table === "session";
+        draft.realtime_responses_enabled = table === "response";
+
+        // clear selected rows
+        draft.selected_rows = new Set();
+      });
+    }
+    case "editor/data-grid/delete/selected": {
+      const {} = <DataGridDeleteSelectedRows>action;
+      return produce(state, (draft) => {
+        switch (state.datagrid_table) {
+          case "response": {
+            const ids = Array.from(state.selected_rows);
+            draft.responses.rows = draft.responses.rows.filter(
+              (response) => !ids.includes(response.id)
+            );
+
+            break;
+          }
+          case "x-supabase-main-table": {
+            const pk = state.x_supabase_main_table!.gfpk!;
+            draft.x_supabase_main_table!.rows =
+              draft.x_supabase_main_table!.rows.filter(
+                (row) => !state.selected_rows.has(row[pk])
+              );
+
+            break;
+          }
+          case "session":
+          default:
+            throw new Error("Unsupported table type: " + state.datagrid_table);
+        }
+
+        // clear selected rows
+        draft.selected_rows = new Set();
       });
     }
     case "editor/customers/edit": {
@@ -544,11 +649,171 @@ export function reducer(
       const { a, b } = <DataGridReorderColumnAction>action;
       return produce(state, (draft) => {
         // update field local_index
-        const field_a = draft.fields.find((f) => f.id === a);
-        const field_b = draft.fields.find((f) => f.id === b);
+        const index_a = draft.fields.findIndex((f) => f.id === a);
+        const index_b = draft.fields.findIndex((f) => f.id === b);
         // TODO:
+        draft.fields = arrayMove(draft.fields, index_a, index_b);
 
         console.error("reorder:: Not implemented yet");
+      });
+    }
+    case "editor/data-grid/dateformat": {
+      const { dateformat } = <DataGridDateFormatAction>action;
+      return produce(state, (draft) => {
+        draft.dateformat = dateformat;
+      });
+    }
+    case "editor/data-grid/tz": {
+      const { tz } = <DataGridDateTZAction>action;
+      return produce(state, (draft) => {
+        draft.datetz = tz;
+      });
+    }
+    case "editor/data-grid/filter": {
+      const { type, ...pref } = <DataGridFilterAction>action;
+
+      return produce(state, (draft) => {
+        draft.datagrid_filter = {
+          ...draft.datagrid_filter,
+          ...pref,
+        };
+      });
+    }
+    case "editor/data-grid/refresh": {
+      const {} = <DataTableRefreshAction>action;
+
+      return produce(state, (draft) => {
+        draft.datagrid_table_refresh_key = draft.datagrid_table_refresh_key + 1;
+      });
+    }
+    case "editor/data-grid/loading": {
+      const { isloading } = <DataTableLoadingAction>action;
+
+      return produce(state, (draft) => {
+        draft.datagrid_isloading = isloading;
+      });
+    }
+    case "editor/data-grid/cell/change": {
+      return produce(state, (draft) => {
+        switch (state.datagrid_table) {
+          case "response": {
+            const { row, column, data } = <DataGridCellChangeAction>action;
+            const { value, option_id } = data;
+
+            const cellid = state.responses.fields[row].find(
+              (f) => f.form_field_id === column && f.response_id === row
+            )?.id;
+
+            draft.responses.fields[row] = draft.responses.fields[row].map(
+              (f) => {
+                if (f.id === cellid) {
+                  return {
+                    ...f,
+                    form_field_option_id: option_id ?? null,
+                    value,
+                  };
+                }
+                return f;
+              }
+            );
+
+            break;
+          }
+          case "x-supabase-main-table": {
+            const {
+              row: row_pk,
+              column,
+              data,
+            } = <DataGridCellChangeAction>action;
+            const { value, option_id } = data;
+
+            const field = state.fields.find((f) => f.id === column);
+            if (!field) return;
+            const pk = state.x_supabase_main_table!.gfpk!;
+
+            // handle jsonpaths - partial object update
+            if (FlatPostgREST.testPath(field.name)) {
+              const { column } = FlatPostgREST.decodePath(field.name);
+              const row = state.x_supabase_main_table!.rows.find(
+                (r) => r[pk] === row_pk
+              );
+
+              if (!row) return;
+
+              const newrow = FlatPostgREST.update(
+                row,
+                field.name,
+                value
+              ) as GridaSupabase.XDataRow;
+
+              draft.x_supabase_main_table!.rows =
+                draft.x_supabase_main_table!.rows.map((r) => {
+                  if (r[pk] === row_pk) {
+                    return newrow;
+                  }
+                  return r;
+                });
+
+              return;
+            }
+
+            draft.x_supabase_main_table!.rows =
+              draft.x_supabase_main_table!.rows.map((r) => {
+                if (r[pk] === row_pk) {
+                  return {
+                    ...r,
+                    [field!.name]: value,
+                  };
+                }
+                return r;
+              });
+
+            break;
+          }
+          case "session":
+          default: {
+            throw new Error("Unsupported table type: " + state.datagrid_table);
+          }
+        }
+      });
+    }
+    case "editor/x-supabase/main-table/feed": {
+      const { data } = <FeedXSupabaseMainTableRowsAction>action;
+
+      return produce(state, (draft) => {
+        draft.x_supabase_main_table!.rows = data;
+        return;
+      });
+      //
+    }
+    case "editor/theme/palette": {
+      const { palette } = <EditorThemePaletteAction>action;
+      return produce(state, (draft) => {
+        draft.theme.palette = palette;
+      });
+    }
+    case "editor/theme/font-family": {
+      const { fontFamily } = <EditorThemeFontFamilyAction>action;
+      return produce(state, (draft) => {
+        draft.theme.fontFamily = fontFamily || "inter";
+      });
+    }
+    case "editor/theme/background": {
+      const { background } = <EditorThemeBackgroundAction>action;
+      return produce(state, (draft) => {
+        draft.theme.background = background;
+      });
+    }
+    case "editor/theme/section": {
+      const { section } = <EditorThemeSectionStyleAction>action;
+      return produce(state, (draft) => {
+        draft.theme.section = section || undefined;
+      });
+    }
+    case "editor/theme/custom-css": {
+      const { custom } = <EditorThemeCustomCSSAction>action;
+      return produce(state, (draft) => {
+        draft.theme.customCSS = custom;
       });
     }
     default:

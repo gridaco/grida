@@ -4,18 +4,6 @@ import React, { useCallback, useEffect, useId, useRef } from "react";
 import { type EditorFlatFormBlock, DRAFT_ID_START_WITH } from "../editor/state";
 import { useEditorState } from "../editor";
 import {
-  CodeIcon,
-  DividerHorizontalIcon,
-  HeadingIcon,
-  ImageIcon,
-  PlusCircledIcon,
-  PlusIcon,
-  ReaderIcon,
-  SectionIcon,
-  TextIcon,
-  VideoIcon,
-} from "@radix-ui/react-icons";
-import {
   DndContext,
   PointerSensor,
   closestCorners,
@@ -23,7 +11,6 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { Block, BlocksCanvas } from "./blocks";
-import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import {
   SortableContext,
@@ -31,13 +18,23 @@ import {
 } from "@dnd-kit/sortable";
 import { createClientFormsClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
-import { FormBlockType } from "@/types";
+import { NewBlockButton } from "./new-block-button";
+import { AgentThemeProvider, SectionStyle } from "../agent/theme";
+import { usePrevious } from "@uidotdev/usehooks";
+import equal from "deep-equal";
+import { FormPageBackgroundSchema, FormStyleSheetV1Schema } from "@/types";
 
 export default function BlocksEditorRoot() {
   return (
-    <DndContextProvider>
-      <BlocksEditor />
-    </DndContextProvider>
+    <div className="w-full overflow-y-auto">
+      <AgentThemeProvider>
+        <DndContextProvider>
+          <div className="py-20">
+            <BlocksEditor />
+          </div>
+        </DndContextProvider>
+      </AgentThemeProvider>
+    </div>
   );
 }
 
@@ -182,7 +179,6 @@ function useSyncBlocks(blocks: EditorFlatFormBlock[]) {
             description_html: block.description_html,
             body_html: block.body_html,
             src: block.src,
-            updated_at: new Date().toISOString(),
           })
           .eq("id", block.id)
           .single();
@@ -216,119 +212,92 @@ function OptimisticBlocksSyncProvider({
   return <>{children}</>;
 }
 
+function AgentThemeSyncProvider({ children }: React.PropsWithChildren<{}>) {
+  const [state] = useEditorState();
+  const { page_id, theme } = state;
+  const prev = usePrevious(state.theme);
+  const supabase = createClientFormsClient();
+
+  useEffect(() => {
+    if (!prev) {
+      return;
+    }
+
+    // sync theme to server
+
+    if (!equal(prev, state.theme)) {
+      supabase
+        .from("form_page")
+        .update({
+          stylesheet: {
+            custom: theme.customCSS,
+            "font-family": theme.fontFamily,
+            palette: theme.palette,
+            section: theme.section,
+          } satisfies FormStyleSheetV1Schema,
+          background: theme.background satisfies
+            | FormPageBackgroundSchema
+            | undefined as {},
+        })
+        .eq("id", page_id!)
+        .then(({ error }) => {
+          if (error) console.error(error);
+        });
+      return;
+    }
+  }, [
+    state.theme,
+    prev,
+    supabase,
+    page_id,
+    theme.customCSS,
+    theme.fontFamily,
+    theme.palette,
+    theme.section,
+    theme.background,
+  ]);
+
+  return <>{children}</>;
+}
+
 function BlocksEditor() {
   const [state, dispatch] = useEditorState();
 
+  const blur = useCallback(() => {
+    dispatch({
+      type: "blocks/blur",
+    });
+  }, [dispatch]);
+
   return (
-    <div>
-      <PendingBlocksResolver />
-      <OptimisticBlocksSyncProvider />
-      <div className="sticky top-20 z-10">
-        <div className="absolute -left-6">
-          <AddBlockButton />
+    <div onPointerDown={blur}>
+      <div className="container mx-auto max-w-screen-sm">
+        <PendingBlocksResolver />
+        <OptimisticBlocksSyncProvider />
+        <AgentThemeSyncProvider />
+        <div className="sticky top-20 z-10">
+          <div className="absolute -left-6">
+            <NewBlockButton />
+          </div>
         </div>
+        <BlocksCanvas id="root" className="mt-10">
+          <SortableContext
+            items={state.blocks.map((b) => b.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <SectionStyle className="flex flex-col gap-4 ">
+              {state.blocks.map((block) => {
+                return (
+                  <div key={block.id}>
+                    <Block {...block} />
+                  </div>
+                );
+              })}
+            </SectionStyle>
+          </SortableContext>
+        </BlocksCanvas>
       </div>
-      <BlocksCanvas id="root" className="flex flex-col gap-4 mt-10">
-        <SortableContext
-          items={state.blocks.map((b) => b.id)}
-          strategy={verticalListSortingStrategy}
-        >
-          {state.blocks.map((block) => {
-            return (
-              <div key={block.id}>
-                <Block {...block} />
-              </div>
-            );
-          })}
-        </SortableContext>
-      </BlocksCanvas>
     </div>
-  );
-}
-
-function AddBlockButton() {
-  const [state, dispatch] = useEditorState();
-
-  const addBlock = useCallback(
-    (block: FormBlockType) => {
-      dispatch({
-        type: "blocks/new",
-        block: block,
-      });
-    },
-    [dispatch]
-  );
-
-  const addSectionBlock = useCallback(() => addBlock("section"), [addBlock]);
-  const addFieldBlock = useCallback(() => addBlock("field"), [addBlock]);
-  const addHtmlBlock = useCallback(() => addBlock("html"), [addBlock]);
-  const addDividerBlock = useCallback(() => addBlock("divider"), [addBlock]);
-  const addHeaderBlock = useCallback(() => addBlock("header"), [addBlock]);
-  const addImageBlock = useCallback(() => addBlock("image"), [addBlock]);
-  const addVideoBlock = useCallback(() => addBlock("video"), [addBlock]);
-  const addPdfBlock = useCallback(() => addBlock("pdf"), [addBlock]);
-
-  return (
-    <DropdownMenu.Root modal={false}>
-      <DropdownMenu.Trigger asChild>
-        <button className="rounded-full w-12 h-12 flex items-center justify-center border bg-white dark:bg-neutral-800 dark:border-neutral-700 p-2">
-          <PlusIcon />
-        </button>
-      </DropdownMenu.Trigger>
-      <DropdownMenu.Portal>
-        <DropdownMenu.Content
-          className="z-50 flex flex-col rounded border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 shadow-lg p-4 gap-2"
-          align="start"
-        >
-          <BlockItem onClick={addFieldBlock}>
-            <PlusCircledIcon />
-            Field
-          </BlockItem>
-          <BlockItem onClick={addImageBlock}>
-            <ImageIcon />
-            Image
-          </BlockItem>
-          <BlockItem onClick={addVideoBlock}>
-            <VideoIcon />
-            Video
-          </BlockItem>
-          <BlockItem onClick={addHtmlBlock}>
-            <CodeIcon />
-            HTML
-          </BlockItem>
-          <BlockItem onClick={addPdfBlock}>
-            <ReaderIcon />
-            Pdf
-          </BlockItem>
-          <BlockItem onClick={addDividerBlock}>
-            <DividerHorizontalIcon />
-            Divider
-          </BlockItem>
-          <BlockItem onClick={addSectionBlock}>
-            <SectionIcon />
-            Section
-          </BlockItem>
-          <BlockItem onClick={addHeaderBlock}>
-            <HeadingIcon />
-            Header
-          </BlockItem>
-        </DropdownMenu.Content>
-      </DropdownMenu.Portal>
-    </DropdownMenu.Root>
-  );
-}
-
-function BlockItem({
-  children,
-  ...props
-}: React.ComponentProps<typeof DropdownMenu.Item>) {
-  return (
-    <DropdownMenu.Item
-      {...props}
-      className="flex gap-2 items-center p-1 cursor-pointer"
-    >
-      {children}
-    </DropdownMenu.Item>
   );
 }
 

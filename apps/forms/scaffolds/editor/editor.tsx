@@ -1,19 +1,19 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo } from "react";
+import React, { useCallback, useMemo } from "react";
 import { StateProvider, useEditorState } from "./provider";
 import { reducer } from "./reducer";
 import { FormEditorInit, initialFormEditorState } from "./state";
 import { FieldEditPanel, FormFieldSave } from "../panels/field-edit-panel";
 import { FormFieldDefinition } from "@/types";
-import { createClientFormsClient } from "@/lib/supabase/client";
 import { FormFieldUpsert, EditorApiResponse } from "@/types/private/api";
 import { TooltipProvider } from "@radix-ui/react-tooltip";
-import { ResponseEditPanel } from "../panels/response-edit-panel";
-import { fmt_local_index } from "@/utils/fmt";
+import { RowEditPanel } from "../panels/response-edit-panel";
 import { CustomerEditPanel } from "../panels/customer-panel";
-import toast from "react-hot-toast";
 import { BlockEditPanel } from "../panels/block-edit-panel";
+import { MediaViewerProvider } from "../mediaviewer";
+import toast from "react-hot-toast";
+import { PaletteProvider } from "@/scaffolds/agent/theme";
 
 export function FormEditorProvider({
   initial,
@@ -26,200 +26,28 @@ export function FormEditorProvider({
 
   return (
     <StateProvider state={state} dispatch={dispatch}>
+      <PaletteProvider palette={state.theme.palette} />
       <TooltipProvider>
-        <BlockPanelProvider>
-          <FieldEditPanelProvider>
-            <ResponseEditPanelProvider>
-              <CustomerPanelProvider>{children}</CustomerPanelProvider>
-            </ResponseEditPanelProvider>
-          </FieldEditPanelProvider>
-        </BlockPanelProvider>
+        <MediaViewerProvider>
+          <BlockEditPanel />
+          <FieldEditPanelProvider />
+          <RowEditPanelProvider />
+          <CustomerPanelProvider />
+          {children}
+        </MediaViewerProvider>
       </TooltipProvider>
     </StateProvider>
   );
-}
-
-export function InitialResponsesProvider({
-  children,
-}: React.PropsWithChildren<{}>) {
-  const [state, dispatch] = useEditorState();
-
-  const supabase = useMemo(() => createClientFormsClient(), []);
-
-  const initially_fetched_responses = React.useRef(false);
-
-  const fetchResponses = useCallback(
-    async (limit: number = 100) => {
-      // fetch the responses
-      const { data, error } = await supabase
-        .from("response")
-        .select(
-          `
-            *,
-            fields:response_field(*)
-        `
-        )
-        .eq("form_id", state.form_id)
-        .order("local_index")
-        .limit(limit);
-
-      if (error) {
-        throw new Error();
-      }
-
-      return data;
-    },
-    [supabase, state.form_id]
-  );
-
-  useEffect(() => {
-    // initially fetch the responses
-    // this should be done only once
-    if (initially_fetched_responses.current) {
-      return;
-    }
-
-    initially_fetched_responses.current = true;
-
-    const feed = fetchResponses(state.responses_pagination_rows).then(
-      (data) => {
-        dispatch({
-          type: "editor/response/feed",
-          data: data,
-          reset: true,
-        });
-      }
-    );
-
-    toast.promise(feed, {
-      loading: "Fetching responses...",
-      success: "Responses fetched",
-      error: "Failed to fetch responses",
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dispatch, fetchResponses]);
-
-  // TODO: this gets called twice after the first hook, initially.
-  useEffect(() => {
-    // re-fetch when the pagination rows change, only if the initial fetch is done
-    if (!initially_fetched_responses.current) {
-      return;
-    }
-
-    const feed = fetchResponses(state.responses_pagination_rows).then(
-      (data) => {
-        dispatch({
-          type: "editor/response/feed",
-          data: data,
-          reset: true,
-        });
-      }
-    );
-
-    toast.promise(feed, {
-      loading: "Fetching responses...",
-      success: "Responses fetched",
-      error: "Failed to fetch responses",
-    });
-  }, [dispatch, fetchResponses, state.responses_pagination_rows]);
-
-  return <>{children}</>;
-}
-
-export function FormResponsesProvider({
-  children,
-}: React.PropsWithChildren<{}>) {
-  const [state, dispatch] = useEditorState();
-
-  const supabase = useMemo(() => createClientFormsClient(), []);
-
-  const fetchResponse = useCallback(
-    async (id: string) => {
-      const { data, error } = await supabase
-        .from("response")
-        .select(
-          `
-            *,
-            fields:response_field(*)
-          `
-        )
-        .eq("id", id)
-        .single();
-
-      if (error) {
-        throw new Error();
-      }
-
-      return data;
-    },
-    [supabase]
-  );
-
-  useEffect(() => {
-    const changes = supabase
-      .channel("table-filter-changes")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "grida_forms",
-          table: "response",
-          filter: `form_id=eq.${state.form_id}`,
-        },
-        (payload) => {
-          const { old, new: _new } = payload;
-
-          // if deleted, the `new` is empty object `{}`
-          const new_id: string | undefined = (_new as { id: string }).id;
-
-          if (new_id) {
-            // fetch the response in detail (delay is required for nested fields to be available)
-            setTimeout(() => {
-              const newresponse = fetchResponse(
-                (_new as { id: string }).id
-              ).then((data) => {
-                console.log("new response", data);
-                dispatch({
-                  type: "editor/response/feed",
-                  data: [data],
-                });
-              });
-
-              toast.promise(
-                newresponse,
-                {
-                  loading: "Fetching new response...",
-                  success: "New response",
-                  error: "Failed to fetch new response",
-                },
-                { id: new_id }
-              );
-            }, 1000);
-          } else {
-            // deleted
-            dispatch({
-              type: "editor/response/delete",
-              id: (old as { id: string }).id,
-            });
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      changes.unsubscribe();
-    };
-  }, [dispatch, fetchResponse, state.form_id, supabase]);
-
-  return <>{children}</>;
 }
 
 function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
 
   const field = useMemo(() => {
-    return state.fields.find((f) => f.id === state.focus_field_id);
-  }, [state.focus_field_id, state.fields]);
+    const focusfound = state.fields.find((f) => f.id === state.focus_field_id);
+    if (focusfound) return focusfound;
+    return state.field_draft_init;
+  }, [state.focus_field_id, state.fields, state.field_draft_init]);
 
   const closeFieldPanel = useCallback(
     (options: { refresh: boolean }) => {
@@ -243,9 +71,9 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
         data: init.data,
       };
 
-      console.log("[EDITOR] saving..", data);
+      // console.log("[EDITOR] saving..", data);
 
-      const promise = fetch("/private/editor/fields", {
+      const promise = fetch(`/private/editor/${state.form_id}/fields`, {
         body: JSON.stringify(data),
         method: "POST",
         headers: {
@@ -260,15 +88,20 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
           const { data } =
             (await res.json()) as EditorApiResponse<FormFieldDefinition>;
 
-          // else save the field
-          dispatch({
-            type: "editor/field/save",
-            field_id: data.id,
-            data: data,
-          });
+          if (data) {
+            // else save the field
+            dispatch({
+              type: "editor/field/save",
+              field_id: data.id,
+              data: data,
+            });
+
+            // only close when successful
+            closeFieldPanel({ refresh: true });
+          }
         })
         .finally(() => {
-          closeFieldPanel({ refresh: true });
+          //
         });
 
       toast.promise(promise, {
@@ -280,7 +113,7 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
     [closeFieldPanel, state.form_id, state.focus_field_id, dispatch]
   );
 
-  const is_existing_field = !!field;
+  const is_existing_field = !!field?.id;
 
   return (
     <>
@@ -301,12 +134,18 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
                 help_text: field.help_text ?? "",
                 placeholder: field.placeholder ?? "",
                 required: field.required,
+                readonly: field.readonly,
                 pattern: field.pattern,
+                step: field.step ?? undefined,
+                min: field.min ?? undefined,
+                max: field.max ?? undefined,
                 autocomplete: field.autocomplete,
                 data: field.data,
                 accept: field.accept,
                 multiple: field.multiple ?? undefined,
                 options: field.options,
+                storage: field.storage,
+                reference: field.reference,
                 // TODO: add inventory support
                 // options_inventory: undefined,
               }
@@ -323,20 +162,37 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
   );
 }
 
-function ResponseEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
+function RowEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
 
-  const response = useMemo(() => {
-    return state.responses?.find((r) => r.id === state.focus_response_id);
+  const focusresponse = useMemo(() => {
+    return state.responses?.rows?.find((r) => r.id === state.focus_response_id);
   }, [state.responses, state.focus_response_id]);
+
+  const focusxsupabasemaintablerow = useMemo(() => {
+    const pk = state.x_supabase_main_table?.gfpk;
+    if (!pk) return;
+    return state.x_supabase_main_table?.rows?.find(
+      (r) => r[pk] === state.focus_response_id // TODO: - pk
+    );
+  }, [
+    state.x_supabase_main_table?.rows,
+    state.x_supabase_main_table?.gfpk,
+    state.focus_response_id,
+  ]);
 
   return (
     <>
-      <ResponseEditPanel
-        key={response?.id}
-        title={`Response ${response?.local_index ? fmt_local_index(response?.local_index) : ""}`}
+      <RowEditPanel
+        key={focusresponse?.id}
         open={state.is_response_edit_panel_open}
-        init={{ response, field_defs: state.fields }}
+        init={{
+          response: focusresponse,
+          response_fields: focusresponse?.id
+            ? state.responses.fields[focusresponse?.id]
+            : [],
+          field_defs: state.fields,
+        }}
         onOpenChange={(open) => {
           dispatch({ type: "editor/responses/edit", open });
         }}
@@ -359,15 +215,6 @@ function CustomerPanelProvider({ children }: React.PropsWithChildren<{}>) {
           dispatch({ type: "editor/customers/edit", open });
         }}
       />
-      {children}
-    </>
-  );
-}
-
-function BlockPanelProvider({ children }: React.PropsWithChildren<{}>) {
-  return (
-    <>
-      <BlockEditPanel />
       {children}
     </>
   );

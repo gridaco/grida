@@ -11,7 +11,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@editor-ui/dropdown-menu";
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
 import { EditorFlatFormBlock } from "@/scaffolds/editor/state";
 import {
   BlockHeader,
@@ -21,8 +22,8 @@ import {
 } from "./base-block";
 import { useEditorState } from "@/scaffolds/editor";
 import * as Tooltip from "@radix-ui/react-tooltip";
-import { MediaPicker } from "@/scaffolds/mediapicker";
 import { useFormMediaUploader } from "@/scaffolds/mediapicker/form-media-uploader";
+import { AdminMediaPicker } from "@/scaffolds/mediapicker";
 
 export function ImageBlock({
   id,
@@ -76,13 +77,13 @@ export function ImageBlock({
           </Tooltip.Root>
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
-              <button>
+              <Button variant="ghost" size="icon">
                 <DotsHorizontalIcon />
-              </button>
+              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
               <DropdownMenuItem onClick={() => deleteBlock(id)}>
-                <TrashIcon />
+                <TrashIcon className="me-2 align-middle" />
                 Delete Block
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -90,8 +91,7 @@ export function ImageBlock({
         </div>
       </BlockHeader>
       <div>
-        <MediaPicker
-          uploader={uploader}
+        <AdminMediaPicker
           open={pickerOpen}
           onOpenChange={setPickerOpen}
           onUseImage={onChangeImage}

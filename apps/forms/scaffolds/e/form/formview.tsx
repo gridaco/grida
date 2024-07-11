@@ -2,7 +2,13 @@
 
 import FormField from "@/components/formfield";
 import { PoweredByGridaFooter } from "./powered-by-brand-footer";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { FormBlockTree } from "@/lib/forms/types";
 import { FormFieldDefinition, PaymentFieldData } from "@/types";
 import dynamic from "next/dynamic";
@@ -16,17 +22,22 @@ import {
 } from "@/components/tosspayments";
 import { StripePaymentFormFieldPreview } from "@/components/formfield/form-field-preview-payment-stripe";
 import { useFingerprint } from "@/scaffolds/fingerprint";
-import { SYSTEM_GF_FINGERPRINT_VISITORID_KEY } from "@/k/system";
+import {
+  SYSTEM_GF_FINGERPRINT_VISITORID_KEY,
+  SYSTEM_GF_SESSION_KEY,
+  SYSTEM_GF_TIMEZONE_UTC_OFFSET_KEY,
+} from "@/k/system";
 import {
   ClientFieldRenderBlock,
+  ClientFileUploadFieldRenderBlock,
   ClientRenderBlock,
   ClientSectionRenderBlock,
 } from "@/lib/forms";
 import { Button } from "@/components/ui/button";
-import { FormAgentProvider } from "./core/agent";
-import { init } from "./core/state";
-import { useFormAgentState } from "./core/provider";
+import { FormAgentProvider, useFormAgentState, init } from "@/lib/formstate";
 import { useLogical } from "./use-logical";
+import { FieldSupports } from "@/k/supported_field_types";
+import { SessionDataSyncProvider } from "./sync";
 
 const cls_button_submit =
   "text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800";
@@ -47,6 +58,7 @@ export interface FormViewTranslation {
 export function FormView(
   props: {
     form_id: string;
+    session_id?: string;
     title: string;
     defaultValues?: { [key: string]: string };
     fields: FormFieldDefinition[];
@@ -58,6 +70,7 @@ export function FormView(
       optimize_for_cjk?: boolean;
     };
     stylesheet?: any;
+    afterSubmit?: () => void;
   } & React.FormHTMLAttributes<HTMLFormElement>
 ) {
   return (
@@ -69,12 +82,14 @@ export function FormView(
 
 function Providers({
   form_id,
+  session_id,
   fields,
   blocks,
   children,
   tree,
 }: React.PropsWithChildren<{
   form_id: string;
+  session_id?: string;
   fields: FormFieldDefinition[];
   blocks: ClientRenderBlock[];
   tree: FormBlockTree<ClientRenderBlock[]>;
@@ -92,10 +107,20 @@ function Providers({
 
   return (
     <>
-      <FormAgentProvider initial={init({ fields, blocks, tree })}>
-        <TossPaymentsCheckoutProvider initial={checkoutSession}>
-          {children}
-        </TossPaymentsCheckoutProvider>
+      <FormAgentProvider
+        initial={init({
+          form_id,
+          session_id,
+          fields,
+          blocks,
+          tree,
+        })}
+      >
+        <SessionDataSyncProvider session_id={session_id}>
+          <TossPaymentsCheckoutProvider initial={checkoutSession}>
+            {children}
+          </TossPaymentsCheckoutProvider>
+        </SessionDataSyncProvider>
       </FormAgentProvider>
     </>
   );
@@ -103,6 +128,7 @@ function Providers({
 
 function Body({
   form_id,
+  session_id,
   title,
   blocks,
   fields,
@@ -111,9 +137,11 @@ function Body({
   translation,
   options,
   stylesheet,
+  afterSubmit,
   ...formattributes
 }: {
   form_id: string;
+  session_id?: string;
   title: string;
   defaultValues?: { [key: string]: string };
   fields: FormFieldDefinition[];
@@ -125,8 +153,12 @@ function Body({
     optimize_for_cjk?: boolean;
   };
   stylesheet?: any;
+  afterSubmit?: () => void;
 } & React.FormHTMLAttributes<HTMLFormElement>) {
   const [state, dispatch] = useFormAgentState();
+
+  // the default value shall be fixed on the first render (since the defaultValues can be changed due to session data sync. - which might cause data loss on the form field.)
+  const initialDefaultValues = useRef(defaultValues);
 
   const {
     is_submitting,
@@ -189,8 +221,8 @@ function Body({
   };
 
   const getDefaultValue = useCallback(
-    (key: string) => defaultValues?.[key],
-    [defaultValues]
+    (key: string) => initialDefaultValues.current?.[key],
+    []
   );
 
   return (
@@ -198,7 +230,7 @@ function Body({
       id="form-view"
       data-cjk={options.optimize_for_cjk}
       className={clsx(
-        "prose dark:prose-invert prose-headings:text-foreground prose-p:text-foreground text-foreground",
+        "prose dark:prose-invert prose-headings:text-foreground prose-p:text-foreground prose-hr:border-border text-foreground",
         "w-full h-full md:h-auto grow md:grow-0",
         "relative",
         "data-[cjk='true']:break-keep",
@@ -225,11 +257,22 @@ function Body({
               // submit
               // disable submit button
               dispatch({ type: "form/submit" });
+              afterSubmit?.();
             }
           }}
           className="p-4 h-full md:h-auto flex-1"
         >
-          <FingerprintField />
+          <div hidden>
+            <BrowserTimezoneOffsetField />
+            <FingerprintField />
+            {session_id && (
+              <input
+                type="hidden"
+                name={SYSTEM_GF_SESSION_KEY}
+                value={session_id}
+              />
+            )}
+          </div>
           <GroupLayout>
             {tree.children.map((b) => (
               <BlockRenderer
@@ -387,6 +430,9 @@ function BlockRenderer({
       const { field } = block;
       const { type } = field;
 
+      const is_not_in_current_section = !context?.is_in_current_section;
+      const defaultValue = getDefaultValue?.(field.name);
+
       switch (type) {
         case "payment": {
           switch ((field.data as PaymentFieldData)?.service_provider) {
@@ -402,9 +448,6 @@ function BlockRenderer({
           }
         }
         default: {
-          const defaultValue = getDefaultValue?.(field.name);
-          const is_not_in_current_section = !context?.is_in_current_section;
-
           return (
             <div {...__shared_root_attr}>
               {/* we are unmounting the field on hidden to prevent the hidden block field value being submitted */}
@@ -412,16 +455,21 @@ function BlockRenderer({
               {!hidden ? (
                 <FormField
                   key={field.id}
+                  id={field.id}
                   name={field.name}
                   label={field.label}
                   placeholder={field.placeholder}
                   type={field.type}
                   is_array={field.is_array}
                   required={field.required}
+                  readonly={field.readonly}
                   requiredAsterisk
                   helpText={field.help_text}
                   options={field.options}
                   pattern={field.pattern}
+                  step={field.step}
+                  min={field.min}
+                  max={field.max}
                   defaultValue={defaultValue}
                   data={field.data}
                   autoComplete={field.autocomplete}
@@ -429,6 +477,18 @@ function BlockRenderer({
                   multiple={field.multiple}
                   novalidate={is_not_in_current_section || hidden}
                   locked={is_not_in_current_section || hidden}
+                  fileupload={
+                    FieldSupports.file_upload(type)
+                      ? (field as ClientFileUploadFieldRenderBlock["field"])
+                          .upload
+                      : undefined
+                  }
+                  fileresolve={
+                    FieldSupports.file_upload(type)
+                      ? (field as ClientFileUploadFieldRenderBlock["field"])
+                          .resolve
+                      : undefined
+                  }
                   onValueChange={onValueChange}
                   onCheckedChange={onValueChange}
                 />
@@ -509,6 +569,17 @@ function BlockRenderer({
 
 function GroupLayout({ children }: React.PropsWithChildren<{}>) {
   return <div className="flex flex-col gap-8">{children}</div>;
+}
+
+function BrowserTimezoneOffsetField() {
+  const offset = useMemo(() => new Date().getTimezoneOffset(), []);
+  return (
+    <input
+      type="hidden"
+      name={SYSTEM_GF_TIMEZONE_UTC_OFFSET_KEY}
+      value={offset}
+    />
+  );
 }
 
 function FingerprintField() {

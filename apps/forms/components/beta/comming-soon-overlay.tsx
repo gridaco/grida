@@ -1,9 +1,15 @@
 import React from "react";
 import { Badge } from "@/components/ui/badge";
 
+const IS_DEV = process.env.NODE_ENV === "development";
+
 export function AlphaDisabledFeature({
   children,
 }: React.PropsWithChildren<{}>) {
+  if (IS_DEV) {
+    return <>{children}</>;
+  }
+
   return (
     <div className="w-full h-full relative">
       <div className="absolute z-50 h-full w-full backdrop-blur flex flex-col justify-center items-center gap-8">

@@ -1,4 +1,4 @@
-import { SubmissionHooks } from "@/app/(api)/submit/[id]/hooks";
+import { OnSubmitProcessors } from "@/app/(api)/submit/[id]/hooks";
 import { createRouteHandlerClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
@@ -31,7 +31,7 @@ export async function POST(
 
   let res;
   if (message) {
-    res = await SubmissionHooks.send_sms({
+    res = await OnSubmitProcessors.send_sms({
       type: "custom",
       text: message,
       form_id,
@@ -39,7 +39,7 @@ export async function POST(
       lang: "en",
     });
   } else {
-    res = await SubmissionHooks.send_sms({
+    res = await OnSubmitProcessors.send_sms({
       type: "formcomplete",
       form_id,
       to: to,

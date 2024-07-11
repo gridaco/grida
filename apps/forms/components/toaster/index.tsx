@@ -22,5 +22,25 @@ export function ToasterWithMax({
 }) {
   useMaxToasts(max);
 
-  return <Toaster {...props} />;
+  return (
+    <Toaster
+      toastOptions={{
+        className:
+          "border text-sm bg-background text-foreground fill-foreground",
+        success: {
+          iconTheme: {
+            primary: "hsl(var(--primary))",
+            secondary: "hsl(var(--secondary))",
+          },
+        },
+        error: {
+          iconTheme: {
+            primary: "hsl(var(--destructive))",
+            secondary: "hsl(var(--destructive-foreground))",
+          },
+        },
+      }}
+      {...props}
+    />
+  );
 }

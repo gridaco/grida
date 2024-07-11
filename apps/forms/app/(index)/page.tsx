@@ -1,9 +1,5 @@
 import { GridaLogo } from "@/components/grida-logo";
-import { GitHubLogoIcon, SlashIcon } from "@radix-ui/react-icons";
-import Link from "next/link";
-import Image from "next/image";
-import PricingComparisonTable from "@/www/pricing/pricing-comparison-table";
-import { PricingCard, PricingCardButton } from "@/www/pricing/pricing-card";
+import { Pricing } from "@/www/pricing/pricing";
 import {
   AccountTreeIcon,
   ApiIcon,
@@ -12,10 +8,13 @@ import {
   AnalysisIcon,
   VisualStudioIcon,
 } from "@/www/icons";
-import { plans } from "@/www/data/plans";
-import { Header } from "../(site)/header";
 import Hero from "./sections/hero";
 import Demo from "./sections/demo";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import Header from "@/www/header";
+import Footer from "@/www/footer";
+import { FAQ } from "./sections/faq";
 
 export default function Home() {
   return (
@@ -23,7 +22,7 @@ export default function Home() {
       <Header />
       <Hero />
       <Demo />
-      <div className="container mx-auto px-4">
+      <div className="container mx-auto px-8">
         <div className="h-16 sm:h-32 lg:h-64" />
         <section>
           <div>
@@ -32,7 +31,7 @@ export default function Home() {
             </h2>
           </div>
           <div className="mt-20">
-            <div className="columns-1 lg:columns-2 2xl:columns-3 grid-rows-2 space-y-20">
+            <div className="columns-2 lg:columns-3 2xl:columns-3 grid-rows-2 space-y-20">
               <FeatureCard
                 icon={<SmartToyIcon size={24} />}
                 title={"Smart Customer Identity"}
@@ -79,124 +78,21 @@ export default function Home() {
           </div>
         </section>
         <div className="h-96" />
-        <section>
-          <div className="pt-12 pb-20 flex flex-col items-center gap-7">
-            <h2 className="text-4xl font-semibold text-center max-w-xl">
-              Discover Our Service: Engineered for Your Expansion
-            </h2>
-            <p className="opacity-50 text-center max-w-lg">
-              Begin your creation at no cost, join forces with your team, and
-              then expand to reach millions.
-            </p>
-            <label className="inline-flex items-center cursor-pointer">
-              <input type="checkbox" value="" className="sr-only peer" />
-              <span className="me-3 text-sm text-gray-900 dark:text-gray-300">
-                Monthly
-              </span>
-              <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-blue  rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-              <span className="ms-3 text-sm text-gray-900 dark:text-gray-300">
-                Yearly (00% save)
-              </span>
-            </label>
-          </div>
-          <div className="columns-1 lg:columns-2 2xl:columns-4 gap-10 space-y-10 w-full">
-            {plans.map((plan) => (
-              <PricingCard
-                key={plan.id}
-                plan={plan.name}
-                price={{
-                  primary: `$${plan.priceMonthly}`,
-                  secondary: plan.costUnit,
-                }}
-                features={plan.features}
-                excerpt={plan.description}
-                highlight={plan.highlight}
-                action={
-                  <Link href={plan.href} className="w-full">
-                    <PricingCardButton>{plan.cta}</PricingCardButton>
-                  </Link>
-                }
-              />
-            ))}
-          </div>
-        </section>
-        <PricingComparisonTable />
+        <Pricing />
         <section className="mt-72">
           <div className="py-80 flex flex-col items-center gap-7">
             <GridaLogo />
             <h2 className="text-4xl font-semibold text-center max-w-2xl mx-auto">
               Create Effortlessly, Expand Boundlessly
             </h2>
-            <Link href="/dashboard">
-              <button
-                className="mt-10 px-3 py-2 text-white bg-neutral-800 rounded border border-neutral-800 hover:invert
-        transition-all"
-              >
-                Start your project
-              </button>
+            <Link href="/dashboard/new?plan=free">
+              <Button className="mt-10">Start your project</Button>
             </Link>
           </div>
         </section>
-        {/* <section>
-          <div id="accordion-collapse" data-accordion="collapse">
-            <h2 id="accordion-collapse-heading-1">
-              <button
-                type="button"
-                className="flex items-center justify-between w-full p-5 font-sm rtl:text-right rounded-xl dark:focus:ring-gray-800 dark:hover:bg-neutral-800 gap-3"
-                data-accordion-target="#accordion-collapse-body-1"
-                aria-expanded="true"
-                aria-controls="accordion-collapse-body-1"
-              >
-                <span>What is Grida Forms?</span>
-                <svg
-                  data-accordion-icon
-                  className="w-3 h-3 rotate-180 shrink-0"
-                  aria-hidden="true"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 10 6"
-                >
-                  <path
-                    stroke="currentColor"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M9 5 5 1 1 5"
-                  />
-                </svg>
-              </button>
-            </h2>
-          </div>
-          <div
-            id="accordion-collapse-body-1"
-            className="hidden"
-            aria-labelledby="accordion-collapse-heading-1"
-          >
-            <div className="p-5 dark:bg-gray-900">
-              <p className="mb-2 text-gray-500 dark:text-gray-400">
-                Flowbite is an open-source library of interactive components
-                built on top of Tailwind CSS including buttons, dropdowns,
-                modals, navbars, and more.
-              </p>
-            </div>
-          </div>
-        </section> */}
+        {/* <FAQ /> */}
       </div>
-      <footer className="mx-auto mt-32 w-full max-w-container px-4 sm:px-6 lg:px-8">
-        <div className="border-t border-neutral-400 border-opacity-25 py-10">
-          <div className="pt-8 flex flex-col items-center gap-7">
-            <GridaLogo />
-          </div>
-        </div>
-        <p className="mt-1 text-center text-sm leading-6 text-current">
-          Grida Inc. All rights reserved.
-        </p>
-        <div className="mt-20 mb-16 flex items-center justify-center text-sm leading-6 text-neutral-500">
-          Privacy policy
-          <div className="h-4 w-px mx-4 bg-neutral-400 opacity-25"></div>
-          <p>Changelog</p>
-        </div>
-      </footer>
+      <Footer />
     </main>
   );
 }

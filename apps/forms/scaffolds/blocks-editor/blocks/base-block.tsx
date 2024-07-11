@@ -53,9 +53,17 @@ export function useBlockFocus(id: string) {
   return [state.focus_block_id === id, setter] as const;
 }
 
-export function BlockHeader({ children }: React.PropsWithChildren<{}>) {
+export function BlockHeader({
+  border,
+  children,
+}: React.PropsWithChildren<{ border?: boolean }>) {
   return (
-    <div className="flex w-full justify-between items-center gap-4">
+    <div
+      className={clsx(
+        "flex w-full justify-between items-center gap-4",
+        border && "pb-4 border-b"
+      )}
+    >
       {children}
     </div>
   );
@@ -76,11 +84,14 @@ export function FlatBlockBase({
       data-invalid={invalid}
       data-focused={focused}
       className={clsx(
-        "rounded-md flex flex-col gap-4 border dark:border-neutral-700 w-full p-4 bg-white dark:bg-neutral-900 shadow-md",
-        'data-[invalid="true"]:border-red-500/50 data-[invalid="true"]:bg-red-500/10',
-        'data-[focused="true"]:border-blue-500/50 data-[focused="true"]:bg-blue-500/10'
+        "rounded-md flex flex-col gap-4 border w-full p-4 bg-background shadow-md",
+        'data-[invalid="true"]:border-destructive data-[invalid="true"]:border-2',
+        'data-[focused="true"]:border-foreground data-[focused="true"]:bg-secondary'
       )}
-      onPointerDown={onPointerDown}
+      onPointerDown={(e) => {
+        e.stopPropagation();
+        onPointerDown?.(e);
+      }}
     >
       {children}
     </div>

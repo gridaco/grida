@@ -10,9 +10,11 @@ import type {
 import { blockstree } from "./tree";
 import { FormBlockTree } from "./types";
 import { toArrayOf } from "@/types/utility";
+import { FieldSupports } from "@/k/supported_field_types";
 
 export type ClientRenderBlock =
   | ClientFieldRenderBlock
+  | ClientFileUploadFieldRenderBlock
   | ClientSectionRenderBlock
   | ClientHtmlRenderBlock
   | ClientImageRenderBlock
@@ -37,19 +39,22 @@ type ClientRenderOption = {
   index?: number;
 };
 
-export interface ClientFieldRenderBlock extends BaseRenderBlock {
+export interface ClientFieldRenderBlock<T extends FormInputType = FormInputType>
+  extends BaseRenderBlock {
   type: "field";
   field: {
     id: string;
-    type: FormInputType;
+    type: T;
     is_array?: boolean;
     name: string;
     label?: string;
     help_text?: string;
+    step?: number;
     min?: number;
     max?: number;
     pattern?: string;
     required?: boolean;
+    readonly?: boolean;
     minlength?: number;
     maxlength?: number;
     placeholder?: string;
@@ -58,6 +63,50 @@ export interface ClientFieldRenderBlock extends BaseRenderBlock {
     data?: FormFieldDataSchema | null;
     accept?: string;
     multiple?: boolean;
+  };
+}
+
+export type FileUploadStrategyMultipart = { type: "multipart" };
+export type FileUploadStrategySignedUrl = {
+  type: "signedurl";
+  signed_urls: Array<{
+    path: string;
+    token: string;
+  }>;
+};
+export type FileUploadStrategyRequesUploadtUrl = {
+  type: "requesturl";
+  request_url: string;
+};
+
+export type FileUploadStrategy =
+  | FileUploadStrategyMultipart
+  | FileUploadStrategySignedUrl
+  | FileUploadStrategyRequesUploadtUrl;
+
+export type FileResolveStrategyRequestUrl = {
+  type: "requesturl";
+  resolve_url: string;
+};
+
+export type FileResolveStrategy =
+  | FileResolveStrategyRequestUrl
+  | {
+      type: "none";
+    };
+
+export interface ClientFileUploadFieldRenderBlock
+  extends ClientFieldRenderBlock<
+    "file" | "image" | "audio" | "video" | "richtext"
+  > {
+  field: ClientFieldRenderBlock<
+    "file" | "image" | "audio" | "video" | "richtext"
+  >["field"] & {
+    accept?: string;
+    multiple?: boolean;
+  } & {
+    upload: FileUploadStrategy;
+    resolve?: FileResolveStrategy;
   };
 }
 
@@ -120,6 +169,8 @@ interface RenderTreeConfig {
 export class FormRenderTree {
   private readonly _m_render_blocks: ClientRenderBlock[];
   private readonly _m_render_fields: FormFieldDefinition[];
+  private readonly _m_options: Option[];
+  private readonly _m_options_by_field: Record<string, Option[]>;
   private readonly _m_tree: FormBlockTree<ClientRenderBlock[]>;
 
   constructor(
@@ -132,6 +183,8 @@ export class FormRenderTree {
     private readonly config?: RenderTreeConfig,
     private readonly plugins?: {
       option_renderer: (option: Option) => Option;
+      file_uploader?: (field_id: string) => FileUploadStrategy;
+      file_resolver?: (field_id: string) => FileResolveStrategy;
     }
   ) {
     this._m_render_blocks = _m_blocks
@@ -154,7 +207,7 @@ export class FormRenderTree {
             return null; // this will be filtered out
           }
 
-          return <ClientFieldRenderBlock>{
+          return <ClientFieldRenderBlock | ClientFileUploadFieldRenderBlock>{
             ...shared,
             type: "field",
             field: this._field_block_field_definition(field),
@@ -229,6 +282,19 @@ export class FormRenderTree {
         (b) => b.type === "field"
       ) as ClientFieldRenderBlock[];
 
+    this._m_options = this._m_fields
+      .map((f) => f.options)
+      .filter(Boolean)
+      .flat() as Option[];
+
+    this._m_options_by_field = _field_blocks.reduce(
+      (acc, b) => {
+        acc[b.field.id] = b.field.options as Option[];
+        return acc;
+      },
+      {} as Record<string, Option[]>
+    );
+
     const _render_field_ids = _field_blocks.map(
       (b: ClientFieldRenderBlock) => b.field.id
     );
@@ -297,13 +363,20 @@ export class FormRenderTree {
     return this._m_fields;
   }
 
+  public options(q?: { of: string }) {
+    if (q?.of) {
+      return this._m_options_by_field[q.of];
+    }
+    return this._m_options;
+  }
+
   public validate() {
     throw new Error("Not implemented");
   }
 
   private _field_block_field_definition(
     field: FormFieldDefinition
-  ): ClientFieldRenderBlock["field"] {
+  ): (ClientFieldRenderBlock | ClientFileUploadFieldRenderBlock)["field"] {
     const mkoption = (options?: Option[]) =>
       options
         ?.sort((a, b) => (a?.index || 0) - (b?.index || 0))
@@ -314,7 +387,33 @@ export class FormRenderTree {
             : (option) => option
         );
 
-    return {
+    const mkfileupload = (): FileUploadStrategy | undefined => {
+      if (FieldSupports.file_upload(field.type)) {
+        if (this.plugins?.file_uploader) {
+          return this.plugins.file_uploader(field.id);
+        } else {
+          return { type: "multipart" };
+        }
+        //
+      } else {
+        return undefined;
+      }
+    };
+
+    const mkfileresolve = (): FileResolveStrategy | undefined => {
+      if (FieldSupports.file_upload(field.type)) {
+        if (this.plugins?.file_resolver) {
+          return this.plugins.file_resolver(field.id);
+        } else {
+          return { type: "none" };
+        }
+        //
+      } else {
+        return undefined;
+      }
+    };
+
+    const base: ClientFieldRenderBlock["field"] = {
       ...field,
       options: mkoption(field.options),
       label: field.label || undefined,
@@ -322,8 +421,22 @@ export class FormRenderTree {
       placeholder: field.placeholder || undefined,
       accept: field.accept || undefined,
       required: field.required ?? undefined,
+      readonly: field.readonly ?? undefined,
       multiple: field.multiple ?? undefined,
       autocomplete: toArrayOf(field.autocomplete)?.join(" ") ?? undefined,
+      step: field.step ?? undefined,
+      min: field.min ?? undefined,
+      max: field.max ?? undefined,
     };
+
+    if (FieldSupports.file_upload(field.type)) {
+      return {
+        ...base,
+        upload: mkfileupload(),
+        resolve: mkfileresolve(),
+      } as ClientFileUploadFieldRenderBlock["field"];
+    } else {
+      return base as ClientFieldRenderBlock["field"];
+    }
   }
 }

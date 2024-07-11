@@ -7,7 +7,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@editor-ui/dropdown-menu";
+} from "@/components/ui/dropdown-menu";
 import { EditorFlatFormBlock } from "@/scaffolds/editor/state";
 import {
   BlockHeader,
@@ -16,7 +16,10 @@ import {
   useDeleteBlock,
 } from "./base-block";
 import { useEditorState } from "@/scaffolds/editor";
-import { Editor } from "@monaco-editor/react";
+import { Editor, useMonaco } from "@monaco-editor/react";
+import { Button } from "@/components/ui/button";
+import { useMonacoTheme } from "@/components/monaco";
+import { useTheme } from "next-themes";
 
 export function HtmlBlock({ id, body_html }: EditorFlatFormBlock) {
   const [state, dispatch] = useEditorState();
@@ -33,6 +36,10 @@ export function HtmlBlock({ id, body_html }: EditorFlatFormBlock) {
   );
 
   const deleteBlock = useDeleteBlock();
+
+  const monaco = useMonaco();
+  const { resolvedTheme } = useTheme();
+  useMonacoTheme(monaco, resolvedTheme ?? "light");
 
   return (
     <FlatBlockBase
@@ -66,13 +73,13 @@ export function HtmlBlock({ id, body_html }: EditorFlatFormBlock) {
         <div>
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
-              <button>
+              <Button variant="ghost" size="icon">
                 <DotsHorizontalIcon />
-              </button>
+              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
               <DropdownMenuItem onClick={() => deleteBlock(id)}>
-                <TrashIcon />
+                <TrashIcon className="me-2 align-middle" />
                 Delete Block
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -80,7 +87,7 @@ export function HtmlBlock({ id, body_html }: EditorFlatFormBlock) {
         </div>
       </BlockHeader>
       <div>
-        <div className="bg-neutral-200 rounded overflow-hidden border border-black/20 aspect-auto">
+        <div className="rounded overflow-hidden border aspect-auto">
           <Editor
             height={400}
             defaultLanguage="html"

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   FORM_FORCE_CLOSED,
-  FORM_OPTION_SOLD_OUT,
+  FORM_OPTION_UNAVAILABLE,
   FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED,
   FORM_RESPONSE_LIMIT_REACHED,
   FORM_SOLD_OUT,
@@ -16,7 +16,6 @@ import {
   SYSTEM_GF_CUSTOMER_EMAIL_KEY,
   SYSTEM_GF_CUSTOMER_UUID_KEY,
   SYSTEM_GF_FINGERPRINT_VISITORID_KEY,
-  SYSTEM_GF_KEY_STARTS_WITH,
 } from "@/k/system";
 import { FormBlockTree } from "@/lib/forms/types";
 import { client } from "@/lib/supabase/server";
@@ -26,14 +25,24 @@ import {
   form_field_options_inventory,
   validate_options_inventory,
 } from "@/services/form/inventory";
-import { validate_max_access } from "@/services/form/validate-max-access";
-import { is_uuid_v4 } from "@/utils/is";
+import {
+  validate_max_access_by_customer,
+  validate_max_access_by_form,
+} from "@/services/form/validate-max-access";
 import i18next from "i18next";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { FormRenderTree, type ClientRenderBlock } from "@/lib/forms";
-import type { FormFieldDefinition, FormPage, Option } from "@/types";
+import type {
+  FormFieldDefinition,
+  FormMethod,
+  FormPage,
+  Option,
+} from "@/types";
 import { Features } from "@/lib/features/scheduling";
+import { requesterurl, resolverurl } from "@/services/form/session-storage";
+import { type GFKeys, parseGFKeys } from "@/lib/forms/gfkeys";
+import { RawdataProcessing } from "@/lib/forms/rawdata";
 
 export const revalidate = 0;
 
@@ -46,6 +55,8 @@ interface FormClientFetchResponse {
 
 export interface FormClientFetchResponseData {
   title: string;
+  session_id: string;
+  method: FormMethod;
   tree: FormBlockTree<ClientRenderBlock[]>;
   blocks: ClientRenderBlock[];
   fields: FormFieldDefinition[];
@@ -90,7 +101,7 @@ export type FormClientFetchResponseError =
         | typeof FORM_RESPONSE_LIMIT_REACHED.code
         | typeof FORM_FORCE_CLOSED.code
         | typeof FORM_SOLD_OUT.code
-        | typeof FORM_OPTION_SOLD_OUT.code;
+        | typeof FORM_OPTION_UNAVAILABLE.code;
       message: string;
     };
 export interface MissingRequiredHiddenFieldsError {
@@ -127,9 +138,9 @@ export async function GET(
   const id = context.params.id;
   const searchParams = req.nextUrl.searchParams;
 
-  let system_keys: SystemKeys = {};
+  let system_keys: GFKeys = {};
   try {
-    system_keys = parse_system_keys(searchParams);
+    system_keys = parseGFKeys(searchParams);
   } catch (e) {
     console.error("error while parsing system keys:", e);
     // @ts-ignore
@@ -160,14 +171,19 @@ export async function GET(
     .eq("id", id)
     .single();
 
-  error && console.error(id, error);
+  error && console.error("v1init", id, error);
 
   if (!data) {
     return notFound();
   }
 
+  // ==================================================
+  // bare setup
+  // ==================================================
+
   const {
     title,
+    method,
     description,
     default_page,
     fields,
@@ -193,6 +209,62 @@ export async function GET(
   });
 
   const page_blocks = (data.default_page as unknown as FormPage).blocks;
+
+  const __gf_fp_fingerprintjs_visitorid =
+    system_keys[SYSTEM_GF_FINGERPRINT_VISITORID_KEY];
+  const __gf_customer_uuid = system_keys[SYSTEM_GF_CUSTOMER_UUID_KEY];
+  const __gf_customer_email = system_keys[SYSTEM_GF_CUSTOMER_EMAIL_KEY];
+
+  // endregion
+
+  // ==================================================
+  // customer
+  // ==================================================
+
+  // fetch customer
+  let customer: { uid: string } | null = null;
+  if (
+    __gf_customer_uuid ||
+    __gf_fp_fingerprintjs_visitorid ||
+    __gf_customer_email
+  ) {
+    try {
+      customer = await upsert_customer_with({
+        project_id: __project_id,
+        uuid: __gf_customer_uuid,
+        hints: {
+          email: __gf_customer_email,
+          _fp_fingerprintjs_visitorid: __gf_fp_fingerprintjs_visitorid,
+        },
+      });
+    } catch (e) {
+      response.error = POSSIBLE_CUSTOMER_IDENTITY_FORGE;
+      console.error("error while upserting customer:", e);
+    }
+  }
+
+  // ==================================================
+  // session
+  // ==================================================
+  const { data: session, error: session_error } = await supabase
+    .from("response_session")
+    .upsert(
+      {
+        id: system_keys.__gf_session ?? undefined,
+        form_id: id,
+        customer_id: customer?.uid,
+      },
+      { onConflict: "id" }
+    )
+    .select()
+    .single();
+
+  if (session_error || !session) {
+    console.error("error while creating session", session_error);
+    return NextResponse.error();
+  }
+
+  // endregion
 
   // store connection - inventory data
   let options_inventory: FormFieldOptionsInventoryMap | null = null;
@@ -242,6 +314,20 @@ export async function GET(
     undefined,
     {
       option_renderer: mkoption,
+      file_uploader: (field_id: string) => ({
+        type: "requesturl",
+        request_url: requesterurl({
+          session_id: session.id,
+          field_id: field_id,
+        }),
+      }),
+      file_resolver: (field_id: string) => ({
+        type: "requesturl",
+        resolve_url: resolverurl({
+          session_id: session.id,
+          field_id: field_id,
+        }),
+      }),
     }
   );
 
@@ -263,7 +349,24 @@ export async function GET(
   // validation execution order matters (does not affect this logic, but logic on the client side, since only one error is shown at a time.
   // to fix this we need to add support for multiple errors in the response, and client side should handle it.
 
-  // validation 1
+  // access validation - check max response limit
+  if (is_max_form_responses_in_total_enabled) {
+    const max_access_error = await validate_max_access_by_form({ form_id: id });
+    if (max_access_error) {
+      switch (max_access_error.code) {
+        case "FORM_RESPONSE_LIMIT_REACHED": {
+          response.error = max_access_error;
+          console.error("session/err", max_access_error);
+          break;
+        }
+        default: {
+          return NextResponse.error();
+        }
+      }
+    }
+  }
+
+  // data validation - check if all required hidden fields are provided.
   if (not_included_required_hidden_fields.length > 0) {
     // check if required hidden fields are not used.
     response.error = {
@@ -281,8 +384,7 @@ export async function GET(
     }
   }
 
-  // validation 2
-  // validate inventory TODO: (this can be moved above with some refactoring)
+  // connection status validation - grida_commerce inventory
   if (options_inventory) {
     // TODO: [might have been resolved] we need to pass inventory map witch only present in render_fields (for whole sold out validation)
     const render_options = renderer
@@ -290,76 +392,48 @@ export async function GET(
       .map((f) => f.options ?? [])
       .flat();
     const inventory_access_error = await validate_options_inventory({
-      options: render_options,
       inventory: options_inventory,
+      options: render_options,
       config: {
         available_counting_strategy: "sum_positive",
       },
     });
 
     if (inventory_access_error) {
-      console.error(
-        "inventory_access_error",
-        render_options,
-        inventory_access_error
-      );
+      console.error("inventory_access_error", {
+        keys: Object.keys(options_inventory),
+        options: render_options?.length,
+        err: inventory_access_error,
+      });
       response.error = inventory_access_error;
     }
   }
 
-  const __gf_fp_fingerprintjs_visitorid =
-    system_keys[SYSTEM_GF_FINGERPRINT_VISITORID_KEY];
-  const __gf_customer_uuid = system_keys[SYSTEM_GF_CUSTOMER_UUID_KEY];
-  const __gf_customer_email = system_keys[SYSTEM_GF_CUSTOMER_EMAIL_KEY];
-
-  // fetch customer
-  let customer: { uid: string } | null = null;
-  if (
-    __gf_customer_uuid ||
-    __gf_fp_fingerprintjs_visitorid ||
-    __gf_customer_email
-  ) {
-    try {
-      customer = await upsert_customer_with({
-        project_id: __project_id,
-        uuid: __gf_customer_uuid,
-        hints: {
-          email: __gf_customer_email,
-          _fp_fingerprintjs_visitorid: __gf_fp_fingerprintjs_visitorid,
-        },
-      });
-    } catch (e) {
-      response.error = POSSIBLE_CUSTOMER_IDENTITY_FORGE;
-      console.error("error while upserting customer:", e);
-    }
-  }
-
-  // validation 3
-  const max_access_error = await validate_max_access({
-    form_id: id,
-    customer_id: customer?.uid,
-    is_max_form_responses_in_total_enabled,
-    max_form_responses_in_total,
-    is_max_form_responses_by_customer_enabled,
-    max_form_responses_by_customer,
-  });
-  if (max_access_error) {
-    switch (max_access_error.code) {
-      case "FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED":
-        const error: MaxResponseByCustomerError = {
-          ...max_access_error,
-          customer_id: customer?.uid,
-          __gf_customer_email,
-          __gf_customer_uuid,
-          __gf_fp_fingerprintjs_visitorid,
-        };
-        console.error("max access error", error);
-        response.error = error;
-        break;
-      case "FORM_RESPONSE_LIMIT_REACHED": {
-        response.error = max_access_error;
-        console.error("max access error", max_access_error);
-        break;
+  // access validation - check if new response is accepted for custoemer
+  if (is_max_form_responses_by_customer_enabled) {
+    const max_access_by_customer_error = await validate_max_access_by_customer({
+      form_id: id,
+      customer_id: customer?.uid,
+      is_max_form_responses_by_customer_enabled,
+      max_form_responses_by_customer,
+    });
+    if (max_access_by_customer_error) {
+      switch (max_access_by_customer_error.code) {
+        case "FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED": {
+          const error: MaxResponseByCustomerError = {
+            ...max_access_by_customer_error,
+            customer_id: customer?.uid,
+            __gf_customer_email,
+            __gf_customer_uuid,
+            __gf_fp_fingerprintjs_visitorid,
+          };
+          console.error("session/err", error);
+          response.error = error;
+          break;
+        }
+        default: {
+          return NextResponse.error();
+        }
       }
     }
   }
@@ -371,7 +445,7 @@ export async function GET(
 
   // validation - check if form is open by schedule
   if (is_scheduling_enabled) {
-    const isopen = Features.isopen({
+    const isopen = Features.schedule_in_range({
       open: scheduling_open_at,
       close: scheduling_close_at,
     });
@@ -382,9 +456,18 @@ export async function GET(
     }
   }
 
+  const default_values = merge(
+    seed, // seed from search params
+    session.raw // data from ongoing session
+      ? RawdataProcessing.idkeytonamekey(session.raw as {}, fields)
+      : {}
+  );
+
   const is_open = !__is_force_closed && response.error === null;
   const payload: FormClientFetchResponseData = {
     title: title,
+    session_id: session.id,
+    method,
     tree: renderer.tree(),
     blocks: renderer.blocks(),
     fields: fields,
@@ -398,7 +481,7 @@ export async function GET(
     stylesheet: (data.default_page as unknown as FormPage).stylesheet,
 
     // default value
-    default_values: seed,
+    default_values: default_values,
 
     // access
     is_open: is_open,
@@ -420,6 +503,10 @@ export async function GET(
   response.data = payload;
 
   return NextResponse.json(response);
+}
+
+function merge<A = any, B = any>(a: A, b: B): A & B {
+  return { ...a, ...b };
 }
 
 function parseSeedFromSearchParams({
@@ -445,54 +532,4 @@ function parseSeedFromSearchParams({
   );
 
   return { seed, missing_required_hidden_fields };
-}
-
-interface SystemKeys {
-  [SYSTEM_GF_FINGERPRINT_VISITORID_KEY]?: string;
-  [SYSTEM_GF_CUSTOMER_UUID_KEY]?: string;
-  [SYSTEM_GF_CUSTOMER_EMAIL_KEY]?: string;
-}
-
-function parse_system_keys(
-  data: URLSearchParams | Map<string, string>
-): SystemKeys {
-  const map: SystemKeys = {};
-  const keys = Array.from(data.keys());
-  const system_gf_keys: string[] = keys.filter((key) =>
-    key.startsWith(SYSTEM_GF_KEY_STARTS_WITH)
-  );
-
-  for (const key of system_gf_keys) {
-    const value = data.get(key) as string;
-    switch (key) {
-      case SYSTEM_GF_FINGERPRINT_VISITORID_KEY: {
-        if (value.length === 32) {
-          map[key] = value;
-          break;
-        } else {
-          throw VISITORID_FORMAT_MISMATCH;
-        }
-      }
-      case SYSTEM_GF_CUSTOMER_UUID_KEY: {
-        if (is_uuid_v4(value)) {
-          map[key] = value;
-          break;
-        } else {
-          console.error("uuid format mismatch", value);
-          throw UUID_FORMAT_MISMATCH;
-        }
-      }
-      case SYSTEM_GF_CUSTOMER_EMAIL_KEY: {
-        if (!value.includes("@")) {
-          // TODO: more strict email validation
-          map[key] = value;
-          break;
-        }
-      }
-      default:
-        break;
-    }
-  }
-
-  return map;
 }

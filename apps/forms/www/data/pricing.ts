@@ -34,9 +34,6 @@ export const pricing: Pricing = {
     features: [
       {
         title: "Smart Customer Identity",
-        // tooltips: {
-        //   main: "The sum of all objects' size in your storage buckets.\nBilling is based on the average daily size in GB throughout your billing period.",
-        // },
         plans: {
           free: false,
           pro: true,
@@ -250,11 +247,6 @@ export const pricing: Pricing = {
         },
         usage_based: false,
       },
-    ],
-  },
-  commingsoon: {
-    title: "Comming Soon",
-    features: [
       {
         title: "Inventory Management",
         plans: {
@@ -265,6 +257,21 @@ export const pricing: Pricing = {
         },
         usage_based: false,
       },
+      {
+        title: "Supabase Integration",
+        plans: {
+          free: false,
+          pro: false,
+          team: true,
+          enterprise: true,
+        },
+        usage_based: false,
+      },
+    ],
+  },
+  commingsoon: {
+    title: "Comming Soon",
+    features: [
       {
         title: "Payments with Toss (For South Korea)",
         plans: {

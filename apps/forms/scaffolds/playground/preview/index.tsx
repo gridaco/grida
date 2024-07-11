@@ -101,7 +101,7 @@ function useRenderer(raw?: string | JSONFormRaw | null) {
   return [valid, invalid] as const;
 }
 
-export function PlaygroundPreviSlave() {
+export function PlaygroundPreviewSlave() {
   const { theme, setTheme } = useTheme();
 
   const [schema, setSchema] = useState<string | null>(null);

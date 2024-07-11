@@ -1,14 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
-import { Toggle } from "@/components/toggle";
+import React from "react";
 import {
   PreferenceBody,
   PreferenceBox,
   PreferenceBoxFooter,
   PreferenceBoxHeader,
   PreferenceDescription,
-  cls_save_button,
 } from "@/components/preferences";
 import {
   Select,
@@ -19,6 +17,10 @@ import {
 } from "@/components/ui/select";
 import { FormResponseUnknownFieldHandlingStrategyType } from "@/types";
 import { Button } from "@/components/ui/button";
+import { useForm, Controller } from "react-hook-form";
+import toast from "react-hot-toast";
+import { PrivateEditorApi } from "@/lib/private";
+import { Spinner } from "@/components/spinner";
 
 export function UnknownFieldPreferences({
   form_id,
@@ -29,10 +31,37 @@ export function UnknownFieldPreferences({
     unknown_field_handling_strategy: FormResponseUnknownFieldHandlingStrategyType;
   };
 }) {
-  const [strategy, setStrategy] =
-    useState<FormResponseUnknownFieldHandlingStrategyType>(
-      init.unknown_field_handling_strategy
-    );
+  const {
+    handleSubmit,
+    control,
+    formState: { isSubmitting, isDirty },
+    reset,
+    watch,
+  } = useForm({
+    defaultValues: {
+      strategy: init.unknown_field_handling_strategy,
+    },
+  });
+
+  const onSubmit = async (data: {
+    strategy: FormResponseUnknownFieldHandlingStrategyType;
+  }) => {
+    const req = PrivateEditorApi.Settings.updateUnknownFieldsHandlingStrategy({
+      form_id,
+      strategy: data.strategy,
+    });
+
+    try {
+      await toast.promise(req, {
+        loading: "Saving...",
+        success: "Settings saved",
+        error: "Failed to save settings",
+      });
+      reset(data); // Reset form state to the new values after successful submission
+    } catch (error) {}
+  };
+
+  const strategy = watch("strategy");
 
   return (
     <PreferenceBox>
@@ -47,31 +76,35 @@ export function UnknownFieldPreferences({
         }
       />
       <PreferenceBody>
-        <form
-          id="/private/editor/settings/unknown-fields"
-          action="/private/editor/settings/unknown-fields"
-          method="POST"
-        >
+        <form id="unknown-fields" onSubmit={handleSubmit(onSubmit)}>
           <input type="hidden" name="form_id" value={form_id} />
           <div className="flex flex-col gap-8">
             <section>
               <div className="mt-4 flex flex-col gap-1">
-                <Select
-                  name="unknown_field_handling_strategy"
-                  value={strategy}
-                  onValueChange={(value) => {
-                    setStrategy(value as any);
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="accept">Accept</SelectItem>
-                    <SelectItem value="ignore">Ignore</SelectItem>
-                    <SelectItem value="reject">Reject</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Controller
+                  name="strategy"
+                  control={control}
+                  render={({ field }) => (
+                    <Select
+                      name="unknown_field_handling_strategy"
+                      value={field.value}
+                      onValueChange={(value) => {
+                        field.onChange(
+                          value as FormResponseUnknownFieldHandlingStrategyType
+                        );
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="accept">Accept</SelectItem>
+                        <SelectItem value="ignore">Ignore</SelectItem>
+                        <SelectItem value="reject">Reject</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
                 <PreferenceDescription>
                   {strategy_descriptions[strategy]}
                 </PreferenceDescription>
@@ -81,8 +114,12 @@ export function UnknownFieldPreferences({
         </form>
       </PreferenceBody>
       <PreferenceBoxFooter>
-        <Button form="/private/editor/settings/unknown-fields" type="submit">
-          Save
+        <Button
+          form="unknown-fields"
+          type="submit"
+          disabled={isSubmitting || !isDirty}
+        >
+          {isSubmitting ? <Spinner /> : "Save"}
         </Button>
       </PreferenceBoxFooter>
     </PreferenceBox>
@@ -93,5 +130,5 @@ const strategy_descriptions = {
   accept: "Accept form with creating new fields in schema.",
   ignore: "Accept form with ignoring unknown fields",
   reject:
-    "Reject from. It will reject the request if unknown fields are found.",
+    "Reject form. It will reject the request if unknown fields are found.",
 } as const;

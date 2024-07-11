@@ -1,3 +1,4 @@
+import { cn } from "@/utils";
 import clsx from "clsx";
 
 export const cls_input =
@@ -23,7 +24,7 @@ export function PreferenceBox({
     <section
       data-warning={warning || beta}
       className={clsx(
-        "rounded-md border dark:border-neutral-700 border-overlay shadow-sm overflow-hidden mb-8 !m-0",
+        "rounded-md border border-overlay shadow-sm overflow-hidden mb-8 !m-0",
         "data-[warning='true']:border-yellow-400 data-[warning='true']:bg-yellow-50 data-[warning='true']:text-yellow-900 data-[warning='true']:dark:bg-yellow-700 data-[warning='true']:dark:text-yellow-200 data-[warning='true']:dark:border-yellow-600",
         disabled && "opacity-50 pointer-events- cursor-not-allowed"
       )}
@@ -73,7 +74,7 @@ export function PreferenceBoxHeader({
 
 export function PreferenceBoxFooter({ children }: React.PropsWithChildren<{}>) {
   return (
-    <footer className="bg-surface-100 border-t dark:border-t-neutral-700 border-overlay">
+    <footer className="bg-surface-100 border-t border-overlay">
       <div className="flex h-16 items-center px-6">
         <div className="flex w-full items-center gap-2 justify-end">
           <div className="flex items-center gap-2">{children}</div>
@@ -106,8 +107,16 @@ export function SectorHeader({ children }: React.PropsWithChildren<{}>) {
   return <header className="flex flex-col gap-1 mb-4">{children}</header>;
 }
 
-export function SectorHeading({ children }: React.PropsWithChildren<{}>) {
-  return <h1 className="text-xl font-medium py-2">{children}</h1>;
+export function SectorHeading({
+  className,
+  children,
+  ...props
+}: React.PropsWithChildren<React.HTMLAttributes<HTMLHeadingElement>>) {
+  return (
+    <h1 {...props} className={cn("text-xl font-medium py-2", className)}>
+      {children}
+    </h1>
+  );
 }
 
 export function SectorDescription({ children }: React.PropsWithChildren<{}>) {

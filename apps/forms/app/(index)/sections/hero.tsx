@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { FormPageBackground } from "@/scaffolds/e/form/background";
 import Link from "next/link";
 
@@ -17,9 +18,7 @@ export default function Hero() {
             builder for developers
           </p>
           <Link href="/dashboard">
-            <button className="mt-16 px-3 py-2 bg-neutral-800 text-white rounded border border-neutral-800 hover:invert transition-all">
-              Start your project
-            </button>
+            <Button className="mt-16">Start your project</Button>
           </Link>
         </div>
       </div>

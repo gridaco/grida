@@ -30,6 +30,20 @@ import { TemplateTextEditor } from "@/scaffolds/template-editor/text-editor";
 import { ContextVariablesTable } from "@/scaffolds/template-editor/about-variable-table";
 import { TemplateVariables } from "@/lib/templating";
 import type { i18n } from "i18next";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  ending_page_template_config,
+  ending_page_templates,
+} from "@/k/templates";
 
 export function TemplateEditor({
   context: _context_init,
@@ -218,7 +232,7 @@ export function TemplateEditor({
                           <TabsTrigger value="data">Test Data</TabsTrigger>
                         </TabsList>
                         <TabsContent value="variables">
-                          <ContextVariablesTable />
+                          <ContextVariablesTable schema="form_response" />
                         </TabsContent>
                         <TabsContent value="data" className="relative">
                           <header className="absolute right-4 top-4">
@@ -321,22 +335,6 @@ const common_translation_attributes = {
     help: "Link url",
   },
 } as const;
-
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Translation } from "@/i18n/resources";
-import {
-  ending_page_template_config,
-  ending_page_templates,
-} from "@/k/templates";
 
 function DiscardChangesAlert({
   onDiscard,

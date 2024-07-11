@@ -22,6 +22,7 @@ import Link from "next/link";
 import { Link2Icon } from "@radix-ui/react-icons";
 import { Skeleton } from "@/components/ui/skeleton";
 import clsx from "clsx";
+import { provisional } from "@/services/customer/utils";
 
 export function CustomerEditPanel({
   customer_id,
@@ -39,7 +40,7 @@ export function CustomerEditPanel({
 
   return (
     <Sheet {...props}>
-      <SheetContent>
+      <SheetContent className="overflow-y-scroll">
         <SheetHeader>
           {/* <SheetTitle>{title}</SheetTitle> */}
           {/* <SheetDescription></SheetDescription> */}
@@ -87,7 +88,10 @@ export function CustomerEditPanel({
               id="email"
               readOnly
               placeholder="Empty"
-              value={customer?.email ?? undefined}
+              value={provisional(
+                customer?.email,
+                customer?.email_provisional
+              ).join(", ")}
               className="col-span-3"
             />
           </div>
@@ -99,7 +103,10 @@ export function CustomerEditPanel({
               id="phone"
               readOnly
               placeholder="Empty"
-              value={customer?.phone ?? undefined}
+              value={provisional(
+                customer?.phone,
+                customer?.phone_provisional
+              ).join(", ")}
               className="col-span-3"
             />
           </div>

@@ -5,7 +5,7 @@ import type {
   FormInputType,
   FormsPageLanguage,
   Option,
-} from ".";
+} from "./types";
 import type { JSONBooleanValueDescriptor, JSONFieldReference } from "./logic";
 import { toArrayOf, MaybeArray } from "./utility";
 
@@ -61,6 +61,7 @@ type _JSONField<T> = {
   label?: string | null;
   placeholder?: string | null;
   required?: boolean;
+  readonly?: boolean;
   pattern?: string;
   type: T;
   options?: JSONOptionLike[];
@@ -185,6 +186,7 @@ function map_json_form_field_to_form_field_definition(
         field.autocomplete
       ),
       required: field.required || false,
+      readonly: field.readonly || false,
       local_index: index,
       options: field.options?.map(map_option) || [],
     };

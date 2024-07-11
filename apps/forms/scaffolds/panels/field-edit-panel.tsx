@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useId, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   PanelClose,
   PanelContent,
@@ -21,13 +21,17 @@ import {
   FormFieldInit,
   PaymentFieldData,
   Option,
+  FormFieldStorageSchema,
+  GridaSupabase,
+  FormFieldReferenceSchema,
 } from "@/types";
-import { LockClosedIcon } from "@radix-ui/react-icons";
 import { FormFieldAssistant } from "../ai/form-field-schema-assistant";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -47,18 +51,16 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
-  FielSupports,
-  html5_multiple_supported_field_types,
+  FieldSupports,
   supported_field_autocomplete_types,
   supported_field_types,
+  fieldlabels,
 } from "@/k/supported_field_types";
 import {
   payments_service_providers,
   payments_service_providers_default,
   payments_service_providers_display_map,
 } from "@/k/payments_service_providers";
-import { cls_save_button } from "@/components/preferences";
-import { Toggle } from "@/components/toggle";
 import { fmt_snake_case_to_human_text } from "@/utils/fmt";
 import toast from "react-hot-toast";
 import { arrayMove } from "@dnd-kit/sortable";
@@ -66,19 +68,21 @@ import { draftid } from "@/utils/id";
 import { OptionsEdit } from "../options/options-edit";
 import { OptionsStockEdit } from "../options/options-sku";
 import { Switch } from "@/components/ui/switch";
-import { InventoryStock } from "@/types/inventory";
-import { INITIAL_INVENTORY_STOCK } from "@/k/inventory_defaults";
 import { FormFieldUpsert } from "@/types/private/api";
-import { GridaCommerceClient } from "@/services/commerce";
 import { useEditorState } from "../editor";
-import {
-  createClientFormsClient,
-  createClientCommerceClient,
-} from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { editorlink } from "@/lib/forms/url";
 import { cn } from "@/utils";
 import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
+import { useInventory, useInventoryState } from "../options/use-inventory";
+import Link from "next/link";
+import { SupabaseLogo } from "@/components/logos";
+import { Spinner } from "@/components/spinner";
+import { NameInput } from "./name-input";
+import { LockClosedIcon, ReloadIcon } from "@radix-ui/react-icons";
+import { PrivateEditorApi } from "@/lib/private";
+import { Badge } from "@/components/ui/badge";
+import { ContextVariablesTable } from "../template-editor/about-variable-table";
 
 // @ts-ignore
 const default_field_init: {
@@ -148,161 +152,7 @@ const default_field_init: {
   },
 };
 
-const html5_input_like_checkbox_field_types: FormInputType[] = [
-  "checkbox",
-  "switch",
-];
-
-/**
- * html5 pattern allowed input types
- * @see https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/pattern
- */
-const input_can_have_pattern: FormInputType[] = [
-  "text",
-  "tel",
-  // `date` uses pattern on fallback - https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input/date#handling_browser_support
-  "date",
-  "email",
-  "url",
-  "password",
-  // "search", // not supported
-];
-
-const input_can_have_autocomplete: FormInputType[] =
-  supported_field_types.filter(
-    (type) =>
-      ![
-        "file",
-        "checkbox",
-        "checkboxes",
-        "switch",
-        "radio",
-        "range",
-        "hidden",
-        "payment",
-      ].includes(type)
-  );
-
 export type FormFieldSave = Omit<FormFieldUpsert, "form_id">;
-
-function useCommerceClient() {
-  const [state] = useEditorState();
-
-  const supabase = useMemo(() => createClientCommerceClient(), []);
-
-  const commerce = useMemo(
-    () =>
-      new GridaCommerceClient(
-        supabase,
-        state.connections.project_id,
-        state.connections.store_id
-      ),
-    [supabase, state.connections.project_id, state.connections.store_id]
-  );
-
-  return commerce;
-}
-
-function useInventory(options: Option[]) {
-  const [state] = useEditorState();
-  const commerce = useCommerceClient();
-  const [loading, setLoading] = useState(true);
-  const [inventory, setInventory] = useState<{
-    [key: string]: InventoryStock;
-  } | null>(null);
-
-  useEffect(() => {
-    setLoading(true);
-
-    if (!state.connections.store_id) {
-      setLoading(false);
-      return;
-    }
-
-    console.log("fetching inventory");
-    commerce
-      .fetchInventoryItemsRPC()
-      .then(({ data, error }) => {
-        if (error) console.error(error);
-        if (!data) return;
-
-        // filter out items that are not in the options list
-        const filtered_data = data.filter((item) =>
-          options.some((option) => option.id === item.sku)
-        );
-
-        if (filtered_data.length === 0) {
-          return;
-        }
-
-        const inventorymap = options.reduce(
-          (acc: { [sku: string]: InventoryStock }, option) => {
-            const item = filtered_data.find((_) => _.sku === option.id);
-            if (item) {
-              acc[item.sku] = {
-                available: item.available,
-                on_hand: item.available, // TODO:
-                committed: item.committed,
-                unavailable: 0,
-                incoming: 0,
-              };
-            } else {
-              acc[option.id] = {
-                available: 0,
-                on_hand: 0,
-                committed: 0,
-                unavailable: 0,
-                incoming: 0,
-              };
-            }
-            return acc;
-          },
-          {}
-        );
-        setInventory(inventorymap);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, [commerce, options, state.connections.store_id]);
-
-  return { inventory, loading };
-}
-
-function useInventoryState(
-  options: Option[],
-  _inventory: { [key: string]: InventoryStock } | null,
-  enabled: boolean
-) {
-  const [inventory, setInventory] = useState<{
-    [key: string]: InventoryStock;
-  } | null>(_inventory);
-
-  useEffect(() => {
-    if (enabled) {
-      setInventory(_inventory);
-
-      if (!_inventory) {
-        const initialmap = options.reduce(
-          (acc: { [sku: string]: InventoryStock }, option) => {
-            acc[option.id] = {
-              available: INITIAL_INVENTORY_STOCK,
-              on_hand: INITIAL_INVENTORY_STOCK,
-              committed: 0,
-              unavailable: 0,
-              incoming: 0,
-            };
-            return acc;
-          },
-          {}
-        );
-        setInventory(initialmap);
-      }
-    }
-  }, [_inventory, options, enabled]);
-
-  return [inventory, setInventory] as const;
-}
 
 export function TypeSelect({
   value,
@@ -311,48 +161,30 @@ export function TypeSelect({
   value: FormInputType;
   onValueChange: (value: FormInputType) => void;
 }) {
-  return (
-    <Select value={value} onValueChange={onValueChange}>
-      <SelectTrigger id="type" aria-label="Select Field Type">
-        <SelectValue placeholder="Type" />
-      </SelectTrigger>
-      <SelectContent>
-        {supported_field_types.map((type) => (
-          <SelectItem key={type} value={type}>
-            <div className="flex items-center gap-2">
-              <FormFieldTypeIcon type={type} />{" "}
-              <span className="capitalize">{type}</span>
-            </div>
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-
-  // TODO: below won't display properly on panel
   const [open, setOpen] = React.useState(false);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-[200px] justify-between"
+          className="w-full justify-between capitalize"
         >
-          {value
-            ? supported_field_types.find((t) => t === value)
-            : "Select input..."}
+          <div className="flex gap-2 items-center">
+            <FormFieldTypeIcon type={value} className="w-4 h-4" />
+            {value ? value : "Type"}
+          </div>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[200px] p-0">
+      <PopoverContent className="w-[--radix-popover-trigger-width] max-h-[--radix-popover-content-available-height] p-0">
         <Command>
-          <CommandInput placeholder="Search framework..." />
+          <CommandInput placeholder="Search" />
           <CommandEmpty>No input found.</CommandEmpty>
-          <CommandGroup>
-            <CommandList>
+          <CommandList>
+            <CommandGroup>
               {supported_field_types.map((t) => (
                 <CommandItem
                   key={t}
@@ -368,11 +200,14 @@ export function TypeSelect({
                       value === t ? "opacity-100" : "opacity-0"
                     )}
                   />
-                  {t}
+                  <div className="flex items-center gap-2">
+                    <FormFieldTypeIcon type={t} className="w-4 h-4" />
+                    <span className="capitalize">{fieldlabels[t]}</span>
+                  </div>
                 </CommandItem>
               ))}
-            </CommandList>
-          </CommandGroup>
+            </CommandGroup>
+          </CommandList>
         </Command>
       </PopoverContent>
     </Popover>
@@ -401,13 +236,36 @@ export function FieldEditPanel({
   const [effect_cause, set_effect_cause] = useState<"ai" | "human" | "system">(
     "system"
   );
+  // columns
+  const [type, setType] = useState<FormInputType>(init?.type || "text");
   const [name, setName] = useState(init?.name || "");
   const [label, setLabel] = useState(init?.label || "");
   const [placeholder, setPlaceholder] = useState(init?.placeholder || "");
   const [helpText, setHelpText] = useState(init?.help_text || "");
-  const [type, setType] = useState<FormInputType>(init?.type || "text");
   const [required, setRequired] = useState(init?.required || false);
+  const [readonly, setReadonly] = useState(init?.readonly || false);
   const [pattern, setPattern] = useState<string | undefined>(init?.pattern);
+
+  // numeric
+  const [step, setStep] = useState<number | undefined>(init?.step);
+  const [min, setMin] = useState<number | undefined>(init?.min);
+  const [max, setMax] = useState<number | undefined>(init?.max);
+
+  useEffect(() => {
+    setType(init?.type || "text");
+    setName(init?.name || "");
+    setLabel(init?.label || "");
+    setPlaceholder(init?.placeholder || "");
+    setHelpText(init?.help_text || "");
+    setRequired(init?.required || false);
+    setReadonly(init?.readonly || false);
+    setPattern(init?.pattern);
+    setStep(init?.step);
+    setMin(init?.min);
+    setMax(init?.max);
+  }, [init]);
+
+  // options
   const [options, setOptions] = useState<Option[]>(
     Array.from(init?.options ?? []).sort(
       (a, b) => (a.index || 0) - (b.index || 0)
@@ -424,6 +282,18 @@ export function FieldEditPanel({
     init?.accept ?? undefined
   );
   const [multiple, setMultiple] = useState(init?.multiple || false);
+
+  const [storage_enabled, __set_storage_enabled] = useState(!!init?.storage);
+  const [storage, setStorage] = useState<
+    Partial<FormFieldStorageSchema | null | undefined>
+  >(init?.storage);
+
+  const [reference_enabled, __set_reference_enabled] = useState(
+    !!init?.reference
+  );
+  const [reference, setReference] = useState<
+    Partial<FormFieldReferenceSchema | null | undefined>
+  >(init?.reference);
 
   const preview_label = buildPreviewLabel({
     name,
@@ -466,9 +336,10 @@ export function FieldEditPanel({
     }
   };
 
-  const supports_options = FielSupports.options(type);
-  const supports_pattern = input_can_have_pattern.includes(type);
-  const supports_accept = type === "file";
+  const supports_options = FieldSupports.options(type);
+  const supports_pattern = FieldSupports.pattern(type);
+  const supports_numeric = FieldSupports.numeric(type);
+  const supports_accept = FieldSupports.accept(type);
 
   const preview_placeholder =
     placeholder ||
@@ -508,13 +379,19 @@ export function FieldEditPanel({
       help_text: helpText,
       type,
       required,
-      pattern,
+      readonly,
+      pattern: supports_pattern ? pattern : undefined,
+      step,
+      min,
+      max,
       options: supports_options ? indexed_options : undefined,
       autocomplete,
       data,
       accept,
       multiple,
       options_inventory: options_inventory_upsert_diff,
+      storage: storage_enabled ? storage : undefined,
+      reference: reference_enabled ? reference : undefined,
     });
   };
 
@@ -564,7 +441,7 @@ export function FieldEditPanel({
         <PanelPropertySection>
           <PanelPropertySectionTitle>Preview</PanelPropertySectionTitle>
           <PanelPropertyFields>
-            <div className="relative w-full min-h-40 bg-neutral-200 dark:bg-neutral-800 rounded p-10 border border-black/20">
+            <div className="relative w-full min-h-40 bg-card rounded p-10 border">
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -582,22 +459,30 @@ export function FieldEditPanel({
                   placeholder={preview_placeholder}
                   helpText={helpText}
                   required={required}
+                  readonly={readonly}
                   requiredAsterisk
                   disabled={preview_disabled}
                   options={supports_options ? options : undefined}
                   pattern={pattern}
+                  step={step}
+                  min={min}
+                  max={max}
                   autoComplete={autocomplete.join(" ")}
                   data={data}
                   accept={accept}
                   multiple={multiple}
                 />
                 <div className="absolute bottom-0 right-0 m-2">
-                  <button
-                    type="submit"
-                    className="rounded-full px-2 py-1 bg-neutral-100 dark:bg-neutral-900 text-xs font-mono"
-                  >
-                    Test
-                  </button>
+                  <div className="font-mono flex gap-2">
+                    <button type="submit">
+                      <Badge variant="secondary">Test</Badge>
+                    </button>
+                    <button type="reset">
+                      <Badge className="h-full" variant="secondary">
+                        <ReloadIcon className="w-3 h-3" />
+                      </Badge>
+                    </button>
+                  </div>
                 </div>
               </form>
             </div>
@@ -630,12 +515,10 @@ export function FieldEditPanel({
                 }
                 description="The input's name, identifier. Recommended to use lowercase and use an underscore to separate words e.g. column_name"
               >
-                <PropertyTextInput
-                  required
-                  autoFocus={mode === "edit"}
-                  placeholder={"field_name"}
+                <NameInput
+                  autoFocus={mode === "new"}
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onValueChange={setName}
                 />
               </PanelPropertyField>
             </PanelPropertyFields>
@@ -758,7 +641,7 @@ export function FieldEditPanel({
                   onChange={(e) => setLabel(e.target.value)}
                 />
               </PanelPropertyField>
-              {type !== "checkbox" && (
+              {FieldSupports.placeholder(type) && (
                 <PanelPropertyField
                   label={"Placeholder"}
                   description={
@@ -794,8 +677,20 @@ export function FieldEditPanel({
                   onChange={(e) => setHelpText(e.target.value)}
                 />
               </PanelPropertyField>
-              {input_can_have_autocomplete.includes(type) && (
-                <PanelPropertyField label={"Auto Complete"}>
+              {FieldSupports.autocomplete(type) && (
+                <PanelPropertyField
+                  label={"Auto Complete"}
+                  help={
+                    <>
+                      <Link
+                        href="https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/autocomplete"
+                        target="_blank"
+                      >
+                        Learn more
+                      </Link>
+                    </>
+                  }
+                >
                   <Select
                     value={autocomplete ? autocomplete[0] : ""}
                     onValueChange={(value) => {
@@ -815,35 +710,83 @@ export function FieldEditPanel({
                   </Select>
                 </PanelPropertyField>
               )}
-              {html5_multiple_supported_field_types.includes(type) && (
-                <PanelPropertyField label={"Multiple"}>
-                  <Toggle value={multiple} onChange={setMultiple} />
+              {FieldSupports.multiple(type) && (
+                <PanelPropertyField
+                  label={"Multiple"}
+                  help={
+                    <>
+                      <Link
+                        href="https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/multiple"
+                        target="_blank"
+                      >
+                        Learn more
+                      </Link>
+                    </>
+                  }
+                >
+                  <Switch checked={multiple} onCheckedChange={setMultiple} />
                 </PanelPropertyField>
               )}
-              {!html5_input_like_checkbox_field_types.includes(type) &&
-                type !== "range" && (
-                  <PanelPropertyField
-                    label={"Required"}
-                    description={
-                      html5_input_like_checkbox_field_types.includes(type) ? (
-                        <>
-                          We follow html5 standards. Checkboxes cannot be
-                          required.{" "}
-                          <a
-                            className="underline"
-                            href="https://github.com/whatwg/html/issues/6868#issue-946624070"
-                            target="_blank"
-                          >
-                            Learn more
-                          </a>
-                        </>
-                      ) : undefined
-                    }
-                    disabled={type === "checkboxes"}
-                  >
-                    <Toggle value={required} onChange={setRequired} />
-                  </PanelPropertyField>
-                )}
+              {FieldSupports.readonly(type) && (
+                <PanelPropertyField
+                  label={"Readonly"}
+                  help={
+                    <>
+                      Because a read-only field cannot have its value changed by
+                      a user interaction,{" "}
+                      <Link
+                        href="https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/readonly"
+                        target="_blank"
+                      >
+                        required
+                      </Link>{" "}
+                      does not have any effect on inputs with the readonly
+                      attribute also specified.{" "}
+                      <Link
+                        href="https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/readonly#attribute_interactions"
+                        target="_blank"
+                      >
+                        (MDN)
+                      </Link>
+                    </>
+                  }
+                >
+                  <Switch checked={readonly} onCheckedChange={setReadonly} />
+                </PanelPropertyField>
+              )}
+              {!FieldSupports.checkbox_alias(type) && type !== "range" && (
+                <PanelPropertyField
+                  label={"Required"}
+                  help={
+                    <>
+                      <Link
+                        href="https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/required"
+                        target="_blank"
+                      >
+                        Learn more
+                      </Link>
+                    </>
+                  }
+                  description={
+                    FieldSupports.checkbox_alias(type) ? (
+                      <>
+                        We follow html5 standards. Checkboxes cannot be
+                        required.{" "}
+                        <a
+                          className="underline"
+                          href="https://github.com/whatwg/html/issues/6868#issue-946624070"
+                          target="_blank"
+                        >
+                          Learn more
+                        </a>
+                      </>
+                    ) : undefined
+                  }
+                  disabled={type === "checkboxes"}
+                >
+                  <Switch checked={required} onCheckedChange={setRequired} />
+                </PanelPropertyField>
+              )}
             </PanelPropertyFields>
           </PanelPropertySection>
 
@@ -852,7 +795,8 @@ export function FieldEditPanel({
               type == "payment" ||
               (!supports_accept &&
                 !supports_pattern &&
-                !html5_input_like_checkbox_field_types.includes(type))
+                !supports_numeric &&
+                !FieldSupports.checkbox_alias(type))
             }
           >
             <PanelPropertySectionTitle>Validation</PanelPropertySectionTitle>
@@ -860,6 +804,16 @@ export function FieldEditPanel({
               {supports_accept && (
                 <PanelPropertyField
                   label={"Accept"}
+                  help={
+                    <>
+                      <Link
+                        href="https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/accept"
+                        target="_blank"
+                      >
+                        Learn more
+                      </Link>
+                    </>
+                  }
                   description="A comma-separated list of file types that the input should accept"
                 >
                   <PropertyTextInput
@@ -881,9 +835,64 @@ export function FieldEditPanel({
                   />
                 </PanelPropertyField>
               )}
-              {html5_input_like_checkbox_field_types.includes(type) && (
+              {supports_numeric && (
+                <>
+                  <PanelPropertyField
+                    label={"Step"}
+                    description="Defines the intervals for the slider values."
+                  >
+                    <PropertyTextInput
+                      type="number"
+                      placeholder="1"
+                      value={step}
+                      onChange={(e) =>
+                        setStep(
+                          e.target.value === ""
+                            ? undefined
+                            : Number(e.target.value)
+                        )
+                      }
+                    />
+                  </PanelPropertyField>
+                  <PanelPropertyField
+                    label={"Min"}
+                    description="Sets the minimum value for the slider."
+                  >
+                    <PropertyTextInput
+                      type="number"
+                      placeholder="E.g. -100"
+                      value={min}
+                      onChange={(e) =>
+                        setMin(
+                          e.target.value === ""
+                            ? undefined
+                            : Number(e.target.value)
+                        )
+                      }
+                    />
+                  </PanelPropertyField>
+                  <PanelPropertyField
+                    label={"Max"}
+                    description="Sets the maximum value for the slider."
+                  >
+                    <PropertyTextInput
+                      type="number"
+                      placeholder="E.g. 100"
+                      value={max}
+                      onChange={(e) =>
+                        setMax(
+                          e.target.value === ""
+                            ? undefined
+                            : Number(e.target.value)
+                        )
+                      }
+                    />
+                  </PanelPropertyField>
+                </>
+              )}
+              {FieldSupports.checkbox_alias(type) && (
                 <PanelPropertyField
-                  label={"Required"}
+                  label={"Check Required"}
                   description={
                     <>
                       The checkbox / switch will be required if it is checked.
@@ -891,7 +900,7 @@ export function FieldEditPanel({
                     </>
                   }
                 >
-                  <Toggle value={required} onChange={setRequired} />
+                  <Switch checked={required} onCheckedChange={setRequired} />
                 </PanelPropertyField>
               )}
             </PanelPropertyFields>
@@ -908,28 +917,416 @@ export function FieldEditPanel({
                   </>
                 }
               >
-                <Toggle value={required} onChange={setRequired} />
+                <Switch checked={required} onCheckedChange={setRequired} />
               </PanelPropertyField>
             </PanelPropertyFields>
           </PanelPropertySection>
+          {FieldSupports.file_upload(type) && state.connections.supabase && (
+            <>
+              <hr />
+              <SupabaseStorageSettings
+                value={storage}
+                onValueChange={setStorage}
+                enabled={storage_enabled}
+                onEnabledChange={__set_storage_enabled}
+                rules={{
+                  pathpolicy: xsupabase_path_policy({ multiple, type }),
+                  bucketpolicy: xsupabase_bucket_policy({ type }),
+                }}
+              />
+            </>
+          )}
+          {FieldSupports.fk(type) && state.connections.supabase && !!name && (
+            <>
+              <hr />
+              <SupabaseReferencesSettings
+                format={
+                  state.connections.supabase.main_supabase_table
+                    ?.sb_table_schema?.properties?.[name]?.format
+                }
+                value={reference}
+                onValueChange={setReference}
+                enabled={reference_enabled}
+                onEnabledChange={__set_reference_enabled}
+              />
+            </>
+          )}
         </form>
       </PanelContent>
       <PanelFooter>
         <PanelClose>
-          <button className="rounded p-2 bg-neutral-100 dark:bg-neutral-900">
-            Cancel
-          </button>
+          <Button variant="ghost">Cancel</Button>
         </PanelClose>
-        <button
-          type="submit"
-          form="field-edit-form"
-          className={cls_save_button}
-        >
+        <Button variant="default" type="submit" form="field-edit-form">
           Save
-        </button>
+        </Button>
       </PanelFooter>
     </SidePanel>
   );
+}
+
+function SupabaseStorageSettings({
+  value,
+  onValueChange,
+  enabled,
+  onEnabledChange,
+  rules,
+}: {
+  value?: Partial<FormFieldStorageSchema> | null | undefined;
+  onValueChange?: (value: Partial<FormFieldStorageSchema>) => void;
+  enabled?: boolean;
+  onEnabledChange?: (enabled: boolean) => void;
+  rules: {
+    pathpolicy:
+      | "x-supabase-storage-compile-time-renderable-single-file-path-template"
+      | undefined;
+    bucketpolicy: "public" | "private" | "any";
+  };
+}) {
+  const [state] = useEditorState();
+  const [buckets, setBuckets] = useState<GridaSupabase.SupabaseBucket[]>();
+  const [bucket, setBucket] = useState<string | undefined>(value?.bucket);
+  const [path, setPath] = useState<string | undefined>(value?.path);
+  const [mode, setMode] = useState<FormFieldStorageSchema["mode"]>(
+    value?.mode ?? "direct"
+  );
+
+  useEffect(() => {
+    // check if path contains template
+
+    onValueChange?.({
+      type: "x-supabase",
+      bucket,
+      mode: isHandlebarTemplate(path) ? "staged" : mode,
+      path,
+    });
+  }, [enabled, bucket, mode, path, onValueChange]);
+
+  // list buckets
+  useEffect(() => {
+    if (enabled) {
+      PrivateEditorApi.SupabaseConnection.listBucket(state.form_id).then(
+        (res) => {
+          res.data.data && setBuckets(res.data.data);
+        }
+      );
+    }
+  }, [enabled, state.form_id]);
+
+  useEffect(() => {
+    setBucket(value?.bucket);
+    setMode(value?.mode ?? "direct");
+    setPath(value?.path);
+  }, [value]);
+
+  return (
+    <PanelPropertySection>
+      <PanelPropertySectionTitle>
+        <SupabaseLogo className="inline me-2 w-5 h-5 align-middle" />
+        Supabase Storage
+      </PanelPropertySectionTitle>
+      <PanelPropertyFields>
+        <PanelPropertyField
+          label={"Enabled Storage"}
+          description="Enable Supabase Storage to store files in your Supabase project. (Required)"
+        >
+          <Switch
+            // IMPORTANT: the custom storage is required since we do not provide a alternate cdn solution. built in storage works only with a 'response' model, where we can't enforce this on x-supabase connection.
+            required
+            checked={enabled}
+            onCheckedChange={onEnabledChange}
+          />
+        </PanelPropertyField>
+        {enabled && (
+          <>
+            <PanelPropertyField
+              label={"Bucket"}
+              description="The bucket name to upload the file to."
+              help={
+                rules.bucketpolicy === "public" && (
+                  <>
+                    Public bucket is required for this field.
+                    <br />
+                    <br />
+                    <i>List of types required for public bucket:</i>
+                    <ul>
+                      <li>
+                        <code>richtext</code>
+                      </li>
+                    </ul>
+                  </>
+                )
+              }
+            >
+              {buckets ? (
+                <>
+                  <Select
+                    required
+                    value={bucket}
+                    onValueChange={(value) => setBucket(value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Bucket" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {buckets?.map((bucket) => (
+                        <SelectItem
+                          key={bucket.id}
+                          value={bucket.id}
+                          disabled={!validatebucket(bucket, rules.bucketpolicy)}
+                        >
+                          <span>
+                            {bucket.name}
+                            <small className="ms-2 text-muted-foreground">
+                              {bucket.public ? "public" : "private"}
+                            </small>
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </>
+              ) : (
+                <>
+                  <Select required disabled>
+                    <SelectTrigger>
+                      <SelectValue
+                        placeholder={
+                          <div className="flex gap-2">
+                            <Spinner /> Loading...
+                          </div>
+                        }
+                      />
+                    </SelectTrigger>
+                  </Select>
+                </>
+              )}
+            </PanelPropertyField>
+            <PanelPropertyField
+              label={"Upload Path"}
+              description="The file upload path. (Leave leading and trailing slashes off)"
+              help={
+                <>
+                  <ContextVariablesTable schema="x-supabase.postgrest_query_insert_select" />
+                </>
+              }
+            >
+              <PropertyTextInput
+                placeholder="public/{{RECORD.id}}/photos/{{file.name}}"
+                value={path}
+                required
+                pattern="^(?!\/).*"
+                onChange={(e) => setPath(e.target.value)}
+              />
+            </PanelPropertyField>
+            <PanelPropertyField
+              label={"Staged Uploading"}
+              help={
+                <>
+                  Staged uploading allows you to upload first under{" "}
+                  <code>tmp/[session]/</code>
+                  folder and then move to the final destination. This is useful
+                  when you want to upload files under <code>path/to/[id]/</code>
+                  and you don&apos;t have the <code>id</code> yet.
+                </>
+              }
+              description={
+                <>
+                  Use staged uploading to upload first, then move to final path
+                  once transaction is complete.
+                </>
+              }
+            >
+              <Switch
+                checked={mode === "staged"}
+                onCheckedChange={(checked) =>
+                  setMode(checked ? "staged" : "direct")
+                }
+              />
+            </PanelPropertyField>
+          </>
+        )}
+      </PanelPropertyFields>
+    </PanelPropertySection>
+  );
+}
+
+function SupabaseReferencesSettings({
+  format,
+  value,
+  onValueChange,
+  enabled,
+  onEnabledChange,
+}: {
+  format?: string;
+  value?: Partial<FormFieldReferenceSchema> | null | undefined;
+  onValueChange?: (value: Partial<FormFieldReferenceSchema>) => void;
+  enabled?: boolean;
+  onEnabledChange?: (enabled: boolean) => void;
+}) {
+  const [state] = useEditorState();
+
+  const { supabase_project } = state.connections.supabase!;
+
+  const { schema, table, column } = value || {};
+
+  const onTableChange = useCallback(
+    (table: string) => {
+      const [schema, _table] = table.split(".");
+
+      onValueChange?.({
+        type: "x-supabase",
+        schema,
+        table: _table,
+        column: undefined,
+      });
+    },
+    [onValueChange]
+  );
+
+  const onColumnCahnge = useCallback(
+    (column: string) => {
+      onValueChange?.({
+        type: "x-supabase",
+        schema,
+        table,
+        column,
+      });
+    },
+    [onValueChange, schema, table]
+  );
+
+  const fulltable = `${schema}.${table}`;
+
+  return (
+    <PanelPropertySection>
+      <PanelPropertySectionTitle>
+        <SupabaseLogo className="inline me-2 w-5 h-5 align-middle" />
+        Supabase Foreign Key
+      </PanelPropertySectionTitle>
+      <PanelPropertyFields>
+        <PanelPropertyField
+          label={"Enable Foreign Key Search"}
+          description="Enable Supabase Foreign Key Search to reference data from your Supabase project."
+        >
+          <Switch checked={enabled} onCheckedChange={onEnabledChange} />
+        </PanelPropertyField>
+        {enabled && (
+          <>
+            <PanelPropertyField
+              label={"Reference Table"}
+              description="The table to reference data from."
+            >
+              <Select value={fulltable} onValueChange={onTableChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder={"Select Table"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectLabel>auth</SelectLabel>
+                    <SelectItem value="auth.users">
+                      <span>auth.users</span>
+                    </SelectItem>
+                  </SelectGroup>
+                  {Object.keys(supabase_project.sb_schema_definitions).map(
+                    (schemaName) => {
+                      return (
+                        <SelectGroup key={schemaName}>
+                          <SelectLabel>{schemaName}</SelectLabel>
+                          {Object.keys(
+                            supabase_project.sb_schema_definitions[schemaName]
+                          ).map((tableName) => {
+                            const fulltable = `${schemaName}.${tableName}`;
+                            return (
+                              <SelectItem key={fulltable} value={fulltable}>
+                                <span>{fulltable}</span>
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectGroup>
+                      );
+                    }
+                  )}
+                </SelectContent>
+              </Select>
+            </PanelPropertyField>
+            <PanelPropertyField
+              label={"Column"}
+              description="The column to reference data from."
+            >
+              <Select
+                // setting this to undefined will throw (don't know why)
+                value={column ?? ""}
+                onValueChange={onColumnCahnge}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={"Select Column"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {schema &&
+                    table &&
+                    (schema === "auth" && table === "users" ? (
+                      <>
+                        {Object.keys(
+                          GridaSupabase.SupabaseUserJsonSchema.properties
+                        ).map((key) => {
+                          const property =
+                            GridaSupabase.SupabaseUserJsonSchema.properties[
+                              key as GridaSupabase.SupabaseUserColumn
+                            ];
+                          return (
+                            <SelectItem
+                              disabled={format !== property.format}
+                              key={key}
+                              value={key}
+                            >
+                              <span>{key}</span>{" "}
+                              <small className="ms-1 text-muted-foreground">
+                                {property.type} | {property.format}
+                              </small>
+                            </SelectItem>
+                          );
+                        })}
+                      </>
+                    ) : (
+                      <>
+                        {Object.keys(
+                          supabase_project.sb_schema_definitions[schema][table]
+                            ?.properties ?? {}
+                        )?.map((key) => {
+                          const property =
+                            supabase_project.sb_schema_definitions[schema][
+                              table
+                            ].properties?.[key];
+                          return (
+                            <SelectItem
+                              disabled={format !== property.format}
+                              key={key}
+                              value={key}
+                            >
+                              <span>{key}</span>{" "}
+                              <small className="ms-1 text-muted-foreground">
+                                {property.type} | {property.format}
+                              </small>
+                            </SelectItem>
+                          );
+                        })}
+                      </>
+                    ))}
+                </SelectContent>
+              </Select>
+            </PanelPropertyField>
+          </>
+        )}
+      </PanelPropertyFields>
+    </PanelPropertySection>
+  );
+}
+
+function isHandlebarTemplate(str?: string) {
+  if (!str) return false;
+  const handlebarRegex = /\{\{[^{}]*\}\}/;
+  return handlebarRegex.test(str);
 }
 
 function next_option_default(options: Option[]): Option {
@@ -952,4 +1349,41 @@ function next_option_default(options: Option[]): Option {
 function buildPreviewLabel({ name, label }: { name: string; label?: string }) {
   let txt = label || fmt_snake_case_to_human_text(name);
   return txt;
+}
+
+function xsupabase_path_policy({
+  type,
+  multiple,
+}: {
+  type: FormInputType;
+  multiple: boolean;
+}):
+  | "x-supabase-storage-compile-time-renderable-single-file-path-template"
+  | undefined {
+  if (multiple)
+    return "x-supabase-storage-compile-time-renderable-single-file-path-template";
+
+  if (FieldSupports.richtext(type))
+    return "x-supabase-storage-compile-time-renderable-single-file-path-template";
+
+  return undefined;
+}
+
+function xsupabase_bucket_policy({
+  type,
+}: {
+  type: FormInputType;
+}): "public" | "private" | "any" {
+  if (FieldSupports.richtext(type)) return "public";
+
+  return "any";
+}
+
+function validatebucket(
+  bucket: { public: boolean },
+  policy: "public" | "private" | "any"
+): boolean {
+  if (policy === "private") return !bucket.public;
+  if (policy === "public") return bucket.public;
+  return true;
 }

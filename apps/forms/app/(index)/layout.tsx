@@ -23,9 +23,9 @@ export default async function RootLayout({
   const cookieStore = cookies();
   const supabase = createServerComponentClient(cookieStore);
 
-  const { data } = await supabase.auth.getSession();
+  const { data } = await supabase.auth.getUser();
 
-  const isLoggedIn = !!data.session?.user;
+  const isLoggedIn = !!data?.user;
 
   if (isLoggedIn) {
     redirect("/dashboard");

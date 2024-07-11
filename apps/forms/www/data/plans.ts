@@ -23,14 +23,14 @@ export const plans: PricingInformation[] = [
     name: "Free",
     nameBadge: "",
     costUnit: "/ month",
-    href: "https://forms.grida.co/dashboard/new?plan=free",
+    href: "/dashboard/new?plan=free",
     priceLabel: "",
     priceMonthly: 0,
     description: "Perfect for hobby projects.",
     features: [
       {
         name: "Responses Included",
-        trail: "50",
+        trail: "100 / month",
       },
       {
         name: "Additional responses",
@@ -57,7 +57,7 @@ export const plans: PricingInformation[] = [
     highlight: true,
     nameBadge: "Most Popular",
     costUnit: "/ month",
-    href: "https://forms.grida.co/dashboard/new?plan=pro",
+    href: "/dashboard/new?plan=pro",
     priceLabel: "From",
     warning: "$10 in compute credits included",
     priceMonthly: 20,
@@ -65,11 +65,11 @@ export const plans: PricingInformation[] = [
     features: [
       {
         name: "Responses Included",
-        trail: "1,000",
+        trail: "1,000 / month",
       },
       {
         name: "Additional responses",
-        trail: "then $5 per 1K",
+        trail: "$5 per 1K",
       },
       {
         name: "Number of forms",
@@ -91,7 +91,7 @@ export const plans: PricingInformation[] = [
     name: "Team",
     nameBadge: "",
     costUnit: "/ month",
-    href: "https://forms.grida.co/dashboard/new?plan=team",
+    href: "/dashboard/new?plan=team",
     priceLabel: "From",
     warning: "$10 in compute credits included",
     priceMonthly: 60,
@@ -99,11 +99,11 @@ export const plans: PricingInformation[] = [
     features: [
       {
         name: "Responses Included",
-        trail: "10,000",
+        trail: "10,000 / month",
       },
       {
         name: "Additional responses",
-        trail: "then $1 per 1K",
+        trail: "$1 per 1K",
       },
       {
         name: "Number of forms",
@@ -123,7 +123,7 @@ export const plans: PricingInformation[] = [
   {
     id: "tier_enterprise",
     name: "Enterprise",
-    href: "https://forms.grida.com/enterprise",
+    href: "/enterprise",
     description:
       "For large-scale and building custom solutions on top fo Grida Forms.",
     features: [
@@ -152,4 +152,19 @@ export const plans: PricingInformation[] = [
     priceMonthly: "Custom",
     cta: "Contact Sales",
   },
+];
+
+export const save_plans: PricingInformation[] = [
+  plans[0],
+  {
+    ...plans[1],
+    priceMonthly: 10,
+    href: "/dashboard/new?plan=pro&period=yearly",
+  },
+  {
+    ...plans[2],
+    priceMonthly: 48,
+    href: "/dashboard/new?plan=team&period=yearly",
+  },
+  plans[3],
 ];

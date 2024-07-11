@@ -11,7 +11,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@editor-ui/dropdown-menu";
+} from "@/components/ui/dropdown-menu";
 import { EditorFlatFormBlock } from "@/scaffolds/editor/state";
 import { useEditorState } from "@/scaffolds/editor";
 import {
@@ -21,6 +21,7 @@ import {
   useDeleteBlock,
 } from "./base-block";
 import TextareaAutosize from "react-textarea-autosize";
+import { Button } from "@/components/ui/button";
 
 export function HeaderBlock({
   id,
@@ -67,13 +68,13 @@ export function HeaderBlock({
         <div>
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
-              <button>
+              <Button variant="ghost" size="icon">
                 <DotsHorizontalIcon />
-              </button>
+              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
               <DropdownMenuItem onClick={() => deleteBlock(id)}>
-                <TrashIcon />
+                <TrashIcon className="me-2 align-middle" />
                 Delete Block
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -81,17 +82,17 @@ export function HeaderBlock({
         </div>
       </BlockHeader>
       <div>
-        <div className="bg-neutral-200 dark:bg-neutral-800 rounded overflow-hidden border border-black/20 aspect-auto">
+        <div className="bg-background rounded overflow-hidden border aspect-auto">
           <input
             type="text"
-            className="w-full p-4 text-2xl font-bold outline-none dark:text-white dark:bg-neutral-900"
+            className="bg-background w-full p-4 text-2xl font-bold outline-none"
             placeholder="Heading"
             value={title_html ?? ""}
             onChange={(e) => onEditTitle(e.target.value)}
           />
           <TextareaAutosize
             minRows={1}
-            className="w-full p-4 text-lg outline-none dark:text-white dark:bg-neutral-900"
+            className="bg-background w-full p-4 text-lg outline-none"
             placeholder="Description"
             value={description_html ?? ""}
             onChange={(e) => onEditDescription(e.target.value)}
