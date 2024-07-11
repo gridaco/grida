@@ -78,7 +78,7 @@ export function SidebarMenuItem({
       className={cn(
         "flex items-center",
         "relative group",
-        "w-full px-2 py-1 rounded hover:bg-accent text-sm font-medium text-foreground data-[muted='true']:text-muted-foreground",
+        "w-full px-2 py-1 rounded hover:bg-accent hover:text-accent-foreground text-sm font-medium text-foreground data-[muted='true']:text-muted-foreground",
         "text-ellipsis whitespace-nowrap overflow-hidden",
         "data-[disabled='true']:cursor-not-allowed data-[disabled='true']:opacity-50 data-[disabled='true']:bg-background",
         className
@@ -112,7 +112,7 @@ export function SidebarSectionHeaderItem({
     <div
       className={cn(
         "relative group",
-        "w-full px-2 py-1 my-1 rounded hover:bg-accent text-sm font-medium text-foreground data-[muted='true']:text-muted-foreground",
+        "w-full px-2 py-1 my-1 rounded hover:bg-accent hover:text-accent-foreground text-sm font-medium text-foreground data-[muted='true']:text-muted-foreground",
         "text-ellipsis whitespace-nowrap overflow-hidden",
         "flex justify-between items-center",
         className
@@ -127,7 +127,7 @@ export function SidebarSectionHeaderLabel({
   children,
 }: React.PropsWithChildren<{}>) {
   return (
-    <span className="text-xs font-normal text-muted-foreground">
+    <span className="text-xs font-normal text-muted-foreground group-hover:text-accent-foreground">
       {children}
     </span>
   );
