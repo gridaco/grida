@@ -29,9 +29,7 @@ export default function BlocksEditorRoot() {
     <div className="w-full overflow-y-auto">
       <AgentThemeProvider>
         <DndContextProvider>
-          <div className="py-20">
-            <BlocksEditor />
-          </div>
+          <BlocksEditor />
         </DndContextProvider>
       </AgentThemeProvider>
     </div>
@@ -271,15 +269,15 @@ function BlocksEditor() {
 
   return (
     <div onPointerDown={blur}>
-      <div className="container mx-auto max-w-screen-sm">
+      <div className="fixed z-10">
+        <div className="absolute left-4 top-4">
+          <NewBlockButton />
+        </div>
+      </div>
+      <div className="py-20 container mx-auto max-w-screen-sm">
         <PendingBlocksResolver />
         <OptimisticBlocksSyncProvider />
         <AgentThemeSyncProvider />
-        <div className="sticky top-20 z-10">
-          <div className="absolute -left-6">
-            <NewBlockButton />
-          </div>
-        </div>
         <BlocksCanvas id="root" className="mt-10">
           <SortableContext
             items={state.blocks.map((b) => b.id)}
