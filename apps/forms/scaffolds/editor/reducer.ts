@@ -42,6 +42,7 @@ import type {
   EditorThemeBackgroundAction,
   EditorThemeSectionStyleAction,
   EditorThemeCustomCSSAction,
+  DocumentSelectPageAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { blockstreeflat } from "@/lib/forms/tree";
@@ -814,6 +815,14 @@ export function reducer(
       const { custom } = <EditorThemeCustomCSSAction>action;
       return produce(state, (draft) => {
         draft.theme.customCSS = custom;
+      });
+    }
+    //
+    case "editor/document/select-page": {
+      const { page_id } = <DocumentSelectPageAction>action;
+
+      return produce(state, (draft) => {
+        draft.document.selected_page_id = page_id;
       });
     }
     default:

@@ -53,7 +53,8 @@ export type BlocksEditorAction =
   | EditorThemeFontFamilyAction
   | EditorThemeSectionStyleAction
   | EditorThemeCustomCSSAction
-  | EditorThemeBackgroundAction;
+  | EditorThemeBackgroundAction
+  | DocumentSelectPageAction;
 
 export type CreateNewPendingBlockAction =
   | {
@@ -287,4 +288,9 @@ export interface EditorThemeCustomCSSAction {
 export interface EditorThemeBackgroundAction {
   type: "editor/theme/background";
   background?: FormPageBackgroundSchema;
+}
+
+export interface DocumentSelectPageAction {
+  type: "editor/document/select-page";
+  page_id: string;
 }

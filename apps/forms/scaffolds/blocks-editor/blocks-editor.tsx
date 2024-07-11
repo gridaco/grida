@@ -19,20 +19,16 @@ import {
 import { createClientFormsClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
 import { NewBlockButton } from "./new-block-button";
-import { AgentThemeProvider, SectionStyle } from "../agent/theme";
+import { SectionStyle } from "../agent/theme";
 import { usePrevious } from "@uidotdev/usehooks";
 import equal from "deep-equal";
 import { FormPageBackgroundSchema, FormStyleSheetV1Schema } from "@/types";
 
 export default function BlocksEditorRoot() {
   return (
-    <div className="w-full overflow-y-auto">
-      <AgentThemeProvider>
-        <DndContextProvider>
-          <BlocksEditor />
-        </DndContextProvider>
-      </AgentThemeProvider>
-    </div>
+    <DndContextProvider>
+      <BlocksEditor />
+    </DndContextProvider>
   );
 }
 

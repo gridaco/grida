@@ -70,6 +70,10 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
     scheduling_tz: init.scheduling_tz,
     page_id: init.page_id,
     blocks: blockstreeflat(init.blocks),
+    document: {
+      pages: ["collection", "form"],
+      selected_page_id: "form",
+    },
     fields: init.fields,
     responses: {
       rows: [],
@@ -146,6 +150,17 @@ export interface FormEditorState {
   scheduling_tz?: string;
   page_id: string | null;
   blocks: EditorFlatFormBlock[];
+  document: {
+    pages: string[];
+    selected_page_id: string;
+  };
+  theme: {
+    palette?: FormStyleSheetV1Schema["palette"];
+    fontFamily?: FormStyleSheetV1Schema["font-family"];
+    customCSS?: FormStyleSheetV1Schema["custom"];
+    section?: FormStyleSheetV1Schema["section"];
+    background?: FormPageBackgroundSchema;
+  };
   fields: FormFieldDefinition[];
   field_draft_init?: Partial<FormFieldInit> | null;
   focus_field_id?: string | null;
@@ -159,13 +174,6 @@ export interface FormEditorState {
     fields: { [key: string]: FormResponseField[] };
   };
   sessions?: FormResponseSession[];
-  theme: {
-    palette?: FormStyleSheetV1Schema["palette"];
-    fontFamily?: FormStyleSheetV1Schema["font-family"];
-    customCSS?: FormStyleSheetV1Schema["custom"];
-    section?: FormStyleSheetV1Schema["section"];
-    background?: FormPageBackgroundSchema;
-  };
   tables: GFTable[];
   datagrid_rows_per_page: number;
   datagrid_table: "response" | "session" | "x-supabase-main-table";

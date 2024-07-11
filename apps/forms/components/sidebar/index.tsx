@@ -63,29 +63,36 @@ export function SidebarMenuItem({
   className,
   disabled,
   children,
+  onSelect,
 }: React.PropsWithChildren<{
   level?: number;
   muted?: boolean;
   selected?: boolean;
   className?: string;
   disabled?: boolean;
+  onSelect?: () => void;
 }>) {
   return (
     <div
       data-level={level}
       data-muted={muted}
       data-disabled={disabled}
+      data-selected={selected}
       className={cn(
         "flex items-center",
         "relative group",
-        "w-full px-2 py-1 rounded hover:bg-accent hover:text-accent-foreground text-sm font-medium text-foreground data-[muted='true']:text-muted-foreground",
+        "w-full px-2 py-1 rounded text-sm font-medium text-foreground",
         "text-ellipsis whitespace-nowrap overflow-hidden",
+        "hover:bg-accent hover:text-accent-foreground",
+        "data-[muted='true']:text-muted-foreground",
         "data-[disabled='true']:cursor-not-allowed data-[disabled='true']:opacity-50 data-[disabled='true']:bg-background",
+        "data-[selected='true']:bg-accent data-[selected='true']:text-accent-foreground",
         className
       )}
       style={{
         paddingLeft: level ? `${level * 1}rem` : undefined,
       }}
+      onClick={onSelect}
     >
       {children}
     </div>

@@ -1,11 +1,10 @@
 "use client";
 
-import React, { useCallback } from "react";
+import React from "react";
 import {
   AvatarIcon,
   GlobeIcon,
   PieChartIcon,
-  PlusIcon,
   ArchiveIcon,
   CodeIcon,
   EnvelopeClosedIcon,
@@ -20,8 +19,6 @@ import { Table2Icon, TabletSmartphoneIcon } from "lucide-react";
 import { StripeLogo1, SupabaseLogo, TossLogo } from "@/components/logos";
 import { Badge } from "@/components/ui/badge";
 import {
-  SidebarMenuGrid,
-  SidebarMenuGridItem,
   SidebarMenuItem,
   SidebarMenuList,
   SidebarRoot,
@@ -42,7 +39,6 @@ export function Siebar({
   const { form_id } = state;
   return (
     <SidebarRoot>
-      <div className="h-5" />
       {mode === "data" && <ModeData />}
       {mode === "blocks" && <ModeBlocks />}
       {mode === "connect" && <ModeConnect />}
@@ -58,6 +54,7 @@ function ModeData() {
 
   return (
     <>
+      <div className="h-5" />
       <SidebarSection>
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>
@@ -145,6 +142,7 @@ function ModeConnect() {
   const { form_id } = state;
   return (
     <>
+      <div className="h-5" />
       <SidebarSection>
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>
@@ -296,6 +294,7 @@ function ModeSettings() {
   const { form_id } = state;
   return (
     <>
+      <div className="h-5" />
       <SidebarSection>
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>

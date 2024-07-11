@@ -136,6 +136,7 @@
   "devDependencies": {
     "@next/font": "^14.2.4",
     "@supabase/storage-js": "^2.6.0",
+    "@tailwindcss/container-queries": "^0.1.1",
     "@tailwindcss/typography": "^0.5.10",
     "@types/core-js": "^2.5.8",
     "@types/css-tree": "^2.3.1",

@@ -185,6 +185,7 @@ const config: Config = {
   },
   plugins: [
     require("@tailwindcss/typography"),
+    require("@tailwindcss/container-queries"),
     addVariablesForColors,
     /**
      * https://ui.aceternity.com/components/grid-and-dot-backgrounds
