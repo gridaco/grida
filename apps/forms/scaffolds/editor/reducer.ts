@@ -43,6 +43,7 @@ import type {
   EditorThemeSectionStyleAction,
   EditorThemeCustomCSSAction,
   DocumentSelectPageAction,
+  DocumentSelectNodeAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { blockstreeflat } from "@/lib/forms/tree";
@@ -823,6 +824,12 @@ export function reducer(
 
       return produce(state, (draft) => {
         draft.document.selected_page_id = page_id;
+      });
+    }
+    case "editor/document/select-node": {
+      const { node_id } = <DocumentSelectNodeAction>action;
+      return produce(state, (draft) => {
+        draft.document.selected_node_id = node_id;
       });
     }
     default:

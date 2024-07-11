@@ -54,7 +54,8 @@ export type BlocksEditorAction =
   | EditorThemeSectionStyleAction
   | EditorThemeCustomCSSAction
   | EditorThemeBackgroundAction
-  | DocumentSelectPageAction;
+  | DocumentSelectPageAction
+  | DocumentSelectNodeAction;
 
 export type CreateNewPendingBlockAction =
   | {
@@ -293,4 +294,9 @@ export interface EditorThemeBackgroundAction {
 export interface DocumentSelectPageAction {
   type: "editor/document/select-page";
   page_id: string;
+}
+
+export interface DocumentSelectNodeAction {
+  type: "editor/document/select-node";
+  node_id?: string;
 }

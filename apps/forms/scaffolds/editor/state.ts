@@ -73,6 +73,7 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
     document: {
       pages: ["collection", "start", "form"],
       selected_page_id: "form",
+      nodes: [],
     },
     fields: init.fields,
     responses: {
@@ -153,6 +154,8 @@ export interface FormEditorState {
   document: {
     pages: string[];
     selected_page_id: string;
+    nodes: any[];
+    selected_node_id?: string;
   };
   theme: {
     palette?: FormStyleSheetV1Schema["palette"];

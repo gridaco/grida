@@ -14,7 +14,11 @@ export default function EditFormPage() {
       <aside className="hidden lg:flex h-full">
         <Siebar mode="blocks" />
       </aside>
-      <div className="w-full overflow-y-auto">
+      <div className="relative w-full overflow-y-auto">
+        <div
+          className="absolute inset-0 pointer-events-none z-10"
+          id="canvas-overlay-portal"
+        />
         <AgentThemeProvider>
           <CurrentPageCanvas />
         </AgentThemeProvider>
@@ -34,13 +38,13 @@ function CurrentPageCanvas() {
       return <BlocksEditor />;
     case "collection":
       return (
-        <div className="mx-auto my-20 max-w-screen-sm border rounded-2xl shadow-2xl bg-background overflow-hidden">
+        <div className="mx-auto my-20 max-w-[430px] border rounded-2xl shadow-2xl bg-background overflow-hidden">
           <FormCollectionPage />
         </div>
       );
     case "start": {
       return (
-        <div className="mx-auto my-20 max-w-screen-sm border rounded-2xl shadow-2xl bg-background overflow-hidden">
+        <div className="mx-auto my-20 max-w-[430px] border rounded-2xl shadow-2xl bg-background overflow-hidden">
           <FormStartPage />
         </div>
       );

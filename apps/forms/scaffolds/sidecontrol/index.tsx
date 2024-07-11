@@ -54,6 +54,53 @@ export function SideControl({ mode }: { mode: "blocks" }) {
 }
 
 function ModeBlocks() {
+  const [state, dispatch] = useEditorState();
+
+  if (state.document.selected_node_id) {
+    return <SelectedNodeProperties />;
+  } else {
+    return <GlobalProperties />;
+  }
+}
+
+function SelectedNodeProperties() {
+  const [state, dispatch] = useEditorState();
+
+  // - color - variables
+  // - hidden
+
+  return (
+    <>
+      <SidebarSection className="border-b pb-4">
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>Debug</SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuSectionContent>
+          <div>Node! {state.document.selected_node_id}</div>
+        </SidebarMenuSectionContent>
+      </SidebarSection>
+      <SidebarSection className="border-b pb-4">
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>Template</SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuSectionContent>
+          <Select>
+            <SelectTrigger>
+              <SelectValue>None</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1">Template 1</SelectItem>
+              <SelectItem value="2">Template 2</SelectItem>
+              <SelectItem value="3">Template 3</SelectItem>
+            </SelectContent>
+          </Select>
+        </SidebarMenuSectionContent>
+      </SidebarSection>
+    </>
+  );
+}
+
+function GlobalProperties() {
   return (
     <>
       <SidebarSection className="border-b pb-4">

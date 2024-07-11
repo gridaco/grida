@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import ReactDOM from "react-dom";
 import { cn } from "@/utils";
 import { useGesture } from "@use-gesture/react";
@@ -17,11 +23,15 @@ export function Node({
   const overlayRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  const portal = useMemo(() => {
+    return document.getElementById("canvas-overlay-portal")!;
+  }, []);
+
   const {
     document: { selected_node_id },
   } = state;
 
-  const selected = selected_node_id == node_id;
+  const selected = !!selected_node_id && selected_node_id === node_id;
 
   const onSelect = useCallback(() => {
     dispatch({
@@ -38,7 +48,10 @@ export function Node({
       onMouseLeave: ({ event }) => {
         setHovered(false);
       },
-      onClick: onSelect,
+      onClick: ({ event }) => {
+        event.stopPropagation();
+        onSelect();
+      },
     },
     {
       eventOptions: {
@@ -50,34 +63,43 @@ export function Node({
   useEffect(() => {
     if (hovered && containerRef.current && overlayRef.current) {
       const containerRect = containerRef.current.getBoundingClientRect();
+      const portalRect = portal.getBoundingClientRect();
       const overlay = overlayRef.current;
 
+      // Calculate the position of the target relative to the portal
+      const top = containerRect.top - portalRect.top;
+      const left = containerRect.left - portalRect.left;
+      const width = containerRect.width;
+      const height = containerRect.height;
+
       overlay.style.position = "absolute";
-      overlay.style.top = `${containerRect.top}px`;
-      overlay.style.left = `${containerRect.left}px`;
-      overlay.style.width = `${containerRect.width}px`;
-      overlay.style.height = `${containerRect.height}px`;
+      overlay.style.top = `${top}px`;
+      overlay.style.left = `${left}px`;
+      overlay.style.width = `${width}px`;
+      overlay.style.height = `${height}px`;
     }
-  }, [hovered]);
+  }, [hovered, portal]);
 
   return (
     <>
       <div ref={containerRef} {...bind()}>
         {children}
       </div>
-      {ReactDOM.createPortal(
-        <div
-          ref={overlayRef}
-          onClick={() => {
-            alert("clicked");
-          }}
-          className={cn(
-            "pointer-events-none select-none z-10 border-blue-500",
-            hovered && "border-2",
-            selected && "border-2"
+      {(hovered || selected) && (
+        <>
+          {ReactDOM.createPortal(
+            <div
+              data-node-id={node_id}
+              data-selected={selected}
+              data-hovered={hovered}
+              ref={overlayRef}
+              className={cn(
+                "pointer-events-none select-none z-10 border-2 border-blue-500"
+              )}
+            />,
+            portal
           )}
-        />,
-        document.body // or a different mount point if you have one
+        </>
       )}
     </>
   );
