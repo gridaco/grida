@@ -18,8 +18,6 @@ export function AdminMediaPicker({
   return <MediaPicker {...props} uploader={uploadFile} />;
 }
 
-type FileUploader = (file: Blob | File) => Promise<string>;
-
 export function MediaPicker({
   open,
   onOpenChange,

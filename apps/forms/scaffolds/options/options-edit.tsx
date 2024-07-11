@@ -30,8 +30,6 @@ import {
 import { fmt_snake_case_to_human_text } from "@/utils/fmt";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { Button } from "@/components/ui/button";
-import { MediaPicker } from "../mediapicker";
-import { useFormMediaUploader } from "../mediapicker/form-media-uploader";
 import { AdminMediaPicker } from "../mediapicker";
 import type { Option } from "@/types";
 import { Input } from "@/components/ui/input";
@@ -179,8 +177,6 @@ function OptionEditItem({
     isOver,
     transition,
   } = useSortable({ id: id, data: { index } });
-
-  const mediaUploader = useFormMediaUploader();
 
   const [value, setValue] = useState(_value);
   const [label, setLabel] = useState(_label);

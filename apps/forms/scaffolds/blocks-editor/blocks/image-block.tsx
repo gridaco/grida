@@ -22,7 +22,6 @@ import {
 } from "./base-block";
 import { useEditorState } from "@/scaffolds/editor";
 import * as Tooltip from "@radix-ui/react-tooltip";
-import { useFormMediaUploader } from "@/scaffolds/mediapicker/form-media-uploader";
 import { AdminMediaPicker } from "@/scaffolds/mediapicker";
 
 export function ImageBlock({
@@ -35,7 +34,6 @@ export function ImageBlock({
   const [state, dispatch] = useEditorState();
   const [pickerOpen, setPickerOpen] = React.useState(false);
   const [focused, setFocus] = useBlockFocus(id);
-  const uploader = useFormMediaUploader();
   const deleteBlock = useDeleteBlock();
 
   const onChangeImage = useCallback(
