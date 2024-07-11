@@ -44,11 +44,11 @@ const data = {
 
 export default function FormStartPage() {
   return (
-    <main>
+    <main className="@container/preview">
       <header className="p-4">
         <GridaLogo />
       </header>
-      <div className="md:container mx-auto flex gap-0 md:gap-10 flex-col justify-center md:flex-row">
+      <div className="@2xl/preview:container @2xl/preview:flex-row mx-auto flex gap-0 md:gap-10 flex-col justify-center">
         <aside>
           <section className="mt-10">
             <Image
@@ -62,7 +62,7 @@ export default function FormStartPage() {
         </aside>
         <aside className="flex-1 md:max-w-2xl">
           <section className="p-4 mt-10">
-            <div className="prose dark:prose-invert">
+            <div className="text-4xl font-bold">
               <h1 className="">{data.title}</h1>
             </div>
           </section>
@@ -98,7 +98,7 @@ export default function FormStartPage() {
           </section>
           <section className="p-4">
             <SectionHeader>About Event</SectionHeader>
-            <article className=" prose dark:prose-invert">
+            <article className="prose dark:prose-invert">
               <span
                 dangerouslySetInnerHTML={{
                   __html: data.description,

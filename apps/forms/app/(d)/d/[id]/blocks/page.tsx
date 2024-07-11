@@ -6,6 +6,7 @@ import { Siebar } from "@/scaffolds/sidebar/sidebar";
 import { SideControl } from "@/scaffolds/sidecontrol";
 import BlocksEditor from "@/scaffolds/blocks-editor";
 import FormCollectionPage from "@/theme/templates/formcollection/page";
+import FormStartPage from "@/theme/templates/formstart/default/page";
 
 export default function EditFormPage() {
   return (
@@ -37,6 +38,13 @@ function CurrentPageCanvas() {
           <FormCollectionPage />
         </div>
       );
+    case "start": {
+      return (
+        <div className="mx-auto my-20 max-w-screen-sm border rounded-2xl shadow-2xl bg-background overflow-hidden">
+          <FormStartPage />
+        </div>
+      );
+    }
     default:
       return <>TODO</>;
   }

@@ -71,7 +71,7 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
     page_id: init.page_id,
     blocks: blockstreeflat(init.blocks),
     document: {
-      pages: ["collection", "form"],
+      pages: ["collection", "start", "form"],
       selected_page_id: "form",
     },
     fields: init.fields,

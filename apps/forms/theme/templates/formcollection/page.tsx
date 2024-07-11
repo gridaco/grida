@@ -10,24 +10,7 @@ import { SlashIcon } from "@radix-ui/react-icons";
 export default function FormCollectionPage() {
   return (
     <div className="@container/preview">
-      <header>
-        <div className="relative">
-          <video
-            className="w-full aspect-[3/4] @5xl/preview:aspect-video object-cover -z-10"
-            autoPlay
-            loop
-            muted
-            playsInline
-            src="https://player.vimeo.com/progressive_redirect/playback/860123788/rendition/1080p/file.mp4?loc=external&log_user=0&signature=ac9c2e0d2e367d8a31af6490edad8c1f7bae87d085c4f3909773a7ca5a129cb6"
-          />
-          <div className="absolute bottom-8 bg-background max-w-md container py-4">
-            <h1 className="text-4xl font-semibold">The Bundle</h1>
-            <p className="text-lg">
-              A collection of events and meetups for developers and designers.
-            </p>
-          </div>
-        </div>
-      </header>
+      <Hero_002 />
       <main className="container">
         <section>
           <header className="py-10">
@@ -44,9 +27,12 @@ export default function FormCollectionPage() {
           </header>
           <TemplateComponent>
             <div className="grid gap-6 grid-cols-1 @3xl/preview:grid-cols-2 @5xl/preview:grid-cols-3 @7xl/preview:grid-cols-4">
-              {[0, 1, 2, 3].map((i) => (
+              {[1, 2, 3, 4].map((i) => (
                 <TemplateComponent key={i}>
-                  <Card_002 key={i} />
+                  <Card_002
+                    key={i}
+                    image={`/images/bundle-abstract/00${i}.png`}
+                  />
                 </TemplateComponent>
               ))}
             </div>
@@ -60,6 +46,53 @@ export default function FormCollectionPage() {
   );
 }
 
+function Hero_001() {
+  return (
+    <header>
+      <div className="relative">
+        <video
+          className="w-full aspect-[3/4] @5xl/preview:aspect-video object-cover -z-10"
+          autoPlay
+          loop
+          muted
+          playsInline
+          src="https://player.vimeo.com/progressive_redirect/playback/860123788/rendition/1080p/file.mp4?loc=external&log_user=0&signature=ac9c2e0d2e367d8a31af6490edad8c1f7bae87d085c4f3909773a7ca5a129cb6"
+        />
+        <div className="absolute bottom-8 bg-background max-w-md container py-4">
+          <h1 className="text-4xl font-semibold">The Bundle</h1>
+          <p className="text-lg">
+            A collection of events and meetups for developers and designers.
+          </p>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function Hero_002() {
+  return (
+    <header>
+      <div className="relative">
+        <video
+          className="w-full aspect-[3/4] @5xl/preview:aspect-video object-cover -z-10"
+          autoPlay
+          loop
+          muted
+          playsInline
+          src="https://player.vimeo.com/progressive_redirect/playback/860123788/rendition/1080p/file.mp4?loc=external&log_user=0&signature=ac9c2e0d2e367d8a31af6490edad8c1f7bae87d085c4f3909773a7ca5a129cb6"
+        />
+        <HalfHeightGradient />
+        <div className="absolute bottom-8 max-w-md container py-4">
+          <h1 className="text-4xl font-semibold">The Bundle</h1>
+          <p className="text-lg">
+            A collection of events and meetups for developers and designers.
+          </p>
+        </div>
+      </div>
+    </header>
+  );
+}
+
 function TemplateComponent({ children }: React.PropsWithChildren<{}>) {
   return (
     <div className={cn("relative")}>
@@ -67,6 +100,10 @@ function TemplateComponent({ children }: React.PropsWithChildren<{}>) {
       {children}
     </div>
   );
+}
+
+interface CardProps {
+  image: string;
 }
 
 function Card_001() {
@@ -99,26 +136,20 @@ function Card_001() {
   );
 }
 
-function Card_002() {
+function Card_002({ image }: CardProps) {
   return (
     <Card className="relative overflow-hidden flex-1 flex flex-col justify-end gap-6 text-foreground w-auto aspect-[4/4]">
       <Image
         className="absolute top-0 left-0 w-full h-full object-cover z-0"
-        src="/images/abstract-placeholder.jpg"
+        src={image}
         alt={""}
         layout="fill"
       />
-      <div
-        className="absolute bottom-0 left-0 w-full h-1/2 z-10"
-        style={{
-          background:
-            "linear-gradient(to top, hsl(var(--background)), transparent)",
-        }}
-      />
+      <HalfHeightGradient />
       <div className="absolute top-0 left-0 py-4 px-4">
-        <span className="bg-background backdrop-blur-md rounded-md px-2 py-1 uppercase text-sm font-bold">
+        <Badge>
           <>Opens 1:11</>
-        </span>
+        </Badge>
       </div>
       <div className="flex flex-col gap-1 z-20 py-8 px-4 pr-10">
         <div className="flex flex-row items-center gap-2">
@@ -136,5 +167,17 @@ function Card_002() {
         <p className="text-xs font-regular opacity-80">register now</p>
       </div>
     </Card>
+  );
+}
+
+function HalfHeightGradient() {
+  return (
+    <div
+      className="absolute bottom-0 left-0 w-full h-2/5 z-0"
+      style={{
+        background:
+          "linear-gradient(to top, hsl(var(--background)), transparent)",
+      }}
+    />
   );
 }
