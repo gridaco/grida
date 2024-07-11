@@ -34,7 +34,6 @@ export function ImageBlock({
   const [state, dispatch] = useEditorState();
   const [pickerOpen, setPickerOpen] = React.useState(false);
   const [focused, setFocus] = useBlockFocus(id);
-
   const deleteBlock = useDeleteBlock();
 
   const onChangeImage = useCallback(
