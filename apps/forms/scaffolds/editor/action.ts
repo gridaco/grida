@@ -56,7 +56,9 @@ export type BlocksEditorAction =
   | EditorThemeCustomCSSAction
   | EditorThemeBackgroundAction
   | DocumentSelectPageAction
-  | DocumentSelectNodeAction;
+  | DocumentSelectNodeAction
+  | DocumentNodeChangeTemplateAction
+  | DocumentNodeUpdatePropertyAction;
 
 export type CreateNewPendingBlockAction =
   | {
@@ -298,7 +300,19 @@ export interface DocumentSelectPageAction {
 }
 
 export interface DocumentSelectNodeAction {
-  type: "editor/document/select-node";
+  type: "editor/document/node/select";
   node_id?: string;
   schema?: ZodObject<any>;
+}
+
+export interface DocumentNodeChangeTemplateAction {
+  type: "editor/document/node/template";
+  node_id: string;
+  template_id: string;
+}
+
+export interface DocumentNodeUpdatePropertyAction {
+  type: "editor/document/node/property";
+  node_id: string;
+  data: { [key: string]: any };
 }

@@ -43,6 +43,13 @@ import { useMonacoTheme } from "@/components/monaco";
 import { customcss_starter_template } from "@/theme/customcss/k";
 import { Input } from "@/components/ui/input";
 import { TemplateComponents } from "@/theme/templates/components";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { TextAlignControl } from "./controls/text-align";
+import { FontSizeControl } from "./controls/font-size";
+import { FontWeightControl } from "./controls/font-weight";
+import { HiddenControl } from "./controls/hidden";
+import { OpacityControl } from "./controls/opacity";
 
 const { default: _, ...variants } = _variants;
 
@@ -78,8 +85,36 @@ function SelectedNodeProperties() {
     selected_node_schema?.shape.props.shape || {}
   );
 
+  const properties = state.document.templatedata[selected_node_id!];
+
+  const { template_id, opacity, hidden } = properties || {};
+
+  const changetemplate = useCallback(
+    (template_id: string) => {
+      dispatch({
+        type: "editor/document/node/template",
+        node_id: selected_node_id!,
+        template_id,
+      });
+    },
+    [dispatch, selected_node_id]
+  );
+
+  const changeproperty = useCallback(
+    (key: string, value: any) => {
+      dispatch({
+        type: "editor/document/node/property",
+        node_id: selected_node_id!,
+        data: {
+          [key]: value,
+        },
+      });
+    },
+    [dispatch, selected_node_id]
+  );
+
   return (
-    <>
+    <div key={selected_node_id}>
       <SidebarSection className="border-b pb-4">
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Debug</SidebarSectionHeaderLabel>
@@ -93,9 +128,9 @@ function SelectedNodeProperties() {
           <SidebarSectionHeaderLabel>Template</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuSectionContent>
-          <Select>
+          <Select value={template_id} onValueChange={changetemplate}>
             <SelectTrigger>
-              <SelectValue>None</SelectValue>
+              <SelectValue placeholder="None" />
             </SelectTrigger>
             <SelectContent>
               {Object.keys(TemplateComponents.components).map((key) => {
@@ -109,7 +144,67 @@ function SelectedNodeProperties() {
           </Select>
         </SidebarMenuSectionContent>
       </SidebarSection>
+      <SidebarSection className="border-b pb-4">
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>Layer</SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuSectionContent className="space-y-4">
+          <div className="grid gap-2">
+            <Label>Hidden</Label>
+            <HiddenControl
+              value={hidden}
+              onValueChange={(value) => {
+                changeproperty("hidden", value);
+              }}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label>Opacity</Label>
+            <OpacityControl
+              value={opacity}
+              onValueChange={(value) => {
+                changeproperty("opacity", value);
+              }}
+            />
+          </div>
+        </SidebarMenuSectionContent>
+      </SidebarSection>
+      <SidebarSection className="border-b pb-4">
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>Text</SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuSectionContent className="space-y-4">
+          <div className="grid gap-2">
+            <Label className="text-xs">Value</Label>
+            <Input />
+          </div>
+          <div className="grid gap-2">
+            <Label className="text-xs">Weight</Label>
+            <FontWeightControl />
+          </div>
+          <div className="grid gap-2">
+            <Label className="text-xs">Size</Label>
+            <FontSizeControl />
+          </div>
+          <div className="grid gap-2">
+            <Label className="text-xs">Align</Label>
+            <TextAlignControl />
+          </div>
+        </SidebarMenuSectionContent>
+      </SidebarSection>
       {propertyNames.map((key) => {
+        const value = state.document.templatedata[selected_node_id!]?.[key];
+
+        const onValueChange = (value: any) => {
+          dispatch({
+            type: "editor/document/node/property",
+            node_id: selected_node_id!,
+            data: {
+              [key]: value,
+            },
+          });
+        };
+
         return (
           <div key={key}>
             <SidebarSection className="border-b pb-4">
@@ -117,13 +212,19 @@ function SelectedNodeProperties() {
                 <SidebarSectionHeaderLabel>{key}</SidebarSectionHeaderLabel>
               </SidebarSectionHeaderItem>
               <SidebarMenuSectionContent>
-                <Input placeholder={key} />
+                <Input
+                  placeholder={key}
+                  value={value}
+                  onChange={(e) => {
+                    onValueChange(e.target.value);
+                  }}
+                />
               </SidebarMenuSectionContent>
             </SidebarSection>
           </div>
         );
       })}
-    </>
+    </div>
   );
 }
 

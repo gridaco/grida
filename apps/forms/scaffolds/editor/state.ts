@@ -75,6 +75,7 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
       pages: ["collection", "start", "form"],
       selected_page_id: "form",
       nodes: [],
+      templatedata: {},
     },
     fields: init.fields,
     responses: {
@@ -156,6 +157,7 @@ export interface FormEditorState {
     pages: string[];
     selected_page_id: string;
     nodes: any[];
+    templatedata: { [key: string]: any };
     selected_node_id?: string;
     selected_node_schema?: ZodObject<any> | null;
   };

@@ -14,17 +14,18 @@ import { useEditorState } from "@/scaffolds/editor";
 import type { ZodSchema } from "zod";
 import { TemplateComponents } from "@/theme/templates/components";
 
-interface TemplateProps<P> {
-  node_id?: string;
+interface SlotProps<P> {
+  node_id: string;
+  // templatePath
   component: React.FC<P>;
   defaultProps: P;
 }
 
-export function Editable<P>({
+export function SlotNode<P>({
   node_id,
   component,
-  defaultProps: props,
-}: TemplateProps<P>) {
+  defaultProps,
+}: SlotProps<P>) {
   const [state, dispatch] = useEditorState();
   const [hovered, setHovered] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -44,7 +45,7 @@ export function Editable<P>({
     const schema = TemplateComponents.components[component.type].schema;
     console.log("selected", node_id, component.type, schema);
     dispatch({
-      type: "editor/document/select-node",
+      type: "editor/document/node/select",
       node_id: node_id,
       schema: component.schema,
     });
@@ -101,12 +102,25 @@ export function Editable<P>({
     }
   }, [hovered, portal, selected]);
 
-  const Component = component as React.FC<P>;
+  const overrideProps = state.document.templatedata[node_id];
+
+  const props = {
+    ...defaultProps,
+    ...overrideProps,
+  };
 
   return (
     <>
       <div ref={containerRef} {...bind()}>
-        {React.createElement(component, props)}
+        <div
+          hidden={props.hidden}
+          style={{
+            opacity: props.opacity,
+          }}
+        >
+          {/*  */}
+          {React.createElement(component, props)}
+        </div>
       </div>
       {(hovered || selected) && (
         <>

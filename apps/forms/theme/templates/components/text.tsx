@@ -13,8 +13,8 @@ const TextSchema = z.object({
 type TextProps = z.infer<typeof TextSchema>["props"];
 
 export const Text = withTemplate(
-  (props: TextProps) => {
-    return <div>{props.text}</div>;
+  ({ text, ...props }: TextProps) => {
+    return <div {...props}>{text}</div>;
   },
   "text",
   TextSchema

@@ -150,14 +150,12 @@ export const Hero_002 = withTemplate(
             loop
             muted
             playsInline
-            src="https://player.vimeo.com/progressive_redirect/playback/860123788/rendition/1080p/file.mp4?loc=external&log_user=0&signature=ac9c2e0d2e367d8a31af6490edad8c1f7bae87d085c4f3909773a7ca5a129cb6"
+            src={props.background}
           />
           <HalfHeightGradient />
           <div className="text-background absolute bottom-8 max-w-md container py-4">
-            <h1 className="text-4xl font-semibold">The Bundle</h1>
-            <p className="text-lg">
-              A collection of events and meetups for developers and designers.
-            </p>
+            <h1 className="text-4xl font-semibold">{props.h1}</h1>
+            <p className="text-lg">{props.p}</p>
           </div>
         </div>
       </header>

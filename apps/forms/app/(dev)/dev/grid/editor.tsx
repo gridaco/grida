@@ -45,6 +45,7 @@ import {
 } from "@radix-ui/react-icons";
 import { RgbaColorPicker } from "react-colorful";
 import * as CSS from "./blocks/css";
+import { TextAlignControl } from "@/scaffolds/sidecontrol/controls/text-align";
 
 export function PageBuilder() {
   return (
@@ -262,10 +263,8 @@ function PropertyBody() {
           </div>
           <div>
             <Label>Horizontal</Label>
-            <ToggleGroup
-              type="single"
-              id="horizontal"
-              value={selection?.style?.textAlign}
+            <TextAlignControl
+              value={selection?.style?.textAlign as any}
               onValueChange={(textAlign) => {
                 dispatch({
                   type: "block/style",
@@ -275,17 +274,8 @@ function PropertyBody() {
                   },
                 });
               }}
-            >
-              <ToggleGroupItem value="left">
-                <TextAlignLeftIcon />
-              </ToggleGroupItem>
-              <ToggleGroupItem value="center">
-                <TextAlignCenterIcon />
-              </ToggleGroupItem>
-              <ToggleGroupItem value="right">
-                <TextAlignRightIcon />
-              </ToggleGroupItem>
-            </ToggleGroup>
+            />
+
             <Label>Vertical</Label>
             <ToggleGroup
               type="single"

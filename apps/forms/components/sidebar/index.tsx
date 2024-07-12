@@ -29,9 +29,12 @@ export function SidebarMenuGrid({ children }: React.PropsWithChildren<{}>) {
 }
 
 export function SidebarMenuSectionContent({
+  className,
   children,
-}: React.PropsWithChildren<{}>) {
-  return <div className="w-full px-2 py-1">{children}</div>;
+}: React.PropsWithChildren<{
+  className?: string;
+}>) {
+  return <div className={cn("w-full px-2 py-1", className)}>{children}</div>;
 }
 
 export function SidebarMenuGridItem({

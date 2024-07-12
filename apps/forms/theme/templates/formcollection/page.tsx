@@ -2,7 +2,7 @@ import React from "react";
 import { PoweredByGridaFooter } from "@/scaffolds/e/form/powered-by-brand-footer";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useEditorState } from "@/scaffolds/editor";
-import { Editable } from "@/scaffolds/canvas";
+import { SlotNode } from "@/scaffolds/canvas";
 import { Card_002, Hero_002 } from "../components/cards";
 import { Text } from "../components/text";
 const tags = [
@@ -72,19 +72,20 @@ export default function FormCollectionPage() {
   const [state] = useEditorState();
   return (
     <div className="@container/preview">
-      <Editable
+      <SlotNode
         node_id="hero"
         component={Hero_002}
         defaultProps={{
-          p: "Events",
-          h1: "Upcoming Events",
-          background: "",
+          h1: "The Bundle",
+          p: "A collection of events and meetups for developers and designers.",
+          background:
+            "https://player.vimeo.com/progressive_redirect/playback/860123788/rendition/1080p/file.mp4?loc=external&log_user=0&signature=ac9c2e0d2e367d8a31af6490edad8c1f7bae87d085c4f3909773a7ca5a129cb6",
         }}
       />
       <main className="container">
         <section>
           <header className="py-10">
-            <Editable
+            <SlotNode
               node_id="list-header-title"
               component={Text}
               defaultProps={{
@@ -98,7 +99,7 @@ export default function FormCollectionPage() {
           {/* <Editable node_id="list"> */}
           <div className="grid gap-6 grid-cols-1 @3xl/preview:grid-cols-2 @5xl/preview:grid-cols-3 @7xl/preview:grid-cols-4">
             {list.map((data, i) => (
-              <Editable
+              <SlotNode
                 node_id={"event-card"}
                 key={i}
                 component={Card_002}

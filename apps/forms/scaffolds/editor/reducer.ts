@@ -44,6 +44,8 @@ import type {
   EditorThemeCustomCSSAction,
   DocumentSelectPageAction,
   DocumentSelectNodeAction,
+  DocumentNodeChangeTemplateAction,
+  DocumentNodeUpdatePropertyAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { blockstreeflat } from "@/lib/forms/tree";
@@ -826,11 +828,29 @@ export function reducer(
         draft.document.selected_page_id = page_id;
       });
     }
-    case "editor/document/select-node": {
+    case "editor/document/node/select": {
       const { node_id, schema } = <DocumentSelectNodeAction>action;
       return produce(state, (draft) => {
         draft.document.selected_node_id = node_id;
         draft.document.selected_node_schema = schema || null;
+      });
+    }
+    case "editor/document/node/template": {
+      const { node_id, template_id } = <DocumentNodeChangeTemplateAction>action;
+      return produce(state, (draft) => {
+        draft.document.templatedata[node_id] = {
+          ...(draft.document.templatedata[node_id] || {}),
+          template_id,
+        };
+      });
+    }
+    case "editor/document/node/property": {
+      const { node_id, data } = <DocumentNodeUpdatePropertyAction>action;
+      return produce(state, (draft) => {
+        draft.document.templatedata[node_id] = {
+          ...(draft.document.templatedata[node_id] || {}),
+          ...data,
+        };
       });
     }
     default:
