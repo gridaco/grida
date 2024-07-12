@@ -1,3 +1,5 @@
+"use client";
+
 import React, {
   useCallback,
   useEffect,
@@ -9,15 +11,16 @@ import ReactDOM from "react-dom";
 import { cn } from "@/utils";
 import { useGesture } from "@use-gesture/react";
 import { useEditorState } from "@/scaffolds/editor";
+import type { ZodSchema } from "zod";
+import { template_components } from "@/theme/templates/components";
 
-interface NodeProps {
+interface TemplateProps<P> {
   node_id?: string;
+  component: React.FC<P>;
+  props: P;
 }
 
-export function Node({
-  node_id,
-  children,
-}: React.PropsWithChildren<NodeProps>) {
+export function Editable<P>({ node_id, component, props }: TemplateProps<P>) {
   const [state, dispatch] = useEditorState();
   const [hovered, setHovered] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -34,11 +37,25 @@ export function Node({
   const selected = !!selected_node_id && selected_node_id === node_id;
 
   const onSelect = useCallback(() => {
+    const schema = template_components[component.type].schema;
+    console.log("selected", node_id, component.type, schema);
     dispatch({
       type: "editor/document/select-node",
       node_id: node_id,
+      schema: component.schema,
     });
+
+    // Access __type from children props
+    // const child = React.Children.only(children);
+    // const childProps = (child as React.ReactElement).props;
+    // console.log("meta in Node", childProps.__type, childProps, children);
   }, [dispatch, node_id]);
+
+  // const child = React.Children.only(children);
+  // const childProps = (child as React.ReactElement).props;
+  // console.log("meta in Node", childProps.__type, childProps, children);
+
+  // console.log(component.schema);
 
   const bind = useGesture(
     {
@@ -61,7 +78,7 @@ export function Node({
   );
 
   useEffect(() => {
-    if (hovered && containerRef.current && overlayRef.current) {
+    if ((hovered || selected) && containerRef.current && overlayRef.current) {
       const containerRect = containerRef.current.getBoundingClientRect();
       const portalRect = portal.getBoundingClientRect();
       const overlay = overlayRef.current;
@@ -78,12 +95,14 @@ export function Node({
       overlay.style.width = `${width}px`;
       overlay.style.height = `${height}px`;
     }
-  }, [hovered, portal]);
+  }, [hovered, portal, selected]);
+
+  const Component = component as React.FC<P>;
 
   return (
     <>
       <div ref={containerRef} {...bind()}>
-        {children}
+        {React.createElement(component, props)}
       </div>
       {(hovered || selected) && (
         <>

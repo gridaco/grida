@@ -41,6 +41,7 @@ import { Editor, useMonaco } from "@monaco-editor/react";
 import { useTheme } from "next-themes";
 import { useMonacoTheme } from "@/components/monaco";
 import { customcss_starter_template } from "@/theme/customcss/k";
+import { Input } from "@/components/ui/input";
 
 const { default: _, ...variants } = _variants;
 
@@ -68,6 +69,11 @@ function SelectedNodeProperties() {
 
   // - color - variables
   // - hidden
+  const { selected_node_id, selected_node_schema } = state.document;
+
+  const propertyNames = Object.keys(
+    selected_node_schema?.shape.props.shape || {}
+  );
 
   return (
     <>
@@ -96,6 +102,20 @@ function SelectedNodeProperties() {
           </Select>
         </SidebarMenuSectionContent>
       </SidebarSection>
+      {propertyNames.map((key) => {
+        return (
+          <div key={key}>
+            <SidebarSection className="border-b pb-4">
+              <SidebarSectionHeaderItem>
+                <SidebarSectionHeaderLabel>{key}</SidebarSectionHeaderLabel>
+              </SidebarSectionHeaderItem>
+              <SidebarMenuSectionContent>
+                <Input placeholder={key} />
+              </SidebarMenuSectionContent>
+            </SidebarSection>
+          </div>
+        );
+      })}
     </>
   );
 }

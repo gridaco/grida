@@ -14,6 +14,7 @@ import type {
 } from "@/types";
 import { LOCALTZ } from "./symbols";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
+import { ZodObject } from "zod";
 
 export type DraftID = `[draft]${string}`;
 export const DRAFT_ID_START_WITH = "[draft]";
@@ -156,6 +157,7 @@ export interface FormEditorState {
     selected_page_id: string;
     nodes: any[];
     selected_node_id?: string;
+    selected_node_schema?: ZodObject<any> | null;
   };
   theme: {
     palette?: FormStyleSheetV1Schema["palette"];

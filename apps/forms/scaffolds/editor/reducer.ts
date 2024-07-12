@@ -827,9 +827,10 @@ export function reducer(
       });
     }
     case "editor/document/select-node": {
-      const { node_id } = <DocumentSelectNodeAction>action;
+      const { node_id, schema } = <DocumentSelectNodeAction>action;
       return produce(state, (draft) => {
         draft.document.selected_node_id = node_id;
+        draft.document.selected_node_schema = schema || null;
       });
     }
     default:

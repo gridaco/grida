@@ -11,6 +11,7 @@ import type {
 import type { EditorFlatFormBlock, FormEditorState } from "./state";
 import type { JSONConditionExpression } from "@/types/logic";
 import { LOCALTZ } from "./symbols";
+import { ZodObject } from "zod";
 
 export type BlocksEditorAction =
   | CreateNewPendingBlockAction
@@ -299,4 +300,5 @@ export interface DocumentSelectPageAction {
 export interface DocumentSelectNodeAction {
   type: "editor/document/select-node";
   node_id?: string;
+  schema?: ZodObject<any>;
 }
