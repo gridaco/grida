@@ -42,6 +42,7 @@ import { useTheme } from "next-themes";
 import { useMonacoTheme } from "@/components/monaco";
 import { customcss_starter_template } from "@/theme/customcss/k";
 import { Input } from "@/components/ui/input";
+import { TemplateComponents } from "@/theme/templates/components";
 
 const { default: _, ...variants } = _variants;
 
@@ -69,6 +70,8 @@ function SelectedNodeProperties() {
 
   // - color - variables
   // - hidden
+  // - text
+
   const { selected_node_id, selected_node_schema } = state.document;
 
   const propertyNames = Object.keys(
@@ -82,7 +85,7 @@ function SelectedNodeProperties() {
           <SidebarSectionHeaderLabel>Debug</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuSectionContent>
-          <div>Node! {state.document.selected_node_id}</div>
+          <div>Node {state.document.selected_node_id}</div>
         </SidebarMenuSectionContent>
       </SidebarSection>
       <SidebarSection className="border-b pb-4">
@@ -95,9 +98,13 @@ function SelectedNodeProperties() {
               <SelectValue>None</SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="1">Template 1</SelectItem>
-              <SelectItem value="2">Template 2</SelectItem>
-              <SelectItem value="3">Template 3</SelectItem>
+              {Object.keys(TemplateComponents.components).map((key) => {
+                return (
+                  <SelectItem key={key} value={key}>
+                    {key}
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
         </SidebarMenuSectionContent>

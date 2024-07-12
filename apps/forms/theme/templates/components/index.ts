@@ -1,14 +1,9 @@
-import { Card_001, Card_002 } from "./cards";
-import { Hero_001, Hero_002 } from "./cards.hero";
+import { TemplateComponent } from "@/scaffolds/canvas/with-template";
 
-export const template_components = [
-  Card_001,
-  Card_002,
-  Hero_001,
-  Hero_002,
-].reduce((acc, component) => {
-  return {
-    ...acc,
-    [component.type!]: component,
-  };
-}, {});
+export namespace TemplateComponents {
+  export const components: { [key: string]: TemplateComponent } = {};
+
+  export function registerComponent(component: TemplateComponent) {
+    components[component.type!] = component;
+  }
+}

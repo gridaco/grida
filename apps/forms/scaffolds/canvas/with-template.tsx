@@ -1,5 +1,6 @@
 import type { ZodSchema } from "zod";
 import React from "react";
+import { TemplateComponents } from "@/theme/templates/components";
 
 const TEMPLATE_SCHEMA_KEY = "schema";
 const TEMPLATE_TYPE_KEY = "type";
@@ -33,6 +34,8 @@ export function withTemplate<P>(
   WrappedComponent[TEMPLATE_SCHEMA_KEY] = schema;
   // @ts-ignore
   WrappedComponent[TEMPLATE_TYPE_KEY] = type;
+
+  TemplateComponents.registerComponent(WrappedComponent);
 
   return WrappedComponent as TemplateComponent<P>;
 }

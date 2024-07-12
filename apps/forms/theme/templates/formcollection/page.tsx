@@ -3,9 +3,8 @@ import { PoweredByGridaFooter } from "@/scaffolds/e/form/powered-by-brand-footer
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useEditorState } from "@/scaffolds/editor";
 import { Editable } from "@/scaffolds/canvas";
-import { Hero_002 } from "../components/cards.hero";
-import { Card_002 } from "../components/cards";
-
+import { Card_002, Hero_002 } from "../components/cards";
+import { Text } from "../components/text";
 const tags = [
   "Apple",
   "Banana",
@@ -73,11 +72,25 @@ export default function FormCollectionPage() {
   const [state] = useEditorState();
   return (
     <div className="@container/preview">
-      <Editable node_id="hero" component={Hero_002} props={{}} />
+      <Editable
+        node_id="hero"
+        component={Hero_002}
+        defaultProps={{
+          p: "Events",
+          h1: "Upcoming Events",
+          background: "",
+        }}
+      />
       <main className="container">
         <section>
           <header className="py-10">
-            <h2 className="text-2xl font-semibold">Upcoming Events</h2>
+            <Editable
+              node_id="list-header-title"
+              component={Text}
+              defaultProps={{
+                text: "Upcoming Events",
+              }}
+            />
             <div className="py-2">
               <Filter />
             </div>
@@ -89,7 +102,7 @@ export default function FormCollectionPage() {
                 node_id={"event-card"}
                 key={i}
                 component={Card_002}
-                props={{
+                defaultProps={{
                   image: data.image,
                   h1: data.title,
                   badge: data.status,
@@ -97,17 +110,7 @@ export default function FormCollectionPage() {
                   n: data.attendees,
                   date1: data.date,
                 }}
-              >
-                <Card_002
-                  key={i}
-                  image={data.image}
-                  h1={data.title}
-                  badge={data.status}
-                  p={data.cta}
-                  n={data.attendees}
-                  date1={data.date}
-                />
-              </Editable>
+              />
             ))}
           </div>
           {/* </Editable> */}

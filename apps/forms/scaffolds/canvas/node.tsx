@@ -12,15 +12,19 @@ import { cn } from "@/utils";
 import { useGesture } from "@use-gesture/react";
 import { useEditorState } from "@/scaffolds/editor";
 import type { ZodSchema } from "zod";
-import { template_components } from "@/theme/templates/components";
+import { TemplateComponents } from "@/theme/templates/components";
 
 interface TemplateProps<P> {
   node_id?: string;
   component: React.FC<P>;
-  props: P;
+  defaultProps: P;
 }
 
-export function Editable<P>({ node_id, component, props }: TemplateProps<P>) {
+export function Editable<P>({
+  node_id,
+  component,
+  defaultProps: props,
+}: TemplateProps<P>) {
   const [state, dispatch] = useEditorState();
   const [hovered, setHovered] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -37,7 +41,7 @@ export function Editable<P>({ node_id, component, props }: TemplateProps<P>) {
   const selected = !!selected_node_id && selected_node_id === node_id;
 
   const onSelect = useCallback(() => {
-    const schema = template_components[component.type].schema;
+    const schema = TemplateComponents.components[component.type].schema;
     console.log("selected", node_id, component.type, schema);
     dispatch({
       type: "editor/document/select-node",
