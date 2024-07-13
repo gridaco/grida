@@ -5,6 +5,7 @@ import { useEditorState } from "@/scaffolds/editor";
 import { SlotNode } from "@/scaffolds/canvas";
 import { Card_002, Hero_002 } from "../components/cards";
 import { Text } from "../components/text";
+import { Footer_001 } from "../components/footers";
 const tags = [
   "Apple",
   "Banana",
@@ -79,6 +80,7 @@ export default function FormCollectionPage() {
           h1: "The Bundle",
           p: "A collection of events and meetups for developers and designers.",
           media: {
+            $id: "media",
             type: "video",
             src: "https://player.vimeo.com/progressive_redirect/playback/860123788/rendition/1080p/file.mp4?loc=external&log_user=0&signature=ac9c2e0d2e367d8a31af6490edad8c1f7bae87d085c4f3909773a7ca5a129cb6",
           },
@@ -106,12 +108,13 @@ export default function FormCollectionPage() {
                 key={i}
                 component={Card_002}
                 defaultProps={{
-                  media: { type: "image", src: data.image },
+                  media: { $id: "media", type: "image", src: data.image },
                   h1: data.title,
                   badge: data.status,
                   p: data.cta,
                   n: data.attendees,
                   date1: data.date,
+                  date2: data.date,
                 }}
               />
             ))}
@@ -120,6 +123,7 @@ export default function FormCollectionPage() {
         </section>
       </main>
       <footer>
+        <Footer_001 />
         <PoweredByGridaFooter />
       </footer>
     </div>
