@@ -241,7 +241,7 @@ function SelectedNodeProperties() {
                     placeholder={key}
                     value={value}
                     onChange={(e) => {
-                      onValueChange(e.target.value);
+                      onValueChange(e.target.value || undefined);
                     }}
                   />
                 </SidebarMenuSectionContent>
