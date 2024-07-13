@@ -159,6 +159,7 @@ export interface FormEditorState {
     nodes: any[];
     templatedata: { [key: string]: any };
     selected_node_id?: string;
+    selected_node_type?: string;
     selected_node_schema?: ZodObject<any> | null;
   };
   theme: {

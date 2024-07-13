@@ -13,11 +13,12 @@ import { useGesture } from "@use-gesture/react";
 import { useEditorState } from "@/scaffolds/editor";
 import type { ZodSchema } from "zod";
 import { TemplateComponents } from "@/theme/templates/components";
+import { TemplateComponent } from "./with-template";
 
 interface SlotProps<P> {
   node_id: string;
   // templatePath
-  component: React.FC<P>;
+  component: TemplateComponent<P>;
   defaultProps: P;
 }
 
@@ -47,6 +48,7 @@ export function SlotNode<P>({
     dispatch({
       type: "editor/document/node/select",
       node_id: node_id,
+      node_type: component.type,
       schema: component.schema,
     });
 

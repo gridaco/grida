@@ -14,7 +14,11 @@ type TextProps = z.infer<typeof TextSchema>["props"];
 
 export const Text = withTemplate(
   ({ text, ...props }: TextProps) => {
-    return <div {...props}>{text}</div>;
+    return (
+      <div {...props} style={{ ...props }}>
+        {text}
+      </div>
+    );
   },
   "text",
   TextSchema

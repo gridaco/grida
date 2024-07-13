@@ -302,6 +302,7 @@ export interface DocumentSelectPageAction {
 export interface DocumentSelectNodeAction {
   type: "editor/document/node/select";
   node_id?: string;
+  node_type?: string;
   schema?: ZodObject<any>;
 }
 

@@ -50,6 +50,7 @@ import { FontSizeControl } from "./controls/font-size";
 import { FontWeightControl } from "./controls/font-weight";
 import { HiddenControl } from "./controls/hidden";
 import { OpacityControl } from "./controls/opacity";
+import { HrefControl } from "./controls/href";
 
 const { default: _, ...variants } = _variants;
 
@@ -76,18 +77,29 @@ function SelectedNodeProperties() {
   const [state, dispatch] = useEditorState();
 
   // - color - variables
-  // - hidden
-  // - text
 
-  const { selected_node_id, selected_node_schema } = state.document;
+  const { selected_node_id, selected_node_schema, selected_node_type } =
+    state.document;
 
   const propertyNames = Object.keys(
     selected_node_schema?.shape.props.shape || {}
   );
 
+  const istemplate = selected_node_type?.startsWith("templates/");
+  const istext = selected_node_type === "text";
+
   const properties = state.document.templatedata[selected_node_id!];
 
-  const { template_id, opacity, hidden } = properties || {};
+  const {
+    template_id,
+    opacity,
+    hidden,
+    text,
+    fontWeight,
+    fontSize,
+    textAlign,
+    //
+  } = properties || {};
 
   const changetemplate = useCallback(
     (template_id: string) => {
@@ -113,6 +125,14 @@ function SelectedNodeProperties() {
     [dispatch, selected_node_id]
   );
 
+  const changehidden = (value: boolean) => changeproperty("hidden", value);
+  const changeopacity = (value: number) => changeproperty("opacity", value);
+  const changetext = (value: string) => changeproperty("text", value);
+  const changefontWeight = (value: string) =>
+    changeproperty("fontWeight", value);
+  const changefontSize = (value: number) => changeproperty("fontSize", value);
+  const changetextAlign = (value: string) => changeproperty("textAlign", value);
+
   return (
     <div key={selected_node_id}>
       <SidebarSection className="border-b pb-4">
@@ -124,6 +144,14 @@ function SelectedNodeProperties() {
         </SidebarMenuSectionContent>
       </SidebarSection>
       <SidebarSection className="border-b pb-4">
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>Link</SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuSectionContent>
+          <HrefControl />
+        </SidebarMenuSectionContent>
+      </SidebarSection>
+      <SidebarSection hidden={!istemplate} className="border-b pb-4">
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Template</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
@@ -151,79 +179,76 @@ function SelectedNodeProperties() {
         <SidebarMenuSectionContent className="space-y-4">
           <div className="grid gap-2">
             <Label>Hidden</Label>
-            <HiddenControl
-              value={hidden}
-              onValueChange={(value) => {
-                changeproperty("hidden", value);
-              }}
-            />
+            <HiddenControl value={hidden} onValueChange={changehidden} />
           </div>
           <div className="grid gap-2">
             <Label>Opacity</Label>
-            <OpacityControl
-              value={opacity}
-              onValueChange={(value) => {
-                changeproperty("opacity", value);
-              }}
-            />
+            <OpacityControl value={opacity} onValueChange={changeopacity} />
           </div>
         </SidebarMenuSectionContent>
       </SidebarSection>
-      <SidebarSection className="border-b pb-4">
+      <SidebarSection hidden={!istext} className="border-b pb-4">
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Text</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuSectionContent className="space-y-4">
           <div className="grid gap-2">
             <Label className="text-xs">Value</Label>
-            <Input />
+            <Input value={text} onChange={(e) => changetext(e.target.value)} />
           </div>
           <div className="grid gap-2">
             <Label className="text-xs">Weight</Label>
-            <FontWeightControl />
+            <FontWeightControl
+              value={fontWeight}
+              onValueChange={changefontWeight}
+            />
           </div>
           <div className="grid gap-2">
             <Label className="text-xs">Size</Label>
-            <FontSizeControl />
+            <FontSizeControl value={fontSize} onValueChange={changefontSize} />
           </div>
           <div className="grid gap-2">
             <Label className="text-xs">Align</Label>
-            <TextAlignControl />
+            <TextAlignControl
+              value={textAlign}
+              onValueChange={changetextAlign}
+            />
           </div>
         </SidebarMenuSectionContent>
       </SidebarSection>
-      {propertyNames.map((key) => {
-        const value = state.document.templatedata[selected_node_id!]?.[key];
+      {istemplate &&
+        propertyNames.map((key) => {
+          const value = state.document.templatedata[selected_node_id!]?.[key];
 
-        const onValueChange = (value: any) => {
-          dispatch({
-            type: "editor/document/node/property",
-            node_id: selected_node_id!,
-            data: {
-              [key]: value,
-            },
-          });
-        };
+          const onValueChange = (value: any) => {
+            dispatch({
+              type: "editor/document/node/property",
+              node_id: selected_node_id!,
+              data: {
+                [key]: value,
+              },
+            });
+          };
 
-        return (
-          <div key={key}>
-            <SidebarSection className="border-b pb-4">
-              <SidebarSectionHeaderItem>
-                <SidebarSectionHeaderLabel>{key}</SidebarSectionHeaderLabel>
-              </SidebarSectionHeaderItem>
-              <SidebarMenuSectionContent>
-                <Input
-                  placeholder={key}
-                  value={value}
-                  onChange={(e) => {
-                    onValueChange(e.target.value);
-                  }}
-                />
-              </SidebarMenuSectionContent>
-            </SidebarSection>
-          </div>
-        );
-      })}
+          return (
+            <div key={key}>
+              <SidebarSection className="border-b pb-4">
+                <SidebarSectionHeaderItem>
+                  <SidebarSectionHeaderLabel>{key}</SidebarSectionHeaderLabel>
+                </SidebarSectionHeaderItem>
+                <SidebarMenuSectionContent>
+                  <Input
+                    placeholder={key}
+                    value={value}
+                    onChange={(e) => {
+                      onValueChange(e.target.value);
+                    }}
+                  />
+                </SidebarMenuSectionContent>
+              </SidebarSection>
+            </div>
+          );
+        })}
     </div>
   );
 }
