@@ -107,6 +107,9 @@ function SelectedNodeProperties() {
     textAlign,
     //
     borderRadius,
+    //
+    margin,
+    padding,
   } = properties || {};
 
   const changetemplate = useCallback(
@@ -142,6 +145,8 @@ function SelectedNodeProperties() {
   const changetextAlign = (value: string) => changeproperty("textAlign", value);
   const changeborderRadius = (value?: number) =>
     changeproperty("borderRadius", value);
+  const changemargin = (value?: number) => changeproperty("margin", value);
+  const changepadding = (value?: number) => changeproperty("padding", value);
 
   return (
     <div key={selected_node_id}>
@@ -292,17 +297,11 @@ function SelectedNodeProperties() {
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Margin</PropertyLineLabel>
-            <MarginControl
-            // value={}
-            // onValueChange={}
-            />
+            <MarginControl value={margin} onValueChange={changemargin} />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Padding</PropertyLineLabel>
-            <PaddingControl
-            // value={}
-            // onValueChange={}
-            />
+            <PaddingControl value={padding} onValueChange={changepadding} />
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>

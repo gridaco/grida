@@ -79,9 +79,13 @@ const Card_001Component: React.FC<CardProps> = ({
   n,
   badge,
   media,
+  ...props
 }) => {
   return (
-    <Card className="group relative overflow-hidden rounded-lg shadow-lg transition-all hover:shadow-xl">
+    <Card
+      className="group relative overflow-hidden rounded-lg shadow-lg transition-all hover:shadow-xl"
+      style={props}
+    >
       <div className="flex overflow-hidden rounded-t-lg">
         <Media
           type={media.type}
@@ -119,9 +123,13 @@ const Card_002Component: React.FC<CardProps> = ({
   n,
   badge,
   media,
+  ...props
 }) => {
   return (
-    <Card className="relative overflow-hidden flex-1 flex flex-col justify-end gap-6 text-foreground w-auto aspect-[4/4]">
+    <Card
+      className="relative overflow-hidden flex-1 flex flex-col justify-end gap-6 text-foreground w-auto aspect-[4/4]"
+      style={props}
+    >
       <Media
         type={media.type}
         src={media.src}
@@ -183,14 +191,14 @@ const HeroCardSchema = z.object({
 type HeroCardProps = z.infer<typeof HeroCardSchema>["props"];
 
 export const Hero_001 = withTemplate(
-  function Hero_001(props: HeroCardProps) {
+  function Hero_001({ media, h1, p, ...props }: HeroCardProps) {
     return (
-      <header>
+      <header style={props}>
         <div className="relative">
           <Media
-            type={props.media.type}
-            src={props.media.src}
-            alt={props.media.alt}
+            type={media.type}
+            src={media.src}
+            alt={media.alt}
             width={800}
             height={400}
             className="w-full aspect-[3/4] @5xl/preview:aspect-video object-cover -z-10"
@@ -204,8 +212,8 @@ export const Hero_001 = withTemplate(
             src={props.media}
           /> */}
           <div className="absolute bottom-8 bg-background max-w-md container py-4">
-            <h1 className="text-4xl font-semibold">{props.h1}</h1>
-            <p className="text-lg">{props.p}</p>
+            <h1 className="text-4xl font-semibold">{h1}</h1>
+            <p className="text-lg">{p}</p>
           </div>
         </div>
       </header>
@@ -216,14 +224,14 @@ export const Hero_001 = withTemplate(
 );
 
 export const Hero_002 = withTemplate(
-  function Hero_002(props: HeroCardProps) {
+  function Hero_002({ media, h1, p, ...props }: HeroCardProps) {
     return (
-      <header>
+      <header style={props}>
         <div className="relative">
           <Media
-            type={props.media.type}
-            src={props.media.src}
-            alt={props.media.alt}
+            type={media.type}
+            src={media.src}
+            alt={media.alt}
             width={800}
             height={400}
             className="w-full aspect-[3/4] @5xl/preview:aspect-video object-cover -z-10"
@@ -238,8 +246,8 @@ export const Hero_002 = withTemplate(
           /> */}
           <HalfHeightGradient />
           <div className="text-background absolute bottom-8 max-w-md container py-4">
-            <h1 className="text-4xl font-semibold">{props.h1}</h1>
-            <p className="text-lg">{props.p}</p>
+            <h1 className="text-4xl font-semibold">{h1}</h1>
+            <p className="text-lg">{p}</p>
           </div>
         </div>
       </header>

@@ -1,4 +1,5 @@
 import { Input } from "@/components/ui/input";
+import { inputVariants } from "./utils/input-variants";
 
 export function FontSizeControl({
   value,
@@ -14,7 +15,7 @@ export function FontSizeControl({
       placeholder="inherit"
       min={1}
       step={1}
-      className="text-xs h-8 px-2"
+      className={inputVariants({ size: "sm" })}
       onChange={(e) => {
         onValueChange?.(parseInt(e.target.value) || undefined);
       }}

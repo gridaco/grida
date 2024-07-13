@@ -17,7 +17,7 @@ export function BorderRadiusControl({
       step={1}
       className={inputVariants({ size: "sm" })}
       onChange={(e) => {
-        onValueChange?.(parseInt(e.target.value) || undefined);
+        onValueChange?.(parseInt(e.target.value));
       }}
     />
   );
