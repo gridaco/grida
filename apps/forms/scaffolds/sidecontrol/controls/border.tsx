@@ -12,17 +12,19 @@ export function BorderControl({
   value?: Border;
   onValueChange?: (value?: Border) => void;
 }) {
+  const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onValueChange?.({
+      ...(value || {}),
+      borderWidth: parseInt(e.target.value),
+    });
+  };
+
   return (
     <Input
       type="number"
       className={inputVariants({ size: "sm" })}
       value={value?.borderWidth}
-      onChange={(e) =>
-        onValueChange?.({
-          ...(value || {}),
-          borderWidth: parseInt(e.target.value),
-        })
-      }
+      onChange={onChange}
     />
   );
 }

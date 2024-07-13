@@ -108,6 +108,8 @@ function SelectedNodeProperties() {
     fontSize,
     textAlign,
     //
+    boxShadow,
+    //
     borderRadius,
     borderWidth,
     //
@@ -160,6 +162,9 @@ function SelectedNodeProperties() {
     changeproperty("aspectRatio", value);
   const changeBorder = (value?: any) => {
     changeproperty("borderWidth", value.borderWidth);
+  };
+  const changeboxShadow = (value?: any) => {
+    changeproperty("boxShadow", value.boxShadow);
   };
 
   return (
@@ -314,8 +319,8 @@ function SelectedNodeProperties() {
           <PropertyLine>
             <PropertyLineLabel>Shadow</PropertyLineLabel>
             <BoxShadowControl
-            // value={}
-            // onValueChange={}
+              value={{ boxShadow }}
+              onValueChange={changeboxShadow}
             />
           </PropertyLine>
 
