@@ -7,6 +7,8 @@ import { SideControl } from "@/scaffolds/sidecontrol";
 import BlocksEditor from "@/scaffolds/blocks-editor";
 import FormCollectionPage from "@/theme/templates/formcollection/page";
 import FormStartPage from "@/theme/templates/formstart/default/page";
+import { useGesture } from "@use-gesture/react";
+import React from "react";
 
 export default function EditFormPage() {
   return (
@@ -14,19 +16,42 @@ export default function EditFormPage() {
       <aside className="hidden lg:flex h-full">
         <Siebar mode="blocks" />
       </aside>
-      <div className="relative w-full overflow-y-auto">
-        <div
-          className="absolute inset-0 pointer-events-none z-10"
-          id="canvas-overlay-portal"
-        />
+      <CanvasEventTarget className="relative w-full overflow-y-auto">
+        <CanvasOverlay />
         <AgentThemeProvider>
           <CurrentPageCanvas />
         </AgentThemeProvider>
-      </div>
+      </CanvasEventTarget>
       <aside className="hidden lg:flex h-full">
         <SideControl mode="blocks" />
       </aside>
     </main>
+  );
+}
+
+function CanvasEventTarget({
+  className,
+  children,
+}: React.PropsWithChildren<{
+  className?: string;
+}>) {
+  const [state, dispatch] = useEditorState();
+
+  const clearselection = () =>
+    dispatch({ type: "editor/document/node/select" });
+
+  return (
+    <div className={className} onPointerDown={clearselection}>
+      {children}
+    </div>
+  );
+}
+
+function CanvasOverlay() {
+  return (
+    <div className="absolute inset-0 pointer-events-none z-10">
+      <div className="w-full h-full" id="canvas-overlay-portal" />
+    </div>
   );
 }
 

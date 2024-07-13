@@ -72,7 +72,7 @@ export function SlotNode<P>({
       onMouseLeave: ({ event }) => {
         setHovered(false);
       },
-      onClick: ({ event }) => {
+      onPointerDown: ({ event }) => {
         event.stopPropagation();
         onSelect();
       },
