@@ -1,4 +1,4 @@
-import { Slider } from "@/components/ui/slider";
+import { Slider } from "./utils/slider";
 import { inputVariants } from "./utils/input-variants";
 import { Input } from "@/components/ui/input";
 

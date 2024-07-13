@@ -58,6 +58,8 @@ import { StringLiteralControl } from "./controls/string-literal";
 import { inputVariants } from "./controls/utils/input-variants";
 import { MarginControl } from "./controls/margin";
 import { PaddingControl } from "./controls/padding";
+import { AspectRatioControl } from "./controls/aspect-ratio";
+import { BoxShadowControl } from "./controls/box-shadow";
 
 const { default: _, ...variants } = _variants;
 
@@ -107,10 +109,17 @@ function SelectedNodeProperties() {
     textAlign,
     //
     borderRadius,
+    borderWidth,
     //
     margin,
     padding,
+    //
+    aspectRatio,
   } = properties || {};
+
+  const border = {
+    borderWidth,
+  };
 
   const changetemplate = useCallback(
     (template_id: string) => {
@@ -147,10 +156,15 @@ function SelectedNodeProperties() {
     changeproperty("borderRadius", value);
   const changemargin = (value?: number) => changeproperty("margin", value);
   const changepadding = (value?: number) => changeproperty("padding", value);
+  const changeaspectRatio = (value?: number) =>
+    changeproperty("aspectRatio", value);
+  const changeBorder = (value?: any) => {
+    changeproperty("borderWidth", value.borderWidth);
+  };
 
   return (
     <div key={selected_node_id}>
-      <SidebarSection className="border-b pb-4">
+      <SidebarSection hidden className="border-b pb-4">
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Debug</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
@@ -265,7 +279,12 @@ function SelectedNodeProperties() {
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>
-      <SidebarSection className="border-b pb-4 ">
+      <SidebarSection className="border-b pb-4">
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>Layout</SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+      </SidebarSection>
+      <SidebarSection className="border-b pb-4">
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Styles</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
@@ -283,10 +302,7 @@ function SelectedNodeProperties() {
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Border</PropertyLineLabel>
-            <BorderControl
-            // value={}
-            // onValueChange={}
-            />
+            <BorderControl value={border} onValueChange={changeBorder} />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Background</PropertyLineLabel>
@@ -296,12 +312,27 @@ function SelectedNodeProperties() {
             />
           </PropertyLine>
           <PropertyLine>
+            <PropertyLineLabel>Shadow</PropertyLineLabel>
+            <BoxShadowControl
+            // value={}
+            // onValueChange={}
+            />
+          </PropertyLine>
+
+          <PropertyLine>
             <PropertyLineLabel>Margin</PropertyLineLabel>
             <MarginControl value={margin} onValueChange={changemargin} />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Padding</PropertyLineLabel>
             <PaddingControl value={padding} onValueChange={changepadding} />
+          </PropertyLine>
+          <PropertyLine>
+            <PropertyLineLabel>Ratio</PropertyLineLabel>
+            <AspectRatioControl
+              value={aspectRatio}
+              onValueChange={changeaspectRatio}
+            />
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>

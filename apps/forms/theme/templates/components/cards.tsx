@@ -1,6 +1,5 @@
 import React from "react";
 import { Card } from "@/components/ui/card";
-import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import { HalfHeightGradient } from "../components/gradient-overlay";
 import {
@@ -9,6 +8,8 @@ import {
 } from "@/scaffolds/canvas/with-template";
 import { z } from "zod";
 import { SlashIcon } from "@radix-ui/react-icons";
+import { SlotNode } from "@/scaffolds/canvas";
+import { Text } from "./text";
 
 function Media({
   type,
@@ -28,6 +29,7 @@ function Media({
   switch (type) {
     case "image":
       return (
+        // eslint-disable-next-line @next/next/no-img-element
         <img
           width={width}
           height={height}
@@ -65,6 +67,7 @@ const CardSchema = z.object({
     h1: z.string(),
     p: z.string(),
     date1: z.string(),
+    date2: z.string(),
     n: z.number(),
     media: MediaSchema,
   }),
@@ -79,6 +82,7 @@ const Card_001Component: React.FC<CardProps> = ({
   n,
   badge,
   media,
+  date2,
   ...props
 }) => {
   return (
@@ -95,20 +99,20 @@ const Card_001Component: React.FC<CardProps> = ({
           height={400}
           className="h-full w-full aspect-[4/3] object-cover transition-transform duration-300 ease-in-out group-hover:scale-105"
         />
-        {/* <Image
-          src={media}
-          alt="Event thumbnail"
-          width={800}
-          height={400}
-          className="h-full w-full aspect-[4/3] object-cover transition-transform duration-300 ease-in-out group-hover:scale-105"
-        /> */}
       </div>
       <div className="space-y-2 bg-background p-4">
-        <h3 className="text-lg font-semibold text-foreground">{h1}</h3>
+        <SlotNode
+          component={Text}
+          defaultProps={{
+            text: h1,
+          }}
+          node_id={".h1"}
+        />
+        {/* <h3 className="text-lg font-semibold text-foreground">{h1}</h3> */}
         <div className="text-sm text-muted-foreground">
-          <span>July 20, 2024</span>
+          <span>{date1}</span>
           <span className="mx-2">·</span>
-          <span>6:00 PM - 9:00 PM</span>
+          <span>{date2}</span>
         </div>
         <div className="text-sm text-muted-foreground">{p}</div>
       </div>
@@ -120,6 +124,7 @@ const Card_002Component: React.FC<CardProps> = ({
   h1,
   p,
   date1,
+  date2,
   n,
   badge,
   media,
@@ -145,9 +150,11 @@ const Card_002Component: React.FC<CardProps> = ({
         layout="fill"
       /> */}
       <HalfHeightGradient />
-      <div className="absolute top-0 left-0 py-4 px-4">
-        <Badge>{badge}</Badge>
-      </div>
+      {badge && (
+        <div className="absolute top-0 left-0 py-4 px-4">
+          <Badge>{badge}</Badge>
+        </div>
+      )}
       <div className="text-background flex flex-col gap-1 z-20 py-8 px-4 pr-10">
         <div className="flex flex-row items-center gap-2">
           <div className="flex gap-2 items-center justify-between">

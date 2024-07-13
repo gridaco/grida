@@ -1,5 +1,28 @@
+import { Input } from "@/components/ui/input";
 import { inputVariants } from "./utils/input-variants";
 
-export function BorderControl() {
-  return <div className={inputVariants({ size: "sm" })}></div>;
+type Border = {
+  borderWidth?: number;
+};
+
+export function BorderControl({
+  value,
+  onValueChange,
+}: {
+  value?: Border;
+  onValueChange?: (value?: Border) => void;
+}) {
+  return (
+    <Input
+      type="number"
+      className={inputVariants({ size: "sm" })}
+      value={value?.borderWidth}
+      onChange={(e) =>
+        onValueChange?.({
+          ...(value || {}),
+          borderWidth: parseInt(e.target.value),
+        })
+      }
+    />
+  );
 }

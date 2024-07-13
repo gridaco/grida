@@ -63,7 +63,7 @@ function CurrentPageCanvas() {
       return <BlocksEditor />;
     case "collection":
       return (
-        <div className="mx-auto my-20 max-w-[430px] border rounded-2xl shadow-2xl bg-background overflow-hidden">
+        <div className="mx-auto my-20 max-w-[430px] border rounded-2xl shadow-2xl bg-background overflow-hidden select-none">
           <FormCollectionPage />
         </div>
       );
