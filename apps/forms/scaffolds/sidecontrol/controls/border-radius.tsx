@@ -1,8 +1,8 @@
 import { Input } from "@/components/ui/input";
 import { inputVariants } from "./utils/input-variants";
 
-export function ZIndexControl({
-  value = 1,
+export function BorderRadiusControl({
+  value,
   onValueChange,
 }: {
   value?: number;
@@ -13,6 +13,7 @@ export function ZIndexControl({
       type="number"
       value={value}
       placeholder="inherit"
+      min={0}
       step={1}
       className={inputVariants({ size: "sm" })}
       onChange={(e) => {

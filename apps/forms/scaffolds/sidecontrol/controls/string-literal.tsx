@@ -1,19 +1,17 @@
 import { Input } from "@/components/ui/input";
-import React from "react";
 import { inputVariants } from "./utils/input-variants";
 
-export function HrefControl({
+export function StringLiteralControl({
   value,
-  onValueChange,
+  onChangeValue,
 }: {
   value?: string;
-  onValueChange?: (value: string) => void;
+  onChangeValue?: (value: string) => void;
 }) {
   return (
     <Input
       value={value}
-      onChange={(e) => onValueChange?.(e.target.value)}
-      placeholder="https://example.com"
+      onChange={(e) => onChangeValue?.(e.target.value)}
       className={inputVariants({ size: "sm" })}
     />
   );

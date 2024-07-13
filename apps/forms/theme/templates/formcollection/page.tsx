@@ -78,8 +78,10 @@ export default function FormCollectionPage() {
         defaultProps={{
           h1: "The Bundle",
           p: "A collection of events and meetups for developers and designers.",
-          background:
-            "https://player.vimeo.com/progressive_redirect/playback/860123788/rendition/1080p/file.mp4?loc=external&log_user=0&signature=ac9c2e0d2e367d8a31af6490edad8c1f7bae87d085c4f3909773a7ca5a129cb6",
+          media: {
+            type: "video",
+            src: "https://player.vimeo.com/progressive_redirect/playback/860123788/rendition/1080p/file.mp4?loc=external&log_user=0&signature=ac9c2e0d2e367d8a31af6490edad8c1f7bae87d085c4f3909773a7ca5a129cb6",
+          },
         }}
       />
       <main className="container">
@@ -104,7 +106,7 @@ export default function FormCollectionPage() {
                 key={i}
                 component={Card_002}
                 defaultProps={{
-                  image: data.image,
+                  media: { type: "image", src: data.image },
                   h1: data.title,
                   badge: data.status,
                   p: data.cta,

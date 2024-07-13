@@ -14,6 +14,7 @@ export function FontSizeControl({
       placeholder="inherit"
       min={1}
       step={1}
+      className="text-xs h-8 px-2"
       onChange={(e) => {
         onValueChange?.(parseInt(e.target.value) || undefined);
       }}

@@ -6,6 +6,7 @@ import {
   SelectItem,
   SelectValue,
 } from "@/components/ui/select";
+import { inputVariants } from "./utils/input-variants";
 
 type FontWeight =
   | "100"
@@ -27,7 +28,7 @@ export function FontWeightControl({
 }) {
   return (
     <Select value={value} onValueChange={onValueChange}>
-      <SelectTrigger>
+      <SelectTrigger className={inputVariants({ size: "sm" })}>
         <SelectValue>Regular</SelectValue>
       </SelectTrigger>
       <SelectContent>

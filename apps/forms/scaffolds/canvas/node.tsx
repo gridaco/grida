@@ -105,6 +105,11 @@ export function SlotNode<P>({
   }, [hovered, portal, selected]);
 
   const overrideProps = state.document.templatedata[node_id];
+  const template_id = overrideProps?.template_id;
+
+  const renderer = template_id
+    ? TemplateComponents.components[template_id]
+    : component;
 
   const props = {
     ...defaultProps,
@@ -121,7 +126,7 @@ export function SlotNode<P>({
           }}
         >
           {/*  */}
-          {React.createElement(component, props)}
+          {React.createElement(renderer, props)}
         </div>
       </div>
       {(hovered || selected) && (
