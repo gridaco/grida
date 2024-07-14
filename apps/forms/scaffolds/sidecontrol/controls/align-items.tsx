@@ -1,16 +1,44 @@
+import React from "react";
 import { ToggleGroup, ToggleGroupItem } from "./utils/toggle-group";
 import {
   AlignLeftIcon,
   AlignRightIcon,
   AlignCenterHorizontallyIcon,
+  AlignTopIcon,
+  AlignCenterVerticallyIcon,
+  AlignBottomIcon,
 } from "@radix-ui/react-icons";
+
+const iconsbyaxis = {
+  vertical: {
+    start: AlignTopIcon,
+    center: AlignCenterVerticallyIcon,
+    end: AlignBottomIcon,
+  },
+  horizontal: {
+    start: AlignLeftIcon,
+    center: AlignCenterHorizontallyIcon,
+    end: AlignRightIcon,
+  },
+};
+
+const icons = {
+  row: iconsbyaxis.vertical,
+  "row-reverse": iconsbyaxis.vertical,
+  column: iconsbyaxis.horizontal,
+  "column-reverse": iconsbyaxis.horizontal,
+};
+
+type AlignItems = "start" | "center" | "end";
 
 export function AlignItemsControl({
   value,
+  flexDirection = "row",
   onValueChange,
 }: {
-  value?: "start" | "center" | "end";
-  onValueChange?: (value: "start" | "center" | "end") => void;
+  value?: AlignItems;
+  flexDirection?: "row" | "column";
+  onValueChange?: (value: AlignItems) => void;
 }) {
   return (
     <ToggleGroup
@@ -20,13 +48,13 @@ export function AlignItemsControl({
       onValueChange={onValueChange}
     >
       <ToggleGroupItem value="start">
-        <AlignLeftIcon />
+        {React.createElement(icons[flexDirection ?? "row"].start)}
       </ToggleGroupItem>
       <ToggleGroupItem value="center">
-        <AlignCenterHorizontallyIcon />
+        {React.createElement(icons[flexDirection ?? "row"].center)}
       </ToggleGroupItem>
       <ToggleGroupItem value="end">
-        <AlignRightIcon />
+        {React.createElement(icons[flexDirection ?? "row"].end)}
       </ToggleGroupItem>
     </ToggleGroup>
   );

@@ -333,6 +333,7 @@ function SelectedNodeProperties() {
             <PropertyLineLabel>Align</PropertyLineLabel>
             <AlignItemsControl
               value={alignItems}
+              flexDirection={flexDirection}
               onValueChange={changealignItems}
             />
           </PropertyLine>
@@ -399,13 +400,13 @@ function SelectedNodeProperties() {
 }
 
 function PropertyLine({ children }: React.PropsWithChildren<{}>) {
-  return <div className="flex items-center justify-between">{children}</div>;
+  return <div className="flex items-start justify-between">{children}</div>;
 }
 
 function PropertyLineLabel({ children }: React.PropsWithChildren<{}>) {
   return (
-    <Label className="text-muted-foreground text-xs w-20 me-4 text-ellipsis overflow-hidden">
-      {children}
+    <Label className="text-muted-foreground h-8 w-20 flex items-center text-xs me-4 overflow-hidden">
+      <span className="text-ellipsis overflow-hidden">{children}</span>
     </Label>
   );
 }

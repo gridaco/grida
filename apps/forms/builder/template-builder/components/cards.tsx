@@ -152,47 +152,68 @@ const Card_003Component: React.FC<CardProps> = ({
   ...props
 }) => {
   return (
-    <Card className="flex justify-between gap-2 p-4" style={props}>
-      <div className="flex-1 flex flex-col gap-1 z-20">
-        <SlotNode
-          node_id="header-layout"
-          component={TemplateBuilderWidgets.Flex}
-          defaultProps={{
-            gap: 4,
-            flexDirection: "column",
-          }}
-        >
-          <div className="flex flex-row items-center gap-2">
-            <div className="flex gap-2 items-center justify-between">
-              <span>{date1}</span>
+    <Card className="p-4" style={props}>
+      <SlotNode
+        component={TemplateBuilderWidgets.Flex}
+        node_id="root"
+        defaultProps={{
+          gap: 4,
+          flexDirection: "row",
+          justifyContent: "space-between",
+        }}
+      >
+        <div className="flex-1 flex flex-col gap-1 z-20">
+          <SlotNode
+            node_id="header-layout"
+            component={TemplateBuilderWidgets.Flex}
+            defaultProps={{
+              gap: 4,
+              flexDirection: "column",
+            }}
+          >
+            <div className="flex flex-row items-center gap-2">
+              <div className="flex gap-2 items-center justify-between">
+                <span>{date1}</span>
+              </div>
+              <span>
+                <strong>{n}</strong>
+              </span>
             </div>
-            <span>
-              <strong>{n}</strong>
-            </span>
-          </div>
-          <h1 className="text-lg font-bold break-keep">{h1}</h1>
-        </SlotNode>
-        <p className="text-xs font-regular opacity-80">{p}</p>
+            <h1 className="text-lg font-bold break-keep">{h1}</h1>
+          </SlotNode>
+          <p className="text-xs font-regular opacity-80">{p}</p>
+          <SlotNode
+            node_id="tags-layout"
+            component={TemplateBuilderWidgets.Flex}
+            defaultProps={{
+              gap: 4,
+            }}
+          >
+            {tags?.map((t, i) => <Badge key={i}>{t}</Badge>)}
+          </SlotNode>
+        </div>
         <SlotNode
-          node_id="tags-layout"
-          component={TemplateBuilderWidgets.Flex}
-          defaultProps={{
-            gap: 4,
-          }}
+          node_id="media-layout"
+          component={TemplateBuilderWidgets.Container}
+          defaultProps={
+            {
+              width: 80,
+              height: 80,
+              borderRadius: 8,
+              overflow: "hidden",
+            } satisfies React.CSSProperties
+          }
         >
-          {tags?.map((t, i) => <Badge key={i}>{t}</Badge>)}
+          <Media
+            type={media.type}
+            src={media.src}
+            alt={media.alt}
+            width={400}
+            height={400}
+            className="object-cover w-full h-full"
+          />
         </SlotNode>
-      </div>
-      <div className="w-20 h-20 rounded-lg overflow-hidden">
-        <Media
-          type={media.type}
-          src={media.src}
-          alt={media.alt}
-          width={400}
-          height={400}
-          className="object-cover w-full h-full"
-        />
-      </div>
+      </SlotNode>
     </Card>
   );
 };
