@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import {
   GitHubLogoIcon,
+  GlobeIcon,
   InstagramLogoIcon,
   LinkedInLogoIcon,
   TwitterLogoIcon,
@@ -12,7 +13,7 @@ export function Footer_001() {
     <div className="py-10 w-full flex flex-wrap justify-center items-center gap-2">
       <Link href="#">
         <Button variant="outline" size="icon" className="rounded-full">
-          <TwitterLogoIcon />
+          <GlobeIcon />
         </Button>
       </Link>
       <Link href="#">
