@@ -7,7 +7,7 @@ import {
   Card_002,
   Hero_002,
 } from "../../../builder/template-builder/components/cards";
-import { Text } from "../../../builder/template-builder/components/text";
+import { Text } from "../../../builder/template-builder/widgets/text";
 import { Footer_001 } from "../../../builder/template-builder/components/footers";
 const tags = [
   "Apple",

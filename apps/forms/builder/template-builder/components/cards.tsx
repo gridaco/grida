@@ -9,7 +9,7 @@ import {
 import { z } from "zod";
 import { SlashIcon } from "@radix-ui/react-icons";
 import { SlotNode } from "@/scaffolds/canvas";
-import { Text } from "./text";
+import { Text } from "../widgets/text";
 
 function Media({
   type,
