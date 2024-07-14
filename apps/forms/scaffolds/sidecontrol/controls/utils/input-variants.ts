@@ -3,7 +3,7 @@ import { cva } from "class-variance-authority";
 export const inputVariants = cva("rounded w-full", {
   variants: {
     variant: {
-      input: "shadow-sm border",
+      input: "shadow-sm",
       container: "px-0 flex items-center gap-2",
     },
     size: {

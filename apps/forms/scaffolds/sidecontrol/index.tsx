@@ -59,6 +59,11 @@ import { MarginControl } from "./controls/margin";
 import { PaddingControl } from "./controls/padding";
 import { AspectRatioControl } from "./controls/aspect-ratio";
 import { BoxShadowControl } from "./controls/box-shadow";
+import { GapControl } from "./controls/gap";
+import { AlignItemsControl } from "./controls/align-items";
+import { FlexWrapControl } from "./controls/flex-wrap";
+import { FlexDirectionControl } from "./controls/flex-direction";
+import { JustifyContentControl } from "./controls/justify-content";
 
 const { default: _, ...variants } = _variants;
 
@@ -290,23 +295,33 @@ function SelectedNodeProperties() {
         <SidebarMenuSectionContent>
           <PropertyLine>
             <PropertyLineLabel>Direction</PropertyLineLabel>
-            {/* <Control value={} onValueChange={change} /> */}
+            <FlexDirectionControl
+            // value={ } onValueChange={change}
+            />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Wrap</PropertyLineLabel>
-            {/* <Control value={} onValueChange={change} /> */}
+            <FlexWrapControl
+            // value={ } onValueChange={change}
+            />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Distribute</PropertyLineLabel>
-            {/* <Control value={} onValueChange={change} /> */}
+            <JustifyContentControl
+              // value={ } onValueChange={change}
+            />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Align</PropertyLineLabel>
-            {/* <Control value={} onValueChange={change} /> */}
+            <AlignItemsControl
+            // value={ } onValueChange={change}
+            />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Gap</PropertyLineLabel>
-            {/* <Control value={} onValueChange={change} /> */}
+            <GapControl
+            // value={ } onValueChange={change}
+            />
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>
