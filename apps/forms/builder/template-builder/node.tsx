@@ -25,7 +25,8 @@ export function SlotNode<P>({
   node_id,
   component,
   defaultProps,
-}: SlotProps<P>) {
+  children,
+}: React.PropsWithChildren<SlotProps<P>>) {
   const [state, dispatch] = useEditorState();
   const [hovered, setHovered] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -125,7 +126,7 @@ export function SlotNode<P>({
           }}
         >
           {/*  */}
-          {React.createElement(renderer, props)}
+          {React.createElement(renderer, props, children)}
         </div>
       </div>
       {(hovered || selected) && (

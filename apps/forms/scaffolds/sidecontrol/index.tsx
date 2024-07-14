@@ -287,6 +287,28 @@ function SelectedNodeProperties() {
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Layout</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
+        <SidebarMenuSectionContent>
+          <PropertyLine>
+            <PropertyLineLabel>Direction</PropertyLineLabel>
+            {/* <Control value={} onValueChange={change} /> */}
+          </PropertyLine>
+          <PropertyLine>
+            <PropertyLineLabel>Wrap</PropertyLineLabel>
+            {/* <Control value={} onValueChange={change} /> */}
+          </PropertyLine>
+          <PropertyLine>
+            <PropertyLineLabel>Distribute</PropertyLineLabel>
+            {/* <Control value={} onValueChange={change} /> */}
+          </PropertyLine>
+          <PropertyLine>
+            <PropertyLineLabel>Align</PropertyLineLabel>
+            {/* <Control value={} onValueChange={change} /> */}
+          </PropertyLine>
+          <PropertyLine>
+            <PropertyLineLabel>Gap</PropertyLineLabel>
+            {/* <Control value={} onValueChange={change} /> */}
+          </PropertyLine>
+        </SidebarMenuSectionContent>
       </SidebarSection>
       <SidebarSection className="border-b pb-4">
         <SidebarSectionHeaderItem>
