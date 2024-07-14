@@ -1,7 +1,4 @@
-import {
-  ZTemplateSchema,
-  withTemplate,
-} from "@/scaffolds/canvas/with-template";
+import { ZTemplateSchema, withTemplate } from "../with-template";
 import { z } from "zod";
 
 const TextSchema = z.object({

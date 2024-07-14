@@ -2,7 +2,7 @@ import React from "react";
 import { PoweredByGridaFooter } from "@/scaffolds/e/form/powered-by-brand-footer";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useEditorState } from "@/scaffolds/editor";
-import { SlotNode } from "@/scaffolds/canvas";
+import { SlotNode } from "@/builder/template-builder/node";
 import {
   Card_002,
   Hero_002,

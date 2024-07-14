@@ -1,6 +1,6 @@
 import type { ZodSchema } from "zod";
 import React from "react";
-import { TemplateComponents } from "@/builder/template-builder/components";
+import { TemplateComponents } from "@/builder/template-builder";
 
 const TEMPLATE_SCHEMA_KEY = "schema";
 const TEMPLATE_TYPE_KEY = "type";

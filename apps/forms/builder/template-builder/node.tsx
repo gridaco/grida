@@ -11,8 +11,7 @@ import ReactDOM from "react-dom";
 import { cn } from "@/utils";
 import { useGesture } from "@use-gesture/react";
 import { useEditorState } from "@/scaffolds/editor";
-import type { ZodSchema } from "zod";
-import { TemplateComponents } from "@/builder/template-builder/components";
+import { TemplateComponents } from "@/builder/template-builder";
 import { TemplateComponent } from "./with-template";
 
 interface SlotProps<P> {

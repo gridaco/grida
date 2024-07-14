@@ -2,13 +2,13 @@ import React from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { HalfHeightGradient } from "./gradient-overlay";
+import { z } from "zod";
+import { SlashIcon } from "@radix-ui/react-icons";
 import {
   withTemplate,
   ZTemplateSchema,
-} from "@/scaffolds/canvas/with-template";
-import { z } from "zod";
-import { SlashIcon } from "@radix-ui/react-icons";
-import { SlotNode } from "@/scaffolds/canvas";
+} from "@/builder/template-builder/with-template";
+import { SlotNode } from "@/builder/template-builder/node";
 import { Media, MediaSchema } from "./media";
 import { TemplateBuilderWidgets } from "../widgets";
 
