@@ -10,55 +10,7 @@ import { z } from "zod";
 import { SlashIcon } from "@radix-ui/react-icons";
 import { SlotNode } from "@/scaffolds/canvas";
 import { Text } from "../widgets/text";
-
-function Media({
-  type,
-  src,
-  alt,
-  width,
-  height,
-  className,
-}: {
-  type: "image" | "video";
-  src: string;
-  alt?: string;
-  width?: number;
-  height?: number;
-  className?: string;
-}) {
-  switch (type) {
-    case "image":
-      return (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          width={width}
-          height={height}
-          className={className}
-          src={src}
-          alt={alt}
-        />
-      );
-    case "video":
-      return (
-        <video
-          width={width}
-          height={height}
-          className={className}
-          src={src}
-          autoPlay
-          loop
-          muted
-        />
-      );
-  }
-}
-
-const MediaSchema = z.object({
-  $id: z.literal("media"),
-  type: z.union([z.literal("image"), z.literal("video")]),
-  src: z.string(),
-  alt: z.string().optional(),
-});
+import { Media, MediaSchema } from "./media";
 
 const CardSchema = z.object({
   $id: z.literal("ui-model-card"),
