@@ -1,5 +1,4 @@
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { inputVariants } from "./utils/input-variants";
+import { ToggleGroup, ToggleGroupItem } from "./utils/toggle-group";
 
 export function FlexWrapControl({
   value,
@@ -15,10 +14,10 @@ export function FlexWrapControl({
       value={value}
       onValueChange={onValueChange}
     >
-      <ToggleGroupItem className={inputVariants({ size: "sm" })} value="wrap">
+      <ToggleGroupItem value="wrap" className="text-xs">
         Yes
       </ToggleGroupItem>
-      <ToggleGroupItem className={inputVariants({ size: "sm" })} value="nowrap">
+      <ToggleGroupItem value="nowrap" className="text-xs">
         No
       </ToggleGroupItem>
     </ToggleGroup>

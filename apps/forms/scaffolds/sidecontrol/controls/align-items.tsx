@@ -1,11 +1,9 @@
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { ToggleGroup, ToggleGroupItem } from "./utils/toggle-group";
 import {
   AlignLeftIcon,
   AlignRightIcon,
-  AlignCenterVerticallyIcon,
   AlignCenterHorizontallyIcon,
 } from "@radix-ui/react-icons";
-import { inputVariants } from "./utils/input-variants";
 
 export function AlignItemsControl({
   value,
@@ -21,13 +19,13 @@ export function AlignItemsControl({
       value={value}
       onValueChange={onValueChange}
     >
-      <ToggleGroupItem className={inputVariants({ size: "sm" })} value="start">
+      <ToggleGroupItem value="start">
         <AlignLeftIcon />
       </ToggleGroupItem>
-      <ToggleGroupItem className={inputVariants({ size: "sm" })} value="center">
+      <ToggleGroupItem value="center">
         <AlignCenterHorizontallyIcon />
       </ToggleGroupItem>
-      <ToggleGroupItem className={inputVariants({ size: "sm" })} value="end">
+      <ToggleGroupItem value="end">
         <AlignRightIcon />
       </ToggleGroupItem>
     </ToggleGroup>

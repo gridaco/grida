@@ -1,6 +1,5 @@
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { ToggleGroup, ToggleGroupItem } from "./utils/toggle-group";
 import { ViewHorizontalIcon, ViewVerticalIcon } from "@radix-ui/react-icons";
-import { inputVariants } from "./utils/input-variants";
 
 export function FlexDirectionControl({
   value,
@@ -16,10 +15,10 @@ export function FlexDirectionControl({
       value={value}
       onValueChange={onValueChange}
     >
-      <ToggleGroupItem value="row" className={inputVariants({ size: "sm" })}>
+      <ToggleGroupItem value="row">
         <ViewVerticalIcon />
       </ToggleGroupItem>
-      <ToggleGroupItem value="column" className={inputVariants({ size: "sm" })}>
+      <ToggleGroupItem value="column">
         <ViewHorizontalIcon />
       </ToggleGroupItem>
     </ToggleGroup>

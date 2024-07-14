@@ -100,6 +100,8 @@ function SelectedNodeProperties() {
 
   const istemplate = selected_node_type?.startsWith("templates/");
   const istext = selected_node_type === "text";
+  const isflex = selected_node_type === "flex";
+  const islayout = isflex;
 
   const properties = state.document.templatedata[selected_node_id!];
 
@@ -227,13 +229,15 @@ function SelectedNodeProperties() {
               <SelectValue placeholder="None" />
             </SelectTrigger>
             <SelectContent>
-              {Object.keys(TemplateComponents.components).map((key) => {
-                return (
-                  <SelectItem key={key} value={key}>
-                    {key}
-                  </SelectItem>
-                );
-              })}
+              {Object.keys(TemplateComponents.components)
+                .filter((k) => k.startsWith("templates/"))
+                .map((key) => {
+                  return (
+                    <SelectItem key={key} value={key}>
+                      {key}
+                    </SelectItem>
+                  );
+                })}
             </SelectContent>
           </Select>
         </SidebarMenuSectionContent>
@@ -302,11 +306,11 @@ function SelectedNodeProperties() {
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>
-      <SidebarSection className="border-b pb-4">
+      <SidebarSection hidden={!islayout} className="border-b pb-4">
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Layout</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent>
+        <SidebarMenuSectionContent className="space-y-2">
           <PropertyLine>
             <PropertyLineLabel>Direction</PropertyLineLabel>
             <FlexDirectionControl

@@ -18,6 +18,7 @@ interface SlotProps<P> {
   node_id: string;
   // templatePath
   component: TemplateComponent<P>;
+  className?: string;
   defaultProps: P;
 }
 
@@ -25,6 +26,7 @@ export function SlotNode<P>({
   node_id,
   component,
   defaultProps,
+  className,
   children,
 }: React.PropsWithChildren<SlotProps<P>>) {
   const [state, dispatch] = useEditorState();
@@ -124,6 +126,7 @@ export function SlotNode<P>({
           style={{
             opacity: props.opacity,
           }}
+          className={cn(className)}
         >
           {/*  */}
           {React.createElement(renderer, props, children)}
