@@ -19,7 +19,7 @@ interface SlotProps<P> {
   // templatePath
   component: TemplateComponent<P>;
   className?: string;
-  defaultProps: P;
+  defaultProps?: P;
 }
 
 export function SlotNode<P>({

@@ -10,6 +10,7 @@ import {
 } from "@/builder/template-builder/components/cards";
 import { Footer_001 } from "@/builder/template-builder/components/footers";
 import { TemplateBuilderWidgets } from "@/builder/template-builder/widgets";
+import { Header_001 } from "@/builder/template-builder/components/headers";
 
 const tags = [
   "Apple",
@@ -82,6 +83,7 @@ export default function FormCollectionPage() {
   const [state] = useEditorState();
   return (
     <div className="@container/preview">
+      <Header_001 />
       <SlotNode
         node_id="hero"
         component={Hero_002}
