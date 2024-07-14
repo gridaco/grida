@@ -16,7 +16,7 @@ import { nanoid } from "nanoid";
 import { DndContext, useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import clsx from "clsx";
-import useMergedRef from "./use-merged-ref";
+import useMergedRef from "@/hooks/use-merged-ref";
 import { cvt_delta_by_resize_handle_origin, resize } from "./transform-resize";
 import { motion } from "framer-motion";
 
