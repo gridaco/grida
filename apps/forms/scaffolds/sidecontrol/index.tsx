@@ -121,6 +121,12 @@ function SelectedNodeProperties() {
     padding,
     //
     aspectRatio,
+    //
+    flexDirection,
+    flexWrap,
+    justifyContent,
+    alignItems,
+    gap,
   } = properties || {};
 
   const border = {
@@ -170,6 +176,14 @@ function SelectedNodeProperties() {
   const changeboxShadow = (value?: any) => {
     changeproperty("boxShadow", value.boxShadow);
   };
+  const changegap = (value?: number) => changeproperty("gap", value);
+  const changeflexDirection = (value?: string) =>
+    changeproperty("flexDirection", value);
+  const changeflexWrap = (value?: string) => changeproperty("flexWrap", value);
+  const changejustifyContent = (value?: string) =>
+    changeproperty("justifyContent", value);
+  const changealignItems = (value?: string) =>
+    changeproperty("alignItems", value);
 
   return (
     <div key={selected_node_id}>
@@ -296,32 +310,31 @@ function SelectedNodeProperties() {
           <PropertyLine>
             <PropertyLineLabel>Direction</PropertyLineLabel>
             <FlexDirectionControl
-            // value={ } onValueChange={change}
+              value={flexDirection}
+              onValueChange={changeflexDirection}
             />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Wrap</PropertyLineLabel>
-            <FlexWrapControl
-            // value={ } onValueChange={change}
-            />
+            <FlexWrapControl value={flexWrap} onValueChange={changeflexWrap} />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Distribute</PropertyLineLabel>
             <JustifyContentControl
-              // value={ } onValueChange={change}
+              value={justifyContent}
+              onValueChange={changejustifyContent}
             />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Align</PropertyLineLabel>
             <AlignItemsControl
-            // value={ } onValueChange={change}
+              value={alignItems}
+              onValueChange={changealignItems}
             />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Gap</PropertyLineLabel>
-            <GapControl
-            // value={ } onValueChange={change}
-            />
+            <GapControl value={gap} onValueChange={changegap} />
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>
