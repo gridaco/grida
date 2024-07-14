@@ -42,7 +42,6 @@ import { useTheme } from "next-themes";
 import { useMonacoTheme } from "@/components/monaco";
 import { customcss_starter_template } from "@/theme/customcss/k";
 import { Input } from "@/components/ui/input";
-import { TemplateComponents } from "@/builder/template-builder";
 import { Label } from "@/components/ui/label";
 import { TextAlignControl } from "./controls/text-align";
 import { FontSizeControl } from "./controls/font-size";
@@ -64,6 +63,7 @@ import { AlignItemsControl } from "./controls/align-items";
 import { FlexWrapControl } from "./controls/flex-wrap";
 import { FlexDirectionControl } from "./controls/flex-direction";
 import { JustifyContentControl } from "./controls/justify-content";
+import { TemplateControl } from "./controls/template";
 
 const { default: _, ...variants } = _variants;
 
@@ -224,22 +224,7 @@ function SelectedNodeProperties() {
           <SidebarSectionHeaderLabel>Template</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuSectionContent>
-          <Select value={template_id} onValueChange={changetemplate}>
-            <SelectTrigger className={inputVariants({ size: "sm" })}>
-              <SelectValue placeholder="None" />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.keys(TemplateComponents.components)
-                .filter((k) => k.startsWith("templates/"))
-                .map((key) => {
-                  return (
-                    <SelectItem key={key} value={key}>
-                      {key}
-                    </SelectItem>
-                  );
-                })}
-            </SelectContent>
-          </Select>
+          <TemplateControl value={template_id} onValueChange={changetemplate} />
         </SidebarMenuSectionContent>
       </SidebarSection>
       <SidebarSection hidden={!istemplate} className="border-b pb-4">
