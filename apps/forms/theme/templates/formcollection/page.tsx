@@ -5,6 +5,7 @@ import { useEditorState } from "@/scaffolds/editor";
 import { SlotNode } from "@/builder/template-builder/node";
 import {
   Card_002,
+  Card_003,
   Hero_002,
 } from "@/builder/template-builder/components/cards";
 import { Footer_001 } from "@/builder/template-builder/components/footers";
@@ -38,6 +39,7 @@ const list = [
     cta: "register now",
     status: "Opens 1:11",
     image: "/images/bundle-abstract/001.png",
+    tags: ["Apple", "Banana"],
   },
   {
     date: "15.2.02",
@@ -46,6 +48,7 @@ const list = [
     cta: "sign up today",
     status: "Opens 2:00",
     image: "/images/bundle-abstract/002.png",
+    tags: ["Apple", "Banana"],
   },
   {
     date: "03.3.02",
@@ -54,6 +57,7 @@ const list = [
     cta: "join now",
     status: "Opens 3:30",
     image: "/images/bundle-abstract/003.png",
+    tags: ["Apple", "Banana"],
   },
   {
     date: "10.4.02",
@@ -62,6 +66,7 @@ const list = [
     cta: "reserve your spot",
     status: "Opens 4:00",
     image: "/images/bundle-abstract/004.png",
+    tags: ["Apple", "Banana"],
   },
   // {
   //   date: "22.5.02",
@@ -110,11 +115,12 @@ export default function FormCollectionPage() {
               <SlotNode
                 node_id={"event-card"}
                 key={i}
-                component={Card_002}
+                component={Card_003}
                 defaultProps={{
                   media: { $id: "media", type: "image", src: data.image },
                   h1: data.title,
                   badge: data.status,
+                  tags: data.tags,
                   p: data.cta,
                   n: data.attendees,
                   date1: data.date,

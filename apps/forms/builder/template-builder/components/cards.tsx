@@ -16,6 +16,7 @@ const CardSchema = z.object({
   $id: z.literal("ui-model-card"),
   props: z.object({
     badge: z.string(),
+    tags: z.array(z.string()).optional(),
     h1: z.string(),
     p: z.string(),
     date1: z.string(),
@@ -35,6 +36,7 @@ const Card_001Component: React.FC<CardProps> = ({
   badge,
   media,
   date2,
+  tags,
   ...props
 }) => {
   return (
@@ -43,6 +45,11 @@ const Card_001Component: React.FC<CardProps> = ({
       style={props}
     >
       <div className="flex overflow-hidden rounded-t-lg">
+        {badge && (
+          <div className="absolute z-10 top-0 left-0 py-4 px-4">
+            <Badge>{badge}</Badge>
+          </div>
+        )}
         <Media
           type={media.type}
           src={media.src}
@@ -67,6 +74,15 @@ const Card_001Component: React.FC<CardProps> = ({
           <span>{date2}</span>
         </div>
         <div className="text-sm text-muted-foreground">{p}</div>
+        <SlotNode
+          node_id="tags-layout"
+          component={TemplateBuilderWidgets.Flex}
+          defaultProps={{
+            gap: 4,
+          }}
+        >
+          {tags?.map((t, i) => <Badge key={i}>{t}</Badge>)}
+        </SlotNode>
       </div>
     </Card>
   );
@@ -124,6 +140,63 @@ const Card_002Component: React.FC<CardProps> = ({
   );
 };
 
+const Card_003Component: React.FC<CardProps> = ({
+  h1,
+  p,
+  date1,
+  date2,
+  n,
+  badge,
+  media,
+  tags,
+  ...props
+}) => {
+  return (
+    <Card className="flex justify-between gap-2 p-4" style={props}>
+      <div className="flex-1 flex flex-col gap-1 z-20">
+        <SlotNode
+          node_id="header-layout"
+          component={TemplateBuilderWidgets.Flex}
+          defaultProps={{
+            gap: 4,
+            flexDirection: "column",
+          }}
+        >
+          <div className="flex flex-row items-center gap-2">
+            <div className="flex gap-2 items-center justify-between">
+              <span>{date1}</span>
+            </div>
+            <span>
+              <strong>{n}</strong>
+            </span>
+          </div>
+          <h1 className="text-lg font-bold break-keep">{h1}</h1>
+        </SlotNode>
+        <p className="text-xs font-regular opacity-80">{p}</p>
+        <SlotNode
+          node_id="tags-layout"
+          component={TemplateBuilderWidgets.Flex}
+          defaultProps={{
+            gap: 4,
+          }}
+        >
+          {tags?.map((t, i) => <Badge key={i}>{t}</Badge>)}
+        </SlotNode>
+      </div>
+      <div className="w-20 h-20 rounded-lg overflow-hidden">
+        <Media
+          type={media.type}
+          src={media.src}
+          alt={media.alt}
+          width={400}
+          height={400}
+          className="object-cover w-full h-full"
+        />
+      </div>
+    </Card>
+  );
+};
+
 export const Card_001 = withTemplate(
   Card_001Component,
   "templates/components/cards/card-001",
@@ -132,6 +205,11 @@ export const Card_001 = withTemplate(
 export const Card_002 = withTemplate(
   Card_002Component,
   "templates/components/cards/card-002",
+  CardSchema
+);
+export const Card_003 = withTemplate(
+  Card_003Component,
+  "templates/components/cards/card-003",
   CardSchema
 );
 
