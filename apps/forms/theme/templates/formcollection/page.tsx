@@ -3,9 +3,12 @@ import { PoweredByGridaFooter } from "@/scaffolds/e/form/powered-by-brand-footer
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useEditorState } from "@/scaffolds/editor";
 import { SlotNode } from "@/scaffolds/canvas";
-import { Card_002, Hero_002 } from "../components/cards";
-import { Text } from "../components/text";
-import { Footer_001 } from "../components/footers";
+import {
+  Card_002,
+  Hero_002,
+} from "../../../builder/template-builder/components/cards";
+import { Text } from "../../../builder/template-builder/components/text";
+import { Footer_001 } from "../../../builder/template-builder/components/footers";
 const tags = [
   "Apple",
   "Banana",

@@ -12,7 +12,7 @@ import { cn } from "@/utils";
 import { useGesture } from "@use-gesture/react";
 import { useEditorState } from "@/scaffolds/editor";
 import type { ZodSchema } from "zod";
-import { TemplateComponents } from "@/theme/templates/components";
+import { TemplateComponents } from "@/builder/template-builder/components";
 import { TemplateComponent } from "./with-template";
 
 interface SlotProps<P> {
