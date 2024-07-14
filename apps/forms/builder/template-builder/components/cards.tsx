@@ -9,8 +9,8 @@ import {
 import { z } from "zod";
 import { SlashIcon } from "@radix-ui/react-icons";
 import { SlotNode } from "@/scaffolds/canvas";
-import { Text } from "../widgets/text";
 import { Media, MediaSchema } from "./media";
+import { TemplateBuilderWidgets } from "../widgets";
 
 const CardSchema = z.object({
   $id: z.literal("ui-model-card"),
@@ -54,7 +54,7 @@ const Card_001Component: React.FC<CardProps> = ({
       </div>
       <div className="space-y-2 bg-background p-4">
         <SlotNode
-          component={Text}
+          component={TemplateBuilderWidgets.Text}
           defaultProps={{
             text: h1,
           }}

@@ -17,7 +17,7 @@ interface LayoutProps {
   alignItems?: "center" | "start" | "end" | "stretch" | "baseline";
 }
 
-export function Layout({
+export function LayoutWidget({
   children,
   ...props
 }: React.PropsWithChildren<LayoutProps>) {

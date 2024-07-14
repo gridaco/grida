@@ -6,9 +6,10 @@ import { SlotNode } from "@/scaffolds/canvas";
 import {
   Card_002,
   Hero_002,
-} from "../../../builder/template-builder/components/cards";
-import { Text } from "../../../builder/template-builder/widgets/text";
-import { Footer_001 } from "../../../builder/template-builder/components/footers";
+} from "@/builder/template-builder/components/cards";
+import { Footer_001 } from "@/builder/template-builder/components/footers";
+import { TemplateBuilderWidgets } from "@/builder/template-builder/widgets";
+
 const tags = [
   "Apple",
   "Banana",
@@ -94,7 +95,7 @@ export default function FormCollectionPage() {
           <header className="py-10">
             <SlotNode
               node_id="list-header-title"
-              component={Text}
+              component={TemplateBuilderWidgets.Text}
               defaultProps={{
                 text: "Upcoming Events",
               }}
