@@ -92,6 +92,12 @@ export function SidebarMenuItem({
   );
 }
 
+export function SidebarMenuItemLabel({
+  children,
+}: React.PropsWithChildren<{}>) {
+  return <span className="text-ellipsis overflow-hidden">{children}</span>;
+}
+
 export function SidebarSection({
   children,
   className,
