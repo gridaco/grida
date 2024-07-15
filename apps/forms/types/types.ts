@@ -1,4 +1,4 @@
-import { IpInfo } from "@/lib/ipinfo";
+import { IpInfo } from "@/clients/ipinfo";
 import type { JSONBooleanValueDescriptor } from "./logic";
 import palettes from "@/theme/palettes";
 
