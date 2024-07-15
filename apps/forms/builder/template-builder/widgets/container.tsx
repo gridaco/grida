@@ -2,22 +2,19 @@ import { z } from "zod";
 import { withTemplate, ZTemplateSchema } from "../with-template";
 import React from "react";
 
-const ContainerWidgetSchema = z.object({
-  props: z.any(),
-  // @ts-ignore
-}) satisfies ZTemplateSchema<any>;
-
-type ContainerWidgetProps = z.infer<typeof ContainerWidgetSchema>["props"];
-
 export const ContainerWidget = withTemplate(
-  ({ children, ...props }: React.PropsWithChildren<ContainerWidgetProps>) => {
+  ({
+    style,
+    children,
+    ...props
+  }: React.PropsWithChildren<{
+    style?: React.CSSProperties;
+  }>) => {
     return (
-      <div {...props} style={{ ...props }}>
+      <div {...props} style={style}>
         {children}
       </div>
     );
   },
-  "container",
-  // @ts-ignore
-  ContainerWidgetSchema
+  "container"
 );

@@ -47,7 +47,7 @@ export function TemplateControl({
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10 p-4">
               {Object.keys(TemplateComponents.components)
                 .filter((k) => k.startsWith("templates/"))
-                .map((key) => {
+                .map((key: string) => {
                   return (
                     <TemplateCard
                       key={key}
@@ -63,18 +63,20 @@ export function TemplateControl({
                     >
                       {React.createElement(TemplateComponents.components[key], {
                         // TODO: needs to be dynamic
-                        media: {
-                          $id: "media",
-                          type: "image",
-                          src: "/images/abstract-placeholder.jpg",
+                        properties: {
+                          media: {
+                            $id: "media",
+                            type: "image",
+                            src: "/images/abstract-placeholder.jpg",
+                          },
+                          h1: "Title",
+                          badge: "Badge",
+                          tags: ["Tag1", "Tag2"],
+                          p: "Content",
+                          n: 100,
+                          date1: new Date().toLocaleDateString(),
+                          date2: new Date().toLocaleDateString(),
                         },
-                        h1: "Title",
-                        badge: "Badge",
-                        tags: ["Tag1", "Tag2"],
-                        p: "Content",
-                        n: 100,
-                        date1: new Date().toLocaleDateString(),
-                        date2: new Date().toLocaleDateString(),
                       })}
                     </TemplateCard>
                   );

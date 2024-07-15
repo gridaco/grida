@@ -5,6 +5,7 @@ import { HalfHeightGradient } from "./gradient-overlay";
 import { z } from "zod";
 import { SlashIcon } from "@radix-ui/react-icons";
 import {
+  FinalProps,
   withTemplate,
   ZTemplateSchema,
 } from "@/builder/template-builder/with-template";
@@ -14,7 +15,7 @@ import { TemplateBuilderWidgets } from "../widgets";
 
 const CardSchema = z.object({
   $id: z.literal("ui-model-card"),
-  props: z.object({
+  properties: z.object({
     badge: z.string(),
     tags: z.array(z.string()).optional(),
     h1: z.string(),
@@ -26,23 +27,16 @@ const CardSchema = z.object({
   }),
 }) satisfies ZTemplateSchema<any>;
 
-type CardProps = z.infer<typeof CardSchema>["props"];
+type CardProps = z.infer<typeof CardSchema> & { style?: React.CSSProperties };
 
-const Card_001Component: React.FC<CardProps> = ({
-  h1,
-  p,
-  date1,
-  n,
-  badge,
-  media,
-  date2,
-  tags,
-  ...props
+const Card_001Component: React.FC<FinalProps<CardProps>> = ({
+  properties: { h1, p, date1, n, badge, media, date2, tags },
+  style,
 }) => {
   return (
     <Card
       className="group relative overflow-hidden rounded-lg shadow-lg transition-all hover:shadow-xl"
-      style={props}
+      style={style}
     >
       <div className="flex overflow-hidden rounded-t-lg">
         {badge && (
@@ -62,7 +56,7 @@ const Card_001Component: React.FC<CardProps> = ({
       <div className="space-y-2 bg-background p-4">
         <SlotNode
           component={TemplateBuilderWidgets.Text}
-          defaultProps={{
+          defaultProperties={{
             text: h1,
           }}
           node_id={".h1"}
@@ -77,7 +71,7 @@ const Card_001Component: React.FC<CardProps> = ({
         <SlotNode
           node_id="tags-layout"
           component={TemplateBuilderWidgets.Flex}
-          defaultProps={{
+          defaultStyle={{
             gap: 4,
           }}
         >
@@ -88,21 +82,14 @@ const Card_001Component: React.FC<CardProps> = ({
   );
 };
 
-const Card_002Component: React.FC<CardProps> = ({
-  h1,
-  p,
-  date1,
-  date2,
-  n,
-  badge,
-  media,
-  ...props
+const Card_002Component: React.FC<FinalProps<CardProps>> = ({
+  properties: { h1, p, date1, date2, n, badge, media, tags },
+  style,
 }) => {
   return (
     <Card
       className="relative overflow-hidden flex-1 flex flex-col justify-end gap-6 text-foreground w-auto aspect-[4/4]"
-      // @ts-ignore TODO:
-      style={props}
+      style={style}
     >
       <Media
         type={media.type}
@@ -135,23 +122,16 @@ const Card_002Component: React.FC<CardProps> = ({
   );
 };
 
-const Card_003Component: React.FC<CardProps> = ({
-  h1,
-  p,
-  date1,
-  date2,
-  n,
-  badge,
-  media,
-  tags,
-  ...props
+const Card_003Component: React.FC<FinalProps<CardProps>> = ({
+  properties: { h1, p, date1, date2, n, badge, media, tags },
+  style,
 }) => {
   return (
-    <Card className="p-4" style={props}>
+    <Card className="p-4" style={style}>
       <SlotNode
         component={TemplateBuilderWidgets.Flex}
         node_id="root"
-        defaultProps={{
+        defaultStyle={{
           gap: 4,
           flexDirection: "row",
           justifyContent: "space-between",
@@ -161,7 +141,7 @@ const Card_003Component: React.FC<CardProps> = ({
           <SlotNode
             node_id="header-layout"
             component={TemplateBuilderWidgets.Flex}
-            defaultProps={{
+            defaultStyle={{
               gap: 4,
               flexDirection: "column",
             }}
@@ -180,7 +160,7 @@ const Card_003Component: React.FC<CardProps> = ({
           <SlotNode
             node_id="tags-layout"
             component={TemplateBuilderWidgets.Flex}
-            defaultProps={{
+            defaultStyle={{
               gap: 4,
             }}
           >
@@ -190,7 +170,7 @@ const Card_003Component: React.FC<CardProps> = ({
         <SlotNode
           node_id="media-layout"
           component={TemplateBuilderWidgets.Container}
-          defaultProps={
+          defaultStyle={
             {
               width: 80,
               height: 80,
@@ -229,24 +209,23 @@ export const Card_003 = withTemplate(
   CardSchema
 );
 
-//
-//
-//
-
 const HeroCardSchema = z.object({
-  props: z.object({
+  properties: z.object({
     media: MediaSchema,
     h1: z.string(),
     p: z.string(),
   }),
 }) satisfies ZTemplateSchema<any>;
 
-type HeroCardProps = z.infer<typeof HeroCardSchema>["props"];
+type HeroCardProps = z.infer<typeof HeroCardSchema>["properties"];
 
 export const Hero_001 = withTemplate(
-  function Hero_001({ media, h1, p, ...props }: HeroCardProps) {
+  function Hero_001({
+    properties: { media, h1, p },
+    style,
+  }: FinalProps<HeroCardProps>) {
     return (
-      <header style={props}>
+      <header style={style}>
         <div className="relative">
           <Media
             type={media.type}
@@ -277,9 +256,13 @@ export const Hero_001 = withTemplate(
 );
 
 export const Hero_002 = withTemplate(
-  function Hero_002({ media, h1, p, ...props }: HeroCardProps) {
+  function Hero_002({
+    properties: { media, h1, p },
+    style,
+    ...props
+  }: FinalProps<HeroCardProps>) {
     return (
-      <header style={props}>
+      <header style={style}>
         <div className="relative">
           <Media
             type={media.type}

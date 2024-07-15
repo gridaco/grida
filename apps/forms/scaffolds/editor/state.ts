@@ -15,6 +15,8 @@ import type {
 import { LOCALTZ } from "./symbols";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { ZodObject } from "zod";
+import { Tokens } from "@/types/ast";
+import React from "react";
 
 export type DraftID = `[draft]${string}`;
 export const DRAFT_ID_START_WITH = "[draft]";
@@ -157,7 +159,18 @@ export interface FormEditorState {
     pages: string[];
     selected_page_id: string;
     nodes: any[];
-    templatedata: { [key: string]: any };
+    templatedata: {
+      [key: string]: {
+        text: Tokens.StringValueExpression;
+        template_id: string;
+        attributes?: Omit<
+          React.HtmlHTMLAttributes<HTMLDivElement>,
+          "style" | "className"
+        >;
+        properties?: { [key: string]: Tokens.StringValueExpression };
+        style?: React.CSSProperties;
+      };
+    };
     selected_node_id?: string;
     selected_node_type?: string;
     selected_node_schema?: ZodObject<any> | null;

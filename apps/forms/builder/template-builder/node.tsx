@@ -19,13 +19,15 @@ interface SlotProps<P> {
   // templatePath
   component: TemplateComponent<P>;
   className?: string;
-  defaultProps?: P;
+  defaultProperties?: P;
+  defaultStyle?: React.CSSProperties;
 }
 
 export function SlotNode<P>({
   node_id,
   component,
-  defaultProps,
+  defaultProperties,
+  defaultStyle,
   className,
   children,
 }: React.PropsWithChildren<SlotProps<P>>) {
@@ -108,25 +110,31 @@ export function SlotNode<P>({
     }
   }, [hovered, portal, selected]);
 
-  const overrideProps = state.document.templatedata[node_id];
-  const template_id = overrideProps?.template_id;
+  const { template_id, properties, style, attributes } =
+    state.document.templatedata[node_id] || {};
 
   const renderer = template_id
     ? TemplateComponents.components[template_id]
     : component;
 
   const props = {
-    ...defaultProps,
-    ...overrideProps,
+    properties: {
+      ...defaultProperties,
+      ...properties,
+    },
+    style: {
+      ...defaultStyle,
+      ...style,
+    },
   };
 
   return (
     <>
       <div ref={containerRef} {...bind()}>
         <div
-          hidden={props.hidden}
+          {...(attributes || {})}
           style={{
-            opacity: props.opacity,
+            opacity: props.style?.opacity,
           }}
           className={cn(className)}
         >

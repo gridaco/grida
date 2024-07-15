@@ -10,7 +10,7 @@ export function Footer_001() {
       className={"py-10 w-full"}
       node_id={"footer-flex"}
       component={TemplateBuilderWidgets.Flex}
-      defaultProps={{
+      defaultStyle={{
         flexWrap: "wrap",
         justifyContent: "center",
         alignItems: "center",

@@ -58,6 +58,7 @@ export type BlocksEditorAction =
   | DocumentSelectPageAction
   | DocumentSelectNodeAction
   | DocumentNodeChangeTemplateAction
+  | DocumentNodeChangeTextAction
   | DocumentNodeUpdateStyleAction
   | DocumentNodeUpdateAttributeAction
   | DocumentNodeUpdatePropertyAction;
@@ -312,6 +313,12 @@ export interface DocumentNodeChangeTemplateAction {
   type: "editor/document/node/template";
   node_id: string;
   template_id: string;
+}
+
+export interface DocumentNodeChangeTextAction {
+  type: "editor/document/node/text";
+  node_id: string;
+  text: Tokens.StringValueExpression;
 }
 
 export interface DocumentNodeUpdateStyleAction {

@@ -31,22 +31,23 @@ import {
   TextIcon,
   TokensIcon,
 } from "@radix-ui/react-icons";
-import { DropdownMenuItemIndicator } from "@radix-ui/react-dropdown-menu";
+import { Tokens } from "@/types/ast";
 
 export function StringLiteralControl({
   value,
   onChangeValue,
   placeholder = "Value",
 }: {
-  value?: string;
-  onChangeValue?: (value: string) => void;
+  value?: Tokens.StringValueExpression;
+  onChangeValue?: (value: Tokens.StringValueExpression) => void;
   placeholder?: string;
 }) {
   return (
     <div className="relative group w-full">
       <Input
         type="text"
-        value={value}
+        // FIXME:
+        value={(value as string) || ""}
         placeholder={placeholder}
         onChange={(e) => onChangeValue?.(e.target.value)}
         className={inputVariants({ size: "sm" })}

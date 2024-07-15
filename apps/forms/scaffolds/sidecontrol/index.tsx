@@ -62,6 +62,7 @@ import { FlexWrapControl } from "./controls/flex-wrap";
 import { FlexDirectionControl } from "./controls/flex-direction";
 import { JustifyContentControl } from "./controls/justify-content";
 import { TemplateControl } from "./controls/template";
+import { Tokens } from "@/types/ast";
 
 const { default: _, ...variants } = _variants;
 
@@ -93,7 +94,8 @@ function SelectedNodeProperties() {
     state.document;
 
   const propertyNames = Object.keys(
-    selected_node_schema?.shape.props.shape || {}
+    // TODO: add typings to schema
+    selected_node_schema?.shape?.properties?.shape || {}
   );
 
   const istemplate = selected_node_type?.startsWith("templates/");
@@ -101,13 +103,13 @@ function SelectedNodeProperties() {
   const isflex = selected_node_type === "flex";
   const islayout = isflex;
 
-  const properties = state.document.templatedata[selected_node_id!];
+  const { template_id, attributes, style, properties, text } =
+    state.document.templatedata[selected_node_id!] || {};
+
+  const { hidden } = attributes || {};
 
   const {
-    template_id,
     opacity,
-    hidden,
-    text,
     fontWeight,
     fontSize,
     textAlign,
@@ -127,7 +129,7 @@ function SelectedNodeProperties() {
     justifyContent,
     alignItems,
     gap,
-  } = properties || {};
+  } = style || {};
 
   const border = {
     borderWidth,
@@ -139,6 +141,17 @@ function SelectedNodeProperties() {
         type: "editor/document/node/template",
         node_id: selected_node_id!,
         template_id,
+      });
+    },
+    [dispatch, selected_node_id]
+  );
+
+  const changetext = useCallback(
+    (text: Tokens.StringValueExpression) => {
+      dispatch({
+        type: "editor/document/node/text",
+        node_id: selected_node_id!,
+        text,
       });
     },
     [dispatch, selected_node_id]
@@ -160,7 +173,7 @@ function SelectedNodeProperties() {
   const changestyle = useCallback(
     (key: string, value: any) => {
       dispatch({
-        type: "editor/document/node/attribute",
+        type: "editor/document/node/style",
         node_id: selected_node_id!,
         data: {
           [key]: value,
@@ -183,9 +196,11 @@ function SelectedNodeProperties() {
     [dispatch, selected_node_id]
   );
 
+  // attributes
   const changehidden = (value: boolean) => changeattribute("hidden", value);
+
+  // style
   const changeopacity = (value: number) => changestyle("opacity", value);
-  const changetext = (value: string) => changestyle("text", value);
   const changefontWeight = (value: string) => changestyle("fontWeight", value);
   const changefontSize = (value?: number) => changestyle("fontSize", value);
   const changetextAlign = (value: string) => changestyle("textAlign", value);
@@ -255,7 +270,8 @@ function SelectedNodeProperties() {
         </SidebarSectionHeaderItem>
         <SidebarMenuSectionContent className="space-y-2">
           {propertyNames.map((key) => {
-            const value = state.document.templatedata[selected_node_id!]?.[key];
+            const value =
+              state.document.templatedata[selected_node_id!]?.properties?.[key];
 
             return (
               <PropertyLine key={key}>
@@ -285,18 +301,21 @@ function SelectedNodeProperties() {
           <PropertyLine>
             <PropertyLineLabel>Weight</PropertyLineLabel>
             <FontWeightControl
-              value={fontWeight}
+              value={fontWeight as any}
               onValueChange={changefontWeight}
             />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Size</PropertyLineLabel>
-            <FontSizeControl value={fontSize} onValueChange={changefontSize} />
+            <FontSizeControl
+              value={fontSize as any}
+              onValueChange={changefontSize}
+            />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Align</PropertyLineLabel>
             <TextAlignControl
-              value={textAlign}
+              value={textAlign as any}
               onValueChange={changetextAlign}
             />
           </PropertyLine>
@@ -310,32 +329,35 @@ function SelectedNodeProperties() {
           <PropertyLine>
             <PropertyLineLabel>Direction</PropertyLineLabel>
             <FlexDirectionControl
-              value={flexDirection}
+              value={flexDirection as any}
               onValueChange={changeflexDirection}
             />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Wrap</PropertyLineLabel>
-            <FlexWrapControl value={flexWrap} onValueChange={changeflexWrap} />
+            <FlexWrapControl
+              value={flexWrap as any}
+              onValueChange={changeflexWrap}
+            />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Distribute</PropertyLineLabel>
             <JustifyContentControl
-              value={justifyContent}
+              value={justifyContent as any}
               onValueChange={changejustifyContent}
             />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Align</PropertyLineLabel>
             <AlignItemsControl
-              value={alignItems}
-              flexDirection={flexDirection}
+              value={alignItems as any}
+              flexDirection={flexDirection as any}
               onValueChange={changealignItems}
             />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Gap</PropertyLineLabel>
-            <GapControl value={gap} onValueChange={changegap} />
+            <GapControl value={gap as any} onValueChange={changegap} />
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>
@@ -346,18 +368,21 @@ function SelectedNodeProperties() {
         <SidebarMenuSectionContent className="space-y-2">
           <PropertyLine>
             <PropertyLineLabel>Opacity</PropertyLineLabel>
-            <OpacityControl value={opacity} onValueChange={changeopacity} />
+            <OpacityControl
+              value={opacity as any}
+              onValueChange={changeopacity}
+            />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Radius</PropertyLineLabel>
             <BorderRadiusControl
-              value={borderRadius}
+              value={borderRadius as any}
               onValueChange={changeborderRadius}
             />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Border</PropertyLineLabel>
-            <BorderControl value={border} onValueChange={changeBorder} />
+            <BorderControl value={border as any} onValueChange={changeBorder} />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Background</PropertyLineLabel>
@@ -376,16 +401,19 @@ function SelectedNodeProperties() {
 
           <PropertyLine>
             <PropertyLineLabel>Margin</PropertyLineLabel>
-            <MarginControl value={margin} onValueChange={changemargin} />
+            <MarginControl value={margin as any} onValueChange={changemargin} />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Padding</PropertyLineLabel>
-            <PaddingControl value={padding} onValueChange={changepadding} />
+            <PaddingControl
+              value={padding as any}
+              onValueChange={changepadding}
+            />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Ratio</PropertyLineLabel>
             <AspectRatioControl
-              value={aspectRatio}
+              value={aspectRatio as any}
               onValueChange={changeaspectRatio}
             />
           </PropertyLine>

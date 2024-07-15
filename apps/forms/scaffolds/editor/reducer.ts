@@ -48,6 +48,7 @@ import type {
   DocumentNodeUpdateStyleAction,
   DocumentNodeUpdateAttributeAction,
   DocumentNodeUpdatePropertyAction,
+  DocumentNodeChangeTextAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { blockstreeflat } from "@/lib/forms/tree";
@@ -847,12 +848,24 @@ export function reducer(
         };
       });
     }
+    case "editor/document/node/text": {
+      const { node_id, text } = <DocumentNodeChangeTextAction>action;
+      return produce(state, (draft) => {
+        draft.document.templatedata[node_id] = {
+          ...(draft.document.templatedata[node_id] || {}),
+          text,
+        };
+      });
+    }
     case "editor/document/node/style": {
       const { node_id, data } = <DocumentNodeUpdateStyleAction>action;
       return produce(state, (draft) => {
         draft.document.templatedata[node_id] = {
           ...(draft.document.templatedata[node_id] || {}),
-          ...data,
+          style: {
+            ...(draft.document.templatedata[node_id]?.style || {}),
+            ...data,
+          },
         };
       });
     }
@@ -861,7 +874,10 @@ export function reducer(
       return produce(state, (draft) => {
         draft.document.templatedata[node_id] = {
           ...(draft.document.templatedata[node_id] || {}),
-          ...data,
+          attributes: {
+            ...(draft.document.templatedata[node_id]?.attributes || {}),
+            ...data,
+          },
         };
       });
     }
@@ -870,7 +886,10 @@ export function reducer(
       return produce(state, (draft) => {
         draft.document.templatedata[node_id] = {
           ...(draft.document.templatedata[node_id] || {}),
-          ...data,
+          properties: {
+            ...(draft.document.templatedata[node_id]?.properties || {}),
+            ...data,
+          },
         };
       });
     }

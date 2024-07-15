@@ -2,12 +2,12 @@ import { ZTemplateSchema, withTemplate } from "../with-template";
 import { z } from "zod";
 
 const TextSchema = z.object({
-  props: z.object({
+  properties: z.object({
     text: z.string(),
   }),
 }) satisfies ZTemplateSchema<any>;
 
-type TextProps = z.infer<typeof TextSchema>["props"];
+type TextProps = z.infer<typeof TextSchema>["properties"];
 
 export const TextWidget = withTemplate(
   ({ text, ...props }: TextProps) => {

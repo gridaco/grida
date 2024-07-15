@@ -87,7 +87,7 @@ export default function FormCollectionPage() {
       <SlotNode
         node_id="hero"
         component={Hero_002}
-        defaultProps={{
+        defaultProperties={{
           h1: "The Bundle",
           p: "A collection of events and meetups for developers and designers.",
           media: {
@@ -103,7 +103,7 @@ export default function FormCollectionPage() {
             <SlotNode
               node_id="list-header-title"
               component={TemplateBuilderWidgets.Text}
-              defaultProps={{
+              defaultProperties={{
                 text: "Upcoming Events",
               }}
             />
@@ -118,7 +118,7 @@ export default function FormCollectionPage() {
                 node_id={"event-card"}
                 key={i}
                 component={Card_003}
-                defaultProps={{
+                defaultProperties={{
                   media: { $id: "media", type: "image", src: data.image },
                   h1: data.title,
                   badge: data.status,
