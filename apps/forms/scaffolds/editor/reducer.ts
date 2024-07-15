@@ -45,6 +45,8 @@ import type {
   DocumentSelectPageAction,
   DocumentSelectNodeAction,
   DocumentNodeChangeTemplateAction,
+  DocumentNodeUpdateStyleAction,
+  DocumentNodeUpdateAttributeAction,
   DocumentNodeUpdatePropertyAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
@@ -842,6 +844,24 @@ export function reducer(
         draft.document.templatedata[node_id] = {
           ...(draft.document.templatedata[node_id] || {}),
           template_id,
+        };
+      });
+    }
+    case "editor/document/node/style": {
+      const { node_id, data } = <DocumentNodeUpdateStyleAction>action;
+      return produce(state, (draft) => {
+        draft.document.templatedata[node_id] = {
+          ...(draft.document.templatedata[node_id] || {}),
+          ...data,
+        };
+      });
+    }
+    case "editor/document/node/attribute": {
+      const { node_id, data } = <DocumentNodeUpdateAttributeAction>action;
+      return produce(state, (draft) => {
+        draft.document.templatedata[node_id] = {
+          ...(draft.document.templatedata[node_id] || {}),
+          ...data,
         };
       });
     }

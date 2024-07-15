@@ -144,6 +144,32 @@ function SelectedNodeProperties() {
     [dispatch, selected_node_id]
   );
 
+  const changeattribute = useCallback(
+    (key: string, value: any) => {
+      dispatch({
+        type: "editor/document/node/attribute",
+        node_id: selected_node_id!,
+        data: {
+          [key]: value,
+        },
+      });
+    },
+    [dispatch, selected_node_id]
+  );
+
+  const changestyle = useCallback(
+    (key: string, value: any) => {
+      dispatch({
+        type: "editor/document/node/attribute",
+        node_id: selected_node_id!,
+        data: {
+          [key]: value,
+        },
+      });
+    },
+    [dispatch, selected_node_id]
+  );
+
   const changeproperty = useCallback(
     (key: string, value: any) => {
       dispatch({
@@ -157,33 +183,31 @@ function SelectedNodeProperties() {
     [dispatch, selected_node_id]
   );
 
-  const changehidden = (value: boolean) => changeproperty("hidden", value);
-  const changeopacity = (value: number) => changeproperty("opacity", value);
-  const changetext = (value: string) => changeproperty("text", value);
-  const changefontWeight = (value: string) =>
-    changeproperty("fontWeight", value);
-  const changefontSize = (value?: number) => changeproperty("fontSize", value);
-  const changetextAlign = (value: string) => changeproperty("textAlign", value);
+  const changehidden = (value: boolean) => changeattribute("hidden", value);
+  const changeopacity = (value: number) => changestyle("opacity", value);
+  const changetext = (value: string) => changestyle("text", value);
+  const changefontWeight = (value: string) => changestyle("fontWeight", value);
+  const changefontSize = (value?: number) => changestyle("fontSize", value);
+  const changetextAlign = (value: string) => changestyle("textAlign", value);
   const changeborderRadius = (value?: number) =>
-    changeproperty("borderRadius", value);
-  const changemargin = (value?: number) => changeproperty("margin", value);
-  const changepadding = (value?: number) => changeproperty("padding", value);
+    changestyle("borderRadius", value);
+  const changemargin = (value?: number) => changestyle("margin", value);
+  const changepadding = (value?: number) => changestyle("padding", value);
   const changeaspectRatio = (value?: number) =>
-    changeproperty("aspectRatio", value);
+    changestyle("aspectRatio", value);
   const changeBorder = (value?: any) => {
-    changeproperty("borderWidth", value.borderWidth);
+    changestyle("borderWidth", value.borderWidth);
   };
   const changeboxShadow = (value?: any) => {
-    changeproperty("boxShadow", value.boxShadow);
+    changestyle("boxShadow", value.boxShadow);
   };
-  const changegap = (value?: number) => changeproperty("gap", value);
+  const changegap = (value?: number) => changestyle("gap", value);
   const changeflexDirection = (value?: string) =>
-    changeproperty("flexDirection", value);
-  const changeflexWrap = (value?: string) => changeproperty("flexWrap", value);
+    changestyle("flexDirection", value);
+  const changeflexWrap = (value?: string) => changestyle("flexWrap", value);
   const changejustifyContent = (value?: string) =>
-    changeproperty("justifyContent", value);
-  const changealignItems = (value?: string) =>
-    changeproperty("alignItems", value);
+    changestyle("justifyContent", value);
+  const changealignItems = (value?: string) => changestyle("alignItems", value);
 
   return (
     <div key={selected_node_id}>
@@ -233,16 +257,6 @@ function SelectedNodeProperties() {
           {propertyNames.map((key) => {
             const value = state.document.templatedata[selected_node_id!]?.[key];
 
-            const onValueChange = (value: any) => {
-              dispatch({
-                type: "editor/document/node/property",
-                node_id: selected_node_id!,
-                data: {
-                  [key]: value,
-                },
-              });
-            };
-
             return (
               <PropertyLine key={key}>
                 <PropertyLineLabel>{key}</PropertyLineLabel>
@@ -250,7 +264,7 @@ function SelectedNodeProperties() {
                   placeholder={key}
                   value={value}
                   onChangeValue={(value) => {
-                    onValueChange(value || undefined);
+                    changeproperty(key, value || undefined);
                   }}
                 />
               </PropertyLine>

@@ -9,7 +9,7 @@ import type {
   GridaSupabase,
 } from "@/types";
 import type { EditorFlatFormBlock, FormEditorState } from "./state";
-import type { JSONConditionExpression } from "@/types/logic";
+import type { Tokens } from "@/types/ast";
 import { LOCALTZ } from "./symbols";
 import { ZodObject } from "zod";
 
@@ -58,6 +58,8 @@ export type BlocksEditorAction =
   | DocumentSelectPageAction
   | DocumentSelectNodeAction
   | DocumentNodeChangeTemplateAction
+  | DocumentNodeUpdateStyleAction
+  | DocumentNodeUpdateAttributeAction
   | DocumentNodeUpdatePropertyAction;
 
 export type CreateNewPendingBlockAction =
@@ -104,7 +106,7 @@ export interface CreateFielFromBlockdAction {
 export interface BlockVHiddenAction {
   type: "blocks/hidden";
   block_id: string;
-  v_hidden: JSONConditionExpression;
+  v_hidden: Tokens.ConditionExpression;
 }
 
 export interface HtmlBlockBodyAction {
@@ -310,6 +312,18 @@ export interface DocumentNodeChangeTemplateAction {
   type: "editor/document/node/template";
   node_id: string;
   template_id: string;
+}
+
+export interface DocumentNodeUpdateStyleAction {
+  type: "editor/document/node/style";
+  node_id: string;
+  data: { [key: string]: any };
+}
+
+export interface DocumentNodeUpdateAttributeAction {
+  type: "editor/document/node/attribute";
+  node_id: string;
+  data: { [key: string]: any };
 }
 
 export interface DocumentNodeUpdatePropertyAction {
