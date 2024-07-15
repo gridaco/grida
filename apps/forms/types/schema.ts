@@ -29,7 +29,7 @@ type JSONOptionalDefineAsArrayAnnotation<T> = T | [T];
 interface JSONFieldBlock {
   type: "field";
   field: Tokens.JSONFieldReference;
-  hidden?: Tokens.BooleanValue;
+  hidden?: Tokens.BooleanValueExpression;
 }
 
 interface _JSONForm<T> {

@@ -232,7 +232,7 @@ export interface IFormBlock<T = FormBlockType> {
   data: any;
   parent_id?: string | null;
   local_index: number;
-  v_hidden?: Tokens.BooleanValue | null;
+  v_hidden?: Tokens.BooleanValueExpression | null;
 }
 
 export interface FormBlock<T = FormBlockType> extends IFormBlock<T> {

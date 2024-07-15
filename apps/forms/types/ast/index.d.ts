@@ -11,9 +11,10 @@ export namespace Tokens {
   type Literal = Primitive;
 
   /**
-   * depending on usage, the reference can be a name (key) or id
-   * - when stored in the database, it should be an id
-   * - when used in the json, it should be a key
+   * Represents a reference to a JSON field.
+   * Depending on usage, the reference can be a name (key) or id.
+   * - When stored in the database, it should be an id.
+   * - When used in the JSON, it should be a key.
    */
   export type JSONFieldReference = {
     $ref: `#/fields/${string}`;
@@ -22,18 +23,14 @@ export namespace Tokens {
   /**
    * Represents the left-hand side of a condition.
    * Can be either a field reference or a literal value.
-   *
-   * @template T - The type of the reference string, defaults to string.
    */
-  type ConditionLHS<T extends Literal> = JSONFieldReference | T;
+  type ConditionLHS = JSONFieldReference | Literal;
 
   /**
    * Represents the right-hand side of a condition.
    * Can be either a field reference or a literal value.
-   *
-   * @template T - The type of the reference string, defaults to string.
    */
-  type ConditionRHS<T extends Literal> = JSONFieldReference | T;
+  type ConditionRHS = JSONFieldReference | Literal;
 
   /**
    * Represents the possible operators for a condition expression.
@@ -45,22 +42,18 @@ export namespace Tokens {
    * - A left-hand side (ConditionLHS)
    * - An operator (ConditionOperator)
    * - A right-hand side (ConditionRHS)
-   *
-   * @template T - The type of the reference string, defaults to string.
    */
   export type ConditionExpression = [
-    ConditionLHS<any>,
+    ConditionLHS,
     ConditionOperator,
-    ConditionRHS<any>,
+    ConditionRHS,
   ];
 
   /**
    * Represents a boolean value descriptor.
    * Can be either a simple boolean or a condition expression.
-   *
-   * @template T - The type of the reference string, defaults to string.
    */
-  export type BooleanValue = boolean | ConditionExpression;
+  export type BooleanValueExpression = boolean | ConditionExpression;
 
   /**
    * Represents an identifier (variable) in a template.
@@ -74,7 +67,7 @@ export namespace Tokens {
   //  * Represents a property access expression in a template.
   //  * @deprecated Use PropertyPathLiteral instead.
   //  *
-  //  * This is although a standard AST node, it is not very useful in the context of json building
+  //  * This is although a standard AST node, it is not very useful in the context of JSON building
   //  */
   // type PropertyAccessExpression = {
   //   kind: "PropertyAccessExpression";
@@ -100,17 +93,20 @@ export namespace Tokens {
   };
 
   /**
-   * Represents a span in a template, which can be a string literal, an identifier, or a property access expression.
+   * Represents a span in a template, which can be a string literal, an identifier, or a property path literal.
    */
   type TemplateSpan = TemplateStringLiteral | Identifier | PropertyPathLiteral;
 
+  /**
+   * Represents a template expression consisting of template spans.
+   */
   type TemplateExpression = {
-    type: "TemplateExpression";
+    kind: "TemplateExpression";
     templateSpans: TemplateSpan[];
   };
 
   /**
-   * Represents a value expression, which can be any of the defined types.
+   * Represents a string value expression, which can be any of the defined types.
    */
   export type StringValueExpression =
     | string
