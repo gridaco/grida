@@ -1,5 +1,5 @@
 import { IpInfo } from "@/clients/ipinfo";
-import type { JSONBooleanValueDescriptor } from "./ast/logic";
+import type { AST } from "@/types/ast";
 import palettes from "@/theme/palettes";
 
 type UUID = string;
@@ -232,7 +232,7 @@ export interface IFormBlock<T = FormBlockType> {
   data: any;
   parent_id?: string | null;
   local_index: number;
-  v_hidden?: JSONBooleanValueDescriptor | null;
+  v_hidden?: AST.JSONBooleanValueDescriptor | null;
 }
 
 export interface FormBlock<T = FormBlockType> extends IFormBlock<T> {
