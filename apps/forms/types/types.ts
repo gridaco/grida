@@ -1,5 +1,5 @@
 import { IpInfo } from "@/clients/ipinfo";
-import type { AST } from "@/types/ast";
+import type { Tokens } from "@/types/ast";
 import palettes from "@/theme/palettes";
 
 type UUID = string;
@@ -232,7 +232,7 @@ export interface IFormBlock<T = FormBlockType> {
   data: any;
   parent_id?: string | null;
   local_index: number;
-  v_hidden?: AST.JSONBooleanValueDescriptor | null;
+  v_hidden?: Tokens.BooleanValue | null;
 }
 
 export interface FormBlock<T = FormBlockType> extends IFormBlock<T> {

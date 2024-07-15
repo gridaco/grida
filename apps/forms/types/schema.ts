@@ -6,7 +6,7 @@ import type {
   FormsPageLanguage,
   Option,
 } from "./types";
-import type { AST } from "@/types/ast";
+import type { Tokens } from "@/types/ast";
 import { toArrayOf, MaybeArray } from "./utility";
 
 /**
@@ -28,8 +28,8 @@ type JSONOptionalDefineAsArrayAnnotation<T> = T | [T];
 
 interface JSONFieldBlock {
   type: "field";
-  field: AST.JSONFieldReference;
-  hidden?: AST.JSONBooleanValueDescriptor;
+  field: Tokens.JSONFieldReference;
+  hidden?: Tokens.BooleanValue;
 }
 
 interface _JSONForm<T> {
