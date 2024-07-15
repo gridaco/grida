@@ -9,17 +9,17 @@ export type JSONFieldReference<T extends string = string> = {
   $ref: `#/fields/${string}`;
 };
 
-type JSONLiteral = Scalar;
+type Literal = Scalar;
 
 type JSONConditionLefthand<T extends string = string> =
   | JSONFieldReference<T>
-  | JSONLiteral;
-
-export type JSONConditionOperator = "==" | "!=" | ">" | "<" | ">=" | "<=";
+  | Literal;
 
 type JSONConditionRighthand<T extends string = string> =
   | JSONFieldReference<T>
-  | JSONLiteral;
+  | Literal;
+
+export type JSONConditionOperator = "==" | "!=" | ">" | "<" | ">=" | "<=";
 
 export type JSONConditionExpression<T extends string = string> = [
   JSONConditionLefthand<T>,

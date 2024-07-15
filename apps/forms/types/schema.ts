@@ -6,7 +6,10 @@ import type {
   FormsPageLanguage,
   Option,
 } from "./types";
-import type { JSONBooleanValueDescriptor, JSONFieldReference } from "./logic";
+import type {
+  JSONBooleanValueDescriptor,
+  JSONFieldReference,
+} from "./ast/logic";
 import { toArrayOf, MaybeArray } from "./utility";
 
 /**

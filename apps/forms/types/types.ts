@@ -1,5 +1,5 @@
 import { IpInfo } from "@/clients/ipinfo";
-import type { JSONBooleanValueDescriptor } from "./logic";
+import type { JSONBooleanValueDescriptor } from "./ast/logic";
 import palettes from "@/theme/palettes";
 
 type UUID = string;
