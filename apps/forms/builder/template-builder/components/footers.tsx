@@ -1,14 +1,8 @@
 import { Button } from "@/components/ui/button";
-import {
-  GitHubLogoIcon,
-  GlobeIcon,
-  InstagramLogoIcon,
-  LinkedInLogoIcon,
-  TwitterLogoIcon,
-} from "@radix-ui/react-icons";
-import Link from "next/link";
 import { TemplateBuilderWidgets } from "../widgets";
 import { SlotNode } from "../node";
+import { IconWidget } from "../widgets/icon";
+import Link from "next/link";
 
 export function Footer_001() {
   return (
@@ -25,27 +19,27 @@ export function Footer_001() {
     >
       <Link href="#">
         <Button variant="outline" size="icon" className="rounded-full">
-          <GlobeIcon />
+          <IconWidget repository="radix-ui/icons" name="GlobeIcon" />
         </Button>
       </Link>
       <Link href="#">
         <Button variant="outline" size="icon" className="rounded-full">
-          <InstagramLogoIcon />
+          <IconWidget repository="radix-ui/icons" name="InstagramLogoIcon" />
         </Button>
       </Link>
       <Link href="#">
         <Button variant="outline" size="icon" className="rounded-full">
-          <TwitterLogoIcon />
+          <IconWidget repository="radix-ui/icons" name="TwitterLogoIcon" />
         </Button>
       </Link>
       <Link href="#">
         <Button variant="outline" size="icon" className="rounded-full">
-          <GitHubLogoIcon />
+          <IconWidget repository="radix-ui/icons" name="GitHubLogoIcon" />
         </Button>
       </Link>
       <Link href="#">
         <Button variant="outline" size="icon" className="rounded-full">
-          <LinkedInLogoIcon />
+          <IconWidget repository="radix-ui/icons" name="LinkedInLogoIcon" />
         </Button>
       </Link>
     </SlotNode>
