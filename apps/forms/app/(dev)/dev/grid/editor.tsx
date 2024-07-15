@@ -1,6 +1,6 @@
 "use client";
 
-import { GridBlock, GridContext, GridEditor, useGrid } from "@/grid-builder";
+import { GridBlock, GridContext, GridEditor, useGrid } from "@/builder/grid-builder";
 import {
   GridaBlock,
   GridaBlockRenderer,

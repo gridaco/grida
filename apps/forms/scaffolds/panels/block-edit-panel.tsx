@@ -28,10 +28,7 @@ import {
 import { useEditorState } from "../editor";
 import toast from "react-hot-toast";
 import { MixIcon } from "@radix-ui/react-icons";
-import type {
-  JSONConditionExpression,
-  JSONConditionOperator,
-} from "@/types/logic";
+import type { Tokens } from "@/types/ast";
 import { KeyIcon } from "lucide-react";
 
 /**
@@ -42,7 +39,7 @@ type ConditionExpression = [
   // field id, will be used as $ref
   string,
   // operator
-  JSONConditionOperator,
+  Tokens.ConditionOperator,
   // option id value, will be used as scalar
   string,
 ];
@@ -73,7 +70,7 @@ export function BlockEditPanel({
       return;
     }
     //
-    const exp: JSONConditionExpression = [
+    const exp: Tokens.ConditionExpression = [
       {
         $ref: `#/fields/${l}/value`,
       },
@@ -176,7 +173,7 @@ function Condition({
 }) {
   const [state, dispatch] = useEditorState();
   const [lefthand, setLefthand] = useState<string>();
-  const [operator, setOperator] = useState<JSONConditionOperator>();
+  const [operator, setOperator] = useState<Tokens.ConditionOperator>();
   const [righthand, setRighthand] = useState<string>();
 
   const block = useMemo(
@@ -225,7 +222,7 @@ function Condition({
         <Select
           value={operator}
           onValueChange={(v) => {
-            setOperator(v as JSONConditionOperator);
+            setOperator(v as Tokens.ConditionOperator);
           }}
         >
           <SelectTrigger>

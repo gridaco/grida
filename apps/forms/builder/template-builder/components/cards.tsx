@@ -101,6 +101,7 @@ const Card_002Component: React.FC<CardProps> = ({
   return (
     <Card
       className="relative overflow-hidden flex-1 flex flex-col justify-end gap-6 text-foreground w-auto aspect-[4/4]"
+      // @ts-ignore TODO:
       style={props}
     >
       <Media
@@ -111,12 +112,6 @@ const Card_002Component: React.FC<CardProps> = ({
         height={800}
         className="absolute top-0 left-0 w-full h-full object-cover z-0"
       />
-      {/* <Image
-        className="absolute top-0 left-0 w-full h-full object-cover z-0"
-        src={media}
-        alt={""}
-        layout="fill"
-      /> */}
       <HalfHeightGradient />
       {badge && (
         <div className="absolute top-0 left-0 py-4 px-4">
