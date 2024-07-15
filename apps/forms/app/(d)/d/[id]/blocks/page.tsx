@@ -9,6 +9,7 @@ import FormCollectionPage from "@/theme/templates/formcollection/page";
 import FormStartPage from "@/theme/templates/formstart/default/page";
 import { useGesture } from "@use-gesture/react";
 import React from "react";
+import { CanvasFloatingToolbar } from "@/scaffolds/canvas-floating-toolbar";
 
 export default function EditFormPage() {
   return (
@@ -21,6 +22,9 @@ export default function EditFormPage() {
         <AgentThemeProvider>
           <CurrentPageCanvas />
         </AgentThemeProvider>
+        <div className="fixed bottom-5 left-0 right-0 flex items-center justify-center z-50">
+          <CanvasFloatingToolbar />
+        </div>
       </CanvasEventTarget>
       <aside className="hidden lg:flex h-full">
         <SideControl mode="blocks" />

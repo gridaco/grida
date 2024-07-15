@@ -49,6 +49,7 @@ import type {
   DocumentNodeUpdateAttributeAction,
   DocumentNodeUpdatePropertyAction,
   DocumentNodeChangeTextAction,
+  DocumentTemplateSampleDataAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { blockstreeflat } from "@/lib/forms/tree";
@@ -829,6 +830,12 @@ export function reducer(
 
       return produce(state, (draft) => {
         draft.document.selected_page_id = page_id;
+      });
+    }
+    case "editor/document/sampledata": {
+      const { sampledata } = <DocumentTemplateSampleDataAction>action;
+      return produce(state, (draft) => {
+        draft.document.templatesample = sampledata;
       });
     }
     case "editor/document/node/select": {

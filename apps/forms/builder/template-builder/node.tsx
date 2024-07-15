@@ -48,8 +48,6 @@ export function SlotNode<P>({
 
   const onSelect = useCallback(() => {
     // @ts-ignore TODO:
-    const schema = TemplateComponents.components[component.type].schema;
-    console.log("selected", node_id, component.type, schema);
     dispatch({
       type: "editor/document/node/select",
       node_id: node_id,

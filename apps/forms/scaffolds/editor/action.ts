@@ -56,6 +56,7 @@ export type BlocksEditorAction =
   | EditorThemeCustomCSSAction
   | EditorThemeBackgroundAction
   | DocumentSelectPageAction
+  | DocumentTemplateSampleDataAction
   | DocumentSelectNodeAction
   | DocumentNodeChangeTemplateAction
   | DocumentNodeChangeTextAction
@@ -300,6 +301,12 @@ export interface EditorThemeBackgroundAction {
 export interface DocumentSelectPageAction {
   type: "editor/document/select-page";
   page_id: string;
+}
+
+// TODO: consider removing this
+export interface DocumentTemplateSampleDataAction {
+  type: "editor/document/sampledata";
+  sampledata: string;
 }
 
 export interface DocumentSelectNodeAction {

@@ -77,6 +77,7 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
       pages: ["collection", "start", "form"],
       selected_page_id: "form",
       nodes: [],
+      templatesample: "formcollection_sample_001_the_bundle",
       templatedata: {},
     },
     fields: init.fields,
@@ -159,6 +160,7 @@ export interface FormEditorState {
     pages: string[];
     selected_page_id: string;
     nodes: any[];
+    templatesample: string;
     templatedata: {
       [key: string]: {
         text: Tokens.StringValueExpression;
