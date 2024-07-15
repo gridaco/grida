@@ -44,7 +44,7 @@ export function TemplateControl({
             <DialogTitle>Browse Templates</DialogTitle>
           </DialogHeader>
           <ScrollArea className="max-h-[80vh]">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-10 p-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10 p-4">
               {Object.keys(TemplateComponents.components)
                 .filter((k) => k.startsWith("templates/"))
                 .map((key) => {
@@ -62,6 +62,7 @@ export function TemplateControl({
                       }}
                     >
                       {React.createElement(TemplateComponents.components[key], {
+                        // TODO: needs to be dynamic
                         media: {
                           $id: "media",
                           type: "image",

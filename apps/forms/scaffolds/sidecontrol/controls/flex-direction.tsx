@@ -61,7 +61,9 @@ export function FlexDirectionControl({
         value={reverse}
         onValueChange={onReverseChange}
       >
-        <ToggleGroupItem value="reverse">Reverse</ToggleGroupItem>
+        <ToggleGroupItem value="reverse" className="text-xs">
+          Reverse
+        </ToggleGroupItem>
       </ToggleGroup>
     </div>
   );
