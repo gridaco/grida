@@ -38,23 +38,23 @@ export function AlignItemsControl({
 }: {
   value?: AlignItems;
   flexDirection?: "row" | "column";
-  onValueChange?: (value: AlignItems) => void;
+  onValueChange?: (value?: AlignItems) => void;
 }) {
   return (
     <ToggleGroup
       type="single"
       id="align-items"
       value={value}
-      onValueChange={onValueChange}
+      onValueChange={(v) => onValueChange?.((v as AlignItems) || undefined)}
     >
       <ToggleGroupItem value="start">
-        {React.createElement(icons[flexDirection ?? "row"].start)}
+        {React.createElement(icons[flexDirection || "row"].start)}
       </ToggleGroupItem>
       <ToggleGroupItem value="center">
-        {React.createElement(icons[flexDirection ?? "row"].center)}
+        {React.createElement(icons[flexDirection || "row"].center)}
       </ToggleGroupItem>
       <ToggleGroupItem value="end">
-        {React.createElement(icons[flexDirection ?? "row"].end)}
+        {React.createElement(icons[flexDirection || "row"].end)}
       </ToggleGroupItem>
     </ToggleGroup>
   );
