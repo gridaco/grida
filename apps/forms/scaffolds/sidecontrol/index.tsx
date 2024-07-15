@@ -41,7 +41,6 @@ import { Editor, useMonaco } from "@monaco-editor/react";
 import { useTheme } from "next-themes";
 import { useMonacoTheme } from "@/components/monaco";
 import { customcss_starter_template } from "@/theme/customcss/k";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TextAlignControl } from "./controls/text-align";
 import { FontSizeControl } from "./controls/font-size";
@@ -53,7 +52,6 @@ import { BorderRadiusControl } from "./controls/border-radius";
 import { BorderControl } from "./controls/border";
 import { BackgroundControl } from "./controls/background";
 import { StringLiteralControl } from "./controls/string-literal";
-import { inputVariants } from "./controls/utils/input-variants";
 import { MarginControl } from "./controls/margin";
 import { PaddingControl } from "./controls/padding";
 import { AspectRatioControl } from "./controls/aspect-ratio";
@@ -229,7 +227,7 @@ function SelectedNodeProperties() {
       </SidebarSection>
       <SidebarSection hidden={!istemplate} className="border-b pb-4">
         <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Properties</SidebarSectionHeaderLabel>
+          <SidebarSectionHeaderLabel>Component</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuSectionContent className="space-y-2">
           {propertyNames.map((key) => {
@@ -248,13 +246,12 @@ function SelectedNodeProperties() {
             return (
               <PropertyLine key={key}>
                 <PropertyLineLabel>{key}</PropertyLineLabel>
-                <Input
+                <StringLiteralControl
                   placeholder={key}
                   value={value}
-                  onChange={(e) => {
-                    onValueChange(e.target.value || undefined);
+                  onChangeValue={(value) => {
+                    onValueChange(value || undefined);
                   }}
-                  className={inputVariants({ size: "sm" })}
                 />
               </PropertyLine>
             );
