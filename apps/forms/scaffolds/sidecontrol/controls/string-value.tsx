@@ -32,29 +32,28 @@ import {
   TokensIcon,
 } from "@radix-ui/react-icons";
 import { Tokens } from "@/types/ast";
+import { Badge } from "@/components/ui/badge";
+import { Factory } from "@/types/ast/factory";
 
-export function StringLiteralControl({
+export function StringValueControl({
   value,
-  onChangeValue,
+  onValueChange,
   placeholder = "Value",
 }: {
   value?: Tokens.StringValueExpression;
-  onChangeValue?: (value: Tokens.StringValueExpression) => void;
+  onValueChange?: (value?: Tokens.StringValueExpression) => void;
   placeholder?: string;
 }) {
   return (
     <div className="relative group w-full">
-      <Input
-        type="text"
-        // FIXME:
-        value={(value as string) || ""}
+      <Control
+        value={value}
+        onValueChange={onValueChange}
         placeholder={placeholder}
-        onChange={(e) => onChangeValue?.(e.target.value)}
-        className={inputVariants({ size: "sm" })}
       />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button className="absolute opacity-0 group-hover:opacity-100 right-0 top-0 bottom-0 p-2 flex items-center justify-center">
+          <button className="absolute opacity-0 group-hover:opacity-100 right-0 top-0 bottom-0 p-2 m-0.5 rounded flex items-center justify-center z-10">
             <BoltIcon className="w-3.5 h-3.5 text-muted-foreground" />
           </button>
         </DropdownMenuTrigger>
@@ -161,12 +160,89 @@ export function StringLiteralControl({
               </DropdownMenuSubContent>
             </DropdownMenuPortal>
           </DropdownMenuSub>
-          <DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={() => {
+              onValueChange?.(undefined);
+            }}
+          >
             <ReloadIcon className="me-2 w-4 h-4" />
             Reset
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+    </div>
+  );
+}
+
+function Control({
+  value,
+  onValueChange,
+  placeholder,
+}: {
+  value?: Tokens.StringValueExpression;
+  onValueChange?: (value: Tokens.StringValueExpression) => void;
+  placeholder?: string;
+}) {
+  if (Factory.isTemplateExpression(value)) {
+    return <TemplateExpressionControl value={value} />;
+  }
+
+  return (
+    <StringLiteralControl
+      value={value as string}
+      onValueChange={onValueChange}
+      placeholder={placeholder}
+    />
+  );
+}
+
+function StringLiteralControl({
+  value,
+  onValueChange,
+  placeholder,
+}: {
+  value?: string;
+  onValueChange?: (value: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <Input
+      type="text"
+      value={(value as string) || ""}
+      placeholder={placeholder}
+      onChange={(e) => onValueChange?.(e.target.value)}
+      className={inputVariants({ size: "sm" })}
+    />
+  );
+}
+
+function TemplateExpressionControl({
+  value,
+}: {
+  value: Tokens.TemplateExpression;
+}) {
+  return (
+    <div className="flex h-8 max-w-full rounded-md border border-input bg-transparent py-1 text-sm shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50">
+      <div className="px-1 flex max-w-full overflow-hidden space-x-1">
+        {value.templateSpans.map((span, i) => {
+          switch (span.kind) {
+            case "StringLiteral":
+              return <span key={i}>{span.value}</span>;
+            case "Identifier":
+              return (
+                <Badge key={i} variant="secondary" className="font-mono">
+                  {span.name}
+                </Badge>
+              );
+            case "PropertyPathLiteral":
+              return (
+                <Badge key={i} variant="secondary" className="font-mono">
+                  {span.path}
+                </Badge>
+              );
+          }
+        })}
+      </div>
     </div>
   );
 }
