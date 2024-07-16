@@ -8,16 +8,7 @@ import {
 } from "@/components/ui/select";
 import { inputVariants } from "./utils/input-variants";
 
-type FontWeight =
-  | "100"
-  | "200"
-  | "300"
-  | "400"
-  | "500"
-  | "600"
-  | "700"
-  | "800"
-  | "900";
+type FontWeight = 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900;
 
 export function FontWeightControl({
   value,
@@ -27,9 +18,14 @@ export function FontWeightControl({
   onValueChange?: (value: FontWeight) => void;
 }) {
   return (
-    <Select value={value} onValueChange={onValueChange}>
+    <Select
+      value={value?.toString()}
+      onValueChange={(v) => {
+        onValueChange?.(parseInt(v) as FontWeight);
+      }}
+    >
       <SelectTrigger className={inputVariants({ size: "sm" })}>
-        <SelectValue>Regular</SelectValue>
+        <SelectValue />
       </SelectTrigger>
       <SelectContent>
         <SelectItem value="100">Thin</SelectItem>

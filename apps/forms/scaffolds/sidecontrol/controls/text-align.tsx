@@ -6,7 +6,7 @@ import {
 } from "@radix-ui/react-icons";
 
 export function TextAlignControl({
-  value,
+  value = "left",
   onValueChange,
 }: {
   value?: "left" | "center" | "right";
