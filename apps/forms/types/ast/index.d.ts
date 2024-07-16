@@ -89,7 +89,7 @@ export namespace Tokens {
    */
   type TemplateStringLiteral = {
     kind: "StringLiteral";
-    value: string;
+    value: Primitive;
   };
 
   /**
