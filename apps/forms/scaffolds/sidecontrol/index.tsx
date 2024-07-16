@@ -51,7 +51,7 @@ import { HrefControl } from "./controls/href";
 import { BorderRadiusControl } from "./controls/border-radius";
 import { BorderControl } from "./controls/border";
 import { BackgroundControl } from "./controls/background";
-import { StringLiteralControl } from "./controls/string-literal";
+import { StringValueControl } from "./controls/string-value";
 import { MarginControl } from "./controls/margin";
 import { PaddingControl } from "./controls/padding";
 import { AspectRatioControl } from "./controls/aspect-ratio";
@@ -294,10 +294,10 @@ function SelectedNodeProperties() {
             return (
               <PropertyLine key={key}>
                 <PropertyLineLabel>{key}</PropertyLineLabel>
-                <StringLiteralControl
+                <StringValueControl
                   placeholder={key}
                   value={value}
-                  onChangeValue={(value) => {
+                  onValueChange={(value) => {
                     changeproperty(key, value || undefined);
                   }}
                 />
@@ -314,9 +314,9 @@ function SelectedNodeProperties() {
         <SidebarMenuSectionContent className="space-y-2">
           <PropertyLine>
             <PropertyLineLabel>Value</PropertyLineLabel>
-            <StringLiteralControl
+            <StringValueControl
               value={text || selected_node_default_text}
-              onChangeValue={changetext}
+              onValueChange={changetext}
             />
           </PropertyLine>
           <PropertyLine>
@@ -445,12 +445,16 @@ function SelectedNodeProperties() {
 }
 
 function PropertyLine({ children }: React.PropsWithChildren<{}>) {
-  return <div className="flex items-start justify-between">{children}</div>;
+  return (
+    <div className="flex items-start justify-between max-w-full">
+      {children}
+    </div>
+  );
 }
 
 function PropertyLineLabel({ children }: React.PropsWithChildren<{}>) {
   return (
-    <Label className="text-muted-foreground h-8 w-20 flex items-center text-xs me-4 overflow-hidden">
+    <Label className="text-muted-foreground h-8 min-w-20 w-20 flex items-center text-xs me-4 overflow-hidden">
       <span className="text-ellipsis overflow-hidden">{children}</span>
     </Label>
   );
