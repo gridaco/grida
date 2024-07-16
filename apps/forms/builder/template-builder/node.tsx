@@ -12,15 +12,19 @@ import { cn } from "@/utils";
 import { useGesture } from "@use-gesture/react";
 import { useEditorState } from "@/scaffolds/editor";
 import { TemplateComponents } from "@/builder/template-builder";
-import { TemplateComponent } from "./with-template";
+import type {
+  ContextValueProperties,
+  TemplateComponent,
+} from "./with-template";
+import type { Tokens } from "@/types/ast";
 
 interface SlotProps<P extends Record<string, any>> {
   node_id: string;
   // templatePath
   component: TemplateComponent<P>;
   className?: string;
-  defaultText?: string;
-  defaultProperties?: P;
+  defaultText?: Tokens.StringValueExpression;
+  defaultProperties?: ContextValueProperties<P, Tokens.StringValueExpression>;
   defaultStyle?: React.CSSProperties;
 }
 
@@ -55,6 +59,8 @@ export function SlotNode<P extends Record<string, any>>({
     ? TemplateComponents.components[template_id]
     : component;
 
+  const componentschema = component.schema;
+
   const props = {
     text: text || defaultText,
     properties: {
@@ -73,7 +79,7 @@ export function SlotNode<P extends Record<string, any>>({
       node_id: node_id,
       node_type: component.type,
       // @ts-ignore TODO:
-      schema: component.schema,
+      schema: componentschema,
       default_properties: defaultProperties,
       default_style: defaultStyle,
       default_text: defaultText,
