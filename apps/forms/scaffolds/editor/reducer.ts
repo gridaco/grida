@@ -839,11 +839,21 @@ export function reducer(
       });
     }
     case "editor/document/node/select": {
-      const { node_id, node_type, schema } = <DocumentSelectNodeAction>action;
+      const {
+        node_id,
+        node_type,
+        schema,
+        default_properties,
+        default_style,
+        default_text,
+      } = <DocumentSelectNodeAction>action;
       return produce(state, (draft) => {
         draft.document.selected_node_id = node_id;
         draft.document.selected_node_type = node_type;
         draft.document.selected_node_schema = schema || null;
+        draft.document.selected_node_default_properties = default_properties;
+        draft.document.selected_node_default_style = default_style;
+        draft.document.selected_node_default_text = default_text;
       });
     }
     case "editor/document/node/template": {

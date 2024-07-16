@@ -314,6 +314,9 @@ export interface DocumentSelectNodeAction {
   node_id?: string;
   node_type?: string;
   schema?: ZodObject<any>;
+  default_properties?: Record<string, any>;
+  default_style?: React.CSSProperties;
+  default_text?: string;
 }
 
 export interface DocumentNodeChangeTemplateAction {

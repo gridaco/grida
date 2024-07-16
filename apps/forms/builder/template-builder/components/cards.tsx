@@ -56,9 +56,7 @@ const Card_001Component: React.FC<PropsWithStyle<CardProps>> = ({
       <div className="space-y-2 bg-background p-4">
         <SlotNode
           component={TemplateBuilderWidgets.Text}
-          defaultProperties={{
-            text: h1,
-          }}
+          defaultText={h1}
           node_id={".h1"}
         />
         {/* <h3 className="text-lg font-semibold text-foreground">{h1}</h3> */}

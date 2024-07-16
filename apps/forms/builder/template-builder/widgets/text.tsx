@@ -14,7 +14,7 @@ const TextSchema = z.object({
 type TextProps = z.infer<typeof TextSchema>["properties"];
 
 export const TextWidget = withTemplate(
-  ({ properties: { text }, style, ...props }: PropsWithStyle<TextProps>) => {
+  ({ text, style, ...props }: PropsWithStyle<TextProps>) => {
     return (
       <div {...props} style={style}>
         {text}

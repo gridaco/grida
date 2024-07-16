@@ -14,18 +14,20 @@ import { useEditorState } from "@/scaffolds/editor";
 import { TemplateComponents } from "@/builder/template-builder";
 import { TemplateComponent } from "./with-template";
 
-interface SlotProps<P> {
+interface SlotProps<P extends Record<string, any>> {
   node_id: string;
   // templatePath
   component: TemplateComponent<P>;
   className?: string;
+  defaultText?: string;
   defaultProperties?: P;
   defaultStyle?: React.CSSProperties;
 }
 
-export function SlotNode<P>({
+export function SlotNode<P extends Record<string, any>>({
   node_id,
   component,
+  defaultText,
   defaultProperties,
   defaultStyle,
   className,
@@ -46,20 +48,38 @@ export function SlotNode<P>({
 
   const selected = !!selected_node_id && selected_node_id === node_id;
 
+  const { template_id, properties, style, attributes, text } =
+    state.document.templatedata[node_id] || {};
+
+  const renderer = template_id
+    ? TemplateComponents.components[template_id]
+    : component;
+
+  const props = {
+    text: text || defaultText,
+    properties: {
+      ...defaultProperties,
+      ...properties,
+    },
+    style: {
+      ...defaultStyle,
+      ...style,
+    },
+  };
+
   const onSelect = useCallback(() => {
-    // @ts-ignore TODO:
     dispatch({
       type: "editor/document/node/select",
       node_id: node_id,
       node_type: component.type,
       // @ts-ignore TODO:
       schema: component.schema,
+      default_properties: defaultProperties,
+      default_style: defaultStyle,
+      default_text: defaultText,
     });
 
-    // Access __type from children props
-    // const child = React.Children.only(children);
-    // const childProps = (child as React.ReactElement).props;
-    // console.log("meta in Node", childProps.__type, childProps, children);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatch, node_id]);
 
   // const child = React.Children.only(children);
@@ -107,24 +127,6 @@ export function SlotNode<P>({
       overlay.style.height = `${height}px`;
     }
   }, [hovered, portal, selected]);
-
-  const { template_id, properties, style, attributes } =
-    state.document.templatedata[node_id] || {};
-
-  const renderer = template_id
-    ? TemplateComponents.components[template_id]
-    : component;
-
-  const props = {
-    properties: {
-      ...defaultProperties,
-      ...properties,
-    },
-    style: {
-      ...defaultStyle,
-      ...style,
-    },
-  };
 
   return (
     <>

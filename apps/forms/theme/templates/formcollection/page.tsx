@@ -31,7 +31,11 @@ export default function FormCollectionPage() {
             <SlotNode
               node_id="list-header-title"
               component={TemplateBuilderWidgets.Text}
-              defaultProperties={data.listheader}
+              defaultText={data.listheader.text}
+              defaultStyle={{
+                fontSize: 24,
+                fontWeight: 700,
+              }}
             />
             <div className="py-2">
               <Filter tags={data.tags} />

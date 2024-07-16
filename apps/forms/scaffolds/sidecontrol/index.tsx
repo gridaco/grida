@@ -90,8 +90,14 @@ function SelectedNodeProperties() {
 
   // - color - variables
 
-  const { selected_node_id, selected_node_schema, selected_node_type } =
-    state.document;
+  const {
+    selected_node_id,
+    selected_node_schema,
+    selected_node_type,
+    selected_node_default_properties,
+    selected_node_default_style,
+    selected_node_default_text,
+  } = state.document;
 
   const propertyNames = Object.keys(
     // TODO: add typings to schema
@@ -103,10 +109,20 @@ function SelectedNodeProperties() {
   const isflex = selected_node_type === "flex";
   const islayout = isflex;
 
-  const { template_id, attributes, style, properties, text } =
-    state.document.templatedata[selected_node_id!] || {};
+  const {
+    template_id,
+    attributes,
+    style,
+    properties: _properties,
+    text,
+  } = state.document.templatedata[selected_node_id!] || {};
 
   const { hidden } = attributes || {};
+
+  const properties = {
+    ...(selected_node_default_properties || {}),
+    ...(_properties || {}),
+  };
 
   const {
     opacity,
@@ -129,7 +145,10 @@ function SelectedNodeProperties() {
     justifyContent,
     alignItems,
     gap,
-  } = style || {};
+  } = {
+    ...selected_node_default_style,
+    ...(style || {}),
+  };
 
   const border = {
     borderWidth,
@@ -201,7 +220,7 @@ function SelectedNodeProperties() {
 
   // style
   const changeopacity = (value: number) => changestyle("opacity", value);
-  const changefontWeight = (value: string) => changestyle("fontWeight", value);
+  const changefontWeight = (value: number) => changestyle("fontWeight", value);
   const changefontSize = (value?: number) => changestyle("fontSize", value);
   const changetextAlign = (value: string) => changestyle("textAlign", value);
   const changeborderRadius = (value?: number) =>
@@ -270,8 +289,7 @@ function SelectedNodeProperties() {
         </SidebarSectionHeaderItem>
         <SidebarMenuSectionContent className="space-y-2">
           {propertyNames.map((key) => {
-            const value =
-              state.document.templatedata[selected_node_id!]?.properties?.[key];
+            const value = properties?.[key];
 
             return (
               <PropertyLine key={key}>
@@ -296,7 +314,10 @@ function SelectedNodeProperties() {
         <SidebarMenuSectionContent className="space-y-2">
           <PropertyLine>
             <PropertyLineLabel>Value</PropertyLineLabel>
-            <StringLiteralControl value={text} onChangeValue={changetext} />
+            <StringLiteralControl
+              value={text || selected_node_default_text}
+              onChangeValue={changetext}
+            />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Weight</PropertyLineLabel>

@@ -176,6 +176,9 @@ export interface FormEditorState {
     selected_node_id?: string;
     selected_node_type?: string;
     selected_node_schema?: ZodObject<any> | null;
+    selected_node_default_properties?: Record<string, any>;
+    selected_node_default_style?: React.CSSProperties;
+    selected_node_default_text?: string;
   };
   theme: {
     palette?: FormStyleSheetV1Schema["palette"];
