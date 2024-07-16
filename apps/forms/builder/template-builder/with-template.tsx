@@ -7,12 +7,12 @@ const TEMPLATE_TYPE_KEY = "type";
 
 export type ZTemplateSchema<P> = ZodSchema<{ properties: P }>;
 
-export type FinalProps<P> = P & {
+export type PropsWithStyle<P> = P & {
   properties: P;
   style?: React.CSSProperties;
 };
 
-export type TemplateComponent<P = any> = React.FC<FinalProps<P>> & {
+export type TemplateComponent<P = any> = React.FC<PropsWithStyle<P>> & {
   [TEMPLATE_SCHEMA_KEY]?: ZTemplateSchema<P>;
   [TEMPLATE_TYPE_KEY]?: string;
 };
@@ -22,7 +22,9 @@ export function withTemplate<P>(
   type: string,
   schema?: ZTemplateSchema<P>
 ): TemplateComponent<P> {
-  const WrappedComponent: React.FC<FinalProps<P>> = (props: FinalProps<P>) => {
+  const WrappedComponent: React.FC<PropsWithStyle<P>> = (
+    props: PropsWithStyle<P>
+  ) => {
     // Validate props against zod schema (uncomment if needed)
     // const result = schema.safeParse(props);
     // if (!result.success) {

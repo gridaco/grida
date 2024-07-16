@@ -12,6 +12,7 @@ import { Footer_001 } from "@/builder/template-builder/components/footers";
 import { TemplateBuilderWidgets } from "@/builder/template-builder/widgets";
 import { Header_001 } from "@/builder/template-builder/components/headers";
 import * as samples from "./samples";
+import * as ArrayBuilder from "@/builder/template-builder/widgets/array";
 
 export default function FormCollectionPage() {
   const [state] = useEditorState();
@@ -37,26 +38,36 @@ export default function FormCollectionPage() {
             </div>
           </header>
           {/* <Editable node_id="list"> */}
-          <div className="grid gap-6 grid-cols-1 @3xl/preview:grid-cols-2 @5xl/preview:grid-cols-3 @7xl/preview:grid-cols-4">
-            {data.events.map((data, i) => (
-              <SlotNode
-                node_id={"event-card"}
-                key={i}
-                component={Card_002}
-                defaultProperties={{
-                  media: { $id: "media", type: "image", src: data.image },
-                  h1: data.title,
-                  badge: data.status,
-                  tags: data.tags,
-                  p: data.cta,
-                  n: data.attendees,
-                  date1: data.date,
-                  date2: data.date,
-                }}
-              />
-            ))}
-          </div>
-          {/* </Editable> */}
+          <ArrayBuilder.Provider data={data.events}>
+            <div className="grid gap-6 grid-cols-1 @3xl/preview:grid-cols-2 @5xl/preview:grid-cols-3 @7xl/preview:grid-cols-4">
+              <ArrayBuilder.Builder>
+                <ArrayBuilder.Item>
+                  {(data) => (
+                    <SlotNode
+                      node_id={"event-card"}
+                      component={Card_002}
+                      defaultProperties={{
+                        media: { $id: "media", type: "image", src: data.image },
+                        // $.title
+                        h1: data.title,
+                        // $.status
+                        badge: data.status,
+                        // $.tags
+                        tags: data.tags,
+                        // $.cta
+                        p: data.cta,
+                        // $.attendees
+                        n: data.attendees,
+                        // $.date
+                        date1: data.date,
+                        date2: data.date,
+                      }}
+                    />
+                  )}
+                </ArrayBuilder.Item>
+              </ArrayBuilder.Builder>
+            </div>
+          </ArrayBuilder.Provider>
         </section>
       </main>
       <footer>

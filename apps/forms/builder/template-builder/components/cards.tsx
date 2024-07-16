@@ -5,7 +5,7 @@ import { HalfHeightGradient } from "./gradient-overlay";
 import { z } from "zod";
 import { SlashIcon } from "@radix-ui/react-icons";
 import {
-  FinalProps,
+  PropsWithStyle,
   withTemplate,
   ZTemplateSchema,
 } from "@/builder/template-builder/with-template";
@@ -29,7 +29,7 @@ const CardSchema = z.object({
 
 type CardProps = z.infer<typeof CardSchema> & { style?: React.CSSProperties };
 
-const Card_001Component: React.FC<FinalProps<CardProps>> = ({
+const Card_001Component: React.FC<PropsWithStyle<CardProps>> = ({
   properties: { h1, p, date1, n, badge, media, date2, tags },
   style,
 }) => {
@@ -82,7 +82,7 @@ const Card_001Component: React.FC<FinalProps<CardProps>> = ({
   );
 };
 
-const Card_002Component: React.FC<FinalProps<CardProps>> = ({
+const Card_002Component: React.FC<PropsWithStyle<CardProps>> = ({
   properties: { h1, p, date1, date2, n, badge, media, tags },
   style,
 }) => {
@@ -122,7 +122,7 @@ const Card_002Component: React.FC<FinalProps<CardProps>> = ({
   );
 };
 
-const Card_003Component: React.FC<FinalProps<CardProps>> = ({
+const Card_003Component: React.FC<PropsWithStyle<CardProps>> = ({
   properties: { h1, p, date1, date2, n, badge, media, tags },
   style,
 }) => {
@@ -223,7 +223,7 @@ export const Hero_001 = withTemplate(
   function Hero_001({
     properties: { media, h1, p },
     style,
-  }: FinalProps<HeroCardProps>) {
+  }: PropsWithStyle<HeroCardProps>) {
     return (
       <header style={style}>
         <div className="relative">
@@ -260,7 +260,7 @@ export const Hero_002 = withTemplate(
     properties: { media, h1, p },
     style,
     ...props
-  }: FinalProps<HeroCardProps>) {
+  }: PropsWithStyle<HeroCardProps>) {
     return (
       <header style={style} className="relative aspect-[3/4]">
         <Media
