@@ -1,4 +1,4 @@
-import { ZTemplateSchema, withTemplate } from "../with-template";
+import { FinalProps, ZTemplateSchema, withTemplate } from "../with-template";
 import { z } from "zod";
 
 const TextSchema = z.object({
@@ -10,9 +10,9 @@ const TextSchema = z.object({
 type TextProps = z.infer<typeof TextSchema>["properties"];
 
 export const TextWidget = withTemplate(
-  ({ text, ...props }: TextProps) => {
+  ({ properties: { text }, style, ...props }: FinalProps<TextProps>) => {
     return (
-      <div {...props} style={{ ...props }}>
+      <div {...props} style={style}>
         {text}
       </div>
     );

@@ -16,7 +16,7 @@ export default function EditFormPage() {
       <aside className="hidden lg:flex h-full">
         <Siebar mode="blocks" />
       </aside>
-      <CanvasEventTarget className="relative w-full overflow-y-auto">
+      <CanvasEventTarget className="relative w-full no-scrollbar overflow-y-auto">
         <CanvasOverlay />
         <AgentThemeProvider>
           <CurrentPageCanvas />
@@ -66,8 +66,8 @@ function CurrentPageCanvas() {
       return <BlocksEditor />;
     case "collection":
       return (
-        // 430 932
-        <div className="mx-auto my-20 max-w-[430px] max-h-[932px] overflow-y-scroll no-scrollbar border rounded-2xl shadow-2xl bg-background select-none">
+        // 430 932 max-h-[932px] no-scrollbar overflow-y-scroll
+        <div className="mx-auto my-20 max-w-[430px] border rounded-2xl shadow-2xl bg-background select-none">
           <FormCollectionPage />
         </div>
       );

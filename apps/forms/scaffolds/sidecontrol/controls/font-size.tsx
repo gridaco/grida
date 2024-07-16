@@ -1,5 +1,12 @@
 import { Input } from "@/components/ui/input";
 import { inputVariants } from "./utils/input-variants";
+import { Select } from "@radix-ui/react-select";
+import {
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export function FontSizeControl({
   value,
@@ -20,6 +27,18 @@ export function FontSizeControl({
         onValueChange?.(parseInt(e.target.value) || undefined);
       }}
     />
+    // <Select>
+    //   <SelectTrigger>
+    //     <SelectValue />
+    //   </SelectTrigger>
+    //   <SelectContent>
+    //     {Object.entries(twsizes).map(([key, value]) => (
+    //       <SelectItem key={key} value={value.name}>
+    //         {value.name}
+    //       </SelectItem>
+    //     ))}
+    //   </SelectContent>
+    // </Select>
   );
 }
 
