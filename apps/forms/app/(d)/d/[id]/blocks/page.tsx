@@ -7,7 +7,6 @@ import { SideControl } from "@/scaffolds/sidecontrol";
 import BlocksEditor from "@/scaffolds/blocks-editor";
 import FormCollectionPage from "@/theme/templates/formcollection/page";
 import FormStartPage from "@/theme/templates/formstart/default/page";
-import { useGesture } from "@use-gesture/react";
 import React from "react";
 import { CanvasFloatingToolbar } from "@/scaffolds/canvas-floating-toolbar";
 
@@ -67,7 +66,8 @@ function CurrentPageCanvas() {
       return <BlocksEditor />;
     case "collection":
       return (
-        <div className="mx-auto my-20 max-w-[430px] border rounded-2xl shadow-2xl bg-background overflow-hidden select-none">
+        // 430 932
+        <div className="mx-auto my-20 max-w-[430px] max-h-[932px] overflow-y-scroll no-scrollbar border rounded-2xl shadow-2xl bg-background select-none">
           <FormCollectionPage />
         </div>
       );

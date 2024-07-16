@@ -262,17 +262,16 @@ export const Hero_002 = withTemplate(
     ...props
   }: FinalProps<HeroCardProps>) {
     return (
-      <header style={style}>
-        <div className="relative">
-          <Media
-            type={media.type}
-            src={media.src}
-            alt={media.alt}
-            width={800}
-            height={400}
-            className="w-full aspect-[3/4] @5xl/preview:aspect-video object-cover -z-10"
-          />
-          {/* <video
+      <header style={style} className="relative aspect-[3/4]">
+        <Media
+          type={media.type}
+          src={media.src}
+          alt={media.alt}
+          width={800}
+          height={400}
+          className="w-full h-full object-cover -z-10"
+        />
+        {/* <video
             className="w-full aspect-[3/4] @5xl/preview:aspect-video object-cover -z-10"
             autoPlay
             loop
@@ -280,11 +279,10 @@ export const Hero_002 = withTemplate(
             playsInline
             src={props.media}
           /> */}
-          <HalfHeightGradient />
-          <div className="text-background absolute bottom-8 max-w-md container py-4">
-            <h1 className="text-4xl font-semibold">{h1}</h1>
-            <p className="text-lg">{p}</p>
-          </div>
+        <HalfHeightGradient />
+        <div className="text-background absolute bottom-8 max-w-md container py-4">
+          <h1 className="text-4xl font-semibold">{h1}</h1>
+          <p className="text-lg">{p}</p>
         </div>
       </header>
     );

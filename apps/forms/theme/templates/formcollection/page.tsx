@@ -76,7 +76,7 @@ function Filter({ tags }: { tags: string[] }) {
       className="flex flex-wrap items-start justify-start"
     >
       {tags.map((tag) => (
-        <ToggleGroupItem key={tag} value={tag} className="">
+        <ToggleGroupItem key={tag} value={tag} className="text-xs">
           {tag}
         </ToggleGroupItem>
       ))}
