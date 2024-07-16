@@ -15,9 +15,11 @@ type TextProps = z.infer<typeof TextSchema>["properties"];
 
 export const TextWidget = withTemplate(
   ({ text, style, ...props }: PropsWithStyle<TextProps>) => {
+    const children = text.toString();
+
     return (
       <div {...props} style={style}>
-        {text}
+        {children}
       </div>
     );
   },
