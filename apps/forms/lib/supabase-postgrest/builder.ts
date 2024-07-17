@@ -106,6 +106,15 @@ export class XSupabaseQueryBuilder {
     return this;
   }
 
+  order(
+    ...parameters: Parameters<PostgrestFilterBuilder<any, any, any>["order"]>
+  ) {
+    this.query = (this.query as PostgrestFilterBuilder<any, any, any>).order(
+      ...parameters
+    );
+    return this;
+  }
+
   fromFilter(filter: XSupabaseQuery.Filter) {
     switch (filter.type) {
       case "eq":

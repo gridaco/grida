@@ -70,6 +70,7 @@ import {
 import { ArrowDownUpIcon } from "lucide-react";
 import { cn } from "@/utils";
 import { PopoverClose } from "@radix-ui/react-popover";
+import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
 
 export function GridEditor() {
   const [state, dispatch] = useEditorState();
@@ -302,15 +303,23 @@ export function GridEditor() {
 }
 
 function TableTools() {
+  const [state] = useEditorState();
+  const { datagrid_table } = state;
+
   return (
-    <div className="flex items-center">
+    <div className="flex items-center gap-2">
       <DataGridLocalSearch />
-      <DataGridSort />
+      {datagrid_table === "x-supabase-main-table" && <XSupaDataGridSort />}
     </div>
   );
 }
 
-function DataGridSort() {
+/**
+ * this can also be used for form query, but at this moment, form does not have a db level field sorting query.
+ * plus, this uses the column name, which in the future, it should be using field id for more universal handling.
+ * when it updates to id, the x-supabase query route will also have to change.
+ */
+function XSupaDataGridSort() {
   const [state, dispatch] = useEditorState();
 
   const { fields, datagrid_orderby } = state;
@@ -391,7 +400,7 @@ function DataGridSort() {
                         </SelectTrigger>
                         <SelectContent>
                           {fields.map((field) => (
-                            <SelectItem key={field.id} value={field.id}>
+                            <SelectItem key={field.name} value={field.name}>
                               {field.name}
                             </SelectItem>
                           ))}
@@ -439,9 +448,13 @@ function DataGridSort() {
             <DropdownMenuContent>
               {fields.map((field) => (
                 <DropdownMenuItem
-                  key={field.id}
-                  onSelect={() => onAdd(field.id)}
+                  key={field.name}
+                  onSelect={() => onAdd(field.name)}
                 >
+                  <FormFieldTypeIcon
+                    type={field.type}
+                    className="w-4 h-4 me-2 align-middle"
+                  />
                   {field.name}
                 </DropdownMenuItem>
               ))}
