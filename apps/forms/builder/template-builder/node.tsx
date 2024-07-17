@@ -17,6 +17,7 @@ import type {
   TemplateComponent,
 } from "./with-template";
 import type { Tokens } from "@/ast";
+import { useComputed } from "./use-computed";
 
 interface SlotProps<P extends Record<string, any>> {
   node_id: string;
@@ -61,10 +62,12 @@ export function SlotNode<P extends Record<string, any>>({
 
   const componentschema = component.schema;
 
+  const computedProperties = useComputed(defaultProperties);
+
   const props = {
     text: text || defaultText,
     properties: {
-      ...defaultProperties,
+      ...computedProperties,
       ...properties,
     },
     style: {

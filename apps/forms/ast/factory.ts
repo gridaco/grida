@@ -1,8 +1,9 @@
+import { Access } from "./access";
 import type { Tokens } from "./tokens";
 
 export namespace Factory {
   export function createStringValueExpression(
-    value?: string | { type: "path"; path: ReadonlyArray<string> }
+    value?: string | { type: "path"; path: Array<string> }
   ): Tokens.StringValueExpression {
     if (typeof value === "string") {
       return value;
@@ -58,8 +59,8 @@ export namespace Factory {
    */
   export function extractTemplateExpressionDataKeyPaths(
     value: Tokens.TemplateExpression
-  ): Array<ReadonlyArray<string>> {
-    const paths: Array<ReadonlyArray<string>> = [];
+  ): Array<Array<string>> {
+    const paths: Array<Array<string>> = [];
 
     for (const span of value.templateSpans) {
       switch (span.kind) {
@@ -75,5 +76,26 @@ export namespace Factory {
     }
 
     return paths;
+  }
+
+  export function renderTemplateExpression(
+    expression: Tokens.TemplateExpression,
+    context: any
+  ) {
+    return expression.templateSpans
+      .map((span) => {
+        switch (span.kind) {
+          case "StringLiteral":
+            return span.value.toString();
+          case "Identifier":
+            return context[span.name]?.toString() || "";
+          case "PropertyPathLiteral":
+            const value = Access.access(context, span.path as any);
+            return value !== undefined ? value.toString() : "";
+          default:
+            return "";
+        }
+      })
+      .join("");
   }
 }
