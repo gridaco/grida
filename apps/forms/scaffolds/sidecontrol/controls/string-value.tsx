@@ -31,9 +31,9 @@ import {
   TextIcon,
   TokensIcon,
 } from "@radix-ui/react-icons";
-import { Tokens } from "@/types/ast";
+import { Tokens } from "@/ast";
 import { Badge } from "@/components/ui/badge";
-import { Factory } from "@/types/ast/factory";
+import { Factory } from "@/ast/factory";
 
 export function StringValueControl({
   value,

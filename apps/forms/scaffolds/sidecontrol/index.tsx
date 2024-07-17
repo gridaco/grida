@@ -62,7 +62,7 @@ import { FlexWrapControl } from "./controls/flex-wrap";
 import { FlexDirectionControl } from "./controls/flex-direction";
 import { JustifyContentControl } from "./controls/justify-content";
 import { TemplateControl } from "./controls/template";
-import { Tokens } from "@/types/ast";
+import { Tokens } from "@/ast";
 
 const { default: _, ...variants } = _variants;
 

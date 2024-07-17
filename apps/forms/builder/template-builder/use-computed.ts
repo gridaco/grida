@@ -1,6 +1,6 @@
 import { useSchemaValue, useValue } from "@/builder/core/data-context";
 import { ContextValueProperties } from "./with-template";
-import { Tokens } from "@/types/ast";
+import { Tokens } from "@/ast";
 
 function useComputed<P extends Record<string, any>>(
   properties: ContextValueProperties<P, Tokens.StringValueExpression>

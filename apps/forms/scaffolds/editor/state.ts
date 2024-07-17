@@ -16,7 +16,7 @@ import type {
 import { LOCALTZ } from "./symbols";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { ZodObject } from "zod";
-import { Tokens } from "@/types/ast";
+import { Tokens } from "@/ast";
 import React from "react";
 
 export type DraftID = `[draft]${string}`;
