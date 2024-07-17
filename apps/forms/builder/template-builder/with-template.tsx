@@ -5,7 +5,7 @@ import { TemplateComponents } from "@/builder/template-builder";
 const TEMPLATE_SCHEMA_KEY = "schema";
 const TEMPLATE_TYPE_KEY = "type";
 
-export type ContextValueProperties<P extends Record<string, any>, T> = {
+export type TemplateValueProperties<P extends Record<string, any>, T> = {
   [K in keyof P]: P[K] | T;
 };
 

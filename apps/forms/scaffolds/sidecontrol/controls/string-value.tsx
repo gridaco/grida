@@ -237,7 +237,7 @@ function TemplateExpressionControl({
             case "PropertyPathLiteral":
               return (
                 <Badge key={i} variant="secondary" className="font-mono">
-                  {span.path}
+                  {span.path.join(".")}
                 </Badge>
               );
           }

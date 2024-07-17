@@ -13,10 +13,10 @@ import { useGesture } from "@use-gesture/react";
 import { useEditorState } from "@/scaffolds/editor";
 import { TemplateComponents } from "@/builder/template-builder";
 import type {
-  ContextValueProperties,
+  TemplateValueProperties,
   TemplateComponent,
 } from "./with-template";
-import type { Tokens } from "@/types/ast";
+import type { Tokens } from "@/ast";
 
 interface SlotProps<P extends Record<string, any>> {
   node_id: string;
@@ -24,7 +24,7 @@ interface SlotProps<P extends Record<string, any>> {
   component: TemplateComponent<P>;
   className?: string;
   defaultText?: Tokens.StringValueExpression;
-  defaultProperties?: ContextValueProperties<P, Tokens.StringValueExpression>;
+  defaultProperties?: TemplateValueProperties<P, Tokens.StringValueExpression>;
   defaultStyle?: React.CSSProperties;
 }
 

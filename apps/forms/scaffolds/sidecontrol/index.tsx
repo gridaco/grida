@@ -166,7 +166,7 @@ function SelectedNodeProperties() {
   );
 
   const changetext = useCallback(
-    (text: Tokens.StringValueExpression) => {
+    (text?: Tokens.StringValueExpression) => {
       dispatch({
         type: "editor/document/node/text",
         node_id: selected_node_id!,
