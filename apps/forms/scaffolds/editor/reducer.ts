@@ -50,6 +50,8 @@ import type {
   DocumentNodeUpdatePropertyAction,
   DocumentNodeChangeTextAction,
   DocumentTemplateSampleDataAction,
+  DataGridOrderByAction,
+  DataGridOrderByResetAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { blockstreeflat } from "@/lib/forms/tree";
@@ -685,6 +687,26 @@ export function reducer(
           ...draft.datagrid_filter,
           ...pref,
         };
+      });
+    }
+    case "editor/data-grid/orderby": {
+      const { column_id, data } = <DataGridOrderByAction>action;
+      return produce(state, (draft) => {
+        if (data === null) {
+          delete draft.datagrid_orderby[column_id];
+          return;
+        }
+
+        draft.datagrid_orderby[column_id] = {
+          column: column_id,
+          ...data,
+        };
+      });
+    }
+    case "editor/data-grid/orderby/reset": {
+      const {} = <DataGridOrderByResetAction>action;
+      return produce(state, (draft) => {
+        draft.datagrid_orderby = {};
       });
     }
     case "editor/data-grid/refresh": {

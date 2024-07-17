@@ -185,7 +185,7 @@ export function ResponseGrid({
             draggable: true,
             editable: true,
             minWidth: 140,
-            maxWidth: 1400,
+            maxWidth: 640,
             width: undefined,
             renderHeaderCell: (props) => (
               <FieldHeaderCell

@@ -29,6 +29,8 @@ export async function GET(
 
   const _q_page = req.nextUrl.searchParams.get("page");
   const page = _q_page ? parseInt(_q_page) : 1;
+  const _q_per_page = req.nextUrl.searchParams.get("per_page");
+  const per_page = _q_per_page ? parseInt(_q_per_page) : 50;
 
   // FIXME: Strict Authorization
 
@@ -85,6 +87,7 @@ export async function GET(
             );
             const { data, error } = await client.auth.admin.listUsers({
               page: page,
+              perPage: per_page,
             });
 
             if (error || !data) {
@@ -104,7 +107,13 @@ export async function GET(
           }
           case "public":
           default: {
-            const { data, error } = await client.from(table).select();
+            const r1 = (page - 1) * per_page;
+            const r2 = r1 + per_page;
+
+            const { data, error } = await client
+              .from(table)
+              .select()
+              .range(r1, r2);
 
             if (error || !data) {
               console.error("search/err::table", error);

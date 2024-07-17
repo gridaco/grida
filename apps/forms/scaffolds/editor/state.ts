@@ -11,6 +11,7 @@ import type {
   FormResponseSession,
   FormStyleSheetV1Schema,
   GridaSupabase,
+  OrderBy,
 } from "@/types";
 import { LOCALTZ } from "./symbols";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
@@ -99,6 +100,7 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
       masking_enabled: false,
       empty_data_hidden: true,
     },
+    datagrid_orderby: {},
     realtime_responses_enabled: true,
     realtime_sessions_enabled: false,
     x_supabase_main_table: init.connections?.supabase
@@ -206,6 +208,7 @@ export interface FormEditorState {
   datagrid_table_refresh_key: number;
   datagrid_isloading: boolean;
   datagrid_filter: DataGridFilterSettings;
+  datagrid_orderby: { [key: string]: OrderBy };
   realtime_sessions_enabled: boolean;
   realtime_responses_enabled: boolean;
   is_field_edit_panel_open?: boolean;

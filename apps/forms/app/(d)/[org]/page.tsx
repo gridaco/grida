@@ -36,6 +36,7 @@ import {
   SidebarSectionHeaderLabel,
   SidebarRoot,
   SidebarSection,
+  SidebarMenuItemLabel,
 } from "@/components/sidebar";
 import { CreateNewProjectDialog } from "./new-project-dialog";
 import {
@@ -213,7 +214,9 @@ export default async function DashboardProjectsPage({
                             }
                             className="inline align-middle w-4 h-4 me-2"
                           />
-                          {form.title}
+                          <SidebarMenuItemLabel>
+                            {form.title}
+                          </SidebarMenuItemLabel>
                         </SidebarMenuItem>
                       </Link>
                     ))}

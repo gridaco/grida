@@ -34,7 +34,9 @@ export default async function OnboardWithNewFormPage({
   const { data } = await supabase.auth.getSession();
   // if no auth, sign in, redirect back here
   if (data.session === null || data.session.user === null) {
-    redirect("/sign-in?redirect_uri=/dashboard/new");
+    const search = new URLSearchParams(searchParams).toString();
+    const uri = encodeURIComponent("/dashboard/new?" + search);
+    redirect("/sign-in?redirect_uri=" + uri);
   }
 
   if (price) {
