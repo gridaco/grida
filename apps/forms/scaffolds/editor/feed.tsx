@@ -11,6 +11,7 @@ import type { FormResponseField, GridaSupabase } from "@/types";
 import { usePrevious } from "@uidotdev/usehooks";
 import { XSupabaseQuery } from "@/lib/supabase-postgrest/builder";
 import equal from "deep-equal";
+import { PostgrestQuery } from "@/lib/supabase-postgrest/postgrest-query";
 
 type RealtimeTableChangeData = {
   id: string;
@@ -448,13 +449,28 @@ export function XSupabaseMainTableFeedProvider({
 }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
 
-  const { datagrid_rows_per_page, datagrid_table_refresh_key } = state;
+  const {
+    datagrid_rows_per_page,
+    datagrid_table_refresh_key,
+    datagrid_orderby,
+  } = state;
+
+  const serachParams = useMemo(() => {
+    const params = new URLSearchParams();
+    params.append("limit", datagrid_rows_per_page.toString());
+
+    params.append(
+      "order",
+      PostgrestQuery.createOrderByQueryString(datagrid_orderby)
+    );
+
+    params.append("r", datagrid_table_refresh_key.toString());
+
+    return params;
+  }, [datagrid_rows_per_page, datagrid_orderby, datagrid_table_refresh_key]);
 
   const request = state.connections.supabase?.main_supabase_table_id
-    ? `/private/editor/connect/${state.form_id}/supabase/table/${state.connections.supabase.main_supabase_table_id}/query?limit=${datagrid_rows_per_page}` +
-      // refresh when fields are updated
-      "&r=" +
-      datagrid_table_refresh_key
+    ? `/private/editor/connect/${state.form_id}/supabase/table/${state.connections.supabase.main_supabase_table_id}/query?${serachParams}`
     : null;
 
   const res = useSWR<EditorApiResponse<GridaSupabase.XDataRow[], any>>(

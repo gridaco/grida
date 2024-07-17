@@ -45,6 +45,8 @@ export type BlocksEditorAction =
   | DataGridDateFormatAction
   | DataGridDateTZAction
   | DataGridFilterAction
+  | DataGridOrderByAction
+  | DataGridOrderByResetAction
   | DataTableRefreshAction
   | DataTableLoadingAction
   | DataGridCellChangeAction
@@ -241,6 +243,19 @@ export interface DataGridDeleteSelectedRows {
 export interface DataGridFilterAction
   extends Partial<FormEditorState["datagrid_filter"]> {
   type: "editor/data-grid/filter";
+}
+
+export interface DataGridOrderByAction {
+  type: "editor/data-grid/orderby";
+  column_id: string;
+  data: {
+    ascending?: boolean;
+    nullsFirst?: boolean;
+  } | null;
+}
+
+export interface DataGridOrderByResetAction {
+  type: "editor/data-grid/orderby/reset";
 }
 
 export interface DataTableRefreshAction {

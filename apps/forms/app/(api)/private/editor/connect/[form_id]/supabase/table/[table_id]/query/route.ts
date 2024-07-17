@@ -18,6 +18,7 @@ import type {
   XSupabaseStorageSchema,
 } from "@/types";
 import assert from "assert";
+import { PostgrestQuery } from "@/lib/supabase-postgrest/postgrest-query";
 
 type Context = {
   params: {
@@ -29,6 +30,9 @@ type Context = {
 export async function GET(req: NextRequest, context: Context) {
   const _q_limit = req.nextUrl.searchParams.get("limit");
   const limit = _q_limit ? parseInt(_q_limit) : undefined;
+  const _q_order = req.nextUrl.searchParams.get("order");
+  const order = PostgrestQuery.parseOrderByQueryString(_q_order || "");
+
   const { form_id, table_id: _table_id } = context.params;
   const table_id = parseInt(_table_id);
 
@@ -42,11 +46,19 @@ export async function GET(req: NextRequest, context: Context) {
 
   const query = new XSupabaseQueryBuilder(x_client);
 
-  const { data, error } = await query
-    .from(main_supabase_table.sb_table_name)
-    .select("*")
-    .limit(limit)
-    .done();
+  query.from(main_supabase_table.sb_table_name);
+  query.select("*");
+  query.limit(limit);
+
+  Object.keys(order).forEach((col) => {
+    const o = order[col];
+    query.order(o.column, {
+      ascending: o.ascending,
+      nullsFirst: o.nullsFirst,
+    });
+  });
+
+  const { data, error } = await query.done();
 
   const pooler = new GridaXSupabaseStorageTaskPooler(x_storage_client);
   pooler.queue(data, fields);
