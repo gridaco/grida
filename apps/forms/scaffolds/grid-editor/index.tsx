@@ -17,9 +17,12 @@ import { useEditorState } from "../editor";
 import Link from "next/link";
 import {
   CommitIcon,
+  Cross2Icon,
+  DotIcon,
   DownloadIcon,
   GearIcon,
   PieChartIcon,
+  PlusIcon,
   ReloadIcon,
   TrashIcon,
 } from "@radix-ui/react-icons";
@@ -59,6 +62,14 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { ArrowDownUpIcon } from "lucide-react";
+import { cn } from "@/utils";
+import { PopoverClose } from "@radix-ui/react-popover";
 
 export function GridEditor() {
   const [state, dispatch] = useEditorState();
@@ -213,7 +224,7 @@ export function GridEditor() {
                     })}
                   </TabsList>
                 </Tabs>
-                <DataGridLocalSearch />
+                <TableTools />
               </div>
             </>
           )}
@@ -287,6 +298,170 @@ export function GridEditor() {
         <DataLoadingIndicator />
       </footer>
     </div>
+  );
+}
+
+function TableTools() {
+  return (
+    <div className="flex items-center">
+      <DataGridLocalSearch />
+      <DataGridSort />
+    </div>
+  );
+}
+
+function DataGridSort() {
+  const [state, dispatch] = useEditorState();
+
+  const { fields, datagrid_orderby } = state;
+
+  const isset = Object.keys(datagrid_orderby).length > 0;
+
+  const onReset = useCallback(() => {
+    dispatch({ type: "editor/data-grid/orderby/reset" });
+  }, [dispatch]);
+
+  const onAdd = useCallback(
+    (column_id: string) => {
+      dispatch({
+        type: "editor/data-grid/orderby",
+        column_id: column_id,
+        data: {},
+      });
+    },
+    [dispatch]
+  );
+
+  const onUpdate = useCallback(
+    (column_id: string, data: { ascending?: boolean }) => {
+      dispatch({
+        type: "editor/data-grid/orderby",
+        column_id: column_id,
+        data: data,
+      });
+    },
+    [dispatch]
+  );
+
+  const onRemove = useCallback(
+    (column_id: string) => {
+      dispatch({
+        type: "editor/data-grid/orderby",
+        column_id: column_id,
+        data: null,
+      });
+    },
+    [dispatch]
+  );
+
+  return (
+    <Popover modal>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={cn(
+            "relative",
+            "text-muted-foreground",
+            isset && " text-accent-foreground"
+          )}
+        >
+          <ArrowDownUpIcon className="w-4 h-4" />
+          {isset && <DotIcon className="absolute top-0.5 right-0.5" />}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="p-2 max-w-none">
+        <section className="py-2">
+          <div className="flex flex-col space-y-2">
+            {Object.keys(datagrid_orderby).map((col) => {
+              const orderby = datagrid_orderby[col];
+              return (
+                <div key={col} className="flex gap-2 px-2">
+                  <div className="flex items-center gap-2 flex-1">
+                    <div>
+                      <Select
+                        disabled
+                        value={orderby.column}
+                        onValueChange={(value) => {
+                          onUpdate(value, orderby);
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {fields.map((field) => (
+                            <SelectItem key={field.id} value={field.id}>
+                              {field.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Select
+                        value={orderby.ascending ? "ASC" : "DESC"}
+                        onValueChange={(value) => {
+                          onUpdate(orderby.column, {
+                            ascending: value === "ASC",
+                          });
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ASC">Ascending</SelectItem>
+                          <SelectItem value="DESC">Descending</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => onRemove(col)}
+                  >
+                    <Cross2Icon />
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+        <section className="flex flex-col">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="flex justify-start">
+                <PlusIcon className="w-4 h-4 me-2 align-middle" /> Add sort
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              {fields.map((field) => (
+                <DropdownMenuItem
+                  key={field.id}
+                  onSelect={() => onAdd(field.id)}
+                >
+                  {field.name}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {isset && (
+            <PopoverClose asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="flex justify-start"
+                onClick={onReset}
+              >
+                <TrashIcon className="w-4 h-4 me-2 align-middle" /> Delete sort
+              </Button>
+            </PopoverClose>
+          )}
+        </section>
+      </PopoverContent>
+    </Popover>
   );
 }
 

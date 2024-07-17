@@ -406,3 +406,9 @@ export interface Organization {
   name: string;
   owner_id: string;
 }
+
+export interface OrderBy {
+  column: string;
+  ascending?: boolean;
+  nullsFirst?: boolean;
+}
