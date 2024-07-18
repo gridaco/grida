@@ -5,8 +5,8 @@ import React, {
   ReactNode,
   FC,
   useMemo,
-  useEffect,
 } from "react";
+import { Access } from "@/ast";
 
 interface RootDataContextProps {
   rootData: Record<string, any>;
@@ -145,4 +145,42 @@ export const DataProvider: FC<DataProviderProps> = ({
       {children}
     </DataContext.Provider>
   );
+};
+
+export const ScopedVariableContext = createContext<
+  ScopedVariableContextProps | undefined
+>(undefined);
+
+interface ScopedVariableContextProps {
+  variablePaths: Record<string, Access.KeyPath<any>>;
+}
+
+/**
+ * Does not support nested scoped variable providers.
+ * This only works for a single level of scoping.
+ */
+export const ScopedVariableProvider: FC<{
+  identifier: string;
+  expression: Access.KeyPath<any>;
+  children: ReactNode;
+}> = ({ identifier, expression, children }) => {
+  const parentScopedContext = useContext(ScopedVariableContext);
+
+  const variablePaths = useMemo(
+    () => ({
+      ...(parentScopedContext ? parentScopedContext.variablePaths : {}),
+      [identifier]: expression,
+    }),
+    [parentScopedContext, identifier, expression]
+  );
+
+  return (
+    <ScopedVariableContext.Provider value={{ variablePaths }}>
+      {children}
+    </ScopedVariableContext.Provider>
+  );
+};
+
+export const useScopedVariable = () => {
+  return useContext(ScopedVariableContext);
 };
