@@ -12,8 +12,8 @@ export namespace Factory {
         kind: "TemplateExpression",
         templateSpans: [
           {
-            kind: "PropertyPathLiteral",
-            path: value.path,
+            kind: "PropertyAccessExpression",
+            expression: value.path,
           },
         ],
       } satisfies Tokens.TemplateExpression;
@@ -40,7 +40,7 @@ export namespace Factory {
    *  kind: "TemplateExpression",
    *  templateSpans: [
    *    {
-   *      kind: "PropertyPathLiteral",
+   *      kind: "PropertyAccessExpression",
    *      path: ["featured", "h1"],
    *    },
    *    {
@@ -67,8 +67,8 @@ export namespace Factory {
         case "Identifier":
           paths.push([span.name]);
           break;
-        case "PropertyPathLiteral":
-          paths.push(span.path);
+        case "PropertyAccessExpression":
+          paths.push(span.expression);
           break;
         case "StringLiteral":
           break;
@@ -89,8 +89,8 @@ export namespace Factory {
             return span.value.toString();
           case "Identifier":
             return context[span.name]?.toString() || "";
-          case "PropertyPathLiteral":
-            const value = Access.access(context, span.path as any);
+          case "PropertyAccessExpression":
+            const value = Access.access(context, span.expression as any);
             return value !== undefined ? value.toString() : "";
           default:
             return "";

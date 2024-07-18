@@ -79,9 +79,9 @@ export namespace Tokens {
    * Represents a property path literal in a template.
    * This encapsulates the concept of a property path more effectively.
    */
-  export type PropertyPathLiteral = {
-    kind: "PropertyPathLiteral";
-    path: Array<string>;
+  export type PropertyAccessExpression = {
+    kind: "PropertyAccessExpression";
+    expression: Array<string>;
   };
 
   /**
@@ -95,7 +95,10 @@ export namespace Tokens {
   /**
    * Represents a span in a template, which can be a string literal, an identifier, or a property path literal.
    */
-  type TemplateSpan = TemplateStringLiteral | Identifier | PropertyPathLiteral;
+  type TemplateSpan =
+    | TemplateStringLiteral
+    | Identifier
+    | PropertyAccessExpression;
 
   /**
    * Represents a template expression consisting of template spans.
@@ -109,7 +112,9 @@ export namespace Tokens {
    * Represents a string value expression, which can be any of the defined types.
    */
   export type StringValueExpression =
-    | string
-    | TemplateExpression
+    | string // static string
+    | PropertyAccessExpression // property path
+    | Identifier // variable
+    | TemplateExpression // template expression
     | ConditionExpression;
 }

@@ -234,10 +234,10 @@ function TemplateExpressionControl({
                   {span.name}
                 </Badge>
               );
-            case "PropertyPathLiteral":
+            case "PropertyAccessExpression":
               return (
                 <Badge key={i} variant="secondary" className="font-mono">
-                  {span.path.join(".")}
+                  {span.expression.join(".")}
                 </Badge>
               );
           }
