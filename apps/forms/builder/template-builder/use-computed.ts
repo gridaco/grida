@@ -9,7 +9,7 @@ export function useComputed<P extends Record<string, any>>(
   // list all data keys that are needed for selecting required values
   const datakeys = Object.entries(properties || {})
     .map(([key, value]) => {
-      if (Factory.isTemplateExpression(value)) {
+      if (Tokens.is.templateExpression(value)) {
         return Factory.extractTemplateExpressionDataKeyPaths(value);
       } else {
         return [];
@@ -23,7 +23,7 @@ export function useComputed<P extends Record<string, any>>(
 
   const computed = Object.entries(properties || {}).reduce(
     (acc: Record<string, any>, [key, value]) => {
-      if (Factory.isTemplateExpression(value)) {
+      if (Tokens.is.templateExpression(value)) {
         acc[key] = Factory.renderTemplateExpression(value, contextdata);
       } else {
         acc[key] = value;

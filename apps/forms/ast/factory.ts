@@ -21,16 +21,6 @@ export namespace Factory {
     return "";
   }
 
-  export function isTemplateExpression(
-    value?: Tokens.StringValueExpression
-  ): value is Tokens.TemplateExpression {
-    return (
-      typeof value === "object" &&
-      "kind" in value &&
-      value.kind === "TemplateExpression"
-    );
-  }
-
   /**
    *
    * Extracts the key paths used within a template expression.

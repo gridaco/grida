@@ -183,7 +183,7 @@ function Control({
   onValueChange?: (value: Tokens.StringValueExpression) => void;
   placeholder?: string;
 }) {
-  if (Factory.isTemplateExpression(value)) {
+  if (Tokens.is.templateExpression(value)) {
     return <TemplateExpressionControl value={value} />;
   }
 

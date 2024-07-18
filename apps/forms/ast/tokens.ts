@@ -1,4 +1,17 @@
 export namespace Tokens {
+  export type Token =
+    | Primitive
+    | JSONFieldReference
+    | Literal
+    | ConditionExpression
+    | BooleanValueExpression
+    | Identifier
+    | PropertyAccessExpression
+    | TemplateStringLiteral
+    | TemplateSpan
+    | TemplateExpression
+    | StringValueExpression;
+
   /**
    * Represents a primitive value.
    * Can be a string, number, or boolean.
@@ -63,20 +76,8 @@ export namespace Tokens {
     name: string;
   };
 
-  // /**
-  //  * Represents a property access expression in a template.
-  //  * @deprecated Use PropertyPathLiteral instead.
-  //  *
-  //  * This is although a standard AST node, it is not very useful in the context of JSON building
-  //  */
-  // type PropertyAccessExpression = {
-  //   kind: "PropertyAccessExpression";
-  //   expression: Identifier | PropertyAccessExpression;
-  //   name: string;
-  // };
-
   /**
-   * Represents a property path literal in a template.
+   * Represents a shorthand for accessing properties.
    * This encapsulates the concept of a property path more effectively.
    */
   export type PropertyAccessExpression = {
@@ -117,4 +118,26 @@ export namespace Tokens {
     | Identifier // variable
     | TemplateExpression // template expression
     | ConditionExpression;
+
+  export namespace is {
+    export function propertyAccessExpression(
+      value?: Tokens.Token
+    ): value is Tokens.Token {
+      return (
+        typeof value === "object" &&
+        "kind" in value &&
+        value.kind === "PropertyAccessExpression"
+      );
+    }
+
+    export function templateExpression(
+      value?: Tokens.StringValueExpression
+    ): value is Tokens.TemplateExpression {
+      return (
+        typeof value === "object" &&
+        "kind" in value &&
+        value.kind === "TemplateExpression"
+      );
+    }
+  }
 }
