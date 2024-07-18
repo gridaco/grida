@@ -144,6 +144,30 @@ describe("select", () => {
       deep: ["doublenested", "f"],
     },
   };
+
+  it("should select object value without context", () => {
+    const paths: Access.KeyPath<typeof obj>[] = [["b", "c"]];
+    const result = Access.select(obj, paths);
+    expect(result).toEqual({
+      b: {
+        c: {
+          d: "hello",
+          e: {
+            f: {
+              z: "z",
+            },
+          },
+        },
+      },
+    });
+  });
+
+  it("should select values without context", () => {
+    const paths: Access.KeyPath<typeof obj>[] = [["b", "c", "d"]];
+    const result = Access.select(obj, paths);
+    expect(result).toEqual({ b: { c: { d: "hello" } } });
+  });
+
   it("should select values with single level context", () => {
     const paths = [["identifier", "d"]] as any;
     const result = Access.select(obj, paths, context);
