@@ -7,7 +7,7 @@ export namespace Tokens {
     | BooleanValueExpression
     | Identifier
     | PropertyAccessExpression
-    | TemplateStringLiteral
+    | StringLiteral
     | TemplateSpan
     | TemplateExpression
     | StringValueExpression;
@@ -69,9 +69,17 @@ export namespace Tokens {
   export type BooleanValueExpression = boolean | ConditionExpression;
 
   /**
+   * Represents a string literal.
+   */
+  export type StringLiteral = {
+    kind: "StringLiteral";
+    text: string;
+  };
+
+  /**
    * Represents an identifier (variable) in a template.
    */
-  type Identifier = {
+  export type Identifier = {
     kind: "Identifier";
     name: string;
   };
@@ -86,18 +94,10 @@ export namespace Tokens {
   };
 
   /**
-   * Represents a string literal in a template.
-   */
-  type TemplateStringLiteral = {
-    kind: "StringLiteral";
-    value: Primitive;
-  };
-
-  /**
    * Represents a span in a template, which can be a string literal, an identifier, or a property path literal.
    */
-  type TemplateSpan =
-    | TemplateStringLiteral
+  export type TemplateSpan =
+    | StringLiteral
     | Identifier
     | PropertyAccessExpression;
 
@@ -114,6 +114,7 @@ export namespace Tokens {
    */
   export type StringValueExpression =
     | string // static string
+    | StringLiteral
     | PropertyAccessExpression // property path
     | Identifier // variable
     | TemplateExpression // template expression
@@ -122,7 +123,7 @@ export namespace Tokens {
   export namespace is {
     export function propertyAccessExpression(
       value?: Tokens.Token
-    ): value is Tokens.Token {
+    ): value is Tokens.PropertyAccessExpression {
       return (
         typeof value === "object" &&
         "kind" in value &&

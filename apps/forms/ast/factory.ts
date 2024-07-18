@@ -2,24 +2,61 @@ import { Access } from "./access";
 import type { Tokens } from "./tokens";
 
 export namespace Factory {
-  export function createStringValueExpression(
-    value?: string | { type: "path"; path: Array<string> }
-  ): Tokens.StringValueExpression {
-    if (typeof value === "string") {
-      return value;
-    } else if (value?.type === "path") {
-      return {
-        kind: "TemplateExpression",
-        templateSpans: [
-          {
-            kind: "PropertyAccessExpression",
-            expression: value.path,
-          },
-        ],
-      } satisfies Tokens.TemplateExpression;
-    }
-    return "";
+  export function createStringLiteral(text: string): Tokens.StringLiteral {
+    return {
+      kind: "StringLiteral",
+      text: text,
+    };
   }
+
+  export function createIdentifier(name: string): Tokens.Identifier {
+    return {
+      kind: "Identifier",
+      name,
+    };
+  }
+
+  export function createPropertyAccessExpression(
+    paths: Array<string>
+  ): Tokens.PropertyAccessExpression {
+    return {
+      kind: "PropertyAccessExpression",
+      expression: paths,
+    };
+  }
+
+  export function createTemplateExpression(
+    templateSpans: Array<Tokens.TemplateSpan>
+  ): Tokens.TemplateExpression {
+    return {
+      kind: "TemplateExpression",
+      templateSpans: templateSpans,
+    };
+  }
+
+  // export function createStringValueExpression(
+  //   value?:
+  //     | string // static string
+  //     | Tokens.PropertyAccessExpression // property path
+  //     | Tokens.Identifier // variable
+  //     | Tokens.TemplateExpression // template expression
+  //     | Tokens.ConditionExpression
+  // ): Tokens.StringValueExpression {
+  //   if (typeof value === "string") {
+  //     return value;
+  //   } else if (value?.type === "PropertyAccessExpression") {
+  //     return {
+  //       kind: "PropertyAccessExpression",
+  //       expression: value.expression,
+  //     };
+  //   } else if (value?.type === "TemplateExpression") {
+  //     return {
+  //       kind: "TemplateExpression",
+  //       templateSpans: value.spans,
+  //     } satisfies Tokens.TemplateExpression;
+  //   }
+  //   return "";
+  // }
 
   /**
    *
@@ -47,7 +84,7 @@ export namespace Factory {
    * @param value the template expression to extract key paths from
    * @returns the key paths used within the template expression
    */
-  export function extractTemplateExpressionDataKeyPaths(
+  export function getTemplateExpressionDataKeyPaths(
     value: Tokens.TemplateExpression
   ): Array<Array<string>> {
     const paths: Array<Array<string>> = [];
@@ -68,6 +105,13 @@ export namespace Factory {
     return paths;
   }
 
+  export function renderPropertyAccessExpression(
+    expression: Tokens.PropertyAccessExpression,
+    context: any
+  ) {
+    return Access.access(context, expression.expression as any);
+  }
+
   export function renderTemplateExpression(
     expression: Tokens.TemplateExpression,
     context: any
@@ -76,7 +120,7 @@ export namespace Factory {
       .map((span) => {
         switch (span.kind) {
           case "StringLiteral":
-            return span.value.toString();
+            return span.text.toString();
           case "Identifier":
             return context[span.name]?.toString() || "";
           case "PropertyAccessExpression":

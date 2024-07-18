@@ -185,6 +185,8 @@ function Control({
 }) {
   if (Tokens.is.templateExpression(value)) {
     return <TemplateExpressionControl value={value} />;
+  } else if (Tokens.is.propertyAccessExpression(value)) {
+    return <PropertyAccessExpressionControl value={value} />;
   }
 
   return (
@@ -216,18 +218,35 @@ function StringLiteralControl({
   );
 }
 
+function PropertyAccessExpressionControl({
+  value,
+}: {
+  value: Tokens.PropertyAccessExpression;
+}) {
+  return (
+    <div className="flex px-1 h-8 w-full rounded-md border border-input bg-transparent py-1 text-sm shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50">
+      <Badge
+        variant="secondary"
+        className="font-mono overflow-hidden text-ellipsis"
+      >
+        {value.expression.join(".")}
+      </Badge>
+    </div>
+  );
+}
+
 function TemplateExpressionControl({
   value,
 }: {
   value: Tokens.TemplateExpression;
 }) {
   return (
-    <div className="flex h-8 max-w-full rounded-md border border-input bg-transparent py-1 text-sm shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50">
-      <div className="px-1 flex max-w-full overflow-hidden space-x-1">
+    <div className="flex h-8 w-full rounded-md border border-input bg-transparent py-1 text-sm shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50">
+      <div className="px-1 flex overflow-hidden space-x-1">
         {value.templateSpans.map((span, i) => {
           switch (span.kind) {
             case "StringLiteral":
-              return <span key={i}>{span.value}</span>;
+              return <span key={i}>{span.text}</span>;
             case "Identifier":
               return (
                 <Badge key={i} variant="secondary" className="font-mono">
