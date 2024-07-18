@@ -22,10 +22,9 @@ export namespace Access {
    */
   export type KeyPath<T> = T extends object
     ? {
-        [K in keyof T]: T[K] extends object ? [K, ...KeyPath<T[K]>] : [K];
+        [K in keyof T]: T[K] extends object ? [K, ...KeyPath<T[K]>] | [K] : [K];
       }[keyof T]
     : never;
-
   /**
    * A utility type that recursively extracts the type of a value at a given path in an object.
    *
@@ -66,14 +65,13 @@ export namespace Access {
    * @param paths - The property paths to select.
    * @returns A merged object containing the selected values.
    */
-  export function select<T>(obj: T, paths: KeyPath<T>[]): Partial<T> {
+  export function select<T = any>(obj: T, paths: KeyPath<T>[]): Partial<T> {
     const result: any = {};
 
     paths.forEach((path) => {
       const value = access(obj, path);
       let current = result;
 
-      // @ts-expect-error
       path.forEach((key, index) => {
         if (index === path.length - 1) {
           current[key] = value;

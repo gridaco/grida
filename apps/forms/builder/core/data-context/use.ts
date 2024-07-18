@@ -2,22 +2,17 @@ import { useContext, useMemo } from "react";
 import { DataContext } from "./context";
 import { Access } from "@/ast";
 
-export const useValue = (key: string): any => {
+export const useValue = <T = any>(key: Access.KeyPath<T>): any => {
   const context = useContext(DataContext);
   if (!context) {
-    // throw new Error("useValue must be used within a DataProvider");
-    return null;
+    throw new Error("useValue must be used within a DataProvider");
   }
 
-  const { data, transformers } = context;
+  const { data } = context;
 
-  const value = key.split(".").reduce((acc, part) => acc && acc[part], data);
+  const value = Access.access(data, key as any);
 
-  // if (value && value.kind === "template" && transformers[value.kind]) {
-  //   return transformers[value.kind](value.path, data);
-  // }
-
-  return { value };
+  return value;
 };
 
 export const useSelectValue = <T>({
@@ -27,8 +22,7 @@ export const useSelectValue = <T>({
 }): Record<string, any> => {
   const context = useContext(DataContext);
   if (!context) {
-    // throw new Error("useProperties must be used within a DataProvider");
-    return {};
+    throw new Error("useProperties must be used within a DataProvider");
   }
   const { data } = context;
 

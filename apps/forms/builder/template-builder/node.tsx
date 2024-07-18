@@ -63,9 +63,10 @@ export function SlotNode<P extends Record<string, any>>({
   const componentschema = component.schema;
 
   const computedProperties = useComputed(defaultProperties);
+  const computedText = useComputed({ text: defaultText });
 
   const props = {
-    text: text || defaultText,
+    text: computedText.text || defaultText,
     properties: {
       ...computedProperties,
       ...properties,

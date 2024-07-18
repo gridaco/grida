@@ -20,7 +20,7 @@ export function Header_001({ logo }: { logo?: string }) {
     >
       <SlotNode node_id="logo" component={TemplateBuilderWidgets.Container}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={logo} alt="logo" className="w-full h-5" />
+        <img src={logo} alt="logo" className="w-full h-5 object-contain" />
       </SlotNode>
     </SlotNode>
   );

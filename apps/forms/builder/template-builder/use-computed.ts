@@ -38,35 +38,7 @@ export function useComputed<P extends Record<string, any>>(
     {} as P
   );
 
-  console.log(computed, contextdata, datakeys);
+  // console.log(computed, contextdata, datakeys, properties);
 
   return computed as P;
 }
-
-// const pathvalues = Object.values(defaultProperties || {});
-
-// const pathdata = useSchemaValue({
-//   keys: pathvalues, // propertyKeys,
-// });
-
-// // map the data back to match the property interface
-// const data = Object.keys(defaultProperties || {}).reduce(
-//   (acc, key) => {
-//     const path = (defaultProperties || {})[key];
-//     acc[key] = pathdata[path];
-//     return acc;
-//   },
-//   {} as Record<string, any>
-// );
-
-// const props = {
-//   text: text || defaultText,
-//   properties: {
-//     ...defaultProperties,
-//     // ...data,
-//   },
-//   style: {
-//     ...defaultStyle,
-//     ...style,
-//   },
-// };

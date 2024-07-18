@@ -16,12 +16,12 @@ export namespace Factory {
     };
   }
 
-  export function createPropertyAccessExpression(
-    paths: Array<string>
+  export function createPropertyAccessExpression<T = any>(
+    paths: Access.KeyPath<T>
   ): Tokens.PropertyAccessExpression {
     return {
       kind: "PropertyAccessExpression",
-      expression: paths,
+      expression: paths as any,
     };
   }
 
