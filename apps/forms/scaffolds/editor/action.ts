@@ -9,7 +9,7 @@ import type {
   GridaSupabase,
 } from "@/types";
 import type { EditorFlatFormBlock, FormEditorState } from "./state";
-import type { Tokens } from "@/types/ast";
+import type { Tokens } from "@/ast";
 import { LOCALTZ } from "./symbols";
 import { ZodObject } from "zod";
 
@@ -329,6 +329,7 @@ export interface DocumentSelectNodeAction {
   node_id?: string;
   node_type?: string;
   schema?: ZodObject<any>;
+  context?: any;
   default_properties?: Record<string, any>;
   default_style?: React.CSSProperties;
   default_text?: Tokens.StringValueExpression;

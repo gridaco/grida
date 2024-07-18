@@ -18,6 +18,7 @@ import type {
 } from "./with-template";
 import type { Tokens } from "@/ast";
 import { useComputed } from "./use-computed";
+import { useValue } from "../core/data-context";
 
 interface SlotProps<P extends Record<string, any>> {
   node_id: string;
@@ -62,6 +63,7 @@ export function SlotNode<P extends Record<string, any>>({
 
   const componentschema = component.schema;
 
+  const context = useValue();
   const computedProperties = useComputed(defaultProperties);
   const computedText = useComputed({ text: defaultText });
 
@@ -87,6 +89,7 @@ export function SlotNode<P extends Record<string, any>>({
       default_properties: defaultProperties,
       default_style: defaultStyle,
       default_text: defaultText,
+      context,
     });
 
     // eslint-disable-next-line react-hooks/exhaustive-deps

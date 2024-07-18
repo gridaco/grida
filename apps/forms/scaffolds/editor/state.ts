@@ -181,6 +181,7 @@ export interface FormEditorState {
     selected_node_default_properties?: Record<string, any>;
     selected_node_default_style?: React.CSSProperties;
     selected_node_default_text?: Tokens.StringValueExpression;
+    selected_node_context?: Record<string, any>;
   };
   theme: {
     palette?: FormStyleSheetV1Schema["palette"];

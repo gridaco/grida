@@ -2,7 +2,7 @@ import { useContext, useMemo } from "react";
 import { DataContext, ScopedVariableContext } from "./context";
 import { Access } from "@/ast";
 
-export const useValue = <T = any>(key: Access.KeyPath<T>): any => {
+export const useValue = <T = any>(key?: Access.KeyPath<T>): any => {
   const dataContext = useContext(DataContext);
   const scopedVariableContext = useContext(ScopedVariableContext);
 
@@ -15,6 +15,9 @@ export const useValue = <T = any>(key: Access.KeyPath<T>): any => {
     ? scopedVariableContext.variablePaths
     : {};
 
+  if (!key) {
+    return data;
+  }
   return Access.access(data, key as any, { scopedIdentifiers: variablePaths });
 };
 

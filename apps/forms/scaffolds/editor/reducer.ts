@@ -865,6 +865,7 @@ export function reducer(
         node_id,
         node_type,
         schema,
+        context,
         default_properties,
         default_style,
         default_text,
@@ -873,6 +874,7 @@ export function reducer(
         draft.document.selected_node_id = node_id;
         draft.document.selected_node_type = node_type;
         draft.document.selected_node_schema = schema || null;
+        draft.document.selected_node_context = context;
         draft.document.selected_node_default_properties = default_properties;
         draft.document.selected_node_default_style = default_style;
         draft.document.selected_node_default_text = default_text;
