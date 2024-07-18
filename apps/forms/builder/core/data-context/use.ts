@@ -39,7 +39,7 @@ export const useSelectValue = <T>({
     const selected = Access.select(data, keys as any, {
       scopedIdentifiers: variablePaths,
     });
-    console.log(selected, data, keys, variablePaths);
+    // console.log(selected, data, keys, variablePaths);
     return selected;
   }, [keys, data, variablePaths]);
 };

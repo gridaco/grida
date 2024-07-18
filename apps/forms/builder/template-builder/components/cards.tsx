@@ -261,22 +261,16 @@ export const Hero_002 = withTemplate(
   }: PropsWithStyle<HeroCardProps>) {
     return (
       <header style={style} className="relative aspect-[3/4]">
-        <Media
-          type={media.type}
-          src={media.src}
-          alt={media.alt}
-          width={800}
-          height={400}
-          className="w-full h-full object-cover -z-10"
-        />
-        {/* <video
-            className="w-full aspect-[3/4] @5xl/preview:aspect-video object-cover -z-10"
-            autoPlay
-            loop
-            muted
-            playsInline
-            src={props.media}
-          /> */}
+        {media && (
+          <Media
+            type={media.type}
+            src={media.src}
+            alt={media.alt}
+            width={800}
+            height={400}
+            className="w-full h-full object-cover -z-10"
+          />
+        )}
         <HalfHeightGradient />
         <div className="text-background absolute bottom-8 max-w-md container py-4">
           <h1 className="text-4xl font-semibold">{h1}</h1>
