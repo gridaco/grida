@@ -1,113 +1,298 @@
 import Image from "next/image";
+import Link from "next/link";
 
 export default function Home() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="z-10 w-full max-w-5xl items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing&nbsp;
-          <code className="font-mono font-bold">app/page.tsx</code>
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:size-auto lg:bg-none">
-          <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <div className="flex flex-col min-h-dvh">
+      <header className="px-4 lg:px-6 h-14 flex items-center">
+        <Link
+          href="#"
+          className="flex items-center justify-center"
+          prefetch={false}
+        >
+          <MountainIcon className="size-6" />
+          <span className="sr-only">Backgrounds by Grida</span>
+        </Link>
+        <nav className="ml-auto flex gap-4 sm:gap-6">
+          <Link
+            href="#"
+            className="text-sm font-medium hover:underline underline-offset-4"
+            prefetch={false}
           >
-            By{" "}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
-        </div>
-      </div>
+            Githib
+          </Link>
+          <Link
+            href="#"
+            className="text-sm font-medium hover:underline underline-offset-4"
+            prefetch={false}
+          >
+            Credits
+          </Link>
+          <Link
+            href="#"
+            className="text-sm font-medium hover:underline underline-offset-4"
+            prefetch={false}
+          >
+            Request
+          </Link>
+        </nav>
+      </header>
+      <main className="flex-1">
+        <section className="w-full py-12 md:py-24 lg:py-32">
+          <div className="container mx-auto space-y-12 px-4 md:px-6">
+            <div className="flex flex-col items-center justify-center space-y-4 text-center">
+              <div className="space-y-2">
+                <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl">
+                  Explore Our Dynamic Backgrounds
+                </h2>
+                <p className="max-w-[900px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
+                  Browse through our curated collection of visually stunning
+                  backgrounds, perfect for enhancing your website or
+                  application.
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              <div className="relative overflow-hidden transition-transform duration-300 ease-in-out rounded-lg shadow-lg group hover:shadow-xl hover:-translate-y-2">
+                <Link
+                  href="#"
+                  className="absolute inset-0 z-10"
+                  prefetch={false}
+                >
+                  <span className="sr-only">Preview</span>
+                </Link>
+                <img
+                  src="/placeholder.svg"
+                  alt="Background 1"
+                  width={300}
+                  height={300}
+                  className="object-cover w-full h-64"
+                />
+                <div className="p-4 bg-background">
+                  <h3 className="text-xl font-bold">Fluid Gradient</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Smooth color transitions
+                  </p>
+                </div>
+              </div>
+              <div className="relative overflow-hidden transition-transform duration-300 ease-in-out rounded-lg shadow-lg group hover:shadow-xl hover:-translate-y-2">
+                <Link
+                  href="#"
+                  className="absolute inset-0 z-10"
+                  prefetch={false}
+                >
+                  <span className="sr-only">Preview</span>
+                </Link>
+                <img
+                  src="/placeholder.svg"
+                  alt="Background 2"
+                  width={300}
+                  height={300}
+                  className="object-cover w-full h-64"
+                />
+                <div className="p-4 bg-background">
+                  <h3 className="text-xl font-bold">Animated Particles</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Captivating particle effects
+                  </p>
+                </div>
+              </div>
+              <div className="relative overflow-hidden transition-transform duration-300 ease-in-out rounded-lg shadow-lg group hover:shadow-xl hover:-translate-y-2">
+                <Link
+                  href="#"
+                  className="absolute inset-0 z-10"
+                  prefetch={false}
+                >
+                  <span className="sr-only">Preview</span>
+                </Link>
+                <img
+                  src="/placeholder.svg"
+                  alt="Background 3"
+                  width={300}
+                  height={300}
+                  className="object-cover w-full h-64"
+                />
+                <div className="p-4 bg-background">
+                  <h3 className="text-xl font-bold">Glowing Orbs</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Mesmerizing spherical patterns
+                  </p>
+                </div>
+              </div>
+              <div className="relative overflow-hidden transition-transform duration-300 ease-in-out rounded-lg shadow-lg group hover:shadow-xl hover:-translate-y-2">
+                <Link
+                  href="#"
+                  className="absolute inset-0 z-10"
+                  prefetch={false}
+                >
+                  <span className="sr-only">Preview</span>
+                </Link>
+                <img
+                  src="/placeholder.svg"
+                  alt="Background 4"
+                  width={300}
+                  height={300}
+                  className="object-cover w-full h-64"
+                />
+                <div className="p-4 bg-background">
+                  <h3 className="text-xl font-bold">Cosmic Swirls</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Captivating cosmic patterns
+                  </p>
+                </div>
+              </div>
+              <div className="relative overflow-hidden transition-transform duration-300 ease-in-out rounded-lg shadow-lg group hover:shadow-xl hover:-translate-y-2">
+                <Link
+                  href="#"
+                  className="absolute inset-0 z-10"
+                  prefetch={false}
+                >
+                  <span className="sr-only">Preview</span>
+                </Link>
+                <img
+                  src="/placeholder.svg"
+                  alt="Background 5"
+                  width={300}
+                  height={300}
+                  className="object-cover w-full h-64"
+                />
+                <div className="p-4 bg-background">
+                  <h3 className="text-xl font-bold">Neon Waves</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Vibrant and dynamic waves
+                  </p>
+                </div>
+              </div>
+              <div className="relative overflow-hidden transition-transform duration-300 ease-in-out rounded-lg shadow-lg group hover:shadow-xl hover:-translate-y-2">
+                <Link
+                  href="#"
+                  className="absolute inset-0 z-10"
+                  prefetch={false}
+                >
+                  <span className="sr-only">Preview</span>
+                </Link>
+                <img
+                  src="/placeholder.svg"
+                  alt="Background 6"
+                  width={300}
+                  height={300}
+                  className="object-cover w-full h-64"
+                />
+                <div className="p-4 bg-background">
+                  <h3 className="text-xl font-bold">Geometric Patterns</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Intricate and visually striking
+                  </p>
+                </div>
+              </div>
+              <div className="relative overflow-hidden transition-transform duration-300 ease-in-out rounded-lg shadow-lg group hover:shadow-xl hover:-translate-y-2">
+                <Link
+                  href="#"
+                  className="absolute inset-0 z-10"
+                  prefetch={false}
+                >
+                  <span className="sr-only">Preview</span>
+                </Link>
+                <img
+                  src="/placeholder.svg"
+                  alt="Background 7"
+                  width={300}
+                  height={300}
+                  className="object-cover w-full h-64"
+                />
+                <div className="p-4 bg-background">
+                  <h3 className="text-xl font-bold">Liquid Distortion</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Mesmerizing fluid effects
+                  </p>
+                </div>
+              </div>
+              <div className="relative overflow-hidden transition-transform duration-300 ease-in-out rounded-lg shadow-lg group hover:shadow-xl hover:-translate-y-2">
+                <Link
+                  href="#"
+                  className="absolute inset-0 z-10"
+                  prefetch={false}
+                >
+                  <span className="sr-only">Preview</span>
+                </Link>
+                <img
+                  src="/placeholder.svg"
+                  alt="Background 8"
+                  width={300}
+                  height={300}
+                  className="object-cover w-full h-64"
+                />
+                <div className="p-4 bg-background">
+                  <h3 className="text-xl font-bold">Prismatic Rays</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Refractive light patterns
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+      <footer className="flex flex-col gap-2 sm:flex-row py-6 w-full shrink-0 items-center px-4 md:px-6 border-t">
+        <p className="text-xs text-muted-foreground">
+          &copy; 2024 Grida. All rights reserved.
+        </p>
+        <nav className="sm:ml-auto flex gap-4 sm:gap-6">
+          <Link
+            href="#"
+            className="text-xs hover:underline underline-offset-4"
+            prefetch={false}
+          >
+            Terms of Service
+          </Link>
+          <Link
+            href="#"
+            className="text-xs hover:underline underline-offset-4"
+            prefetch={false}
+          >
+            Privacy
+          </Link>
+        </nav>
+      </footer>
+    </div>
+  );
+}
 
-      <div className="relative z-[-1] flex place-items-center before:absolute before:h-[300px] before:w-full before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-full after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700 before:dark:opacity-10 after:dark:from-sky-900 after:dark:via-[#0141ff] after:dark:opacity-40 sm:before:w-[480px] sm:after:w-[240px] before:lg:h-[360px]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
+function MountainIcon(props) {
+  return (
+    <svg
+      {...props}
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="m8 3 4 8 5-5 5 15H2L8 3z" />
+    </svg>
+  );
+}
 
-      <div className="mb-32 grid text-center lg:mb-0 lg:w-full lg:max-w-5xl lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className="mb-3 text-2xl font-semibold">
-            Docs{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className="m-0 max-w-[30ch] text-sm opacity-50">
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className="mb-3 text-2xl font-semibold">
-            Learn{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className="m-0 max-w-[30ch] text-sm opacity-50">
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className="mb-3 text-2xl font-semibold">
-            Templates{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className="m-0 max-w-[30ch] text-sm opacity-50">
-            Explore starter templates for Next.js.
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className="mb-3 text-2xl font-semibold">
-            Deploy{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className="m-0 max-w-[30ch] text-balance text-sm opacity-50">
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
+function XIcon(props) {
+  return (
+    <svg
+      {...props}
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </svg>
   );
 }

@@ -1,4 +1,4 @@
-import { DotsBackground } from "@/theme/backgrounds/dots";
+import { DotsBackground } from "@/backgrounds/dots";
 
 export default function DotsBackgroundPage() {
   return (

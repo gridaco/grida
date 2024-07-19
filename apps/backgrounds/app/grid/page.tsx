@@ -1,4 +1,4 @@
-import { BackgroundGrid } from "@/theme/backgrounds/grid";
+import { BackgroundGrid } from "@/backgrounds/grid";
 
 export default function BackgroundGridPage({
   searchParams,

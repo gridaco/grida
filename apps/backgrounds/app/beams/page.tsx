@@ -1,4 +1,4 @@
-import { BackgroundBeams } from "@/theme/backgrounds/beams";
+import { BackgroundBeams } from "@/backgrounds/beams";
 
 export default function BackgroundBeamsPage() {
   return (
