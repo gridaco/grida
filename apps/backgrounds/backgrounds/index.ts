@@ -19,12 +19,12 @@ const data: ReadonlyArray<Background> = [
     type: "dynamic",
   },
   {
-    name: "dot",
-    title: "Dot",
-    description: "Dot background",
-    embed: "/embed/dot",
-    url: "/dot",
-    preview: ["/preview/dot.png"],
+    name: "dots",
+    title: "Dots",
+    description: "Dots background",
+    embed: "/embed/dots",
+    url: "/dots",
+    preview: ["/preview/dots.png"],
     type: "static",
   },
   {
