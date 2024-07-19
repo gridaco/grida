@@ -18,6 +18,16 @@ const nextConfig = withMDX()({
       },
     ],
   },
+  async rewrites() {
+    return [
+      {
+        // REMOVE ME when migration is complete.
+        // 1. db, 2. site static values
+        source: "/theme/embed/backgrounds/:path*",
+        destination: "https://backgrounds.grida.co/embed/:path*",
+      },
+    ];
+  },
   webpack: (config) => {
     // https://github.com/wojtekmaj/react-pdf?tab=readme-ov-file#nextjs
     config.resolve.alias.canvas = false;
