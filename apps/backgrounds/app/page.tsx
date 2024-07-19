@@ -1,3 +1,4 @@
+import data from "@/backgrounds";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -53,182 +54,15 @@ export default function Home() {
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              <div className="relative overflow-hidden transition-transform duration-300 ease-in-out rounded-lg shadow-lg group hover:shadow-xl hover:-translate-y-2">
-                <Link
-                  href="#"
-                  className="absolute inset-0 z-10"
-                  prefetch={false}
-                >
-                  <span className="sr-only">Preview</span>
-                </Link>
-                <img
-                  src="/placeholder.svg"
-                  alt="Background 1"
-                  width={300}
-                  height={300}
-                  className="object-cover w-full h-64"
+              {data.map((bg) => (
+                <Card
+                  key={bg.name}
+                  title={bg.title}
+                  description={bg.description}
+                  preview={bg.preview}
+                  href={bg.url}
                 />
-                <div className="p-4 bg-background">
-                  <h3 className="text-xl font-bold">Fluid Gradient</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Smooth color transitions
-                  </p>
-                </div>
-              </div>
-              <div className="relative overflow-hidden transition-transform duration-300 ease-in-out rounded-lg shadow-lg group hover:shadow-xl hover:-translate-y-2">
-                <Link
-                  href="#"
-                  className="absolute inset-0 z-10"
-                  prefetch={false}
-                >
-                  <span className="sr-only">Preview</span>
-                </Link>
-                <img
-                  src="/placeholder.svg"
-                  alt="Background 2"
-                  width={300}
-                  height={300}
-                  className="object-cover w-full h-64"
-                />
-                <div className="p-4 bg-background">
-                  <h3 className="text-xl font-bold">Animated Particles</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Captivating particle effects
-                  </p>
-                </div>
-              </div>
-              <div className="relative overflow-hidden transition-transform duration-300 ease-in-out rounded-lg shadow-lg group hover:shadow-xl hover:-translate-y-2">
-                <Link
-                  href="#"
-                  className="absolute inset-0 z-10"
-                  prefetch={false}
-                >
-                  <span className="sr-only">Preview</span>
-                </Link>
-                <img
-                  src="/placeholder.svg"
-                  alt="Background 3"
-                  width={300}
-                  height={300}
-                  className="object-cover w-full h-64"
-                />
-                <div className="p-4 bg-background">
-                  <h3 className="text-xl font-bold">Glowing Orbs</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Mesmerizing spherical patterns
-                  </p>
-                </div>
-              </div>
-              <div className="relative overflow-hidden transition-transform duration-300 ease-in-out rounded-lg shadow-lg group hover:shadow-xl hover:-translate-y-2">
-                <Link
-                  href="#"
-                  className="absolute inset-0 z-10"
-                  prefetch={false}
-                >
-                  <span className="sr-only">Preview</span>
-                </Link>
-                <img
-                  src="/placeholder.svg"
-                  alt="Background 4"
-                  width={300}
-                  height={300}
-                  className="object-cover w-full h-64"
-                />
-                <div className="p-4 bg-background">
-                  <h3 className="text-xl font-bold">Cosmic Swirls</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Captivating cosmic patterns
-                  </p>
-                </div>
-              </div>
-              <div className="relative overflow-hidden transition-transform duration-300 ease-in-out rounded-lg shadow-lg group hover:shadow-xl hover:-translate-y-2">
-                <Link
-                  href="#"
-                  className="absolute inset-0 z-10"
-                  prefetch={false}
-                >
-                  <span className="sr-only">Preview</span>
-                </Link>
-                <img
-                  src="/placeholder.svg"
-                  alt="Background 5"
-                  width={300}
-                  height={300}
-                  className="object-cover w-full h-64"
-                />
-                <div className="p-4 bg-background">
-                  <h3 className="text-xl font-bold">Neon Waves</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Vibrant and dynamic waves
-                  </p>
-                </div>
-              </div>
-              <div className="relative overflow-hidden transition-transform duration-300 ease-in-out rounded-lg shadow-lg group hover:shadow-xl hover:-translate-y-2">
-                <Link
-                  href="#"
-                  className="absolute inset-0 z-10"
-                  prefetch={false}
-                >
-                  <span className="sr-only">Preview</span>
-                </Link>
-                <img
-                  src="/placeholder.svg"
-                  alt="Background 6"
-                  width={300}
-                  height={300}
-                  className="object-cover w-full h-64"
-                />
-                <div className="p-4 bg-background">
-                  <h3 className="text-xl font-bold">Geometric Patterns</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Intricate and visually striking
-                  </p>
-                </div>
-              </div>
-              <div className="relative overflow-hidden transition-transform duration-300 ease-in-out rounded-lg shadow-lg group hover:shadow-xl hover:-translate-y-2">
-                <Link
-                  href="#"
-                  className="absolute inset-0 z-10"
-                  prefetch={false}
-                >
-                  <span className="sr-only">Preview</span>
-                </Link>
-                <img
-                  src="/placeholder.svg"
-                  alt="Background 7"
-                  width={300}
-                  height={300}
-                  className="object-cover w-full h-64"
-                />
-                <div className="p-4 bg-background">
-                  <h3 className="text-xl font-bold">Liquid Distortion</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Mesmerizing fluid effects
-                  </p>
-                </div>
-              </div>
-              <div className="relative overflow-hidden transition-transform duration-300 ease-in-out rounded-lg shadow-lg group hover:shadow-xl hover:-translate-y-2">
-                <Link
-                  href="#"
-                  className="absolute inset-0 z-10"
-                  prefetch={false}
-                >
-                  <span className="sr-only">Preview</span>
-                </Link>
-                <img
-                  src="/placeholder.svg"
-                  alt="Background 8"
-                  width={300}
-                  height={300}
-                  className="object-cover w-full h-64"
-                />
-                <div className="p-4 bg-background">
-                  <h3 className="text-xl font-bold">Prismatic Rays</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Refractive light patterns
-                  </p>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
         </section>
@@ -254,6 +88,37 @@ export default function Home() {
           </Link>
         </nav>
       </footer>
+    </div>
+  );
+}
+
+function Card({
+  title,
+  description,
+  preview,
+  href,
+}: {
+  title: string;
+  description: string;
+  preview: [string] | [string, string];
+  href: string;
+}) {
+  return (
+    <div className="relative overflow-hidden transition-transform duration-300 ease-in-out rounded-lg shadow-lg group hover:shadow-xl hover:-translate-y-2">
+      <Link href={href} className="absolute inset-0 z-10" prefetch={false}>
+        <span className="sr-only">Preview</span>
+      </Link>
+      <Image
+        src={preview[0]}
+        alt={title}
+        width={300}
+        height={300}
+        className="object-cover w-full h-64"
+      />
+      <div className="p-4 bg-background">
+        <h3 className="text-xl font-bold">{title}</h3>
+        <p className="text-sm text-muted-foreground">{description}</p>
+      </div>
     </div>
   );
 }
