@@ -5,6 +5,7 @@ interface Background {
   embed: string;
   url: string;
   preview: [string] | [string, string];
+  type: "dynamic" | "static";
 }
 
 const data: ReadonlyArray<Background> = [
@@ -15,6 +16,7 @@ const data: ReadonlyArray<Background> = [
     embed: "/embed/aurora",
     url: "/embed/aurora",
     preview: ["/preview/aurora.png", "/preview/aurora.mp4"],
+    type: "dynamic",
   },
   {
     name: "dot",
@@ -23,6 +25,7 @@ const data: ReadonlyArray<Background> = [
     embed: "/embed/dot",
     url: "/embed/dot",
     preview: ["/preview/dot.png"],
+    type: "static",
   },
   {
     name: "globe",
@@ -31,6 +34,7 @@ const data: ReadonlyArray<Background> = [
     embed: "/embed/globe",
     url: "/embed/globe",
     preview: ["/preview/globe.png", "/preview/globe.mp4"],
+    type: "dynamic",
   },
   {
     name: "grid",
@@ -39,6 +43,7 @@ const data: ReadonlyArray<Background> = [
     embed: "/embed/grid",
     url: "/embed/grid",
     preview: ["/preview/grid.png"],
+    type: "static",
   },
   {
     name: "grid-sm",
@@ -47,6 +52,7 @@ const data: ReadonlyArray<Background> = [
     embed: "/embed/grid?variant=sm",
     url: "/embed/grid?variant=sm",
     preview: ["/preview/grid-sm.png"],
+    type: "static",
   },
   {
     name: "shadergradient-00",
@@ -58,6 +64,7 @@ const data: ReadonlyArray<Background> = [
       "/preview/shadergradient-00.png",
       "/preview/shadergradient-00.mp4",
     ],
+    type: "dynamic",
   },
   {
     name: "shadergradient-01",
@@ -69,6 +76,7 @@ const data: ReadonlyArray<Background> = [
       "/preview/shadergradient-01.png",
       "/preview/shadergradient-01.mp4",
     ],
+    type: "dynamic",
   },
   {
     name: "shadergradient-02",
@@ -80,6 +88,7 @@ const data: ReadonlyArray<Background> = [
       "/preview/shadergradient-02.png",
       "/preview/shadergradient-02.mp4",
     ],
+    type: "dynamic",
   },
   {
     name: "shadergradient-03",
@@ -91,6 +100,7 @@ const data: ReadonlyArray<Background> = [
       "/preview/shadergradient-03.png",
       "/preview/shadergradient-03.mp4",
     ],
+    type: "dynamic",
   },
   {
     name: "shadergradient-04",
@@ -102,6 +112,7 @@ const data: ReadonlyArray<Background> = [
       "/preview/shadergradient-04.png",
       "/preview/shadergradient-04.mp4",
     ],
+    type: "dynamic",
   },
   {
     name: "shadergradient-05",
@@ -113,6 +124,7 @@ const data: ReadonlyArray<Background> = [
       "/preview/shadergradient-05.png",
       "/preview/shadergradient-05.mp4",
     ],
+    type: "dynamic",
   },
   {
     name: "shadergradient-06",
@@ -124,6 +136,7 @@ const data: ReadonlyArray<Background> = [
       "/preview/shadergradient-06.png",
       "/preview/shadergradient-06.mp4",
     ],
+    type: "dynamic",
   },
   {
     name: "shadergradient-07",
@@ -135,6 +148,7 @@ const data: ReadonlyArray<Background> = [
       "/preview/shadergradient-07.png",
       "/preview/shadergradient-07.mp4",
     ],
+    type: "dynamic",
   },
   {
     name: "shadergradient-08",
@@ -146,6 +160,7 @@ const data: ReadonlyArray<Background> = [
       "/preview/shadergradient-08.png",
       "/preview/shadergradient-08.mp4",
     ],
+    type: "dynamic",
   },
   {
     name: "shadergradient-09",
@@ -157,6 +172,7 @@ const data: ReadonlyArray<Background> = [
       "/preview/shadergradient-09.png",
       "/preview/shadergradient-09.mp4",
     ],
+    type: "dynamic",
   },
   {
     name: "shadergradient-91",
@@ -168,6 +184,7 @@ const data: ReadonlyArray<Background> = [
       "/preview/shadergradient-91.png",
       "/preview/shadergradient-91.mp4",
     ],
+    type: "dynamic",
   },
   {
     name: "shadergradient-92",
@@ -179,6 +196,7 @@ const data: ReadonlyArray<Background> = [
       "/preview/shadergradient-92.png",
       "/preview/shadergradient-92.mp4",
     ],
+    type: "dynamic",
   },
   {
     name: "shadergradient-93",
@@ -186,10 +204,8 @@ const data: ReadonlyArray<Background> = [
     description: "Shader Gradient 93 Twilight blue",
     embed: "/embed/shadergradient/93",
     url: "/embed/shadergradient/93",
-    preview: [
-      "/preview/shadergradient-93.png",
-      "/preview/shadergradient-93.mp4",
-    ],
+    preview: ["/preview/shadergradient-93.png"],
+    type: "static",
   },
   {
     name: "shadergradient-94",
@@ -201,6 +217,7 @@ const data: ReadonlyArray<Background> = [
       "/preview/shadergradient-94.png",
       "/preview/shadergradient-94.mp4",
     ],
+    type: "dynamic",
   },
   {
     name: "shadergradient-95",
@@ -212,6 +229,7 @@ const data: ReadonlyArray<Background> = [
       "/preview/shadergradient-95.png",
       "/preview/shadergradient-95.mp4",
     ],
+    type: "dynamic",
   },
   {
     name: "shadergradient-96",
@@ -223,6 +241,7 @@ const data: ReadonlyArray<Background> = [
       "/preview/shadergradient-96.png",
       "/preview/shadergradient-96.mp4",
     ],
+    type: "dynamic",
   },
   {
     name: "shadergradient-97",
@@ -234,6 +253,7 @@ const data: ReadonlyArray<Background> = [
       "/preview/shadergradient-97.png",
       "/preview/shadergradient-97.mp4",
     ],
+    type: "dynamic",
   },
   {
     name: "shadergradient-98",
@@ -245,6 +265,7 @@ const data: ReadonlyArray<Background> = [
       "/preview/shadergradient-98.png",
       "/preview/shadergradient-98.mp4",
     ],
+    type: "dynamic",
   },
   {
     name: "shadergradient-99",
@@ -256,6 +277,7 @@ const data: ReadonlyArray<Background> = [
       "/preview/shadergradient-99.png",
       "/preview/shadergradient-99.mp4",
     ],
+    type: "dynamic",
   },
 ];
 

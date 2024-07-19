@@ -1,4 +1,5 @@
 import data from "@/backgrounds";
+import { Preview } from "@/components/preview";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -105,20 +106,13 @@ function Card({
 }) {
   return (
     <div className="relative overflow-hidden transition-transform duration-300 ease-in-out rounded-lg shadow-lg group hover:shadow-xl hover:-translate-y-2">
-      <Link href={href} className="absolute inset-0 z-10" prefetch={false}>
-        <span className="sr-only">Preview</span>
+      <Link href={href} prefetch={false}>
+        <Preview preview={preview} />
+        <div className="p-4 bg-background">
+          <h3 className="text-xl font-bold">{title}</h3>
+          <p className="text-sm text-muted-foreground">{description}</p>
+        </div>
       </Link>
-      <Image
-        src={preview[0]}
-        alt={title}
-        width={300}
-        height={300}
-        className="object-cover w-full h-64"
-      />
-      <div className="p-4 bg-background">
-        <h3 className="text-xl font-bold">{title}</h3>
-        <p className="text-sm text-muted-foreground">{description}</p>
-      </div>
     </div>
   );
 }
