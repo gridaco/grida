@@ -50,7 +50,10 @@ export default function Home() {
                 <p className="max-w-[900px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
                   Browse through our curated collection of visually stunning
                   backgrounds, perfect for enhancing your website or
-                  application.
+                  application.{" "}
+                  <Link href="/data" className="underline">
+                    Use with API
+                  </Link>
                 </p>
               </div>
             </div>
