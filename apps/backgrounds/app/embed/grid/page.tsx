@@ -1,5 +1,8 @@
+"use client";
+
 import { BackgroundGrid } from "@/backgrounds/grid";
 import { SupportsDarkMode } from "@/components/dark";
+import { Suspense } from "react";
 
 export default function BackgroundGridPage({
   searchParams,
@@ -11,10 +14,12 @@ export default function BackgroundGridPage({
   const { variant } = searchParams;
 
   return (
-    <SupportsDarkMode>
-      <main className="h-screen w-screen">
-        <BackgroundGrid variant={variant} />
-      </main>
-    </SupportsDarkMode>
+    <Suspense>
+      <SupportsDarkMode>
+        <main className="h-screen w-screen">
+          <BackgroundGrid variant={variant} />
+        </main>
+      </SupportsDarkMode>
+    </Suspense>
   );
 }
