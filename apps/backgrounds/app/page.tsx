@@ -1,6 +1,6 @@
 import data from "@/backgrounds";
+import { GridaLogo } from "@/components/grida-logo";
 import { Preview } from "@/components/preview";
-import Image from "next/image";
 import Link from "next/link";
 
 export default function Home() {
@@ -12,26 +12,26 @@ export default function Home() {
           className="flex items-center justify-center"
           prefetch={false}
         >
-          <MountainIcon className="size-6" />
+          <GridaLogo className="size-6" />
           <span className="sr-only">Backgrounds by Grida</span>
         </Link>
         <nav className="ml-auto flex gap-4 sm:gap-6">
           <Link
-            href="#"
+            href="https://github.com/gridaco/grida"
             className="text-sm font-medium hover:underline underline-offset-4"
             prefetch={false}
           >
             Githib
           </Link>
           <Link
-            href="#"
+            href="https://github.com/gridaco/grida/tree/main/apps/backgrounds"
             className="text-sm font-medium hover:underline underline-offset-4"
             prefetch={false}
           >
             Credits
           </Link>
           <Link
-            href="#"
+            href="https://github.com/gridaco/grida/issues/new"
             className="text-sm font-medium hover:underline underline-offset-4"
             prefetch={false}
           >
@@ -42,7 +42,7 @@ export default function Home() {
       <main className="flex-1">
         <section className="w-full py-12 md:py-24 lg:py-32">
           <div className="container mx-auto space-y-12 px-4 md:px-6">
-            <div className="flex flex-col items-center justify-center space-y-4 text-center">
+            <div className="flex flex-col items-center justify-center space-y-4 text-center py-40">
               <div className="space-y-2">
                 <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl">
                   Explore Our Dynamic Backgrounds
@@ -74,14 +74,14 @@ export default function Home() {
         </p>
         <nav className="sm:ml-auto flex gap-4 sm:gap-6">
           <Link
-            href="#"
+            href="https://grida.co/docs/support/terms-and-conditions"
             className="text-xs hover:underline underline-offset-4"
             prefetch={false}
           >
             Terms of Service
           </Link>
           <Link
-            href="#"
+            href="https://grida.co/docs/support/privacy-policy"
             className="text-xs hover:underline underline-offset-4"
             prefetch={false}
           >
@@ -114,24 +114,5 @@ function Card({
         </div>
       </Link>
     </div>
-  );
-}
-
-function MountainIcon(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="m8 3 4 8 5-5 5 15H2L8 3z" />
-    </svg>
   );
 }
