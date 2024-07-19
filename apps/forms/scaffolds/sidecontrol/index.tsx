@@ -63,6 +63,7 @@ import { FlexDirectionControl } from "./controls/flex-direction";
 import { JustifyContentControl } from "./controls/justify-content";
 import { TemplateControl } from "./controls/template";
 import { Tokens } from "@/ast";
+import { CursorControl } from "./controls/cursor";
 
 const { default: _, ...variants } = _variants;
 
@@ -145,6 +146,8 @@ function SelectedNodeProperties() {
     justifyContent,
     alignItems,
     gap,
+    //
+    cursor,
   } = {
     ...selected_node_default_style,
     ...(style || {}),
@@ -242,6 +245,7 @@ function SelectedNodeProperties() {
   const changejustifyContent = (value?: string) =>
     changestyle("justifyContent", value);
   const changealignItems = (value?: string) => changestyle("alignItems", value);
+  const changecursor = (value?: string) => changestyle("cursor", value);
 
   return (
     <div key={selected_node_id}>
@@ -419,7 +423,6 @@ function SelectedNodeProperties() {
               onValueChange={changeboxShadow}
             />
           </PropertyLine>
-
           <PropertyLine>
             <PropertyLineLabel>Margin</PropertyLineLabel>
             <MarginControl value={margin as any} onValueChange={changemargin} />
@@ -437,6 +440,10 @@ function SelectedNodeProperties() {
               value={aspectRatio as any}
               onValueChange={changeaspectRatio}
             />
+          </PropertyLine>
+          <PropertyLine>
+            <PropertyLineLabel>Cursor</PropertyLineLabel>
+            <CursorControl value={cursor} onValueChange={changecursor} />
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>
