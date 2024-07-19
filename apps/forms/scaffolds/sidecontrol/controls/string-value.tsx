@@ -1,15 +1,6 @@
 import { Input } from "@/components/ui/input";
 import { inputVariants } from "./utils/input-variants";
-import {
-  AsteriskSquareIcon,
-  BoltIcon,
-  BracesIcon,
-  BracketsIcon,
-  CircleOffIcon,
-  FileQuestionIcon,
-  HashIcon,
-  SquareFunctionIcon,
-} from "lucide-react";
+import { BoltIcon } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,14 +12,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  CalendarIcon,
-  CookieIcon,
-  DotIcon,
-  ImageIcon,
+  InputIcon,
   LockClosedIcon,
   ReloadIcon,
-  ShuffleIcon,
-  TextIcon,
   TokensIcon,
 } from "@radix-ui/react-icons";
 import { Tokens } from "@/ast";
@@ -37,7 +23,6 @@ import { Factory } from "@/ast/factory";
 import { useEditorState } from "@/scaffolds/editor";
 import NestedDropdownMenu from "./context/variable";
 import PropertyTypeIcon from "./context/property-type-icon";
-import { useCallback } from "react";
 
 export function StringValueControl({
   value,
@@ -61,7 +46,6 @@ export function StringValueControl({
         onValueChange={onValueChange}
         placeholder={placeholder}
       />
-
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button className="absolute opacity-0 group-hover:opacity-100 right-0 top-0 bottom-0 p-2 m-0.5 rounded flex items-center justify-center z-10">
@@ -80,7 +64,7 @@ export function StringValueControl({
                 Factory.createPropertyAccessExpression(expression)
               );
             }}
-            data={selected_node_context}
+            data={selected_node_context || {}}
           />
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>
@@ -152,11 +136,11 @@ export function StringValueControl({
           </DropdownMenuItem>
           <DropdownMenuItem
             onSelect={() => {
-              onValueChange?.("");
+              onValueChange?.("Text");
             }}
           >
-            <ReloadIcon className="me-2 w-4 h-4" />
-            Clear
+            <InputIcon className="me-2 w-4 h-4" />
+            Type Manually
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

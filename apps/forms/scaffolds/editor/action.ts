@@ -344,7 +344,7 @@ export interface DocumentNodeChangeTemplateAction {
 export interface DocumentNodeChangeTextAction {
   type: "editor/document/node/text";
   node_id: string;
-  text: Tokens.StringValueExpression;
+  text?: Tokens.StringValueExpression;
 }
 
 export interface DocumentNodeUpdateStyleAction {

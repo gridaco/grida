@@ -39,7 +39,10 @@ export const formcollection_sample_001_the_bundle = {
       title: "Tech meetup",
       cta: "register now",
       status: "Opens 1:11",
-      image: "/templates/sample-brand-the-bundle/collection/001.png",
+      media: {
+        type: "image",
+        src: "/templates/sample-brand-the-bundle/collection/001.png",
+      },
       tags: ["Apple", "Banana"],
     },
     {
@@ -48,7 +51,10 @@ export const formcollection_sample_001_the_bundle = {
       title: "AI Conference",
       cta: "sign up today",
       status: "Opens 2:00",
-      image: "/templates/sample-brand-the-bundle/collection/002.png",
+      media: {
+        type: "image",
+        src: "/templates/sample-brand-the-bundle/collection/002.png",
+      },
       tags: ["Apple", "Banana"],
     },
     {
@@ -57,7 +63,10 @@ export const formcollection_sample_001_the_bundle = {
       title: "Blockchain Expo",
       cta: "join now",
       status: "Opens 3:30",
-      image: "/templates/sample-brand-the-bundle/collection/003.png",
+      media: {
+        type: "image",
+        src: "/templates/sample-brand-the-bundle/collection/003.png",
+      },
       tags: ["Apple", "Banana"],
     },
     {
@@ -66,7 +75,10 @@ export const formcollection_sample_001_the_bundle = {
       title: "Cybersecurity Summit",
       cta: "reserve your spot",
       status: "Opens 4:00",
-      image: "/templates/sample-brand-the-bundle/collection/004.png",
+      media: {
+        type: "image",
+        src: "/templates/sample-brand-the-bundle/collection/004.png",
+      },
       tags: ["Apple", "Banana"],
     },
     // {
@@ -75,7 +87,7 @@ export const formcollection_sample_001_the_bundle = {
     //   title: "Cloud Computing Workshop",
     //   cta: "get tickets",
     //   status: "Opens 5:15",
-    //   image: "/bundle-abstract/004.png",
+    //   media: "/bundle-abstract/004.png",
     // },
   ],
 } as const;
@@ -126,7 +138,10 @@ export const formcollection_sample_002_endura_sports = {
       title: "Football Fan Fest",
       cta: "Register Now",
       status: "Opens 2024-07-20",
-      image: "/templates/sample-brand-endura-sports/collection/001.png",
+      media: {
+        type: "image",
+        src: "/templates/sample-brand-endura-sports/collection/001.png",
+      },
       tags: ["Football", "Running"],
     },
     {
@@ -135,7 +150,10 @@ export const formcollection_sample_002_endura_sports = {
       title: "Basketball Bash",
       cta: "Sign Up Today",
       status: "Opens 2024-08-30",
-      image: "/templates/sample-brand-endura-sports/collection/002.png",
+      media: {
+        type: "image",
+        src: "/templates/sample-brand-endura-sports/collection/002.png",
+      },
       tags: ["Basketball", "Gymnastics"],
     },
     {
@@ -144,7 +162,10 @@ export const formcollection_sample_002_endura_sports = {
       title: "Tennis Tournament",
       cta: "Join Now",
       status: "Opens 2024-09-15",
-      image: "/templates/sample-brand-endura-sports/collection/003.png",
+      media: {
+        type: "image",
+        src: "/templates/sample-brand-endura-sports/collection/003.png",
+      },
       tags: ["Tennis", "Cycling"],
     },
     {
@@ -153,7 +174,10 @@ export const formcollection_sample_002_endura_sports = {
       title: "Running Marathon",
       cta: "Reserve Your Spot",
       status: "Opens 2024-10-25",
-      image: "/templates/sample-brand-endura-sports/collection/004.png",
+      media: {
+        type: "image",
+        src: "/templates/sample-brand-endura-sports/collection/004.png",
+      },
       tags: ["Running", "Swimming"],
     },
     {
@@ -162,7 +186,10 @@ export const formcollection_sample_002_endura_sports = {
       title: "Cycling Challenge",
       cta: "Get Tickets",
       status: "Opens 2024-12-05",
-      image: "/templates/sample-brand-endura-sports/collection/005.png",
+      media: {
+        type: "image",
+        src: "/templates/sample-brand-endura-sports/collection/005.png",
+      },
       tags: ["Cycling", "Volleyball"],
     },
   ],
@@ -206,7 +233,10 @@ export const formcollection_sample_003_prism = {
       title: "Seoul Concert",
       cta: "Buy Tickets",
       status: "Tickets Available",
-      image: "/templates/sample-brand-prism/collection/001.png",
+      media: {
+        type: "image",
+        src: "/templates/sample-brand-prism/collection/001.png",
+      },
       tags: ["Concert", "Live Performance"],
     },
     {
@@ -215,7 +245,10 @@ export const formcollection_sample_003_prism = {
       title: "Tokyo Fan Meeting",
       cta: "Sign Up Today",
       status: "Opens 2024-07-30",
-      image: "/templates/sample-brand-prism/collection/002.png",
+      media: {
+        type: "image",
+        src: "/templates/sample-brand-prism/collection/002.png",
+      },
       tags: ["Fan Meeting", "Meet & Greet"],
     },
     {
@@ -224,7 +257,10 @@ export const formcollection_sample_003_prism = {
       title: "New York Concert",
       cta: "Join Now",
       status: "Tickets Available",
-      image: "/templates/sample-brand-prism/collection/003.png",
+      media: {
+        type: "image",
+        src: "/templates/sample-brand-prism/collection/003.png",
+      },
       tags: ["Concert", "Live Performance"],
     },
     {
@@ -233,7 +269,11 @@ export const formcollection_sample_003_prism = {
       title: "Bangkok Autograph Session",
       cta: "Reserve Your Spot",
       status: "Opens 2024-09-15",
-      image: "/templates/sample-brand-prism/collection/004.png",
+      media: {
+        type: "image",
+        src: "/templates/sample-brand-prism/collection/004.png",
+      },
+
       tags: ["Autograph Session", "Meet & Greet"],
     },
     {
@@ -242,33 +282,11 @@ export const formcollection_sample_003_prism = {
       title: "London Community Event",
       cta: "Get Tickets",
       status: "Opens 2024-11-01",
-      image: "/templates/sample-brand-prism/collection/005.png",
+      media: {
+        type: "image",
+        src: "/templates/sample-brand-prism/collection/005.png",
+      },
       tags: ["Community Event", "Exclusive Event"],
     },
   ],
-  luckDraw: {
-    title: "Lucky Draw",
-    description:
-      "Enter our lucky draw for a chance to win exclusive Prism merchandise and VIP tickets to upcoming events.",
-    entryDetails:
-      "Participants can enter the lucky draw at any of our events. Winners will be announced at the end of each event.",
-    prizes: [
-      {
-        prize: "Exclusive Prism T-shirt",
-        image: "https://example.com/images/prism_prizes/tshirt.png",
-      },
-      {
-        prize: "VIP Tickets to Next Concert",
-        image: "https://example.com/images/prism_prizes/vip_tickets.png",
-      },
-      {
-        prize: "Signed Album",
-        image: "https://example.com/images/prism_prizes/signed_album.png",
-      },
-      {
-        prize: "Meet & Greet Pass",
-        image: "https://example.com/images/prism_prizes/meet_greet.png",
-      },
-    ],
-  },
 } as const;

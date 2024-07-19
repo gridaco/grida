@@ -63,7 +63,7 @@ export default function FormCollectionPage() {
                   }}
                 />
                 <div className="py-2">
-                  <Filter tags={data.tags} />
+                  <Filter tags={data.tags as any as string[]} />
                 </div>
               </header>
               <div className="grid gap-6 grid-cols-1 @3xl/preview:grid-cols-2 @5xl/preview:grid-cols-3 @7xl/preview:grid-cols-4">
@@ -73,11 +73,10 @@ export default function FormCollectionPage() {
                       node_id={"event-card"}
                       component={Card_002}
                       defaultProperties={{
-                        media: {
-                          $id: "media",
-                          type: "image",
-                          src: data.image, // TODO:L property access within static nested data
-                        },
+                        media: Factory.createPropertyAccessExpression([
+                          "event",
+                          "media",
+                        ]),
                         h1: Factory.createPropertyAccessExpression([
                           "event",
                           "title",

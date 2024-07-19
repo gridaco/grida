@@ -13,7 +13,7 @@ import PropertyTypeIcon from "./property-type-icon";
 // Define the type for a property in the schema
 interface Property {
   name: string;
-  type: "string" | "number" | "object" | "unknown";
+  type: "string" | "number" | "object" | "unknown" | "this";
   properties: Property[];
   value?: any;
   expression: string[];
@@ -21,7 +21,7 @@ interface Property {
 
 // Define the type for the schema
 interface Schema {
-  type: "string" | "number" | "object" | "unknown";
+  type: "string" | "number" | "object" | "unknown" | "this";
   properties: Property[];
 }
 
@@ -42,22 +42,32 @@ const getType = (value: any): "string" | "number" | "object" | "unknown" => {
 // Transform data to a format partially resembling JSON Schema
 const transformDataToSchema = (data: Record<string, any>): Schema => {
   const transform = (obj: Record<string, any>, path: string[] = []): Schema => {
+    const properties = Object.keys(obj).map((key: string) => {
+      const value = obj[key];
+      const type = getType(value);
+      const expression = [...path, key];
+
+      return {
+        name: key,
+        type,
+        properties:
+          type === "object" ? transform(value, expression).properties : [],
+        value: type !== "object" ? value : undefined,
+        expression,
+      };
+    });
+
     return {
       type: "object",
-      properties: Object.keys(obj).map((key: string) => {
-        const value = obj[key];
-        const type = getType(value);
-        const expression = [...path, key];
-
-        return {
-          name: key,
-          type,
-          properties:
-            type === "object" ? transform(value, expression).properties : [],
-          value: type !== "object" ? value : undefined,
-          expression,
-        };
-      }),
+      properties: [
+        {
+          name: "this",
+          type: "this",
+          properties: [],
+          expression: path,
+        },
+        ...properties,
+      ],
     };
   };
 
@@ -121,7 +131,7 @@ export default function NestedDropdownMenu({
             type={transformedData.type}
             className="me-2 w-4 h-4"
           />
-          Root
+          Page
         </DropdownMenuSubTrigger>
         <DropdownMenuPortal>
           <DropdownMenuSubContent>
