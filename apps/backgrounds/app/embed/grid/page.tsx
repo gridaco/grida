@@ -1,4 +1,5 @@
 import { BackgroundGrid } from "@/backgrounds/grid";
+import { SupportsDarkMode } from "@/components/dark";
 
 export default function BackgroundGridPage({
   searchParams,
@@ -10,8 +11,10 @@ export default function BackgroundGridPage({
   const { variant } = searchParams;
 
   return (
-    <main className="h-screen w-screen dark:bg-black bg-white">
-      <BackgroundGrid variant={variant} />
-    </main>
+    <SupportsDarkMode>
+      <main className="h-screen w-screen">
+        <BackgroundGrid variant={variant} />
+      </main>
+    </SupportsDarkMode>
   );
 }

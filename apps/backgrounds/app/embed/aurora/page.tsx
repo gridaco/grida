@@ -1,5 +1,10 @@
+import { SupportsDarkMode } from "@/components/dark";
 import { AuroraBackground } from "@/backgrounds/aurora";
 
 export default function AuroraBgPage() {
-  return <AuroraBackground />;
+  return (
+    <SupportsDarkMode>
+      <AuroraBackground />
+    </SupportsDarkMode>
+  );
 }
