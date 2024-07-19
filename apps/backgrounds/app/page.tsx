@@ -43,16 +43,16 @@ export default function Home() {
         <section className="w-full py-12 md:py-24 lg:py-32">
           <div className="container mx-auto space-y-12 px-4 md:px-6">
             <div className="flex flex-col items-center justify-center space-y-4 text-center py-40">
-              <div className="space-y-2">
+              <div className="space-y-4">
                 <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl">
-                  Explore Our Dynamic Backgrounds
+                  Embed Beautiful Backgrounds
                 </h2>
-                <p className="max-w-[900px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
+                <p className="max-w-xl mx-auto text-base text-muted-foreground">
                   Browse through our curated collection of visually stunning
                   backgrounds, perfect for enhancing your website or
-                  application.{" "}
+                  application. You can also use{" "}
                   <Link href="/data" className="underline">
-                    Use with API
+                    with API
                   </Link>
                 </p>
               </div>
