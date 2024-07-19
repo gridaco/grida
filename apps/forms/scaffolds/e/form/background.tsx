@@ -2,7 +2,8 @@
 
 import { motion } from "framer-motion";
 import type { FormPageBackgroundSchema } from "@/types";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useTheme } from "next-themes";
 
 export function FormPageBackground({ element, src }: FormPageBackgroundSchema) {
   const renderBackground = () => {
@@ -20,7 +21,18 @@ export function FormPageBackground({ element, src }: FormPageBackgroundSchema) {
 }
 
 export function FormPageBackgroundIframe({ src }: { src: string }) {
+  const { resolvedTheme } = useTheme();
+  const isdark = resolvedTheme === "dark";
   // const [isLoaded, setIsLoaded] = useState(false);
+
+  const url = useMemo(() => {
+    const url = new URL(src);
+    if (isdark) {
+      url.searchParams.set("dark", "1");
+    }
+    return url.toString();
+  }, [isdark, src]);
+
   return (
     // prevent flickering
     <motion.iframe
@@ -35,7 +47,7 @@ export function FormPageBackgroundIframe({ src }: { src: string }) {
       allowtransparency="true"
       background="transparent"
       className="absolute inset-0 w-screen h-screen -z-10"
-      src={src}
+      src={url}
       width="100vw"
       height="100vh"
     />

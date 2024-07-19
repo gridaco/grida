@@ -1,5 +1,6 @@
 const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
 
+// TODO: replace this with backgrounds api - https://backgrounds.grida.co/data
 export const backgrounds = [
   { name: "None", value: "" },
   { name: "Aurora", value: `${HOST_NAME}/theme/embed/backgrounds/aurora` },
