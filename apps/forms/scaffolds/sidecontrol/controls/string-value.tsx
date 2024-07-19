@@ -34,6 +34,10 @@ import {
 import { Tokens } from "@/ast";
 import { Badge } from "@/components/ui/badge";
 import { Factory } from "@/ast/factory";
+import { useEditorState } from "@/scaffolds/editor";
+import NestedDropdownMenu from "./context/variable";
+import PropertyTypeIcon from "./context/property-type-icon";
+import { useCallback } from "react";
 
 export function StringValueControl({
   value,
@@ -44,6 +48,12 @@ export function StringValueControl({
   onValueChange?: (value?: Tokens.StringValueExpression) => void;
   placeholder?: string;
 }) {
+  const [state] = useEditorState();
+
+  const {
+    document: { selected_node_context },
+  } = state;
+
   return (
     <div className="relative group w-full">
       <Control
@@ -51,6 +61,7 @@ export function StringValueControl({
         onValueChange={onValueChange}
         placeholder={placeholder}
       />
+
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button className="absolute opacity-0 group-hover:opacity-100 right-0 top-0 bottom-0 p-2 m-0.5 rounded flex items-center justify-center z-10">
@@ -62,6 +73,15 @@ export function StringValueControl({
           side="bottom"
           className="max-w-sm overflow-hidden min-w-96"
         >
+          <NestedDropdownMenu
+            asSubmenu
+            onSelect={(expression) => {
+              onValueChange?.(
+                Factory.createPropertyAccessExpression(expression)
+              );
+            }}
+            data={selected_node_context}
+          />
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>
               <TokensIcon className="me-2 w-4 h-4" />
@@ -88,7 +108,7 @@ export function StringValueControl({
               </DropdownMenuSubContent>
             </DropdownMenuPortal>
           </DropdownMenuSub>
-          <DropdownMenuSub>
+          {/* <DropdownMenuSub>
             <DropdownMenuSubTrigger>
               <CookieIcon className="me-2 w-4 h-4" />
               Sample Data
@@ -98,46 +118,7 @@ export function StringValueControl({
                 <DropdownMenuItem>aa</DropdownMenuItem>
               </DropdownMenuSubContent>
             </DropdownMenuPortal>
-          </DropdownMenuSub>
-
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger>
-              <ShuffleIcon className="me-2 w-4 h-4" />
-              Random
-            </DropdownMenuSubTrigger>
-            <DropdownMenuPortal>
-              <DropdownMenuSubContent>
-                <DropdownMenuItem>
-                  <PropertyTypeIcon type="number" className="me-2 w-4 h-4" />
-                  Random Number
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <PropertyTypeIcon type="number" className="me-2 w-4 h-4" />
-                  Random Integer
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <PropertyTypeIcon type="date" className="me-2 w-4 h-4" />
-                  Random Date
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <PropertyTypeIcon type="string" className="me-2 w-4 h-4" />
-                  Random Title
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <PropertyTypeIcon type="string" className="me-2 w-4 h-4" />
-                  Random Word
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <PropertyTypeIcon type="string" className="me-2 w-4 h-4" />
-                  Random Paragraph
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <ImageIcon className="me-2 w-4 h-4" />
-                  Random Image
-                </DropdownMenuItem>
-              </DropdownMenuSubContent>
-            </DropdownMenuPortal>
-          </DropdownMenuSub>
+          </DropdownMenuSub> */}
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>
               <LockClosedIcon className="me-2 w-4 h-4" />
@@ -160,6 +141,7 @@ export function StringValueControl({
               </DropdownMenuSubContent>
             </DropdownMenuPortal>
           </DropdownMenuSub>
+
           <DropdownMenuItem
             onSelect={() => {
               onValueChange?.(undefined);
@@ -168,11 +150,20 @@ export function StringValueControl({
             <ReloadIcon className="me-2 w-4 h-4" />
             Reset
           </DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={() => {
+              onValueChange?.("");
+            }}
+          >
+            <ReloadIcon className="me-2 w-4 h-4" />
+            Clear
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
   );
 }
+//
 
 function Control({
   value,
@@ -264,69 +255,4 @@ function TemplateExpressionControl({
       </div>
     </div>
   );
-}
-
-function PropertyTypeIcon({
-  type,
-  className,
-}: {
-  type:
-    | "string"
-    | "number"
-    | "boolean"
-    | "date"
-    | "object"
-    | "array"
-    | "null"
-    | "undefined"
-    | "function"
-    | "symbol"
-    | "bigint"
-    | "any"
-    | "unknown"
-    | "never"
-    | "void"
-    | "this"
-    | "const"
-    | "object";
-  className?: string;
-}) {
-  const props = {
-    className,
-  };
-
-  switch (type) {
-    case "string":
-      return <TextIcon {...props} />;
-    case "number":
-    case "bigint":
-      return <HashIcon {...props} />;
-    case "boolean":
-      return <LockClosedIcon {...props} />;
-    case "object":
-      return <BracesIcon {...props} />;
-    case "array":
-      return <BracketsIcon {...props} />;
-    case "date":
-      return <CalendarIcon {...props} />;
-    case "null":
-    case "undefined":
-    case "never":
-    case "void":
-      return <CircleOffIcon {...props} />;
-    case "function":
-      return <SquareFunctionIcon {...props} />;
-    case "symbol":
-      return <LockClosedIcon {...props} />;
-    case "any":
-      return <AsteriskSquareIcon {...props} />;
-    case "unknown":
-      return <FileQuestionIcon {...props} />;
-    case "this":
-      return <DotIcon {...props} />;
-    case "const":
-      return <LockClosedIcon {...props} />;
-    default:
-      return <ImageIcon {...props} />;
-  }
 }

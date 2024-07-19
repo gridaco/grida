@@ -17,7 +17,7 @@ export namespace Factory {
   }
 
   export function createPropertyAccessExpression<T = any>(
-    paths: Access.KeyPath<T>
+    paths: Access.KeyPath<T> | string[]
   ): Tokens.PropertyAccessExpression {
     return {
       kind: "PropertyAccessExpression",
