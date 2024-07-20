@@ -176,8 +176,8 @@ const data: ReadonlyArray<Background> = [
   },
   {
     name: "shadergradient-85",
-    title: "Lunar wave",
-    description: "Shader Gradient 85 Mint Fresh",
+    title: "Vivid green",
+    description: "Shader Gradient 85 Vivid green",
     embed: "/embed/shadergradient/85",
     url: "/shadergradient-85",
     preview: [
@@ -188,7 +188,7 @@ const data: ReadonlyArray<Background> = [
   },
   {
     name: "shadergradient-86",
-    title: "Lunar wave",
+    title: "Blush Spiral",
     description: "Shader Gradient 86 Blush Spiral",
     embed: "/embed/shadergradient/86",
     url: "/shadergradient-86",
@@ -200,7 +200,7 @@ const data: ReadonlyArray<Background> = [
   },
   {
     name: "shadergradient-87",
-    title: "Lunar wave",
+    title: "Crimson Tide",
     description: "Shader Gradient 87 Crimson Tide",
     embed: "/embed/shadergradient/87",
     url: "/shadergradient-87",
@@ -212,7 +212,7 @@ const data: ReadonlyArray<Background> = [
   },
   {
     name: "shadergradient-88",
-    title: "Lunar wave",
+    title: "Solar Vortex",
     description: "Shader Gradient 88 Solar Vortex",
     embed: "/embed/shadergradient/88",
     url: "/shadergradient-88",
@@ -224,7 +224,7 @@ const data: ReadonlyArray<Background> = [
   },
   {
     name: "shadergradient-89",
-    title: "Lunar wave",
+    title: "Shadow Wave",
     description: "Shader Gradient 89 Shadow Wave",
     embed: "/embed/shadergradient/89",
     url: "/shadergradient-89",
@@ -236,7 +236,7 @@ const data: ReadonlyArray<Background> = [
   },
   {
     name: "shadergradient-90",
-    title: "Lunar wave",
+    title: "Emerald Glow",
     description: "Shader Gradient 90 Emerald Glow",
     embed: "/embed/shadergradient/90",
     url: "/shadergradient-90",
