@@ -25,7 +25,7 @@ export default function Hero() {
       <FormPageBackground
         type="background"
         element="iframe"
-        src="https://forms.grida.co/theme/embed/backgrounds/dots"
+        src="https://bg.grida.co/embed/dots"
       />
     </section>
   );
