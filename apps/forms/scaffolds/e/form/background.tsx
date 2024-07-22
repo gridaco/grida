@@ -26,12 +26,20 @@ export function FormPageBackgroundIframe({ src }: { src: string }) {
   // const [isLoaded, setIsLoaded] = useState(false);
 
   const url = useMemo(() => {
-    const url = new URL(src);
-    if (isdark) {
-      url.searchParams.set("dark", "1");
+    try {
+      const url = new URL(src);
+      if (isdark) {
+        url.searchParams.set("dark", "1");
+      }
+      return url.toString();
+    } catch (e) {
+      return src;
     }
-    return url.toString();
   }, [isdark, src]);
+
+  if (!url) {
+    return <></>;
+  }
 
   return (
     // prevent flickering
