@@ -27,6 +27,7 @@ export function DataGridLocalSearch() {
           placeholder="Search locally"
           onChange={(e) => onSearchChange(e.target.value)}
           className="max-w-sm"
+          variant="icon"
         />
       </TooltipTrigger>
       <TooltipContent>Local search - Search within loaded data</TooltipContent>

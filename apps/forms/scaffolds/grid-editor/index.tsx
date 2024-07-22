@@ -265,7 +265,7 @@ function TableTools() {
   const { datagrid_table } = state;
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1">
       <DataGridLocalSearch />
       {datagrid_table === "x-supabase-main-table" && <XSupaDataGridSort />}
     </div>
