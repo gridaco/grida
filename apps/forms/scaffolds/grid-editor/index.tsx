@@ -72,11 +72,9 @@ export function GridEditor() {
       filter: datagrid_filter,
       responses: responses,
       sessions: sessions ?? [],
-      // TODO:
       data: {
         pks: x_supabase_main_table?.pks ?? [],
         rows: x_supabase_main_table?.rows ?? [],
-        fields: {},
       },
     });
   }, [
