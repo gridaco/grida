@@ -1,7 +1,7 @@
 import data from "@/backgrounds";
 import { NextResponse } from "next/server";
 
-const HOST = "https://backgrounds.grida.co";
+const HOST = "https://bg.grida.co";
 
 export function GET() {
   const data_w_full_url = data.map((bg) => ({

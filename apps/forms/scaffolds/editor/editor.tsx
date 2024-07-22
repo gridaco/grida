@@ -14,6 +14,7 @@ import { BlockEditPanel } from "../panels/block-edit-panel";
 import { MediaViewerProvider } from "../mediaviewer";
 import toast from "react-hot-toast";
 import { PaletteProvider } from "@/scaffolds/agent/theme";
+import { AssetsBackgroundsResolver } from "./resolver/assets-backgrounds-resolver";
 
 export function FormEditorProvider({
   initial,
@@ -26,6 +27,7 @@ export function FormEditorProvider({
 
   return (
     <StateProvider state={state} dispatch={dispatch}>
+      <AssetsBackgroundsResolver />
       <PaletteProvider palette={state.theme.palette} />
       <TooltipProvider>
         <MediaViewerProvider>

@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/select";
 import { FormPageBackgroundSchema } from "@/types";
 import { Button } from "@/components/ui/button";
-import { backgrounds } from "@/theme/k";
+import { useEditorState } from "@/scaffolds/editor";
 
 export function CustomPageBackgroundPreferences({
   form_id,
@@ -27,7 +27,12 @@ export function CustomPageBackgroundPreferences({
     background?: FormPageBackgroundSchema;
   };
 }) {
+  const [state] = useEditorState();
   const [src, setSrc] = useState(init.background?.src);
+
+  const {
+    assets: { backgrounds },
+  } = state;
 
   return (
     <PreferenceBox>
@@ -49,8 +54,8 @@ export function CustomPageBackgroundPreferences({
             </SelectTrigger>
             <SelectContent>
               {backgrounds.map((background, i) => (
-                <SelectItem key={i} value={background.value}>
-                  {background.name}
+                <SelectItem key={i} value={background.embed}>
+                  {background.title}
                 </SelectItem>
               ))}
             </SelectContent>
