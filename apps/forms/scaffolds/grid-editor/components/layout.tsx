@@ -5,7 +5,15 @@ export function GridRoot({ children }: React.PropsWithChildren<{}>) {
 }
 
 export function GridHeader({ children }: React.PropsWithChildren<{}>) {
-  return <header className="h-14 w-full">{children}</header>;
+  return (
+    <header className="h-14 w-full flex items-center justify-between gap-4 px-4 py-1">
+      {children}
+    </header>
+  );
+}
+
+export function GridHeaderMenus({ children }: React.PropsWithChildren<{}>) {
+  return <div className="flex gap-2 items-center">{children}</div>;
 }
 
 export function GridContent({ children }: React.PropsWithChildren<{}>) {

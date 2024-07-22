@@ -2,18 +2,24 @@
 
 import { PrivateEditorApi } from "@/lib/private";
 import { useEditorState } from "@/scaffolds/editor";
+import { GridCount } from "@/scaffolds/grid-editor/components/count";
 import {
   GridContent,
   GridFooter,
   GridHeader,
+  GridHeaderMenus,
   GridRoot,
 } from "@/scaffolds/grid-editor/components/layout";
 import { GridLimit } from "@/scaffolds/grid-editor/components/limit";
 import { GridRefresh } from "@/scaffolds/grid-editor/components/refresh";
+import { DataGridLocalSearch } from "@/scaffolds/grid-editor/components/search";
+import { GridViewSettings } from "@/scaffolds/grid-editor/components/view-settings";
 import { ReferenceTableGrid } from "@/scaffolds/grid/reference-grid";
+import { GridaSupabase } from "@/types";
 import { EditorApiResponse } from "@/types/private/api";
+import { priority_sorter } from "@/utils/sort";
 import assert from "assert";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import useSWR from "swr";
 
 export default function XTablePage({
@@ -25,7 +31,7 @@ export default function XTablePage({
 }) {
   const { table } = params;
 
-  const [state] = useEditorState();
+  const [state, dispatch] = useEditorState();
 
   // only supports auth.users atm.
   assert(table === "auth.users", `Unsupported table "${table}"`);
@@ -49,7 +55,9 @@ export default function XTablePage({
     ? `/private/editor/connect/${state.form_id}/supabase/table/${table}/query?${serachParams}`
     : null;
 
-  const { data } = useSWR<EditorApiResponse<{ users: any[] }, any>>(
+  const { data, isLoading, isValidating } = useSWR<
+    EditorApiResponse<{ users: any[] }, any>
+  >(
     request,
     async (url: string) => {
       const res = await fetch(url);
@@ -61,20 +69,51 @@ export default function XTablePage({
     }
   );
 
+  useEffect(() => {
+    dispatch({
+      type: "editor/data-grid/loading",
+      isloading: isLoading || isValidating,
+    });
+  }, [dispatch, isLoading, isValidating]);
+
+  const sort_by_priorities = priority_sorter(
+    GridaSupabase.unknown_table_column_priorities
+  );
+
+  const columns = useMemo(
+    () =>
+      Object.keys(GridaSupabase.SupabaseUserJsonSchema.properties)
+        .sort(sort_by_priorities)
+        .map((key) => {
+          return {
+            key: key,
+            name: key,
+          };
+        }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
+
   return (
     <GridRoot>
       <GridHeader>
-        <h1 className="text-2xl font-bold">{table}</h1>
+        <GridHeaderMenus>
+          <DataGridLocalSearch />
+        </GridHeaderMenus>
+        <GridHeaderMenus>
+          <GridViewSettings />
+        </GridHeaderMenus>
       </GridHeader>
       <GridContent>
         <ReferenceTableGrid
-          columns={[{ key: "id", name: "id", type: "text" }]}
+          columns={columns}
           // columns={[]}
           rows={data?.data?.users ?? []}
         />
       </GridContent>
       <GridFooter>
         <GridLimit />
+        <GridCount count={data?.data?.users?.length ?? 0} />
         <GridRefresh />
       </GridFooter>
     </GridRoot>

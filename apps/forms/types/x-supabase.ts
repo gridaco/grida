@@ -170,6 +170,16 @@ export namespace GridaSupabase {
     ],
   };
 
+  /**
+   * general & common priorities for columns order (only for auth.users table)
+   */
+  export const unknown_table_column_priorities = [
+    "id",
+    "email",
+    "name",
+    "username",
+  ];
+
   export type SupabaseUserColumn =
     keyof (typeof SupabaseUserJsonSchema)["properties"];
 

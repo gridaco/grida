@@ -24,6 +24,9 @@ import { Badge } from "@/components/ui/badge";
 export function GridViewSettings() {
   const [state, dispatch] = useEditorState();
 
+  const { scheduling_tz, datetz, dateformat, datagrid_filter, datagrid_table } =
+    state;
+
   // dummy example date - happy star wars day!
   const starwarsday = useMemo(
     () => new Date(new Date().getFullYear(), 4, 4),
@@ -34,13 +37,16 @@ export function GridViewSettings() {
     () => s2Hmm(new Date().getTimezoneOffset() * -1 * 60),
     []
   );
+
   const tzoffset_scheduling_tz = useMemo(
     () =>
-      state.scheduling_tz
-        ? formatTZ(new Date(), "XXX", { timeZone: state.scheduling_tz })
+      scheduling_tz
+        ? formatTZ(new Date(), "XXX", { timeZone: scheduling_tz })
         : undefined,
-    [state.scheduling_tz]
+    [scheduling_tz]
   );
+
+  const simulator_available = datagrid_table !== "x-supabase-main-table";
 
   return (
     <DropdownMenu>
@@ -55,7 +61,7 @@ export function GridViewSettings() {
         <DropdownMenuLabel>Table Settings</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuCheckboxItem
-          checked={state.datagrid_filter.empty_data_hidden}
+          checked={datagrid_filter.empty_data_hidden}
           onCheckedChange={(checked) => {
             dispatch({
               type: "editor/data-grid/filter",
@@ -66,7 +72,7 @@ export function GridViewSettings() {
           Hide records with empty data
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
-          checked={state.datagrid_filter.masking_enabled}
+          checked={datagrid_filter.masking_enabled}
           onCheckedChange={(checked) => {
             dispatch({
               type: "editor/data-grid/filter",
@@ -78,7 +84,7 @@ export function GridViewSettings() {
         </DropdownMenuCheckboxItem>
         <DropdownMenuSeparator />
         <DropdownMenuRadioGroup
-          value={state.dateformat}
+          value={dateformat}
           onValueChange={(value) => {
             dispatch({
               type: "editor/data-grid/dateformat",
@@ -107,7 +113,7 @@ export function GridViewSettings() {
         </DropdownMenuRadioGroup>
         <DropdownMenuSeparator />
         <DropdownMenuRadioGroup
-          value={tztostr(state.datetz, "browser")}
+          value={tztostr(datetz, "browser")}
           onValueChange={(tz) => {
             switch (tz) {
               case "browser":
@@ -128,26 +134,30 @@ export function GridViewSettings() {
             <DropdownMenuShortcut>(UTC+0)</DropdownMenuShortcut>
           </DropdownMenuRadioItem>
           <DropdownMenuRadioItem
-            disabled={!state.scheduling_tz}
-            value={state.scheduling_tz ?? "N/A"}
+            disabled={!scheduling_tz}
+            value={scheduling_tz ?? "N/A"}
           >
             Scheduling Time
-            {state.scheduling_tz && (
+            {scheduling_tz && (
               <DropdownMenuShortcut className="text-end">
-                {state.scheduling_tz}
+                {scheduling_tz}
                 <br />
                 (UTC{tzoffset_scheduling_tz})
               </DropdownMenuShortcut>
             )}
           </DropdownMenuRadioItem>
         </DropdownMenuRadioGroup>
-        <DropdownMenuSeparator />
-        <Link href={`./simulator`} target="_blank">
-          <DropdownMenuItem className="cursor-pointer">
-            <CommitIcon className="inline align-middle me-2" />
-            Open Simulator
-          </DropdownMenuItem>
-        </Link>
+        {simulator_available && (
+          <>
+            <DropdownMenuSeparator />
+            <Link href={`./simulator`} target="_blank">
+              <DropdownMenuItem className="cursor-pointer">
+                <CommitIcon className="inline align-middle me-2" />
+                Open Simulator
+              </DropdownMenuItem>
+            </Link>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

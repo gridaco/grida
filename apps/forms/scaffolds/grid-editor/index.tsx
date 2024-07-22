@@ -32,9 +32,11 @@ import {
   GridContent,
   GridFooter,
   GridHeader,
+  GridHeaderMenus,
   GridRoot,
 } from "./components/layout";
 import { txt_n_plural } from "@/utils/plural";
+import { GridCount } from "./components/count";
 
 export function GridEditor() {
   const [state, dispatch] = useEditorState();
@@ -144,33 +146,31 @@ export function GridEditor() {
   return (
     <GridRoot>
       <GridHeader>
-        <div className="flex py-1 h-full justify-between gap-4">
+        <GridHeaderMenus>
           {has_selected_responses ? (
-            <>
-              <div
-                className={clsx(
-                  "px-4 flex items-center",
-                  !has_selected_responses || selectionDisabled ? "hidden" : ""
-                )}
-              >
-                <div className="flex gap-2 items-center">
-                  <span
-                    className="text-sm font-normal text-neutral-500"
-                    aria-label="selected responses"
-                  >
-                    {txt_n_plural(
-                      selected_responses.size,
-                      datagrid_table_row_keyword
-                    )}{" "}
-                    selected
-                  </span>
-                  <DeleteSelectedRowsButton />
-                </div>
+            <div
+              className={clsx(
+                "flex items-center",
+                !has_selected_responses || selectionDisabled ? "hidden" : ""
+              )}
+            >
+              <div className="flex gap-2 items-center">
+                <span
+                  className="text-sm font-normal text-neutral-500"
+                  aria-label="selected responses"
+                >
+                  {txt_n_plural(
+                    selected_responses.size,
+                    datagrid_table_row_keyword
+                  )}{" "}
+                  selected
+                </span>
+                <DeleteSelectedRowsButton />
               </div>
-            </>
+            </div>
           ) : (
             <>
-              <div className="px-2 flex justify-center items-center gap-4">
+              <div className="flex justify-center items-center gap-4">
                 <Tabs
                   value={state.datagrid_table}
                   onValueChange={(value) => {
@@ -200,27 +200,16 @@ export function GridEditor() {
               </div>
             </>
           )}
-          <div
-            className={clsx(
-              "flex items-center",
-              datagrid_table !== "session" && "hidden"
-            )}
-          >
-            <span className="ms-2 text-xs text-muted-foreground">
-              Displaying Responses & In-Progress Sessions
-            </span>
-          </div>
-          <div className="flex-1" />
-          <div className="px-4 flex gap-2 items-center">
-            <Link href={`./analytics`} className="flex">
-              <Badge variant={"outline"} className="cursor-pointer">
-                <PieChartIcon className="align-middle me-2" />
-                Realtime
-              </Badge>
-            </Link>
-            <GridViewSettings />
-          </div>
-        </div>
+        </GridHeaderMenus>
+        <GridHeaderMenus>
+          <Link href={`./analytics`} className="flex">
+            <Badge variant={"outline"} className="cursor-pointer">
+              <PieChartIcon className="align-middle me-2" />
+              Realtime
+            </Badge>
+          </Link>
+          <GridViewSettings />
+        </GridHeaderMenus>
       </GridHeader>
       <DeleteFieldConfirmDialog
         open={deleteFieldConfirmOpen}
@@ -257,9 +246,7 @@ export function GridEditor() {
       <GridFooter>
         <div className="flex gap-2 items-center">
           <GridLimit />
-          <span className="text-sm font-medium">
-            {txt_n_plural(rows.length, datagrid_table_row_keyword)}
-          </span>
+          <GridCount count={rows?.length ?? 0} />
         </div>
         <Link href={`/v1/${form_id}/export/csv`} download target="_blank">
           <Button variant="ghost">
