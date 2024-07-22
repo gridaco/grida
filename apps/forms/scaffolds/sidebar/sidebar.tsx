@@ -81,6 +81,12 @@ function ModeData() {
               Form
             </SidebarMenuItem>
           </Link>
+          <Link href={`/d/${form_id}/data/x/auth.users`}>
+            <SidebarMenuItem muted>
+              <AvatarIcon className="inline align-middle w-4 h-4 me-2" />
+              Users
+            </SidebarMenuItem>
+          </Link>
           <Link href={`/d/${form_id}/data/customers`}>
             <SidebarMenuItem muted>
               <AvatarIcon className="inline align-middle w-4 h-4 me-2" />
