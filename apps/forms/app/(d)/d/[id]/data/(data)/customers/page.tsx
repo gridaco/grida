@@ -48,6 +48,12 @@ export default function Customers() {
         </GridLayout.Header>
         <GridLayout.Content>
           <CustomerGrid
+            tokens={
+              state.datagrid_filter.localsearch
+                ? [state.datagrid_filter.localsearch]
+                : []
+            }
+            masked={state.datagrid_filter.masking_enabled}
             rows={
               rows?.map((customer: Customer) => ({
                 uid: customer.uid,

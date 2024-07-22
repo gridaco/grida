@@ -6,12 +6,14 @@ import { XSupabaseReferenceTableRow } from "./types";
 import { EmptyRowsRenderer } from "./empty";
 import Highlight from "@/components/highlight";
 import "./grid.css";
+import { mask } from "./mask";
 
 export function ReferenceTableGrid({
   columns: _columns,
   rows: _rows,
   rowKey,
   tokens,
+  masked,
   onSelected,
 }: {
   columns: {
@@ -22,6 +24,7 @@ export function ReferenceTableGrid({
   rows: XSupabaseReferenceTableRow[];
   rowKey?: string;
   tokens?: string[];
+  masked?: boolean;
   onSelected?: (key: string, row: XSupabaseReferenceTableRow) => void;
 }) {
   const columns = _columns.map(
@@ -36,10 +39,15 @@ export function ReferenceTableGrid({
         width: undefined,
         renderCell: ({ row, column }: RenderCellProps<any>) => {
           const val = row[col.key as keyof XSupabaseReferenceTableRow];
+          const display = masked
+            ? val
+              ? mask(val.toString())
+              : ""
+            : val?.toString();
 
           return (
             <Highlight
-              text={val?.toString()}
+              text={display}
               tokens={tokens}
               className="bg-foreground text-background"
             />

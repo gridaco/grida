@@ -11,14 +11,20 @@ import { EmptyRowsRenderer } from "./empty";
 import "./grid.css";
 import { CalendarIcon, EnvelopeClosedIcon } from "@radix-ui/react-icons";
 import { PhoneIcon } from "lucide-react";
+import { mask } from "./mask";
+import Highlight from "@/components/highlight";
 
 export function CustomerGrid({
   rows: _rows,
   rowKey,
   onSelected,
+  tokens,
+  masked,
 }: {
   rows: CFCustomerRow[];
   rowKey?: string;
+  tokens?: string[];
+  masked?: boolean;
   onSelected?: (key: string, row: CFCustomerRow) => void;
 }) {
   const columns = [
@@ -53,6 +59,22 @@ export function CustomerGrid({
         // frozen: col.key === rowKey,
         width: undefined,
         renderHeaderCell: HeaderCell,
+        renderCell: ({ row, column }: RenderCellProps<any>) => {
+          const val = row[col.key as keyof CFCustomerRow];
+          const display = masked
+            ? val
+              ? mask(val.toString())
+              : ""
+            : val?.toString();
+
+          return (
+            <Highlight
+              text={display}
+              tokens={tokens}
+              className="bg-foreground text-background"
+            />
+          );
+        },
       }) as Column<any>
   );
 

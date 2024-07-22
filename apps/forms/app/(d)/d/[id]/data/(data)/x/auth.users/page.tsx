@@ -104,7 +104,16 @@ export default function XTablePage() {
           </GridLayout.HeaderMenus>
         </GridLayout.Header>
         <GridLayout.Content>
-          <ReferenceTableGrid columns={columns} rows={rows} />
+          <ReferenceTableGrid
+            masked={state.datagrid_filter.masking_enabled}
+            tokens={
+              state.datagrid_filter.localsearch
+                ? [state.datagrid_filter.localsearch]
+                : []
+            }
+            columns={columns}
+            rows={rows}
+          />
         </GridLayout.Content>
         <GridLayout.Footer>
           <GridLimit />
