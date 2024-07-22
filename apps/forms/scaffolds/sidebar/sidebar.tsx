@@ -64,7 +64,7 @@ export function Siebar({
 function ModeData() {
   const [state] = useEditorState();
 
-  const { form_id } = state;
+  const { form_id, datagrid_table, tables, connections } = state;
 
   return (
     <>
@@ -76,17 +76,27 @@ function ModeData() {
         </SidebarSectionHeaderItem>
         <SidebarMenuList>
           <Link href={`/d/${form_id}/data/responses`}>
-            <SidebarMenuItem muted>
-              <Table2Icon className="inline align-middle w-4 h-4 me-2" />
-              Form
-            </SidebarMenuItem>
+            {datagrid_table === "x-supabase-main-table" ? (
+              <SidebarMenuItem muted>
+                <SupabaseLogo className="inline align-middle w-4 h-4 me-2" />
+                {/* TODO: not a good way. */}
+                {tables.find((t) => t.type === "x-supabase-main-table")?.name}
+              </SidebarMenuItem>
+            ) : (
+              <SidebarMenuItem muted>
+                <Table2Icon className="inline align-middle w-4 h-4 me-2" />
+                Form
+              </SidebarMenuItem>
+            )}
           </Link>
-          <Link href={`/d/${form_id}/data/x/auth.users`}>
-            <SidebarMenuItem muted>
-              <SupabaseLogo className="inline align-middle w-4 h-4 me-2" />
-              auth.users
-            </SidebarMenuItem>
-          </Link>
+          {connections.supabase && (
+            <Link href={`/d/${form_id}/data/x/auth.users`}>
+              <SidebarMenuItem muted>
+                <SupabaseLogo className="inline align-middle w-4 h-4 me-2" />
+                auth.users
+              </SidebarMenuItem>
+            </Link>
+          )}
           <Link href={`/d/${form_id}/data/customers`}>
             <SidebarMenuItem muted>
               <AvatarIcon className="inline align-middle w-4 h-4 me-2" />
