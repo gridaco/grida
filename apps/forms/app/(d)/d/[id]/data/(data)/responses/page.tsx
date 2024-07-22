@@ -6,7 +6,6 @@ import {
   XSupabaseMainTableSyncProvider,
 } from "@/scaffolds/editor/feed";
 import { GridEditor } from "@/scaffolds/grid-editor";
-import { Siebar } from "@/scaffolds/sidebar/sidebar";
 
 export default function FormResponsesPage() {
   return (
@@ -16,15 +15,7 @@ export default function FormResponsesPage() {
       <ResponseSessionFeedProvider />
       <XSupabaseMainTableFeedProvider />
       <XSupabaseMainTableSyncProvider />
-      <div className="h-full flex flex-1 w-full">
-        {/* side */}
-        <aside className="hidden lg:flex h-full">
-          <Siebar mode="data" />
-        </aside>
-        <div className="w-full h-full overflow-x-hidden">
-          <GridEditor />
-        </div>
-      </div>
+      <GridEditor />
     </>
   );
 }

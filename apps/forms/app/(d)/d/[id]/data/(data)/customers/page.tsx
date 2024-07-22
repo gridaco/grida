@@ -1,10 +1,8 @@
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   createRouteHandlerClient,
   createRouteHandlerWorkspaceClient,
 } from "@/lib/supabase/server";
 import { CustomerGrid } from "@/scaffolds/grid/customer-grid";
-import { Siebar } from "@/scaffolds/sidebar/sidebar";
 import { provisional } from "@/services/customer/utils";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
@@ -43,10 +41,6 @@ export default async function Customers({
 
   return (
     <div className="h-full flex flex-1 w-full">
-      {/* side */}
-      <aside className="hidden lg:flex h-full">
-        <Siebar mode="data" />
-      </aside>
       <div className="w-full h-full overflow-x-hidden">
         <main className="flex flex-col h-full">
           {/* <Tabs>
