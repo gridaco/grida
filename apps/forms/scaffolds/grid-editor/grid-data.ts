@@ -1,4 +1,5 @@
-import type {
+import {
+  Customer,
   FormFieldDefinition,
   FormInputType,
   FormResponse,
@@ -15,30 +16,45 @@ import { PrivateEditorApi } from "@/lib/private";
 import { GridFilter } from "../grid-filter";
 
 export namespace GridData {
-  type DataGridInput = {
-    form_id: string;
-    fields: FormFieldDefinition[];
-    filter: DataGridFilterSettings;
-  } & (
+  type DataGridInput =
+    | ({
+        form_id: string;
+        fields: FormFieldDefinition[];
+        filter: DataGridFilterSettings;
+      } & (
+        | {
+            table: "session";
+            sessions: FormResponseSession[];
+          }
+        | {
+            table: "response";
+            responses: {
+              rows: FormResponse[];
+              fields: { [key: string]: FormResponseField[] };
+            };
+          }
+        | {
+            table: "x-supabase-main-table";
+            data: {
+              pks: string[];
+              rows: any[];
+            };
+          }
+      ))
     | {
-        table: "session";
-        sessions: FormResponseSession[];
-      }
-    | {
-        table: "response";
-        responses: {
-          rows: FormResponse[];
-          fields: { [key: string]: FormResponseField[] };
+        filter: DataGridFilterSettings;
+        table: "customer";
+        data: {
+          rows: Customer[];
         };
       }
     | {
-        table: "x-supabase-main-table";
+        filter: DataGridFilterSettings;
+        table: "x-supabase-auth.users";
         data: {
-          pks: string[];
           rows: any[];
         };
-      }
-  );
+      };
 
   export function columns(
     table: FormEditorState["datagrid_table"],
@@ -149,6 +165,24 @@ export namespace GridData {
             input.fields.map((f) => f.name)
           ),
         });
+      }
+      case "x-supabase-auth.users": {
+        return GridFilter.filter(
+          input.data.rows,
+          input.filter,
+          undefined,
+          Object.keys(GridaSupabase.SupabaseUserJsonSchema.properties)
+        );
+      }
+      case "customer": {
+        return GridFilter.filter(input.data.rows, input.filter, undefined, [
+          "uid",
+          "email",
+          "email_provisional",
+          "phone",
+          "created_at",
+          "last_seen_at",
+        ]);
       }
     }
   }

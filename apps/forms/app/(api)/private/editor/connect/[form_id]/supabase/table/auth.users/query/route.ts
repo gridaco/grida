@@ -14,10 +14,8 @@ export async function GET(
 ) {
   const { form_id } = context.params;
 
-  const _q_page = req.nextUrl.searchParams.get("page");
-  const page = _q_page ? parseInt(_q_page) : 1;
-  const _q_per_page = req.nextUrl.searchParams.get("per_page");
-  const per_page = _q_per_page ? parseInt(_q_per_page) : 50;
+  const _q_limit = req.nextUrl.searchParams.get("limit");
+  const limit = _q_limit ? parseInt(_q_limit) : undefined;
 
   // FIXME: Strict Authorization - this route accesses auth.users
 
@@ -50,9 +48,9 @@ export async function GET(
     }
   );
 
-  const res = await client.auth.admin.listUsers({
-    page: page,
-    perPage: per_page,
+  const res = await xclient.auth.admin.listUsers({
+    page: 1,
+    perPage: limit,
   });
 
   return NextResponse.json(res);

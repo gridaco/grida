@@ -18,21 +18,10 @@ import { priority_sorter } from "@/utils/sort";
 import { useEffect, useMemo } from "react";
 import { MainTable } from "@/scaffolds/editor/utils/main-table";
 import useSWR from "swr";
-import assert from "assert";
+import { GridData } from "@/scaffolds/grid-editor/grid-data";
 
-export default function XTablePage({
-  params,
-}: {
-  params: {
-    table: string;
-  };
-}) {
-  const { table } = params;
-
+export default function XTablePage() {
   const [state, dispatch] = useEditorState();
-
-  // only supports auth.users atm.
-  assert(table === "auth.users", `Unsupported table "${table}"`);
 
   const {
     form_id,
@@ -50,7 +39,7 @@ export default function XTablePage({
   }, [datagrid_rows_per_page, datagrid_orderby, datagrid_table_refresh_key]);
 
   const request = state.connections.supabase?.main_supabase_table_id
-    ? `/private/editor/connect/${state.form_id}/supabase/table/${table}/query?${serachParams}`
+    ? `/private/editor/connect/${state.form_id}/supabase/table/auth.users/query?${serachParams}`
     : null;
 
   const { data, isLoading, isValidating } = useSWR<
@@ -92,6 +81,16 @@ export default function XTablePage({
     []
   );
 
+  const rows = useMemo(() => {
+    return GridData.rows({
+      filter: state.datagrid_filter,
+      table: "x-supabase-auth.users",
+      data: {
+        rows: data?.data?.users ?? [],
+      },
+    });
+  }, [data, state.datagrid_filter]);
+
   return (
     <MainTable table="x-supabase-auth.users">
       <GridLayout.Root>
@@ -105,15 +104,11 @@ export default function XTablePage({
           </GridLayout.HeaderMenus>
         </GridLayout.Header>
         <GridLayout.Content>
-          <ReferenceTableGrid
-            columns={columns}
-            // columns={[]}
-            rows={data?.data?.users ?? []}
-          />
+          <ReferenceTableGrid columns={columns} rows={rows} />
         </GridLayout.Content>
         <GridLayout.Footer>
           <GridLimit />
-          <GridCount count={data?.data?.users?.length ?? 0} />
+          <GridCount count={rows.length} />
           <GridRefresh />
         </GridLayout.Footer>
       </GridLayout.Root>

@@ -14,11 +14,24 @@ import * as GridLayout from "@/scaffolds/grid-editor/components/layout";
 import { MainTable } from "@/scaffolds/editor/utils/main-table";
 import { useEditorState } from "@/scaffolds/editor";
 import { CustomerFeedProvider } from "@/scaffolds/editor/feed";
+import { useMemo } from "react";
+import { GridData } from "@/scaffolds/grid-editor/grid-data";
+import { Customer } from "@/types";
 
 export default function Customers() {
   const [state] = useEditorState();
 
   const { customers } = state;
+
+  const rows = useMemo(() => {
+    return GridData.rows({
+      filter: state.datagrid_filter,
+      table: "customer",
+      data: {
+        rows: customers || [],
+      },
+    });
+  }, [customers, state.datagrid_filter]);
 
   return (
     <MainTable table="customer">
@@ -36,7 +49,7 @@ export default function Customers() {
         <GridLayout.Content>
           <CustomerGrid
             rows={
-              customers?.map((customer) => ({
+              rows?.map((customer: Customer) => ({
                 uid: customer.uid,
                 email: provisional(
                   customer.email,
@@ -54,7 +67,7 @@ export default function Customers() {
         </GridLayout.Content>
         <GridLayout.Footer>
           <GridLimit />
-          <GridCount count={customers?.length ?? 0} />
+          <GridCount count={rows.length} />
           <GridRefresh />
         </GridLayout.Footer>
       </GridLayout.Root>
