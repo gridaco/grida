@@ -1,7 +1,7 @@
 import type { OrderBy } from "@/types";
 
 export namespace PostgrestQuery {
-  type ParsedOrderBy = { [col: string]: OrderBy };
+  export type ParsedOrderBy = { [col: string]: OrderBy };
 
   export function parseOrderByQueryString(orderQuery: string): ParsedOrderBy {
     const parsedOrderBy: ParsedOrderBy = {};

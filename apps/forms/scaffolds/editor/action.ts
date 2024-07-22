@@ -1,4 +1,5 @@
 import type {
+  Customer,
   FormBlockType,
   FormFieldDefinition,
   FormInputType,
@@ -40,6 +41,7 @@ export type BlocksEditorAction =
   | DataGridRowsAction
   | FeedResponseSessionsAction
   | DataGridTableAction
+  | FeedCustomerAction
   | OpenCustomerEditAction
   | OpenBlockEditPanelAction
   | DataGridReorderColumnAction
@@ -201,6 +203,11 @@ export interface OpenResponseEditAction {
   open?: boolean;
 }
 
+export interface FeedCustomerAction {
+  type: "editor/customers/feed";
+  data: Customer[];
+}
+
 export interface OpenCustomerEditAction {
   type: "editor/customers/edit";
   customer_id?: string;
@@ -233,7 +240,7 @@ export interface DataGridDateTZAction {
 
 export interface DataGridTableAction {
   type: "editor/data-grid/table";
-  table: "response" | "session" | "x-supabase-main-table";
+  table: FormEditorState["datagrid_table"];
 }
 
 export interface DataGridRowsAction {

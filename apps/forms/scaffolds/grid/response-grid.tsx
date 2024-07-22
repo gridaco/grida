@@ -62,6 +62,7 @@ import { RichTextEditCell } from "./richtext-cell";
 import Highlight from "@/components/highlight";
 import { FieldSupports } from "@/k/supported_field_types";
 import { format } from "date-fns";
+import { EmptyRowsRenderer } from "./empty";
 
 function rowKeyGetter(row: GFResponseRow) {
   return row.__gf_id;
@@ -257,6 +258,7 @@ export function ResponseGrid({
       onSelectedRowsChange={
         selectionDisabled ? undefined : onSelectedRowsChange
       }
+      renderers={{ noRowsFallback: <EmptyRowsRenderer /> }}
       rows={rows}
       rowHeight={44}
     />

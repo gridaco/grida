@@ -71,7 +71,7 @@ export default async function WithLink({ params }: { params: { id: string } }) {
         </SectorHeader>
         <SectorBlocks>
           <PreferenceBox>
-            <PreferenceBoxHeader heading={<>Quick Submit API URL</>} />
+            <PreferenceBoxHeader heading={<>Action URL</>} />
             <PreferenceBody>
               <p className="mb-2 opacity-80">
                 Use this URL to action on your html form to collect data

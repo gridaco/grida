@@ -151,7 +151,8 @@ export namespace SupabasePostgRESTOpenApi {
           // need a better way for parsing format
           format,
           description,
-          required: schema.required.includes(columnName),
+          // required can be null when postgrest view
+          required: schema.required?.includes(columnName),
           pk,
           fk,
           default: defaultValue,
