@@ -71,6 +71,7 @@ import { ArrowDownUpIcon } from "lucide-react";
 import { cn } from "@/utils";
 import { PopoverClose } from "@radix-ui/react-popover";
 import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
+import { SupabaseLogo } from "@/components/logos";
 
 export function GridEditor() {
   const [state, dispatch] = useEditorState();
@@ -219,6 +220,9 @@ export function GridEditor() {
                           key={table.type + table.name}
                           value={table.type}
                         >
+                          {table.type === "x-supabase-main-table" && (
+                            <SupabaseLogo className="w-4 h-4 align-middle me-2" />
+                          )}
                           {table.label}
                         </TabsTrigger>
                       );
