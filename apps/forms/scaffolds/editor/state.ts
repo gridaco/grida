@@ -82,6 +82,9 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
       templatedata: {},
     },
     fields: init.fields,
+    assets: {
+      backgrounds: [],
+    },
     responses: {
       rows: [],
       fields: {},
@@ -197,6 +200,14 @@ export interface FormEditorState {
   focus_customer_id?: string;
   focus_block_id?: string | null;
   available_field_ids: string[];
+  assets: {
+    backgrounds: {
+      name: string;
+      title: string;
+      embed: string;
+      preview: [string] | [string, string];
+    }[];
+  };
   selected_rows: Set<string>;
   responses: {
     rows: FormResponse[];

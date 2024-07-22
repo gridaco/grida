@@ -52,6 +52,7 @@ import type {
   DocumentTemplateSampleDataAction,
   DataGridOrderByAction,
   DataGridOrderByResetAction,
+  InitAssetAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { blockstreeflat } from "@/lib/forms/tree";
@@ -410,6 +411,15 @@ export function reducer(
     case "blocks/blur": {
       return produce(state, (draft) => {
         draft.focus_block_id = null;
+      });
+    }
+    case "editor/assets/init": {
+      const { type, ...pref } = <InitAssetAction>action;
+      return produce(state, (draft) => {
+        draft.assets = {
+          ...draft.assets,
+          ...pref,
+        };
       });
     }
     case "editor/field/focus": {
