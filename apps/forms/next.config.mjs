@@ -16,6 +16,14 @@ const nextConfig = withMDX()({
         protocol: "https",
         hostname: "base.grida.co",
       },
+      {
+        protocol: "https",
+        hostname: "bg.grida.co",
+      },
+      {
+        protocol: "https",
+        hostname: "backgrounds.grida.co",
+      },
     ],
   },
   async redirects() {
