@@ -16,7 +16,7 @@ export function AssetsBackgroundsResolver({
 
   useEffect(() => {
     if (data) {
-      console.log("[EDITOR] backgrounds", data);
+      // console.log("[EDITOR] backgrounds", data);
       dispatch({
         type: "editor/assets/init",
         backgrounds: data,
