@@ -16,7 +16,7 @@ import {
 } from "@radix-ui/react-icons";
 import Link from "next/link";
 import { useEditorState } from "../editor";
-import { Table2Icon, TabletSmartphoneIcon } from "lucide-react";
+import { KeyIcon, Table2Icon, TabletSmartphoneIcon } from "lucide-react";
 import { StripeLogo1, SupabaseLogo, TossLogo } from "@/components/logos";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -83,8 +83,8 @@ function ModeData() {
           </Link>
           <Link href={`/d/${form_id}/data/x/auth.users`}>
             <SidebarMenuItem muted>
-              <AvatarIcon className="inline align-middle w-4 h-4 me-2" />
-              Users
+              <SupabaseLogo className="inline align-middle w-4 h-4 me-2" />
+              auth.users
             </SidebarMenuItem>
           </Link>
           <Link href={`/d/${form_id}/data/customers`}>
