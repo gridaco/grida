@@ -10,7 +10,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-export function DataGridLocalSearch() {
+export function GridLocalSearch() {
   const [state, dispatch] = useEditorState();
 
   const onSearchChange = useDebounceCallback((txt: string) => {

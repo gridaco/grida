@@ -28,20 +28,17 @@ import clsx from "clsx";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { XSupabaseQuery } from "@/lib/supabase-postgrest/builder";
 import { SupabaseLogo } from "@/components/logos";
-import { GridLimit } from "./components/limit";
-import { GridViewSettings } from "./components/view-settings";
-import { GridRefresh } from "./components/refresh";
-import { XSupaDataGridSort } from "./components/sort";
-import { DataGridLocalSearch } from "./components/search";
 import {
-  GridContent,
-  GridFooter,
-  GridHeader,
-  GridHeaderMenus,
-  GridRoot,
-} from "./components/layout";
+  GridLimit,
+  GridViewSettings,
+  GridRefresh,
+  XSupaDataGridSort,
+  GridLocalSearch,
+  GridCount,
+  TableViews,
+} from "./components";
+import * as GridLayout from "./components/layout";
 import { txt_n_plural } from "@/utils/plural";
-import { GridCount } from "./components/count";
 
 export function GridEditor() {
   const [state, dispatch] = useEditorState();
@@ -149,9 +146,9 @@ export function GridEditor() {
   const readonly = datagrid_table === "session";
 
   return (
-    <GridRoot>
-      <GridHeader>
-        <GridHeaderMenus>
+    <GridLayout.Root>
+      <GridLayout.Header>
+        <GridLayout.HeaderMenus>
           {has_selected_responses ? (
             <div
               className={clsx(
@@ -182,8 +179,8 @@ export function GridEditor() {
               </div>
             </>
           )}
-        </GridHeaderMenus>
-        <GridHeaderMenus>
+        </GridLayout.HeaderMenus>
+        <GridLayout.HeaderMenus>
           <Link href={`./analytics`} className="flex">
             <Badge variant={"outline"} className="cursor-pointer">
               <PieChartIcon className="align-middle me-2" />
@@ -191,15 +188,15 @@ export function GridEditor() {
             </Badge>
           </Link>
           <GridViewSettings />
-        </GridHeaderMenus>
-      </GridHeader>
+        </GridLayout.HeaderMenus>
+      </GridLayout.Header>
       <DeleteFieldConfirmDialog
         open={deleteFieldConfirmOpen}
         onOpenChange={setDeleteFieldConfirmOpen}
         onCancel={closeDeleteFieldConfirm}
         onDeleteConfirm={onDeleteField}
       />
-      <GridContent>
+      <GridLayout.Content>
         <ResponseGrid
           systemcolumns={systemcolumns}
           columns={columns}
@@ -224,8 +221,8 @@ export function GridEditor() {
             });
           }}
         />
-      </GridContent>
-      <GridFooter>
+      </GridLayout.Content>
+      <GridLayout.Footer>
         <div className="flex gap-2 items-center">
           <GridLimit />
           <GridCount count={rows?.length ?? 0} />
@@ -237,8 +234,8 @@ export function GridEditor() {
           </Button>
         </Link>
         <GridRefresh />
-      </GridFooter>
-    </GridRoot>
+      </GridLayout.Footer>
+    </GridLayout.Root>
   );
 }
 
@@ -248,42 +245,8 @@ function TableTools() {
 
   return (
     <div className="flex items-center gap-1">
-      <DataGridLocalSearch />
+      <GridLocalSearch />
       {datagrid_table === "x-supabase-main-table" && <XSupaDataGridSort />}
-    </div>
-  );
-}
-
-function TableViews() {
-  const [state, dispatch] = useEditorState();
-
-  return (
-    <div className="flex items-center gap-2">
-      <Tabs
-        value={state.datagrid_table}
-        onValueChange={(value) => {
-          dispatch({
-            type: "editor/data-grid/table",
-            table: value as any,
-          });
-        }}
-      >
-        <TabsList>
-          {state.tables.map((table) => {
-            return (
-              <TabsTrigger key={table.type + table.name} value={table.type}>
-                {table.type === "x-supabase-main-table" && (
-                  <SupabaseLogo className="w-4 h-4 align-middle me-2" />
-                )}
-                {table.label}
-              </TabsTrigger>
-            );
-          })}
-        </TabsList>
-      </Tabs>
-      {/* <Button variant="ghost" size="icon">
-        <PlusIcon />
-      </Button> */}
     </div>
   );
 }
