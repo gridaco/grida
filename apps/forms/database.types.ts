@@ -2207,7 +2207,35 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      dummy_with_user: {
+        Row: {
+          created_at: string | null
+          data: Json | null
+          email: string | null
+          enum: Database["grida_commerce"]["Enums"]["currency"] | null
+          float4: number | null
+          float8: number | null
+          id: number | null
+          int2: number | null
+          int4: number | null
+          jsonb: Json | null
+          numeric: number | null
+          richtext: Json | null
+          text: string | null
+          timestamptz: string | null
+          user_id: string | null
+          varchar: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dummy_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       create_new_combination_maps: {

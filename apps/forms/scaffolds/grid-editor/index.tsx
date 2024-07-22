@@ -15,7 +15,12 @@ import {
 import toast from "react-hot-toast";
 import { useEditorState } from "../editor";
 import Link from "next/link";
-import { DownloadIcon, PieChartIcon, TrashIcon } from "@radix-ui/react-icons";
+import {
+  DownloadIcon,
+  PieChartIcon,
+  PlusIcon,
+  TrashIcon,
+} from "@radix-ui/react-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { GridData } from "./grid-data";
@@ -170,32 +175,9 @@ export function GridEditor() {
             </div>
           ) : (
             <>
-              <div className="flex justify-center items-center gap-4">
-                <Tabs
-                  value={state.datagrid_table}
-                  onValueChange={(value) => {
-                    dispatch({
-                      type: "editor/data-grid/table",
-                      table: value as any,
-                    });
-                  }}
-                >
-                  <TabsList>
-                    {state.tables.map((table) => {
-                      return (
-                        <TabsTrigger
-                          key={table.type + table.name}
-                          value={table.type}
-                        >
-                          {table.type === "x-supabase-main-table" && (
-                            <SupabaseLogo className="w-4 h-4 align-middle me-2" />
-                          )}
-                          {table.label}
-                        </TabsTrigger>
-                      );
-                    })}
-                  </TabsList>
-                </Tabs>
+              <div className="flex justify-center items-center divide-x *:px-2 first:*:pl-0 last:*:pr-0">
+                <TableViews />
+                {/* <div className="border-r"/> */}
                 <TableTools />
               </div>
             </>
@@ -268,6 +250,40 @@ function TableTools() {
     <div className="flex items-center gap-1">
       <DataGridLocalSearch />
       {datagrid_table === "x-supabase-main-table" && <XSupaDataGridSort />}
+    </div>
+  );
+}
+
+function TableViews() {
+  const [state, dispatch] = useEditorState();
+
+  return (
+    <div className="flex items-center gap-2">
+      <Tabs
+        value={state.datagrid_table}
+        onValueChange={(value) => {
+          dispatch({
+            type: "editor/data-grid/table",
+            table: value as any,
+          });
+        }}
+      >
+        <TabsList>
+          {state.tables.map((table) => {
+            return (
+              <TabsTrigger key={table.type + table.name} value={table.type}>
+                {table.type === "x-supabase-main-table" && (
+                  <SupabaseLogo className="w-4 h-4 align-middle me-2" />
+                )}
+                {table.label}
+              </TabsTrigger>
+            );
+          })}
+        </TabsList>
+      </Tabs>
+      {/* <Button variant="ghost" size="icon">
+        <PlusIcon />
+      </Button> */}
     </div>
   );
 }
