@@ -32,7 +32,7 @@ const nextConfig = withMDX()({
         // REMOVE ME when migration is complete.
         // 1. db, 2. site static values
         source: "/theme/embed/backgrounds/:path*",
-        destination: "https://backgrounds.grida.co/embed/:path*",
+        destination: "https://bg.grida.co/embed/:path*",
         permanent: true,
       },
     ];
