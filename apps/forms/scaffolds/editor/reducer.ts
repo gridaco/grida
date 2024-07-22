@@ -605,6 +605,7 @@ export function reducer(
       const { table } = <DataGridTableAction>action;
       return produce(state, (draft) => {
         draft.datagrid_table = table;
+        draft.datagrid_table_row_keyword = table_keyword(table);
 
         draft.realtime_sessions_enabled = table === "session";
         draft.realtime_responses_enabled = table === "response";
@@ -887,5 +888,18 @@ function init_block(
     case "divider":
     default:
       return base;
+  }
+}
+
+function table_keyword(
+  table: "response" | "session" | "x-supabase-main-table"
+) {
+  switch (table) {
+    case "response":
+      return "response";
+    case "session":
+      return "session";
+    case "x-supabase-main-table":
+      return "row";
   }
 }

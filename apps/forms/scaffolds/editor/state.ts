@@ -83,6 +83,7 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
     available_field_ids: block_available_field_ids,
     datagrid_rows_per_page: 100,
     datagrid_table_refresh_key: 0,
+    datagrid_table_row_keyword: "row",
     datagrid_isloading: false,
     dateformat: "datetime",
     datetz: LOCALTZ,
@@ -183,6 +184,7 @@ export interface FormEditorState {
   datagrid_rows_per_page: number;
   datagrid_table: "response" | "session" | "x-supabase-main-table";
   datagrid_table_refresh_key: number;
+  datagrid_table_row_keyword: string;
   datagrid_isloading: boolean;
   datagrid_filter: DataGridFilterSettings;
   datagrid_orderby: { [key: string]: OrderBy };
