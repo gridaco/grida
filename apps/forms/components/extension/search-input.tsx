@@ -1,7 +1,7 @@
 "use client";
 import { SearchIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/utils";
@@ -60,17 +60,21 @@ function ExpandableSearchInput({
       className="relative ml-auto flex-1 md:grow-0 h-9"
       animate={{ width: isExpanded ? 200 : 36 }}
       initial={{ width: 36 }}
-      transition={{ duration: 0.2 }}
+      transition={{ duration: 0.15 }}
       onClick={handleIconClick}
     >
-      <Button
-        variant="ghost"
-        size="icon"
-        className="absolute left-0"
-        disabled={isExpanded}
+      <div
+        className={cn(
+          "absolute left-0",
+          buttonVariants({
+            variant: "ghost",
+            size: "icon",
+          }),
+          isExpanded && "pointer-events-none"
+        )}
       >
         <SearchIcon className="h-4 w-4 text-muted-foreground" />
-      </Button>
+      </div>
       <Input
         type="search"
         ref={ref}
