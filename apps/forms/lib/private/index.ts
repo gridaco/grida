@@ -14,6 +14,7 @@ import {
   XSupabasePrivateApiTypes,
 } from "@/types/private/api";
 import Axios from "axios";
+import { PostgrestQuery } from "../supabase-postgrest/postgrest-query";
 
 export namespace PrivateEditorApi {
   export namespace Files {
@@ -220,6 +221,30 @@ export namespace PrivateEditorApi {
         data: GridaSupabase.SupabaseBucket[];
         error: any;
       }>(`/private/editor/connect/${form_id}/supabase/storage/buckets`);
+    }
+  }
+
+  export namespace SupabaseQuery {
+    export function makeQueryParams({
+      limit,
+      order,
+      refreshKey,
+    }: {
+      limit?: number;
+      order?: PostgrestQuery.ParsedOrderBy;
+      refreshKey?: number | number;
+    }) {
+      //
+      const params = new URLSearchParams();
+
+      if (limit) params.append("limit", limit.toString());
+
+      if (order)
+        params.append("order", PostgrestQuery.createOrderByQueryString(order));
+
+      if (refreshKey) params.append("r", refreshKey.toString());
+
+      return params;
     }
   }
 }

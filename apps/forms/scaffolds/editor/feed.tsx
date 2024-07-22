@@ -11,7 +11,7 @@ import type { FormResponseField, GridaSupabase } from "@/types";
 import { usePrevious } from "@uidotdev/usehooks";
 import { XSupabaseQuery } from "@/lib/supabase-postgrest/builder";
 import equal from "deep-equal";
-import { PostgrestQuery } from "@/lib/supabase-postgrest/postgrest-query";
+import { PrivateEditorApi } from "@/lib/private";
 
 type RealtimeTableChangeData = {
   id: string;
@@ -456,17 +456,11 @@ export function XSupabaseMainTableFeedProvider({
   } = state;
 
   const serachParams = useMemo(() => {
-    const params = new URLSearchParams();
-    params.append("limit", datagrid_rows_per_page.toString());
-
-    params.append(
-      "order",
-      PostgrestQuery.createOrderByQueryString(datagrid_orderby)
-    );
-
-    params.append("r", datagrid_table_refresh_key.toString());
-
-    return params;
+    return PrivateEditorApi.SupabaseQuery.makeQueryParams({
+      limit: datagrid_rows_per_page,
+      order: datagrid_orderby,
+      refreshKey: datagrid_table_refresh_key,
+    });
   }, [datagrid_rows_per_page, datagrid_orderby, datagrid_table_refresh_key]);
 
   const request = state.connections.supabase?.main_supabase_table_id
