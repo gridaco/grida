@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
+import Image from "next/image";
 import {
   SidebarMenuSectionContent,
   SidebarRoot,
@@ -22,7 +23,6 @@ import { useEditorState } from "../editor";
 import { FormStyleSheetV1Schema } from "@/types";
 import * as _variants from "@/theme/palettes";
 import { PaletteColorChip } from "@/components/design/palette-color-chip";
-import { backgrounds } from "@/theme/k";
 import { sections } from "@/theme/section";
 import { Button } from "@/components/ui/button";
 import { OpenInNewWindowIcon, Pencil2Icon } from "@radix-ui/react-icons";
@@ -41,6 +41,7 @@ import { Editor, useMonaco } from "@monaco-editor/react";
 import { useTheme } from "next-themes";
 import { useMonacoTheme } from "@/components/monaco";
 import { customcss_starter_template } from "@/theme/customcss/k";
+import { cn } from "@/utils";
 
 const { default: _, ...variants } = _variants;
 
@@ -192,7 +193,10 @@ function Palette() {
 function Background() {
   const [state, dispatch] = useEditorState();
 
-  const background = state.theme.background;
+  const {
+    theme: { background },
+    assets: { backgrounds },
+  } = state;
 
   const onBackgroundSrcChange = useCallback(
     (src: string) => {
@@ -208,6 +212,8 @@ function Background() {
     [dispatch]
   );
 
+  const selected = backgrounds.find((b) => b.embed === background?.src);
+
   return (
     <>
       <Select
@@ -215,13 +221,44 @@ function Background() {
         value={background?.src}
         onValueChange={onBackgroundSrcChange}
       >
-        <SelectTrigger>
-          <SelectValue placeholder="None" />
+        <SelectTrigger className={cn(selected && "h-16 px-2 py-2")}>
+          <SelectValue placeholder="None">
+            {selected ? (
+              <div className="flex items-center gap-2">
+                <Image
+                  width={48}
+                  height={48}
+                  src={selected.preview[0]}
+                  alt={selected.title}
+                  className="rounded border"
+                />
+                <span className="text-xs text-muted-foreground">
+                  {selected.title}
+                </span>
+              </div>
+            ) : (
+              <>None</>
+            )}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
+          <SelectItem key={"noop"} value={""}>
+            None
+          </SelectItem>
           {backgrounds.map((background, i) => (
-            <SelectItem key={i} value={background.value}>
-              {background.name}
+            <SelectItem key={background.embed} value={background.embed}>
+              <div>
+                <Image
+                  width={100}
+                  height={100}
+                  src={background.preview[0]}
+                  alt={background.title}
+                  className="rounded"
+                />
+                <span className="text-xs text-muted-foreground">
+                  {background.title}
+                </span>
+              </div>
             </SelectItem>
           ))}
         </SelectContent>
