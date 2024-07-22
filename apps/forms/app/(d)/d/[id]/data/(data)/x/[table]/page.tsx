@@ -2,25 +2,23 @@
 
 import { PrivateEditorApi } from "@/lib/private";
 import { useEditorState } from "@/scaffolds/editor";
-import { GridCount } from "@/scaffolds/grid-editor/components/count";
 import {
-  GridContent,
-  GridFooter,
-  GridHeader,
-  GridHeaderMenus,
-  GridRoot,
-} from "@/scaffolds/grid-editor/components/layout";
-import { GridLimit } from "@/scaffolds/grid-editor/components/limit";
-import { GridRefresh } from "@/scaffolds/grid-editor/components/refresh";
-import { DataGridLocalSearch } from "@/scaffolds/grid-editor/components/search";
-import { GridViewSettings } from "@/scaffolds/grid-editor/components/view-settings";
+  GridLimit,
+  GridViewSettings,
+  GridRefresh,
+  GridLocalSearch,
+  GridCount,
+  TableViews,
+} from "@/scaffolds/grid-editor/components";
+import * as GridLayout from "@/scaffolds/grid-editor/components/layout";
 import { ReferenceTableGrid } from "@/scaffolds/grid/reference-grid";
 import { GridaSupabase } from "@/types";
 import { EditorApiResponse } from "@/types/private/api";
 import { priority_sorter } from "@/utils/sort";
-import assert from "assert";
 import { useEffect, useMemo } from "react";
+import { MainTable } from "@/scaffolds/editor/utils/main-table";
 import useSWR from "swr";
+import assert from "assert";
 
 export default function XTablePage({
   params,
@@ -95,27 +93,30 @@ export default function XTablePage({
   );
 
   return (
-    <GridRoot>
-      <GridHeader>
-        <GridHeaderMenus>
-          <DataGridLocalSearch />
-        </GridHeaderMenus>
-        <GridHeaderMenus>
-          <GridViewSettings />
-        </GridHeaderMenus>
-      </GridHeader>
-      <GridContent>
-        <ReferenceTableGrid
-          columns={columns}
-          // columns={[]}
-          rows={data?.data?.users ?? []}
-        />
-      </GridContent>
-      <GridFooter>
-        <GridLimit />
-        <GridCount count={data?.data?.users?.length ?? 0} />
-        <GridRefresh />
-      </GridFooter>
-    </GridRoot>
+    <MainTable table="x-supabase-auth.users">
+      <GridLayout.Root>
+        <GridLayout.Header>
+          <GridLayout.HeaderMenus>
+            <TableViews />
+            <GridLocalSearch />
+          </GridLayout.HeaderMenus>
+          <GridLayout.HeaderMenus>
+            <GridViewSettings />
+          </GridLayout.HeaderMenus>
+        </GridLayout.Header>
+        <GridLayout.Content>
+          <ReferenceTableGrid
+            columns={columns}
+            // columns={[]}
+            rows={data?.data?.users ?? []}
+          />
+        </GridLayout.Content>
+        <GridLayout.Footer>
+          <GridLimit />
+          <GridCount count={data?.data?.users?.length ?? 0} />
+          <GridRefresh />
+        </GridLayout.Footer>
+      </GridLayout.Root>
+    </MainTable>
   );
 }

@@ -45,6 +45,7 @@ import type {
   DataGridOrderByAction,
   DataGridOrderByResetAction,
   InitAssetAction,
+  FeedCustomerAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { blockstreeflat } from "@/lib/forms/tree";
@@ -644,6 +645,12 @@ export function reducer(
         draft.selected_rows = new Set();
       });
     }
+    case "editor/customers/feed": {
+      const { data } = <FeedCustomerAction>action;
+      return produce(state, (draft) => {
+        draft.customers = data;
+      });
+    }
     case "editor/customers/edit": {
       const { customer_id, open } = <OpenCustomerEditAction>action;
       return produce(state, (draft) => {
@@ -891,15 +898,19 @@ function init_block(
   }
 }
 
-function table_keyword(
-  table: "response" | "session" | "x-supabase-main-table"
-) {
+function table_keyword(table: FormEditorState["datagrid_table"]) {
   switch (table) {
     case "response":
       return "response";
     case "session":
       return "session";
+    case "customer":
+      return "customer";
     case "x-supabase-main-table":
+      return "row";
+    case "x-supabase-auth.users":
+      return "user";
+    default:
       return "row";
   }
 }

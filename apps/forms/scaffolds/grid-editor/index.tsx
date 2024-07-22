@@ -67,7 +67,7 @@ export function GridEditor() {
   const rows = useMemo(() => {
     return GridData.rows({
       form_id: form_id,
-      table: datagrid_table,
+      table: datagrid_table as "response" | "session" | "x-supabase-main-table",
       fields: fields,
       filter: datagrid_filter,
       responses: responses,

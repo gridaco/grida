@@ -8,7 +8,7 @@ import type {
 } from "@/types";
 import { fmt_local_index } from "@/utils/fmt";
 import type { GFFile, GFResponseRow, GFSystemColumnTypes } from "../grid/types";
-import type { DataGridFilterSettings } from "../editor/state";
+import type { DataGridFilterSettings, FormEditorState } from "../editor/state";
 import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";
 import { FieldSupports } from "@/k/supported_field_types";
 import { PrivateEditorApi } from "@/lib/private";
@@ -42,7 +42,7 @@ export namespace GridData {
   );
 
   export function columns(
-    table: "response" | "session" | "x-supabase-main-table",
+    table: FormEditorState["datagrid_table"],
     fields: FormFieldDefinition[]
   ): {
     systemcolumns: {
@@ -96,6 +96,11 @@ export namespace GridData {
           columns: fieldcolumns,
         };
       }
+      default:
+        return {
+          systemcolumns: [],
+          columns: [],
+        };
     }
   }
 
