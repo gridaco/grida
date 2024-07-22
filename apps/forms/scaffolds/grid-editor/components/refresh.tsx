@@ -5,7 +5,7 @@ import { Spinner } from "@/components/spinner";
 import { ReloadIcon } from "@radix-ui/react-icons";
 import { Button } from "@/components/ui/button";
 
-export function DataLoadingIndicator() {
+export function GridRefresh() {
   const [state, dispatch] = useEditorState();
   const { datagrid_isloading } = state;
 

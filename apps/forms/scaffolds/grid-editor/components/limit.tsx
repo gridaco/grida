@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/select";
 import { useEditorState } from "@/scaffolds/editor";
 
-export function MaxRowsSelect() {
+export function GridLimit() {
   const [state, dispatch] = useEditorState();
 
   return (

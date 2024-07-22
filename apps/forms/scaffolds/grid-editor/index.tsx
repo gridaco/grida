@@ -23,11 +23,18 @@ import clsx from "clsx";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { XSupabaseQuery } from "@/lib/supabase-postgrest/builder";
 import { SupabaseLogo } from "@/components/logos";
-import { MaxRowsSelect } from "./components/limit";
+import { GridLimit } from "./components/limit";
 import { GridViewSettings } from "./components/view-settings";
-import { DataLoadingIndicator } from "./components/refresh";
+import { GridRefresh } from "./components/refresh";
 import { XSupaDataGridSort } from "./components/sort";
 import { DataGridLocalSearch } from "./components/search";
+import {
+  GridContent,
+  GridFooter,
+  GridHeader,
+  GridRoot,
+} from "./components/layout";
+import { txt_n_plural } from "@/utils/plural";
 
 export function GridEditor() {
   const [state, dispatch] = useEditorState();
@@ -41,6 +48,7 @@ export function GridEditor() {
     sessions,
     datagrid_filter,
     datagrid_table,
+    datagrid_table_row_keyword,
     x_supabase_main_table,
     selected_rows: selected_responses,
   } = state;
@@ -130,13 +138,12 @@ export function GridEditor() {
   }, [supabase, focus_field_id, dispatch]);
 
   const has_selected_responses = selected_responses.size > 0;
-  const keyword = table_keyword(datagrid_table);
   const selectionDisabled = datagrid_table === "session";
   const readonly = datagrid_table === "session";
 
   return (
-    <div className="flex flex-col h-full">
-      <header className="h-14 w-full">
+    <GridRoot>
+      <GridHeader>
         <div className="flex py-1 h-full justify-between gap-4">
           {has_selected_responses ? (
             <>
@@ -151,7 +158,11 @@ export function GridEditor() {
                     className="text-sm font-normal text-neutral-500"
                     aria-label="selected responses"
                   >
-                    {txt_n_plural(selected_responses.size, keyword)} selected
+                    {txt_n_plural(
+                      selected_responses.size,
+                      datagrid_table_row_keyword
+                    )}{" "}
+                    selected
                   </span>
                   <DeleteSelectedRowsButton />
                 </div>
@@ -210,14 +221,14 @@ export function GridEditor() {
             <GridViewSettings />
           </div>
         </div>
-      </header>
+      </GridHeader>
       <DeleteFieldConfirmDialog
         open={deleteFieldConfirmOpen}
         onOpenChange={setDeleteFieldConfirmOpen}
         onCancel={closeDeleteFieldConfirm}
         onDeleteConfirm={onDeleteField}
       />
-      <div className="flex flex-col w-full h-full">
+      <GridContent>
         <ResponseGrid
           systemcolumns={systemcolumns}
           columns={columns}
@@ -242,12 +253,12 @@ export function GridEditor() {
             });
           }}
         />
-      </div>
-      <footer className="flex gap-4 min-h-9 overflow-hidden items-center px-2 py-2 w-full border-t dark:border-t-neutral-700 divide-x">
+      </GridContent>
+      <GridFooter>
         <div className="flex gap-2 items-center">
-          <MaxRowsSelect />
+          <GridLimit />
           <span className="text-sm font-medium">
-            {txt_n_plural(rows.length, keyword)}
+            {txt_n_plural(rows.length, datagrid_table_row_keyword)}
           </span>
         </div>
         <Link href={`/v1/${form_id}/export/csv`} download target="_blank">
@@ -256,9 +267,9 @@ export function GridEditor() {
             <DownloadIcon />
           </Button>
         </Link>
-        <DataLoadingIndicator />
-      </footer>
-    </div>
+        <GridRefresh />
+      </GridFooter>
+    </GridRoot>
   );
 }
 
@@ -315,9 +326,7 @@ function DeleteSelectedRowsButton() {
   const supabase = createClientFormsClient();
   const [state, dispatch] = useEditorState();
 
-  const { datagrid_table, selected_rows } = state;
-
-  const keyword = table_keyword(datagrid_table);
+  const { datagrid_table, selected_rows, datagrid_table_row_keyword } = state;
 
   const delete_selected_responses = useCallback(() => {
     const deleting = supabase
@@ -390,12 +399,12 @@ function DeleteSelectedRowsButton() {
       <AlertDialogTrigger asChild>
         <button className="flex items-center gap-1 p-2 rounded-md border text-sm">
           <TrashIcon />
-          Delete {txt_n_plural(selected_rows.size, keyword)}
+          Delete {txt_n_plural(selected_rows.size, datagrid_table_row_keyword)}
         </button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogTitle>
-          Delete {txt_n_plural(selected_rows.size, keyword)}
+          Delete {txt_n_plural(selected_rows.size, datagrid_table_row_keyword)}
         </AlertDialogTitle>
         <AlertDialogDescription>
           Deleting this record will remove all data associated with it. Are you
@@ -413,23 +422,6 @@ function DeleteSelectedRowsButton() {
       </AlertDialogContent>
     </AlertDialog>
   );
-}
-
-function table_keyword(
-  table: "response" | "session" | "x-supabase-main-table"
-) {
-  switch (table) {
-    case "response":
-      return "response";
-    case "session":
-      return "session";
-    case "x-supabase-main-table":
-      return "row";
-  }
-}
-
-function txt_n_plural(n: number | undefined, singular: string) {
-  return (n || 0) > 1 ? `${n} ${singular}s` : `${n} ${singular}`;
 }
 
 function DeleteFieldConfirmDialog({

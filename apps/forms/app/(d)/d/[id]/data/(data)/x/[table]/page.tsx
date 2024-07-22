@@ -2,7 +2,15 @@
 
 import { PrivateEditorApi } from "@/lib/private";
 import { useEditorState } from "@/scaffolds/editor";
-import { GridaSupabase } from "@/types";
+import {
+  GridContent,
+  GridFooter,
+  GridHeader,
+  GridRoot,
+} from "@/scaffolds/grid-editor/components/layout";
+import { GridLimit } from "@/scaffolds/grid-editor/components/limit";
+import { GridRefresh } from "@/scaffolds/grid-editor/components/refresh";
+import { ReferenceTableGrid } from "@/scaffolds/grid/reference-grid";
 import { EditorApiResponse } from "@/types/private/api";
 import assert from "assert";
 import { useMemo } from "react";
@@ -41,7 +49,7 @@ export default function XTablePage({
     ? `/private/editor/connect/${state.form_id}/supabase/table/${table}/query?${serachParams}`
     : null;
 
-  const res = useSWR<EditorApiResponse<GridaSupabase.XDataRow[], any>>(
+  const { data } = useSWR<EditorApiResponse<{ users: any[] }, any>>(
     request,
     async (url: string) => {
       const res = await fetch(url);
@@ -54,9 +62,21 @@ export default function XTablePage({
   );
 
   return (
-    <main>
-      <h1 className="text-2xl font-bold">{table}</h1>
-      <pre>{JSON.stringify(res.data, null, 2)}</pre>
-    </main>
+    <GridRoot>
+      <GridHeader>
+        <h1 className="text-2xl font-bold">{table}</h1>
+      </GridHeader>
+      <GridContent>
+        <ReferenceTableGrid
+          columns={[{ key: "id", name: "id", type: "text" }]}
+          // columns={[]}
+          rows={data?.data?.users ?? []}
+        />
+      </GridContent>
+      <GridFooter>
+        <GridLimit />
+        <GridRefresh />
+      </GridFooter>
+    </GridRoot>
   );
 }
