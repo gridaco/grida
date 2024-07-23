@@ -1,6 +1,6 @@
 import {
-  create_new_form_with_page,
-  seed_form_page_blocks,
+  create_new_form_with_document,
+  seed_form_document_blocks,
 } from "@/services/new";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -15,14 +15,14 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { form_id, form_page_id } = await create_new_form_with_page({
+    const { form_id, form_document_id } = await create_new_form_with_document({
       project_id,
     });
 
     try {
-      await seed_form_page_blocks({
+      await seed_form_document_blocks({
         form_id,
-        form_page_id,
+        form_document_id: form_document_id,
       });
     } catch (e) {
       // this won't be happening

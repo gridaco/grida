@@ -4,7 +4,7 @@ import { v4 } from "uuid";
 import { FormRenderTree } from "../forms";
 import { createClientFormsClient } from "../supabase/client";
 import assert from "assert";
-import { FormPage } from "@/types";
+import { FormDocument } from "@/types";
 import { FormSubmitErrorCode } from "@/types/private/api";
 import { type FakeLocationPlan, FormDataFaker, CustomerFaker } from "./faker";
 
@@ -82,7 +82,7 @@ export class Simulator {
 
     assert(!!data, "form not found");
 
-    const page_blocks = (data.default_page as unknown as FormPage).blocks;
+    const page_blocks = (data.default_page as unknown as FormDocument).blocks;
 
     this.__schema = new FormRenderTree(
       data.id,

@@ -1,4 +1,4 @@
-import { create_new_form_with_page } from "@/services/new";
+import { create_new_form_with_document } from "@/services/new";
 import { NextRequest, NextResponse } from "next/server";
 
 export const revalidate = 0;
@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
 
   if (template_name == "headless") {
     try {
-      const { form_id } = await create_new_form_with_page({
+      const { form_id } = await create_new_form_with_document({
         project_id,
         title: "Headless Form",
         description: "This is a headless form",

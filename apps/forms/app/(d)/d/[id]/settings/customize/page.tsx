@@ -14,7 +14,7 @@ import { notFound } from "next/navigation";
 import { CustomPoweredByBrandingPreferences } from "@/scaffolds/settings/customize/custom-powered-by-branding-preferences";
 import { CustomSectionStylePreferences } from "@/scaffolds/settings/customize/custom-section-style-preferences";
 import { CustomPageBackgroundPreferences } from "@/scaffolds/settings/customize/custom-page-background-preferences";
-import { EndingPageI18nOverrides, FormPage } from "@/types";
+import { EndingPageI18nOverrides, FormDocument } from "@/types";
 import { EndingPagePreferences } from "@/scaffolds/settings/customize/custom-ending-page-preferences";
 import { CustomPagePalettePreferences } from "@/scaffolds/settings/customize/custom-page-palette-preference";
 import { CustomPageCssPreferences } from "@/scaffolds/settings/customize/custom-page-css-preference";
@@ -62,7 +62,7 @@ export default async function FormsCustomizeSettingsPage({
     ending_page_i18n_overrides,
   } = data!;
 
-  const { background, stylesheet } = default_page as any as FormPage;
+  const { background, stylesheet } = default_page as any as FormDocument;
 
   return (
     <main className="max-w-2xl mx-auto">

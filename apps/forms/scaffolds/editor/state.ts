@@ -34,7 +34,7 @@ export interface FormEditorInit {
   };
   theme: FormEditorState["theme"];
   form_title: string;
-  page_id: string | null;
+  form_document_id: string | null;
   blocks: EditorFlatFormBlock[];
   fields: FormFieldDefinition[];
 }
@@ -104,7 +104,7 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
           },
         ],
     scheduling_tz: init.scheduling_tz,
-    page_id: init.page_id,
+    form_document_id: init.form_document_id,
     blocks: blockstreeflat(init.blocks),
     document: {
       pages: ISDEV ? ["collection", "start", "form"] : ["form"],
@@ -198,7 +198,7 @@ export interface FormEditorState {
   form_id: string;
   form_title: string;
   scheduling_tz?: string;
-  page_id: string | null;
+  form_document_id: string | null;
   blocks: EditorFlatFormBlock[];
   document: {
     pages: string[];

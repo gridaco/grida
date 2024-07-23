@@ -1,7 +1,7 @@
 import { client } from "@/lib/supabase/server";
 import { FormResponseUnknownFieldHandlingStrategyType } from "@/types";
 
-export async function create_new_form_with_page({
+export async function create_new_form_with_document({
   project_id,
   ...optional
 }: {
@@ -36,7 +36,7 @@ export async function create_new_form_with_page({
   }
 
   // create a default page
-  const { data: page } = await client
+  const { data: document } = await client
     .from("form_document")
     .insert({
       form_id: data.id,
@@ -49,22 +49,22 @@ export async function create_new_form_with_page({
   await client
     .from("form")
     .update({
-      default_form_page_id: page!.id,
+      default_form_page_id: document!.id,
     })
     .eq("id", data.id);
 
   return {
     form_id: data.id,
-    form_page_id: page!.id,
+    form_document_id: document!.id,
   };
 }
 
-export async function seed_form_page_blocks({
+export async function seed_form_document_blocks({
   form_id,
-  form_page_id,
+  form_document_id: form_document_id,
 }: {
   form_id: string;
-  form_page_id: string;
+  form_document_id: string;
 }) {
   // default template blocks
   // 1. section
@@ -76,7 +76,7 @@ export async function seed_form_page_blocks({
     .insert({
       type: "section",
       form_id,
-      form_page_id,
+      form_page_id: form_document_id,
       local_index: 0,
     })
     .select("id")
@@ -88,7 +88,7 @@ export async function seed_form_page_blocks({
     {
       type: "header",
       form_id,
-      form_page_id,
+      form_page_id: form_document_id,
       parent_id: section_1_id,
       title_html: "Untitled Section",
       local_index: 0,
@@ -96,7 +96,7 @@ export async function seed_form_page_blocks({
     {
       type: "field",
       form_id,
-      form_page_id,
+      form_page_id: form_document_id,
       parent_id: section_1_id,
       local_index: 0,
     },
