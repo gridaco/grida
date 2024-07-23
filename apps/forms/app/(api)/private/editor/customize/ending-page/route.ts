@@ -29,12 +29,18 @@ export async function POST(req: NextRequest) {
     .update({
       is_ending_page_enabled: is_ending_page_enabled,
       ending_page_template_id: template_id,
+    })
+    .eq("id", form_id)
+    .single();
+
+  await supabase
+    .from("form_document")
+    .update({
       is_redirect_after_response_uri_enabled:
         // turn off if ending page enabled, otherwise don't change
         is_ending_page_enabled == true ? false : undefined,
     })
-    .eq("id", form_id)
-    .single();
+    .eq("form_id", form_id);
 
   // redirect to the page requested
   return NextResponse.redirect(origin + `/d/${form_id}/settings/customize`, {

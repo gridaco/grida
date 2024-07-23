@@ -15,10 +15,8 @@ export async function create_new_form_with_document({
   is_max_form_responses_by_customer_enabled?: boolean;
   is_max_form_responses_in_total_enabled?: boolean;
   is_multiple_response_allowed?: boolean;
-  is_redirect_after_response_uri_enabled?: boolean;
   max_form_responses_by_customer?: number | null;
   max_form_responses_in_total?: number | null;
-  redirect_after_response_uri?: string | null;
   title?: string;
   unknown_field_handling_strategy?: FormResponseUnknownFieldHandlingStrategyType;
 }>) {
