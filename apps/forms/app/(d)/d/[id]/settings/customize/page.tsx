@@ -54,15 +54,18 @@ export default async function FormsCustomizeSettingsPage({
     title,
     default_form_page_language,
     is_powered_by_branding_enabled,
-    redirect_after_response_uri,
-    is_redirect_after_response_uri_enabled,
     default_page,
     is_ending_page_enabled,
     ending_page_template_id,
     ending_page_i18n_overrides,
   } = data!;
 
-  const { background, stylesheet } = default_page as any as FormDocument;
+  const {
+    background,
+    stylesheet,
+    redirect_after_response_uri,
+    is_redirect_after_response_uri_enabled,
+  } = default_page as any as FormDocument;
 
   return (
     <main className="max-w-2xl mx-auto">

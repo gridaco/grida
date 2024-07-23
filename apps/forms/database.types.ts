@@ -865,13 +865,11 @@ export type Database = {
           is_max_form_responses_in_total_enabled: boolean
           is_multiple_response_allowed: boolean
           is_powered_by_branding_enabled: boolean
-          is_redirect_after_response_uri_enabled: boolean
           is_scheduling_enabled: boolean
           max_form_responses_by_customer: number | null
           max_form_responses_in_total: number | null
           method: Database["grida_forms"]["Enums"]["form_method"]
           project_id: number
-          redirect_after_response_uri: string | null
           scheduling_close_at: string | null
           scheduling_open_at: string | null
           scheduling_tz: string | null
@@ -896,13 +894,11 @@ export type Database = {
           is_max_form_responses_in_total_enabled?: boolean
           is_multiple_response_allowed?: boolean
           is_powered_by_branding_enabled?: boolean
-          is_redirect_after_response_uri_enabled?: boolean
           is_scheduling_enabled?: boolean
           max_form_responses_by_customer?: number | null
           max_form_responses_in_total?: number | null
           method?: Database["grida_forms"]["Enums"]["form_method"]
           project_id: number
-          redirect_after_response_uri?: string | null
           scheduling_close_at?: string | null
           scheduling_open_at?: string | null
           scheduling_tz?: string | null
@@ -927,13 +923,11 @@ export type Database = {
           is_max_form_responses_in_total_enabled?: boolean
           is_multiple_response_allowed?: boolean
           is_powered_by_branding_enabled?: boolean
-          is_redirect_after_response_uri_enabled?: boolean
           is_scheduling_enabled?: boolean
           max_form_responses_by_customer?: number | null
           max_form_responses_in_total?: number | null
           method?: Database["grida_forms"]["Enums"]["form_method"]
           project_id?: number
-          redirect_after_response_uri?: string | null
           scheduling_close_at?: string | null
           scheduling_open_at?: string | null
           scheduling_tz?: string | null
@@ -1047,7 +1041,9 @@ export type Database = {
           created_at: string
           form_id: string
           id: string
+          is_redirect_after_response_uri_enabled: boolean
           name: string
+          redirect_after_response_uri: string | null
           stylesheet: Json | null
         }
         Insert: {
@@ -1055,7 +1051,9 @@ export type Database = {
           created_at?: string
           form_id: string
           id?: string
+          is_redirect_after_response_uri_enabled?: boolean
           name?: string
+          redirect_after_response_uri?: string | null
           stylesheet?: Json | null
         }
         Update: {
@@ -1063,7 +1061,9 @@ export type Database = {
           created_at?: string
           form_id?: string
           id?: string
+          is_redirect_after_response_uri_enabled?: boolean
           name?: string
+          redirect_after_response_uri?: string | null
           stylesheet?: Json | null
         }
         Relationships: [
