@@ -6,8 +6,8 @@ import type {
   FormsPageLanguage,
   Option,
 } from "./types";
-import type { Tokens } from "@/types/ast";
 import { toArrayOf, MaybeArray } from "./utility";
+import type { Tokens } from "@/ast";
 
 /**
  * used when representing a type in json following the schema.

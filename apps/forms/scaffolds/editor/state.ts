@@ -206,7 +206,7 @@ export interface FormEditorState {
     templatesample: string;
     templatedata: {
       [key: string]: {
-        text: Tokens.StringValueExpression;
+        text?: Tokens.StringValueExpression;
         template_id: string;
         attributes?: Omit<
           React.HtmlHTMLAttributes<HTMLDivElement>,

@@ -1,4 +1,4 @@
-import type { Tokens } from "@/types/ast";
+import type { Tokens } from "@/ast";
 import { useFormAgentState } from "@/lib/formstate";
 import { useMemo } from "react";
 

@@ -28,7 +28,7 @@ import {
 import { useEditorState } from "../editor";
 import toast from "react-hot-toast";
 import { MixIcon } from "@radix-ui/react-icons";
-import type { Tokens } from "@/types/ast";
+import type { Tokens } from "@/ast";
 import { KeyIcon } from "lucide-react";
 
 /**
