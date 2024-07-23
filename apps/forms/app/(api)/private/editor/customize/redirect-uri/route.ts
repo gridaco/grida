@@ -39,13 +39,13 @@ export async function POST(req: NextRequest) {
   const supabase = createRouteHandlerClient(cookieStore);
 
   await supabase
-    .from("form")
+    .from("form_document")
     .update({
       redirect_after_response_uri: redirect_after_response_uri,
       is_redirect_after_response_uri_enabled:
         is_redirect_after_response_uri_enabled,
     })
-    .eq("id", form_id)
+    .eq("form_id", form_id)
     .single();
 
   // redirect to the page requested

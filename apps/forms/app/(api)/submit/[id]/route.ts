@@ -140,6 +140,9 @@ async function submit({
           options:form_field_option(*)
         ),
         options:form_field_option(*),
+        default_page:form_document!default_form_page_id(
+          *
+        ),
         store_connection:connection_commerce_store(*),
         supabase_connection:connection_supabase(*)
       `
@@ -155,10 +158,8 @@ async function submit({
     project_id,
     fields,
     unknown_field_handling_strategy,
-    is_redirect_after_response_uri_enabled,
     is_ending_page_enabled,
     ending_page_template_id,
-    redirect_after_response_uri,
     is_force_closed,
     is_scheduling_enabled,
     is_max_form_responses_in_total_enabled,
@@ -168,8 +169,14 @@ async function submit({
     scheduling_close_at,
     store_connection,
     supabase_connection,
+    default_page,
     options,
   } = form_reference;
+
+  const {
+    is_redirect_after_response_uri_enabled,
+    redirect_after_response_uri,
+  } = (default_page as any) || {};
 
   const entries = formdata.entries();
 
@@ -1007,7 +1014,7 @@ async function submit({
         redirect_after_response_uri
       ) {
         return NextResponse.redirect(redirect_after_response_uri, {
-          status: 307,
+          status: 303,
         });
       }
 

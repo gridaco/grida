@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { client, createServerComponentClient } from "@/lib/supabase/server";
 import { Metadata } from "next";
 import { Inconsolata, Inter, Lora } from "next/font/google";
-import { FormPage } from "@/types";
+import { FormDocument } from "@/types";
 import { ThemeProvider } from "@/components/theme-provider";
 import { stringfyThemeVariables } from "@/theme/palettes/utils";
 import palettes from "@/theme/palettes";
@@ -84,7 +84,7 @@ export default async function Layout({
     data;
 
   // this is safe to cast this way - typegen has a bug
-  const default_form_page = default_form_pages as unknown as FormPage;
+  const default_form_page = default_form_pages as unknown as FormDocument;
   const { stylesheet } = default_form_page;
 
   const font =

@@ -7,7 +7,7 @@ import { GridaLogo } from "@/components/grida-logo";
 import { SlashIcon } from "@radix-ui/react-icons";
 import { Tabs } from "@/scaffolds/d/tabs";
 import { FormEditorProvider } from "@/scaffolds/editor";
-import { FormPage } from "@/types";
+import { FormDocument } from "@/types";
 import { PreviewButton } from "@/components/preview-button";
 import { GridaXSupabaseService } from "@/services/x-supabase";
 import type { Metadata } from "next";
@@ -62,7 +62,7 @@ export default async function Layout({
           *,
           options:form_field_option(*)
         ),
-        default_page:form_document!default_form_page_id(
+        default_document:form_document!default_form_page_id(
           *,
           blocks:form_block(*)
         ),
@@ -86,7 +86,7 @@ export default async function Layout({
 
   // there's a bug with supabase typegen, where the default_page will not be a array, but cast it to array.
   // it's safe to assume as non array.
-  const default_page = data.default_page as unknown as FormPage;
+  const default_document = data.default_document as unknown as FormDocument;
 
   return (
     <div className="h-screen flex flex-col">
@@ -99,18 +99,18 @@ export default async function Layout({
             supabase: supabase_connection_state || undefined,
           },
           theme: {
-            palette: default_page?.stylesheet?.palette,
-            fontFamily: default_page.stylesheet?.["font-family"],
-            section: default_page.stylesheet?.section,
-            customCSS: default_page.stylesheet?.custom,
-            background: default_page.background,
+            palette: default_document?.stylesheet?.palette,
+            fontFamily: default_document.stylesheet?.["font-family"],
+            section: default_document.stylesheet?.section,
+            customCSS: default_document.stylesheet?.custom,
+            background: default_document.background,
           },
           form_id: id,
           form_title: data.title,
           scheduling_tz: data.scheduling_tz || undefined,
-          page_id: data.default_form_page_id,
+          form_document_id: data.default_form_page_id,
           fields: data.fields,
-          blocks: default_page ? default_page.blocks || [] : [],
+          blocks: default_document ? default_document.blocks || [] : [],
         }}
       >
         <div className="flex flex-1 overflow-y-auto">{children}</div>

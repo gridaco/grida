@@ -36,7 +36,7 @@ import { FormRenderTree, type ClientRenderBlock } from "@/lib/forms";
 import type {
   FormFieldDefinition,
   FormMethod,
-  FormPage,
+  FormDocument,
   Option,
 } from "@/types";
 import { Features } from "@/lib/features/scheduling";
@@ -66,8 +66,8 @@ export interface FormClientFetchResponseData {
     is_powered_by_branding_enabled: boolean;
     optimize_for_cjk: boolean;
   };
-  background?: FormPage["background"];
-  stylesheet?: FormPage["stylesheet"];
+  background?: FormDocument["background"];
+  stylesheet?: FormDocument["stylesheet"];
   default_values: { [key: string]: string };
   // access
   is_open: boolean;
@@ -208,7 +208,7 @@ export async function GET(
     preload: [default_form_page_language],
   });
 
-  const page_blocks = (data.default_page as unknown as FormPage).blocks;
+  const page_blocks = (data.default_page as unknown as FormDocument).blocks;
 
   const __gf_fp_fingerprintjs_visitorid =
     system_keys[SYSTEM_GF_FINGERPRINT_VISITORID_KEY];
@@ -477,8 +477,8 @@ export async function GET(
       is_powered_by_branding_enabled,
       optimize_for_cjk: cjk.includes(default_form_page_language),
     },
-    background: (data.default_page as unknown as FormPage).background,
-    stylesheet: (data.default_page as unknown as FormPage).stylesheet,
+    background: (data.default_page as unknown as FormDocument).background,
+    stylesheet: (data.default_page as unknown as FormDocument).stylesheet,
 
     // default value
     default_values: default_values,

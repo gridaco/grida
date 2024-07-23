@@ -19,11 +19,9 @@ export interface Form {
   is_max_form_responses_in_total_enabled: boolean;
   is_multiple_response_allowed: boolean;
   is_powered_by_branding_enabled: boolean;
-  is_redirect_after_response_uri_enabled: boolean;
   max_form_responses_by_customer: number | null;
   max_form_responses_in_total: number | null;
   project_id: number;
-  redirect_after_response_uri: string | null;
   title: string;
   unknown_field_handling_strategy: FormResponseUnknownFieldHandlingStrategyType;
   updated_at: string;
@@ -213,13 +211,15 @@ export interface FormFieldDefinition extends IFormField {
   local_index: number;
 }
 
-export interface FormPage {
+export interface FormDocument {
   id: string;
   form_id: string;
   name: string;
   blocks: FormBlock[];
   background?: FormPageBackgroundSchema;
   stylesheet?: FormStyleSheetV1Schema;
+  is_redirect_after_response_uri_enabled: boolean;
+  redirect_after_response_uri: string | null;
 }
 
 export interface IFormBlock<T = FormBlockType> {

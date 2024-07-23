@@ -28,7 +28,7 @@ type FormBlockInsertion =
 export class JSONFrom2DB {
   private renderer: FormRenderTree;
   private form_id: ID | null = null;
-  private page_id: ID | null = null;
+  private form_document_id: ID | null = null;
   private fields_db_map: Record<string, ID> = {};
   private fields_db_map_ready = false;
 
@@ -82,7 +82,7 @@ export class JSONFrom2DB {
 
   private async insert_page() {
     assert(!!this.form_id, "form not inserted");
-    if (this.page_id) {
+    if (this.form_document_id) {
       return;
     }
 
@@ -97,7 +97,7 @@ export class JSONFrom2DB {
 
     assert(!!data, "page not inserted");
 
-    this.page_id = data.id;
+    this.form_document_id = data.id;
 
     await this.client
       .from("form")
@@ -193,7 +193,7 @@ export class JSONFrom2DB {
 
   private async insert_blocks() {
     assert(!!this.form_id, "form not inserted");
-    assert(!!this.page_id, "page not inserted");
+    assert(!!this.form_document_id, "page not inserted");
 
     // FIXME: block mapping is not complete - only works for field blocks and header blocks
 
@@ -202,7 +202,7 @@ export class JSONFrom2DB {
       const __shared: Partial<FormBlockInsertion> = {
         // data: b.data
         form_id: this.form_id!,
-        form_page_id: this.page_id!,
+        form_page_id: this.form_document_id!,
         local_index: b.local_index,
         parent_id: null, // TODO: need tree handling
         type: b.type,
@@ -244,7 +244,7 @@ export class JSONFrom2DB {
 
     return {
       form_id: this.form_id!,
-      page_id: this.page_id!,
+      form_document_id: this.form_document_id!,
     };
   }
 }

@@ -103,7 +103,7 @@ export function reducer(
         id,
         created_at: new Date().toISOString(),
         form_id: state.form_id,
-        form_page_id: state.page_id,
+        form_page_id: state.form_document_id,
         parent_id: block === "section" ? null : parent_id,
         type: block,
         local_index: old_index,
