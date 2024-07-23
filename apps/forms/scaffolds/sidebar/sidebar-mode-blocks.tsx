@@ -27,7 +27,7 @@ import type { FormBlockType, FormInputType } from "@/types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileIcon } from "lucide-react";
 
-export function ModeBlocks() {
+export function ModeDesign() {
   const [state, dispatch] = useEditorState();
 
   const addBlock = useCallback(

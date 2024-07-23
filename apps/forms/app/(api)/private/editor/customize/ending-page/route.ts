@@ -1,3 +1,4 @@
+import { editorlink } from "@/lib/forms/url";
 import { createRouteHandlerClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
@@ -36,7 +37,10 @@ export async function POST(req: NextRequest) {
     .eq("form_id", form_id);
 
   // redirect to the page requested
-  return NextResponse.redirect(origin + `/d/${form_id}/settings/customize`, {
-    status: 301,
-  });
+  return NextResponse.redirect(
+    editorlink("settings/customize", { origin, form_id }),
+    {
+      status: 301,
+    }
+  );
 }

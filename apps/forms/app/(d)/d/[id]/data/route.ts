@@ -1,3 +1,4 @@
+import { editorlink } from "@/lib/forms/url";
 import { NextRequest, NextResponse } from "next/server";
 
 export function GET(
@@ -11,7 +12,10 @@ export function GET(
   const form_id = context.params.id;
   const origin = request.nextUrl.origin;
 
-  return NextResponse.redirect(origin + `/d/${form_id}/data/responses`, {
-    status: 301,
-  });
+  return NextResponse.redirect(
+    editorlink("data/responses", { origin, form_id }),
+    {
+      status: 301,
+    }
+  );
 }
