@@ -221,7 +221,7 @@ function AgentThemeSyncProvider({ children }: React.PropsWithChildren<{}>) {
 
     if (!equal(prev, state.theme)) {
       supabase
-        .from("form_page")
+        .from("form_document")
         .update({
           stylesheet: {
             custom: theme.customCSS,

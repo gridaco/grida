@@ -37,7 +37,7 @@ export async function create_new_form_with_page({
 
   // create a default page
   const { data: page } = await client
-    .from("form_page")
+    .from("form_document")
     .insert({
       form_id: data.id,
       name: data.title,

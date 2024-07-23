@@ -68,7 +68,7 @@ export default async function Layout({
     .select(
       `
         default_form_page_language,
-        default_form_page:form_page!default_form_page_id(
+        default_form_page:form_document!default_form_page_id(
           stylesheet
         )
       `

@@ -62,7 +62,7 @@ export default async function Layout({
           *,
           options:form_field_option(*)
         ),
-        default_page:form_page!default_form_page_id(
+        default_page:form_document!default_form_page_id(
           *,
           blocks:form_block(*)
         ),

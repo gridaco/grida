@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
   const supabase = createRouteHandlerClient(cookieStore);
 
   const { data: old, error } = await supabase
-    .from("form_page")
+    .from("form_document")
     .select("stylesheet")
     .eq("form_id", form_id)
     .single();
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
   } satisfies FormStyleSheetV1Schema;
 
   await supabase
-    .from("form_page")
+    .from("form_document")
     .update({
       stylesheet: stylesheet,
     })
