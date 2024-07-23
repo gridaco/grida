@@ -224,13 +224,6 @@ export interface FormEditorState {
     selected_node_default_text?: Tokens.StringValueExpression;
     selected_node_context?: Record<string, any>;
   };
-  theme: {
-    palette?: FormStyleSheetV1Schema["palette"];
-    fontFamily?: FormStyleSheetV1Schema["font-family"];
-    customCSS?: FormStyleSheetV1Schema["custom"];
-    section?: FormStyleSheetV1Schema["section"];
-    background?: FormPageBackgroundSchema;
-  };
   fields: FormFieldDefinition[];
   field_draft_init?: Partial<FormFieldInit> | null;
   focus_field_id?: string | null;
