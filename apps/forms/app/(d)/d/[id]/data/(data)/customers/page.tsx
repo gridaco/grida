@@ -21,7 +21,7 @@ import { Customer } from "@/types";
 export default function Customers() {
   const [state] = useEditorState();
 
-  const { customers } = state;
+  const { datagrid_isloading, customers } = state;
 
   const { filtered, inputlength } = useMemo(() => {
     return GridData.rows({
@@ -48,7 +48,7 @@ export default function Customers() {
         </GridLayout.Header>
         <GridLayout.Content>
           <CustomerGrid
-            loading={inputlength === 0}
+            loading={datagrid_isloading}
             tokens={
               state.datagrid_filter.localsearch
                 ? [state.datagrid_filter.localsearch]

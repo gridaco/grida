@@ -196,6 +196,13 @@ export interface FormEditorState {
   focus_customer_id?: string;
   focus_block_id?: string | null;
   available_field_ids: string[];
+  theme: {
+    palette?: FormStyleSheetV1Schema["palette"];
+    fontFamily?: FormStyleSheetV1Schema["font-family"];
+    customCSS?: FormStyleSheetV1Schema["custom"];
+    section?: FormStyleSheetV1Schema["section"];
+    background?: FormPageBackgroundSchema;
+  };
   assets: {
     backgrounds: {
       name: string;
@@ -211,13 +218,6 @@ export interface FormEditorState {
     fields: { [key: string]: FormResponseField[] };
   };
   sessions?: FormResponseSession[];
-  theme: {
-    palette?: FormStyleSheetV1Schema["palette"];
-    fontFamily?: FormStyleSheetV1Schema["font-family"];
-    customCSS?: FormStyleSheetV1Schema["custom"];
-    section?: FormStyleSheetV1Schema["section"];
-    background?: FormPageBackgroundSchema;
-  };
   tables: {
     name: string;
     group:
