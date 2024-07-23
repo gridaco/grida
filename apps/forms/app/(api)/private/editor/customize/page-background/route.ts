@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     : null;
 
   await supabase
-    .from("form_page")
+    .from("form_document")
     .update({
       background: background as any,
     })

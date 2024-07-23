@@ -38,7 +38,7 @@ export default async function FormsCustomizeSettingsPage({
     .select(
       `
         *,
-        default_page:form_page!default_form_page_id(
+        default_page:form_document!default_form_page_id(
           *
         )
       `

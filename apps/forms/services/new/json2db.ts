@@ -19,7 +19,7 @@ type FormBlockInsertion =
  * as data ooeration, the json 2 form will be processed as follows:
  *
  * - 1. create a new form (grida_forms.form)
- * - 2. create a new form page (grida_forms.form_page)
+ * - 2. create a new form document (grida_forms.form_document)
  * - 3. create fields (grida_forms.form_field)
  * - 4. create options (grida_forms.form_field_option)
  * // TODO:
@@ -87,7 +87,7 @@ export class JSONFrom2DB {
     }
 
     const _ = await this.client
-      .from("form_page")
+      .from("form_document")
       .insert({
         form_id: this.form_id,
       })

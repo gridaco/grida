@@ -946,7 +946,7 @@ export type Database = {
             foreignKeyName: "grida_forms_form_default_form_page_id_fkey"
             columns: ["default_form_page_id"]
             isOneToOne: false
-            referencedRelation: "form_page"
+            referencedRelation: "form_document"
             referencedColumns: ["id"]
           },
           {
@@ -1029,7 +1029,7 @@ export type Database = {
             foreignKeyName: "grida_forms_form_block_form_page_id_fkey"
             columns: ["form_page_id"]
             isOneToOne: false
-            referencedRelation: "form_page"
+            referencedRelation: "form_document"
             referencedColumns: ["id"]
           },
           {
@@ -1037,6 +1037,41 @@ export type Database = {
             columns: ["parent_id"]
             isOneToOne: false
             referencedRelation: "form_block"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      form_document: {
+        Row: {
+          background: Json | null
+          created_at: string
+          form_id: string
+          id: string
+          name: string
+          stylesheet: Json | null
+        }
+        Insert: {
+          background?: Json | null
+          created_at?: string
+          form_id: string
+          id?: string
+          name?: string
+          stylesheet?: Json | null
+        }
+        Update: {
+          background?: Json | null
+          created_at?: string
+          form_id?: string
+          id?: string
+          name?: string
+          stylesheet?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grida_forms_form_page_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "form"
             referencedColumns: ["id"]
           },
         ]
@@ -1235,44 +1270,6 @@ export type Database = {
           },
           {
             foreignKeyName: "grida_forms_form_field_option_form_id_fkey"
-            columns: ["form_id"]
-            isOneToOne: false
-            referencedRelation: "form"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      form_page: {
-        Row: {
-          _id: number
-          background: Json | null
-          created_at: string
-          form_id: string
-          id: string
-          name: string
-          stylesheet: Json | null
-        }
-        Insert: {
-          _id?: number
-          background?: Json | null
-          created_at?: string
-          form_id: string
-          id?: string
-          name?: string
-          stylesheet?: Json | null
-        }
-        Update: {
-          _id?: number
-          background?: Json | null
-          created_at?: string
-          form_id?: string
-          id?: string
-          name?: string
-          stylesheet?: Json | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "grida_forms_form_page_form_id_fkey"
             columns: ["form_id"]
             isOneToOne: false
             referencedRelation: "form"
