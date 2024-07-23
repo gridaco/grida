@@ -11,7 +11,6 @@ export interface Form {
   default_form_page_id: string | null;
   description: string | null;
   id: string;
-  is_edit_after_submission_allowed: boolean;
   is_max_form_responses_by_customer_enabled: boolean;
   is_max_form_responses_in_total_enabled: boolean;
   max_form_responses_by_customer: number | null;

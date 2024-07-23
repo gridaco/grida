@@ -853,7 +853,6 @@ export type Database = {
           default_form_page_id: string | null
           description: string | null
           id: string
-          is_edit_after_submission_allowed: boolean
           is_force_closed: boolean
           is_max_form_responses_by_customer_enabled: boolean
           is_max_form_responses_in_total_enabled: boolean
@@ -874,7 +873,6 @@ export type Database = {
           default_form_page_id?: string | null
           description?: string | null
           id?: string
-          is_edit_after_submission_allowed?: boolean
           is_force_closed?: boolean
           is_max_form_responses_by_customer_enabled?: boolean
           is_max_form_responses_in_total_enabled?: boolean
@@ -895,7 +893,6 @@ export type Database = {
           default_form_page_id?: string | null
           description?: string | null
           id?: string
-          is_edit_after_submission_allowed?: boolean
           is_force_closed?: boolean
           is_max_form_responses_by_customer_enabled?: boolean
           is_max_form_responses_in_total_enabled?: boolean
