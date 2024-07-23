@@ -20,12 +20,11 @@ export function PaletteColorChip({
   className?: string;
 }) {
   return (
-    <button
-      type="button"
+    <div
       data-selected={selected}
       onClick={onSelect}
       className={cn(
-        "w-6 h-6 border-2 rounded-full overflow-hidden",
+        "w-6 h-6 border-2 rounded-full overflow-hidden cursor-pointer",
         "data-[selected='true']:outline data-[selected='true']:outline-foreground data-[selected='true']:border-background",
         className
       )}
@@ -54,7 +53,7 @@ export function PaletteColorChip({
           />
         )}
       </div>
-    </button>
+    </div>
   );
 }
 

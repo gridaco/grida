@@ -21,9 +21,6 @@ export default function EditFormPage() {
         <AgentThemeProvider>
           <CurrentPageCanvas />
         </AgentThemeProvider>
-        <div className="fixed bottom-5 left-0 right-0 flex items-center justify-center z-50">
-          <CanvasFloatingToolbar />
-        </div>
       </CanvasEventTarget>
       <aside className="hidden lg:flex h-full">
         <SideControl mode="blocks" />
@@ -66,10 +63,15 @@ function CurrentPageCanvas() {
       return <BlocksEditor />;
     case "collection":
       return (
-        // 430 932 max-h-[932px] no-scrollbar overflow-y-scroll
-        <div className="mx-auto my-20 max-w-[430px] border rounded-2xl shadow-2xl bg-background select-none">
-          <FormCollectionPage />
-        </div>
+        <>
+          {/* // 430 932 max-h-[932px] no-scrollbar overflow-y-scroll */}
+          <div className="mx-auto my-20 max-w-[430px] border rounded-2xl shadow-2xl bg-background select-none">
+            <FormCollectionPage />
+          </div>
+          <div className="fixed bottom-5 left-0 right-0 flex items-center justify-center z-50">
+            <CanvasFloatingToolbar />
+          </div>
+        </>
       );
     case "start": {
       return (
