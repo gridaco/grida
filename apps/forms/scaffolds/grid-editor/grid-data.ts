@@ -122,67 +122,87 @@ export namespace GridData {
   export function rows(input: DataGridInput) {
     switch (input.table) {
       case "response": {
-        return input.responses
-          ? rows_from_responses(
-              {
-                rows: GridFilter.filter(
-                  input.responses.rows,
-                  input.filter,
-                  "raw",
-                  // response raw is saved with name: value
-                  input.fields.map((f) => f.name)
-                ),
-                fields: input.responses.fields,
-              },
-              input.fields
-            )
-          : [];
+        return {
+          inputlength: input.responses?.rows.length || 0,
+          filtered: input.responses
+            ? rows_from_responses(
+                {
+                  rows: GridFilter.filter(
+                    input.responses.rows,
+                    input.filter,
+                    "raw",
+                    // response raw is saved with name: value
+                    input.fields.map((f) => f.name)
+                  ),
+                  fields: input.responses.fields,
+                },
+                input.fields
+              )
+            : [],
+        };
       }
       case "session": {
-        return input.sessions
-          ? rows_from_sessions(
-              GridFilter.filter(
-                input.sessions,
-                input.filter,
-                "raw",
-                // session raw is saved with id: value
-                input.fields.map((f) => f.id)
-              ),
-              input.fields
-            )
-          : [];
+        return {
+          inputlength: input.sessions?.length || 0,
+          filtered: input.sessions
+            ? rows_from_sessions(
+                GridFilter.filter(
+                  input.sessions,
+                  input.filter,
+                  "raw",
+                  // session raw is saved with id: value
+                  input.fields.map((f) => f.id)
+                ),
+                input.fields
+              )
+            : [],
+        };
       }
       case "x-supabase-main-table": {
-        return rows_from_x_supabase_main_table({
-          form_id: input.form_id,
-          // TODO: support multiple PKs
-          pk: input.data.pks.length > 0 ? input.data.pks[0] : null,
-          fields: input.fields,
-          rows: GridFilter.filter(
+        return {
+          inputlength: input.data.rows.length,
+          filtered: rows_from_x_supabase_main_table({
+            form_id: input.form_id,
+            // TODO: support multiple PKs
+            pk: input.data.pks.length > 0 ? input.data.pks[0] : null,
+            fields: input.fields,
+            rows: GridFilter.filter(
+              input.data.rows,
+              input.filter,
+              undefined,
+              input.fields.map((f) => f.name)
+            ),
+          }),
+        };
+      }
+      case "x-supabase-auth.users": {
+        return {
+          inputlength: input.data.rows.length,
+          filtered: GridFilter.filter(
             input.data.rows,
             input.filter,
             undefined,
-            input.fields.map((f) => f.name)
+            Object.keys(GridaSupabase.SupabaseUserJsonSchema.properties)
           ),
-        });
-      }
-      case "x-supabase-auth.users": {
-        return GridFilter.filter(
-          input.data.rows,
-          input.filter,
-          undefined,
-          Object.keys(GridaSupabase.SupabaseUserJsonSchema.properties)
-        );
+        };
       }
       case "customer": {
-        return GridFilter.filter(input.data.rows, input.filter, undefined, [
-          "uid",
-          "email",
-          "email_provisional",
-          "phone",
-          "created_at",
-          "last_seen_at",
-        ]);
+        return {
+          inputlength: input.data.rows.length,
+          filtered: GridFilter.filter(
+            input.data.rows,
+            input.filter,
+            undefined,
+            [
+              "uid",
+              "email",
+              "email_provisional",
+              "phone",
+              "created_at",
+              "last_seen_at",
+            ]
+          ),
+        };
       }
     }
   }

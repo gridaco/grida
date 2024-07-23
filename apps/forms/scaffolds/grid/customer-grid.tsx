@@ -20,11 +20,13 @@ export function CustomerGrid({
   onSelected,
   tokens,
   masked,
+  loading,
 }: {
   rows: CFCustomerRow[];
   rowKey?: string;
   tokens?: string[];
   masked?: boolean;
+  loading?: boolean;
   onSelected?: (key: string, row: CFCustomerRow) => void;
 }) {
   const columns = [
@@ -94,7 +96,7 @@ export function CustomerGrid({
       className="flex-grow select-none"
       columns={columns}
       rows={rows}
-      renderers={{ noRowsFallback: <EmptyRowsRenderer /> }}
+      renderers={{ noRowsFallback: <EmptyRowsRenderer loading={loading} /> }}
       rowKeyGetter={rowKey ? (row) => (row as any)[rowKey] : undefined}
       rowHeight={44}
     />

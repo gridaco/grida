@@ -81,7 +81,7 @@ export default function XTablePage() {
     []
   );
 
-  const rows = useMemo(() => {
+  const { filtered, inputlength } = useMemo(() => {
     return GridData.rows({
       filter: state.datagrid_filter,
       table: "x-supabase-auth.users",
@@ -112,12 +112,13 @@ export default function XTablePage() {
                 : []
             }
             columns={columns}
-            rows={rows}
+            rows={filtered}
+            loading={inputlength === 0}
           />
         </GridLayout.Content>
         <GridLayout.Footer>
           <GridLimit />
-          <GridCount count={rows.length} />
+          <GridCount count={filtered.length} />
           <GridRefresh />
         </GridLayout.Footer>
       </GridLayout.Root>

@@ -64,7 +64,7 @@ export function GridEditor() {
   );
 
   // Transforming the responses into the format expected by react-data-grid
-  const rows = useMemo(() => {
+  const { filtered, inputlength } = useMemo(() => {
     return GridData.rows({
       form_id: form_id,
       table: datagrid_table as "response" | "session" | "x-supabase-main-table",
@@ -198,8 +198,9 @@ export function GridEditor() {
         <ResponseGrid
           systemcolumns={systemcolumns}
           columns={columns}
-          rows={rows}
+          rows={filtered}
           readonly={readonly}
+          loading={inputlength === 0}
           selectionDisabled={selectionDisabled}
           onAddNewFieldClick={openNewFieldPanel}
           onEditFieldClick={openEditFieldPanel}
@@ -223,7 +224,7 @@ export function GridEditor() {
       <GridLayout.Footer>
         <div className="flex gap-2 items-center">
           <GridLimit />
-          <GridCount count={rows?.length ?? 0} />
+          <GridCount count={filtered?.length ?? 0} />
         </div>
         <Link href={`/v1/${form_id}/export/csv`} download target="_blank">
           <Button variant="ghost">

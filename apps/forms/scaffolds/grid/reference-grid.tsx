@@ -14,6 +14,7 @@ export function ReferenceTableGrid({
   rowKey,
   tokens,
   masked,
+  loading,
   onSelected,
 }: {
   columns: {
@@ -25,6 +26,7 @@ export function ReferenceTableGrid({
   rowKey?: string;
   tokens?: string[];
   masked?: boolean;
+  loading?: boolean;
   onSelected?: (key: string, row: XSupabaseReferenceTableRow) => void;
 }) {
   const columns = _columns.map(
@@ -77,7 +79,7 @@ export function ReferenceTableGrid({
         const k = rowKey ? (args.row as any)[rowKey] : undefined;
         onSelected?.(k, args.row);
       }}
-      renderers={{ noRowsFallback: <EmptyRowsRenderer /> }}
+      renderers={{ noRowsFallback: <EmptyRowsRenderer loading={loading} /> }}
       rowKeyGetter={rowKey ? (row) => (row as any)[rowKey] : undefined}
       rowHeight={44}
     />

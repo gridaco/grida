@@ -74,6 +74,7 @@ export function ResponseGrid({
   rows,
   selectionDisabled,
   readonly,
+  loading,
   onAddNewFieldClick,
   onEditFieldClick,
   onDeleteFieldClick,
@@ -92,6 +93,7 @@ export function ResponseGrid({
   rows: GFResponseRow[];
   selectionDisabled?: boolean;
   readonly?: boolean;
+  loading?: boolean;
   onAddNewFieldClick?: () => void;
   onEditFieldClick?: (id: string) => void;
   onDeleteFieldClick?: (id: string) => void;
@@ -258,7 +260,7 @@ export function ResponseGrid({
       onSelectedRowsChange={
         selectionDisabled ? undefined : onSelectedRowsChange
       }
-      renderers={{ noRowsFallback: <EmptyRowsRenderer /> }}
+      renderers={{ noRowsFallback: <EmptyRowsRenderer loading={loading} /> }}
       rows={rows}
       rowHeight={44}
     />

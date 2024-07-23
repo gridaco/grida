@@ -113,6 +113,7 @@ export function ReferenceSearch({
         <div className="flex-1">
           <div className="flex flex-col w-full h-full">
             <ReferenceTableGrid
+              loading={!rows}
               tokens={localSearch ? [localSearch] : undefined}
               onSelected={(key, row) => {
                 setValue(key);

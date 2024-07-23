@@ -23,7 +23,7 @@ export default function Customers() {
 
   const { customers } = state;
 
-  const rows = useMemo(() => {
+  const { filtered, inputlength } = useMemo(() => {
     return GridData.rows({
       filter: state.datagrid_filter,
       table: "customer",
@@ -48,6 +48,7 @@ export default function Customers() {
         </GridLayout.Header>
         <GridLayout.Content>
           <CustomerGrid
+            loading={inputlength === 0}
             tokens={
               state.datagrid_filter.localsearch
                 ? [state.datagrid_filter.localsearch]
@@ -55,7 +56,7 @@ export default function Customers() {
             }
             masked={state.datagrid_filter.masking_enabled}
             rows={
-              rows?.map((customer: Customer) => ({
+              filtered?.map((customer: Customer) => ({
                 uid: customer.uid,
                 email: provisional(
                   customer.email,
@@ -73,7 +74,7 @@ export default function Customers() {
         </GridLayout.Content>
         <GridLayout.Footer>
           <GridLimit />
-          <GridCount count={rows.length} />
+          <GridCount count={filtered.length} />
           <GridRefresh />
         </GridLayout.Footer>
       </GridLayout.Root>
