@@ -591,9 +591,11 @@ function Palette() {
                 primary={paletteobj["light"]["--primary"]}
                 secondary={paletteobj["light"]["--secondary"]}
                 background={paletteobj["light"]["--background"]}
-                className="w-10 h-10 rounded"
+                className="min-w-12 w-12 h-12 rounded border"
               />
-              <span className="text-ellipsis overflow-hidden">{palette}</span>
+              <span className="text-xs text-muted-foreground text-ellipsis overflow-hidden">
+                {palette}
+              </span>
             </div>
           )}
         </SelectValue>
@@ -701,7 +703,7 @@ function Background() {
                   height={100}
                   src={background.preview[0]}
                   alt={background.title}
-                  className="rounded"
+                  className="rounded border"
                 />
                 <span className="text-xs text-muted-foreground">
                   {background.title}
