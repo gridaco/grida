@@ -53,6 +53,7 @@ export function GridEditor() {
     datagrid_filter,
     datagrid_table,
     datagrid_table_row_keyword,
+    datagrid_isloading,
     x_supabase_main_table,
     selected_rows: selected_responses,
   } = state;
@@ -200,7 +201,7 @@ export function GridEditor() {
           columns={columns}
           rows={filtered}
           readonly={readonly}
-          loading={inputlength === 0}
+          loading={datagrid_isloading}
           selectionDisabled={selectionDisabled}
           onAddNewFieldClick={openNewFieldPanel}
           onEditFieldClick={openEditFieldPanel}

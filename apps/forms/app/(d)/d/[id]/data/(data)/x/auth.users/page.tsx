@@ -28,6 +28,7 @@ export default function XTablePage() {
     datagrid_rows_per_page,
     datagrid_orderby,
     datagrid_table_refresh_key,
+    datagrid_isloading,
   } = state;
 
   const serachParams = useMemo(() => {
@@ -113,7 +114,7 @@ export default function XTablePage() {
             }
             columns={columns}
             rows={filtered}
-            loading={inputlength === 0}
+            loading={datagrid_isloading}
           />
         </GridLayout.Content>
         <GridLayout.Footer>
