@@ -13,7 +13,9 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -66,7 +68,7 @@ import { Tokens } from "@/ast";
 import { CursorControl } from "./controls/cursor";
 import { cn } from "@/utils";
 
-const { default: _, ...variants } = _variants;
+const { default: all, ...variants } = _variants;
 
 export function SideControl({ mode }: { mode: "blocks" }) {
   return (
@@ -572,35 +574,67 @@ function Palette() {
     [dispatch]
   );
 
+  const paletteobj = palette ? all[palette] : undefined;
+
   return (
-    <div className="flex flex-col gap-4">
-      {Object.keys(variants).map((variant) => {
-        const palettes = variants[variant as keyof typeof variants];
-        return (
-          <div key={variant} className="flex flex-col gap-2">
-            <h2 className="text-sm font-mono text-muted-foreground">
-              {variant}
-            </h2>
-            <div className="flex flex-wrap gap-1">
+    <Select
+      value={palette}
+      onValueChange={(v) => {
+        onPaletteChange(v as any);
+      }}
+    >
+      <SelectTrigger className={cn(paletteobj && "h-16 px-2 py-2")}>
+        <SelectValue>
+          {paletteobj && (
+            <div className="flex items-center gap-2">
+              <PaletteColorChip
+                primary={paletteobj["light"]["--primary"]}
+                secondary={paletteobj["light"]["--secondary"]}
+                background={paletteobj["light"]["--background"]}
+                className="w-10 h-10 rounded"
+              />
+              <span className="text-ellipsis overflow-hidden">{palette}</span>
+            </div>
+          )}
+        </SelectValue>
+      </SelectTrigger>
+      <SelectContent>
+        {Object.keys(variants).map((variant) => {
+          const palettes = variants[variant as keyof typeof variants];
+          return (
+            <SelectGroup key={variant} className="flex flex-col gap-2">
+              <SelectLabel>{variant}</SelectLabel>
               {Object.keys(palettes).map((key) => {
                 const colors = palettes[key as keyof typeof palettes];
-                const primary: any = colors["light"]["--primary"];
+                const primary = colors["light"]["--primary"];
+                const secondary = colors["light"]["--secondary"];
+                const background = colors["light"]["--background"];
                 return (
-                  <PaletteColorChip
-                    key={key}
-                    primary={primary}
-                    onClick={() => {
-                      onPaletteChange(key as any);
-                    }}
-                    selected={key === palette}
-                  />
+                  <SelectItem key={key} value={key}>
+                    <div className="flex gap-2 items-center">
+                      <PaletteColorChip
+                        key={key}
+                        primary={primary}
+                        secondary={secondary}
+                        background={background}
+                        onSelect={() => {
+                          onPaletteChange(key as any);
+                        }}
+                        selected={key === palette}
+                        className="w-10 h-10 rounded"
+                      />
+                      <span className="text-ellipsis overflow-hidden">
+                        {key}
+                      </span>
+                    </div>
+                  </SelectItem>
                 );
               })}
-            </div>
-          </div>
-        );
-      })}
-    </div>
+            </SelectGroup>
+          );
+        })}
+      </SelectContent>
+    </Select>
   );
 }
 
