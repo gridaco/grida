@@ -20,6 +20,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
+import { GridaSupabase } from "@/types";
 
 const CommandInput = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive.Input>,
@@ -194,6 +195,8 @@ export function NameInput({
                       );
                     })}
                   </CommandGroup>
+                  {/* <CommandSeparator /> */}
+                  {/* <XSupabaseAuthUsersTableProperties/> */}
                 </>
               )}
             </>
@@ -201,5 +204,55 @@ export function NameInput({
         </Command>
       </PopoverContent>
     </Popover>
+  );
+}
+
+function XSupabaseAuthUsersTableProperties({
+  onSelect,
+}: {
+  onSelect?: (value: string) => void;
+}) {
+  return (
+    <>
+      <CommandGroup
+        heading={
+          <>
+            <SupabaseLogo className="inline w-4 h-4 me-1 align-middle" />{" "}
+            Supabase{" "}
+            <code className="ms-2 text-xs font-mono text-muted-foreground">
+              auth.users
+            </code>
+          </>
+        }
+      >
+        {Object.keys(GridaSupabase.SupabaseUserJsonSchema.properties).map(
+          (key) => {
+            const property =
+              GridaSupabase.SupabaseUserJsonSchema.properties[
+                key as keyof typeof GridaSupabase.SupabaseUserJsonSchema.properties
+              ];
+
+            const keywords = ["auth", "users"].filter(Boolean) as string[];
+
+            const column = `auth.users.${key}`;
+
+            return (
+              <CommandItem
+                key={key}
+                keywords={keywords}
+                value={column}
+                onSelect={onSelect}
+              >
+                <Link1Icon className="mr-2 h-4 w-4" />
+                <span>{key}</span>{" "}
+                <small className="ms-1 text-muted-foreground">
+                  {property?.type} | {property?.format}
+                </small>
+              </CommandItem>
+            );
+          }
+        )}
+      </CommandGroup>
+    </>
   );
 }

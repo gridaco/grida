@@ -4,6 +4,13 @@ import React from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useEditorState } from "@/scaffolds/editor";
 import { TableTypeIcon } from "@/components/table-type-icon";
+import { Button } from "@/components/ui/button";
+import { PlusIcon } from "@radix-ui/react-icons";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export function TableViews() {
   const [state, dispatch] = useEditorState();
@@ -39,9 +46,14 @@ export function TableViews() {
           })}
         </TabsList>
       </Tabs>
-      {/* <Button variant="ghost" size="icon">
-        <PlusIcon />
-      </Button> */}
+      {/* <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="ghost" size="icon">
+            <PlusIcon />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Add new view</TooltipContent>
+      </Tooltip> */}
     </div>
   );
 }
