@@ -187,8 +187,6 @@ export async function GET(
     description,
     default_page,
     fields,
-    is_powered_by_branding_enabled,
-    default_form_page_language,
     is_max_form_responses_in_total_enabled,
     max_form_responses_in_total,
     is_max_form_responses_by_customer_enabled,
@@ -201,11 +199,17 @@ export async function GET(
     store_connection,
   } = data;
 
+  const {
+    //
+    is_powered_by_branding_enabled,
+    lang,
+  } = (default_page as unknown as FormDocument) || {};
+
   await i18next.init({
-    lng: default_form_page_language,
+    lng: lang,
     debug: false, //!IS_PRODUTION,
     resources: resources,
-    preload: [default_form_page_language],
+    preload: [lang],
   });
 
   const page_blocks = (data.default_page as unknown as FormDocument).blocks;
@@ -308,7 +312,7 @@ export async function GET(
     id,
     title,
     description,
-    default_form_page_language,
+    lang,
     fields,
     page_blocks,
     undefined,
@@ -472,10 +476,10 @@ export async function GET(
     blocks: renderer.blocks(),
     fields: fields,
     required_hidden_fields: required_hidden_fields,
-    lang: default_form_page_language,
+    lang: lang,
     options: {
       is_powered_by_branding_enabled,
-      optimize_for_cjk: cjk.includes(default_form_page_language),
+      optimize_for_cjk: cjk.includes(lang),
     },
     background: (data.default_page as unknown as FormDocument).background,
     stylesheet: (data.default_page as unknown as FormDocument).stylesheet,

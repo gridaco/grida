@@ -11,14 +11,12 @@ export interface Form {
   custom_preview_url_path: string | null;
   custom_publish_url_path: string | null;
   default_form_page_id: string | null;
-  default_form_page_language: FormsPageLanguage;
   description: string | null;
   id: string;
   is_edit_after_submission_allowed: boolean;
   is_max_form_responses_by_customer_enabled: boolean;
   is_max_form_responses_in_total_enabled: boolean;
   is_multiple_response_allowed: boolean;
-  is_powered_by_branding_enabled: boolean;
   max_form_responses_by_customer: number | null;
   max_form_responses_in_total: number | null;
   project_id: number;
@@ -220,6 +218,11 @@ export interface FormDocument {
   stylesheet?: FormStyleSheetV1Schema;
   is_redirect_after_response_uri_enabled: boolean;
   redirect_after_response_uri: string | null;
+  lang: FormsPageLanguage;
+  is_powered_by_branding_enabled: boolean;
+  is_ending_page_enabled: boolean;
+  ending_page_template_id: string | null;
+  ending_page_i18n_overrides: EndingPageI18nOverrides | null;
 }
 
 export interface IFormBlock<T = FormBlockType> {

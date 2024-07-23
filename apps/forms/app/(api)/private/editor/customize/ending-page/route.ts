@@ -25,17 +25,10 @@ export async function POST(req: NextRequest) {
   const is_ending_page_enabled = template_id ? true : false;
 
   await supabase
-    .from("form")
+    .from("form_document")
     .update({
       is_ending_page_enabled: is_ending_page_enabled,
       ending_page_template_id: template_id,
-    })
-    .eq("id", form_id)
-    .single();
-
-  await supabase
-    .from("form_document")
-    .update({
       is_redirect_after_response_uri_enabled:
         // turn off if ending page enabled, otherwise don't change
         is_ending_page_enabled == true ? false : undefined,

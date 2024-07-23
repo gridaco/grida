@@ -14,11 +14,9 @@ export async function POST(req: NextRequest) {
 
   const form_id = String(formdata.get("form_id"));
 
-  const __raw_default_form_page_language = formdata.get(
-    "default_form_page_language"
-  );
-  const default_form_page_language = __raw_default_form_page_language
-    ? (String(__raw_default_form_page_language) as FormsPageLanguage)
+  const __raw_lang = formdata.get("lang");
+  const lang = __raw_lang
+    ? (String(__raw_lang) as FormsPageLanguage)
     : undefined;
 
   if (!form_id) {
@@ -28,11 +26,11 @@ export async function POST(req: NextRequest) {
   const supabase = createRouteHandlerClient(cookieStore);
 
   await supabase
-    .from("form")
+    .from("form_document")
     .update({
-      default_form_page_language: default_form_page_language,
+      lang: lang,
     })
-    .eq("id", form_id)
+    .eq("form_id", form_id)
     .single();
 
   // redirect to the page requested

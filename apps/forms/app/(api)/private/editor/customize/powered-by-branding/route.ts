@@ -32,11 +32,12 @@ export async function POST(req: NextRequest) {
   const supabase = createRouteHandlerClient(cookieStore);
 
   await supabase
-    .from("form")
+    .from("form_document")
     .update({
       is_powered_by_branding_enabled: is_powered_by_branding_enabled,
     })
-    .eq("id", form_id)
+    // TODO: change to document id after migration
+    .eq("form_id", form_id)
     .single();
 
   // redirect to the page requested

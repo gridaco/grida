@@ -73,13 +73,14 @@ export function EndingPagePreferences({
     };
 
     const { error } = await supabase
-      .from("form")
+      .from("form_document")
       .update({
         is_ending_page_enabled: true,
         ending_page_template_id: template_id,
         ending_page_i18n_overrides: _ as {},
       })
-      .eq("id", form_id);
+      // TODO: change to document id after migration
+      .eq("form_id", form_id);
 
     if (error) throw error;
   };

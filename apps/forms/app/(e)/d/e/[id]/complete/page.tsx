@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { EndingPageWithContext } from "@/theme/templates/formcomplete";
 import { ssr_page_init_i18n } from "@/i18n/ssr";
 import { fmt_local_index } from "@/utils/fmt";
-import { EndingPageI18nOverrides } from "@/types";
+import { EndingPageI18nOverrides, FormDocument } from "@/types";
 import type { FormLinkURLParams } from "@/lib/forms/url";
 import { FormValue } from "@/services/form";
 
@@ -37,15 +37,13 @@ export default async function SubmitCompletePage({
     return notFound();
   }
 
-  await ssr_page_init_i18n({ lng: data.default_form_page_language });
+  const { title, fields, options, default_page } = data;
+  const { lang, ending_page_template_id, ending_page_i18n_overrides } =
+    default_page as unknown as FormDocument;
 
-  const {
-    title,
-    fields,
-    options,
-    ending_page_template_id,
-    ending_page_i18n_overrides,
-  } = data;
+  await ssr_page_init_i18n({
+    lng: lang,
+  });
 
   if (!response_id) {
     return notFound();
@@ -91,7 +89,7 @@ export default async function SubmitCompletePage({
         overrides={ending_page_i18n_overrides as {} as EndingPageI18nOverrides}
         context={{
           title: title,
-          language: data.default_form_page_language,
+          language: lang,
           form_title: title,
           response: {
             index: local_index,
