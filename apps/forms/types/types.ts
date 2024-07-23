@@ -1,6 +1,6 @@
-import { IpInfo } from "@/lib/ipinfo";
-import type { JSONBooleanValueDescriptor } from "./logic";
+import { IpInfo } from "@/clients/ipinfo";
 import palettes from "@/theme/palettes";
+import type { Tokens } from "@/ast";
 
 type UUID = string;
 
@@ -232,7 +232,7 @@ export interface IFormBlock<T = FormBlockType> {
   data: any;
   parent_id?: string | null;
   local_index: number;
-  v_hidden?: JSONBooleanValueDescriptor | null;
+  v_hidden?: Tokens.BooleanValueExpression | null;
 }
 
 export interface FormBlock<T = FormBlockType> extends IFormBlock<T> {

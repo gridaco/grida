@@ -1,9 +1,4 @@
-import type {
-  JSONBooleanValueDescriptor,
-  JSONConditionExpression,
-  JSONFieldReference,
-  Scalar,
-} from "@/types/logic";
+import type { Tokens } from "@/ast";
 import { useFormAgentState } from "@/lib/formstate";
 import { useMemo } from "react";
 
@@ -18,7 +13,7 @@ export function LogicalProvider() {
  * @returns
  */
 export function useLogical(
-  descriptor?: JSONBooleanValueDescriptor | undefined | null
+  descriptor?: Tokens.BooleanValueExpression | undefined | null
 ) {
   const [l, op, r] = Array.isArray(descriptor) ? descriptor : [];
 
@@ -47,7 +42,9 @@ export function useLogical(
   }
 }
 
-export function useReference(ref?: JSONFieldReference | Scalar) {
+export function useReference(
+  ref?: Tokens.JSONFieldReference | Tokens.Primitive
+) {
   const [state] = useFormAgentState();
 
   const scalar = typeof ref !== "object" ? ref : null;
@@ -76,7 +73,9 @@ export function useReference(ref?: JSONFieldReference | Scalar) {
   return scalar || value;
 }
 
-const parseReference = (ref?: JSONFieldReference | Scalar | null) => {
+const parseReference = (
+  ref?: Tokens.JSONFieldReference | Tokens.Primitive | null
+) => {
   const [_, def, key, ...access] =
     typeof ref === "object" ? ref?.$ref?.split("/") ?? [] : [];
   return { def: def as "fields" | undefined, key, access };

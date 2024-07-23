@@ -66,7 +66,7 @@ export function CustomPagePalettePreferences({
                         <PaletteColorChip
                           key={key}
                           primary={primary}
-                          onClick={() => {
+                          onSelect={() => {
                             setPalette((prev) =>
                               prev === key
                                 ? undefined

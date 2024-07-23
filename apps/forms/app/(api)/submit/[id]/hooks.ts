@@ -1,6 +1,6 @@
 import { Resend } from "resend";
 import { EmailTemplate } from "@/theme/templates-email/formcomplete/default";
-import { Bird } from "@/lib/bird";
+import { Bird } from "@/clients/bird";
 import { toArrayOf } from "@/types/utility";
 
 const resend = new Resend(process.env.RESEND_API_KEY);

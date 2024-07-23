@@ -16,9 +16,13 @@ import type {
 } from "@/types";
 import { LOCALTZ } from "./symbols";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
+import { ZodObject } from "zod";
+import { Tokens } from "@/ast";
+import React from "react";
 
 export type DraftID = `[draft]${string}`;
 export const DRAFT_ID_START_WITH = "[draft]";
+const ISDEV = process.env.NODE_ENV === "development";
 
 export interface FormEditorInit {
   project_id: number;
@@ -102,6 +106,13 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
     scheduling_tz: init.scheduling_tz,
     page_id: init.page_id,
     blocks: blockstreeflat(init.blocks),
+    document: {
+      pages: ISDEV ? ["collection", "start", "form"] : ["form"],
+      selected_page_id: "form",
+      nodes: [],
+      templatesample: "formcollection_sample_001_the_bundle",
+      templatedata: {},
+    },
     fields: init.fields,
     assets: {
       backgrounds: [],
@@ -189,6 +200,31 @@ export interface FormEditorState {
   scheduling_tz?: string;
   page_id: string | null;
   blocks: EditorFlatFormBlock[];
+  document: {
+    pages: string[];
+    selected_page_id: string;
+    nodes: any[];
+    templatesample: string;
+    templatedata: {
+      [key: string]: {
+        text?: Tokens.StringValueExpression;
+        template_id: string;
+        attributes?: Omit<
+          React.HtmlHTMLAttributes<HTMLDivElement>,
+          "style" | "className"
+        >;
+        properties?: { [key: string]: Tokens.StringValueExpression };
+        style?: React.CSSProperties;
+      };
+    };
+    selected_node_id?: string;
+    selected_node_type?: string;
+    selected_node_schema?: ZodObject<any> | null;
+    selected_node_default_properties?: Record<string, any>;
+    selected_node_default_style?: React.CSSProperties;
+    selected_node_default_text?: Tokens.StringValueExpression;
+    selected_node_context?: Record<string, any>;
+  };
   fields: FormFieldDefinition[];
   field_draft_init?: Partial<FormFieldInit> | null;
   focus_field_id?: string | null;

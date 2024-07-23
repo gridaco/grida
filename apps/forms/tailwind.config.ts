@@ -8,7 +8,7 @@ const config: Config = {
     "./www/**/*.{js,ts,jsx,tsx,mdx}",
     "./theme/**/*.{js,ts,jsx,tsx,mdx}",
     "./scaffolds/**/*.{js,ts,jsx,tsx,mdx}",
-    "./grid/**/*.{js,ts,jsx,tsx,mdx}",
+    "./builder/**/*.{js,ts,jsx,tsx,mdx}",
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {

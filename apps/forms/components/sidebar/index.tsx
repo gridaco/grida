@@ -29,9 +29,12 @@ export function SidebarMenuGrid({ children }: React.PropsWithChildren<{}>) {
 }
 
 export function SidebarMenuSectionContent({
+  className,
   children,
-}: React.PropsWithChildren<{}>) {
-  return <div className="w-full px-2 py-1">{children}</div>;
+}: React.PropsWithChildren<{
+  className?: string;
+}>) {
+  return <div className={cn("w-full px-2 py-1", className)}>{children}</div>;
 }
 
 export function SidebarMenuGridItem({
@@ -63,29 +66,36 @@ export function SidebarMenuItem({
   className,
   disabled,
   children,
+  onSelect,
 }: React.PropsWithChildren<{
   level?: number;
   muted?: boolean;
   selected?: boolean;
   className?: string;
   disabled?: boolean;
+  onSelect?: () => void;
 }>) {
   return (
     <div
       data-level={level}
       data-muted={muted}
       data-disabled={disabled}
+      data-selected={selected}
       className={cn(
         "flex items-center",
         "relative group",
-        "w-full px-2 py-1 rounded hover:bg-accent text-sm font-medium text-foreground data-[muted='true']:text-muted-foreground",
+        "w-full px-2 py-1 rounded text-sm font-medium text-foreground",
         "text-ellipsis whitespace-nowrap overflow-hidden",
+        "hover:bg-accent hover:text-accent-foreground",
+        "data-[muted='true']:text-muted-foreground",
         "data-[disabled='true']:cursor-not-allowed data-[disabled='true']:opacity-50 data-[disabled='true']:bg-background",
+        "data-[selected='true']:bg-accent data-[selected='true']:text-accent-foreground",
         className
       )}
       style={{
         paddingLeft: level ? `${level * 1}rem` : undefined,
       }}
+      onClick={onSelect}
     >
       {children}
     </div>
@@ -118,7 +128,7 @@ export function SidebarSectionHeaderItem({
     <div
       className={cn(
         "relative group",
-        "w-full px-2 py-1 my-1 rounded hover:bg-accent text-sm font-medium text-foreground data-[muted='true']:text-muted-foreground",
+        "w-full px-2 py-1 my-1 rounded hover:bg-accent hover:text-accent-foreground text-sm font-medium text-foreground data-[muted='true']:text-muted-foreground",
         "text-ellipsis whitespace-nowrap overflow-hidden",
         "flex justify-between items-center",
         className
@@ -133,7 +143,7 @@ export function SidebarSectionHeaderLabel({
   children,
 }: React.PropsWithChildren<{}>) {
   return (
-    <span className="text-xs font-normal text-muted-foreground">
+    <span className="text-xs font-normal text-muted-foreground group-hover:text-accent-foreground">
       {children}
     </span>
   );

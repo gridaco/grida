@@ -6,8 +6,8 @@ import type {
   FormsPageLanguage,
   Option,
 } from "./types";
-import type { JSONBooleanValueDescriptor, JSONFieldReference } from "./logic";
 import { toArrayOf, MaybeArray } from "./utility";
+import type { Tokens } from "@/ast";
 
 /**
  * used when representing a type in json following the schema.
@@ -28,8 +28,8 @@ type JSONOptionalDefineAsArrayAnnotation<T> = T | [T];
 
 interface JSONFieldBlock {
   type: "field";
-  field: JSONFieldReference;
-  hidden?: JSONBooleanValueDescriptor;
+  field: Tokens.JSONFieldReference;
+  hidden?: Tokens.BooleanValueExpression;
 }
 
 interface _JSONForm<T> {

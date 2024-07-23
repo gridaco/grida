@@ -10,6 +10,7 @@ import _009_neon_yellow from "./009-neon-yellow";
 import _010_cherry_blossom from "./010-cherry-blossom";
 import _011_peach_sorbet from "./011-peach-sorbet";
 import _012_cotton_candy from "./012-cotton-candy";
+import _013_soft_violet from "./013-soft-violet";
 
 export {
   _001_monochrome,
@@ -24,4 +25,5 @@ export {
   _010_cherry_blossom,
   _011_peach_sorbet,
   _012_cotton_candy,
+  _013_soft_violet,
 };
