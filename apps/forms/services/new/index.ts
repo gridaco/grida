@@ -7,8 +7,6 @@ export async function create_new_form_with_document({
 }: {
   project_id: number;
 } & Partial<{
-  custom_preview_url_path?: string | null;
-  custom_publish_url_path?: string | null;
   default_form_page_id?: string | null;
   description?: string | null;
   is_edit_after_submission_allowed?: boolean;

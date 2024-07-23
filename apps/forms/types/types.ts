@@ -8,8 +8,6 @@ export type FormMethod = "get" | "post" | "dialog";
 
 export interface Form {
   created_at: string;
-  custom_preview_url_path: string | null;
-  custom_publish_url_path: string | null;
   default_form_page_id: string | null;
   description: string | null;
   id: string;
