@@ -53,6 +53,7 @@ import type {
   DataGridOrderByAction,
   DataGridOrderByResetAction,
   InitAssetAction,
+  FeedCustomerAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { blockstreeflat } from "@/lib/forms/tree";
@@ -613,6 +614,7 @@ export function reducer(
       const { table } = <DataGridTableAction>action;
       return produce(state, (draft) => {
         draft.datagrid_table = table;
+        draft.datagrid_table_row_keyword = table_keyword(table);
 
         draft.realtime_sessions_enabled = table === "session";
         draft.realtime_responses_enabled = table === "response";
@@ -649,6 +651,12 @@ export function reducer(
 
         // clear selected rows
         draft.selected_rows = new Set();
+      });
+    }
+    case "editor/customers/feed": {
+      const { data } = <FeedCustomerAction>action;
+      return produce(state, (draft) => {
+        draft.customers = data;
       });
     }
     case "editor/customers/edit": {
@@ -983,5 +991,22 @@ function init_block(
     case "divider":
     default:
       return base;
+  }
+}
+
+function table_keyword(table: FormEditorState["datagrid_table"]) {
+  switch (table) {
+    case "response":
+      return "response";
+    case "session":
+      return "session";
+    case "customer":
+      return "customer";
+    case "x-supabase-main-table":
+      return "row";
+    case "x-supabase-auth.users":
+      return "user";
+    default:
+      return "row";
   }
 }

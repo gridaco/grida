@@ -15,7 +15,7 @@ import {
 } from "@radix-ui/react-icons";
 import Link from "next/link";
 import { useEditorState } from "../editor";
-import { Table2Icon, TabletSmartphoneIcon } from "lucide-react";
+import { TabletSmartphoneIcon } from "lucide-react";
 import { StripeLogo1, SupabaseLogo, TossLogo } from "@/components/logos";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -26,8 +26,9 @@ import {
   SidebarSectionHeaderItem,
   SidebarSectionHeaderLabel,
 } from "@/components/sidebar";
-
 import { ModeBlocks } from "./sidebar-mode-blocks";
+import { FormEditorState } from "../editor/state";
+import { TableTypeIcon } from "@/components/table-type-icon";
 
 export function Siebar({
   mode,
@@ -50,7 +51,7 @@ export function Siebar({
 function ModeData() {
   const [state] = useEditorState();
 
-  const { form_id } = state;
+  const { form_id, datagrid_table, tables, connections } = state;
 
   return (
     <>
@@ -62,18 +63,19 @@ function ModeData() {
           </SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuList>
-          <Link href={`/d/${form_id}/data/responses`}>
-            <SidebarMenuItem muted>
-              <Table2Icon className="inline align-middle w-4 h-4 me-2" />
-              Form
-            </SidebarMenuItem>
-          </Link>
-          <Link href={`/d/${form_id}/data/customers`}>
-            <SidebarMenuItem muted>
-              <AvatarIcon className="inline align-middle w-4 h-4 me-2" />
-              Customers
-            </SidebarMenuItem>
-          </Link>
+          {tables.map((table, i) => {
+            return (
+              <Link key={i} href={tablehref(form_id, table.group)}>
+                <SidebarMenuItem muted>
+                  <TableTypeIcon
+                    type={table.group}
+                    className="inline align-middle w-4 h-4 me-2"
+                  />
+                  {table.name}
+                </SidebarMenuItem>
+              </Link>
+            );
+          })}
           {/* <li>
           <Link href={`/d/${form_id}/data/files`}>
             <SideNavItem>
@@ -135,6 +137,22 @@ function ModeData() {
       </SidebarSection>
     </>
   );
+}
+
+function tablehref(
+  form_id: string,
+  type: FormEditorState["tables"][number]["group"]
+) {
+  switch (type) {
+    case "response":
+      return `/d/${form_id}/data/responses`;
+    case "customer":
+      return `/d/${form_id}/data/customers`;
+    case "x-supabase-main-table":
+      return `/d/${form_id}/data/responses`;
+    case "x-supabase-auth.users":
+      return `/d/${form_id}/data/x/auth.users`;
+  }
 }
 
 function ModeConnect() {

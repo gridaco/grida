@@ -16,61 +16,29 @@ import toast from "react-hot-toast";
 import { useEditorState } from "../editor";
 import Link from "next/link";
 import {
-  CommitIcon,
-  Cross2Icon,
-  DotIcon,
   DownloadIcon,
-  GearIcon,
   PieChartIcon,
   PlusIcon,
-  ReloadIcon,
   TrashIcon,
 } from "@radix-ui/react-icons";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuShortcut,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { format, startOfDay, addSeconds } from "date-fns";
-import { format as formatTZ } from "date-fns-tz";
-import { LOCALTZ, tztostr } from "../editor/symbols";
 import { GridData } from "./grid-data";
 import clsx from "clsx";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { XSupabaseQuery } from "@/lib/supabase-postgrest/builder";
-import { Spinner } from "@/components/spinner";
-import { SearchInput } from "@/components/extension/search-input";
-import { useDebounceCallback } from "usehooks-ts";
+import { SupabaseLogo } from "@/components/logos";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { ArrowDownUpIcon } from "lucide-react";
-import { cn } from "@/utils";
-import { PopoverClose } from "@radix-ui/react-popover";
-import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
+  GridLimit,
+  GridViewSettings,
+  GridRefresh,
+  XSupaDataGridSort,
+  GridLocalSearch,
+  GridCount,
+  TableViews,
+} from "./components";
+import * as GridLayout from "./components/layout";
+import { txt_n_plural } from "@/utils/plural";
 
 export function GridEditor() {
   const [state, dispatch] = useEditorState();
@@ -84,6 +52,7 @@ export function GridEditor() {
     sessions,
     datagrid_filter,
     datagrid_table,
+    datagrid_table_row_keyword,
     x_supabase_main_table,
     selected_rows: selected_responses,
   } = state;
@@ -95,19 +64,17 @@ export function GridEditor() {
   );
 
   // Transforming the responses into the format expected by react-data-grid
-  const rows = useMemo(() => {
+  const { filtered, inputlength } = useMemo(() => {
     return GridData.rows({
       form_id: form_id,
-      table: datagrid_table,
+      table: datagrid_table as "response" | "session" | "x-supabase-main-table",
       fields: fields,
       filter: datagrid_filter,
       responses: responses,
       sessions: sessions ?? [],
-      // TODO:
       data: {
         pks: x_supabase_main_table?.pks ?? [],
         rows: x_supabase_main_table?.rows ?? [],
-        fields: {},
       },
     });
   }, [
@@ -173,96 +140,67 @@ export function GridEditor() {
   }, [supabase, focus_field_id, dispatch]);
 
   const has_selected_responses = selected_responses.size > 0;
-  const keyword = table_keyword(datagrid_table);
   const selectionDisabled = datagrid_table === "session";
   const readonly = datagrid_table === "session";
 
   return (
-    <div className="flex flex-col h-full">
-      <header className="h-14 w-full">
-        <div className="flex py-1 h-full justify-between gap-4">
+    <GridLayout.Root>
+      <GridLayout.Header>
+        <GridLayout.HeaderMenus>
           {has_selected_responses ? (
-            <>
-              <div
-                className={clsx(
-                  "px-4 flex items-center",
-                  !has_selected_responses || selectionDisabled ? "hidden" : ""
-                )}
-              >
-                <div className="flex gap-2 items-center">
-                  <span
-                    className="text-sm font-normal text-neutral-500"
-                    aria-label="selected responses"
-                  >
-                    {txt_n_plural(selected_responses.size, keyword)} selected
-                  </span>
-                  <DeleteSelectedRowsButton />
-                </div>
+            <div
+              className={clsx(
+                "flex items-center",
+                !has_selected_responses || selectionDisabled ? "hidden" : ""
+              )}
+            >
+              <div className="flex gap-2 items-center">
+                <span
+                  className="text-sm font-normal text-neutral-500"
+                  aria-label="selected responses"
+                >
+                  {txt_n_plural(
+                    selected_responses.size,
+                    datagrid_table_row_keyword
+                  )}{" "}
+                  selected
+                </span>
+                <DeleteSelectedRowsButton />
               </div>
-            </>
+            </div>
           ) : (
             <>
-              <div className="px-2 flex justify-center items-center gap-4">
-                <Tabs
-                  value={state.datagrid_table}
-                  onValueChange={(value) => {
-                    dispatch({
-                      type: "editor/data-grid/table",
-                      table: value as any,
-                    });
-                  }}
-                >
-                  <TabsList>
-                    {state.tables.map((table) => {
-                      return (
-                        <TabsTrigger
-                          key={table.type + table.name}
-                          value={table.type}
-                        >
-                          {table.label}
-                        </TabsTrigger>
-                      );
-                    })}
-                  </TabsList>
-                </Tabs>
+              <div className="flex justify-center items-center divide-x *:px-2 first:*:pl-0 last:*:pr-0">
+                <TableViews />
+                {/* <div className="border-r"/> */}
                 <TableTools />
               </div>
             </>
           )}
-          <div
-            className={clsx(
-              "flex items-center",
-              datagrid_table !== "session" && "hidden"
-            )}
-          >
-            <span className="ms-2 text-xs text-muted-foreground">
-              Displaying Responses & In-Progress Sessions
-            </span>
-          </div>
-          <div className="flex-1" />
-          <div className="px-4 flex gap-2 items-center">
-            <Link href={`./analytics`} className="flex">
-              <Badge variant={"outline"} className="cursor-pointer">
-                <PieChartIcon className="align-middle me-2" />
-                Realtime
-              </Badge>
-            </Link>
-            <GridViewSettings />
-          </div>
-        </div>
-      </header>
+        </GridLayout.HeaderMenus>
+        <GridLayout.HeaderMenus>
+          <Link href={`./analytics`} className="flex">
+            <Badge variant={"outline"} className="cursor-pointer">
+              <PieChartIcon className="align-middle me-2" />
+              Realtime
+            </Badge>
+          </Link>
+          <GridViewSettings />
+        </GridLayout.HeaderMenus>
+      </GridLayout.Header>
       <DeleteFieldConfirmDialog
         open={deleteFieldConfirmOpen}
         onOpenChange={setDeleteFieldConfirmOpen}
         onCancel={closeDeleteFieldConfirm}
         onDeleteConfirm={onDeleteField}
       />
-      <div className="flex flex-col w-full h-full">
+      <GridLayout.Content>
         <ResponseGrid
           systemcolumns={systemcolumns}
           columns={columns}
-          rows={rows}
+          rows={filtered}
           readonly={readonly}
+          loading={inputlength === 0}
           selectionDisabled={selectionDisabled}
           onAddNewFieldClick={openNewFieldPanel}
           onEditFieldClick={openEditFieldPanel}
@@ -282,13 +220,11 @@ export function GridEditor() {
             });
           }}
         />
-      </div>
-      <footer className="flex gap-4 min-h-9 overflow-hidden items-center px-2 py-2 w-full border-t dark:border-t-neutral-700 divide-x">
+      </GridLayout.Content>
+      <GridLayout.Footer>
         <div className="flex gap-2 items-center">
-          <MaxRowsSelect />
-          <span className="text-sm font-medium">
-            {txt_n_plural(rows.length, keyword)}
-          </span>
+          <GridLimit />
+          <GridCount count={filtered?.length ?? 0} />
         </div>
         <Link href={`/v1/${form_id}/export/csv`} download target="_blank">
           <Button variant="ghost">
@@ -296,9 +232,9 @@ export function GridEditor() {
             <DownloadIcon />
           </Button>
         </Link>
-        <DataLoadingIndicator />
-      </footer>
-    </div>
+        <GridRefresh />
+      </GridLayout.Footer>
+    </GridLayout.Root>
   );
 }
 
@@ -307,216 +243,10 @@ function TableTools() {
   const { datagrid_table } = state;
 
   return (
-    <div className="flex items-center gap-2">
-      <DataGridLocalSearch />
+    <div className="flex items-center gap-1">
+      <GridLocalSearch />
       {datagrid_table === "x-supabase-main-table" && <XSupaDataGridSort />}
     </div>
-  );
-}
-
-/**
- * this can also be used for form query, but at this moment, form does not have a db level field sorting query.
- * plus, this uses the column name, which in the future, it should be using field id for more universal handling.
- * when it updates to id, the x-supabase query route will also have to change.
- */
-function XSupaDataGridSort() {
-  const [state, dispatch] = useEditorState();
-
-  const { fields, datagrid_orderby } = state;
-
-  const isset = Object.keys(datagrid_orderby).length > 0;
-
-  const onReset = useCallback(() => {
-    dispatch({ type: "editor/data-grid/orderby/reset" });
-  }, [dispatch]);
-
-  const onAdd = useCallback(
-    (column_id: string) => {
-      dispatch({
-        type: "editor/data-grid/orderby",
-        column_id: column_id,
-        data: {},
-      });
-    },
-    [dispatch]
-  );
-
-  const onUpdate = useCallback(
-    (column_id: string, data: { ascending?: boolean }) => {
-      dispatch({
-        type: "editor/data-grid/orderby",
-        column_id: column_id,
-        data: data,
-      });
-    },
-    [dispatch]
-  );
-
-  const onRemove = useCallback(
-    (column_id: string) => {
-      dispatch({
-        type: "editor/data-grid/orderby",
-        column_id: column_id,
-        data: null,
-      });
-    },
-    [dispatch]
-  );
-
-  return (
-    <Popover modal>
-      <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className={cn(
-            "relative",
-            "text-muted-foreground",
-            isset && " text-accent-foreground"
-          )}
-        >
-          <ArrowDownUpIcon className="w-4 h-4" />
-          {isset && <DotIcon className="absolute top-0.5 right-0.5" />}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="p-2 max-w-none">
-        <section className="py-2">
-          <div className="flex flex-col space-y-2">
-            {Object.keys(datagrid_orderby).map((col) => {
-              const orderby = datagrid_orderby[col];
-              return (
-                <div key={col} className="flex gap-2 px-2">
-                  <div className="flex items-center gap-2 flex-1">
-                    <div>
-                      <Select
-                        disabled
-                        value={orderby.column}
-                        onValueChange={(value) => {
-                          onUpdate(value, orderby);
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {fields.map((field) => (
-                            <SelectItem key={field.name} value={field.name}>
-                              {field.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Select
-                        value={orderby.ascending ? "ASC" : "DESC"}
-                        onValueChange={(value) => {
-                          onUpdate(orderby.column, {
-                            ascending: value === "ASC",
-                          });
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="ASC">Ascending</SelectItem>
-                          <SelectItem value="DESC">Descending</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => onRemove(col)}
-                  >
-                    <Cross2Icon />
-                  </Button>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-        <section className="flex flex-col">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="flex justify-start">
-                <PlusIcon className="w-4 h-4 me-2 align-middle" /> Add sort
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              {fields.map((field) => (
-                <DropdownMenuItem
-                  key={field.name}
-                  onSelect={() => onAdd(field.name)}
-                >
-                  <FormFieldTypeIcon
-                    type={field.type}
-                    className="w-4 h-4 me-2 align-middle"
-                  />
-                  {field.name}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          {isset && (
-            <PopoverClose asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="flex justify-start"
-                onClick={onReset}
-              >
-                <TrashIcon className="w-4 h-4 me-2 align-middle" /> Delete sort
-              </Button>
-            </PopoverClose>
-          )}
-        </section>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-function DataGridLocalSearch() {
-  const [state, dispatch] = useEditorState();
-
-  const onSearchChange = useDebounceCallback((txt: string) => {
-    dispatch({
-      type: "editor/data-grid/filter",
-      localsearch: txt,
-    });
-  }, 250);
-
-  return (
-    <Tooltip>
-      <TooltipTrigger>
-        <SearchInput
-          placeholder="Search in table"
-          onChange={(e) => onSearchChange(e.target.value)}
-          className="max-w-sm"
-        />
-      </TooltipTrigger>
-      <TooltipContent>Local search - Search within loaded data</TooltipContent>
-    </Tooltip>
-  );
-}
-
-function DataLoadingIndicator() {
-  const [state, dispatch] = useEditorState();
-  const { datagrid_isloading } = state;
-
-  const onRefresh = useCallback(() => {
-    dispatch({ type: "editor/data-grid/refresh" });
-  }, [dispatch]);
-
-  return (
-    <Button disabled={datagrid_isloading} onClick={onRefresh} variant="ghost">
-      <span className="me-2">
-        {datagrid_isloading ? <Spinner /> : <ReloadIcon />}
-      </span>
-      Refresh
-    </Button>
   );
 }
 
@@ -561,9 +291,7 @@ function DeleteSelectedRowsButton() {
   const supabase = createClientFormsClient();
   const [state, dispatch] = useEditorState();
 
-  const { datagrid_table, selected_rows } = state;
-
-  const keyword = table_keyword(datagrid_table);
+  const { datagrid_table, selected_rows, datagrid_table_row_keyword } = state;
 
   const delete_selected_responses = useCallback(() => {
     const deleting = supabase
@@ -636,12 +364,12 @@ function DeleteSelectedRowsButton() {
       <AlertDialogTrigger asChild>
         <button className="flex items-center gap-1 p-2 rounded-md border text-sm">
           <TrashIcon />
-          Delete {txt_n_plural(selected_rows.size, keyword)}
+          Delete {txt_n_plural(selected_rows.size, datagrid_table_row_keyword)}
         </button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogTitle>
-          Delete {txt_n_plural(selected_rows.size, keyword)}
+          Delete {txt_n_plural(selected_rows.size, datagrid_table_row_keyword)}
         </AlertDialogTitle>
         <AlertDialogDescription>
           Deleting this record will remove all data associated with it. Are you
@@ -658,192 +386,6 @@ function DeleteSelectedRowsButton() {
         </div>
       </AlertDialogContent>
     </AlertDialog>
-  );
-}
-
-function table_keyword(
-  table: "response" | "session" | "x-supabase-main-table"
-) {
-  switch (table) {
-    case "response":
-      return "response";
-    case "session":
-      return "session";
-    case "x-supabase-main-table":
-      return "row";
-  }
-}
-
-function GridViewSettings() {
-  const [state, dispatch] = useEditorState();
-
-  const starwarsday = useMemo(
-    () => new Date(new Date().getFullYear(), 4, 4),
-    []
-  );
-
-  const tzoffset = useMemo(
-    () => s2Hmm(new Date().getTimezoneOffset() * -1 * 60),
-    []
-  );
-  const tzoffset_scheduling_tz = useMemo(
-    () =>
-      state.scheduling_tz
-        ? formatTZ(new Date(), "XXX", { timeZone: state.scheduling_tz })
-        : undefined,
-    [state.scheduling_tz]
-  );
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button className="flex items-center justify-center">
-          <Badge variant="outline" className="cursor-pointer">
-            <GearIcon />
-          </Badge>
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-56">
-        <DropdownMenuLabel>Table Settings</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuCheckboxItem
-          checked={state.datagrid_filter.empty_data_hidden}
-          onCheckedChange={(checked) => {
-            dispatch({
-              type: "editor/data-grid/filter",
-              empty_data_hidden: checked,
-            });
-          }}
-        >
-          Hide records with empty data
-        </DropdownMenuCheckboxItem>
-        <DropdownMenuCheckboxItem
-          checked={state.datagrid_filter.masking_enabled}
-          onCheckedChange={(checked) => {
-            dispatch({
-              type: "editor/data-grid/filter",
-              masking_enabled: checked,
-            });
-          }}
-        >
-          Mask data
-        </DropdownMenuCheckboxItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuRadioGroup
-          value={state.dateformat}
-          onValueChange={(value) => {
-            dispatch({
-              type: "editor/data-grid/dateformat",
-              dateformat: value as any,
-            });
-          }}
-        >
-          <DropdownMenuRadioItem value="date">
-            Date
-            <DropdownMenuShortcut>
-              {starwarsday.toLocaleDateString()}
-            </DropdownMenuShortcut>
-          </DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="time">
-            Time
-            <DropdownMenuShortcut>
-              {starwarsday.toLocaleTimeString()}
-            </DropdownMenuShortcut>
-          </DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="datetime">
-            Date Time
-            <DropdownMenuShortcut className="ms-4">
-              {starwarsday.toLocaleString()}
-            </DropdownMenuShortcut>
-          </DropdownMenuRadioItem>
-        </DropdownMenuRadioGroup>
-        <DropdownMenuSeparator />
-        <DropdownMenuRadioGroup
-          value={tztostr(state.datetz, "browser")}
-          onValueChange={(tz) => {
-            switch (tz) {
-              case "browser":
-                dispatch({ type: "editor/data-grid/tz", tz: LOCALTZ });
-                return;
-              default:
-                dispatch({ type: "editor/data-grid/tz", tz: tz });
-                return;
-            }
-          }}
-        >
-          <DropdownMenuRadioItem value="browser">
-            Local Time
-            <DropdownMenuShortcut>(UTC+{tzoffset})</DropdownMenuShortcut>
-          </DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="UTC">
-            UTC Time
-            <DropdownMenuShortcut>(UTC+0)</DropdownMenuShortcut>
-          </DropdownMenuRadioItem>
-          <DropdownMenuRadioItem
-            disabled={!state.scheduling_tz}
-            value={state.scheduling_tz ?? "N/A"}
-          >
-            Scheduling Time
-            {state.scheduling_tz && (
-              <DropdownMenuShortcut className="text-end">
-                {state.scheduling_tz}
-                <br />
-                (UTC{tzoffset_scheduling_tz})
-              </DropdownMenuShortcut>
-            )}
-          </DropdownMenuRadioItem>
-        </DropdownMenuRadioGroup>
-        <DropdownMenuSeparator />
-        <Link href={`./simulator`} target="_blank">
-          <DropdownMenuItem className="cursor-pointer">
-            <CommitIcon className="inline align-middle me-2" />
-            Open Simulator
-          </DropdownMenuItem>
-        </Link>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
-function s2Hmm(s: number) {
-  const now = new Date();
-  const startOfDayDate = startOfDay(now);
-  const updatedDate = addSeconds(startOfDayDate, s);
-  const formattedTime = format(updatedDate, "H:mm");
-
-  return formattedTime;
-}
-
-function txt_n_plural(n: number | undefined, singular: string) {
-  return (n || 0) > 1 ? `${n} ${singular}s` : `${n} ${singular}`;
-}
-
-function MaxRowsSelect() {
-  const [state, dispatch] = useEditorState();
-
-  return (
-    <div>
-      <Select
-        value={state.datagrid_rows_per_page + ""}
-        onValueChange={(value) => {
-          dispatch({
-            type: "editor/data-grid/rows",
-            rows: parseInt(value),
-          });
-        }}
-      >
-        <SelectTrigger>
-          <SelectValue placeholder="rows" />
-        </SelectTrigger>
-        <SelectContent>
-          <></>
-          <SelectItem value={10 + ""}>10 rows</SelectItem>
-          <SelectItem value={100 + ""}>100 rows</SelectItem>
-          <SelectItem value={500 + ""}>500 rows</SelectItem>
-          <SelectItem value={1000 + ""}>1000 rows</SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
   );
 }
 

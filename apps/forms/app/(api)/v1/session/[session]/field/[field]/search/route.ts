@@ -32,7 +32,7 @@ export async function GET(
   const _q_per_page = req.nextUrl.searchParams.get("per_page");
   const per_page = _q_per_page ? parseInt(_q_per_page) : 50;
 
-  // FIXME: Strict Authorization
+  // FIXME: Strict Authorization - this route accesses auth.users
 
   const { data, error } = await client
     .from("response_session")

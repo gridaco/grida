@@ -1,6 +1,7 @@
 import { blockstreeflat } from "@/lib/forms/tree";
 import type {
   ConnectionSupabaseJoint,
+  Customer,
   FormBlock,
   FormBlockType,
   FormFieldDefinition,
@@ -62,14 +63,44 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
     tables: init.connections?.supabase?.main_supabase_table
       ? [
           {
-            type: "x-supabase-main-table",
             name: init.connections.supabase.main_supabase_table.sb_table_name,
-            label: init.connections.supabase.main_supabase_table.sb_table_name,
+            group: "x-supabase-main-table",
+            views: [
+              {
+                type: "x-supabase-main-table",
+                name: init.connections.supabase.main_supabase_table
+                  .sb_table_name,
+                label:
+                  init.connections.supabase.main_supabase_table.sb_table_name,
+              },
+            ],
+          },
+          {
+            name: "auth.users",
+            group: "x-supabase-auth.users",
+            views: [
+              {
+                type: "x-supabase-auth.users",
+                name: "auth.users",
+                label: "auth.users",
+              },
+            ],
           },
         ]
       : [
-          { type: "response", name: "response", label: "Responses" },
-          { type: "session", name: "session", label: "Sessions" },
+          {
+            name: "Responses",
+            group: "response",
+            views: [
+              { type: "response", name: "response", label: "Responses" },
+              { type: "session", name: "session", label: "Sessions" },
+            ],
+          },
+          {
+            name: "Customers",
+            group: "customer",
+            views: [{ type: "customer", name: "customer", label: "Customers" }],
+          },
         ],
     scheduling_tz: init.scheduling_tz,
     page_id: init.page_id,
@@ -85,6 +116,7 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
     assets: {
       backgrounds: [],
     },
+    customers: undefined,
     responses: {
       rows: [],
       fields: {},
@@ -93,6 +125,7 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
     available_field_ids: block_available_field_ids,
     datagrid_rows_per_page: 100,
     datagrid_table_refresh_key: 0,
+    datagrid_table_row_keyword: "row",
     datagrid_isloading: false,
     dateformat: "datetime",
     datetz: LOCALTZ,
@@ -145,7 +178,12 @@ type GFTable =
       label: string;
     }
   | {
-      type: "x-supabase-main-table";
+      type: "customer";
+      name: string;
+      label: string;
+    }
+  | {
+      type: "x-supabase-main-table" | "x-supabase-auth.users";
       name: string;
       label: string;
     };
@@ -208,16 +246,31 @@ export interface FormEditorState {
       preview: [string] | [string, string];
     }[];
   };
+  customers?: Customer[];
   selected_rows: Set<string>;
   responses: {
     rows: FormResponse[];
     fields: { [key: string]: FormResponseField[] };
   };
   sessions?: FormResponseSession[];
-  tables: GFTable[];
+  tables: {
+    name: string;
+    group:
+      | "response"
+      | "customer"
+      | "x-supabase-main-table"
+      | "x-supabase-auth.users";
+    views: GFTable[];
+  }[];
   datagrid_rows_per_page: number;
-  datagrid_table: "response" | "session" | "x-supabase-main-table";
+  datagrid_table:
+    | "response"
+    | "session"
+    | "customer"
+    | "x-supabase-main-table"
+    | "x-supabase-auth.users";
   datagrid_table_refresh_key: number;
+  datagrid_table_row_keyword: string;
   datagrid_isloading: boolean;
   datagrid_filter: DataGridFilterSettings;
   datagrid_orderby: { [key: string]: OrderBy };

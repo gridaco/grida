@@ -140,7 +140,10 @@ importers:
 
   apps/backgrounds:
     dependencies:
-      "@react-three/drei":
+      '@next/third-parties':
+        specifier: ^14.1.3
+        version: 14.2.3(next@14.2.5)(react@18.3.1)
+      '@react-three/drei':
         specifier: ^9.83.9
         version: 9.105.6(@react-three/fiber@8.16.7)(@types/react@18.2.58)(@types/three@0.149.0)(react-dom@18.3.1)(react@18.3.1)(three@0.150.1)
       "@react-three/fiber":

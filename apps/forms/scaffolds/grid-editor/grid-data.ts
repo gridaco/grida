@@ -1,4 +1,5 @@
-import type {
+import {
+  Customer,
   FormFieldDefinition,
   FormInputType,
   FormResponse,
@@ -8,41 +9,55 @@ import type {
 } from "@/types";
 import { fmt_local_index } from "@/utils/fmt";
 import type { GFFile, GFResponseRow, GFSystemColumnTypes } from "../grid/types";
-import type { DataGridFilterSettings } from "../editor/state";
+import type { DataGridFilterSettings, FormEditorState } from "../editor/state";
 import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";
 import { FieldSupports } from "@/k/supported_field_types";
 import { PrivateEditorApi } from "@/lib/private";
 import { GridFilter } from "../grid-filter";
 
 export namespace GridData {
-  type DataGridInput = {
-    form_id: string;
-    fields: FormFieldDefinition[];
-    filter: DataGridFilterSettings;
-  } & (
+  type DataGridInput =
+    | ({
+        form_id: string;
+        fields: FormFieldDefinition[];
+        filter: DataGridFilterSettings;
+      } & (
+        | {
+            table: "session";
+            sessions: FormResponseSession[];
+          }
+        | {
+            table: "response";
+            responses: {
+              rows: FormResponse[];
+              fields: { [key: string]: FormResponseField[] };
+            };
+          }
+        | {
+            table: "x-supabase-main-table";
+            data: {
+              pks: string[];
+              rows: any[];
+            };
+          }
+      ))
     | {
-        table: "session";
-        sessions: FormResponseSession[];
-      }
-    | {
-        table: "response";
-        responses: {
-          rows: FormResponse[];
-          fields: { [key: string]: FormResponseField[] };
-        };
-      }
-    | {
-        table: "x-supabase-main-table";
+        filter: DataGridFilterSettings;
+        table: "customer";
         data: {
-          pks: string[];
-          rows: any[];
-          fields: { [key: string]: any[] };
+          rows: Customer[];
         };
       }
-  );
+    | {
+        filter: DataGridFilterSettings;
+        table: "x-supabase-auth.users";
+        data: {
+          rows: any[];
+        };
+      };
 
   export function columns(
-    table: "response" | "session" | "x-supabase-main-table",
+    table: FormEditorState["datagrid_table"],
     fields: FormFieldDefinition[]
   ): {
     systemcolumns: {
@@ -96,142 +111,98 @@ export namespace GridData {
           columns: fieldcolumns,
         };
       }
+      default:
+        return {
+          systemcolumns: [],
+          columns: [],
+        };
     }
   }
 
   export function rows(input: DataGridInput) {
     switch (input.table) {
       case "response": {
-        return input.responses
-          ? rows_from_responses(
-              {
-                rows: GridFilter.filter(
-                  input.responses.rows,
-                  input.filter,
-                  "raw",
-                  // response raw is saved with name: value
-                  input.fields.map((f) => f.name)
-                ),
-                fields: input.responses.fields,
-              },
-              input.fields
-            )
-          : [];
+        return {
+          inputlength: input.responses?.rows.length || 0,
+          filtered: input.responses
+            ? rows_from_responses(
+                {
+                  rows: GridFilter.filter(
+                    input.responses.rows,
+                    input.filter,
+                    "raw",
+                    // response raw is saved with name: value
+                    input.fields.map((f) => f.name)
+                  ),
+                  fields: input.responses.fields,
+                },
+                input.fields
+              )
+            : [],
+        };
       }
       case "session": {
-        return input.sessions
-          ? rows_from_sessions(
-              GridFilter.filter(
-                input.sessions,
-                input.filter,
-                "raw",
-                // session raw is saved with id: value
-                input.fields.map((f) => f.id)
-              ),
-              input.fields
-            )
-          : [];
+        return {
+          inputlength: input.sessions?.length || 0,
+          filtered: input.sessions
+            ? rows_from_sessions(
+                GridFilter.filter(
+                  input.sessions,
+                  input.filter,
+                  "raw",
+                  // session raw is saved with id: value
+                  input.fields.map((f) => f.id)
+                ),
+                input.fields
+              )
+            : [],
+        };
       }
       case "x-supabase-main-table": {
-        const valuefn = (
-          row: Record<string, any>,
-          field: FormFieldDefinition
-        ) => {
-          // jsonpath field
-          if (FlatPostgREST.testPath(field.name)) {
-            return FlatPostgREST.get(field.name, row);
-          }
-
-          return row[field.name];
+        return {
+          inputlength: input.data.rows.length,
+          filtered: rows_from_x_supabase_main_table({
+            form_id: input.form_id,
+            // TODO: support multiple PKs
+            pk: input.data.pks.length > 0 ? input.data.pks[0] : null,
+            fields: input.fields,
+            rows: GridFilter.filter(
+              input.data.rows,
+              input.filter,
+              undefined,
+              input.fields.map((f) => f.name)
+            ),
+          }),
         };
-
-        const filesfn = (
-          row: GridaSupabase.XDataRow,
-          field: FormFieldDefinition
-        ) => {
-          // file field
-          if (
-            FieldSupports.file_alias(field.type) &&
-            row.__gf_storage_fields[field.id]
-          ) {
-            const objects = row.__gf_storage_fields[field.id];
-            return objects
-              ?.map((obj) => {
-                const { path, signedUrl } = obj;
-
-                const thumbnail =
-                  PrivateEditorApi.FormFieldFile.file_preview_url({
-                    params: {
-                      form_id: input.form_id,
-                      field_id: field.id,
-                      filepath: path,
-                    },
-                    options: {
-                      width: 200,
-                    },
-                  });
-
-                const upsert =
-                  PrivateEditorApi.FormFieldFile.file_request_upsert_url({
-                    form_id: input.form_id,
-                    field_id: field.id,
-                    filepath: path,
-                  });
-
-                return {
-                  // use thumbnail as src
-                  src: thumbnail,
-                  srcset: {
-                    thumbnail: thumbnail,
-                    original: signedUrl,
-                  },
-                  // use path as name for x-supabase
-                  name: path,
-                  download: signedUrl,
-                  upsert: upsert,
-                } satisfies GFFile;
-              })
-              .filter((f) => f) as GFFile[] | [];
-          }
+      }
+      case "x-supabase-auth.users": {
+        return {
+          inputlength: input.data.rows.length,
+          filtered: GridFilter.filter(
+            input.data.rows,
+            input.filter,
+            undefined,
+            Object.keys(GridaSupabase.SupabaseUserJsonSchema.properties)
+          ),
         };
-
-        return GridFilter.filter(
-          input.data.rows,
-          input.filter,
-          undefined,
-          input.fields.map((f) => f.name)
-        ).reduce((acc, row, index) => {
-          // TODO: support multiple PKs
-          const pk = input.data.pks.length > 0 ? input.data.pks[0] : null;
-          const gfRow: GFResponseRow = {
-            __gf_id: pk ? row[pk] : "",
-            __gf_display_id: pk ? row[pk] : "",
-            fields: {},
-          };
-          input.fields.forEach((field) => {
-            gfRow.fields[field.id] = {
-              type: field.type,
-              value: valuefn(row, field),
-              readonly: field.readonly || false,
-              options: field.options?.reduce(
-                (
-                  acc: { [key: string]: { value: string; label?: string } },
-                  option
-                ) => {
-                  acc[option.id] = {
-                    value: option.value,
-                    label: option.label,
-                  };
-                  return acc;
-                },
-                {}
-              ),
-              files: filesfn(row, field),
-            };
-          });
-          acc.push(gfRow);
-          return acc;
-        }, []);
+      }
+      case "customer": {
+        return {
+          inputlength: input.data.rows.length,
+          filtered: GridFilter.filter(
+            input.data.rows,
+            input.filter,
+            undefined,
+            [
+              "uid",
+              "email",
+              "email_provisional",
+              "phone",
+              "created_at",
+              "last_seen_at",
+            ]
+          ),
+        };
       }
     }
   }
@@ -348,5 +319,106 @@ export namespace GridData {
         return row;
       }) ?? []
     );
+  }
+
+  function rows_from_x_supabase_main_table({
+    pk,
+    form_id,
+    fields,
+    rows,
+  }: {
+    pk: string | null;
+    form_id: string;
+    fields: FormFieldDefinition[];
+    rows: any[];
+  }) {
+    const valuefn = (row: Record<string, any>, field: FormFieldDefinition) => {
+      // jsonpath field
+      if (FlatPostgREST.testPath(field.name)) {
+        return FlatPostgREST.get(field.name, row);
+      }
+
+      return row[field.name];
+    };
+
+    const filesfn = (
+      row: GridaSupabase.XDataRow,
+      field: FormFieldDefinition
+    ) => {
+      // file field
+      if (
+        FieldSupports.file_alias(field.type) &&
+        row.__gf_storage_fields[field.id]
+      ) {
+        const objects = row.__gf_storage_fields[field.id];
+        return objects
+          ?.map((obj) => {
+            const { path, signedUrl } = obj;
+
+            const thumbnail = PrivateEditorApi.FormFieldFile.file_preview_url({
+              params: {
+                form_id: form_id,
+                field_id: field.id,
+                filepath: path,
+              },
+              options: {
+                width: 200,
+              },
+            });
+
+            const upsert =
+              PrivateEditorApi.FormFieldFile.file_request_upsert_url({
+                form_id: form_id,
+                field_id: field.id,
+                filepath: path,
+              });
+
+            return {
+              // use thumbnail as src
+              src: thumbnail,
+              srcset: {
+                thumbnail: thumbnail,
+                original: signedUrl,
+              },
+              // use path as name for x-supabase
+              name: path,
+              download: signedUrl,
+              upsert: upsert,
+            } satisfies GFFile;
+          })
+          .filter((f) => f) as GFFile[] | [];
+      }
+    };
+
+    return rows.reduce((acc, row, index) => {
+      const gfRow: GFResponseRow = {
+        __gf_id: pk ? row[pk] : "",
+        __gf_display_id: pk ? row[pk] : "",
+        fields: {},
+      };
+      fields.forEach((field) => {
+        gfRow.fields[field.id] = {
+          type: field.type,
+          value: valuefn(row, field),
+          readonly: field.readonly || false,
+          options: field.options?.reduce(
+            (
+              acc: { [key: string]: { value: string; label?: string } },
+              option
+            ) => {
+              acc[option.id] = {
+                value: option.value,
+                label: option.label,
+              };
+              return acc;
+            },
+            {}
+          ),
+          files: filesfn(row, field),
+        };
+      });
+      acc.push(gfRow);
+      return acc;
+    }, []);
   }
 }

@@ -62,6 +62,7 @@ import { RichTextEditCell } from "./richtext-cell";
 import Highlight from "@/components/highlight";
 import { FieldSupports } from "@/k/supported_field_types";
 import { format } from "date-fns";
+import { EmptyRowsRenderer } from "./empty";
 
 function rowKeyGetter(row: GFResponseRow) {
   return row.__gf_id;
@@ -73,6 +74,7 @@ export function ResponseGrid({
   rows,
   selectionDisabled,
   readonly,
+  loading,
   onAddNewFieldClick,
   onEditFieldClick,
   onDeleteFieldClick,
@@ -91,6 +93,7 @@ export function ResponseGrid({
   rows: GFResponseRow[];
   selectionDisabled?: boolean;
   readonly?: boolean;
+  loading?: boolean;
   onAddNewFieldClick?: () => void;
   onEditFieldClick?: (id: string) => void;
   onDeleteFieldClick?: (id: string) => void;
@@ -257,6 +260,7 @@ export function ResponseGrid({
       onSelectedRowsChange={
         selectionDisabled ? undefined : onSelectedRowsChange
       }
+      renderers={{ noRowsFallback: <EmptyRowsRenderer loading={loading} /> }}
       rows={rows}
       rowHeight={44}
     />

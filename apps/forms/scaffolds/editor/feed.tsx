@@ -3,7 +3,10 @@
 import React, { useCallback, useEffect, useMemo } from "react";
 import { useEditorState } from "./provider";
 import toast from "react-hot-toast";
-import { createClientFormsClient } from "@/lib/supabase/client";
+import {
+  createClientFormsClient,
+  createClientWorkspaceClient,
+} from "@/lib/supabase/client";
 import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import useSWR from "swr";
 import type { EditorApiResponse } from "@/types/private/api";
@@ -11,7 +14,7 @@ import type { FormResponseField, GridaSupabase } from "@/types";
 import { usePrevious } from "@uidotdev/usehooks";
 import { XSupabaseQuery } from "@/lib/supabase-postgrest/builder";
 import equal from "deep-equal";
-import { PostgrestQuery } from "@/lib/supabase-postgrest/postgrest-query";
+import { PrivateEditorApi } from "@/lib/private";
 
 type RealtimeTableChangeData = {
   id: string;
@@ -158,10 +161,21 @@ export function ResponseFeedProvider({
     form_id,
     datagrid_table,
     datagrid_rows_per_page,
+    datagrid_table_refresh_key,
     realtime_responses_enabled,
   } = state;
 
   const supabase = useMemo(() => createClientFormsClient(), []);
+
+  const setLoading = useCallback(
+    (loading: boolean) => {
+      dispatch({
+        type: "editor/data-grid/loading",
+        isloading: loading,
+      });
+    },
+    [dispatch]
+  );
 
   const fetchResponses = useCallback(
     async (limit: number = 100) => {
@@ -211,6 +225,7 @@ export function ResponseFeedProvider({
 
   useEffect(() => {
     if (datagrid_table !== "response") return;
+    setLoading(true);
     const feed = fetchResponses(datagrid_rows_per_page).then((data) => {
       dispatch({
         type: "editor/response/feed",
@@ -219,12 +234,22 @@ export function ResponseFeedProvider({
       });
     });
 
-    toast.promise(feed, {
-      loading: "Fetching responses...",
-      success: "Responses fetched",
-      error: "Failed to fetch responses",
-    });
-  }, [dispatch, fetchResponses, datagrid_rows_per_page, datagrid_table]);
+    toast
+      .promise(feed, {
+        loading: "Fetching responses...",
+        success: "Responses fetched",
+        error: "Failed to fetch responses",
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [
+    dispatch,
+    fetchResponses,
+    datagrid_rows_per_page,
+    datagrid_table,
+    datagrid_table_refresh_key,
+  ]);
 
   useSubscription({
     table: "response",
@@ -285,6 +310,7 @@ export function ResponseSessionFeedProvider({
     form_id,
     datagrid_table,
     datagrid_rows_per_page,
+    datagrid_table_refresh_key,
     realtime_sessions_enabled: _realtime_sessions_enabled,
   } = state;
 
@@ -292,6 +318,16 @@ export function ResponseSessionFeedProvider({
     forceEnableRealtime ?? _realtime_sessions_enabled;
 
   const supabase = useMemo(() => createClientFormsClient(), []);
+
+  const setLoading = useCallback(
+    (loading: boolean) => {
+      dispatch({
+        type: "editor/data-grid/loading",
+        isloading: loading,
+      });
+    },
+    [dispatch]
+  );
 
   const fetchResponseSessions = useCallback(
     async (limit: number = 100) => {
@@ -314,6 +350,7 @@ export function ResponseSessionFeedProvider({
 
   useEffect(() => {
     if (datagrid_table !== "session") return;
+    setLoading(true);
 
     const feed = fetchResponseSessions(datagrid_rows_per_page).then((data) => {
       dispatch({
@@ -323,12 +360,22 @@ export function ResponseSessionFeedProvider({
       });
     });
 
-    toast.promise(feed, {
-      loading: "Fetching sessions...",
-      success: "Sessions fetched",
-      error: "Failed to fetch sessions",
-    });
-  }, [dispatch, datagrid_table, datagrid_rows_per_page, fetchResponseSessions]);
+    toast
+      .promise(feed, {
+        loading: "Fetching sessions...",
+        success: "Sessions fetched",
+        error: "Failed to fetch sessions",
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [
+    dispatch,
+    datagrid_table,
+    datagrid_rows_per_page,
+    datagrid_table_refresh_key,
+    fetchResponseSessions,
+  ]);
 
   useSubscription({
     table: "response_session",
@@ -350,6 +397,58 @@ export function ResponseSessionFeedProvider({
     },
     enabled: realtime_sessions_enabled,
   });
+
+  return <>{children}</>;
+}
+
+export function CustomerFeedProvider({
+  children,
+}: React.PropsWithChildren<{}>) {
+  const [state, dispatch] = useEditorState();
+  const {
+    connections: { project_id },
+    datagrid_table,
+    datagrid_rows_per_page,
+    datagrid_table_refresh_key,
+  } = state;
+
+  const client = createClientWorkspaceClient();
+
+  const setLoading = useCallback(
+    (loading: boolean) => {
+      dispatch({
+        type: "editor/data-grid/loading",
+        isloading: loading,
+      });
+    },
+    [dispatch]
+  );
+
+  useEffect(() => {
+    if (datagrid_table !== "customer") return;
+
+    setLoading(true);
+    client
+      .from("customer")
+      .select()
+      .order("last_seen_at", { ascending: false })
+      .limit(datagrid_rows_per_page)
+      .eq("project_id", project_id)
+      .then(({ data, error }) => {
+        setLoading(false);
+        if (data) {
+          dispatch({
+            type: "editor/customers/feed",
+            data: data,
+          });
+        }
+      });
+  }, [
+    datagrid_table,
+    datagrid_rows_per_page,
+    project_id,
+    datagrid_table_refresh_key,
+  ]);
 
   return <>{children}</>;
 }
@@ -456,17 +555,11 @@ export function XSupabaseMainTableFeedProvider({
   } = state;
 
   const serachParams = useMemo(() => {
-    const params = new URLSearchParams();
-    params.append("limit", datagrid_rows_per_page.toString());
-
-    params.append(
-      "order",
-      PostgrestQuery.createOrderByQueryString(datagrid_orderby)
-    );
-
-    params.append("r", datagrid_table_refresh_key.toString());
-
-    return params;
+    return PrivateEditorApi.SupabaseQuery.makeQueryParams({
+      limit: datagrid_rows_per_page,
+      order: datagrid_orderby,
+      refreshKey: datagrid_table_refresh_key,
+    });
   }, [datagrid_rows_per_page, datagrid_orderby, datagrid_table_refresh_key]);
 
   const request = state.connections.supabase?.main_supabase_table_id

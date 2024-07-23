@@ -708,7 +708,7 @@ function DBSchemaSelect({
           ))}
           <SelectItem value={__add_custom}>
             <PlusIcon className="me-2 inline align-middle w-4 h-4" />
-            Add Custom
+            Add custom schema
           </SelectItem>
         </SelectContent>
       </Select>

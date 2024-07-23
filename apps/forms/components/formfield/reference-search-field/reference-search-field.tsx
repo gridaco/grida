@@ -25,29 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-/**
- * general & common priorities for columns order (only for auth.users table)
- */
-const priorities = ["id", "email", "name", "username"];
-
-const sort_by_priorities = (a: string, b: string) => {
-  const _a = priorities.indexOf(a);
-  const _b = priorities.indexOf(b);
-  if (_a === -1 && _b === -1) {
-    return a.localeCompare(b);
-  }
-
-  if (_a === -1) {
-    return 1;
-  }
-
-  if (_b === -1) {
-    return -1;
-  }
-
-  return _a - _b;
-};
+import { priority_sorter } from "@/utils/sort";
 
 export function ReferenceSearchPreview(
   props: React.ComponentProps<typeof SearchInput>
@@ -109,6 +87,10 @@ export function ReferenceSearch({
     return fuse.search(localSearch).map((r) => r.item);
   }, [fuse, localSearch, _rows]);
 
+  const sort_by_priorities = priority_sorter(
+    GridaSupabase.unknown_table_column_priorities
+  );
+
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger>
@@ -131,6 +113,7 @@ export function ReferenceSearch({
         <div className="flex-1">
           <div className="flex flex-col w-full h-full">
             <ReferenceTableGrid
+              loading={!rows}
               tokens={localSearch ? [localSearch] : undefined}
               onSelected={(key, row) => {
                 setValue(key);
