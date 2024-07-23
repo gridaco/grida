@@ -22,6 +22,7 @@ import React from "react";
 
 export type DraftID = `[draft]${string}`;
 export const DRAFT_ID_START_WITH = "[draft]";
+const ISDEV = process.env.NODE_ENV === "development";
 
 export interface FormEditorInit {
   project_id: number;
@@ -106,7 +107,7 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
     page_id: init.page_id,
     blocks: blockstreeflat(init.blocks),
     document: {
-      pages: ["collection", "start", "form"],
+      pages: ISDEV ? ["collection", "start", "form"] : ["form"],
       selected_page_id: "form",
       nodes: [],
       templatesample: "formcollection_sample_001_the_bundle",
