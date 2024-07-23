@@ -69,7 +69,6 @@ export class JSONFrom2DB {
         project_id: this.project_id,
         title: this.renderer.title || undefined,
         description: this.renderer.description,
-        default_form_page_language: this.renderer.lang || undefined,
       })
       .select()
       .single();
@@ -90,6 +89,7 @@ export class JSONFrom2DB {
       .from("form_document")
       .insert({
         form_id: this.form_id,
+        lang: this.renderer.lang || undefined,
       })
       .select()
       .single();

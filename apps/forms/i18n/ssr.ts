@@ -12,18 +12,19 @@ export async function ssr_page_init_i18n(init: InitWith) {
   } else {
     const { form_id } = init;
     const { data, error } = await client
-      .from("form")
+      .from("form_document")
       .select(
         `
-          default_form_page_language
+          lang
         `
       )
-      .eq("id", form_id)
+      // TODO: change to document id after migration
+      .eq("form_id", form_id)
       .single();
 
     if (data) {
-      const { default_form_page_language } = data;
-      lng = default_form_page_language;
+      const { lang } = data;
+      lng = lang;
     }
   }
 

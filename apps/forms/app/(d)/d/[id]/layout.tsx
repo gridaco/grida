@@ -21,6 +21,7 @@ export async function generateMetadata({
   const supabase = createServerComponentClient(cookieStore);
   const id = params.id;
 
+  // TODO: change to form_document after migration
   const { data, error } = await supabase
     .from("form")
     .select(

@@ -33,6 +33,7 @@ export default async function FormsCustomizeSettingsPage({
 
   const supabase = createServerComponentClient(cookieStore);
 
+  // TODO: change to form_document after migration
   const { data, error } = await supabase
     .from("form")
     .select(
@@ -50,17 +51,14 @@ export default async function FormsCustomizeSettingsPage({
     return notFound();
   }
 
+  const { title, default_page } = data!;
+
   const {
-    title,
-    default_form_page_language,
+    lang,
     is_powered_by_branding_enabled,
-    default_page,
     is_ending_page_enabled,
     ending_page_template_id,
     ending_page_i18n_overrides,
-  } = data!;
-
-  const {
     background,
     stylesheet,
     redirect_after_response_uri,
@@ -76,7 +74,7 @@ export default async function FormsCustomizeSettingsPage({
         <FormPageLanguagePreferences
           form_id={form_id}
           init={{
-            default_form_page_language,
+            lang,
           }}
         />
       </Sector>
@@ -98,7 +96,7 @@ export default async function FormsCustomizeSettingsPage({
           />
           <EndingPagePreferences
             form_id={form_id}
-            lang={default_form_page_language}
+            lang={lang}
             title={title}
             init={{
               enabled: is_ending_page_enabled,

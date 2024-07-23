@@ -29,12 +29,10 @@ export function FormPageLanguagePreferences({
 }: {
   form_id: string;
   init: {
-    default_form_page_language: FormsPageLanguage;
+    lang: FormsPageLanguage;
   };
 }) {
-  const [language, setLanguage] = useState<FormsPageLanguage>(
-    init.default_form_page_language
-  );
+  const [language, setLanguage] = useState<FormsPageLanguage>(init.lang);
 
   return (
     <PreferenceBox>
@@ -55,7 +53,7 @@ export function FormPageLanguagePreferences({
             <section>
               <div className="mt-4 flex flex-col gap-1">
                 <Select
-                  name="default_form_page_language"
+                  name="lang"
                   value={language}
                   onValueChange={(value) => {
                     setLanguage(value as any);

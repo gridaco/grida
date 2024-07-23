@@ -158,8 +158,6 @@ async function submit({
     project_id,
     fields,
     unknown_field_handling_strategy,
-    is_ending_page_enabled,
-    ending_page_template_id,
     is_force_closed,
     is_scheduling_enabled,
     is_max_form_responses_in_total_enabled,
@@ -176,6 +174,8 @@ async function submit({
   const {
     is_redirect_after_response_uri_enabled,
     redirect_after_response_uri,
+    is_ending_page_enabled,
+    ending_page_template_id,
   } = (default_page as any) || {};
 
   const entries = formdata.entries();

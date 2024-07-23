@@ -31,24 +31,25 @@ export async function generateMetadata({
   const id = params.id;
 
   const { data, error } = await client
-    .from("form")
+    .from("form_document")
     .select(
       `
-        title,
+        name,
         is_powered_by_branding_enabled
       `
     )
-    .eq("id", id)
+    // TODO: change to document id after migration
+    .eq("form_id", id)
     .single();
 
   if (!data) {
     return notFound();
   }
 
-  const { title, is_powered_by_branding_enabled } = data;
+  const { name, is_powered_by_branding_enabled } = data;
 
   return {
-    title: is_powered_by_branding_enabled ? `${title} | Grida Forms` : title,
+    title: is_powered_by_branding_enabled ? `${name} | Grida Forms` : name,
   };
 }
 
@@ -64,28 +65,22 @@ export default async function Layout({
   const supabase = createServerComponentClient(cookieStore);
 
   const { data, error } = await client
-    .from("form")
+    .from("form_document")
     .select(
       `
-        default_form_page_language,
-        default_form_page:form_document!default_form_page_id(
-          stylesheet
-        )
+        lang,
+        stylesheet
       `
     )
-    .eq("id", id)
+    // TODO: change to document id after migration
+    .eq("form_id", id)
     .single();
 
   if (!data) {
     return notFound();
   }
 
-  const { default_form_page_language, default_form_page: default_form_pages } =
-    data;
-
-  // this is safe to cast this way - typegen has a bug
-  const default_form_page = default_form_pages as unknown as FormDocument;
-  const { stylesheet } = default_form_page;
+  const { stylesheet, lang } = data as FormDocument;
 
   const font =
     fonts[stylesheet?.["font-family"] as keyof typeof fonts] || fonts.inter;
@@ -104,7 +99,7 @@ export default async function Layout({
   };
 
   return (
-    <html lang={default_form_page_language} suppressHydrationWarning>
+    <html lang={lang} suppressHydrationWarning>
       <body className={font.className} {...props}>
         {iscsscustomized && (
           <style

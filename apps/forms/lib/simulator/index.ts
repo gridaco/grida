@@ -82,13 +82,14 @@ export class Simulator {
 
     assert(!!data, "form not found");
 
-    const page_blocks = (data.default_page as unknown as FormDocument).blocks;
+    const { blocks: page_blocks, lang: page_language } =
+      data.default_page as unknown as FormDocument;
 
     this.__schema = new FormRenderTree(
       data.id,
       data.title,
       data.description,
-      data.default_form_page_language,
+      page_language,
       data.fields,
       page_blocks
     );
