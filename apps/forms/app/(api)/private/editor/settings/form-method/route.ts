@@ -20,11 +20,11 @@ export async function POST(req: NextRequest) {
   const supabase = createRouteHandlerClient(cookieStore);
 
   const { error } = await supabase
-    .from("form")
+    .from("form_document")
     .update({
       method: method,
     })
-    .eq("id", form_id)
+    .eq("form_id", form_id)
     .single();
 
   if (error) {

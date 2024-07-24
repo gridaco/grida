@@ -40,7 +40,6 @@ export default async function FormGeneralSettingsPage({
   }
 
   const {
-    unknown_field_handling_strategy,
     max_form_responses_by_customer,
     is_max_form_responses_by_customer_enabled,
     max_form_responses_in_total,
@@ -50,7 +49,6 @@ export default async function FormGeneralSettingsPage({
     scheduling_open_at,
     scheduling_close_at,
     scheduling_tz,
-    method,
   } = data!;
 
   return (

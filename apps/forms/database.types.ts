@@ -859,7 +859,6 @@ export type Database = {
           is_scheduling_enabled: boolean
           max_form_responses_by_customer: number | null
           max_form_responses_in_total: number | null
-          method: Database["grida_forms"]["Enums"]["form_method"]
           project_id: number
           scheduling_close_at: string | null
           scheduling_open_at: string | null
@@ -879,7 +878,6 @@ export type Database = {
           is_scheduling_enabled?: boolean
           max_form_responses_by_customer?: number | null
           max_form_responses_in_total?: number | null
-          method?: Database["grida_forms"]["Enums"]["form_method"]
           project_id: number
           scheduling_close_at?: string | null
           scheduling_open_at?: string | null
@@ -899,7 +897,6 @@ export type Database = {
           is_scheduling_enabled?: boolean
           max_form_responses_by_customer?: number | null
           max_form_responses_in_total?: number | null
-          method?: Database["grida_forms"]["Enums"]["form_method"]
           project_id?: number
           scheduling_close_at?: string | null
           scheduling_open_at?: string | null
@@ -1020,6 +1017,7 @@ export type Database = {
           is_powered_by_branding_enabled: boolean
           is_redirect_after_response_uri_enabled: boolean
           lang: Database["grida_forms"]["Enums"]["form_page_language"]
+          method: Database["grida_forms"]["Enums"]["form_method"]
           name: string
           redirect_after_response_uri: string | null
           stylesheet: Json | null
@@ -1035,6 +1033,7 @@ export type Database = {
           is_powered_by_branding_enabled?: boolean
           is_redirect_after_response_uri_enabled?: boolean
           lang?: Database["grida_forms"]["Enums"]["form_page_language"]
+          method?: Database["grida_forms"]["Enums"]["form_method"]
           name?: string
           redirect_after_response_uri?: string | null
           stylesheet?: Json | null
@@ -1050,6 +1049,7 @@ export type Database = {
           is_powered_by_branding_enabled?: boolean
           is_redirect_after_response_uri_enabled?: boolean
           lang?: Database["grida_forms"]["Enums"]["form_page_language"]
+          method?: Database["grida_forms"]["Enums"]["form_method"]
           name?: string
           redirect_after_response_uri?: string | null
           stylesheet?: Json | null

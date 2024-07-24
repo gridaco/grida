@@ -19,7 +19,6 @@ export interface Form {
   title: string;
   unknown_field_handling_strategy: FormResponseUnknownFieldHandlingStrategyType;
   updated_at: string;
-  method: FormMethod;
 }
 
 export interface Customer {
@@ -219,6 +218,7 @@ export interface FormDocument {
   is_ending_page_enabled: boolean;
   ending_page_template_id: string | null;
   ending_page_i18n_overrides: EndingPageI18nOverrides | null;
+  method: FormMethod;
 }
 
 export interface IFormBlock<T = FormBlockType> {
