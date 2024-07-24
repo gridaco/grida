@@ -26,14 +26,15 @@ import {
   SidebarSectionHeaderItem,
   SidebarSectionHeaderLabel,
 } from "@/components/sidebar";
-import { ModeBlocks } from "./sidebar-mode-blocks";
+import { ModeDesign } from "./sidebar-mode-blocks";
 import { FormEditorState } from "../editor/state";
 import { TableTypeIcon } from "@/components/table-type-icon";
+import { editorlink } from "@/lib/forms/url";
 
 export function Siebar({
   mode,
 }: {
-  mode: "data" | "blocks" | "connect" | "settings";
+  mode: "data" | "design" | "connect" | "settings";
 }) {
   const [state] = useEditorState();
 
@@ -41,7 +42,7 @@ export function Siebar({
   return (
     <SidebarRoot>
       {mode === "data" && <ModeData />}
-      {mode === "blocks" && <ModeBlocks />}
+      {mode === "design" && <ModeDesign />}
       {mode === "connect" && <ModeConnect />}
       {mode === "settings" && <ModeSettings />}
     </SidebarRoot>
@@ -93,7 +94,7 @@ function ModeData() {
           </SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuList>
-          <Link href={`/d/${form_id}/blocks`}>
+          <Link href={editorlink("design", { form_id })}>
             <SidebarMenuItem muted>
               <TabletSmartphoneIcon className="inline align-middle w-4 h-4 me-2" />
               Main
@@ -127,7 +128,7 @@ function ModeData() {
           </SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuList>
-          <Link href={`/d/${form_id}/data/analytics`}>
+          <Link href={editorlink("data/analytics", { form_id })}>
             <SidebarMenuItem muted>
               <PieChartIcon className="inline align-middle w-4 h-4 me-2" />
               Realtime

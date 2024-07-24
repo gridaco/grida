@@ -2,29 +2,43 @@ import type { FormSubmitErrorCode } from "@/types/private/api";
 import * as ERR from "@/k/error";
 
 export function editorlink(
-  origin: string,
-  form_id: string,
   page:
-    | "blocks"
+    | "design"
     | "settings"
+    | "settings/general"
+    | "settings/customize"
     | "data"
     | "data/responses"
+    | "data/analytics"
     | "connect"
+    | "connect/share"
+    | "connect/customer"
     | "connect/store"
     | "connect/store/get-started"
-    | "connect/store/products"
+    | "connect/store/products",
+  { origin = "", form_id }: { origin?: string; form_id: string }
 ) {
   switch (page) {
-    case "blocks":
-      return `${origin}/d/${form_id}/blocks`;
+    case "design":
+      return `${origin}/d/${form_id}/design`;
     case "settings":
       return `${origin}/d/${form_id}/settings`;
+    case "settings/customize":
+      return `${origin}/d/${form_id}/settings/customize`;
+    case "settings/general":
+      return `${origin}/d/${form_id}/settings/general`;
     case "data":
       return `${origin}/d/${form_id}/data`;
     case "data/responses":
       return `${origin}/d/${form_id}/data/responses`;
+    case "data/analytics":
+      return `${origin}/d/${form_id}/data/analytics`;
     case "connect":
       return `${origin}/d/${form_id}/connect`;
+    case "connect/share":
+      return `${origin}/d/${form_id}/connect/share`;
+    case "connect/customer":
+      return `${origin}/d/${form_id}/connect/customer`;
     case "connect/store":
       return `${origin}/d/${form_id}/connect/store`;
     case "connect/store/get-started":

@@ -17,8 +17,8 @@ export function Tabs({ form_id: id }: { form_id: string }) {
       <Link href={`/d/${id}/data`} prefetch={false}>
         <Tab selected={tab === "data"}>Data</Tab>
       </Link>
-      <Link href={`/d/${id}/blocks`} prefetch={false}>
-        <Tab selected={tab === "blocks"}>Blocks</Tab>
+      <Link href={`/d/${id}/design`} prefetch={false}>
+        <Tab selected={tab === "design"}>Design</Tab>
       </Link>
       <Link href={`/d/${id}/connect`} prefetch={false}>
         <Tab selected={tab === "connect"}>Connect</Tab>

@@ -1,3 +1,4 @@
+import { formlink } from "@/lib/forms/url";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(
@@ -8,10 +9,8 @@ export async function GET(
     };
   }
 ) {
-  const id = context.params.id;
+  const form_id = context.params.id;
   const origin = req.nextUrl.origin;
 
-  // TODO: fetch custom_preview_url_path and build the path
-
-  return NextResponse.redirect(origin + `/d/e/${id}`, { status: 301 });
+  return NextResponse.redirect(formlink(origin, form_id), { status: 301 });
 }

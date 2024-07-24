@@ -48,7 +48,7 @@ export async function POST(
 
   if (form_reference.store_connection) {
     return NextResponse.redirect(
-      editorlink(origin, form_id, "connect/store/products"),
+      editorlink("connect/store/products", { origin, form_id }),
       {
         status: 301,
       }
@@ -69,9 +69,12 @@ export async function POST(
 
   if (!store) {
     console.error("store::not-inserted");
-    return NextResponse.redirect(editorlink(origin, form_id, "connect/store"), {
-      status: 301,
-    });
+    return NextResponse.redirect(
+      editorlink("connect/store", { origin, form_id }),
+      {
+        status: 301,
+      }
+    );
   }
 
   // create new connection record
@@ -81,13 +84,16 @@ export async function POST(
 
   if (error) {
     console.error("connection::error:", error);
-    return NextResponse.redirect(editorlink(origin, form_id, "connect/store"), {
-      status: 301,
-    });
+    return NextResponse.redirect(
+      editorlink("connect/store", { origin, form_id }),
+      {
+        status: 301,
+      }
+    );
   }
 
   return NextResponse.redirect(
-    editorlink(origin, form_id, "connect/store/products"),
+    editorlink("connect/store/products", { origin, form_id }),
     {
       status: 301,
     }

@@ -324,11 +324,10 @@ export function FieldEditPanel({
         "You need to connect a store to enable inventory tracking"
       );
       if (ok) {
-        const connect_redirect_link = editorlink(
-          window.location.origin,
-          state.form_id,
-          "connect/store"
-        );
+        const connect_redirect_link = editorlink("connect/store", {
+          origin: window.location.origin,
+          form_id: state.form_id,
+        });
         console.log("redirecting to", connect_redirect_link);
         props.onOpenChange?.(false);
         router.push(connect_redirect_link);

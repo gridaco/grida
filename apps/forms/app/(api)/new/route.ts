@@ -1,3 +1,4 @@
+import { editorlink } from "@/lib/forms/url";
 import {
   create_new_form_with_document,
   seed_form_document_blocks,
@@ -30,7 +31,7 @@ export async function POST(request: NextRequest) {
       // ignore and continue since the form itself is created anyway.
     }
 
-    return NextResponse.redirect(origin + `/d/${form_id}/blocks`, {
+    return NextResponse.redirect(editorlink("design", { origin, form_id }), {
       status: 302,
     });
   } catch (e) {

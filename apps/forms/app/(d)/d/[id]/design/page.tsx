@@ -14,7 +14,7 @@ export default function EditFormPage() {
   return (
     <main className="h-full flex flex-1 w-full">
       <aside className="hidden lg:flex h-full">
-        <Siebar mode="blocks" />
+        <Siebar mode="design" />
       </aside>
       <CanvasEventTarget className="relative w-full no-scrollbar overflow-y-auto">
         <CanvasOverlay />
@@ -23,7 +23,7 @@ export default function EditFormPage() {
         </AgentThemeProvider>
       </CanvasEventTarget>
       <aside className="hidden lg:flex h-full">
-        <SideControl mode="blocks" />
+        <SideControl mode="design" />
       </aside>
     </main>
   );

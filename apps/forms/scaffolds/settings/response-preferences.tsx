@@ -24,6 +24,7 @@ import { useForm, Controller } from "react-hook-form";
 import toast from "react-hot-toast";
 import { PrivateEditorApi } from "@/lib/private";
 import { Spinner } from "@/components/spinner";
+import { editorlink } from "@/lib/forms/url";
 
 export function RestrictNumberOfResponseByCustomer({
   form_id,
@@ -138,7 +139,7 @@ function MaxResponsesByCustomerHelpWarning({ form_id }: { form_id: string }) {
   return (
     <>
       Make sure you have{" "}
-      <Link href={`/d/${form_id}/connect/customer`}>
+      <Link href={editorlink("connect/customer", { form_id })}>
         <u>customer identity</u>
       </Link>{" "}
       configured or login page enabled.

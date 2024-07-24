@@ -70,16 +70,16 @@ import { cn } from "@/utils";
 
 const { default: all, ...variants } = _variants;
 
-export function SideControl({ mode }: { mode: "blocks" }) {
+export function SideControl({ mode }: { mode: "design" }) {
   return (
     <SidebarRoot side="right">
       <div className="h-5" />
-      {mode === "blocks" && <ModeBlocks />}
+      {mode === "design" && <ModeDesign />}
     </SidebarRoot>
   );
 }
 
-function ModeBlocks() {
+function ModeDesign() {
   const [state, dispatch] = useEditorState();
 
   if (state.document.selected_node_id) {

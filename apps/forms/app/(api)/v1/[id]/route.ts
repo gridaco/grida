@@ -183,7 +183,7 @@ export async function GET(
 
   const {
     title,
-    method,
+
     description,
     default_page,
     fields,
@@ -201,6 +201,7 @@ export async function GET(
 
   const {
     //
+    method,
     is_powered_by_branding_enabled,
     lang,
   } = (default_page as unknown as FormDocument) || {};

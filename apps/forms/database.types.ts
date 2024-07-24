@@ -850,20 +850,15 @@ export type Database = {
       form: {
         Row: {
           created_at: string
-          custom_preview_url_path: string | null
-          custom_publish_url_path: string | null
           default_form_page_id: string | null
           description: string | null
           id: string
-          is_edit_after_submission_allowed: boolean
           is_force_closed: boolean
           is_max_form_responses_by_customer_enabled: boolean
           is_max_form_responses_in_total_enabled: boolean
-          is_multiple_response_allowed: boolean
           is_scheduling_enabled: boolean
           max_form_responses_by_customer: number | null
           max_form_responses_in_total: number | null
-          method: Database["grida_forms"]["Enums"]["form_method"]
           project_id: number
           scheduling_close_at: string | null
           scheduling_open_at: string | null
@@ -874,20 +869,15 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          custom_preview_url_path?: string | null
-          custom_publish_url_path?: string | null
           default_form_page_id?: string | null
           description?: string | null
           id?: string
-          is_edit_after_submission_allowed?: boolean
           is_force_closed?: boolean
           is_max_form_responses_by_customer_enabled?: boolean
           is_max_form_responses_in_total_enabled?: boolean
-          is_multiple_response_allowed?: boolean
           is_scheduling_enabled?: boolean
           max_form_responses_by_customer?: number | null
           max_form_responses_in_total?: number | null
-          method?: Database["grida_forms"]["Enums"]["form_method"]
           project_id: number
           scheduling_close_at?: string | null
           scheduling_open_at?: string | null
@@ -898,20 +888,15 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          custom_preview_url_path?: string | null
-          custom_publish_url_path?: string | null
           default_form_page_id?: string | null
           description?: string | null
           id?: string
-          is_edit_after_submission_allowed?: boolean
           is_force_closed?: boolean
           is_max_form_responses_by_customer_enabled?: boolean
           is_max_form_responses_in_total_enabled?: boolean
-          is_multiple_response_allowed?: boolean
           is_scheduling_enabled?: boolean
           max_form_responses_by_customer?: number | null
           max_form_responses_in_total?: number | null
-          method?: Database["grida_forms"]["Enums"]["form_method"]
           project_id?: number
           scheduling_close_at?: string | null
           scheduling_open_at?: string | null
@@ -1032,6 +1017,7 @@ export type Database = {
           is_powered_by_branding_enabled: boolean
           is_redirect_after_response_uri_enabled: boolean
           lang: Database["grida_forms"]["Enums"]["form_page_language"]
+          method: Database["grida_forms"]["Enums"]["form_method"]
           name: string
           redirect_after_response_uri: string | null
           stylesheet: Json | null
@@ -1047,6 +1033,7 @@ export type Database = {
           is_powered_by_branding_enabled?: boolean
           is_redirect_after_response_uri_enabled?: boolean
           lang?: Database["grida_forms"]["Enums"]["form_page_language"]
+          method?: Database["grida_forms"]["Enums"]["form_method"]
           name?: string
           redirect_after_response_uri?: string | null
           stylesheet?: Json | null
@@ -1062,6 +1049,7 @@ export type Database = {
           is_powered_by_branding_enabled?: boolean
           is_redirect_after_response_uri_enabled?: boolean
           lang?: Database["grida_forms"]["Enums"]["form_page_language"]
+          method?: Database["grida_forms"]["Enums"]["form_method"]
           name?: string
           redirect_after_response_uri?: string | null
           stylesheet?: Json | null

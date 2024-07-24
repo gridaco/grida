@@ -13,6 +13,7 @@ import { TrustedOriginPreferences } from "@/scaffolds/settings/trusted-origin-pr
 import { notFound } from "next/navigation";
 import { AboutThisForm } from "@/scaffolds/settings/about-this-form";
 import { FormMethodPreference } from "@/scaffolds/settings/form-method-preference";
+import { FormDocument } from "@/types";
 
 export default async function FormGeneralSettingsPage({
   params,
@@ -27,7 +28,15 @@ export default async function FormGeneralSettingsPage({
 
   const { data } = await supabase
     .from("form")
-    .select()
+    .select(
+      `
+        *,
+        default_document:form_document!default_form_page_id(
+          *,
+          blocks:form_block(*)
+        )
+      `
+    )
     .eq("id", form_id)
     .single();
 
@@ -35,7 +44,8 @@ export default async function FormGeneralSettingsPage({
     return notFound();
   }
 
-  const { unknown_field_handling_strategy, method } = data!;
+  const { unknown_field_handling_strategy, default_document } = data!;
+  const { method } = default_document as unknown as FormDocument;
 
   return (
     <main className="max-w-2xl mx-auto">
