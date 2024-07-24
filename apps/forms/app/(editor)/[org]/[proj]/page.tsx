@@ -20,9 +20,9 @@ export const revalidate = 0;
 export async function generateMetadata({
   params,
 }: {
-  params: { project_name: string };
+  params: { proj: string };
 }): Promise<Metadata> {
-  const { project_name } = params;
+  const { proj: project_name } = params;
 
   return {
     title: `${project_name} | Grida Forms`,
@@ -38,13 +38,13 @@ export default async function FormsDashboardPage({
   searchParams,
 }: {
   params: {
-    project_name: string;
+    proj: string;
   };
   searchParams: {
     layout?: "grid" | "list";
   };
 }) {
-  const { project_name } = params;
+  const { proj: project_name } = params;
 
   const cookieStore = cookies();
   const supabase = createServerComponentClient(cookieStore);
