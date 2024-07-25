@@ -610,7 +610,7 @@ function Palette() {
     >
       <SelectTrigger className={cn(paletteobj && "h-16 px-2 py-2")}>
         <SelectValue>
-          {paletteobj && (
+          {paletteobj ? (
             <div className="flex items-center gap-2">
               <PaletteColorChip
                 primary={paletteobj["light"]["--primary"]}
@@ -622,6 +622,8 @@ function Palette() {
                 {palette}
               </span>
             </div>
+          ) : (
+            <>None</>
           )}
         </SelectValue>
       </SelectTrigger>

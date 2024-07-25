@@ -276,7 +276,7 @@ function ModeConnect() {
               <SupabaseLogo className="inline align-middle w-4 h-4 me-2" />
               Supabase
               <Badge variant="outline" className="ms-auto">
-                alpha
+                beta
               </Badge>
             </SidebarMenuItem>
           </Link>

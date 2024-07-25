@@ -27,18 +27,22 @@ export async function POST(
   const supabase = createRouteHandlerClient(cookieStore);
   const wsclient = createRouteHandlerWorkspaceClient(cookieStore);
 
-  const { data: form_reference } = await supabase
+  const { data: form_reference, error: form_ref_err } = await supabase
     .from("form")
     .select(
       `
         title,
         project_id,
-        project(*),
         store_connection:connection_commerce_store(*)
       `
     )
     .eq("id", form_id)
     .single();
+
+  if (form_ref_err) {
+    console.error(form_ref_err);
+    return notFound();
+  }
 
   if (!form_reference) {
     return notFound();
