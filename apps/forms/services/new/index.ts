@@ -1,4 +1,4 @@
-import { client } from "@/lib/supabase/server";
+import { client, workspaceclient } from "@/lib/supabase/server";
 import { FormResponseUnknownFieldHandlingStrategyType } from "@/types";
 
 export async function create_new_form_with_document({
@@ -16,7 +16,7 @@ export async function create_new_form_with_document({
   title?: string;
   unknown_field_handling_strategy?: FormResponseUnknownFieldHandlingStrategyType;
 }>) {
-  const { data, error } = await client
+  const { data: form, error } = await client
     .from("form")
     .insert({
       project_id: project_id,
@@ -25,31 +25,62 @@ export async function create_new_form_with_document({
     .select("*")
     .single();
 
-  if (!data) {
+  if (error) {
+    console.error(error);
     throw error;
   }
 
-  // create a default page
-  const { data: document } = await client
+  if (!form) {
+    console.error("form not created");
+    throw error;
+  }
+
+  // create document
+  const { data: document_ref, error: doc_ref_err } = await workspaceclient
+    .from("document")
+    .insert({
+      doctype: "v0_form",
+    })
+    .select()
+    .single();
+
+  if (doc_ref_err) {
+    console.error(doc_ref_err);
+    throw doc_ref_err;
+  }
+
+  if (!document_ref) {
+    console.error("document not created");
+    throw doc_ref_err;
+  }
+
+  // create a form document
+  const { data: form_document, error: form_doc_err } = await client
     .from("form_document")
     .insert({
-      form_id: data.id,
-      name: data.title,
+      id: document_ref.id,
+      form_id: form.id,
+      name: form.title,
     })
     .select("id")
     .single();
+
+  if (form_doc_err) {
+    console.error(form_doc_err);
+    throw form_doc_err;
+  }
 
   // link the page to the form
   await client
     .from("form")
     .update({
-      default_form_page_id: document!.id,
+      default_form_page_id: form_document!.id,
     })
-    .eq("id", data.id);
+    .eq("id", form.id);
 
   return {
-    form_id: data.id,
-    form_document_id: document!.id,
+    form_id: form.id,
+    form_document_id: form_document!.id,
   };
 }
 

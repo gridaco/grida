@@ -1028,7 +1028,7 @@ export type Database = {
           ending_page_i18n_overrides?: Json | null
           ending_page_template_id?: string | null
           form_id: string
-          id?: string
+          id: string
           is_ending_page_enabled?: boolean
           is_powered_by_branding_enabled?: boolean
           is_redirect_after_response_uri_enabled?: boolean
@@ -1056,9 +1056,16 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "form_document_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "document"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "grida_forms_form_page_form_id_fkey"
             columns: ["form_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "form"
             referencedColumns: ["id"]
           },
@@ -1948,6 +1955,24 @@ export type Database = {
           },
         ]
       }
+      document: {
+        Row: {
+          created_at: string
+          doctype: Database["public"]["Enums"]["doctype"]
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          doctype: Database["public"]["Enums"]["doctype"]
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          doctype?: Database["public"]["Enums"]["doctype"]
+          id?: string
+        }
+        Relationships: []
+      }
       dummy: {
         Row: {
           created_at: string
@@ -2352,7 +2377,7 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      doctype: "v0_form" | "v0_site"
     }
     CompositeTypes: {
       [_ in never]: never
