@@ -10,7 +10,6 @@ import { fonts } from "@/theme/font-family";
 import type { NextFont } from "@next/font/dist/types";
 import type { FormPageBackgroundSchema, FormStyleSheetV1Schema } from "@/types";
 import { cn } from "@/utils";
-import Head from "next/head";
 import { CustomCSS } from "@/theme/customcss";
 
 export function AgentThemeProvider({ children }: React.PropsWithChildren<{}>) {

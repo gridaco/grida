@@ -116,7 +116,9 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
     form_document_id: init.form_document_id,
     blocks: blockstreeflat(init.blocks),
     document: {
-      pages: ISDEV ? ["collection", "start", "form"] : ["form"],
+      pages: ISDEV
+        ? ["collection", "start", "form", "ending"]
+        : ["form", "ending"],
       selected_page_id: "form",
       nodes: [],
       templatesample: "formcollection_sample_001_the_bundle",

@@ -2,28 +2,35 @@
 
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import React from "react";
 
-export function Tabs({ form_id: id }: { form_id: string }) {
-  const router = useRouter();
+export function Tabs({
+  org,
+  proj,
+  form_id: id,
+}: {
+  org: string;
+  proj: string;
+  form_id: string;
+}) {
   const pathname = usePathname();
 
-  // path is /d/:id/:tab/~
-  const tab = pathname.split("/")[3];
+  // path is /:org/:proj/:id/:tab/~
+  const tab = pathname.split("/")[4];
 
   return (
     <nav className="flex items-center justify-start md:justify-center gap-2">
-      <Link href={`/d/${id}/data`} prefetch={false}>
+      <Link href={`/${org}/${proj}/${id}/data`} prefetch={false}>
         <Tab selected={tab === "data"}>Data</Tab>
       </Link>
-      <Link href={`/d/${id}/design`} prefetch={false}>
+      <Link href={`/${org}/${proj}/${id}/design`} prefetch={false}>
         <Tab selected={tab === "design"}>Design</Tab>
       </Link>
-      <Link href={`/d/${id}/connect`} prefetch={false}>
+      <Link href={`/${org}/${proj}/${id}/connect`} prefetch={false}>
         <Tab selected={tab === "connect"}>Connect</Tab>
       </Link>
-      <Link href={`/d/${id}/settings`} prefetch={false}>
+      <Link href={`/${org}/${proj}/${id}/settings`} prefetch={false}>
         <Tab selected={tab === "settings"}>Settings</Tab>
       </Link>
     </nav>

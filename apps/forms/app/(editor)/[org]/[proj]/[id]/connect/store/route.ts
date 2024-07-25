@@ -9,11 +9,14 @@ export async function GET(
   request: NextRequest,
   context: {
     params: {
+      org: string;
+      proj: string;
       id: string;
     };
   }
 ) {
   const form_id = context.params.id;
+  const { org, proj } = context.params;
   const origin = request.nextUrl.origin;
   const cookieStore = cookies();
 
@@ -27,7 +30,12 @@ export async function GET(
 
   if (!connection) {
     return NextResponse.redirect(
-      editorlink("connect/store/get-started", { origin, form_id }),
+      editorlink("connect/store/get-started", {
+        org,
+        proj,
+        origin,
+        form_id,
+      }),
       {
         status: 307,
       }
@@ -35,7 +43,12 @@ export async function GET(
   }
 
   return NextResponse.redirect(
-    editorlink("connect/store/products", { origin, form_id }),
+    editorlink("connect/store/products", {
+      org,
+      proj,
+      origin,
+      form_id,
+    }),
     {
       status: 302,
     }

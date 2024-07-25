@@ -83,7 +83,6 @@ export default async function FormGeneralSettingsPage({
             }}
           />
           <RestrictNumberOfResponseByCustomer
-            form_id={form_id}
             init={{
               is_max_form_responses_by_customer_enabled,
               max_form_responses_by_customer,

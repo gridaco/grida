@@ -52,7 +52,7 @@ export function Siebar({
 function ModeData() {
   const [state] = useEditorState();
 
-  const { form_id, datagrid_table, tables, connections } = state;
+  const { form_id, organization, project, tables } = state;
 
   return (
     <>
@@ -94,7 +94,13 @@ function ModeData() {
           </SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuList>
-          <Link href={editorlink("design", { form_id })}>
+          <Link
+            href={editorlink("design", {
+              org: organization.name,
+              proj: project.name,
+              form_id,
+            })}
+          >
             <SidebarMenuItem muted>
               <TabletSmartphoneIcon className="inline align-middle w-4 h-4 me-2" />
               Main
@@ -128,7 +134,13 @@ function ModeData() {
           </SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuList>
-          <Link href={editorlink("data/analytics", { form_id })}>
+          <Link
+            href={editorlink("data/analytics", {
+              org: organization.name,
+              proj: project.name,
+              form_id,
+            })}
+          >
             <SidebarMenuItem muted>
               <PieChartIcon className="inline align-middle w-4 h-4 me-2" />
               Realtime
@@ -310,7 +322,7 @@ function ModeConnect() {
 
 function ModeSettings() {
   const [state] = useEditorState();
-  const { form_id } = state;
+  const { form_id, organization, project } = state;
   return (
     <>
       <div className="h-5" />
@@ -321,13 +333,25 @@ function ModeSettings() {
           </SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuList>
-          <Link href={`/d/${form_id}/settings/general`}>
+          <Link
+            href={editorlink("settings/general", {
+              proj: project.name,
+              org: organization.name,
+              form_id,
+            })}
+          >
             <SidebarMenuItem>
               <GearIcon className="inline align-middle w-4 h-4 me-2" />
               General
             </SidebarMenuItem>
           </Link>
-          <Link href={`/d/${form_id}/settings/customize`}>
+          <Link
+            href={editorlink("settings/customize", {
+              proj: project.name,
+              org: organization.name,
+              form_id,
+            })}
+          >
             <SidebarMenuItem>
               <MagicWandIcon className="inline align-middle w-4 h-4 me-2" />
               Customize
@@ -342,7 +366,13 @@ function ModeSettings() {
           </SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuList>
-          <Link href={`/d/${form_id}/settings/security`}>
+          <Link
+            href={editorlink("settings/security", {
+              proj: project.name,
+              org: organization.name,
+              form_id,
+            })}
+          >
             <SidebarMenuItem>
               <LockClosedIcon className="inline align-middle w-4 h-4 me-2" />
               Data & Security

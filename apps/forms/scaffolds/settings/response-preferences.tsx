@@ -25,17 +25,20 @@ import toast from "react-hot-toast";
 import { PrivateEditorApi } from "@/lib/private";
 import { Spinner } from "@/components/spinner";
 import { editorlink } from "@/lib/forms/url";
+import { useEditorState } from "../editor";
 
 export function RestrictNumberOfResponseByCustomer({
-  form_id,
   init,
 }: {
-  form_id: string;
   init: {
     is_max_form_responses_by_customer_enabled: boolean;
     max_form_responses_by_customer?: number | null;
   };
 }) {
+  const [state] = useEditorState();
+
+  const { form_id } = state;
+
   const {
     handleSubmit,
     control,
@@ -73,7 +76,7 @@ export function RestrictNumberOfResponseByCustomer({
     <PreferenceBox>
       <PreferenceBoxHeader
         heading={<>Limit number of responses by customer</>}
-        description={<MaxResponsesByCustomerHelpWarning form_id={form_id} />}
+        description={<MaxResponsesByCustomerHelpWarning />}
       />
       <PreferenceBody>
         <form id="max-responses-by-customer" onSubmit={handleSubmit(onSubmit)}>
@@ -135,11 +138,21 @@ export function RestrictNumberOfResponseByCustomer({
   );
 }
 
-function MaxResponsesByCustomerHelpWarning({ form_id }: { form_id: string }) {
+function MaxResponsesByCustomerHelpWarning() {
+  const [state] = useEditorState();
+
+  const { form_id, organization, project } = state;
+
   return (
     <>
       Make sure you have{" "}
-      <Link href={editorlink("connect/customer", { form_id })}>
+      <Link
+        href={editorlink("connect/customer", {
+          org: organization.name,
+          proj: project.name,
+          form_id,
+        })}
+      >
         <u>customer identity</u>
       </Link>{" "}
       configured or login page enabled.

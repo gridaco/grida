@@ -7,6 +7,7 @@ export function editorlink(
     | "settings"
     | "settings/general"
     | "settings/customize"
+    | "settings/security"
     | "data"
     | "data/responses"
     | "data/analytics"
@@ -16,35 +17,47 @@ export function editorlink(
     | "connect/store"
     | "connect/store/get-started"
     | "connect/store/products",
-  { origin = "", form_id }: { origin?: string; form_id: string }
+  {
+    origin = "",
+    org,
+    proj,
+    form_id,
+  }: {
+    org: string;
+    proj: string;
+    origin?: string;
+    form_id: string;
+  }
 ) {
   switch (page) {
     case "design":
-      return `${origin}/d/${form_id}/design`;
+      return `${origin}/${org}/${proj}/${form_id}/design`;
     case "settings":
-      return `${origin}/d/${form_id}/settings`;
+      return `${origin}/${org}/${proj}/${form_id}/settings`;
     case "settings/customize":
-      return `${origin}/d/${form_id}/settings/customize`;
+      return `${origin}/${org}/${proj}/${form_id}/settings/customize`;
     case "settings/general":
-      return `${origin}/d/${form_id}/settings/general`;
+      return `${origin}/${org}/${proj}/${form_id}/settings/general`;
+    case "settings/security":
+      return `${origin}/${org}/${proj}/${form_id}/settings/security`;
     case "data":
-      return `${origin}/d/${form_id}/data`;
+      return `${origin}/${org}/${proj}/${form_id}/data`;
     case "data/responses":
-      return `${origin}/d/${form_id}/data/responses`;
+      return `${origin}/${org}/${proj}/${form_id}/data/responses`;
     case "data/analytics":
-      return `${origin}/d/${form_id}/data/analytics`;
+      return `${origin}/${org}/${proj}/${form_id}/data/analytics`;
     case "connect":
-      return `${origin}/d/${form_id}/connect`;
+      return `${origin}/${org}/${proj}/${form_id}/connect`;
     case "connect/share":
-      return `${origin}/d/${form_id}/connect/share`;
+      return `${origin}/${org}/${proj}/${form_id}/connect/share`;
     case "connect/customer":
-      return `${origin}/d/${form_id}/connect/customer`;
+      return `${origin}/${org}/${proj}/${form_id}/connect/customer`;
     case "connect/store":
-      return `${origin}/d/${form_id}/connect/store`;
+      return `${origin}/${org}/${proj}/${form_id}/connect/store`;
     case "connect/store/get-started":
-      return `${origin}/d/${form_id}/connect/store/get-started`;
+      return `${origin}/${org}/${proj}/${form_id}/connect/store/get-started`;
     case "connect/store/products":
-      return `${origin}/d/${form_id}/connect/store/products`;
+      return `${origin}/${org}/${proj}/${form_id}/connect/store/products`;
   }
 }
 

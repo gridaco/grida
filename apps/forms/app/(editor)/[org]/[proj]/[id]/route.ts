@@ -5,13 +5,24 @@ export function GET(
   req: NextRequest,
   context: {
     params: {
+      org: string;
+      proj: string;
       id: string;
     };
   }
 ) {
   const origin = req.nextUrl.origin;
-  const form_id = context.params.id;
-  return NextResponse.redirect(editorlink("data", { origin, form_id }), {
-    status: 301,
-  });
+  const { id: form_id, org, proj } = context.params;
+
+  return NextResponse.redirect(
+    editorlink("data", {
+      org,
+      proj,
+      origin,
+      form_id,
+    }),
+    {
+      status: 301,
+    }
+  );
 }
