@@ -20,12 +20,12 @@ export const revalidate = 0;
 export async function generateMetadata({
   params,
 }: {
-  params: { proj: string };
+  params: { org: string; proj: string };
 }): Promise<Metadata> {
-  const { proj: project_name } = params;
+  const { org: organization_name, proj: project_name } = params;
 
   return {
-    title: `${project_name} | Grida Forms`,
+    title: `${organization_name}/${project_name} | Grida Forms`,
   };
 }
 
@@ -110,10 +110,10 @@ export default async function FormsDashboardPage({
                 avatar_url={avatar_url}
                 alt={project_ref.organization?.name}
               />
-              Forms
+              {project_name}
             </span>
           </Link>
-          <span className="font-mono opacity-50">{project_name}</span>
+          <span className="font-mono opacity-50">{organization_name}</span>
         </div>
         <div>
           <CreateNewFormButton

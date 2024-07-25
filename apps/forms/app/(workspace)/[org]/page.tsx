@@ -25,7 +25,8 @@ import { PoweredByGridaFooter } from "@/scaffolds/e/form/powered-by-brand-footer
 import { OrganizationAvatar } from "@/components/organization-avatar";
 import { GridCard, RowCard } from "@/components/site/form-card";
 import { BoxSelectIcon, FolderDotIcon, PanelsTopLeftIcon } from "lucide-react";
-import { WorkspaceMenu } from "./org-menu";
+import { WorkspaceMenu } from "@/scaffolds/workspace/org-menu";
+import { CreateNewProjectDialog } from "@/scaffolds/workspace/new-project-dialog";
 import { PublicUrls } from "@/services/public-urls";
 import {
   SidebarMenuItem,
@@ -38,7 +39,6 @@ import {
   SidebarSection,
   SidebarMenuItemLabel,
 } from "@/components/sidebar";
-import { CreateNewProjectDialog } from "./new-project-dialog";
 import {
   Card,
   CardContent,
