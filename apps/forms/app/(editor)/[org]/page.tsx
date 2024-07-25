@@ -269,7 +269,11 @@ export default async function DashboardProjectsPage({
                   <div>
                     <h2 className="text-2xl font-bold">{p.name}</h2>
                   </div>
-                  <CreateNewFormButton project_id={p.id} />
+                  <CreateNewFormButton
+                    organization_name={organization.name}
+                    project_name={p.name}
+                    project_id={p.id}
+                  />
                 </header>
                 <section className="py-10">
                   <ProjectStats project_id={p.id} />

@@ -38,13 +38,14 @@ export default async function FormsDashboardPage({
   searchParams,
 }: {
   params: {
+    org: string;
     proj: string;
   };
   searchParams: {
     layout?: "grid" | "list";
   };
 }) {
-  const { proj: project_name } = params;
+  const { org: organization_name, proj: project_name } = params;
 
   const cookieStore = cookies();
   const supabase = createServerComponentClient(cookieStore);
@@ -115,7 +116,11 @@ export default async function FormsDashboardPage({
           <span className="font-mono opacity-50">{project_name}</span>
         </div>
         <div>
-          <CreateNewFormButton project_id={project_id} />
+          <CreateNewFormButton
+            organization_name={organization_name}
+            project_name={project_name}
+            project_id={project_id}
+          />
         </div>
       </header>
       <section>

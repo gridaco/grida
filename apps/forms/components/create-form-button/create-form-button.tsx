@@ -10,7 +10,15 @@ import {
 import clsx from "clsx";
 import { useRouter } from "next/navigation";
 
-export function CreateNewFormButton({ project_id }: { project_id: number }) {
+export function CreateNewFormButton({
+  organization_name,
+  project_name,
+  project_id,
+}: {
+  organization_name: string;
+  project_name: string;
+  project_id: number;
+}) {
   const router = useRouter();
   const new_default_form_url = `/new?project_id=${project_id}`;
 
@@ -26,7 +34,7 @@ export function CreateNewFormButton({ project_id }: { project_id: number }) {
 
     // TODO: add globl spinner to block ui
 
-    router.push(`/d/${form_id}/settings`);
+    router.push(`/${organization_name}/${project_name}/${form_id}/connect`);
   };
 
   return (

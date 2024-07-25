@@ -17,7 +17,6 @@ import {
   SectorHeading,
 } from "@/components/preferences";
 import { EndingRedirectPreferences } from "@/scaffolds/settings/customize/custom-ending-redirect-preferences";
-import { EndingPageI18nOverrides, FormDocument } from "@/types";
 import { EndingPagePreferences } from "@/scaffolds/settings/customize/custom-ending-page-preferences";
 import { ClosingFormPreferences } from "@/scaffolds/settings/closing-preference";
 import { SchedulingPreferences } from "@/scaffolds/settings/scheduling-preference";
@@ -124,10 +123,6 @@ function CurrentPageCanvas() {
       );
     }
     case "ending": {
-      // FIXME:
-      const is_ending_page_enabled = true;
-      const ending_page_template_id = "default";
-      const ending_page_i18n_overrides = {};
       return (
         <main className="max-w-2xl mx-auto">
           <Sector>
@@ -139,17 +134,7 @@ function CurrentPageCanvas() {
             </SectorHeader>
             <SectorBlocks>
               <EndingRedirectPreferences />
-              <EndingPagePreferences
-                form_id={form_id}
-                lang={lang}
-                title={form_title}
-                init={{
-                  enabled: is_ending_page_enabled,
-                  template_id: ending_page_template_id as any,
-                  i18n_overrides:
-                    ending_page_i18n_overrides as {} as EndingPageI18nOverrides,
-                }}
-              />
+              <EndingPagePreferences />
             </SectorBlocks>
           </Sector>
         </main>
