@@ -37,6 +37,7 @@ import type {
   FeedXSupabaseMainTableRowsAction,
   DataTableRefreshAction,
   DataTableLoadingAction,
+  EditorThemeLangAction,
   EditorThemePaletteAction,
   EditorThemeFontFamilyAction,
   EditorThemeBackgroundAction,
@@ -54,6 +55,7 @@ import type {
   DataGridOrderByResetAction,
   InitAssetAction,
   FeedCustomerAction,
+  EditorThemePoweredByBrandingAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { blockstreeflat } from "@/lib/forms/tree";
@@ -833,6 +835,18 @@ export function reducer(
         return;
       });
       //
+    }
+    case "editor/theme/lang": {
+      const { lang } = <EditorThemeLangAction>action;
+      return produce(state, (draft) => {
+        draft.theme.lang = lang;
+      });
+    }
+    case "editor/theme/powered_by_branding": {
+      const { enabled } = <EditorThemePoweredByBrandingAction>action;
+      return produce(state, (draft) => {
+        draft.theme.is_powered_by_branding_enabled = enabled;
+      });
     }
     case "editor/theme/palette": {
       const { palette } = <EditorThemePaletteAction>action;

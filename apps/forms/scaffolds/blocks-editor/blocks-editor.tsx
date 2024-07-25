@@ -223,6 +223,8 @@ function AgentThemeSyncProvider({ children }: React.PropsWithChildren<{}>) {
       supabase
         .from("form_document")
         .update({
+          lang: theme.lang,
+          is_powered_by_branding_enabled: theme.is_powered_by_branding_enabled,
           stylesheet: {
             custom: theme.customCSS,
             "font-family": theme.fontFamily,
@@ -244,6 +246,8 @@ function AgentThemeSyncProvider({ children }: React.PropsWithChildren<{}>) {
     prev,
     supabase,
     form_document_id,
+    theme.is_powered_by_branding_enabled,
+    theme.lang,
     theme.customCSS,
     theme.fontFamily,
     theme.palette,

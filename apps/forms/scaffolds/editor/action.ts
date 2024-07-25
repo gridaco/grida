@@ -7,6 +7,7 @@ import type {
   FormResponse,
   FormResponseWithFields,
   FormStyleSheetV1Schema,
+  FormsPageLanguage,
   GridaSupabase,
 } from "@/types";
 import type { EditorFlatFormBlock, FormEditorState } from "./state";
@@ -55,6 +56,8 @@ export type BlocksEditorAction =
   | DataTableLoadingAction
   | DataGridCellChangeAction
   | FeedXSupabaseMainTableRowsAction
+  | EditorThemeLangAction
+  | EditorThemePoweredByBrandingAction
   | EditorThemePaletteAction
   | EditorThemeFontFamilyAction
   | EditorThemeSectionStyleAction
@@ -298,6 +301,16 @@ export interface DataGridCellChangeAction {
 export interface FeedXSupabaseMainTableRowsAction {
   type: "editor/x-supabase/main-table/feed";
   data: GridaSupabase.XDataRow[];
+}
+
+export interface EditorThemeLangAction {
+  type: "editor/theme/lang";
+  lang: FormsPageLanguage;
+}
+
+export interface EditorThemePoweredByBrandingAction {
+  type: "editor/theme/powered_by_branding";
+  enabled: boolean;
 }
 
 export interface EditorThemePaletteAction {

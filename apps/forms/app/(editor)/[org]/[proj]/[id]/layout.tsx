@@ -2,7 +2,10 @@ import Link from "next/link";
 import { EditableFormTitle } from "@/scaffolds/editable-form-title";
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
-import { createServerComponentClient } from "@/lib/supabase/server";
+import {
+  createServerComponentClient,
+  createServerComponentWorkspaceClient,
+} from "@/lib/supabase/server";
 import { GridaLogo } from "@/components/grida-logo";
 import { SlashIcon } from "@radix-ui/react-icons";
 import { Tabs } from "@/scaffolds/d/tabs";
@@ -12,10 +15,16 @@ import { PreviewButton } from "@/components/preview-button";
 import { GridaXSupabaseService } from "@/services/x-supabase";
 import type { Metadata } from "next";
 
+type Params = {
+  org: string;
+  proj: string;
+  id: string;
+};
+
 export async function generateMetadata({
   params,
 }: {
-  params: { id: string };
+  params: Params;
 }): Promise<Metadata> {
   const cookieStore = cookies();
   const supabase = createServerComponentClient(cookieStore);
@@ -48,11 +57,27 @@ export default async function Layout({
   children,
 }: Readonly<{
   children: React.ReactNode;
-  params: { id: string };
+  params: Params;
 }>) {
   const cookieStore = cookies();
   const supabase = createServerComponentClient(cookieStore);
-  const id = params.id;
+  const wsclient = createServerComponentWorkspaceClient(cookieStore);
+  const { id, org, proj } = params;
+
+  const { data: project_ref, error: project_ref_err } = await wsclient
+    .from("project")
+    .select("id, name, organization(id, name)")
+    .eq("name", proj)
+    .single();
+
+  if (project_ref_err) {
+    console.error(project_ref_err);
+    return notFound();
+  }
+
+  if (!project_ref) {
+    return notFound();
+  }
 
   const { data, error } = await supabase
     .from("form")
@@ -71,6 +96,7 @@ export default async function Layout({
         supabase_connection:connection_supabase(*)
       `
     )
+    .eq("project_id", project_ref.id)
     .eq("id", id)
     .single();
 
@@ -91,15 +117,27 @@ export default async function Layout({
 
   return (
     <div className="h-screen flex flex-col">
-      <Header form_id={id} title={data.title} />
+      <Header
+        org={params.org}
+        proj={params.proj}
+        form_id={id}
+        title={data.title}
+      />
       <FormEditorProvider
         initial={{
-          project_id: data.project_id,
+          project: { id: project_ref.id, name: project_ref.name },
+          organization: {
+            id: project_ref.organization!.id,
+            name: project_ref.organization!.name,
+          },
           connections: {
             store_id: data.store_connection?.store_id,
             supabase: supabase_connection_state || undefined,
           },
           theme: {
+            lang: default_document.lang,
+            is_powered_by_branding_enabled:
+              default_document.is_powered_by_branding_enabled,
             palette: default_document?.stylesheet?.palette,
             fontFamily: default_document.stylesheet?.["font-family"],
             section: default_document.stylesheet?.section,
@@ -120,7 +158,17 @@ export default async function Layout({
   );
 }
 
-function Header({ form_id, title }: { form_id: string; title: string }) {
+function Header({
+  org,
+  proj,
+  form_id,
+  title,
+}: {
+  org: string;
+  proj: string;
+  form_id: string;
+  title: string;
+}) {
   return (
     <header className="flex flex-col w-full gap-4 bg-background border-b z-10">
       <div className="w-full flex gap-4">
@@ -136,14 +184,14 @@ function Header({ form_id, title }: { form_id: string; title: string }) {
           </div>
         </div>
         <div className="px-4 invisible lg:visible w-1/3">
-          <Tabs form_id={form_id} />
+          <Tabs org={org} proj={proj} form_id={form_id} />
         </div>
         <div className="px-4 w-1/3 flex gap-4 items-center justify-end">
           <PreviewButton form_id={form_id} />
         </div>
       </div>
       <div className="px-4 block lg:hidden">
-        <Tabs form_id={form_id} />
+        <Tabs org={org} proj={proj} form_id={form_id} />
       </div>
     </header>
   );

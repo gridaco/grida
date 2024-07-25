@@ -11,6 +11,7 @@ import type {
   FormResponseField,
   FormResponseSession,
   FormStyleSheetV1Schema,
+  FormsPageLanguage,
   GridaSupabase,
   OrderBy,
 } from "@/types";
@@ -25,7 +26,14 @@ export const DRAFT_ID_START_WITH = "[draft]";
 const ISDEV = process.env.NODE_ENV === "development";
 
 export interface FormEditorInit {
-  project_id: number;
+  organization: {
+    name: string;
+    id: number;
+  };
+  project: {
+    name: string;
+    id: number;
+  };
   form_id: string;
   scheduling_tz?: string;
   connections?: {
@@ -53,8 +61,9 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
     !!init.connections?.supabase?.main_supabase_table;
 
   return {
+    project: init.project,
+    organization: init.organization,
     connections: {
-      project_id: init.project_id,
       store_id: init.connections?.store_id,
       supabase: init.connections?.supabase,
     },
@@ -190,8 +199,15 @@ type GFTable =
     };
 
 export interface FormEditorState {
+  organization: {
+    name: string;
+    id: number;
+  };
+  project: {
+    name: string;
+    id: number;
+  };
   connections: {
-    project_id: number;
     store_id?: number | null;
     supabase?: GridaSupabase.SupabaseConnectionState;
   };
@@ -233,6 +249,8 @@ export interface FormEditorState {
   focus_block_id?: string | null;
   available_field_ids: string[];
   theme: {
+    is_powered_by_branding_enabled: boolean;
+    lang: FormsPageLanguage;
     palette?: FormStyleSheetV1Schema["palette"];
     fontFamily?: FormStyleSheetV1Schema["font-family"];
     customCSS?: FormStyleSheetV1Schema["custom"];
