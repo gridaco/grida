@@ -24,7 +24,7 @@ export function PreferenceBox({
     <section
       data-warning={warning || beta}
       className={clsx(
-        "rounded-md border border-overlay shadow-sm overflow-hidden mb-8 !m-0",
+        "bg-card rounded-md border border-overlay shadow-sm overflow-hidden mb-8 !m-0",
         "data-[warning='true']:border-yellow-400 data-[warning='true']:bg-yellow-50 data-[warning='true']:text-yellow-900 data-[warning='true']:dark:bg-yellow-700 data-[warning='true']:dark:text-yellow-200 data-[warning='true']:dark:border-yellow-600",
         disabled && "opacity-50 pointer-events- cursor-not-allowed"
       )}

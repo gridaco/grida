@@ -19,6 +19,12 @@ import {
 import { EndingRedirectPreferences } from "@/scaffolds/settings/customize/custom-ending-redirect-preferences";
 import { EndingPageI18nOverrides, FormDocument } from "@/types";
 import { EndingPagePreferences } from "@/scaffolds/settings/customize/custom-ending-page-preferences";
+import { ClosingFormPreferences } from "@/scaffolds/settings/closing-preference";
+import { SchedulingPreferences } from "@/scaffolds/settings/scheduling-preference";
+import {
+  MaxRespoonses,
+  RestrictNumberOfResponseByCustomer,
+} from "@/scaffolds/settings/response-preferences";
 
 export default function EditFormPage() {
   return (
@@ -95,6 +101,26 @@ function CurrentPageCanvas() {
         <div className="mx-auto my-20 max-w-[430px] border rounded-2xl shadow-2xl bg-background overflow-hidden">
           <FormStartPage />
         </div>
+      );
+    }
+    case "campaign": {
+      return (
+        <main className="max-w-2xl mx-auto">
+          <Sector id="access">
+            <SectorHeader>
+              <SectorHeading>Access</SectorHeading>
+              <SectorDescription>
+                Manage how responses are collected and protected
+              </SectorDescription>
+            </SectorHeader>
+            <SectorBlocks>
+              <ClosingFormPreferences />
+              <SchedulingPreferences />
+              <RestrictNumberOfResponseByCustomer />
+              <MaxRespoonses />
+            </SectorBlocks>
+          </Sector>
+        </main>
       );
     }
     case "ending": {

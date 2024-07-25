@@ -146,7 +146,19 @@ export default async function Layout({
           },
           form_id: id,
           form_title: data.title,
-          scheduling_tz: data.scheduling_tz || undefined,
+          campaign: {
+            is_scheduling_enabled: data.is_scheduling_enabled,
+            is_force_closed: data.is_force_closed,
+            max_form_responses_by_customer: data.max_form_responses_by_customer,
+            is_max_form_responses_by_customer_enabled:
+              data.is_max_form_responses_by_customer_enabled,
+            max_form_responses_in_total: data.max_form_responses_in_total,
+            is_max_form_responses_in_total_enabled:
+              data.is_max_form_responses_in_total_enabled,
+            scheduling_open_at: data.scheduling_open_at,
+            scheduling_close_at: data.scheduling_close_at,
+            scheduling_tz: data.scheduling_tz || undefined,
+          },
           form_document_id: data.default_form_page_id,
           fields: data.fields,
           blocks: default_document ? default_document.blocks || [] : [],

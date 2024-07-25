@@ -63,6 +63,7 @@ export type BlocksEditorAction =
   | EditorThemeSectionStyleAction
   | EditorThemeCustomCSSAction
   | EditorThemeBackgroundAction
+  | FormCampaignPreferencesAction
   | DocumentSelectPageAction
   | DocumentTemplateSampleDataAction
   | DocumentSelectNodeAction
@@ -336,6 +337,11 @@ export interface EditorThemeCustomCSSAction {
 export interface EditorThemeBackgroundAction {
   type: "editor/theme/background";
   background?: FormPageBackgroundSchema;
+}
+
+export interface FormCampaignPreferencesAction
+  extends Partial<FormEditorState["campaign"]> {
+  type: "editor/form/campaign/preferences";
 }
 
 export interface DocumentSelectPageAction {

@@ -35,7 +35,7 @@ export interface FormEditorInit {
     id: number;
   };
   form_id: string;
-  scheduling_tz?: string;
+  campaign: FormEditorState["campaign"];
   connections?: {
     store_id?: number | null;
     supabase?: GridaSupabase.SupabaseConnectionState;
@@ -112,13 +112,13 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
             views: [{ type: "customer", name: "customer", label: "Customers" }],
           },
         ],
-    scheduling_tz: init.scheduling_tz,
+    campaign: init.campaign,
     form_document_id: init.form_document_id,
     blocks: blockstreeflat(init.blocks),
     document: {
       pages: ISDEV
-        ? ["collection", "start", "form", "ending"]
-        : ["form", "ending"],
+        ? ["collection", "campaign", "start", "form", "ending"]
+        : ["campaign", "form", "ending"],
       selected_page_id: "form",
       nodes: [],
       templatesample: "formcollection_sample_001_the_bundle",
@@ -215,7 +215,17 @@ export interface FormEditorState {
   };
   form_id: string;
   form_title: string;
-  scheduling_tz?: string;
+  campaign: {
+    max_form_responses_by_customer: number | null;
+    is_max_form_responses_by_customer_enabled: boolean;
+    max_form_responses_in_total: number | null;
+    is_max_form_responses_in_total_enabled: boolean;
+    is_force_closed: boolean;
+    is_scheduling_enabled: boolean;
+    scheduling_open_at: string | null;
+    scheduling_close_at: string | null;
+    scheduling_tz?: string;
+  };
   form_document_id: string | null;
   blocks: EditorFlatFormBlock[];
   document: {

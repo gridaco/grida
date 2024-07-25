@@ -14,16 +14,12 @@ import { PrivateEditorApi } from "@/lib/private";
 import toast from "react-hot-toast";
 import { useForm, Controller } from "react-hook-form";
 import { Spinner } from "@/components/spinner";
+import { useEditorState } from "../editor";
 
-export function ClosingFormPreferences({
-  form_id,
-  init,
-}: {
-  form_id: string;
-  init: {
-    is_force_closed: boolean;
-  };
-}) {
+export function ClosingFormPreferences() {
+  const [state, dispatch] = useEditorState();
+  const { form_id, campaign } = state;
+
   const {
     handleSubmit,
     control,
@@ -31,7 +27,7 @@ export function ClosingFormPreferences({
     reset,
   } = useForm({
     defaultValues: {
-      is_force_closed: init.is_force_closed,
+      is_force_closed: campaign.is_force_closed,
     },
   });
 
@@ -42,11 +38,18 @@ export function ClosingFormPreferences({
     });
 
     try {
-      await toast.promise(req, {
-        loading: "Saving...",
-        success: "Saved",
-        error: "Failed",
-      });
+      await toast
+        .promise(req, {
+          loading: "Saving...",
+          success: "Saved",
+          error: "Failed",
+        })
+        .then(() => {
+          dispatch({
+            type: "editor/form/campaign/preferences",
+            is_force_closed: data.is_force_closed,
+          });
+        });
 
       // Reset form state to the new values after successful submission
       reset(data);

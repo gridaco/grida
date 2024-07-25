@@ -56,6 +56,7 @@ import type {
   InitAssetAction,
   FeedCustomerAction,
   EditorThemePoweredByBrandingAction,
+  FormCampaignPreferencesAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { blockstreeflat } from "@/lib/forms/tree";
@@ -864,6 +865,15 @@ export function reducer(
       const { background } = <EditorThemeBackgroundAction>action;
       return produce(state, (draft) => {
         draft.theme.background = background;
+      });
+    }
+    case "editor/form/campaign/preferences": {
+      const { type, ...pref } = <FormCampaignPreferencesAction>action;
+      return produce(state, (draft) => {
+        draft.campaign = {
+          ...draft.campaign,
+          ...pref,
+        };
       });
     }
     case "editor/theme/section": {
