@@ -118,12 +118,6 @@ export default async function Layout({
 
   return (
     <div className="h-screen flex flex-col">
-      <Header
-        org={params.org}
-        proj={params.proj}
-        form_id={id}
-        title={data.title}
-      />
       <FormEditorProvider
         initial={
           {
@@ -179,6 +173,12 @@ export default async function Layout({
           } satisfies FormEditorInit
         }
       >
+        <Header
+          org={params.org}
+          proj={params.proj}
+          form_id={id}
+          title={data.title}
+        />
         <div className="flex flex-1 overflow-y-auto">{children}</div>
       </FormEditorProvider>
     </div>
@@ -214,7 +214,7 @@ function Header({
           <Tabs org={org} proj={proj} form_id={form_id} />
         </div>
         <div className="px-4 w-1/3 flex gap-4 items-center justify-end">
-          <PreviewButton form_id={form_id} />
+          <PreviewButton />
         </div>
       </div>
       <div className="px-4 block lg:hidden">
