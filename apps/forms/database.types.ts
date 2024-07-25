@@ -1960,18 +1960,32 @@ export type Database = {
           created_at: string
           doctype: Database["public"]["Enums"]["doctype"]
           id: string
+          project_id: number
+          title: string
         }
         Insert: {
           created_at?: string
           doctype: Database["public"]["Enums"]["doctype"]
           id?: string
+          project_id: number
+          title?: string
         }
         Update: {
           created_at?: string
           doctype?: Database["public"]["Enums"]["doctype"]
           id?: string
+          project_id?: number
+          title?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "document_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       dummy: {
         Row: {
@@ -2374,6 +2388,20 @@ export type Database = {
           p_organization_id: number
         }
         Returns: boolean
+      }
+      workspace_documents: {
+        Args: {
+          p_organization_id: number
+        }
+        Returns: {
+          id: string
+          created_at: string
+          doctype: Database["public"]["Enums"]["doctype"]
+          project_id: number
+          title: string
+          form_id: string
+          organization_id: number
+        }[]
       }
     }
     Enums: {

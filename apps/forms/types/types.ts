@@ -406,6 +406,23 @@ export interface Organization {
   owner_id: string;
 }
 
+export interface Project {
+  id: number;
+  name: string;
+  organization_id: number;
+  created_at: string;
+}
+
+export interface GDocument {
+  id: string;
+  created_at: string;
+  project_id: number;
+  organization_id: number;
+  doctype: "v0_form" | "v0_site";
+  title: string;
+  form_id: string | null;
+}
+
 export interface OrderBy {
   column: string;
   ascending?: boolean;
