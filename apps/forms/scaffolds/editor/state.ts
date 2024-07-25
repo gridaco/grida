@@ -22,6 +22,7 @@ import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { ZodObject } from "zod";
 import { Tokens } from "@/ast";
 import React from "react";
+import { editorbasepath } from "@/lib/forms/url";
 
 export type DraftID = `[draft]${string}`;
 export const DRAFT_ID_START_WITH = "[draft]";
@@ -64,6 +65,10 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
     !!init.connections?.supabase?.main_supabase_table;
 
   return {
+    basepath: editorbasepath({
+      org: init.organization.name,
+      proj: init.project.name,
+    }),
     project: init.project,
     organization: init.organization,
     connections: {
@@ -205,6 +210,7 @@ type GFTable =
     };
 
 export interface FormEditorState {
+  basepath: string;
   organization: {
     name: string;
     id: number;

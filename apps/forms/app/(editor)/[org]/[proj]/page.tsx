@@ -135,7 +135,12 @@ export default async function FormsDashboardPage({
         </Link>
       </section>
       <hr className="mb-10 mt-5 dark:border-neutral-700" />
-      <FormsGrid forms={forms} layout={layout} />
+      <FormsGrid
+        organization_name={organization_name}
+        project_name={project_name}
+        forms={forms}
+        layout={layout}
+      />
       <footer className="mt-10 mb-5">
         <PoweredByGridaFooter />
       </footer>
@@ -144,9 +149,13 @@ export default async function FormsDashboardPage({
 }
 
 function FormsGrid({
+  organization_name,
+  project_name,
   forms,
   layout,
 }: {
+  organization_name: string;
+  project_name: string;
   forms: FormDashboardItem[];
   layout: "grid" | "list";
 }) {
@@ -154,7 +163,11 @@ function FormsGrid({
     return (
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         {forms?.map((form, i) => (
-          <Link key={i} href={`/d/${form.id}`} prefetch={false}>
+          <Link
+            key={i}
+            href={`/${organization_name}/${project_name}/${form.id}`}
+            prefetch={false}
+          >
             <GridCard
               // TODO:
               supabase_connection={null}
@@ -177,7 +190,11 @@ function FormsGrid({
         <span className="w-44">Updated At</span>
       </header>
       {forms?.map((form, i) => (
-        <Link key={i} href={`/d/${form.id}`} prefetch={false}>
+        <Link
+          key={i}
+          href={`/${organization_name}/${project_name}//${form.id}`}
+          prefetch={false}
+        >
           <RowCard
             // TODO:
             supabase_connection={null}

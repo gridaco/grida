@@ -23,6 +23,7 @@ import { Link2Icon } from "@radix-ui/react-icons";
 import { Skeleton } from "@/components/ui/skeleton";
 import clsx from "clsx";
 import { provisional } from "@/services/customer/utils";
+import { useEditorState } from "../editor";
 
 export function CustomerEditPanel({
   customer_id,
@@ -30,6 +31,9 @@ export function CustomerEditPanel({
 }: React.ComponentProps<typeof Sheet> & {
   customer_id?: string;
 }) {
+  const [state] = useEditorState();
+  const { organization, project } = state;
+
   const { data: customer } = useSWR<FormCustomerDetail>(
     customer_id ? `/private/editor/customers/${customer_id}` : undefined,
     async (url: string) => {
@@ -123,7 +127,9 @@ export function CustomerEditPanel({
                     className="flex items-center group border-b border-dashed hover:border-black"
                   >
                     <Link2Icon className="mr-2" />
-                    <Link href={`/d/${response.form.id}`}>
+                    <Link
+                      href={`/${organization.name}/${project.name}/${response.form.id}`}
+                    >
                       {response.form.title}
                     </Link>
                     <span className="font-mono">

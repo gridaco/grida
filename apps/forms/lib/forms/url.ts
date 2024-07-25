@@ -19,46 +19,66 @@ export function editorlink(
     | "connect/store/products",
   {
     origin = "",
-    org,
-    proj,
     form_id,
+    ...path
   }: {
-    org: string;
-    proj: string;
     origin?: string;
     form_id: string;
-  }
+  } & (
+    | {
+        org: string;
+        proj: string;
+      }
+    | {
+        basepath: string;
+      }
+  )
 ) {
+  const basepath = editorbasepath(path);
   switch (page) {
     case "design":
-      return `${origin}/${org}/${proj}/${form_id}/design`;
+      return `${origin}/${basepath}/${form_id}/design`;
     case "settings":
-      return `${origin}/${org}/${proj}/${form_id}/settings`;
+      return `${origin}/${basepath}/${form_id}/settings`;
     case "settings/customize":
-      return `${origin}/${org}/${proj}/${form_id}/settings/customize`;
+      return `${origin}/${basepath}/${form_id}/settings/customize`;
     case "settings/general":
-      return `${origin}/${org}/${proj}/${form_id}/settings/general`;
+      return `${origin}/${basepath}/${form_id}/settings/general`;
     case "settings/security":
-      return `${origin}/${org}/${proj}/${form_id}/settings/security`;
+      return `${origin}/${basepath}/${form_id}/settings/security`;
     case "data":
-      return `${origin}/${org}/${proj}/${form_id}/data`;
+      return `${origin}/${basepath}/${form_id}/data`;
     case "data/responses":
-      return `${origin}/${org}/${proj}/${form_id}/data/responses`;
+      return `${origin}/${basepath}/${form_id}/data/responses`;
     case "data/analytics":
-      return `${origin}/${org}/${proj}/${form_id}/data/analytics`;
+      return `${origin}/${basepath}/${form_id}/data/analytics`;
     case "connect":
-      return `${origin}/${org}/${proj}/${form_id}/connect`;
+      return `${origin}/${basepath}/${form_id}/connect`;
     case "connect/share":
-      return `${origin}/${org}/${proj}/${form_id}/connect/share`;
+      return `${origin}/${basepath}/${form_id}/connect/share`;
     case "connect/customer":
-      return `${origin}/${org}/${proj}/${form_id}/connect/customer`;
+      return `${origin}/${basepath}/${form_id}/connect/customer`;
     case "connect/store":
-      return `${origin}/${org}/${proj}/${form_id}/connect/store`;
+      return `${origin}/${basepath}/${form_id}/connect/store`;
     case "connect/store/get-started":
-      return `${origin}/${org}/${proj}/${form_id}/connect/store/get-started`;
+      return `${origin}/${basepath}/${form_id}/connect/store/get-started`;
     case "connect/store/products":
-      return `${origin}/${org}/${proj}/${form_id}/connect/store/products`;
+      return `${origin}/${basepath}/${form_id}/connect/store/products`;
   }
+}
+
+export function editorbasepath(
+  params:
+    | {
+        org: string;
+        proj: string;
+      }
+    | {
+        basepath: string;
+      }
+) {
+  if ("basepath" in params) return params.basepath;
+  return `${params.org}/${params.proj}`;
 }
 
 export interface FormLinkURLParams {
