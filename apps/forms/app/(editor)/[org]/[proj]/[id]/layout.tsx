@@ -14,6 +14,7 @@ import { FormDocument } from "@/types";
 import { PreviewButton } from "@/components/preview-button";
 import { GridaXSupabaseService } from "@/services/x-supabase";
 import type { Metadata } from "next";
+import { FormEditorInit } from "@/scaffolds/editor/state";
 
 type Params = {
   org: string;
@@ -124,45 +125,54 @@ export default async function Layout({
         title={data.title}
       />
       <FormEditorProvider
-        initial={{
-          project: { id: project_ref.id, name: project_ref.name },
-          organization: {
-            id: project_ref.organization!.id,
-            name: project_ref.organization!.name,
-          },
-          connections: {
-            store_id: data.store_connection?.store_id,
-            supabase: supabase_connection_state || undefined,
-          },
-          theme: {
-            lang: default_document.lang,
-            is_powered_by_branding_enabled:
-              default_document.is_powered_by_branding_enabled,
-            palette: default_document?.stylesheet?.palette,
-            fontFamily: default_document.stylesheet?.["font-family"],
-            section: default_document.stylesheet?.section,
-            customCSS: default_document.stylesheet?.custom,
-            background: default_document.background,
-          },
-          form_id: id,
-          form_title: data.title,
-          campaign: {
-            is_scheduling_enabled: data.is_scheduling_enabled,
-            is_force_closed: data.is_force_closed,
-            max_form_responses_by_customer: data.max_form_responses_by_customer,
-            is_max_form_responses_by_customer_enabled:
-              data.is_max_form_responses_by_customer_enabled,
-            max_form_responses_in_total: data.max_form_responses_in_total,
-            is_max_form_responses_in_total_enabled:
-              data.is_max_form_responses_in_total_enabled,
-            scheduling_open_at: data.scheduling_open_at,
-            scheduling_close_at: data.scheduling_close_at,
-            scheduling_tz: data.scheduling_tz || undefined,
-          },
-          form_document_id: data.default_form_page_id,
-          fields: data.fields,
-          blocks: default_document ? default_document.blocks || [] : [],
-        }}
+        initial={
+          {
+            project: { id: project_ref.id, name: project_ref.name },
+            organization: {
+              id: project_ref.organization!.id,
+              name: project_ref.organization!.name,
+            },
+            connections: {
+              store_id: data.store_connection?.store_id,
+              supabase: supabase_connection_state || undefined,
+            },
+            theme: {
+              lang: default_document.lang,
+              is_powered_by_branding_enabled:
+                default_document.is_powered_by_branding_enabled,
+              palette: default_document?.stylesheet?.palette,
+              fontFamily: default_document.stylesheet?.["font-family"],
+              section: default_document.stylesheet?.section,
+              customCSS: default_document.stylesheet?.custom,
+              background: default_document.background,
+            },
+            form_id: id,
+            form_title: data.title,
+            campaign: {
+              is_scheduling_enabled: data.is_scheduling_enabled,
+              is_force_closed: data.is_force_closed,
+              max_form_responses_by_customer:
+                data.max_form_responses_by_customer,
+              is_max_form_responses_by_customer_enabled:
+                data.is_max_form_responses_by_customer_enabled,
+              max_form_responses_in_total: data.max_form_responses_in_total,
+              is_max_form_responses_in_total_enabled:
+                data.is_max_form_responses_in_total_enabled,
+              scheduling_open_at: data.scheduling_open_at,
+              scheduling_close_at: data.scheduling_close_at,
+              scheduling_tz: data.scheduling_tz || undefined,
+            },
+            ending: {
+              is_redirect_after_response_uri_enabled:
+                default_document.is_redirect_after_response_uri_enabled,
+              redirect_after_response_uri:
+                default_document.redirect_after_response_uri,
+            },
+            form_document_id: data.default_form_page_id,
+            fields: data.fields,
+            blocks: default_document ? default_document.blocks || [] : [],
+          } satisfies FormEditorInit
+        }
       >
         <div className="flex flex-1 overflow-y-auto">{children}</div>
       </FormEditorProvider>

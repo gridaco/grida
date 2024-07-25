@@ -125,8 +125,6 @@ function CurrentPageCanvas() {
     }
     case "ending": {
       // FIXME:
-      const is_redirect_after_response_uri_enabled = true;
-      const redirect_after_response_uri = "https://google.com";
       const is_ending_page_enabled = true;
       const ending_page_template_id = "default";
       const ending_page_i18n_overrides = {};
@@ -140,15 +138,7 @@ function CurrentPageCanvas() {
               </SectorDescription>
             </SectorHeader>
             <SectorBlocks>
-              <EndingRedirectPreferences
-                form_id={form_id}
-                init={{
-                  is_redirect_after_response_uri_enabled:
-                    is_redirect_after_response_uri_enabled,
-                  redirect_after_response_uri:
-                    redirect_after_response_uri ?? "",
-                }}
-              />
+              <EndingRedirectPreferences />
               <EndingPagePreferences
                 form_id={form_id}
                 lang={lang}

@@ -49,8 +49,6 @@ export default async function FormsCustomizeSettingsPage({
     is_ending_page_enabled,
     ending_page_template_id,
     ending_page_i18n_overrides,
-    redirect_after_response_uri,
-    is_redirect_after_response_uri_enabled,
   } = default_page as any as FormDocument;
 
   return (
@@ -63,14 +61,7 @@ export default async function FormsCustomizeSettingsPage({
           </SectorDescription>
         </SectorHeader>
         <SectorBlocks>
-          <EndingRedirectPreferences
-            form_id={form_id}
-            init={{
-              is_redirect_after_response_uri_enabled:
-                is_redirect_after_response_uri_enabled,
-              redirect_after_response_uri: redirect_after_response_uri ?? "",
-            }}
-          />
+          <EndingRedirectPreferences />
           <EndingPagePreferences
             form_id={form_id}
             lang={lang}

@@ -57,6 +57,7 @@ import type {
   FeedCustomerAction,
   EditorThemePoweredByBrandingAction,
   FormCampaignPreferencesAction,
+  FormEndingPreferencesAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { blockstreeflat } from "@/lib/forms/tree";
@@ -872,6 +873,15 @@ export function reducer(
       return produce(state, (draft) => {
         draft.campaign = {
           ...draft.campaign,
+          ...pref,
+        };
+      });
+    }
+    case "editor/form/ending/preferences": {
+      const { type, ...pref } = <FormEndingPreferencesAction>action;
+      return produce(state, (draft) => {
+        draft.ending = {
+          ...draft.ending,
           ...pref,
         };
       });

@@ -14,7 +14,7 @@ import { PrivateEditorApi } from "@/lib/private";
 import toast from "react-hot-toast";
 import { useForm, Controller } from "react-hook-form";
 import { Spinner } from "@/components/spinner";
-import { useEditorState } from "../editor";
+import { useEditorState } from "@/scaffolds/editor";
 
 export function ClosingFormPreferences() {
   const [state, dispatch] = useEditorState();

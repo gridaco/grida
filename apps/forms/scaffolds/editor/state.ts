@@ -36,6 +36,7 @@ export interface FormEditorInit {
   };
   form_id: string;
   campaign: FormEditorState["campaign"];
+  ending: FormEditorState["ending"];
   connections?: {
     store_id?: number | null;
     supabase?: GridaSupabase.SupabaseConnectionState;
@@ -113,6 +114,7 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
           },
         ],
     campaign: init.campaign,
+    ending: init.ending,
     form_document_id: init.form_document_id,
     blocks: blockstreeflat(init.blocks),
     document: {
@@ -225,6 +227,10 @@ export interface FormEditorState {
     scheduling_open_at: string | null;
     scheduling_close_at: string | null;
     scheduling_tz?: string;
+  };
+  ending: {
+    is_redirect_after_response_uri_enabled: boolean;
+    redirect_after_response_uri: string | null;
   };
   form_document_id: string | null;
   blocks: EditorFlatFormBlock[];
