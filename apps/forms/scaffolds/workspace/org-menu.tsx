@@ -10,11 +10,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { createClientWorkspaceClient } from "@/lib/supabase/client";
-import { PublicUrls } from "@/services/public-urls";
-import type { Organization } from "@/types";
 import { CheckIcon, PlusIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo } from "react";
+import { useWorkspace } from "./workspace";
 
 export function WorkspaceMenu({
   current,
@@ -22,21 +21,10 @@ export function WorkspaceMenu({
 }: React.PropsWithChildren<{
   current?: number;
 }>) {
+  const { state } = useWorkspace();
   const supabase = useMemo(() => createClientWorkspaceClient(), []);
 
-  const [orgs, setOrgs] = useState<Organization[]>([]);
-
-  const avatar_url = PublicUrls.organization_avatar_url(supabase);
-
-  useEffect(() => {
-    supabase
-      .from("organization_member")
-      .select(`*, organization:organization(*)`)
-      .then(({ data, error }) => {
-        const organizations = data?.map((d) => d.organization!);
-        setOrgs(organizations!);
-      });
-  }, [supabase]);
+  const { organizations } = state;
 
   const onLogoutClick = () => {
     supabase.auth.signOut().then(() => {
@@ -45,7 +33,7 @@ export function WorkspaceMenu({
   };
 
   return (
-    <DropdownMenu>
+    <DropdownMenu modal={true}>
       <DropdownMenuTrigger asChild className="cursor-pointer">
         {children}
       </DropdownMenuTrigger>
@@ -57,16 +45,14 @@ export function WorkspaceMenu({
         className="w-80 max-w-sm overflow-hidden max-h-[80vh]"
       >
         <ScrollArea>
-          {orgs.map((org) => {
+          {organizations.map((org) => {
             const iscurrent = current === org.id;
             return (
               <Link key={org.id} href={`/${org.name}`}>
                 <DropdownMenuItem>
                   <OrganizationAvatar
                     className="inline w-7 h-7 me-2 border shadow-sm rounded"
-                    avatar_url={
-                      org.avatar_path ? avatar_url(org.avatar_path) : undefined
-                    }
+                    avatar_url={org.avatar_path}
                     alt={org.display_name}
                   />
                   {org.display_name}
