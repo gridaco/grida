@@ -202,7 +202,7 @@ export default async function DashboardProjectsPage({
                     {projectforms.map((form, i) => (
                       <Link
                         key={form.id}
-                        href={`/d/${form.id}`}
+                        href={`/${organization.name}/${p.name}/${form.id}`}
                         prefetch={false}
                       >
                         <SidebarMenuItem level={1} muted>
@@ -274,7 +274,12 @@ export default async function DashboardProjectsPage({
                 <section className="py-10">
                   <ProjectStats project_id={p.id} />
                 </section>
-                <FormsGrid forms={projectforms} layout={layout} />
+                <FormsGrid
+                  organization_name={organization.name}
+                  project_name={p.name}
+                  forms={projectforms}
+                  layout={layout}
+                />
               </div>
             );
           })}
@@ -290,7 +295,11 @@ export default async function DashboardProjectsPage({
 function FormsGrid({
   forms,
   layout,
+  organization_name,
+  project_name,
 }: {
+  organization_name: string;
+  project_name: string;
   forms: FormDashboardItem[];
   layout: "grid" | "list";
 }) {
@@ -298,7 +307,11 @@ function FormsGrid({
     return (
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         {forms?.map((form, i) => (
-          <Link key={i} href={`/d/${form.id}`} prefetch={false}>
+          <Link
+            key={i}
+            href={`/${organization_name}/${project_name}/${form.id}`}
+            prefetch={false}
+          >
             <GridCard {...form} />
           </Link>
         ))}
@@ -317,7 +330,11 @@ function FormsGrid({
         <span className="w-44">Updated At</span>
       </header>
       {forms?.map((form, i) => (
-        <Link key={i} href={`/d/${form.id}`} prefetch={false}>
+        <Link
+          key={i}
+          href={`/${organization_name}/${project_name}/${form.id}`}
+          prefetch={false}
+        >
           <RowCard {...form} />
         </Link>
       ))}
