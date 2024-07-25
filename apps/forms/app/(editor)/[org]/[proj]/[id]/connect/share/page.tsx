@@ -9,6 +9,7 @@ import {
   SectorHeader,
   SectorHeading,
 } from "@/components/preferences";
+import { AboutThisForm } from "@/scaffolds/settings/about-this-form";
 import React from "react";
 
 const HOST = process.env.HOST;
@@ -34,6 +35,9 @@ export default async function WithLink({ params }: { params: { id: string } }) {
 
   return (
     <main className="max-w-2xl mx-auto">
+      <Sector>
+        <AboutThisForm form_id={id} />
+      </Sector>
       <Sector>
         <SectorHeader>
           <SectorHeading>Share the link</SectorHeading>
