@@ -2,7 +2,6 @@
 
 import {
   ChevronDownIcon,
-  EyeOpenIcon,
   OpenInNewWindowIcon,
   GearIcon,
   CommitIcon,
@@ -15,10 +14,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import clsx from "clsx";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { formlink } from "@/lib/forms/url";
 
 export function PreviewButton({ form_id }: { form_id: string }) {
-  const built_in_agent_url = `/d/${form_id}/preview`;
+  const built_in_agent_url = formlink("", form_id);
 
   return (
     <div role="group" className="inline-flex rounded-md shadow-sm">

@@ -10,7 +10,7 @@ import { GridaLogo } from "@/components/grida-logo";
 import { SlashIcon } from "@radix-ui/react-icons";
 import { Tabs } from "@/scaffolds/d/tabs";
 import { FormEditorProvider } from "@/scaffolds/editor";
-import { FormDocument } from "@/types";
+import { EndingPageTemplateID, FormDocument } from "@/types";
 import { PreviewButton } from "@/components/preview-button";
 import { GridaXSupabaseService } from "@/services/x-supabase";
 import type { Metadata } from "next";
@@ -168,7 +168,8 @@ export default async function Layout({
               redirect_after_response_uri:
                 default_document.redirect_after_response_uri,
               is_ending_page_enabled: default_document.is_ending_page_enabled,
-              ending_page_template_id: default_document.ending_page_template_id,
+              ending_page_template_id:
+                default_document.ending_page_template_id as EndingPageTemplateID,
               ending_page_i18n_overrides:
                 default_document.ending_page_i18n_overrides,
             },
