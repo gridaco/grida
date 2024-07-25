@@ -167,6 +167,10 @@ export default async function Layout({
                 default_document.is_redirect_after_response_uri_enabled,
               redirect_after_response_uri:
                 default_document.redirect_after_response_uri,
+              is_ending_page_enabled: default_document.is_ending_page_enabled,
+              ending_page_template_id: default_document.ending_page_template_id,
+              ending_page_i18n_overrides:
+                default_document.ending_page_i18n_overrides,
             },
             form_document_id: data.default_form_page_id,
             fields: data.fields,

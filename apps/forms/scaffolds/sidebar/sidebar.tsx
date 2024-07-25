@@ -345,18 +345,6 @@ function ModeSettings() {
               General
             </SidebarMenuItem>
           </Link>
-          <Link
-            href={editorlink("settings/customize", {
-              proj: project.name,
-              org: organization.name,
-              form_id,
-            })}
-          >
-            <SidebarMenuItem>
-              <MagicWandIcon className="inline align-middle w-4 h-4 me-2" />
-              Customize
-            </SidebarMenuItem>
-          </Link>
         </SidebarMenuList>
       </SidebarSection>
       <SidebarSection>

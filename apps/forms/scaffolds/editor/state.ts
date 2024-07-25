@@ -2,6 +2,8 @@ import { blockstreeflat } from "@/lib/forms/tree";
 import type {
   ConnectionSupabaseJoint,
   Customer,
+  EndingPageI18nOverrides,
+  EndingPageTemplateID,
   FormBlock,
   FormBlockType,
   FormFieldDefinition,
@@ -231,6 +233,9 @@ export interface FormEditorState {
   ending: {
     is_redirect_after_response_uri_enabled: boolean;
     redirect_after_response_uri: string | null;
+    is_ending_page_enabled: boolean;
+    ending_page_template_id: EndingPageTemplateID | null;
+    ending_page_i18n_overrides: EndingPageI18nOverrides | null;
   };
   form_document_id: string | null;
   blocks: EditorFlatFormBlock[];
