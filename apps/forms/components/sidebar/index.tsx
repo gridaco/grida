@@ -21,7 +21,7 @@ export function SidebarRoot({
 }
 
 export function SidebarMenuList({ children }: React.PropsWithChildren<{}>) {
-  return <ul className="flex flex-col gap-0.5">{children}</ul>;
+  return <ul className="flex flex-col gap-0.5 pb-4">{children}</ul>;
 }
 
 export function SidebarMenuGrid({ children }: React.PropsWithChildren<{}>) {

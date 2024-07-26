@@ -25,17 +25,13 @@ import toast from "react-hot-toast";
 import { PrivateEditorApi } from "@/lib/private";
 import { Spinner } from "@/components/spinner";
 import { editorlink } from "@/lib/forms/url";
+import { useEditorState } from "../editor";
 
-export function RestrictNumberOfResponseByCustomer({
-  form_id,
-  init,
-}: {
-  form_id: string;
-  init: {
-    is_max_form_responses_by_customer_enabled: boolean;
-    max_form_responses_by_customer?: number | null;
-  };
-}) {
+export function RestrictNumberOfResponseByCustomer() {
+  const [state, dispatch] = useEditorState();
+
+  const { form_id, campaign } = state;
+
   const {
     handleSubmit,
     control,
@@ -44,8 +40,8 @@ export function RestrictNumberOfResponseByCustomer({
     watch,
   } = useForm({
     defaultValues: {
-      enabled: init.is_max_form_responses_by_customer_enabled,
-      max: init.max_form_responses_by_customer || 1,
+      enabled: campaign.is_max_form_responses_by_customer_enabled,
+      max: campaign.max_form_responses_by_customer || 1,
     },
   });
 
@@ -57,11 +53,19 @@ export function RestrictNumberOfResponseByCustomer({
       });
 
     try {
-      await toast.promise(req, {
-        loading: "Saving...",
-        success: "Saved",
-        error: "Failed",
-      });
+      await toast
+        .promise(req, {
+          loading: "Saving...",
+          success: "Saved",
+          error: "Failed",
+        })
+        .then(() => {
+          dispatch({
+            type: "editor/form/campaign/preferences",
+            is_max_form_responses_by_customer_enabled: data.enabled,
+            max_form_responses_by_customer: data.max,
+          });
+        });
       reset(data); // Reset form state to the new values after successful submission
     } catch (error) {}
   };
@@ -73,7 +77,7 @@ export function RestrictNumberOfResponseByCustomer({
     <PreferenceBox>
       <PreferenceBoxHeader
         heading={<>Limit number of responses by customer</>}
-        description={<MaxResponsesByCustomerHelpWarning form_id={form_id} />}
+        description={<MaxResponsesByCustomerHelpWarning />}
       />
       <PreferenceBody>
         <form id="max-responses-by-customer" onSubmit={handleSubmit(onSubmit)}>
@@ -135,11 +139,20 @@ export function RestrictNumberOfResponseByCustomer({
   );
 }
 
-function MaxResponsesByCustomerHelpWarning({ form_id }: { form_id: string }) {
+function MaxResponsesByCustomerHelpWarning() {
+  const [state] = useEditorState();
+
+  const { form_id, basepath } = state;
+
   return (
     <>
       Make sure you have{" "}
-      <Link href={editorlink("connect/customer", { form_id })}>
+      <Link
+        href={editorlink("connect/customer", {
+          basepath,
+          form_id,
+        })}
+      >
         <u>customer identity</u>
       </Link>{" "}
       configured or login page enabled.
@@ -177,16 +190,11 @@ function MaxResponsesByCustomerHelpWarning({ form_id }: { form_id: string }) {
   );
 }
 
-export function MaxRespoonses({
-  form_id,
-  init,
-}: {
-  form_id: string;
-  init: {
-    is_max_form_responses_in_total_enabled: boolean;
-    max_form_responses_in_total: number | null;
-  };
-}) {
+export function MaxRespoonses() {
+  const [state, dispatch] = useEditorState();
+
+  const { form_id, campaign } = state;
+
   const {
     handleSubmit,
     control,
@@ -195,8 +203,8 @@ export function MaxRespoonses({
     watch,
   } = useForm({
     defaultValues: {
-      enabled: init.is_max_form_responses_in_total_enabled,
-      max: init.max_form_responses_in_total || 100,
+      enabled: campaign.is_max_form_responses_in_total_enabled,
+      max: campaign.max_form_responses_in_total || 100,
     },
   });
 
@@ -207,11 +215,19 @@ export function MaxRespoonses({
     });
 
     try {
-      await toast.promise(req, {
-        loading: "Saving...",
-        success: "Saved",
-        error: "Failed",
-      });
+      await toast
+        .promise(req, {
+          loading: "Saving...",
+          success: "Saved",
+          error: "Failed",
+        })
+        .then(() => {
+          dispatch({
+            type: "editor/form/campaign/preferences",
+            is_max_form_responses_in_total_enabled: data.enabled,
+            max_form_responses_in_total: data.max,
+          });
+        });
       reset(data); // Reset form state to the new values after successful submission
     } catch (error) {}
   };

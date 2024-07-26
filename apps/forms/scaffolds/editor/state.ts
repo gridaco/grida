@@ -2,6 +2,8 @@ import { blockstreeflat } from "@/lib/forms/tree";
 import type {
   ConnectionSupabaseJoint,
   Customer,
+  EndingPageI18nOverrides,
+  EndingPageTemplateID,
   FormBlock,
   FormBlockType,
   FormFieldDefinition,
@@ -11,6 +13,7 @@ import type {
   FormResponseField,
   FormResponseSession,
   FormStyleSheetV1Schema,
+  FormsPageLanguage,
   GridaSupabase,
   OrderBy,
 } from "@/types";
@@ -19,15 +22,24 @@ import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { ZodObject } from "zod";
 import { Tokens } from "@/ast";
 import React from "react";
+import { editorbasepath } from "@/lib/forms/url";
 
 export type DraftID = `[draft]${string}`;
 export const DRAFT_ID_START_WITH = "[draft]";
 const ISDEV = process.env.NODE_ENV === "development";
 
 export interface FormEditorInit {
-  project_id: number;
+  organization: {
+    name: string;
+    id: number;
+  };
+  project: {
+    name: string;
+    id: number;
+  };
   form_id: string;
-  scheduling_tz?: string;
+  campaign: FormEditorState["campaign"];
+  ending: FormEditorState["ending"];
   connections?: {
     store_id?: number | null;
     supabase?: GridaSupabase.SupabaseConnectionState;
@@ -53,8 +65,13 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
     !!init.connections?.supabase?.main_supabase_table;
 
   return {
+    basepath: editorbasepath({
+      org: init.organization.name,
+      proj: init.project.name,
+    }),
+    project: init.project,
+    organization: init.organization,
     connections: {
-      project_id: init.project_id,
       store_id: init.connections?.store_id,
       supabase: init.connections?.supabase,
     },
@@ -103,11 +120,14 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
             views: [{ type: "customer", name: "customer", label: "Customers" }],
           },
         ],
-    scheduling_tz: init.scheduling_tz,
+    campaign: init.campaign,
+    ending: init.ending,
     form_document_id: init.form_document_id,
     blocks: blockstreeflat(init.blocks),
     document: {
-      pages: ISDEV ? ["collection", "start", "form"] : ["form"],
+      pages: ISDEV
+        ? ["collection", "campaign", "start", "form", "ending"]
+        : ["campaign", "form", "ending"],
       selected_page_id: "form",
       nodes: [],
       templatesample: "formcollection_sample_001_the_bundle",
@@ -190,14 +210,39 @@ type GFTable =
     };
 
 export interface FormEditorState {
+  basepath: string;
+  organization: {
+    name: string;
+    id: number;
+  };
+  project: {
+    name: string;
+    id: number;
+  };
   connections: {
-    project_id: number;
     store_id?: number | null;
     supabase?: GridaSupabase.SupabaseConnectionState;
   };
   form_id: string;
   form_title: string;
-  scheduling_tz?: string;
+  campaign: {
+    max_form_responses_by_customer: number | null;
+    is_max_form_responses_by_customer_enabled: boolean;
+    max_form_responses_in_total: number | null;
+    is_max_form_responses_in_total_enabled: boolean;
+    is_force_closed: boolean;
+    is_scheduling_enabled: boolean;
+    scheduling_open_at: string | null;
+    scheduling_close_at: string | null;
+    scheduling_tz?: string;
+  };
+  ending: {
+    is_redirect_after_response_uri_enabled: boolean;
+    redirect_after_response_uri: string | null;
+    is_ending_page_enabled: boolean;
+    ending_page_template_id: EndingPageTemplateID | null;
+    ending_page_i18n_overrides: EndingPageI18nOverrides | null;
+  };
   form_document_id: string | null;
   blocks: EditorFlatFormBlock[];
   document: {
@@ -233,6 +278,8 @@ export interface FormEditorState {
   focus_block_id?: string | null;
   available_field_ids: string[];
   theme: {
+    is_powered_by_branding_enabled: boolean;
+    lang: FormsPageLanguage;
     palette?: FormStyleSheetV1Schema["palette"];
     fontFamily?: FormStyleSheetV1Schema["font-family"];
     customCSS?: FormStyleSheetV1Schema["custom"];

@@ -406,7 +406,7 @@ export function CustomerFeedProvider({
 }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
   const {
-    connections: { project_id },
+    project: { id: project_id },
     datagrid_table,
     datagrid_rows_per_page,
     datagrid_table_refresh_key,

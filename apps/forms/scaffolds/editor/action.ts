@@ -7,6 +7,7 @@ import type {
   FormResponse,
   FormResponseWithFields,
   FormStyleSheetV1Schema,
+  FormsPageLanguage,
   GridaSupabase,
 } from "@/types";
 import type { EditorFlatFormBlock, FormEditorState } from "./state";
@@ -55,11 +56,15 @@ export type BlocksEditorAction =
   | DataTableLoadingAction
   | DataGridCellChangeAction
   | FeedXSupabaseMainTableRowsAction
+  | EditorThemeLangAction
+  | EditorThemePoweredByBrandingAction
   | EditorThemePaletteAction
   | EditorThemeFontFamilyAction
   | EditorThemeSectionStyleAction
   | EditorThemeCustomCSSAction
   | EditorThemeBackgroundAction
+  | FormCampaignPreferencesAction
+  | FormEndingPreferencesAction
   | DocumentSelectPageAction
   | DocumentTemplateSampleDataAction
   | DocumentSelectNodeAction
@@ -300,6 +305,16 @@ export interface FeedXSupabaseMainTableRowsAction {
   data: GridaSupabase.XDataRow[];
 }
 
+export interface EditorThemeLangAction {
+  type: "editor/theme/lang";
+  lang: FormsPageLanguage;
+}
+
+export interface EditorThemePoweredByBrandingAction {
+  type: "editor/theme/powered_by_branding";
+  enabled: boolean;
+}
+
 export interface EditorThemePaletteAction {
   type: "editor/theme/palette";
   palette?: FormStyleSheetV1Schema["palette"];
@@ -323,6 +338,16 @@ export interface EditorThemeCustomCSSAction {
 export interface EditorThemeBackgroundAction {
   type: "editor/theme/background";
   background?: FormPageBackgroundSchema;
+}
+
+export interface FormCampaignPreferencesAction
+  extends Partial<FormEditorState["campaign"]> {
+  type: "editor/form/campaign/preferences";
+}
+
+export interface FormEndingPreferencesAction
+  extends Partial<FormEditorState["ending"]> {
+  type: "editor/form/ending/preferences";
 }
 
 export interface DocumentSelectPageAction {

@@ -9,6 +9,7 @@ import {
   UpdateFormAccessMaxResponseByCustomerRequest,
   UpdateFormAccessMaxResponseInTotalRequest,
   UpdateFormMethodRequest,
+  UpdateFormRedirectAfterSubmissionRequest,
   UpdateFormScheduleRequest,
   UpdateFormUnknownFieldsHandlingStrategyRequest,
   XSupabasePrivateApiTypes,
@@ -95,6 +96,15 @@ export namespace PrivateEditorApi {
   }
 
   export namespace Settings {
+    export function updateFormRedirectAfterSubmission(
+      data: UpdateFormRedirectAfterSubmissionRequest
+    ) {
+      return Axios.post<EditorApiResponseOk>(
+        `/private/editor/settings/redirect-uri`,
+        data
+      );
+    }
+
     export function updateFormAccessForceClose(
       data: UpdateFormAccessForceClosedRequest
     ) {

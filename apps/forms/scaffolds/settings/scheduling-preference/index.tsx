@@ -27,21 +27,14 @@ import { Spinner } from "@/components/spinner";
 import { PrivateEditorApi } from "@/lib/private";
 import { CalendarIcon, InfoCircledIcon } from "@radix-ui/react-icons";
 import { DatePicker, TZPicker, TimePicker } from "./pickers";
+import { useEditorState } from "@/scaffolds/editor";
 
-export function SchedulingPreferences({
-  form_id,
-  init,
-}: {
-  form_id: string;
-  init: {
-    is_scheduling_enabled: boolean;
-    scheduling_open_at: string | null;
-    scheduling_close_at: string | null;
-    scheduling_tz: string | null;
-  };
-}) {
+export function SchedulingPreferences() {
+  const [state, dispatch] = useEditorState();
+  const { form_id, campaign } = state;
+
   const initialTZ =
-    init.scheduling_tz || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    campaign.scheduling_tz || Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   const {
     date: scheduling_open_at,
@@ -50,7 +43,7 @@ export function SchedulingPreferences({
     setDate: set_scheduling_open_at,
     setTime: setOpenTime,
     setTimezone: setOpenTimezone,
-  } = useTimestampTZ(init.scheduling_open_at || undefined, initialTZ);
+  } = useTimestampTZ(campaign.scheduling_open_at || undefined, initialTZ);
 
   const {
     date: scheduling_close_at,
@@ -59,7 +52,7 @@ export function SchedulingPreferences({
     setDate: set_scheduling_close_at,
     setTime: setCloseTime,
     setTimezone: setCloseTimezone,
-  } = useTimestampTZ(init.scheduling_close_at || undefined, initialTZ);
+  } = useTimestampTZ(campaign.scheduling_close_at || undefined, initialTZ);
 
   // Function to synchronize timezones
   const synchronizeTimezones = (newTz: string) => {
@@ -76,7 +69,7 @@ export function SchedulingPreferences({
     setValue,
   } = useForm({
     defaultValues: {
-      is_scheduling_enabled: init.is_scheduling_enabled,
+      is_scheduling_enabled: campaign.is_scheduling_enabled,
       scheduling_open_at: scheduling_open_at,
       scheduling_close_at: scheduling_close_at,
       scheduling_tz: initialTZ,
@@ -99,7 +92,8 @@ export function SchedulingPreferences({
       toast.error("You must either set the opening or closing time");
       return;
     }
-    const updating = PrivateEditorApi.Settings.updateFormAccessScheduling({
+
+    const payload = {
       form_id: form_id,
       enabled: data.is_scheduling_enabled,
       open_at: scheduling_open_at
@@ -109,14 +103,27 @@ export function SchedulingPreferences({
         ? fromZonedTime(scheduling_close_at, closeTz).toISOString()
         : null,
       scheduling_tz: openTz, // Save the timezone used
-    });
+    };
+
+    const updating =
+      PrivateEditorApi.Settings.updateFormAccessScheduling(payload);
 
     try {
-      await toast.promise(updating, {
-        loading: "Saving...",
-        success: "Saved!",
-        error: "Failed to save",
-      });
+      await toast
+        .promise(updating, {
+          loading: "Saving...",
+          success: "Saved!",
+          error: "Failed to save",
+        })
+        .then(() => {
+          dispatch({
+            type: "editor/form/campaign/preferences",
+            is_scheduling_enabled: payload.enabled,
+            scheduling_open_at: payload.open_at,
+            scheduling_close_at: payload.close_at,
+            scheduling_tz: payload.scheduling_tz,
+          });
+        });
 
       reset(data); // Reset form state to the new values after successful submission
     } catch (error) {}

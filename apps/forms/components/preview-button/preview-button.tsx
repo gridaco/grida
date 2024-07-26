@@ -2,7 +2,6 @@
 
 import {
   ChevronDownIcon,
-  EyeOpenIcon,
   OpenInNewWindowIcon,
   GearIcon,
   CommitIcon,
@@ -15,10 +14,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import clsx from "clsx";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { formlink } from "@/lib/forms/url";
+import { useEditorState } from "@/scaffolds/editor";
 
-export function PreviewButton({ form_id }: { form_id: string }) {
-  const built_in_agent_url = `/d/${form_id}/preview`;
+export function PreviewButton() {
+  const [state] = useEditorState();
+
+  const { form_id, organization, project } = state;
+
+  const built_in_agent_url = formlink("", form_id);
 
   return (
     <div role="group" className="inline-flex rounded-md shadow-sm">
@@ -51,13 +55,17 @@ export function PreviewButton({ form_id }: { form_id: string }) {
               Built in Agent
             </DropdownMenuItem>
           </Link>
-          <Link href={`/d/${form_id}/connect`}>
+          <Link
+            href={`/${organization.name}/${project.name}/${form_id}/connect`}
+          >
             <DropdownMenuItem>
               <GearIcon className="me-2 align-middle" />
               Configure Agent
             </DropdownMenuItem>
           </Link>
-          <Link href={`/d/${form_id}/data/simulator`}>
+          <Link
+            href={`/${organization.name}/${project.name}/${form_id}/data/simulator`}
+          >
             <DropdownMenuItem>
               <CommitIcon className="me-2 align-middle" />
               Simulator

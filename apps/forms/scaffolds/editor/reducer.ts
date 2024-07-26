@@ -37,6 +37,7 @@ import type {
   FeedXSupabaseMainTableRowsAction,
   DataTableRefreshAction,
   DataTableLoadingAction,
+  EditorThemeLangAction,
   EditorThemePaletteAction,
   EditorThemeFontFamilyAction,
   EditorThemeBackgroundAction,
@@ -54,6 +55,9 @@ import type {
   DataGridOrderByResetAction,
   InitAssetAction,
   FeedCustomerAction,
+  EditorThemePoweredByBrandingAction,
+  FormCampaignPreferencesAction,
+  FormEndingPreferencesAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { blockstreeflat } from "@/lib/forms/tree";
@@ -834,6 +838,18 @@ export function reducer(
       });
       //
     }
+    case "editor/theme/lang": {
+      const { lang } = <EditorThemeLangAction>action;
+      return produce(state, (draft) => {
+        draft.theme.lang = lang;
+      });
+    }
+    case "editor/theme/powered_by_branding": {
+      const { enabled } = <EditorThemePoweredByBrandingAction>action;
+      return produce(state, (draft) => {
+        draft.theme.is_powered_by_branding_enabled = enabled;
+      });
+    }
     case "editor/theme/palette": {
       const { palette } = <EditorThemePaletteAction>action;
       return produce(state, (draft) => {
@@ -850,6 +866,24 @@ export function reducer(
       const { background } = <EditorThemeBackgroundAction>action;
       return produce(state, (draft) => {
         draft.theme.background = background;
+      });
+    }
+    case "editor/form/campaign/preferences": {
+      const { type, ...pref } = <FormCampaignPreferencesAction>action;
+      return produce(state, (draft) => {
+        draft.campaign = {
+          ...draft.campaign,
+          ...pref,
+        };
+      });
+    }
+    case "editor/form/ending/preferences": {
+      const { type, ...pref } = <FormEndingPreferencesAction>action;
+      return produce(state, (draft) => {
+        draft.ending = {
+          ...draft.ending,
+          ...pref,
+        };
       });
     }
     case "editor/theme/section": {
