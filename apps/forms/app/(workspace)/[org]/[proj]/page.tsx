@@ -66,7 +66,6 @@ export default function FormsDashboardPage({
             {project && (
               <div>
                 <CreateNewFormButton
-                  organization_name={organization_name}
                   project_name={project_name}
                   project_id={project.id}
                 />

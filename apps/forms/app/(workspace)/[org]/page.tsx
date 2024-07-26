@@ -8,7 +8,7 @@ import {
   ViewHorizontalIcon,
 } from "@radix-ui/react-icons";
 import { CreateNewFormButton } from "@/components/create-form-button";
-import { ConnectionSupabaseJoint, Form } from "@/types";
+import { GDocument, ConnectionSupabaseJoint, Form } from "@/types";
 import { ProjectStats } from "@/scaffolds/analytics/stats";
 import { PoweredByGridaFooter } from "@/scaffolds/e/form/powered-by-brand-footer";
 import { GridCard, RowCard } from "@/components/site/form-card";
@@ -134,7 +134,6 @@ export default function DashboardProjectsPage({
                         <h2 className="text-2xl font-bold">{p.name}</h2>
                       </div>
                       <CreateNewFormButton
-                        organization_name={organization.name}
                         project_name={p.name}
                         project_id={p.id}
                       />
@@ -142,7 +141,7 @@ export default function DashboardProjectsPage({
                     <section className="py-10">
                       <ProjectStats project_id={p.id} />
                     </section>
-                    <FormsGrid
+                    <FormDocumentsGrid
                       organization_name={organization.name}
                       project_name={p.name}
                       forms={projectdocuments}
@@ -162,7 +161,7 @@ export default function DashboardProjectsPage({
   );
 }
 
-function FormsGrid({
+function FormDocumentsGrid({
   forms,
   layout,
   organization_name,
@@ -170,7 +169,7 @@ function FormsGrid({
 }: {
   organization_name: string;
   project_name: string;
-  forms: FormDashboardItem[];
+  forms: GDocument[];
   layout: "grid" | "list";
 }) {
   if (layout === "grid") {
@@ -179,7 +178,7 @@ function FormsGrid({
         {forms?.map((form, i) => (
           <Link
             key={i}
-            href={`/${organization_name}/${project_name}/${form.id}`}
+            href={`/${organization_name}/${project_name}/${form.form_id}`}
             prefetch={false}
           >
             <GridCard {...form} />
@@ -202,7 +201,7 @@ function FormsGrid({
       {forms?.map((form, i) => (
         <Link
           key={i}
-          href={`/${organization_name}/${project_name}/${form.id}`}
+          href={`/${organization_name}/${project_name}/${form.form_id}`}
           prefetch={false}
         >
           <RowCard {...form} />

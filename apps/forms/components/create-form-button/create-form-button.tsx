@@ -9,16 +9,21 @@ import {
 } from "@/components/ui/dropdown-menu";
 import clsx from "clsx";
 import { useRouter } from "next/navigation";
+import { useWorkspace } from "@/scaffolds/workspace";
 
 export function CreateNewFormButton({
-  organization_name,
   project_name,
   project_id,
 }: {
-  organization_name: string;
   project_name: string;
   project_id: number;
 }) {
+  const {
+    state: {
+      organization: { name: organization_name },
+    },
+  } = useWorkspace();
+
   const router = useRouter();
   const new_default_form_url = `/new?project_id=${project_id}`;
 
