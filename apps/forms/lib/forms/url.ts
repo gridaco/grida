@@ -7,7 +7,6 @@ export function editorlink(
     | "settings"
     | "settings/general"
     | "settings/customize"
-    | "settings/security"
     | "data"
     | "data/responses"
     | "data/analytics"
@@ -44,8 +43,6 @@ export function editorlink(
       return `${origin}/${basepath}/${form_id}/settings/customize`;
     case "settings/general":
       return `${origin}/${basepath}/${form_id}/settings/general`;
-    case "settings/security":
-      return `${origin}/${basepath}/${form_id}/settings/security`;
     case "data":
       return `${origin}/${basepath}/${form_id}/data`;
     case "data/responses":

@@ -8,10 +8,12 @@ import type {
   FormBlockType,
   FormFieldDefinition,
   FormFieldInit,
+  FormMethod,
   FormPageBackgroundSchema,
   FormResponse,
   FormResponseField,
   FormResponseSession,
+  FormResponseUnknownFieldHandlingStrategyType,
   FormStyleSheetV1Schema,
   FormsPageLanguage,
   GridaSupabase,
@@ -39,6 +41,7 @@ export interface FormEditorInit {
   };
   form_id: string;
   campaign: FormEditorState["campaign"];
+  form_security: FormEditorState["form_security"];
   ending: FormEditorState["ending"];
   connections?: {
     store_id?: number | null;
@@ -121,6 +124,7 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
           },
         ],
     campaign: init.campaign,
+    form_security: init.form_security,
     ending: init.ending,
     form_document_id: init.form_document_id,
     blocks: blockstreeflat(init.blocks),
@@ -235,6 +239,10 @@ export interface FormEditorState {
     scheduling_open_at: string | null;
     scheduling_close_at: string | null;
     scheduling_tz?: string;
+  };
+  form_security: {
+    unknown_field_handling_strategy: FormResponseUnknownFieldHandlingStrategyType;
+    method: FormMethod;
   };
   ending: {
     is_redirect_after_response_uri_enabled: boolean;

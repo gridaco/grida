@@ -90,31 +90,49 @@ function ModeDocuments() {
   const { state: workspace } = useWorkspace();
   const { documents } = workspace;
   const [state] = useEditorState();
-  const { form_id, basepath } = state;
+  const { form_id, basepath, form_title } = state;
   return (
-    <SidebarSection>
-      <SidebarSectionHeaderItem>
-        <SidebarSectionHeaderLabel>
-          <span>Documents</span>
-        </SidebarSectionHeaderLabel>
-      </SidebarSectionHeaderItem>
-      <SidebarMenuList>
-        {documents.map((d) => (
-          <Link
-            key={d.id}
-            href={editorlink("design", { form_id: d.form_id!, basepath })}
-          >
-            <SidebarMenuItem muted>
-              <ResourceTypeIcon
-                type={d.doctype}
-                className="inline align-middle min-w-4 w-4 h-4 me-2"
-              />
-              <SidebarMenuItemLabel>{d.title}</SidebarMenuItemLabel>
-            </SidebarMenuItem>
-          </Link>
-        ))}
-      </SidebarMenuList>
-    </SidebarSection>
+    <>
+      <SidebarSection>
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>
+            <span>Resources</span>
+          </SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuList>
+          <SidebarMenuItem muted>
+            <ResourceTypeIcon
+              type={"v0_form"}
+              className="inline align-middle min-w-4 w-4 h-4 me-2"
+            />
+            <SidebarMenuItemLabel>{form_title}</SidebarMenuItemLabel>
+          </SidebarMenuItem>
+        </SidebarMenuList>
+      </SidebarSection>
+      <SidebarSection>
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>
+            <span>Documents</span>
+          </SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuList>
+          {documents.map((d) => (
+            <Link
+              key={d.id}
+              href={editorlink("design", { form_id: d.form_id!, basepath })}
+            >
+              <SidebarMenuItem muted>
+                <ResourceTypeIcon
+                  type={d.doctype}
+                  className="inline align-middle min-w-4 w-4 h-4 me-2"
+                />
+                <SidebarMenuItemLabel>{d.title}</SidebarMenuItemLabel>
+              </SidebarMenuItem>
+            </Link>
+          ))}
+        </SidebarMenuList>
+      </SidebarSection>
+    </>
   );
 }
 
@@ -434,18 +452,6 @@ function ModeSettings() {
           </SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuList>
-          <Link
-            href={editorlink("settings/security", {
-              proj: project.name,
-              org: organization.name,
-              form_id,
-            })}
-          >
-            <SidebarMenuItem>
-              <LockClosedIcon className="inline align-middle w-4 h-4 me-2" />
-              Data & Security
-            </SidebarMenuItem>
-          </Link>
           {/* <Link href={`/${basepath}/${id}/settings/api`}> */}
           <SidebarMenuItem disabled>
             <CodeIcon className="inline align-middle w-4 h-4 me-2" />

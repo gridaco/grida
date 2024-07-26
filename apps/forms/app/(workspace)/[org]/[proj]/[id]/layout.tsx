@@ -156,6 +156,11 @@ export default async function Layout({
               scheduling_close_at: data.scheduling_close_at,
               scheduling_tz: data.scheduling_tz || undefined,
             },
+            form_security: {
+              unknown_field_handling_strategy:
+                data.unknown_field_handling_strategy,
+              method: default_document.method,
+            },
             ending: {
               is_redirect_after_response_uri_enabled:
                 default_document.is_redirect_after_response_uri_enabled,

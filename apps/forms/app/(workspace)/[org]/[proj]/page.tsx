@@ -5,7 +5,6 @@ import Link from "next/link";
 import { ViewGridIcon, ViewHorizontalIcon } from "@radix-ui/react-icons";
 import { CreateNewFormButton } from "@/components/create-form-button";
 import { Form, GDocument } from "@/types";
-import { Metadata } from "next";
 import { ProjectStats } from "@/scaffolds/analytics/stats";
 import { PoweredByGridaFooter } from "@/scaffolds/e/form/powered-by-brand-footer";
 import { OrganizationAvatar } from "@/components/organization-avatar";

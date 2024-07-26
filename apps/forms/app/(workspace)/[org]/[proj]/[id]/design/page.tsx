@@ -23,6 +23,10 @@ import {
   MaxRespoonses,
   RestrictNumberOfResponseByCustomer,
 } from "@/scaffolds/settings/response-preferences";
+import { AboutThisForm } from "@/scaffolds/settings/about-this-form";
+import { UnknownFieldPreferences } from "@/scaffolds/settings/data-dynamic-field-preferences";
+import { FormMethodPreference } from "@/scaffolds/settings/form-method-preference";
+import { TrustedOriginPreferences } from "@/scaffolds/settings/trusted-origin-preferences";
 
 export default function EditFormPage() {
   return (
@@ -101,6 +105,12 @@ function CurrentPageCanvas() {
     case "campaign": {
       return (
         <main className="max-w-2xl mx-auto">
+          <Sector>
+            <SectorHeader>
+              <SectorHeading>General</SectorHeading>
+            </SectorHeader>
+            <AboutThisForm form_id={form_id} />
+          </Sector>
           <Sector id="access">
             <SectorHeader>
               <SectorHeading>Access</SectorHeading>
@@ -114,6 +124,24 @@ function CurrentPageCanvas() {
               <RestrictNumberOfResponseByCustomer />
               <MaxRespoonses />
             </SectorBlocks>
+          </Sector>
+          <Sector>
+            <SectorHeader>
+              <SectorHeading>Data</SectorHeading>
+            </SectorHeader>
+            <SectorBlocks>
+              <UnknownFieldPreferences />
+              <FormMethodPreference />
+            </SectorBlocks>
+          </Sector>
+          <Sector>
+            <SectorHeader>
+              <SectorHeading>Security</SectorHeading>
+              <SectorDescription>
+                Configure where the form can be embedded
+              </SectorDescription>
+            </SectorHeader>
+            <TrustedOriginPreferences />
           </Sector>
         </main>
       );
