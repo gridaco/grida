@@ -4,7 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { ViewGridIcon, ViewHorizontalIcon } from "@radix-ui/react-icons";
 import { CreateNewFormButton } from "@/components/create-form-button";
-import { Form } from "@/types";
+import { Form, GDocument } from "@/types";
 import { Metadata } from "next";
 import { ProjectStats } from "@/scaffolds/analytics/stats";
 import { PoweredByGridaFooter } from "@/scaffolds/e/form/powered-by-brand-footer";
@@ -117,7 +117,7 @@ function FormsGrid({
 }: {
   organization_name: string;
   project_name: string;
-  forms: FormDashboardItem[];
+  forms: GDocument[];
   layout: "grid" | "list";
 }) {
   if (layout === "grid") {
@@ -126,7 +126,7 @@ function FormsGrid({
         {forms?.map((form, i) => (
           <Link
             key={i}
-            href={`/${organization_name}/${project_name}/${form.id}`}
+            href={`/${organization_name}/${project_name}/${form.form_id}`}
             prefetch={false}
           >
             <GridCard
@@ -153,7 +153,7 @@ function FormsGrid({
       {forms?.map((form, i) => (
         <Link
           key={i}
-          href={`/${organization_name}/${project_name}//${form.id}`}
+          href={`/${organization_name}/${project_name}//${form.form_id}`}
           prefetch={false}
         >
           <RowCard

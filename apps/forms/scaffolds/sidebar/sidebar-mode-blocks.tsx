@@ -54,7 +54,7 @@ export function ModeDesign() {
   );
 
   return (
-    <Tabs defaultValue="add">
+    <Tabs defaultValue="page">
       <SidebarSectionHeaderItem>
         <TabsList>
           <TabsTrigger value="page">Pages</TabsTrigger>

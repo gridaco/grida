@@ -10,15 +10,13 @@ import {
   EnvelopeClosedIcon,
   Link2Icon,
   GearIcon,
-  MagicWandIcon,
   LockClosedIcon,
 } from "@radix-ui/react-icons";
 import Link from "next/link";
 import { useEditorState } from "../editor";
 import {
   DatabaseIcon,
-  FileIcon,
-  PackageIcon,
+  LayersIcon,
   PlugIcon,
   TabletSmartphoneIcon,
 } from "lucide-react";
@@ -26,6 +24,7 @@ import { StripeLogo1, SupabaseLogo, TossLogo } from "@/components/logos";
 import { Badge } from "@/components/ui/badge";
 import {
   SidebarMenuItem,
+  SidebarMenuItemLabel,
   SidebarMenuList,
   SidebarRoot,
   SidebarSection,
@@ -37,35 +36,35 @@ import { FormEditorState } from "../editor/state";
 import { TableTypeIcon } from "@/components/table-type-icon";
 import { editorlink } from "@/lib/forms/url";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useWorkspace } from "../workspace";
+import { ResourceTypeIcon } from "@/components/resource-type-icon";
 
-export function Siebar({
-  mode,
-}: {
-  mode: "data" | "design" | "connect" | "settings";
-}) {
-  const [state] = useEditorState();
-
-  const { form_id } = state;
+export function Sidebar() {
   return (
     <SidebarRoot>
-      <Tabs>
-        <TabsList className="w-full rounded-none">
-          <TabsTrigger value="documents">
-            <FileIcon className="w-4 h-4" />
-          </TabsTrigger>
-          <TabsTrigger value="data">
-            <DatabaseIcon className="w-4 h-4" />
-          </TabsTrigger>
-          <TabsTrigger value="design">
-            <PackageIcon className="w-4 h-4" />
-          </TabsTrigger>
-          <TabsTrigger value="connect">
-            <PlugIcon className="w-4 h-4" />
-          </TabsTrigger>
-          <TabsTrigger value="settings">
-            <GearIcon className="w-4 h-4" />
-          </TabsTrigger>
-        </TabsList>
+      <Tabs defaultValue="design">
+        <header className="sticky h-12 px-2 flex justify-center items-center top-0 bg-background border-b z-10">
+          <TabsList className="w-full max-w-full">
+            <TabsTrigger value="documents">
+              <ResourceTypeIcon type="project" className="w-4 h-4" />
+            </TabsTrigger>
+            <TabsTrigger value="design">
+              <LayersIcon className="w-4 h-4" />
+            </TabsTrigger>
+            <TabsTrigger value="data">
+              <DatabaseIcon className="w-4 h-4" />
+            </TabsTrigger>
+            <TabsTrigger value="connect">
+              <PlugIcon className="w-4 h-4" />
+            </TabsTrigger>
+            <TabsTrigger value="settings">
+              <GearIcon className="w-4 h-4" />
+            </TabsTrigger>
+          </TabsList>
+        </header>
+        <TabsContent value="documents">
+          <ModeDocuments />
+        </TabsContent>
         <TabsContent value="data">
           <ModeData />
         </TabsContent>
@@ -84,6 +83,38 @@ export function Siebar({
       {mode === "connect" && <ModeConnect />}
       {mode === "settings" && <ModeSettings />} */}
     </SidebarRoot>
+  );
+}
+
+function ModeDocuments() {
+  const { state: workspace } = useWorkspace();
+  const { documents } = workspace;
+  const [state] = useEditorState();
+  const { form_id, basepath } = state;
+  return (
+    <SidebarSection>
+      <SidebarSectionHeaderItem>
+        <SidebarSectionHeaderLabel>
+          <span>Documents</span>
+        </SidebarSectionHeaderLabel>
+      </SidebarSectionHeaderItem>
+      <SidebarMenuList>
+        {documents.map((d) => (
+          <Link
+            key={d.id}
+            href={editorlink("design", { form_id: d.form_id!, basepath })}
+          >
+            <SidebarMenuItem muted>
+              <ResourceTypeIcon
+                type={d.doctype}
+                className="inline align-middle min-w-4 w-4 h-4 me-2"
+              />
+              <SidebarMenuItemLabel>{d.title}</SidebarMenuItemLabel>
+            </SidebarMenuItem>
+          </Link>
+        ))}
+      </SidebarMenuList>
+    </SidebarSection>
   );
 }
 

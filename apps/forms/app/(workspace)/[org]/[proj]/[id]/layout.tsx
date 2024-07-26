@@ -8,7 +8,7 @@ import {
 } from "@/lib/supabase/server";
 import { GridaLogo } from "@/components/grida-logo";
 import { SlashIcon } from "@radix-ui/react-icons";
-import { Tabs } from "@/scaffolds/d/tabs";
+import { Sidebar } from "@/scaffolds/sidebar/sidebar";
 import { FormEditorProvider } from "@/scaffolds/editor";
 import { EndingPageTemplateID, FormDocument } from "@/types";
 import { PreviewButton } from "@/components/preview-button";
@@ -179,7 +179,12 @@ export default async function Layout({
           form_id={id}
           title={data.title}
         />
-        <div className="flex flex-1 overflow-y-auto">{children}</div>
+        <div className="flex flex-1 overflow-y-auto">
+          <Sidebar />
+          <div className="h-full flex flex-1 w-full">
+            <div className="w-full h-full overflow-x-hidden">{children}</div>
+          </div>
+        </div>
       </FormEditorProvider>
     </div>
   );

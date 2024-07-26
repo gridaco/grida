@@ -3,7 +3,6 @@
 import React from "react";
 import { AgentThemeProvider } from "@/scaffolds/agent/theme";
 import { useEditorState } from "@/scaffolds/editor";
-import { Siebar } from "@/scaffolds/sidebar/sidebar";
 import { SideControl } from "@/scaffolds/sidecontrol";
 import BlocksEditor from "@/scaffolds/blocks-editor";
 import FormCollectionPage from "@/theme/templates/formcollection/page";
@@ -28,9 +27,6 @@ import {
 export default function EditFormPage() {
   return (
     <main className="h-full flex flex-1 w-full">
-      <aside className="hidden lg:flex h-full">
-        <Siebar mode="design" />
-      </aside>
       <CanvasEventTarget className="relative w-full no-scrollbar overflow-y-auto">
         <CanvasOverlay />
         <AgentThemeProvider>

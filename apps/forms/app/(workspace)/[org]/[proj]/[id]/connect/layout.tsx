@@ -1,5 +1,3 @@
-import { Siebar } from "@/scaffolds/sidebar/sidebar";
-
 export default function Layout({
   params,
   children,
@@ -11,11 +9,6 @@ export default function Layout({
 
   return (
     <main className="flex flex-1">
-      {/* side */}
-      <aside className="hidden lg:flex h-full">
-        <Siebar mode="connect" />
-      </aside>
-
       <div className="w-full h-full overflow-y-scroll p-4 pb-20">
         {children}
       </div>
