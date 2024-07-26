@@ -1962,6 +1962,7 @@ export type Database = {
           id: string
           project_id: number
           title: string
+          updated_at: string
         }
         Insert: {
           created_at?: string
@@ -1969,6 +1970,7 @@ export type Database = {
           id?: string
           project_id: number
           title?: string
+          updated_at?: string
         }
         Update: {
           created_at?: string
@@ -1976,6 +1978,7 @@ export type Database = {
           id?: string
           project_id?: number
           title?: string
+          updated_at?: string
         }
         Relationships: [
           {
@@ -2396,6 +2399,7 @@ export type Database = {
         Returns: {
           id: string
           created_at: string
+          updated_at: string
           doctype: Database["public"]["Enums"]["doctype"]
           project_id: number
           title: string

@@ -35,12 +35,11 @@ export async function GET(
     return notFound();
   }
 
-  const { data: documents, error: documents_err } = await client.rpc(
-    "workspace_documents",
-    {
+  const { data: documents, error: documents_err } = await client
+    .rpc("workspace_documents", {
       p_organization_id: Number(organization_id),
-    }
-  );
+    })
+    .order("updated_at", { ascending: false });
 
   if (!documents) {
     return notFound();

@@ -416,6 +416,7 @@ export interface Project {
 export interface GDocument {
   id: string;
   created_at: string;
+  updated_at: string;
   project_id: number;
   organization_id: number;
   doctype: "v0_form" | "v0_site";
