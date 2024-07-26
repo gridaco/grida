@@ -130,8 +130,18 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
     blocks: blockstreeflat(init.blocks),
     document: {
       pages: ISDEV
-        ? ["collection", "campaign", "start", "form", "ending"]
-        : ["campaign", "form", "ending"],
+        ? [
+            // { id: "collection", label: "Collection", icon: "file" },
+            { id: "campaign", label: "Campaign", icon: "folder" },
+            { id: "start", label: "Start Page", icon: "file", level: 1 },
+            { id: "form", label: "Form Page", icon: "file", level: 1 },
+            { id: "ending", label: "Ending Page", icon: "file", level: 1 },
+          ]
+        : [
+            { id: "campaign", label: "Campaign", icon: "file" },
+            { id: "form", label: "Form Page", icon: "file" },
+            { id: "ending", label: "Ending Page", icon: "file" },
+          ],
       selected_page_id: "form",
       nodes: [],
       templatesample: "formcollection_sample_001_the_bundle",
@@ -213,6 +223,13 @@ type GFTable =
       label: string;
     };
 
+interface MenuItem {
+  id: string;
+  level?: number;
+  label: string;
+  icon: "folder" | "file" | "setting";
+}
+
 export interface FormEditorState {
   basepath: string;
   organization: {
@@ -227,6 +244,7 @@ export interface FormEditorState {
     store_id?: number | null;
     supabase?: GridaSupabase.SupabaseConnectionState;
   };
+
   form_id: string;
   form_title: string;
   campaign: {
@@ -254,7 +272,7 @@ export interface FormEditorState {
   form_document_id: string | null;
   blocks: EditorFlatFormBlock[];
   document: {
-    pages: string[];
+    pages: MenuItem[];
     selected_page_id: string;
     nodes: any[];
     templatesample: string;
@@ -332,6 +350,7 @@ export interface FormEditorState {
   datagrid_orderby: { [key: string]: OrderBy };
   realtime_sessions_enabled: boolean;
   realtime_responses_enabled: boolean;
+  is_insert_menu_open?: boolean;
   is_field_edit_panel_open?: boolean;
   is_response_edit_panel_open?: boolean;
   is_customer_edit_panel_open?: boolean;

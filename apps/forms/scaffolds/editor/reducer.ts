@@ -19,6 +19,7 @@ import type {
   HtmlBlockBodyAction,
   ImageBlockSrcAction,
   OpenBlockEditPanelAction,
+  OpenInsertMenuPanelAction,
   OpenCustomerEditAction,
   OpenEditFieldAction,
   OpenResponseEditAction,
@@ -675,6 +676,12 @@ export function reducer(
       return produce(state, (draft) => {
         draft.is_block_edit_panel_open = open ?? true;
         draft.focus_block_id = block_id;
+      });
+    }
+    case "editor/panels/insert-menu": {
+      const { open } = <OpenInsertMenuPanelAction>action;
+      return produce(state, (draft) => {
+        draft.is_insert_menu_open = open ?? true;
       });
     }
     case "editor/data-grid/column/reorder": {

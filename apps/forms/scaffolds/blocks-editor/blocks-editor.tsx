@@ -18,7 +18,7 @@ import {
 } from "@dnd-kit/sortable";
 import { createClientFormsClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
-import { NewBlockButton } from "./new-block-button";
+import { InsertMenuTrigger } from "./insert-menu-trigger";
 import { SectionStyle } from "../agent/theme";
 import { usePrevious } from "@uidotdev/usehooks";
 import equal from "deep-equal";
@@ -271,7 +271,7 @@ function BlocksEditor() {
     <div onPointerDown={blur}>
       <div className="fixed z-10">
         <div className="absolute left-4 top-4">
-          <NewBlockButton />
+          <InsertMenuTrigger />
         </div>
       </div>
       <div className="py-20 container mx-auto max-w-screen-sm">

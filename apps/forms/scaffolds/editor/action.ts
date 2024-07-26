@@ -46,6 +46,7 @@ export type BlocksEditorAction =
   | FeedCustomerAction
   | OpenCustomerEditAction
   | OpenBlockEditPanelAction
+  | OpenInsertMenuPanelAction
   | DataGridReorderColumnAction
   | DataGridDateFormatAction
   | DataGridDateTZAction
@@ -232,6 +233,12 @@ export interface OpenCustomerEditAction {
 export interface OpenBlockEditPanelAction {
   type: "editor/panels/block-edit";
   block_id?: string;
+  // true by default
+  open?: boolean;
+}
+
+export interface OpenInsertMenuPanelAction {
+  type: "editor/panels/insert-menu";
   // true by default
   open?: boolean;
 }

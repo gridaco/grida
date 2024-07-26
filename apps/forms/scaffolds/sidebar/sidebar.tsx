@@ -31,15 +31,38 @@ import {
   SidebarSectionHeaderItem,
   SidebarSectionHeaderLabel,
 } from "@/components/sidebar";
-import { ModeDesign } from "./sidebar-mode-blocks";
+import { ModeBlocks, ModeDesign } from "./sidebar-mode-blocks";
 import { FormEditorState } from "../editor/state";
 import { TableTypeIcon } from "@/components/table-type-icon";
 import { editorlink } from "@/lib/forms/url";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useWorkspace } from "../workspace";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
+import * as Dialog from "@radix-ui/react-dialog";
 
 export function Sidebar() {
+  const [state, dispatch] = useEditorState();
+  const { is_insert_menu_open: is_add_block_panel_open } = state;
+
+  const openInsertMenu = (open: boolean) => {
+    dispatch({
+      type: "editor/panels/insert-menu",
+      open: open,
+    });
+  };
+
+  if (is_add_block_panel_open) {
+    return (
+      <Dialog.Root open={is_add_block_panel_open} onOpenChange={openInsertMenu}>
+        <Dialog.Content>
+          <SidebarRoot>
+            <ModeBlocks />
+          </SidebarRoot>
+        </Dialog.Content>
+      </Dialog.Root>
+    );
+  }
+
   return (
     <SidebarRoot>
       <Tabs defaultValue="design">
@@ -101,6 +124,26 @@ function ModeDocuments() {
             />
             <SidebarMenuItemLabel>{form_title}</SidebarMenuItemLabel>
           </SidebarMenuItem>
+        </SidebarMenuList>
+      </SidebarSection>
+      <SidebarSection>
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>
+            <span>App / Campaign</span>
+          </SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuList>
+          <Link
+            href={editorlink("design", {
+              basepath,
+              form_id,
+            })}
+          >
+            <SidebarMenuItem muted>
+              <TabletSmartphoneIcon className="inline align-middle w-4 h-4 me-2" />
+              Main
+            </SidebarMenuItem>
+          </Link>
         </SidebarMenuList>
       </SidebarSection>
       <SidebarSection>
@@ -168,26 +211,7 @@ function ModeData() {
         </li> */}
         </SidebarMenuList>
       </SidebarSection>
-      <SidebarSection>
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>
-            <span>App / Campaign</span>
-          </SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuList>
-          <Link
-            href={editorlink("design", {
-              basepath,
-              form_id,
-            })}
-          >
-            <SidebarMenuItem muted>
-              <TabletSmartphoneIcon className="inline align-middle w-4 h-4 me-2" />
-              Main
-            </SidebarMenuItem>
-          </Link>
-        </SidebarMenuList>
-      </SidebarSection>
+
       {/* <label className="text-xs text-muted-foreground py-4 px-4">
         Commerce
       </label>
