@@ -2405,6 +2405,9 @@ export type Database = {
           title: string
           form_id: string
           organization_id: number
+          has_connection_supabase: boolean
+          responses: number
+          max_responses: number
         }[]
       }
     }

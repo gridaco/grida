@@ -1,21 +1,15 @@
 import React from "react";
 import Image from "next/image";
 import { ResourceTypeIcon } from "../resource-type-icon";
-import type { ConnectionSupabaseJoint, Form } from "@/types";
-
-interface FormDashboardItem extends Form {
-  responses: number;
-  supabase_connection: ConnectionSupabaseJoint | null;
-}
+import type { ConnectionSupabaseJoint, Form, GDocument } from "@/types";
 
 export function GridCard({
   title,
   responses,
   thumbnail,
-  is_max_form_responses_in_total_enabled,
-  max_form_responses_in_total,
-  supabase_connection,
-}: FormDashboardItem & { thumbnail?: string }) {
+  max_responses,
+  has_connection_supabase,
+}: GDocument & { thumbnail?: string }) {
   return (
     <div className="rounded border border-neutral-500/10 bg-white dark:bg-neutral-900 shadow-md">
       {thumbnail ? (
@@ -29,7 +23,7 @@ export function GridCard({
       ) : (
         <div className="p-2 aspect-square w-full flex items-center justify-center border-b">
           <ResourceTypeIcon
-            type={supabase_connection ? "form-x-supabase" : "form"}
+            type={has_connection_supabase ? "form-x-supabase" : "form"}
             className="w-10 h-10"
           />
         </div>
@@ -37,9 +31,9 @@ export function GridCard({
       <div className="px-4 py-2 flex flex-col gap-2">
         <span>{title}</span>
         <span className="text-xs opacity-50">
-          {is_max_form_responses_in_total_enabled ? (
+          {max_responses ? (
             <>
-              {responses} / {max_form_responses_in_total} responses
+              {responses} / {max_responses} responses
             </>
           ) : (
             <>{responses} responses</>
@@ -54,12 +48,11 @@ export function RowCard({
   title,
   thumbnail,
   responses,
+  max_responses,
   created_at,
   updated_at,
-  is_max_form_responses_in_total_enabled,
-  max_form_responses_in_total,
-  supabase_connection,
-}: FormDashboardItem & { thumbnail?: string }) {
+  has_connection_supabase,
+}: GDocument & { thumbnail?: string }) {
   return (
     <div className="flex items-center border rounded-md overflow-hidden h-16 shadow bg-white dark:bg-neutral-900">
       {thumbnail ? (
@@ -73,7 +66,7 @@ export function RowCard({
       ) : (
         <div className="p-2 aspect-square h-full flex items-center justify-center border-r">
           <ResourceTypeIcon
-            type={supabase_connection ? "form-x-supabase" : "form"}
+            type={has_connection_supabase ? "form-x-supabase" : "form"}
             className="w-5 h-5"
           />
         </div>
@@ -87,9 +80,9 @@ export function RowCard({
         </div>
       </div>
       <div className="opacity-80 w-32 text-sm">
-        {is_max_form_responses_in_total_enabled ? (
+        {max_responses ? (
           <>
-            {responses} / {max_form_responses_in_total}
+            {responses} / {max_responses}
           </>
         ) : (
           <>{responses}</>

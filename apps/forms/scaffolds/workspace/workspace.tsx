@@ -110,8 +110,6 @@ export function Workspace({
     }
   }, [data]);
 
-  console.log("workspace", state);
-
   return (
     <WorkspaceContext.Provider value={{ state, dispatch }}>
       {children}

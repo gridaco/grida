@@ -101,7 +101,7 @@ export function WorkspaceSidebar() {
                     (d) => d.project_id === p.id
                   );
                   return (
-                    <>
+                    <div key={p.id}>
                       <Link href={`/${organization.name}/${p.name}`}>
                         <SidebarMenuItem key={p.name} muted>
                           <ResourceTypeIcon
@@ -134,7 +134,7 @@ export function WorkspaceSidebar() {
                           </SidebarMenuItem>
                         </Link>
                       ))}
-                    </>
+                    </div>
                   );
                 })}
               </>

@@ -422,6 +422,9 @@ export interface GDocument {
   doctype: "v0_form" | "v0_site";
   title: string;
   form_id: string | null;
+  has_connection_supabase: boolean;
+  responses: number | null;
+  max_responses: number | null;
 }
 
 export interface OrderBy {

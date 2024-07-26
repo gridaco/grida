@@ -185,8 +185,11 @@ export default async function Layout({
           title={data.title}
         />
         <div className="flex flex-1 overflow-y-auto">
-          <Sidebar />
           <div className="h-full flex flex-1 w-full">
+            {/* side */}
+            <aside className="hidden lg:flex h-full">
+              <Sidebar />
+            </aside>
             <div className="w-full h-full overflow-x-hidden">{children}</div>
           </div>
         </div>

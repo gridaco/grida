@@ -44,11 +44,11 @@ const nextConfig = withMDX()({
         destination: "/:org/:proj/:id/data/responses",
         permanent: true,
       },
-      {
-        source: "/:org/:proj/:id/settings",
-        destination: "/:org/:proj/:id/settings/general",
-        permanent: true,
-      },
+      // {
+      //   source: "/:org/:proj/:id/settings",
+      //   destination: "/:org/:proj/:id/settings/general",
+      //   permanent: true,
+      // },
       {
         source: "/:org/:proj/:id/connect",
         destination: "/:org/:proj/:id/connect/share",

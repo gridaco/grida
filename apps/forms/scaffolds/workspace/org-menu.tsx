@@ -33,9 +33,9 @@ export function WorkspaceMenu({
   };
 
   return (
-    <DropdownMenu modal={true}>
+    <DropdownMenu>
       <DropdownMenuTrigger asChild className="cursor-pointer">
-        {children}
+        <div>{children}</div>
       </DropdownMenuTrigger>
 
       <DropdownMenuContent
@@ -52,7 +52,7 @@ export function WorkspaceMenu({
                 <DropdownMenuItem>
                   <OrganizationAvatar
                     className="inline w-7 h-7 me-2 border shadow-sm rounded"
-                    avatar_url={org.avatar_path}
+                    avatar_url={org.avatar_url}
                     alt={org.display_name}
                   />
                   {org.display_name}

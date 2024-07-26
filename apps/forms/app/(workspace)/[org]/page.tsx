@@ -25,11 +25,6 @@ import { WorkspaceSidebar } from "@/scaffolds/workspace/sidebar";
 import { useWorkspace } from "@/scaffolds/workspace";
 import { Skeleton } from "@/components/ui/skeleton";
 
-interface FormDashboardItem extends Form {
-  responses: number;
-  supabase_connection: ConnectionSupabaseJoint | null;
-}
-
 export default function DashboardProjectsPage({
   params,
   searchParams,
@@ -45,35 +40,6 @@ export default function DashboardProjectsPage({
 
   const { state } = useWorkspace();
   const { loading, organization, projects, documents } = state;
-
-  // fetch forms with responses count
-  // const { data: __forms, error } = await supabase
-  //   .from("form")
-  //   .select(
-  //     `
-  //       *,
-  //       response(count),
-  //       supabase_connection:connection_supabase(*)
-  //     `
-  //   )
-  //   .in(
-  //     "project_id",
-  //     organization.projects.map((p) => p.id)
-  //   )
-  //   .order("updated_at", { ascending: false });
-
-  // if (!__forms) {
-  //   return notFound();
-  // }
-
-  // const forms: FormDashboardItem[] = __forms.map(
-  //   (form) =>
-  //     ({
-  //       ...form,
-  //       responses: (form.response as any as { count: number }[])[0]?.count || 0, // Unwrap count or default to 0 if no responses
-  //     }) as FormDashboardItem
-  // );
-  //
 
   return (
     <div className="h-full flex flex-1 w-full">
@@ -121,12 +87,6 @@ export default function DashboardProjectsPage({
                   (d) => d.project_id === p.id
                 );
 
-                console.log(
-                  "projectdocuments",
-                  p.id,
-                  projectdocuments,
-                  documents
-                );
                 return (
                   <div key={p.id} className="mb-40">
                     <header className="py-4 mb-2 flex justify-between items-center">

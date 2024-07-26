@@ -59,24 +59,28 @@ export function SidebarMenuGridItem({
   );
 }
 
-export function SidebarMenuItem({
-  level,
-  muted,
-  selected,
-  className,
-  disabled,
-  children,
-  onSelect,
-}: React.PropsWithChildren<{
-  level?: number;
-  muted?: boolean;
-  selected?: boolean;
-  className?: string;
-  disabled?: boolean;
-  onSelect?: () => void;
-}>) {
+export const SidebarMenuItem = React.forwardRef(function SidebarMenuItem(
+  {
+    level,
+    muted,
+    selected,
+    className,
+    disabled,
+    children,
+    onSelect,
+  }: React.PropsWithChildren<{
+    level?: number;
+    muted?: boolean;
+    selected?: boolean;
+    className?: string;
+    disabled?: boolean;
+    onSelect?: () => void;
+  }>,
+  forwardedRef
+) {
   return (
     <div
+      ref={forwardedRef as any}
       data-level={level}
       data-muted={muted}
       data-disabled={disabled}
@@ -100,7 +104,7 @@ export function SidebarMenuItem({
       {children}
     </div>
   );
-}
+});
 
 export function SidebarMenuItemLabel({
   children,
@@ -159,18 +163,24 @@ export function SidebarMenuItemActions({
   );
 }
 
-export function SidebarSectionHeaderAction({
-  children,
-  ...props
-}: React.PropsWithChildren<React.ComponentProps<typeof Button>>) {
-  return (
-    <Button
-      {...props}
-      variant="ghost"
-      size="sm"
-      className={cn("w-5 h-5 p-0", props.className)}
-    >
-      {children}
-    </Button>
-  );
-}
+export const SidebarSectionHeaderAction = React.forwardRef(
+  function SidebarSectionHeaderAction(
+    {
+      children,
+      ...props
+    }: React.PropsWithChildren<React.ComponentProps<typeof Button>>,
+    forwardedRef
+  ) {
+    return (
+      <Button
+        ref={forwardedRef as any}
+        {...props}
+        variant="ghost"
+        size="sm"
+        className={cn("w-5 h-5 p-0", props.className)}
+      >
+        {children}
+      </Button>
+    );
+  }
+);

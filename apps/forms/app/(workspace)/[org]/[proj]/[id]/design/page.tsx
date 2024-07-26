@@ -27,6 +27,7 @@ import { AboutThisForm } from "@/scaffolds/settings/about-this-form";
 import { UnknownFieldPreferences } from "@/scaffolds/settings/data-dynamic-field-preferences";
 import { FormMethodPreference } from "@/scaffolds/settings/form-method-preference";
 import { TrustedOriginPreferences } from "@/scaffolds/settings/trusted-origin-preferences";
+import { DeleteFormSection } from "@/scaffolds/settings/delete-form/delete-form-section";
 
 export default function EditFormPage() {
   return (
@@ -142,6 +143,14 @@ function CurrentPageCanvas() {
               </SectorDescription>
             </SectorHeader>
             <TrustedOriginPreferences />
+          </Sector>
+          <Sector>
+            <SectorHeader>
+              <SectorHeading className="text-destructive">
+                Danger Zone
+              </SectorHeading>
+            </SectorHeader>
+            <DeleteFormSection />
           </Sector>
         </main>
       );

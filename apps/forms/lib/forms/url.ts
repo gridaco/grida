@@ -5,8 +5,8 @@ export function editorlink(
   page:
     | "design"
     | "settings"
-    | "settings/general"
-    | "settings/customize"
+    // | "settings/general"
+    // | "settings/customize"
     | "data"
     | "data/responses"
     | "data/analytics"
@@ -39,10 +39,10 @@ export function editorlink(
       return `${origin}/${basepath}/${form_id}/design`;
     case "settings":
       return `${origin}/${basepath}/${form_id}/settings`;
-    case "settings/customize":
-      return `${origin}/${basepath}/${form_id}/settings/customize`;
-    case "settings/general":
-      return `${origin}/${basepath}/${form_id}/settings/general`;
+    // case "settings/customize":
+    //   return `${origin}/${basepath}/${form_id}/settings/customize`;
+    // case "settings/general":
+    //   return `${origin}/${basepath}/${form_id}/settings/general`;
     case "data":
       return `${origin}/${basepath}/${form_id}/data`;
     case "data/responses":

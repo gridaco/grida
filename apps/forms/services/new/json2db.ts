@@ -91,6 +91,7 @@ export class JSONFrom2DB {
     const { data: docref } = await workspaceclient
       .from("document")
       .insert({
+        project_id: this.project_id,
         doctype: "v0_form",
       })
       .select()

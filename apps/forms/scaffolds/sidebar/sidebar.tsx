@@ -57,9 +57,6 @@ export function Sidebar() {
             <TabsTrigger value="connect">
               <PlugIcon className="w-4 h-4" />
             </TabsTrigger>
-            <TabsTrigger value="settings">
-              <GearIcon className="w-4 h-4" />
-            </TabsTrigger>
           </TabsList>
         </header>
         <TabsContent value="documents">
@@ -73,9 +70,6 @@ export function Sidebar() {
         </TabsContent>
         <TabsContent value="connect">
           <ModeConnect />
-        </TabsContent>
-        <TabsContent value="settings">
-          <ModeSettings />
         </TabsContent>
       </Tabs>
       {/* {mode === "data" && <ModeData />}
@@ -431,7 +425,7 @@ function ModeSettings() {
           </SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuList>
-          <Link
+          {/* <Link
             href={editorlink("settings/general", {
               proj: project.name,
               org: organization.name,
@@ -442,7 +436,7 @@ function ModeSettings() {
               <GearIcon className="inline align-middle w-4 h-4 me-2" />
               General
             </SidebarMenuItem>
-          </Link>
+          </Link> */}
         </SidebarMenuList>
       </SidebarSection>
       <SidebarSection>

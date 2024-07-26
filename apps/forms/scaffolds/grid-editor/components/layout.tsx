@@ -2,7 +2,7 @@
 import React from "react";
 
 export function Root({ children }: React.PropsWithChildren<{}>) {
-  return <div className="flex flex-col h-full">{children}</div>;
+  return <div className="flex flex-col h-full w-full">{children}</div>;
 }
 
 export function Header({ children }: React.PropsWithChildren<{}>) {

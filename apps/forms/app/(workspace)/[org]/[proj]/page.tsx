@@ -14,10 +14,6 @@ import { useWorkspace } from "@/scaffolds/workspace";
 import { Skeleton } from "@/components/ui/skeleton";
 import Head from "next/head";
 
-interface FormDashboardItem extends Form {
-  responses: number;
-}
-
 export default function FormsDashboardPage({
   params,
   searchParams,
@@ -128,11 +124,7 @@ function FormsGrid({
             href={`/${organization_name}/${project_name}/${form.form_id}`}
             prefetch={false}
           >
-            <GridCard
-              // TODO:
-              supabase_connection={null}
-              {...form}
-            />
+            <GridCard {...form} />
           </Link>
         ))}
       </div>
@@ -155,11 +147,7 @@ function FormsGrid({
           href={`/${organization_name}/${project_name}//${form.form_id}`}
           prefetch={false}
         >
-          <RowCard
-            // TODO:
-            supabase_connection={null}
-            {...form}
-          />
+          <RowCard {...form} />
         </Link>
       ))}
     </div>

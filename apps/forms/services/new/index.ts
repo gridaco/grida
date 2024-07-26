@@ -39,6 +39,7 @@ export async function create_new_form_with_document({
   const { data: document_ref, error: doc_ref_err } = await workspaceclient
     .from("document")
     .insert({
+      project_id: project_id,
       doctype: "v0_form",
     })
     .select()
