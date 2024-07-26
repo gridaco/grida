@@ -28,6 +28,7 @@ import { UnknownFieldPreferences } from "@/scaffolds/settings/data-dynamic-field
 import { FormMethodPreference } from "@/scaffolds/settings/form-method-preference";
 import { TrustedOriginPreferences } from "@/scaffolds/settings/trusted-origin-preferences";
 import { DeleteFormSection } from "@/scaffolds/settings/delete-form/delete-form-section";
+import { Tabs } from "@/scaffolds/d/tabs";
 
 export default function EditFormPage() {
   return (
@@ -106,6 +107,9 @@ function CurrentPageCanvas() {
     case "campaign": {
       return (
         <main className="max-w-2xl mx-auto">
+          <div>
+            <Tabs />
+          </div>
           <Sector>
             <SectorHeader>
               <SectorHeading>General</SectorHeading>

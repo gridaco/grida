@@ -4,16 +4,11 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import React from "react";
+import { useEditorState } from "../editor";
 
-export function Tabs({
-  org,
-  proj,
-  form_id: id,
-}: {
-  org: string;
-  proj: string;
-  form_id: string;
-}) {
+export function Tabs() {
+  const [state] = useEditorState();
+  const { form_id: id, basepath } = state;
   const pathname = usePathname();
 
   // path is /:org/:proj/:id/:tab/~
@@ -21,16 +16,16 @@ export function Tabs({
 
   return (
     <nav className="flex items-center justify-start md:justify-center gap-2">
-      <Link href={`/${org}/${proj}/${id}/data`} prefetch={false}>
+      <Link href={`/${basepath}/${id}/data`} prefetch={false}>
         <Tab selected={tab === "data"}>Data</Tab>
       </Link>
-      <Link href={`/${org}/${proj}/${id}/design`} prefetch={false}>
+      <Link href={`/${basepath}/${id}/design`} prefetch={false}>
         <Tab selected={tab === "design"}>Design</Tab>
       </Link>
-      <Link href={`/${org}/${proj}/${id}/connect`} prefetch={false}>
+      <Link href={`/${basepath}/${id}/connect`} prefetch={false}>
         <Tab selected={tab === "connect"}>Connect</Tab>
       </Link>
-      <Link href={`/${org}/${proj}/${id}/settings`} prefetch={false}>
+      <Link href={`/${basepath}/${id}/settings`} prefetch={false}>
         <Tab selected={tab === "settings"}>Settings</Tab>
       </Link>
     </nav>
