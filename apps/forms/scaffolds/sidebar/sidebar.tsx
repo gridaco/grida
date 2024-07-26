@@ -15,7 +15,13 @@ import {
 } from "@radix-ui/react-icons";
 import Link from "next/link";
 import { useEditorState } from "../editor";
-import { TabletSmartphoneIcon } from "lucide-react";
+import {
+  DatabaseIcon,
+  FileIcon,
+  PackageIcon,
+  PlugIcon,
+  TabletSmartphoneIcon,
+} from "lucide-react";
 import { StripeLogo1, SupabaseLogo, TossLogo } from "@/components/logos";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -30,6 +36,7 @@ import { ModeDesign } from "./sidebar-mode-blocks";
 import { FormEditorState } from "../editor/state";
 import { TableTypeIcon } from "@/components/table-type-icon";
 import { editorlink } from "@/lib/forms/url";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export function Siebar({
   mode,
@@ -41,10 +48,41 @@ export function Siebar({
   const { form_id } = state;
   return (
     <SidebarRoot>
-      {mode === "data" && <ModeData />}
+      <Tabs>
+        <TabsList className="w-full rounded-none">
+          <TabsTrigger value="documents">
+            <FileIcon className="w-4 h-4" />
+          </TabsTrigger>
+          <TabsTrigger value="data">
+            <DatabaseIcon className="w-4 h-4" />
+          </TabsTrigger>
+          <TabsTrigger value="design">
+            <PackageIcon className="w-4 h-4" />
+          </TabsTrigger>
+          <TabsTrigger value="connect">
+            <PlugIcon className="w-4 h-4" />
+          </TabsTrigger>
+          <TabsTrigger value="settings">
+            <GearIcon className="w-4 h-4" />
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="data">
+          <ModeData />
+        </TabsContent>
+        <TabsContent value="design">
+          <ModeDesign />
+        </TabsContent>
+        <TabsContent value="connect">
+          <ModeConnect />
+        </TabsContent>
+        <TabsContent value="settings">
+          <ModeSettings />
+        </TabsContent>
+      </Tabs>
+      {/* {mode === "data" && <ModeData />}
       {mode === "design" && <ModeDesign />}
       {mode === "connect" && <ModeConnect />}
-      {mode === "settings" && <ModeSettings />}
+      {mode === "settings" && <ModeSettings />} */}
     </SidebarRoot>
   );
 }

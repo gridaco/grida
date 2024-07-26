@@ -197,28 +197,18 @@ function Header({
   title: string;
 }) {
   return (
-    <header className="flex flex-col w-full gap-4 bg-background border-b z-10">
-      <div className="w-full flex gap-4">
-        <div className="w-1/3">
-          <div className="h-full px-4 min-w-60 w-min flex items-center lg:border-e">
-            <Link href="/dashboard" prefetch={false}>
-              <span className="flex items-center gap-2 text-md font-black select-none">
-                <GridaLogo size={15} />
-              </span>
-            </Link>
-            <SlashIcon className="min-w-[20px] ms-2" width={15} height={15} />
-            <EditableFormTitle form_id={form_id} defaultValue={title} />
-          </div>
-        </div>
-        <div className="px-4 invisible lg:visible w-1/3">
-          <Tabs org={org} proj={proj} form_id={form_id} />
-        </div>
-        <div className="px-4 w-1/3 flex gap-4 items-center justify-end">
-          <PreviewButton />
-        </div>
+    <header className="flex w-full gap-4 bg-background justify-between border-b z-10 h-12">
+      <div className="h-full px-4 min-w-60 w-min flex items-center lg:border-e">
+        <Link href="/dashboard" prefetch={false}>
+          <span className="flex items-center gap-2 text-md font-black select-none">
+            <GridaLogo size={15} />
+          </span>
+        </Link>
+        <SlashIcon className="min-w-[20px] ms-2" width={15} height={15} />
+        <EditableFormTitle form_id={form_id} defaultValue={title} />
       </div>
-      <div className="px-4 block lg:hidden">
-        <Tabs org={org} proj={proj} form_id={form_id} />
+      <div className="px-4 flex gap-4 items-center justify-end">
+        <PreviewButton />
       </div>
     </header>
   );
