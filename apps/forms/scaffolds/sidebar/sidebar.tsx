@@ -107,7 +107,10 @@ function ModeDocuments() {
   const { state: workspace } = useWorkspace();
   const { documents } = workspace;
   const [state] = useEditorState();
-  const { form_id, basepath, form_title } = state;
+  const { form_id, basepath, form_title, project } = state;
+  const current_project_documents = documents.filter(
+    (d) => d.project_id === project.id
+  );
   return (
     <>
       <SidebarSection>
@@ -149,11 +152,11 @@ function ModeDocuments() {
       <SidebarSection>
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>
-            <span>Documents</span>
+            <span>{project.name}</span>
           </SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuList>
-          {documents.map((d) => (
+          {current_project_documents.map((d) => (
             <Link
               key={d.id}
               href={editorlink("form/edit", { form_id: d.form_id!, basepath })}

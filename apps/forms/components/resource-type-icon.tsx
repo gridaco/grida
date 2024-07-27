@@ -1,12 +1,11 @@
 import { DotIcon, FileIcon, HomeIcon } from "@radix-ui/react-icons";
 import {
   FolderDotIcon,
-  FilePenLineIcon,
-  FileSlidersIcon,
   PanelsTopLeftIcon,
   GalleryHorizontalIcon,
   FileBarChart2,
   SettingsIcon,
+  PieChartIcon,
 } from "lucide-react";
 import { SupabaseLogo } from "./logos";
 
@@ -22,6 +21,7 @@ export function ResourceTypeIcon({
     | "table"
     | "project"
     | "form"
+    | "chart"
     | "form-x-supabase"
     | "v0_form"
     | "v0_site";
@@ -44,6 +44,8 @@ export function ResourceTypeIcon({
     case "v0_form":
     case "form":
       return <FileBarChart2 {...props} />;
+    case "chart":
+      return <PieChartIcon {...props} />;
     case "v0_site":
       return <GalleryHorizontalIcon {...props} />;
     case "form-x-supabase":

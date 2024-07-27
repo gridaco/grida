@@ -223,7 +223,7 @@ function formpagesinit({
       id: "analytics",
       label: "Analytics",
       href: `/${basepath}/${form_id}/data/analytics`,
-      icon: "table",
+      icon: "chart",
       level: 1,
     },
   ];
@@ -277,7 +277,7 @@ interface MenuItem {
   id: string;
   level?: number;
   label: string;
-  icon: "folder" | "file" | "setting" | "table";
+  icon: "folder" | "file" | "setting" | "table" | "chart";
   href?: string;
 }
 
