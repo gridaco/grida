@@ -16,6 +16,7 @@ import Link from "next/link";
 import { useEditorState } from "../editor";
 import {
   DatabaseIcon,
+  HammerIcon,
   LayersIcon,
   PlugIcon,
   TabletSmartphoneIcon,
@@ -74,7 +75,7 @@ export function Sidebar() {
               <ResourceTypeIcon type="project" className="w-4 h-4" />
             </TabsTrigger>
             <TabsTrigger value="design">
-              <LayersIcon className="w-4 h-4" />
+              <HammerIcon className="w-4 h-4" />
             </TabsTrigger>
             <TabsTrigger value="data">
               <DatabaseIcon className="w-4 h-4" />

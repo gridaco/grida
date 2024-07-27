@@ -217,13 +217,6 @@ function formpagesinit({
       icon: "table",
     },
     {
-      section: "Data",
-      id: "analytics",
-      label: "Analytics",
-      href: `/${basepath}/${form_id}/data/analytics`,
-      icon: "chart",
-    },
-    {
       section: "Analytics",
       id: "realtime",
       label: "Realtime",
