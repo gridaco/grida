@@ -67,6 +67,12 @@ export type StoragePublicUrlData = {
   publicUrl: string;
 };
 
+export type UpdateFormRedirectAfterSubmissionRequest = {
+  form_id: string;
+  is_redirect_after_response_uri_enabled: boolean;
+  redirect_after_response_uri?: string | null;
+};
+
 export type UpdateFormAccessForceClosedRequest = {
   form_id: string;
   closed: boolean;

@@ -20,16 +20,11 @@ import toast from "react-hot-toast";
 import { PrivateEditorApi } from "@/lib/private";
 import { FormMethod } from "@/types";
 import { Spinner } from "@/components/spinner";
+import { useEditorState } from "../editor";
 
-export function FormMethodPreference({
-  form_id,
-  init,
-}: {
-  form_id: string;
-  init: {
-    method: FormMethod;
-  };
-}) {
+export function FormMethodPreference() {
+  const [state] = useEditorState();
+  const { form_id, form_security: initial } = state;
   const {
     handleSubmit,
     control,
@@ -38,7 +33,7 @@ export function FormMethodPreference({
     watch,
   } = useForm({
     defaultValues: {
-      method: init.method,
+      method: initial.method,
     },
   });
 

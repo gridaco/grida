@@ -2,6 +2,7 @@ import { editorlink } from "@/lib/forms/url";
 import {
   grida_commerce_client,
   createRouteHandlerClient,
+  createRouteHandlerWorkspaceClient,
 } from "@/lib/supabase/server";
 import { GridaCommerceClient } from "@/services/commerce";
 import { GridaFormsClient } from "@/services/form";
@@ -24,14 +25,41 @@ export async function POST(
   const cookieStore = cookies();
   const { form_id } = context.params;
   const supabase = createRouteHandlerClient(cookieStore);
+  const wsclient = createRouteHandlerWorkspaceClient(cookieStore);
 
-  const { data: form_reference } = await supabase
+  const { data: form_reference, error: form_ref_err } = await supabase
     .from("form")
-    .select("title, project_id, store_connection:connection_commerce_store(*)")
+    .select(
+      `
+        title,
+        project_id,
+        store_connection:connection_commerce_store(*)
+      `
+    )
     .eq("id", form_id)
     .single();
 
+  if (form_ref_err) {
+    console.error(form_ref_err);
+    return notFound();
+  }
+
   if (!form_reference) {
+    return notFound();
+  }
+
+  const { data: project_ref, error: project_ref_err } = await wsclient
+    .from("project")
+    .select(`id, name, organization(name)`)
+    .eq("id", form_reference.project_id)
+    .single();
+
+  if (project_ref_err) {
+    console.error(project_ref_err);
+    return notFound();
+  }
+
+  if (!project_ref) {
     return notFound();
   }
 
@@ -48,7 +76,12 @@ export async function POST(
 
   if (form_reference.store_connection) {
     return NextResponse.redirect(
-      editorlink("connect/store/products", { origin, form_id }),
+      editorlink("connect/store/products", {
+        org: project_ref.organization!.name,
+        proj: project_ref.name,
+        origin,
+        form_id,
+      }),
       {
         status: 301,
       }
@@ -70,7 +103,12 @@ export async function POST(
   if (!store) {
     console.error("store::not-inserted");
     return NextResponse.redirect(
-      editorlink("connect/store", { origin, form_id }),
+      editorlink("connect/store", {
+        org: project_ref.organization!.name,
+        proj: project_ref.name,
+        origin,
+        form_id,
+      }),
       {
         status: 301,
       }
@@ -85,7 +123,12 @@ export async function POST(
   if (error) {
     console.error("connection::error:", error);
     return NextResponse.redirect(
-      editorlink("connect/store", { origin, form_id }),
+      editorlink("connect/store", {
+        org: project_ref.organization!.name,
+        proj: project_ref.name,
+        origin,
+        form_id,
+      }),
       {
         status: 301,
       }
@@ -93,7 +136,12 @@ export async function POST(
   }
 
   return NextResponse.redirect(
-    editorlink("connect/store/products", { origin, form_id }),
+    editorlink("connect/store/products", {
+      org: project_ref.organization!.name,
+      proj: project_ref.name,
+      origin,
+      form_id,
+    }),
     {
       status: 301,
     }

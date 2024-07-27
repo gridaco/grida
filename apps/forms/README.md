@@ -14,7 +14,7 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 ## Supabase Types
 
 ```bash
-npx supabase gen types typescript \
+npx supabase gen types --lang=typescript \
   --project-id "$PROJECT_REF" \
   --schema public \
   --schema grida_x_supabase \

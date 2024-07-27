@@ -40,80 +40,121 @@ import {
   ending_page_template_config,
   ending_page_templates,
 } from "@/k/templates";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { useEditorState } from "@/scaffolds/editor";
+import { useForm, Controller } from "react-hook-form";
+import { Spinner } from "@/components/spinner";
 
-export function EndingPagePreferences({
-  form_id,
-  lang = "en",
-  title,
-  init,
-}: {
-  form_id: string;
-  lang?: FormsPageLanguage;
-  title: string;
-  init: {
-    enabled: boolean;
-    template_id: EndingPageTemplateID | null;
-    i18n_overrides: EndingPageI18nOverrides | null;
-  };
-}) {
-  const [template, setTemplate] = useState(init.template_id ?? undefined);
+export function EndingPagePreferences() {
+  const [state] = useEditorState();
+
+  const {
+    form_title,
+    form_id,
+    theme: { lang },
+    ending,
+  } = state;
+
   const [customizeOpen, setCustomizeOpen] = useState(false);
-  const [overrides, setOverrides] = useState(init.i18n_overrides?.overrides);
-
   const supabase = createClientFormsClient();
 
-  const save = async (
-    template_id: EndingPageTemplateID,
-    texts: Record<string, string>
-  ) => {
+  const {
+    handleSubmit,
+    control,
+    formState: { isSubmitting, isDirty },
+    reset,
+    watch,
+    setValue,
+  } = useForm({
+    defaultValues: {
+      is_ending_page_enabled: ending.is_ending_page_enabled,
+      ending_page_template_id: ending.ending_page_template_id,
+      overrides: ending.ending_page_i18n_overrides?.overrides,
+    },
+  });
+
+  const save = async (data: {
+    is_ending_page_enabled: boolean;
+    ending_page_template_id: EndingPageTemplateID | null;
+    overrides?: Record<string, string> | null;
+  }) => {
     const _: EndingPageI18nOverrides = {
       $schema: "https://forms.grida.co/schemas/v1/endingpage.json",
-      template_id,
-      overrides: texts,
+      template_id: data.ending_page_template_id ?? "default",
+      overrides: data.overrides ?? {},
     };
 
     const { error } = await supabase
       .from("form_document")
       .update({
-        is_ending_page_enabled: true,
-        ending_page_template_id: template_id,
+        is_ending_page_enabled: data.is_ending_page_enabled,
+        ending_page_template_id: data.ending_page_template_id,
         ending_page_i18n_overrides: _ as {},
+        // disable redirect if ending page is enabled
+        is_redirect_after_response_uri_enabled: data.is_ending_page_enabled
+          ? false
+          : undefined,
       })
       // TODO: change to document id after migration
       .eq("form_id", form_id);
 
     if (error) throw error;
+
+    toast.success("Saved");
   };
+
+  const onSubmit = handleSubmit(save);
+
+  const enabled = watch("is_ending_page_enabled");
+  const template = watch("ending_page_template_id");
+  const overrides = watch("overrides");
+  const disabled = !!overrides || !enabled;
 
   return (
     <PreferenceBox>
       <PreferenceBoxHeader heading={<>Ending Page Template</>} />
       <PreferenceBody>
-        <form
-          id="/private/editor/customize/ending-page"
-          action="/private/editor/customize/ending-page"
-          method="POST"
-        >
-          <input type="hidden" name="form_id" value={form_id} />
-          <Select
-            name="template_id"
-            value={template ?? undefined}
-            onValueChange={(template) =>
-              setTemplate(template as EndingPageTemplateID)
-            }
-            disabled={!!overrides}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select Ending Page Template" />
-            </SelectTrigger>
-            <SelectContent>
-              {ending_page_templates.map((id) => (
-                <SelectItem key={id} value={id}>
-                  {ending_page_template_config[id].label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <form id="ending-page" className="space-y-4" onSubmit={onSubmit}>
+          <Controller
+            name="is_ending_page_enabled"
+            control={control}
+            render={({ field }) => (
+              <div className="flex gap-2 items-center">
+                <Switch
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+                <Label>{enabled ? <>Enabled</> : <>Disabled</>}</Label>
+              </div>
+            )}
+          />
+
+          <Controller
+            name="ending_page_template_id"
+            control={control}
+            render={({ field }) => (
+              <Select
+                name="ending_page_template_id"
+                value={field.value ?? ""}
+                onValueChange={(template) =>
+                  field.onChange(template as EndingPageTemplateID)
+                }
+                disabled={disabled}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Ending Page Template" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ending_page_templates.map((id) => (
+                    <SelectItem key={id} value={id}>
+                      {ending_page_template_config[id].label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
           <PreferenceDescription>
             Enabling ending page will disable redirection
           </PreferenceDescription>
@@ -122,7 +163,7 @@ export function EndingPagePreferences({
           {template && (
             <div className="flex justify-center items-center min-h-96">
               <Preview
-                title={title}
+                title={form_title}
                 lang={lang}
                 template={template}
                 overrides={overrides}
@@ -134,10 +175,10 @@ export function EndingPagePreferences({
       <CustomizeTemplate
         key={template}
         form_id={form_id}
-        title={title}
+        title={form_title}
         lang={lang}
         init={{
-          template_id: template,
+          template_id: template ?? "default",
           i18n_overrides: overrides,
         }}
         open={customizeOpen}
@@ -145,19 +186,10 @@ export function EndingPagePreferences({
           if (open === false) setCustomizeOpen(false);
         }}
         onSave={(template, data) => {
-          const saving = save(template as EndingPageTemplateID, data).then(
-            () => {
-              setTemplate(template as EndingPageTemplateID);
-              setCustomizeOpen(false);
-              setOverrides(data);
-            }
-          );
-
-          toast.promise(saving, {
-            loading: "Saving...",
-            success: "Saved",
-            error: "Failed to save",
-          });
+          setValue("ending_page_template_id", template as EndingPageTemplateID);
+          setValue("overrides", data);
+          setCustomizeOpen(false);
+          onSubmit();
         }}
       />
       <PreferenceBoxFooter>
@@ -169,11 +201,13 @@ export function EndingPagePreferences({
           <MixIcon className="me-2" />
           Customize
         </Button>
-        {!overrides && (
-          <Button form="/private/editor/customize/ending-page" type="submit">
-            Save
-          </Button>
-        )}
+        <Button
+          form="ending-page"
+          type="submit"
+          disabled={isSubmitting || !isDirty}
+        >
+          {isSubmitting ? <Spinner /> : "Save"}
+        </Button>
       </PreferenceBoxFooter>
     </PreferenceBox>
   );
@@ -252,7 +286,7 @@ function CustomizeTemplate({
   ...props
 }: React.ComponentProps<typeof Dialog> & {
   init: {
-    template_id?: string;
+    template_id?: EndingPageTemplateID;
     i18n_overrides?: Record<string, string>;
   };
   lang: FormsPageLanguage;

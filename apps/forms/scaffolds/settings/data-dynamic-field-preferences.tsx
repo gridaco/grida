@@ -21,16 +21,15 @@ import { useForm, Controller } from "react-hook-form";
 import toast from "react-hot-toast";
 import { PrivateEditorApi } from "@/lib/private";
 import { Spinner } from "@/components/spinner";
+import { useEditorState } from "../editor";
 
-export function UnknownFieldPreferences({
-  form_id,
-  init,
-}: {
-  form_id: string;
-  init: {
-    unknown_field_handling_strategy: FormResponseUnknownFieldHandlingStrategyType;
-  };
-}) {
+export function UnknownFieldPreferences() {
+  const [state] = useEditorState();
+  const {
+    form_id,
+    form_security: { unknown_field_handling_strategy },
+  } = state;
+
   const {
     handleSubmit,
     control,
@@ -39,7 +38,7 @@ export function UnknownFieldPreferences({
     watch,
   } = useForm({
     defaultValues: {
-      strategy: init.unknown_field_handling_strategy,
+      strategy: unknown_field_handling_strategy,
     },
   });
 

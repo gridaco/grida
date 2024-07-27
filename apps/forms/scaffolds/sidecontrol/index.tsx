@@ -22,12 +22,16 @@ import {
 import { Ag } from "@/components/design/ag";
 import { fonts } from "@/theme/font-family";
 import { useEditorState } from "../editor";
-import { FormStyleSheetV1Schema } from "@/types";
+import { FormStyleSheetV1Schema, FormsPageLanguage } from "@/types";
 import * as _variants from "@/theme/palettes";
 import { PaletteColorChip } from "@/components/design/palette-color-chip";
 import { sections } from "@/theme/section";
 import { Button } from "@/components/ui/button";
-import { OpenInNewWindowIcon, Pencil2Icon } from "@radix-ui/react-icons";
+import {
+  GearIcon,
+  OpenInNewWindowIcon,
+  Pencil2Icon,
+} from "@radix-ui/react-icons";
 import {
   Dialog,
   DialogClose,
@@ -67,6 +71,19 @@ import { TemplateControl } from "./controls/template";
 import { Tokens } from "@/ast";
 import { CursorControl } from "./controls/cursor";
 import { cn } from "@/utils";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  PreferenceBody,
+  PreferenceBox,
+  PreferenceBoxHeader,
+  PreferenceDescription,
+} from "@/components/preferences";
+import {
+  language_label_map,
+  supported_form_page_languages,
+} from "@/k/supported_languages";
+import { Switch } from "@/components/ui/switch";
+import { PoweredByGridaWaterMark } from "@/components/powered-by-branding";
 
 const { default: all, ...variants } = _variants;
 
@@ -511,6 +528,14 @@ function GlobalProperties() {
           <CustomCSS />
         </SidebarMenuSectionContent>
       </SidebarSection>
+      <SidebarSection className="border-b pb-4">
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>Settings</SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuSectionContent>
+          <FormSettings />
+        </SidebarMenuSectionContent>
+      </SidebarSection>
     </>
   );
 }
@@ -832,6 +857,132 @@ function CustomCSS() {
             <Button onClick={onSaveClick}>Save</Button>
           </DialogClose>
         </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function FormSettings() {
+  const [state, dispatch] = useEditorState();
+  const {
+    theme: { lang, is_powered_by_branding_enabled },
+  } = state;
+
+  const onLangChange = useCallback(
+    (lang: FormsPageLanguage) => {
+      dispatch({
+        type: "editor/theme/lang",
+        lang,
+      });
+    },
+    [dispatch]
+  );
+
+  const onPoweredByBrandingEnabledChange = useCallback(
+    (enabled: boolean) => {
+      dispatch({
+        type: "editor/theme/powered_by_branding",
+        enabled,
+      });
+    },
+    [dispatch]
+  );
+
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="outline" className="w-full">
+          <GearIcon className="w-4 h-4 inline me-2 align-middle" />
+          Settings
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Page Settings</DialogTitle>
+        </DialogHeader>
+        <div>
+          <Tabs>
+            <TabsList>
+              <TabsTrigger value="lang">Language</TabsTrigger>
+              <TabsTrigger value="branding">Branding</TabsTrigger>
+            </TabsList>
+            <TabsContent value="lang">
+              <PreferenceBox>
+                <PreferenceBoxHeader
+                  heading={<>Page Language</>}
+                  description={
+                    <>Choose the language that your customers will be seeing.</>
+                  }
+                />
+                <PreferenceBody>
+                  <div className="flex flex-col gap-8">
+                    <section>
+                      <div className="mt-4 flex flex-col gap-1">
+                        <Select
+                          name="lang"
+                          value={lang}
+                          onValueChange={(value) => {
+                            onLangChange(value as any);
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="None" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {supported_form_page_languages.map((lang) => (
+                              <SelectItem key={lang} value={lang}>
+                                {language_label_map[lang]}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <PreferenceDescription>
+                          The form page will be displayed in{" "}
+                          <span className="font-bold font-mono">
+                            {language_label_map[lang]}
+                          </span>
+                        </PreferenceDescription>
+                      </div>
+                    </section>
+                  </div>
+                </PreferenceBody>
+              </PreferenceBox>
+            </TabsContent>
+            <TabsContent value="branding">
+              <PreferenceBox>
+                <PreferenceBoxHeader
+                  heading={<>{`"Powered by Grida" Branding`}</>}
+                />
+                <PreferenceBody>
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="is_powered_by_branding_enabled"
+                      name="is_powered_by_branding_enabled"
+                      checked={is_powered_by_branding_enabled}
+                      onCheckedChange={onPoweredByBrandingEnabledChange}
+                    />
+                    <Label htmlFor="is_powered_by_branding_enabled">
+                      {is_powered_by_branding_enabled ? "Enabled" : "Disabled"}
+                    </Label>
+                  </div>
+                  {is_powered_by_branding_enabled && (
+                    <div className="mt-10 flex items-center justify-center select-none p-4 border rounded-sm">
+                      <PoweredByGridaWaterMark />
+                    </div>
+                  )}
+                </PreferenceBody>
+              </PreferenceBox>
+            </TabsContent>
+          </Tabs>
+        </div>
+        {/* <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="secondary">Cancel</Button>
+          </DialogClose>
+          <DialogClose asChild>
+            <Button onClick={() => {}}>Save</Button>
+          </DialogClose>
+        </DialogFooter> */}
       </DialogContent>
     </Dialog>
   );

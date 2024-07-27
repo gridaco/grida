@@ -4,6 +4,7 @@ import type { Database } from "@/database.types";
 import { toArrayOf } from "@/types/utility";
 import { SupabaseClient } from "@supabase/supabase-js";
 import assert from "assert";
+import { workspaceclient } from "@/lib/supabase/server";
 
 type ID = string;
 type FormFieldInsertion =
@@ -79,15 +80,27 @@ export class JSONFrom2DB {
     return _;
   }
 
-  private async insert_page() {
+  private async insert_form_document() {
     assert(!!this.form_id, "form not inserted");
     if (this.form_document_id) {
       return;
     }
 
+    // insert document
+    // this is bad, but since form is created, its safe to use without rls.
+    const { data: docref } = await workspaceclient
+      .from("document")
+      .insert({
+        project_id: this.project_id,
+        doctype: "v0_form",
+      })
+      .select()
+      .single();
+
     const _ = await this.client
       .from("form_document")
       .insert({
+        id: docref!.id,
         form_id: this.form_id,
         lang: this.renderer.lang || undefined,
       })
@@ -237,7 +250,7 @@ export class JSONFrom2DB {
 
   async insert() {
     await this.insert_form();
-    await this.insert_page();
+    await this.insert_form_document();
     await this.insert_fields();
     await this.insert_options();
     await this.insert_blocks();

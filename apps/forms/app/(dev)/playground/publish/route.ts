@@ -65,8 +65,8 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let ORG_ID = null;
-  let PROJECT_ID = null;
+  let ORG: { id: number; name: string } | null = null;
+  let PROJECT: { id: number; name: string } | null = null;
 
   // check if user has a project as a owner
   // get the user owned organization
@@ -94,21 +94,21 @@ export async function POST(req: NextRequest) {
     if (error) console.error(error);
     assert(neworg, "failed to create organization");
 
-    ORG_ID = neworg.id;
+    ORG = neworg;
   } else {
-    ORG_ID = org.id;
+    ORG = org;
     if (org.projects.length > 0) {
       // TODO: this is bad
-      PROJECT_ID = org.projects[0].id;
+      PROJECT = org.projects[0];
     }
   }
 
-  if (!PROJECT_ID) {
+  if (!PROJECT) {
     // 2. create project if not exists  - TODO: also bad
     const { data: project, error } = await workspaceclient
       .from("project")
       .insert({
-        organization_id: ORG_ID,
+        organization_id: ORG.id,
         name: "forms",
       })
       .select()
@@ -117,7 +117,7 @@ export async function POST(req: NextRequest) {
     if (error) console.error(error);
     assert(project, "failed to create project");
 
-    PROJECT_ID = project.id;
+    PROJECT = project;
   }
 
   const jsonform = new JSONFormParser(src).parse();
@@ -127,14 +127,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.error();
   }
 
-  const service = new JSONFrom2DB(supabase, PROJECT_ID, jsonform);
+  const service = new JSONFrom2DB(supabase, PROJECT.id, jsonform);
 
   const { form_id } = await service.insert();
 
   // redirect to form editor page
 
   return NextResponse.redirect(
-    editorlink("design", {
+    editorlink("form/edit", {
+      org: ORG.name,
+      proj: PROJECT.name,
       origin: HOST,
       form_id,
     }),

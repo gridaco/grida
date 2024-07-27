@@ -2,15 +2,20 @@ import { blockstreeflat } from "@/lib/forms/tree";
 import type {
   ConnectionSupabaseJoint,
   Customer,
+  EndingPageI18nOverrides,
+  EndingPageTemplateID,
   FormBlock,
   FormBlockType,
   FormFieldDefinition,
   FormFieldInit,
+  FormMethod,
   FormPageBackgroundSchema,
   FormResponse,
   FormResponseField,
   FormResponseSession,
+  FormResponseUnknownFieldHandlingStrategyType,
   FormStyleSheetV1Schema,
+  FormsPageLanguage,
   GridaSupabase,
   OrderBy,
 } from "@/types";
@@ -19,15 +24,25 @@ import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { ZodObject } from "zod";
 import { Tokens } from "@/ast";
 import React from "react";
+import { editorbasepath } from "@/lib/forms/url";
 
 export type DraftID = `[draft]${string}`;
 export const DRAFT_ID_START_WITH = "[draft]";
 const ISDEV = process.env.NODE_ENV === "development";
 
 export interface FormEditorInit {
-  project_id: number;
+  organization: {
+    name: string;
+    id: number;
+  };
+  project: {
+    name: string;
+    id: number;
+  };
   form_id: string;
-  scheduling_tz?: string;
+  campaign: FormEditorState["campaign"];
+  form_security: FormEditorState["form_security"];
+  ending: FormEditorState["ending"];
   connections?: {
     store_id?: number | null;
     supabase?: GridaSupabase.SupabaseConnectionState;
@@ -52,9 +67,16 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
   const is_main_table_supabase =
     !!init.connections?.supabase?.main_supabase_table;
 
+  const basepath = editorbasepath({
+    org: init.organization.name,
+    proj: init.project.name,
+  });
+
   return {
+    basepath: basepath,
+    project: init.project,
+    organization: init.organization,
     connections: {
-      project_id: init.project_id,
       store_id: init.connections?.store_id,
       supabase: init.connections?.supabase,
     },
@@ -103,11 +125,13 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
             views: [{ type: "customer", name: "customer", label: "Customers" }],
           },
         ],
-    scheduling_tz: init.scheduling_tz,
+    campaign: init.campaign,
+    form_security: init.form_security,
+    ending: init.ending,
     form_document_id: init.form_document_id,
     blocks: blockstreeflat(init.blocks),
     document: {
-      pages: ISDEV ? ["collection", "start", "form"] : ["form"],
+      pages: formpagesinit({ basepath, form_id: init.form_id }),
       selected_page_id: "form",
       nodes: [],
       templatesample: "formcollection_sample_001_the_bundle",
@@ -144,6 +168,69 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
       ? xsbmtinit(init.connections.supabase)
       : undefined,
   };
+}
+
+function formpagesinit({
+  basepath,
+  form_id,
+}: {
+  basepath: string;
+  form_id: string;
+}): MenuItem[] {
+  return [
+    {
+      section: "Form",
+      id: "campaign",
+      label: "Campaign",
+      href: `/${basepath}/${form_id}/form`,
+      icon: "folder",
+    },
+    // {
+    //   section: "Form",
+    //   id: "start",
+    //   label: "Start Page",
+    //   href: `/${basepath}/${form_id}/form/start`,
+    //   icon: "file",
+    //   level: 1,
+    // },
+    {
+      section: "Form",
+      id: "form",
+      label: "Form Page",
+      href: `/${basepath}/${form_id}/form/edit`,
+      icon: "file",
+      level: 1,
+    },
+    {
+      section: "Form",
+      id: "ending",
+      label: "Ending Page",
+      href: `/${basepath}/${form_id}/form/end`,
+      icon: "file",
+      level: 1,
+    },
+    {
+      section: "Data",
+      id: "responses",
+      label: "Responses",
+      href: `/${basepath}/${form_id}/data/responses`,
+      icon: "table",
+    },
+    {
+      section: "Data",
+      id: "analytics",
+      label: "Analytics",
+      href: `/${basepath}/${form_id}/data/analytics`,
+      icon: "chart",
+    },
+    {
+      section: "Analytics",
+      id: "realtime",
+      label: "Realtime",
+      href: `/${basepath}/${form_id}/data/analytics`,
+      icon: "chart",
+    },
+  ];
 }
 
 function xsbmtinit(conn?: GridaSupabase.SupabaseConnectionState) {
@@ -189,19 +276,58 @@ type GFTable =
       label: string;
     };
 
+interface MenuItem {
+  section: string;
+  id: string;
+  level?: number;
+  label: string;
+  icon: "folder" | "file" | "setting" | "table" | "chart";
+  href?: string;
+}
+
 export interface FormEditorState {
+  basepath: string;
+  organization: {
+    name: string;
+    id: number;
+  };
+  project: {
+    name: string;
+    id: number;
+  };
   connections: {
-    project_id: number;
     store_id?: number | null;
     supabase?: GridaSupabase.SupabaseConnectionState;
   };
+
   form_id: string;
   form_title: string;
-  scheduling_tz?: string;
+  campaign: {
+    max_form_responses_by_customer: number | null;
+    is_max_form_responses_by_customer_enabled: boolean;
+    max_form_responses_in_total: number | null;
+    is_max_form_responses_in_total_enabled: boolean;
+    is_force_closed: boolean;
+    is_scheduling_enabled: boolean;
+    scheduling_open_at: string | null;
+    scheduling_close_at: string | null;
+    scheduling_tz?: string;
+  };
+  form_security: {
+    unknown_field_handling_strategy: FormResponseUnknownFieldHandlingStrategyType;
+    method: FormMethod;
+  };
+  ending: {
+    is_redirect_after_response_uri_enabled: boolean;
+    redirect_after_response_uri: string | null;
+    is_ending_page_enabled: boolean;
+    ending_page_template_id: EndingPageTemplateID | null;
+    ending_page_i18n_overrides: EndingPageI18nOverrides | null;
+  };
   form_document_id: string | null;
   blocks: EditorFlatFormBlock[];
   document: {
-    pages: string[];
+    pages: MenuItem[];
     selected_page_id: string;
     nodes: any[];
     templatesample: string;
@@ -233,6 +359,8 @@ export interface FormEditorState {
   focus_block_id?: string | null;
   available_field_ids: string[];
   theme: {
+    is_powered_by_branding_enabled: boolean;
+    lang: FormsPageLanguage;
     palette?: FormStyleSheetV1Schema["palette"];
     fontFamily?: FormStyleSheetV1Schema["font-family"];
     customCSS?: FormStyleSheetV1Schema["custom"];
@@ -277,6 +405,7 @@ export interface FormEditorState {
   datagrid_orderby: { [key: string]: OrderBy };
   realtime_sessions_enabled: boolean;
   realtime_responses_enabled: boolean;
+  is_insert_menu_open?: boolean;
   is_field_edit_panel_open?: boolean;
   is_response_edit_panel_open?: boolean;
   is_customer_edit_panel_open?: boolean;

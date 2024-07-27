@@ -18,7 +18,7 @@ import {
 } from "@dnd-kit/sortable";
 import { createClientFormsClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
-import { NewBlockButton } from "./new-block-button";
+import { InsertMenuTrigger } from "./insert-menu-trigger";
 import { SectionStyle } from "../agent/theme";
 import { usePrevious } from "@uidotdev/usehooks";
 import equal from "deep-equal";
@@ -223,6 +223,8 @@ function AgentThemeSyncProvider({ children }: React.PropsWithChildren<{}>) {
       supabase
         .from("form_document")
         .update({
+          lang: theme.lang,
+          is_powered_by_branding_enabled: theme.is_powered_by_branding_enabled,
           stylesheet: {
             custom: theme.customCSS,
             "font-family": theme.fontFamily,
@@ -244,6 +246,8 @@ function AgentThemeSyncProvider({ children }: React.PropsWithChildren<{}>) {
     prev,
     supabase,
     form_document_id,
+    theme.is_powered_by_branding_enabled,
+    theme.lang,
     theme.customCSS,
     theme.fontFamily,
     theme.palette,
@@ -267,7 +271,7 @@ function BlocksEditor() {
     <div onPointerDown={blur}>
       <div className="fixed z-10">
         <div className="absolute left-4 top-4">
-          <NewBlockButton />
+          <InsertMenuTrigger />
         </div>
       </div>
       <div className="py-20 container mx-auto max-w-screen-sm">

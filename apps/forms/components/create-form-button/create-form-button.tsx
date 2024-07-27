@@ -9,8 +9,21 @@ import {
 } from "@/components/ui/dropdown-menu";
 import clsx from "clsx";
 import { useRouter } from "next/navigation";
+import { useWorkspace } from "@/scaffolds/workspace";
 
-export function CreateNewFormButton({ project_id }: { project_id: number }) {
+export function CreateNewFormButton({
+  project_name,
+  project_id,
+}: {
+  project_name: string;
+  project_id: number;
+}) {
+  const {
+    state: {
+      organization: { name: organization_name },
+    },
+  } = useWorkspace();
+
   const router = useRouter();
   const new_default_form_url = `/new?project_id=${project_id}`;
 
@@ -26,7 +39,7 @@ export function CreateNewFormButton({ project_id }: { project_id: number }) {
 
     // TODO: add globl spinner to block ui
 
-    router.push(`/d/${form_id}/settings`);
+    router.push(`/${organization_name}/${project_name}/${form_id}/connect`);
   };
 
   return (

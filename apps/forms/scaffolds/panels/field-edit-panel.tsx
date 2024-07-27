@@ -232,6 +232,7 @@ export function FieldEditPanel({
 }) {
   const is_edit_mode = !!init?.id;
   const [state] = useEditorState();
+  const { basepath } = state;
   const router = useRouter();
   const [effect_cause, set_effect_cause] = useState<"ai" | "human" | "system">(
     "system"
@@ -325,6 +326,7 @@ export function FieldEditPanel({
       );
       if (ok) {
         const connect_redirect_link = editorlink("connect/store", {
+          basepath,
           origin: window.location.origin,
           form_id: state.form_id,
         });

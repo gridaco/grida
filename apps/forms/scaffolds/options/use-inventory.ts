@@ -15,10 +15,10 @@ function useCommerceClient() {
     () =>
       new GridaCommerceClient(
         supabase,
-        state.connections.project_id,
+        state.project.id,
         state.connections.store_id
       ),
-    [supabase, state.connections.project_id, state.connections.store_id]
+    [supabase, state.project.id, state.connections.store_id]
   );
 
   return commerce;

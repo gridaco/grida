@@ -24,8 +24,13 @@ import { Badge } from "@/components/ui/badge";
 export function GridViewSettings() {
   const [state, dispatch] = useEditorState();
 
-  const { scheduling_tz, datetz, dateformat, datagrid_filter, datagrid_table } =
-    state;
+  const {
+    campaign: { scheduling_tz },
+    datetz,
+    dateformat,
+    datagrid_filter,
+    datagrid_table,
+  } = state;
 
   // dummy example date - happy star wars day!
   const starwarsday = useMemo(

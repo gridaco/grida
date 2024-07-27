@@ -29,6 +29,32 @@ const nextConfig = withMDX()({
   async redirects() {
     return [
       {
+        source: "/d",
+        destination: "/",
+        permanent: true,
+      },
+      // DO NOT ADD BELOW. this will match all paths with 3 segments.
+      // {
+      //   source: "/:org/:proj/:id",
+      //   destination: "/:org/:proj/:id/data",
+      //   permanent: true,
+      // },
+      {
+        source: "/:org/:proj/:id/data",
+        destination: "/:org/:proj/:id/data/responses",
+        permanent: true,
+      },
+      // {
+      //   source: "/:org/:proj/:id/settings",
+      //   destination: "/:org/:proj/:id/settings/general",
+      //   permanent: true,
+      // },
+      {
+        source: "/:org/:proj/:id/connect",
+        destination: "/:org/:proj/:id/connect/share",
+        permanent: true,
+      },
+      {
         // REMOVE ME when migration is complete.
         // 1. db, 2. site static values
         source: "/theme/embed/backgrounds/:path*",

@@ -1,6 +1,10 @@
+"use client";
+
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/utils";
+import { usePathname } from "next/navigation";
+import Link from "next/link";
 
 export function SidebarRoot({
   side = "left",
@@ -20,8 +24,15 @@ export function SidebarRoot({
   );
 }
 
-export function SidebarMenuList({ children }: React.PropsWithChildren<{}>) {
-  return <ul className="flex flex-col gap-0.5">{children}</ul>;
+export function SidebarMenuList({
+  children,
+  className,
+}: React.PropsWithChildren<{
+  className?: string;
+}>) {
+  return (
+    <ul className={cn("flex flex-col gap-0.5 pb-4", className)}>{children}</ul>
+  );
 }
 
 export function SidebarMenuGrid({ children }: React.PropsWithChildren<{}>) {
@@ -59,24 +70,46 @@ export function SidebarMenuGridItem({
   );
 }
 
-export function SidebarMenuItem({
-  level,
-  muted,
-  selected,
-  className,
-  disabled,
+export const SidebarMenuLink = React.forwardRef(function SidebarMenuLink({
+  href,
   children,
-  onSelect,
 }: React.PropsWithChildren<{
-  level?: number;
-  muted?: boolean;
-  selected?: boolean;
-  className?: string;
-  disabled?: boolean;
-  onSelect?: () => void;
+  href: string;
 }>) {
+  const pathName = usePathname();
+
+  const selected = pathName === href;
+
+  return (
+    <Link href={href}>
+      {/* override selected prop */}
+      {React.cloneElement(children as any, { selected })}
+    </Link>
+  );
+});
+
+export const SidebarMenuItem = React.forwardRef(function SidebarMenuItem(
+  {
+    level,
+    muted,
+    selected,
+    className,
+    disabled,
+    children,
+    onSelect,
+  }: React.PropsWithChildren<{
+    level?: number;
+    muted?: boolean;
+    selected?: boolean;
+    className?: string;
+    disabled?: boolean;
+    onSelect?: () => void;
+  }>,
+  forwardedRef
+) {
   return (
     <div
+      ref={forwardedRef as any}
       data-level={level}
       data-muted={muted}
       data-disabled={disabled}
@@ -88,7 +121,7 @@ export function SidebarMenuItem({
         "text-ellipsis whitespace-nowrap overflow-hidden",
         "hover:bg-accent hover:text-accent-foreground",
         "data-[muted='true']:text-muted-foreground",
-        "data-[disabled='true']:cursor-not-allowed data-[disabled='true']:opacity-50 data-[disabled='true']:bg-background",
+        "data-[disabled='true']:cursor-not-allowed data-[disabled='true']:opacity-40 data-[disabled='true']:bg-background",
         "data-[selected='true']:bg-accent data-[selected='true']:text-accent-foreground",
         className
       )}
@@ -100,7 +133,7 @@ export function SidebarMenuItem({
       {children}
     </div>
   );
-}
+});
 
 export function SidebarMenuItemLabel({
   children,
@@ -159,18 +192,24 @@ export function SidebarMenuItemActions({
   );
 }
 
-export function SidebarSectionHeaderAction({
-  children,
-  ...props
-}: React.PropsWithChildren<React.ComponentProps<typeof Button>>) {
-  return (
-    <Button
-      {...props}
-      variant="ghost"
-      size="sm"
-      className={cn("w-5 h-5 p-0", props.className)}
-    >
-      {children}
-    </Button>
-  );
-}
+export const SidebarSectionHeaderAction = React.forwardRef(
+  function SidebarSectionHeaderAction(
+    {
+      children,
+      ...props
+    }: React.PropsWithChildren<React.ComponentProps<typeof Button>>,
+    forwardedRef
+  ) {
+    return (
+      <Button
+        ref={forwardedRef as any}
+        {...props}
+        variant="ghost"
+        size="sm"
+        className={cn("w-5 h-5 p-0", props.className)}
+      >
+        {children}
+      </Button>
+    );
+  }
+);

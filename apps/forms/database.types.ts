@@ -1028,7 +1028,7 @@ export type Database = {
           ending_page_i18n_overrides?: Json | null
           ending_page_template_id?: string | null
           form_id: string
-          id?: string
+          id: string
           is_ending_page_enabled?: boolean
           is_powered_by_branding_enabled?: boolean
           is_redirect_after_response_uri_enabled?: boolean
@@ -1056,9 +1056,16 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "form_document_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "document"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "grida_forms_form_page_form_id_fkey"
             columns: ["form_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "form"
             referencedColumns: ["id"]
           },
@@ -1948,6 +1955,41 @@ export type Database = {
           },
         ]
       }
+      document: {
+        Row: {
+          created_at: string
+          doctype: Database["public"]["Enums"]["doctype"]
+          id: string
+          project_id: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          doctype: Database["public"]["Enums"]["doctype"]
+          id?: string
+          project_id: number
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          doctype?: Database["public"]["Enums"]["doctype"]
+          id?: string
+          project_id?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dummy: {
         Row: {
           created_at: string
@@ -2350,9 +2392,27 @@ export type Database = {
         }
         Returns: boolean
       }
+      workspace_documents: {
+        Args: {
+          p_organization_id: number
+        }
+        Returns: {
+          id: string
+          created_at: string
+          updated_at: string
+          doctype: Database["public"]["Enums"]["doctype"]
+          project_id: number
+          title: string
+          form_id: string
+          organization_id: number
+          has_connection_supabase: boolean
+          responses: number
+          max_responses: number
+        }[]
+      }
     }
     Enums: {
-      [_ in never]: never
+      doctype: "v0_form" | "v0_site"
     }
     CompositeTypes: {
       [_ in never]: never
