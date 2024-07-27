@@ -85,17 +85,17 @@ export function WorkspaceSidebar() {
               </CreateNewProjectDialog>
             </SidebarMenuItemActions>
           </SidebarSectionHeaderItem>
-          <SidebarMenuList>
+          <>
             {loading ? (
-              <>
-                {Array.from({ length: 32 }).map((_, i) => (
-                  <div key={i} className={cn(i % 8 !== 0 ? "ml-2" : "")}>
+              <SidebarMenuList className="gap-1.5">
+                {Array.from({ length: 10 }).map((_, i) => (
+                  <div key={i} className={cn(i % 4 !== 0 ? "ml-2" : "")}>
                     <Skeleton className="w-full h-6" />
                   </div>
                 ))}
-              </>
+              </SidebarMenuList>
             ) : (
-              <>
+              <SidebarMenuList>
                 {projects.map((p) => {
                   const projectdocs = documents.filter(
                     (d) => d.project_id === p.id
@@ -120,7 +120,7 @@ export function WorkspaceSidebar() {
                       {projectdocs.map((doc, i) => (
                         <Link
                           key={doc.id}
-                          href={`/${organization.name}/${p.name}/${doc.id}`}
+                          href={`/${organization.name}/${p.name}/${doc.form_id}`}
                           prefetch={false}
                         >
                           <SidebarMenuItem level={1} muted>
@@ -137,9 +137,9 @@ export function WorkspaceSidebar() {
                     </div>
                   );
                 })}
-              </>
+              </SidebarMenuList>
             )}
-          </SidebarMenuList>
+          </>
         </SidebarSection>
       </div>
     </SidebarRoot>

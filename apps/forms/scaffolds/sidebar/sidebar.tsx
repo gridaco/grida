@@ -97,10 +97,6 @@ export function Sidebar() {
           <ModeConnect />
         </TabsContent>
       </Tabs>
-      {/* {mode === "data" && <ModeData />}
-      {mode === "design" && <ModeDesign />}
-      {mode === "connect" && <ModeConnect />}
-      {mode === "settings" && <ModeSettings />} */}
     </SidebarRoot>
   );
 }
@@ -115,42 +111,7 @@ function ModeDocuments() {
   );
   return (
     <>
-      <SidebarSection>
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>
-            <span>Resources</span>
-          </SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuList>
-          <SidebarMenuItem muted>
-            <ResourceTypeIcon
-              type={"v0_form"}
-              className="inline align-middle min-w-4 w-4 h-4 me-2"
-            />
-            <SidebarMenuItemLabel>{form_title}</SidebarMenuItemLabel>
-          </SidebarMenuItem>
-        </SidebarMenuList>
-      </SidebarSection>
-      <SidebarSection>
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>
-            <span>App / Campaign</span>
-          </SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuList>
-          <Link
-            href={editorlink("form/edit", {
-              basepath,
-              form_id,
-            })}
-          >
-            <SidebarMenuItem muted>
-              <TabletSmartphoneIcon className="inline align-middle w-4 h-4 me-2" />
-              Main
-            </SidebarMenuItem>
-          </Link>
-        </SidebarMenuList>
-      </SidebarSection>
+      <ModeDesign />
       <SidebarSection>
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>
@@ -188,7 +149,7 @@ function ModeData() {
       <SidebarSection>
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>
-            <span>Table</span>
+            <span>Tables</span>
           </SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuList>
@@ -250,26 +211,6 @@ function ModeData() {
           </SideNavItem>
         </Link>
       </li> */}
-      <SidebarSection>
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>
-            <span>Analytics</span>
-          </SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuList>
-          <Link
-            href={editorlink("data/analytics", {
-              basepath,
-              form_id,
-            })}
-          >
-            <SidebarMenuItem muted>
-              <PieChartIcon className="inline align-middle w-4 h-4 me-2" />
-              Realtime
-            </SidebarMenuItem>
-          </Link>
-        </SidebarMenuList>
-      </SidebarSection>
     </>
   );
 }

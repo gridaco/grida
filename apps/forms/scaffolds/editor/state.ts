@@ -178,24 +178,23 @@ function formpagesinit({
   form_id: string;
 }): MenuItem[] {
   return [
-    // { id: "collection", label: "Collection", icon: "file" },
     {
-      section: "form",
+      section: "Form",
       id: "campaign",
       label: "Campaign",
       href: `/${basepath}/${form_id}/form`,
       icon: "folder",
     },
+    // {
+    //   section: "Form",
+    //   id: "start",
+    //   label: "Start Page",
+    //   href: `/${basepath}/${form_id}/form/start`,
+    //   icon: "file",
+    //   level: 1,
+    // },
     {
-      section: "form",
-      id: "start",
-      label: "Start Page",
-      href: `/${basepath}/${form_id}/form/start`,
-      icon: "file",
-      level: 1,
-    },
-    {
-      section: "form",
+      section: "Form",
       id: "form",
       label: "Form Page",
       href: `/${basepath}/${form_id}/form/edit`,
@@ -203,7 +202,7 @@ function formpagesinit({
       level: 1,
     },
     {
-      section: "form",
+      section: "Form",
       id: "ending",
       label: "Ending Page",
       href: `/${basepath}/${form_id}/form/end`,
@@ -211,16 +210,23 @@ function formpagesinit({
       level: 1,
     },
     {
-      section: "data",
-      id: "results",
-      label: "Results",
+      section: "Data",
+      id: "responses",
+      label: "Responses",
       href: `/${basepath}/${form_id}/data/responses`,
       icon: "table",
     },
     {
-      section: "data",
+      section: "Data",
       id: "analytics",
       label: "Analytics",
+      href: `/${basepath}/${form_id}/data/analytics`,
+      icon: "chart",
+    },
+    {
+      section: "Analytics",
+      id: "realtime",
+      label: "Realtime",
       href: `/${basepath}/${form_id}/data/analytics`,
       icon: "chart",
     },

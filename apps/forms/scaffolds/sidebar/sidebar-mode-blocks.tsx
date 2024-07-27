@@ -26,7 +26,6 @@ import { blocklabels, supported_block_types } from "@/k/supported_block_types";
 import { BlockTypeIcon } from "@/components/form-blcok-type-icon";
 import type { FormBlockType, FormInputType } from "@/types";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
-import Link from "next/link";
 import "core-js/features/map/group-by";
 import { usePathname } from "next/navigation";
 
