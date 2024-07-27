@@ -25,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   SidebarMenuItem,
   SidebarMenuItemLabel,
+  SidebarMenuLink,
   SidebarMenuList,
   SidebarRoot,
   SidebarSection,
@@ -39,6 +40,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useWorkspace } from "../workspace";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
 import * as Dialog from "@radix-ui/react-dialog";
+import { usePathname } from "next/navigation";
 
 export function Sidebar() {
   const [state, dispatch] = useEditorState();
@@ -192,7 +194,10 @@ function ModeData() {
         <SidebarMenuList>
           {tables.map((table, i) => {
             return (
-              <Link key={i} href={tablehref(basepath, form_id, table.group)}>
+              <SidebarMenuLink
+                key={i}
+                href={tablehref(basepath, form_id, table.group)}
+              >
                 <SidebarMenuItem muted>
                   <TableTypeIcon
                     type={table.group}
@@ -200,7 +205,7 @@ function ModeData() {
                   />
                   {table.name}
                 </SidebarMenuItem>
-              </Link>
+              </SidebarMenuLink>
             );
           })}
           {/* <li>
@@ -289,6 +294,7 @@ function tablehref(
 function ModeConnect() {
   const [state] = useEditorState();
   const { form_id, basepath } = state;
+  const pathname = usePathname();
   return (
     <>
       <SidebarSection>
@@ -299,7 +305,10 @@ function ModeConnect() {
         </SidebarSectionHeaderItem>
         <SidebarMenuList>
           <Link href={`/${basepath}/${form_id}/connect/share`}>
-            <SidebarMenuItem>
+            <SidebarMenuItem
+              muted
+              selected={`/${basepath}/${form_id}/connect/share` === pathname}
+            >
               <Link2Icon className="inline align-middle w-4 h-4 me-2" />
               Share
             </SidebarMenuItem>
@@ -323,13 +332,13 @@ function ModeConnect() {
         </SidebarSectionHeaderItem>
         <SidebarMenuList>
           <Link href={`/${basepath}/${form_id}/connect/channels`}>
-            <SidebarMenuItem>
+            <SidebarMenuItem muted>
               <EnvelopeClosedIcon className="inline align-middle w-4 h-4 me-2" />
               Channels
             </SidebarMenuItem>
           </Link>
           <Link href={`/${basepath}/${form_id}/connect/customer`}>
-            <SidebarMenuItem>
+            <SidebarMenuItem muted>
               <AvatarIcon className="inline align-middle w-4 h-4 me-2" />
               Customer Identity
             </SidebarMenuItem>
@@ -344,7 +353,7 @@ function ModeConnect() {
         </SidebarSectionHeaderItem>
         <SidebarMenuList>
           <Link href={`/${basepath}/${form_id}/connect/store`}>
-            <SidebarMenuItem>
+            <SidebarMenuItem muted>
               <ArchiveIcon className="inline align-middle w-4 h-4 me-2" />
               Store
             </SidebarMenuItem>
@@ -378,7 +387,7 @@ function ModeConnect() {
         </SidebarSectionHeaderItem>
         <SidebarMenuList>
           <Link href={`/${basepath}/${form_id}/connect/database/supabase`}>
-            <SidebarMenuItem>
+            <SidebarMenuItem muted>
               <SupabaseLogo className="inline align-middle w-4 h-4 me-2" />
               Supabase
               <Badge variant="outline" className="ms-auto">

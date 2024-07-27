@@ -1,6 +1,10 @@
+"use client";
+
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/utils";
+import { usePathname } from "next/navigation";
+import Link from "next/link";
 
 export function SidebarRoot({
   side = "left",
@@ -59,6 +63,24 @@ export function SidebarMenuGridItem({
   );
 }
 
+export const SidebarMenuLink = React.forwardRef(function SidebarMenuLink({
+  href,
+  children,
+}: React.PropsWithChildren<{
+  href: string;
+}>) {
+  const pathName = usePathname();
+
+  const selected = pathName === href;
+
+  return (
+    <Link href={href}>
+      {/* override selected prop */}
+      {React.cloneElement(children as any, { selected })}
+    </Link>
+  );
+});
+
 export const SidebarMenuItem = React.forwardRef(function SidebarMenuItem(
   {
     level,
@@ -92,7 +114,7 @@ export const SidebarMenuItem = React.forwardRef(function SidebarMenuItem(
         "text-ellipsis whitespace-nowrap overflow-hidden",
         "hover:bg-accent hover:text-accent-foreground",
         "data-[muted='true']:text-muted-foreground",
-        "data-[disabled='true']:cursor-not-allowed data-[disabled='true']:opacity-50 data-[disabled='true']:bg-background",
+        "data-[disabled='true']:cursor-not-allowed data-[disabled='true']:opacity-40 data-[disabled='true']:bg-background",
         "data-[selected='true']:bg-accent data-[selected='true']:text-accent-foreground",
         className
       )}

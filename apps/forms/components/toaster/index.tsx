@@ -33,6 +33,12 @@ export function ToasterWithMax({
             secondary: "hsl(var(--secondary))",
           },
         },
+        loading: {
+          iconTheme: {
+            primary: "hsl(var(--primary))",
+            secondary: "hsl(var(--secondary))",
+          },
+        },
         error: {
           iconTheme: {
             primary: "hsl(var(--destructive))",

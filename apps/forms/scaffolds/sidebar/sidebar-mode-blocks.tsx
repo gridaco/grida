@@ -7,6 +7,7 @@ import {
   SidebarMenuGrid,
   SidebarMenuGridItem,
   SidebarMenuItem,
+  SidebarMenuLink,
   SidebarMenuList,
   SidebarSection,
   SidebarSectionHeaderItem,
@@ -27,9 +28,12 @@ import type { FormBlockType, FormInputType } from "@/types";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
 import Link from "next/link";
 import "core-js/features/map/group-by";
+import { usePathname } from "next/navigation";
 
 export function ModeDesign() {
   const [state, dispatch] = useEditorState();
+
+  const pathname = usePathname();
 
   const {
     document: { pages },
@@ -48,25 +52,27 @@ export function ModeDesign() {
           </SidebarSectionHeaderItem>
           <SidebarMenuList>
             {sections.get(section)?.map((page) => (
-              <Link key={page.id} href={page.href ?? ""}>
-                <SidebarMenuItem
-                  level={page.level}
-                  key={page.id}
-                  onSelect={() => {
-                    dispatch({
-                      type: "editor/document/select-page",
-                      page_id: page.id,
-                    });
-                  }}
-                  selected={state.document.selected_page_id === page.id}
-                >
+              <SidebarMenuLink key={page.id} href={page.href ?? ""}>
+                <SidebarMenuItem muted level={page.level}>
                   <ResourceTypeIcon
                     type={page.icon}
                     className="w-4 h-4 me-2 inline"
                   />
                   {page.label}
                 </SidebarMenuItem>
-              </Link>
+              </SidebarMenuLink>
+              // <Link key={page.id} href={page.href ?? ""}>
+              //   <SidebarMenuItem
+              //     level={page.level}
+              //     selected={pathname === page.href}
+              //   >
+              //     <ResourceTypeIcon
+              //       type={page.icon}
+              //       className="w-4 h-4 me-2 inline"
+              //     />
+              //     {page.label}
+              //   </SidebarMenuItem>
+              // </Link>
             ))}
           </SidebarMenuList>
         </SidebarSection>

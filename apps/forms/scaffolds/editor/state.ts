@@ -216,7 +216,6 @@ function formpagesinit({
       label: "Results",
       href: `/${basepath}/${form_id}/data/responses`,
       icon: "table",
-      level: 1,
     },
     {
       section: "data",
@@ -224,7 +223,6 @@ function formpagesinit({
       label: "Analytics",
       href: `/${basepath}/${form_id}/data/analytics`,
       icon: "chart",
-      level: 1,
     },
   ];
 }
