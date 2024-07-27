@@ -177,42 +177,56 @@ function formpagesinit({
   basepath: string;
   form_id: string;
 }): MenuItem[] {
-  return ISDEV
-    ? [
-        // { id: "collection", label: "Collection", icon: "file" },
-        {
-          id: "campaign",
-          label: "Campaign",
-          href: `/${basepath}/${form_id}/form`,
-          icon: "folder",
-        },
-        {
-          id: "start",
-          label: "Start Page",
-          href: `/${basepath}/${form_id}/form/start`,
-          icon: "file",
-          level: 1,
-        },
-        {
-          id: "form",
-          label: "Form Page",
-          href: `/${basepath}/${form_id}/form/edit`,
-          icon: "file",
-          level: 1,
-        },
-        {
-          id: "ending",
-          label: "Ending Page",
-          href: `/${basepath}/${form_id}/form/end`,
-          icon: "file",
-          level: 1,
-        },
-      ]
-    : [
-        { id: "campaign", label: "Campaign", icon: "file" },
-        { id: "form", label: "Form Page", icon: "file" },
-        { id: "ending", label: "Ending Page", icon: "file" },
-      ];
+  return [
+    // { id: "collection", label: "Collection", icon: "file" },
+    {
+      section: "form",
+      id: "campaign",
+      label: "Campaign",
+      href: `/${basepath}/${form_id}/form`,
+      icon: "folder",
+    },
+    {
+      section: "form",
+      id: "start",
+      label: "Start Page",
+      href: `/${basepath}/${form_id}/form/start`,
+      icon: "file",
+      level: 1,
+    },
+    {
+      section: "form",
+      id: "form",
+      label: "Form Page",
+      href: `/${basepath}/${form_id}/form/edit`,
+      icon: "file",
+      level: 1,
+    },
+    {
+      section: "form",
+      id: "ending",
+      label: "Ending Page",
+      href: `/${basepath}/${form_id}/form/end`,
+      icon: "file",
+      level: 1,
+    },
+    {
+      section: "data",
+      id: "results",
+      label: "Results",
+      href: `/${basepath}/${form_id}/data/responses`,
+      icon: "table",
+      level: 1,
+    },
+    {
+      section: "data",
+      id: "analytics",
+      label: "Analytics",
+      href: `/${basepath}/${form_id}/data/analytics`,
+      icon: "table",
+      level: 1,
+    },
+  ];
 }
 
 function xsbmtinit(conn?: GridaSupabase.SupabaseConnectionState) {
@@ -259,10 +273,11 @@ type GFTable =
     };
 
 interface MenuItem {
+  section: string;
   id: string;
   level?: number;
   label: string;
-  icon: "folder" | "file" | "setting";
+  icon: "folder" | "file" | "setting" | "table";
   href?: string;
 }
 

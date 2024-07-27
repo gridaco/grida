@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.redirect(
-      editorlink("design", {
+      editorlink("form/edit", {
         proj: project_ref.name,
         org: project_ref.organization!.name,
         origin,

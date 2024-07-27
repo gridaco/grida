@@ -134,7 +134,7 @@ export async function POST(req: NextRequest) {
   // redirect to form editor page
 
   return NextResponse.redirect(
-    editorlink("design", {
+    editorlink("form/edit", {
       org: ORG.name,
       proj: PROJECT.name,
       origin: HOST,

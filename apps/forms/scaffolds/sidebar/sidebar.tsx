@@ -134,7 +134,7 @@ function ModeDocuments() {
         </SidebarSectionHeaderItem>
         <SidebarMenuList>
           <Link
-            href={editorlink("design", {
+            href={editorlink("form/edit", {
               basepath,
               form_id,
             })}
@@ -156,7 +156,7 @@ function ModeDocuments() {
           {documents.map((d) => (
             <Link
               key={d.id}
-              href={editorlink("design", { form_id: d.form_id!, basepath })}
+              href={editorlink("form/edit", { form_id: d.form_id!, basepath })}
             >
               <SidebarMenuItem muted>
                 <ResourceTypeIcon

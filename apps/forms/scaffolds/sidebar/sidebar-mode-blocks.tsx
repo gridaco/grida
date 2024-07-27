@@ -24,60 +24,54 @@ import { Button } from "@/components/ui/button";
 import { blocklabels, supported_block_types } from "@/k/supported_block_types";
 import { BlockTypeIcon } from "@/components/form-blcok-type-icon";
 import type { FormBlockType, FormInputType } from "@/types";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
 import Link from "next/link";
+import "core-js/features/map/group-by";
 
 export function ModeDesign() {
   const [state, dispatch] = useEditorState();
 
+  const {
+    document: { pages },
+  } = state;
+
+  const sections = Map.groupBy(pages, (page) => page.section);
+
   return (
     <>
-      <SidebarSection>
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>
-            <span>Pages</span>
-          </SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuList>
-          {state.document.pages.map((page) => (
-            <Link key={page.id} href={page.href ?? ""}>
-              <SidebarMenuItem
-                level={page.level}
-                key={page.id}
-                onSelect={() => {
-                  dispatch({
-                    type: "editor/document/select-page",
-                    page_id: page.id,
-                  });
-                }}
-                selected={state.document.selected_page_id === page.id}
-              >
-                <ResourceTypeIcon
-                  type={page.icon}
-                  className="w-4 h-4 me-2 inline"
-                />
-                {page.label}
-              </SidebarMenuItem>
-            </Link>
-          ))}
-        </SidebarMenuList>
-      </SidebarSection>
+      {Array.from(sections.keys()).map((section) => (
+        <SidebarSection key={section}>
+          <SidebarSectionHeaderItem>
+            <SidebarSectionHeaderLabel>
+              <span>{section}</span>
+            </SidebarSectionHeaderLabel>
+          </SidebarSectionHeaderItem>
+          <SidebarMenuList>
+            {sections.get(section)?.map((page) => (
+              <Link key={page.id} href={page.href ?? ""}>
+                <SidebarMenuItem
+                  level={page.level}
+                  key={page.id}
+                  onSelect={() => {
+                    dispatch({
+                      type: "editor/document/select-page",
+                      page_id: page.id,
+                    });
+                  }}
+                  selected={state.document.selected_page_id === page.id}
+                >
+                  <ResourceTypeIcon
+                    type={page.icon}
+                    className="w-4 h-4 me-2 inline"
+                  />
+                  {page.label}
+                </SidebarMenuItem>
+              </Link>
+            ))}
+          </SidebarMenuList>
+        </SidebarSection>
+      ))}
     </>
-    // <Tabs defaultValue="page">
-    //   <SidebarSectionHeaderItem>
-    //     <TabsList>
-    //       <TabsTrigger value="page">Pages</TabsTrigger>
-    //       <TabsTrigger value="add">Add</TabsTrigger>
-    //     </TabsList>
-    //   </SidebarSectionHeaderItem>
-    //   <TabsContent value="page">
-
-    //   </TabsContent>
-    //   <TabsContent value="add">
-
-    //   </TabsContent>
-    // </Tabs>
   );
 }
 

@@ -19,6 +19,7 @@ export function ResourceTypeIcon({
     | "file"
     | "setting"
     | "home"
+    | "table"
     | "project"
     | "form"
     | "form-x-supabase"
@@ -38,6 +39,8 @@ export function ResourceTypeIcon({
       return <FolderDotIcon {...props} />;
     case "file":
       return <FileIcon {...props} />;
+    case "table":
+      return <PanelsTopLeftIcon {...props} />;
     case "v0_form":
     case "form":
       return <FileBarChart2 {...props} />;

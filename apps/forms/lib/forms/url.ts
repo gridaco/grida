@@ -3,7 +3,8 @@ import * as ERR from "@/k/error";
 
 export function editorlink(
   page:
-    | "design"
+    | "form"
+    | "form/edit"
     | "settings"
     // | "settings/general"
     // | "settings/customize"
@@ -35,8 +36,10 @@ export function editorlink(
 ) {
   const basepath = editorbasepath(path);
   switch (page) {
-    case "design":
-      return `${origin}/${basepath}/${form_id}/design`;
+    case "form":
+      return `${origin}/${basepath}/${form_id}/form`;
+    case "form/edit":
+      return `${origin}/${basepath}/${form_id}/form/edit`;
     case "settings":
       return `${origin}/${basepath}/${form_id}/settings`;
     // case "settings/customize":
