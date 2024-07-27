@@ -68,16 +68,18 @@ export default async function Layout({
 
   const { data: project_ref, error: project_ref_err } = await wsclient
     .from("project")
-    .select("id, name, organization(id, name)")
+    .select("id, name, organization!inner(id, name)")
     .eq("name", proj)
+    .eq("organization.name", org)
     .single();
 
   if (project_ref_err) {
-    console.error(project_ref_err);
+    console.error("project_ref err", project_ref_err);
     return notFound();
   }
 
   if (!project_ref) {
+    console.error("project_ref not found", proj);
     return notFound();
   }
 
