@@ -67,11 +67,13 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
   const is_main_table_supabase =
     !!init.connections?.supabase?.main_supabase_table;
 
+  const basepath = editorbasepath({
+    org: init.organization.name,
+    proj: init.project.name,
+  });
+
   return {
-    basepath: editorbasepath({
-      org: init.organization.name,
-      proj: init.project.name,
-    }),
+    basepath: basepath,
     project: init.project,
     organization: init.organization,
     connections: {
@@ -129,19 +131,7 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
     form_document_id: init.form_document_id,
     blocks: blockstreeflat(init.blocks),
     document: {
-      pages: ISDEV
-        ? [
-            // { id: "collection", label: "Collection", icon: "file" },
-            { id: "campaign", label: "Campaign", icon: "folder" },
-            { id: "start", label: "Start Page", icon: "file", level: 1 },
-            { id: "form", label: "Form Page", icon: "file", level: 1 },
-            { id: "ending", label: "Ending Page", icon: "file", level: 1 },
-          ]
-        : [
-            { id: "campaign", label: "Campaign", icon: "file" },
-            { id: "form", label: "Form Page", icon: "file" },
-            { id: "ending", label: "Ending Page", icon: "file" },
-          ],
+      pages: formpagesinit({ basepath, form_id: init.form_id }),
       selected_page_id: "form",
       nodes: [],
       templatesample: "formcollection_sample_001_the_bundle",
@@ -178,6 +168,51 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
       ? xsbmtinit(init.connections.supabase)
       : undefined,
   };
+}
+
+function formpagesinit({
+  basepath,
+  form_id,
+}: {
+  basepath: string;
+  form_id: string;
+}): MenuItem[] {
+  return ISDEV
+    ? [
+        // { id: "collection", label: "Collection", icon: "file" },
+        {
+          id: "campaign",
+          label: "Campaign",
+          href: `/${basepath}/${form_id}/form`,
+          icon: "folder",
+        },
+        {
+          id: "start",
+          label: "Start Page",
+          href: `/${basepath}/${form_id}/form/start`,
+          icon: "file",
+          level: 1,
+        },
+        {
+          id: "form",
+          label: "Form Page",
+          href: `/${basepath}/${form_id}/form/edit`,
+          icon: "file",
+          level: 1,
+        },
+        {
+          id: "ending",
+          label: "Ending Page",
+          href: `/${basepath}/${form_id}/form/end`,
+          icon: "file",
+          level: 1,
+        },
+      ]
+    : [
+        { id: "campaign", label: "Campaign", icon: "file" },
+        { id: "form", label: "Form Page", icon: "file" },
+        { id: "ending", label: "Ending Page", icon: "file" },
+      ];
 }
 
 function xsbmtinit(conn?: GridaSupabase.SupabaseConnectionState) {
@@ -228,6 +263,7 @@ interface MenuItem {
   level?: number;
   label: string;
   icon: "folder" | "file" | "setting";
+  href?: string;
 }
 
 export interface FormEditorState {

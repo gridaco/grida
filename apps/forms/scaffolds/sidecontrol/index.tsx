@@ -898,7 +898,7 @@ function FormSettings() {
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Form Settings</DialogTitle>
+          <DialogTitle>Page Settings</DialogTitle>
         </DialogHeader>
         <div>
           <Tabs>

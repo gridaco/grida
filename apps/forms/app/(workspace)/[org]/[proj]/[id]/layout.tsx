@@ -15,6 +15,7 @@ import { PreviewButton } from "@/components/preview-button";
 import { GridaXSupabaseService } from "@/services/x-supabase";
 import type { Metadata } from "next";
 import { FormEditorInit } from "@/scaffolds/editor/state";
+import { Breadcrumbs } from "@/scaffolds/breadcrumb";
 
 type Params = {
   org: string;
@@ -210,7 +211,7 @@ function Header({
   title: string;
 }) {
   return (
-    <header className="flex w-full gap-4 bg-background justify-between border-b z-10 h-12">
+    <header className="flex w-full gap-4 bg-background border-b z-10 h-12">
       <div className="h-full px-4 min-w-60 w-min flex items-center lg:border-e">
         <Link href="/dashboard" prefetch={false}>
           <span className="flex items-center gap-2 text-md font-black select-none">
@@ -220,8 +221,13 @@ function Header({
         <SlashIcon className="min-w-[20px] ms-2" width={15} height={15} />
         <EditableFormTitle form_id={form_id} defaultValue={title} />
       </div>
-      <div className="px-4 flex gap-4 items-center justify-end">
-        <PreviewButton />
+      <div className="flex-1 flex items-center justify-between">
+        <div>
+          <Breadcrumbs />
+        </div>
+        <div className="px-4 flex gap-4 items-center justify-end">
+          <PreviewButton />
+        </div>
       </div>
     </header>
   );

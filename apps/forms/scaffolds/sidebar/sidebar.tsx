@@ -180,7 +180,6 @@ function ModeData() {
 
   return (
     <>
-      <div className="h-5" />
       <SidebarSection>
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>
@@ -289,7 +288,6 @@ function ModeConnect() {
   const { form_id, basepath } = state;
   return (
     <>
-      <div className="h-5" />
       <SidebarSection>
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>
@@ -441,7 +439,6 @@ function ModeSettings() {
   const { form_id, organization, project } = state;
   return (
     <>
-      <div className="h-5" />
       <SidebarSection>
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>

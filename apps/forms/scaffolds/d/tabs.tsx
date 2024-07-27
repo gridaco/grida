@@ -11,22 +11,18 @@ export function Tabs() {
   const { form_id: id, basepath } = state;
   const pathname = usePathname();
 
-  // path is /:org/:proj/:id/:tab/~
-  const tab = pathname.split("/")[4];
-
   return (
     <nav className="flex items-center justify-start md:justify-center gap-2">
       <Link href={`/${basepath}/${id}/data`} prefetch={false}>
-        <Tab selected={tab === "data"}>Data</Tab>
-      </Link>
-      <Link href={`/${basepath}/${id}/design`} prefetch={false}>
-        <Tab selected={tab === "design"}>Design</Tab>
+        <Tab selected={pathname === `/${basepath}/${id}/data`}>Data</Tab>
       </Link>
       <Link href={`/${basepath}/${id}/connect`} prefetch={false}>
-        <Tab selected={tab === "connect"}>Connect</Tab>
+        <Tab selected={pathname === `/${basepath}/${id}/connect`}>Connect</Tab>
       </Link>
       <Link href={`/${basepath}/${id}/settings`} prefetch={false}>
-        <Tab selected={tab === "settings"}>Settings</Tab>
+        <Tab selected={pathname === `/${basepath}/${id}/settings`}>
+          Settings
+        </Tab>
       </Link>
     </nav>
   );

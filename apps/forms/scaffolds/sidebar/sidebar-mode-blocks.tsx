@@ -25,34 +25,11 @@ import { blocklabels, supported_block_types } from "@/k/supported_block_types";
 import { BlockTypeIcon } from "@/components/form-blcok-type-icon";
 import type { FormBlockType, FormInputType } from "@/types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileIcon } from "lucide-react";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
+import Link from "next/link";
 
 export function ModeDesign() {
   const [state, dispatch] = useEditorState();
-
-  const addBlock = useCallback(
-    (block: FormBlockType) => {
-      dispatch({
-        type: "blocks/new",
-        block: block,
-      });
-    },
-    [dispatch]
-  );
-
-  const addFieldBlock = useCallback(
-    (type: FormInputType) => {
-      dispatch({
-        type: "blocks/new",
-        block: "field",
-        init: {
-          type: type,
-        },
-      });
-    },
-    [dispatch]
-  );
 
   return (
     <>
@@ -64,23 +41,25 @@ export function ModeDesign() {
         </SidebarSectionHeaderItem>
         <SidebarMenuList>
           {state.document.pages.map((page) => (
-            <SidebarMenuItem
-              level={page.level}
-              key={page.id}
-              onSelect={() => {
-                dispatch({
-                  type: "editor/document/select-page",
-                  page_id: page.id,
-                });
-              }}
-              selected={state.document.selected_page_id === page.id}
-            >
-              <ResourceTypeIcon
-                type={page.icon}
-                className="w-4 h-4 me-2 inline"
-              />
-              {page.label}
-            </SidebarMenuItem>
+            <Link key={page.id} href={page.href ?? ""}>
+              <SidebarMenuItem
+                level={page.level}
+                key={page.id}
+                onSelect={() => {
+                  dispatch({
+                    type: "editor/document/select-page",
+                    page_id: page.id,
+                  });
+                }}
+                selected={state.document.selected_page_id === page.id}
+              >
+                <ResourceTypeIcon
+                  type={page.icon}
+                  className="w-4 h-4 me-2 inline"
+                />
+                {page.label}
+              </SidebarMenuItem>
+            </Link>
           ))}
         </SidebarMenuList>
       </SidebarSection>
