@@ -39,6 +39,7 @@ import {
 } from "./components";
 import * as GridLayout from "./components/layout";
 import { txt_n_plural } from "@/utils/plural";
+import { editorlink } from "@/lib/forms/url";
 
 export function GridEditor() {
   const [state, dispatch] = useEditorState();
@@ -180,7 +181,13 @@ export function GridEditor() {
           )}
         </GridLayout.HeaderMenus>
         <GridLayout.HeaderMenus>
-          <Link href={`./analytics`} className="flex">
+          <Link
+            href={editorlink("data/analytics", {
+              basepath: state.basepath,
+              document_id: state.document_id,
+            })}
+            className="flex"
+          >
             <Badge variant={"outline"} className="cursor-pointer">
               <PieChartIcon className="align-middle me-2" />
               Realtime

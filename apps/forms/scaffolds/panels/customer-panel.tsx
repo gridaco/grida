@@ -127,11 +127,12 @@ export function CustomerEditPanel({
                     className="flex items-center group border-b border-dashed hover:border-black"
                   >
                     <Link2Icon className="mr-2" />
-                    <Link
+                    {/* FIXME: form.id is not a valud route - migration */}
+                    {/* <Link
                       href={`/${organization.name}/${project.name}/${response.form.id}`}
-                    >
-                      {response.form.title}
-                    </Link>
+                    > */}
+                    {response.form.title}
+                    {/* </Link> */}
                     <span className="font-mono">
                       {fmt_local_index(response.local_index)}
                     </span>

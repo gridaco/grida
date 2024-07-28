@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
         proj: project_ref.name,
         org: project_ref.organization!.name,
         origin,
-        form_id,
+        document_id: form_document_id,
       }),
       {
         status: 302,

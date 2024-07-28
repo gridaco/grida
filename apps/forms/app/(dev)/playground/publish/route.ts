@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
 
   const service = new JSONFrom2DB(supabase, PROJECT.id, jsonform);
 
-  const { form_id } = await service.insert();
+  const { form_document_id } = await service.insert();
 
   // redirect to form editor page
 
@@ -138,7 +138,7 @@ export async function POST(req: NextRequest) {
       org: ORG.name,
       proj: PROJECT.name,
       origin: HOST,
-      form_id,
+      document_id: form_document_id,
     }),
     {
       status: 302,

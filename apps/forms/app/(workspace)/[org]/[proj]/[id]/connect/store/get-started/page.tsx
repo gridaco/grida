@@ -24,6 +24,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { editorlink } from "@/lib/forms/url";
 import { useEditorState } from "@/scaffolds/editor";
 import { generated_form_store_name } from "@/services/utils/generated-form-store-name";
 import { ArchiveIcon, InfoCircledIcon } from "@radix-ui/react-icons";
@@ -92,10 +93,17 @@ function ConnectStoreForm() {
 
   const [state] = useEditorState();
 
+  const { document_id, basepath } = state;
+
+  const redirect_uri = editorlink("connect/store/products", {
+    basepath,
+    document_id,
+  });
+
   return (
     <form
       id="connect-store-form"
-      action={`/private/editor/connect/${state.form_id}/store/connection`}
+      action={`/private/editor/connect/${state.form_id}/store/connection?redirect_uri=${redirect_uri}`}
       method="POST"
       className="prose dark:prose-invert"
     >

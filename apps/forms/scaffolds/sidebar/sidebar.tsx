@@ -106,7 +106,7 @@ function ModeDocuments() {
   const { state: workspace } = useWorkspace();
   const { documents } = workspace;
   const [state] = useEditorState();
-  const { form_id, basepath, form_title, project } = state;
+  const { basepath, project } = state;
   const current_project_documents = documents.filter(
     (d) => d.project_id === project.id
   );
@@ -123,7 +123,7 @@ function ModeDocuments() {
           {current_project_documents.map((d) => (
             <Link
               key={d.id}
-              href={editorlink("form/edit", { form_id: d.form_id!, basepath })}
+              href={editorlink("form/edit", { document_id: d.id, basepath })}
             >
               <SidebarMenuItem muted>
                 <ResourceTypeIcon
@@ -143,7 +143,7 @@ function ModeDocuments() {
 function ModeData() {
   const [state] = useEditorState();
 
-  const { form_id, basepath, tables } = state;
+  const { document_id, basepath, tables } = state;
 
   return (
     <>
@@ -158,7 +158,7 @@ function ModeData() {
             return (
               <SidebarMenuLink
                 key={i}
-                href={tablehref(basepath, form_id, table.group)}
+                href={tablehref(basepath, document_id, table.group)}
               >
                 <SidebarMenuItem muted>
                   <TableTypeIcon
@@ -171,7 +171,7 @@ function ModeData() {
             );
           })}
           {/* <li>
-          <Link href={`/${basepath}/${form_id}/data/files`}>
+          <Link href="#">
             <SideNavItem>
               <FileIcon className="w-4 h-4" />
               Files
@@ -218,24 +218,24 @@ function ModeData() {
 
 function tablehref(
   basepath: string,
-  form_id: string,
+  document_id: string,
   type: FormEditorState["tables"][number]["group"]
 ) {
   switch (type) {
     case "response":
-      return `/${basepath}/${form_id}/data/responses`;
+      return `/${basepath}/${document_id}/data/responses`;
     case "customer":
-      return `/${basepath}/${form_id}/data/customers`;
+      return `/${basepath}/${document_id}/data/customers`;
     case "x-supabase-main-table":
-      return `/${basepath}/${form_id}/data/responses`;
+      return `/${basepath}/${document_id}/data/responses`;
     case "x-supabase-auth.users":
-      return `/${basepath}/${form_id}/data/x/auth.users`;
+      return `/${basepath}/${document_id}/data/x/auth.users`;
   }
 }
 
 function ModeConnect() {
   const [state] = useEditorState();
-  const { form_id, basepath } = state;
+  const { form_id, document_id: form_document_id, basepath } = state;
   const pathname = usePathname();
   return (
     <>
@@ -246,16 +246,18 @@ function ModeConnect() {
           </SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuList>
-          <Link href={`/${basepath}/${form_id}/connect/share`}>
-            <SidebarMenuItem
-              muted
-              selected={`/${basepath}/${form_id}/connect/share` === pathname}
-            >
+          <SidebarMenuLink
+            href={editorlink("connect/share", {
+              document_id: form_document_id,
+              basepath,
+            })}
+          >
+            <SidebarMenuItem muted>
               <Link2Icon className="inline align-middle w-4 h-4 me-2" />
               Share
             </SidebarMenuItem>
-          </Link>
-          {/* <Link href={`/${basepath}/${form_id}/connect/domain`}> */}
+          </SidebarMenuLink>
+          {/* <Link href={`connect/domain`}> */}
           <SidebarMenuItem disabled>
             <GlobeIcon className="inline align-middle w-4 h-4 me-2" />
             Domain
@@ -273,18 +275,28 @@ function ModeConnect() {
           </SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuList>
-          <Link href={`/${basepath}/${form_id}/connect/channels`}>
+          <SidebarMenuLink
+            href={editorlink("connect/channels", {
+              basepath,
+              document_id: form_document_id,
+            })}
+          >
             <SidebarMenuItem muted>
               <EnvelopeClosedIcon className="inline align-middle w-4 h-4 me-2" />
               Channels
             </SidebarMenuItem>
-          </Link>
-          <Link href={`/${basepath}/${form_id}/connect/customer`}>
+          </SidebarMenuLink>
+          <SidebarMenuLink
+            href={editorlink("connect/customer", {
+              basepath,
+              document_id: form_document_id,
+            })}
+          >
             <SidebarMenuItem muted>
               <AvatarIcon className="inline align-middle w-4 h-4 me-2" />
               Customer Identity
             </SidebarMenuItem>
-          </Link>
+          </SidebarMenuLink>
         </SidebarMenuList>
       </SidebarSection>
       <SidebarSection>
@@ -294,14 +306,19 @@ function ModeConnect() {
           </SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuList>
-          <Link href={`/${basepath}/${form_id}/connect/store`}>
+          <SidebarMenuLink
+            href={editorlink("connect/store", {
+              basepath,
+              document_id: form_document_id,
+            })}
+          >
             <SidebarMenuItem muted>
               <ArchiveIcon className="inline align-middle w-4 h-4 me-2" />
               Store
             </SidebarMenuItem>
-          </Link>
+          </SidebarMenuLink>
 
-          {/* <Link href={`/${basepath}/${id}/connect/pg/stripe`}> */}
+          {/* <Link href={`connect/pg/stripe`}> */}
           <SidebarMenuItem disabled>
             <StripeLogo1 className="inline align-middle w-4 h-4 me-2" />
             Stripe
@@ -310,7 +327,7 @@ function ModeConnect() {
             </Badge>
           </SidebarMenuItem>
           {/* </Link> */}
-          {/* <Link href={`/${basepath}/${id}/connect/pg/tosspayments`}> */}
+          {/* <Link href={`connect/pg/tosspayments`}> */}
           <SidebarMenuItem disabled>
             <TossLogo className="inline align-middle w-4 h-4 me-2" />
             Toss
@@ -328,7 +345,12 @@ function ModeConnect() {
           </SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuList>
-          <Link href={`/${basepath}/${form_id}/connect/database/supabase`}>
+          <SidebarMenuLink
+            href={editorlink("connect/database/supabase", {
+              basepath,
+              document_id: form_document_id,
+            })}
+          >
             <SidebarMenuItem muted>
               <SupabaseLogo className="inline align-middle w-4 h-4 me-2" />
               Supabase
@@ -336,7 +358,7 @@ function ModeConnect() {
                 beta
               </Badge>
             </SidebarMenuItem>
-          </Link>
+          </SidebarMenuLink>
         </SidebarMenuList>
       </SidebarSection>
       <SidebarSection>
@@ -346,7 +368,7 @@ function ModeConnect() {
           </SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuList>
-          {/* <Link href={`/${basepath}/${id}/connect/parameters`}> */}
+          {/* <Link href={`connect/parameters`}> */}
           <SidebarMenuItem disabled>
             <CodeIcon className="inline align-middle w-4 h-4 me-2" />
             URL parameters
@@ -355,7 +377,7 @@ function ModeConnect() {
             </Badge>
           </SidebarMenuItem>
           {/* </Link> */}
-          {/* <Link href={`/${basepath}/${id}/connect/webhooks`}> */}
+          {/* <Link href={`connect/webhooks`}> */}
           <SidebarMenuItem disabled>
             <CodeIcon className="inline align-middle w-4 h-4 me-2" />
             Webhooks
@@ -364,7 +386,7 @@ function ModeConnect() {
             </Badge>{" "}
           </SidebarMenuItem>
           {/* </Link> */}
-          {/* <Link href={`/${basepath}/${id}/connect/integrations`}> */}
+          {/* <Link href={`connect/integrations`}> */}
           <SidebarMenuItem disabled>
             <CodeIcon className="inline align-middle w-4 h-4 me-2" />
             Integrations
@@ -373,7 +395,7 @@ function ModeConnect() {
             </Badge>{" "}
           </SidebarMenuItem>
           {/* </Link> */}
-          {/* <Link href={`/${basepath}/${form_id}/connect/import`}> */}
+          {/* <Link href={`connect/import`}> */}
           <SidebarMenuItem disabled>
             <CodeIcon className="inline align-middle w-4 h-4 me-2" />
             Import Data
@@ -421,7 +443,7 @@ function ModeSettings() {
           </SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuList>
-          {/* <Link href={`/${basepath}/${id}/settings/api`}> */}
+          {/* <Link href={`settings/api`}> */}
           <SidebarMenuItem disabled>
             <CodeIcon className="inline align-middle w-4 h-4 me-2" />
             API Keys
