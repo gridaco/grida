@@ -10,47 +10,23 @@ import { GridaLogo } from "@/components/grida-logo";
 import { SlashIcon } from "@radix-ui/react-icons";
 import { Sidebar } from "@/scaffolds/sidebar/sidebar";
 import { FormEditorProvider } from "@/scaffolds/editor";
-import { EndingPageTemplateID, FormDocument } from "@/types";
 import { PreviewButton } from "@/components/preview-button";
 import { GridaXSupabaseService } from "@/services/x-supabase";
-import type { Metadata } from "next";
-import { FormEditorInit } from "@/scaffolds/editor/state";
+import type {
+  EndingPageTemplateID,
+  Form,
+  FormBlock,
+  FormFieldDefinition,
+  FormPageBackgroundSchema,
+  FormStyleSheetV1Schema,
+} from "@/types";
+import type {
+  GDocEditorRouteParams,
+  FormEditorInit,
+} from "@/scaffolds/editor/state";
 import { Breadcrumbs } from "@/scaffolds/breadcrumb";
-
-type Params = {
-  org: string;
-  proj: string;
-  id: string;
-};
-
-export async function generateMetadata({
-  params,
-}: {
-  params: Params;
-}): Promise<Metadata> {
-  const cookieStore = cookies();
-  const supabase = createServerComponentClient(cookieStore);
-  const id = params.id;
-
-  // TODO: change to form_document after migration
-  const { data, error } = await supabase
-    .from("form")
-    .select(
-      `
-        title
-      `
-    )
-    .eq("id", id)
-    .single();
-
-  if (!data) {
-    return notFound();
-  }
-
-  return {
-    title: `${data.title} | Grida Forms`,
-  };
-}
+import assert from "assert";
+import Head from "next/head";
 
 export const revalidate = 0;
 
@@ -59,7 +35,7 @@ export default async function Layout({
   children,
 }: Readonly<{
   children: React.ReactNode;
-  params: Params;
+  params: GDocEditorRouteParams;
 }>) {
   const cookieStore = cookies();
   const supabase = createServerComponentClient(cookieStore);
@@ -84,20 +60,20 @@ export default async function Layout({
   }
 
   const { data, error } = await supabase
-    .from("form")
+    .from("form_document")
     .select(
       `
         *,
-        fields:form_field(
+        blocks:form_block(*),
+        form!form_id(
           *,
-          options:form_field_option(*)
-        ),
-        default_document:form_document!default_form_page_id(
-          *,
-          blocks:form_block(*)
-        ),
-        store_connection:connection_commerce_store(*),
-        supabase_connection:connection_supabase(*)
+          fields:form_field(
+            *,
+            options:form_field_option(*)
+          ),
+          store_connection:connection_commerce_store(*),
+          supabase_connection:connection_supabase(*)
+        )
       `
     )
     .eq("project_id", project_ref.id)
@@ -111,16 +87,25 @@ export default async function Layout({
 
   const client = new GridaXSupabaseService();
 
-  const supabase_connection_state = data.supabase_connection
-    ? await client.getConnection(data.supabase_connection)
-    : null;
+  const { form: _form } = data;
+  assert(_form);
+  const form = _form as any as Form & {
+    supabase_connection: any;
+    store_connection: any;
+    fields: FormFieldDefinition[];
+  };
 
-  // there's a bug with supabase typegen, where the default_page will not be a array, but cast it to array.
-  // it's safe to assume as non array.
-  const default_document = data.default_document as unknown as FormDocument;
+  const supabase_connection_state = form.supabase_connection
+    ? await client.getConnection(form.supabase_connection)
+    : null;
 
   return (
     <div className="h-screen flex flex-col">
+      <Head>
+        <title>
+          {form.title} | {proj}
+        </title>
+      </Head>
       <FormEditorProvider
         initial={
           {
@@ -130,54 +115,57 @@ export default async function Layout({
               name: project_ref.organization!.name,
             },
             connections: {
-              store_id: data.store_connection?.store_id,
+              store_id: form.store_connection?.store_id,
               supabase: supabase_connection_state || undefined,
             },
             theme: {
-              lang: default_document.lang,
+              lang: data.lang,
               is_powered_by_branding_enabled:
-                default_document.is_powered_by_branding_enabled,
-              palette: default_document?.stylesheet?.palette,
-              fontFamily: default_document.stylesheet?.["font-family"],
-              section: default_document.stylesheet?.section,
-              customCSS: default_document.stylesheet?.custom,
-              background: default_document.background,
+                data.is_powered_by_branding_enabled,
+              palette: (data?.stylesheet as FormStyleSheetV1Schema)?.palette,
+              fontFamily: (data.stylesheet as FormStyleSheetV1Schema)?.[
+                "font-family"
+              ],
+              section: (data.stylesheet as FormStyleSheetV1Schema)?.section,
+              customCSS: (data.stylesheet as FormStyleSheetV1Schema)?.custom,
+              background:
+                data.background as unknown as FormPageBackgroundSchema,
             },
-            form_id: id,
-            form_title: data.title,
+            form_id: form.id,
+            // TODO:
+            form_title: form.title,
             campaign: {
-              is_scheduling_enabled: data.is_scheduling_enabled,
-              is_force_closed: data.is_force_closed,
+              is_scheduling_enabled: form.is_scheduling_enabled,
+              is_force_closed: form.is_force_closed,
               max_form_responses_by_customer:
-                data.max_form_responses_by_customer,
+                form.max_form_responses_by_customer,
               is_max_form_responses_by_customer_enabled:
-                data.is_max_form_responses_by_customer_enabled,
-              max_form_responses_in_total: data.max_form_responses_in_total,
+                form.is_max_form_responses_by_customer_enabled,
+              max_form_responses_in_total: form.max_form_responses_in_total,
               is_max_form_responses_in_total_enabled:
-                data.is_max_form_responses_in_total_enabled,
-              scheduling_open_at: data.scheduling_open_at,
-              scheduling_close_at: data.scheduling_close_at,
-              scheduling_tz: data.scheduling_tz || undefined,
+                form.is_max_form_responses_in_total_enabled,
+              scheduling_open_at: form.scheduling_open_at,
+              scheduling_close_at: form.scheduling_close_at,
+              scheduling_tz: form.scheduling_tz || undefined,
             },
             form_security: {
               unknown_field_handling_strategy:
-                data.unknown_field_handling_strategy,
-              method: default_document.method,
+                form.unknown_field_handling_strategy,
+              method: data.method,
             },
             ending: {
               is_redirect_after_response_uri_enabled:
-                default_document.is_redirect_after_response_uri_enabled,
-              redirect_after_response_uri:
-                default_document.redirect_after_response_uri,
-              is_ending_page_enabled: default_document.is_ending_page_enabled,
+                data.is_redirect_after_response_uri_enabled,
+              redirect_after_response_uri: data.redirect_after_response_uri,
+              is_ending_page_enabled: data.is_ending_page_enabled,
               ending_page_template_id:
-                default_document.ending_page_template_id as EndingPageTemplateID,
+                data.ending_page_template_id as EndingPageTemplateID,
               ending_page_i18n_overrides:
-                default_document.ending_page_i18n_overrides,
+                data.ending_page_i18n_overrides as any,
             },
-            form_document_id: data.default_form_page_id,
-            fields: data.fields,
-            blocks: default_document ? default_document.blocks || [] : [],
+            document_id: data.id,
+            fields: form.fields,
+            blocks: data.blocks as FormBlock[],
           } satisfies FormEditorInit
         }
       >
@@ -185,7 +173,8 @@ export default async function Layout({
           org={params.org}
           proj={params.proj}
           form_id={id}
-          title={data.title}
+          // TODO:
+          title={form.title}
         />
         <div className="flex flex-1 overflow-y-auto">
           <div className="h-full flex flex-1 w-full">

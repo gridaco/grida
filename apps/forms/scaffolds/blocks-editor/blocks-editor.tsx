@@ -81,7 +81,7 @@ function PendingBlocksResolver() {
         .insert({
           form_id: state.form_id,
           type: block.type,
-          form_page_id: state.form_document_id,
+          form_page_id: state.document_id,
           parent_id: block.parent_id?.startsWith(DRAFT_ID_START_WITH)
             ? null
             : block.parent_id,
@@ -99,7 +99,7 @@ function PendingBlocksResolver() {
 
       return data;
     },
-    [state.form_id, state.form_document_id, supabase]
+    [state.form_id, state.document_id, supabase]
   );
 
   useEffect(() => {
@@ -208,7 +208,7 @@ function OptimisticBlocksSyncProvider({
 
 function AgentThemeSyncProvider({ children }: React.PropsWithChildren<{}>) {
   const [state] = useEditorState();
-  const { form_document_id, theme } = state;
+  const { document_id, theme } = state;
   const prev = usePrevious(state.theme);
   const supabase = createClientFormsClient();
 
@@ -235,7 +235,7 @@ function AgentThemeSyncProvider({ children }: React.PropsWithChildren<{}>) {
             | FormPageBackgroundSchema
             | undefined as {},
         })
-        .eq("id", form_document_id!)
+        .eq("id", document_id!)
         .then(({ error }) => {
           if (error) console.error(error);
         });
@@ -245,7 +245,7 @@ function AgentThemeSyncProvider({ children }: React.PropsWithChildren<{}>) {
     state.theme,
     prev,
     supabase,
-    form_document_id,
+    document_id,
     theme.is_powered_by_branding_enabled,
     theme.lang,
     theme.customCSS,

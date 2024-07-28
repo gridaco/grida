@@ -142,7 +142,7 @@ export function RestrictNumberOfResponseByCustomer() {
 function MaxResponsesByCustomerHelpWarning() {
   const [state] = useEditorState();
 
-  const { form_id, basepath } = state;
+  const { document_id, basepath } = state;
 
   return (
     <>
@@ -150,7 +150,7 @@ function MaxResponsesByCustomerHelpWarning() {
       <Link
         href={editorlink("connect/customer", {
           basepath,
-          form_id,
+          document_id: document_id,
         })}
       >
         <u>customer identity</u>

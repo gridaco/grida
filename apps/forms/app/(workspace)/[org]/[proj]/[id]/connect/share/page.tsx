@@ -1,3 +1,5 @@
+"use client";
+
 import { CopyToClipboardInput } from "@/components/copy-to-clipboard-input";
 import {
   PreferenceBody,
@@ -9,34 +11,25 @@ import {
   SectorHeader,
   SectorHeading,
 } from "@/components/preferences";
+import { useEditorState } from "@/scaffolds/editor";
 import { AboutThisForm } from "@/scaffolds/settings/about-this-form";
 import React from "react";
+import useSWR from "swr";
 
-const HOST = process.env.HOST;
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
-async function getData(id: string) {
-  const res = await fetch(`${HOST}/v1/${id}/share`);
-  // The return value is *not* serialized
-  // You can return Date, Map, Set, etc.
+export default function WithLink() {
+  const [state] = useEditorState();
+  const { form_id } = state;
 
-  if (!res.ok) {
-    // This will activate the closest `error.js` Error Boundary
-    throw new Error("Failed to fetch data");
-  }
+  const { data } = useSWR(`/v1/${form_id}/share`, fetcher);
 
-  return res.json();
-}
-
-export default async function WithLink({ params }: { params: { id: string } }) {
-  const { id } = params;
-  const data = await getData(id);
-
-  const { url, submit, embed } = data;
+  const { url, submit, embed } = data || {};
 
   return (
     <main className="max-w-2xl mx-auto">
       <Sector>
-        <AboutThisForm form_id={id} />
+        <AboutThisForm form_id={form_id} />
       </Sector>
       <Sector>
         <SectorHeader>

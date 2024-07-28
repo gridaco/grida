@@ -61,15 +61,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { SupabaseTableInfo } from "@/scaffolds/x-supabase/supabase-table-info";
+import { useEditorState } from "@/scaffolds/editor";
 
-export default function ConnectDB({
-  params,
-}: {
-  params: {
-    id: string;
-  };
-}) {
-  const form_id = params.id;
+export default function ConnectSupabasePage() {
+  const [state] = useEditorState();
+  const { form_id } = state;
 
   return (
     <main className="max-w-2xl mx-auto mt-10">

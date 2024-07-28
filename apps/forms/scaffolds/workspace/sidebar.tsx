@@ -27,6 +27,7 @@ import { ResourceTypeIcon } from "@/components/resource-type-icon";
 import { useWorkspace } from "./workspace";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/utils";
+import { editorlink } from "@/lib/forms/url";
 
 export function WorkspaceSidebar() {
   const { state } = useWorkspace();
@@ -120,7 +121,11 @@ export function WorkspaceSidebar() {
                       {projectdocs.map((doc, i) => (
                         <Link
                           key={doc.id}
-                          href={`/${organization.name}/${p.name}/${doc.form_id}`}
+                          href={editorlink(".", {
+                            org: organization.name,
+                            proj: p.name,
+                            document_id: doc.id,
+                          })}
                           prefetch={false}
                         >
                           <SidebarMenuItem level={1} muted>

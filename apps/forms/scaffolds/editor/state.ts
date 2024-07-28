@@ -26,6 +26,12 @@ import { Tokens } from "@/ast";
 import React from "react";
 import { editorbasepath } from "@/lib/forms/url";
 
+export type GDocEditorRouteParams = {
+  org: string;
+  proj: string;
+  id: string;
+};
+
 export type DraftID = `[draft]${string}`;
 export const DRAFT_ID_START_WITH = "[draft]";
 const ISDEV = process.env.NODE_ENV === "development";
@@ -49,7 +55,7 @@ export interface FormEditorInit {
   };
   theme: FormEditorState["theme"];
   form_title: string;
-  form_document_id: string | null;
+  document_id: string;
   blocks: EditorFlatFormBlock[];
   fields: FormFieldDefinition[];
 }
@@ -128,10 +134,10 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
     campaign: init.campaign,
     form_security: init.form_security,
     ending: init.ending,
-    form_document_id: init.form_document_id,
+    document_id: init.document_id,
     blocks: blockstreeflat(init.blocks),
     document: {
-      pages: formpagesinit({ basepath, form_id: init.form_id }),
+      pages: formpagesinit({ basepath, document_id: init.document_id }),
       selected_page_id: "form",
       nodes: [],
       templatesample: "formcollection_sample_001_the_bundle",
@@ -172,17 +178,17 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
 
 function formpagesinit({
   basepath,
-  form_id,
+  document_id,
 }: {
   basepath: string;
-  form_id: string;
+  document_id: string;
 }): MenuItem[] {
   return [
     {
       section: "Form",
       id: "campaign",
       label: "Campaign",
-      href: `/${basepath}/${form_id}/form`,
+      href: `/${basepath}/${document_id}/form`,
       icon: "folder",
     },
     // {
@@ -197,7 +203,7 @@ function formpagesinit({
       section: "Form",
       id: "form",
       label: "Form Page",
-      href: `/${basepath}/${form_id}/form/edit`,
+      href: `/${basepath}/${document_id}/form/edit`,
       icon: "file",
       level: 1,
     },
@@ -205,7 +211,7 @@ function formpagesinit({
       section: "Form",
       id: "ending",
       label: "Ending Page",
-      href: `/${basepath}/${form_id}/form/end`,
+      href: `/${basepath}/${document_id}/form/end`,
       icon: "file",
       level: 1,
     },
@@ -213,14 +219,14 @@ function formpagesinit({
       section: "Data",
       id: "responses",
       label: "Responses",
-      href: `/${basepath}/${form_id}/data/responses`,
+      href: `/${basepath}/${document_id}/data/responses`,
       icon: "table",
     },
     {
       section: "Analytics",
       id: "realtime",
       label: "Realtime",
-      href: `/${basepath}/${form_id}/data/analytics`,
+      href: `/${basepath}/${document_id}/data/analytics`,
       icon: "chart",
     },
   ];
@@ -317,7 +323,7 @@ export interface FormEditorState {
     ending_page_template_id: EndingPageTemplateID | null;
     ending_page_i18n_overrides: EndingPageI18nOverrides | null;
   };
-  form_document_id: string | null;
+  document_id: string;
   blocks: EditorFlatFormBlock[];
   document: {
     pages: MenuItem[];

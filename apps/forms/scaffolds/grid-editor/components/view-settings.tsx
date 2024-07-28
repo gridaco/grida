@@ -20,6 +20,7 @@ import { LOCALTZ, tztostr } from "../../editor/symbols";
 import { useEditorState } from "@/scaffolds/editor";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { editorlink } from "@/lib/forms/url";
 
 export function GridViewSettings() {
   const [state, dispatch] = useEditorState();
@@ -155,7 +156,13 @@ export function GridViewSettings() {
         {simulator_available && (
           <>
             <DropdownMenuSeparator />
-            <Link href={`./simulator`} target="_blank">
+            <Link
+              href={editorlink("data/simulator", {
+                basepath: state.basepath,
+                document_id: state.document_id,
+              })}
+              target="_blank"
+            >
               <DropdownMenuItem className="cursor-pointer">
                 <CommitIcon className="inline align-middle me-2" />
                 Open Simulator

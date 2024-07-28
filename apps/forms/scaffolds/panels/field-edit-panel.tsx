@@ -328,7 +328,7 @@ export function FieldEditPanel({
         const connect_redirect_link = editorlink("connect/store", {
           basepath,
           origin: window.location.origin,
-          form_id: state.form_id,
+          document_id: state.form_id,
         });
         console.log("redirecting to", connect_redirect_link);
         props.onOpenChange?.(false);

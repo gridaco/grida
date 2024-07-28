@@ -4,7 +4,6 @@ import {
   ChevronDownIcon,
   OpenInNewWindowIcon,
   GearIcon,
-  CommitIcon,
 } from "@radix-ui/react-icons";
 import {
   DropdownMenu,
@@ -14,13 +13,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import clsx from "clsx";
 import Link from "next/link";
-import { formlink } from "@/lib/forms/url";
+import { editorlink, formlink } from "@/lib/forms/url";
 import { useEditorState } from "@/scaffolds/editor";
 
 export function PreviewButton() {
   const [state] = useEditorState();
 
-  const { form_id, organization, project } = state;
+  const { form_id, document_id, organization, project } = state;
 
   const built_in_agent_url = formlink("", form_id);
 
@@ -56,19 +55,15 @@ export function PreviewButton() {
             </DropdownMenuItem>
           </Link>
           <Link
-            href={`/${organization.name}/${project.name}/${form_id}/connect`}
+            href={editorlink("connect", {
+              org: organization.name,
+              proj: project.name,
+              document_id: document_id,
+            })}
           >
             <DropdownMenuItem>
               <GearIcon className="me-2 align-middle" />
               Configure Agent
-            </DropdownMenuItem>
-          </Link>
-          <Link
-            href={`/${organization.name}/${project.name}/${form_id}/data/simulator`}
-          >
-            <DropdownMenuItem>
-              <CommitIcon className="me-2 align-middle" />
-              Simulator
             </DropdownMenuItem>
           </Link>
         </DropdownMenuContent>

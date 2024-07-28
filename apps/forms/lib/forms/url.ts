@@ -3,6 +3,7 @@ import * as ERR from "@/k/error";
 
 export function editorlink(
   page:
+    | "."
     | "form"
     | "form/edit"
     | "settings"
@@ -11,19 +12,22 @@ export function editorlink(
     | "data"
     | "data/responses"
     | "data/analytics"
+    | "data/simulator"
     | "connect"
     | "connect/share"
     | "connect/customer"
+    | "connect/channels"
     | "connect/store"
     | "connect/store/get-started"
-    | "connect/store/products",
+    | "connect/store/products"
+    | "connect/database/supabase",
   {
     origin = "",
-    form_id,
+    document_id: id,
     ...path
   }: {
     origin?: string;
-    form_id: string;
+    document_id: string;
   } & (
     | {
         org: string;
@@ -36,34 +40,42 @@ export function editorlink(
 ) {
   const basepath = editorbasepath(path);
   switch (page) {
+    case ".":
+      return `${origin}/${basepath}/${id}`;
     case "form":
-      return `${origin}/${basepath}/${form_id}/form`;
+      return `${origin}/${basepath}/${id}/form`;
     case "form/edit":
-      return `${origin}/${basepath}/${form_id}/form/edit`;
+      return `${origin}/${basepath}/${id}/form/edit`;
     case "settings":
-      return `${origin}/${basepath}/${form_id}/settings`;
+      return `${origin}/${basepath}/${id}/settings`;
     // case "settings/customize":
     //   return `${origin}/${basepath}/${form_id}/settings/customize`;
     // case "settings/general":
     //   return `${origin}/${basepath}/${form_id}/settings/general`;
     case "data":
-      return `${origin}/${basepath}/${form_id}/data`;
+      return `${origin}/${basepath}/${id}/data`;
     case "data/responses":
-      return `${origin}/${basepath}/${form_id}/data/responses`;
+      return `${origin}/${basepath}/${id}/data/responses`;
     case "data/analytics":
-      return `${origin}/${basepath}/${form_id}/data/analytics`;
+      return `${origin}/${basepath}/${id}/data/analytics`;
+    case "data/simulator":
+      return `${origin}/${basepath}/${id}/data/simulator`;
     case "connect":
-      return `${origin}/${basepath}/${form_id}/connect`;
+      return `${origin}/${basepath}/${id}/connect`;
     case "connect/share":
-      return `${origin}/${basepath}/${form_id}/connect/share`;
+      return `${origin}/${basepath}/${id}/connect/share`;
     case "connect/customer":
-      return `${origin}/${basepath}/${form_id}/connect/customer`;
+      return `${origin}/${basepath}/${id}/connect/customer`;
+    case "connect/channels":
+      return `${origin}/${basepath}/${id}/connect/channels`;
     case "connect/store":
-      return `${origin}/${basepath}/${form_id}/connect/store`;
+      return `${origin}/${basepath}/${id}/connect/store`;
     case "connect/store/get-started":
-      return `${origin}/${basepath}/${form_id}/connect/store/get-started`;
+      return `${origin}/${basepath}/${id}/connect/store/get-started`;
     case "connect/store/products":
-      return `${origin}/${basepath}/${form_id}/connect/store/products`;
+      return `${origin}/${basepath}/${id}/connect/store/products`;
+    case "connect/database/supabase":
+      return `${origin}/${basepath}/${id}/connect/database/supabase`;
   }
 }
 
@@ -79,6 +91,26 @@ export function editorbasepath(
 ) {
   if ("basepath" in params) return params.basepath;
   return `${params.org}/${params.proj}`;
+}
+
+export function resolve_next(
+  origin: string,
+  uri?: string | null,
+  fallback = "/"
+) {
+  if (!uri) return resolve_next(origin, fallback);
+  // Check if the URL is absolute
+  const isAbsolute = /^https?:\/\//i.test(uri);
+
+  // If the URL is absolute, return it as is
+  if (isAbsolute) {
+    return uri;
+  }
+
+  // If the URL is relative, combine it with the origin
+  const combinedUri = new URL(uri, origin).toString();
+
+  return combinedUri;
 }
 
 export interface FormLinkURLParams {

@@ -24,17 +24,13 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { editorlink } from "@/lib/forms/url";
 import { useEditorState } from "@/scaffolds/editor";
 import { generated_form_store_name } from "@/services/utils/generated-form-store-name";
 import { ArchiveIcon, InfoCircledIcon } from "@radix-ui/react-icons";
 import { useState } from "react";
 
-export default function StoreGetStartedPage({
-  params,
-}: {
-  params: { id: string };
-}) {
-  const form_id = params.id;
+export default function StoreGetStartedPage() {
   return (
     <main className="h-full flex flex-col">
       <div className="h-hull flex-1 flex flex-col justify-center items-center gap-8">
@@ -97,10 +93,17 @@ function ConnectStoreForm() {
 
   const [state] = useEditorState();
 
+  const { document_id, basepath } = state;
+
+  const next = editorlink("connect/store/products", {
+    basepath,
+    document_id,
+  });
+
   return (
     <form
       id="connect-store-form"
-      action={`/private/editor/connect/${state.form_id}/store/connection`}
+      action={`/private/editor/connect/${state.form_id}/store/connection?next=${next}`}
       method="POST"
       className="prose dark:prose-invert"
     >

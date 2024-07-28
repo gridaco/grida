@@ -13,6 +13,7 @@ import { WorkspaceSidebar } from "@/scaffolds/workspace/sidebar";
 import { useWorkspace } from "@/scaffolds/workspace";
 import { Skeleton } from "@/components/ui/skeleton";
 import Head from "next/head";
+import { editorlink } from "@/lib/forms/url";
 
 export default function FormsDashboardPage({
   params,
@@ -87,10 +88,10 @@ export default function FormsDashboardPage({
                 </Link>
               </section>
               <hr className="mb-10 mt-5 dark:border-neutral-700" />
-              <FormsGrid
+              <DocumentsGrid
                 organization_name={organization_name}
                 project_name={project_name}
-                forms={documents}
+                documents={documents}
                 layout={layout}
               />
               <footer className="mt-10 mb-5">
@@ -104,27 +105,31 @@ export default function FormsDashboardPage({
   );
 }
 
-function FormsGrid({
+function DocumentsGrid({
   organization_name,
   project_name,
-  forms,
+  documents,
   layout,
 }: {
   organization_name: string;
   project_name: string;
-  forms: GDocument[];
+  documents: GDocument[];
   layout: "grid" | "list";
 }) {
   if (layout === "grid") {
     return (
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        {forms?.map((form, i) => (
+        {documents?.map((doc, i) => (
           <Link
             key={i}
-            href={`/${organization_name}/${project_name}/${form.form_id}`}
+            href={editorlink(".", {
+              org: organization_name,
+              proj: project_name,
+              document_id: doc.id,
+            })}
             prefetch={false}
           >
-            <GridCard {...form} />
+            <GridCard {...doc} />
           </Link>
         ))}
       </div>
@@ -136,18 +141,22 @@ function FormsGrid({
       <header className="flex text-sm opacity-80">
         <span className="flex-1">
           Form
-          <span className="ml-2 text-xs opacity-50">{forms.length}</span>
+          <span className="ml-2 text-xs opacity-50">{documents.length}</span>
         </span>
         <span className="w-32">Responses</span>
         <span className="w-44">Updated At</span>
       </header>
-      {forms?.map((form, i) => (
+      {documents?.map((doc, i) => (
         <Link
           key={i}
-          href={`/${organization_name}/${project_name}//${form.form_id}`}
+          href={editorlink(".", {
+            org: organization_name,
+            proj: project_name,
+            document_id: doc.id,
+          })}
           prefetch={false}
         >
-          <RowCard {...form} />
+          <RowCard {...doc} />
         </Link>
       ))}
     </div>

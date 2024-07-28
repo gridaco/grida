@@ -19,6 +19,11 @@ export interface Form {
   title: string;
   unknown_field_handling_strategy: FormResponseUnknownFieldHandlingStrategyType;
   updated_at: string;
+  is_scheduling_enabled: boolean;
+  is_force_closed: boolean;
+  scheduling_close_at: string | null;
+  scheduling_open_at: string | null;
+  scheduling_tz: string | null;
 }
 
 export interface Customer {

@@ -1,4 +1,4 @@
-import { editorlink } from "@/lib/forms/url";
+import { resolve_next } from "@/lib/forms/url";
 import {
   grida_commerce_client,
   createRouteHandlerClient,
@@ -24,6 +24,7 @@ export async function POST(
   const origin = req.nextUrl.origin;
   const cookieStore = cookies();
   const { form_id } = context.params;
+  const next = req.nextUrl.searchParams.get("next");
   const supabase = createRouteHandlerClient(cookieStore);
   const wsclient = createRouteHandlerWorkspaceClient(cookieStore);
 
@@ -75,17 +76,9 @@ export async function POST(
   );
 
   if (form_reference.store_connection) {
-    return NextResponse.redirect(
-      editorlink("connect/store/products", {
-        org: project_ref.organization!.name,
-        proj: project_ref.name,
-        origin,
-        form_id,
-      }),
-      {
-        status: 301,
-      }
-    );
+    return NextResponse.redirect(resolve_next(origin, next), {
+      status: 301,
+    });
   }
 
   const name =
@@ -102,17 +95,7 @@ export async function POST(
 
   if (!store) {
     console.error("store::not-inserted");
-    return NextResponse.redirect(
-      editorlink("connect/store", {
-        org: project_ref.organization!.name,
-        proj: project_ref.name,
-        origin,
-        form_id,
-      }),
-      {
-        status: 301,
-      }
-    );
+    return NextResponse.error();
   }
 
   // create new connection record
@@ -122,28 +105,10 @@ export async function POST(
 
   if (error) {
     console.error("connection::error:", error);
-    return NextResponse.redirect(
-      editorlink("connect/store", {
-        org: project_ref.organization!.name,
-        proj: project_ref.name,
-        origin,
-        form_id,
-      }),
-      {
-        status: 301,
-      }
-    );
+    return NextResponse.error();
   }
 
-  return NextResponse.redirect(
-    editorlink("connect/store/products", {
-      org: project_ref.organization!.name,
-      proj: project_ref.name,
-      origin,
-      form_id,
-    }),
-    {
-      status: 301,
-    }
-  );
+  return NextResponse.redirect(resolve_next(origin, next), {
+    status: 301,
+  });
 }

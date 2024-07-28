@@ -12,14 +12,14 @@ export function GET(
   }
 ) {
   const origin = req.nextUrl.origin;
-  const { id: form_id, org, proj } = context.params;
+  const { id, org, proj } = context.params;
 
   return NextResponse.redirect(
     editorlink("data", {
       org,
       proj,
       origin,
-      form_id,
+      document_id: id,
     }),
     {
       status: 301,

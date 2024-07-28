@@ -2,30 +2,37 @@ import { editorlink } from "@/lib/forms/url";
 import { createRouteHandlerClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import type { GDocEditorRouteParams } from "@/scaffolds/editor/state";
+import { notFound } from "next/navigation";
 
 export const revalidate = 0;
 
 export async function GET(
   request: NextRequest,
   context: {
-    params: {
-      org: string;
-      proj: string;
-      id: string;
-    };
+    params: GDocEditorRouteParams;
   }
 ) {
-  const form_id = context.params.id;
-  const { org, proj } = context.params;
+  const { id, org, proj } = context.params;
   const origin = request.nextUrl.origin;
   const cookieStore = cookies();
 
   const supabase = createRouteHandlerClient(cookieStore);
 
+  const { data: formdoc } = await supabase
+    .from("form_document")
+    .select("form_id")
+    .eq("id", id)
+    .single();
+
+  if (!formdoc) {
+    return notFound();
+  }
+
   const { data: connection } = await supabase
     .from("connection_commerce_store")
     .select()
-    .eq("form_id", form_id)
+    .eq("form_id", formdoc.form_id)
     .single();
 
   if (!connection) {
@@ -34,7 +41,7 @@ export async function GET(
         org,
         proj,
         origin,
-        form_id,
+        document_id: id,
       }),
       {
         status: 307,
@@ -47,7 +54,7 @@ export async function GET(
       org,
       proj,
       origin,
-      form_id,
+      document_id: id,
     }),
     {
       status: 302,
