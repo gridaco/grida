@@ -28,7 +28,7 @@ interface LineChartData {
 
 async function fetchSession(
   q: {
-    project_id: number;
+    project_ids: number[];
     from: Date;
     to: Date;
   },
@@ -41,7 +41,7 @@ async function fetchSession(
   return await supabase
     .from("response_session")
     .select("created_at, form:form_id!inner( project_id )")
-    .eq("form.project_id", q.project_id)
+    .in("form.project_id", q.project_ids)
     .gte("created_at", q.from.toISOString())
     .lte("created_at", q.to.toISOString())
     .order("created_at", { ascending: true });
@@ -49,7 +49,7 @@ async function fetchSession(
 
 async function fetchCustomers(
   q: {
-    project_id: number;
+    project_ids: number[];
     from: Date;
     to: Date;
   },
@@ -62,7 +62,7 @@ async function fetchCustomers(
   return await supabase
     .from("customer")
     .select("created_at")
-    .eq("project_id", q.project_id)
+    .in("project_id", q.project_ids)
     .gte("created_at", q.from.toISOString())
     .lte("created_at", q.to.toISOString())
     .order("created_at", { ascending: true });
@@ -70,7 +70,7 @@ async function fetchCustomers(
 
 async function fetchResponses(
   q: {
-    project_id: number;
+    project_ids: number[];
     from: Date;
     to: Date;
   },
@@ -83,13 +83,13 @@ async function fetchResponses(
   return await supabase
     .from("response")
     .select("created_at, form:form_id!inner( project_id )")
-    .eq("form.project_id", q.project_id)
+    .in("form.project_id", q.project_ids)
     .gte("created_at", q.from.toISOString())
     .lte("created_at", q.to.toISOString())
     .order("created_at", { ascending: true });
 }
 
-export function ProjectStats({ project_id }: { project_id: number }) {
+export function ProjectStats({ project_ids }: { project_ids: number[] }) {
   const { range, setRange, from, to } = useDateRange();
   return (
     <div>
@@ -102,9 +102,9 @@ export function ProjectStats({ project_id }: { project_id: number }) {
         </div>
       </header>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
-        <Customers project_id={project_id} from={from} to={to} />
-        <Responses project_id={project_id} from={from} to={to} />
-        <Sessions project_id={project_id} from={from} to={to} />
+        <Customers project_ids={project_ids} from={from} to={to} />
+        <Responses project_ids={project_ids} from={from} to={to} />
+        <Sessions project_ids={project_ids} from={from} to={to} />
       </div>
     </div>
   );
@@ -177,13 +177,13 @@ export function fmtnum(num: number) {
 export function Sessions({
   from,
   to,
-  project_id,
+  project_ids,
 }: {
-  project_id: number;
+  project_ids: number[];
   from: Date;
   to: Date;
 }) {
-  const supabase = createClientFormsClient();
+  const supabase = useMemo(() => createClientFormsClient(), []);
 
   const [data, setData] = useState<LineChartData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -193,7 +193,7 @@ export function Sessions({
       setLoading(true);
       let { data, error } = await fetchSession(
         {
-          project_id,
+          project_ids,
           from: from,
           to: to,
         },
@@ -217,7 +217,7 @@ export function Sessions({
     };
 
     fetchData();
-  }, [project_id, from, to]);
+  }, [project_ids, from, to]);
 
   return (
     <Card className="overflow-hidden">
@@ -249,13 +249,13 @@ export function Sessions({
 export function Customers({
   from,
   to,
-  project_id,
+  project_ids,
 }: {
-  project_id: number;
+  project_ids: number[];
   from: Date;
   to: Date;
 }) {
-  const supabase = createClientWorkspaceClient();
+  const supabase = useMemo(() => createClientWorkspaceClient(), []);
 
   const [data, setData] = useState<LineChartData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -265,7 +265,7 @@ export function Customers({
       setLoading(true);
       let { data, error } = await fetchCustomers(
         {
-          project_id,
+          project_ids,
           from: from,
           to: to,
         },
@@ -289,7 +289,7 @@ export function Customers({
     };
 
     fetchData();
-  }, [project_id, from, to]);
+  }, [project_ids, from, to]);
 
   return (
     <Card className="overflow-hidden">
@@ -321,13 +321,13 @@ export function Customers({
 export function Responses({
   from,
   to,
-  project_id,
+  project_ids,
 }: {
-  project_id: number;
+  project_ids: number[];
   from: Date;
   to: Date;
 }) {
-  const supabase = createClientFormsClient();
+  const supabase = useMemo(() => createClientFormsClient(), []);
 
   const [data, setData] = useState<LineChartData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -337,7 +337,7 @@ export function Responses({
       setLoading(true);
       let { data, error } = await fetchResponses(
         {
-          project_id,
+          project_ids,
           from: from,
           to: to,
         },
@@ -361,7 +361,7 @@ export function Responses({
     };
 
     fetchData();
-  }, [project_id, from, to]);
+  }, [project_ids, from, to]);
 
   return (
     <Card className="overflow-hidden">

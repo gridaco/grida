@@ -48,15 +48,9 @@ export default function FormsDashboardPage({
         <div className="container mx-auto">
           <header className="py-10 flex justify-between">
             <div>
-              <Link href="/dashboard" prefetch={false}>
-                <span className="flex items-center gap-2 text-2xl font-black select-none">
-                  <OrganizationAvatar
-                    avatar_url={organization.avatar_url}
-                    alt={organization.name}
-                  />
-                  {project_name}
-                </span>
-              </Link>
+              <span className="flex items-center gap-2 text-2xl font-black select-none">
+                {project_name}
+              </span>
               <span className="font-mono opacity-50">{organization_name}</span>
             </div>
             {project && (
@@ -77,7 +71,7 @@ export default function FormsDashboardPage({
           ) : (
             <div>
               <section>
-                <ProjectStats project_id={project!.id} />
+                <ProjectStats project_ids={[project!.id]} />
               </section>
               <section className="w-full flex justify-end gap-2 mt-10">
                 <Link href="?layout=grid" replace>
@@ -91,7 +85,9 @@ export default function FormsDashboardPage({
               <DocumentsGrid
                 organization_name={organization_name}
                 project_name={project_name}
-                documents={documents}
+                documents={documents.filter(
+                  (doc) => doc.project_id === project!.id
+                )}
                 layout={layout}
               />
               <footer className="mt-10 mb-5">

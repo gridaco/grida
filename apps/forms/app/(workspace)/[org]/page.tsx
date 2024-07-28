@@ -3,6 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import {
+  OpenInNewWindowIcon,
   PlusIcon,
   ViewGridIcon,
   ViewHorizontalIcon,
@@ -49,9 +50,18 @@ export default function DashboardProjectsPage({
         <div className="container mx-auto">
           <header className="py-10">
             <div>
-              <span className="text-2xl font-black">Forms</span>
+              <span className="text-2xl font-black">Home</span>
             </div>
           </header>
+          {loading ? (
+            <></>
+          ) : (
+            <>
+              <section className="py-10">
+                <ProjectStats project_ids={projects.map((p) => p.id)} />
+              </section>
+            </>
+          )}
           <section className="w-full flex justify-end gap-2 mt-10">
             <Link href="?layout=grid" replace>
               <ViewGridIcon />
@@ -60,7 +70,7 @@ export default function DashboardProjectsPage({
               <ViewHorizontalIcon />
             </Link>
           </section>
-          <hr className="mb-10 mt-5 dark:border-neutral-700" />
+          <hr className="mb-10 mt-5" />
           {loading ? (
             <ProjectsLoading />
           ) : (
@@ -90,18 +100,18 @@ export default function DashboardProjectsPage({
 
                 return (
                   <div key={p.id} className="mb-40">
-                    <header className="py-4 mb-2 flex justify-between items-center">
-                      <div>
-                        <h2 className="text-2xl font-bold">{p.name}</h2>
-                      </div>
+                    <header className="sticky top-0 py-5 mb-10 flex justify-between items-center border-b bg-background z-10">
+                      <Link href={`/${organization.name}/${p.name}`}>
+                        <h2 className="text-2xl font-bold">
+                          {p.name}
+                          <OpenInNewWindowIcon className="inline align-middle ms-2 w-5 h-5" />
+                        </h2>
+                      </Link>
                       <CreateNewDocumentButton
                         project_name={p.name}
                         project_id={p.id}
                       />
                     </header>
-                    <section className="py-10">
-                      <ProjectStats project_id={p.id} />
-                    </section>
                     <DocumentsGrid
                       organization_name={organization.name}
                       project_name={p.name}

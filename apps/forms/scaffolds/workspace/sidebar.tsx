@@ -52,7 +52,7 @@ export function WorkspaceSidebar() {
             <li>
               <SidebarMenuItem muted>
                 <HomeIcon className="inline align-middle me-2 w-4 h-4" />
-                <Link href="/dashboard">Home</Link>
+                <Link href={`/${organization.name}`}>Home</Link>
               </SidebarMenuItem>
             </li>
             {/* <li>
