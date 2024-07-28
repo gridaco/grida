@@ -102,6 +102,7 @@ export class JSONFrom2DB {
       .insert({
         id: docref!.id,
         form_id: this.form_id,
+        project_id: this.project_id,
         lang: this.renderer.lang || undefined,
       })
       .select()
