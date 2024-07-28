@@ -61,6 +61,7 @@ export async function create_new_form_with_document({
     .insert({
       id: document_ref.id,
       form_id: form.id,
+      project_id,
       name: form.title,
     })
     .select("id")

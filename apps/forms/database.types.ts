@@ -1019,6 +1019,7 @@ export type Database = {
           lang: Database["grida_forms"]["Enums"]["form_page_language"]
           method: Database["grida_forms"]["Enums"]["form_method"]
           name: string
+          project_id: number
           redirect_after_response_uri: string | null
           stylesheet: Json | null
         }
@@ -1035,6 +1036,7 @@ export type Database = {
           lang?: Database["grida_forms"]["Enums"]["form_page_language"]
           method?: Database["grida_forms"]["Enums"]["form_method"]
           name?: string
+          project_id: number
           redirect_after_response_uri?: string | null
           stylesheet?: Json | null
         }
@@ -1051,6 +1053,7 @@ export type Database = {
           lang?: Database["grida_forms"]["Enums"]["form_page_language"]
           method?: Database["grida_forms"]["Enums"]["form_method"]
           name?: string
+          project_id?: number
           redirect_after_response_uri?: string | null
           stylesheet?: Json | null
         }
@@ -1060,6 +1063,13 @@ export type Database = {
             columns: ["id"]
             isOneToOne: true
             referencedRelation: "document"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_document_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project"
             referencedColumns: ["id"]
           },
           {
