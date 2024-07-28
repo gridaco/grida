@@ -1,6 +1,11 @@
 "use client";
 
-import { ChevronDownIcon, CodeIcon, PlusIcon } from "@radix-ui/react-icons";
+import {
+  ChevronDownIcon,
+  CodeIcon,
+  MagicWandIcon,
+  PlusIcon,
+} from "@radix-ui/react-icons";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,6 +15,7 @@ import {
 import clsx from "clsx";
 import { useRouter } from "next/navigation";
 import { useWorkspace } from "@/scaffolds/workspace";
+import Link from "next/link";
 
 export function CreateNewFormButton({
   project_name,
@@ -76,6 +82,12 @@ export function CreateNewFormButton({
             <CodeIcon className="me-2 align-middle" />
             Blank Headless Form
           </DropdownMenuItem>
+          <Link href="/ai">
+            <DropdownMenuItem>
+              <MagicWandIcon className="me-2 align-middle" />
+              Create with AI
+            </DropdownMenuItem>
+          </Link>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
