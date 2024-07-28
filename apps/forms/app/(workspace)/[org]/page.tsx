@@ -7,7 +7,7 @@ import {
   ViewGridIcon,
   ViewHorizontalIcon,
 } from "@radix-ui/react-icons";
-import { CreateNewFormButton } from "@/components/create-form-button";
+import { CreateNewDocumentButton } from "@/components/create-new-document-button";
 import { GDocument, ConnectionSupabaseJoint, Form } from "@/types";
 import { ProjectStats } from "@/scaffolds/analytics/stats";
 import { PoweredByGridaFooter } from "@/scaffolds/e/form/powered-by-brand-footer";
@@ -94,7 +94,7 @@ export default function DashboardProjectsPage({
                       <div>
                         <h2 className="text-2xl font-bold">{p.name}</h2>
                       </div>
-                      <CreateNewFormButton
+                      <CreateNewDocumentButton
                         project_name={p.name}
                         project_id={p.id}
                       />

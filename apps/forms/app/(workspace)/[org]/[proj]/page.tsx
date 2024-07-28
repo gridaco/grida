@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { ViewGridIcon, ViewHorizontalIcon } from "@radix-ui/react-icons";
-import { CreateNewFormButton } from "@/components/create-form-button";
+import { CreateNewDocumentButton } from "@/components/create-new-document-button";
 import { Form, GDocument } from "@/types";
 import { ProjectStats } from "@/scaffolds/analytics/stats";
 import { PoweredByGridaFooter } from "@/scaffolds/e/form/powered-by-brand-footer";
@@ -61,7 +61,7 @@ export default function FormsDashboardPage({
             </div>
             {project && (
               <div>
-                <CreateNewFormButton
+                <CreateNewDocumentButton
                   project_name={project_name}
                   project_id={project.id}
                 />

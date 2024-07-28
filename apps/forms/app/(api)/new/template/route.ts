@@ -14,14 +14,16 @@ export async function POST(request: NextRequest) {
 
   if (template_name == "headless") {
     try {
-      const { form_id } = await create_new_form_with_document({
-        project_id,
-        title: "Headless Form",
-        description: "This is a headless form",
-        unknown_field_handling_strategy: "accept",
-      });
+      const { form_id, form_document_id } = await create_new_form_with_document(
+        {
+          project_id,
+          title: "Headless Form",
+          description: "This is a headless form",
+          unknown_field_handling_strategy: "accept",
+        }
+      );
 
-      return NextResponse.json({ form_id });
+      return NextResponse.json({ form_id, form_document_id });
     } catch (e) {
       console.error("error while creating new form", e);
       return NextResponse.error();
