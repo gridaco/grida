@@ -9,6 +9,7 @@ import {
   SectorHeader,
   SectorHeading,
 } from "@/components/preferences";
+import type { GDocEditorRouteParams } from "@/scaffolds/editor/state";
 import { AboutThisForm } from "@/scaffolds/settings/about-this-form";
 import React from "react";
 
@@ -27,16 +28,20 @@ async function getData(id: string) {
   return res.json();
 }
 
-export default async function WithLink({ params }: { params: { id: string } }) {
-  const { id } = params;
-  const data = await getData(id);
+export default async function WithLink({
+  params,
+}: {
+  params: GDocEditorRouteParams;
+}) {
+  const { id: form_id } = params;
+  const data = await getData(form_id);
 
   const { url, submit, embed } = data;
 
   return (
     <main className="max-w-2xl mx-auto">
       <Sector>
-        <AboutThisForm form_id={id} />
+        <AboutThisForm form_id={form_id} />
       </Sector>
       <Sector>
         <SectorHeader>

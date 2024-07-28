@@ -2,17 +2,14 @@ import { editorlink } from "@/lib/forms/url";
 import { createRouteHandlerClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import type { GDocEditorRouteParams } from "@/scaffolds/editor/state";
 
 export const revalidate = 0;
 
 export async function GET(
   request: NextRequest,
   context: {
-    params: {
-      org: string;
-      proj: string;
-      id: string;
-    };
+    params: GDocEditorRouteParams;
   }
 ) {
   const form_id = context.params.id;

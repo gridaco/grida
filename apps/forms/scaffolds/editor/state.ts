@@ -26,6 +26,12 @@ import { Tokens } from "@/ast";
 import React from "react";
 import { editorbasepath } from "@/lib/forms/url";
 
+export type GDocEditorRouteParams = {
+  org: string;
+  proj: string;
+  id: string;
+};
+
 export type DraftID = `[draft]${string}`;
 export const DRAFT_ID_START_WITH = "[draft]";
 const ISDEV = process.env.NODE_ENV === "development";

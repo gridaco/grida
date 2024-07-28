@@ -14,19 +14,16 @@ import { EndingPageTemplateID, FormDocument } from "@/types";
 import { PreviewButton } from "@/components/preview-button";
 import { GridaXSupabaseService } from "@/services/x-supabase";
 import type { Metadata } from "next";
-import { FormEditorInit } from "@/scaffolds/editor/state";
+import type {
+  GDocEditorRouteParams,
+  FormEditorInit,
+} from "@/scaffolds/editor/state";
 import { Breadcrumbs } from "@/scaffolds/breadcrumb";
-
-type Params = {
-  org: string;
-  proj: string;
-  id: string;
-};
 
 export async function generateMetadata({
   params,
 }: {
-  params: Params;
+  params: GDocEditorRouteParams;
 }): Promise<Metadata> {
   const cookieStore = cookies();
   const supabase = createServerComponentClient(cookieStore);
@@ -59,7 +56,7 @@ export default async function Layout({
   children,
 }: Readonly<{
   children: React.ReactNode;
-  params: Params;
+  params: GDocEditorRouteParams;
 }>) {
   const cookieStore = cookies();
   const supabase = createServerComponentClient(cookieStore);

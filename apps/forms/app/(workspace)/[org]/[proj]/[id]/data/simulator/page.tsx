@@ -37,6 +37,7 @@ import {
   Simulator,
   SimulatorSubmission,
 } from "@/lib/simulator";
+import { useEditorState } from "@/scaffolds/editor";
 import { FormSubmitErrorCode } from "@/types/private/api";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
 import { format } from "date-fns";
@@ -51,14 +52,9 @@ type SimulatorStatus = "none" | "idle" | "running" | "paused";
 
 const START_COUNTDOWN = 5 * 1000;
 
-export default function SimulatorPage({
-  params,
-}: {
-  params: {
-    id: string;
-  };
-}) {
-  const form_id = params.id;
+export default function SimulatorPage() {
+  const [state] = useEditorState();
+  const { form_id } = state;
   const [status, setStatus] = useState<SimulatorStatus>("none");
   const [startsAt, setStartsAt] = useState<Date | null>(null);
   const [plan, setPlan] = useState<SimulationPlan | null>(null);

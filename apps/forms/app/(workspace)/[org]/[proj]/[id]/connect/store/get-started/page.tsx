@@ -29,12 +29,7 @@ import { generated_form_store_name } from "@/services/utils/generated-form-store
 import { ArchiveIcon, InfoCircledIcon } from "@radix-ui/react-icons";
 import { useState } from "react";
 
-export default function StoreGetStartedPage({
-  params,
-}: {
-  params: { id: string };
-}) {
-  const form_id = params.id;
+export default function StoreGetStartedPage() {
   return (
     <main className="h-full flex flex-col">
       <div className="h-hull flex-1 flex flex-col justify-center items-center gap-8">

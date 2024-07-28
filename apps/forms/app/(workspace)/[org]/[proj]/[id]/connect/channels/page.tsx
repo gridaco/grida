@@ -58,18 +58,14 @@ import { useState } from "react";
 import toast from "react-hot-toast";
 import React from "react";
 import { MessageCircleIcon } from "lucide-react";
+import { useEditorState } from "@/scaffolds/editor";
 
 const SMS_DEFAULT_ORIGINATOR = process.env
   .NEXT_PUBLIC_BIRD_SMS_DEFAULT_ORIGINATOR as string;
 
-export default function ConnectChannels({
-  params,
-}: {
-  params: {
-    form_id: string;
-  };
-}) {
-  const { form_id } = params;
+export default function ConnectChannels() {
+  const [state] = useEditorState();
+  const { form_id } = state;
 
   return (
     <main className="max-w-2xl mx-auto">
