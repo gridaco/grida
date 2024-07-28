@@ -1,4 +1,5 @@
 import type { Database } from "@/database.types";
+import { resolve_next } from "@/lib/forms/url";
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest) {
   }
 
   if (next) {
-    return NextResponse.redirect(`${requestUrl.origin}${next}`);
+    return NextResponse.redirect(resolve_next(requestUrl.origin, next));
   }
 
   // URL to redirect to after sign in process completes

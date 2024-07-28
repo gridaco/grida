@@ -1,4 +1,4 @@
-import { resolve_redirect_uri } from "@/lib/forms/url";
+import { resolve_next } from "@/lib/forms/url";
 import {
   grida_commerce_client,
   createRouteHandlerClient,
@@ -24,7 +24,7 @@ export async function POST(
   const origin = req.nextUrl.origin;
   const cookieStore = cookies();
   const { form_id } = context.params;
-  const redirect_uri = req.nextUrl.searchParams.get("redirect_uri");
+  const next = req.nextUrl.searchParams.get("next");
   const supabase = createRouteHandlerClient(cookieStore);
   const wsclient = createRouteHandlerWorkspaceClient(cookieStore);
 
@@ -76,7 +76,7 @@ export async function POST(
   );
 
   if (form_reference.store_connection) {
-    return NextResponse.redirect(resolve_redirect_uri(origin, redirect_uri), {
+    return NextResponse.redirect(resolve_next(origin, next), {
       status: 301,
     });
   }
@@ -108,7 +108,7 @@ export async function POST(
     return NextResponse.error();
   }
 
-  return NextResponse.redirect(resolve_redirect_uri(origin, redirect_uri), {
+  return NextResponse.redirect(resolve_next(origin, next), {
     status: 301,
   });
 }

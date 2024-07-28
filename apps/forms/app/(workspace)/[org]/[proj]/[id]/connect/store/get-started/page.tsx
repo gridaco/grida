@@ -95,7 +95,7 @@ function ConnectStoreForm() {
 
   const { document_id, basepath } = state;
 
-  const redirect_uri = editorlink("connect/store/products", {
+  const next = editorlink("connect/store/products", {
     basepath,
     document_id,
   });
@@ -103,7 +103,7 @@ function ConnectStoreForm() {
   return (
     <form
       id="connect-store-form"
-      action={`/private/editor/connect/${state.form_id}/store/connection?redirect_uri=${redirect_uri}`}
+      action={`/private/editor/connect/${state.form_id}/store/connection?next=${next}`}
       method="POST"
       className="prose dark:prose-invert"
     >

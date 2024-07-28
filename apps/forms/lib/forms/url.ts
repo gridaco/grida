@@ -93,12 +93,12 @@ export function editorbasepath(
   return `${params.org}/${params.proj}`;
 }
 
-export function resolve_redirect_uri(
+export function resolve_next(
   origin: string,
   uri?: string | null,
   fallback = "/"
 ) {
-  if (!uri) return resolve_redirect_uri(origin, fallback);
+  if (!uri) return resolve_next(origin, fallback);
   // Check if the URL is absolute
   const isAbsolute = /^https?:\/\//i.test(uri);
 
