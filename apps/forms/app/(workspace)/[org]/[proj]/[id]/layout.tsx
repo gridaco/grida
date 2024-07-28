@@ -26,9 +26,32 @@ import type {
 } from "@/scaffolds/editor/state";
 import { Breadcrumbs } from "@/scaffolds/breadcrumb";
 import assert from "assert";
-import Head from "next/head";
+import { Metadata } from "next";
 
 export const revalidate = 0;
+
+export async function generateMetadata({
+  params,
+}: {
+  params: GDocEditorRouteParams;
+}): Promise<Metadata> {
+  const { id, proj } = params;
+  const cookieStore = cookies();
+  const supabase = createServerComponentWorkspaceClient(cookieStore);
+  const { data, error } = await supabase
+    .from("document")
+    .select(`title`)
+    .eq("id", id)
+    .single();
+
+  if (!data) {
+    return notFound();
+  }
+
+  return {
+    title: `${data.title} | ${proj}`,
+  };
+}
 
 export default async function Layout({
   params,
@@ -101,11 +124,6 @@ export default async function Layout({
 
   return (
     <div className="h-screen flex flex-col">
-      <Head>
-        <title>
-          {form.title} | {proj}
-        </title>
-      </Head>
       <FormEditorProvider
         initial={
           {
