@@ -32,11 +32,11 @@ export function CreateNewDocumentButton({
   } = useWorkspace();
 
   const router = useRouter();
-  const new_default_form_url = `/new?project_id=${project_id}`;
+  const new_default_form_url = `/private/editor/new?project_id=${project_id}`;
 
   const new_formn_with_template = async (template: string) => {
     const res = await fetch(
-      `/new/template?project_id=${project_id}&template=${template}`,
+      `/private/editor/new/template?project_id=${project_id}&template=${template}`,
       {
         method: "POST",
       }
@@ -66,7 +66,27 @@ export function CreateNewDocumentButton({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" sideOffset={8}>
         <DropdownMenuGroup>
-          <DropdownMenuLabel>Form</DropdownMenuLabel>
+          <DropdownMenuLabel>Sites</DropdownMenuLabel>
+          <DropdownMenuItem>
+            <ResourceTypeIcon
+              type="v0_site"
+              className="w-4 h-4 me-2 align-middle"
+            />
+            Blank Site
+          </DropdownMenuItem>
+          <DropdownMenuItem disabled>
+            <ResourceTypeIcon
+              type="v0_site"
+              className="w-4 h-4 me-2 align-middle"
+            />
+            Admin Console
+            <Badge variant="outline" className="ms-auto">
+              soon
+            </Badge>
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Forms</DropdownMenuLabel>
           <form action={new_default_form_url} method="POST">
             <button className="w-full">
               <DropdownMenuItem>
@@ -100,16 +120,15 @@ export function CreateNewDocumentButton({
           </Link>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem disabled>
-          <ResourceTypeIcon
-            type="v0_site"
-            className="w-4 h-4 me-2 align-middle"
-          />
-          Site
-          <Badge variant="outline" className="ms-auto">
-            soon
-          </Badge>
-        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>
+            CMS / Commerce
+            <div className="inline-flex ms-auto pl-4">
+              <Badge variant="outline">soon</Badge>
+            </div>
+          </DropdownMenuLabel>
+        </DropdownMenuGroup>
         <DropdownMenuItem disabled>
           <ResourceTypeIcon
             type="database"
