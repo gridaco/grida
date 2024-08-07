@@ -65,7 +65,8 @@ export function CreateNewDocumentButton({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" sideOffset={8}>
-        <DropdownMenuGroup>
+        {/* hidden - under development */}
+        <DropdownMenuGroup hidden>
           <DropdownMenuLabel>Sites</DropdownMenuLabel>
           <DropdownMenuItem>
             <ResourceTypeIcon
@@ -85,6 +86,7 @@ export function CreateNewDocumentButton({
             </Badge>
           </DropdownMenuItem>
         </DropdownMenuGroup>
+        <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuLabel>Forms</DropdownMenuLabel>
           <form action={new_default_form_url} method="POST">
@@ -119,7 +121,6 @@ export function CreateNewDocumentButton({
             </DropdownMenuItem>
           </Link>
         </DropdownMenuGroup>
-        <DropdownMenuSeparator />
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuLabel>

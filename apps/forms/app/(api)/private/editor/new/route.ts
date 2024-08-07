@@ -1,9 +1,6 @@
 import { editorlink } from "@/lib/forms/url";
 import { createRouteHandlerWorkspaceClient } from "@/lib/supabase/server";
-import {
-  FormDocumentSetupAssistantService,
-  seed_form_document_blocks,
-} from "@/services/new";
+import { FormDocumentSetupAssistantService } from "@/services/new";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
@@ -40,13 +37,10 @@ export async function POST(request: NextRequest) {
     case "v0_form": {
       try {
         const setup = new FormDocumentSetupAssistantService(project_id);
-        const { form_id, form_document_id } = await setup.createFormDocument();
+        const { form_document_id } = await setup.createFormDocument();
 
         try {
-          await seed_form_document_blocks({
-            form_id,
-            form_document_id: form_document_id,
-          });
+          await setup.seedFormDocumentBlocks();
         } catch (e) {
           // this won't be happening
           console.error("error while seeding form page blocks", e);

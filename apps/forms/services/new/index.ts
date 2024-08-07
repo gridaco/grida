@@ -14,10 +14,11 @@ class DocumentSetupAssistantService {
     private readonly doctype: GDocumentType
   ) {}
 
-  protected async createMasterDocument() {
+  protected async createMasterDocument({ title }: { title?: string }) {
     const { data: document_ref, error: doc_ref_err } = await workspaceclient
       .from("document")
       .insert({
+        title: title,
         project_id: this.project_id,
         doctype: this.doctype,
       })
@@ -41,20 +42,18 @@ export class FormDocumentSetupAssistantService extends DocumentSetupAssistantSer
   constructor(
     readonly project_id: number,
     private readonly seed: Partial<{
-      default_form_page_id?: string | null;
       description?: string | null;
-      is_max_form_responses_by_customer_enabled?: boolean;
-      is_max_form_responses_in_total_enabled?: boolean;
-      max_form_responses_by_customer?: number | null;
-      max_form_responses_in_total?: number | null;
       title?: string;
       unknown_field_handling_strategy?: FormResponseUnknownFieldHandlingStrategyType;
     }> = {}
   ) {
     super(project_id, "v0_form");
   }
-  //
-  async createFormDocument() {
+
+  private form_id: string | null = null;
+  private async createFormDatabase() {
+    if (this.form_id) return this.form_id;
+
     const { data: form, error } = await client
       .from("form")
       .insert({
@@ -74,17 +73,28 @@ export class FormDocumentSetupAssistantService extends DocumentSetupAssistantSer
       throw error;
     }
 
+    this.form_id = form.id;
+    return this.form_id;
+  }
+
+  //
+  async createFormDocument() {
     // create document
-    const document_ref = await this.createMasterDocument();
+    const document_ref = await this.createMasterDocument({
+      title: this.seed.title,
+    });
+
+    await this.createFormDatabase();
+    assert(this.form_id, "form not created");
 
     // create a form document
     const { data: form_document, error: form_doc_err } = await client
       .from("form_document")
       .insert({
         id: document_ref.id,
-        form_id: form.id,
+        form_id: this.form_id,
         project_id: this.project_id,
-        name: form.title,
+        name: document_ref.title,
       })
       .select("id")
       .single();
@@ -100,16 +110,23 @@ export class FormDocumentSetupAssistantService extends DocumentSetupAssistantSer
       .update({
         default_form_page_id: form_document!.id,
       })
-      .eq("id", form.id);
+      .eq("id", this.form_id);
 
     return {
-      form_id: form.id,
+      form_id: this.form_id,
       form_document_id: form_document!.id,
     };
   }
+
+  async seedFormDocumentBlocks() {
+    return await seed_form_document_blocks({
+      form_id: this.form_id!,
+      form_document_id: this.form_id!,
+    });
+  }
 }
 
-export async function seed_form_document_blocks({
+async function seed_form_document_blocks({
   form_id,
   form_document_id: form_document_id,
 }: {
