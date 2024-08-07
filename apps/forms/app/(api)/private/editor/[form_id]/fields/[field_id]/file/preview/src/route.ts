@@ -65,17 +65,34 @@ export async function GET(
             service_role: true,
           }
         );
-        const { data: singed } = await client.storage
-          .from(bucket)
-          .createSignedUrl(qpath, expiresIn, options);
 
-        const src = singed?.signedUrl;
+        // check if bucket is public
+        const { data: bucket_ref, error: bucket_ref_err } =
+          await client.storage.getBucket(bucket);
 
-        if (!src) {
+        if (bucket_ref_err || !bucket_ref) {
           return notFound();
         }
 
-        return NextResponse.redirect(src);
+        if (bucket_ref.public) {
+          // use public url when possible (this can utilize caching from supabase cdn)
+          const { publicUrl: src } = client.storage
+            .from(bucket)
+            .getPublicUrl(qpath, options).data;
+          return NextResponse.redirect(src);
+        } else {
+          const { data: singed } = await client.storage
+            .from(bucket)
+            .createSignedUrl(qpath, expiresIn, options);
+
+          const src = singed?.signedUrl;
+
+          if (!src) {
+            return notFound();
+          }
+          return NextResponse.redirect(src);
+        }
+
         //
       }
       case "grida":
