@@ -7,6 +7,10 @@ import assert from "assert";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
+const expiresIn = 60 * 60;
+
+export const revalidate = expiresIn;
+
 export async function GET(
   req: NextRequest,
   context: {
@@ -17,7 +21,7 @@ export async function GET(
   }
 ) {
   const { form_id, field_id } = context.params;
-  const expiresIn = 60 * 60;
+
   const qpath = req.nextUrl.searchParams.get("path");
   const options = parseStorageUrlOptions(req.nextUrl.searchParams);
   // TODO: support RLS
@@ -91,9 +95,9 @@ export async function GET(
   }
 
   return NextResponse.redirect(src, {
-    status: 301,
+    status: 302,
     headers: {
-      "Cache-Control": `public, max-age=${expiresIn}, s-maxage=${expiresIn}, stale-while-revalidate=59`,
+      "Cache-Control": `public, max-age=${expiresIn}, s-maxage=${expiresIn}`,
     },
   });
 }
