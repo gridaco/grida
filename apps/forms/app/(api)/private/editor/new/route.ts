@@ -1,12 +1,14 @@
 import { editorlink } from "@/lib/forms/url";
 import { createRouteHandlerWorkspaceClient } from "@/lib/supabase/server";
 import {
-  create_new_form_with_document,
+  FormDocumentSetupAssistantService,
   seed_form_document_blocks,
 } from "@/services/new";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
+import type { GDocumentType } from "@/types";
+import assert from "assert";
 
 export const revalidate = 0;
 
@@ -15,10 +17,10 @@ export async function POST(request: NextRequest) {
   const wsclient = createRouteHandlerWorkspaceClient(cookieStore);
   const origin = request.nextUrl.origin;
   const project_id = Number(request.nextUrl.searchParams.get("project_id"));
+  const doctype = request.nextUrl.searchParams.get("doctype") as GDocumentType;
 
-  if (!project_id) {
-    return NextResponse.error();
-  }
+  assert(project_id, "project_id is required");
+  assert(doctype, "doctype is required");
 
   const { data: project_ref, error: project_ref_err } = await wsclient
     .from("project")
@@ -34,35 +36,44 @@ export async function POST(request: NextRequest) {
     return notFound();
   }
 
-  try {
-    const { form_id, form_document_id } = await create_new_form_with_document({
-      project_id,
-    });
+  switch (doctype) {
+    case "v0_form": {
+      try {
+        const setup = new FormDocumentSetupAssistantService(project_id);
+        const { form_id, form_document_id } = await setup.createFormDocument();
 
-    try {
-      await seed_form_document_blocks({
-        form_id,
-        form_document_id: form_document_id,
-      });
-    } catch (e) {
-      // this won't be happening
-      console.error("error while seeding form page blocks", e);
-      // ignore and continue since the form itself is created anyway.
-    }
+        try {
+          await seed_form_document_blocks({
+            form_id,
+            form_document_id: form_document_id,
+          });
+        } catch (e) {
+          // this won't be happening
+          console.error("error while seeding form page blocks", e);
+          // ignore and continue since the form itself is created anyway.
+        }
 
-    return NextResponse.redirect(
-      editorlink("form/edit", {
-        proj: project_ref.name,
-        org: project_ref.organization!.name,
-        origin,
-        document_id: form_document_id,
-      }),
-      {
-        status: 302,
+        return NextResponse.redirect(
+          editorlink("form/edit", {
+            proj: project_ref.name,
+            org: project_ref.organization!.name,
+            origin,
+            document_id: form_document_id,
+          }),
+          {
+            status: 302,
+          }
+        );
+      } catch (e) {
+        console.error("error while creating new form", e);
+        return NextResponse.error();
       }
-    );
-  } catch (e) {
-    console.error("error while creating new form", e);
-    return NextResponse.error();
+    }
+    case "v0_site": {
+    }
+    default: {
+      console.error("unknown doctype", doctype);
+      return NextResponse.error();
+    }
   }
 }

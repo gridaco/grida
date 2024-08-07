@@ -32,11 +32,11 @@ export function CreateNewDocumentButton({
   } = useWorkspace();
 
   const router = useRouter();
-  const new_default_form_url = `/private/editor/new?project_id=${project_id}`;
+  const new_default_form_url = `/private/editor/new?project_id=${project_id}&doctype=v0_form`;
 
   const new_formn_with_template = async (template: string) => {
     const res = await fetch(
-      `/private/editor/new/template?project_id=${project_id}&template=${template}`,
+      `/private/editor/new/template?project_id=${project_id}&template=${template}&doctype=v0_form`,
       {
         method: "POST",
       }
