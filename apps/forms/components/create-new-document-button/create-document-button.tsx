@@ -33,6 +33,7 @@ export function CreateNewDocumentButton({
 
   const router = useRouter();
   const new_default_form_url = `/private/editor/new?project_id=${project_id}&doctype=v0_form`;
+  const new_default_site_url = `/private/editor/new?project_id=${project_id}&doctype=v0_site`;
 
   const new_formn_with_template = async (template: string) => {
     const res = await fetch(
@@ -65,16 +66,19 @@ export function CreateNewDocumentButton({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" sideOffset={8}>
-        {/* hidden - under development */}
-        <DropdownMenuGroup hidden>
+        <DropdownMenuGroup>
           <DropdownMenuLabel>Sites</DropdownMenuLabel>
-          <DropdownMenuItem>
-            <ResourceTypeIcon
-              type="v0_site"
-              className="w-4 h-4 me-2 align-middle"
-            />
-            Blank Site
-          </DropdownMenuItem>
+          <form action={new_default_site_url} method="POST">
+            <button className="w-full">
+              <DropdownMenuItem>
+                <ResourceTypeIcon
+                  type="v0_site"
+                  className="w-4 h-4 me-2 align-middle"
+                />
+                Blank Site
+              </DropdownMenuItem>
+            </button>
+          </form>
           <DropdownMenuItem disabled>
             <ResourceTypeIcon
               type="v0_site"
