@@ -4,7 +4,17 @@ import { createRouteHandlerClient as _createRouteHandlerClient } from "@supabase
 import { createClient } from "@supabase/supabase-js";
 import type { ReadonlyRequestCookies } from "next/dist/server/web/spec-extension/adapters/request-cookies";
 
-export const client = createClient<Database, "grida_forms">(
+export const workspaceclient = createClient<Database, "public">(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_KEY!,
+  {
+    db: {
+      schema: "public",
+    },
+  }
+);
+
+export const grida_forms_client = createClient<Database, "grida_forms">(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_KEY!,
   {
@@ -14,12 +24,12 @@ export const client = createClient<Database, "grida_forms">(
   }
 );
 
-export const workspaceclient = createClient<Database, "public">(
+export const grida_sites_client = createClient<Database, "grida_sites">(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_KEY!,
   {
     db: {
-      schema: "public",
+      schema: "grida_sites",
     },
   }
 );

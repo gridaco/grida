@@ -1,4 +1,4 @@
-import { client, workspaceclient } from "@/lib/supabase/server";
+import { grida_forms_client, workspaceclient } from "@/lib/supabase/server";
 import { process_response_provisional_info } from "@/services/customer/utils";
 import { unique } from "@/utils/unique";
 import assert from "assert";
@@ -17,7 +17,7 @@ export async function POST(
 
   assert(response_id, "response_id is required");
 
-  const { data: response, error: response_err } = await client
+  const { data: response, error: response_err } = await grida_forms_client
     .from("response")
     .select(
       `*, response_fields:response_field(*, form_field:form_field(type, name))`

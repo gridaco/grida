@@ -1,5 +1,5 @@
 import { GRIDA_FORMS_RESPONSE_BUCKET } from "@/k/env";
-import { client } from "@/lib/supabase/server";
+import { grida_forms_client } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { SupabaseStorageExtensions } from "@/lib/supabase/storage-ext";
 import assert from "assert";
@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   assert(path, "path is required");
 
   const d = await SupabaseStorageExtensions.rmdir(
-    client.storage,
+    grida_forms_client.storage,
     GRIDA_FORMS_RESPONSE_BUCKET,
     path
   );

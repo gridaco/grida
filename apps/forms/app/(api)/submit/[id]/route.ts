@@ -4,7 +4,10 @@ import {
   SYSTEM_GF_CUSTOMER_UUID_KEY,
 } from "@/k/system";
 // TODO: need RLS?
-import { client, grida_commerce_client } from "@/lib/supabase/server";
+import {
+  grida_forms_client,
+  grida_commerce_client,
+} from "@/lib/supabase/server";
 import { upsert_customer_with } from "@/services/customer";
 import {
   validate_max_access_by_customer,
@@ -130,7 +133,7 @@ async function submit({
   }
 
   // check if form exists
-  const { data: form_reference } = await client
+  const { data: form_reference } = await grida_forms_client
     .from("form")
     .select(
       `
@@ -406,7 +409,7 @@ async function submit({
 
   // create new form response
   const { data: response_reference_obj, error: response_insertion_error } =
-    await client
+    await grida_forms_client
       .from("response")
       .insert({
         raw: FormValue.safejson(Object.fromEntries(entries)),
@@ -521,7 +524,7 @@ async function submit({
 
   if (needs_to_be_created) {
     // create new fields
-    const { data: new_fields } = await client
+    const { data: new_fields } = await grida_forms_client
       .from("form_field")
       .insert(
         needs_to_be_created.map((key) => ({
@@ -618,65 +621,67 @@ async function submit({
   );
 
   // save each field value
-  const { error: v_fields_error } = await client.from("response_field").insert(
-    v_form_fields!.map((field) => {
-      const { type, name, options } = field;
+  const { error: v_fields_error } = await grida_forms_client
+    .from("response_field")
+    .insert(
+      v_form_fields!.map((field) => {
+        const { type, name, options } = field;
 
-      // the field's value can be a input value or a reference to form_field_option
-      const value_or_reference = formdata.get(name);
-      const { value, enum_id } = FormValue.parse(value_or_reference, {
-        utc_offset: meta.utc_offset,
-        type: type,
-        enums: options,
-      });
+        // the field's value can be a input value or a reference to form_field_option
+        const value_or_reference = formdata.get(name);
+        const { value, enum_id } = FormValue.parse(value_or_reference, {
+          utc_offset: meta.utc_offset,
+          type: type,
+          enums: options,
+        });
 
-      // handle file uploads
-      if (FieldSupports.file_upload(type)) {
-        if (FieldSupports.file_alias(type)) {
-          const files = (formdata as FormData).getAll(name);
+        // handle file uploads
+        if (FieldSupports.file_upload(type)) {
+          if (FieldSupports.file_alias(type)) {
+            const files = (formdata as FormData).getAll(name);
 
-          console.log("submit/files", files);
+            console.log("submit/files", files);
 
-          field_file_uploads[field.id] =
-            field_file_processor.process_field_files(
-              {
-                id: field.id,
-                storage: field.storage as FormFieldStorageSchema | null,
-              },
-              files
-            );
-        } else if (FieldSupports.richtext(type)) {
-          // 1. parse the tmp files
-          const { staged_file_paths } =
-            RichTextStagedFileUtils.parseDocument(value);
+            field_file_uploads[field.id] =
+              field_file_processor.process_field_files(
+                {
+                  id: field.id,
+                  storage: field.storage as FormFieldStorageSchema | null,
+                },
+                files
+              );
+          } else if (FieldSupports.richtext(type)) {
+            // 1. parse the tmp files
+            const { staged_file_paths } =
+              RichTextStagedFileUtils.parseDocument(value);
 
-          console.log("submit/richtext/files", staged_file_paths);
+            console.log("submit/richtext/files", staged_file_paths);
 
-          // 2. upload the files
-          field_file_uploads[field.id] =
-            field_file_processor.process_field_files(
-              {
-                id: field.id,
-                storage: field.storage as FormFieldStorageSchema | null,
-              },
-              staged_file_paths
-            );
+            // 2. upload the files
+            field_file_uploads[field.id] =
+              field_file_processor.process_field_files(
+                {
+                  id: field.id,
+                  storage: field.storage as FormFieldStorageSchema | null,
+                },
+                staged_file_paths
+              );
 
-          // 3. replace the tmp file path with the uploaded file path
-          // => this will happen after the file upload is completed - FileProcessCompleteContext
+            // 3. replace the tmp file path with the uploaded file path
+            // => this will happen after the file upload is completed - FileProcessCompleteContext
+          }
         }
-      }
 
-      return {
-        type: type,
-        response_id: response_reference_obj!.id,
-        form_field_id: field.id,
-        form_id: form_id,
-        value: value,
-        form_field_option_id: enum_id,
-      };
-    })
-  );
+        return {
+          type: type,
+          response_id: response_reference_obj!.id,
+          form_field_id: field.id,
+          form_id: form_id,
+          value: value,
+          form_field_option_id: enum_id,
+        };
+      })
+    );
 
   if (v_fields_error) console.error("submit/err/fields", v_fields_error);
 
@@ -876,7 +881,7 @@ async function submit({
   });
 
   if (response_field_with_resolved_file_upserts.length > 0) {
-    const { error: file_upload_upsertion_error } = await client
+    const { error: file_upload_upsertion_error } = await grida_forms_client
       .from("response_field")
       .upsert(response_field_with_resolved_file_upserts, {
         onConflict: "response_id, form_field_id",
@@ -889,7 +894,7 @@ async function submit({
     }
 
     // notify response change with updating updated_at
-    await client
+    await grida_forms_client
       .from("response")
       .update({ updated_at: new Date().toISOString() })
       .eq("id", response_reference_obj!.id);
@@ -974,18 +979,19 @@ async function submit({
       // endregion
 
       // finally fetch the response for pingback
-      const { data: response, error: select_response_error } = await client
-        .from("response")
-        .select(
-          `
+      const { data: response, error: select_response_error } =
+        await grida_forms_client
+          .from("response")
+          .select(
+            `
         *,
         response_field (
           *
         )
       `
-        )
-        .eq("id", response_reference_obj!.id)
-        .single();
+          )
+          .eq("id", response_reference_obj!.id)
+          .single();
 
       if (select_response_error) console.error(select_response_error);
 
@@ -1164,7 +1170,7 @@ class ResponseFieldFilesProcessor {
           const uniqueFileName = uniqueFileNameGenerator.name(file.name);
           const path = basepath + uniqueFileName;
 
-          const upload = client.storage
+          const upload = grida_forms_client.storage
             .from(GRIDA_FORMS_RESPONSE_BUCKET)
             .upload(path, file);
           uploads.push(upload);
@@ -1244,7 +1250,7 @@ class ResponseFieldFilesProcessor {
               // refer: *(1) (see comment above)
               const targetpath = basepath + _p.name;
               const storage = new SessionStagedFileStorage(
-                client,
+                grida_forms_client,
                 GRIDA_FORMS_RESPONSE_BUCKET
               );
 

@@ -1,4 +1,4 @@
-import { client, workspaceclient } from "@/lib/supabase/server";
+import { grida_forms_client, workspaceclient } from "@/lib/supabase/server";
 import type {
   FormResponseUnknownFieldHandlingStrategyType,
   GDocumentType,
@@ -35,6 +35,18 @@ class DocumentSetupAssistantService {
   }
 }
 
+export class SiteDocumentSetupAssistantService extends DocumentSetupAssistantService {
+  constructor(readonly project_id: number) {
+    super(project_id, "v0_site");
+  }
+
+  async createSiteDocument() {
+    return this.createMasterDocument({
+      title: "Untitled Site",
+    });
+  }
+}
+
 /**
  * NO RLS - use with caution
  */
@@ -54,7 +66,7 @@ export class FormDocumentSetupAssistantService extends DocumentSetupAssistantSer
   private async createFormDatabase() {
     if (this.form_id) return this.form_id;
 
-    const { data: form, error } = await client
+    const { data: form, error } = await grida_forms_client
       .from("form")
       .insert({
         project_id: this.project_id,
@@ -88,16 +100,17 @@ export class FormDocumentSetupAssistantService extends DocumentSetupAssistantSer
     assert(this.form_id, "form not created");
 
     // create a form document
-    const { data: form_document, error: form_doc_err } = await client
-      .from("form_document")
-      .insert({
-        id: document_ref.id,
-        form_id: this.form_id,
-        project_id: this.project_id,
-        name: document_ref.title,
-      })
-      .select("id")
-      .single();
+    const { data: form_document, error: form_doc_err } =
+      await grida_forms_client
+        .from("form_document")
+        .insert({
+          id: document_ref.id,
+          form_id: this.form_id,
+          project_id: this.project_id,
+          name: document_ref.title,
+        })
+        .select("id")
+        .single();
 
     if (form_doc_err) {
       console.error(form_doc_err);
@@ -105,7 +118,7 @@ export class FormDocumentSetupAssistantService extends DocumentSetupAssistantSer
     }
 
     // link the page to the form
-    await client
+    await grida_forms_client
       .from("form")
       .update({
         default_form_page_id: form_document!.id,
@@ -138,7 +151,7 @@ async function seed_form_document_blocks({
   // - header block
   // - field block
 
-  const { data: section_block } = await client
+  const { data: section_block } = await grida_forms_client
     .from("form_block")
     .insert({
       type: "section",
@@ -151,7 +164,7 @@ async function seed_form_document_blocks({
 
   const section_1_id = section_block!.id;
 
-  await client.from("form_block").insert([
+  await grida_forms_client.from("form_block").insert([
     {
       type: "header",
       form_id,

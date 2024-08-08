@@ -2,7 +2,7 @@ import {
   GRIDA_FORMS_RESPONSE_BUCKET,
   GRIDA_FORMS_RESPONSE_BUCKET_TMP_FOLDER,
 } from "@/k/env";
-import { client } from "@/lib/supabase/server";
+import { grida_forms_client } from "@/lib/supabase/server";
 import { SupabaseStorageExtensions } from "@/lib/supabase/storage-ext";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   const path = req.nextUrl.searchParams.get("path");
 
   const d = await SupabaseStorageExtensions.tree(
-    client.storage,
+    grida_forms_client.storage,
     GRIDA_FORMS_RESPONSE_BUCKET,
     path ?? GRIDA_FORMS_RESPONSE_BUCKET_TMP_FOLDER
   );

@@ -1,6 +1,9 @@
 import { editorlink } from "@/lib/forms/url";
 import { createRouteHandlerWorkspaceClient } from "@/lib/supabase/server";
-import { FormDocumentSetupAssistantService } from "@/services/new";
+import {
+  FormDocumentSetupAssistantService,
+  SiteDocumentSetupAssistantService,
+} from "@/services/new";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
@@ -62,8 +65,23 @@ export async function POST(request: NextRequest) {
         console.error("error while creating new form", e);
         return NextResponse.error();
       }
+      break;
     }
     case "v0_site": {
+      const setup = new SiteDocumentSetupAssistantService(project_id);
+      const { id } = await setup.createSiteDocument();
+      return NextResponse.redirect(
+        editorlink(".", {
+          proj: project_ref.name,
+          org: project_ref.organization!.name,
+          origin,
+          document_id: id,
+        }),
+        {
+          status: 302,
+        }
+      );
+      break;
     }
     default: {
       console.error("unknown doctype", doctype);
