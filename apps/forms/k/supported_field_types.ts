@@ -70,6 +70,8 @@ if (process.env.NODE_ENV === "development") {
     "checkboxes",
     "signature",
     "payment",
+    "toggle",
+    "toggle-group",
   ] as const;
   supported_field_types.push(...dev);
 }
@@ -143,6 +145,7 @@ const html5_file_alias_field_types: FormInputType[] = [
 
 const html5_multiple_supported_field_types: FormInputType[] = [
   ...html5_file_alias_field_types,
+  "toggle-group",
   // TODO: this needs to be supported - work with the db first.
   // "email",
   // "select",

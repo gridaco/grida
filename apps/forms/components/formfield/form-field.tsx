@@ -356,7 +356,7 @@ function MonoFormField({
           // html5 vanilla select
           // does not support `src`
           return (
-            <HtmlSelectWithSafeValue
+            <SafeValueHtml5Select
               {...(sharedInputProps as React.ComponentProps<"select">)}
               options={options}
               locked={locked}
@@ -372,7 +372,7 @@ function MonoFormField({
           }
 
           return (
-            <SelectWithSafeValue
+            <SafeValueSelect
               {...(sharedInputProps as React.ComponentProps<"select">)}
               options={options}
               locked={locked}
@@ -654,10 +654,12 @@ function MonoFormField({
     case "toggle-group": {
       if (options) {
         return (
-          // @ts-ignore
-          <ToggleGroup
-            type={multiple ? "multiple" : "single"}
-            // TODO: this can be array
+          <ToggleGroupRootWithValue
+            name={name}
+            required={required}
+            type={(multiple ? "multiple" : "single") as any}
+            defaultValue={defaultValue}
+            // TODO: need handling - this can be an array
             onValueChange={onValueChange}
           >
             {options.map((option) => (
@@ -665,7 +667,7 @@ function MonoFormField({
                 {option.label}
               </ToggleGroupItem>
             ))}
-          </ToggleGroup>
+          </ToggleGroupRootWithValue>
         );
       }
     }
@@ -688,7 +690,7 @@ interface OnValueChange {
 /**
  * This is for Select component to automatically de-select the selected item when the selected option is disabled.
  */
-function SelectWithSafeValue({
+function SafeValueSelect({
   options: _options,
   locked,
   onValueChange: cb_onValueChange,
@@ -773,7 +775,7 @@ function SelectWithSafeValue({
 /**
  * This is for Select component to automatically de-select the selected item when the selected option is disabled.
  */
-function HtmlSelectWithSafeValue({
+function SafeValueHtml5Select({
   options: _options,
   locked,
   onValueChange: cb_onValueChange,
@@ -936,6 +938,47 @@ function SliderWithValueLabel(
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * radix-ui's toggle group does not have a 'value'
+ * @see https://github.com/radix-ui/primitives/issues/3058
+ */
+function ToggleGroupRootWithValue({
+  children,
+  name,
+  required,
+  ...props
+}: React.PropsWithChildren<
+  React.ComponentProps<typeof ToggleGroup> & {
+    name?: string;
+    required?: boolean;
+  }
+>) {
+  const ref = React.useRef<HTMLInputElement>(null);
+  const [hiddenValue, setHiddenValue] = useState(props.defaultValue);
+  const onValueChange = (v: any) => {
+    setHiddenValue(v);
+    props.onValueChange?.(v);
+  };
+
+  return (
+    <ToggleGroup
+      variant="outline"
+      {...props}
+      onValueChange={onValueChange}
+      className="flex items-start justify-start flex-wrap"
+    >
+      <input
+        ref={ref}
+        className="sr-only"
+        required={required}
+        name={name}
+        value={hiddenValue}
+      />
+      {children}
+    </ToggleGroup>
   );
 }
 
