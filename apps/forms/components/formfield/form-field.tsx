@@ -502,7 +502,6 @@ function MonoFormField({
           />
         );
       }
-
       case "search": {
         if (preview) {
           return <ReferenceSearchPreview />;
@@ -539,9 +538,9 @@ function MonoFormField({
     return <PaymentField data={data as PaymentFieldData} disabled={disabled} />;
   }
 
-  const LabelText = ({ htmlFor = name }: { htmlFor?: string }) => (
+  const LabelText = ({ htmlFor = name }: { htmlFor?: "none" | {} }) => (
     <Label
-      htmlFor={htmlFor}
+      htmlFor={htmlFor as string}
       data-capitalize={labelCapitalize}
       className="data-[capitalize]:capitalize mb-2"
     >
@@ -563,15 +562,15 @@ function MonoFormField({
 
   // custom layout
   switch (type) {
-    // this can only present on ai generated data.
+    // this can only be present on ai generated data.
     // @ts-ignore
     case "submit": {
       return <></>;
     }
     case "switch": {
       return (
-        <label
-          data-field-type={type}
+        <Root
+          type={type}
           className="flex flex-row gap-1 justify-between items-center"
         >
           <div className="flex flex-col gap-2">
@@ -579,18 +578,18 @@ function MonoFormField({
             <HelpText />
           </div>
           {renderInput()}
-        </label>
+        </Root>
       );
     }
     case "checkbox": {
       return (
-        <div className="items-top flex space-x-2">
+        <Root type={type} className="items-top flex space-x-2">
           {renderInput()}
           <div className="grid gap-1.5 leading-none">
             <LabelText />
             <HelpText />
           </div>
-        </div>
+        </Root>
       );
     }
     case "checkboxes": {
@@ -622,7 +621,7 @@ function MonoFormField({
       };
 
       return (
-        <div data-field-type={type} className="flex flex-col gap-1">
+        <Root type={type} className="flex flex-col gap-1">
           <LabelText htmlFor="none" />
           <HelpText />
           <Card>
@@ -639,52 +638,71 @@ function MonoFormField({
               </ul>
             </fieldset>
           </Card>
-        </div>
+        </Root>
       );
     }
     case "radio": {
       return (
-        <div data-field-type={type} className="flex flex-col gap-1">
+        <Root type={type} className="flex flex-col gap-1">
           <LabelText htmlFor="none" />
           {renderInput()}
           <HelpText />
-        </div>
+        </Root>
       );
     }
     case "toggle-group": {
       if (options) {
         return (
-          <ToggleGroupRootWithValue
-            name={name}
-            required={required}
-            type={(multiple ? "multiple" : "single") as any}
-            defaultValue={defaultValue}
-            // TODO: need handling - this can be an array
-            onValueChange={onValueChange}
-          >
-            {options.map((option) => (
-              <ToggleGroupItem key={option.id} value={option.id}>
-                {option.label}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroupRootWithValue>
+          <Root type={type} className="grid gap-1">
+            <LabelText htmlFor="none" />
+            <HelpText />
+            <ToggleGroupRootWithValue
+              name={name}
+              required={required}
+              type={(multiple ? "multiple" : "single") as any}
+              defaultValue={defaultValue}
+              // TODO: need handling - this can be an array
+              onValueChange={onValueChange}
+            >
+              {options.map((option) => (
+                <ToggleGroupItem key={option.id} value={option.id}>
+                  {option.label}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroupRootWithValue>
+          </Root>
         );
       }
     }
   }
 
   return (
-    <div data-field-type={type} className="grid gap-2">
+    <Root type={type} className="grid gap-2">
       <LabelText />
       {renderInput()}
       <HelpText />
-    </div>
+    </Root>
   );
 }
 
 interface OnValueChange {
   onValueChange?: (value: string) => void;
   onCheckedChange?: (checked: boolean) => void;
+}
+
+function Root({
+  type,
+  children,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement> &
+  React.PropsWithChildren<{
+    type: FormInputType;
+  }>) {
+  return (
+    <div data-field-type={type} {...props}>
+      {children}
+    </div>
+  );
 }
 
 /**
