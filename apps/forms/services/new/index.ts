@@ -1,94 +1,151 @@
-import { client, workspaceclient } from "@/lib/supabase/server";
-import { FormResponseUnknownFieldHandlingStrategyType } from "@/types";
+import { grida_forms_client, workspaceclient } from "@/lib/supabase/server";
+import type {
+  FormResponseUnknownFieldHandlingStrategyType,
+  GDocumentType,
+} from "@/types";
+import assert from "assert";
 
-export async function create_new_form_with_document({
-  project_id,
-  ...optional
-}: {
-  project_id: number;
-} & Partial<{
-  default_form_page_id?: string | null;
-  description?: string | null;
-  is_max_form_responses_by_customer_enabled?: boolean;
-  is_max_form_responses_in_total_enabled?: boolean;
-  max_form_responses_by_customer?: number | null;
-  max_form_responses_in_total?: number | null;
-  title?: string;
-  unknown_field_handling_strategy?: FormResponseUnknownFieldHandlingStrategyType;
-}>) {
-  const { data: form, error } = await client
-    .from("form")
-    .insert({
-      project_id: project_id,
-      ...optional,
-    })
-    .select("*")
-    .single();
+/**
+ * NO RLS - use with caution
+ */
+class DocumentSetupAssistantService {
+  constructor(
+    readonly project_id: number,
+    private readonly doctype: GDocumentType
+  ) {}
 
-  if (error) {
-    console.error(error);
-    throw error;
+  document_id: string | null = null;
+  protected async createMasterDocument({ title }: { title?: string }) {
+    if (this.document_id) throw new Error("document already created");
+    const { data: document_ref, error: doc_ref_err } = await workspaceclient
+      .from("document")
+      .insert({
+        title: title,
+        project_id: this.project_id,
+        doctype: this.doctype,
+      })
+      .select()
+      .single();
+
+    if (doc_ref_err) {
+      console.error(doc_ref_err);
+      throw doc_ref_err;
+    }
+
+    assert(document_ref, "document not created");
+
+    this.document_id = document_ref.id;
+    return document_ref;
   }
-
-  if (!form) {
-    console.error("form not created");
-    throw error;
-  }
-
-  // create document
-  const { data: document_ref, error: doc_ref_err } = await workspaceclient
-    .from("document")
-    .insert({
-      project_id: project_id,
-      doctype: "v0_form",
-    })
-    .select()
-    .single();
-
-  if (doc_ref_err) {
-    console.error(doc_ref_err);
-    throw doc_ref_err;
-  }
-
-  if (!document_ref) {
-    console.error("document not created");
-    throw doc_ref_err;
-  }
-
-  // create a form document
-  const { data: form_document, error: form_doc_err } = await client
-    .from("form_document")
-    .insert({
-      id: document_ref.id,
-      form_id: form.id,
-      project_id,
-      name: form.title,
-    })
-    .select("id")
-    .single();
-
-  if (form_doc_err) {
-    console.error(form_doc_err);
-    throw form_doc_err;
-  }
-
-  // link the page to the form
-  await client
-    .from("form")
-    .update({
-      default_form_page_id: form_document!.id,
-    })
-    .eq("id", form.id);
-
-  return {
-    form_id: form.id,
-    form_document_id: form_document!.id,
-  };
 }
 
-export async function seed_form_document_blocks({
+export class SiteDocumentSetupAssistantService extends DocumentSetupAssistantService {
+  constructor(readonly project_id: number) {
+    super(project_id, "v0_site");
+  }
+
+  async createSiteDocument() {
+    return this.createMasterDocument({
+      title: "Untitled Site",
+    });
+  }
+}
+
+/**
+ * NO RLS - use with caution
+ */
+export class FormDocumentSetupAssistantService extends DocumentSetupAssistantService {
+  constructor(
+    readonly project_id: number,
+    private readonly seed: Partial<{
+      description?: string | null;
+      title?: string;
+      unknown_field_handling_strategy?: FormResponseUnknownFieldHandlingStrategyType;
+    }> = {}
+  ) {
+    super(project_id, "v0_form");
+  }
+
+  private form_id: string | null = null;
+  private async createFormDatabase() {
+    if (this.form_id) return this.form_id;
+
+    const { data: form, error } = await grida_forms_client
+      .from("form")
+      .insert({
+        project_id: this.project_id,
+        ...this.seed,
+      })
+      .select("*")
+      .single();
+
+    if (error) {
+      console.error(error);
+      throw error;
+    }
+
+    if (!form) {
+      console.error("form not created");
+      throw error;
+    }
+
+    this.form_id = form.id;
+    return this.form_id;
+  }
+
+  //
+  async createFormDocument() {
+    // create document
+    const document_ref = await this.createMasterDocument({
+      title: this.seed.title,
+    });
+
+    await this.createFormDatabase();
+    assert(this.form_id, "form not created");
+
+    // create a form document
+    const { data: form_document, error: form_doc_err } =
+      await grida_forms_client
+        .from("form_document")
+        .insert({
+          id: document_ref.id,
+          form_id: this.form_id,
+          project_id: this.project_id,
+          name: document_ref.title,
+        })
+        .select("id")
+        .single();
+
+    if (form_doc_err) {
+      console.error(form_doc_err);
+      throw form_doc_err;
+    }
+
+    // link the page to the form
+    await grida_forms_client
+      .from("form")
+      .update({
+        default_form_page_id: form_document!.id,
+      })
+      .eq("id", this.form_id);
+
+    return {
+      form_id: this.form_id,
+      form_document_id: form_document!.id,
+    };
+  }
+
+  async seedFormDocumentBlocks() {
+    return await seed_form_document_blocks({
+      form_id: this.form_id!,
+      form_document_id: this.document_id!,
+    });
+  }
+}
+
+async function seed_form_document_blocks({
   form_id,
-  form_document_id: form_document_id,
+  form_document_id,
 }: {
   form_id: string;
   form_document_id: string;
@@ -98,7 +155,7 @@ export async function seed_form_document_blocks({
   // - header block
   // - field block
 
-  const { data: section_block } = await client
+  const { data: section_block, error } = await grida_forms_client
     .from("form_block")
     .insert({
       type: "section",
@@ -109,9 +166,11 @@ export async function seed_form_document_blocks({
     .select("id")
     .single();
 
+  if (error) throw error;
+
   const section_1_id = section_block!.id;
 
-  await client.from("form_block").insert([
+  await grida_forms_client.from("form_block").insert([
     {
       type: "header",
       form_id,

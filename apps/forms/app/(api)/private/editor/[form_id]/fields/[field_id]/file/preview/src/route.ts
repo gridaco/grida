@@ -1,11 +1,15 @@
 import { GRIDA_FORMS_RESPONSE_BUCKET } from "@/k/env";
-import { client } from "@/lib/supabase/server";
+import { grida_forms_client } from "@/lib/supabase/server";
 import { parseStorageUrlOptions } from "@/services/form/storage";
 import { createXSupabaseClient } from "@/services/x-supabase";
 import { FormFieldStorageSchema } from "@/types";
 import assert from "assert";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
+
+const expiresIn = 60 * 60;
+
+export const revalidate = expiresIn;
 
 export async function GET(
   req: NextRequest,
@@ -17,13 +21,13 @@ export async function GET(
   }
 ) {
   const { form_id, field_id } = context.params;
-  const expiresIn = 60 * 60;
+
   const qpath = req.nextUrl.searchParams.get("path");
   const options = parseStorageUrlOptions(req.nextUrl.searchParams);
   // TODO: support RLS
   // const cookieStore = cookies();
   // const supabase = createRouteHandlerClient(cookieStore);
-  const supabase = client;
+  const supabase = grida_forms_client;
 
   assert(qpath);
 
@@ -61,17 +65,34 @@ export async function GET(
             service_role: true,
           }
         );
-        const { data: singed } = await client.storage
-          .from(bucket)
-          .createSignedUrl(qpath, expiresIn, options);
 
-        const src = singed?.signedUrl;
+        // check if bucket is public
+        const { data: bucket_ref, error: bucket_ref_err } =
+          await client.storage.getBucket(bucket);
 
-        if (!src) {
+        if (bucket_ref_err || !bucket_ref) {
           return notFound();
         }
 
-        return NextResponse.redirect(src);
+        if (bucket_ref.public) {
+          // use public url when possible (this can utilize caching from supabase cdn)
+          const { publicUrl: src } = client.storage
+            .from(bucket)
+            .getPublicUrl(qpath, options).data;
+          return NextResponse.redirect(src);
+        } else {
+          const { data: singed } = await client.storage
+            .from(bucket)
+            .createSignedUrl(qpath, expiresIn, options);
+
+          const src = singed?.signedUrl;
+
+          if (!src) {
+            return notFound();
+          }
+          return NextResponse.redirect(src);
+        }
+
         //
       }
       case "grida":
@@ -91,9 +112,9 @@ export async function GET(
   }
 
   return NextResponse.redirect(src, {
-    status: 301,
+    status: 302,
     headers: {
-      "Cache-Control": `public, max-age=${expiresIn}, s-maxage=${expiresIn}, stale-while-revalidate=59`,
+      "Cache-Control": `public, max-age=${expiresIn}, s-maxage=${expiresIn}`,
     },
   });
 }

@@ -1,4 +1,4 @@
-import { client, workspaceclient } from "@/lib/supabase/server";
+import { grida_forms_client, workspaceclient } from "@/lib/supabase/server";
 import { process_response_provisional_info } from "@/services/customer/utils";
 import { NextResponse } from "next/server";
 
@@ -14,7 +14,7 @@ export async function POST() {
   let i = 0;
   for (const customer of customers!) {
     try {
-      const { data: responses } = await client
+      const { data: responses } = await grida_forms_client
         .from("response")
         .select(
           `*, response_fields:response_field(*, form_field:form_field(type, name))`

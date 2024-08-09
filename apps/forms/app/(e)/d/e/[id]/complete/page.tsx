@@ -1,5 +1,5 @@
 import React from "react";
-import { client } from "@/lib/supabase/server";
+import { grida_forms_client } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { EndingPageWithContext } from "@/theme/templates/formcomplete";
 import { ssr_page_init_i18n } from "@/i18n/ssr";
@@ -18,7 +18,7 @@ export default async function SubmitCompletePage({
   const form_id = params.id;
   const response_id = searchParams.rid;
 
-  const { data, error } = await client
+  const { data, error } = await grida_forms_client
     .from("form")
     .select(
       `
@@ -49,7 +49,7 @@ export default async function SubmitCompletePage({
     return notFound();
   }
 
-  const { data: response } = await client
+  const { data: response } = await grida_forms_client
     .from("response")
     .select(
       `

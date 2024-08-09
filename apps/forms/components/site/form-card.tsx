@@ -9,6 +9,7 @@ export function GridCard({
   thumbnail,
   max_responses,
   has_connection_supabase,
+  doctype,
 }: GDocument & { thumbnail?: string }) {
   return (
     <div className="rounded border border-neutral-500/10 bg-white dark:bg-neutral-900 shadow-md">
@@ -23,7 +24,7 @@ export function GridCard({
       ) : (
         <div className="p-2 aspect-square w-full flex items-center justify-center border-b">
           <ResourceTypeIcon
-            type={has_connection_supabase ? "form-x-supabase" : "form"}
+            type={has_connection_supabase ? "form-x-supabase" : doctype}
             className="w-10 h-10"
           />
         </div>
@@ -51,6 +52,7 @@ export function RowCard({
   max_responses,
   created_at,
   updated_at,
+  doctype,
   has_connection_supabase,
 }: GDocument & { thumbnail?: string }) {
   return (
@@ -66,7 +68,7 @@ export function RowCard({
       ) : (
         <div className="p-2 aspect-square h-full flex items-center justify-center border-r">
           <ResourceTypeIcon
-            type={has_connection_supabase ? "form-x-supabase" : "form"}
+            type={has_connection_supabase ? "form-x-supabase" : doctype}
             className="w-5 h-5"
           />
         </div>

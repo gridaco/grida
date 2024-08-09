@@ -1,28 +1,28 @@
 "use client";
 
 import { Input } from "@/components/ui/input";
-import { createClientFormsClient } from "@/lib/supabase/client";
-import React, { useState, useEffect, useCallback } from "react";
+import { createClientWorkspaceClient } from "@/lib/supabase/client";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import toast from "react-hot-toast";
 
-export function EditableFormTitle({
-  form_id,
+export function EditableDocumentTitle({
+  id,
   defaultValue,
 }: {
-  form_id: string;
+  id: string;
   defaultValue?: string;
 }) {
   const [value, setValue] = useState<string>(defaultValue || "");
 
-  const supabase = createClientFormsClient();
+  const supabase = useMemo(() => createClientWorkspaceClient(), []);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const updateTitle = useCallback(
     debounce(async (newValue: string) => {
       const { error } = await supabase
-        .from("form")
+        .from("document")
         .update({ title: newValue })
-        .eq("id", form_id);
+        .eq("id", id);
 
       if (error) {
         toast.error("Failed to save");
@@ -31,7 +31,7 @@ export function EditableFormTitle({
       }
     }, 1000),
 
-    [form_id, supabase]
+    [id, supabase]
   );
 
   const onChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -49,7 +49,7 @@ export function EditableFormTitle({
     <>
       <Input
         type="text"
-        placeholder="Form title"
+        placeholder="Document title"
         value={value}
         onChange={onChange}
       />

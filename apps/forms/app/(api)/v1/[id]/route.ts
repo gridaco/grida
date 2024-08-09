@@ -18,7 +18,7 @@ import {
   SYSTEM_GF_FINGERPRINT_VISITORID_KEY,
 } from "@/k/system";
 import { FormBlockTree } from "@/lib/forms/types";
-import { client } from "@/lib/supabase/server";
+import { grida_forms_client } from "@/lib/supabase/server";
 import { upsert_customer_with } from "@/services/customer";
 import {
   FormFieldOptionsInventoryMap,
@@ -149,7 +149,7 @@ export async function GET(
 
   const cookieStore = cookies();
   // TODO: strict with permissions
-  const supabase = client;
+  const supabase = grida_forms_client;
   // const supabase = createRouteHandlerClient(cookieStore);
 
   const { data, error } = await supabase

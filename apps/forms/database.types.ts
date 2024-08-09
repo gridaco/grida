@@ -1779,6 +1779,48 @@ export type Database = {
       [_ in never]: never
     }
   }
+  grida_sites: {
+    Tables: {
+      site_document: {
+        Row: {
+          created_at: string
+          data: Json
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          data: Json
+          id: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_document_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "document"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   grida_x_supabase: {
     Tables: {
       supabase_project: {

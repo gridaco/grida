@@ -1,4 +1,4 @@
-import { client } from "@/lib/supabase/server";
+import { grida_forms_client } from "@/lib/supabase/server";
 import { createXSupabaseClient } from "@/services/x-supabase";
 import assert from "assert";
 import { notFound } from "next/navigation";
@@ -19,7 +19,7 @@ export async function GET(
 
   // FIXME: Strict Authorization - this route accesses auth.users
 
-  const { data: formref, error: formreferr } = await client
+  const { data: formref, error: formreferr } = await grida_forms_client
     .from("form")
     .select(`supabase_connection:connection_supabase(*)`)
     .eq("id", form_id)

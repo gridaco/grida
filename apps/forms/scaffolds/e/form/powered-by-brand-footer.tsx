@@ -4,7 +4,7 @@ import Link from "next/link";
 export function PoweredByGridaFooter() {
   return (
     <footer className="py-10 w-max mx-auto">
-      <Link href={"/"} target="_blank">
+      <Link href={"/"} target="_blank" className="not-prose">
         <PoweredByGridaWaterMark />
       </Link>
     </footer>

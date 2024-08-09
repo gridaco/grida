@@ -418,13 +418,15 @@ export interface Project {
   created_at: string;
 }
 
+export type GDocumentType = "v0_form" | "v0_site";
+
 export interface GDocument {
   id: string;
   created_at: string;
   updated_at: string;
   project_id: number;
   organization_id: number;
-  doctype: "v0_form" | "v0_site";
+  doctype: GDocumentType;
   title: string;
   form_id: string | null;
   has_connection_supabase: boolean;

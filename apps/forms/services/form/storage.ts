@@ -1,7 +1,7 @@
 import { GRIDA_FORMS_RESPONSE_BUCKET } from "@/k/env";
 import { UniqueFileNameGenerator } from "@/lib/forms/storage";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
-import { client } from "@/lib/supabase/server";
+import { grida_forms_client } from "@/lib/supabase/server";
 import { TemplateVariables } from "@/lib/templating";
 import {
   FileStorage,
@@ -73,7 +73,10 @@ export class FieldStorageService {
       throw new Error("storage type not supported");
     }
 
-    this._m_fileStorage = new FileStorage(client, GRIDA_FORMS_RESPONSE_BUCKET);
+    this._m_fileStorage = new FileStorage(
+      grida_forms_client,
+      GRIDA_FORMS_RESPONSE_BUCKET
+    );
     return this._m_fileStorage;
   }
 
@@ -218,7 +221,7 @@ export namespace SessionStorageServices {
       }
     } else {
       const storage = new SessionStagedFileStorage(
-        client,
+        grida_forms_client,
         GRIDA_FORMS_RESPONSE_BUCKET
       );
 
@@ -273,7 +276,10 @@ export namespace SessionStorageServices {
           throw new Error("storage type not supported");
       }
     } else {
-      const storage = new FileStorage(client, GRIDA_FORMS_RESPONSE_BUCKET);
+      const storage = new FileStorage(
+        grida_forms_client,
+        GRIDA_FORMS_RESPONSE_BUCKET
+      );
 
       return storage.getPublicUrl(file.path);
     }

@@ -1,4 +1,4 @@
-import { client } from "@/lib/supabase/server";
+import { grida_forms_client } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
@@ -21,7 +21,7 @@ export async function POST(
     }
   );
 
-  const { data: inserted, error } = await client
+  const { data: inserted, error } = await grida_forms_client
     .from("form_field")
     .insert({
       name: data.name,

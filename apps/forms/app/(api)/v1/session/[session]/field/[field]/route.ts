@@ -1,4 +1,4 @@
-import { client } from "@/lib/supabase/server";
+import { grida_forms_client } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function PATCH(
@@ -13,7 +13,7 @@ export async function PATCH(
   const { session, field } = context.params;
   const { value } = await req.json();
 
-  await client.rpc("set_response_session_field_value", {
+  await grida_forms_client.rpc("set_response_session_field_value", {
     session_id: session,
     key: field,
     value: value,

@@ -1,6 +1,9 @@
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
-import { client, createServerComponentClient } from "@/lib/supabase/server";
+import {
+  grida_forms_client,
+  createServerComponentClient,
+} from "@/lib/supabase/server";
 import { Metadata } from "next";
 import { Inconsolata, Inter, Lora } from "next/font/google";
 import { FormDocument } from "@/types";
@@ -30,7 +33,8 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const id = params.id;
 
-  const { data, error } = await client
+  // FIXME: drop `name` and use document.title instead
+  const { data, error } = await grida_forms_client
     .from("form_document")
     .select(
       `
@@ -64,7 +68,7 @@ export default async function Layout({
   const cookieStore = cookies();
   const supabase = createServerComponentClient(cookieStore);
 
-  const { data, error } = await client
+  const { data, error } = await grida_forms_client
     .from("form_document")
     .select(
       `
