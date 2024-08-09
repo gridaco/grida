@@ -30,6 +30,7 @@ import { usePathname } from "next/navigation";
 import "core-js/features/map/group-by";
 import { Input } from "@/components/ui/input";
 import { SearchInput } from "@/components/extension/search-input";
+import Fuse from "fuse.js";
 
 export function ModeDesign() {
   const [state, dispatch] = useEditorState();
@@ -109,25 +110,37 @@ export function ModeBlocks() {
     [dispatch]
   );
 
-  const filtered_block_types = useMemo(
-    () =>
-      supported_block_types.filter((block_type) => {
-        return blocklabels[block_type]
-          .toLowerCase()
-          .includes(search.toLowerCase());
-      }),
-    [search]
-  );
+  const blockFuse = useMemo(() => {
+    const blockData = supported_block_types.map((block_type) => ({
+      type: block_type,
+      label: blocklabels[block_type],
+    }));
+    return new Fuse(blockData, { keys: ["label"] });
+  }, []);
 
-  const filtered_field_types = useMemo(
-    () =>
-      supported_field_types.filter((field_type) => {
-        return fieldlabels[field_type]
-          .toLowerCase()
-          .includes(search.toLowerCase());
-      }),
-    [search]
-  );
+  const fieldFuse = useMemo(() => {
+    const fieldData = supported_field_types.map((field_type) => ({
+      type: field_type,
+      label: fieldlabels[field_type],
+    }));
+    return new Fuse(fieldData, { keys: ["label"] });
+  }, []);
+
+  const filtered_block_types = useMemo(() => {
+    if (search.trim() === "") {
+      return supported_block_types;
+    }
+    const results = blockFuse.search(search);
+    return results.map((result) => result.item.type);
+  }, [search, blockFuse]);
+
+  const filtered_field_types = useMemo(() => {
+    if (search.trim() === "") {
+      return supported_field_types;
+    }
+    const results = fieldFuse.search(search);
+    return results.map((result) => result.item.type);
+  }, [search, fieldFuse]);
 
   return (
     <>
