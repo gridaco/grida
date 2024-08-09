@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { EditableFormTitle } from "@/scaffolds/editable-form-title";
+import { EditableDocumentTitle } from "@/scaffolds/editable-document-title";
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import {
@@ -82,6 +82,22 @@ export default async function Layout({
     return notFound();
   }
 
+  const { data: masterdoc_ref, error: masterdoc_ref_err } = await wsclient
+    .from("document")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (masterdoc_ref_err) {
+    console.error("masterdoc_ref err", masterdoc_ref_err);
+    return notFound();
+  }
+
+  if (!masterdoc_ref) {
+    console.error("masterdoc_ref not found", id);
+    return notFound();
+  }
+
   const { data, error } = await supabase
     .from("form_document")
     .select(
@@ -100,7 +116,7 @@ export default async function Layout({
       `
     )
     .eq("project_id", project_ref.id)
-    .eq("id", id)
+    .eq("id", masterdoc_ref.id)
     .single();
 
   if (!data) {
@@ -190,9 +206,10 @@ export default async function Layout({
         <Header
           org={params.org}
           proj={params.proj}
-          form_id={id}
-          // TODO:
-          title={form.title}
+          document={{
+            id,
+            title: masterdoc_ref.title,
+          }}
         />
         <div className="flex flex-1 overflow-y-auto">
           <div className="h-full flex flex-1 w-full">
@@ -211,13 +228,14 @@ export default async function Layout({
 function Header({
   org,
   proj,
-  form_id,
-  title,
+  document: { id, title },
 }: {
   org: string;
   proj: string;
-  form_id: string;
-  title: string;
+  document: {
+    id: string;
+    title: string;
+  };
 }) {
   return (
     <header className="flex w-full gap-4 bg-background border-b z-10 h-12">
@@ -228,7 +246,7 @@ function Header({
           </span>
         </Link>
         <SlashIcon className="min-w-[20px] ms-2" width={15} height={15} />
-        <EditableFormTitle form_id={form_id} defaultValue={title} />
+        <EditableDocumentTitle id={id} defaultValue={title} />
       </div>
       <div className="flex-1 flex items-center justify-between">
         <div>

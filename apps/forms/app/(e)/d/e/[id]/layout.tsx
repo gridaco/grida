@@ -33,6 +33,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const id = params.id;
 
+  // FIXME: drop `name` and use document.title instead
   const { data, error } = await grida_forms_client
     .from("form_document")
     .select(
