@@ -142,6 +142,15 @@ const default_field_init: {
     // https://github.com/whatwg/html/issues/6868
     required: false,
   },
+  "toggle-group": {
+    type: "toggle-group",
+    options: [
+      { id: draftid(), label: "Choice A", value: "choice_a" },
+      { id: draftid(), label: "Choice B", value: "choice_b" },
+      { id: draftid(), label: "Choice C", value: "choice_c" },
+    ],
+    multiple: true,
+  },
   hidden: { type: "hidden" },
   payment: {
     type: "payment",
