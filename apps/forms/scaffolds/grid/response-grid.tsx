@@ -438,7 +438,7 @@ function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
     return <></>;
   }
 
-  const { type, value, options, files } = data;
+  const { type, value, options, multiple, files } = data;
 
   const unwrapped = unwrapFeildValue(
     FormValue.parse(value, {
@@ -449,6 +449,7 @@ function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
             value: options[key].value,
           }))
         : [],
+      multiple: multiple,
     }).value,
     type as FormInputType
   );

@@ -33,17 +33,29 @@ import { Button } from "@/components/ui/button";
 import { AdminMediaPicker } from "../mediapicker";
 import type { Option } from "@/types";
 import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 
 export function OptionsEdit({
   options,
   onAdd,
+  onAddMany,
   onChange,
   onSort,
   onRemove,
   disableNewOption,
 }: {
   options?: Option[];
-  onAdd?: () => void;
+  onAdd: () => void;
+  onAddMany: (values: string[]) => void;
   onChange?: (id: string, option: Option) => void;
   onSort?: (from: number, to: number) => void;
   onRemove?: (id: string) => void;
@@ -111,14 +123,18 @@ export function OptionsEdit({
               />
             ))}
             {!disableNewOption && (
-              <button
-                type="button"
-                className="flex gap-2 items-center justify-center border rounded text-xs p-2 w-fit"
-                onClick={onAdd}
-              >
-                <PlusIcon />
-                Add Option
-              </button>
+              <div className="flex gap-2 items-center">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={onAdd}
+                >
+                  <PlusIcon className="inline-flex me-2" />
+                  Add Option
+                </Button>
+                <OptionsBulkAdd onSave={onAddMany} />
+              </div>
             )}
           </div>
         </div>
@@ -313,5 +329,61 @@ function OptionEditItem({
         <span className="w-5" />
       </div>
     </div>
+  );
+}
+
+function OptionsBulkAdd({ onSave }: { onSave?: (values: string[]) => void }) {
+  const [txt, setTxt] = useState("");
+
+  const values = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          txt
+            .split("\n")
+            .map((v) => v.trim())
+            .filter(Boolean)
+        )
+      ),
+    [txt]
+  );
+
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button type="button" variant="outline" size="sm">
+          Add Multiple
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>Add Multiple Options</DialogHeader>
+        <DialogDescription>
+          Add multiple options by entering a list of values separated by a new
+          line. Duplicate values will be ignored
+        </DialogDescription>
+        <Textarea
+          value={txt}
+          onChange={(e) => setTxt(e.target.value)}
+          placeholder={`apple\nbanana\ncherry`}
+          className="min-h-96"
+        />
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="ghost">Cancel</Button>
+          </DialogClose>
+          <DialogClose asChild>
+            <Button
+              disabled={values.length === 0}
+              onClick={() => {
+                onSave?.(values);
+                setTxt("");
+              }}
+            >
+              {values.length === 0 ? "Add" : <>Add ({values.length})</>}
+            </Button>
+          </DialogClose>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

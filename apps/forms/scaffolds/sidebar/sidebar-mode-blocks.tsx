@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useCallback } from "react";
-import { PlusIcon } from "@radix-ui/react-icons";
+import React, { useCallback, useMemo } from "react";
+import { MagnifyingGlassIcon, PlusIcon } from "@radix-ui/react-icons";
 import { useEditorState } from "../editor";
 import {
   SidebarMenuGrid,
@@ -26,8 +26,11 @@ import { blocklabels, supported_block_types } from "@/k/supported_block_types";
 import { BlockTypeIcon } from "@/components/form-blcok-type-icon";
 import type { FormBlockType, FormInputType } from "@/types";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
-import "core-js/features/map/group-by";
 import { usePathname } from "next/navigation";
+import "core-js/features/map/group-by";
+import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/extension/search-input";
+import Fuse from "fuse.js";
 
 export function ModeDesign() {
   const [state, dispatch] = useEditorState();
@@ -81,6 +84,7 @@ export function ModeDesign() {
 }
 
 export function ModeBlocks() {
+  const [search, setSearch] = React.useState("");
   const [state, dispatch] = useEditorState();
 
   const addBlock = useCallback(
@@ -106,16 +110,55 @@ export function ModeBlocks() {
     [dispatch]
   );
 
+  const blockFuse = useMemo(() => {
+    const blockData = supported_block_types.map((block_type) => ({
+      type: block_type,
+      label: blocklabels[block_type],
+    }));
+    return new Fuse(blockData, { keys: ["label"] });
+  }, []);
+
+  const fieldFuse = useMemo(() => {
+    const fieldData = supported_field_types.map((field_type) => ({
+      type: field_type,
+      label: fieldlabels[field_type],
+    }));
+    return new Fuse(fieldData, { keys: ["label"] });
+  }, []);
+
+  const filtered_block_types = useMemo(() => {
+    if (search.trim() === "") {
+      return supported_block_types;
+    }
+    const results = blockFuse.search(search);
+    return results.map((result) => result.item.type);
+  }, [search, blockFuse]);
+
+  const filtered_field_types = useMemo(() => {
+    if (search.trim() === "") {
+      return supported_field_types;
+    }
+    const results = fieldFuse.search(search);
+    return results.map((result) => result.item.type);
+  }, [search, fieldFuse]);
+
   return (
     <>
+      <SidebarSection className="mt-2">
+        <SearchInput
+          autoFocus
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </SidebarSection>
       <SidebarSection>
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>
-            <span>Blocks</span>
+            <span>Blocks ({filtered_block_types.length})</span>
           </SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuGrid>
-          {supported_block_types.map((block_type) => (
+          {filtered_block_types.map((block_type) => (
             <HoverCard key={block_type} openDelay={100} closeDelay={100}>
               <HoverCardTrigger>
                 <SidebarMenuGridItem
@@ -155,11 +198,11 @@ export function ModeBlocks() {
       <SidebarSection>
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>
-            <span>Fields</span>
+            <span>Fields ({filtered_field_types.length})</span>
           </SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuGrid>
-          {supported_field_types.map((field_type) => (
+          {filtered_field_types.map((field_type) => (
             <HoverCard key={field_type} openDelay={100} closeDelay={100}>
               <HoverCardTrigger>
                 <SidebarMenuGridItem

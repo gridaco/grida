@@ -52,6 +52,8 @@ export async function sbconn_insert({
     service_role: true,
   });
 
+  // console.log("insert into", `"${sb_table_name}"`, "values", row);
+
   return {
     insertion: sbclient.from(sb_table_name).insert(row).select().single(),
     pks,
@@ -172,15 +174,25 @@ function asTableRowData(
       }
     }
 
+    // prettier-ignore
+    // console.log("constructrow", key, parsedvalue, { type, format, is_array });
+
     if (is_array) {
       // we wrap the value as array if the schema expects an array. this is because our form does not support array inputs
       // do not wrap if the value is undefined (undefined means no data input through the postgrest api)
       if (parsedvalue !== undefined) {
-        parsedvalue = [parsedvalue];
+        parsedvalue = toArray(parsedvalue);
       }
     }
     row[key] = parsedvalue;
   });
 
   return row;
+}
+
+function toArray(value: any) {
+  if (Array.isArray(value)) {
+    return value;
+  }
+  return [value];
 }

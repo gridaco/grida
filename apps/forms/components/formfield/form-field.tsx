@@ -356,7 +356,7 @@ function MonoFormField({
           // html5 vanilla select
           // does not support `src`
           return (
-            <HtmlSelectWithSafeValue
+            <SafeValueHtml5Select
               {...(sharedInputProps as React.ComponentProps<"select">)}
               options={options}
               locked={locked}
@@ -372,7 +372,7 @@ function MonoFormField({
           }
 
           return (
-            <SelectWithSafeValue
+            <SafeValueSelect
               {...(sharedInputProps as React.ComponentProps<"select">)}
               options={options}
               locked={locked}
@@ -502,7 +502,6 @@ function MonoFormField({
           />
         );
       }
-
       case "search": {
         if (preview) {
           return <ReferenceSearchPreview />;
@@ -539,9 +538,9 @@ function MonoFormField({
     return <PaymentField data={data as PaymentFieldData} disabled={disabled} />;
   }
 
-  const LabelText = ({ htmlFor = name }: { htmlFor?: string }) => (
+  const LabelText = ({ htmlFor = name }: { htmlFor?: "none" | {} }) => (
     <Label
-      htmlFor={htmlFor}
+      htmlFor={htmlFor as string}
       data-capitalize={labelCapitalize}
       className="data-[capitalize]:capitalize mb-2"
     >
@@ -563,15 +562,15 @@ function MonoFormField({
 
   // custom layout
   switch (type) {
-    // this can only present on ai generated data.
+    // this can only be present on ai generated data.
     // @ts-ignore
     case "submit": {
       return <></>;
     }
     case "switch": {
       return (
-        <label
-          data-field-type={type}
+        <Root
+          type={type}
           className="flex flex-row gap-1 justify-between items-center"
         >
           <div className="flex flex-col gap-2">
@@ -579,18 +578,18 @@ function MonoFormField({
             <HelpText />
           </div>
           {renderInput()}
-        </label>
+        </Root>
       );
     }
     case "checkbox": {
       return (
-        <div className="items-top flex space-x-2">
+        <Root type={type} className="items-top flex space-x-2">
           {renderInput()}
           <div className="grid gap-1.5 leading-none">
             <LabelText />
             <HelpText />
           </div>
-        </div>
+        </Root>
       );
     }
     case "checkboxes": {
@@ -622,7 +621,7 @@ function MonoFormField({
       };
 
       return (
-        <div data-field-type={type} className="flex flex-col gap-1">
+        <Root type={type} className="flex flex-col gap-1">
           <LabelText htmlFor="none" />
           <HelpText />
           <Card>
@@ -639,44 +638,50 @@ function MonoFormField({
               </ul>
             </fieldset>
           </Card>
-        </div>
+        </Root>
       );
     }
     case "radio": {
       return (
-        <div data-field-type={type} className="flex flex-col gap-1">
+        <Root type={type} className="flex flex-col gap-1">
           <LabelText htmlFor="none" />
           {renderInput()}
           <HelpText />
-        </div>
+        </Root>
       );
     }
     case "toggle-group": {
       if (options) {
         return (
-          // @ts-ignore
-          <ToggleGroup
-            type={multiple ? "multiple" : "single"}
-            // TODO: this can be array
-            onValueChange={onValueChange}
-          >
-            {options.map((option) => (
-              <ToggleGroupItem key={option.id} value={option.id}>
-                {option.label}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
+          <Root type={type} className="grid gap-1">
+            <LabelText htmlFor="none" />
+            <HelpText />
+            <ToggleGroupRootWithValue
+              name={name}
+              required={required}
+              type={(multiple ? "multiple" : "single") as any}
+              defaultValue={defaultValue}
+              // TODO: need handling - this can be an array
+              onValueChange={onValueChange}
+            >
+              {options.map((option) => (
+                <ToggleGroupItem key={option.id} value={option.id}>
+                  {option.label}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroupRootWithValue>
+          </Root>
         );
       }
     }
   }
 
   return (
-    <div data-field-type={type} className="grid gap-2">
+    <Root type={type} className="grid gap-2">
       <LabelText />
       {renderInput()}
       <HelpText />
-    </div>
+    </Root>
   );
 }
 
@@ -685,10 +690,25 @@ interface OnValueChange {
   onCheckedChange?: (checked: boolean) => void;
 }
 
+function Root({
+  type,
+  children,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement> &
+  React.PropsWithChildren<{
+    type: FormInputType;
+  }>) {
+  return (
+    <div data-field-type={type} {...props}>
+      {children}
+    </div>
+  );
+}
+
 /**
  * This is for Select component to automatically de-select the selected item when the selected option is disabled.
  */
-function SelectWithSafeValue({
+function SafeValueSelect({
   options: _options,
   locked,
   onValueChange: cb_onValueChange,
@@ -773,7 +793,7 @@ function SelectWithSafeValue({
 /**
  * This is for Select component to automatically de-select the selected item when the selected option is disabled.
  */
-function HtmlSelectWithSafeValue({
+function SafeValueHtml5Select({
   options: _options,
   locked,
   onValueChange: cb_onValueChange,
@@ -936,6 +956,47 @@ function SliderWithValueLabel(
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * radix-ui's toggle group does not have a 'value'
+ * @see https://github.com/radix-ui/primitives/issues/3058
+ */
+function ToggleGroupRootWithValue({
+  children,
+  name,
+  required,
+  ...props
+}: React.PropsWithChildren<
+  React.ComponentProps<typeof ToggleGroup> & {
+    name?: string;
+    required?: boolean;
+  }
+>) {
+  const ref = React.useRef<HTMLInputElement>(null);
+  const [hiddenValue, setHiddenValue] = useState(props.defaultValue);
+  const onValueChange = (v: any) => {
+    setHiddenValue(v);
+    props.onValueChange?.(v);
+  };
+
+  return (
+    <ToggleGroup
+      variant="outline"
+      {...props}
+      onValueChange={onValueChange}
+      className="flex items-start justify-start flex-wrap"
+    >
+      <input
+        ref={ref}
+        className="sr-only"
+        required={required}
+        name={name}
+        value={hiddenValue}
+      />
+      {children}
+    </ToggleGroup>
   );
 }
 

@@ -66,13 +66,15 @@ export default async function SubmitCompletePage({
 
   // id:val map
   const responsefields: Record<string, string> = response.fields.reduce(
-    (acc: any, field) => {
-      const key = fields.find((f) => f.id === field.form_field_id)?.name;
+    (acc: any, response_field) => {
+      const field = fields.find((f) => f.id === response_field.form_field_id);
+      const key = field?.name;
       if (!key) return acc; // this can't happen - but just in case
 
-      acc[key] = FormValue.parse(field.value, {
+      acc[key] = FormValue.parse(response_field.value, {
         type: field.type,
         enums: options,
+        multiple: field.multiple,
       }).value;
 
       return acc;
