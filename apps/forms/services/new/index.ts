@@ -14,7 +14,9 @@ class DocumentSetupAssistantService {
     private readonly doctype: GDocumentType
   ) {}
 
+  document_id: string | null = null;
   protected async createMasterDocument({ title }: { title?: string }) {
+    if (this.document_id) throw new Error("document already created");
     const { data: document_ref, error: doc_ref_err } = await workspaceclient
       .from("document")
       .insert({
@@ -31,6 +33,8 @@ class DocumentSetupAssistantService {
     }
 
     assert(document_ref, "document not created");
+
+    this.document_id = document_ref.id;
     return document_ref;
   }
 }
@@ -134,14 +138,14 @@ export class FormDocumentSetupAssistantService extends DocumentSetupAssistantSer
   async seedFormDocumentBlocks() {
     return await seed_form_document_blocks({
       form_id: this.form_id!,
-      form_document_id: this.form_id!,
+      form_document_id: this.document_id!,
     });
   }
 }
 
 async function seed_form_document_blocks({
   form_id,
-  form_document_id: form_document_id,
+  form_document_id,
 }: {
   form_id: string;
   form_document_id: string;
@@ -151,7 +155,7 @@ async function seed_form_document_blocks({
   // - header block
   // - field block
 
-  const { data: section_block } = await grida_forms_client
+  const { data: section_block, error } = await grida_forms_client
     .from("form_block")
     .insert({
       type: "section",
@@ -161,6 +165,8 @@ async function seed_form_document_blocks({
     })
     .select("id")
     .single();
+
+  if (error) throw error;
 
   const section_1_id = section_block!.id;
 
