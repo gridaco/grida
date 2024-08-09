@@ -66,7 +66,8 @@ export function CreateNewDocumentButton({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" sideOffset={8}>
-        <DropdownMenuGroup>
+        {/* TODO: alpha feature */}
+        <DropdownMenuGroup hidden={process.env.NODE_ENV === "production"}>
           <DropdownMenuLabel>Sites</DropdownMenuLabel>
           <form action={new_default_site_url} method="POST">
             <button className="w-full">
@@ -89,8 +90,8 @@ export function CreateNewDocumentButton({
               soon
             </Badge>
           </DropdownMenuItem>
+          <DropdownMenuSeparator />
         </DropdownMenuGroup>
-        <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuLabel>Forms</DropdownMenuLabel>
           <form action={new_default_form_url} method="POST">
@@ -124,8 +125,8 @@ export function CreateNewDocumentButton({
               Create with AI
             </DropdownMenuItem>
           </Link>
+          <DropdownMenuSeparator />
         </DropdownMenuGroup>
-        <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuLabel>
             CMS / Commerce
@@ -133,27 +134,27 @@ export function CreateNewDocumentButton({
               <Badge variant="outline">soon</Badge>
             </div>
           </DropdownMenuLabel>
+          <DropdownMenuItem disabled>
+            <ResourceTypeIcon
+              type="database"
+              className="w-4 h-4 me-2 align-middle"
+            />
+            Database
+            <Badge variant="outline" className="ms-auto">
+              soon
+            </Badge>
+          </DropdownMenuItem>
+          <DropdownMenuItem disabled>
+            <ResourceTypeIcon
+              type="commerce"
+              className="w-4 h-4 me-2 align-middle"
+            />
+            Store
+            <Badge variant="outline" className="ms-auto">
+              soon
+            </Badge>
+          </DropdownMenuItem>
         </DropdownMenuGroup>
-        <DropdownMenuItem disabled>
-          <ResourceTypeIcon
-            type="database"
-            className="w-4 h-4 me-2 align-middle"
-          />
-          Database
-          <Badge variant="outline" className="ms-auto">
-            soon
-          </Badge>
-        </DropdownMenuItem>
-        <DropdownMenuItem disabled>
-          <ResourceTypeIcon
-            type="commerce"
-            className="w-4 h-4 me-2 align-middle"
-          />
-          Store
-          <Badge variant="outline" className="ms-auto">
-            soon
-          </Badge>
-        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
