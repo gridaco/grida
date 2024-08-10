@@ -440,19 +440,23 @@ function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
 
   const { type, value, options, multiple, files } = data;
 
-  const unwrapped = unwrapFeildValue(
-    FormValue.parse(value, {
-      type,
-      enums: options
-        ? Object.keys(options).map((key) => ({
-            id: key,
-            value: options[key].value,
-          }))
-        : [],
-      multiple: multiple,
-    }).value,
-    type as FormInputType
-  );
+  // FIXME: we need to use other parser for db-oriented data.
+  // at the moment, we are using type check on value to use the value as is or not.
+  const parsed =
+    typeof value === "object"
+      ? value
+      : FormValue.parse(value, {
+          type,
+          enums: options
+            ? Object.keys(options).map((key) => ({
+                id: key,
+                value: options[key].value,
+              }))
+            : [],
+          multiple: multiple,
+        }).value;
+
+  const unwrapped = unwrapFeildValue(parsed, type as FormInputType);
 
   if (
     !FieldSupports.file_alias(type) &&
@@ -658,7 +662,6 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
     const unwrapped = unwrapFeildValue(value, type);
 
     if (!FieldSupports.file_alias(type) && unwrapped === undefined) {
-      console.log("unwrapped", unwrapped);
       return <NotSupportedEditCell />;
     }
 
