@@ -142,6 +142,15 @@ const default_field_init: {
     // https://github.com/whatwg/html/issues/6868
     required: false,
   },
+  "toggle-group": {
+    type: "toggle-group",
+    options: [
+      { id: draftid(), label: "Choice A", value: "choice_a" },
+      { id: draftid(), label: "Choice B", value: "choice_b" },
+      { id: draftid(), label: "Choice C", value: "choice_c" },
+    ],
+    multiple: true,
+  },
   hidden: { type: "hidden" },
   payment: {
     type: "payment",
@@ -563,6 +572,12 @@ export function FieldEditPanel({
                 options={options}
                 onAdd={() => {
                   setOptions([...options, next_option_default(options)]);
+                }}
+                onAddMany={(values) => {
+                  const new_options = values.map((value) =>
+                    next_option_default(options, value)
+                  );
+                  setOptions([...options, ...new_options]);
                 }}
                 onChange={(id, option) => {
                   setOptions(
@@ -1330,9 +1345,16 @@ function isHandlebarTemplate(str?: string) {
   return handlebarRegex.test(str);
 }
 
-function next_option_default(options: Option[]): Option {
+function next_option_default(options: Option[], seed?: string): Option {
   const len = options.length;
-  const val = (n: number) => `option_${n}`;
+  const val = (n: number) =>
+    seed && !options.some((_) => _.value === seed)
+      ? seed
+      : `${seed || "option_"}${n}`;
+  const label = (n: number) =>
+    seed && !options.some((_) => _.label === seed)
+      ? seed
+      : `${seed ? seed.charAt(0).toUpperCase() + seed.slice(1) : "Option"} ${n}`;
 
   let n = len + 1;
   while (options.some((_) => _.value === val(n))) {
@@ -1342,7 +1364,7 @@ function next_option_default(options: Option[]): Option {
   return {
     id: draftid(),
     value: val(n),
-    label: `Option ${n}`,
+    label: label(n),
     disabled: false,
   };
 }

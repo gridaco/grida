@@ -549,7 +549,7 @@ async function submit({
     try {
       // parsed values
       const entries = v_form_fields.map((field) => {
-        const { type, name, options } = field;
+        const { type, name, options, multiple } = field;
         const value_or_reference = formdata.get(name);
         return [
           // name: column name
@@ -558,6 +558,7 @@ async function submit({
           FormValue.parse(value_or_reference, {
             type: type,
             enums: options,
+            multiple: multiple,
             utc_offset: meta.utc_offset,
           }).value,
         ];
@@ -572,10 +573,8 @@ async function submit({
       const { data: sbconn_inserted, error: sbconn_insertion_error } =
         await insertion;
 
-      console.log("sbconn_insertion", {
-        sbconn_inserted,
-        sbconn_insertion_error,
-      });
+      // prettier-ignore
+      // console.log("sbconn_insertion", { data, sbconn_inserted, sbconn_insertion_error });
 
       if (sbconn_insertion_error) {
         console.error("submit/err/sbconn", sbconn_insertion_error);
@@ -625,15 +624,21 @@ async function submit({
     .from("response_field")
     .insert(
       v_form_fields!.map((field) => {
-        const { type, name, options } = field;
+        const { type, name, options, multiple } = field;
 
         // the field's value can be a input value or a reference to form_field_option
         const value_or_reference = formdata.get(name);
-        const { value, enum_id } = FormValue.parse(value_or_reference, {
-          utc_offset: meta.utc_offset,
-          type: type,
-          enums: options,
-        });
+        const { value, enum_id, enum_ids } = FormValue.parse(
+          value_or_reference,
+          {
+            utc_offset: meta.utc_offset,
+            type: type,
+            enums: options,
+            multiple: multiple,
+          }
+        );
+
+        // console.log("submit/field", field, value_or_reference, value, enum_id);
 
         // handle file uploads
         if (FieldSupports.file_upload(type)) {
@@ -679,7 +684,8 @@ async function submit({
           form_id: form_id,
           value: value,
           form_field_option_id: enum_id,
-        };
+          form_field_option_ids: enum_ids,
+        } satisfies InsertDto<"response_field">;
       })
     );
 
@@ -776,6 +782,7 @@ async function submit({
               utc_offset: meta.utc_offset,
               enums: field.options,
               type: field.type,
+              multiple: field.multiple,
             }
           );
 
@@ -858,6 +865,7 @@ async function submit({
           utc_offset: meta.utc_offset,
           enums: field.options,
           type: field.type,
+          multiple: field.multiple,
         }
       );
 

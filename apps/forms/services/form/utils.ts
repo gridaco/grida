@@ -4,17 +4,24 @@ import { FieldSupports } from "@/k/supported_field_types";
 import { unwrapFeildValue } from "@/lib/forms/unwrap";
 import { toDate } from "date-fns-tz";
 
+type EnumOption = { id: string; value: string };
+
 export namespace FormValue {
   export function parse(
     value_or_reference: any,
     extra: {
       // in minutes, where the givven value is the offset from UTC
       utc_offset?: number;
-      enums?: { id: string; value: string }[];
-      type?: FormInputType;
+      enums?: EnumOption[];
+      type: FormInputType | undefined;
+      multiple?: boolean | null;
     }
-  ) {
-    const { type, enums } = extra;
+  ): {
+    value: any;
+    enum_id?: string | null;
+    enum_ids?: string[] | null;
+  } {
+    const { type, multiple, enums } = extra;
     if (!type) {
       return {
         value: value_or_reference,
@@ -76,25 +83,60 @@ export namespace FormValue {
       }
     }
     if (FieldSupports.enums(type)) {
-      // check if the value is a reference to form_field_option
-      const is_value_fkey_and_found =
-        is_uuid_v4(value_or_reference as string) &&
-        enums?.find((o: any) => o.id === value_or_reference);
+      if (FieldSupports.multiple(type) && multiple) {
+        switch (typeof value_or_reference) {
+          case "string": {
+            const keys = value_or_reference.split(",");
+            const found = keys
+              .map((key) => getEnum(key, enums))
+              .filter(Boolean) as EnumOption[];
+            return {
+              value: found.map((o) => o.value),
+              enum_ids: found.map((o) => o.id),
+            };
+          }
+          case "object": {
+            if (Array.isArray(value_or_reference)) {
+              const keys = value_or_reference;
+              const found = keys
+                .map((key) => getEnum(key, enums))
+                .filter(Boolean) as EnumOption[];
+              return {
+                value: found.map((o) => o.value),
+                enum_ids: found.map((o) => o.id),
+              };
+            }
+            break;
+          }
+          default: {
+            break;
+          }
+        }
+      }
+
+      const found = getEnum(value_or_reference, enums);
 
       // locate the value
-      const value = is_value_fkey_and_found
-        ? is_value_fkey_and_found.value
-        : value_or_reference;
+      const value = found ? found.value : value_or_reference;
 
       return {
         value,
-        enum_id: is_value_fkey_and_found ? is_value_fkey_and_found.id : null,
+        enum_id: found ? found.id : null,
       };
     }
 
     return {
       value: unwrapFeildValue(value_or_reference, type),
     };
+  }
+
+  export function getEnum(
+    value_or_reference: string,
+    enums?: EnumOption[]
+  ): EnumOption | null {
+    if (!enums) return null;
+    if (!is_uuid_v4(value_or_reference)) return null;
+    return enums.find((o) => o.id === value_or_reference) || null;
   }
 
   export function safejson(data: any) {

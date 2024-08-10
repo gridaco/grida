@@ -59,9 +59,9 @@ export function Component({
   return (
     <Card className="w-full max-w-md p-4">
       <CardHeader className="flex flex-col items-center">
-        <CheckIcon className="w-12 h-12 my-4" />
+        <CheckIcon className="w-12 h-12 my-4 text-foreground" />
         <h1
-          className="text-lg text-center font-bold tracking-tight"
+          className="text-lg text-center font-bold text-foreground tracking-tight"
           dangerouslySetInnerHTML={{
             __html: h1,
           }}

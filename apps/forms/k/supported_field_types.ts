@@ -42,6 +42,7 @@ export const supported_field_types: FormInputType[] = [
   "checkbox",
   "switch",
   "radio",
+  "toggle-group",
   "email",
   "tel",
   "url",
@@ -70,6 +71,7 @@ if (process.env.NODE_ENV === "development") {
     "checkboxes",
     "signature",
     "payment",
+    "toggle",
   ] as const;
   supported_field_types.push(...dev);
 }
@@ -143,6 +145,7 @@ const html5_file_alias_field_types: FormInputType[] = [
 
 const html5_multiple_supported_field_types: FormInputType[] = [
   ...html5_file_alias_field_types,
+  "toggle-group",
   // TODO: this needs to be supported - work with the db first.
   // "email",
   // "select",
@@ -201,6 +204,9 @@ const html5_checkbox_alias_field_types: FormInputType[] = [
 const html5_placeholder_not_supported_field_types: FormInputType[] = [
   ...html5_file_alias_field_types,
   ...html5_checkbox_alias_field_types,
+  "toggle",
+  "toggle-group",
+  "radio",
   "date",
   "datetime-local",
   "time",
@@ -213,6 +219,8 @@ const html5_autocomplete_supported_field_types: FormInputType[] =
       ![
         ...html5_file_alias_field_types,
         ...html5_checkbox_alias_field_types,
+        "toggle",
+        "toggle-group",
         "radio",
         "richtext",
         "range",

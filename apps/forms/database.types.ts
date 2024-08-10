@@ -930,7 +930,7 @@ export type Database = {
           description_html: string | null
           form_field_id: string | null
           form_id: string
-          form_page_id: string | null
+          form_page_id: string
           id: string
           local_index: number
           parent_id: string | null
@@ -947,7 +947,7 @@ export type Database = {
           description_html?: string | null
           form_field_id?: string | null
           form_id: string
-          form_page_id?: string | null
+          form_page_id: string
           id?: string
           local_index?: number
           parent_id?: string | null
@@ -964,7 +964,7 @@ export type Database = {
           description_html?: string | null
           form_field_id?: string | null
           form_id?: string
-          form_page_id?: string | null
+          form_page_id?: string
           id?: string
           local_index?: number
           parent_id?: string | null
@@ -976,17 +976,17 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "form_block_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "form"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "grida_forms_form_block_form_field_id_fkey"
             columns: ["form_field_id"]
             isOneToOne: false
             referencedRelation: "form_field"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "grida_forms_form_block_form_id_fkey"
-            columns: ["form_id"]
-            isOneToOne: false
-            referencedRelation: "form"
             referencedColumns: ["id"]
           },
           {
@@ -1451,6 +1451,7 @@ export type Database = {
           created_at: string
           form_field_id: string
           form_field_option_id: string | null
+          form_field_option_ids: string[] | null
           form_id: string | null
           id: string
           response_id: string
@@ -1463,6 +1464,7 @@ export type Database = {
           created_at?: string
           form_field_id: string
           form_field_option_id?: string | null
+          form_field_option_ids?: string[] | null
           form_id?: string | null
           id?: string
           response_id: string
@@ -1475,6 +1477,7 @@ export type Database = {
           created_at?: string
           form_field_id?: string
           form_field_option_id?: string | null
+          form_field_option_ids?: string[] | null
           form_id?: string | null
           id?: string
           response_id?: string
