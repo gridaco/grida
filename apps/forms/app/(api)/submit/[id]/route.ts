@@ -574,7 +574,7 @@ async function submit({
         await insertion;
 
       // prettier-ignore
-      console.log("sbconn_insertion", { data, sbconn_inserted, sbconn_insertion_error });
+      // console.log("sbconn_insertion", { data, sbconn_inserted, sbconn_insertion_error });
 
       if (sbconn_insertion_error) {
         console.error("submit/err/sbconn", sbconn_insertion_error);
