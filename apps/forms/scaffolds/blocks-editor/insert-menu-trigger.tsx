@@ -23,7 +23,14 @@ export function InsertMenuTrigger() {
       variant={is_insert_menu_open ? "default" : "outline"}
       size="icon"
       className="rounded-full"
-      onClick={() => openInsertMenu(true)}
+      onPointerDown={(e) => {
+        // this shall not trigger focused block to lose focus
+        e.preventDefault();
+        e.stopPropagation();
+      }}
+      onClick={(e) => {
+        openInsertMenu(true);
+      }}
     >
       <PlusIcon />
     </Button>

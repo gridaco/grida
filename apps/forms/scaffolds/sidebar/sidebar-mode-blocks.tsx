@@ -87,12 +87,20 @@ export function ModeBlocks() {
   const [search, setSearch] = React.useState("");
   const [state, dispatch] = useEditorState();
 
+  const close = useCallback(() => {
+    dispatch({
+      type: "editor/panels/insert-menu",
+      open: false,
+    });
+  }, [dispatch]);
+
   const addBlock = useCallback(
     (block: FormBlockType) => {
       dispatch({
         type: "blocks/new",
         block: block,
       });
+      close();
     },
     [dispatch]
   );
@@ -106,6 +114,7 @@ export function ModeBlocks() {
           type: type,
         },
       });
+      close();
     },
     [dispatch]
   );
