@@ -3,6 +3,7 @@ import {
   unflatten as _unflatten,
   FlattenOptions,
 } from "flat";
+
 /**
  * Namespace FlatPostgREST
  *
@@ -51,6 +52,8 @@ import {
  * const parsedData = FlatPostgREST.unflatten(formdata, { enums });
  * console.log(parsedData);  // Outputs: { a: { b: "value" } }
  * ```
+ *
+ * @see https://github.com/hughsk/flat/issues/178
  */
 export namespace FlatPostgREST {
   //

@@ -101,6 +101,23 @@ function useRenderer(raw?: string | JSONFormRaw | null) {
   return [valid, invalid] as const;
 }
 
+type PlaygroundWindowMessageAction =
+  | PlaygroundWindowMessageActionSetSchema
+  | PlaygroundWindowMessageActionSetVariablescss
+  | PlaygroundWindowMessageActionSetDarkMode;
+type PlaygroundWindowMessageActionSetSchema = {
+  type: "set_schema";
+  schema: string;
+};
+type PlaygroundWindowMessageActionSetVariablescss = {
+  type: "set_variablescss";
+  variablescss: string;
+};
+type PlaygroundWindowMessageActionSetDarkMode = {
+  type: "set_dark_mode";
+  dark: boolean;
+};
+
 export function PlaygroundPreviewSlave() {
   const { theme, setTheme } = useTheme();
 
@@ -110,7 +127,7 @@ export function PlaygroundPreviewSlave() {
   useVariablesCSS(variablescss);
 
   useEffect(() => {
-    const cb = (event: MessageEvent) => {
+    const cb = (event: MessageEvent<PlaygroundWindowMessageAction>) => {
       switch (event.data?.type) {
         case "set_schema":
           setSchema(event.data.schema);

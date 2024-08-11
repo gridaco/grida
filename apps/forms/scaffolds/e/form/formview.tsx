@@ -590,7 +590,7 @@ function FingerprintField() {
     <input
       type="hidden"
       name={SYSTEM_GF_FINGERPRINT_VISITORID_KEY}
-      value={result?.visitorId}
+      value={result?.visitorId ?? ""}
     />
   );
 }
