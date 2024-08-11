@@ -46,7 +46,6 @@ type FormReadyEventMessage = {
  */
 type FormLoadedEventMessage = {
   type: "form_view_loaded";
-  fields: FormAgentState["fields"];
   loaded: true;
 };
 
@@ -55,8 +54,7 @@ type FormLoadedEventMessage = {
  */
 type FormChangeEventMessage = {
   type: "change";
-  fields: FormAgentState["fields"];
-};
+} & FormAgentState;
 
 type FormSubmitEventMessage = {
   type: "submit";

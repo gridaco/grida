@@ -82,6 +82,7 @@ interface IInputField {
   fileupload?: FileUploadStrategy;
   fileresolve?: FileResolveStrategy;
   onValueChange?: (value: string) => void;
+  onRangeChange?: (value: number[]) => void;
   onCheckedChange?: (checked: boolean) => void;
 }
 
@@ -171,6 +172,7 @@ function MonoFormField({
   locked,
   preview,
   onValueChange,
+  onRangeChange,
   onCheckedChange,
 }: IMonoFormFieldRenderingProps) {
   const __onchange = (
@@ -490,6 +492,7 @@ function MonoFormField({
         return (
           // @ts-ignore
           <SliderWithValueLabel
+            onRangeChange={onRangeChange}
             {...(sharedInputProps as React.ComponentProps<"input">)}
           />
         );
@@ -936,13 +939,17 @@ function PaymentField({
   }
 }
 
-function SliderWithValueLabel(
-  props: Omit<React.ComponentProps<typeof Slider>, "onValueChange">
-) {
+function SliderWithValueLabel({
+  onRangeChange,
+  ...props
+}: Omit<React.ComponentProps<typeof Slider>, "onValueChange"> & {
+  onRangeChange?: (value: number[]) => void;
+}) {
   const [value, setValue] = useState(props.value);
 
   const onValueChange = (value: number[]) => {
     setValue(value);
+    onRangeChange?.(value);
   };
 
   return (

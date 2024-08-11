@@ -380,7 +380,7 @@ function BlockRenderer({
   const [state, dispatch] = useFormAgentState();
 
   const onValueChange = useCallback(
-    (value: string | boolean) => {
+    (value: string | boolean | number) => {
       dispatch({
         type: "fields/value/change",
         id: (block as ClientFieldRenderBlock).field.id,
@@ -495,6 +495,10 @@ function BlockRenderer({
                   }
                   onValueChange={onValueChange}
                   onCheckedChange={onValueChange}
+                  onRangeChange={([num]) => {
+                    // this does not support multiple range input
+                    onValueChange(num);
+                  }}
                 />
               ) : (
                 <></>

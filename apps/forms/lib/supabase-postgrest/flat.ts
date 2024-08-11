@@ -29,8 +29,6 @@ import {
  * console.log(decodedPath);  // Outputs: "a.b"
  *
  * // Parsing form data
- * const formdata = new FormData();
- * formdata.append('data.$.a.b', 'value');
  * const schema = {
  *   type: "object",
  *   properties: {
@@ -48,9 +46,8 @@ import {
  *     }
  *   }
  * };
- * const enums = []; // Assuming FormValue and enums are defined appropriately
- * const parsedData = FlatPostgREST.unflatten(formdata, { enums });
- * console.log(parsedData);  // Outputs: { a: { b: "value" } }
+ * const parsedData = FlatPostgREST.unflatten({"field.$.a": "a", "field.$.a.b": "b"});
+ * console.log(parsedData);  // Outputs: { field: { a: "a", b: "value" } }
  * ```
  *
  * @see https://github.com/hughsk/flat/issues/178

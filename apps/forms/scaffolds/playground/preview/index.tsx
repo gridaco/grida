@@ -14,6 +14,7 @@ import type {
   FormEventMessage,
   PlaygroundWindowMessageAction,
 } from "@/lib/forms/messages";
+import { FormAgentState } from "@/lib/formstate";
 
 export default function PlaygroundPreview({
   schema,
@@ -26,7 +27,7 @@ export default function PlaygroundPreview({
   css: string;
   dark?: boolean;
   onMessage?: (event: MessageEvent<FormEventMessage>) => void;
-  onChange?: (state: { fields: Record<string, any> }) => void;
+  onChange?: (state: FormAgentState) => void;
 }) {
   const ref = useRef<HTMLIFrameElement>(null);
 
@@ -62,7 +63,12 @@ export default function PlaygroundPreview({
         onMessage?.(event);
         switch (event.data.type) {
           case "change": {
-            onChange?.({ fields: event.data.fields });
+            // @ts-expect-error
+            delete event.data.namespace;
+            // @ts-expect-error
+            delete event.data.type;
+
+            onChange?.(event.data);
           }
         }
       } else {

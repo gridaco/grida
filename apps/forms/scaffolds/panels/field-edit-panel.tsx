@@ -876,7 +876,7 @@ export function FieldEditPanel({
                   >
                     <PropertyTextInput
                       type="number"
-                      placeholder="E.g. -100"
+                      placeholder="0"
                       value={min}
                       onChange={(e) =>
                         setMin(
@@ -893,7 +893,7 @@ export function FieldEditPanel({
                   >
                     <PropertyTextInput
                       type="number"
-                      placeholder="E.g. 100"
+                      placeholder="100"
                       value={max}
                       onChange={(e) =>
                         setMax(

@@ -8,7 +8,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Editor as MonacoEditor, useMonaco } from "@monaco-editor/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { GridaLogo } from "@/components/grida-logo";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,7 +19,7 @@ import {
   SlashIcon,
 } from "@radix-ui/react-icons";
 import toast from "react-hot-toast";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { examples } from "./k";
 import { generate } from "@/app/actions";
 import { readStreamableValue } from "ai/rsc";
@@ -40,6 +40,9 @@ import { Console } from "console-feed";
 import { Badge } from "@/components/ui/badge";
 import { Hightlight } from "@/components/prism/highlight";
 import { BanIcon } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";
+import { FormAgentState } from "@/lib/formstate";
 
 const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
 
@@ -102,7 +105,7 @@ export function Playground({
     { id: string; data: any[]; method: "info" }[]
   >([]);
 
-  const [formstate, setFormstate] = useState<any>();
+  const [formstate, setFormstate] = useState<FormAgentState>();
 
   const streamGeneration = (prompt: string) => {
     if (generating.current) {
@@ -198,7 +201,7 @@ export function Playground({
               value={exampleId}
               onValueChange={(value) => setExampleId(value)}
             >
-              <SelectTrigger id="method" aria-label="select method">
+              <SelectTrigger>
                 <SelectValue placeholder="Examples" />
               </SelectTrigger>
               <SelectContent>
@@ -272,7 +275,6 @@ export function Playground({
       <div className="flex-1 flex max-h-full overflow-hidden">
         <aside className="flex-1 h-full">
           <div className="w-full h-full flex flex-col">
-            {/* This */}
             <div className="relative flex-grow overflow-y-auto">
               {fileName === "variables.css" && (
                 <div className="absolute z-20 top-16 right-4 max-w-lg">
@@ -323,7 +325,6 @@ export function Playground({
                 }}
               />
             </div>
-            {/* This */}
             <Collapsible className="flex-shrink-0 overflow-hidden">
               <CollapsibleTrigger className="w-full">
                 <header className="flex justify-between items-center border-y p-2">
@@ -338,13 +339,13 @@ export function Playground({
                 </header>
               </CollapsibleTrigger>
               <CollapsibleContent>
-                <Tabs className="p-2" defaultValue="logs">
+                <Tabs className="p-2" defaultValue="events">
                   <TabsList>
-                    <TabsTrigger value="logs">Logs</TabsTrigger>
+                    <TabsTrigger value="events">Events</TabsTrigger>
                     <TabsTrigger value="data">Data</TabsTrigger>
                   </TabsList>
                   <div className="relative w-full h-96">
-                    <TabsContent value="logs" className="w-full h-full">
+                    <TabsContent value="events" className="w-full h-full">
                       <div className="absolute right-0 top-0 z-10">
                         <Button
                           variant="outline"
@@ -371,17 +372,43 @@ export function Playground({
                         )}
                       </div>
                     </TabsContent>
-                    <TabsContent value="data" className="prose">
-                      <Hightlight
-                        code={JSON.stringify(formstate, null, 2) || ""}
-                        language="js"
-                        theme={
-                          resolvedTheme === "dark" ? "vs-dark" : "vs-light"
-                        }
-                        options={{
-                          lineNumbers: "off",
-                        }}
-                      />
+                    <TabsContent
+                      value="data"
+                      className="h-full prose flex gap-4"
+                    >
+                      <div className="flex-1 overflow-scroll">
+                        <Label className="font-mono">Form State</Label>
+                        <Hightlight
+                          code={
+                            JSON.stringify(formstate, null, 2) || "// no data"
+                          }
+                          language="js"
+                          theme={
+                            resolvedTheme === "dark" ? "vs-dark" : "vs-light"
+                          }
+                          options={{
+                            lineNumbers: "off",
+                          }}
+                        />
+                      </div>
+                      <div className="h-full border-r" />
+                      <div className="flex-1 overflow-scroll">
+                        <Label className="font-mono">Transformed Data</Label>
+                        <Hightlight
+                          code={
+                            formstate
+                              ? JSON.stringify(transform(formstate), null, 2)
+                              : "// data"
+                          }
+                          language="js"
+                          theme={
+                            resolvedTheme === "dark" ? "vs-dark" : "vs-light"
+                          }
+                          options={{
+                            lineNumbers: "off",
+                          }}
+                        />
+                      </div>
                     </TabsContent>
                   </div>
                 </Tabs>
@@ -411,6 +438,18 @@ export function Playground({
       </div>
     </main>
   );
+}
+
+function transform(formstate: FormAgentState) {
+  const raw = Object.keys(formstate.fields).reduce(
+    (acc, key) => {
+      acc[key] = formstate.fields[key].value;
+      return acc;
+    },
+    {} as Record<string, any>
+  );
+
+  return FlatPostgREST.unflatten(raw);
 }
 
 const schema = {
