@@ -95,6 +95,13 @@ export function Playground({
   const is_modified = __schema_txt !== initial?.src;
   const [busy, setBusy] = useState(false);
 
+  // debugger
+  const [logs, setLogs] = useState<
+    { id: string; data: any[]; method: "info" }[]
+  >([]);
+
+  const [formstate, setFormstate] = useState<any>();
+
   const streamGeneration = (prompt: string) => {
     if (generating.current) {
       return;
@@ -329,48 +336,23 @@ export function Playground({
                 </header>
               </CollapsibleTrigger>
               <CollapsibleContent>
-                <Tabs className="p-2" defaultValue="events">
+                <Tabs className="p-2" defaultValue="logs">
                   <TabsList>
                     <TabsTrigger value="logs">Logs</TabsTrigger>
                     <TabsTrigger value="data">Data</TabsTrigger>
-                    <TabsTrigger value="tools">Tools</TabsTrigger>
                   </TabsList>
                   <div className="h-96 overflow-y-scroll">
                     <TabsContent value="logs">
                       <Console
                         variant={resolvedTheme === "dark" ? "dark" : "light"}
-                        logs={[
-                          { id: "1", method: "info", data: ["a"] },
-                          { id: "2", method: "info", data: ["b"] },
-                          { id: "3", method: "info", data: ["c"] },
-                          { id: "4", method: "info", data: ["d"] },
-                          { id: "5", method: "info", data: ["e"] },
-                          { id: "6", method: "info", data: ["f"] },
-                          { id: "7", method: "info", data: ["g"] },
-                          { id: "8", method: "info", data: ["h"] },
-                          { id: "9", method: "info", data: ["i"] },
-                          { id: "10", method: "info", data: ["j"] },
-                          { id: "11", method: "info", data: ["k"] },
-                          { id: "12", method: "info", data: ["l"] },
-                          { id: "13", method: "info", data: ["m"] },
-                          { id: "14", method: "info", data: ["n"] },
-                          { id: "15", method: "info", data: ["o"] },
-                          { id: "16", method: "info", data: ["p"] },
-                          { id: "17", method: "info", data: ["q"] },
-                          { id: "18", method: "info", data: ["r"] },
-                          { id: "19", method: "info", data: ["s"] },
-                          { id: "20", method: "info", data: ["t"] },
-                          { id: "21", method: "info", data: ["u"] },
-                          { id: "22", method: "info", data: ["v"] },
-                          { id: "23", method: "info", data: ["w"] },
-                          { id: "24", method: "info", data: ["x"] },
-                          { id: "25", method: "info", data: ["y"] },
-                          { id: "26", method: "info", data: ["z"] },
-                        ]}
+                        logs={logs}
                       />
                     </TabsContent>
-                    <TabsContent value="data">{/*  */}</TabsContent>
-                    <TabsContent value="tools">{/*  */}</TabsContent>
+                    <TabsContent value="data" className="prose">
+                      <pre className="text-sm">
+                        {JSON.stringify(formstate, null, 2)}
+                      </pre>
+                    </TabsContent>
                   </div>
                 </Tabs>
               </CollapsibleContent>
@@ -383,6 +365,17 @@ export function Playground({
             schema={__schema_txt || ""}
             css={(__variablecss_txt || "") + "\n" + (__customcss_txt || "")}
             dark={dark}
+            onMessage={(msg) => {
+              setLogs((prev) => [
+                ...prev,
+                {
+                  id: new Date().toISOString(),
+                  data: [msg.data.type, msg.data],
+                  method: "info",
+                },
+              ]);
+            }}
+            onChange={setFormstate}
           />
         </aside>
       </div>

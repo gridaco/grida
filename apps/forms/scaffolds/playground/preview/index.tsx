@@ -10,44 +10,72 @@ import { ExclamationTriangleIcon } from "@radix-ui/react-icons";
 import useVariablesCSS from "../use-variables-css";
 import { FormsPageLanguage } from "@/types";
 import { useTheme } from "next-themes";
+import type {
+  FormEventMessage,
+  PlaygroundWindowMessageAction,
+} from "@/lib/forms/messages";
 
 export default function PlaygroundPreview({
   schema,
   css,
   dark,
+  onMessage,
+  onChange,
 }: {
   schema: string;
   css: string;
   dark?: boolean;
+  onMessage?: (event: MessageEvent<FormEventMessage>) => void;
+  onChange?: (state: { fields: Record<string, any> }) => void;
 }) {
   const ref = useRef<HTMLIFrameElement>(null);
 
+  const message = (data: PlaygroundWindowMessageAction) => {
+    ref.current?.contentWindow?.postMessage(data, "*");
+  };
+
   useEffect(() => {
     if (ref.current) {
-      ref.current.contentWindow?.postMessage(
-        { type: "set_schema", schema },
-        "*"
-      );
+      message({ type: "set_schema", schema });
     }
   }, [schema]);
 
   useEffect(() => {
     if (ref.current) {
-      ref.current.contentWindow?.postMessage(
-        { type: "set_variablescss", variablescss: css },
-        "*"
-      );
+      message({ type: "set_variablescss", variablescss: css });
     }
   }, [css]);
 
   useEffect(() => {
     if (ref.current) {
-      ref.current.contentWindow?.postMessage(
-        { type: "set_dark_mode", dark },
-        "*"
-      );
+      message({ type: "set_dark_mode", dark: dark || false });
     }
   }, [dark]);
+
+  // forward messages
+  useEffect(() => {
+    const cb = (event: MessageEvent<FormEventMessage>) => {
+      if (
+        "namespace" in event.data &&
+        event.data.namespace.includes("grida.co")
+      ) {
+        onMessage?.(event);
+        switch (event.data.type) {
+          case "change": {
+            onChange?.({ fields: event.data.fields });
+          }
+        }
+      } else {
+        // 3rd party junks
+      }
+    };
+
+    window.addEventListener("message", cb);
+
+    return () => {
+      window.removeEventListener("message", cb);
+    };
+  }, [onMessage]);
 
   return <iframe ref={ref} width="100%" height="100%" src="/preview" />;
 }
@@ -100,23 +128,6 @@ function useRenderer(raw?: string | JSONFormRaw | null) {
 
   return [valid, invalid] as const;
 }
-
-type PlaygroundWindowMessageAction =
-  | PlaygroundWindowMessageActionSetSchema
-  | PlaygroundWindowMessageActionSetVariablescss
-  | PlaygroundWindowMessageActionSetDarkMode;
-type PlaygroundWindowMessageActionSetSchema = {
-  type: "set_schema";
-  schema: string;
-};
-type PlaygroundWindowMessageActionSetVariablescss = {
-  type: "set_variablescss";
-  variablescss: string;
-};
-type PlaygroundWindowMessageActionSetDarkMode = {
-  type: "set_dark_mode";
-  dark: boolean;
-};
 
 export function PlaygroundPreviewSlave() {
   const { theme, setTheme } = useTheme();

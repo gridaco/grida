@@ -1,0 +1,79 @@
+import type { FormAgentState } from "../formstate";
+
+export type PlaygroundWindowMessageAction =
+  | PlaygroundWindowMessageActionSetSchema
+  | PlaygroundWindowMessageActionSetVariablescss
+  | PlaygroundWindowMessageActionSetDarkMode;
+type PlaygroundWindowMessageActionSetSchema = {
+  type: "set_schema";
+  schema: string;
+};
+type PlaygroundWindowMessageActionSetVariablescss = {
+  type: "set_variablescss";
+  variablescss: string;
+};
+type PlaygroundWindowMessageActionSetDarkMode = {
+  type: "set_dark_mode";
+  dark: boolean;
+};
+
+export type FormEventMessage = {
+  namespace: "forms.grida.co";
+} & _FormEventMessage;
+
+type _FormEventMessage =
+  | FormReadyEventMessage
+  | FormLoadedEventMessage
+  | FormChangeEventMessage
+  | FormSubmitEventMessage;
+
+/**
+ * when form is ready to handle incoming messages
+ * this event will be sent initially once ready, and every 1 second after that
+ * @deprecated
+ * @todo NOT IMPLEMENTED YET
+ */
+type FormReadyEventMessage = {
+  type: "messaging_interface_ready";
+  initial: boolean;
+  ready: true;
+};
+
+/**
+ * when the main form view is loaded
+ * @deprecated
+ * @todo NOT IMPLEMENTED YET
+ */
+type FormLoadedEventMessage = {
+  type: "form_view_loaded";
+  fields: FormAgentState["fields"];
+  loaded: true;
+};
+
+/**
+ * when ever a field value is changed
+ */
+type FormChangeEventMessage = {
+  type: "change";
+  fields: FormAgentState["fields"];
+  target: {
+    id: string;
+    value: any;
+  };
+};
+
+type FormSubmitEventMessage = {
+  type: "submit";
+  fields: FormAgentState["fields"];
+};
+
+export function emit(payload: _FormEventMessage) {
+  try {
+    if (typeof window !== "undefined") {
+      window.parent.postMessage({
+        namespace: "forms.grida.co",
+        ...payload,
+      } satisfies FormEventMessage);
+    }
+  } catch (e) {}
+}

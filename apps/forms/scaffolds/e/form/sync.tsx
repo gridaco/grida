@@ -17,7 +17,7 @@ export function SessionDataSyncProvider({
     if (!session_id) return;
     const syncToServer = async (
       field_id: string,
-      value: string | boolean | undefined
+      value: string | number | boolean | string[] | undefined
     ) => {
       try {
         fetch(`/v1/session/${session_id}/field/${field_id}`, {

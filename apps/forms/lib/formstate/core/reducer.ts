@@ -1,6 +1,8 @@
 import { produce } from "immer";
 import type { FormAgentAction } from "./action";
 import type { FormAgentState } from "./state";
+import { emit } from "@/lib/forms/messages";
+
 export function reducer(
   state: FormAgentState,
   action: FormAgentAction
@@ -14,6 +16,7 @@ export function reducer(
     }
     case "fields/value/change": {
       const { id, value } = action;
+      emit({ type: "change", fields: state.fields, target: { id, value } });
       return produce(state, (draft) => {
         draft.fields[id].value = value;
       });
@@ -37,6 +40,7 @@ export function reducer(
       });
     }
     case "form/submit": {
+      emit({ type: "submit", fields: state.fields });
       return produce(state, (draft) => {
         draft.is_submitting = true;
       });
