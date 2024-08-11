@@ -38,6 +38,8 @@ import { FormAgentProvider, useFormAgentState, init } from "@/lib/formstate";
 import { useLogical } from "./use-logical";
 import { FieldSupports } from "@/k/supported_field_types";
 import { SessionDataSyncProvider } from "./sync";
+import { FormAgentMessagingInterface } from "./interface";
+import { emit } from "./emit";
 
 const cls_button_submit =
   "text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800";
@@ -116,6 +118,7 @@ function Providers({
           tree,
         })}
       >
+        <FormAgentMessagingInterface />
         <SessionDataSyncProvider session_id={session_id}>
           <TossPaymentsCheckoutProvider initial={checkoutSession}>
             {children}
@@ -255,6 +258,7 @@ function Body({
               }
             } else {
               // submit
+              emit({ type: "submit" });
               // disable submit button
               dispatch({ type: "form/submit" });
               afterSubmit?.();
@@ -376,7 +380,7 @@ function BlockRenderer({
   const [state, dispatch] = useFormAgentState();
 
   const onValueChange = useCallback(
-    (value: string | boolean) => {
+    (value: string | boolean | number) => {
       dispatch({
         type: "fields/value/change",
         id: (block as ClientFieldRenderBlock).field.id,
@@ -491,6 +495,10 @@ function BlockRenderer({
                   }
                   onValueChange={onValueChange}
                   onCheckedChange={onValueChange}
+                  onRangeChange={([num]) => {
+                    // this does not support multiple range input
+                    onValueChange(num);
+                  }}
                 />
               ) : (
                 <></>
@@ -590,7 +598,7 @@ function FingerprintField() {
     <input
       type="hidden"
       name={SYSTEM_GF_FINGERPRINT_VISITORID_KEY}
-      value={result?.visitorId}
+      value={result?.visitorId ?? ""}
     />
   );
 }

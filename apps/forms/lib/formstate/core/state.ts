@@ -9,7 +9,7 @@ export interface FormAgentState {
   // #/fields/${string}/value
   fields: {
     [key: string]: {
-      value?: string | boolean | undefined;
+      value?: string | number | boolean | string[] | undefined;
     };
   };
   blocks: {

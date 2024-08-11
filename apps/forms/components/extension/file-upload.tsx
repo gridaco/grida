@@ -381,19 +381,25 @@ FileValue.displayName = "FileValue";
 export const UploadedFileValue = forwardRef<
   HTMLInputElement,
   React.InputHTMLAttributes<HTMLInputElement>
->(({ className, name, required, value, children, ...props }, ref) => {
-  return (
-    <>
-      <input
-        ref={ref}
-        {...props}
-        name={name}
-        required={required}
-        value={value}
-        className={cn("sr-only", className)}
-      />
-    </>
-  );
-});
+>(
+  (
+    { className, name, required, value, children, readOnly: __omit, ...props },
+    ref
+  ) => {
+    return (
+      <>
+        <input
+          ref={ref}
+          {...props}
+          name={name}
+          required={required}
+          value={value}
+          readOnly
+          className={cn("sr-only", className)}
+        />
+      </>
+    );
+  }
+);
 
 UploadedFileValue.displayName = "UploadedFileValue";

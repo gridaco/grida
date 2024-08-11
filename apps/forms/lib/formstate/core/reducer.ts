@@ -1,6 +1,7 @@
 import { produce } from "immer";
 import type { FormAgentAction } from "./action";
 import type { FormAgentState } from "./state";
+
 export function reducer(
   state: FormAgentState,
   action: FormAgentAction

@@ -46,6 +46,15 @@ export const examples = [
       },
     },
   },
+  {
+    id: "006-data-transform",
+    name: "Data Transform",
+    template: {
+      schema: {
+        src: `${HOST}/schema/examples/006-data-transform/form.json`,
+      },
+    },
+  },
 ] as const;
 
 /**

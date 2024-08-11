@@ -10,44 +10,78 @@ import { ExclamationTriangleIcon } from "@radix-ui/react-icons";
 import useVariablesCSS from "../use-variables-css";
 import { FormsPageLanguage } from "@/types";
 import { useTheme } from "next-themes";
+import type {
+  FormEventMessage,
+  PlaygroundWindowMessageAction,
+} from "@/lib/forms/messages";
+import { FormAgentState } from "@/lib/formstate";
 
 export default function PlaygroundPreview({
   schema,
   css,
   dark,
+  onMessage,
+  onChange,
 }: {
   schema: string;
   css: string;
   dark?: boolean;
+  onMessage?: (event: MessageEvent<FormEventMessage>) => void;
+  onChange?: (state: FormAgentState) => void;
 }) {
   const ref = useRef<HTMLIFrameElement>(null);
 
+  const message = (data: PlaygroundWindowMessageAction) => {
+    ref.current?.contentWindow?.postMessage(data, "*");
+  };
+
   useEffect(() => {
     if (ref.current) {
-      ref.current.contentWindow?.postMessage(
-        { type: "set_schema", schema },
-        "*"
-      );
+      message({ type: "set_schema", schema });
     }
   }, [schema]);
 
   useEffect(() => {
     if (ref.current) {
-      ref.current.contentWindow?.postMessage(
-        { type: "set_variablescss", variablescss: css },
-        "*"
-      );
+      message({ type: "set_variablescss", variablescss: css });
     }
   }, [css]);
 
   useEffect(() => {
     if (ref.current) {
-      ref.current.contentWindow?.postMessage(
-        { type: "set_dark_mode", dark },
-        "*"
-      );
+      message({ type: "set_dark_mode", dark: dark || false });
     }
   }, [dark]);
+
+  // forward messages
+  useEffect(() => {
+    const cb = (event: MessageEvent<FormEventMessage>) => {
+      if (
+        "namespace" in event.data &&
+        event.data.namespace.includes("grida.co")
+      ) {
+        onMessage?.(event);
+        switch (event.data.type) {
+          case "change": {
+            // @ts-expect-error
+            delete event.data.namespace;
+            // @ts-expect-error
+            delete event.data.type;
+
+            onChange?.(event.data);
+          }
+        }
+      } else {
+        // 3rd party junks
+      }
+    };
+
+    window.addEventListener("message", cb);
+
+    return () => {
+      window.removeEventListener("message", cb);
+    };
+  }, [onMessage]);
 
   return <iframe ref={ref} width="100%" height="100%" src="/preview" />;
 }
@@ -110,7 +144,7 @@ export function PlaygroundPreviewSlave() {
   useVariablesCSS(variablescss);
 
   useEffect(() => {
-    const cb = (event: MessageEvent) => {
+    const cb = (event: MessageEvent<PlaygroundWindowMessageAction>) => {
       switch (event.data?.type) {
         case "set_schema":
           setSchema(event.data.schema);

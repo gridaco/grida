@@ -1,10 +1,6 @@
 "use client";
 
-import {
-  ChevronDownIcon,
-  OpenInNewWindowIcon,
-  GearIcon,
-} from "@radix-ui/react-icons";
+import { ChevronDownIcon, GearIcon, Share2Icon } from "@radix-ui/react-icons";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -48,10 +44,16 @@ export function PreviewButton() {
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <Link href={built_in_agent_url} target="_blank">
+          <Link
+            href={editorlink("connect/share", {
+              org: organization.name,
+              proj: project.name,
+              document_id: document_id,
+            })}
+          >
             <DropdownMenuItem>
-              <OpenInNewWindowIcon className="me-2 align-middle" />
-              Built in Agent
+              <Share2Icon className="me-2 align-middle" />
+              Share
             </DropdownMenuItem>
           </Link>
           <Link
