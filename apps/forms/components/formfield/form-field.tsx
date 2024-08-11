@@ -661,7 +661,7 @@ function MonoFormField({
             <HelpText />
             <ToggleGroupRootWithValue
               name={name}
-              required={required}
+              required={novalidate ? false : required}
               type={(multiple ? "multiple" : "single") as any}
               defaultValue={defaultValue}
               // TODO: need handling - this can be an array
