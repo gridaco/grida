@@ -12,6 +12,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { GridaLogo } from "@/components/grida-logo";
 import { Button } from "@/components/ui/button";
 import {
+  CaretSortIcon,
   Link2Icon,
   ReloadIcon,
   RocketIcon,
@@ -23,14 +24,20 @@ import { examples } from "./k";
 import { generate } from "@/app/actions";
 import { readStreamableValue } from "ai/rsc";
 import Link from "next/link";
-import { useDarkMode } from "usehooks-ts";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import PlaygroundPreview from "./preview";
 import { ThemePalette } from "../theme-editor/palette-editor";
 import { stringfyThemeVariables } from "@/theme/palettes/utils";
 import palettes from "@/theme/palettes";
 import { useTheme } from "next-themes";
 import { useMonacoTheme } from "@/components/monaco";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { Console } from "console-feed";
+import { Badge } from "@/components/ui/badge";
 
 const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
 
@@ -153,6 +160,8 @@ export function Playground({
       });
   };
 
+  const { resolvedTheme } = useTheme();
+
   return (
     <main className="h-screen flex flex-col overflow-hidden">
       <header className="relative p-4 flex justify-between border-b">
@@ -252,9 +261,10 @@ export function Playground({
         </div>
       </header>
       <div className="flex-1 flex max-h-full overflow-hidden">
-        <section className="flex-1 h-full">
+        <aside className="flex-1 h-full">
           <div className="w-full h-full flex flex-col">
-            <div className="relative flex-shrink flex flex-col h-full">
+            {/* This */}
+            <div className="relative flex-grow overflow-y-auto">
               {fileName === "variables.css" && (
                 <div className="absolute z-20 top-16 right-4 max-w-lg">
                   <ThemePalette
@@ -304,16 +314,77 @@ export function Playground({
                 }}
               />
             </div>
+            {/* This */}
+            <Collapsible className="flex-shrink-0 overflow-hidden">
+              <CollapsibleTrigger className="w-full">
+                <header className="flex justify-between items-center border-y p-2">
+                  <div>
+                    <Badge className="font-mono" variant="outline">
+                      Debug
+                    </Badge>
+                  </div>
+                  <div>
+                    <CaretSortIcon />
+                  </div>
+                </header>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <Tabs className="p-2" defaultValue="events">
+                  <TabsList>
+                    <TabsTrigger value="logs">Logs</TabsTrigger>
+                    <TabsTrigger value="data">Data</TabsTrigger>
+                    <TabsTrigger value="tools">Tools</TabsTrigger>
+                  </TabsList>
+                  <div className="h-96 overflow-y-scroll">
+                    <TabsContent value="logs">
+                      <Console
+                        variant={resolvedTheme === "dark" ? "dark" : "light"}
+                        logs={[
+                          { id: "1", method: "info", data: ["a"] },
+                          { id: "2", method: "info", data: ["b"] },
+                          { id: "3", method: "info", data: ["c"] },
+                          { id: "4", method: "info", data: ["d"] },
+                          { id: "5", method: "info", data: ["e"] },
+                          { id: "6", method: "info", data: ["f"] },
+                          { id: "7", method: "info", data: ["g"] },
+                          { id: "8", method: "info", data: ["h"] },
+                          { id: "9", method: "info", data: ["i"] },
+                          { id: "10", method: "info", data: ["j"] },
+                          { id: "11", method: "info", data: ["k"] },
+                          { id: "12", method: "info", data: ["l"] },
+                          { id: "13", method: "info", data: ["m"] },
+                          { id: "14", method: "info", data: ["n"] },
+                          { id: "15", method: "info", data: ["o"] },
+                          { id: "16", method: "info", data: ["p"] },
+                          { id: "17", method: "info", data: ["q"] },
+                          { id: "18", method: "info", data: ["r"] },
+                          { id: "19", method: "info", data: ["s"] },
+                          { id: "20", method: "info", data: ["t"] },
+                          { id: "21", method: "info", data: ["u"] },
+                          { id: "22", method: "info", data: ["v"] },
+                          { id: "23", method: "info", data: ["w"] },
+                          { id: "24", method: "info", data: ["x"] },
+                          { id: "25", method: "info", data: ["y"] },
+                          { id: "26", method: "info", data: ["z"] },
+                        ]}
+                      />
+                    </TabsContent>
+                    <TabsContent value="data">{/*  */}</TabsContent>
+                    <TabsContent value="tools">{/*  */}</TabsContent>
+                  </div>
+                </Tabs>
+              </CollapsibleContent>
+            </Collapsible>
           </div>
-        </section>
+        </aside>
         <div className="h-full border-r" />
-        <section className="flex-1 h-full overflow-y-scroll">
+        <aside className="flex-1 h-full overflow-y-scroll">
           <PlaygroundPreview
             schema={__schema_txt || ""}
             css={(__variablecss_txt || "") + "\n" + (__customcss_txt || "")}
             dark={dark}
           />
-        </section>
+        </aside>
       </div>
     </main>
   );
