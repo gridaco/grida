@@ -998,7 +998,6 @@ function ToggleGroupRootWithValue({
       <input
         ref={ref}
         className="sr-only"
-        readOnly
         required={required}
         name={name}
         value={hiddenValue || ""}
