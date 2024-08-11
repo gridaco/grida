@@ -19,9 +19,9 @@ type PlaygroundWindowMessageActionSetDarkMode = {
 
 export type FormEventMessage = {
   namespace: "forms.grida.co";
-} & _FormEventMessage;
+} & FormEventMessagePayload;
 
-type _FormEventMessage =
+export type FormEventMessagePayload =
   | FormReadyEventMessage
   | FormLoadedEventMessage
   | FormChangeEventMessage
@@ -51,29 +51,13 @@ type FormLoadedEventMessage = {
 };
 
 /**
- * when ever a field value is changed
+ * when ever a state is changed
  */
 type FormChangeEventMessage = {
   type: "change";
   fields: FormAgentState["fields"];
-  target: {
-    id: string;
-    value: any;
-  };
 };
 
 type FormSubmitEventMessage = {
   type: "submit";
-  fields: FormAgentState["fields"];
 };
-
-export function emit(payload: _FormEventMessage) {
-  try {
-    if (typeof window !== "undefined") {
-      window.parent.postMessage({
-        namespace: "forms.grida.co",
-        ...payload,
-      } satisfies FormEventMessage);
-    }
-  } catch (e) {}
-}

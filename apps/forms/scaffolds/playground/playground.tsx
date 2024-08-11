@@ -38,6 +38,8 @@ import {
 } from "@/components/ui/collapsible";
 import { Console } from "console-feed";
 import { Badge } from "@/components/ui/badge";
+import { Hightlight } from "@/components/prism/highlight";
+import { BanIcon } from "lucide-react";
 
 const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
 
@@ -341,17 +343,45 @@ export function Playground({
                     <TabsTrigger value="logs">Logs</TabsTrigger>
                     <TabsTrigger value="data">Data</TabsTrigger>
                   </TabsList>
-                  <div className="h-96 overflow-y-scroll">
-                    <TabsContent value="logs">
-                      <Console
-                        variant={resolvedTheme === "dark" ? "dark" : "light"}
-                        logs={logs}
-                      />
+                  <div className="relative w-full h-96">
+                    <TabsContent value="logs" className="w-full h-full">
+                      <div className="absolute right-0 top-0 z-10">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => {
+                            setLogs([]);
+                          }}
+                        >
+                          <BanIcon className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="w-full h-full overflow-y-scroll">
+                        {logs.length ? (
+                          <Console
+                            variant={
+                              resolvedTheme === "dark" ? "dark" : "light"
+                            }
+                            logs={logs}
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <p className="text-gray-500 text-center">No logs</p>
+                          </div>
+                        )}
+                      </div>
                     </TabsContent>
                     <TabsContent value="data" className="prose">
-                      <pre className="text-sm">
-                        {JSON.stringify(formstate, null, 2)}
-                      </pre>
+                      <Hightlight
+                        code={JSON.stringify(formstate, null, 2) || ""}
+                        language="js"
+                        theme={
+                          resolvedTheme === "dark" ? "vs-dark" : "vs-light"
+                        }
+                        options={{
+                          lineNumbers: "off",
+                        }}
+                      />
                     </TabsContent>
                   </div>
                 </Tabs>
