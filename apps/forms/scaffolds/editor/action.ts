@@ -16,6 +16,7 @@ import { LOCALTZ } from "./symbols";
 import { ZodObject } from "zod";
 
 export type BlocksEditorAction =
+  | GlobalSavingAction
   | CreateNewPendingBlockAction
   | ResolvePendingBlockAction
   | DeleteBlockAction
@@ -74,6 +75,11 @@ export type BlocksEditorAction =
   | DocumentNodeUpdateStyleAction
   | DocumentNodeUpdateAttributeAction
   | DocumentNodeUpdatePropertyAction;
+
+export type GlobalSavingAction = {
+  type: "saving";
+  saving: boolean;
+};
 
 export type CreateNewPendingBlockAction =
   | {

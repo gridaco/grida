@@ -1,6 +1,7 @@
 import { produce } from "immer";
 import { EditorFlatFormBlock, FormEditorState } from "./state";
 import type {
+  GlobalSavingAction,
   BlockDescriptionAction,
   BlockTitleAction,
   BlockVHiddenAction,
@@ -75,6 +76,12 @@ export function reducer(
   action: BlocksEditorAction
 ): FormEditorState {
   switch (action.type) {
+    case "saving": {
+      const { saving } = <GlobalSavingAction>action;
+      return produce(state, (draft) => {
+        draft.saving = saving;
+      });
+    }
     case "blocks/new": {
       // TODO: if adding new section, if there is a present non-section-blocks on root, it should automatically be nested under new section.
       const { block } = <CreateNewPendingBlockAction>action;

@@ -27,6 +27,7 @@ import type {
 import { Breadcrumbs } from "@/scaffolds/breadcrumb";
 import assert from "assert";
 import { Metadata } from "next";
+import { SavingIndicator } from "@/scaffolds/workbench/saving-indicator";
 
 export const revalidate = 0;
 
@@ -249,8 +250,9 @@ function Header({
         <EditableDocumentTitle id={id} defaultValue={title} />
       </div>
       <div className="flex-1 flex items-center justify-between">
-        <div>
+        <div className="flex items-center gap-4">
           <Breadcrumbs />
+          <SavingIndicator />
         </div>
         <div className="px-4 flex gap-4 items-center justify-end">
           <PreviewButton />

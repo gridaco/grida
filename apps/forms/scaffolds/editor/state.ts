@@ -79,6 +79,7 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
   });
 
   return {
+    saving: false,
     basepath: basepath,
     project: init.project,
     organization: init.organization,
@@ -285,6 +286,7 @@ interface MenuItem {
 }
 
 export interface FormEditorState {
+  saving: boolean;
   basepath: string;
   organization: {
     name: string;
