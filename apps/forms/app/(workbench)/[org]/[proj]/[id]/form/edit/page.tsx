@@ -10,7 +10,7 @@ import { Spinner } from "@/components/spinner";
 export default function EditFormPage() {
   return (
     <main className="h-full flex flex-1 w-full">
-      <CanvasEventTarget className="relative w-full no-scrollbar overflow-y-auto bg-background text-foreground">
+      <CanvasEventTarget className="relative w-full no-scrollbar overflow-y-auto bg-transparent">
         <CanvasOverlay />
         <AgentThemeProvider>
           <CurrentPageCanvas />
