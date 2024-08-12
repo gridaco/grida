@@ -1043,7 +1043,7 @@ function SupabaseStorageSettings({
       </PanelPropertySectionTitle>
       <PanelPropertyFields>
         <PanelPropertyField
-          label={"Enabled Storage"}
+          label={"Enable Storage"}
           description="Enable Supabase Storage to store files in your Supabase project. (Required)"
         >
           <Switch
