@@ -95,6 +95,7 @@ export default async function Layout({
   const palettecss = stylesheet?.palette
     ? stringfyThemeVariables(palettes[stylesheet.palette] as any)
     : undefined;
+  const appearance = stylesheet?.appearance || "system";
 
   const iscsscustomized = !!customcss;
 
@@ -125,8 +126,9 @@ export default async function Layout({
         />
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
+          defaultTheme={appearance}
           enableSystem
+          storageKey={`theme-form-agent-${id}`}
           disableTransitionOnChange
         >
           {children}
