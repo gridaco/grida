@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { createClientWorkspaceClient } from "@/lib/supabase/client";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import toast from "react-hot-toast";
+import { useEditorState } from "./editor";
 
 export function EditableDocumentTitle({
   id,
@@ -12,6 +13,8 @@ export function EditableDocumentTitle({
   id: string;
   defaultValue?: string;
 }) {
+  const [state, dispatch] = useEditorState();
+
   const [value, setValue] = useState<string>(defaultValue || "");
 
   const supabase = useMemo(() => createClientWorkspaceClient(), []);
@@ -19,6 +22,7 @@ export function EditableDocumentTitle({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const updateTitle = useCallback(
     debounce(async (newValue: string) => {
+      dispatch({ type: "saving", saving: true });
       const { error } = await supabase
         .from("document")
         .update({ title: newValue })
@@ -27,7 +31,7 @@ export function EditableDocumentTitle({
       if (error) {
         toast.error("Failed to save");
       } else {
-        toast.success("Saved");
+        dispatch({ type: "saving", saving: false });
       }
     }, 1000),
 

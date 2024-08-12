@@ -29,7 +29,6 @@ export default function RootLayout({
         {process.env.NEXT_PUBLIC_GAID && (
           <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GAID} />
         )}
-        <ToasterWithMax position="bottom-center" max={5} />
         <div className="h-screen flex flex-col">
           <ThemeProvider
             attribute="class"
@@ -39,6 +38,7 @@ export default function RootLayout({
           >
             {children}
             <EditorHelpFab />
+            <ToasterWithMax position="bottom-center" max={5} />
           </ThemeProvider>
         </div>
       </body>

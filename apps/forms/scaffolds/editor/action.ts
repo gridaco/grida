@@ -1,5 +1,7 @@
 import type {
+  Appearance,
   Customer,
+  FontFamily,
   FormBlockType,
   FormFieldDefinition,
   FormInputType,
@@ -16,6 +18,7 @@ import { LOCALTZ } from "./symbols";
 import { ZodObject } from "zod";
 
 export type BlocksEditorAction =
+  | GlobalSavingAction
   | CreateNewPendingBlockAction
   | ResolvePendingBlockAction
   | DeleteBlockAction
@@ -60,6 +63,7 @@ export type BlocksEditorAction =
   | EditorThemeLangAction
   | EditorThemePoweredByBrandingAction
   | EditorThemePaletteAction
+  | EditorThemeAppearanceAction
   | EditorThemeFontFamilyAction
   | EditorThemeSectionStyleAction
   | EditorThemeCustomCSSAction
@@ -74,6 +78,11 @@ export type BlocksEditorAction =
   | DocumentNodeUpdateStyleAction
   | DocumentNodeUpdateAttributeAction
   | DocumentNodeUpdatePropertyAction;
+
+export type GlobalSavingAction = {
+  type: "saving";
+  saving: boolean;
+};
 
 export type CreateNewPendingBlockAction =
   | {
@@ -327,9 +336,14 @@ export interface EditorThemePaletteAction {
   palette?: FormStyleSheetV1Schema["palette"];
 }
 
+export interface EditorThemeAppearanceAction {
+  type: "editor/theme/appearance";
+  appearance: Appearance;
+}
+
 export interface EditorThemeFontFamilyAction {
   type: "editor/theme/font-family";
-  fontFamily?: FormStyleSheetV1Schema["font-family"];
+  fontFamily: FontFamily;
 }
 
 export interface EditorThemeSectionStyleAction {

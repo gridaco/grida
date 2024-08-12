@@ -19,7 +19,7 @@ export function Breadcrumbs() {
   const {
     organization: { name: org },
     project: { name: proj },
-    form_title,
+    document_title,
   } = state;
 
   const [__org, __proj, id, ...paths] = pathname.split("/").slice(1);
@@ -32,7 +32,7 @@ export function Breadcrumbs() {
         </BreadcrumbItem>
         <BreadcrumbSeparator />
         <BreadcrumbItem>
-          <BreadcrumbPage>{form_title}</BreadcrumbPage>
+          <BreadcrumbPage>{document_title}</BreadcrumbPage>
         </BreadcrumbItem>
         {paths.map((path, i) => (
           <React.Fragment key={i}>

@@ -14,6 +14,7 @@ import { useWorkspace } from "@/scaffolds/workspace";
 import { Skeleton } from "@/components/ui/skeleton";
 import Head from "next/head";
 import { editorlink } from "@/lib/forms/url";
+import { notFound } from "next/navigation";
 
 export default function FormsDashboardPage({
   params,
@@ -35,6 +36,10 @@ export default function FormsDashboardPage({
   const layout = searchParams.layout ?? "list";
 
   const project = projects.find((p) => p.name === project_name);
+
+  if (!project && !loading) {
+    return notFound();
+  }
 
   return (
     <div className="h-full flex flex-1 w-full">

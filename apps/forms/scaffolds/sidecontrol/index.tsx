@@ -22,15 +22,23 @@ import {
 import { Ag } from "@/components/design/ag";
 import { fonts } from "@/theme/font-family";
 import { useEditorState } from "../editor";
-import { FormStyleSheetV1Schema, FormsPageLanguage } from "@/types";
+import {
+  Appearance,
+  FontFamily,
+  FormStyleSheetV1Schema,
+  FormsPageLanguage,
+} from "@/types";
 import * as _variants from "@/theme/palettes";
 import { PaletteColorChip } from "@/components/design/palette-color-chip";
 import { sections } from "@/theme/section";
 import { Button } from "@/components/ui/button";
 import {
+  DesktopIcon,
   GearIcon,
+  MoonIcon,
   OpenInNewWindowIcon,
   Pencil2Icon,
+  SunIcon,
 } from "@radix-ui/react-icons";
 import {
   Dialog,
@@ -494,7 +502,7 @@ function GlobalProperties() {
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Type</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
-        <FontFamily />
+        <FontFamilyControl />
       </SidebarSection>
       <SidebarSection className="border-b pb-4">
         <SidebarSectionHeaderItem>
@@ -502,6 +510,8 @@ function GlobalProperties() {
         </SidebarSectionHeaderItem>
         <SidebarMenuSectionContent>
           <Palette />
+          <div className="h-4" />
+          <AppearanceControl />
         </SidebarMenuSectionContent>
       </SidebarSection>
       <SidebarSection className="border-b pb-4">
@@ -540,11 +550,11 @@ function GlobalProperties() {
   );
 }
 
-function FontFamily() {
+function FontFamilyControl() {
   const [state, dispatch] = useEditorState();
 
   const onFontChange = useCallback(
-    (fontFamily: FormStyleSheetV1Schema["font-family"]) => {
+    (fontFamily: FontFamily) => {
       dispatch({
         type: "editor/theme/font-family",
         fontFamily,
@@ -584,10 +594,25 @@ function FontFamily() {
   );
 }
 
+function useThemeColorScheme(appearance: Appearance): "light" | "dark" {
+  const { systemTheme } = useTheme();
+
+  const safeSystemTheme =
+    // system theme is typed light | dark, but it sometimes gives "system"
+    (systemTheme as any) === "system" ? "light" : systemTheme ?? "light";
+
+  const colorscheme: "light" | "dark" =
+    (appearance === "system" ? safeSystemTheme : appearance) ?? "light";
+
+  return colorscheme;
+}
+
 function Palette() {
   const [state, dispatch] = useEditorState();
 
-  const palette = state.theme.palette;
+  const { appearance, palette } = state.theme;
+
+  const colorscheme = useThemeColorScheme(appearance);
 
   const onPaletteChange = useCallback(
     (palette: FormStyleSheetV1Schema["palette"]) => {
@@ -613,9 +638,9 @@ function Palette() {
           {paletteobj ? (
             <div className="flex items-center gap-2">
               <PaletteColorChip
-                primary={paletteobj["light"]["--primary"]}
-                secondary={paletteobj["light"]["--secondary"]}
-                background={paletteobj["light"]["--background"]}
+                primary={paletteobj[colorscheme]["--primary"]}
+                secondary={paletteobj[colorscheme]["--secondary"]}
+                background={paletteobj[colorscheme]["--background"]}
                 className="min-w-12 w-12 h-12 rounded border"
               />
               <span className="text-xs text-muted-foreground text-ellipsis overflow-hidden">
@@ -635,9 +660,9 @@ function Palette() {
               <SelectLabel>{variant}</SelectLabel>
               {Object.keys(palettes).map((key) => {
                 const colors = palettes[key as keyof typeof palettes];
-                const primary = colors["light"]["--primary"];
-                const secondary = colors["light"]["--secondary"];
-                const background = colors["light"]["--background"];
+                const primary = colors[colorscheme]["--primary"];
+                const secondary = colors[colorscheme]["--secondary"];
+                const background = colors[colorscheme]["--background"];
                 return (
                   <SelectItem key={key} value={key}>
                     <div className="flex gap-2 items-center">
@@ -662,6 +687,50 @@ function Palette() {
             </SelectGroup>
           );
         })}
+      </SelectContent>
+    </Select>
+  );
+}
+
+function AppearanceControl() {
+  const [state, dispatch] = useEditorState();
+
+  const { theme } = state;
+  const { appearance } = theme;
+
+  const onAppearanceChange = useCallback(
+    (appearance: Appearance) => {
+      dispatch({
+        type: "editor/theme/appearance",
+        appearance,
+      });
+    },
+    [dispatch]
+  );
+
+  return (
+    <Select
+      value={appearance}
+      onValueChange={(v) => {
+        onAppearanceChange(v as Appearance);
+      }}
+    >
+      <SelectTrigger>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={"light"}>
+          <SunIcon className="inline-flex me-2 align-middle" />
+          Light
+        </SelectItem>
+        <SelectItem value={"dark"}>
+          <MoonIcon className="inline-flex me-2 align-middle" />
+          Dark
+        </SelectItem>
+        <SelectItem value={"system"}>
+          <DesktopIcon className="inline-flex me-2 align-middle" />
+          System
+        </SelectItem>
       </SelectContent>
     </Select>
   );

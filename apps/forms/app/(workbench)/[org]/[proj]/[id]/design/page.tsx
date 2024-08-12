@@ -5,12 +5,14 @@ import { AgentThemeProvider } from "@/scaffolds/agent/theme";
 import { useEditorState } from "@/scaffolds/editor";
 import { SideControl } from "@/scaffolds/sidecontrol";
 import BlocksEditor from "@/scaffolds/blocks-editor";
-import { Spinner } from "@/components/spinner";
+import FormCollectionPage from "@/theme/templates/formcollection/page";
+import FormStartPage from "@/theme/templates/formstart/default/page";
+import { CanvasFloatingToolbar } from "@/scaffolds/canvas-floating-toolbar";
 
 export default function EditFormPage() {
   return (
     <main className="h-full flex flex-1 w-full">
-      <CanvasEventTarget className="relative w-full no-scrollbar overflow-y-auto">
+      <CanvasEventTarget className="relative w-full no-scrollbar overflow-y-auto bg-transparent">
         <CanvasOverlay />
         <AgentThemeProvider>
           <CurrentPageCanvas />
@@ -62,24 +64,27 @@ function CurrentPageCanvas() {
   switch (selected_page_id) {
     case "form":
       return <BlocksEditor />;
-    // case "collection":
-    //   return (
-    //     <>
-    //       {/* // 430 932 max-h-[932px] no-scrollbar overflow-y-scroll */}
-    //       <div className="mx-auto my-20 max-w-[430px] border rounded-2xl shadow-2xl bg-background select-none">
-    //         <FormCollectionPage />
-    //       </div>
-    //       <div className="fixed bottom-5 left-0 right-0 flex items-center justify-center z-50">
-    //         <CanvasFloatingToolbar />
-    //       </div>
-    //     </>
-    //   );
-
-    default:
+    case "collection":
       return (
-        <div className="w-full h-full flex items-center justify-center">
-          <Spinner />
+        <>
+          {/* // 430 932 max-h-[932px] no-scrollbar overflow-y-scroll */}
+          <div className="mx-auto my-20 max-w-[430px] border rounded-2xl shadow-2xl bg-background select-none">
+            <FormCollectionPage />
+          </div>
+          <div className="fixed bottom-5 left-0 right-0 flex items-center justify-center z-50">
+            <CanvasFloatingToolbar />
+          </div>
+        </>
+      );
+    case "start": {
+      return (
+        <div className="mx-auto my-20 max-w-[430px] border rounded-2xl shadow-2xl bg-background overflow-hidden">
+          <FormStartPage />
         </div>
       );
+    }
+
+    default:
+      return <>UNKNOWN PAGE {selected_page_id}</>;
   }
 }

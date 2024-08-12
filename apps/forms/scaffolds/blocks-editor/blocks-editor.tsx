@@ -226,6 +226,7 @@ function AgentThemeSyncProvider({ children }: React.PropsWithChildren<{}>) {
           lang: theme.lang,
           is_powered_by_branding_enabled: theme.is_powered_by_branding_enabled,
           stylesheet: {
+            appearance: theme.appearance,
             custom: theme.customCSS,
             "font-family": theme.fontFamily,
             palette: theme.palette,
@@ -248,6 +249,7 @@ function AgentThemeSyncProvider({ children }: React.PropsWithChildren<{}>) {
     document_id,
     theme.is_powered_by_branding_enabled,
     theme.lang,
+    theme.appearance,
     theme.customCSS,
     theme.fontFamily,
     theme.palette,
