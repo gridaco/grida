@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo } from "react";
 import palettes from "@/theme/palettes";
 import useVariablesCSS from "../playground/use-variables-css";
 import { stringfyThemeVariables } from "@/theme/palettes/utils";
@@ -8,9 +8,10 @@ import { FormPageBackground } from "../e/form/background";
 import { useEditorState } from "../editor";
 import { fonts } from "@/theme/font-family";
 import type { NextFont } from "@next/font/dist/types";
-import type { FormPageBackgroundSchema, FormStyleSheetV1Schema } from "@/types";
+import type { FormPageBackgroundSchema } from "@/types";
 import { cn } from "@/utils";
 import { CustomCSS } from "@/theme/customcss";
+import { useTheme } from "next-themes";
 
 export function AgentThemeProvider({ children }: React.PropsWithChildren<{}>) {
   const [state] = useEditorState();
@@ -23,6 +24,7 @@ export function AgentThemeProvider({ children }: React.PropsWithChildren<{}>) {
 
   return (
     <div id="agent-theme-provider" className="relative">
+      <PaletteProvider />
       <CustomCSSProvider css={customcss}>
         <FontFamilyProvider font={font}>{children}</FontFamilyProvider>
       </CustomCSSProvider>
@@ -32,7 +34,7 @@ export function AgentThemeProvider({ children }: React.PropsWithChildren<{}>) {
   //
 }
 
-export function BackgroundProvider({
+function BackgroundProvider({
   background,
 }: {
   background?: FormPageBackgroundSchema;
@@ -46,7 +48,7 @@ export function BackgroundProvider({
   );
 }
 
-export function CustomCSSProvider({
+function CustomCSSProvider({
   css,
   children,
 }: React.PropsWithChildren<{ css?: string }>) {
@@ -75,19 +77,25 @@ export function CustomCSSProvider({
   );
 }
 
-export function FontFamilyProvider({
+function FontFamilyProvider({
   font,
   children,
 }: React.PropsWithChildren<{ font: NextFont }>) {
   return <div className={font.className}>{children}</div>;
 }
 
-export function PaletteProvider({
-  palette,
-  children,
-}: React.PropsWithChildren<{
-  palette?: FormStyleSheetV1Schema["palette"];
-}>) {
+function PaletteProvider({ children }: React.PropsWithChildren<{}>) {
+  const [state] = useEditorState();
+
+  const { appearance, palette } = state.theme;
+  const { setTheme: setAppearance } = useTheme();
+
+  useEffect(() => {
+    if (appearance) {
+      setAppearance(appearance);
+    }
+  }, [appearance]);
+
   useVariablesCSS(
     palette ? stringfyThemeVariables(palettes[palette] as any) : undefined
   );

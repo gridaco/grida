@@ -357,10 +357,15 @@ export type FormPageBackgroundSchema = FormPageThemeEmbeddedBackgroundData;
 
 export type FormStyleSheetV1Schema = {
   section?: string;
-  "font-family"?: "inter" | "lora" | "inconsolata";
+  "font-family"?: FontFamily;
   palette?: keyof typeof palettes;
+  appearance?: Appearance;
   custom?: string;
 };
+
+export type FontFamily = "inter" | "lora" | "inconsolata";
+
+export type Appearance = "light" | "dark" | "system";
 
 interface FormPageThemeEmbeddedBackgroundData {
   type: "background";

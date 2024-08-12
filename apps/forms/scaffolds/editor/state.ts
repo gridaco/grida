@@ -1,9 +1,11 @@
 import { blockstreeflat } from "@/lib/forms/tree";
 import type {
+  Appearance,
   ConnectionSupabaseJoint,
   Customer,
   EndingPageI18nOverrides,
   EndingPageTemplateID,
+  FontFamily,
   FormBlock,
   FormBlockType,
   FormFieldDefinition,
@@ -56,6 +58,7 @@ export interface FormEditorInit {
   theme: FormEditorState["theme"];
   form_title: string;
   document_id: string;
+  document_title: string;
   blocks: EditorFlatFormBlock[];
   fields: FormFieldDefinition[];
 }
@@ -79,6 +82,7 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
   });
 
   return {
+    saving: false,
     basepath: basepath,
     project: init.project,
     organization: init.organization,
@@ -135,6 +139,7 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
     form_security: init.form_security,
     ending: init.ending,
     document_id: init.document_id,
+    document_title: init.document_title,
     blocks: blockstreeflat(init.blocks),
     document: {
       pages: formpagesinit({ basepath, document_id: init.document_id }),
@@ -285,6 +290,7 @@ interface MenuItem {
 }
 
 export interface FormEditorState {
+  saving: boolean;
   basepath: string;
   organization: {
     name: string;
@@ -298,7 +304,6 @@ export interface FormEditorState {
     store_id?: number | null;
     supabase?: GridaSupabase.SupabaseConnectionState;
   };
-
   form_id: string;
   form_title: string;
   campaign: {
@@ -324,6 +329,7 @@ export interface FormEditorState {
     ending_page_i18n_overrides: EndingPageI18nOverrides | null;
   };
   document_id: string;
+  document_title: string;
   blocks: EditorFlatFormBlock[];
   document: {
     pages: MenuItem[];
@@ -360,8 +366,9 @@ export interface FormEditorState {
   theme: {
     is_powered_by_branding_enabled: boolean;
     lang: FormsPageLanguage;
+    appearance: Appearance;
     palette?: FormStyleSheetV1Schema["palette"];
-    fontFamily?: FormStyleSheetV1Schema["font-family"];
+    fontFamily: FontFamily;
     customCSS?: FormStyleSheetV1Schema["custom"];
     section?: FormStyleSheetV1Schema["section"];
     background?: FormPageBackgroundSchema;

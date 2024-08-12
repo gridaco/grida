@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import {
   grida_forms_client,
   createServerComponentClient,
+  workspaceclient,
 } from "@/lib/supabase/server";
 import { Metadata } from "next";
 import { Inconsolata, Inter, Lora } from "next/font/google";
@@ -31,13 +32,15 @@ export async function generateMetadata({
 }: {
   params: { id: string };
 }): Promise<Metadata> {
+  // room for improvement - query optimization via rpc or meta from client side
   const id = params.id;
 
   // FIXME: drop `name` and use document.title instead
-  const { data, error } = await grida_forms_client
+  const { data } = await grida_forms_client
     .from("form_document")
     .select(
       `
+        id,
         name,
         is_powered_by_branding_enabled
       `
@@ -50,10 +53,21 @@ export async function generateMetadata({
     return notFound();
   }
 
-  const { name, is_powered_by_branding_enabled } = data;
+  const { data: doc } = await workspaceclient
+    .from("document")
+    .select("*")
+    .eq("id", data.id)
+    .single();
+
+  if (!doc) {
+    return notFound();
+  }
+
+  const { is_powered_by_branding_enabled } = data;
+  const { title } = doc;
 
   return {
-    title: is_powered_by_branding_enabled ? `${name} | Grida Forms` : name,
+    title: is_powered_by_branding_enabled ? `${title} | Grida Forms` : title,
   };
 }
 
@@ -95,6 +109,7 @@ export default async function Layout({
   const palettecss = stylesheet?.palette
     ? stringfyThemeVariables(palettes[stylesheet.palette] as any)
     : undefined;
+  const appearance = stylesheet?.appearance || "system";
 
   const iscsscustomized = !!customcss;
 
@@ -125,8 +140,9 @@ export default async function Layout({
         />
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
+          defaultTheme={appearance}
           enableSystem
+          storageKey={`theme-form-agent-${id}`}
           disableTransitionOnChange
         >
           {children}

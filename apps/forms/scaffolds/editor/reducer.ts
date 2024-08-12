@@ -1,6 +1,7 @@
 import { produce } from "immer";
 import { EditorFlatFormBlock, FormEditorState } from "./state";
 import type {
+  GlobalSavingAction,
   BlockDescriptionAction,
   BlockTitleAction,
   BlockVHiddenAction,
@@ -59,6 +60,7 @@ import type {
   EditorThemePoweredByBrandingAction,
   FormCampaignPreferencesAction,
   FormEndingPreferencesAction,
+  EditorThemeAppearanceAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { blockstreeflat } from "@/lib/forms/tree";
@@ -75,6 +77,12 @@ export function reducer(
   action: BlocksEditorAction
 ): FormEditorState {
   switch (action.type) {
+    case "saving": {
+      const { saving } = <GlobalSavingAction>action;
+      return produce(state, (draft) => {
+        draft.saving = saving;
+      });
+    }
     case "blocks/new": {
       // TODO: if adding new section, if there is a present non-section-blocks on root, it should automatically be nested under new section.
       const { block } = <CreateNewPendingBlockAction>action;
@@ -861,6 +869,12 @@ export function reducer(
       const { palette } = <EditorThemePaletteAction>action;
       return produce(state, (draft) => {
         draft.theme.palette = palette;
+      });
+    }
+    case "editor/theme/appearance": {
+      const { appearance } = <EditorThemeAppearanceAction>action;
+      return produce(state, (draft) => {
+        draft.theme.appearance = appearance;
       });
     }
     case "editor/theme/font-family": {
