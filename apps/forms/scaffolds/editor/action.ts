@@ -1,5 +1,7 @@
 import type {
+  Appearance,
   Customer,
+  FontFamily,
   FormBlockType,
   FormFieldDefinition,
   FormInputType,
@@ -61,6 +63,7 @@ export type BlocksEditorAction =
   | EditorThemeLangAction
   | EditorThemePoweredByBrandingAction
   | EditorThemePaletteAction
+  | EditorThemeAppearanceAction
   | EditorThemeFontFamilyAction
   | EditorThemeSectionStyleAction
   | EditorThemeCustomCSSAction
@@ -333,9 +336,14 @@ export interface EditorThemePaletteAction {
   palette?: FormStyleSheetV1Schema["palette"];
 }
 
+export interface EditorThemeAppearanceAction {
+  type: "editor/theme/appearance";
+  appearance: Appearance;
+}
+
 export interface EditorThemeFontFamilyAction {
   type: "editor/theme/font-family";
-  fontFamily?: FormStyleSheetV1Schema["font-family"];
+  fontFamily: FontFamily;
 }
 
 export interface EditorThemeSectionStyleAction {

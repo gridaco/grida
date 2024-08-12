@@ -1,9 +1,11 @@
 import { blockstreeflat } from "@/lib/forms/tree";
 import type {
+  Appearance,
   ConnectionSupabaseJoint,
   Customer,
   EndingPageI18nOverrides,
   EndingPageTemplateID,
+  FontFamily,
   FormBlock,
   FormBlockType,
   FormFieldDefinition,
@@ -362,8 +364,9 @@ export interface FormEditorState {
   theme: {
     is_powered_by_branding_enabled: boolean;
     lang: FormsPageLanguage;
+    appearance: Appearance;
     palette?: FormStyleSheetV1Schema["palette"];
-    fontFamily?: FormStyleSheetV1Schema["font-family"];
+    fontFamily: FontFamily;
     customCSS?: FormStyleSheetV1Schema["custom"];
     section?: FormStyleSheetV1Schema["section"];
     background?: FormPageBackgroundSchema;

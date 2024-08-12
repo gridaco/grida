@@ -60,6 +60,7 @@ import type {
   EditorThemePoweredByBrandingAction,
   FormCampaignPreferencesAction,
   FormEndingPreferencesAction,
+  EditorThemeAppearanceAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { blockstreeflat } from "@/lib/forms/tree";
@@ -868,6 +869,12 @@ export function reducer(
       const { palette } = <EditorThemePaletteAction>action;
       return produce(state, (draft) => {
         draft.theme.palette = palette;
+      });
+    }
+    case "editor/theme/appearance": {
+      const { appearance } = <EditorThemeAppearanceAction>action;
+      return produce(state, (draft) => {
+        draft.theme.appearance = appearance;
       });
     }
     case "editor/theme/font-family": {

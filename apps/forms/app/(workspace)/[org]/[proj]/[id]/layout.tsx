@@ -157,10 +157,13 @@ export default async function Layout({
               lang: data.lang,
               is_powered_by_branding_enabled:
                 data.is_powered_by_branding_enabled,
+              appearance:
+                (data.stylesheet as FormStyleSheetV1Schema)?.appearance ??
+                "system",
               palette: (data?.stylesheet as FormStyleSheetV1Schema)?.palette,
-              fontFamily: (data.stylesheet as FormStyleSheetV1Schema)?.[
-                "font-family"
-              ],
+              fontFamily:
+                (data.stylesheet as FormStyleSheetV1Schema)?.["font-family"] ??
+                "inter",
               section: (data.stylesheet as FormStyleSheetV1Schema)?.section,
               customCSS: (data.stylesheet as FormStyleSheetV1Schema)?.custom,
               background:
