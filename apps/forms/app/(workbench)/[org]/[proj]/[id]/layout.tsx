@@ -28,6 +28,9 @@ import { Breadcrumbs } from "@/scaffolds/breadcrumb";
 import assert from "assert";
 import { Metadata } from "next";
 import { SavingIndicator } from "@/scaffolds/workbench/saving-indicator";
+import { ThemeProvider } from "@/components/theme-provider";
+import { ToasterWithMax } from "@/components/toaster";
+import { EditorHelpFab } from "@/scaffolds/help/editor-help-fab";
 
 export const revalidate = 0;
 
@@ -139,6 +142,9 @@ export default async function Layout({
     ? await client.getConnection(form.supabase_connection)
     : null;
 
+  const appearance =
+    (data.stylesheet as FormStyleSheetV1Schema)?.appearance ?? "system";
+
   return (
     <div className="h-screen flex flex-col">
       <FormEditorProvider
@@ -157,9 +163,7 @@ export default async function Layout({
               lang: data.lang,
               is_powered_by_branding_enabled:
                 data.is_powered_by_branding_enabled,
-              appearance:
-                (data.stylesheet as FormStyleSheetV1Schema)?.appearance ??
-                "system",
+              appearance: appearance,
               palette: (data?.stylesheet as FormStyleSheetV1Schema)?.palette,
               fontFamily:
                 (data.stylesheet as FormStyleSheetV1Schema)?.["font-family"] ??
@@ -207,23 +211,33 @@ export default async function Layout({
           } satisfies FormEditorInit
         }
       >
-        <Header
-          org={params.org}
-          proj={params.proj}
-          document={{
-            id,
-            title: masterdoc_ref.title,
-          }}
-        />
-        <div className="flex flex-1 overflow-y-auto">
-          <div className="h-full flex flex-1 w-full">
-            {/* side */}
-            <aside className="hidden lg:flex h-full">
-              <Sidebar />
-            </aside>
-            <div className="w-full h-full overflow-x-hidden">{children}</div>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme={appearance}
+          enableSystem
+          disableTransitionOnChange
+          storageKey={`theme-workbench-${id}`}
+        >
+          <Header
+            org={params.org}
+            proj={params.proj}
+            document={{
+              id,
+              title: masterdoc_ref.title,
+            }}
+          />
+          <div className="flex flex-1 overflow-y-auto">
+            <div className="h-full flex flex-1 w-full">
+              {/* side */}
+              <aside className="hidden lg:flex h-full">
+                <Sidebar />
+              </aside>
+              <div className="w-full h-full overflow-x-hidden">{children}</div>
+            </div>
           </div>
-        </div>
+          <EditorHelpFab />
+          <ToasterWithMax position="bottom-center" max={5} />
+        </ThemeProvider>
       </FormEditorProvider>
     </div>
   );
