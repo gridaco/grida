@@ -58,6 +58,7 @@ export interface FormEditorInit {
   theme: FormEditorState["theme"];
   form_title: string;
   document_id: string;
+  document_title: string;
   blocks: EditorFlatFormBlock[];
   fields: FormFieldDefinition[];
 }
@@ -138,6 +139,7 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
     form_security: init.form_security,
     ending: init.ending,
     document_id: init.document_id,
+    document_title: init.document_title,
     blocks: blockstreeflat(init.blocks),
     document: {
       pages: formpagesinit({ basepath, document_id: init.document_id }),
@@ -302,7 +304,6 @@ export interface FormEditorState {
     store_id?: number | null;
     supabase?: GridaSupabase.SupabaseConnectionState;
   };
-
   form_id: string;
   form_title: string;
   campaign: {
@@ -328,6 +329,7 @@ export interface FormEditorState {
     ending_page_i18n_overrides: EndingPageI18nOverrides | null;
   };
   document_id: string;
+  document_title: string;
   blocks: EditorFlatFormBlock[];
   document: {
     pages: MenuItem[];

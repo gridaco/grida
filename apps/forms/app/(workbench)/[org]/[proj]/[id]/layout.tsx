@@ -24,15 +24,19 @@ import type {
   GDocEditorRouteParams,
   FormEditorInit,
 } from "@/scaffolds/editor/state";
-import { Breadcrumbs } from "@/scaffolds/breadcrumb";
+import { Breadcrumbs } from "@/scaffolds/workbench/breadcrumb";
 import assert from "assert";
 import { Metadata } from "next";
 import { SavingIndicator } from "@/scaffolds/workbench/saving-indicator";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ToasterWithMax } from "@/components/toaster";
 import { EditorHelpFab } from "@/scaffolds/help/editor-help-fab";
+import { Inter } from "next/font/google";
+import { cn } from "@/utils";
 
 export const revalidate = 0;
+
+const inter = Inter({ subsets: ["latin"] });
 
 export async function generateMetadata({
   params,
@@ -146,100 +150,116 @@ export default async function Layout({
     (data.stylesheet as FormStyleSheetV1Schema)?.appearance ?? "system";
 
   return (
-    <div className="h-screen flex flex-col">
-      <FormEditorProvider
-        initial={
-          {
-            project: { id: project_ref.id, name: project_ref.name },
-            organization: {
-              id: project_ref.organization!.id,
-              name: project_ref.organization!.name,
-            },
-            connections: {
-              store_id: form.store_connection?.store_id,
-              supabase: supabase_connection_state || undefined,
-            },
-            theme: {
-              lang: data.lang,
-              is_powered_by_branding_enabled:
-                data.is_powered_by_branding_enabled,
-              appearance: appearance,
-              palette: (data?.stylesheet as FormStyleSheetV1Schema)?.palette,
-              fontFamily:
-                (data.stylesheet as FormStyleSheetV1Schema)?.["font-family"] ??
-                "inter",
-              section: (data.stylesheet as FormStyleSheetV1Schema)?.section,
-              customCSS: (data.stylesheet as FormStyleSheetV1Schema)?.custom,
-              background:
-                data.background as unknown as FormPageBackgroundSchema,
-            },
-            form_id: form.id,
-            // TODO:
-            form_title: form.title,
-            campaign: {
-              is_scheduling_enabled: form.is_scheduling_enabled,
-              is_force_closed: form.is_force_closed,
-              max_form_responses_by_customer:
-                form.max_form_responses_by_customer,
-              is_max_form_responses_by_customer_enabled:
-                form.is_max_form_responses_by_customer_enabled,
-              max_form_responses_in_total: form.max_form_responses_in_total,
-              is_max_form_responses_in_total_enabled:
-                form.is_max_form_responses_in_total_enabled,
-              scheduling_open_at: form.scheduling_open_at,
-              scheduling_close_at: form.scheduling_close_at,
-              scheduling_tz: form.scheduling_tz || undefined,
-            },
-            form_security: {
-              unknown_field_handling_strategy:
-                form.unknown_field_handling_strategy,
-              method: data.method,
-            },
-            ending: {
-              is_redirect_after_response_uri_enabled:
-                data.is_redirect_after_response_uri_enabled,
-              redirect_after_response_uri: data.redirect_after_response_uri,
-              is_ending_page_enabled: data.is_ending_page_enabled,
-              ending_page_template_id:
-                data.ending_page_template_id as EndingPageTemplateID,
-              ending_page_i18n_overrides:
-                data.ending_page_i18n_overrides as any,
-            },
-            document_id: data.id,
-            fields: form.fields,
-            blocks: data.blocks as FormBlock[],
-          } satisfies FormEditorInit
-        }
+    <html lang="en" suppressHydrationWarning>
+      <body
+        className={cn(
+          inter.className,
+          // to prevent the whole page from scrolling by sr-only or other hidden absolute elements
+          "h-screen overflow-hidden"
+        )}
       >
-        <ThemeProvider
-          attribute="class"
-          defaultTheme={appearance}
-          enableSystem
-          disableTransitionOnChange
-          storageKey={`theme-workbench-${id}`}
-        >
-          <Header
-            org={params.org}
-            proj={params.proj}
-            document={{
-              id,
-              title: masterdoc_ref.title,
-            }}
-          />
-          <div className="flex flex-1 overflow-y-auto">
-            <div className="h-full flex flex-1 w-full">
-              {/* side */}
-              <aside className="hidden lg:flex h-full">
-                <Sidebar />
-              </aside>
-              <div className="w-full h-full overflow-x-hidden">{children}</div>
-            </div>
-          </div>
-          <EditorHelpFab />
-          <ToasterWithMax position="bottom-center" max={5} />
-        </ThemeProvider>
-      </FormEditorProvider>
-    </div>
+        <div className="h-screen flex flex-col">
+          <FormEditorProvider
+            initial={
+              {
+                project: { id: project_ref.id, name: project_ref.name },
+                organization: {
+                  id: project_ref.organization!.id,
+                  name: project_ref.organization!.name,
+                },
+                connections: {
+                  store_id: form.store_connection?.store_id,
+                  supabase: supabase_connection_state || undefined,
+                },
+                theme: {
+                  lang: data.lang,
+                  is_powered_by_branding_enabled:
+                    data.is_powered_by_branding_enabled,
+                  appearance: appearance,
+                  palette: (data?.stylesheet as FormStyleSheetV1Schema)
+                    ?.palette,
+                  fontFamily:
+                    (data.stylesheet as FormStyleSheetV1Schema)?.[
+                      "font-family"
+                    ] ?? "inter",
+                  section: (data.stylesheet as FormStyleSheetV1Schema)?.section,
+                  customCSS: (data.stylesheet as FormStyleSheetV1Schema)
+                    ?.custom,
+                  background:
+                    data.background as unknown as FormPageBackgroundSchema,
+                },
+                form_id: form.id,
+                // TODO:
+                form_title: form.title,
+                campaign: {
+                  is_scheduling_enabled: form.is_scheduling_enabled,
+                  is_force_closed: form.is_force_closed,
+                  max_form_responses_by_customer:
+                    form.max_form_responses_by_customer,
+                  is_max_form_responses_by_customer_enabled:
+                    form.is_max_form_responses_by_customer_enabled,
+                  max_form_responses_in_total: form.max_form_responses_in_total,
+                  is_max_form_responses_in_total_enabled:
+                    form.is_max_form_responses_in_total_enabled,
+                  scheduling_open_at: form.scheduling_open_at,
+                  scheduling_close_at: form.scheduling_close_at,
+                  scheduling_tz: form.scheduling_tz || undefined,
+                },
+                form_security: {
+                  unknown_field_handling_strategy:
+                    form.unknown_field_handling_strategy,
+                  method: data.method,
+                },
+                ending: {
+                  is_redirect_after_response_uri_enabled:
+                    data.is_redirect_after_response_uri_enabled,
+                  redirect_after_response_uri: data.redirect_after_response_uri,
+                  is_ending_page_enabled: data.is_ending_page_enabled,
+                  ending_page_template_id:
+                    data.ending_page_template_id as EndingPageTemplateID,
+                  ending_page_i18n_overrides:
+                    data.ending_page_i18n_overrides as any,
+                },
+                document_id: masterdoc_ref.id,
+                document_title: masterdoc_ref.title,
+                fields: form.fields,
+                blocks: data.blocks as FormBlock[],
+              } satisfies FormEditorInit
+            }
+          >
+            <ThemeProvider
+              attribute="class"
+              defaultTheme={appearance}
+              enableSystem
+              disableTransitionOnChange
+              storageKey={`theme-workbench-${id}`}
+            >
+              <Header
+                org={params.org}
+                proj={params.proj}
+                document={{
+                  id: masterdoc_ref.id,
+                  title: masterdoc_ref.title,
+                }}
+              />
+              <div className="flex flex-1 overflow-y-auto">
+                <div className="h-full flex flex-1 w-full">
+                  {/* side */}
+                  <aside className="hidden lg:flex h-full">
+                    <Sidebar />
+                  </aside>
+                  <div className="w-full h-full overflow-x-hidden">
+                    {children}
+                  </div>
+                </div>
+              </div>
+              <EditorHelpFab />
+              <ToasterWithMax position="bottom-center" max={5} />
+            </ThemeProvider>
+          </FormEditorProvider>
+        </div>
+      </body>
+    </html>
   );
 }
 
