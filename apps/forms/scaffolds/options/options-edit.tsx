@@ -4,6 +4,7 @@ import React, { useEffect, useId, useMemo, useState } from "react";
 import {
   Cross1Icon,
   CrossCircledIcon,
+  DividerHorizontalIcon,
   DragHandleDots2Icon,
   GearIcon,
   ImageIcon,
@@ -43,6 +44,12 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { cn } from "@/utils";
 
 export function OptionsEdit({
   options,
@@ -71,6 +78,8 @@ export function OptionsEdit({
     setMode(mode === "simple" ? "advanced" : "simple");
   };
 
+  const isAdvancedMode = mode === "advanced";
+
   return (
     <DndContext
       id={id}
@@ -89,12 +98,20 @@ export function OptionsEdit({
               Set the options for the select or radio input. you can set the
               value and label individually in advanced mode.
             </span>
-            <button type="button" onClick={toggleMode}>
-              {mode === "advanced" ? <CrossCircledIcon /> : <GearIcon />}
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button type="button" onClick={toggleMode}>
+                  {isAdvancedMode ? <CrossCircledIcon /> : <GearIcon />}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                Advance Mode - <br />
+                customize label, disabled and group
+              </TooltipContent>
+            </Tooltip>
           </div>
           <div className="flex flex-col gap-2">
-            {mode === "advanced" && (
+            {isAdvancedMode && (
               <div className="flex text-xs opacity-80">
                 <span className="w-5" />
                 <span className="flex-1">value</span>
@@ -104,24 +121,28 @@ export function OptionsEdit({
               </div>
             )}
             <hr />
-            {options?.map(({ id, ...option }, index) => (
-              <OptionEditItem
-                key={id}
-                id={id}
-                mode={mode}
-                label={option.label || ""}
-                value={option.value}
-                src={option.src}
-                disabled={option.disabled}
-                index={index}
-                onRemove={() => {
-                  onRemove?.(id);
-                }}
-                onChange={(option) => {
-                  onChange?.(id, { id, ...option });
-                }}
-              />
-            ))}
+            <OptgroupEditItem />
+            <div className="flex flex-col">
+              {options?.map(({ id, ...option }, index) => (
+                <OptionEditItem
+                  key={id}
+                  id={id}
+                  mode={mode}
+                  label={option.label || ""}
+                  value={option.value}
+                  src={option.src}
+                  disabled={option.disabled}
+                  index={index}
+                  onRemove={() => {
+                    onRemove?.(id);
+                  }}
+                  onChange={(option) => {
+                    onChange?.(id, { id, ...option });
+                  }}
+                />
+              ))}
+            </div>
+            <hr />
             {!disableNewOption && (
               <div className="flex gap-2 items-center">
                 <Button
@@ -133,7 +154,14 @@ export function OptionsEdit({
                   <PlusIcon className="inline-flex me-2" />
                   Add Option
                 </Button>
-                <OptionsBulkAdd onSave={onAddMany} />
+                {isAdvancedMode && (
+                  <>
+                    <OptionsBulkAdd onSave={onAddMany} />
+                    <Button type="button" variant="outline" size="sm">
+                      Add Group
+                    </Button>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -231,80 +259,86 @@ function OptionEditItem({
       //
       ref={setNodeRef}
       style={style}
-      className="flex flex-col gap-1"
+      className="flex flex-col"
     >
       <div className="flex gap-1 items-center">
-        <button
-          //
-          type="button"
-          {...listeners}
-          {...attributes}
-          ref={setActivatorNodeRef}
-        >
-          <DragHandleDots2Icon className="opacity-50" />
-        </button>
-        <label className="flex-1">
-          <Input
-            className="block w-full"
-            type="text"
-            placeholder="option_value"
-            value={value}
-            required
-            onChange={(e) => setValue(e.target.value)}
-          />
-        </label>
-        <div
-          className={clsx(
-            mode === "simple" && "hidden",
-            "relative gap-2 flex-[2]"
-          )}
-        >
-          <Input
-            className={"block w-full"}
-            type="text"
-            placeholder="Option Label"
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-          />
-          <div>
-            <AdminMediaPicker
-              open={mediaPickerOpen}
-              onOpenChange={setMediaPickerOpen}
-              onUseImage={(src) => {
-                setSrc(src);
-                setMediaPickerOpen(false);
-              }}
+        <KnobSlot>
+          <button
+            //
+            type="button"
+            {...listeners}
+            {...attributes}
+            ref={setActivatorNodeRef}
+          >
+            <DragHandleDots2Icon className="opacity-50" />
+          </button>
+        </KnobSlot>
+        {!isDragging && <ItemGroupIndent />}
+        <div className="flex gap-1 items-center py-2 w-full">
+          <label className="flex-1">
+            <Input
+              className="block w-full font-mono"
+              type="text"
+              placeholder="option_value"
+              value={value}
+              required
+              onChange={(e) => setValue(e.target.value)}
             />
-            {!src && (
-              <button
-                onClick={() => setMediaPickerOpen(true)}
-                type="button"
-                className="absolute right-0 top-0 bottom-0 p-2 z-10"
-              >
-                <ImageIcon />
-              </button>
+          </label>
+          <div
+            className={clsx(
+              mode === "simple" && "hidden",
+              "relative gap-2 flex-[2]"
             )}
+          >
+            <Input
+              className={"block w-full"}
+              type="text"
+              placeholder="Option Label"
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+            />
+            <div>
+              <AdminMediaPicker
+                open={mediaPickerOpen}
+                onOpenChange={setMediaPickerOpen}
+                onUseImage={(src) => {
+                  setSrc(src);
+                  setMediaPickerOpen(false);
+                }}
+              />
+              {!src && (
+                <button
+                  onClick={() => setMediaPickerOpen(true)}
+                  type="button"
+                  className="absolute right-0 top-0 bottom-0 p-2 z-10"
+                >
+                  <ImageIcon />
+                </button>
+              )}
+            </div>
           </div>
+
+          <label
+            className={clsx(
+              mode === "simple" && "hidden",
+              "flex items-center justify-center min-w-16"
+            )}
+          >
+            <Switch checked={disabled} onCheckedChange={setDisabled} />
+          </label>
+
+          <button type="button" onClick={onRemove}>
+            <TrashIcon />
+          </button>
         </div>
-
-        <label
-          className={clsx(
-            mode === "simple" && "hidden",
-            "flex items-center min-w-16"
-          )}
-        >
-          <Switch checked={disabled} onCheckedChange={setDisabled} />
-        </label>
-
-        <button type="button" onClick={onRemove}>
-          <TrashIcon />
-        </button>
       </div>
-      <div className={clsx(mode === "simple" && "hidden", "flex gap-1")}>
-        <span className="w-5" />
-        <span className="flex-1" />
-        <div className="flex-[2]">
-          {src && (
+      {src && (
+        <div className={clsx(mode === "simple" && "hidden", "flex gap-1")}>
+          <KnobSlot />
+          <ItemGroupIndent />
+          <span className="flex-1" />
+          <div className="flex-[2]">
             <div className="relative">
               <Button
                 onClick={clearSrc}
@@ -323,11 +357,57 @@ function OptionEditItem({
                 />
               </div>
             </div>
-          )}
+          </div>
+          <span className="min-w-16" />
+          <span className="w-5" />
         </div>
-        <span className="min-w-16" />
-        <span className="w-5" />
-      </div>
+      )}
+    </div>
+  );
+}
+
+function KnobSlot({ children }: React.PropsWithChildren<{}>) {
+  return <div className="min-w-5 w-5">{children}</div>;
+}
+
+function ItemGroupIndent({ className }: { className?: string }) {
+  return <div className={cn("h-full border-l mx-2", className)} />;
+}
+
+function OptgroupEditItem({}) {
+  return (
+    <div className="flex gap-1 items-center">
+      <button
+        //
+        type="button"
+      >
+        <DragHandleDots2Icon className="opacity-50" />
+      </button>
+      <label className="flex-1">
+        <div
+          className={
+            "flex items-center h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm cursor-not-allowed opacity-50"
+          }
+        >
+          <DividerHorizontalIcon className="me-2" />
+          Group
+        </div>
+      </label>
+      <label className="flex-[2]">
+        <Input
+          className="block w-full font-mono"
+          type="text"
+          placeholder="Label"
+          required
+        />
+      </label>
+
+      <label className="flex items-center min-w-16 justify-center">
+        <Switch />
+      </label>
+      <button type="button">
+        <TrashIcon />
+      </button>
     </div>
   );
 }
