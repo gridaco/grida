@@ -219,6 +219,11 @@ export const FileUploader = forwardRef<
 
     const dropzoneState = useDropzone({
       ...opts,
+      // we need to turn this off for android webview and iframe embeds
+      // othersise, we will get
+      // Error: Cannot open the file picker because the https://developer.mozilla.org/en-US/docs/Web/API/File_System_Access_API is not supported and no <input> was provided.
+      // @see https://github.com/gridaco/grida/issues/172
+      useFsAccessApi: false,
       onDrop,
       onDropRejected: () => setIsFileTooBig(true),
       onDropAccepted: () => setIsFileTooBig(false),
