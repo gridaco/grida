@@ -8,7 +8,6 @@ import {
   DragHandleDots2Icon,
   GearIcon,
   ImageIcon,
-  LockClosedIcon,
   PlusIcon,
   TrashIcon,
 } from "@radix-ui/react-icons";
@@ -16,7 +15,6 @@ import { Switch } from "@/components/ui/switch";
 import clsx from "clsx";
 import {
   SortableContext,
-  arrayMove,
   useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
@@ -32,7 +30,7 @@ import { fmt_snake_case_to_human_text } from "@/utils/fmt";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { Button } from "@/components/ui/button";
 import { AdminMediaPicker } from "../mediapicker";
-import type { Option } from "@/types";
+import type { Optgroup, Option } from "@/types";
 import { Input } from "@/components/ui/input";
 import {
   Dialog,
@@ -51,21 +49,28 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/utils";
 
+type RowItem =
+  | ({ type: "option" } & Option)
+  | ({ type: "optgroup" } & Optgroup);
+type ItemType = RowItem["type"];
+
 export function OptionsEdit({
   options,
+  optgroups,
   onAdd,
-  onAddMany,
-  onChange,
+  onAddManyOptions,
+  onItemChange,
   onSort,
   onRemove,
   disableNewOption,
 }: {
   options?: Option[];
-  onAdd: () => void;
-  onAddMany: (values: string[]) => void;
-  onChange?: (id: string, option: Option) => void;
+  optgroups?: Optgroup[];
+  onAdd: (type: ItemType) => void;
+  onAddManyOptions: (values: string[]) => void;
+  onItemChange?: (id: string, data: RowItem) => void;
   onSort?: (from: number, to: number) => void;
-  onRemove?: (id: string) => void;
+  onRemove?: (type: ItemType, id: string) => void;
   disableNewOption?: boolean;
 }) {
   const id = useId();
@@ -80,6 +85,17 @@ export function OptionsEdit({
 
   const isAdvancedMode = mode === "advanced";
 
+  const items: RowItem[] = useMemo(
+    () => [
+      ...(optgroups || []).map((o) => ({ type: "optgroup" as const, ...o })),
+      ...(options || []).map((o) => ({ type: "option" as const, ...o })),
+    ],
+    [options, optgroups]
+  );
+
+  // options + optgroups
+  const sortable_item_ids = items.map((o) => o.id);
+
   return (
     <DndContext
       id={id}
@@ -89,7 +105,7 @@ export function OptionsEdit({
       onDragEnd={handleDragEnd}
     >
       <SortableContext
-        items={options?.map((option) => option.id) || []}
+        items={sortable_item_ids}
         strategy={verticalListSortingStrategy}
       >
         <div className="flex flex-col gap-4">
@@ -121,26 +137,54 @@ export function OptionsEdit({
               </div>
             )}
             <hr />
-            <OptgroupEditItem />
             <div className="flex flex-col">
-              {options?.map(({ id, ...option }, index) => (
-                <OptionEditItem
-                  key={id}
-                  id={id}
-                  mode={mode}
-                  label={option.label || ""}
-                  value={option.value}
-                  src={option.src}
-                  disabled={option.disabled}
-                  index={index}
-                  onRemove={() => {
-                    onRemove?.(id);
-                  }}
-                  onChange={(option) => {
-                    onChange?.(id, { id, ...option });
-                  }}
-                />
-              ))}
+              {items.map((item, index) => {
+                switch (item.type) {
+                  case "option":
+                    return (
+                      <OptionEditItem
+                        key={item.id}
+                        id={item.id}
+                        mode={mode}
+                        label={item.label || ""}
+                        value={item.value}
+                        src={item.src}
+                        disabled={item.disabled}
+                        index={index}
+                        indent={item.optgroup_id != null}
+                        onRemove={() => {
+                          onRemove?.("option", item.id);
+                        }}
+                        onChange={(option) => {
+                          onItemChange?.(item.id, {
+                            type: "option",
+                            id: item.id,
+                            ...option,
+                          });
+                        }}
+                      />
+                    );
+                  case "optgroup":
+                    return (
+                      <OptgroupEditItem
+                        id={item.id}
+                        index={index}
+                        mode={mode}
+                        onChange={(label) => {
+                          onItemChange?.(item.id, {
+                            ...item,
+                            type: "optgroup",
+                            id: item.id,
+                            label,
+                          });
+                        }}
+                        onRemove={() => {
+                          onRemove?.("optgroup", item.id);
+                        }}
+                      />
+                    );
+                }
+              })}
             </div>
             <hr />
             {!disableNewOption && (
@@ -149,15 +193,20 @@ export function OptionsEdit({
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={onAdd}
+                  onClick={() => onAdd("option")}
                 >
                   <PlusIcon className="inline-flex me-2" />
                   Add Option
                 </Button>
                 {isAdvancedMode && (
                   <>
-                    <OptionsBulkAdd onSave={onAddMany} />
-                    <Button type="button" variant="outline" size="sm">
+                    <OptionsBulkAdd onSave={onAddManyOptions} />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onAdd("optgroup")}
+                    >
                       Add Group
                     </Button>
                   </>
@@ -194,6 +243,7 @@ function OptionEditItem({
   mode,
   onChange,
   onRemove,
+  indent,
 }: {
   id: string;
   label: string;
@@ -209,19 +259,8 @@ function OptionEditItem({
     disabled: boolean;
   }) => void;
   onRemove?: () => void;
+  indent?: boolean;
 }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    setActivatorNodeRef,
-    transform,
-    isDragging,
-    isSorting,
-    isOver,
-    transition,
-  } = useSortable({ id: id, data: { index } });
-
   const [value, setValue] = useState(_value);
   const [label, setLabel] = useState(_label);
   const [disabled, setDisabled] = useState<boolean>(_disabled || false);
@@ -248,33 +287,10 @@ function OptionEditItem({
     onChange?.({ label, value, disabled, src });
   }, [value, label, disabled, src]);
 
-  const style = {
-    transform: CSS.Translate.toString(transform),
-    zIndex: isDragging ? 1 : 0,
-    transition,
-  };
-
   return (
-    <div
-      //
-      ref={setNodeRef}
-      style={style}
-      className="flex flex-col"
-    >
-      <div className="flex gap-1 items-center">
-        <KnobSlot>
-          <button
-            //
-            type="button"
-            {...listeners}
-            {...attributes}
-            ref={setActivatorNodeRef}
-          >
-            <DragHandleDots2Icon className="opacity-50" />
-          </button>
-        </KnobSlot>
-        {!isDragging && <ItemGroupIndent />}
-        <div className="flex gap-1 items-center py-2 w-full">
+    <RowItemBase id={id} index={index} type="option" indent={indent}>
+      <div className="flex flex-col w-full">
+        <div className="flex gap-1 items-center pt-2 w-full">
           <label className="flex-1">
             <Input
               className="block w-full font-mono"
@@ -319,96 +335,179 @@ function OptionEditItem({
             </div>
           </div>
 
-          <label
-            className={clsx(
-              mode === "simple" && "hidden",
-              "flex items-center justify-center min-w-16"
-            )}
-          >
+          <SlotSwitch className={clsx(mode === "simple" && "hidden")}>
             <Switch checked={disabled} onCheckedChange={setDisabled} />
-          </label>
+          </SlotSwitch>
 
           <button type="button" onClick={onRemove}>
             <TrashIcon />
           </button>
         </div>
-      </div>
-      {src && (
-        <div className={clsx(mode === "simple" && "hidden", "flex gap-1")}>
-          <KnobSlot />
-          <ItemGroupIndent />
-          <span className="flex-1" />
-          <div className="flex-[2]">
-            <div className="relative">
-              <Button
-                onClick={clearSrc}
-                className="absolute z-10 top-0 right-0 w-6 h-6 p-0 m-1"
-                variant="ghost"
-                type="button"
-              >
-                <Cross1Icon />
-              </Button>
-              <div className="aspect-square bg-neutral-500/50">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={src}
-                  alt=""
-                  className="w-full h-full object-contain rounded-sm overflow-hidden pointer-events-none select-none"
-                />
+        {src && (
+          <div
+            className={clsx("flex gap-1 mt-2", mode === "simple" && "hidden")}
+          >
+            <span className="flex-1" />
+            <div className="flex-[2]">
+              <div className="relative">
+                <Button
+                  onClick={clearSrc}
+                  className="absolute z-10 top-0 right-0 w-6 h-6 p-0 m-1"
+                  variant="ghost"
+                  type="button"
+                >
+                  <Cross1Icon />
+                </Button>
+                <div className="aspect-square bg-neutral-500/50">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={src}
+                    alt=""
+                    className="w-full h-full object-contain rounded-sm overflow-hidden pointer-events-none select-none"
+                  />
+                </div>
               </div>
             </div>
+            <span className="min-w-16" />
+            <span className="w-5" />
           </div>
-          <span className="min-w-16" />
-          <span className="w-5" />
-        </div>
-      )}
+        )}
+      </div>
+    </RowItemBase>
+  );
+}
+
+function SlotKnob({ children }: React.PropsWithChildren<{}>) {
+  return <div className="min-w-5 w-5">{children}</div>;
+}
+
+function SlotSwitch({
+  className,
+  children,
+}: React.PropsWithChildren<{ className?: string }>) {
+  return (
+    <div className={cn("flex items-center justify-center min-w-16", className)}>
+      {children}
     </div>
   );
 }
 
-function KnobSlot({ children }: React.PropsWithChildren<{}>) {
-  return <div className="min-w-5 w-5">{children}</div>;
-}
-
-function ItemGroupIndent({ className }: { className?: string }) {
+function SlotIndent({ className }: { className?: string }) {
   return <div className={cn("h-full border-l mx-2", className)} />;
 }
 
-function OptgroupEditItem({}) {
-  return (
-    <div className="flex gap-1 items-center">
-      <button
-        //
-        type="button"
-      >
-        <DragHandleDots2Icon className="opacity-50" />
-      </button>
-      <label className="flex-1">
-        <div
-          className={
-            "flex items-center h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm cursor-not-allowed opacity-50"
-          }
-        >
-          <DividerHorizontalIcon className="me-2" />
-          Group
-        </div>
-      </label>
-      <label className="flex-[2]">
-        <Input
-          className="block w-full font-mono"
-          type="text"
-          placeholder="Label"
-          required
-        />
-      </label>
+function RowItemBase({
+  id,
+  index,
+  type,
+  children,
+  indent,
+}: React.PropsWithChildren<{
+  type: "option" | "optgroup";
+  id: string;
+  index: number;
+  indent?: boolean;
+}>) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    isDragging,
+    isSorting,
+    isOver,
+    transition,
+  } = useSortable({ id: id, data: { type, index } });
 
-      <label className="flex items-center min-w-16 justify-center">
-        <Switch />
-      </label>
-      <button type="button">
-        <TrashIcon />
-      </button>
+  const style = {
+    transform: CSS.Translate.toString(transform),
+    zIndex: isDragging ? 1 : 0,
+    transition,
+  };
+
+  return (
+    <div
+      //
+      ref={setNodeRef}
+      style={style}
+      className="flex flex-col"
+    >
+      <div className="flex gap-1 items-center">
+        <SlotKnob>
+          <button
+            //
+            type="button"
+            {...listeners}
+            {...attributes}
+            ref={setActivatorNodeRef}
+          >
+            <DragHandleDots2Icon className="opacity-50" />
+          </button>
+        </SlotKnob>
+        {indent && (
+          <SlotIndent className={isDragging ? "opacity-50" : "opacity-100"} />
+        )}
+        {children}
+      </div>
     </div>
+  );
+}
+
+function OptgroupEditItem({
+  id,
+  index,
+  mode,
+  label,
+  onChange,
+  onRemove,
+}: {
+  id: string;
+  index: number;
+  mode?: "simple" | "advanced";
+  label?: string;
+  onChange?: (label: string) => void;
+  onRemove?: () => void;
+}) {
+  const detailed = mode === "advanced";
+
+  return (
+    <RowItemBase id={id} index={index} type="optgroup">
+      <div className="flex gap-1 items-center w-full pt-2">
+        {detailed && (
+          <label className="flex-1">
+            <div
+              className={
+                "flex items-center h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm cursor-not-allowed opacity-50"
+              }
+            >
+              <DividerHorizontalIcon className="me-2" />
+              Group
+            </div>
+          </label>
+        )}
+        <label className="flex-[2]">
+          <Input
+            className="block w-full font-mono"
+            type="text"
+            placeholder="Group Label"
+            value={label}
+            onChange={(e) => onChange?.(e.target.value)}
+            required
+          />
+        </label>
+
+        {detailed && (
+          <SlotSwitch>
+            <Switch />
+          </SlotSwitch>
+        )}
+
+        <button type="button" onClick={onRemove}>
+          <TrashIcon />
+        </button>
+      </div>
+    </RowItemBase>
   );
 }
 

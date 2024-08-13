@@ -173,6 +173,7 @@ export type FormFieldInit = {
   min?: number;
   max?: number;
   options?: Option[];
+  optgroups?: Optgroup[];
   autocomplete?: FormFieldAutocompleteType[] | null;
   data?: FormFieldDataSchema | null;
   accept?: string | null;
@@ -196,6 +197,7 @@ export interface IFormField {
   min?: number | null;
   max?: number | null;
   options?: Option[];
+  optgroups?: Optgroup[];
   autocomplete?: FormFieldAutocompleteType[] | null;
   data?: FormFieldDataSchema | null;
   accept?: string | null;
@@ -251,6 +253,14 @@ export type Option = {
   label?: string;
   value: string;
   src?: string | null;
+  disabled?: boolean | null;
+  index?: number;
+  optgroup_id?: string | null;
+};
+
+export type Optgroup = {
+  id: string;
+  label?: string;
   disabled?: boolean | null;
   index?: number;
 };
