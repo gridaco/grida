@@ -72,7 +72,8 @@ export const FileUploadField = ({
       value={files}
       onValueChange={handleValueChange}
       dropzoneOptions={dropzone}
-      includeFiles={isMultipartFile}
+      // include files is required for the *required to work with dropped files. (files selected via file picker works automatically)
+      includeFiles
     >
       <FileUploaderTrigger>
         <>
