@@ -74,15 +74,23 @@ export const FileUploadField = ({
       dropzoneOptions={dropzone}
       includeFiles={isMultipartFile}
     >
-      {isMultipartFile && <FileValue name={name} required={required} />}
-      {!isMultipartFile && (
-        <UploadedFileValue
-          name={name}
-          required={required}
-          value={uploadedFilesPaths}
-        />
-      )}
       <FileUploaderTrigger>
+        <>
+          {/* @see https://github.com/gridaco/grida/issues/172 */}
+          {/* this is required to be present since we are not using fs access api. */}
+          <FileValue
+            // removing the name will prevent the field from being included in form data.
+            name={isMultipartFile ? name : undefined}
+            required={required}
+          />
+          {!isMultipartFile && (
+            <UploadedFileValue
+              name={name}
+              required={required}
+              value={uploadedFilesPaths}
+            />
+          )}
+        </>
         <Card>
           <div className="flex items-center justify-center h-40 w-full rounded-md">
             <p className="text-muted-foreground text-center">
