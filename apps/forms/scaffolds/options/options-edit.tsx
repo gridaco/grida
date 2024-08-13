@@ -49,7 +49,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/utils";
-import { produce } from "immer";
+import { produce, type Draft } from "immer";
 import { draftid } from "@/utils/id";
 
 type RowItem =
@@ -93,6 +93,27 @@ export function initialOptionsEditState(init: {
 const maxindex = (items: (Option | Optgroup)[]) =>
   items.reduce((max, item) => Math.max(max, item.index || 0), 0);
 
+function organize(draft: Draft<OptionsEditState>) {
+  const allitems: RowItem[] = [
+    ...draft.options.map((_) => ({ type: "option" as const, ..._ })),
+    ...draft.optgroups.map((_) => ({ type: "optgroup" as const, ..._ })),
+  ].sort((a, b) => (a.index || 0) - (b.index || 0));
+
+  let currentOptgroupId: string | null = null;
+
+  allitems.forEach((item, i) => {
+    item.index = i;
+    if (item.type === "optgroup") {
+      currentOptgroupId = item.id;
+    } else if (item.type === "option") {
+      item.optgroup_id = currentOptgroupId;
+    }
+  });
+
+  draft.options = allitems.filter((_) => _.type === "option") as Option[];
+  draft.optgroups = allitems.filter((_) => _.type === "optgroup") as Optgroup[];
+}
+
 export function useOptionsEdit(
   state: OptionsEditState,
   action: OptionsEditAction
@@ -120,6 +141,7 @@ export function useOptionsEdit(
             });
             break;
         }
+        organize(draft);
         break;
       case "remove":
         switch (arg.type) {
@@ -130,6 +152,7 @@ export function useOptionsEdit(
             draft.optgroups = draft.optgroups.filter((_) => _.id !== arg.id);
             break;
         }
+        organize(draft);
         break;
       case "change":
         switch (arg.data.type) {
@@ -151,6 +174,7 @@ export function useOptionsEdit(
             next_option_default(value, { options: draft.options })
           )
         );
+        organize(draft);
         break;
       case "sort":
         const allitems: RowItem[] = [
@@ -167,6 +191,8 @@ export function useOptionsEdit(
         draft.optgroups = shifted.filter(
           (_) => _.type === "optgroup"
         ) as Optgroup[];
+
+        organize(draft);
         break;
     }
   });
@@ -588,7 +614,9 @@ function RowItemBase({
       style={style}
       className="flex flex-col"
     >
-      {debug && <div className="text-xs opacity-50">{debug}</div>}
+      {/* {debug && process.env.NODE_ENV === "development" && (
+        <div className="text-xs opacity-50">{debug}</div>
+      )} */}
       <div className="flex gap-1 items-center">
         <SlotKnob>
           <button
