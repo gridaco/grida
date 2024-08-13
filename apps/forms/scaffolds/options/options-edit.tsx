@@ -90,11 +90,16 @@ export function initialOptionsEditState(init: {
   };
 }
 
+const maxindex = (items: (Option | Optgroup)[]) =>
+  items.reduce((max, item) => Math.max(max, item.index || 0), 0);
+
 export function useOptionsEdit(
   state: OptionsEditState,
   action: OptionsEditAction
 ) {
   return produce(state, (draft) => {
+    const next_index = maxindex([...draft.options, ...draft.optgroups]) + 1;
+
     const [type, arg] = action;
     switch (type) {
       case "set":
@@ -102,14 +107,16 @@ export function useOptionsEdit(
       case "add":
         switch (arg) {
           case "option":
-            draft.options.push(
-              next_option_default(undefined, { options: draft.options })
-            );
+            draft.options.push({
+              ...next_option_default(undefined, { options: draft.options }),
+              index: next_index,
+            });
             break;
           case "optgroup":
             draft.optgroups.push({
               id: draftid(),
               label: "Group",
+              index: next_index,
             });
             break;
         }
@@ -146,7 +153,20 @@ export function useOptionsEdit(
         );
         break;
       case "sort":
-        draft.options = arrayMove(draft.options, arg.from, arg.to);
+        const allitems: RowItem[] = [
+          ...draft.options.map((_) => ({ type: "option" as const, ..._ })),
+          ...draft.optgroups.map((_) => ({ type: "optgroup" as const, ..._ })),
+        ].sort((a, b) => (a.index || 0) - (b.index || 0));
+
+        const shifted = arrayMove(allitems, arg.from, arg.to).map((_, i) => ({
+          ..._,
+          index: i,
+        }));
+
+        draft.options = shifted.filter((_) => _.type === "option") as Option[];
+        draft.optgroups = shifted.filter(
+          (_) => _.type === "optgroup"
+        ) as Optgroup[];
         break;
     }
   });
@@ -211,10 +231,11 @@ export function OptionsEdit({
   const isAdvancedMode = mode === "advanced";
 
   const items: RowItem[] = useMemo(
-    () => [
-      ...(optgroups || []).map((o) => ({ type: "optgroup" as const, ...o })),
-      ...(options || []).map((o) => ({ type: "option" as const, ...o })),
-    ],
+    () =>
+      [
+        ...(optgroups || []).map((o) => ({ type: "optgroup" as const, ...o })),
+        ...(options || []).map((o) => ({ type: "option" as const, ...o })),
+      ].sort((a, b) => (a.index || 0) - (b.index || 0)),
     [options, optgroups]
   );
 
@@ -414,7 +435,13 @@ function OptionEditItem({
   }, [value, label, disabled, src]);
 
   return (
-    <RowItemBase id={id} index={index} type="option" indent={indent}>
+    <RowItemBase
+      id={id}
+      index={index}
+      type="option"
+      indent={indent}
+      debug={`index - ${index}`}
+    >
       <div className="flex flex-col w-full">
         <div className="flex gap-1 items-center pt-2 w-full">
           <label className="flex-1">
@@ -528,11 +555,13 @@ function RowItemBase({
   type,
   children,
   indent,
+  debug,
 }: React.PropsWithChildren<{
   type: "option" | "optgroup";
   id: string;
   index: number;
   indent?: boolean;
+  debug?: string;
 }>) {
   const {
     attributes,
@@ -559,6 +588,7 @@ function RowItemBase({
       style={style}
       className="flex flex-col"
     >
+      {debug && <div className="text-xs opacity-50">{debug}</div>}
       <div className="flex gap-1 items-center">
         <SlotKnob>
           <button
@@ -598,7 +628,12 @@ function OptgroupEditItem({
   const detailed = mode === "advanced";
 
   return (
-    <RowItemBase id={id} index={index} type="optgroup">
+    <RowItemBase
+      id={id}
+      index={index}
+      type="optgroup"
+      debug={`index - ${index}`}
+    >
       <div className="flex gap-1 items-center w-full pt-2">
         {detailed && (
           <label className="flex-1">
