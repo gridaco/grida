@@ -14,6 +14,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import clsx from "clsx";
 import {
+  arrayMove,
   SortableContext,
   useSortable,
   verticalListSortingStrategy,
@@ -48,11 +49,135 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/utils";
+import { produce } from "immer";
+import { draftid } from "@/utils/id";
 
 type RowItem =
   | ({ type: "option" } & Option)
   | ({ type: "optgroup" } & Optgroup);
 type ItemType = RowItem["type"];
+
+type OptionsEditState = {
+  options: Option[];
+  optgroups: Optgroup[];
+};
+
+type OptionsEditAction =
+  | ["set", OptionsEditState]
+  | ["add", ItemType]
+  | ["add-many-options", values: string[]]
+  | ["change", { id: string; data: RowItem }]
+  | ["sort", { from: number; to: number }]
+  | [
+      "remove",
+      {
+        id: string;
+        type: ItemType;
+      },
+    ];
+
+export function initialOptionsEditState(init: {
+  options?: Option[];
+  optgroups?: Optgroup[];
+}): OptionsEditState {
+  return {
+    options: Array.from(init?.options ?? []).sort(
+      (a, b) => (a.index || 0) - (b.index || 0)
+    ),
+    optgroups: Array.from(init?.optgroups ?? []).sort(
+      (a, b) => (a.index || 0) - (b.index || 0)
+    ),
+  };
+}
+
+export function useOptionsEdit(
+  state: OptionsEditState,
+  action: OptionsEditAction
+) {
+  return produce(state, (draft) => {
+    const [type, arg] = action;
+    switch (type) {
+      case "set":
+        return arg;
+      case "add":
+        switch (arg) {
+          case "option":
+            draft.options.push(
+              next_option_default(undefined, { options: draft.options })
+            );
+            break;
+          case "optgroup":
+            draft.optgroups.push({
+              id: draftid(),
+              label: "Group",
+            });
+            break;
+        }
+        break;
+      case "remove":
+        switch (arg.type) {
+          case "option":
+            draft.options = draft.options.filter((_) => _.id !== arg.id);
+            break;
+          case "optgroup":
+            draft.optgroups = draft.optgroups.filter((_) => _.id !== arg.id);
+            break;
+        }
+        break;
+      case "change":
+        switch (arg.data.type) {
+          case "option":
+            draft.options = draft.options.map((_option) =>
+              _option.id === arg.id ? (arg.data as Option) : _option
+            );
+            break;
+          case "optgroup":
+            draft.optgroups = draft.optgroups.map((_optgroup) =>
+              _optgroup.id === arg.id ? arg.data : _optgroup
+            );
+            break;
+        }
+        break;
+      case "add-many-options":
+        draft.options.push(
+          ...arg.map((value) =>
+            next_option_default(value, { options: draft.options })
+          )
+        );
+        break;
+      case "sort":
+        draft.options = arrayMove(draft.options, arg.from, arg.to);
+        break;
+    }
+  });
+}
+
+function next_option_default(
+  seed: string | undefined,
+  { options }: { options: Option[] }
+): Option {
+  const len = options.length;
+  const val = (n: number) =>
+    seed && !options.some((_) => _.value === seed)
+      ? seed
+      : `${seed || "option_"}${n}`;
+  const label = (n: number) =>
+    seed && !options.some((_) => _.label === seed)
+      ? seed
+      : `${seed ? seed.charAt(0).toUpperCase() + seed.slice(1) : "Option"} ${n}`;
+
+  let n = len + 1;
+  while (options.some((_) => _.value === val(n))) {
+    n++;
+  }
+
+  return {
+    id: draftid(),
+    value: val(n),
+    label: label(n),
+    disabled: false,
+  };
+}
 
 export function OptionsEdit({
   options,
@@ -170,6 +295,7 @@ export function OptionsEdit({
                         id={item.id}
                         index={index}
                         mode={mode}
+                        label={item.label || ""}
                         onChange={(label) => {
                           onItemChange?.(item.id, {
                             ...item,
