@@ -375,13 +375,6 @@ export function FieldEditPanel({
   const save = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    const indexed_options = options
-      .map((option, index) => ({
-        ...option,
-        index,
-      }))
-      .sort((a, b) => a.index - b.index);
-
     const options_inventory_upsert_diff = is_inventory_enabled
       ? Object.fromEntries(
           Object.entries(inventory ?? {}).map(([id, stock]) => [
@@ -405,7 +398,8 @@ export function FieldEditPanel({
       step,
       min,
       max,
-      options: supports_options ? indexed_options : undefined,
+      options: supports_options ? options : undefined,
+      optgroups: supports_options ? optgroups : undefined,
       autocomplete,
       data,
       accept,

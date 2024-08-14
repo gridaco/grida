@@ -116,7 +116,8 @@ export default async function Layout({
           *,
           fields:form_field(
             *,
-            options:form_field_option(*)
+            options:form_field_option(*),
+            optgroups:optgroup(*)
           ),
           store_connection:connection_commerce_store(*),
           supabase_connection:connection_supabase(*)

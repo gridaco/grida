@@ -64,7 +64,9 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
     (init: FormFieldSave) => {
       const data: FormFieldUpsert = {
         ...init,
+        //
         options: init.options?.length ? init.options : undefined,
+        optgroups: init.optgroups?.length ? init.optgroups : undefined,
         //
         id: state.focus_field_id ?? undefined,
         form_id: state.form_id,
@@ -144,6 +146,7 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
                 accept: field.accept,
                 multiple: field.multiple ?? undefined,
                 options: field.options,
+                optgroups: field.optgroups,
                 storage: field.storage,
                 reference: field.reference,
                 // TODO: add inventory support
