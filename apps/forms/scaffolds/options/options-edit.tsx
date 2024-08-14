@@ -66,7 +66,7 @@ type OptionsEditAction =
   | ["set", OptionsEditState]
   | ["add", ItemType]
   | ["add-many-options", values: string[]]
-  | ["change", { id: string; data: RowItem }]
+  | ["change", { id: string; data: Omit<RowItem, "index"> }]
   | ["sort", { from: number; to: number }]
   | [
       "remove",
@@ -80,24 +80,36 @@ export function initialOptionsEditState(init: {
   options?: Option[];
   optgroups?: Optgroup[];
 }): OptionsEditState {
+  const sorted_options = Array.from(init?.options ?? []).sort(
+    (a, b) => (a.index || -1) - (b.index || -1)
+  );
+  const sorted_optgroups = Array.from(init?.optgroups ?? []).sort(
+    (a, b) => (a.index || -1) - (b.index || -1)
+  );
+  const allitems = [
+    ...sorted_options.map((_) => ({ type: "option" as const, ..._ })),
+    ...sorted_optgroups.map((_) => ({ type: "optgroup" as const, ..._ })),
+  ].map((_, i) => ({ ..._, index: i }));
+  const indexed_options = allitems.filter((_) => _.type === "option");
+  const indexed_optgroups = allitems.filter((_) => _.type === "optgroup");
+
   return {
-    options: Array.from(init?.options ?? []).sort(
-      (a, b) => (a.index || 0) - (b.index || 0)
-    ),
-    optgroups: Array.from(init?.optgroups ?? []).sort(
-      (a, b) => (a.index || 0) - (b.index || 0)
-    ),
+    options: indexed_options,
+    optgroups: indexed_optgroups,
   };
 }
 
 const maxindex = (items: (Option | Optgroup)[]) =>
-  items.reduce((max, item) => Math.max(max, item.index || 0), 0);
+  Math.max(
+    items.reduce((max, item) => Math.max(max, item.index || 0), 0),
+    items.length
+  );
 
 function organize(draft: Draft<OptionsEditState>) {
   const allitems: RowItem[] = [
     ...draft.options.map((_) => ({ type: "option" as const, ..._ })),
     ...draft.optgroups.map((_) => ({ type: "optgroup" as const, ..._ })),
-  ].sort((a, b) => (a.index || 0) - (b.index || 0));
+  ].sort((a, b) => (a.index || -1) - (b.index || -1));
 
   let currentOptgroupId: string | null = null;
 
@@ -128,10 +140,11 @@ export function useOptionsEdit(
       case "add":
         switch (arg) {
           case "option":
-            draft.options.push({
+            const next_option: Option = {
               ...next_option_default(undefined, { options: draft.options }),
               index: next_index,
-            });
+            };
+            draft.options.push(next_option);
             break;
           case "optgroup":
             draft.optgroups.push({
@@ -158,12 +171,28 @@ export function useOptionsEdit(
         switch (arg.data.type) {
           case "option":
             draft.options = draft.options.map((_option) =>
-              _option.id === arg.id ? (arg.data as Option) : _option
+              _option.id === arg.id
+                ? ({
+                    ..._option,
+                    // fields that can be changed via change action (keep id, index, optgroup_id)
+                    label: (arg.data as Partial<Option>).label,
+                    value: (arg.data as Partial<Option>).value || _option.value,
+                    src: (arg.data as Partial<Option>).src,
+                    disabled: (arg.data as Partial<Option>).disabled,
+                  } satisfies Option)
+                : _option
             );
             break;
           case "optgroup":
             draft.optgroups = draft.optgroups.map((_optgroup) =>
-              _optgroup.id === arg.id ? arg.data : _optgroup
+              _optgroup.id === arg.id
+                ? {
+                    ..._optgroup,
+                    // fields that can be changed via change action (keep id, index)
+                    label: arg.data.label,
+                    disabled: arg.data.disabled,
+                  }
+                : _optgroup
             );
             break;
         }
@@ -180,7 +209,7 @@ export function useOptionsEdit(
         const allitems: RowItem[] = [
           ...draft.options.map((_) => ({ type: "option" as const, ..._ })),
           ...draft.optgroups.map((_) => ({ type: "optgroup" as const, ..._ })),
-        ].sort((a, b) => (a.index || 0) - (b.index || 0));
+        ].sort((a, b) => (a.index || -1) - (b.index || -1));
 
         const shifted = arrayMove(allitems, arg.from, arg.to).map((_, i) => ({
           ..._,
@@ -256,6 +285,7 @@ export function OptionsEdit({
 
   const isAdvancedMode = mode === "advanced";
 
+  // options + optgroups
   const items: RowItem[] = useMemo(
     () =>
       [
@@ -265,7 +295,6 @@ export function OptionsEdit({
     [options, optgroups]
   );
 
-  // options + optgroups
   const sortable_item_ids = items.map((o) => o.id);
 
   return (
