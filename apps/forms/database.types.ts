@@ -1240,6 +1240,7 @@ export type Database = {
           id: string
           index: number
           label: string
+          optgroup_id: string | null
           src: string | null
           value: string
         }
@@ -1251,6 +1252,7 @@ export type Database = {
           id?: string
           index?: number
           label?: string
+          optgroup_id?: string | null
           src?: string | null
           value: string
         }
@@ -1262,10 +1264,18 @@ export type Database = {
           id?: string
           index?: number
           label?: string
+          optgroup_id?: string | null
           src?: string | null
           value?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "form_field_option_optgroup_id_fkey"
+            columns: ["optgroup_id"]
+            isOneToOne: false
+            referencedRelation: "optgroup"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "grida_forms_form_field_option_form_field_id_fkey"
             columns: ["form_field_id"]
@@ -1357,6 +1367,51 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      optgroup: {
+        Row: {
+          created_at: string
+          disabled: boolean
+          form_field_id: string
+          form_id: string
+          id: string
+          index: number
+          label: string
+        }
+        Insert: {
+          created_at?: string
+          disabled?: boolean
+          form_field_id: string
+          form_id: string
+          id?: string
+          index?: number
+          label: string
+        }
+        Update: {
+          created_at?: string
+          disabled?: boolean
+          form_field_id?: string
+          form_id?: string
+          id?: string
+          index?: number
+          label?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "optgroup_form_field_id_fkey"
+            columns: ["form_field_id"]
+            isOneToOne: false
+            referencedRelation: "form_field"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "optgroup_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "form"
             referencedColumns: ["id"]
           },
         ]
@@ -2059,6 +2114,7 @@ export type Database = {
           numeric: number | null
           richtext: Json | null
           text: string
+          text_arr: string[] | null
           timestamptz: string | null
           user_id: string | null
           varchar: string | null
@@ -2076,6 +2132,7 @@ export type Database = {
           numeric?: number | null
           richtext?: Json | null
           text: string
+          text_arr?: string[] | null
           timestamptz?: string | null
           user_id?: string | null
           varchar?: string | null
@@ -2093,6 +2150,7 @@ export type Database = {
           numeric?: number | null
           richtext?: Json | null
           text?: string
+          text_arr?: string[] | null
           timestamptz?: string | null
           user_id?: string | null
           varchar?: string | null

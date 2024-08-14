@@ -39,6 +39,13 @@ type ClientRenderOption = {
   index?: number;
 };
 
+type ClientRenderOptgroup = {
+  id: string;
+  label?: string;
+  disabled?: boolean | null;
+  index?: number;
+};
+
 export interface ClientFieldRenderBlock<T extends FormInputType = FormInputType>
   extends BaseRenderBlock {
   type: "field";
@@ -59,6 +66,7 @@ export interface ClientFieldRenderBlock<T extends FormInputType = FormInputType>
     maxlength?: number;
     placeholder?: string;
     options?: ClientRenderOption[];
+    optgroups?: ClientRenderOptgroup[];
     autocomplete?: string;
     data?: FormFieldDataSchema | null;
     accept?: string;
@@ -416,6 +424,7 @@ export class FormRenderTree {
     const base: ClientFieldRenderBlock["field"] = {
       ...field,
       options: mkoption(field.options),
+      optgroups: field.optgroups,
       label: field.label || undefined,
       help_text: field.help_text || undefined,
       placeholder: field.placeholder || undefined,

@@ -284,6 +284,8 @@ export function FieldBlock({
             helpText={form_field?.help_text ?? ""}
             placeholder={form_field?.placeholder ?? ""}
             options={form_field?.options}
+            optgroups={form_field?.optgroups}
+            multiple={form_field?.multiple ?? false}
             data={form_field?.data}
           />
         )}

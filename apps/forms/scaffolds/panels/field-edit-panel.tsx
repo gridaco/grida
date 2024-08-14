@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useReducer, useState } from "react";
 import {
   PanelClose,
   PanelContent,
@@ -20,7 +20,6 @@ import {
   FormInputType,
   FormFieldInit,
   PaymentFieldData,
-  Option,
   FormFieldStorageSchema,
   GridaSupabase,
   FormFieldReferenceSchema,
@@ -63,9 +62,12 @@ import {
 } from "@/k/payments_service_providers";
 import { fmt_snake_case_to_human_text } from "@/utils/fmt";
 import toast from "react-hot-toast";
-import { arrayMove } from "@dnd-kit/sortable";
 import { draftid } from "@/utils/id";
-import { OptionsEdit } from "../options/options-edit";
+import {
+  OptionsEdit,
+  initialOptionsEditState,
+  useOptionsEdit,
+} from "../options/options-edit";
 import { OptionsStockEdit } from "../options/options-sku";
 import { Switch } from "@/components/ui/switch";
 import { FormFieldUpsert } from "@/types/private/api";
@@ -261,6 +263,15 @@ export function FieldEditPanel({
   const [min, setMin] = useState<number | undefined>(init?.min);
   const [max, setMax] = useState<number | undefined>(init?.max);
 
+  // options
+  const [{ options, optgroups }, dispatchoptions] = useReducer(
+    useOptionsEdit,
+    initialOptionsEditState({
+      options: init?.options,
+      optgroups: init?.optgroups,
+    })
+  );
+
   useEffect(() => {
     setType(init?.type || "text");
     setName(init?.name || "");
@@ -273,14 +284,14 @@ export function FieldEditPanel({
     setStep(init?.step);
     setMin(init?.min);
     setMax(init?.max);
-  }, [init]);
-
-  // options
-  const [options, setOptions] = useState<Option[]>(
-    Array.from(init?.options ?? []).sort(
-      (a, b) => (a.index || 0) - (b.index || 0)
-    )
-  );
+    dispatchoptions([
+      "set",
+      {
+        options: init?.options || [],
+        optgroups: init?.optgroups || [],
+      },
+    ]);
+  }, []);
 
   const [autocomplete, setAutocomplete] = useState<FormFieldAutocompleteType[]>(
     init?.autocomplete || []
@@ -364,13 +375,6 @@ export function FieldEditPanel({
   const save = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    const indexed_options = options
-      .map((option, index) => ({
-        ...option,
-        index,
-      }))
-      .sort((a, b) => a.index - b.index);
-
     const options_inventory_upsert_diff = is_inventory_enabled
       ? Object.fromEntries(
           Object.entries(inventory ?? {}).map(([id, stock]) => [
@@ -394,7 +398,8 @@ export function FieldEditPanel({
       step,
       min,
       max,
-      options: supports_options ? indexed_options : undefined,
+      options: supports_options ? options : undefined,
+      optgroups: supports_options ? optgroups : undefined,
       autocomplete,
       data,
       accept,
@@ -414,8 +419,14 @@ export function FieldEditPanel({
     setHelpText(schema.help_text);
     setType(schema.type);
     setRequired(schema.required);
-    setOptions(schema.options || []);
     setPattern(schema.pattern);
+    dispatchoptions([
+      "set",
+      {
+        options: schema.options || [],
+        optgroups: schema.optgroups || [],
+      },
+    ]);
   };
 
   useEffect(() => {
@@ -435,7 +446,13 @@ export function FieldEditPanel({
         setData((_data) => _data || defaults.data);
         // reset options if there were no existing options
         if (!options?.length) {
-          setOptions(defaults.options || []);
+          dispatchoptions([
+            "set",
+            {
+              options: defaults.options || [],
+              optgroups: [],
+            },
+          ]);
         }
 
         // always reset pattern
@@ -473,6 +490,7 @@ export function FieldEditPanel({
                   requiredAsterisk
                   disabled={preview_disabled}
                   options={supports_options ? options : undefined}
+                  optgroups={supports_options ? optgroups : undefined}
                   pattern={pattern}
                   step={step}
                   min={min}
@@ -570,27 +588,21 @@ export function FieldEditPanel({
               <OptionsEdit
                 disableNewOption={is_inventory_enabled}
                 options={options}
-                onAdd={() => {
-                  setOptions([...options, next_option_default(options)]);
+                optgroups={optgroups}
+                onAdd={(type) => {
+                  dispatchoptions(["add", type]);
                 }}
-                onAddMany={(values) => {
-                  const new_options = values.map((value) =>
-                    next_option_default(options, value)
-                  );
-                  setOptions([...options, ...new_options]);
+                onAddManyOptions={(values) => {
+                  dispatchoptions(["add-many-options", values]);
                 }}
-                onChange={(id, option) => {
-                  setOptions(
-                    options.map((_option: Option) =>
-                      _option.id && _option.id === id ? option : _option
-                    )
-                  );
+                onItemChange={(id, data) => {
+                  dispatchoptions(["change", { id, data }]);
                 }}
-                onRemove={(id) => {
-                  setOptions(options.filter((_) => _.id !== id));
+                onRemove={(type, id) => {
+                  dispatchoptions(["remove", { type, id }]);
                 }}
                 onSort={(from, to) => {
-                  setOptions(arrayMove(options, from, to));
+                  dispatchoptions(["sort", { from, to }]);
                 }}
               />
             </PanelPropertyFields>
@@ -1343,30 +1355,6 @@ function isHandlebarTemplate(str?: string) {
   if (!str) return false;
   const handlebarRegex = /\{\{[^{}]*\}\}/;
   return handlebarRegex.test(str);
-}
-
-function next_option_default(options: Option[], seed?: string): Option {
-  const len = options.length;
-  const val = (n: number) =>
-    seed && !options.some((_) => _.value === seed)
-      ? seed
-      : `${seed || "option_"}${n}`;
-  const label = (n: number) =>
-    seed && !options.some((_) => _.label === seed)
-      ? seed
-      : `${seed ? seed.charAt(0).toUpperCase() + seed.slice(1) : "Option"} ${n}`;
-
-  let n = len + 1;
-  while (options.some((_) => _.value === val(n))) {
-    n++;
-  }
-
-  return {
-    id: draftid(),
-    value: val(n),
-    label: label(n),
-    disabled: false,
-  };
 }
 
 function buildPreviewLabel({ name, label }: { name: string; label?: string }) {
