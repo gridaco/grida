@@ -31,7 +31,7 @@ import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
 import { Textarea } from "../ui/textarea";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
-import { Card } from "../ui/card";
+import { Card, CardContent, CardHeader } from "../ui/card";
 import { Label } from "../ui/label";
 import {
   FileUploadField,
@@ -674,11 +674,32 @@ function MonoFormField({
               // TODO: need handling - this can be an array
               onValueChange={onValueChange}
             >
-              {options.map((option) => (
+              {renderOptions({
+                options,
+                optgroups,
+                renderOption: (option) => (
+                  <ToggleGroupItem key={option.id} value={option.id}>
+                    {option.label}
+                  </ToggleGroupItem>
+                ),
+                renderOptgroup: ({ id, label, children }) => (
+                  <Card key={id} className="w-full mt-4">
+                    <CardHeader>
+                      <Label>{label}</Label>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-start justify-start flex-wrap gap-1">
+                        {children}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ),
+              })}
+              {/* {options.map((option) => (
                 <ToggleGroupItem key={option.id} value={option.id}>
                   {option.label}
                 </ToggleGroupItem>
-              ))}
+              ))} */}
             </ToggleGroupRootWithValue>
           </Root>
         );
@@ -896,13 +917,19 @@ function renderOptions({
   optgroups?: Optgroup[];
   renderOption: (option: Option) => React.ReactNode;
   renderOptgroup: ({
+    id,
     label,
     children,
   }: {
+    id: string;
     label?: string;
     children: React.ReactNode[];
   }) => React.ReactNode;
 }) {
+  if (!optgroups.length) {
+    return options.map(renderOption);
+  }
+
   const grouped = options.reduce(
     (acc, option) => {
       const key = option.optgroup_id || "ungrouped";
@@ -918,6 +945,7 @@ function renderOptions({
   const renderedOptgroups = optgroups.map((optgroup) => {
     const groupOptions = grouped[optgroup.id] || [];
     return renderOptgroup({
+      id: optgroup.id,
       label: optgroup.label,
       children: groupOptions.map(renderOption),
     });
@@ -1066,7 +1094,7 @@ function ToggleGroupRootWithValue({
       variant="outline"
       {...props}
       onValueChange={onValueChange}
-      className="flex items-start justify-start flex-wrap"
+      className="flex items-start justify-start flex-wrap gap-1"
     >
       <input
         ref={ref}

@@ -470,6 +470,7 @@ function BlockRenderer({
                   requiredAsterisk
                   helpText={field.help_text}
                   options={field.options}
+                  optgroups={field.optgroups}
                   pattern={field.pattern}
                   step={field.step}
                   min={field.min}

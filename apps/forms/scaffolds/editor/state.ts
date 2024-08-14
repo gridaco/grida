@@ -190,7 +190,7 @@ function formpagesinit({
 }): MenuItem[] {
   return [
     {
-      section: "Form",
+      section: "Design",
       id: "campaign",
       label: "Campaign",
       href: `/${basepath}/${document_id}/form`,
@@ -205,7 +205,7 @@ function formpagesinit({
     //   level: 1,
     // },
     {
-      section: "Form",
+      section: "Design",
       id: "form",
       label: "Form Page",
       href: `/${basepath}/${document_id}/form/edit`,
@@ -213,7 +213,7 @@ function formpagesinit({
       level: 1,
     },
     {
-      section: "Form",
+      section: "Design",
       id: "ending",
       label: "Ending Page",
       href: `/${basepath}/${document_id}/form/end`,
