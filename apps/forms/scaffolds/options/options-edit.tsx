@@ -51,6 +51,7 @@ import {
 import { cn } from "@/utils";
 import { produce, type Draft } from "immer";
 import { draftid } from "@/utils/id";
+import { FolderIcon } from "lucide-react";
 
 type RowItem =
   | ({ type: "option" } & Option)
@@ -151,10 +152,13 @@ export function useOptionsEdit(
             draft.options.push(next_option);
             break;
           case "optgroup":
+            // if its a first group assign index 0 so it can contain all options
+            const is_first_group = draft.optgroups.length === 0;
+            const next_group_index = is_first_group ? -999 : next_index;
             draft.optgroups.push({
               id: draftid(),
               label: "Group",
-              index: next_index,
+              index: next_group_index,
             });
             break;
         }
@@ -203,9 +207,10 @@ export function useOptionsEdit(
         break;
       case "add-many-options":
         draft.options.push(
-          ...arg.map((value) =>
-            next_option_default(value, { options: draft.options })
-          )
+          ...arg.map((value, i) => ({
+            ...next_option_default(value, { options: draft.options }),
+            index: next_index + i,
+          }))
         );
         organize(draft);
         break;
@@ -703,14 +708,19 @@ function OptgroupEditItem({
                 "flex items-center h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm cursor-not-allowed opacity-50"
               }
             >
-              <DividerHorizontalIcon className="me-2" />
+              <FolderIcon className="me-2 w-4 h-4" />
               Group
             </div>
           </label>
         )}
-        <label className="flex-[2]">
+        <label className="flex-[2] relative">
+          {!detailed && (
+            <div className="absolute left-2 top-0 bottom-0 flex items-center justify-center">
+              <FolderIcon className="text-muted-foreground w-4 h-4" />
+            </div>
+          )}
           <Input
-            className="block w-full font-mono"
+            className={clsx("block w-full font-mono", !detailed && "pl-8")}
             type="text"
             placeholder="Group Label"
             value={label}
