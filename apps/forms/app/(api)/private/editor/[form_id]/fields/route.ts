@@ -78,13 +78,19 @@ export async function POST(
       reference: init.reference ?? null,
       // 'description': init.description,
     })
-    .select("*, existing_options:form_field_option(*)")
+    .select(
+      `
+        *,
+        existing_options:form_field_option(*),
+        existing_optgroups:optgroup(*)
+      `
+    )
     .single();
 
   // console.log("upserted", upserted, init.data);
 
   if (error) {
-    console.error("error while upserting field", error);
+    console.error("ERR: while upserting field", error);
     return NextResponse.json(
       {
         message: `Failed to ${operation} field`,
@@ -99,41 +105,103 @@ export async function POST(
     );
   }
 
-  const { existing_options } = upserted;
+  const { id: form_field_id, existing_optgroups, existing_options } = upserted;
+  const { optgroups, options, options_inventory } = init;
 
-  // upsert options if any
-  const { options, options_inventory } = init;
-  const upserting_option_ids = options?.map((option) => option.id) ?? [];
-  // options to be deleted
-  const deleting_option_ids = existing_options
-    .map((option) => option.id)
-    .filter((id) => !upserting_option_ids.includes(id));
+  //
+  // #region handle optgroups
+  //
+  const { remove: deleting_optgroups } = itemsdiff(
+    optgroups ?? [],
+    existing_optgroups ?? [],
+    "id"
+  );
+  const deleting_optgroup_ids = deleting_optgroups.map((o) => o.id);
 
-  let field_options: any[] | undefined = undefined;
+  const { remove: deleting_options } = itemsdiff(
+    options ?? [],
+    existing_options ?? [],
+    "id"
+  );
+  const deleting_option_ids = deleting_options.map((o) => o.id);
+
+  // upsert optgroups
+  // upserted & inserted optgroups (for response)
+  const upserted_optgroups: any[] = [];
+  // input id (draftid | db id) -> db id
+  const upserted_optgroups_id_map = new Map<string, string>();
+  if (optgroups) {
+    // keeping optgroups
+    const { data: upserted, error: upsertion_err } = await supabase
+      .from("optgroup")
+      .upsert(
+        optgroups.map((optgroup) => ({
+          id: existing_optgroups.find((o) => o.id === optgroup.id)?.id,
+          label: optgroup.label ?? "Group",
+          index: optgroup.index,
+          disabled: optgroup.disabled ?? false,
+          form_field_id: form_field_id,
+          form_id: form_id,
+        })),
+        {
+          defaultToNull: false,
+        }
+      )
+      .select();
+
+    if (upsertion_err) {
+      console.error("ERR: optgroup upsertion", error);
+      return NextResponse.error();
+    }
+
+    // map the upserted optgroups
+    upserted?.forEach((upserted) => {
+      const original = optgroups.find(
+        (optgroup) =>
+          // find by id if old,
+          optgroup.id === upserted.id ||
+          // other wise find by index (new)
+          optgroup.index === upserted.index
+      );
+      if (original) {
+        upserted_optgroups_id_map.set(original.id, upserted.id);
+      }
+    });
+
+    // push to upserted optgroups
+    upserted_optgroups.push(...upserted);
+  }
+
+  let upserted_options: any[] | undefined = undefined;
 
   if (options) {
-    const { data: upserted_options, error } = await supabase
+    const { data: options_upsert, error } = await supabase
       .from("form_field_option")
       .upsert(
         options.map((option) => ({
+          // use the id if this is old, otherwise it will be generated
+          id: existing_options.find((o) => o.id === option.id)?.id,
           label: option.label,
           value: option.value,
           src: option.src,
           disabled: option.disabled,
           index: option.index ?? 0,
-          form_field_id: upserted.id,
+          form_field_id: form_field_id,
           form_id: form_id,
+          optgroup_id: option.optgroup_id
+            ? upserted_optgroups_id_map.get(option.optgroup_id)
+            : null,
         })),
         {
-          onConflict: "value,form_field_id",
+          defaultToNull: false,
         }
       )
       .select();
 
-    field_options = upserted_options ?? undefined;
+    upserted_options = options_upsert ?? undefined;
 
     if (error) {
-      console.error("error while upserting field options", error);
+      console.error("ERR: while upserting field options", error);
       console.info("failed options payload", init.options);
       if (operation === "create") {
         // revert field if options failed
@@ -144,6 +212,27 @@ export async function POST(
       return NextResponse.error();
     }
   }
+
+  //
+  // #region clean options & optgroups
+  //
+
+  // delete removed optgroups
+  if (deleting_optgroup_ids?.length) {
+    console.log("removing_option_ids", deleting_optgroup_ids);
+    await supabase.from("optgroup").delete().in("id", deleting_optgroup_ids);
+  }
+
+  // delete removed options
+  if (deleting_option_ids?.length) {
+    console.log("removing_option_ids", deleting_option_ids);
+    await supabase
+      .from("form_field_option")
+      .delete()
+      .in("id", deleting_option_ids);
+  }
+
+  // #endregion
 
   // handle inventory update if any
   if (options_inventory) {
@@ -192,19 +281,12 @@ export async function POST(
     // assert(product, "failed to upsert product with options");
   }
 
-  if (deleting_option_ids?.length) {
-    console.log("removing_option_ids", deleting_option_ids);
-    await supabase
-      .from("form_field_option")
-      .delete()
-      .in("id", deleting_option_ids);
-  }
-
   return NextResponse.json(
     {
       data: {
         ...upserted,
-        options: field_options,
+        options: upserted_options,
+        optgroups: upserted_optgroups,
       },
       message: `Field ${operation}d`,
       info: {
@@ -215,6 +297,28 @@ export async function POST(
       status: operation === "create" ? 201 : 200,
     }
   );
+}
+
+function itemsdiff<T>(
+  current: T[],
+  previous: T[],
+  key: keyof T
+): {
+  add: T[];
+  keep: T[];
+  remove: T[];
+} {
+  const previous_keys = previous.map((r) => r[key]);
+  const current_keys = current.map((r) => r[key]);
+  const added_keys = current_keys.filter((k) => !previous_keys.includes(k));
+  const removed_keys = previous_keys.filter((k) => !current_keys.includes(k));
+  // not removed and not added
+  const keep_keys = current_keys.filter((k) => previous_keys.includes(k));
+  return {
+    add: current.filter((r) => added_keys.includes(r[key])),
+    remove: previous.filter((r) => removed_keys.includes(r[key])),
+    keep: current.filter((r) => keep_keys.includes(r[key])),
+  };
 }
 
 /**
