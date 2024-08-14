@@ -1,6 +1,7 @@
 import {
   FormFieldDataSchema,
   FormInputType,
+  Optgroup,
   Option,
   PaymentFieldData,
 } from "@/types";
@@ -9,7 +10,9 @@ import { Select as HtmlSelect } from "../vanilla/select";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -50,6 +53,7 @@ import {
 import { PhoneField } from "./phone-field";
 import { RichTextEditorField } from "./richtext-field";
 import { FieldProperties } from "@/k/supported_field_types";
+import "core-js/features/map/group-by";
 
 /**
  * this disables the auto zoom in input text tag safari on iphone by setting font-size to 16px
@@ -69,6 +73,7 @@ interface IInputField {
   requiredAsterisk?: boolean;
   defaultValue?: string;
   options?: Option[];
+  optgroups?: Optgroup[];
   pattern?: string;
   step?: number;
   min?: number;
@@ -154,6 +159,7 @@ function MonoFormField({
   requiredAsterisk,
   defaultValue,
   options,
+  optgroups,
   helpText,
   readonly,
   disabled,
@@ -377,6 +383,7 @@ function MonoFormField({
             <SafeValueSelect
               {...(sharedInputProps as React.ComponentProps<"select">)}
               options={options}
+              optgroups={optgroups}
               locked={locked}
               onValueChange={onValueChange}
             />
@@ -713,12 +720,14 @@ function Root({
  */
 function SafeValueSelect({
   options: _options,
+  optgroups,
   locked,
   onValueChange: cb_onValueChange,
   ...inputProps
 }: React.ComponentProps<"select"> & {
   placeholder?: string;
   options?: Option[];
+  optgroups?: Optgroup[];
 } & {
   locked?: boolean;
 } & OnValueChange) {
@@ -733,7 +742,6 @@ function SafeValueSelect({
       value: _value as string,
       options: _options?.map((option) => ({
         ...option,
-        // map value to id if id exists
         value: option.id || option.value,
         label: option.label || option.value,
       })),
@@ -767,27 +775,37 @@ function SafeValueSelect({
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
-        {options?.map((option) => (
-          <SelectItem
-            key={option.value}
-            value={option.value}
-            disabled={option.disabled || false}
-          >
-            {option.src ? (
-              <div className="flex items-center gap-2">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={option.src}
-                  alt={option.label || option.value}
-                  className="w-6 h-6 aspect-square rounded-sm mr-2"
-                />
-                {option.label || option.value}
-              </div>
-            ) : (
-              <>{option.label || option.value}</>
-            )}
-          </SelectItem>
-        ))}
+        {renderOptions({
+          options,
+          optgroups,
+          renderOption: (option) => (
+            <SelectItem
+              key={option.value}
+              value={option.value}
+              disabled={option.disabled || false}
+            >
+              {option.src ? (
+                <div className="flex items-center gap-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={option.src}
+                    alt={option.label || option.value}
+                    className="w-6 h-6 aspect-square rounded-sm mr-2"
+                  />
+                  {option.label || option.value}
+                </div>
+              ) : (
+                <>{option.label || option.value}</>
+              )}
+            </SelectItem>
+          ),
+          renderOptgroup: ({ label, children }) => (
+            <SelectGroup>
+              <SelectLabel>{label}</SelectLabel>
+              {children}
+            </SelectGroup>
+          ),
+        })}
       </SelectContent>
     </Select>
   );
@@ -798,17 +816,14 @@ function SafeValueSelect({
  */
 function SafeValueHtml5Select({
   options: _options,
+  optgroups,
   locked,
   onValueChange: cb_onValueChange,
   ...inputProps
 }: React.ComponentProps<"select"> & {
   placeholder?: string;
-  options?: {
-    id?: string;
-    label?: string | null;
-    value: string;
-    disabled?: boolean | null;
-  }[];
+  options?: Option[];
+  optgroups?: Optgroup[];
 } & {
   locked?: boolean;
 } & OnValueChange) {
@@ -819,17 +834,19 @@ function SafeValueHtml5Select({
     required,
   } = inputProps;
 
-  const { value, defaultValue, setValue, options } = useSafeSelectValue({
-    value: _value as string,
-    defaultValue: _defaultValue as string,
-    options: _options?.map((option) => ({
-      // map value to id if id exists
-      value: option.id || option.value,
-      label: option.label || option.value,
-      disabled: option.disabled,
-    })),
-    locked,
-  });
+  const { value, defaultValue, setValue, options } = useSafeSelectValue<Option>(
+    {
+      value: _value as string,
+      defaultValue: _defaultValue as string,
+      options: _options?.map((option) => ({
+        id: option.id,
+        value: option.id || option.value,
+        label: option.label || option.value,
+        disabled: option.disabled,
+      })),
+      locked,
+    }
+  );
 
   const onChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setValue(e.target.value);
@@ -849,16 +866,72 @@ function SafeValueHtml5Select({
           {placeholder}
         </option>
       )}
-      {options?.map((option) => (
-        <option
-          key={option.value}
-          value={option.value}
-          disabled={option.disabled || false}
-        >
-          {option.label}
-        </option>
-      ))}
+      {renderOptions({
+        options,
+        optgroups,
+        renderOption: (option) => (
+          <option
+            key={option.value}
+            value={option.value}
+            disabled={option.disabled || false}
+          >
+            {option.label}
+          </option>
+        ),
+        renderOptgroup: ({ label, children }) => (
+          <optgroup label={label}>{children}</optgroup>
+        ),
+      })}
     </HtmlSelect>
+  );
+}
+
+function renderOptions({
+  options = [],
+  optgroups = [],
+  renderOption,
+  renderOptgroup,
+}: {
+  options?: Option[];
+  optgroups?: Optgroup[];
+  renderOption: (option: Option) => React.ReactNode;
+  renderOptgroup: ({
+    label,
+    children,
+  }: {
+    label?: string;
+    children: React.ReactNode[];
+  }) => React.ReactNode;
+}) {
+  const grouped = options.reduce(
+    (acc, option) => {
+      const key = option.optgroup_id || "ungrouped";
+      if (!acc[key]) {
+        acc[key] = [];
+      }
+      acc[key].push(option);
+      return acc;
+    },
+    {} as Record<string, Option[]>
+  );
+
+  const renderedOptgroups = optgroups.map((optgroup) => {
+    const groupOptions = grouped[optgroup.id] || [];
+    return renderOptgroup({
+      label: optgroup.label,
+      children: groupOptions.map(renderOption),
+    });
+  });
+
+  const ungroupedOptions = grouped["ungrouped"]
+    ? grouped["ungrouped"].map(renderOption)
+    : [];
+
+  return (
+    <>
+      {renderedOptgroups}
+      {ungroupedOptions}
+    </>
   );
 }
 
