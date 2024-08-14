@@ -90,8 +90,12 @@ export function initialOptionsEditState(init: {
     ...sorted_options.map((_) => ({ type: "option" as const, ..._ })),
     ...sorted_optgroups.map((_) => ({ type: "optgroup" as const, ..._ })),
   ].map((_, i) => ({ ..._, index: i }));
-  const indexed_options = allitems.filter((_) => _.type === "option");
-  const indexed_optgroups = allitems.filter((_) => _.type === "optgroup");
+  const indexed_options: Option[] = allitems.filter(
+    (_) => _.type === "option"
+  ) as Option[];
+  const indexed_optgroups: Optgroup[] = allitems.filter(
+    (_) => _.type === "optgroup"
+  ) as Optgroup[];
 
   return {
     options: indexed_options,
