@@ -315,6 +315,9 @@ function ModeConnect() {
             <SidebarMenuItem muted>
               <ArchiveIcon className="inline align-middle w-4 h-4 me-2" />
               Store
+              <Badge variant="outline" className="ms-auto">
+                alpha
+              </Badge>
             </SidebarMenuItem>
           </SidebarMenuLink>
 

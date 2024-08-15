@@ -85,6 +85,7 @@ import { LockClosedIcon, ReloadIcon } from "@radix-ui/react-icons";
 import { PrivateEditorApi } from "@/lib/private";
 import { Badge } from "@/components/ui/badge";
 import { ContextVariablesTable } from "../template-editor/about-variable-table";
+import { FormAgentProvider, initdummy } from "@/lib/formstate";
 
 // @ts-ignore
 const default_field_init: {
@@ -243,7 +244,7 @@ export function FieldEditPanel({
 }) {
   const is_edit_mode = !!init?.id;
   const [state] = useEditorState();
-  const { basepath } = state;
+  const { basepath, document_id } = state;
   const router = useRouter();
   const [effect_cause, set_effect_cause] = useState<"ai" | "human" | "system">(
     "system"
@@ -347,8 +348,7 @@ export function FieldEditPanel({
       if (ok) {
         const connect_redirect_link = editorlink("connect/store", {
           basepath,
-          origin: window.location.origin,
-          document_id: state.form_id,
+          document_id: document_id,
         });
         console.log("redirecting to", connect_redirect_link);
         props.onOpenChange?.(false);
@@ -361,6 +361,11 @@ export function FieldEditPanel({
   const supports_pattern = FieldSupports.pattern(type);
   const supports_numeric = FieldSupports.numeric(type);
   const supports_accept = FieldSupports.accept(type);
+  const supports_computedvalue = FieldSupports.computedvalue({
+    type,
+    readonly,
+    required,
+  });
 
   const preview_placeholder =
     placeholder ||
@@ -477,29 +482,31 @@ export function FieldEditPanel({
                   });
                 }}
               >
-                <FormFieldPreview
-                  preview
-                  name={name}
-                  type={type}
-                  label={preview_label}
-                  labelCapitalize={!!label}
-                  placeholder={preview_placeholder}
-                  helpText={helpText}
-                  required={required}
-                  readonly={readonly}
-                  requiredAsterisk
-                  disabled={preview_disabled}
-                  options={supports_options ? options : undefined}
-                  optgroups={supports_options ? optgroups : undefined}
-                  pattern={pattern}
-                  step={step}
-                  min={min}
-                  max={max}
-                  autoComplete={autocomplete.join(" ")}
-                  data={data}
-                  accept={accept}
-                  multiple={multiple}
-                />
+                <DummyFormAgentStateProvider>
+                  <FormFieldPreview
+                    preview
+                    name={name}
+                    type={type}
+                    label={preview_label}
+                    labelCapitalize={!!label}
+                    placeholder={preview_placeholder}
+                    helpText={helpText}
+                    required={required}
+                    readonly={readonly}
+                    requiredAsterisk
+                    disabled={preview_disabled}
+                    options={supports_options ? options : undefined}
+                    optgroups={supports_options ? optgroups : undefined}
+                    pattern={pattern}
+                    step={step}
+                    min={min}
+                    max={max}
+                    autoComplete={autocomplete.join(" ")}
+                    data={data}
+                    accept={accept}
+                    multiple={multiple}
+                  />
+                </DummyFormAgentStateProvider>
                 <div className="absolute bottom-0 right-0 m-2">
                   <div className="font-mono flex gap-2">
                     <button type="submit">
@@ -820,6 +827,7 @@ export function FieldEditPanel({
 
           <PanelPropertySection
             hidden={
+              readonly ||
               type == "payment" ||
               (!supports_accept &&
                 !supports_pattern &&
@@ -941,7 +949,16 @@ export function FieldEditPanel({
                 description={
                   <>
                     When checked, the field will be required. Developer must set
-                    a value for this field before via SDK or URL Params.
+                    a value for this field before via SDK or{" "}
+                    <Link
+                      href={editorlink("connect/parameters", {
+                        basepath: basepath,
+                        document_id: state.document_id,
+                      })}
+                    >
+                      URL Params
+                    </Link>
+                    .
                   </>
                 }
               >
@@ -949,6 +966,7 @@ export function FieldEditPanel({
               </PanelPropertyField>
             </PanelPropertyFields>
           </PanelPropertySection>
+
           {FieldSupports.file_upload(type) && state.connections.supabase && (
             <>
               <hr />
@@ -1348,6 +1366,18 @@ function SupabaseReferencesSettings({
         )}
       </PanelPropertyFields>
     </PanelPropertySection>
+  );
+}
+
+/**
+ * TODO: this is added while developing a v_value feature on form field. once the value computation is moved to the higher level, this can be removed.
+ * @returns
+ */
+function DummyFormAgentStateProvider({
+  children,
+}: React.PropsWithChildren<{}>) {
+  return (
+    <FormAgentProvider initial={initdummy()}>{children}</FormAgentProvider>
   );
 }
 

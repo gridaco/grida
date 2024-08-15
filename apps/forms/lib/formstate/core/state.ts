@@ -37,6 +37,20 @@ export interface FormAgentState {
   sections: ClientSectionRenderBlock[];
 }
 
+export function initdummy() {
+  return {
+    form_id: "",
+    fields: {},
+    blocks: {},
+    rawfiles: {},
+    sections: [],
+    has_sections: false,
+    last_section_id: null,
+    current_section_id: null,
+    is_submitting: false,
+  };
+}
+
 export function init({
   form_id,
   session_id,

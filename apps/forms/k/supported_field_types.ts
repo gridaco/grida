@@ -318,6 +318,23 @@ export namespace FieldSupports {
     return type === "payment";
   }
 
+  export function computedvalue({
+    type,
+    readonly,
+    required,
+  }: {
+    type: FormInputType;
+    readonly?: boolean;
+    required?: boolean;
+  }) {
+    if (type === "hidden") return !required;
+    if (file_alias(type)) return false;
+    if (richtext(type)) return false;
+    if (payments(type)) return false;
+    if (readonly) return true;
+    return false;
+  }
+
   /**
    * if the value must be a json object
    */

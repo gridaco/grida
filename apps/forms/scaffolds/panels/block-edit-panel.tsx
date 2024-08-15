@@ -28,7 +28,7 @@ import {
 import { useEditorState } from "../editor";
 import toast from "react-hot-toast";
 import { MixIcon } from "@radix-ui/react-icons";
-import type { Tokens } from "@/ast";
+import { Tokens } from "@/ast";
 import { KeyIcon } from "lucide-react";
 
 /**
@@ -164,6 +164,20 @@ export function BlockEditPanel({
   );
 }
 
+const boolean_value_operators_labels: Record<
+  Tokens.BooleanBinaryOperator,
+  [string, string]
+> = {
+  "==": ["is", "equal to"],
+  "!=": ["is not", "not equal to"],
+  ">": ["gt", "greater than"],
+  "<": ["lt", "less than"],
+  ">=": ["gte", "greater than or equal to"],
+  "<=": ["lte", "less than or equal to"],
+  "&&": ["and", "and"],
+  "||": ["or", "or"],
+};
+
 function Condition({
   defaultValue,
   onValueCommit,
@@ -176,12 +190,12 @@ function Condition({
   const [operator, setOperator] = useState<Tokens.BooleanBinaryOperator>();
   const [righthand, setRighthand] = useState<string>();
 
-  const block = useMemo(
-    () => state.blocks.find((b) => b.id === state.focus_block_id),
-    [state.blocks, state.focus_block_id]
-  );
+  // const block = useMemo(
+  //   () => state.blocks.find((b) => b.id === state.focus_block_id),
+  //   [state.blocks, state.focus_block_id]
+  // );
 
-  block?.v_hidden;
+  // block?.v_hidden;
 
   const lefthandField = useMemo(
     () => state.fields.find((f) => f.id === lefthand),
@@ -229,12 +243,14 @@ function Condition({
             <SelectValue placeholder="Operator" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="==">
-              is <code>(==)</code>
-            </SelectItem>
-            <SelectItem value="!=">
-              is not <code>(!=)</code>
-            </SelectItem>
+            {Tokens.BOOLEAN_BINARY_OPERATORS.map((op) => (
+              <SelectItem key={op} value={op}>
+                <code>{op}</code> {boolean_value_operators_labels[op][0]}{" "}
+                <small className="text-muted-foreground">
+                  ({boolean_value_operators_labels[op][1]})
+                </small>
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
         <Select

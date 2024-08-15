@@ -44,6 +44,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import clsx from "clsx";
+import { editorlink } from "@/lib/forms/url";
 
 export function FieldBlock({
   id,
@@ -53,6 +54,8 @@ export function FieldBlock({
 }: EditorFlatFormBlock) {
   const [state, dispatch] = useEditorState();
   const [focused, setFocus] = useBlockFocus(id);
+
+  const { document_id, basepath } = state;
 
   const form_field: FormFieldDefinition | undefined = state.fields.find(
     (f) => f.id === form_field_id
@@ -261,7 +264,13 @@ export function FieldBlock({
               Hidden fields are not displayed in the form.
               <br />
               Configure how this field is populated in the form{" "}
-              <Link className="underline" href="./settings">
+              <Link
+                className="underline"
+                href={editorlink("connect/parameters", {
+                  document_id,
+                  basepath,
+                })}
+              >
                 settings
               </Link>
               .

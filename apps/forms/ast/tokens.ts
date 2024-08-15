@@ -66,6 +66,17 @@ export namespace Tokens {
     "??",
   ] as const;
 
+  export const BOOLEAN_BINARY_OPERATORS = [
+    "==",
+    "!=",
+    ">",
+    "<",
+    ">=",
+    "<=",
+    "&&",
+    "||",
+  ] as const;
+
   export type BooleanBinaryOperator =
     | "=="
     | "!="
