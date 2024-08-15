@@ -35,10 +35,10 @@ import {
 } from "@/lib/forms";
 import { Button } from "@/components/ui/button";
 import { FormAgentProvider, useFormAgentState, init } from "@/lib/formstate";
-import { useLogical } from "./use-logical";
 import { FieldSupports } from "@/k/supported_field_types";
 import { SessionDataSyncProvider } from "./sync";
 import { FormAgentMessagingInterface } from "./interface";
+import { useLogical } from "@/lib/spock";
 import { emit } from "./emit";
 
 const cls_button_submit =
