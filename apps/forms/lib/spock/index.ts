@@ -1,1 +1,1 @@
-export * from "./use-logical";
+export * from "./use";

@@ -28,7 +28,7 @@ type JSONOptionalDefineAsArrayAnnotation<T> = T | [T];
 
 interface JSONFieldBlock {
   type: "field";
-  field: Tokens.JSONFieldReference;
+  field: Tokens.JSONRef;
   hidden?: Tokens.BooleanValueExpression;
 }
 
@@ -67,6 +67,7 @@ type _JSONField<T> = {
   options?: JSONOptionLike[];
   multiple?: boolean | null;
   autocomplete?: FormFieldAutocompleteType | FormFieldAutocompleteType[] | null;
+  value?: Tokens.TValueExpression;
 };
 
 export type JSONFieldRaw = _JSONField<
@@ -175,22 +176,21 @@ function map_json_form_field_to_form_field_definition(
     }
   };
 
-  {
-    const { type, is_array } = parse_jsonfield_type(field.type);
-    return {
-      ...field,
-      id: field.name,
-      type: type,
-      is_array,
-      autocomplete: toArrayOf<FormFieldAutocompleteType | null | undefined>(
-        field.autocomplete
-      ),
-      required: field.required || false,
-      readonly: field.readonly || false,
-      local_index: index,
-      options: field.options?.map(map_option) || [],
-    };
-  }
+  const { type, is_array } = parse_jsonfield_type(field.type);
+  return {
+    ...field,
+    id: field.name,
+    type: type,
+    is_array,
+    autocomplete: toArrayOf<FormFieldAutocompleteType | null | undefined>(
+      field.autocomplete
+    ),
+    required: field.required || false,
+    readonly: field.readonly || false,
+    local_index: index,
+    options: field.options?.map(map_option) || [],
+    v_value: field.value,
+  };
 }
 
 function map_json_form_block_to_form_block(

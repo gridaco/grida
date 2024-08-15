@@ -390,7 +390,7 @@ function BlockRenderer({
     [block, dispatch]
   );
 
-  const hidden = useLogical(block.hidden);
+  const hidden = useLogical(block.v_hidden);
 
   const { current_section_id } = state;
 
@@ -482,6 +482,7 @@ function BlockRenderer({
                   multiple={field.multiple}
                   novalidate={is_not_in_current_section || hidden}
                   locked={is_not_in_current_section || hidden}
+                  v_value={field.v_value}
                   fileupload={
                     FieldSupports.file_upload(type)
                       ? (field as ClientFileUploadFieldRenderBlock["field"])

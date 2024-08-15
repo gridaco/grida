@@ -204,6 +204,7 @@ export interface IFormField {
   multiple?: boolean | null;
   storage?: FormFieldStorageSchema | {} | null;
   reference?: FormFieldReferenceSchema | {} | null;
+  v_value?: Tokens.TValueExpression | null;
 }
 
 export interface FormFieldDefinition extends IFormField {

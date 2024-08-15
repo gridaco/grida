@@ -70,7 +70,7 @@ export function BlockEditPanel({
       return;
     }
     //
-    const exp: Tokens.ConditionExpression = [
+    const exp: Tokens.ShorthandConditionExpression = [
       {
         $ref: `#/fields/${l}/value`,
       },
