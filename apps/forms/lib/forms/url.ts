@@ -15,6 +15,7 @@ export function editorlink(
     | "data/simulator"
     | "connect"
     | "connect/share"
+    | "connect/parameters"
     | "connect/customer"
     | "connect/channels"
     | "connect/store"
@@ -64,6 +65,8 @@ export function editorlink(
       return `${origin}/${basepath}/${id}/connect`;
     case "connect/share":
       return `${origin}/${basepath}/${id}/connect/share`;
+    case "connect/parameters":
+      return `${origin}/${basepath}/${id}/connect/parameters`;
     case "connect/customer":
       return `${origin}/${basepath}/${id}/connect/customer`;
     case "connect/channels":
