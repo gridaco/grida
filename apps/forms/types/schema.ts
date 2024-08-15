@@ -26,10 +26,18 @@ type JSONSchemaOptionalDefineAsArrayDescriptor<T> =
 
 type JSONOptionalDefineAsArrayAnnotation<T> = T | [T];
 
+type JSONBlock = JSONFieldBlock | JSONHeaderBlock;
 interface JSONFieldBlock {
   type: "field";
   field: Tokens.JSONRef;
   hidden?: Tokens.BooleanValueExpression;
+}
+
+interface JSONHeaderBlock {
+  type: "header";
+  hidden?: Tokens.BooleanValueExpression;
+  title: string;
+  description?: string;
 }
 
 interface _JSONForm<T> {
@@ -46,7 +54,7 @@ interface _JSONForm<T> {
   novalidate?: boolean;
   target?: "_blank" | "_self" | "_parent" | "_top";
   fields?: T[];
-  blocks?: JSONFieldBlock[];
+  blocks?: JSONBlock[];
 }
 
 export type JSONForm = Omit<_JSONForm<FormFieldDefinition>, "blocks"> & {
@@ -194,21 +202,28 @@ function map_json_form_field_to_form_field_definition(
 }
 
 function map_json_form_block_to_form_block(
-  block: JSONFieldBlock,
+  block: JSONBlock,
   index: number
 ): FormBlock {
-  // TODO: support other types - now only field
+  // TODO: support other types - now only field, divider, header
+
+  const is_field_block = block.type === "field";
+
   return {
     id: `block-${index}`,
     local_index: index,
     type: block.type,
     data: {},
     v_hidden: block.hidden,
-    // TODO: needs name:id mapping
-    form_field_id: block.field.$ref.split("/").pop() as string,
-    //
+    form_field_id: is_field_block
+      ? // TODO: needs name:id mapping
+        (block.field.$ref.split("/").pop() as string)
+      : undefined,
     created_at: new Date().toISOString(),
     form_id: "form",
     form_page_id: "form",
-  };
+    // header block
+    title_html: block.type === "header" ? block.title : undefined,
+    description_html: block.type === "header" ? block.description : undefined,
+  } satisfies FormBlock;
 }
