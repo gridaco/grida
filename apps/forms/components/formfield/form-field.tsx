@@ -92,6 +92,7 @@ interface IInputField {
   onValueChange?: (value: string) => void;
   onRangeChange?: (value: number[]) => void;
   onCheckedChange?: (checked: boolean) => void;
+  onFilesChange?: (files: File[]) => void;
 }
 
 interface IFormField extends IInputField {
@@ -184,6 +185,7 @@ function MonoFormField({
   onValueChange,
   onRangeChange,
   onCheckedChange,
+  onFilesChange,
 }: IMonoFormFieldRenderingProps) {
   const __onchange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -336,6 +338,11 @@ function MonoFormField({
               type="file"
               {...(sharedInputProps as React.ComponentProps<"input">)}
               accept={accept}
+              onChange={(e) => {
+                const files = e.target.files;
+                if (!files) return;
+                onFilesChange?.(Array.from(files));
+              }}
             />
           );
         }
@@ -351,6 +358,7 @@ function MonoFormField({
             }
             maxSize={getMaxUploadSize(fileupload?.type)}
             uploader={makeUploader(fileupload)}
+            onFilesChange={onFilesChange}
           />
         );
       }

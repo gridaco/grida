@@ -7,16 +7,35 @@ export function reducer(
   action: FormAgentAction
 ): FormAgentState {
   switch (action.type) {
-    case "section/change": {
-      const { id } = action;
-      return produce(state, (draft) => {
-        draft.current_section_id = id;
-      });
-    }
     case "fields/value/change": {
       const { id, value } = action;
       return produce(state, (draft) => {
         draft.fields[id].value = value;
+      });
+    }
+    case "fields/files/change": {
+      const { id, files } = action;
+      return produce(state, (draft) => {
+        draft.fields[id].files = files.map((file) => ({
+          // reading is required as the properties are proxied
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          lastModified: file.lastModified,
+        }));
+        draft.rawfiles[id] = files;
+      });
+    }
+    case "fields/files/metadata/change": {
+      const { id, index, metadata } = action;
+      return produce(state, (draft) => {
+        draft.fields[id].files![index].duration = metadata.duration;
+      });
+    }
+    case "section/change": {
+      const { id } = action;
+      return produce(state, (draft) => {
+        draft.current_section_id = id;
       });
     }
     case "section/prev": {

@@ -6,27 +6,23 @@
   "method": "post",
   "fields": [
     {
-      "name": "celcius",
-      "label": "Celcius",
-      "placeholder": "Enter temperature in celcius",
+      "name": "usd",
+      "label": "$USD",
+      "placeholder": "Enter amount in USD",
       "type": "number"
     },
     {
-      "name": "fahrenheit",
-      "label": "Fahrenheit",
+      "name": "krw",
+      "label": "₩KRW",
       "type": "number",
-      "placeholder": "Computed: Temperature in fahrenheit",
+      "placeholder": "Computed: USDKRW",
       "readonly": true,
       "value": [
-        [
-          {
-            "$ref": "#/fields/celcius/value"
-          },
-          "*",
-          1.8
-        ],
-        "+",
-        32
+        {
+          "$ref": "#/fields/usd/value"
+        },
+        "*",
+        1200
       ]
     },
     {
@@ -42,18 +38,11 @@
       "type": "text",
       "value": [
         {
-          "join": {
-            "items": [
-              "name: ",
-              {
-                "$ref": "#/fields/upload/files/0/name"
-              },
-              "size: ",
-              {
-                "$ref": "#/fields/upload/files/0/size"
-              }
-            ]
-          }
+          "$ref": "#/fields/upload/files/0/name"
+        },
+        "+",
+        {
+          "$ref": "#/fields/upload/files/0/duration"
         }
       ]
     }

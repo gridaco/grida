@@ -2,16 +2,29 @@ import type { ClientRenderBlock, ClientSectionRenderBlock } from "@/lib/forms";
 import { FormBlockTree } from "@/lib/forms/types";
 import type { FormFieldDefinition } from "@/types";
 
+type VirtualFileValueProxy = {
+  // standard
+  name: string;
+  type: string;
+  size: number;
+  lastModified: number;
+  // proxied
+  duration?: number;
+};
+
 export interface FormAgentState {
   form_id: string;
   session_id?: string;
   // do not change the keys
-  // #/fields/${string}/value
+  // #/fields/[key]/value
   fields: {
     [key: string]: {
       value?: string | number | boolean | string[] | undefined;
+      files?: VirtualFileValueProxy[];
     };
   };
+  // used for browser dom manipulation
+  rawfiles: { [key: string]: File[] };
   blocks: {
     [key: string]: {
       hidden?: boolean;
@@ -80,6 +93,7 @@ export function init({
   return {
     form_id,
     session_id,
+    rawfiles: {},
     fields: fields_state,
     blocks: blocks_state,
     sections,

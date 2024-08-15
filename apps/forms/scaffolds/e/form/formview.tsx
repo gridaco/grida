@@ -37,6 +37,7 @@ import { Button } from "@/components/ui/button";
 import { FormAgentProvider, useFormAgentState, init } from "@/lib/formstate";
 import { FieldSupports } from "@/k/supported_field_types";
 import { SessionDataSyncProvider } from "./sync";
+import { MediaLoadProvider } from "./mediaload";
 import { FormAgentMessagingInterface } from "./interface";
 import { useLogical } from "@/lib/spock";
 import { emit } from "./emit";
@@ -119,6 +120,7 @@ function Providers({
         })}
       >
         <FormAgentMessagingInterface />
+        <MediaLoadProvider />
         <SessionDataSyncProvider session_id={session_id}>
           <TossPaymentsCheckoutProvider initial={checkoutSession}>
             {children}
@@ -390,6 +392,17 @@ function BlockRenderer({
     [block, dispatch]
   );
 
+  const onFilesChange = useCallback(
+    (files: File[]) => {
+      dispatch({
+        type: "fields/files/change",
+        id: (block as ClientFieldRenderBlock).field.id,
+        files,
+      });
+    },
+    [block, dispatch]
+  );
+
   const hidden = useLogical(block.v_hidden);
 
   const { current_section_id } = state;
@@ -501,6 +514,7 @@ function BlockRenderer({
                     // this does not support multiple range input
                     onValueChange(num);
                   }}
+                  onFilesChange={onFilesChange}
                 />
               ) : (
                 <></>

@@ -29,6 +29,7 @@ type FileUploadDropzoneProps = {
   maxSize?: number;
   maxFiles?: number;
   uploader?: FileUploaderFn;
+  onFilesChange?: (files: File[]) => void;
 };
 
 export const FileUploadField = ({
@@ -39,6 +40,7 @@ export const FileUploadField = ({
   maxFiles,
   required,
   uploader,
+  onFilesChange,
 }: FileUploadDropzoneProps) => {
   const [files, setFiles] = useState<File[]>([]);
   const { getStatus, data } = useFileUploader({
@@ -59,6 +61,7 @@ export const FileUploadField = ({
 
   const handleValueChange = (newFiles: File[] | null) => {
     setFiles(newFiles || []);
+    onFilesChange?.(newFiles || []);
   };
 
   const isMultipartFile = !uploader;
