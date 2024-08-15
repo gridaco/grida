@@ -31,6 +31,7 @@ import "core-js/features/map/group-by";
 import { Input } from "@/components/ui/input";
 import { SearchInput } from "@/components/extension/search-input";
 import Fuse from "fuse.js";
+import { FormAgentProvider, initdummy } from "@/lib/formstate";
 
 export function ModeDesign() {
   const [state, dispatch] = useEditorState();
@@ -254,19 +255,21 @@ export function ModeBlocks() {
                     </Button>
                   </div>
                   <hr className="my-4" />
-                  <FormField
-                    type={field_type}
-                    name={"example"}
-                    label={fieldlabels[field_type] + " Example"}
-                    placeholder="Example"
-                    helpText="This is an example field"
-                    options={[
-                      { id: "1", label: "Option 1", value: "option1" },
-                      { id: "2", label: "Option 2", value: "option2" },
-                      { id: "3", label: "Option 3", value: "option3" },
-                    ]}
-                    preview
-                  />
+                  <DummyFormAgentStateProvider>
+                    <FormField
+                      type={field_type}
+                      name={"example"}
+                      label={fieldlabels[field_type] + " Example"}
+                      placeholder="Example"
+                      helpText="This is an example field"
+                      options={[
+                        { id: "1", label: "Option 1", value: "option1" },
+                        { id: "2", label: "Option 2", value: "option2" },
+                        { id: "3", label: "Option 3", value: "option3" },
+                      ]}
+                      preview
+                    />
+                  </DummyFormAgentStateProvider>
                 </div>
               </HoverCardContent>
             </HoverCard>
@@ -274,5 +277,17 @@ export function ModeBlocks() {
         </SidebarMenuGrid>
       </SidebarSection>
     </>
+  );
+}
+
+/**
+ * TODO: this is added while developing a v_value feature on form field. once the value computation is moved to the higher level, this can be removed.
+ * @returns
+ */
+function DummyFormAgentStateProvider({
+  children,
+}: React.PropsWithChildren<{}>) {
+  return (
+    <FormAgentProvider initial={initdummy()}>{children}</FormAgentProvider>
   );
 }
