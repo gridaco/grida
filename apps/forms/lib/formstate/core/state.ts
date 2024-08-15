@@ -19,7 +19,7 @@ export interface FormAgentState {
   // #/fields/[key]/value
   fields: {
     [key: string]: {
-      value?: string | number | boolean | string[] | undefined;
+      value: string | number | boolean | string[] | undefined | null;
       files?: VirtualFileValueProxy[];
     };
   };

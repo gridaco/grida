@@ -9,7 +9,7 @@
       "name": "celcius",
       "label": "°C",
       "placeholder": "Enter temperature in Celcius",
-      "type": "number"
+      "type": "range"
     },
     {
       "name": "fahrenheit",
@@ -50,7 +50,7 @@
         ],
         "+",
         [
-          "Size: ",
+          "\nSize: ",
           "+",
           {
             "$ref": "#/fields/upload/files/0/size"
@@ -77,6 +77,22 @@
       "field": {
         "$ref": "#/fields/fahrenheit"
       }
+    },
+    {
+      "type": "header",
+      "title": "🔥 Too Hot!",
+      "description": "Please dial down the temperature right now!",
+      "hidden": [
+        [
+          {
+            "$ref": "#/fields/celcius/value"
+          },
+          "??",
+          0
+        ],
+        "<",
+        35
+      ]
     },
     { "type": "divider" },
     {

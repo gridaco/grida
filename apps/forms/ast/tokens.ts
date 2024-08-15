@@ -4,7 +4,7 @@ export namespace Tokens {
     | TValueExpression
     | JSONRef
     | Literal
-    | ShorthandConditionExpression
+    | ShorthandBooleanBinaryExpression
     | ShorthandBinaryExpression
     | BooleanValueExpression
     | Identifier
@@ -42,21 +42,61 @@ export namespace Tokens {
   };
 
   /**
+   * Represents the shorthand syntax supported operators for a expression.
+   */
+  export type BinaryOperator =
+    | NumericBinaryOperator
+    | BooleanBinaryOperator
+    | CoalescingOperator;
+
+  export const BINARY_OPERATORS = [
+    "==",
+    "!=",
+    ">",
+    "<",
+    ">=",
+    "<=",
+    "&&",
+    "||",
+    "+",
+    "-",
+    "*",
+    "/",
+    "%",
+    "??",
+  ] as const;
+
+  export type BooleanBinaryOperator =
+    | "=="
+    | "!="
+    | ">"
+    | "<"
+    | ">="
+    | "<="
+    | "&&"
+    | "||";
+  export type NumericBinaryOperator = "+" | "-" | "*" | "/" | "%";
+  export type CoalescingOperator = "??";
+
+  export type ShorthandBinaryExpressionLHS = TValueExpression;
+  export type ShorthandBinaryExpressionRHS = TValueExpression;
+
+  export type ShorthandBinaryExpression<
+    LHS extends ShorthandBinaryExpressionLHS = ShorthandBinaryExpressionLHS,
+    RHS extends ShorthandBinaryExpressionRHS = ShorthandBinaryExpressionRHS,
+  > = [LHS, BinaryOperator, RHS];
+
+  /**
    * Represents the left-hand side of a condition.
    * Can be either a field reference or a literal value.
    */
-  type ConditionLHS = JSONRef | Literal;
+  type ShorthandBooleanBinaryExpressionLHS = JSONRef | Literal;
 
   /**
    * Represents the right-hand side of a condition.
    * Can be either a field reference or a literal value.
    */
-  type ConditionRHS = JSONRef | Literal;
-
-  /**
-   * Represents the possible operators for a condition expression.
-   */
-  export type ConditionOperator = "==" | "!=" | ">" | "<" | ">=" | "<=";
+  type ShorthandBooleanBinaryExpressionRHS = JSONRef | Literal;
 
   /**
    * Represents a condition expression, which is a tuple consisting of:
@@ -64,16 +104,20 @@ export namespace Tokens {
    * - An operator (ConditionOperator)
    * - A right-hand side (ConditionRHS)
    */
-  export type ShorthandConditionExpression<
-    LHS extends ConditionLHS = ConditionLHS,
-    RHS extends ConditionRHS = ConditionRHS,
-  > = [LHS, ConditionOperator, RHS];
+  export type ShorthandBooleanBinaryExpression<
+    LHS extends
+      ShorthandBooleanBinaryExpressionLHS = ShorthandBooleanBinaryExpressionLHS,
+    RHS extends
+      ShorthandBooleanBinaryExpressionRHS = ShorthandBooleanBinaryExpressionRHS,
+  > = [LHS, BooleanBinaryOperator, RHS];
 
   /**
    * Represents a boolean value descriptor.
    * Can be either a simple boolean or a condition expression.
    */
-  export type BooleanValueExpression = boolean | ShorthandConditionExpression;
+  export type BooleanValueExpression =
+    | boolean
+    | ShorthandBooleanBinaryExpression;
 
   /**
    * Represents an identifier (variable) in a template.
@@ -129,7 +173,7 @@ export namespace Tokens {
     | PropertyAccessExpression // property path
     | Identifier // variable
     | TemplateExpression // template expression
-    | ShorthandConditionExpression;
+    | ShorthandBooleanBinaryExpression;
 
   // #endregion
 
@@ -137,25 +181,16 @@ export namespace Tokens {
   // #region numeric
   //
 
-  export type NumericBinaryOperator = "+" | "-" | "*" | "/" | "%";
-
   export type NumericLiteral = {
     kind: "NumericLiteral";
     value: number;
   };
 
-  export type ShorthandBinaryExpressionLHS = NumericValueExpression;
-  export type ShorthandBinaryExpressionRHS = NumericValueExpression;
-
-  export type ShorthandBinaryExpression<
-    LHS extends ShorthandBinaryExpressionLHS = ShorthandBinaryExpressionLHS,
-    RHS extends ShorthandBinaryExpressionRHS = ShorthandBinaryExpressionRHS,
-  > = [LHS, NumericBinaryOperator, RHS];
-
   export type NumericValueExpression =
     | number
     | NumericLiteral
     | PropertyAccessExpression
+    | ShorthandBinaryExpression<number, number>
     | Identifier;
 
   // #endregion
@@ -204,24 +239,16 @@ export namespace Tokens {
     /**
      * can't be trusted 100%. use this in the safe context.
      */
-    export function inferredShorthandOperationExpression(
+    export function inferredShorthandBinaryExpression(
       exp: Tokens.Token
     ): exp is
-      | Tokens.ShorthandConditionExpression
+      | Tokens.ShorthandBooleanBinaryExpression
       | Tokens.ShorthandBinaryExpression {
       const is_array_constructed_well = Array.isArray(exp) && exp.length === 3;
       if (is_array_constructed_well) {
         const [l, op, r] = exp;
-        if (typeof op === "string") {
-          const _condition_op = ["==", "!=", ">", "<", ">=", "<="];
-          if (_condition_op.includes(op)) {
-            return true;
-          }
-
-          const _numeric_op = ["+", "-", "*", "/", "%"];
-          if (_numeric_op.includes(op)) {
-            return true;
-          }
+        if (typeof op === "string" && BINARY_OPERATORS.includes(op)) {
+          return true;
         }
       }
 

@@ -7,13 +7,15 @@ import { useMemo } from "react";
  * primative compute operation
  * compute condition with resolved primative values
  */
-function op<T>(
+function op<T = any>(
   ...[l, o, r]:
-    | Tokens.ShorthandConditionExpression<Tokens.Primitive, Tokens.Primitive>
     | Tokens.ShorthandBinaryExpression<number, number>
+    | Tokens.ShorthandBooleanBinaryExpression<
+        Tokens.Primitive,
+        Tokens.Primitive
+      >
 ): T | undefined {
   switch (o) {
-    // condition operators
     case "==":
       return (l === r) as T;
     case "!=":
@@ -26,7 +28,12 @@ function op<T>(
       return (l >= r) as T;
     case "<=":
       return (l <= r) as T;
-    // binary operators
+    //
+    case "&&":
+      return (l && r) as T;
+    case "||":
+      return (l || r) as T;
+    //
     case "+":
       return (l + r) as T;
     case "-":
@@ -37,6 +44,9 @@ function op<T>(
       return (l / r) as T;
     case "%":
       return (l % r) as T;
+    //
+    case "??":
+      return (l ?? r) as T;
     default:
       return undefined;
   }
@@ -53,8 +63,9 @@ function resolveJsonRefPath(ref: Tokens.JSONRef): string[] {
 function access(
   data: any,
   exp?: Tokens.TValueExpression | undefined | null
-): Tokens.Primitive | undefined {
-  if (!exp) return undefined;
+): Tokens.Primitive | undefined | null {
+  if (exp === undefined) return undefined;
+  if (exp === null) return null;
   if (Tokens.is.primitive(exp)) {
     return exp;
   }
@@ -63,7 +74,7 @@ function access(
     const value = Access.access(data, path);
     return value;
   }
-  if (Tokens.is.inferredShorthandOperationExpression(exp)) {
+  if (Tokens.is.inferredShorthandBinaryExpression(exp)) {
     const [l, o, r] = exp;
 
     const left: any = access(data, l);

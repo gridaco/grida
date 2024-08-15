@@ -39,7 +39,7 @@ type ConditionExpression = [
   // field id, will be used as $ref
   string,
   // operator
-  Tokens.ConditionOperator,
+  Tokens.BooleanBinaryOperator,
   // option id value, will be used as scalar
   string,
 ];
@@ -70,7 +70,7 @@ export function BlockEditPanel({
       return;
     }
     //
-    const exp: Tokens.ShorthandConditionExpression = [
+    const exp: Tokens.ShorthandBooleanBinaryExpression = [
       {
         $ref: `#/fields/${l}/value`,
       },
@@ -173,7 +173,7 @@ function Condition({
 }) {
   const [state, dispatch] = useEditorState();
   const [lefthand, setLefthand] = useState<string>();
-  const [operator, setOperator] = useState<Tokens.ConditionOperator>();
+  const [operator, setOperator] = useState<Tokens.BooleanBinaryOperator>();
   const [righthand, setRighthand] = useState<string>();
 
   const block = useMemo(
@@ -222,7 +222,7 @@ function Condition({
         <Select
           value={operator}
           onValueChange={(v) => {
-            setOperator(v as Tokens.ConditionOperator);
+            setOperator(v as Tokens.BooleanBinaryOperator);
           }}
         >
           <SelectTrigger>
