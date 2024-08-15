@@ -1,0 +1,61 @@
+{
+  "$schema": "https://forms.grida.co/schema/form.schema.json",
+  "title": "Computed Fields Demo",
+  "name": "computed property (output) fields",
+  "description": "Use Computed property to reference / compute value from other fields",
+  "method": "post",
+  "fields": [
+    {
+      "name": "celcius",
+      "label": "Celcius",
+      "placeholder": "Enter temperature in celcius",
+      "type": "number"
+    },
+    {
+      "name": "fahrenheit",
+      "label": "Fahrenheit",
+      "type": "number",
+      "placeholder": "Computed: Temperature in fahrenheit",
+      "readonly": true,
+      "value": [
+        [
+          {
+            "$ref": "#/fields/celcius/value"
+          },
+          "*",
+          1.8
+        ],
+        "+",
+        32
+      ]
+    },
+    {
+      "name": "upload",
+      "label": "Select File",
+      "type": "file"
+    },
+    {
+      "name": "selected_file_name",
+      "readonly": true,
+      "label": "Selected File",
+      "placeholder": "selected file name will be displayed here",
+      "type": "text",
+      "value": [
+        {
+          "join": {
+            "items": [
+              "name: ",
+              {
+                "$ref": "#/fields/upload/files/0/name"
+              },
+              "size: ",
+              {
+                "$ref": "#/fields/upload/files/0/size"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

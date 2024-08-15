@@ -47,6 +47,15 @@ export const examples = [
     },
   },
   {
+    id: "006-computed-fields",
+    name: "Computed Fields",
+    template: {
+      schema: {
+        src: `${HOST}/schema/examples/006-computed-fields/form.json`,
+      },
+    },
+  },
+  {
     id: "007-data-transform",
     name: "Data Transform",
     template: {
