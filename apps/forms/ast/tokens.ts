@@ -26,6 +26,7 @@ export namespace Tokens {
   type Literal = Primitive;
 
   export type TValueExpression =
+    | JSONRef
     | StringValueExpression
     | BooleanValueExpression
     | NumericValueExpression;
@@ -160,6 +161,20 @@ export namespace Tokens {
   // #endregion
 
   export namespace is {
+    export function primitive(
+      value?: any,
+      checknull = true
+    ): value is Primitive {
+      return (
+        (checknull && value === null) ||
+        typeof value === "undefined" ||
+        //
+        typeof value === "string" ||
+        typeof value === "number" ||
+        typeof value === "boolean"
+      );
+    }
+
     export function jsonRef(exp?: Tokens.Token): exp is Tokens.JSONRef {
       return (
         typeof exp === "object" && "$ref" in exp && exp.$ref.startsWith("#/")

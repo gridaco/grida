@@ -6,23 +6,27 @@
   "method": "post",
   "fields": [
     {
-      "name": "usd",
-      "label": "$USD",
-      "placeholder": "Enter amount in USD",
+      "name": "celcius",
+      "label": "°C",
+      "placeholder": "Enter temperature in Celcius",
       "type": "number"
     },
     {
-      "name": "krw",
-      "label": "₩KRW",
+      "name": "fahrenheit",
+      "label": "°F",
       "type": "number",
-      "placeholder": "Computed: USDKRW",
+      "placeholder": "°F = °C * 9/5 + 32",
       "readonly": true,
       "value": [
-        {
-          "$ref": "#/fields/usd/value"
-        },
-        "*",
-        1200
+        [
+          {
+            "$ref": "#/fields/celcius/value"
+          },
+          "*",
+          1.8
+        ],
+        "+",
+        32
       ]
     },
     {
@@ -31,20 +35,61 @@
       "type": "file"
     },
     {
-      "name": "selected_file_name",
+      "name": "filemetadata",
       "readonly": true,
       "label": "Selected File",
       "placeholder": "selected file name will be displayed here",
-      "type": "text",
+      "type": "textarea",
       "value": [
-        {
-          "$ref": "#/fields/upload/files/0/name"
-        },
+        [
+          "Name: ",
+          "+",
+          {
+            "$ref": "#/fields/upload/files/0/name"
+          }
+        ],
         "+",
-        {
-          "$ref": "#/fields/upload/files/0/duration"
-        }
+        [
+          "Size: ",
+          "+",
+          {
+            "$ref": "#/fields/upload/files/0/size"
+          }
+        ]
       ]
+    }
+  ],
+  "blocks": [
+    {
+      "type": "header",
+      "title": "Computed Fields Demo",
+      "description": "Use Computed property to reference / compute value from other fields"
+    },
+    { "type": "divider" },
+    {
+      "type": "field",
+      "field": {
+        "$ref": "#/fields/celcius"
+      }
+    },
+    {
+      "type": "field",
+      "field": {
+        "$ref": "#/fields/fahrenheit"
+      }
+    },
+    { "type": "divider" },
+    {
+      "type": "field",
+      "field": {
+        "$ref": "#/fields/upload"
+      }
+    },
+    {
+      "type": "field",
+      "field": {
+        "$ref": "#/fields/filemetadata"
+      }
     }
   ]
 }

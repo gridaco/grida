@@ -1,51 +1,18 @@
-import { Tokens } from "@/ast";
+import { Access, Tokens } from "@/ast";
 import { useFormAgentState } from "@/lib/formstate";
+import assert from "assert";
 import { useMemo } from "react";
 
-export function useReference(ref?: Tokens.JSONRef | Tokens.Primitive) {
-  const [state] = useFormAgentState();
-
-  const scalar = typeof ref !== "object" ? ref : null;
-  const { def, key, access } = parseReference(ref);
-
-  // @ts-ignore
-  const entity = state?.[def]?.[key];
-
-  const value = useMemo(() => {
-    if (!entity) {
-      return;
-    }
-
-    const value = access.reduce((acc: any, key: string) => {
-      if (acc === undefined) {
-        return acc;
-      }
-
-      // @ts-ignore
-      return acc?.[key] as string | boolean | undefined;
-    }, entity);
-
-    return value;
-  }, [access, entity]);
-
-  return scalar || value;
-}
-
-const parseReference = (ref?: Tokens.JSONRef | Tokens.Primitive | null) => {
-  const [_, def, key, ...access] =
-    typeof ref === "object" ? ref?.$ref?.split("/") ?? [] : [];
-  return { def: def as "fields" | undefined, key, access };
-};
-
 /**
+ * primative compute operation
  * compute condition with resolved primative values
  */
-function pcomputeop<T>(
-  ...[l, op, r]:
+function op<T>(
+  ...[l, o, r]:
     | Tokens.ShorthandConditionExpression<Tokens.Primitive, Tokens.Primitive>
     | Tokens.ShorthandBinaryExpression<number, number>
 ): T | undefined {
-  switch (op) {
+  switch (o) {
     // condition operators
     case "==":
       return (l === r) as T;
@@ -75,28 +42,51 @@ function pcomputeop<T>(
   }
 }
 
-export function useValue<O>(
+function resolveJsonRefPath(ref: Tokens.JSONRef): string[] {
+  // get rid of #/ prefix
+  const path = ref.$ref?.startsWith("#/") ? ref.$ref.slice(2) : undefined;
+  assert(path, "Invalid JSON Reference - Must start with #/");
+
+  return path.split("/");
+}
+
+function access(
+  data: any,
   exp?: Tokens.TValueExpression | undefined | null
-): O | undefined {
-  const [l, op, r] = Array.isArray(exp) ? exp : [];
+): Tokens.Primitive | undefined {
+  if (!exp) return undefined;
+  if (Tokens.is.primitive(exp)) {
+    return exp;
+  }
+  if (Tokens.is.jsonRef(exp)) {
+    const path = resolveJsonRefPath(exp);
+    const value = Access.access(data, path);
+    return value;
+  }
+  if (Tokens.is.inferredShorthandOperationExpression(exp)) {
+    const [l, o, r] = exp;
 
-  const left = useReference(l);
-  const right = useReference(r);
+    const left: any = access(data, l);
+    const right: any = access(data, r);
+    return op(left, o!, right);
+  }
 
-  if (!exp) return;
-  if (!Tokens.is.inferredShorthandOperationExpression(exp)) return;
+  // unhandled expression
+  console.error("unhandled expression", exp);
 
-  return pcomputeop(left, op!, right);
+  return undefined;
 }
 
 /**
- * returns a computed value based on the descriptor
- * (currently only supports boolean values)
+ * @beta TODO: Limited usage
  * @param exp
  * @returns
  */
-export function useLogical(
-  exp?: Tokens.BooleanValueExpression | undefined | null
-): boolean | undefined {
-  return useValue<boolean>(exp);
+export function useValue<O>(
+  exp?: Tokens.TValueExpression | undefined | null
+): O | undefined {
+  const [state] = useFormAgentState();
+  return useMemo(() => {
+    return access(state, exp) as O;
+  }, [exp, state]);
 }

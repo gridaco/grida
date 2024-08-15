@@ -39,7 +39,7 @@ import { FieldSupports } from "@/k/supported_field_types";
 import { SessionDataSyncProvider } from "./sync";
 import { MediaLoadProvider } from "./mediaload";
 import { FormAgentMessagingInterface } from "./interface";
-import { useLogical } from "@/lib/spock";
+import { useValue } from "@/lib/spock";
 import { emit } from "./emit";
 
 const cls_button_submit =
@@ -403,7 +403,7 @@ function BlockRenderer({
     [block, dispatch]
   );
 
-  const hidden = useLogical(block.v_hidden);
+  const hidden = useValue<boolean>(block.v_hidden);
 
   const { current_section_id } = state;
 
