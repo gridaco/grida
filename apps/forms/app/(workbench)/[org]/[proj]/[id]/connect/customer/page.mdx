@@ -2,7 +2,7 @@
 
 Your Form, your Customers. Learn how to link response identity with your existing user records.
 
-## Method 1. Provide customer uuid via invisible form field
+## Method 1. Provide customer uuid via hidden field
 
 Add a hidden input field to your form with the name `__gf_customer_uuid` and the value of the customer's unique identifier.
 
@@ -16,7 +16,15 @@ Add a hidden input field to your form with the name `__gf_customer_uuid` and the
 </form>
 ```
 
+Or via url parameter (hidden field configuration is required)
+
+```txt
+https://forms.grida.co/d/e/xxx?__gf_customer_uuid=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+```
+
 ## Method 2. Provide customer uuid via SDK
+
+> This feature is under development. if you wish to access this feature, please contact us
 
 ```tsx
 import { Agent } from "@base-sdk/forms";
@@ -47,3 +55,13 @@ const Form = () => {
 ```
 
 ## Method 3. Ensure identity with email / phone
+
+> This feature is under development. if you wish to access this feature, please contact us
+
+## Method 4. SSO Integration
+
+> This feature is under development. if you wish to access this feature, please contact us
+
+## Method 5. Supabase Auth Integration (with your own project)
+
+> This feature is under development. if you wish to access this feature, please contact us
