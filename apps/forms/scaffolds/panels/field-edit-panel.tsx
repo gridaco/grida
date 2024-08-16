@@ -81,6 +81,7 @@ import { Badge } from "@/components/ui/badge";
 import { FormAgentProvider, initdummy } from "@/lib/formstate";
 import { SupabaseReferencesSettings } from "./extensions/field-x-sb-reference-fk-settings";
 import { SupabaseStorageSettings } from "./extensions/field-x-sb-storage-settings";
+import { XSupabaseFieldConnectionPolicyCheck } from "@/lib/supabase/check";
 
 // @ts-ignore
 const default_field_init: {
@@ -975,8 +976,19 @@ export function FieldEditPanel({
                 enabled={storage_enabled}
                 onEnabledChange={__set_storage_enabled}
                 rules={{
-                  pathpolicy: xsupabase_path_policy({ multiple, type }),
-                  bucketpolicy: xsupabase_bucket_policy({ type }),
+                  pathpolicy:
+                    XSupabaseFieldConnectionPolicyCheck.required_object_path_policy_for(
+                      {
+                        multiple,
+                        type,
+                      }
+                    ),
+                  bucketpolicy:
+                    XSupabaseFieldConnectionPolicyCheck.required_bucket_policy_for(
+                      {
+                        type,
+                      }
+                    ),
                 }}
               />
             </>
@@ -1025,32 +1037,4 @@ function DummyFormAgentStateProvider({
 function buildPreviewLabel({ name, label }: { name: string; label?: string }) {
   let txt = label || fmt_snake_case_to_human_text(name);
   return txt;
-}
-
-function xsupabase_path_policy({
-  type,
-  multiple,
-}: {
-  type: FormInputType;
-  multiple: boolean;
-}):
-  | "x-supabase-storage-compile-time-renderable-single-file-path-template"
-  | undefined {
-  if (multiple)
-    return "x-supabase-storage-compile-time-renderable-single-file-path-template";
-
-  if (FieldSupports.richtext(type))
-    return "x-supabase-storage-compile-time-renderable-single-file-path-template";
-
-  return undefined;
-}
-
-function xsupabase_bucket_policy({
-  type,
-}: {
-  type: FormInputType;
-}): "public" | "private" | "any" {
-  if (FieldSupports.richtext(type)) return "public";
-
-  return "any";
 }
