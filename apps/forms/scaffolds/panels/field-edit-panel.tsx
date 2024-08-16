@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useReducer, useState } from "react";
+import React, { useEffect, useReducer, useState } from "react";
 import {
   PanelClose,
   PanelContent,
@@ -15,22 +15,19 @@ import {
 } from "@/components/panels/side-panel";
 import FormFieldPreview from "@/components/formfield";
 import {
-  FormFieldAutocompleteType,
-  FormFieldDataSchema,
-  FormInputType,
-  FormFieldInit,
-  PaymentFieldData,
-  FormFieldStorageSchema,
-  GridaSupabase,
-  FormFieldReferenceSchema,
+  type FormFieldAutocompleteType,
+  type FormFieldDataSchema,
+  type FormInputType,
+  type FormFieldInit,
+  type PaymentFieldData,
+  type FormFieldStorageSchema,
+  type FormFieldReferenceSchema,
 } from "@/types";
 import { FormFieldAssistant } from "../ai/form-field-schema-assistant";
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -71,21 +68,19 @@ import {
 import { OptionsStockEdit } from "../options/options-sku";
 import { Switch } from "@/components/ui/switch";
 import { FormFieldUpsert } from "@/types/private/api";
-import { useEditorState } from "../editor";
+import { useEditorState } from "@/scaffolds/editor";
 import { useRouter } from "next/navigation";
 import { editorlink } from "@/lib/forms/url";
 import { cn } from "@/utils";
 import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
 import { useInventory, useInventoryState } from "../options/use-inventory";
 import Link from "next/link";
-import { SupabaseLogo } from "@/components/logos";
-import { Spinner } from "@/components/spinner";
 import { NameInput } from "./name-input";
 import { LockClosedIcon, ReloadIcon } from "@radix-ui/react-icons";
-import { PrivateEditorApi } from "@/lib/private";
 import { Badge } from "@/components/ui/badge";
-import { ContextVariablesTable } from "../template-editor/about-variable-table";
 import { FormAgentProvider, initdummy } from "@/lib/formstate";
+import { SupabaseReferencesSettings } from "./extensions/field-x-sb-reference-fk-settings";
+import { SupabaseStorageSettings } from "./extensions/field-x-sb-storage-settings";
 
 // @ts-ignore
 const default_field_init: {
@@ -966,7 +961,11 @@ export function FieldEditPanel({
               </PanelPropertyField>
             </PanelPropertyFields>
           </PanelPropertySection>
-
+          {supports_computedvalue && (
+            <>
+              <hr />
+            </>
+          )}
           {FieldSupports.file_upload(type) && state.connections.supabase && (
             <>
               <hr />
@@ -1011,364 +1010,6 @@ export function FieldEditPanel({
   );
 }
 
-function SupabaseStorageSettings({
-  value,
-  onValueChange,
-  enabled,
-  onEnabledChange,
-  rules,
-}: {
-  value?: Partial<FormFieldStorageSchema> | null | undefined;
-  onValueChange?: (value: Partial<FormFieldStorageSchema>) => void;
-  enabled?: boolean;
-  onEnabledChange?: (enabled: boolean) => void;
-  rules: {
-    pathpolicy:
-      | "x-supabase-storage-compile-time-renderable-single-file-path-template"
-      | undefined;
-    bucketpolicy: "public" | "private" | "any";
-  };
-}) {
-  const [state] = useEditorState();
-  const [buckets, setBuckets] = useState<GridaSupabase.SupabaseBucket[]>();
-  const [bucket, setBucket] = useState<string | undefined>(value?.bucket);
-  const [path, setPath] = useState<string | undefined>(value?.path);
-  const [mode, setMode] = useState<FormFieldStorageSchema["mode"]>(
-    value?.mode ?? "direct"
-  );
-
-  useEffect(() => {
-    // check if path contains template
-
-    onValueChange?.({
-      type: "x-supabase",
-      bucket,
-      mode: isHandlebarTemplate(path) ? "staged" : mode,
-      path,
-    });
-  }, [enabled, bucket, mode, path, onValueChange]);
-
-  // list buckets
-  useEffect(() => {
-    if (enabled) {
-      PrivateEditorApi.SupabaseConnection.listBucket(state.form_id).then(
-        (res) => {
-          res.data.data && setBuckets(res.data.data);
-        }
-      );
-    }
-  }, [enabled, state.form_id]);
-
-  useEffect(() => {
-    setBucket(value?.bucket);
-    setMode(value?.mode ?? "direct");
-    setPath(value?.path);
-  }, [value]);
-
-  return (
-    <PanelPropertySection>
-      <PanelPropertySectionTitle>
-        <SupabaseLogo className="inline me-2 w-5 h-5 align-middle" />
-        Supabase Storage
-      </PanelPropertySectionTitle>
-      <PanelPropertyFields>
-        <PanelPropertyField
-          label={"Enable Storage"}
-          description="Enable Supabase Storage to store files in your Supabase project. (Required)"
-        >
-          <Switch
-            // IMPORTANT: the custom storage is required since we do not provide a alternate cdn solution. built in storage works only with a 'response' model, where we can't enforce this on x-supabase connection.
-            required
-            checked={enabled}
-            onCheckedChange={onEnabledChange}
-          />
-        </PanelPropertyField>
-        {enabled && (
-          <>
-            <PanelPropertyField
-              label={"Bucket"}
-              description="The bucket name to upload the file to."
-              help={
-                rules.bucketpolicy === "public" && (
-                  <>
-                    Public bucket is required for this field.
-                    <br />
-                    <br />
-                    <i>List of types required for public bucket:</i>
-                    <ul>
-                      <li>
-                        <code>richtext</code>
-                      </li>
-                    </ul>
-                  </>
-                )
-              }
-            >
-              {buckets ? (
-                <>
-                  <Select
-                    required
-                    value={bucket}
-                    onValueChange={(value) => setBucket(value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select Bucket" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {buckets?.map((bucket) => (
-                        <SelectItem
-                          key={bucket.id}
-                          value={bucket.id}
-                          disabled={!validatebucket(bucket, rules.bucketpolicy)}
-                        >
-                          <span>
-                            {bucket.name}
-                            <small className="ms-2 text-muted-foreground">
-                              {bucket.public ? "public" : "private"}
-                            </small>
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </>
-              ) : (
-                <>
-                  <Select required disabled>
-                    <SelectTrigger>
-                      <SelectValue
-                        placeholder={
-                          <div className="flex gap-2">
-                            <Spinner /> Loading...
-                          </div>
-                        }
-                      />
-                    </SelectTrigger>
-                  </Select>
-                </>
-              )}
-            </PanelPropertyField>
-            <PanelPropertyField
-              label={"Upload Path"}
-              description="The file upload path. (Leave leading and trailing slashes off)"
-              help={
-                <>
-                  <ContextVariablesTable schema="x-supabase.postgrest_query_insert_select" />
-                </>
-              }
-            >
-              <PropertyTextInput
-                placeholder="public/{{RECORD.id}}/photos/{{file.name}}"
-                value={path}
-                required
-                pattern="^(?!\/).*"
-                onChange={(e) => setPath(e.target.value)}
-              />
-            </PanelPropertyField>
-            <PanelPropertyField
-              label={"Staged Uploading"}
-              help={
-                <>
-                  Staged uploading allows you to upload first under{" "}
-                  <code>tmp/[session]/</code>
-                  folder and then move to the final destination. This is useful
-                  when you want to upload files under <code>path/to/[id]/</code>
-                  and you don&apos;t have the <code>id</code> yet.
-                </>
-              }
-              description={
-                <>
-                  Use staged uploading to upload first, then move to final path
-                  once transaction is complete.
-                </>
-              }
-            >
-              <Switch
-                checked={mode === "staged"}
-                onCheckedChange={(checked) =>
-                  setMode(checked ? "staged" : "direct")
-                }
-              />
-            </PanelPropertyField>
-          </>
-        )}
-      </PanelPropertyFields>
-    </PanelPropertySection>
-  );
-}
-
-function SupabaseReferencesSettings({
-  format,
-  value,
-  onValueChange,
-  enabled,
-  onEnabledChange,
-}: {
-  format?: string;
-  value?: Partial<FormFieldReferenceSchema> | null | undefined;
-  onValueChange?: (value: Partial<FormFieldReferenceSchema>) => void;
-  enabled?: boolean;
-  onEnabledChange?: (enabled: boolean) => void;
-}) {
-  const [state] = useEditorState();
-
-  const { supabase_project } = state.connections.supabase!;
-
-  const { schema, table, column } = value || {};
-
-  const onTableChange = useCallback(
-    (table: string) => {
-      const [schema, _table] = table.split(".");
-
-      onValueChange?.({
-        type: "x-supabase",
-        schema,
-        table: _table,
-        column: undefined,
-      });
-    },
-    [onValueChange]
-  );
-
-  const onColumnCahnge = useCallback(
-    (column: string) => {
-      onValueChange?.({
-        type: "x-supabase",
-        schema,
-        table,
-        column,
-      });
-    },
-    [onValueChange, schema, table]
-  );
-
-  const fulltable = `${schema}.${table}`;
-
-  return (
-    <PanelPropertySection>
-      <PanelPropertySectionTitle>
-        <SupabaseLogo className="inline me-2 w-5 h-5 align-middle" />
-        Supabase Foreign Key
-      </PanelPropertySectionTitle>
-      <PanelPropertyFields>
-        <PanelPropertyField
-          label={"Enable Foreign Key Search"}
-          description="Enable Supabase Foreign Key Search to reference data from your Supabase project."
-        >
-          <Switch checked={enabled} onCheckedChange={onEnabledChange} />
-        </PanelPropertyField>
-        {enabled && (
-          <>
-            <PanelPropertyField
-              label={"Reference Table"}
-              description="The table to reference data from."
-            >
-              <Select value={fulltable} onValueChange={onTableChange}>
-                <SelectTrigger>
-                  <SelectValue placeholder={"Select Table"} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectLabel>auth</SelectLabel>
-                    <SelectItem value="auth.users">
-                      <span>auth.users</span>
-                    </SelectItem>
-                  </SelectGroup>
-                  {Object.keys(supabase_project.sb_schema_definitions).map(
-                    (schemaName) => {
-                      return (
-                        <SelectGroup key={schemaName}>
-                          <SelectLabel>{schemaName}</SelectLabel>
-                          {Object.keys(
-                            supabase_project.sb_schema_definitions[schemaName]
-                          ).map((tableName) => {
-                            const fulltable = `${schemaName}.${tableName}`;
-                            return (
-                              <SelectItem key={fulltable} value={fulltable}>
-                                <span>{fulltable}</span>
-                              </SelectItem>
-                            );
-                          })}
-                        </SelectGroup>
-                      );
-                    }
-                  )}
-                </SelectContent>
-              </Select>
-            </PanelPropertyField>
-            <PanelPropertyField
-              label={"Column"}
-              description="The column to reference data from."
-            >
-              <Select
-                // setting this to undefined will throw (don't know why)
-                value={column ?? ""}
-                onValueChange={onColumnCahnge}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={"Select Column"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {schema &&
-                    table &&
-                    (schema === "auth" && table === "users" ? (
-                      <>
-                        {Object.keys(
-                          GridaSupabase.SupabaseUserJsonSchema.properties
-                        ).map((key) => {
-                          const property =
-                            GridaSupabase.SupabaseUserJsonSchema.properties[
-                              key as GridaSupabase.SupabaseUserColumn
-                            ];
-                          return (
-                            <SelectItem
-                              disabled={format !== property.format}
-                              key={key}
-                              value={key}
-                            >
-                              <span>{key}</span>{" "}
-                              <small className="ms-1 text-muted-foreground">
-                                {property.type} | {property.format}
-                              </small>
-                            </SelectItem>
-                          );
-                        })}
-                      </>
-                    ) : (
-                      <>
-                        {Object.keys(
-                          supabase_project.sb_schema_definitions[schema][table]
-                            ?.properties ?? {}
-                        )?.map((key) => {
-                          const property =
-                            supabase_project.sb_schema_definitions[schema][
-                              table
-                            ].properties?.[key];
-                          return (
-                            <SelectItem
-                              disabled={format !== property.format}
-                              key={key}
-                              value={key}
-                            >
-                              <span>{key}</span>{" "}
-                              <small className="ms-1 text-muted-foreground">
-                                {property.type} | {property.format}
-                              </small>
-                            </SelectItem>
-                          );
-                        })}
-                      </>
-                    ))}
-                </SelectContent>
-              </Select>
-            </PanelPropertyField>
-          </>
-        )}
-      </PanelPropertyFields>
-    </PanelPropertySection>
-  );
-}
-
 /**
  * TODO: this is added while developing a v_value feature on form field. once the value computation is moved to the higher level, this can be removed.
  * @returns
@@ -1379,12 +1020,6 @@ function DummyFormAgentStateProvider({
   return (
     <FormAgentProvider initial={initdummy()}>{children}</FormAgentProvider>
   );
-}
-
-function isHandlebarTemplate(str?: string) {
-  if (!str) return false;
-  const handlebarRegex = /\{\{[^{}]*\}\}/;
-  return handlebarRegex.test(str);
 }
 
 function buildPreviewLabel({ name, label }: { name: string; label?: string }) {
@@ -1418,13 +1053,4 @@ function xsupabase_bucket_policy({
   if (FieldSupports.richtext(type)) return "public";
 
   return "any";
-}
-
-function validatebucket(
-  bucket: { public: boolean },
-  policy: "public" | "private" | "any"
-): boolean {
-  if (policy === "private") return !bucket.public;
-  if (policy === "public") return bucket.public;
-  return true;
 }
