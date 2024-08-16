@@ -45,6 +45,7 @@ import {
 import { Button } from "@/components/ui/button";
 import clsx from "clsx";
 import { editorlink } from "@/lib/forms/url";
+import { SYSTEM_GF_KEY_STARTS_WITH } from "@/k/system";
 
 export function FieldBlock({
   id,
@@ -263,7 +264,7 @@ export function FieldBlock({
             <p className="text-xs opacity-50">
               Hidden fields are not displayed in the form.
               <br />
-              Configure how this field is populated in the form{" "}
+              Configure how this field is populated with{" "}
               <Link
                 className="underline"
                 href={editorlink("connect/parameters", {
@@ -271,9 +272,24 @@ export function FieldBlock({
                   basepath,
                 })}
               >
-                settings
-              </Link>
-              .
+                URL Parameters
+              </Link>{" "}
+              {form_field.required ? "(required)" : ""}{" "}
+              {!(
+                form_field.name.startsWith(SYSTEM_GF_KEY_STARTS_WITH) ||
+                form_field.required
+              ) && (
+                <>
+                  or{" "}
+                  <Button
+                    onClick={onFieldEditClick}
+                    variant="link"
+                    className="inline text-xs p-0"
+                  >
+                    Edit computed value
+                  </Button>
+                </>
+              )}
             </p>
           </div>
         ) : (
