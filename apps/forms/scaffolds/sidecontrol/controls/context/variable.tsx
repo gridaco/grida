@@ -8,7 +8,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import PropertyTypeIcon from "./property-type-icon";
+import PropertyTypeIcon from "@/components/property-type-icon";
 
 // Define the type for a property in the schema
 interface Property {
