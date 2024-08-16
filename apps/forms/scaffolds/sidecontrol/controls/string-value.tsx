@@ -22,7 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Factory } from "@/ast/factory";
 import { useEditorState } from "@/scaffolds/editor";
 import NestedDropdownMenu from "./context/variable";
-import PropertyTypeIcon from "./context/property-type-icon";
+import PropertyTypeIcon from "@/components/property-type-icon";
 
 export function StringValueControl({
   value,
