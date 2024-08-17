@@ -11,6 +11,7 @@ import {
 import { Tokens } from "@/ast";
 import { binary_operator_labels } from "@/ast/k";
 import { Label } from "@/components/ui/label";
+import { ExpressionEditor } from "@/scaffolds/expression-editor";
 
 type Identifier = string;
 
@@ -21,7 +22,7 @@ type PrimaryPropertyReferenceProps<T extends string = string> = {
 };
 
 export function EditValueExpression() {
-  return <></>;
+  return <ExpressionEditor />;
 }
 
 export function EditBinaryExpression<

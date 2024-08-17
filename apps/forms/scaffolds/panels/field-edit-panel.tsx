@@ -76,12 +76,13 @@ import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
 import { useInventory, useInventoryState } from "../options/use-inventory";
 import Link from "next/link";
 import { NameInput } from "./name-input";
-import { LockClosedIcon, ReloadIcon } from "@radix-ui/react-icons";
+import { LockClosedIcon, MixIcon, ReloadIcon } from "@radix-ui/react-icons";
 import { Badge } from "@/components/ui/badge";
 import { FormAgentProvider, initdummy } from "@/lib/formstate";
 import { SupabaseReferencesSettings } from "./extensions/field-x-sb-reference-fk-settings";
 import { SupabaseStorageSettings } from "./extensions/field-x-sb-storage-settings";
 import { XSupabaseFieldConnectionPolicyCheck } from "@/lib/supabase/check";
+import { FieldValueExpression } from "./extensions/field-value-expression";
 
 // @ts-ignore
 const default_field_init: {
@@ -962,11 +963,10 @@ export function FieldEditPanel({
               </PanelPropertyField>
             </PanelPropertyFields>
           </PanelPropertySection>
-          {supports_computedvalue && (
-            <>
-              <hr />
-            </>
-          )}
+          {supports_computedvalue &&
+            // TODO: DEV ONLY
+            process.env.NODE_ENV == "development" && <FieldValueExpression />}
+
           {FieldSupports.file_upload(type) && state.connections.supabase && (
             <>
               <hr />

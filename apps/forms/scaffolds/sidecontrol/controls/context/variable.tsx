@@ -77,7 +77,7 @@ const transformDataToSchema = (data: Record<string, any>): Schema => {
 // Render menu items from the transformed schema
 const renderMenuItems = (
   properties: Property[],
-  onSelect: (expression: string[]) => void
+  onSelect?: (expression: string[]) => void
 ): React.ReactNode => {
   return properties.map((property, index) => {
     if (property.type === "object" && property.properties.length > 0) {
@@ -98,7 +98,7 @@ const renderMenuItems = (
       return (
         <DropdownMenuItem
           key={index}
-          onSelect={() => onSelect(property.expression)}
+          onSelect={() => onSelect?.(property.expression)}
         >
           <PropertyTypeIcon type={property.type} className="me-2 w-4 h-4" />
           {property.name}
@@ -111,7 +111,7 @@ const renderMenuItems = (
 // Props for the NestedDropdownMenu component
 interface NestedDropdownMenuProps {
   data: Record<string, any>;
-  onSelect: (expression: string[]) => void;
+  onSelect?: (expression: string[]) => void;
   asSubmenu?: boolean;
 }
 
@@ -143,7 +143,7 @@ export default function NestedDropdownMenu({
   }
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger>Open Menu</DropdownMenuTrigger>
+      <DropdownMenuTrigger>Select Property</DropdownMenuTrigger>
       <DropdownMenuContent>
         {renderMenuItems(transformedData.properties, onSelect)}
       </DropdownMenuContent>
