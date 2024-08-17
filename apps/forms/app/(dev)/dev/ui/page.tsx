@@ -1,43 +1,54 @@
 "use client";
 
-import NestedDropdownMenu from "@/components/extension/nested-dropdown-menu";
+import NestedDropdownMenu, {
+  NestedMenuItemProps,
+} from "@/components/extension/nested-dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { accessSchema, TSchema } from "@/lib/spock";
+import { accessSchema, TProperty, TSchema } from "@/lib/spock";
 import PropertyAccessDropdownMenu from "@/scaffolds/sidecontrol/controls/context/variable";
 
-const data: TSchema = {
+const schema: TSchema = {
   type: "object",
-  properties: [
-    {
-      name: "dev",
+  properties: {
+    dev: {
       type: "object",
-      properties: [
-        {
-          type: "string",
-          name: "Page 1",
-          properties: [
-            {
+      properties: {
+        page_1: {
+          type: "object",
+          properties: {
+            title: {
               type: "string",
-              name: "Title",
             },
-            {
+            content: {
               type: "string",
-              name: "Content",
             },
-          ],
+          },
         },
-        {
-          type: "string",
-          name: "Page 2",
+        page_2: {
+          type: "object",
         },
-        {
-          type: "string",
-          name: "Page 3",
+        page_3: {
+          type: "object",
         },
-      ],
+      },
     },
-  ],
+  },
 };
+
+const property_to_menu_item = (
+  name: string,
+  property: TProperty
+): NestedMenuItemProps =>
+  "$ref" in property
+    ? {
+        name: name,
+        data: property,
+        resolved: true,
+      }
+    : {
+        name: name,
+        data: property,
+      };
 
 export default function UIDEV() {
   return (
@@ -46,29 +57,33 @@ export default function UIDEV() {
         <NestedDropdownMenu
           asChild
           resolveMenuItems={(path) => {
+            if (!schema) return undefined;
+            if (!schema.properties) return undefined;
+
             if (path === "root") {
-              return data.properties?.map((item) => ({
-                path: [item.name],
-                id: item.name,
-              }));
+              return Object.keys(schema.properties).map((key) => {
+                const property = schema.properties![key];
+                return property_to_menu_item(key, property);
+              });
             }
 
-            const item = accessSchema(path, data);
-            return item?.properties?.map((prop: any) => ({
-              id: prop.name,
-              path: [...path, prop.name],
-            }));
+            const item = accessSchema(path, schema);
+
+            if (!item) return undefined;
+            if (!("properties" in item)) return undefined;
+            if (!item.properties) return undefined;
+            return Object.keys(item.properties).map((key) => {
+              const property = item.properties![key];
+              return property_to_menu_item(key, property);
+            });
           }}
-          renderMenuItem={(item) => <>{item.path.join(".")}</>}
+          renderMenuItem={(path, item) => <>{path.join(".")}</>}
         >
           <Button>Nested Dropdown Menu</Button>
         </NestedDropdownMenu>
       </div>
       <div className="p-20">
-        <PropertyAccessDropdownMenu
-          data={{ a: "", b: { c: { d: "" } } }}
-          asChild
-        >
+        <PropertyAccessDropdownMenu schema={schema} asChild>
           <Button>Property Access Dropdown Menu</Button>
         </PropertyAccessDropdownMenu>
       </div>
