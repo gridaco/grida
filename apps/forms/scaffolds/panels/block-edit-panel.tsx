@@ -24,6 +24,7 @@ import { KeyIcon } from "lucide-react";
 import toast from "react-hot-toast";
 import { EditBinaryExpression } from "./extensions/v-edit";
 import { PopoverClose } from "@radix-ui/react-popover";
+import { FormExpression } from "@/lib/forms/expression";
 
 /**
  * NOTE - the type string represents a id, not a scalar for this component, atm.
@@ -58,9 +59,7 @@ export function BlockEditPanel({
     }
     //
     const exp: Tokens.ShorthandBooleanBinaryExpression = [
-      {
-        $ref: `#/fields/${l}/value`,
-      },
+      FormExpression.create_field_property_json_ref(l as string, "value"),
       op,
       r,
     ];

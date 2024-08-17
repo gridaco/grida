@@ -37,8 +37,8 @@ export namespace Tokens {
    * - When stored in the database, it should be an id.
    * - When used in the JSON, it should be a key.
    */
-  export type JSONRef = {
-    $ref: `#/fields/${string}`;
+  export type JSONRef<PREFIX extends string = string> = {
+    $ref: `#/${PREFIX}${string}`;
   };
 
   /**

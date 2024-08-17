@@ -10,6 +10,10 @@ export type TType = {
     | "null";
 };
 
+type TDescription = {
+  description?: string;
+};
+
 // Properties type (for object types)
 export type TProperties<T extends object = {}> = {
   properties: { [key: string]: TProperty<T> };
@@ -22,13 +26,15 @@ export type TRef<T> = {
 
 // TProperty definition, combining name, type, properties, or $ref
 export type TProperty<T extends object = {}> = (
-  | (TType & Partial<TProperties<T>>)
+  | (TType & TDescription & Partial<TProperties<T>>)
   | TRef<T>
 ) &
   T;
 
 // TSchema: Root schema cannot be a $ref
-export type TSchema<T extends object = {}> = (TType & Partial<TProperties<T>>) &
+export type TSchema<T extends object = {}> = (TType &
+  TDescription &
+  Partial<TProperties<T>>) &
   T;
 
 export function accessSchema<T extends object>(
