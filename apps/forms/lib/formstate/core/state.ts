@@ -2,7 +2,7 @@ import type { ClientRenderBlock, ClientSectionRenderBlock } from "@/lib/forms";
 import { FormBlockTree } from "@/lib/forms/types";
 import type { FormFieldDefinition } from "@/types";
 
-type VirtualFileValueProxy = {
+export type VirtualFileValueProxy = {
   // standard
   name: string;
   type: string;
@@ -21,6 +21,8 @@ export interface FormAgentState {
     [key: string]: {
       value: string | number | boolean | string[] | undefined | null;
       files?: VirtualFileValueProxy[];
+      // consider moving this to a proxy method
+      file?: VirtualFileValueProxy;
     };
   };
   // used for browser dom manipulation

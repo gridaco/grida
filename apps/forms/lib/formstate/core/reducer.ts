@@ -1,6 +1,6 @@
 import { produce } from "immer";
 import type { FormAgentAction } from "./action";
-import type { FormAgentState } from "./state";
+import type { FormAgentState, VirtualFileValueProxy } from "./state";
 
 export function reducer(
   state: FormAgentState,
@@ -16,20 +16,32 @@ export function reducer(
     case "fields/files/change": {
       const { id, files } = action;
       return produce(state, (draft) => {
-        draft.fields[id].files = files.map((file) => ({
-          // reading is required as the properties are proxied
-          name: file.name,
-          size: file.size,
-          type: file.type,
-          lastModified: file.lastModified,
-        }));
+        const mapper = (file: File) =>
+          ({
+            // reading is required as the properties are proxied
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            lastModified: file.lastModified,
+          }) satisfies VirtualFileValueProxy;
+
+        draft.fields[id].files = files.map(mapper);
+        if (files.length === 1) {
+          draft.fields[id].file = mapper(files[0]);
+        }
         draft.rawfiles[id] = files;
       });
     }
     case "fields/files/metadata/change": {
       const { id, index, metadata } = action;
       return produce(state, (draft) => {
-        draft.fields[id].files![index].duration = metadata.duration;
+        try {
+          draft.fields[id].files![index].duration = metadata.duration;
+          if (draft.fields[id].file)
+            draft.fields[id].file.duration = metadata.duration;
+        } catch (e) {
+          console.error("metadata resolved, but file was removed", metadata);
+        }
       });
     }
     case "section/change": {
