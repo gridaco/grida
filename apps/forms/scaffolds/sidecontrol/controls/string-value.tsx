@@ -23,6 +23,8 @@ import { Factory } from "@/ast/factory";
 import { useEditorState } from "@/scaffolds/editor";
 import PropertyAccessDropdownMenu from "./context/variable";
 import PropertyTypeIcon from "@/components/property-type-icon";
+import { useMemo } from "react";
+import { inferSchemaFromData } from "@/lib/spock";
 
 export function StringValueControl({
   value,
@@ -38,6 +40,14 @@ export function StringValueControl({
   const {
     document: { selected_node_context },
   } = state;
+
+  const schema = useMemo(
+    () =>
+      selected_node_context
+        ? inferSchemaFromData(selected_node_context)
+        : undefined,
+    [selected_node_context]
+  );
 
   return (
     <div className="relative group w-full">
@@ -59,12 +69,10 @@ export function StringValueControl({
         >
           <PropertyAccessDropdownMenu
             asSubmenu
-            onSelect={(expression) => {
-              onValueChange?.(
-                Factory.createPropertyAccessExpression(expression)
-              );
+            schema={schema}
+            onSelect={(path) => {
+              onValueChange?.(Factory.createPropertyAccessExpression(path));
             }}
-            data={selected_node_context || {}}
           >
             <PropertyTypeIcon type="object" className="me-2 w-4 h-4" />
             Page

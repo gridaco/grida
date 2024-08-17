@@ -1,4 +1,4 @@
-import { accessSchema, TProperty, TSchema } from "./schema";
+import { accessSchema, TSchema, inferSchemaFromData } from "./schema";
 
 describe("accessSchema", () => {
   // Define a sample schema for testing
@@ -55,5 +55,50 @@ describe("accessSchema", () => {
   it("should return null if the initial path does not match any property", () => {
     const result = accessSchema(["nonexistent"], testSchema);
     expect(result).toBeNull();
+  });
+});
+
+describe("infer schema", () => {
+  const testData = {
+    id: 1,
+    user: {
+      name: "John",
+      address: {
+        street: "123 Main St",
+        city: "Springfield",
+      },
+    },
+  };
+
+  it("should should infer schema from data object", () => {
+    const schema = inferSchemaFromData(testData, [], {
+      transformthis: true,
+      keepvalue: false,
+    });
+    expect(schema).toEqual({
+      properties: {
+        id: { type: "number" },
+        user: {
+          properties: {
+            this: {
+              $ref: "#/properties/user",
+            },
+            address: {
+              properties: {
+                this: {
+                  $ref: "#/properties/user/properties/address",
+                },
+                city: { type: "string" },
+                street: { type: "string" },
+              },
+              type: "object",
+            },
+            name: { type: "string" },
+          },
+          type: "object",
+        },
+      },
+      type: "object",
+    });
   });
 });

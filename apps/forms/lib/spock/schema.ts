@@ -61,3 +61,97 @@ export function accessSchema<T extends object>(
   }
   return current as TProperty<T>;
 }
+
+const inferType = (
+  value: any
+):
+  | "string"
+  | "number"
+  | "object"
+  | "array"
+  | "boolean"
+  | "null"
+  | "unknown" => {
+  if (value === null) {
+    return "null";
+  }
+  if (Array.isArray(value)) {
+    return "array";
+  }
+  if (typeof value === "object") {
+    return "object";
+  }
+  if (typeof value === "string") {
+    return "string";
+  }
+  if (typeof value === "number") {
+    return "number";
+  }
+  if (typeof value === "boolean") {
+    return "boolean";
+  }
+  return "unknown";
+};
+
+/**
+ * Infers a JSON schema from the given input data.
+ *
+ * @param data - The input data from which to infer the schema.
+ * @param currentPath - The current path within the object being processed.
+ * @param options - Options for schema transformation.
+ * @param options.transformthis - When set to `true`, injects the 'this' property into object properties.
+ *
+ * @returns A JSON schema inferred from the input data.
+ */
+export const inferSchemaFromData = (
+  data: Record<string, any>,
+  currentPath: string[] = [],
+  options = {
+    transformthis: false,
+    keepvalue: true,
+  }
+): TSchema => {
+  const transform = (
+    obj: Record<string, any>,
+    path: string[] = []
+  ): TSchema => {
+    const properties: { [key: string]: any } = {};
+
+    Object.keys(obj).forEach((key: string) => {
+      const value = obj[key];
+      const type = inferType(value);
+      const newPath = [...path, key];
+      const propertyPath = `#/properties/${newPath.join("/properties/")}`;
+
+      if (type === "object") {
+        const defaultproperties = transform(value, newPath).properties;
+        properties[key] = {
+          type: "object",
+          properties: options.transformthis
+            ? {
+                ...defaultproperties,
+                this: {
+                  $ref: propertyPath,
+                },
+              }
+            : defaultproperties,
+        };
+      } else {
+        properties[key] = {
+          type,
+        };
+
+        if (options.keepvalue) {
+          properties[key].value = value;
+        }
+      }
+    });
+
+    return {
+      type: "object",
+      properties,
+    };
+  };
+
+  return transform(data, currentPath);
+};
