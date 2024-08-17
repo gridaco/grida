@@ -1,6 +1,8 @@
 import React, { useMemo } from "react";
 import PropertyTypeIcon from "@/components/property-type-icon";
-import NestedDropdownMenu from "@/components/extension/nested-dropdown-menu";
+import NestedDropdownMenu, {
+  NestedMenuItemProps,
+} from "@/components/extension/nested-dropdown-menu";
 import { accessSchema, TProperty, TSchema } from "@/lib/spock";
 
 // Props for the NestedDropdownMenu component
@@ -8,7 +10,7 @@ interface PropertyAccessDropdownMenuProps<T extends object> {
   asSubmenu?: boolean;
   asChild?: boolean;
   schema?: TSchema<T>;
-  onSelect?: (expression: string[]) => void;
+  onSelect?: (expression: string[], item: NestedMenuItemProps) => void;
 }
 
 // Main component to render the nested dropdown menu

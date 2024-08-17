@@ -83,6 +83,7 @@ import { SupabaseReferencesSettings } from "./extensions/field-x-sb-reference-fk
 import { SupabaseStorageSettings } from "./extensions/field-x-sb-storage-settings";
 import { XSupabaseFieldConnectionPolicyCheck } from "@/lib/supabase/check";
 import { FieldValueExpression } from "./extensions/field-value-expression";
+import { Tokens } from "@/ast";
 
 // @ts-ignore
 const default_field_init: {
@@ -261,6 +262,11 @@ export function FieldEditPanel({
   const [min, setMin] = useState<number | undefined>(init?.min);
   const [max, setMax] = useState<number | undefined>(init?.max);
 
+  // v_value
+  const [v_value, set_v_value] = useState<
+    Tokens.TValueExpression | null | undefined
+  >(init?.v_value);
+
   // options
   const [{ options, optgroups }, dispatchoptions] = useReducer(
     useOptionsEdit,
@@ -409,6 +415,7 @@ export function FieldEditPanel({
       options_inventory: options_inventory_upsert_diff,
       storage: storage_enabled ? storage : undefined,
       reference: reference_enabled ? reference : undefined,
+      v_value: v_value,
     });
   };
 
@@ -965,7 +972,12 @@ export function FieldEditPanel({
           </PanelPropertySection>
           {supports_computedvalue &&
             // TODO: DEV ONLY
-            process.env.NODE_ENV == "development" && <FieldValueExpression />}
+            process.env.NODE_ENV == "development" && (
+              <FieldValueExpression
+                expression={v_value ?? undefined}
+                onChange={set_v_value}
+              />
+            )}
 
           {FieldSupports.file_upload(type) && state.connections.supabase && (
             <>

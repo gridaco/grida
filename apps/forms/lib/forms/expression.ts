@@ -15,7 +15,8 @@ export namespace FormExpression {
     export function map_field_to_property(
       field: FormFieldDefinition
     ): TProperty {
-      switch (field.type) {
+      const { type, multiple } = field;
+      switch (type) {
         case "range":
         case "number":
           return {
@@ -73,10 +74,11 @@ export namespace FormExpression {
         case "image":
         case "video":
         case "audio":
+          // files: type: array - not supported
+          if (multiple) break;
           return {
             type: "object",
             properties: {
-              // files: type: array - not supported
               file: {
                 description:
                   "References a single file in selected file. when multiple is true, this will always be undefined",

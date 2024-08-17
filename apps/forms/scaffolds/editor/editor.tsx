@@ -149,6 +149,7 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
                 optgroups: field.optgroups,
                 storage: field.storage,
                 reference: field.reference,
+                v_value: field.v_value,
                 // TODO: add inventory support
                 // options_inventory: undefined,
               }

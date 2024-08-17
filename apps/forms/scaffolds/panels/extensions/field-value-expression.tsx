@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useReducer, useState } from "react";
+import React, { useEffect, useMemo, useReducer, useState } from "react";
 import {
   PanelPropertyField,
   PanelPropertyFields,
@@ -12,17 +12,67 @@ import { LockClosedIcon, MixIcon, ReloadIcon } from "@radix-ui/react-icons";
 import { Button } from "@/components/ui/button";
 import { EditValueExpression } from "./v-edit";
 import PropertyAccessDropdownMenu from "@/scaffolds/sidecontrol/controls/context/variable";
+import { TProperties, TProperty, TSchema } from "@/lib/spock";
+import { useEditorState } from "@/scaffolds/editor";
+import { FormExpression } from "@/lib/forms/expression";
+import toast from "react-hot-toast";
+import { Tokens } from "@/ast";
 
-export function FieldValueExpression() {
-  const data = {
-    fields: {
-      a: "string",
-      b: "number",
-      c: {
-        d: "boolean",
-      },
-    },
+function useFormSchema() {
+  const [state] = useEditorState();
+  const { fields } = state;
+
+  return useMemo(
+    () =>
+      ({
+        type: "object",
+        description: "available field value references",
+        properties: fields.reduce(
+          (acc, f) => {
+            acc[f.name] = FormExpression.schema.map_field_to_property(f);
+            return acc;
+          },
+          {} as TProperties["properties"]
+        ),
+      }) satisfies TSchema,
+    [fields]
+  );
+}
+
+export function FieldValueExpression({
+  expression,
+  onChange,
+}: {
+  expression?: Tokens.TValueExpression;
+  onChange?: (expression: Tokens.TValueExpression) => void;
+}) {
+  const [state] = useEditorState();
+  const { fields } = state;
+  const schema = useFormSchema();
+
+  const onPropertySelect = (path: string[], { data }: any) => {
+    const [field_name, ...access] = path;
+    // find field id by name
+    const field_id = fields.find((f) => f.name === field_name)?.id;
+    if (!field_id) {
+      toast.error("The selected field does not exist.");
+      return;
+    }
+
+    const rejecttypes = ["null", "object", "array"];
+    if (rejecttypes.includes(data.type)) {
+      toast.error("This type can't be applied");
+    }
+
+    const ref = FormExpression.create_field_property_json_ref(
+      field_id,
+      ...access
+    );
+
+    onChange?.(ref);
+    // create a expression with path.
   };
+
   return (
     <PanelPropertySection>
       <PanelPropertySectionTitle>Computed Value</PanelPropertySectionTitle>
@@ -36,10 +86,18 @@ export function FieldValueExpression() {
             </>
           }
         >
-          <PropertyAccessDropdownMenu data={data} asChild>
+          <PropertyAccessDropdownMenu
+            onSelect={onPropertySelect}
+            schema={schema}
+            asChild
+          >
             <Button variant="outline" type="button">
               <MixIcon className="me-2" />
-              <>Set Value Expression</>
+              {expression ? (
+                <>Update Value Expression</>
+              ) : (
+                <>Set Value Expression</>
+              )}
             </Button>
           </PropertyAccessDropdownMenu>
           {/* <Dialog>
@@ -56,6 +114,11 @@ export function FieldValueExpression() {
             </DialogContent>
           </Dialog> */}
         </PanelPropertyField>
+        {expression && (
+          <PanelPropertyField label="Expression">
+            <code>{JSON.stringify(expression, null, 2)}</code>
+          </PanelPropertyField>
+        )}
       </PanelPropertyFields>
     </PanelPropertySection>
   );

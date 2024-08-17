@@ -180,6 +180,7 @@ export type FormFieldInit = {
   multiple?: boolean;
   storage?: FormFieldStorageSchema | {} | null;
   reference?: FormFieldReferenceSchema | {} | null;
+  v_value?: Tokens.TValueExpression | null;
   // options_inventory?: { [option_id: string]: MutableInventoryStock };
 };
 

@@ -76,6 +76,7 @@ export async function POST(
       multiple: init.multiple,
       storage: init.storage ?? null,
       reference: init.reference ?? null,
+      v_value: init.v_value ?? null,
       // 'description': init.description,
     })
     .select(

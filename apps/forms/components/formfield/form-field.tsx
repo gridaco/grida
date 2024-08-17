@@ -558,7 +558,14 @@ function MonoFormField({
       return <p>hidden field - {name}</p>;
     }
 
-    return <input type="hidden" name={name} defaultValue={defaultValue} />;
+    return (
+      <input
+        type="hidden"
+        name={name}
+        defaultValue={defaultValue}
+        value={(computed_value ?? undefined) as any}
+      />
+    );
   }
 
   if (type === "payment") {
