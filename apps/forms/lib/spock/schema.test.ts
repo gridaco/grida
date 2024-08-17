@@ -6,15 +6,12 @@ describe("accessSchema", () => {
     type: "object",
     properties: {
       id: {
-        name: "id",
         type: "integer",
       },
       user: {
-        name: "user",
         type: "object",
         properties: {
           name: {
-            name: "name",
             type: "string",
           },
           address: {
@@ -41,7 +38,6 @@ describe("accessSchema", () => {
   it("should return the correct schema for a valid path", () => {
     const result = accessSchema(["user", "name"], testSchema);
     expect(result).toEqual({
-      name: "name",
       type: "string",
     });
   });

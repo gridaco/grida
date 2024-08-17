@@ -1,8 +1,3 @@
-// Name type
-export type TName = {
-  name: string;
-};
-
 // Type type
 export type TType = {
   type:
@@ -27,7 +22,7 @@ export type TRef<T> = {
 
 // TProperty definition, combining name, type, properties, or $ref
 export type TProperty<T extends object = {}> = (
-  | (TName & TType & Partial<TProperties<T>>)
+  | (TType & Partial<TProperties<T>>)
   | TRef<T>
 ) &
   T;
