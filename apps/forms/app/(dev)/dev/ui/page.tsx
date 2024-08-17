@@ -2,66 +2,44 @@
 
 import NestedDropdownMenu from "@/components/extension/nested-dropdown-menu";
 import { Button } from "@/components/ui/button";
+import { accessSchema, TSchema } from "@/lib/spock";
+import PropertyAccessDropdownMenu from "@/scaffolds/sidecontrol/controls/context/variable";
+
+const data: TSchema = {
+  type: "object",
+  properties: [
+    {
+      name: "dev",
+      type: "object",
+      properties: [
+        {
+          type: "string",
+          name: "Page 1",
+          properties: [
+            {
+              type: "string",
+              name: "Title",
+            },
+            {
+              type: "string",
+              name: "Content",
+            },
+          ],
+        },
+        {
+          type: "string",
+          name: "Page 2",
+        },
+        {
+          type: "string",
+          name: "Page 3",
+        },
+      ],
+    },
+  ],
+};
 
 export default function UIDEV() {
-  const data = {
-    type: "object",
-    properties: [
-      {
-        type: "object",
-        properties: [
-          {
-            type: "string",
-            name: "Page 1",
-            properties: [
-              {
-                type: "string",
-                name: "Title",
-              },
-              {
-                type: "string",
-                name: "Content",
-              },
-            ],
-          },
-          {
-            type: "string",
-            name: "Page 2",
-            expression: ["Page 2"],
-          },
-          {
-            type: "string",
-            name: "Page 3",
-            expression: ["Page 3"],
-          },
-        ],
-        name: "Pages",
-      },
-    ],
-  };
-
-  function access(path: string[], data: any) {
-    let current = data;
-    let currentPath = [];
-
-    for (let key of path) {
-      if (current.type === "object" && current.properties) {
-        const next = current.properties.find((prop: any) => prop.name === key);
-        if (!next) return null;
-        current = next;
-        currentPath.push(key);
-      } else {
-        return null;
-      }
-    }
-
-    return {
-      path: currentPath,
-      name: current.name,
-      properties: current.properties || [],
-    };
-  }
-
   return (
     <main>
       <div className="p-20">
@@ -69,22 +47,30 @@ export default function UIDEV() {
           asChild
           resolveMenuItems={(path) => {
             if (path === "root") {
-              return data.properties.map((item) => ({
+              return data.properties?.map((item) => ({
                 path: [item.name],
-                identifier: item.name,
+                id: item.name,
               }));
             }
 
-            const item = access(path, data);
-            return item?.properties.map((prop: any) => ({
-              identifier: prop.name,
+            const item = accessSchema(path, data);
+            return item?.properties?.map((prop: any) => ({
+              id: prop.name,
               path: [...path, prop.name],
             }));
           }}
-          renderMenuItem={(path) => <>{path.join(".")}</>}
+          renderMenuItem={(item) => <>{item.path.join(".")}</>}
         >
           <Button>Nested Dropdown Menu</Button>
         </NestedDropdownMenu>
+      </div>
+      <div className="p-20">
+        <PropertyAccessDropdownMenu
+          data={{ a: "", b: { c: { d: "" } } }}
+          asChild
+        >
+          <Button>Property Access Dropdown Menu</Button>
+        </PropertyAccessDropdownMenu>
       </div>
     </main>
   );

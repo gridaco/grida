@@ -12,16 +12,22 @@ import React from "react";
 
 type Path = string[];
 
-interface MenuItem<T = any> {
+interface NestedMenuItem<T = any> {
   path: Path;
-  identifier: string;
+  id: string;
+  // when resolved set to true, the menu item will not have a submenu
+  resolved?: boolean;
+  disabled?: boolean;
   data?: T;
 }
 
 // Props for the NestedDropdownMenu component
 interface NestedDropdownMenuProps<T = any> {
-  resolveMenuItems: (path: Path | "root", data?: T) => MenuItem<T>[];
-  renderMenuItem: (path: Path, data?: T) => React.ReactNode;
+  resolveMenuItems: (
+    path: Path | "root",
+    data?: T
+  ) => NestedMenuItem<T>[] | undefined;
+  renderMenuItem: (item: NestedMenuItem<T>) => React.ReactNode;
   onSelect?: (path: Path) => void;
 }
 
@@ -31,15 +37,18 @@ const renderMenuItems = ({
   renderMenuItem,
   onSelect,
 }: {
-  items: MenuItem[];
+  items: NestedMenuItem[];
 } & NestedDropdownMenuProps): React.ReactNode => {
   return items.map((item, index) => {
-    const subitems = resolveMenuItems(item.path, item.data);
-    if (subitems?.length > 0) {
+    const subitems = item.resolved
+      ? undefined
+      : resolveMenuItems(item.path, item.data);
+
+    if (subitems && subitems.length > 0) {
       return (
         <DropdownMenuSub key={index}>
-          <DropdownMenuSubTrigger>
-            {renderMenuItem(item.path, item.data)}
+          <DropdownMenuSubTrigger disabled={item.disabled}>
+            {renderMenuItem(item)}
           </DropdownMenuSubTrigger>
           <DropdownMenuPortal>
             <DropdownMenuSubContent>
@@ -55,8 +64,12 @@ const renderMenuItems = ({
       );
     } else {
       return (
-        <DropdownMenuItem key={index} onSelect={() => onSelect?.(item.path)}>
-          {renderMenuItem(item.path, item.data)}
+        <DropdownMenuItem
+          key={index}
+          onSelect={() => onSelect?.(item.path)}
+          disabled={item.disabled}
+        >
+          {renderMenuItem(item)}
         </DropdownMenuItem>
       );
     }
@@ -64,7 +77,7 @@ const renderMenuItems = ({
 };
 
 // Main component to render the nested dropdown menu
-export default function NestedDropdownMenu({
+export default function NestedDropdownMenu<T>({
   asSubmenu,
   asChild,
   resolveMenuItems,
@@ -72,11 +85,13 @@ export default function NestedDropdownMenu({
   onSelect,
   children,
 }: React.PropsWithChildren<
-  NestedDropdownMenuProps & {
+  NestedDropdownMenuProps<T> & {
     asSubmenu?: boolean;
     asChild?: boolean;
   }
 >) {
+  const items = resolveMenuItems("root");
+
   if (asSubmenu) {
     return (
       <DropdownMenuSub>
@@ -85,12 +100,13 @@ export default function NestedDropdownMenu({
         </DropdownMenuSubTrigger>
         <DropdownMenuPortal>
           <DropdownMenuSubContent>
-            {renderMenuItems({
-              items: resolveMenuItems("root"),
-              resolveMenuItems,
-              renderMenuItem,
-              onSelect,
-            })}
+            {items &&
+              renderMenuItems({
+                items: items,
+                resolveMenuItems,
+                renderMenuItem,
+                onSelect,
+              })}
           </DropdownMenuSubContent>
         </DropdownMenuPortal>
       </DropdownMenuSub>
@@ -100,12 +116,13 @@ export default function NestedDropdownMenu({
     <DropdownMenu>
       <DropdownMenuTrigger asChild={asChild}>{children}</DropdownMenuTrigger>
       <DropdownMenuContent>
-        {renderMenuItems({
-          items: resolveMenuItems("root"),
-          resolveMenuItems,
-          renderMenuItem,
-          onSelect,
-        })}
+        {items &&
+          renderMenuItems({
+            items: items,
+            resolveMenuItems,
+            renderMenuItem,
+            onSelect,
+          })}
       </DropdownMenuContent>
     </DropdownMenu>
   );

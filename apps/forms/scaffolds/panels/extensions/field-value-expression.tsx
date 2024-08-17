@@ -11,8 +11,18 @@ import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { LockClosedIcon, MixIcon, ReloadIcon } from "@radix-ui/react-icons";
 import { Button } from "@/components/ui/button";
 import { EditValueExpression } from "./v-edit";
+import PropertyAccessDropdownMenu from "@/scaffolds/sidecontrol/controls/context/variable";
 
 export function FieldValueExpression() {
+  const data = {
+    fields: {
+      a: "string",
+      b: "number",
+      c: {
+        d: "boolean",
+      },
+    },
+  };
   return (
     <PanelPropertySection>
       <PanelPropertySectionTitle>Computed Value</PanelPropertySectionTitle>
@@ -26,7 +36,13 @@ export function FieldValueExpression() {
             </>
           }
         >
-          <Dialog>
+          <PropertyAccessDropdownMenu data={data} asChild>
+            <Button variant="outline" type="button">
+              <MixIcon className="me-2" />
+              <>Set Value Expression</>
+            </Button>
+          </PropertyAccessDropdownMenu>
+          {/* <Dialog>
             <DialogTrigger>
               <div>
                 <Button variant="outline" type="button">
@@ -38,7 +54,7 @@ export function FieldValueExpression() {
             <DialogContent className="min-w-full h-screen p-0">
               <EditValueExpression />
             </DialogContent>
-          </Dialog>
+          </Dialog> */}
         </PanelPropertyField>
       </PanelPropertyFields>
     </PanelPropertySection>

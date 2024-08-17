@@ -7,7 +7,7 @@ import {
   useNodesState,
   MiniMap,
 } from "@xyflow/react";
-import NestedDropdownMenu from "@/scaffolds/sidecontrol/controls/context/variable";
+import PropertyAccessDropdownMenu from "@/scaffolds/sidecontrol/controls/context/variable";
 import { useCallback } from "react";
 import { Handle, Position } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -167,7 +167,7 @@ function PropertyNode({ data }: any) {
   return (
     <div className="px-4 py-2 shadow-md rounded-md border">
       <div>
-        <NestedDropdownMenu
+        <PropertyAccessDropdownMenu
           data={{
             a: { value: "" },
           }}

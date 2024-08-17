@@ -21,7 +21,7 @@ import { Tokens } from "@/ast";
 import { Badge } from "@/components/ui/badge";
 import { Factory } from "@/ast/factory";
 import { useEditorState } from "@/scaffolds/editor";
-import NestedDropdownMenu from "./context/variable";
+import PropertyAccessDropdownMenu from "./context/variable";
 import PropertyTypeIcon from "@/components/property-type-icon";
 
 export function StringValueControl({
@@ -57,7 +57,7 @@ export function StringValueControl({
           side="bottom"
           className="max-w-sm overflow-hidden min-w-96"
         >
-          <NestedDropdownMenu
+          <PropertyAccessDropdownMenu
             asSubmenu
             onSelect={(expression) => {
               onValueChange?.(
@@ -65,7 +65,10 @@ export function StringValueControl({
               );
             }}
             data={selected_node_context || {}}
-          />
+          >
+            <PropertyTypeIcon type="object" className="me-2 w-4 h-4" />
+            Page
+          </PropertyAccessDropdownMenu>
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>
               <TokensIcon className="me-2 w-4 h-4" />
