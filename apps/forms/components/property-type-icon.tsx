@@ -23,12 +23,13 @@ export default function PropertyTypeIcon({
   className,
 }: {
   type:
-    | "string"
-    | "number"
-    | "boolean"
-    | "date"
+    | "integer"
     | "object"
     | "array"
+    | "boolean"
+    | "string"
+    | "number"
+    | "date"
     | "null"
     | "undefined"
     | "function"
@@ -39,8 +40,8 @@ export default function PropertyTypeIcon({
     | "never"
     | "void"
     | "this"
-    | "const"
-    | "object";
+    | "$ref"
+    | "const";
   className?: string;
 }) {
   const props = {
@@ -50,6 +51,7 @@ export default function PropertyTypeIcon({
   switch (type) {
     case "string":
       return <TextIcon {...props} />;
+    case "integer":
     case "number":
     case "bigint":
       return <HashIcon {...props} />;
@@ -75,6 +77,7 @@ export default function PropertyTypeIcon({
     case "unknown":
       return <FileQuestionIcon {...props} />;
     case "this":
+    case "$ref":
       return <DotIcon {...props} />;
     case "const":
       return <LockClosedIcon {...props} />;

@@ -30,6 +30,9 @@ const schema: TSchema = {
         page_3: {
           type: "object",
         },
+        reference: {
+          $ref: "#/dev/page_1",
+        },
       },
     },
   },

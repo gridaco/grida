@@ -3,115 +3,69 @@ import PropertyTypeIcon from "@/components/property-type-icon";
 import NestedDropdownMenu from "@/components/extension/nested-dropdown-menu";
 import { accessSchema, TProperty, TSchema } from "@/lib/spock";
 
-// Function to get the type of a value
-const getType = (value: any): "string" | "number" | "object" | "unknown" => {
-  if (typeof value === "object" && !Array.isArray(value)) {
-    return "object";
-  }
-  if (typeof value === "string") {
-    return "string";
-  }
-  if (typeof value === "number") {
-    return "number";
-  }
-  return "unknown";
-};
-
-type PropertyAccessExpressionMapSchema = TSchema<{
-  expression: string[];
-}>;
-
-// Transform data to a format partially resembling JSON Schema
-const transformDataToSchema = (
-  data: Record<string, any>
-): PropertyAccessExpressionMapSchema => {
-  const transform = (
-    obj: Record<string, any>,
-    path: string[] = []
-  ): PropertyAccessExpressionMapSchema => {
-    const properties = Object.keys(obj).map((key: string) => {
-      const value = obj[key];
-      const type = getType(value);
-      const expression = [...path, key];
-
-      return {
-        name: key,
-        type,
-        properties:
-          type === "object" ? transform(value, expression).properties : [],
-        value: type !== "object" ? value : undefined,
-        expression,
-      };
-    });
-
-    return {
-      type: "object",
-      expression: path,
-      properties: [
-        {
-          name: "this",
-          type: "this",
-          properties: [],
-          expression: path,
-        },
-        ...properties,
-      ],
-    };
-  };
-
-  return transform(data);
-};
-
 // Props for the NestedDropdownMenu component
-interface PropertyAccessDropdownMenuProps {
+interface PropertyAccessDropdownMenuProps<T extends object> {
   asSubmenu?: boolean;
   asChild?: boolean;
-  data: Record<string, any>;
+  schema?: TSchema<T>;
   onSelect?: (expression: string[]) => void;
 }
 
 // Main component to render the nested dropdown menu
-export default function PropertyAccessDropdownMenu({
-  data,
+export default function PropertyAccessDropdownMenu<T extends object>({
+  schema,
   asSubmenu,
   asChild,
   onSelect,
   children,
-}: React.PropsWithChildren<PropertyAccessDropdownMenuProps>) {
-  const schema = useMemo(() => transformDataToSchema(data), [data]);
-
-  const property_to_menu_item = (
-    property: TProperty<{ expression: string[] }>
-  ) => ({
-    id: property.name,
-    path: property.expression,
-    data: property,
-    resolved: property.type === "this",
-  });
+}: React.PropsWithChildren<PropertyAccessDropdownMenuProps<T>>) {
+  const property_to_menu_item = (name: string, property: TProperty) =>
+    "$ref" in property
+      ? {
+          name: name,
+          data: property,
+          resolved: true,
+        }
+      : {
+          name: name,
+          data: property,
+        };
 
   return (
-    <NestedDropdownMenu
+    <NestedDropdownMenu<TProperty>
       asChild={asChild}
       asSubmenu={asSubmenu}
       onSelect={onSelect}
+      disabled={!schema}
       resolveMenuItems={(path) => {
+        if (!schema) return undefined;
+        if (!schema.properties) return undefined;
+
         if (path === "root") {
-          return schema.properties?.map(property_to_menu_item);
+          return Object.keys(schema.properties).map((key) => {
+            const property = schema.properties![key];
+            return property_to_menu_item(key, property);
+          });
         }
 
         const item = accessSchema(path, schema);
-        return item?.properties?.map((prop: any) => ({
-          id: prop.name,
-          path: [...path, prop.name],
-          data: prop,
-          resolved: prop.type === "this",
-        }));
+
+        if (!item) return undefined;
+        if (!("properties" in item)) return undefined;
+        if (!item.properties) return undefined;
+        return Object.keys(item.properties).map((key) => {
+          const property = item.properties![key];
+          return property_to_menu_item(key, property);
+        });
       }}
       // renderMenuItem={(path) => <>{path.join(".")}</>}
-      renderMenuItem={(item) => (
+      renderMenuItem={(path, item) => (
         <>
-          <PropertyTypeIcon type={item.data.type} className="me-2 w-4 h-4" />
-          {item.id}
+          <PropertyTypeIcon
+            type={"type" in item.data ? item.data.type : "$ref"}
+            className="me-2 w-4 h-4"
+          />
+          {item.name}
         </>
       )}
     >
