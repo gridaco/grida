@@ -563,6 +563,7 @@ function MonoFormField({
         type="hidden"
         name={name}
         defaultValue={defaultValue}
+        // hidden value supports computed value
         value={(computed_value ?? undefined) as any}
       />
     );

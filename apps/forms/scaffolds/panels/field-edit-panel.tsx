@@ -970,15 +970,12 @@ export function FieldEditPanel({
               </PanelPropertyField>
             </PanelPropertyFields>
           </PanelPropertySection>
-          {supports_computedvalue &&
-            // TODO: DEV ONLY
-            process.env.NODE_ENV == "development" && (
-              <FieldValueExpression
-                expression={v_value ?? undefined}
-                onChange={set_v_value}
-              />
-            )}
-
+          {supports_computedvalue && (
+            <FieldValueExpression
+              expression={v_value ?? undefined}
+              onChange={set_v_value}
+            />
+          )}
           {FieldSupports.file_upload(type) && state.connections.supabase && (
             <>
               <hr />
