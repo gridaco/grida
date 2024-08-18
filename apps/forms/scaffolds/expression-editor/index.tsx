@@ -167,11 +167,10 @@ function PropertyNode({ data }: any) {
   return (
     <div className="px-4 py-2 shadow-md rounded-md border">
       <div>
-        <PropertyAccessDropdownMenu
-          data={{
-            a: { value: "" },
+        {/* <PropertyAccessDropdownMenu
+          schema={{
           }}
-        />
+        /> */}
         <Handle type="source" position={Position.Right} />
       </div>
     </div>
