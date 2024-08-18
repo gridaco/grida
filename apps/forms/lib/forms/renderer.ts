@@ -438,7 +438,7 @@ export class FormRenderTree {
       step: field.step ?? undefined,
       min: field.min ?? undefined,
       max: field.max ?? undefined,
-      v_value: field.v_value ?? undefined,
+      v_value: (field.v_value as Tokens.TValueExpression) ?? undefined,
     };
 
     if (FieldSupports.file_upload(field.type)) {

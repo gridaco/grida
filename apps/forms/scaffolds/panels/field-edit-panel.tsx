@@ -265,7 +265,7 @@ export function FieldEditPanel({
   // v_value
   const [v_value, set_v_value] = useState<
     Tokens.TValueExpression | null | undefined
-  >(init?.v_value);
+  >(init?.v_value as Tokens.TValueExpression);
 
   // options
   const [{ options, optgroups }, dispatchoptions] = useReducer(

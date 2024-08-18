@@ -37,8 +37,9 @@ export function reducer(
       return produce(state, (draft) => {
         try {
           draft.fields[id].files![index].duration = metadata.duration;
-          if (draft.fields[id].file)
-            draft.fields[id].file.duration = metadata.duration;
+          if (draft.fields[id].file) {
+            draft.fields[id].file!.duration = metadata.duration;
+          }
         } catch (e) {
           console.error("metadata resolved, but file was removed", metadata);
         }
