@@ -1,152 +1,77 @@
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuPortal,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import PropertyTypeIcon from "./property-type-icon";
-
-// Define the type for a property in the schema
-interface Property {
-  name: string;
-  type: "string" | "number" | "object" | "unknown" | "this";
-  properties: Property[];
-  value?: any;
-  expression: string[];
-}
-
-// Define the type for the schema
-interface Schema {
-  type: "string" | "number" | "object" | "unknown" | "this";
-  properties: Property[];
-}
-
-// Function to get the type of a value
-const getType = (value: any): "string" | "number" | "object" | "unknown" => {
-  if (typeof value === "object" && !Array.isArray(value)) {
-    return "object";
-  }
-  if (typeof value === "string") {
-    return "string";
-  }
-  if (typeof value === "number") {
-    return "number";
-  }
-  return "unknown";
-};
-
-// Transform data to a format partially resembling JSON Schema
-const transformDataToSchema = (data: Record<string, any>): Schema => {
-  const transform = (obj: Record<string, any>, path: string[] = []): Schema => {
-    const properties = Object.keys(obj).map((key: string) => {
-      const value = obj[key];
-      const type = getType(value);
-      const expression = [...path, key];
-
-      return {
-        name: key,
-        type,
-        properties:
-          type === "object" ? transform(value, expression).properties : [],
-        value: type !== "object" ? value : undefined,
-        expression,
-      };
-    });
-
-    return {
-      type: "object",
-      properties: [
-        {
-          name: "this",
-          type: "this",
-          properties: [],
-          expression: path,
-        },
-        ...properties,
-      ],
-    };
-  };
-
-  return transform(data);
-};
-
-// Render menu items from the transformed schema
-const renderMenuItems = (
-  properties: Property[],
-  onSelect: (expression: string[]) => void
-): React.ReactNode => {
-  return properties.map((property, index) => {
-    if (property.type === "object" && property.properties.length > 0) {
-      return (
-        <DropdownMenuSub key={index}>
-          <DropdownMenuSubTrigger>
-            <PropertyTypeIcon type={property.type} className="me-2 w-4 h-4" />
-            {property.name}
-          </DropdownMenuSubTrigger>
-          <DropdownMenuPortal>
-            <DropdownMenuSubContent>
-              {renderMenuItems(property.properties, onSelect)}
-            </DropdownMenuSubContent>
-          </DropdownMenuPortal>
-        </DropdownMenuSub>
-      );
-    } else {
-      return (
-        <DropdownMenuItem
-          key={index}
-          onSelect={() => onSelect(property.expression)}
-        >
-          <PropertyTypeIcon type={property.type} className="me-2 w-4 h-4" />
-          {property.name}
-        </DropdownMenuItem>
-      );
-    }
-  });
-};
+import React, { useMemo } from "react";
+import PropertyTypeIcon from "@/components/property-type-icon";
+import NestedDropdownMenu, {
+  NestedMenuItemProps,
+} from "@/components/extension/nested-dropdown-menu";
+import { accessSchema, TProperty, TSchema } from "@/lib/spock";
 
 // Props for the NestedDropdownMenu component
-interface NestedDropdownMenuProps {
-  data: Record<string, any>;
-  onSelect: (expression: string[]) => void;
+interface PropertyAccessDropdownMenuProps<T extends object> {
   asSubmenu?: boolean;
+  asChild?: boolean;
+  schema?: TSchema<T>;
+  onSelect?: (expression: string[], item: NestedMenuItemProps) => void;
 }
 
 // Main component to render the nested dropdown menu
-export default function NestedDropdownMenu({
-  data,
+export default function PropertyAccessDropdownMenu<T extends object>({
+  schema,
   asSubmenu,
+  asChild,
   onSelect,
-}: NestedDropdownMenuProps) {
-  const transformedData = transformDataToSchema(data);
+  children,
+}: React.PropsWithChildren<PropertyAccessDropdownMenuProps<T>>) {
+  const property_to_menu_item = (name: string, property: TProperty) =>
+    "$ref" in property
+      ? {
+          name: name,
+          data: property,
+          resolved: true,
+        }
+      : {
+          name: name,
+          data: property,
+        };
 
-  if (asSubmenu) {
-    return (
-      <DropdownMenuSub>
-        <DropdownMenuSubTrigger>
+  return (
+    <NestedDropdownMenu<TProperty>
+      asChild={asChild}
+      asSubmenu={asSubmenu}
+      onSelect={onSelect}
+      disabled={!schema}
+      resolveMenuItems={(path) => {
+        if (!schema) return undefined;
+        if (!schema.properties) return undefined;
+
+        if (path === "root") {
+          return Object.keys(schema.properties).map((key) => {
+            const property = schema.properties![key];
+            return property_to_menu_item(key, property);
+          });
+        }
+
+        const item = accessSchema(path, schema);
+
+        if (!item) return undefined;
+        if (!("properties" in item)) return undefined;
+        if (!item.properties) return undefined;
+        return Object.keys(item.properties).map((key) => {
+          const property = item.properties![key];
+          return property_to_menu_item(key, property);
+        });
+      }}
+      // renderMenuItem={(path) => <>{path.join(".")}</>}
+      renderMenuItem={(path, item) => (
+        <>
           <PropertyTypeIcon
-            type={transformedData.type}
+            type={"type" in item.data ? item.data.type : "$ref"}
             className="me-2 w-4 h-4"
           />
-          Page
-        </DropdownMenuSubTrigger>
-        <DropdownMenuPortal>
-          <DropdownMenuSubContent>
-            {renderMenuItems(transformedData.properties, onSelect)}
-          </DropdownMenuSubContent>
-        </DropdownMenuPortal>
-      </DropdownMenuSub>
-    );
-  }
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger>Open Menu</DropdownMenuTrigger>
-      <DropdownMenuContent>
-        {renderMenuItems(transformedData.properties, onSelect)}
-      </DropdownMenuContent>
-    </DropdownMenu>
+          {item.name}
+        </>
+      )}
+    >
+      {children}
+    </NestedDropdownMenu>
   );
 }

@@ -1,0 +1,111 @@
+{
+  "$schema": "https://forms.grida.co/schema/form.schema.json",
+  "title": "Computed Fields Demo",
+  "name": "computed property (output) fields",
+  "description": "Use Computed property to reference / compute value from other fields",
+  "method": "post",
+  "fields": [
+    {
+      "name": "celcius",
+      "label": "°C",
+      "placeholder": "Enter temperature in Celcius",
+      "type": "range"
+    },
+    {
+      "name": "fahrenheit",
+      "label": "°F",
+      "type": "number",
+      "placeholder": "°F = °C * 9/5 + 32",
+      "readonly": true,
+      "value": [
+        [
+          {
+            "$ref": "#/fields/celcius/value"
+          },
+          "*",
+          1.8
+        ],
+        "+",
+        32
+      ]
+    },
+    {
+      "name": "upload",
+      "label": "Select File",
+      "type": "file"
+    },
+    {
+      "name": "filemetadata",
+      "readonly": true,
+      "label": "Selected File",
+      "placeholder": "selected file name will be displayed here",
+      "type": "textarea",
+      "value": [
+        [
+          "Name: ",
+          "+",
+          {
+            "$ref": "#/fields/upload/files/0/name"
+          }
+        ],
+        "+",
+        [
+          "\nSize: ",
+          "+",
+          {
+            "$ref": "#/fields/upload/files/0/size"
+          }
+        ]
+      ]
+    }
+  ],
+  "blocks": [
+    {
+      "type": "header",
+      "title": "Computed Fields Demo",
+      "description": "Use Computed property to reference / compute value from other fields"
+    },
+    { "type": "divider" },
+    {
+      "type": "field",
+      "field": {
+        "$ref": "#/fields/celcius"
+      }
+    },
+    {
+      "type": "field",
+      "field": {
+        "$ref": "#/fields/fahrenheit"
+      }
+    },
+    {
+      "type": "header",
+      "title": "🔥 Too Hot!",
+      "description": "Please dial down the temperature right now!",
+      "hidden": [
+        [
+          {
+            "$ref": "#/fields/celcius/value"
+          },
+          "??",
+          0
+        ],
+        "<",
+        35
+      ]
+    },
+    { "type": "divider" },
+    {
+      "type": "field",
+      "field": {
+        "$ref": "#/fields/upload"
+      }
+    },
+    {
+      "type": "field",
+      "field": {
+        "$ref": "#/fields/filemetadata"
+      }
+    }
+  ]
+}

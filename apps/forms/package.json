@@ -68,6 +68,7 @@
     "@visx/tooltip": "^3.3.0",
     "@visx/visx": "^3.11.0",
     "@visx/xychart": "^3.11.0",
+    "@xyflow/react": "^12.1.0",
     "ai": "3.1.8",
     "ajv": "^8.13.0",
     "axios": "1.6.7",

@@ -832,7 +832,7 @@ function SectionStyle() {
     <>
       <Select name="css" value={css} onValueChange={onSectionStyleChange}>
         <SelectTrigger>
-          <SelectValue placeholder="Select Section Style" />
+          <SelectValue placeholder="None" />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value={""}>None</SelectItem>

@@ -23,12 +23,27 @@ import { SectionStyle } from "../agent/theme";
 import { usePrevious } from "@uidotdev/usehooks";
 import equal from "deep-equal";
 import { FormPageBackgroundSchema, FormStyleSheetV1Schema } from "@/types";
+import { FormAgentProvider, initdummy } from "@/lib/formstate";
 
 export default function BlocksEditorRoot() {
   return (
     <DndContextProvider>
-      <BlocksEditor />
+      <DummyFormAgentStateProvider>
+        <BlocksEditor />
+      </DummyFormAgentStateProvider>
     </DndContextProvider>
+  );
+}
+
+/**
+ * TODO: this is added while developing a v_value feature on form field. once the value computation is moved to the higher level, this can be removed.
+ * @returns
+ */
+function DummyFormAgentStateProvider({
+  children,
+}: React.PropsWithChildren<{}>) {
+  return (
+    <FormAgentProvider initial={initdummy()}>{children}</FormAgentProvider>
   );
 }
 

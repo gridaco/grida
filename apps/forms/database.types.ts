@@ -1158,6 +1158,7 @@ export type Database = {
           storage: Json | null
           type: Database["grida_forms"]["Enums"]["form_field_type"]
           updated_at: string
+          v_value: Json | null
         }
         Insert: {
           accept?: string | null
@@ -1189,6 +1190,7 @@ export type Database = {
           storage?: Json | null
           type?: Database["grida_forms"]["Enums"]["form_field_type"]
           updated_at?: string
+          v_value?: Json | null
         }
         Update: {
           accept?: string | null
@@ -1220,6 +1222,7 @@ export type Database = {
           storage?: Json | null
           type?: Database["grida_forms"]["Enums"]["form_field_type"]
           updated_at?: string
+          v_value?: Json | null
         }
         Relationships: [
           {

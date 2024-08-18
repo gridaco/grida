@@ -315,6 +315,9 @@ function ModeConnect() {
             <SidebarMenuItem muted>
               <ArchiveIcon className="inline align-middle w-4 h-4 me-2" />
               Store
+              <Badge variant="outline" className="ms-auto">
+                alpha
+              </Badge>
             </SidebarMenuItem>
           </SidebarMenuLink>
 
@@ -368,15 +371,17 @@ function ModeConnect() {
           </SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuList>
-          {/* <Link href={`connect/parameters`}> */}
-          <SidebarMenuItem disabled>
-            <CodeIcon className="inline align-middle w-4 h-4 me-2" />
-            URL parameters
-            <Badge variant="outline" className="ms-auto">
-              soon
-            </Badge>
-          </SidebarMenuItem>
-          {/* </Link> */}
+          <SidebarMenuLink
+            href={editorlink("connect/parameters", {
+              document_id: form_document_id,
+              basepath: basepath,
+            })}
+          >
+            <SidebarMenuItem>
+              <CodeIcon className="inline align-middle w-4 h-4 me-2" />
+              URL parameters
+            </SidebarMenuItem>
+          </SidebarMenuLink>
           {/* <Link href={`connect/webhooks`}> */}
           <SidebarMenuItem disabled>
             <CodeIcon className="inline align-middle w-4 h-4 me-2" />

@@ -3,7 +3,7 @@ import type { FormFieldDefinition } from "@/types";
 export namespace RawdataProcessing {
   export function idkeytonamekey(
     data: Record<string, any>,
-    fields: FormFieldDefinition[]
+    fields: Pick<FormFieldDefinition, "id" | "name">[]
   ) {
     const result: Record<string, any> = {};
     for (const key in data) {
@@ -17,7 +17,7 @@ export namespace RawdataProcessing {
 
   export function namekeytoidkey(
     data: Record<string, any>,
-    fields: FormFieldDefinition[]
+    fields: Pick<FormFieldDefinition, "id" | "name">[]
   ) {
     const result: Record<string, any> = {};
     for (const key in data) {

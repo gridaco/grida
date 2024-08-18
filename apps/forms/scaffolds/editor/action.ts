@@ -128,7 +128,7 @@ export interface CreateFielFromBlockdAction {
 export interface BlockVHiddenAction {
   type: "blocks/hidden";
   block_id: string;
-  v_hidden: Tokens.ConditionExpression;
+  v_hidden: Tokens.ShorthandBooleanBinaryExpression;
 }
 
 export interface HtmlBlockBodyAction {

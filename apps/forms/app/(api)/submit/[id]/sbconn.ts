@@ -128,8 +128,22 @@ function asTableRowData(
     );
 
     switch (type) {
-      case "number": {
-        parsedvalue = Number(data[key]);
+      case "int":
+      case "int2":
+      case "int4":
+      case "int8":
+      case "bigint":
+      case "integer": {
+        parsedvalue = parseInt(data[key]);
+        break;
+      }
+      case "float":
+      case "float4":
+      case "float8":
+      case "double precision":
+      case "numeric":
+      case "real": {
+        parsedvalue = parseFloat(data[key]);
         break;
       }
       case "boolean": {

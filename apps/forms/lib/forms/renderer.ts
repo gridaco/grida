@@ -11,6 +11,7 @@ import { blockstree } from "./tree";
 import { FormBlockTree } from "./types";
 import { toArrayOf } from "@/types/utility";
 import { FieldSupports } from "@/k/supported_field_types";
+import type { Tokens } from "@/ast";
 
 export type ClientRenderBlock =
   | ClientFieldRenderBlock
@@ -28,7 +29,7 @@ export interface BaseRenderBlock {
   type: FormBlockType;
   local_index: number;
   parent_id: string | null;
-  hidden?: FormBlock["v_hidden"] | null;
+  v_hidden?: FormBlock["v_hidden"] | null;
 }
 
 type ClientRenderOption = {
@@ -71,6 +72,7 @@ export interface ClientFieldRenderBlock<T extends FormInputType = FormInputType>
     data?: FormFieldDataSchema | null;
     accept?: string;
     multiple?: boolean;
+    v_value?: Tokens.TValueExpression;
   };
 }
 
@@ -206,7 +208,7 @@ export class FormRenderTree {
           id: block.id,
           local_index: block.local_index,
           parent_id: block.parent_id,
-          hidden: block.v_hidden,
+          v_hidden: block.v_hidden,
         } as const;
 
         if (is_field) {
@@ -436,6 +438,7 @@ export class FormRenderTree {
       step: field.step ?? undefined,
       min: field.min ?? undefined,
       max: field.max ?? undefined,
+      v_value: (field.v_value as Tokens.TValueExpression) ?? undefined,
     };
 
     if (FieldSupports.file_upload(field.type)) {

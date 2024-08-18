@@ -193,7 +193,7 @@ class GridaXSupabaseStorageTaskPooler {
 
   queue(
     rows: ReadonlyArray<Record<string, any>>,
-    fields: FormFieldDefinition[]
+    fields: Pick<FormFieldDefinition, "id" | "storage" | "type">[]
   ) {
     const x_supabase_storage_file_fields = fields.filter(
       (f) =>

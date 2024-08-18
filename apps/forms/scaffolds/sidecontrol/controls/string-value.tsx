@@ -21,8 +21,10 @@ import { Tokens } from "@/ast";
 import { Badge } from "@/components/ui/badge";
 import { Factory } from "@/ast/factory";
 import { useEditorState } from "@/scaffolds/editor";
-import NestedDropdownMenu from "./context/variable";
-import PropertyTypeIcon from "./context/property-type-icon";
+import PropertyAccessDropdownMenu from "./context/variable";
+import PropertyTypeIcon from "@/components/property-type-icon";
+import { useMemo } from "react";
+import { inferSchemaFromData } from "@/lib/spock";
 
 export function StringValueControl({
   value,
@@ -38,6 +40,14 @@ export function StringValueControl({
   const {
     document: { selected_node_context },
   } = state;
+
+  const schema = useMemo(
+    () =>
+      selected_node_context
+        ? inferSchemaFromData(selected_node_context)
+        : undefined,
+    [selected_node_context]
+  );
 
   return (
     <div className="relative group w-full">
@@ -57,15 +67,16 @@ export function StringValueControl({
           side="bottom"
           className="max-w-sm overflow-hidden min-w-96"
         >
-          <NestedDropdownMenu
+          <PropertyAccessDropdownMenu
             asSubmenu
-            onSelect={(expression) => {
-              onValueChange?.(
-                Factory.createPropertyAccessExpression(expression)
-              );
+            schema={schema}
+            onSelect={(path) => {
+              onValueChange?.(Factory.createPropertyAccessExpression(path));
             }}
-            data={selected_node_context || {}}
-          />
+          >
+            <PropertyTypeIcon type="object" className="me-2 w-4 h-4" />
+            Page
+          </PropertyAccessDropdownMenu>
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>
               <TokensIcon className="me-2 w-4 h-4" />

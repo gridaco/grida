@@ -44,6 +44,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import clsx from "clsx";
+import { editorlink } from "@/lib/forms/url";
+import { SYSTEM_GF_KEY_STARTS_WITH } from "@/k/system";
 
 export function FieldBlock({
   id,
@@ -53,6 +55,8 @@ export function FieldBlock({
 }: EditorFlatFormBlock) {
   const [state, dispatch] = useEditorState();
   const [focused, setFocus] = useBlockFocus(id);
+
+  const { document_id, basepath } = state;
 
   const form_field: FormFieldDefinition | undefined = state.fields.find(
     (f) => f.id === form_field_id
@@ -260,11 +264,32 @@ export function FieldBlock({
             <p className="text-xs opacity-50">
               Hidden fields are not displayed in the form.
               <br />
-              Configure how this field is populated in the form{" "}
-              <Link className="underline" href="./settings">
-                settings
-              </Link>
-              .
+              Configure how this field is populated with{" "}
+              <Link
+                className="underline"
+                href={editorlink("connect/parameters", {
+                  document_id,
+                  basepath,
+                })}
+              >
+                URL Parameters
+              </Link>{" "}
+              {form_field.required ? "(required)" : ""}{" "}
+              {!(
+                form_field.name.startsWith(SYSTEM_GF_KEY_STARTS_WITH) ||
+                form_field.required
+              ) && (
+                <>
+                  or{" "}
+                  <Button
+                    onClick={onFieldEditClick}
+                    variant="link"
+                    className="inline text-xs p-0"
+                  >
+                    Edit computed value
+                  </Button>
+                </>
+              )}
             </p>
           </div>
         ) : (

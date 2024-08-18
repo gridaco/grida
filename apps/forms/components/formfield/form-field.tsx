@@ -54,6 +54,8 @@ import { PhoneField } from "./phone-field";
 import { RichTextEditorField } from "./richtext-field";
 import { FieldProperties } from "@/k/supported_field_types";
 import "core-js/features/map/group-by";
+import { Tokens } from "@/ast";
+import { useValue } from "@/lib/spock";
 
 /**
  * this disables the auto zoom in input text tag safari on iphone by setting font-size to 16px
@@ -86,9 +88,11 @@ interface IInputField {
   data?: FormFieldDataSchema | null;
   fileupload?: FileUploadStrategy;
   fileresolve?: FileResolveStrategy;
+  v_value?: Tokens.TValueExpression | null;
   onValueChange?: (value: string) => void;
   onRangeChange?: (value: number[]) => void;
   onCheckedChange?: (checked: boolean) => void;
+  onFilesChange?: (files: File[]) => void;
 }
 
 interface IFormField extends IInputField {
@@ -177,15 +181,20 @@ function MonoFormField({
   vanilla,
   locked,
   preview,
+  v_value,
   onValueChange,
   onRangeChange,
   onCheckedChange,
+  onFilesChange,
 }: IMonoFormFieldRenderingProps) {
   const __onchange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     onValueChange?.(e.target.value);
   };
+
+  const computed_value = useValue(v_value);
+  // console.log("computed_value", name, v_value, computed_value);
 
   const sharedInputProps: (
     | React.ComponentProps<"input">
@@ -202,6 +211,8 @@ function MonoFormField({
     accept,
     multiple,
     defaultValue: defaultValue,
+    // experimental: this does not work with checkbox and other custom components.
+    value: (computed_value as string | string[] | number) ?? undefined,
     // form validation related
     required: novalidate ? false : required,
     pattern: novalidate ? undefined : pattern || undefined,
@@ -326,6 +337,11 @@ function MonoFormField({
               type="file"
               {...(sharedInputProps as React.ComponentProps<"input">)}
               accept={accept}
+              onChange={(e) => {
+                const files = e.target.files;
+                if (!files) return;
+                onFilesChange?.(Array.from(files));
+              }}
             />
           );
         }
@@ -341,6 +357,7 @@ function MonoFormField({
             }
             maxSize={getMaxUploadSize(fileupload?.type)}
             uploader={makeUploader(fileupload)}
+            onFilesChange={onFilesChange}
           />
         );
       }
@@ -501,6 +518,8 @@ function MonoFormField({
           <SliderWithValueLabel
             onRangeChange={onRangeChange}
             {...(sharedInputProps as React.ComponentProps<"input">)}
+            // TODO: range does not support default value. - for safety
+            defaultValue={undefined}
           />
         );
       }
@@ -541,7 +560,15 @@ function MonoFormField({
       return <p>hidden field - {name}</p>;
     }
 
-    return <input type="hidden" name={name} defaultValue={defaultValue} />;
+    return (
+      <input
+        type="hidden"
+        name={name}
+        defaultValue={defaultValue}
+        // hidden value supports computed value
+        value={(computed_value ?? undefined) as any}
+      />
+    );
   }
 
   if (type === "payment") {

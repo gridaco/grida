@@ -123,7 +123,7 @@ export namespace Access {
    * const wrappedPath = ["deep"] as OkWithContext<typeof context>;
    * console.log(access(obj, wrappedPath, context)); // Output: "hello"
    */
-  export function access<T, P extends KeyPath<T>>(
+  export function access<T extends object, P extends string[] | KeyPath<T>>(
     obj: T,
     path: P,
     context?: ScopedIdentifiersContext
@@ -155,11 +155,10 @@ export namespace Access {
    * @param context - Optional context containing scoped identifiers that map to paths.
    * @returns A merged object containing the selected values.
    */
-  export function select<T = any, P extends KeyPath<T> = any>(
-    obj: T,
-    paths: P[],
-    context?: ScopedIdentifiersContext
-  ): Partial<T> {
+  export function select<
+    T extends object = any,
+    P extends string[] | KeyPath<T> = any,
+  >(obj: T, paths: P[], context?: ScopedIdentifiersContext): Partial<T> {
     const result: any = {};
 
     paths.forEach((path) => {

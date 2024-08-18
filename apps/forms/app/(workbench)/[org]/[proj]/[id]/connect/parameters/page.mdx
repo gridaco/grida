@@ -1,3 +1,57 @@
 # URL Parameters
 
-You can ues url parameters to fill out the form fields.
+You can use URL parameters to dynamically pre-populate form fields when sharing or embedding your form. This feature is useful for providing contextual data (e.g., user information) without requiring manual input from the user.
+
+## Key Concepts and Behaviors
+
+### 1. **Hidden Fields**
+
+- Hidden fields are not visible to the form user but can be populated using URL parameters. The name of the hidden field must match the name of the URL parameter exactly (1:1 matching).
+- Example: If a hidden field has the name `user_id`, you can pre-populate it by adding `?user_id=12345` to the form URL.
+
+### 2. **Required Hidden Fields**
+
+- Hidden fields can also be marked as required in the form settings. In such cases, the field must be explicitly rendered in the form (by adding it via the editor).
+- A required hidden field also needs to be populated via a URL parameter or by manual input. However, supplying the parameter via the URL is not mandatory unless the field is both hidden and required.
+- Example: A required hidden field `campaign_id` must be rendered on the form, and the URL could include `?campaign_id=xyz`.
+
+### 3. **System Parameters**
+
+- System parameters are reserved and always prefixed with `__gf_`. These parameters carry special meanings and typically represent internal form-specific or user-specific data.
+- Example: `__gf_customer_uuid` is a system parameter that can be used to identify a customer. You can generate a new UUID for each customer or use an existing identifier from your database.
+- Usage example: `?__gf_customer_uuid=123e4567-e89b-12d3-a456-426614174000` sets the customer’s UUID for the form session.
+
+### 4. **Handling Unknown URL Parameters**
+
+- Unregistered URL parameters (i.e., parameters that do not match any form fields) will be ignored by default. However, even if you set the "unknown field handling strategy" to `accept`, it only applies to the data submitted via the form, not to pre-populated fields via URL parameters.
+- This ensures that only valid fields are populated through URL parameters, even if other parameters are passed in the URL.
+
+### 5. **Pre-filling Non-Hidden Fields**
+
+- URL parameters can also be used to pre-populate non-hidden (visible) fields. The URL parameter values will act as default values that the user can modify unless the field is set to `readonly`.
+- Example: If the form has a visible field `email`, you can pre-fill it by passing `?email=test@example.com` in the URL. The user can then modify the email unless the field is marked `readonly`.
+- Readonly fields will retain the value passed via URL and cannot be changed by the user.
+
+## Example Usage
+
+Here’s an example URL for a form where both hidden and visible fields are pre-populated:
+
+```
+https://forms.grida.co/d/e/xxx?email=test@example.com&__gf_customer_uuid=123e4567-e89b-12d3-a456-426614174000&name=JohnDoe&age=30&campaign_id=abc123
+```
+
+- **`email=test@example.com`**: The visible `email` field is pre-filled with "test@example.com". The user can change this unless the field is set to `readonly`.
+- **`__gf_customer_uuid=123e4567-e89b-12d3-a456-426614174000`**: The hidden system field `__gf_customer_uuid` is set to the customer UUID.
+- **`name=JohnDoe`**: The visible `name` field is pre-filled with "JohnDoe", which can be edited by the user.
+- **`age=30`**: The visible `age` field is pre-filled with "30", allowing user modification.
+- **`campaign_id=abc123`**: A hidden field `campaign_id` is set to "abc123" and could be required based on the form settings.
+
+In this case:
+
+- The form displays `email`, `name`, and `age` as editable fields (unless set to readonly).
+- Hidden fields like `__gf_customer_uuid` and `campaign_id` will be populated silently, and `campaign_id` may be required depending on the form configuration.
+
+### Notes:
+
+- Make sure that field names in the URL match exactly with the field names defined in your form (case-sensitive).
+- System parameters (those prefixed with `__gf_`) are for internal use and should not be altered unless you are handling specific internal logic, such as tracking customers or campaigns.

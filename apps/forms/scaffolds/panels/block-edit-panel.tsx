@@ -17,32 +17,20 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { PopoverClose } from "@radix-ui/react-popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { useEditorState } from "../editor";
-import toast from "react-hot-toast";
+import { useEditorState } from "@/scaffolds/editor";
 import { MixIcon } from "@radix-ui/react-icons";
-import type { Tokens } from "@/ast";
+import { Tokens } from "@/ast";
 import { KeyIcon } from "lucide-react";
+import toast from "react-hot-toast";
+import { EditBinaryExpression } from "./extensions/v-edit";
+import { PopoverClose } from "@radix-ui/react-popover";
+import { FormExpression } from "@/lib/forms/expression";
 
 /**
  * NOTE - the type string represents a id, not a scalar for this component, atm.
  * TODO: support scalar types
  */
-type ConditionExpression = [
-  // field id, will be used as $ref
-  string,
-  // operator
-  Tokens.ConditionOperator,
-  // option id value, will be used as scalar
-  string,
-];
+type ConditionExpression = Tokens.ShorthandBooleanBinaryExpression;
 
 export function BlockEditPanel({
   ...props
@@ -70,10 +58,8 @@ export function BlockEditPanel({
       return;
     }
     //
-    const exp: Tokens.ConditionExpression = [
-      {
-        $ref: `#/fields/${l}/value`,
-      },
+    const exp: Tokens.ShorthandBooleanBinaryExpression = [
+      FormExpression.create_field_property_json_ref(l as string, "value"),
       op,
       r,
     ];
@@ -131,12 +117,35 @@ export function BlockEditPanel({
                 </div>
               </PopoverTrigger>
               <PopoverContent collisionPadding={16} className="w-full">
-                <Condition
-                  defaultValue={condition_v_hidden}
-                  onValueCommit={(value) => {
-                    set_condition_v_hidden(value);
-                  }}
-                />
+                <div className="flex gap-4">
+                  <Label htmlFor="phone" className="text-right">
+                    Block is hidden when <br />
+                    <code className="text-muted-foreground">
+                      block.hidden ={" "}
+                    </code>
+                  </Label>
+                  <EditBinaryExpression
+                    resolvedType="boolean"
+                    leftOptions={state.fields.map((f) => ({
+                      type: "form_field_value",
+                      identifier: f.id,
+                      label: f.name,
+                    }))}
+                    rightOptions={(left) =>
+                      state.fields
+                        .find((f) => f.id === left)
+                        ?.options?.map((o) => ({
+                          type: "option_value_reference",
+                          identifier: o.id,
+                          label: o.label || o.value,
+                        }))
+                    }
+                    defaultValue={condition_v_hidden}
+                    onValueChange={(value) => {
+                      set_condition_v_hidden(value);
+                    }}
+                  />
+                </div>
               </PopoverContent>
             </Popover>
             <div className="col-span-3">
@@ -156,111 +165,12 @@ export function BlockEditPanel({
         </div>
         <SheetFooter>
           <SheetClose asChild>
-            <Button onClick={onSave}>Save</Button>
+            <Button disabled={!condition_v_hidden} onClick={onSave}>
+              Save
+            </Button>
           </SheetClose>
         </SheetFooter>
       </SheetContent>
     </Sheet>
-  );
-}
-
-function Condition({
-  defaultValue,
-  onValueCommit,
-}: {
-  defaultValue?: ConditionExpression;
-  onValueCommit?: (value: ConditionExpression) => void;
-}) {
-  const [state, dispatch] = useEditorState();
-  const [lefthand, setLefthand] = useState<string>();
-  const [operator, setOperator] = useState<Tokens.ConditionOperator>();
-  const [righthand, setRighthand] = useState<string>();
-
-  const block = useMemo(
-    () => state.blocks.find((b) => b.id === state.focus_block_id),
-    [state.blocks, state.focus_block_id]
-  );
-
-  block?.v_hidden;
-
-  const lefthandField = useMemo(
-    () => state.fields.find((f) => f.id === lefthand),
-    [state.fields, lefthand]
-  );
-
-  const options = lefthandField?.options;
-
-  const onDone = (e: any) => {
-    // validate
-    if (!lefthand || !operator || !righthand) {
-      e.preventDefault();
-      toast.error("Invalid Condition");
-      return;
-    }
-
-    onValueCommit?.([lefthand, operator, righthand]);
-  };
-
-  return (
-    <div className="grid gap-4 py-4">
-      <div className="grid grid-cols-4 items-center gap-4">
-        <Label htmlFor="phone" className="text-right">
-          Hide Block When
-        </Label>
-        <Select value={lefthand} onValueChange={setLefthand}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select Field" />
-          </SelectTrigger>
-          <SelectContent>
-            {state.fields.map((f) => (
-              <SelectItem key={f.id} value={f.id}>
-                {f.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={operator}
-          onValueChange={(v) => {
-            setOperator(v as Tokens.ConditionOperator);
-          }}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Operator" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="==">
-              is <code>(==)</code>
-            </SelectItem>
-            <SelectItem value="!=">
-              is not <code>(!=)</code>
-            </SelectItem>
-          </SelectContent>
-        </Select>
-        <Select
-          value={righthand}
-          onValueChange={setRighthand}
-          disabled={!lefthand || !operator}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Select Value" />
-          </SelectTrigger>
-          <SelectContent>
-            {options?.map((o) => (
-              <SelectItem key={o.id} value={o.id}>
-                {o.value}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <footer>
-        <PopoverClose asChild>
-          <Button onClick={onDone} size="sm" variant="outline">
-            Done
-          </Button>
-        </PopoverClose>
-      </footer>
-    </div>
   );
 }

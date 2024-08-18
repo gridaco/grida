@@ -35,10 +35,11 @@ import {
 } from "@/lib/forms";
 import { Button } from "@/components/ui/button";
 import { FormAgentProvider, useFormAgentState, init } from "@/lib/formstate";
-import { useLogical } from "./use-logical";
 import { FieldSupports } from "@/k/supported_field_types";
 import { SessionDataSyncProvider } from "./sync";
+import { MediaLoadProvider } from "./mediaload";
 import { FormAgentMessagingInterface } from "./interface";
+import { useValue } from "@/lib/spock";
 import { emit } from "./emit";
 
 const cls_button_submit =
@@ -119,6 +120,7 @@ function Providers({
         })}
       >
         <FormAgentMessagingInterface />
+        <MediaLoadProvider />
         <SessionDataSyncProvider session_id={session_id}>
           <TossPaymentsCheckoutProvider initial={checkoutSession}>
             {children}
@@ -390,7 +392,18 @@ function BlockRenderer({
     [block, dispatch]
   );
 
-  const hidden = useLogical(block.hidden);
+  const onFilesChange = useCallback(
+    (files: File[]) => {
+      dispatch({
+        type: "fields/files/change",
+        id: (block as ClientFieldRenderBlock).field.id,
+        files,
+      });
+    },
+    [block, dispatch]
+  );
+
+  const hidden = useValue<boolean>(block.v_hidden);
 
   const { current_section_id } = state;
 
@@ -482,6 +495,7 @@ function BlockRenderer({
                   multiple={field.multiple}
                   novalidate={is_not_in_current_section || hidden}
                   locked={is_not_in_current_section || hidden}
+                  v_value={field.v_value}
                   fileupload={
                     FieldSupports.file_upload(type)
                       ? (field as ClientFileUploadFieldRenderBlock["field"])
@@ -500,6 +514,7 @@ function BlockRenderer({
                     // this does not support multiple range input
                     onValueChange(num);
                   }}
+                  onFilesChange={onFilesChange}
                 />
               ) : (
                 <></>
