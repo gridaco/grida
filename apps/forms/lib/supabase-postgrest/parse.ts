@@ -2,6 +2,7 @@ import type { OpenAPI } from "openapi-types";
 import type { GridaSupabase } from "@/types";
 import type { ColumnType } from "./@types/column-types";
 import { XMLParser } from "fast-xml-parser";
+import { PGSupportedColumnTypeWithoutArray } from "./@types/pg";
 
 export namespace SupabasePostgRESTOpenApi {
   export type SupabaseOpenAPIDocument = OpenAPI.Document & {
@@ -277,7 +278,7 @@ export namespace SupabasePostgRESTOpenApi {
     is_enum: boolean;
     is_array: boolean;
     format: ColumnType;
-    type: string;
+    type: PGSupportedColumnTypeWithoutArray;
   } {
     const is_array = property.format.includes("[]");
     const scalar = is_array
@@ -294,7 +295,7 @@ export namespace SupabasePostgRESTOpenApi {
       is_enum,
       is_array,
       format: scalar,
-      type: property.type,
+      type: property.type as PGSupportedColumnTypeWithoutArray,
     };
   }
 }
