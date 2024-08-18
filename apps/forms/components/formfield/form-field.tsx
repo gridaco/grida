@@ -518,6 +518,8 @@ function MonoFormField({
           <SliderWithValueLabel
             onRangeChange={onRangeChange}
             {...(sharedInputProps as React.ComponentProps<"input">)}
+            // TODO: range does not support default value. - for safety
+            defaultValue={undefined}
           />
         );
       }
