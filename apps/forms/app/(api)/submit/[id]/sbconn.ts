@@ -134,7 +134,8 @@ function asTableRowData(
       case "int8":
       case "bigint":
       case "integer": {
-        parsedvalue = parseInt(data[key]);
+        if (data[key] === undefined) parsedvalue = undefined;
+        else parsedvalue = parseInt(data[key]) || undefined;
         break;
       }
       case "float":
@@ -143,7 +144,8 @@ function asTableRowData(
       case "double precision":
       case "numeric":
       case "real": {
-        parsedvalue = parseFloat(data[key]);
+        if (data[key] === undefined) parsedvalue = undefined;
+        else parsedvalue = parseFloat(data[key]) || undefined;
         break;
       }
       case "boolean": {
