@@ -12,6 +12,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { stringfyThemeVariables } from "@/theme/palettes/utils";
 import palettes from "@/theme/palettes";
 import { CustomCSS } from "@/theme/customcss";
+import { FormAgentGlobalWindowMessagingInterface } from "@/scaffolds/e/form/interface";
 
 export const revalidate = 0;
 
@@ -138,15 +139,17 @@ export default async function Layout({
             `,
           }}
         />
-        <ThemeProvider
-          attribute="class"
-          defaultTheme={appearance}
-          enableSystem
-          storageKey={`theme-form-agent-${id}`}
-          disableTransitionOnChange
-        >
-          {children}
-        </ThemeProvider>
+        <FormAgentGlobalWindowMessagingInterface>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme={appearance}
+            enableSystem
+            storageKey={`theme-form-agent-${id}`}
+            disableTransitionOnChange
+          >
+            {children}
+          </ThemeProvider>
+        </FormAgentGlobalWindowMessagingInterface>
       </body>
     </html>
   );

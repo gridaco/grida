@@ -4,6 +4,7 @@ export type PlaygroundWindowMessageAction =
   | PlaygroundWindowMessageActionSetSchema
   | PlaygroundWindowMessageActionSetVariablescss
   | PlaygroundWindowMessageActionSetDarkMode;
+
 type PlaygroundWindowMessageActionSetSchema = {
   type: "set_schema";
   schema: string;
@@ -25,7 +26,9 @@ export type FormEventMessagePayload =
   | FormReadyEventMessage
   | FormLoadedEventMessage
   | FormChangeEventMessage
-  | FormSubmitEventMessage;
+  | FormSubmitEventMessage
+  | FormAgentWindowHashchangeEventMessage
+  | FormAgentWindowPopstateEventMessage;
 
 /**
  * when form is ready to handle incoming messages
@@ -58,4 +61,15 @@ type FormChangeEventMessage = {
 
 type FormSubmitEventMessage = {
   type: "submit";
+};
+
+// window related
+type FormAgentWindowHashchangeEventMessage = {
+  type: "hashchange";
+  newURL: string;
+  oldURL: string;
+};
+
+type FormAgentWindowPopstateEventMessage = {
+  type: "popstate";
 };
