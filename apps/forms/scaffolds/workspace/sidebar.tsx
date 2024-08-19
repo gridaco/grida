@@ -15,7 +15,7 @@ import {
   SidebarMenuItem,
   SidebarMenuList,
   SidebarSectionHeaderItem,
-  SidebarSectionHeaderAction,
+  SidebarMenuItemAction,
   SidebarMenuItemActions,
   SidebarSectionHeaderLabel,
   SidebarRoot,
@@ -80,9 +80,9 @@ export function WorkspaceSidebar() {
             </SidebarSectionHeaderLabel>
             <SidebarMenuItemActions>
               <CreateNewProjectDialog org={organization.name}>
-                <SidebarSectionHeaderAction>
+                <SidebarMenuItemAction>
                   <PlusIcon className="w-4 h-4" />
-                </SidebarSectionHeaderAction>
+                </SidebarMenuItemAction>
               </CreateNewProjectDialog>
             </SidebarMenuItemActions>
           </SidebarSectionHeaderItem>
@@ -111,9 +111,9 @@ export function WorkspaceSidebar() {
                           />
                           {p.name}
                           <SidebarMenuItemActions>
-                            <SidebarSectionHeaderAction>
+                            <SidebarMenuItemAction>
                               <DotsHorizontalIcon className="w-4 h-4" />
-                            </SidebarSectionHeaderAction>
+                            </SidebarMenuItemAction>
                           </SidebarMenuItemActions>
                         </SidebarMenuItem>
                       </Link>
