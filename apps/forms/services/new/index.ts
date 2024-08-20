@@ -70,19 +70,22 @@ export class SchemaDocumentSetupAssistantService extends DocumentSetupAssistantS
     }
 
     // check for duplicate
-    const { data, error } = await grida_forms_client
+    const { error, count } = await grida_forms_client
       .from("schema_document")
-      .select("id")
+      .select("id", { count: "exact" })
       .eq("name", this.seed.name)
-      .eq("project_id", this.project_id)
-      .single();
+      .eq("project_id", this.project_id);
 
     if (error) {
       console.error(error);
       throw error;
     }
 
-    if (data) {
+    if (count === null) {
+      throw new Error("Unexpected error");
+    }
+
+    if (count > 0) {
       return "taken";
     }
 

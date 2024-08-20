@@ -160,6 +160,9 @@ export async function POST(request: NextRequest) {
             },
           } as NewDocumentResponse);
         }
+
+        console.error("error while creating new schema", e);
+        return NextResponse.error();
       }
       break;
     }
