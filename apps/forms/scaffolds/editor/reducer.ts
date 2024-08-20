@@ -62,6 +62,7 @@ import type {
   FormCampaignPreferencesAction,
   FormEndingPreferencesAction,
   EditorThemeAppearanceAction,
+  SchemaTableAddAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { blockstreeflat } from "@/lib/forms/tree";
@@ -1012,6 +1013,16 @@ export function reducer(
             ...data,
           },
         };
+      });
+    }
+    case "editor/schema/table/add": {
+      const { table } = <SchemaTableAddAction>action;
+      return produce(state, (draft) => {
+        draft.tables.push({
+          group: "schema",
+          name: table,
+          views: [{ label: table, name: "table", type: "table" }],
+        });
       });
     }
     default:

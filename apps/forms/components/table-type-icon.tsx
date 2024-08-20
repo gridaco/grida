@@ -22,5 +22,7 @@ export function TableTypeIcon({
     case "x-supabase-auth.users":
     case "x-supabase-main-table":
       return <SupabaseLogo {...props} />;
+    default:
+      return <Table2Icon {...props} />;
   }
 }

@@ -78,7 +78,8 @@ export type BlocksEditorAction =
   | DocumentNodeChangeTextAction
   | DocumentNodeUpdateStyleAction
   | DocumentNodeUpdateAttributeAction
-  | DocumentNodeUpdatePropertyAction;
+  | DocumentNodeUpdatePropertyAction
+  | SchemaTableAddAction;
 
 export type GlobalSavingAction = {
   type: "saving";
@@ -427,4 +428,9 @@ export interface DocumentNodeUpdatePropertyAction {
   type: "editor/document/node/property";
   node_id: string;
   data: { [key: string]: any };
+}
+
+export interface SchemaTableAddAction {
+  type: "editor/schema/table/add";
+  table: string;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { PlusIcon } from "@radix-ui/react-icons";
 import { useEditorState } from "../editor";
 import { SupabaseLogo } from "@/components/logos";
@@ -22,9 +22,12 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { FormEditorState } from "@/scaffolds/editor/state";
+import type { FormEditorState, TableGroup } from "@/scaffolds/editor/state";
 import {
   Dialog,
   DialogClose,
@@ -36,8 +39,10 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
+import { useForm, Controller } from "react-hook-form";
+import toast from "react-hot-toast";
 
 export function ModeData() {
   const [state] = useEditorState();
@@ -68,6 +73,24 @@ export function ModeData() {
                       <ResourceTypeIcon type="table" className="w-4 h-4 me-2" />
                       New Table
                     </DropdownMenuItem>
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger>
+                        <ResourceTypeIcon
+                          type="table"
+                          className="w-4 h-4 me-2"
+                        />
+                        Examples
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuSubContent>
+                        <DropdownMenuItem>
+                          <ResourceTypeIcon
+                            type="table"
+                            className="w-4 h-4 me-2"
+                          />
+                          Blog
+                        </DropdownMenuItem>
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
                   </DropdownMenuGroup>
                   <DropdownMenuGroup>
                     <DropdownMenuLabel>Supabase</DropdownMenuLabel>
@@ -86,11 +109,31 @@ export function ModeData() {
           )}
         </SidebarSectionHeaderItem>
         <SidebarMenuList>
+          {tables.length === 0 && (
+            <div className="py-4 border border-dashed rounded-sm flex flex-col gap-2 items-center justify-center w-full">
+              <span className="text-center">
+                <h4 className="text-muted-foreground text-xs font-bold">
+                  No tables
+                </h4>
+                <p className="text-muted-foreground text-xs">
+                  Create your first table
+                </p>
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={newTableDialog.openDialog}
+              >
+                <PlusIcon className="w-4 h-4 me-2" />
+                New Table
+              </Button>
+            </div>
+          )}
           {tables.map((table, i) => {
             return (
               <SidebarMenuLink
                 key={i}
-                href={tablehref(basepath, document_id, table.group)}
+                href={tablehref(basepath, document_id, table)}
               >
                 <SidebarMenuItem muted>
                   <TableTypeIcon
@@ -112,23 +155,27 @@ export function ModeData() {
         </li> */}
         </SidebarMenuList>
       </SidebarSection>
-      <SidebarSection>
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>
-            <span>Analytics</span>
-          </SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuList>
-          <SidebarMenuLink href={`/${basepath}/${document_id}/data/analytics`}>
-            <SidebarMenuItem
-              muted
-              icon={<ResourceTypeIcon type="chart" className="w-4 h-4" />}
+      {state.doctype == "v0_form" && (
+        <SidebarSection>
+          <SidebarSectionHeaderItem>
+            <SidebarSectionHeaderLabel>
+              <span>Analytics</span>
+            </SidebarSectionHeaderLabel>
+          </SidebarSectionHeaderItem>
+          <SidebarMenuList>
+            <SidebarMenuLink
+              href={`/${basepath}/${document_id}/data/analytics`}
             >
-              Realtime
-            </SidebarMenuItem>
-          </SidebarMenuLink>
-        </SidebarMenuList>
-      </SidebarSection>
+              <SidebarMenuItem
+                muted
+                icon={<ResourceTypeIcon type="chart" className="w-4 h-4" />}
+              >
+                Realtime
+              </SidebarMenuItem>
+            </SidebarMenuLink>
+          </SidebarMenuList>
+        </SidebarSection>
+      )}
 
       {/* <label className="text-xs text-muted-foreground py-4 px-4">
         Commerce
@@ -169,13 +216,18 @@ export function ModeData() {
 function tablehref(
   basepath: string,
   document_id: string,
-  type: FormEditorState["tables"][number]["group"]
+  table: {
+    group: TableGroup;
+    name: string;
+  }
 ) {
-  switch (type) {
+  switch (table.group) {
     case "response":
       return `/${basepath}/${document_id}/data/responses`;
     case "customer":
       return `/${basepath}/${document_id}/data/customers`;
+    case "schema":
+      return `/${basepath}/${document_id}/data/table/${table.name}`;
     case "x-supabase-main-table":
       return `/${basepath}/${document_id}/data/responses`;
     case "x-supabase-auth.users":
@@ -186,6 +238,39 @@ function tablehref(
 function CreateNewTableDialog({
   ...props
 }: React.ComponentProps<typeof Dialog>) {
+  const [state, dispatch] = useEditorState();
+  const {
+    control,
+    handleSubmit,
+    formState: { isSubmitting, isSubmitSuccessful },
+  } = useForm({
+    defaultValues: {
+      name: "",
+      description: "",
+    },
+  });
+
+  const onSubmit = handleSubmit(
+    async (data: { name: string; description: string }) => {
+      toast.success("Table created");
+      dispatch({
+        type: "editor/schema/table/add",
+        table: data.name,
+      });
+    }
+  );
+
+  const onSaveClick = () => {
+    onSubmit();
+  };
+
+  useEffect(() => {
+    if (isSubmitSuccessful) {
+      // close
+      props.onOpenChange?.(false);
+    }
+  }, [isSubmitSuccessful]);
+
   return (
     <Dialog {...props}>
       <DialogContent>
@@ -196,21 +281,35 @@ function CreateNewTableDialog({
           </DialogTitle>
         </DialogHeader>
         {/*  */}
-        <div className="grid gap-2">
-          <Label>Name</Label>
-          <Input placeholder="table_name" />
-        </div>
-        <div className="grid gap-2">
-          <Label>Description</Label>
-          <Input placeholder="Optional" />
+        <div className="py-4 space-y-4">
+          <div className="grid gap-2">
+            <Label>Name</Label>
+            <Controller
+              name="name"
+              control={control}
+              render={({ field }) => (
+                <Input placeholder="table_name" {...field} />
+              )}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label>Description</Label>
+            <Controller
+              name="description"
+              control={control}
+              render={({ field }) => (
+                <Input placeholder="Optional" {...field} />
+              )}
+            />
+          </div>
         </div>
         <DialogFooter>
-          <DialogClose className={buttonVariants({ variant: "ghost" })}>
-            Cancel
+          <DialogClose asChild>
+            <Button value="ghost">Cancel</Button>
           </DialogClose>
-          <DialogClose className={buttonVariants({ variant: "default" })}>
+          <Button disabled={isSubmitting} onClick={onSaveClick}>
             Save
-          </DialogClose>
+          </Button>
         </DialogFooter>
       </DialogContent>
       {/*  */}

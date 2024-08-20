@@ -77,13 +77,17 @@ function initialDatabaseEditorState(
       nodes: [],
       templatedata: {},
     },
-    tables: [
-      {
-        group: "response",
-        name: "table_1",
-        views: [],
-      },
-    ],
+    tables: init.tables.map((t) => ({
+      group: "schema",
+      name: t.name,
+      views: [
+        {
+          type: "table",
+          label: t.name,
+          name: t.name,
+        },
+      ],
+    })),
   };
 }
 

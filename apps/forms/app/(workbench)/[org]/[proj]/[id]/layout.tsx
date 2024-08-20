@@ -275,6 +275,32 @@ export default async function Layout({
       );
     }
     case "v0_schema": {
+      const { data, error } = await supabase
+        .from("schema_document")
+        .select(
+          `
+            *,
+            tables:form(
+              *,
+              fields:form_field(
+                *,
+                options:form_field_option(*),
+                optgroups:optgroup(*)
+              ),
+              store_connection:connection_commerce_store(*),
+              supabase_connection:connection_supabase(*)
+            )
+          `
+        )
+        .eq("project_id", project_ref.id)
+        .eq("id", masterdoc_ref.id)
+        .single();
+
+      if (!data) {
+        console.error("editorinit", id, error);
+        return notFound();
+      }
+
       return (
         <Html>
           <EditorProvider
@@ -285,6 +311,12 @@ export default async function Layout({
                 id: project_ref.organization!.id,
                 name: project_ref.organization!.name,
               },
+              tables: data.tables.map((ft) => ({
+                id: ft.id,
+                // TODO: this should be migrated from database
+                name: ft.title,
+                description: ft.description,
+              })),
               document_id: masterdoc_ref.id,
               document_title: masterdoc_ref.title,
               theme: {

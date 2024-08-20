@@ -61,6 +61,11 @@ export interface SiteDocumentEditorInit extends BaseDocumentEditorInit {
 
 export interface DatabaseDocumentEditorInit extends BaseDocumentEditorInit {
   doctype: "v0_schema";
+  tables: ReadonlyArray<{
+    id: string;
+    name: string;
+    description: string | null;
+  }>;
 }
 
 export interface FormDocumentEditorInit extends BaseDocumentEditorInit {
@@ -84,7 +89,7 @@ export interface DataGridFilterSettings {
   empty_data_hidden: boolean;
 }
 
-type GFTable =
+type GDocTable =
   | {
       type: "response" | "session";
       name: string;
@@ -92,6 +97,11 @@ type GFTable =
     }
   | {
       type: "customer";
+      name: string;
+      label: string;
+    }
+  | {
+      type: "table";
       name: string;
       label: string;
     }
@@ -172,6 +182,13 @@ export interface BaseDocumentEditorState {
   };
 }
 
+export type TableGroup =
+  | "response"
+  | "customer"
+  | "schema"
+  | "x-supabase-main-table"
+  | "x-supabase-auth.users";
+
 export interface FormEditorState extends BaseDocumentEditorState {
   connections: {
     store_id?: number | null;
@@ -218,12 +235,8 @@ export interface FormEditorState extends BaseDocumentEditorState {
   sessions?: FormResponseSession[];
   tables: {
     name: string;
-    group:
-      | "response"
-      | "customer"
-      | "x-supabase-main-table"
-      | "x-supabase-auth.users";
-    views: GFTable[];
+    group: TableGroup;
+    views: GDocTable[];
   }[];
   datagrid_rows_per_page: number;
   datagrid_table:
@@ -231,7 +244,8 @@ export interface FormEditorState extends BaseDocumentEditorState {
     | "session"
     | "customer"
     | "x-supabase-main-table"
-    | "x-supabase-auth.users";
+    | "x-supabase-auth.users"
+    | string;
   datagrid_table_refresh_key: number;
   datagrid_table_row_keyword: string;
   datagrid_isloading: boolean;
