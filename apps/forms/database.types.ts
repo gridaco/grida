@@ -863,6 +863,7 @@ export type Database = {
           scheduling_close_at: string | null
           scheduling_open_at: string | null
           scheduling_tz: string | null
+          schema_id: string | null
           title: string
           unknown_field_handling_strategy: Database["grida_forms"]["Enums"]["form_response_unknown_field_handling_strategy_type"]
           updated_at: string
@@ -882,6 +883,7 @@ export type Database = {
           scheduling_close_at?: string | null
           scheduling_open_at?: string | null
           scheduling_tz?: string | null
+          schema_id?: string | null
           title?: string
           unknown_field_handling_strategy?: Database["grida_forms"]["Enums"]["form_response_unknown_field_handling_strategy_type"]
           updated_at?: string
@@ -901,11 +903,19 @@ export type Database = {
           scheduling_close_at?: string | null
           scheduling_open_at?: string | null
           scheduling_tz?: string | null
+          schema_id?: string | null
           title?: string
           unknown_field_handling_strategy?: Database["grida_forms"]["Enums"]["form_response_unknown_field_handling_strategy_type"]
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "form_schema_id_fkey"
+            columns: ["schema_id"]
+            isOneToOne: false
+            referencedRelation: "schema_document"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "grida_forms_form_default_form_page_id_fkey"
             columns: ["default_form_page_id"]
@@ -1650,6 +1660,39 @@ export type Database = {
             columns: ["visitor_id"]
             isOneToOne: true
             referencedRelation: "visitor"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      schema_document: {
+        Row: {
+          id: string
+          name: string
+          project_id: number
+        }
+        Insert: {
+          id: string
+          name: string
+          project_id: number
+        }
+        Update: {
+          id?: string
+          name?: string
+          project_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schema_document_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "document"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schema_document_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project"
             referencedColumns: ["id"]
           },
         ]
@@ -2528,7 +2571,7 @@ export type Database = {
       }
     }
     Enums: {
-      doctype: "v0_form" | "v0_site" | "v0_database"
+      doctype: "v0_form" | "v0_site" | "v0_schema"
     }
     CompositeTypes: {
       [_ in never]: never

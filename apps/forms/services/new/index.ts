@@ -39,15 +39,32 @@ class DocumentSetupAssistantService {
   }
 }
 
-export class DatabaseDocumentSetupAssistantService extends DocumentSetupAssistantService {
+export class SchemaDocumentSetupAssistantService extends DocumentSetupAssistantService {
   constructor(readonly project_id: number) {
-    super(project_id, "v0_database");
+    super(project_id, "v0_schema");
   }
 
-  async createDatabaseDocument() {
-    return this.createMasterDocument({
-      title: "Untitled Database",
+  async createSchemaDocument({ name }: { name: string }) {
+    const masterdoc_ref = await this.createMasterDocument({
+      title: name + "(Database)",
     });
+
+    const { data, error } = await grida_forms_client
+      .from("schema_document")
+      .insert({
+        id: masterdoc_ref.id,
+        name: name,
+        project_id: this.project_id,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error(error);
+      throw error;
+    }
+
+    return data;
   }
 }
 

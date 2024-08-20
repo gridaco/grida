@@ -1,7 +1,7 @@
 import { editorlink } from "@/lib/forms/url";
 import { createRouteHandlerWorkspaceClient } from "@/lib/supabase/server";
 import {
-  DatabaseDocumentSetupAssistantService,
+  SchemaDocumentSetupAssistantService,
   FormDocumentSetupAssistantService,
   SiteDocumentSetupAssistantService,
 } from "@/services/new";
@@ -84,9 +84,12 @@ export async function POST(request: NextRequest) {
       );
       break;
     }
-    case "v0_database": {
-      const setup = new DatabaseDocumentSetupAssistantService(project_id);
-      const { id } = await setup.createDatabaseDocument();
+    case "v0_schema": {
+      const setup = new SchemaDocumentSetupAssistantService(project_id);
+      const { id } = await setup.createSchemaDocument({
+        // TODO:
+        name: "todo",
+      });
       return NextResponse.redirect(
         editorlink(".", {
           proj: project_ref.name,

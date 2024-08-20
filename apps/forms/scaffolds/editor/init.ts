@@ -20,7 +20,7 @@ export function initialEditorState(init: EditorInit): FormEditorState {
       return initialFormEditorState(init);
     case "v0_site":
       return initialSiteEditorState(init);
-    case "v0_database":
+    case "v0_schema":
       return initialDatabaseEditorState(init);
     default:
       throw new Error("unsupported doctype");
@@ -30,7 +30,7 @@ export function initialEditorState(init: EditorInit): FormEditorState {
 const initial_sidebar_mode = {
   v0_form: "build",
   v0_site: "build",
-  v0_database: "data",
+  v0_schema: "data",
 } as const;
 
 function initialBaseDocumentEditorState(

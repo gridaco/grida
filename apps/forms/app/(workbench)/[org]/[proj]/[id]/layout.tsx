@@ -274,12 +274,12 @@ export default async function Layout({
         </Html>
       );
     }
-    case "v0_database": {
+    case "v0_schema": {
       return (
         <Html>
           <EditorProvider
             initial={{
-              doctype: "v0_database",
+              doctype: "v0_schema",
               project: { id: project_ref.id, name: project_ref.name },
               organization: {
                 id: project_ref.organization!.id,

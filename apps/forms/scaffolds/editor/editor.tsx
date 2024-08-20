@@ -40,7 +40,7 @@ export function EditorProvider({
           {children}
         </SiteDocumentEditorProvider>
       );
-    case "v0_database":
+    case "v0_schema":
       return (
         <DatabaseDocumentEditorProvider initial={initial}>
           <AssetsBackgroundsResolver />

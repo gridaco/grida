@@ -60,7 +60,7 @@ export interface SiteDocumentEditorInit extends BaseDocumentEditorInit {
 }
 
 export interface DatabaseDocumentEditorInit extends BaseDocumentEditorInit {
-  doctype: "v0_database";
+  doctype: "v0_schema";
 }
 
 export interface FormDocumentEditorInit extends BaseDocumentEditorInit {

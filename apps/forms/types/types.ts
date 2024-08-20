@@ -435,7 +435,7 @@ export interface Project {
   created_at: string;
 }
 
-export type GDocumentType = "v0_form" | "v0_site" | "v0_database";
+export type GDocumentType = "v0_form" | "v0_site" | "v0_schema";
 
 export interface GDocument {
   id: string;

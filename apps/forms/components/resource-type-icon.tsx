@@ -33,7 +33,7 @@ export function ResourceTypeIcon({
     | "form-x-supabase"
     | "v0_form"
     | "v0_site"
-    | "v0_database";
+    | "v0_schema";
   className?: string;
 }) {
   const props = {
@@ -52,7 +52,7 @@ export function ResourceTypeIcon({
       return <FolderDotIcon {...props} />;
     case "file":
       return <FileIcon {...props} />;
-    case "v0_database":
+    case "v0_schema":
     case "database":
       return <DatabaseIcon {...props} />;
     case "table":
