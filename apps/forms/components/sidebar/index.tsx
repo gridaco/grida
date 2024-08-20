@@ -71,7 +71,7 @@ export function SidebarMenuGridItem({
   );
 }
 
-export const SidebarMenuLink = React.forwardRef(function SidebarMenuLink({
+export function SidebarMenuLink({
   href,
   children,
 }: React.PropsWithChildren<{
@@ -87,7 +87,7 @@ export const SidebarMenuLink = React.forwardRef(function SidebarMenuLink({
       {React.cloneElement(children as any, { selected })}
     </Link>
   );
-});
+}
 
 export const SidebarMenuItem = React.forwardRef(function SidebarMenuItem(
   {
