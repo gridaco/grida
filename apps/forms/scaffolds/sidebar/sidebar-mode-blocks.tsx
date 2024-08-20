@@ -44,9 +44,9 @@ export function ModeDesign() {
 
   const sections = Map.groupBy(pages, (page) => page.section);
 
-  const show_hierarchy = ["form", "collection"].includes(
-    state.document.selected_page_id
-  );
+  const show_hierarchy =
+    state.document.selected_page_id &&
+    ["form", "collection"].includes(state.document.selected_page_id);
 
   return (
     <>
