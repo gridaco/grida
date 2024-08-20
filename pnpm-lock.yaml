@@ -596,6 +596,9 @@ importers:
       timezones-list:
         specifier: ^3.0.3
         version: 3.0.3
+      ua-parser-js:
+        specifier: ^1.0.38
+        version: 1.0.38
       use-file-picker:
         specifier: ^2.1.1
         version: 2.1.2(react@18.3.1)
@@ -663,6 +666,9 @@ importers:
       '@types/stylis':
         specifier: ^4.2.6
         version: 4.2.6
+      '@types/ua-parser-js':
+        specifier: ^0.7.39
+        version: 0.7.39
       '@types/uuid':
         specifier: ^9.0.8
         version: 9.0.8
@@ -22243,6 +22249,10 @@ packages:
 
   /@types/tough-cookie@4.0.5:
     resolution: {integrity: sha512-/Ad8+nIOV7Rl++6f1BdKxFSMgmoqEoYbHRpPcx3JEfv8VRsQe9Z4mCXeJBzxs7mbHY/XOZZuXlRNfhpVPbs6ZA==}
+    dev: true
+
+  /@types/ua-parser-js@0.7.39:
+    resolution: {integrity: sha512-P/oDfpofrdtF5xw433SPALpdSchtJmY7nsJItf8h3KXqOslkbySh8zq4dSWXH2oTjRvJ5PczVEoCZPow6GicLg==}
     dev: true
 
   /@types/uglify-js@3.17.5:
@@ -44759,6 +44769,10 @@ packages:
     resolution: {integrity: sha512-aXofE06xGhaQSPzt8hlTY+/YWQhm9P0jYUp1f2XtmW/3Bk0qzXcyFWAtPoo2uTGQj1ZwbDuSyuxicq+aDo8lCQ==}
     dependencies:
       typewise-core: 1.2.0
+    dev: false
+
+  /ua-parser-js@1.0.38:
+    resolution: {integrity: sha512-Aq5ppTOfvrCMgAPneW1HfWj66Xi7XL+/mIy996R1/CLS/rcyJQm6QZdsKrUeivDFQ+Oc9Wyuwor8Ze8peEoUoQ==}
     dev: false
 
   /uc.micro@2.1.0:
