@@ -244,18 +244,12 @@ function formdocumentpagesinit({
       level: 1,
     },
     {
-      section: "Data",
+      section: "Design",
       id: "responses",
       label: "Responses",
       href: `/${basepath}/${document_id}/data/responses`,
       icon: "table",
-    },
-    {
-      section: "Analytics",
-      id: "realtime",
-      label: "Realtime",
-      href: `/${basepath}/${document_id}/data/analytics`,
-      icon: "chart",
+      level: 1,
     },
   ];
 }

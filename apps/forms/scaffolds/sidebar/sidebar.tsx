@@ -180,6 +180,23 @@ function ModeData() {
         </li> */}
         </SidebarMenuList>
       </SidebarSection>
+      <SidebarSection>
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>
+            <span>Analytics</span>
+          </SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuList>
+          <SidebarMenuLink href={`/${basepath}/${document_id}/data/analytics`}>
+            <SidebarMenuItem
+              muted
+              icon={<ResourceTypeIcon type="chart" className="w-4 h-4" />}
+            >
+              Realtime
+            </SidebarMenuItem>
+          </SidebarMenuLink>
+        </SidebarMenuList>
+      </SidebarSection>
 
       {/* <label className="text-xs text-muted-foreground py-4 px-4">
         Commerce

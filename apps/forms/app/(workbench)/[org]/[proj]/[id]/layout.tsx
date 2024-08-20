@@ -308,22 +308,22 @@ function BaseLayout({
   proj: string;
 }>) {
   return (
-    <ThemeProvider
-      attribute="class"
-      defaultTheme={appearance}
-      enableSystem
-      disableTransitionOnChange
-      storageKey={`theme-workbench-${docid}`}
-    >
-      <Header
-        org={org}
-        proj={proj}
-        document={{
-          id: docid,
-          title: doctitle,
-        }}
-      />
-      <div className="h-screen flex flex-col">
+    <div className="h-screen flex flex-col">
+      <ThemeProvider
+        attribute="class"
+        defaultTheme={appearance}
+        enableSystem
+        disableTransitionOnChange
+        storageKey={`theme-workbench-${docid}`}
+      >
+        <Header
+          org={org}
+          proj={proj}
+          document={{
+            id: docid,
+            title: doctitle,
+          }}
+        />
         <div className="flex flex-1 overflow-y-auto">
           <div className="h-full flex flex-1 w-full">
             {/* side */}
@@ -333,10 +333,10 @@ function BaseLayout({
             <div className="w-full h-full overflow-x-hidden">{children}</div>
           </div>
         </div>
-      </div>
-      <EditorHelpFab />
-      <ToasterWithMax position="bottom-center" max={5} />
-    </ThemeProvider>
+        <EditorHelpFab />
+        <ToasterWithMax position="bottom-center" max={5} />
+      </ThemeProvider>
+    </div>
   );
 }
 
