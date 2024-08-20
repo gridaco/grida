@@ -10,7 +10,12 @@ import {
   Link2Icon,
 } from "@radix-ui/react-icons";
 import { useEditorState } from "../editor";
-import { StripeLogo1, SupabaseLogo, TossLogo } from "@/components/logos";
+import {
+  PostgreSQL,
+  StripeLogo1,
+  SupabaseLogo,
+  TossLogo,
+} from "@/components/logos";
 import { Badge } from "@/components/ui/badge";
 import {
   SidebarMenuItem,
@@ -29,6 +34,8 @@ export function ModeConnect() {
   switch (doctype) {
     case "v0_form":
       return <DoctypeForms />;
+    case "v0_schema":
+      return <DoctypeDatabase />;
     default:
       return <></>;
   }
@@ -142,29 +149,7 @@ function DoctypeForms() {
           {/* </Link> */}
         </SidebarMenuList>
       </SidebarSection>
-      <SidebarSection>
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>
-            <span>Database</span>
-          </SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuList>
-          <SidebarMenuLink
-            href={editorlink("connect/database/supabase", {
-              basepath,
-              document_id: form_document_id,
-            })}
-          >
-            <SidebarMenuItem muted>
-              <SupabaseLogo className="inline align-middle w-4 h-4 me-2" />
-              Supabase
-              <Badge variant="outline" className="ms-auto">
-                beta
-              </Badge>
-            </SidebarMenuItem>
-          </SidebarMenuLink>
-        </SidebarMenuList>
-      </SidebarSection>
+      <SectionXDatabase />
       <SidebarSection>
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>
@@ -213,5 +198,51 @@ function DoctypeForms() {
         </SidebarMenuList>
       </SidebarSection>
     </>
+  );
+}
+
+function DoctypeDatabase() {
+  return (
+    <>
+      <SectionXDatabase />
+    </>
+  );
+}
+
+function SectionXDatabase() {
+  const [state] = useEditorState();
+  const { document_id, basepath } = state;
+
+  return (
+    <SidebarSection>
+      <SidebarSectionHeaderItem>
+        <SidebarSectionHeaderLabel>
+          <span>External Database</span>
+        </SidebarSectionHeaderLabel>
+      </SidebarSectionHeaderItem>
+      <SidebarMenuList>
+        <SidebarMenuLink
+          href={editorlink("connect/database/supabase", {
+            basepath,
+            document_id,
+          })}
+        >
+          <SidebarMenuItem muted>
+            <SupabaseLogo className="inline align-middle w-4 h-4 me-2" />
+            Supabase
+            <Badge variant="outline" className="ms-auto">
+              beta
+            </Badge>
+          </SidebarMenuItem>
+        </SidebarMenuLink>
+        <SidebarMenuItem muted disabled>
+          <PostgreSQL className="inline align-middle w-4 h-4 me-2" />
+          PostgreSQL
+          <Badge variant="outline" className="ms-auto">
+            soon
+          </Badge>
+        </SidebarMenuItem>
+      </SidebarMenuList>
+    </SidebarSection>
   );
 }

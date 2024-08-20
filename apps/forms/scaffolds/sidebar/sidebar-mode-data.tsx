@@ -25,11 +25,26 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { FormEditorState } from "@/scaffolds/editor/state";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { buttonVariants } from "@/components/ui/button";
+import { useDialogState } from "@/components/hooks/use-dialog-state";
 
 export function ModeData() {
   const [state] = useEditorState();
 
   const { document_id, basepath, tables } = state;
+
+  const newTableDialog = useDialogState();
 
   return (
     <>
@@ -38,7 +53,7 @@ export function ModeData() {
           <SidebarSectionHeaderLabel>
             <span>Tables</span>
           </SidebarSectionHeaderLabel>
-          <SidebarMenuItemActions>
+          <SidebarMenuItemActions hidden={state.doctype !== "v0_schema"}>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <SidebarMenuItemAction>
@@ -48,7 +63,7 @@ export function ModeData() {
               <DropdownMenuContent side="right" align="start">
                 <DropdownMenuGroup>
                   <DropdownMenuLabel>CMS</DropdownMenuLabel>
-                  <DropdownMenuItem>
+                  <DropdownMenuItem onSelect={newTableDialog.openDialog}>
                     <ResourceTypeIcon type="table" className="w-4 h-4 me-2" />
                     New Table
                   </DropdownMenuItem>
@@ -57,7 +72,11 @@ export function ModeData() {
                   <DropdownMenuLabel>Supabase</DropdownMenuLabel>
                   <DropdownMenuItem>
                     <SupabaseLogo className="w-4 h-4 me-2" />
-                    Existing Table
+                    Connect Supabase Table
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <SupabaseLogo className="w-4 h-4 me-2" />
+                    Connect Supabase Project
                   </DropdownMenuItem>
                 </DropdownMenuGroup>
               </DropdownMenuContent>
@@ -140,6 +159,7 @@ export function ModeData() {
           </SideNavItem>
         </Link>
       </li> */}
+      <CreateNewTableDialog {...newTableDialog} />
     </>
   );
 }
@@ -159,4 +179,39 @@ function tablehref(
     case "x-supabase-auth.users":
       return `/${basepath}/${document_id}/data/x/auth.users`;
   }
+}
+
+function CreateNewTableDialog({
+  ...props
+}: React.ComponentProps<typeof Dialog>) {
+  return (
+    <Dialog {...props}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="flex gap-2 items-center">
+            <ResourceTypeIcon type="table" className="w-5 h-5" />
+            Create New CMS Table
+          </DialogTitle>
+        </DialogHeader>
+        {/*  */}
+        <div className="grid gap-2">
+          <Label>Name</Label>
+          <Input placeholder="table_name" />
+        </div>
+        <div className="grid gap-2">
+          <Label>Description</Label>
+          <Input placeholder="Optional" />
+        </div>
+        <DialogFooter>
+          <DialogClose className={buttonVariants({ variant: "ghost" })}>
+            Cancel
+          </DialogClose>
+          <DialogClose className={buttonVariants({ variant: "default" })}>
+            Save
+          </DialogClose>
+        </DialogFooter>
+      </DialogContent>
+      {/*  */}
+    </Dialog>
+  );
 }

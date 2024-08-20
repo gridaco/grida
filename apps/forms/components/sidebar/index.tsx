@@ -220,9 +220,17 @@ export function SidebarSectionHeaderLabel({
 
 export function SidebarMenuItemActions({
   children,
-}: React.PropsWithChildren<{}>) {
+  className,
+  ...props
+}: React.PropsWithChildren<React.HTMLAttributes<HTMLDivElement>>) {
   return (
-    <div className="absolute right-1 top-0 bottom-0 flex gap-2 items-center bg-background opacity-0 group-hover:opacity-100 group-hover:bg-accent transition-opacity rounded">
+    <div
+      {...props}
+      className={cn(
+        "absolute right-1 top-0 bottom-0 flex gap-2 items-center bg-background opacity-0 group-hover:opacity-100 group-hover:bg-accent transition-opacity rounded",
+        className
+      )}
+    >
       {children}
     </div>
   );
