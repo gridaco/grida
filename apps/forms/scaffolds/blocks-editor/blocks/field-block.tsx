@@ -69,8 +69,6 @@ export function FieldBlock({
 
   const can_advanced_mode = fields.length > 0;
 
-  const deleteBlock = useDeleteBlock();
-
   const onFieldChange = useCallback(
     (field_id: string) => {
       dispatch({
@@ -100,14 +98,6 @@ export function FieldBlock({
       field_id: form_field_id!,
     });
   }, [dispatch, form_field_id]);
-
-  const onLogicEditClick = useCallback(() => {
-    dispatch({
-      type: "editor/panels/block-edit",
-      block_id: id,
-      open: true,
-    });
-  }, [dispatch, id]);
 
   return (
     <FlatBlockBase
@@ -240,20 +230,10 @@ export function FieldBlock({
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              {form_field_id && (
-                <DropdownMenuItem onClick={onFieldEditClick}>
-                  <Pencil1Icon className="me-2 align-middle" />
-                  Edit Field Definition
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuItem onClick={onLogicEditClick}>
-                <MixIcon className="me-2 align-middle" />
-                Logic
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => deleteBlock(id)}>
-                <TrashIcon className="me-2 align-middle" />
-                Delete Block
-              </DropdownMenuItem>
+              <FormFieldBlockMenuItems
+                block_id={id}
+                form_field_id={form_field_id}
+              />
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -316,5 +296,51 @@ export function FieldBlock({
         )}
       </div>
     </FlatBlockBase>
+  );
+}
+
+export function FormFieldBlockMenuItems({
+  block_id,
+  form_field_id,
+}: {
+  block_id: string;
+  form_field_id?: string | null;
+}) {
+  const [state, dispatch] = useEditorState();
+
+  const onFieldEditClick = useCallback(() => {
+    dispatch({
+      type: "editor/field/edit",
+      field_id: form_field_id!,
+    });
+  }, [dispatch, form_field_id]);
+
+  const onLogicEditClick = useCallback(() => {
+    dispatch({
+      type: "editor/panels/block-edit",
+      block_id: block_id,
+      open: true,
+    });
+  }, [dispatch, block_id]);
+
+  const deleteBlock = useDeleteBlock();
+
+  return (
+    <>
+      {form_field_id && (
+        <DropdownMenuItem onClick={onFieldEditClick}>
+          <Pencil1Icon className="me-2 align-middle" />
+          Edit Field Definition
+        </DropdownMenuItem>
+      )}
+      <DropdownMenuItem onClick={onLogicEditClick}>
+        <MixIcon className="me-2 align-middle" />
+        Logic
+      </DropdownMenuItem>
+      <DropdownMenuItem onClick={() => deleteBlock(block_id)}>
+        <TrashIcon className="me-2 align-middle" />
+        Delete Block
+      </DropdownMenuItem>
+    </>
   );
 }

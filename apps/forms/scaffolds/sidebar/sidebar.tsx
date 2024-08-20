@@ -33,7 +33,7 @@ import {
   SidebarSectionHeaderItem,
   SidebarSectionHeaderLabel,
 } from "@/components/sidebar";
-import { ModeBlocks, ModeDesign } from "./sidebar-mode-blocks";
+import { ModeDesign } from "./sidebar-mode-blocks";
 import { FormEditorState } from "../editor/state";
 import { TableTypeIcon } from "@/components/table-type-icon";
 import { editorlink } from "@/lib/forms/url";
@@ -42,6 +42,7 @@ import { useWorkspace } from "../workspace";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
 import * as Dialog from "@radix-ui/react-dialog";
 import { usePathname } from "next/navigation";
+import { ModeInsertBlocks } from "./sidebar-mode-insert";
 
 export function Sidebar() {
   const [state, dispatch] = useEditorState();
@@ -59,7 +60,7 @@ export function Sidebar() {
       <Dialog.Root open={is_add_block_panel_open} onOpenChange={openInsertMenu}>
         <Dialog.Content>
           <SidebarRoot>
-            <ModeBlocks />
+            <ModeInsertBlocks />
           </SidebarRoot>
         </Dialog.Content>
       </Dialog.Root>
