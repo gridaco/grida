@@ -1,32 +1,14 @@
 "use client";
 
 import React from "react";
-import {
-  AvatarIcon,
-  GlobeIcon,
-  PieChartIcon,
-  ArchiveIcon,
-  CodeIcon,
-  EnvelopeClosedIcon,
-  Link2Icon,
-  GearIcon,
-  LockClosedIcon,
-} from "@radix-ui/react-icons";
+import { CodeIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
 import { useEditorState } from "../editor";
-import {
-  DatabaseIcon,
-  HammerIcon,
-  LayersIcon,
-  PlugIcon,
-  TabletSmartphoneIcon,
-} from "lucide-react";
-import { StripeLogo1, SupabaseLogo, TossLogo } from "@/components/logos";
+import { DatabaseIcon, HammerIcon, PlugIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   SidebarMenuItem,
   SidebarMenuItemLabel,
-  SidebarMenuLink,
   SidebarMenuList,
   SidebarRoot,
   SidebarSection,
@@ -34,19 +16,26 @@ import {
   SidebarSectionHeaderLabel,
 } from "@/components/sidebar";
 import { ModeDesign } from "./sidebar-mode-blocks";
-import { FormEditorState } from "../editor/state";
-import { TableTypeIcon } from "@/components/table-type-icon";
 import { editorlink } from "@/lib/forms/url";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useWorkspace } from "../workspace";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
 import * as Dialog from "@radix-ui/react-dialog";
-import { usePathname } from "next/navigation";
 import { ModeInsertBlocks } from "./sidebar-mode-insert";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ModeData } from "./sidebar-mode-data";
+import { ModeConnect } from "./sidebar-mode-connect";
 
 export function Sidebar() {
   const [state, dispatch] = useEditorState();
   const { is_insert_menu_open: is_add_block_panel_open } = state;
+
+  const onSidebarModeChange = (mode: string) => {
+    dispatch({
+      type: "editor/sidebar/mode",
+      mode: mode as any,
+    });
+  };
 
   const openInsertMenu = (open: boolean) => {
     dispatch({
@@ -69,13 +58,13 @@ export function Sidebar() {
 
   return (
     <SidebarRoot>
-      <Tabs defaultValue="design">
+      <Tabs value={state.sidebar.mode} onValueChange={onSidebarModeChange}>
         <header className="sticky h-12 px-2 flex justify-center items-center top-0 bg-background border-b z-10">
           <TabsList className="w-full max-w-full">
-            <TabsTrigger value="documents">
+            <TabsTrigger value="project">
               <ResourceTypeIcon type="project" className="w-4 h-4" />
             </TabsTrigger>
-            <TabsTrigger value="design">
+            <TabsTrigger value="build">
               <HammerIcon className="w-4 h-4" />
             </TabsTrigger>
             <TabsTrigger value="data">
@@ -86,14 +75,14 @@ export function Sidebar() {
             </TabsTrigger>
           </TabsList>
         </header>
-        <TabsContent value="documents">
-          <ModeDocuments />
+        <TabsContent value="project">
+          <ModeProjectHiearchy />
+        </TabsContent>
+        <TabsContent value="build">
+          <ModeDesign />
         </TabsContent>
         <TabsContent value="data">
           <ModeData />
-        </TabsContent>
-        <TabsContent value="design">
-          <ModeDesign />
         </TabsContent>
         <TabsContent value="connect">
           <ModeConnect />
@@ -103,14 +92,15 @@ export function Sidebar() {
   );
 }
 
-function ModeDocuments() {
+function ModeProjectHiearchy() {
   const { state: workspace } = useWorkspace();
-  const { documents } = workspace;
+  const { documents, loading } = workspace;
   const [state] = useEditorState();
   const { basepath, project } = state;
   const current_project_documents = documents.filter(
     (d) => d.project_id === project.id
   );
+  console.log("loading", loading);
   return (
     <>
       <SidebarSection>
@@ -120,312 +110,36 @@ function ModeDocuments() {
           </SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuList>
-          {current_project_documents.map((d) => (
-            <Link
-              key={d.id}
-              href={editorlink("form/edit", { document_id: d.id, basepath })}
-            >
-              <SidebarMenuItem muted selected={d.id === state.document_id}>
-                <ResourceTypeIcon
-                  type={d.doctype}
-                  className="inline align-middle min-w-4 w-4 h-4 me-2"
-                />
-                <SidebarMenuItemLabel>{d.title}</SidebarMenuItemLabel>
-              </SidebarMenuItem>
-            </Link>
-          ))}
-        </SidebarMenuList>
-      </SidebarSection>
-    </>
-  );
-}
-
-function ModeData() {
-  const [state] = useEditorState();
-
-  const { document_id, basepath, tables } = state;
-
-  return (
-    <>
-      <SidebarSection>
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>
-            <span>Tables</span>
-          </SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuList>
-          {tables.map((table, i) => {
-            return (
-              <SidebarMenuLink
-                key={i}
-                href={tablehref(basepath, document_id, table.group)}
-              >
-                <SidebarMenuItem muted>
-                  <TableTypeIcon
-                    type={table.group}
-                    className="inline align-middle w-4 h-4 me-2"
-                  />
-                  {table.name}
-                </SidebarMenuItem>
-              </SidebarMenuLink>
-            );
-          })}
-          {/* <li>
-          <Link href="#">
-            <SideNavItem>
-              <FileIcon className="w-4 h-4" />
-              Files
-            </SideNavItem>
-          </Link>
-        </li> */}
-        </SidebarMenuList>
-      </SidebarSection>
-      <SidebarSection>
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>
-            <span>Analytics</span>
-          </SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuList>
-          <SidebarMenuLink href={`/${basepath}/${document_id}/data/analytics`}>
-            <SidebarMenuItem
-              muted
-              icon={<ResourceTypeIcon type="chart" className="w-4 h-4" />}
-            >
-              Realtime
-            </SidebarMenuItem>
-          </SidebarMenuLink>
-        </SidebarMenuList>
-      </SidebarSection>
-
-      {/* <label className="text-xs text-muted-foreground py-4 px-4">
-        Commerce
-      </label>
-      <li>
-        <Link
-          href={editorlink("connect/store/orders", {
-            org: organization.name,
-            proj: project.name,
-            form_id,
-          })}
-        >
-          <SideNavItem>
-            <ArchiveIcon />
-            Orders
-          </SideNavItem>
-        </Link>
-      </li>
-      <li>
-        <Link
-          href={editorlink("connect/store/products", {
-            org: organization.name,
-            proj: project.name,
-            form_id,
-          })}
-        >
-          <SideNavItem>
-            <ArchiveIcon />
-            Inventory
-          </SideNavItem>
-        </Link>
-      </li> */}
-    </>
-  );
-}
-
-function tablehref(
-  basepath: string,
-  document_id: string,
-  type: FormEditorState["tables"][number]["group"]
-) {
-  switch (type) {
-    case "response":
-      return `/${basepath}/${document_id}/data/responses`;
-    case "customer":
-      return `/${basepath}/${document_id}/data/customers`;
-    case "x-supabase-main-table":
-      return `/${basepath}/${document_id}/data/responses`;
-    case "x-supabase-auth.users":
-      return `/${basepath}/${document_id}/data/x/auth.users`;
-  }
-}
-
-function ModeConnect() {
-  const [state] = useEditorState();
-  const { form_id, document_id: form_document_id, basepath } = state;
-  const pathname = usePathname();
-  return (
-    <>
-      <SidebarSection>
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>
-            <span>Share</span>
-          </SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuList>
-          <SidebarMenuLink
-            href={editorlink("connect/share", {
-              document_id: form_document_id,
-              basepath,
-            })}
-          >
-            <SidebarMenuItem muted>
-              <Link2Icon className="inline align-middle w-4 h-4 me-2" />
-              Share
-            </SidebarMenuItem>
-          </SidebarMenuLink>
-          {/* <Link href={`connect/domain`}> */}
-          <SidebarMenuItem disabled>
-            <GlobeIcon className="inline align-middle w-4 h-4 me-2" />
-            Domain
-            <Badge variant="outline" className="ms-auto">
-              enterprise
-            </Badge>
-          </SidebarMenuItem>
-          {/* </Link> */}
-        </SidebarMenuList>
-      </SidebarSection>
-      <SidebarSection>
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>
-            <span>Customer</span>
-          </SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuList>
-          <SidebarMenuLink
-            href={editorlink("connect/channels", {
-              basepath,
-              document_id: form_document_id,
-            })}
-          >
-            <SidebarMenuItem muted>
-              <EnvelopeClosedIcon className="inline align-middle w-4 h-4 me-2" />
-              Channels
-            </SidebarMenuItem>
-          </SidebarMenuLink>
-          <SidebarMenuLink
-            href={editorlink("connect/customer", {
-              basepath,
-              document_id: form_document_id,
-            })}
-          >
-            <SidebarMenuItem muted>
-              <AvatarIcon className="inline align-middle w-4 h-4 me-2" />
-              Customer Identity
-            </SidebarMenuItem>
-          </SidebarMenuLink>
-        </SidebarMenuList>
-      </SidebarSection>
-      <SidebarSection>
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>
-            <span>Commerce</span>
-          </SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuList>
-          <SidebarMenuLink
-            href={editorlink("connect/store", {
-              basepath,
-              document_id: form_document_id,
-            })}
-          >
-            <SidebarMenuItem muted>
-              <ArchiveIcon className="inline align-middle w-4 h-4 me-2" />
-              Store
-              <Badge variant="outline" className="ms-auto">
-                alpha
-              </Badge>
-            </SidebarMenuItem>
-          </SidebarMenuLink>
-
-          {/* <Link href={`connect/pg/stripe`}> */}
-          <SidebarMenuItem disabled>
-            <StripeLogo1 className="inline align-middle w-4 h-4 me-2" />
-            Stripe
-            <Badge variant="outline" className="ms-auto">
-              soon
-            </Badge>
-          </SidebarMenuItem>
-          {/* </Link> */}
-          {/* <Link href={`connect/pg/tosspayments`}> */}
-          <SidebarMenuItem disabled>
-            <TossLogo className="inline align-middle w-4 h-4 me-2" />
-            Toss
-            <Badge variant="outline" className="ms-auto">
-              enterprise
-            </Badge>
-          </SidebarMenuItem>
-          {/* </Link> */}
-        </SidebarMenuList>
-      </SidebarSection>
-      <SidebarSection>
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>
-            <span>Database</span>
-          </SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuList>
-          <SidebarMenuLink
-            href={editorlink("connect/database/supabase", {
-              basepath,
-              document_id: form_document_id,
-            })}
-          >
-            <SidebarMenuItem muted>
-              <SupabaseLogo className="inline align-middle w-4 h-4 me-2" />
-              Supabase
-              <Badge variant="outline" className="ms-auto">
-                beta
-              </Badge>
-            </SidebarMenuItem>
-          </SidebarMenuLink>
-        </SidebarMenuList>
-      </SidebarSection>
-      <SidebarSection>
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>
-            <span>Developer</span>
-          </SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuList>
-          <SidebarMenuLink
-            href={editorlink("connect/parameters", {
-              document_id: form_document_id,
-              basepath: basepath,
-            })}
-          >
-            <SidebarMenuItem>
-              <CodeIcon className="inline align-middle w-4 h-4 me-2" />
-              URL parameters
-            </SidebarMenuItem>
-          </SidebarMenuLink>
-          {/* <Link href={`connect/webhooks`}> */}
-          <SidebarMenuItem disabled>
-            <CodeIcon className="inline align-middle w-4 h-4 me-2" />
-            Webhooks
-            <Badge variant="outline" className="ms-auto">
-              soon
-            </Badge>{" "}
-          </SidebarMenuItem>
-          {/* </Link> */}
-          {/* <Link href={`connect/integrations`}> */}
-          <SidebarMenuItem disabled>
-            <CodeIcon className="inline align-middle w-4 h-4 me-2" />
-            Integrations
-            <Badge variant="outline" className="ms-auto">
-              soon
-            </Badge>{" "}
-          </SidebarMenuItem>
-          {/* </Link> */}
-          {/* <Link href={`connect/import`}> */}
-          <SidebarMenuItem disabled>
-            <CodeIcon className="inline align-middle w-4 h-4 me-2" />
-            Import Data
-            <Badge variant="outline" className="ms-auto">
-              soon
-            </Badge>{" "}
-          </SidebarMenuItem>
-          {/* </Link> */}
+          {loading ? (
+            <>
+              <div className="w-full grid gap-2">
+                <Skeleton className="w-full h-10" />
+                <Skeleton className="w-full h-10" />
+                <Skeleton className="w-full h-10" />
+                <Skeleton className="w-full h-10" />
+              </div>
+            </>
+          ) : (
+            <>
+              {current_project_documents.map((d) => (
+                <Link
+                  key={d.id}
+                  href={editorlink("form/edit", {
+                    document_id: d.id,
+                    basepath,
+                  })}
+                >
+                  <SidebarMenuItem muted selected={d.id === state.document_id}>
+                    <ResourceTypeIcon
+                      type={d.doctype}
+                      className="inline align-middle min-w-4 w-4 h-4 me-2"
+                    />
+                    <SidebarMenuItemLabel>{d.title}</SidebarMenuItemLabel>
+                  </SidebarMenuItem>
+                </Link>
+              ))}
+            </>
+          )}
         </SidebarMenuList>
       </SidebarSection>
     </>
