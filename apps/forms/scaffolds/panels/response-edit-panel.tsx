@@ -186,14 +186,14 @@ function ResponseCustomerMetaTable({
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Property</TableHead>
+          <TableHead className="w-[120px]">Property</TableHead>
           <TableHead>Value</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody className="font-mono prose prose-sm dark:prose-invert prose-pre:my-1">
         <TableRow>
           <TableCell>
-            <code>customer_id</code>
+            <code>id</code>
           </TableCell>
           <TableCell>
             <pre>{customer_id}</pre>
@@ -258,7 +258,7 @@ function ResponsePropertiesTable({
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Property</TableHead>
+          <TableHead className="w-[120px]">Property</TableHead>
           <TableHead>Value</TableHead>
         </TableRow>
       </TableHeader>
@@ -292,7 +292,7 @@ function ResponseIdTable({
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Identifier</TableHead>
+          <TableHead className="w-[120px]">Identifier</TableHead>
           <TableHead>Value</TableHead>
         </TableRow>
       </TableHeader>
