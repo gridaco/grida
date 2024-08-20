@@ -16,6 +16,7 @@ import type {
   FormResponseUnknownFieldHandlingStrategyType,
   FormStyleSheetV1Schema,
   FormsPageLanguage,
+  GDocumentType,
   GridaSupabase,
   OrderBy,
 } from "@/types";
@@ -45,14 +46,21 @@ export interface BaseDocumentEditorInit {
   };
   document_id: string;
   document_title: string;
-  doctype: "v0_form" | "v0_site";
+  doctype: GDocumentType;
   theme: FormEditorState["theme"];
 }
 
-export type EditorInit = FormDocumentEditorInit | SiteDocumentEditorInit;
+export type EditorInit =
+  | FormDocumentEditorInit
+  | SiteDocumentEditorInit
+  | DatabaseDocumentEditorInit;
 
 export interface SiteDocumentEditorInit extends BaseDocumentEditorInit {
   doctype: "v0_site";
+}
+
+export interface DatabaseDocumentEditorInit extends BaseDocumentEditorInit {
+  doctype: "v0_database";
 }
 
 export interface FormDocumentEditorInit extends BaseDocumentEditorInit {
@@ -115,12 +123,12 @@ export interface BaseDocumentEditorState {
   };
   document_id: string;
   document_title: string;
-  doctype: "v0_form" | "v0_site";
+  doctype: GDocumentType;
   document: {
     pages: MenuItem[];
-    selected_page_id: string;
+    selected_page_id?: string;
     nodes: any[];
-    templatesample: string;
+    templatesample?: string;
     templatedata: {
       [key: string]: {
         text?: Tokens.StringValueExpression;
@@ -140,6 +148,9 @@ export interface BaseDocumentEditorState {
     selected_node_default_style?: React.CSSProperties;
     selected_node_default_text?: Tokens.StringValueExpression;
     selected_node_context?: Record<string, any>;
+  };
+  sidebar: {
+    mode: "project" | "build" | "data" | "connect";
   };
   theme: {
     is_powered_by_branding_enabled: boolean;

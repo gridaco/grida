@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { EditableDocumentTitle } from "@/scaffolds/editable-document-title";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import {
   createServerComponentClient,
@@ -273,6 +273,46 @@ export default async function Layout({
           </EditorProvider>
         </Html>
       );
+    }
+    case "v0_database": {
+      return (
+        <Html>
+          <EditorProvider
+            initial={{
+              doctype: "v0_database",
+              project: { id: project_ref.id, name: project_ref.name },
+              organization: {
+                id: project_ref.organization!.id,
+                name: project_ref.organization!.name,
+              },
+              document_id: masterdoc_ref.id,
+              document_title: masterdoc_ref.title,
+              theme: {
+                appearance: "system",
+                fontFamily: "inter",
+                lang: "en",
+                is_powered_by_branding_enabled: true,
+              },
+            }}
+          >
+            <BaseLayout
+              docid={masterdoc_ref.id}
+              doctitle={masterdoc_ref.title}
+              org={org}
+              proj={proj}
+            >
+              {/* <p>
+                This document is a site document. Site documents are not
+                supported yet.
+              </p> */}
+              {/* {children} */}
+            </BaseLayout>
+          </EditorProvider>
+        </Html>
+      );
+    }
+    default: {
+      redirect("/");
     }
   }
 }

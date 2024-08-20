@@ -2,6 +2,7 @@ import { produce } from "immer";
 import { EditorFlatFormBlock, FormEditorState } from "./state";
 import type {
   GlobalSavingAction,
+  EditorSidebarModeAction,
   BlockDescriptionAction,
   BlockTitleAction,
   BlockVHiddenAction,
@@ -81,6 +82,12 @@ export function reducer(
       const { saving } = <GlobalSavingAction>action;
       return produce(state, (draft) => {
         draft.saving = saving;
+      });
+    }
+    case "editor/sidebar/mode": {
+      const { mode } = <EditorSidebarModeAction>action;
+      return produce(state, (draft) => {
+        draft.sidebar.mode = mode;
       });
     }
     case "blocks/new": {

@@ -19,6 +19,7 @@ import { ZodObject } from "zod";
 
 export type BlocksEditorAction =
   | GlobalSavingAction
+  | EditorSidebarModeAction
   | CreateNewPendingBlockAction
   | ResolvePendingBlockAction
   | DeleteBlockAction
@@ -83,6 +84,11 @@ export type GlobalSavingAction = {
   type: "saving";
   saving: boolean;
 };
+
+export interface EditorSidebarModeAction {
+  type: "editor/sidebar/mode";
+  mode: "project" | "build" | "data" | "connect";
+}
 
 export type CreateNewPendingBlockAction =
   | {

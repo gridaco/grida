@@ -2,6 +2,7 @@ import { editorbasepath } from "@/lib/forms/url";
 import type {
   BaseDocumentEditorInit,
   BaseDocumentEditorState,
+  DatabaseDocumentEditorInit,
   EditorInit,
   FormDocumentEditorInit,
   FormEditorState,
@@ -19,8 +20,18 @@ export function initialEditorState(init: EditorInit): FormEditorState {
       return initialFormEditorState(init);
     case "v0_site":
       return initialSiteEditorState(init);
+    case "v0_database":
+      return initialDatabaseEditorState(init);
+    default:
+      throw new Error("unsupported doctype");
   }
 }
+
+const initial_sidebar_mode = {
+  v0_form: "build",
+  v0_site: "build",
+  v0_database: "data",
+} as const;
 
 function initialBaseDocumentEditorState(
   init: BaseDocumentEditorInit
@@ -42,6 +53,37 @@ function initialBaseDocumentEditorState(
     assets: {
       backgrounds: [],
     },
+    sidebar: {
+      mode: initial_sidebar_mode[init.doctype],
+    },
+  };
+}
+
+/**
+ * // FIXME: not ready
+ * @deprecated @beta
+ * @param init
+ * @returns
+ */
+function initialDatabaseEditorState(
+  init: DatabaseDocumentEditorInit
+): FormEditorState {
+  const base = initialBaseDocumentEditorState(init);
+  // @ts-ignore
+  return {
+    ...base,
+    document: {
+      pages: [],
+      nodes: [],
+      templatedata: {},
+    },
+    tables: [
+      {
+        group: "response",
+        name: "table_1",
+        views: [],
+      },
+    ],
   };
 }
 

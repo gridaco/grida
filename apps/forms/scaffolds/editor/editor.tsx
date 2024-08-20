@@ -4,6 +4,7 @@ import React, { useCallback, useMemo } from "react";
 import { StateProvider, useEditorState } from "./provider";
 import { reducer } from "./reducer";
 import {
+  DatabaseDocumentEditorInit,
   EditorInit,
   FormDocumentEditorInit,
   SiteDocumentEditorInit,
@@ -39,7 +40,31 @@ export function EditorProvider({
           {children}
         </SiteDocumentEditorProvider>
       );
+    case "v0_database":
+      return (
+        <DatabaseDocumentEditorProvider initial={initial}>
+          <AssetsBackgroundsResolver />
+          {children}
+        </DatabaseDocumentEditorProvider>
+      );
+    default:
+      throw new Error("unsupported doctype");
   }
+}
+
+export function DatabaseDocumentEditorProvider({
+  initial,
+  children,
+}: React.PropsWithChildren<{ initial: DatabaseDocumentEditorInit }>) {
+  const [state, dispatch] = React.useReducer(
+    reducer,
+    initialEditorState(initial)
+  );
+  return (
+    <StateProvider state={state} dispatch={dispatch}>
+      {children}
+    </StateProvider>
+  );
 }
 
 export function SiteDocumentEditorProvider({
