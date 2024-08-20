@@ -113,7 +113,6 @@ function ModeDocuments() {
   );
   return (
     <>
-      <ModeDesign />
       <SidebarSection>
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>
@@ -126,7 +125,7 @@ function ModeDocuments() {
               key={d.id}
               href={editorlink("form/edit", { document_id: d.id, basepath })}
             >
-              <SidebarMenuItem muted>
+              <SidebarMenuItem muted selected={d.id === state.document_id}>
                 <ResourceTypeIcon
                   type={d.doctype}
                   className="inline align-middle min-w-4 w-4 h-4 me-2"

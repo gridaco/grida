@@ -6,9 +6,9 @@ import { reducer } from "./reducer";
 import {
   EditorInit,
   FormDocumentEditorInit,
-  initialEditorState,
   SiteDocumentEditorInit,
 } from "./state";
+import { initialEditorState } from "./init";
 import { FieldEditPanel, FormFieldSave } from "../panels/field-edit-panel";
 import { FormFieldDefinition } from "@/types";
 import { FormFieldUpsert, EditorApiResponse } from "@/types/private/api";

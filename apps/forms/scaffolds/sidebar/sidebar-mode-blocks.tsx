@@ -44,6 +44,10 @@ export function ModeDesign() {
 
   const sections = Map.groupBy(pages, (page) => page.section);
 
+  const show_hierarchy = ["form", "collection"].includes(
+    state.document.selected_page_id
+  );
+
   return (
     <>
       {Array.from(sections.keys()).map((section) => (
@@ -89,15 +93,80 @@ export function ModeDesign() {
           </SidebarMenuList>
         </SidebarSection>
       ))}
-      {state.document.selected_page_id === "form" && <HierarchyView />}
+      {show_hierarchy && (
+        <>
+          <hr />
+          <HierarchyView />
+        </>
+      )}
     </>
   );
 }
 
-function HierarchyView() {
+function FormBlockHierarchyList() {
   const [state, dispatch] = useEditorState();
   // const [expands, setExpands] = useState<Record<string, boolean>>({});
   const { focus_block_id } = state;
+
+  return (
+    <>
+      {state.blocks.map((b) => {
+        const selected = focus_block_id === b.id;
+        const { label, icon } = blocklabel(b, {
+          fields: state.fields,
+        });
+        return (
+          <SidebarMenuItem
+            key={b.id}
+            muted
+            // expandable={b.type === "section"}
+            // expanded={expands[b.id]}
+            // onExpandChange={(expanded) => {
+            //   setExpands((expands) => ({
+            //     ...expands,
+            //     [b.id]: expanded,
+            //   }));
+            // }}
+            level={b.parent_id ? 1 : 0}
+            selected={selected}
+            onSelect={() => {
+              dispatch({
+                type: "blocks/focus",
+                block_id: b.id,
+              });
+            }}
+            icon={<FormHierarchyItemIcon icon={icon} className="w-4 h-4" />}
+          >
+            {label}
+            <SidebarMenuItemActions>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <SidebarMenuItemAction>
+                    <DotsHorizontalIcon />
+                  </SidebarMenuItemAction>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <FormFieldBlockMenuItems
+                    block_id={b.id}
+                    form_field_id={b.form_field_id}
+                  />
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </SidebarMenuItemActions>
+          </SidebarMenuItem>
+        );
+      })}
+    </>
+  );
+}
+
+function SiteLayerHierarchyList() {
+  return <></>;
+}
+
+function HierarchyView() {
+  const [state] = useEditorState();
+  const { doctype } = state;
 
   return (
     <Collapsible defaultOpen>
@@ -111,54 +180,8 @@ function HierarchyView() {
         </CollapsibleTrigger>
         <CollapsibleContent>
           <SidebarMenuList>
-            {state.blocks.map((b) => {
-              const selected = focus_block_id === b.id;
-              const { label, icon } = blocklabel(b, {
-                fields: state.fields,
-              });
-              return (
-                <SidebarMenuItem
-                  key={b.id}
-                  muted
-                  // expandable={b.type === "section"}
-                  // expanded={expands[b.id]}
-                  // onExpandChange={(expanded) => {
-                  //   setExpands((expands) => ({
-                  //     ...expands,
-                  //     [b.id]: expanded,
-                  //   }));
-                  // }}
-                  level={b.parent_id ? 1 : 0}
-                  selected={selected}
-                  onSelect={() => {
-                    dispatch({
-                      type: "blocks/focus",
-                      block_id: b.id,
-                    });
-                  }}
-                  icon={
-                    <FormHierarchyItemIcon icon={icon} className="w-4 h-4" />
-                  }
-                >
-                  {label}
-                  <SidebarMenuItemActions>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <SidebarMenuItemAction>
-                          <DotsHorizontalIcon />
-                        </SidebarMenuItemAction>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent>
-                        <FormFieldBlockMenuItems
-                          block_id={b.id}
-                          form_field_id={b.form_field_id}
-                        />
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </SidebarMenuItemActions>
-                </SidebarMenuItem>
-              );
-            })}
+            {doctype === "v0_form" && <FormBlockHierarchyList />}
+            {doctype === "v0_site" && <SiteLayerHierarchyList />}
           </SidebarMenuList>
         </CollapsibleContent>
       </SidebarSection>
