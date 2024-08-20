@@ -1,5 +1,8 @@
 import { workspaceclient } from "@/lib/supabase/server";
-import { isValidUsername, messages } from "@/services/utils/username";
+import {
+  isValidUsername,
+  username_validation_messages,
+} from "@/services/utils/regex";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
@@ -23,8 +26,8 @@ export async function POST(req: NextRequest) {
     ok: available && valid,
     message: available
       ? valid
-        ? messages.available
-        : messages.invalid
-      : messages.taken,
+        ? username_validation_messages.available
+        : username_validation_messages.invalid
+      : username_validation_messages.taken,
   });
 }

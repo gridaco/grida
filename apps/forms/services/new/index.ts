@@ -40,13 +40,17 @@ class DocumentSetupAssistantService {
 }
 
 export class SchemaDocumentSetupAssistantService extends DocumentSetupAssistantService {
-  constructor(readonly project_id: number) {
+  constructor(
+    readonly project_id: number,
+    private readonly seed: { name: string }
+  ) {
     super(project_id, "v0_schema");
   }
 
-  async createSchemaDocument({ name }: { name: string }) {
+  async createSchemaDocument() {
+    const { name } = this.seed;
     const masterdoc_ref = await this.createMasterDocument({
-      title: name + "(Database)",
+      title: name,
     });
 
     const { data, error } = await grida_forms_client
@@ -69,13 +73,16 @@ export class SchemaDocumentSetupAssistantService extends DocumentSetupAssistantS
 }
 
 export class SiteDocumentSetupAssistantService extends DocumentSetupAssistantService {
-  constructor(readonly project_id: number) {
+  constructor(
+    readonly project_id: number,
+    private readonly seed: Partial<{ title: string }>
+  ) {
     super(project_id, "v0_site");
   }
 
   async createSiteDocument() {
     return this.createMasterDocument({
-      title: "Untitled Site",
+      title: this.seed.title ?? "Untitled Site",
     });
   }
 }

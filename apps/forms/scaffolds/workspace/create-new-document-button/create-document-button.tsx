@@ -37,6 +37,10 @@ import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { Label } from "@/components/ui/label";
 import { EditorApiResponse } from "@/types/private/api";
 import { Spinner } from "@/components/spinner";
+import {
+  NewDocumentRequest,
+  NewDocumentResponse,
+} from "@/app/(api)/private/editor/new/route";
 
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
 
@@ -198,23 +202,9 @@ export function CreateNewDocumentButton({
   );
 }
 
-type CreateNewDocumentInit =
-  | {
-      doctype: "v0_schema";
-      name: string;
-    }
-  | {
-      doctype: "v0_form";
-      title: string;
-    }
-  | {
-      doctype: "v0_site";
-      title: string;
-    };
-
 async function create_new_document(
-  init: CreateNewDocumentInit
-): Promise<EditorApiResponse<{ id: string }>> {
+  init: NewDocumentRequest
+): Promise<NewDocumentResponse> {
   return fetch(`/private/editor/new`, {
     method: "POST",
     body: JSON.stringify(init),
@@ -250,30 +240,27 @@ function CreateNewDatabaseDialog({
   const onSaveClick = () => {
     setBusy(true);
     create_new_document({
+      project_id: project_id,
       doctype: "v0_schema",
       name: name,
     })
       .then(({ data, error }) => {
         if (error) {
-          setError(error);
+          setError(error.message);
         }
         if (data) {
           setError(undefined);
 
           // client side redirect
-          router.push(
-            editorlink("data", {
-              document_id: data.id,
-              org: organization_name,
-              proj: project_name,
-            })
-          );
+          router.push(data.redirect);
+          return;
         }
+
+        // this shall not be raeched when success
+        setBusy(false);
       })
       .catch(() => {
         setError("Unknown error. Please try again.");
-      })
-      .finally(() => {
         setBusy(false);
       });
   };
