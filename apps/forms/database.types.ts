@@ -2528,7 +2528,7 @@ export type Database = {
       }
     }
     Enums: {
-      doctype: "v0_form" | "v0_site"
+      doctype: "v0_form" | "v0_site" | "v0_database"
     }
     CompositeTypes: {
       [_ in never]: never

@@ -18,6 +18,8 @@ import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { editorlink } from "@/lib/forms/url";
 
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
+
 export function CreateNewDocumentButton({
   project_name,
   project_id,
@@ -34,6 +36,7 @@ export function CreateNewDocumentButton({
   const router = useRouter();
   const new_default_form_url = `/private/editor/new?project_id=${project_id}&doctype=v0_form`;
   const new_default_site_url = `/private/editor/new?project_id=${project_id}&doctype=v0_site`;
+  const new_default_database_url = `/private/editor/new?project_id=${project_id}&doctype=v0_database`;
 
   const new_formn_with_template = async (template: string) => {
     const res = await fetch(
@@ -67,7 +70,7 @@ export function CreateNewDocumentButton({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" sideOffset={8}>
         {/* TODO: alpha feature */}
-        <DropdownMenuGroup hidden={process.env.NODE_ENV === "production"}>
+        <DropdownMenuGroup hidden={IS_PRODUCTION}>
           <DropdownMenuLabel>Sites</DropdownMenuLabel>
           <form action={new_default_site_url} method="POST">
             <button className="w-full">
@@ -134,16 +137,21 @@ export function CreateNewDocumentButton({
               <Badge variant="outline">soon</Badge>
             </div>
           </DropdownMenuLabel>
-          <DropdownMenuItem disabled>
-            <ResourceTypeIcon
-              type="database"
-              className="w-4 h-4 me-2 align-middle"
-            />
-            Database
-            <Badge variant="outline" className="ms-auto">
-              soon
-            </Badge>
-          </DropdownMenuItem>
+          <form action={new_default_database_url} method="POST">
+            <button className="w-full">
+              <DropdownMenuItem disabled={IS_PRODUCTION}>
+                <ResourceTypeIcon
+                  type="database"
+                  className="w-4 h-4 me-2 align-middle"
+                />
+                Database
+                <Badge variant="outline" className="ms-auto">
+                  soon
+                </Badge>
+              </DropdownMenuItem>
+            </button>
+          </form>
+
           <DropdownMenuItem disabled>
             <ResourceTypeIcon
               type="commerce"

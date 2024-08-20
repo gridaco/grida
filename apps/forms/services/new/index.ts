@@ -39,6 +39,18 @@ class DocumentSetupAssistantService {
   }
 }
 
+export class DatabaseDocumentSetupAssistantService extends DocumentSetupAssistantService {
+  constructor(readonly project_id: number) {
+    super(project_id, "v0_database");
+  }
+
+  async createDatabaseDocument() {
+    return this.createMasterDocument({
+      title: "Untitled Database",
+    });
+  }
+}
+
 export class SiteDocumentSetupAssistantService extends DocumentSetupAssistantService {
   constructor(readonly project_id: number) {
     super(project_id, "v0_site");
