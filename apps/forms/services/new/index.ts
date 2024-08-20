@@ -64,6 +64,9 @@ export class SchemaDocumentSetupAssistantService extends DocumentSetupAssistantS
       .single();
 
     if (error) {
+      if (error.code === "23505") {
+        throw new Error("Schema name already exists");
+      }
       console.error(error);
       throw error;
     }

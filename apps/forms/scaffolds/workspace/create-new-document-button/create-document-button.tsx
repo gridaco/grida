@@ -41,8 +41,21 @@ import {
   NewDocumentRequest,
   NewDocumentResponse,
 } from "@/app/(api)/private/editor/new/route";
+import toast from "react-hot-toast";
 
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
+
+async function create_new_document(
+  init: NewDocumentRequest
+): Promise<NewDocumentResponse> {
+  return fetch(`/private/editor/new`, {
+    method: "POST",
+    body: JSON.stringify(init),
+    headers: {
+      "Content-Type": "application/json",
+    },
+  }).then((res) => res.json());
+}
 
 export function CreateNewDocumentButton({
   project_name,
@@ -60,9 +73,56 @@ export function CreateNewDocumentButton({
   const newDatabaseDialog = useDialogState();
 
   const router = useRouter();
-  const new_default_form_url = `/private/editor/new?project_id=${project_id}&doctype=v0_form`;
-  const new_default_site_url = `/private/editor/new?project_id=${project_id}&doctype=v0_site`;
-  const new_default_database_url = `/private/editor/new?project_id=${project_id}&doctype=v0_schema`;
+
+  const new_default_form = async () => {
+    const promise = create_new_document({
+      project_id: project_id,
+      doctype: "v0_form",
+    });
+
+    toast.promise(promise, {
+      loading: "Creating...",
+      error: "Failed to create form",
+      success: "Form created",
+    });
+
+    promise.then(({ data, error }) => {
+      if (error) {
+        console.error(error);
+        return;
+      }
+      if (data) {
+        // client side redirect
+        router.push(data.redirect);
+        toast.loading("Loading...");
+      }
+    });
+  };
+
+  const new_default_site = async () => {
+    const promise = create_new_document({
+      project_id: project_id,
+      doctype: "v0_site",
+    });
+
+    toast.promise(promise, {
+      loading: "Creating...",
+      error: "Failed to create site",
+      success: "Site created",
+    });
+
+    promise.then(({ data, error }) => {
+      if (error) {
+        console.error(error);
+        return;
+      }
+      if (data) {
+        // client side redirect
+        router.push(data.redirect);
+        toast.loading("Loading...");
+      }
+    });
+  };
 
   const new_formn_with_template = async (template: string) => {
     const res = await fetch(
@@ -99,17 +159,13 @@ export function CreateNewDocumentButton({
           {/* TODO: alpha feature */}
           <DropdownMenuGroup hidden={IS_PRODUCTION}>
             <DropdownMenuLabel>Sites</DropdownMenuLabel>
-            <form action={new_default_site_url} method="POST">
-              <button className="w-full">
-                <DropdownMenuItem>
-                  <ResourceTypeIcon
-                    type="v0_site"
-                    className="w-4 h-4 me-2 align-middle"
-                  />
-                  Blank Site
-                </DropdownMenuItem>
-              </button>
-            </form>
+            <DropdownMenuItem onSelect={new_default_site}>
+              <ResourceTypeIcon
+                type="v0_site"
+                className="w-4 h-4 me-2 align-middle"
+              />
+              Blank Site
+            </DropdownMenuItem>
             <DropdownMenuItem disabled>
               <ResourceTypeIcon
                 type="v0_site"
@@ -124,17 +180,13 @@ export function CreateNewDocumentButton({
           </DropdownMenuGroup>
           <DropdownMenuGroup>
             <DropdownMenuLabel>Forms</DropdownMenuLabel>
-            <form action={new_default_form_url} method="POST">
-              <button className="w-full">
-                <DropdownMenuItem>
-                  <ResourceTypeIcon
-                    type="v0_form"
-                    className="w-4 h-4 me-2 align-middle"
-                  />
-                  Blank Form
-                </DropdownMenuItem>
-              </button>
-            </form>
+            <DropdownMenuItem onSelect={new_default_form}>
+              <ResourceTypeIcon
+                type="v0_form"
+                className="w-4 h-4 me-2 align-middle"
+              />
+              Blank Form
+            </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => {
                 new_formn_with_template("headless");
@@ -200,18 +252,6 @@ export function CreateNewDocumentButton({
       />
     </>
   );
-}
-
-async function create_new_document(
-  init: NewDocumentRequest
-): Promise<NewDocumentResponse> {
-  return fetch(`/private/editor/new`, {
-    method: "POST",
-    body: JSON.stringify(init),
-    headers: {
-      "Content-Type": "application/json",
-    },
-  }).then((res) => res.json());
 }
 
 function CreateNewDatabaseDialog({

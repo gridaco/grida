@@ -133,23 +133,34 @@ export async function POST(request: NextRequest) {
           },
         } as NewDocumentResponse);
       }
-      const setup = new SchemaDocumentSetupAssistantService(project_id, {
-        name: data.name,
-      });
-      const { id } = await setup.createSchemaDocument();
 
-      return NextResponse.json({
-        data: {
-          document_id: id,
-          redirect: editorlink(".", {
-            proj: project_ref.name,
-            org: project_ref.organization!.name,
-            origin,
+      try {
+        const setup = new SchemaDocumentSetupAssistantService(project_id, {
+          name: data.name,
+        });
+        const { id } = await setup.createSchemaDocument();
+
+        return NextResponse.json({
+          data: {
             document_id: id,
-          }),
-        },
-      } satisfies NewDocumentResponse);
-
+            redirect: editorlink(".", {
+              proj: project_ref.name,
+              org: project_ref.organization!.name,
+              origin,
+              document_id: id,
+            }),
+          },
+        } satisfies NewDocumentResponse);
+      } catch (e) {
+        if (e instanceof Error) {
+          return NextResponse.json({
+            data: null,
+            error: {
+              message: e.message,
+            },
+          } as NewDocumentResponse);
+        }
+      }
       break;
     }
     default: {
