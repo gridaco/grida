@@ -4,6 +4,10 @@ import type {
   GDocumentType,
 } from "@/types";
 import assert from "assert";
+import {
+  isValidSchemaName,
+  schemaname_validation_messages,
+} from "../utils/regex";
 
 /**
  * NO RLS - use with caution
@@ -37,6 +41,19 @@ class DocumentSetupAssistantService {
     this.document_id = document_ref.id;
     return document_ref;
   }
+
+  protected async rollback() {
+    try {
+      if (!this.document_id) return;
+
+      await workspaceclient
+        .from("document")
+        .delete()
+        .eq("id", this.document_id);
+    } catch (e) {
+      console.error(e);
+    }
+  }
 }
 
 export class SchemaDocumentSetupAssistantService extends DocumentSetupAssistantService {
@@ -47,8 +64,44 @@ export class SchemaDocumentSetupAssistantService extends DocumentSetupAssistantS
     super(project_id, "v0_schema");
   }
 
+  private async validateName(): Promise<true | "taken" | "invalid"> {
+    if (!isValidSchemaName(this.seed.name)) {
+      return "invalid";
+    }
+
+    // check for duplicate
+    const { data, error } = await grida_forms_client
+      .from("schema_document")
+      .select("id")
+      .eq("name", this.seed.name)
+      .eq("project_id", this.project_id)
+      .single();
+
+    if (error) {
+      console.error(error);
+      throw error;
+    }
+
+    if (data) {
+      return "taken";
+    }
+
+    return true;
+  }
+
   async createSchemaDocument() {
     const { name } = this.seed;
+
+    // pre-validation
+    const isvalidname = await this.validateName();
+    if (isvalidname !== true) {
+      if (isvalidname === "taken") {
+        throw new Error("Schema name already exists");
+      } else {
+        throw new Error(schemaname_validation_messages.invalid);
+      }
+    }
+
     const masterdoc_ref = await this.createMasterDocument({
       title: name,
     });
@@ -64,6 +117,7 @@ export class SchemaDocumentSetupAssistantService extends DocumentSetupAssistantS
       .single();
 
     if (error) {
+      await this.rollback();
       if (error.code === "23505") {
         throw new Error("Schema name already exists");
       }
