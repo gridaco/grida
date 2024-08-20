@@ -199,7 +199,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): FormEditorState {
         basepath: base.basepath,
         document_id: init.document_id,
       }),
-      selected_page_id: "form",
+      selected_page_id: "", // "form",
       nodes: [],
       templatesample: "formcollection_sample_001_the_bundle",
       templatedata: {},

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/utils";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
+import { CaretDownIcon, CaretRightIcon } from "@radix-ui/react-icons";
 
 export function SidebarRoot({
   side = "left",
@@ -90,6 +91,9 @@ export const SidebarMenuLink = React.forwardRef(function SidebarMenuLink({
 
 export const SidebarMenuItem = React.forwardRef(function SidebarMenuItem(
   {
+    expandable,
+    expanded,
+    icon,
     level,
     muted,
     selected,
@@ -97,16 +101,22 @@ export const SidebarMenuItem = React.forwardRef(function SidebarMenuItem(
     disabled,
     children,
     onSelect,
+    onExpandChange,
   }: React.PropsWithChildren<{
+    expandable?: boolean;
+    expanded?: boolean;
     level?: number;
     muted?: boolean;
     selected?: boolean;
     className?: string;
     disabled?: boolean;
+    icon?: React.ReactNode;
     onSelect?: () => void;
+    onExpandChange?: (expand: boolean) => void;
   }>,
   forwardedRef
 ) {
+  const hasiconslot = icon !== undefined || expandable;
   return (
     <div
       ref={forwardedRef as any}
@@ -130,6 +140,32 @@ export const SidebarMenuItem = React.forwardRef(function SidebarMenuItem(
       }}
       onClick={onSelect}
     >
+      {hasiconslot && (
+        <div className="relative w-4 h-4 me-2">
+          {expandable && (
+            <button
+              type="button"
+              className="absolute z-10 w-4 h-4 me-2 opacity-0 group-hover:opacity-100"
+              onClick={(e) => {
+                e.stopPropagation();
+                onExpandChange?.(!expanded);
+              }}
+            >
+              {expanded ? <CaretDownIcon /> : <CaretRightIcon />}
+            </button>
+          )}
+          <>
+            {icon && (
+              <div
+                data-expandable={expandable}
+                className="w-4 h-4 me-2 data-[expandable='true']:group-hover:opacity-0"
+              >
+                {icon}
+              </div>
+            )}
+          </>
+        </div>
+      )}
       {children}
     </div>
   );
@@ -192,8 +228,8 @@ export function SidebarMenuItemActions({
   );
 }
 
-export const SidebarSectionHeaderAction = React.forwardRef(
-  function SidebarSectionHeaderAction(
+export const SidebarMenuItemAction = React.forwardRef(
+  function SidebarMenuItemAction(
     {
       children,
       ...props
