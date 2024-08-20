@@ -53,35 +53,37 @@ export function ModeData() {
           <SidebarSectionHeaderLabel>
             <span>Tables</span>
           </SidebarSectionHeaderLabel>
-          <SidebarMenuItemActions hidden={state.doctype !== "v0_schema"}>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuItemAction>
-                  <PlusIcon />
-                </SidebarMenuItemAction>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent side="right" align="start">
-                <DropdownMenuGroup>
-                  <DropdownMenuLabel>CMS</DropdownMenuLabel>
-                  <DropdownMenuItem onSelect={newTableDialog.openDialog}>
-                    <ResourceTypeIcon type="table" className="w-4 h-4 me-2" />
-                    New Table
-                  </DropdownMenuItem>
-                </DropdownMenuGroup>
-                <DropdownMenuGroup>
-                  <DropdownMenuLabel>Supabase</DropdownMenuLabel>
-                  <DropdownMenuItem>
-                    <SupabaseLogo className="w-4 h-4 me-2" />
-                    Connect Supabase Table
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <SupabaseLogo className="w-4 h-4 me-2" />
-                    Connect Supabase Project
-                  </DropdownMenuItem>
-                </DropdownMenuGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </SidebarMenuItemActions>
+          {state.doctype == "v0_schema" && (
+            <SidebarMenuItemActions>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <SidebarMenuItemAction>
+                    <PlusIcon />
+                  </SidebarMenuItemAction>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent side="right" align="start">
+                  <DropdownMenuGroup>
+                    <DropdownMenuLabel>CMS</DropdownMenuLabel>
+                    <DropdownMenuItem onSelect={newTableDialog.openDialog}>
+                      <ResourceTypeIcon type="table" className="w-4 h-4 me-2" />
+                      New Table
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                  <DropdownMenuGroup>
+                    <DropdownMenuLabel>Supabase</DropdownMenuLabel>
+                    <DropdownMenuItem>
+                      <SupabaseLogo className="w-4 h-4 me-2" />
+                      Connect Supabase Table
+                    </DropdownMenuItem>
+                    <DropdownMenuItem>
+                      <SupabaseLogo className="w-4 h-4 me-2" />
+                      Connect Supabase Project
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </SidebarMenuItemActions>
+          )}
         </SidebarSectionHeaderItem>
         <SidebarMenuList>
           {tables.map((table, i) => {

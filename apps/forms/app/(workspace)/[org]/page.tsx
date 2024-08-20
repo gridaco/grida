@@ -8,7 +8,7 @@ import {
   ViewGridIcon,
   ViewHorizontalIcon,
 } from "@radix-ui/react-icons";
-import { CreateNewDocumentButton } from "@/components/create-new-document-button";
+import { CreateNewDocumentButton } from "@/scaffolds/workspace/create-new-document-button";
 import { GDocument, ConnectionSupabaseJoint, Form } from "@/types";
 import { ProjectStats } from "@/scaffolds/analytics/stats";
 import { PoweredByGridaFooter } from "@/scaffolds/e/form/powered-by-brand-footer";

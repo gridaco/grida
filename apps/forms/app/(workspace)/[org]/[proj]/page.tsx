@@ -3,11 +3,10 @@
 import React from "react";
 import Link from "next/link";
 import { ViewGridIcon, ViewHorizontalIcon } from "@radix-ui/react-icons";
-import { CreateNewDocumentButton } from "@/components/create-new-document-button";
+import { CreateNewDocumentButton } from "@/scaffolds/workspace/create-new-document-button";
 import { Form, GDocument } from "@/types";
 import { ProjectStats } from "@/scaffolds/analytics/stats";
 import { PoweredByGridaFooter } from "@/scaffolds/e/form/powered-by-brand-footer";
-import { OrganizationAvatar } from "@/components/organization-avatar";
 import { GridCard, RowCard } from "@/components/site/form-card";
 import { WorkspaceSidebar } from "@/scaffolds/workspace/sidebar";
 import { useWorkspace } from "@/scaffolds/workspace";

@@ -17,7 +17,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useWorkspace } from "@/scaffolds/workspace";
 import Link from "next/link";
-import { ResourceTypeIcon } from "../resource-type-icon";
+import { ResourceTypeIcon } from "@/components/resource-type-icon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { editorlink } from "@/lib/forms/url";
@@ -36,7 +36,7 @@ import { Input } from "@/components/ui/input";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { Label } from "@/components/ui/label";
 import { EditorApiResponse } from "@/types/private/api";
-import { Spinner } from "../spinner";
+import { Spinner } from "@/components/spinner";
 
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
 
@@ -305,7 +305,14 @@ function CreateNewDatabaseDialog({
             <TabsContent value="database" className="py-4">
               <div className="grid gap-2">
                 <Label>Database Name</Label>
-                <Input required minLength={1} placeholder="name" />
+                <Input
+                  autoFocus
+                  required
+                  minLength={1}
+                  placeholder="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
                 <span className="text-muted-foreground text-xs max-w-80">
                   {error && (
                     <span className="text-destructive">
