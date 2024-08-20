@@ -3,7 +3,12 @@
 import React, { useCallback, useMemo } from "react";
 import { StateProvider, useEditorState } from "./provider";
 import { reducer } from "./reducer";
-import { FormEditorInit, initialFormEditorState } from "./state";
+import {
+  EditorInit,
+  FormDocumentEditorInit,
+  initialEditorState,
+  SiteDocumentEditorInit,
+} from "./state";
 import { FieldEditPanel, FormFieldSave } from "../panels/field-edit-panel";
 import { FormFieldDefinition } from "@/types";
 import { FormFieldUpsert, EditorApiResponse } from "@/types/private/api";
@@ -15,18 +20,54 @@ import { MediaViewerProvider } from "../mediaviewer";
 import { AssetsBackgroundsResolver } from "./resolver/assets-backgrounds-resolver";
 import toast from "react-hot-toast";
 
-export function FormEditorProvider({
+export function EditorProvider({
   initial,
   children,
-}: React.PropsWithChildren<{ initial: FormEditorInit }>) {
+}: React.PropsWithChildren<{ initial: EditorInit }>) {
+  switch (initial.doctype) {
+    case "v0_form":
+      return (
+        <FormDocumentEditorProvider initial={initial}>
+          <AssetsBackgroundsResolver />
+          {children}
+        </FormDocumentEditorProvider>
+      );
+    case "v0_site":
+      return (
+        <SiteDocumentEditorProvider initial={initial}>
+          <AssetsBackgroundsResolver />
+          {children}
+        </SiteDocumentEditorProvider>
+      );
+  }
+}
+
+export function SiteDocumentEditorProvider({
+  initial,
+  children,
+}: React.PropsWithChildren<{ initial: SiteDocumentEditorInit }>) {
   const [state, dispatch] = React.useReducer(
     reducer,
-    initialFormEditorState(initial)
+    initialEditorState(initial)
+  );
+  return (
+    <StateProvider state={state} dispatch={dispatch}>
+      {children}
+    </StateProvider>
+  );
+}
+
+export function FormDocumentEditorProvider({
+  initial,
+  children,
+}: React.PropsWithChildren<{ initial: FormDocumentEditorInit }>) {
+  const [state, dispatch] = React.useReducer(
+    reducer,
+    initialEditorState(initial)
   );
 
   return (
     <StateProvider state={state} dispatch={dispatch}>
-      <AssetsBackgroundsResolver />
       <TooltipProvider>
         <MediaViewerProvider>
           <BlockEditPanel />

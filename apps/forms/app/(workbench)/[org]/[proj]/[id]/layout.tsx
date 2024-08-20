@@ -9,7 +9,7 @@ import {
 import { GridaLogo } from "@/components/grida-logo";
 import { SlashIcon } from "@radix-ui/react-icons";
 import { Sidebar } from "@/scaffolds/sidebar/sidebar";
-import { FormEditorProvider } from "@/scaffolds/editor";
+import { EditorProvider, FormDocumentEditorProvider } from "@/scaffolds/editor";
 import { PreviewButton } from "@/components/preview-button";
 import { GridaXSupabaseService } from "@/services/x-supabase";
 import type {
@@ -22,7 +22,7 @@ import type {
 } from "@/types";
 import type {
   GDocEditorRouteParams,
-  FormEditorInit,
+  FormDocumentEditorInit,
 } from "@/scaffolds/editor/state";
 import { Breadcrumbs } from "@/scaffolds/workbench/breadcrumb";
 import assert from "assert";
@@ -33,6 +33,7 @@ import { ToasterWithMax } from "@/components/toaster";
 import { EditorHelpFab } from "@/scaffolds/help/editor-help-fab";
 import { Inter } from "next/font/google";
 import { cn } from "@/utils";
+import React from "react";
 
 export const revalidate = 0;
 
@@ -106,10 +107,12 @@ export default async function Layout({
     return notFound();
   }
 
-  const { data, error } = await supabase
-    .from("form_document")
-    .select(
-      `
+  switch (masterdoc_ref.doctype) {
+    case "v0_form": {
+      const { data, error } = await supabase
+        .from("form_document")
+        .select(
+          `
         *,
         blocks:form_block(*),
         form!form_id(
@@ -123,46 +126,39 @@ export default async function Layout({
           supabase_connection:connection_supabase(*)
         )
       `
-    )
-    .eq("project_id", project_ref.id)
-    .eq("id", masterdoc_ref.id)
-    .single();
+        )
+        .eq("project_id", project_ref.id)
+        .eq("id", masterdoc_ref.id)
+        .single();
 
-  if (!data) {
-    console.error("editorinit", id, error);
-    return notFound();
-  }
+      if (!data) {
+        console.error("editorinit", id, error);
+        return notFound();
+      }
 
-  const client = new GridaXSupabaseService();
+      const appearance =
+        (data.stylesheet as FormStyleSheetV1Schema)?.appearance ?? "system";
 
-  const { form: _form } = data;
-  assert(_form);
-  const form = _form as any as Form & {
-    supabase_connection: any;
-    store_connection: any;
-    fields: FormFieldDefinition[];
-  };
+      const client = new GridaXSupabaseService();
 
-  const supabase_connection_state = form.supabase_connection
-    ? await client.getConnection(form.supabase_connection)
-    : null;
+      const { form: _form } = data;
+      assert(_form);
+      const form = _form as any as Form & {
+        supabase_connection: any;
+        store_connection: any;
+        fields: FormFieldDefinition[];
+      };
 
-  const appearance =
-    (data.stylesheet as FormStyleSheetV1Schema)?.appearance ?? "system";
+      const supabase_connection_state = form.supabase_connection
+        ? await client.getConnection(form.supabase_connection)
+        : null;
 
-  return (
-    <html lang="en" suppressHydrationWarning>
-      <body
-        className={cn(
-          inter.className,
-          // to prevent the whole page from scrolling by sr-only or other hidden absolute elements
-          "h-screen overflow-hidden"
-        )}
-      >
-        <div className="h-screen flex flex-col">
-          <FormEditorProvider
+      return (
+        <Html>
+          <FormDocumentEditorProvider
             initial={
               {
+                doctype: "v0_form",
                 project: { id: project_ref.id, name: project_ref.name },
                 organization: {
                   id: project_ref.organization!.id,
@@ -225,42 +221,122 @@ export default async function Layout({
                 document_title: masterdoc_ref.title,
                 fields: form.fields,
                 blocks: data.blocks as FormBlock[],
-              } satisfies FormEditorInit
+              } satisfies FormDocumentEditorInit
             }
           >
-            <ThemeProvider
-              attribute="class"
-              defaultTheme={appearance}
-              enableSystem
-              disableTransitionOnChange
-              storageKey={`theme-workbench-${id}`}
+            <BaseLayout
+              docid={masterdoc_ref.id}
+              doctitle={masterdoc_ref.title}
+              appearance={appearance}
+              org={org}
+              proj={proj}
             >
-              <Header
-                org={params.org}
-                proj={params.proj}
-                document={{
-                  id: masterdoc_ref.id,
-                  title: masterdoc_ref.title,
-                }}
-              />
-              <div className="flex flex-1 overflow-y-auto">
-                <div className="h-full flex flex-1 w-full">
-                  {/* side */}
-                  <aside className="hidden lg:flex h-full">
-                    <Sidebar />
-                  </aside>
-                  <div className="w-full h-full overflow-x-hidden">
-                    {children}
-                  </div>
-                </div>
-              </div>
-              <EditorHelpFab />
-              <ToasterWithMax position="bottom-center" max={5} />
-            </ThemeProvider>
-          </FormEditorProvider>
-        </div>
+              {children}
+            </BaseLayout>
+          </FormDocumentEditorProvider>
+        </Html>
+      );
+    }
+    case "v0_site": {
+      return (
+        <Html>
+          <EditorProvider
+            initial={{
+              doctype: "v0_site",
+              project: { id: project_ref.id, name: project_ref.name },
+              organization: {
+                id: project_ref.organization!.id,
+                name: project_ref.organization!.name,
+              },
+              document_id: masterdoc_ref.id,
+              document_title: masterdoc_ref.title,
+              theme: {
+                appearance: "system",
+                fontFamily: "inter",
+                lang: "en",
+                is_powered_by_branding_enabled: true,
+              },
+            }}
+          >
+            <BaseLayout
+              docid={masterdoc_ref.id}
+              doctitle={masterdoc_ref.title}
+              org={org}
+              proj={proj}
+            >
+              {/* <p>
+                This document is a site document. Site documents are not
+                supported yet.
+              </p> */}
+              {children}
+            </BaseLayout>
+          </EditorProvider>
+        </Html>
+      );
+    }
+  }
+}
+
+function Html({ children }: React.PropsWithChildren<{}>) {
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <body
+        className={cn(
+          inter.className,
+          // to prevent the whole page from scrolling by sr-only or other hidden absolute elements
+          "h-screen overflow-hidden"
+        )}
+      >
+        {children}
       </body>
     </html>
+  );
+}
+
+function BaseLayout({
+  docid,
+  doctitle,
+  org,
+  proj,
+  appearance,
+  children,
+}: React.PropsWithChildren<{
+  docid: string;
+  doctitle: string;
+  appearance?: string;
+  org: string;
+  proj: string;
+}>) {
+  return (
+    <ThemeProvider
+      attribute="class"
+      defaultTheme={appearance}
+      enableSystem
+      disableTransitionOnChange
+      storageKey={`theme-workbench-${docid}`}
+    >
+      <Header
+        org={org}
+        proj={proj}
+        document={{
+          id: docid,
+          title: doctitle,
+        }}
+      />
+      <div className="h-screen flex flex-col">
+        <div className="flex flex-1 overflow-y-auto">
+          <div className="h-full flex flex-1 w-full">
+            {/* side */}
+            <aside className="hidden lg:flex h-full">
+              <Sidebar />
+            </aside>
+            <div className="w-full h-full overflow-x-hidden">{children}</div>
+          </div>
+        </div>
+      </div>
+      <EditorHelpFab />
+      <ToasterWithMax position="bottom-center" max={5} />
+    </ThemeProvider>
   );
 }
 

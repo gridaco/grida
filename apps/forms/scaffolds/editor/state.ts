@@ -38,7 +38,7 @@ export type DraftID = `[draft]${string}`;
 export const DRAFT_ID_START_WITH = "[draft]";
 const ISDEV = process.env.NODE_ENV === "development";
 
-export interface FormEditorInit {
+interface BaseDocumentEditorInit {
   organization: {
     name: string;
     id: number;
@@ -47,6 +47,20 @@ export interface FormEditorInit {
     name: string;
     id: number;
   };
+  document_id: string;
+  document_title: string;
+  doctype: "v0_form" | "v0_site";
+  theme: FormEditorState["theme"];
+}
+
+export type EditorInit = FormDocumentEditorInit | SiteDocumentEditorInit;
+
+export interface SiteDocumentEditorInit extends BaseDocumentEditorInit {
+  doctype: "v0_site";
+}
+
+export interface FormDocumentEditorInit extends BaseDocumentEditorInit {
+  doctype: "v0_form";
   form_id: string;
   campaign: FormEditorState["campaign"];
   form_security: FormEditorState["form_security"];
@@ -55,15 +69,62 @@ export interface FormEditorInit {
     store_id?: number | null;
     supabase?: GridaSupabase.SupabaseConnectionState;
   };
-  theme: FormEditorState["theme"];
   form_title: string;
-  document_id: string;
-  document_title: string;
   blocks: EditorFlatFormBlock[];
   fields: FormFieldDefinition[];
 }
 
-export function initialFormEditorState(init: FormEditorInit): FormEditorState {
+export function initialEditorState(init: EditorInit): FormEditorState {
+  switch (init.doctype) {
+    case "v0_form":
+      return initialFormEditorState(init);
+    case "v0_site":
+      return initialSiteEditorState(init);
+  }
+}
+
+function initialBaseDocumentEditorState(
+  init: BaseDocumentEditorInit
+): Omit<BaseDocumentEditorState, "document"> {
+  const basepath = editorbasepath({
+    org: init.organization.name,
+    proj: init.project.name,
+  });
+
+  return {
+    basepath: basepath,
+    doctype: init.doctype,
+    document_id: init.document_id,
+    document_title: init.document_title,
+    organization: init.organization,
+    project: init.project,
+    saving: false,
+    theme: init.theme,
+    assets: {
+      backgrounds: [],
+    },
+  };
+}
+
+function initialSiteEditorState(init: SiteDocumentEditorInit): FormEditorState {
+  const base = initialBaseDocumentEditorState(init);
+  return {
+    ...base,
+    document: {
+      pages: sitedocumentpagesinit({
+        basepath: base.basepath,
+        document_id: init.document_id,
+      }),
+      selected_page_id: "collection",
+      nodes: [],
+      templatesample: "formcollection_sample_001_the_bundle",
+      templatedata: {},
+    },
+    tables: [],
+  };
+}
+
+function initialFormEditorState(init: FormDocumentEditorInit): FormEditorState {
   // prepare initial available_field_ids
   const field_ids = init.fields.map((f) => f.id);
   const block_referenced_field_ids = init.blocks
@@ -76,16 +137,10 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
   const is_main_table_supabase =
     !!init.connections?.supabase?.main_supabase_table;
 
-  const basepath = editorbasepath({
-    org: init.organization.name,
-    proj: init.project.name,
-  });
+  const base = initialBaseDocumentEditorState(init);
 
   return {
-    saving: false,
-    basepath: basepath,
-    project: init.project,
-    organization: init.organization,
+    ...base,
     connections: {
       store_id: init.connections?.store_id,
       supabase: init.connections?.supabase,
@@ -138,20 +193,18 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
     campaign: init.campaign,
     form_security: init.form_security,
     ending: init.ending,
-    document_id: init.document_id,
-    document_title: init.document_title,
     blocks: blockstreeflat(init.blocks),
     document: {
-      pages: formpagesinit({ basepath, document_id: init.document_id }),
+      pages: formdocumentpagesinit({
+        basepath: base.basepath,
+        document_id: init.document_id,
+      }),
       selected_page_id: "form",
       nodes: [],
       templatesample: "formcollection_sample_001_the_bundle",
       templatedata: {},
     },
     fields: init.fields,
-    assets: {
-      backgrounds: [],
-    },
     customers: undefined,
     responses: {
       rows: [],
@@ -181,7 +234,25 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
   };
 }
 
-function formpagesinit({
+function sitedocumentpagesinit({
+  basepath,
+  document_id,
+}: {
+  basepath: string;
+  document_id: string;
+}): MenuItem[] {
+  return [
+    {
+      section: "Pages",
+      id: "collection",
+      label: "home",
+      href: `/${basepath}/${document_id}/design`,
+      icon: "file",
+    },
+  ];
+}
+
+function formdocumentpagesinit({
   basepath,
   document_id,
 }: {
@@ -289,7 +360,7 @@ interface MenuItem {
   href?: string;
 }
 
-export interface FormEditorState {
+interface BaseDocumentEditorState {
   saving: boolean;
   basepath: string;
   organization: {
@@ -300,6 +371,55 @@ export interface FormEditorState {
     name: string;
     id: number;
   };
+  document_id: string;
+  document_title: string;
+  doctype: "v0_form" | "v0_site";
+  document: {
+    pages: MenuItem[];
+    selected_page_id: string;
+    nodes: any[];
+    templatesample: string;
+    templatedata: {
+      [key: string]: {
+        text?: Tokens.StringValueExpression;
+        template_id: string;
+        attributes?: Omit<
+          React.HtmlHTMLAttributes<HTMLDivElement>,
+          "style" | "className"
+        >;
+        properties?: { [key: string]: Tokens.StringValueExpression };
+        style?: React.CSSProperties;
+      };
+    };
+    selected_node_id?: string;
+    selected_node_type?: string;
+    selected_node_schema?: ZodObject<any> | null;
+    selected_node_default_properties?: Record<string, any>;
+    selected_node_default_style?: React.CSSProperties;
+    selected_node_default_text?: Tokens.StringValueExpression;
+    selected_node_context?: Record<string, any>;
+  };
+  theme: {
+    is_powered_by_branding_enabled: boolean;
+    lang: FormsPageLanguage;
+    appearance: Appearance;
+    palette?: FormStyleSheetV1Schema["palette"];
+    fontFamily: FontFamily;
+    customCSS?: FormStyleSheetV1Schema["custom"];
+    section?: FormStyleSheetV1Schema["section"];
+    background?: FormPageBackgroundSchema;
+  };
+  assets: {
+    backgrounds: {
+      name: string;
+      title: string;
+      embed: string;
+      preview: [string] | [string, string];
+    }[];
+  };
+}
+
+export interface FormEditorState extends BaseDocumentEditorState {
   connections: {
     store_id?: number | null;
     supabase?: GridaSupabase.SupabaseConnectionState;
@@ -328,34 +448,7 @@ export interface FormEditorState {
     ending_page_template_id: EndingPageTemplateID | null;
     ending_page_i18n_overrides: EndingPageI18nOverrides | null;
   };
-  document_id: string;
-  document_title: string;
   blocks: EditorFlatFormBlock[];
-  document: {
-    pages: MenuItem[];
-    selected_page_id: string;
-    nodes: any[];
-    templatesample: string;
-    templatedata: {
-      [key: string]: {
-        text?: Tokens.StringValueExpression;
-        template_id: string;
-        attributes?: Omit<
-          React.HtmlHTMLAttributes<HTMLDivElement>,
-          "style" | "className"
-        >;
-        properties?: { [key: string]: Tokens.StringValueExpression };
-        style?: React.CSSProperties;
-      };
-    };
-    selected_node_id?: string;
-    selected_node_type?: string;
-    selected_node_schema?: ZodObject<any> | null;
-    selected_node_default_properties?: Record<string, any>;
-    selected_node_default_style?: React.CSSProperties;
-    selected_node_default_text?: Tokens.StringValueExpression;
-    selected_node_context?: Record<string, any>;
-  };
   fields: FormFieldDefinition[];
   field_draft_init?: Partial<FormFieldInit> | null;
   focus_field_id?: string | null;
@@ -363,24 +456,6 @@ export interface FormEditorState {
   focus_customer_id?: string;
   focus_block_id?: string | null;
   available_field_ids: string[];
-  theme: {
-    is_powered_by_branding_enabled: boolean;
-    lang: FormsPageLanguage;
-    appearance: Appearance;
-    palette?: FormStyleSheetV1Schema["palette"];
-    fontFamily: FontFamily;
-    customCSS?: FormStyleSheetV1Schema["custom"];
-    section?: FormStyleSheetV1Schema["section"];
-    background?: FormPageBackgroundSchema;
-  };
-  assets: {
-    backgrounds: {
-      name: string;
-      title: string;
-      embed: string;
-      preview: [string] | [string, string];
-    }[];
-  };
   customers?: Customer[];
   selected_rows: Set<string>;
   responses: {
