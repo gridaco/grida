@@ -108,10 +108,10 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
 
   const field = useMemo(() => {
-    const focusfound = state.fields.find((f) => f.id === state.focus_field_id);
+    const focusfound = state.fields.find((f) => f.id === state.field_editor.id);
     if (focusfound) return focusfound;
-    return state.field_draft_init;
-  }, [state.focus_field_id, state.fields, state.field_draft_init]);
+    return state.field_editor.data?.draft;
+  }, [state.field_editor.id, state.fields, state.field_editor.data?.draft]);
 
   const closeFieldPanel = useCallback(
     (options: { refresh: boolean }) => {
@@ -132,7 +132,7 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
         options: init.options?.length ? init.options : undefined,
         optgroups: init.optgroups?.length ? init.optgroups : undefined,
         //
-        id: state.focus_field_id ?? undefined,
+        id: state.field_editor.id ?? undefined,
         form_id: state.form_id,
         data: init.data,
       };
@@ -176,7 +176,7 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
         error: "Failed to save field",
       });
     },
-    [closeFieldPanel, state.form_id, state.focus_field_id, dispatch]
+    [closeFieldPanel, state.form_id, state.field_editor.id, dispatch]
   );
 
   const is_existing_field = !!field?.id;
@@ -184,12 +184,12 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
   return (
     <>
       <FieldEditPanel
-        key={field?.name || state.field_edit_panel_refresh_key}
-        open={state.is_field_edit_panel_open}
+        key={field?.name || state.field_editor.refreshkey}
+        open={state.field_editor.open}
         title={is_existing_field ? "Edit Field" : "New Field"}
         enableAI={!is_existing_field}
         mode={is_existing_field ? "edit" : "new"}
-        formResetKey={state.field_edit_panel_refresh_key}
+        formResetKey={state.field_editor.refreshkey}
         init={
           field
             ? {

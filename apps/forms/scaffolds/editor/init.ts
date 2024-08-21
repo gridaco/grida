@@ -59,6 +59,10 @@ function initialBaseDocumentEditorState(
     row_editor: {
       open: false,
     },
+    customers: {
+      stream: undefined,
+      realtime: false,
+    },
     customer_editor: {
       open: false,
     },
@@ -209,15 +213,14 @@ function initialFormEditorState(init: FormDocumentEditorInit): FormEditorState {
       }),
       selected_page_id: "", // "form",
       nodes: [],
-      templatesample: "formcollection_sample_001_the_bundle",
       templatedata: {},
     },
     fields: init.fields,
-    customers: undefined,
     responses: {
       rows: [],
       fields: {},
     },
+    realtime_responses_enabled: true,
     sessions: {
       stream: undefined,
       realtime: false,
@@ -236,8 +239,10 @@ function initialFormEditorState(init: FormDocumentEditorInit): FormEditorState {
       empty_data_hidden: true,
     },
     datagrid_orderby: {},
-    realtime_responses_enabled: true,
     insertmenu: {
+      open: false,
+    },
+    field_editor: {
       open: false,
     },
     x_supabase_main_table: init.connections?.supabase

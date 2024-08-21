@@ -28,10 +28,10 @@ export default function Customers() {
       filter: state.datagrid_filter,
       table: "customer",
       data: {
-        rows: customers || [],
+        rows: customers.stream || [],
       },
     });
-  }, [customers, state.datagrid_filter]);
+  }, [customers.stream, state.datagrid_filter]);
 
   return (
     <MainTable table="customer">

@@ -17,7 +17,6 @@ import type {
   DataGridDeleteSelectedRows,
   FeedResponseAction,
   FocusBlockAction,
-  FocusFieldAction,
   HtmlBlockBodyAction,
   ImageBlockSrcAction,
   OpenInsertMenuPanelAction,
@@ -171,9 +170,9 @@ export function reducer(
 
             if (init) {
               // if init provided, always create new.
-              draft.field_draft_init = init;
+              draft.field_editor.data = { draft: init };
             } else {
-              draft.field_draft_init = null;
+              draft.field_editor.data = { draft: null };
               // find unused field id (if any)
               field_id = available_field_ids[0] ?? null;
               if (field_id) {
@@ -203,8 +202,8 @@ export function reducer(
 
             if (!field_id) {
               // if no available field, but field block provided, open a field editor panel
-              draft.focus_field_id = null;
-              draft.is_field_edit_panel_open = true;
+              draft.field_editor.id = undefined;
+              draft.field_editor.open = true;
               //
             }
           });
@@ -240,12 +239,14 @@ export function reducer(
       const { block_id } = <CreateFielFromBlockdAction>action;
       // trigger new field from empty field block
       return produce(state, (draft) => {
-        draft.field_draft_init = null;
         // update focus block id
         draft.focus_block_id = block_id;
-        draft.focus_field_id = null;
         // open a field editor panel
-        draft.is_field_edit_panel_open = true;
+        draft.field_editor.open = true;
+        draft.field_editor.id = undefined;
+        draft.field_editor.data = {
+          draft: null,
+        };
       });
     }
     case "blocks/resolve": {
@@ -443,21 +444,15 @@ export function reducer(
         };
       });
     }
-    case "editor/field/focus": {
-      const { field_id } = <FocusFieldAction>action;
-      return produce(state, (draft) => {
-        draft.focus_field_id = field_id;
-      });
-    }
     case "editor/field/edit": {
       const { field_id, open, refresh } = <OpenEditFieldAction>action;
       return produce(state, (draft) => {
-        draft.is_field_edit_panel_open = open ?? true;
-        draft.focus_field_id = field_id;
-        if (refresh) {
-          draft.field_edit_panel_refresh_key =
-            (draft.field_edit_panel_refresh_key ?? 0) + 1;
-        }
+        draft.field_editor.open = open ?? true;
+        draft.field_editor.id = field_id;
+        draft.field_editor.refreshkey = nextrefreshkey(
+          draft.field_editor.refreshkey,
+          refresh
+        );
       });
     }
     case "editor/field/save": {
@@ -476,7 +471,7 @@ export function reducer(
           let unused_field_id: string | null = field_id;
 
           // clear init
-          draft.field_draft_init = null;
+          draft.field_editor.data = { draft: null };
 
           // if new field, and focus block has no assigned field, use this.
           if (draft.focus_block_id) {
@@ -676,7 +671,7 @@ export function reducer(
     case "editor/customers/feed": {
       const { data } = <FeedCustomerAction>action;
       return produce(state, (draft) => {
-        draft.customers = data;
+        draft.customers.stream = data;
       });
     }
     case "editor/customers/edit": {
@@ -1074,4 +1069,14 @@ function table_keyword(table: FormEditorState["datagrid_table"]) {
     default:
       return "row";
   }
+}
+
+/**
+ * refresh by adding 1 to number based refresh key
+ */
+function nextrefreshkey(curr: number | undefined, refresh: boolean = true) {
+  if (refresh) {
+    return curr ? curr + 1 : 0;
+  }
+  return curr;
 }

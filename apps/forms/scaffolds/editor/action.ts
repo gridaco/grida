@@ -28,7 +28,6 @@ export type BlocksEditorAction =
   | FocusBlockAction
   | BlurBlockAction
   | InitAssetAction
-  | FocusFieldAction
   | ChangeBlockFieldAction
   | CreateFielFromBlockdAction
   | BlockVHiddenAction
@@ -178,11 +177,6 @@ export interface BlurBlockAction {
 
 export interface InitAssetAction extends Partial<FormEditorState["assets"]> {
   type: "editor/assets/init";
-}
-
-export interface FocusFieldAction {
-  type: "editor/field/focus";
-  field_id: string;
 }
 
 export interface OpenEditFieldAction {

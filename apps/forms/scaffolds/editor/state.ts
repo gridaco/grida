@@ -151,9 +151,11 @@ interface IDataGridState {
 /**
  * Utility state for entity edit dialog. id shall be processed within the correct context.
  */
-interface TGlobalEditorDialogState {
+interface TGlobalEditorDialogState<T = never> {
   id?: string;
+  refreshkey?: number;
   open: boolean;
+  data?: T;
 }
 
 /**
@@ -170,6 +172,10 @@ interface IRowEditorState {
 
 interface ICustomerEditorState {
   customer_editor: TGlobalEditorDialogState;
+}
+
+interface ICustomersDataStreamState {
+  customers: TGlobalDataStreamState<Customer>;
 }
 
 interface IEditorDateContextState {
@@ -203,6 +209,7 @@ export interface BaseDocumentEditorState
     IEditorDateContextState,
     IEditorAssetsState,
     IEditorSidebarState,
+    ICustomersDataStreamState,
     ICustomerEditorState,
     IRowEditorState {
   basepath: string;
@@ -254,6 +261,12 @@ export interface BaseDocumentEditorState
   };
 }
 
+interface IFieldEditorState {
+  field_editor: TGlobalEditorDialogState<{
+    draft: Partial<FormFieldInit> | null;
+  }>;
+}
+
 interface IFormResponseSessionDataStreamState {
   sessions: TGlobalDataStreamState<FormResponseSession>;
 }
@@ -266,6 +279,7 @@ export interface FormEditorState
   extends BaseDocumentEditorState,
     IFormResponseSessionDataStreamState,
     IFormBlockInsertionMenuState,
+    IFieldEditorState,
     IDataGridState {
   form_id: string;
   form_title: string;
@@ -299,16 +313,9 @@ export interface FormEditorState
   blocks: EditorFlatFormBlock[];
   fields: FormFieldDefinition[];
 
-  field_draft_init?: Partial<FormFieldInit> | null;
-  focus_field_id?: string | null;
-  is_field_edit_panel_open?: boolean;
-  field_edit_panel_refresh_key?: number;
-
   available_field_ids: string[];
-
   focus_block_id?: string | null;
 
-  customers?: Customer[];
   responses: {
     rows: FormResponse[];
     fields: { [key: string]: FormResponseField[] };

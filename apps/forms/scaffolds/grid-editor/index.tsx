@@ -33,14 +33,14 @@ import {
 import * as GridLayout from "./components/layout";
 import { txt_n_plural } from "@/utils/plural";
 import { editorlink } from "@/lib/forms/url";
+import { useDialogState } from "@/components/hooks/use-dialog-state";
 
 export function GridEditor() {
   const [state, dispatch] = useEditorState();
-  const [deleteFieldConfirmOpen, setDeleteFieldConfirmOpen] = useState(false);
+  const deleteFieldConfirmDialog = useDialogState<{ field_id: string }>();
 
   const {
     form_id,
-    focus_field_id,
     fields,
     responses,
     sessions,
@@ -102,37 +102,32 @@ export function GridEditor() {
     [dispatch]
   );
 
-  const openDeleteFieldConfirm = () => {
-    setDeleteFieldConfirmOpen(true);
-  };
-
-  const closeDeleteFieldConfirm = () => {
-    setDeleteFieldConfirmOpen(false);
-  };
-
-  const onDeleteField = useCallback(() => {
-    const deleting = supabase
-      .from("form_field")
-      .delete({
-        count: "exact",
-      })
-      .eq("id", focus_field_id!)
-      .then(({ error, count }) => {
-        if (!count || error) {
-          throw error;
-        }
-        dispatch({
-          type: "editor/field/delete",
-          field_id: focus_field_id!,
+  const onDeleteField = useCallback(
+    (field_id: string) => {
+      const deleting = supabase
+        .from("form_field")
+        .delete({
+          count: "exact",
+        })
+        .eq("id", field_id)
+        .then(({ error, count }) => {
+          if (!count || error) {
+            throw error;
+          }
+          dispatch({
+            type: "editor/field/delete",
+            field_id: field_id,
+          });
         });
-      });
 
-    toast.promise(deleting as Promise<any>, {
-      loading: "Deleting...",
-      success: "Field deleted",
-      error: "Failed to delete field",
-    });
-  }, [supabase, focus_field_id, dispatch]);
+      toast.promise(deleting as Promise<any>, {
+        loading: "Deleting...",
+        success: "Field deleted",
+        error: "Failed to delete field",
+      });
+    },
+    [supabase, dispatch]
+  );
 
   const has_selected_responses = selected_responses.size > 0;
   const selectionDisabled = datagrid_table === "session";
@@ -190,10 +185,11 @@ export function GridEditor() {
         </GridLayout.HeaderMenus>
       </GridLayout.Header>
       <DeleteFieldConfirmDialog
-        open={deleteFieldConfirmOpen}
-        onOpenChange={setDeleteFieldConfirmOpen}
-        onCancel={closeDeleteFieldConfirm}
-        onDeleteConfirm={onDeleteField}
+        open={deleteFieldConfirmDialog.open}
+        onOpenChange={deleteFieldConfirmDialog.onOpenChange}
+        onCancel={deleteFieldConfirmDialog.closeDialog}
+        field_id={deleteFieldConfirmDialog.data?.field_id}
+        onDeleteConfirm={(field_id) => onDeleteField(field_id)}
       />
       <GridLayout.Content>
         <ResponseGrid
@@ -206,11 +202,8 @@ export function GridEditor() {
           onAddNewFieldClick={openNewFieldPanel}
           onEditFieldClick={openEditFieldPanel}
           onDeleteFieldClick={(field_id) => {
-            dispatch({
-              type: "editor/field/focus",
-              field_id,
-            });
-            openDeleteFieldConfirm();
+            deleteFieldConfirmDialog.setData({ field_id });
+            deleteFieldConfirmDialog.openDialog();
           }}
           onCellChange={(row, column, data) => {
             dispatch({
@@ -402,10 +395,12 @@ function DeleteSelectedRowsButton() {
 function DeleteFieldConfirmDialog({
   onCancel,
   onDeleteConfirm,
+  field_id,
   ...props
 }: React.ComponentProps<typeof AlertDialog> & {
+  field_id?: string;
   onCancel: () => void;
-  onDeleteConfirm: () => void;
+  onDeleteConfirm: (field_id: string) => void;
 }) {
   const [state] = useEditorState();
 
@@ -435,7 +430,10 @@ function DeleteFieldConfirmDialog({
         </AlertDialogDescription>
         <div className="flex justify-end gap-2 p-2">
           <AlertDialogCancel onClick={onCancel}>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={onDeleteConfirm}>
+          <AlertDialogAction
+            disabled={!field_id}
+            onClick={() => onDeleteConfirm(field_id!)}
+          >
             Delete
           </AlertDialogAction>
         </div>
