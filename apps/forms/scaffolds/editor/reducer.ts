@@ -598,18 +598,18 @@ export function reducer(
       const { data, reset } = <FeedResponseSessionsAction>action;
       return produce(state, (draft) => {
         // Initialize draft.sessions if it's not already an array
-        if (!Array.isArray(draft.sessions)) {
-          draft.sessions = [];
+        if (!Array.isArray(draft.sessions.stream)) {
+          draft.sessions.stream = [];
         }
 
         if (reset) {
-          draft.sessions = data;
+          draft.sessions.stream = data;
           return;
         }
 
         // Merge & Add new responses to the existing responses
         // Map of ids to responses for the existing responses
-        const existingSessionsById = draft.sessions.reduce(
+        const existingSessionsById = draft.sessions.stream.reduce(
           (acc: any, session) => {
             acc[session.id] = session;
             return acc;
@@ -626,7 +626,7 @@ export function reducer(
             );
           } else {
             // Add new response if id does not exist
-            draft.sessions!.push(newSession);
+            draft.sessions.stream?.push(newSession);
           }
         });
       });
@@ -637,7 +637,7 @@ export function reducer(
         draft.datagrid_table = table;
         draft.datagrid_table_row_keyword = table_keyword(table);
 
-        draft.realtime_sessions_enabled = table === "session";
+        draft.sessions.realtime = table === "session";
         draft.realtime_responses_enabled = table === "response";
 
         // clear selected rows
@@ -683,8 +683,8 @@ export function reducer(
     case "editor/customers/edit": {
       const { customer_id, open } = <OpenCustomerEditAction>action;
       return produce(state, (draft) => {
-        draft.is_customer_edit_panel_open = open ?? true;
-        draft.focus_customer_id = customer_id;
+        draft.customer_editor.open = open ?? true;
+        draft.customer_editor.id = customer_id;
       });
     }
     case "editor/panels/block-edit": {

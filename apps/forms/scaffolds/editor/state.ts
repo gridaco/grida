@@ -35,6 +35,10 @@ export type DraftID = `[draft]${string}`;
 export const DRAFT_ID_START_WITH = "[draft]";
 const ISDEV = process.env.NODE_ENV === "development";
 
+export interface EditorFlatFormBlock<T = FormBlockType> extends FormBlock<T> {
+  id: string | DraftID;
+}
+
 export interface BaseDocumentEditorInit {
   organization: {
     name: string;
@@ -147,17 +151,60 @@ interface IDataGridState {
 /**
  * Utility state for entity edit dialog. id shall be processed within the correct context.
  */
-interface IGlobalEditorDialogState {
-  id?: string | null;
+interface TGlobalEditorDialogState {
+  id?: string;
   open: boolean;
 }
 
-interface IRowEditorState {
-  row_editor: IGlobalEditorDialogState;
+/**
+ * Utility state for global data stream state.
+ */
+interface TGlobalDataStreamState<T> {
+  realtime: boolean;
+  stream?: Array<T>;
 }
 
-export interface BaseDocumentEditorState extends IRowEditorState {
+interface IRowEditorState {
+  row_editor: TGlobalEditorDialogState;
+}
+
+interface ICustomerEditorState {
+  customer_editor: TGlobalEditorDialogState;
+}
+
+interface IEditorDateContextState {
+  dateformat: "date" | "time" | "datetime";
+  datetz: typeof LOCALTZ | string;
+}
+
+interface IEditorSidebarState {
+  sidebar: {
+    mode: "project" | "build" | "data" | "connect";
+  };
+}
+
+interface IEditorGlobalSavingState {
   saving: boolean;
+}
+
+interface IEditorAssetsState {
+  assets: {
+    backgrounds: {
+      name: string;
+      title: string;
+      embed: string;
+      preview: [string] | [string, string];
+    }[];
+  };
+}
+
+export interface BaseDocumentEditorState
+  extends IEditorGlobalSavingState,
+    IEditorDateContextState,
+    IEditorAssetsState,
+    IEditorSidebarState,
+    ICustomerEditorState,
+    IRowEditorState {
   basepath: string;
   organization: {
     name: string;
@@ -195,9 +242,6 @@ export interface BaseDocumentEditorState extends IRowEditorState {
     selected_node_default_text?: Tokens.StringValueExpression;
     selected_node_context?: Record<string, any>;
   };
-  sidebar: {
-    mode: "project" | "build" | "data" | "connect";
-  };
   theme: {
     is_powered_by_branding_enabled: boolean;
     lang: FormsPageLanguage;
@@ -208,20 +252,16 @@ export interface BaseDocumentEditorState extends IRowEditorState {
     section?: FormStyleSheetV1Schema["section"];
     background?: FormPageBackgroundSchema;
   };
-  assets: {
-    backgrounds: {
-      name: string;
-      title: string;
-      embed: string;
-      preview: [string] | [string, string];
-    }[];
-  };
+}
+
+interface IFormResponseSessionDataStreamState {
+  sessions: TGlobalDataStreamState<FormResponseSession>;
 }
 
 export interface FormEditorState
   extends BaseDocumentEditorState,
-    IDataGridState,
-    IRowEditorState {
+    IFormResponseSessionDataStreamState,
+    IDataGridState {
   form_id: string;
   form_title: string;
   connections: {
@@ -257,28 +297,22 @@ export interface FormEditorState
   focus_field_id?: string | null;
   available_field_ids: string[];
 
-  focus_customer_id?: string;
   focus_block_id?: string | null;
   customers?: Customer[];
   responses: {
     rows: FormResponse[];
     fields: { [key: string]: FormResponseField[] };
   };
-  sessions?: FormResponseSession[];
   tables: {
     name: string;
     group: TableGroup;
     views: GDocTable[];
   }[];
-  realtime_sessions_enabled: boolean;
   realtime_responses_enabled: boolean;
   is_insert_menu_open?: boolean;
   is_field_edit_panel_open?: boolean;
-  is_customer_edit_panel_open?: boolean;
   is_block_edit_panel_open?: boolean;
   field_edit_panel_refresh_key?: number;
-  dateformat: "date" | "time" | "datetime";
-  datetz: typeof LOCALTZ | string;
   x_supabase_main_table?: {
     schema: GridaSupabase.JSONSChema;
     // we need a single pk for editor operations
@@ -286,8 +320,4 @@ export interface FormEditorState
     pks: string[];
     rows: GridaSupabase.XDataRow[];
   };
-}
-
-export interface EditorFlatFormBlock<T = FormBlockType> extends FormBlock<T> {
-  id: string | DraftID;
 }

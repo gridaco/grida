@@ -278,9 +278,9 @@ function CustomerPanelProvider({ children }: React.PropsWithChildren<{}>) {
   return (
     <>
       <CustomerEditPanel
-        key={state.focus_customer_id}
-        customer_id={state.focus_customer_id}
-        open={state.is_customer_edit_panel_open}
+        key={state.customer_editor.id}
+        customer_id={state.customer_editor.id}
+        open={state.customer_editor.open}
         onOpenChange={(open) => {
           dispatch({ type: "editor/customers/edit", open });
         }}

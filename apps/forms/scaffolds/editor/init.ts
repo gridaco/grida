@@ -59,6 +59,11 @@ function initialBaseDocumentEditorState(
     row_editor: {
       open: false,
     },
+    customer_editor: {
+      open: false,
+    },
+    dateformat: "datetime",
+    datetz: LOCALTZ,
   };
 }
 
@@ -213,14 +218,16 @@ function initialFormEditorState(init: FormDocumentEditorInit): FormEditorState {
       rows: [],
       fields: {},
     },
+    sessions: {
+      stream: undefined,
+      realtime: false,
+    },
     datagrid_selected_rows: new Set(),
     available_field_ids: block_available_field_ids,
     datagrid_rows_per_page: 100,
     datagrid_table_refresh_key: 0,
     datagrid_table_row_keyword: "row",
     datagrid_isloading: false,
-    dateformat: "datetime",
-    datetz: LOCALTZ,
     datagrid_table: is_main_table_supabase
       ? "x-supabase-main-table"
       : "response",
@@ -230,7 +237,6 @@ function initialFormEditorState(init: FormDocumentEditorInit): FormEditorState {
     },
     datagrid_orderby: {},
     realtime_responses_enabled: true,
-    realtime_sessions_enabled: false,
     x_supabase_main_table: init.connections?.supabase
       ? xsbmtinit(init.connections.supabase)
       : undefined,

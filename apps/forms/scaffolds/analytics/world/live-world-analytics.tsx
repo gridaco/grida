@@ -181,14 +181,14 @@ function View() {
   }, [state.responses]);
 
   const sessionChartData = useMemo(() => {
-    return serialize(state.sessions || [], {
+    return serialize(state.sessions.stream || [], {
       dateKey: "created_at",
       // last 15 minutes
       from: new Date(new Date().getTime() - 15 * 60 * 1000),
       to: new Date(),
       intervalMs: 15 * 1000, // 15 seconds
     });
-  }, [state.sessions]);
+  }, [state.sessions.stream]);
 
   return (
     <main className="relative p-4 w-full h-full">

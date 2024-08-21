@@ -311,7 +311,7 @@ export function ResponseSessionFeedProvider({
     datagrid_table,
     datagrid_rows_per_page,
     datagrid_table_refresh_key,
-    realtime_sessions_enabled: _realtime_sessions_enabled,
+    sessions: { realtime: _realtime_sessions_enabled },
   } = state;
 
   const realtime_sessions_enabled =

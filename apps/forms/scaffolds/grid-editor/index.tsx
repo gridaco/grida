@@ -66,7 +66,7 @@ export function GridEditor() {
       fields: fields,
       filter: datagrid_filter,
       responses: responses,
-      sessions: sessions ?? [],
+      sessions: sessions.stream ?? [],
       data: {
         pks: x_supabase_main_table?.pks ?? [],
         rows: x_supabase_main_table?.rows ?? [],
