@@ -90,8 +90,9 @@ function initialDatabaseEditorState(
       templatedata: {},
     },
     tables: init.tables.map((t) => ({
-      group: "schema",
+      type: "schema",
       name: t.name,
+      icon: "table",
       views: [
         {
           type: "table",
@@ -128,8 +129,9 @@ function initialSiteEditorState(init: SiteDocumentEditorInit): FormEditorState {
     },
     tables: [
       {
-        group: "response",
+        type: "schema",
         name: "Campaigns",
+        icon: "table",
         views: [],
       },
     ],
@@ -164,7 +166,8 @@ function initialFormEditorState(init: FormDocumentEditorInit): FormEditorState {
       ? [
           {
             name: init.connections.supabase.main_supabase_table.sb_table_name,
-            group: "x-supabase-main-table",
+            type: "response",
+            icon: "supabase",
             views: [
               {
                 type: "x-supabase-main-table",
@@ -177,7 +180,8 @@ function initialFormEditorState(init: FormDocumentEditorInit): FormEditorState {
           },
           {
             name: "auth.users",
-            group: "x-supabase-auth.users",
+            type: "x-supabase-auth.users",
+            icon: "supabase",
             views: [
               {
                 type: "x-supabase-auth.users",
@@ -190,7 +194,8 @@ function initialFormEditorState(init: FormDocumentEditorInit): FormEditorState {
       : [
           {
             name: "Responses",
-            group: "response",
+            type: "response",
+            icon: "table",
             views: [
               { type: "response", name: "response", label: "Responses" },
               { type: "session", name: "session", label: "Sessions" },
@@ -198,7 +203,8 @@ function initialFormEditorState(init: FormDocumentEditorInit): FormEditorState {
           },
           {
             name: "Customers",
-            group: "customer",
+            type: "customer",
+            icon: "user",
             views: [{ type: "customer", name: "customer", label: "Customers" }],
           },
         ],

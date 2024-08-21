@@ -14,7 +14,6 @@ import {
   SidebarSectionHeaderItem,
   SidebarSectionHeaderLabel,
 } from "@/components/sidebar";
-import { TableTypeIcon } from "@/components/table-type-icon";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
 import {
   DropdownMenu,
@@ -27,7 +26,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { FormEditorState, TableGroup } from "@/scaffolds/editor/state";
+import type { FormEditorState, TableType } from "@/scaffolds/editor/state";
 import {
   Dialog,
   DialogClose,
@@ -136,8 +135,8 @@ export function ModeData() {
                 href={tablehref(basepath, document_id, table)}
               >
                 <SidebarMenuItem muted>
-                  <TableTypeIcon
-                    type={table.group}
+                  <ResourceTypeIcon
+                    type={table.icon}
                     className="inline align-middle w-4 h-4 me-2"
                   />
                   {table.name}
@@ -217,19 +216,17 @@ function tablehref(
   basepath: string,
   document_id: string,
   table: {
-    group: TableGroup;
+    type: TableType;
     name: string;
   }
 ) {
-  switch (table.group) {
+  switch (table.type) {
     case "response":
       return `/${basepath}/${document_id}/data/responses`;
     case "customer":
       return `/${basepath}/${document_id}/data/customers`;
     case "schema":
       return `/${basepath}/${document_id}/data/table/${table.name}`;
-    case "x-supabase-main-table":
-      return `/${basepath}/${document_id}/data/responses`;
     case "x-supabase-auth.users":
       return `/${basepath}/${document_id}/data/x/auth.users`;
   }

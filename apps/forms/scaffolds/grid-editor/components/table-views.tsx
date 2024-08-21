@@ -3,14 +3,7 @@
 import React from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useEditorState } from "@/scaffolds/editor";
-import { TableTypeIcon } from "@/components/table-type-icon";
-import { Button } from "@/components/ui/button";
-import { PlusIcon } from "@radix-ui/react-icons";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { ResourceTypeIcon } from "@/components/resource-type-icon";
 
 export function TableViews() {
   const [state, dispatch] = useEditorState();
@@ -36,8 +29,8 @@ export function TableViews() {
           {tablegroup?.views.map((table) => {
             return (
               <TabsTrigger key={table.type + table.name} value={table.type}>
-                <TableTypeIcon
-                  type={tablegroup.group}
+                <ResourceTypeIcon
+                  type={tablegroup.icon}
                   className="inline align-middle w-4 h-4 me-2"
                 />
                 {table.label}

@@ -1020,7 +1020,8 @@ export function reducer(
       const { table } = <SchemaTableAddAction>action;
       return produce(state, (draft) => {
         draft.tables.push({
-          group: "schema",
+          type: "schema",
+          icon: "table",
           name: table,
           views: [{ label: table, name: "table", type: "table" }],
         });

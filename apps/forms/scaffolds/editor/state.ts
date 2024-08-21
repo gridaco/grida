@@ -24,6 +24,7 @@ import { LOCALTZ } from "./symbols";
 import { ZodObject } from "zod";
 import { Tokens } from "@/ast";
 import React from "react";
+import { ResourceTypeIconName } from "@/components/resource-type-icon";
 
 export type GDocEditorRouteParams = {
   org: string;
@@ -124,11 +125,10 @@ export interface MenuItem {
   href?: string;
 }
 
-export type TableGroup =
+export type TableType =
   | "response"
   | "customer"
   | "schema"
-  | "x-supabase-main-table"
   | "x-supabase-auth.users";
 
 interface IDataGridState {
@@ -333,7 +333,8 @@ export interface FormEditorState
 
   tables: {
     name: string;
-    group: TableGroup;
+    type: TableType;
+    icon: ResourceTypeIconName;
     views: GDocTable[];
   }[];
 
