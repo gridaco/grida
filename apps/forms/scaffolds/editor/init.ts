@@ -66,6 +66,9 @@ function initialBaseDocumentEditorState(
     customer_editor: {
       open: false,
     },
+    insertmenu: {
+      open: false,
+    },
     dateformat: "datetime",
     datetz: LOCALTZ,
   };
@@ -244,9 +247,6 @@ function initialFormEditorState(init: FormDocumentEditorInit): FormEditorState {
       empty_data_hidden: true,
     },
     datagrid_orderby: {},
-    insertmenu: {
-      open: false,
-    },
     field_editor: {
       open: false,
     },

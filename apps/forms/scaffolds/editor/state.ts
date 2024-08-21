@@ -211,10 +211,15 @@ interface IEditorAssetsState {
   };
 }
 
+interface IInsertionMenuState {
+  insertmenu: TGlobalEditorDialogState;
+}
+
 export interface BaseDocumentEditorState
   extends IEditorGlobalSavingState,
     IEditorDateContextState,
     IEditorAssetsState,
+    IInsertionMenuState,
     IEditorSidebarState,
     ICustomersDataStreamState,
     ICustomerEditorState,
@@ -284,15 +289,10 @@ interface IFormResponseDataStreamState {
   >;
 }
 
-interface IFormBlockInsertionMenuState {
-  insertmenu: TGlobalEditorDialogState;
-}
-
 export interface FormEditorState
   extends BaseDocumentEditorState,
     IFormResponseSessionDataStreamState,
     IFormResponseDataStreamState,
-    IFormBlockInsertionMenuState,
     IFieldEditorState,
     IDataGridState {
   form_id: string;
