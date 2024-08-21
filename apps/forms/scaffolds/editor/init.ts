@@ -178,7 +178,6 @@ function initialFormEditorState(init: FormDocumentEditorInit): FormEditorState {
               {
                 id: GridaEditorSymbols.Table
                   .SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID,
-                type: "x-supabase-main-table",
                 row_keyword: "row",
                 name: init.connections.supabase.main_supabase_table
                   .sb_table_name,
@@ -196,7 +195,6 @@ function initialFormEditorState(init: FormDocumentEditorInit): FormEditorState {
                 id: GridaEditorSymbols.Table
                   .SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID,
                 row_keyword: "user",
-                type: "x-supabase-auth.users",
                 name: "auth.users",
                 label: "auth.users",
               },
@@ -212,14 +210,12 @@ function initialFormEditorState(init: FormDocumentEditorInit): FormEditorState {
               {
                 id: GridaEditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID,
                 row_keyword: "response",
-                type: "response",
                 name: "response",
                 label: "Responses",
               },
               {
                 id: GridaEditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID,
                 row_keyword: "session",
-                type: "session",
                 name: "session",
                 label: "Sessions",
               },
@@ -233,7 +229,6 @@ function initialFormEditorState(init: FormDocumentEditorInit): FormEditorState {
               {
                 id: GridaEditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID,
                 row_keyword: "customer",
-                type: "customer",
                 name: "customer",
                 label: "Customers",
               },

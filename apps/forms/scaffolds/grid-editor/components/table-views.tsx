@@ -30,7 +30,7 @@ export function TableViews() {
         <TabsList>
           {tablegroup?.views.map((table) => {
             return (
-              <TabsTrigger key={table.type + table.name} value={table.name}>
+              <TabsTrigger key={table.id.toString()} value={table.name}>
                 <ResourceTypeIcon
                   type={tablegroup.icon}
                   className="inline align-middle w-4 h-4 me-2"

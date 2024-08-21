@@ -1058,7 +1058,6 @@ export function reducer(
               label: table,
               row_keyword: "row",
               name: "table",
-              type: "table",
             },
           ],
         });

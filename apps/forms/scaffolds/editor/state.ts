@@ -105,27 +105,21 @@ type GDocTable = {
 } & (
   | {
       id: typeof GridaEditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID;
-      type: "response";
     }
   | {
       id: typeof GridaEditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID;
-      type: "session";
     }
   | {
       id: typeof GridaEditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID;
-      type: "customer";
     }
   | {
       id: typeof GridaEditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID;
-      type: "x-supabase-main-table";
     }
   | {
       id: typeof GridaEditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID;
-      type: "x-supabase-auth.users";
     }
   | {
       id: string;
-      type: "table";
     }
 );
 
