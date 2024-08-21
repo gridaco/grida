@@ -12,7 +12,7 @@ import type {
   FormsPageLanguage,
   GridaSupabase,
 } from "@/types";
-import type { EditorFlatFormBlock, FormEditorState } from "./state";
+import type { EditorFlatFormBlock, EditorState } from "./state";
 import type { Tokens } from "@/ast";
 import { SYM_LOCALTZ } from "./symbols";
 import { ZodObject } from "zod";
@@ -175,7 +175,7 @@ export interface BlurBlockAction {
   type: "blocks/blur";
 }
 
-export interface InitAssetAction extends Partial<FormEditorState["assets"]> {
+export interface InitAssetAction extends Partial<EditorState["assets"]> {
   type: "editor/assets/init";
 }
 
@@ -265,7 +265,7 @@ export type DataGridTableAction = {
   type: "editor/data-grid/table";
 } & (
   | {
-      id: FormEditorState["datagrid_table_id"];
+      id: EditorState["datagrid_table_id"];
     }
   | {
       // using name as a query will swith the table within the current group
@@ -284,7 +284,7 @@ export interface DataGridDeleteSelectedRows {
 }
 
 export interface DataGridFilterAction
-  extends Partial<FormEditorState["datagrid_filter"]> {
+  extends Partial<EditorState["datagrid_filter"]> {
   type: "editor/data-grid/filter";
 }
 
@@ -363,12 +363,12 @@ export interface EditorThemeBackgroundAction {
 }
 
 export interface FormCampaignPreferencesAction
-  extends Partial<FormEditorState["campaign"]> {
+  extends Partial<EditorState["campaign"]> {
   type: "editor/form/campaign/preferences";
 }
 
 export interface FormEndingPreferencesAction
-  extends Partial<FormEditorState["ending"]> {
+  extends Partial<EditorState["ending"]> {
   type: "editor/form/ending/preferences";
 }
 

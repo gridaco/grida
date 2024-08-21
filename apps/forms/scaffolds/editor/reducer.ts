@@ -1,7 +1,7 @@
 import { produce } from "immer";
 import type {
   EditorFlatFormBlock,
-  FormEditorState,
+  EditorState,
   GDocTableID,
   TVirtualRow,
   TVirtualRowData,
@@ -86,9 +86,9 @@ import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";
 import { GridaEditorSymbols } from "./symbols";
 
 export function reducer(
-  state: FormEditorState,
+  state: EditorState,
   action: BlocksEditorAction
-): FormEditorState {
+): EditorState {
   switch (action.type) {
     case "saving": {
       const { saving } = <GlobalSavingAction>action;

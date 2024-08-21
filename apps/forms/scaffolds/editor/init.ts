@@ -5,7 +5,7 @@ import type {
   DatabaseDocumentEditorInit,
   EditorInit,
   FormDocumentEditorInit,
-  FormEditorState,
+  EditorState,
   MenuItem,
   SiteDocumentEditorInit,
 } from "./state";
@@ -14,7 +14,7 @@ import { SYM_LOCALTZ, GridaEditorSymbols } from "./symbols";
 import { GridaSupabase } from "@/types";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 
-export function initialEditorState(init: EditorInit): FormEditorState {
+export function initialEditorState(init: EditorInit): EditorState {
   switch (init.doctype) {
     case "v0_form":
       return initialFormEditorState(init);
@@ -82,7 +82,7 @@ function initialBaseDocumentEditorState(
  */
 function initialDatabaseEditorState(
   init: DatabaseDocumentEditorInit
-): FormEditorState {
+): EditorState {
   const base = initialBaseDocumentEditorState(init);
   // @ts-ignore
   return {
@@ -92,6 +92,17 @@ function initialDatabaseEditorState(
       nodes: [],
       templatedata: {},
     },
+    datagrid_selected_rows: new Set(),
+    datagrid_rows_per_page: 100,
+    datagrid_table_refresh_key: 0,
+    datagrid_isloading: false,
+    datagrid_filter: {
+      masking_enabled: false,
+      empty_data_hidden: true,
+    },
+    datagrid_orderby: {},
+    // TODO:
+    // datagrid_table_id:
     tables: init.tables.map((t) => ({
       type: "schema",
       name: t.name,
@@ -118,7 +129,7 @@ function initialDatabaseEditorState(
  * @param init
  * @returns
  */
-function initialSiteEditorState(init: SiteDocumentEditorInit): FormEditorState {
+function initialSiteEditorState(init: SiteDocumentEditorInit): EditorState {
   const base = initialBaseDocumentEditorState(init);
   // @ts-ignore
   return {
@@ -144,7 +155,7 @@ function initialSiteEditorState(init: SiteDocumentEditorInit): FormEditorState {
   };
 }
 
-function initialFormEditorState(init: FormDocumentEditorInit): FormEditorState {
+function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
   // prepare initial available_field_ids
   const field_ids = init.fields.map((f) => f.id);
   const block_referenced_field_ids = init.blocks
@@ -257,8 +268,8 @@ function initialFormEditorState(init: FormDocumentEditorInit): FormEditorState {
       stream: undefined,
       realtime: false,
     },
-    datagrid_selected_rows: new Set(),
     available_field_ids: block_available_field_ids,
+    datagrid_selected_rows: new Set(),
     datagrid_rows_per_page: 100,
     datagrid_table_refresh_key: 0,
     datagrid_isloading: false,

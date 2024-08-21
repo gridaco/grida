@@ -29,13 +29,8 @@ import {
 export function GridViewSettings() {
   const [state, dispatch] = useEditorState();
 
-  const {
-    campaign: { scheduling_tz },
-    datetz,
-    dateformat,
-    datagrid_filter,
-    datagrid_table_id,
-  } = state;
+  const { doctype, datetz, dateformat, datagrid_filter, datagrid_table_id } =
+    state;
 
   // dummy example date - happy star wars day!
   const starwarsday = useMemo(
@@ -48,14 +43,7 @@ export function GridViewSettings() {
     []
   );
 
-  const tzoffset_scheduling_tz = useMemo(
-    () =>
-      scheduling_tz
-        ? formatTZ(new Date(), "XXX", { timeZone: scheduling_tz })
-        : undefined,
-    [scheduling_tz]
-  );
-
+  //
   const simulator_available =
     datagrid_table_id ===
       GridaEditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID ||
@@ -147,19 +135,7 @@ export function GridViewSettings() {
             UTC Time
             <DropdownMenuShortcut>(UTC+0)</DropdownMenuShortcut>
           </DropdownMenuRadioItem>
-          <DropdownMenuRadioItem
-            disabled={!scheduling_tz}
-            value={scheduling_tz ?? "N/A"}
-          >
-            Scheduling Time
-            {scheduling_tz && (
-              <DropdownMenuShortcut className="text-end">
-                {scheduling_tz}
-                <br />
-                (UTC{tzoffset_scheduling_tz})
-              </DropdownMenuShortcut>
-            )}
-          </DropdownMenuRadioItem>
+          {doctype === "v0_form" && <DoctypeFormsCampaignTZ />}
         </DropdownMenuRadioGroup>
         {simulator_available && (
           <>
@@ -180,6 +156,39 @@ export function GridViewSettings() {
         )}
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+function DoctypeFormsCampaignTZ() {
+  const [state] = useEditorState();
+
+  const {
+    //
+    campaign: { scheduling_tz },
+  } = state;
+
+  const tzoffset_scheduling_tz = useMemo(
+    () =>
+      scheduling_tz
+        ? formatTZ(new Date(), "XXX", { timeZone: scheduling_tz })
+        : undefined,
+    [scheduling_tz]
+  );
+
+  return (
+    <DropdownMenuRadioItem
+      disabled={!scheduling_tz}
+      value={scheduling_tz ?? "N/A"}
+    >
+      Scheduling Time
+      {scheduling_tz && (
+        <DropdownMenuShortcut className="text-end">
+          {scheduling_tz}
+          <br />
+          (UTC{tzoffset_scheduling_tz})
+        </DropdownMenuShortcut>
+      )}
+    </DropdownMenuRadioItem>
   );
 }
 

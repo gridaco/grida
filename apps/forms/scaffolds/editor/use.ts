@@ -1,12 +1,12 @@
 "use client";
 
 import { useMemo, useContext } from "react";
-import type { FormEditorState } from "./state";
+import type { EditorState } from "./state";
 import { useDispatch, type FlatDispatcher } from "./dispatch";
 
 import { Context } from "./provider";
 
-export const useEditorState = (): [FormEditorState, FlatDispatcher] => {
+export const useEditorState = (): [EditorState, FlatDispatcher] => {
   const state = useContext(Context);
 
   if (!state) {

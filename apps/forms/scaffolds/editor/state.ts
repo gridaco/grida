@@ -52,7 +52,7 @@ export interface BaseDocumentEditorInit {
   document_id: string;
   document_title: string;
   doctype: GDocumentType;
-  theme: FormEditorState["theme"];
+  theme: EditorState["theme"];
 }
 
 export type EditorInit =
@@ -76,9 +76,9 @@ export interface DatabaseDocumentEditorInit extends BaseDocumentEditorInit {
 export interface FormDocumentEditorInit extends BaseDocumentEditorInit {
   doctype: "v0_form";
   form_id: string;
-  campaign: FormEditorState["campaign"];
-  form_security: FormEditorState["form_security"];
-  ending: FormEditorState["ending"];
+  campaign: EditorState["campaign"];
+  form_security: EditorState["form_security"];
+  ending: EditorState["ending"];
   connections?: {
     store_id?: number | null;
     supabase?: GridaSupabase.SupabaseConnectionState;
@@ -351,3 +351,5 @@ export interface FormEditorState
     rows: GridaSupabase.XDataRow[];
   };
 }
+
+export type EditorState = FormEditorState;

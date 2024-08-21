@@ -62,7 +62,10 @@ export function DatabaseDocumentEditorProvider({
   );
   return (
     <StateProvider state={state} dispatch={dispatch}>
-      {children}
+      <TooltipProvider>
+        {/*  */}
+        {children}
+      </TooltipProvider>
     </StateProvider>
   );
 }
@@ -77,7 +80,10 @@ export function SiteDocumentEditorProvider({
   );
   return (
     <StateProvider state={state} dispatch={dispatch}>
-      {children}
+      <TooltipProvider>
+        {/*  */}
+        {children}
+      </TooltipProvider>
     </StateProvider>
   );
 }

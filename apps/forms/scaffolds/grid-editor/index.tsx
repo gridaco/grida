@@ -37,23 +37,19 @@ import { GFResponseRow } from "../grid/types";
 import { PrivateEditorApi } from "@/lib/private";
 import { GridaEditorSymbols } from "../editor/symbols";
 
-export function GridEditor() {
+export function GridEditor({ rows }: { rows?: GFResponseRow[] }) {
   const [state, dispatch] = useEditorState();
   const deleteFieldConfirmDialog = useDialogState<{ field_id: string }>();
 
   const {
     form_id,
     fields,
-    responses,
-    sessions,
-    datagrid_filter,
     datagrid_table_id,
     datagrid_isloading,
-    x_supabase_main_table,
-    datagrid_selected_rows: selected_responses,
+    datagrid_selected_rows,
   } = state;
 
-  const supabase = createClientFormsClient();
+  const supabase = useMemo(() => createClientFormsClient(), []);
 
   const { systemcolumns, columns } = useMemo(
     () => GridData.columns(datagrid_table_id, fields),
@@ -61,30 +57,6 @@ export function GridEditor() {
   );
 
   const { row_keyword } = useCurrentTableView() || { row_keyword: "row" };
-  // Transforming the responses into the format expected by react-data-grid
-  const { filtered, inputlength } = useMemo(() => {
-    return GridData.rows({
-      form_id: form_id,
-      // TODO: types with symbols not working ?
-      table: datagrid_table_id as any,
-      fields: fields,
-      filter: datagrid_filter,
-      responses: responses.stream ?? [],
-      sessions: sessions.stream ?? [],
-      data: {
-        pks: x_supabase_main_table?.pks ?? [],
-        rows: x_supabase_main_table?.rows ?? [],
-      },
-    });
-  }, [
-    form_id,
-    datagrid_table_id,
-    sessions,
-    fields,
-    responses,
-    x_supabase_main_table,
-    datagrid_filter,
-  ]);
 
   const openNewFieldPanel = useCallback(() => {
     dispatch({
@@ -133,7 +105,7 @@ export function GridEditor() {
     [supabase, dispatch]
   );
 
-  const has_selected_responses = selected_responses.size > 0;
+  const has_selected_responses = datagrid_selected_rows.size > 0;
   const selectionDisabled =
     datagrid_table_id ===
     GridaEditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID;
@@ -157,7 +129,8 @@ export function GridEditor() {
                   className="text-sm font-normal text-neutral-500"
                   aria-label="selected responses"
                 >
-                  {txt_n_plural(selected_responses.size, row_keyword)} selected
+                  {txt_n_plural(datagrid_selected_rows.size, row_keyword)}{" "}
+                  selected
                 </span>
                 <DeleteSelectedRowsButton />
               </div>
@@ -199,7 +172,7 @@ export function GridEditor() {
         <ResponseGrid
           systemcolumns={systemcolumns}
           columns={columns}
-          rows={filtered as GFResponseRow[]}
+          rows={rows ?? []}
           readonly={readonly}
           loading={datagrid_isloading}
           selectionDisabled={selectionDisabled}
@@ -222,7 +195,7 @@ export function GridEditor() {
       <GridLayout.Footer>
         <div className="flex gap-2 items-center">
           <GridLimit />
-          <GridCount count={filtered?.length} keyword={row_keyword} />
+          <GridCount count={rows?.length} keyword={row_keyword} />
         </div>
         <Link href={`/v1/${form_id}/export/csv`} download target="_blank">
           <Button variant="ghost">
