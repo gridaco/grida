@@ -1,2 +1,2 @@
 export * from "./editor";
-export { useEditorState } from "./provider";
+export { useEditorState, useCurrentTableView } from "./use";

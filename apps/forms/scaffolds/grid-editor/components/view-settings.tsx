@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -16,11 +16,15 @@ import {
 import { CommitIcon, GearIcon } from "@radix-ui/react-icons";
 import { format, startOfDay, addSeconds } from "date-fns";
 import { format as formatTZ } from "date-fns-tz";
-import { LOCALTZ, tztostr } from "../../editor/symbols";
 import { useEditorState } from "@/scaffolds/editor";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { editorlink } from "@/lib/forms/url";
+import {
+  GridaEditorSymbols,
+  SYM_LOCALTZ,
+  tztostr,
+} from "@/scaffolds/editor/symbols";
 
 export function GridViewSettings() {
   const [state, dispatch] = useEditorState();
@@ -30,7 +34,7 @@ export function GridViewSettings() {
     datetz,
     dateformat,
     datagrid_filter,
-    datagrid_table,
+    datagrid_table_id,
   } = state;
 
   // dummy example date - happy star wars day!
@@ -52,7 +56,11 @@ export function GridViewSettings() {
     [scheduling_tz]
   );
 
-  const simulator_available = datagrid_table !== "x-supabase-main-table";
+  const simulator_available =
+    datagrid_table_id ===
+      GridaEditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID ||
+    datagrid_table_id ===
+      GridaEditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID;
 
   return (
     <DropdownMenu>
@@ -123,7 +131,7 @@ export function GridViewSettings() {
           onValueChange={(tz) => {
             switch (tz) {
               case "browser":
-                dispatch({ type: "editor/data-grid/tz", tz: LOCALTZ });
+                dispatch({ type: "editor/data-grid/tz", tz: SYM_LOCALTZ });
                 return;
               default:
                 dispatch({ type: "editor/data-grid/tz", tz: tz });

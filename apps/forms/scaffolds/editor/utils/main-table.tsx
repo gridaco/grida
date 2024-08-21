@@ -1,33 +1,34 @@
 import React, { useEffect, useLayoutEffect, useState } from "react";
-import { useEditorState } from "../provider";
-import { FormEditorState } from "../state";
+import { useEditorState } from "../use";
+import type { GDocTableID } from "../state";
+import { GridaEditorSymbols } from "../symbols";
 
 export function MainTable({
   table,
   children,
 }: React.PropsWithChildren<{
-  table: FormEditorState["datagrid_table"] | "main";
+  table: GDocTableID | "main";
 }>) {
   const [state, dispatch] = useEditorState();
   const [stale, setstale] = useState<boolean>(false);
 
-  const tabletype =
+  const tableid =
     table === "main"
       ? state.x_supabase_main_table
-        ? "x-supabase-main-table"
-        : "response"
+        ? GridaEditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID
+        : GridaEditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID
       : table;
   useLayoutEffect(() => {
     setstale(true);
     dispatch({
       type: "editor/data-grid/table",
-      table: tabletype,
+      id: tableid,
     });
   }, [table]);
 
   useEffect(() => {
-    if (state.datagrid_table === tabletype) setstale(false);
-  }, [state.datagrid_table]);
+    if (state.datagrid_table_id === tableid) setstale(false);
+  }, [state.datagrid_table_id]);
 
   // if (stale) return <></>;
   // if (state.datagrid_table === tabletype)

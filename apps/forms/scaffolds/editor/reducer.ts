@@ -2,6 +2,7 @@ import { produce } from "immer";
 import type {
   EditorFlatFormBlock,
   FormEditorState,
+  GDocTableID,
   TVirtualRow,
   TVirtualRowData,
 } from "./state";
@@ -82,6 +83,7 @@ import type {
   GridaSupabase,
 } from "@/types";
 import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";
+import { GridaEditorSymbols } from "./symbols";
 
 export function reducer(
   state: FormEditorState,
@@ -644,13 +646,33 @@ export function reducer(
       });
     }
     case "editor/data-grid/table": {
-      const { table } = <DataGridTableAction>action;
+      const { ...opt } = <DataGridTableAction>action;
       return produce(state, (draft) => {
-        draft.datagrid_table = table;
-        draft.datagrid_table_row_keyword = table_keyword(table);
+        // find the id =====
+        let tableid: GDocTableID | undefined;
+        if ("id" in opt) {
+          tableid = opt.id;
+        } else {
+          // find withind current group.
+          const group = draft.tables.find((g) =>
+            g.views.some((v) => v.id === draft.datagrid_table_id)
+          );
+          tableid = group?.views.find((v) => v.name === opt.name)?.id;
+        }
+        // =================
 
-        draft.sessions.realtime = table === "session";
-        draft.responses.realtime = table === "response";
+        if (!tableid) {
+          console.error("Table not found", opt);
+          return;
+        }
+
+        draft.datagrid_table_id = tableid;
+
+        draft.sessions.realtime =
+          tableid === GridaEditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID;
+        draft.responses.realtime =
+          tableid ===
+          GridaEditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID;
 
         // clear selected rows
         draft.datagrid_selected_rows = new Set();
@@ -659,8 +681,8 @@ export function reducer(
     case "editor/data-grid/delete/selected": {
       const {} = <DataGridDeleteSelectedRows>action;
       return produce(state, (draft) => {
-        switch (state.datagrid_table) {
-          case "response": {
+        switch (state.datagrid_table_id) {
+          case GridaEditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID: {
             const ids = Array.from(state.datagrid_selected_rows);
             draft.responses.stream = draft.responses.stream?.filter(
               (response) => !ids.includes(response.id)
@@ -668,7 +690,8 @@ export function reducer(
 
             break;
           }
-          case "x-supabase-main-table": {
+          case GridaEditorSymbols.Table
+            .SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID: {
             const pk = state.x_supabase_main_table!.gfpk!;
             draft.x_supabase_main_table!.rows =
               draft.x_supabase_main_table!.rows.filter(
@@ -677,9 +700,11 @@ export function reducer(
 
             break;
           }
-          case "session":
+          case GridaEditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID:
           default:
-            throw new Error("Unsupported table type: " + state.datagrid_table);
+            throw new Error(
+              "Unsupported table type: " + state.datagrid_table_id.toString()
+            );
         }
 
         // clear selected rows
@@ -775,8 +800,8 @@ export function reducer(
     }
     case "editor/data-grid/cell/change": {
       return produce(state, (draft) => {
-        switch (state.datagrid_table) {
-          case "response": {
+        switch (state.datagrid_table_id) {
+          case GridaEditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID: {
             const {
               row: row_id,
               column: attribute_id,
@@ -795,7 +820,8 @@ export function reducer(
 
             break;
           }
-          case "x-supabase-main-table": {
+          case GridaEditorSymbols.Table
+            .SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID: {
             const {
               row: row_pk,
               column,
@@ -846,9 +872,11 @@ export function reducer(
 
             break;
           }
-          case "session":
+          case GridaEditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID:
           default: {
-            throw new Error("Unsupported table type: " + state.datagrid_table);
+            throw new Error(
+              "Unsupported table type: " + state.datagrid_table_id.toString()
+            );
           }
         }
       });
@@ -1023,7 +1051,16 @@ export function reducer(
           type: "schema",
           icon: "table",
           name: table,
-          views: [{ label: table, name: "table", type: "table" }],
+          views: [
+            {
+              // TODO:
+              id: draftid(),
+              label: table,
+              row_keyword: "row",
+              name: "table",
+              type: "table",
+            },
+          ],
         });
       });
     }
@@ -1066,23 +1103,6 @@ function init_block(
     case "divider":
     default:
       return base;
-  }
-}
-
-function table_keyword(table: FormEditorState["datagrid_table"]) {
-  switch (table) {
-    case "response":
-      return "response";
-    case "session":
-      return "session";
-    case "customer":
-      return "customer";
-    case "x-supabase-main-table":
-      return "row";
-    case "x-supabase-auth.users":
-      return "user";
-    default:
-      return "row";
   }
 }
 

@@ -11,13 +11,14 @@ import { fmt_local_index } from "@/utils/fmt";
 import type { GFFile, GFResponseRow, GFSystemColumnTypes } from "../grid/types";
 import type {
   DataGridFilterSettings,
-  FormEditorState,
+  GDocTableID,
   TVirtualRow,
 } from "../editor/state";
 import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";
 import { FieldSupports } from "@/k/supported_field_types";
 import { PrivateEditorApi } from "@/lib/private";
 import { GridFilter } from "../grid-filter";
+import { GridaEditorSymbols } from "../editor/symbols";
 
 export namespace GridData {
   type DataGridInput =
@@ -27,15 +28,15 @@ export namespace GridData {
         filter: DataGridFilterSettings;
       } & (
         | {
-            table: "session";
-            sessions: FormResponseSession[];
-          }
-        | {
-            table: "response";
+            table: typeof GridaEditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID;
             responses: Array<TVirtualRow<FormResponseField, FormResponse>>;
           }
         | {
-            table: "x-supabase-main-table";
+            table: typeof GridaEditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID;
+            sessions: FormResponseSession[];
+          }
+        | {
+            table: typeof GridaEditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID;
             data: {
               pks: string[];
               rows: any[];
@@ -44,21 +45,21 @@ export namespace GridData {
       ))
     | {
         filter: DataGridFilterSettings;
-        table: "customer";
+        table: typeof GridaEditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID;
         data: {
           rows: Customer[];
         };
       }
     | {
         filter: DataGridFilterSettings;
-        table: "x-supabase-auth.users";
+        table: typeof GridaEditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID;
         data: {
           rows: any[];
         };
       };
 
   export function columns(
-    table: FormEditorState["datagrid_table"],
+    table: GDocTableID,
     fields: FormFieldDefinition[]
   ): {
     systemcolumns: {
@@ -82,8 +83,8 @@ export namespace GridData {
       }));
 
     switch (table) {
-      case "response":
-      case "session": {
+      case GridaEditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID:
+      case GridaEditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID: {
         return {
           systemcolumns: [
             {
@@ -99,7 +100,7 @@ export namespace GridData {
           columns: fieldcolumns,
         };
       }
-      case "x-supabase-main-table": {
+      case GridaEditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID: {
         return {
           systemcolumns: [
             {
@@ -120,9 +121,32 @@ export namespace GridData {
     }
   }
 
-  export function rows(input: DataGridInput) {
+  type TProcessedGridRows =
+    | {
+        type: "response";
+        inputlength: number;
+        filtered: GFResponseRow[];
+      }
+    | {
+        type: "session";
+        inputlength: number;
+        filtered: GFResponseRow[];
+      }
+    | {
+        type: "customer";
+        inputlength: number;
+        filtered: Customer[];
+      }
+    | {
+        type: "x-supabase-auth.users";
+        inputlength: number;
+        // FIXME: add type
+        filtered: any[];
+      };
+
+  export function rows(input: DataGridInput): TProcessedGridRows {
     switch (input.table) {
-      case "response": {
+      case GridaEditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID: {
         const filtered = GridFilter.filter(
           input.responses,
           input.filter,
@@ -132,12 +156,14 @@ export namespace GridData {
         );
 
         return {
+          type: "response",
           inputlength: input.responses.length || 0,
           filtered: rows_from_responses(filtered, input.fields),
         };
       }
-      case "session": {
+      case GridaEditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID: {
         return {
+          type: "session",
           inputlength: input.sessions?.length || 0,
           filtered: input.sessions
             ? rows_from_sessions(
@@ -153,8 +179,9 @@ export namespace GridData {
             : [],
         };
       }
-      case "x-supabase-main-table": {
+      case GridaEditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID: {
         return {
+          type: "response",
           inputlength: input.data.rows.length,
           filtered: rows_from_x_supabase_main_table({
             form_id: input.form_id,
@@ -170,8 +197,9 @@ export namespace GridData {
           }),
         };
       }
-      case "x-supabase-auth.users": {
+      case GridaEditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID: {
         return {
+          type: "x-supabase-auth.users",
           inputlength: input.data.rows.length,
           filtered: GridFilter.filter(
             input.data.rows,
@@ -181,9 +209,11 @@ export namespace GridData {
           ),
         };
       }
-      case "customer": {
+      case GridaEditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID: {
         return {
+          type: "customer",
           inputlength: input.data.rows.length,
+          // @ts-ignore - FIXME:
           filtered: GridFilter.filter(
             input.data.rows,
             input.filter,

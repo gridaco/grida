@@ -36,7 +36,7 @@ export type GFResponseRow = {
   fields: Record<string, GFResponseFieldData>;
 };
 
-export type CFCustomerRow = {
+export type GRCustomerRow = {
   uid: string;
   email: string | null;
   // name: string;

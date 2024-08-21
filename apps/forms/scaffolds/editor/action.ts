@@ -14,7 +14,7 @@ import type {
 } from "@/types";
 import type { EditorFlatFormBlock, FormEditorState } from "./state";
 import type { Tokens } from "@/ast";
-import { LOCALTZ } from "./symbols";
+import { SYM_LOCALTZ } from "./symbols";
 import { ZodObject } from "zod";
 
 export type BlocksEditorAction =
@@ -258,13 +258,21 @@ export interface DataGridDateFormatAction {
 
 export interface DataGridDateTZAction {
   type: "editor/data-grid/tz";
-  tz: typeof LOCALTZ | string;
+  tz: typeof SYM_LOCALTZ | string;
 }
 
-export interface DataGridTableAction {
+export type DataGridTableAction = {
   type: "editor/data-grid/table";
-  table: FormEditorState["datagrid_table"];
-}
+} & (
+  | {
+      id: FormEditorState["datagrid_table_id"];
+    }
+  | {
+      // using name as a query will swith the table within the current group
+      // this is useful when can't use the id (symbol), like in select ui, where value is a string
+      name: string;
+    }
+);
 
 export interface DataGridRowsAction {
   type: "editor/data-grid/rows";

@@ -15,7 +15,9 @@ import {
   XSupabasePrivateApiTypes,
 } from "@/types/private/api";
 import Axios from "axios";
-import { PostgrestQuery } from "../supabase-postgrest/postgrest-query";
+import { PostgrestQuery } from "@/lib/supabase-postgrest/postgrest-query";
+import { XSupabaseQuery } from "@/lib/supabase-postgrest/builder";
+import { PostgrestSingleResponse } from "@supabase/postgrest-js";
 
 export namespace PrivateEditorApi {
   export namespace Files {
@@ -255,6 +257,22 @@ export namespace PrivateEditorApi {
       if (refreshKey) params.append("r", refreshKey.toString());
 
       return params;
+    }
+
+    export async function qdelete({
+      form_id,
+      main_table_id,
+      filters,
+    }: {
+      form_id: string;
+      main_table_id: number;
+      filters: ReadonlyArray<XSupabaseQuery.Filter>;
+    }) {
+      return Axios.request<PostgrestSingleResponse<any>>({
+        method: "DELETE",
+        url: `/private/editor/connect/${form_id}/supabase/table/${main_table_id}/query`,
+        data: { filters } satisfies XSupabaseQuery.Body,
+      });
     }
   }
 }

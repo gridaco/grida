@@ -13,14 +13,13 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import toast from "react-hot-toast";
-import { useEditorState } from "../editor";
+import { useCurrentTableView, useEditorState } from "../editor";
 import Link from "next/link";
 import { DownloadIcon, PieChartIcon, TrashIcon } from "@radix-ui/react-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { GridData } from "./grid-data";
 import clsx from "clsx";
-import type { XSupabaseQuery } from "@/lib/supabase-postgrest/builder";
 import {
   GridLimit,
   GridViewSettings,
@@ -34,6 +33,9 @@ import * as GridLayout from "./components/layout";
 import { txt_n_plural } from "@/utils/plural";
 import { editorlink } from "@/lib/forms/url";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
+import { GFResponseRow } from "../grid/types";
+import { PrivateEditorApi } from "@/lib/private";
+import { GridaEditorSymbols } from "../editor/symbols";
 
 export function GridEditor() {
   const [state, dispatch] = useEditorState();
@@ -45,24 +47,26 @@ export function GridEditor() {
     responses,
     sessions,
     datagrid_filter,
-    datagrid_table,
-    datagrid_table_row_keyword,
+    datagrid_table_id,
     datagrid_isloading,
     x_supabase_main_table,
     datagrid_selected_rows: selected_responses,
   } = state;
+
   const supabase = createClientFormsClient();
 
   const { systemcolumns, columns } = useMemo(
-    () => GridData.columns(datagrid_table, fields),
-    [datagrid_table, fields]
+    () => GridData.columns(datagrid_table_id, fields),
+    [datagrid_table_id, fields]
   );
 
+  const { row_keyword } = useCurrentTableView() || { row_keyword: "row" };
   // Transforming the responses into the format expected by react-data-grid
   const { filtered, inputlength } = useMemo(() => {
     return GridData.rows({
       form_id: form_id,
-      table: datagrid_table as "response" | "session" | "x-supabase-main-table",
+      // TODO: types with symbols not working ?
+      table: datagrid_table_id as any,
       fields: fields,
       filter: datagrid_filter,
       responses: responses.stream ?? [],
@@ -74,7 +78,7 @@ export function GridEditor() {
     });
   }, [
     form_id,
-    datagrid_table,
+    datagrid_table_id,
     sessions,
     fields,
     responses,
@@ -130,8 +134,12 @@ export function GridEditor() {
   );
 
   const has_selected_responses = selected_responses.size > 0;
-  const selectionDisabled = datagrid_table === "session";
-  const readonly = datagrid_table === "session";
+  const selectionDisabled =
+    datagrid_table_id ===
+    GridaEditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID;
+  const readonly =
+    datagrid_table_id ===
+    GridaEditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID;
 
   return (
     <GridLayout.Root>
@@ -149,11 +157,7 @@ export function GridEditor() {
                   className="text-sm font-normal text-neutral-500"
                   aria-label="selected responses"
                 >
-                  {txt_n_plural(
-                    selected_responses.size,
-                    datagrid_table_row_keyword
-                  )}{" "}
-                  selected
+                  {txt_n_plural(selected_responses.size, row_keyword)} selected
                 </span>
                 <DeleteSelectedRowsButton />
               </div>
@@ -195,7 +199,7 @@ export function GridEditor() {
         <ResponseGrid
           systemcolumns={systemcolumns}
           columns={columns}
-          rows={filtered}
+          rows={filtered as GFResponseRow[]}
           readonly={readonly}
           loading={datagrid_isloading}
           selectionDisabled={selectionDisabled}
@@ -218,7 +222,7 @@ export function GridEditor() {
       <GridLayout.Footer>
         <div className="flex gap-2 items-center">
           <GridLimit />
-          <GridCount count={filtered?.length ?? 0} />
+          <GridCount count={filtered?.length} keyword={row_keyword} />
         </div>
         <Link href={`/v1/${form_id}/export/csv`} download target="_blank">
           <Button variant="ghost">
@@ -234,59 +238,25 @@ export function GridEditor() {
 
 function TableTools() {
   const [state] = useEditorState();
-  const { datagrid_table } = state;
+  const { datagrid_table_id } = state;
 
   return (
     <div className="flex items-center gap-1">
       <GridLocalSearch />
-      {datagrid_table === "x-supabase-main-table" && <XSupaDataGridSort />}
+      {datagrid_table_id ===
+        GridaEditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID && (
+        <XSupaDataGridSort />
+      )}
     </div>
   );
-}
-
-async function xsupabase_delete_query({
-  form_id,
-  main_table_id,
-  column,
-  values,
-}: {
-  form_id: string;
-  main_table_id: number;
-  column: string;
-  values: any[];
-}) {
-  const res = await fetch(
-    `/private/editor/connect/${form_id}/supabase/table/${main_table_id}/query`,
-    {
-      method: "DELETE",
-      body: JSON.stringify({
-        filters: [
-          {
-            type: "in",
-            column: column,
-            values: values,
-          },
-        ],
-      } satisfies XSupabaseQuery.Body),
-    }
-  );
-
-  const { error, count } = await res.json();
-
-  if (error || !count) {
-    console.error("Failed to delete rows", error);
-    throw error;
-  }
-
-  return true;
 }
 
 function DeleteSelectedRowsButton() {
   const supabase = createClientFormsClient();
   const [state, dispatch] = useEditorState();
 
-  const { datagrid_table, datagrid_selected_rows, datagrid_table_row_keyword } =
-    state;
+  const { datagrid_table_id, datagrid_selected_rows } = state;
+  const { row_keyword } = useCurrentTableView() || { row_keyword: "row" };
 
   const delete_selected_responses = useCallback(() => {
     const deleting = supabase
@@ -312,12 +282,21 @@ function DeleteSelectedRowsButton() {
       return;
     }
 
-    const res = xsupabase_delete_query({
+    const res = PrivateEditorApi.SupabaseQuery.qdelete({
       form_id: state.form_id,
       main_table_id: state.connections!.supabase!.main_supabase_table_id!,
-      column: state.x_supabase_main_table.gfpk,
-      values: Array.from(datagrid_selected_rows),
-    }).then(() => {
+      filters: [
+        {
+          type: "in",
+          column: state.x_supabase_main_table.gfpk,
+          values: Array.from(datagrid_selected_rows),
+        },
+      ],
+    }).then(({ data: { error, count } }) => {
+      if (error || !count) {
+        console.error("Failed to delete rows", error);
+        throw error;
+      }
       dispatch({
         type: "editor/data-grid/delete/selected",
       });
@@ -337,19 +316,21 @@ function DeleteSelectedRowsButton() {
   ]);
 
   const onDeleteSelection = useCallback(() => {
-    switch (datagrid_table) {
-      case "response":
+    switch (datagrid_table_id) {
+      case GridaEditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID:
         delete_selected_responses();
         break;
-      case "session":
+      case GridaEditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID:
         toast.error("Cannot delete sessions");
         break;
-      case "x-supabase-main-table":
+      case GridaEditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID:
         delete_selected_x_supabase_main_table_rows();
         break;
+      default:
+        toast.error("Cannot delete rows from this table");
     }
   }, [
-    datagrid_table,
+    datagrid_table_id,
     delete_selected_responses,
     delete_selected_x_supabase_main_table_rows,
   ]);
@@ -359,20 +340,12 @@ function DeleteSelectedRowsButton() {
       <AlertDialogTrigger asChild>
         <button className="flex items-center gap-1 p-2 rounded-md border text-sm">
           <TrashIcon />
-          Delete{" "}
-          {txt_n_plural(
-            datagrid_selected_rows.size,
-            datagrid_table_row_keyword
-          )}
+          Delete {txt_n_plural(datagrid_selected_rows.size, row_keyword)}
         </button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogTitle>
-          Delete{" "}
-          {txt_n_plural(
-            datagrid_selected_rows.size,
-            datagrid_table_row_keyword
-          )}
+          Delete {txt_n_plural(datagrid_selected_rows.size, row_keyword)}
         </AlertDialogTitle>
         <AlertDialogDescription>
           Deleting this record will remove all data associated with it. Are you
@@ -404,14 +377,15 @@ function DeleteFieldConfirmDialog({
 }) {
   const [state] = useEditorState();
 
-  const { datagrid_table } = state;
+  const { datagrid_table_id } = state;
 
   return (
     <AlertDialog {...props}>
       <AlertDialogContent>
         <AlertDialogTitle>Delete Field</AlertDialogTitle>
         <AlertDialogDescription>
-          {datagrid_table === "x-supabase-main-table" ? (
+          {datagrid_table_id ===
+          GridaEditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID ? (
             <>
               Deleting this field will remove all data associated with it
               (within Grida Forms). Are you sure you want to delete this field?

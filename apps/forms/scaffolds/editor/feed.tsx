@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo } from "react";
-import { useEditorState } from "./provider";
+import { useEditorState } from "./use";
 import toast from "react-hot-toast";
 import {
   createClientFormsClient,
@@ -10,11 +10,12 @@ import {
 import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import useSWR from "swr";
 import type { EditorApiResponse } from "@/types/private/api";
-import type { FormResponseField, GridaSupabase } from "@/types";
+import type { GridaSupabase } from "@/types";
 import { usePrevious } from "@uidotdev/usehooks";
 import { XSupabaseQuery } from "@/lib/supabase-postgrest/builder";
 import equal from "deep-equal";
 import { PrivateEditorApi } from "@/lib/private";
+import { GridaEditorSymbols } from "./symbols";
 
 type RealtimeTableChangeData = {
   id: string;
@@ -152,7 +153,7 @@ export function ResponseFeedProvider({
 
   const {
     form_id,
-    datagrid_table,
+    datagrid_table_id,
     datagrid_rows_per_page,
     datagrid_table_refresh_key,
     responses: { realtime: realtime_responses_enabled },
@@ -217,7 +218,13 @@ export function ResponseFeedProvider({
   );
 
   useEffect(() => {
-    if (datagrid_table !== "response") return;
+    if (
+      datagrid_table_id !==
+      GridaEditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID
+    ) {
+      return;
+    }
+
     setLoading(true);
     const feed = fetchResponses(datagrid_rows_per_page).then((data) => {
       dispatch({
@@ -240,7 +247,7 @@ export function ResponseFeedProvider({
     dispatch,
     fetchResponses,
     datagrid_rows_per_page,
-    datagrid_table,
+    datagrid_table_id,
     datagrid_table_refresh_key,
   ]);
 
@@ -301,7 +308,7 @@ export function ResponseSessionFeedProvider({
 
   const {
     form_id,
-    datagrid_table,
+    datagrid_table_id,
     datagrid_rows_per_page,
     datagrid_table_refresh_key,
     sessions: { realtime: _realtime_sessions_enabled },
@@ -342,7 +349,13 @@ export function ResponseSessionFeedProvider({
   );
 
   useEffect(() => {
-    if (datagrid_table !== "session") return;
+    if (
+      datagrid_table_id !==
+      GridaEditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID
+    ) {
+      return;
+    }
+
     setLoading(true);
 
     const feed = fetchResponseSessions(datagrid_rows_per_page).then((data) => {
@@ -364,7 +377,7 @@ export function ResponseSessionFeedProvider({
       });
   }, [
     dispatch,
-    datagrid_table,
+    datagrid_table_id,
     datagrid_rows_per_page,
     datagrid_table_refresh_key,
     fetchResponseSessions,
@@ -400,7 +413,7 @@ export function CustomerFeedProvider({
   const [state, dispatch] = useEditorState();
   const {
     project: { id: project_id },
-    datagrid_table,
+    datagrid_table_id,
     datagrid_rows_per_page,
     datagrid_table_refresh_key,
   } = state;
@@ -418,7 +431,10 @@ export function CustomerFeedProvider({
   );
 
   useEffect(() => {
-    if (datagrid_table !== "customer") return;
+    if (
+      datagrid_table_id !== GridaEditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID
+    )
+      return;
 
     setLoading(true);
     client
@@ -437,7 +453,7 @@ export function CustomerFeedProvider({
         }
       });
   }, [
-    datagrid_table,
+    datagrid_table_id,
     datagrid_rows_per_page,
     project_id,
     datagrid_table_refresh_key,

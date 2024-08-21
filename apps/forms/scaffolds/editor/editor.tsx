@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useCallback, useMemo } from "react";
-import { StateProvider, useEditorState } from "./provider";
+import { StateProvider } from "./provider";
+import { useEditorState } from "./use";
 import { reducer } from "./reducer";
 import {
   DatabaseDocumentEditorInit,

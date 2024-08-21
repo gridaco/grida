@@ -17,8 +17,9 @@ import { EditorApiResponse } from "@/types/private/api";
 import { priority_sorter } from "@/utils/sort";
 import { useEffect, useMemo } from "react";
 import { MainTable } from "@/scaffolds/editor/utils/main-table";
-import useSWR from "swr";
 import { GridData } from "@/scaffolds/grid-editor/grid-data";
+import { GridaEditorSymbols } from "@/scaffolds/editor/symbols";
+import useSWR from "swr";
 
 export default function XTablePage() {
   const [state, dispatch] = useEditorState();
@@ -85,7 +86,7 @@ export default function XTablePage() {
   const { filtered, inputlength } = useMemo(() => {
     return GridData.rows({
       filter: state.datagrid_filter,
-      table: "x-supabase-auth.users",
+      table: GridaEditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID,
       data: {
         rows: data?.data?.users ?? [],
       },
@@ -93,7 +94,9 @@ export default function XTablePage() {
   }, [data, state.datagrid_filter]);
 
   return (
-    <MainTable table="x-supabase-auth.users">
+    <MainTable
+      table={GridaEditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID}
+    >
       <GridLayout.Root>
         <GridLayout.Header>
           <GridLayout.HeaderMenus>
@@ -119,7 +122,7 @@ export default function XTablePage() {
         </GridLayout.Content>
         <GridLayout.Footer>
           <GridLimit />
-          <GridCount count={filtered.length} />
+          <GridCount count={filtered.length} keyword="user" />
           <GridRefresh />
         </GridLayout.Footer>
       </GridLayout.Root>

@@ -20,7 +20,7 @@ import type {
   GridaSupabase,
   OrderBy,
 } from "@/types";
-import { LOCALTZ } from "./symbols";
+import { SYM_LOCALTZ, GridaEditorSymbols } from "./symbols";
 import { ZodObject } from "zod";
 import { Tokens } from "@/ast";
 import React from "react";
@@ -94,27 +94,42 @@ export interface DataGridFilterSettings {
   empty_data_hidden: boolean;
 }
 
-type GDocTable =
+type GDocTable = {
+  /**
+   * keyword indicating the row, singular form (will be made plural in the UI)
+   * e.g. "row" "user" "session" "customer"
+   */
+  row_keyword: string;
+  name: string;
+  label: string;
+} & (
   | {
-      type: "response" | "session";
-      name: string;
-      label: string;
+      id: typeof GridaEditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID;
+      type: "response";
     }
   | {
+      id: typeof GridaEditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID;
+      type: "session";
+    }
+  | {
+      id: typeof GridaEditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID;
       type: "customer";
-      name: string;
-      label: string;
     }
   | {
+      id: typeof GridaEditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID;
+      type: "x-supabase-main-table";
+    }
+  | {
+      id: typeof GridaEditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID;
+      type: "x-supabase-auth.users";
+    }
+  | {
+      id: string;
       type: "table";
-      name: string;
-      label: string;
     }
-  | {
-      type: "x-supabase-main-table" | "x-supabase-auth.users";
-      name: string;
-      label: string;
-    };
+);
+
+export type GDocTableID = GDocTable["id"];
 
 export interface MenuItem {
   section: string;
@@ -132,16 +147,12 @@ export type TableType =
   | "x-supabase-auth.users";
 
 interface IDataGridState {
+  /**
+   * @global rows per page is not saved per table
+   */
   datagrid_rows_per_page: number;
-  datagrid_table:
-    | "response"
-    | "session"
-    | "customer"
-    | "x-supabase-main-table"
-    | "x-supabase-auth.users"
-    | string;
+  datagrid_table_id: GDocTableID;
   datagrid_table_refresh_key: number;
-  datagrid_table_row_keyword: string;
   datagrid_isloading: boolean;
   datagrid_filter: DataGridFilterSettings;
   datagrid_orderby: { [key: string]: OrderBy };
@@ -187,7 +198,7 @@ interface ICustomersDataStreamState {
 
 interface IEditorDateContextState {
   dateformat: "date" | "time" | "datetime";
-  datetz: typeof LOCALTZ | string;
+  datetz: typeof SYM_LOCALTZ | string;
 }
 
 interface IEditorSidebarState {
