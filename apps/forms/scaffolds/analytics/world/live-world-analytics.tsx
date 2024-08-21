@@ -122,8 +122,8 @@ function View() {
   );
 
   useEffect(() => {
-    if (state.responses && state.responses.length > 0) {
-      const sorted = state.responses
+    if (state.responses.stream && state.responses.stream?.length > 0) {
+      const sorted = state.responses.stream
         .slice()
         .sort((a, b) => a.meta.local_index - b.meta.local_index);
 
@@ -137,7 +137,7 @@ function View() {
       });
       setRecent(recent);
     }
-  }, [state.responses]);
+  }, [state.responses.stream]);
 
   useEffect(() => {
     if (recent.length === 0) return;
@@ -171,14 +171,14 @@ function View() {
   }, [debounceFlyTo, recent]);
 
   const responseChartData = useMemo(() => {
-    return serialize(state.responses.map((r) => r.meta) || [], {
+    return serialize(state.responses.stream?.map((r) => r.meta) || [], {
       dateKey: "created_at",
       // last 15 minutes
       from: new Date(new Date().getTime() - 15 * 60 * 1000),
       to: new Date(),
       intervalMs: 15 * 1000, // 15 seconds
     });
-  }, [state.responses]);
+  }, [state.responses.stream]);
 
   const sessionChartData = useMemo(() => {
     return serialize(state.sessions.stream || [], {

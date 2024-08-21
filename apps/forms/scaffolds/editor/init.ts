@@ -216,8 +216,10 @@ function initialFormEditorState(init: FormDocumentEditorInit): FormEditorState {
       templatedata: {},
     },
     fields: init.fields,
-    responses: [],
-    realtime_responses_enabled: true,
+    responses: {
+      realtime: true,
+      stream: [],
+    },
     sessions: {
       stream: undefined,
       realtime: false,

@@ -278,6 +278,12 @@ interface IFormResponseSessionDataStreamState {
   sessions: TGlobalDataStreamState<FormResponseSession>;
 }
 
+interface IFormResponseDataStreamState {
+  responses: TGlobalDataStreamState<
+    TVirtualRow<FormResponseField, FormResponse>
+  >;
+}
+
 interface IFormBlockInsertionMenuState {
   insertmenu: TGlobalEditorDialogState;
 }
@@ -285,6 +291,7 @@ interface IFormBlockInsertionMenuState {
 export interface FormEditorState
   extends BaseDocumentEditorState,
     IFormResponseSessionDataStreamState,
+    IFormResponseDataStreamState,
     IFormBlockInsertionMenuState,
     IFieldEditorState,
     IDataGridState {
@@ -323,15 +330,6 @@ export interface FormEditorState
 
   available_field_ids: string[];
   focus_block_id?: string | null;
-
-  // responses: {
-  //   rows: FormResponse[];
-  //   fields: { [key: string]: FormResponseField[] };
-  // };
-
-  responses: Array<TVirtualRow<FormResponseField, FormResponse>>;
-
-  realtime_responses_enabled: boolean;
 
   tables: {
     name: string;

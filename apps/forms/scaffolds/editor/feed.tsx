@@ -83,7 +83,7 @@ export function ResponseSyncProvider({
   const [state] = useEditorState();
   const { responses } = state;
   const supabase = useMemo(() => createClientFormsClient(), []);
-  const prev = usePrevious(responses);
+  const prev = usePrevious(responses.stream);
 
   const sync = useCallback(
     async (id: string, payload: { value: any; option_id?: string | null }) => {
@@ -109,7 +109,7 @@ export function ResponseSyncProvider({
   );
 
   useEffect(() => {
-    responses.forEach((r) => {
+    responses.stream?.forEach((r) => {
       r.data;
       Object.keys(r.data).forEach((attrkey) => {
         const cell = r.data[attrkey];
@@ -140,7 +140,7 @@ export function ResponseSyncProvider({
         }
       });
     });
-  }, [prev, responses, sync]);
+  }, [prev, responses.stream, sync]);
 
   return <>{children}</>;
 }
@@ -155,7 +155,7 @@ export function ResponseFeedProvider({
     datagrid_table,
     datagrid_rows_per_page,
     datagrid_table_refresh_key,
-    realtime_responses_enabled,
+    responses: { realtime: realtime_responses_enabled },
   } = state;
 
   const supabase = useMemo(() => createClientFormsClient(), []);

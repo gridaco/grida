@@ -234,8 +234,8 @@ function RowEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
 
   const focusresponse = useMemo(() => {
-    return state.responses.find((r) => r.id === state.row_editor.id);
-  }, [state.responses, state.row_editor.id]);
+    return state.responses.stream?.find((r) => r.id === state.row_editor.id);
+  }, [state.responses.stream, state.row_editor.id]);
 
   const focusxsupabasemaintablerow = useMemo(() => {
     const pk = state.x_supabase_main_table?.gfpk;

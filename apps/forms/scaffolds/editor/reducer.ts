@@ -531,7 +531,9 @@ export function reducer(
     case "editor/response/delete": {
       const { id } = <DeleteResponseAction>action;
       return produce(state, (draft) => {
-        draft.responses = draft.responses.filter((row) => row.id !== id);
+        draft.responses.stream = draft.responses.stream?.filter(
+          (row) => row.id !== id
+        );
 
         // also remove from selected_responses
         const new_selected_responses = new Set(state.datagrid_selected_rows);
@@ -568,14 +570,14 @@ export function reducer(
 
       return produce(state, (draft) => {
         if (reset) {
-          draft.responses = virtualized;
+          draft.responses.stream = virtualized;
           return;
         }
 
         // Merge & Add new responses to the existing responses
         // Map of ids to responses for the existing responses
         // { [id] : row}
-        const existing_responses_id_map = draft.responses.reduce(
+        const existing_responses_id_map = draft.responses.stream?.reduce(
           (acc: any, response) => {
             acc[response.id] = response;
             return acc;
@@ -592,7 +594,7 @@ export function reducer(
             );
           } else {
             // Add new response if id does not exist
-            draft.responses.push(newResponse);
+            draft.responses.stream?.push(newResponse);
           }
         });
       });
@@ -648,7 +650,7 @@ export function reducer(
         draft.datagrid_table_row_keyword = table_keyword(table);
 
         draft.sessions.realtime = table === "session";
-        draft.realtime_responses_enabled = table === "response";
+        draft.responses.realtime = table === "response";
 
         // clear selected rows
         draft.datagrid_selected_rows = new Set();
@@ -660,7 +662,7 @@ export function reducer(
         switch (state.datagrid_table) {
           case "response": {
             const ids = Array.from(state.datagrid_selected_rows);
-            draft.responses = draft.responses.filter(
+            draft.responses.stream = draft.responses.stream?.filter(
               (response) => !ids.includes(response.id)
             );
 
@@ -782,9 +784,9 @@ export function reducer(
             } = <DataGridCellChangeAction>action;
             const { value, option_id } = data;
 
-            const cell = draft.responses.find((row) => row.id === row_id)!.data[
-              attribute_id
-            ];
+            const cell = draft.responses.stream?.find(
+              (row) => row.id === row_id
+            )!.data[attribute_id];
 
             if (!cell) return;
 

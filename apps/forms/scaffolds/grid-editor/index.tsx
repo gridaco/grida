@@ -65,7 +65,7 @@ export function GridEditor() {
       table: datagrid_table as "response" | "session" | "x-supabase-main-table",
       fields: fields,
       filter: datagrid_filter,
-      responses: responses,
+      responses: responses.stream ?? [],
       sessions: sessions.stream ?? [],
       data: {
         pks: x_supabase_main_table?.pks ?? [],
