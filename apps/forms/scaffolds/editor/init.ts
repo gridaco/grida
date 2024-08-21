@@ -56,6 +56,9 @@ function initialBaseDocumentEditorState(
     sidebar: {
       mode: initial_sidebar_mode[init.doctype],
     },
+    row_editor: {
+      open: false,
+    },
   };
 }
 
@@ -88,6 +91,8 @@ function initialDatabaseEditorState(
         },
       ],
     })),
+    // TODO: move me under a schema
+    fields: [],
   };
 }
 
@@ -208,7 +213,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): FormEditorState {
       rows: [],
       fields: {},
     },
-    selected_rows: new Set(),
+    datagrid_selected_rows: new Set(),
     available_field_ids: block_available_field_ids,
     datagrid_rows_per_page: 100,
     datagrid_table_refresh_key: 0,

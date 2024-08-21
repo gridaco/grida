@@ -104,7 +104,7 @@ export function ResponseGrid({
   ) => void;
 }) {
   const [state, dispatch] = useEditorState();
-  const { selected_rows: selected_responses } = state;
+  const { datagrid_selected_rows: selected_responses } = state;
 
   const onSelectedRowsChange = (selectedRows: ReadonlySet<string>) => {
     dispatch({

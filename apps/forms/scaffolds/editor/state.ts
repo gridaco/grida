@@ -120,7 +120,43 @@ export interface MenuItem {
   href?: string;
 }
 
-export interface BaseDocumentEditorState {
+export type TableGroup =
+  | "response"
+  | "customer"
+  | "schema"
+  | "x-supabase-main-table"
+  | "x-supabase-auth.users";
+
+interface IDataGridState {
+  datagrid_rows_per_page: number;
+  datagrid_table:
+    | "response"
+    | "session"
+    | "customer"
+    | "x-supabase-main-table"
+    | "x-supabase-auth.users"
+    | string;
+  datagrid_table_refresh_key: number;
+  datagrid_table_row_keyword: string;
+  datagrid_isloading: boolean;
+  datagrid_filter: DataGridFilterSettings;
+  datagrid_orderby: { [key: string]: OrderBy };
+  datagrid_selected_rows: Set<string>;
+}
+
+/**
+ * Utility state for entity edit dialog. id shall be processed within the correct context.
+ */
+interface IGlobalEditorDialogState {
+  id?: string | null;
+  open: boolean;
+}
+
+interface IRowEditorState {
+  row_editor: IGlobalEditorDialogState;
+}
+
+export interface BaseDocumentEditorState extends IRowEditorState {
   saving: boolean;
   basepath: string;
   organization: {
@@ -182,20 +218,16 @@ export interface BaseDocumentEditorState {
   };
 }
 
-export type TableGroup =
-  | "response"
-  | "customer"
-  | "schema"
-  | "x-supabase-main-table"
-  | "x-supabase-auth.users";
-
-export interface FormEditorState extends BaseDocumentEditorState {
+export interface FormEditorState
+  extends BaseDocumentEditorState,
+    IDataGridState,
+    IRowEditorState {
+  form_id: string;
+  form_title: string;
   connections: {
     store_id?: number | null;
     supabase?: GridaSupabase.SupabaseConnectionState;
   };
-  form_id: string;
-  form_title: string;
   campaign: {
     max_form_responses_by_customer: number | null;
     is_max_form_responses_by_customer_enabled: boolean;
@@ -220,14 +252,14 @@ export interface FormEditorState extends BaseDocumentEditorState {
   };
   blocks: EditorFlatFormBlock[];
   fields: FormFieldDefinition[];
+
   field_draft_init?: Partial<FormFieldInit> | null;
   focus_field_id?: string | null;
-  focus_response_id?: string;
+  available_field_ids: string[];
+
   focus_customer_id?: string;
   focus_block_id?: string | null;
-  available_field_ids: string[];
   customers?: Customer[];
-  selected_rows: Set<string>;
   responses: {
     rows: FormResponse[];
     fields: { [key: string]: FormResponseField[] };
@@ -238,24 +270,10 @@ export interface FormEditorState extends BaseDocumentEditorState {
     group: TableGroup;
     views: GDocTable[];
   }[];
-  datagrid_rows_per_page: number;
-  datagrid_table:
-    | "response"
-    | "session"
-    | "customer"
-    | "x-supabase-main-table"
-    | "x-supabase-auth.users"
-    | string;
-  datagrid_table_refresh_key: number;
-  datagrid_table_row_keyword: string;
-  datagrid_isloading: boolean;
-  datagrid_filter: DataGridFilterSettings;
-  datagrid_orderby: { [key: string]: OrderBy };
   realtime_sessions_enabled: boolean;
   realtime_responses_enabled: boolean;
   is_insert_menu_open?: boolean;
   is_field_edit_panel_open?: boolean;
-  is_response_edit_panel_open?: boolean;
   is_customer_edit_panel_open?: boolean;
   is_block_edit_panel_open?: boolean;
   field_edit_panel_refresh_key?: number;

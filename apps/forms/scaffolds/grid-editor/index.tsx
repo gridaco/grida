@@ -15,19 +15,12 @@ import {
 import toast from "react-hot-toast";
 import { useEditorState } from "../editor";
 import Link from "next/link";
-import {
-  DownloadIcon,
-  PieChartIcon,
-  PlusIcon,
-  TrashIcon,
-} from "@radix-ui/react-icons";
+import { DownloadIcon, PieChartIcon, TrashIcon } from "@radix-ui/react-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { GridData } from "./grid-data";
 import clsx from "clsx";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { XSupabaseQuery } from "@/lib/supabase-postgrest/builder";
-import { SupabaseLogo } from "@/components/logos";
 import {
   GridLimit,
   GridViewSettings,
@@ -56,7 +49,7 @@ export function GridEditor() {
     datagrid_table_row_keyword,
     datagrid_isloading,
     x_supabase_main_table,
-    selected_rows: selected_responses,
+    datagrid_selected_rows: selected_responses,
   } = state;
   const supabase = createClientFormsClient();
 
@@ -299,13 +292,14 @@ function DeleteSelectedRowsButton() {
   const supabase = createClientFormsClient();
   const [state, dispatch] = useEditorState();
 
-  const { datagrid_table, selected_rows, datagrid_table_row_keyword } = state;
+  const { datagrid_table, datagrid_selected_rows, datagrid_table_row_keyword } =
+    state;
 
   const delete_selected_responses = useCallback(() => {
     const deleting = supabase
       .from("response")
       .delete()
-      .in("id", Array.from(selected_rows))
+      .in("id", Array.from(datagrid_selected_rows))
       .then(() => {
         dispatch({
           type: "editor/data-grid/delete/selected",
@@ -317,7 +311,7 @@ function DeleteSelectedRowsButton() {
       success: "Response deleted",
       error: "", // this won't be shown (supabase does not return error for delete operation)
     });
-  }, [supabase, selected_rows, dispatch]);
+  }, [supabase, datagrid_selected_rows, dispatch]);
 
   const delete_selected_x_supabase_main_table_rows = useCallback(() => {
     if (!state.x_supabase_main_table?.gfpk) {
@@ -329,7 +323,7 @@ function DeleteSelectedRowsButton() {
       form_id: state.form_id,
       main_table_id: state.connections!.supabase!.main_supabase_table_id!,
       column: state.x_supabase_main_table.gfpk,
-      values: Array.from(selected_rows),
+      values: Array.from(datagrid_selected_rows),
     }).then(() => {
       dispatch({
         type: "editor/data-grid/delete/selected",
@@ -345,7 +339,7 @@ function DeleteSelectedRowsButton() {
     state.form_id,
     state.connections,
     state.x_supabase_main_table?.gfpk,
-    selected_rows,
+    datagrid_selected_rows,
     dispatch,
   ]);
 
@@ -372,12 +366,20 @@ function DeleteSelectedRowsButton() {
       <AlertDialogTrigger asChild>
         <button className="flex items-center gap-1 p-2 rounded-md border text-sm">
           <TrashIcon />
-          Delete {txt_n_plural(selected_rows.size, datagrid_table_row_keyword)}
+          Delete{" "}
+          {txt_n_plural(
+            datagrid_selected_rows.size,
+            datagrid_table_row_keyword
+          )}
         </button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogTitle>
-          Delete {txt_n_plural(selected_rows.size, datagrid_table_row_keyword)}
+          Delete{" "}
+          {txt_n_plural(
+            datagrid_selected_rows.size,
+            datagrid_table_row_keyword
+          )}
         </AlertDialogTitle>
         <AlertDialogDescription>
           Deleting this record will remove all data associated with it. Are you

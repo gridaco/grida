@@ -520,7 +520,7 @@ export function reducer(
     case "editor/response/select": {
       const { selection } = <SelectResponse>action;
       return produce(state, (draft) => {
-        draft.selected_rows = new Set(selection);
+        draft.datagrid_selected_rows = new Set(selection);
       });
     }
     case "editor/response/delete": {
@@ -531,10 +531,10 @@ export function reducer(
         );
 
         // also remove from selected_responses
-        const new_selected_responses = new Set(state.selected_rows);
+        const new_selected_responses = new Set(state.datagrid_selected_rows);
         new_selected_responses.delete(id);
 
-        draft.selected_rows = new_selected_responses;
+        draft.datagrid_selected_rows = new_selected_responses;
       });
     }
     case "editor/data-grid/rows": {
@@ -590,8 +590,8 @@ export function reducer(
     case "editor/responses/edit": {
       const { response_id, open } = <OpenResponseEditAction>action;
       return produce(state, (draft) => {
-        draft.is_response_edit_panel_open = open ?? true;
-        draft.focus_response_id = response_id;
+        draft.row_editor.open = open ?? true;
+        draft.row_editor.id = response_id;
       });
     }
     case "editor/data/sessions/feed": {
@@ -641,7 +641,7 @@ export function reducer(
         draft.realtime_responses_enabled = table === "response";
 
         // clear selected rows
-        draft.selected_rows = new Set();
+        draft.datagrid_selected_rows = new Set();
       });
     }
     case "editor/data-grid/delete/selected": {
@@ -649,7 +649,7 @@ export function reducer(
       return produce(state, (draft) => {
         switch (state.datagrid_table) {
           case "response": {
-            const ids = Array.from(state.selected_rows);
+            const ids = Array.from(state.datagrid_selected_rows);
             draft.responses.rows = draft.responses.rows.filter(
               (response) => !ids.includes(response.id)
             );
@@ -660,7 +660,7 @@ export function reducer(
             const pk = state.x_supabase_main_table!.gfpk!;
             draft.x_supabase_main_table!.rows =
               draft.x_supabase_main_table!.rows.filter(
-                (row) => !state.selected_rows.has(row[pk])
+                (row) => !state.datagrid_selected_rows.has(row[pk])
               );
 
             break;
@@ -671,7 +671,7 @@ export function reducer(
         }
 
         // clear selected rows
-        draft.selected_rows = new Set();
+        draft.datagrid_selected_rows = new Set();
       });
     }
     case "editor/customers/feed": {

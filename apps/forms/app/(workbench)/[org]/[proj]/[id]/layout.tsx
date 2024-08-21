@@ -333,11 +333,7 @@ export default async function Layout({
               org={org}
               proj={proj}
             >
-              {/* <p>
-                This document is a site document. Site documents are not
-                supported yet.
-              </p> */}
-              {/* {children} */}
+              {children}
             </BaseLayout>
           </EditorProvider>
         </Html>

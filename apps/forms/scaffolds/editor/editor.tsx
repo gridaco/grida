@@ -236,26 +236,26 @@ function RowEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
 
   const focusresponse = useMemo(() => {
-    return state.responses?.rows?.find((r) => r.id === state.focus_response_id);
-  }, [state.responses, state.focus_response_id]);
+    return state.responses?.rows?.find((r) => r.id === state.row_editor.id);
+  }, [state.responses, state.row_editor.id]);
 
   const focusxsupabasemaintablerow = useMemo(() => {
     const pk = state.x_supabase_main_table?.gfpk;
     if (!pk) return;
     return state.x_supabase_main_table?.rows?.find(
-      (r) => r[pk] === state.focus_response_id // TODO: - pk
+      (r) => r[pk] === state.row_editor.id // TODO: - pk
     );
   }, [
     state.x_supabase_main_table?.rows,
     state.x_supabase_main_table?.gfpk,
-    state.focus_response_id,
+    state.row_editor.id,
   ]);
 
   return (
     <>
       <RowEditPanel
         key={focusresponse?.id}
-        open={state.is_response_edit_panel_open}
+        open={state.row_editor.open}
         init={{
           response: focusresponse,
           response_fields: focusresponse?.id
