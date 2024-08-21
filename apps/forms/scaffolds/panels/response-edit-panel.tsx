@@ -35,6 +35,7 @@ import {
 import { UAParser } from "ua-parser-js";
 import { AvatarIcon } from "@radix-ui/react-icons";
 import { useEditorState } from "../editor";
+import { TVirtualRow } from "../editor/state";
 
 export function RowEditPanel({
   onSave,
@@ -42,21 +43,18 @@ export function RowEditPanel({
   ...props
 }: React.ComponentProps<typeof SidePanel> & {
   init?: Partial<{
-    response: FormResponse;
-    response_fields: FormResponseField[];
-    field_defs: FormFieldDefinition[];
+    row: TVirtualRow<FormResponseField, FormResponse>;
+    attributes: FormFieldDefinition[];
   }>;
   onSave?: (field: FormFieldInit) => void;
 }) {
   const [state, dispatch] = useEditorState();
-  const { response, response_fields, field_defs } = init ?? {};
+  const { row, attributes } = init ?? {};
 
   const { resolvedTheme } = useTheme();
 
   const monaco = useMonaco();
   useMonacoTheme(monaco, resolvedTheme ?? "light");
-
-  const onSaveClick = () => {};
 
   const onViewCustomerDetailsClick = useCallback(
     (customer_id: string) => {
@@ -68,33 +66,29 @@ export function RowEditPanel({
     [dispatch]
   );
 
-  if (!response) return <></>;
+  if (!row) return <></>;
 
   return (
     <SidePanel {...props}>
-      <PanelHeader>{`Response ${init?.response?.local_index ? fmt_local_index(init.response?.local_index) : ""}`}</PanelHeader>
+      <PanelHeader>{`Response ${row.meta.local_index ? fmt_local_index(row.meta.local_index) : ""}`}</PanelHeader>
       <PanelContent>
         <PanelPropertySection>
           <PanelPropertySectionTitle>General</PanelPropertySectionTitle>
           <PanelPropertyFields>
-            {response && (
-              <>
-                <ResponseIdTable {...response} />
-                <ResponsePropertiesTable {...response} />
-              </>
-            )}
+            <ResponseIdTable {...row.meta} />
+            <ResponsePropertiesTable {...row.meta} />
           </PanelPropertyFields>
         </PanelPropertySection>
         <PanelPropertySection>
           <PanelPropertySectionTitle>Customer</PanelPropertySectionTitle>
           <PanelPropertyFields>
-            {response.customer_id && (
+            {row.meta.customer_id && (
               <>
-                <ResponseCustomerMetaTable {...response} />
+                <ResponseCustomerMetaTable {...row.meta} />
                 <Button
                   type="button"
                   onClick={() =>
-                    onViewCustomerDetailsClick(response.customer_id!)
+                    onViewCustomerDetailsClick(row.meta.customer_id!)
                   }
                   variant="secondary"
                 >
@@ -109,19 +103,17 @@ export function RowEditPanel({
           <PanelPropertySection>
             <PanelPropertySectionTitle>Response</PanelPropertySectionTitle>
             <PanelPropertyFields>
-              {field_defs?.map((def) => {
-                const record = response_fields?.find(
-                  (f) => f.form_field_id === def.id
-                );
+              {attributes?.map((attr) => {
+                const cell = row.data[attr.id];
 
-                const txt = record?.value ?? "";
+                const txt = cell?.value ?? "";
 
                 return (
-                  <PanelPropertyField key={def.id} label={def.name}>
+                  <PanelPropertyField key={attr.id} label={attr.name}>
                     <PropertyTextInput
                       autoFocus={false}
                       readOnly
-                      placeholder={def.placeholder ?? ""}
+                      placeholder={attr.placeholder ?? ""}
                       value={txt}
                     />
                   </PanelPropertyField>
@@ -138,7 +130,7 @@ export function RowEditPanel({
                 className="rounded overflow-hidden shadow-sm border"
                 height={400}
                 defaultLanguage="json"
-                defaultValue={JSON.stringify(response, null, 2)}
+                defaultValue={JSON.stringify(row.meta, null, 2)}
                 options={{
                   readOnly: true,
                   padding: {

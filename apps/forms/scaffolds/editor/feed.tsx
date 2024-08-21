@@ -81,8 +81,9 @@ export function ResponseSyncProvider({
   children,
 }: React.PropsWithChildren<{}>) {
   const [state] = useEditorState();
+  const { responses } = state;
   const supabase = useMemo(() => createClientFormsClient(), []);
-  const prev = usePrevious(state.responses);
+  const prev = usePrevious(responses);
 
   const sync = useCallback(
     async (id: string, payload: { value: any; option_id?: string | null }) => {
@@ -108,46 +109,38 @@ export function ResponseSyncProvider({
   );
 
   useEffect(() => {
-    //
+    responses.forEach((r) => {
+      r.data;
+      Object.keys(r.data).forEach((attrkey) => {
+        const cell = r.data[attrkey];
+        const prevcell = prev?.find((pr) => pr.id === r.id)?.data[attrkey];
+        // skip
+        if (!prevcell) return;
 
-    Object.keys(state.responses.fields).forEach((key) => {
-      const fields = state.responses.fields[key];
+        // check if field value is updated
+        if (!equal(prevcell.value, cell.value)) {
+          const _ = sync(cell.id, {
+            value: cell.value,
+            option_id: cell.form_field_option_id,
+          });
 
-      // - if field id is draft and value is not empty, create a new response field - we don't handle this case - there will be no empty cells (db trigger)
-      // - if field id is not draft and value is updated, update the response field
-      // - we don't handle delete since field can't be deleted individually (deletes when row deleted)
-
-      for (const cell of fields) {
-        const prevField = prev?.fields[key]?.find(
-          (f: FormResponseField) => f.id === cell.id
-        );
-
-        if (prevField) {
-          // check if field value is updated
-          if (!equal(prevField.value, cell.value)) {
-            const _ = sync(cell.id, {
-              value: cell.value,
-              option_id: cell.form_field_option_id,
+          toast
+            .promise(_, {
+              loading: "Updating...",
+              success: "Updated",
+              error: "Failed",
+            })
+            .then((data) => {
+              // TODO:
+              // update state (although its already updated, but let's update it again with db response - triggers & other metadata)
+            })
+            .catch((error) => {
+              // else revert the change
             });
-
-            toast
-              .promise(_, {
-                loading: "Updating...",
-                success: "Updated",
-                error: "Failed",
-              })
-              .then((data) => {
-                // TODO:
-                // update state (although its already updated, but let's update it again with db response - triggers & other metadata)
-              })
-              .catch((error) => {
-                // else revert the change
-              });
-          }
         }
-      }
+      });
     });
-  }, [prev?.fields, state.responses, sync]);
+  }, [prev, responses, sync]);
 
   return <>{children}</>;
 }

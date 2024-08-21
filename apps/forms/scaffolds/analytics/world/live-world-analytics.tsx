@@ -122,17 +122,17 @@ function View() {
   );
 
   useEffect(() => {
-    if (state.responses && state.responses.rows.length > 0) {
-      const sorted = state.responses.rows
+    if (state.responses && state.responses.length > 0) {
+      const sorted = state.responses
         .slice()
-        .sort((a, b) => a.local_index - b.local_index);
+        .sort((a, b) => a.meta.local_index - b.meta.local_index);
 
       const recent = sorted.slice(-RECENT_N).map((r) => {
         return {
           id: r.id,
-          at: new Date(r.created_at),
-          latitude: Number(r.geo?.latitude) || 0,
-          longitude: Number(r.geo?.longitude) || 0,
+          at: new Date(r.meta.created_at),
+          latitude: Number(r.meta.geo?.latitude) || 0,
+          longitude: Number(r.meta.geo?.longitude) || 0,
         };
       });
       setRecent(recent);
@@ -171,7 +171,7 @@ function View() {
   }, [debounceFlyTo, recent]);
 
   const responseChartData = useMemo(() => {
-    return serialize(state.responses?.rows || [], {
+    return serialize(state.responses.map((r) => r.meta) || [], {
       dateKey: "created_at",
       // last 15 minutes
       from: new Date(new Date().getTime() - 15 * 60 * 1000),

@@ -158,6 +158,13 @@ interface TGlobalEditorDialogState<T = never> {
   data?: T;
 }
 
+export type TVirtualRowData<T> = { [attributekey: string]: T };
+export type TVirtualRow<T = Record<string, any>, M = Record<string, any>> = {
+  id: string;
+  data: TVirtualRowData<T>;
+  meta: M;
+};
+
 /**
  * Utility state for global data stream state.
  */
@@ -311,15 +318,19 @@ export interface FormEditorState
   };
 
   blocks: EditorFlatFormBlock[];
+
   fields: FormFieldDefinition[];
 
   available_field_ids: string[];
   focus_block_id?: string | null;
 
-  responses: {
-    rows: FormResponse[];
-    fields: { [key: string]: FormResponseField[] };
-  };
+  // responses: {
+  //   rows: FormResponse[];
+  //   fields: { [key: string]: FormResponseField[] };
+  // };
+
+  responses: Array<TVirtualRow<FormResponseField, FormResponse>>;
+
   realtime_responses_enabled: boolean;
 
   tables: {

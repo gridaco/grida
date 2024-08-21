@@ -1,5 +1,10 @@
 import { produce } from "immer";
-import { EditorFlatFormBlock, FormEditorState } from "./state";
+import type {
+  EditorFlatFormBlock,
+  FormEditorState,
+  TVirtualRow,
+  TVirtualRowData,
+} from "./state";
 import type {
   GlobalSavingAction,
   EditorSidebarModeAction,
@@ -69,7 +74,13 @@ import { VIDEO_BLOCK_SRC_DEFAULT_VALUE } from "@/k/video_block_defaults";
 import { IMAGE_BLOCK_SRC_DEFAULT_VALUE } from "@/k/image_block_defaults";
 import { PDF_BLOCK_SRC_DEFAULT_VALUE } from "@/k/pdf_block_defaults";
 import { draftid } from "@/utils/id";
-import type { FormBlockType, FormInputType, GridaSupabase } from "@/types";
+import type {
+  FormBlockType,
+  FormInputType,
+  FormResponse,
+  FormResponseField,
+  GridaSupabase,
+} from "@/types";
 import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";
 
 export function reducer(
@@ -520,9 +531,7 @@ export function reducer(
     case "editor/response/delete": {
       const { id } = <DeleteResponseAction>action;
       return produce(state, (draft) => {
-        draft.responses.rows = draft.responses.rows.filter(
-          (response) => response.id !== id
-        );
+        draft.responses = draft.responses.filter((row) => row.id !== id);
 
         // also remove from selected_responses
         const new_selected_responses = new Set(state.datagrid_selected_rows);
@@ -540,23 +549,33 @@ export function reducer(
     case "editor/response/feed": {
       const { data, reset } = <FeedResponseAction>action;
 
-      const responses = {
-        rows: data,
-        fields: data.reduce((acc: any, response) => {
-          acc[response.id] = response.fields;
-          return acc;
-        }, {}),
-      };
+      const virtualized: Array<TVirtualRow<FormResponseField, FormResponse>> =
+        data.map((response) => {
+          const { fields, ...row } = response;
+          return {
+            id: row.id,
+            data: fields.reduce(
+              (acc: TVirtualRowData<FormResponseField>, field) => {
+                const attrkey = field.form_field_id;
+                acc[attrkey] = field;
+                return acc;
+              },
+              {}
+            ),
+            meta: row,
+          };
+        });
 
       return produce(state, (draft) => {
         if (reset) {
-          draft.responses = responses;
+          draft.responses = virtualized;
           return;
         }
 
         // Merge & Add new responses to the existing responses
         // Map of ids to responses for the existing responses
-        const existingResponsesById = draft.responses.rows.reduce(
+        // { [id] : row}
+        const existing_responses_id_map = draft.responses.reduce(
           (acc: any, response) => {
             acc[response.id] = response;
             return acc;
@@ -564,20 +583,17 @@ export function reducer(
           {}
         );
 
-        responses.rows.forEach((newResponse) => {
-          if (existingResponsesById.hasOwnProperty(newResponse.id)) {
+        virtualized.forEach((newResponse) => {
+          if (existing_responses_id_map.hasOwnProperty(newResponse.id)) {
             // Update existing response
             Object.assign(
-              (existingResponsesById as any)[newResponse.id],
+              (existing_responses_id_map as any)[newResponse.id],
               newResponse
             );
           } else {
             // Add new response if id does not exist
-            draft.responses.rows.push(newResponse);
+            draft.responses.push(newResponse);
           }
-
-          // Update fields
-          draft.responses.fields[newResponse.id] = newResponse.fields;
         });
       });
     }
@@ -644,7 +660,7 @@ export function reducer(
         switch (state.datagrid_table) {
           case "response": {
             const ids = Array.from(state.datagrid_selected_rows);
-            draft.responses.rows = draft.responses.rows.filter(
+            draft.responses = draft.responses.filter(
               (response) => !ids.includes(response.id)
             );
 
@@ -759,25 +775,21 @@ export function reducer(
       return produce(state, (draft) => {
         switch (state.datagrid_table) {
           case "response": {
-            const { row, column, data } = <DataGridCellChangeAction>action;
+            const {
+              row: row_id,
+              column: attribute_id,
+              data,
+            } = <DataGridCellChangeAction>action;
             const { value, option_id } = data;
 
-            const cellid = state.responses.fields[row].find(
-              (f) => f.form_field_id === column && f.response_id === row
-            )?.id;
+            const cell = draft.responses.find((row) => row.id === row_id)!.data[
+              attribute_id
+            ];
 
-            draft.responses.fields[row] = draft.responses.fields[row].map(
-              (f) => {
-                if (f.id === cellid) {
-                  return {
-                    ...f,
-                    form_field_option_id: option_id ?? null,
-                    value,
-                  };
-                }
-                return f;
-              }
-            );
+            if (!cell) return;
+
+            cell.value = value;
+            cell.form_field_option_id = option_id ?? null;
 
             break;
           }

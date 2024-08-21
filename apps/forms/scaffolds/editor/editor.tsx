@@ -234,7 +234,7 @@ function RowEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
 
   const focusresponse = useMemo(() => {
-    return state.responses?.rows?.find((r) => r.id === state.row_editor.id);
+    return state.responses.find((r) => r.id === state.row_editor.id);
   }, [state.responses, state.row_editor.id]);
 
   const focusxsupabasemaintablerow = useMemo(() => {
@@ -255,11 +255,8 @@ function RowEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
         key={focusresponse?.id}
         open={state.row_editor.open}
         init={{
-          response: focusresponse,
-          response_fields: focusresponse?.id
-            ? state.responses.fields[focusresponse?.id]
-            : [],
-          field_defs: state.fields,
+          row: focusresponse,
+          attributes: state.fields,
         }}
         onOpenChange={(open) => {
           dispatch({ type: "editor/responses/edit", open });

@@ -9,7 +9,11 @@ import {
 } from "@/types";
 import { fmt_local_index } from "@/utils/fmt";
 import type { GFFile, GFResponseRow, GFSystemColumnTypes } from "../grid/types";
-import type { DataGridFilterSettings, FormEditorState } from "../editor/state";
+import type {
+  DataGridFilterSettings,
+  FormEditorState,
+  TVirtualRow,
+} from "../editor/state";
 import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";
 import { FieldSupports } from "@/k/supported_field_types";
 import { PrivateEditorApi } from "@/lib/private";
@@ -28,10 +32,7 @@ export namespace GridData {
           }
         | {
             table: "response";
-            responses: {
-              rows: FormResponse[];
-              fields: { [key: string]: FormResponseField[] };
-            };
+            responses: Array<TVirtualRow<FormResponseField, FormResponse>>;
           }
         | {
             table: "x-supabase-main-table";
@@ -122,23 +123,17 @@ export namespace GridData {
   export function rows(input: DataGridInput) {
     switch (input.table) {
       case "response": {
+        const filtered = GridFilter.filter(
+          input.responses,
+          input.filter,
+          (row) => row.meta.raw,
+          // response raw is saved with name: value
+          input.fields.map((f) => f.name)
+        );
+
         return {
-          inputlength: input.responses?.rows.length || 0,
-          filtered: input.responses
-            ? rows_from_responses(
-                {
-                  rows: GridFilter.filter(
-                    input.responses.rows,
-                    input.filter,
-                    "raw",
-                    // response raw is saved with name: value
-                    input.fields.map((f) => f.name)
-                  ),
-                  fields: input.responses.fields,
-                },
-                input.fields
-              )
-            : [],
+          inputlength: input.responses.length || 0,
+          filtered: rows_from_responses(filtered, input.fields),
         };
       }
       case "session": {
@@ -208,33 +203,29 @@ export namespace GridData {
   }
 
   function rows_from_responses(
-    responses: {
-      rows: FormResponse[];
-      fields: { [key: string]: FormResponseField[] };
-    },
-    fields: FormFieldDefinition[]
-  ) {
+    responses: Array<TVirtualRow<FormResponseField, FormResponse>>,
+    attributes: FormFieldDefinition[]
+  ): Array<GFResponseRow> {
     return (
-      responses.rows.map((response, index) => {
+      responses.map((response, index) => {
         const row: GFResponseRow = {
           __gf_id: response.id,
-          __gf_display_id: fmt_local_index(response.local_index),
-          __gf_created_at: response.created_at,
-          __gf_customer_id: response.customer_id,
+          __gf_display_id: fmt_local_index(response.meta.local_index),
+          __gf_created_at: response.meta.created_at,
+          __gf_customer_id: response.meta.customer_id,
           fields: {},
         }; // react-data-grid expects each row to have a unique 'id' property
 
-        fields.forEach((field) => {
-          const responseField = responses.fields[response.id]?.find(
-            (f) => f.form_field_id === field.id
-          );
-          row.fields[field.id] = {
-            type: responseField?.type || field.type,
-            value: responseField?.value,
-            readonly: field.readonly || false,
-            multiple: field.multiple || false,
-            option_id: responseField?.form_field_option_id,
-            options: field.options?.reduce(
+        attributes.forEach((attribute) => {
+          const cell: FormResponseField = response.data[attribute.id];
+
+          row.fields[attribute.id] = {
+            type: cell?.type || attribute.type,
+            value: cell?.value,
+            readonly: attribute.readonly || false,
+            multiple: attribute.multiple || false,
+            option_id: cell?.form_field_option_id,
+            options: attribute.options?.reduce(
               (
                 acc: { [key: string]: { value: string; label?: string } },
                 option
@@ -248,10 +239,10 @@ export namespace GridData {
               {}
             ),
             files:
-              responseField?.storage_object_paths?.map((path) => {
+              cell?.storage_object_paths?.map((path) => {
                 return gf_response_file({
-                  form_id: response.form_id,
-                  field_id: field.id,
+                  form_id: response.meta.form_id,
+                  field_id: attribute.id,
                   filepath: path,
                 });
               }) || [],

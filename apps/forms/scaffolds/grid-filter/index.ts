@@ -1,11 +1,21 @@
 import type { DataGridFilterSettings } from "@/scaffolds/editor/state";
 import Fuse from "fuse.js";
 
+type DataGetter<T> = ((row: T) => any) | keyof T;
+
+function getRpwData<T>(row: T, datakey?: DataGetter<T>): any {
+  if (datakey === undefined) return row;
+  if (typeof datakey === "function") {
+    return datakey(row);
+  }
+  return row[datakey];
+}
+
 export namespace GridFilter {
   export function filter<T extends { [key: string]: any }>(
     rows: Array<T>,
     filter: DataGridFilterSettings,
-    datakey?: keyof T,
+    datakey?: DataGetter<T>,
     datasearchkeys?: string[]
   ): Array<T> {
     const { empty_data_hidden, localsearch } = filter;
@@ -28,12 +38,12 @@ export namespace GridFilter {
 
   function filter_empty_data_hidden<T extends { [key: string]: any }>(
     rows: Array<T>,
-    datakey?: keyof T
+    datakey?: DataGetter<T>
   ): number[] {
     return rows
       .map((row, index) => ({ row, index }))
       .filter(({ row }) => {
-        const v = datakey ? row[datakey] : row;
+        const v = getRpwData(row, datakey);
         return (
           v !== null &&
           v !== undefined &&
@@ -48,13 +58,12 @@ export namespace GridFilter {
   function filter_full_text_search<T extends { [key: string]: any }>(
     rows: Array<T>,
     localsearch: string,
-    datakey?: keyof T,
+    datakey?: DataGetter<T>,
     datasearchkeys?: string[]
   ): number[] {
-    const fuse = new Fuse(rows, {
-      keys: datasearchkeys?.map((k) =>
-        datakey ? `${datakey?.toString()}.${k}` : k
-      ),
+    const input = rows.map((r) => getRpwData(r, datakey));
+    const fuse = new Fuse(input, {
+      keys: datasearchkeys,
       threshold: 0.3, // Adjust threshold to allow more matches
     });
 
