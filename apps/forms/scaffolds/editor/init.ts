@@ -237,6 +237,9 @@ function initialFormEditorState(init: FormDocumentEditorInit): FormEditorState {
     },
     datagrid_orderby: {},
     realtime_responses_enabled: true,
+    insertmenu: {
+      open: false,
+    },
     x_supabase_main_table: init.connections?.supabase
       ? xsbmtinit(init.connections.supabase)
       : undefined,

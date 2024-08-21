@@ -315,14 +315,6 @@ export function FormFieldBlockMenuItems({
     });
   }, [dispatch, form_field_id]);
 
-  const onLogicEditClick = useCallback(() => {
-    dispatch({
-      type: "editor/panels/block-edit",
-      block_id: block_id,
-      open: true,
-    });
-  }, [dispatch, block_id]);
-
   const deleteBlock = useDeleteBlock();
 
   return (
@@ -333,10 +325,6 @@ export function FormFieldBlockMenuItems({
           Edit Field Definition
         </DropdownMenuItem>
       )}
-      <DropdownMenuItem onClick={onLogicEditClick}>
-        <MixIcon className="me-2 align-middle" />
-        Logic
-      </DropdownMenuItem>
       <DropdownMenuItem onClick={() => deleteBlock(block_id)}>
         <TrashIcon className="me-2 align-middle" />
         Delete Block

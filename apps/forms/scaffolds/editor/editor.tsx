@@ -16,7 +16,6 @@ import { FormFieldUpsert, EditorApiResponse } from "@/types/private/api";
 import { TooltipProvider } from "@radix-ui/react-tooltip";
 import { RowEditPanel } from "../panels/response-edit-panel";
 import { CustomerEditPanel } from "../panels/customer-panel";
-import { BlockEditPanel } from "../panels/block-edit-panel";
 import { MediaViewerProvider } from "../mediaviewer";
 import { AssetsBackgroundsResolver } from "./resolver/assets-backgrounds-resolver";
 import toast from "react-hot-toast";
@@ -95,7 +94,6 @@ export function FormDocumentEditorProvider({
     <StateProvider state={state} dispatch={dispatch}>
       <TooltipProvider>
         <MediaViewerProvider>
-          <BlockEditPanel />
           <FieldEditPanelProvider />
           <RowEditPanelProvider />
           <CustomerPanelProvider />

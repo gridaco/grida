@@ -20,7 +20,6 @@ import type {
   FocusFieldAction,
   HtmlBlockBodyAction,
   ImageBlockSrcAction,
-  OpenBlockEditPanelAction,
   OpenInsertMenuPanelAction,
   OpenCustomerEditAction,
   OpenEditFieldAction,
@@ -687,17 +686,10 @@ export function reducer(
         draft.customer_editor.id = customer_id;
       });
     }
-    case "editor/panels/block-edit": {
-      const { block_id, open } = <OpenBlockEditPanelAction>action;
-      return produce(state, (draft) => {
-        draft.is_block_edit_panel_open = open ?? true;
-        draft.focus_block_id = block_id;
-      });
-    }
     case "editor/panels/insert-menu": {
       const { open } = <OpenInsertMenuPanelAction>action;
       return produce(state, (draft) => {
-        draft.is_insert_menu_open = open ?? true;
+        draft.insertmenu.open = open ?? true;
       });
     }
     case "editor/data-grid/column/reorder": {

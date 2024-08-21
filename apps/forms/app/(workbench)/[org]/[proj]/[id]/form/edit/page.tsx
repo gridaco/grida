@@ -17,7 +17,7 @@ export default function EditFormPage() {
         </AgentThemeProvider>
       </CanvasEventTarget>
       <aside className="hidden lg:flex h-full">
-        <SideControl mode="design" />
+        <SideControl />
       </aside>
     </main>
   );

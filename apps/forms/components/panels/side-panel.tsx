@@ -1,11 +1,6 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import React from "react";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
   HoverCard,
   HoverCardTrigger,
   HoverCardContent,

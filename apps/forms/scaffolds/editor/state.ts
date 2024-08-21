@@ -258,9 +258,14 @@ interface IFormResponseSessionDataStreamState {
   sessions: TGlobalDataStreamState<FormResponseSession>;
 }
 
+interface IFormBlockInsertionMenuState {
+  insertmenu: TGlobalEditorDialogState;
+}
+
 export interface FormEditorState
   extends BaseDocumentEditorState,
     IFormResponseSessionDataStreamState,
+    IFormBlockInsertionMenuState,
     IDataGridState {
   form_id: string;
   form_title: string;
@@ -290,29 +295,32 @@ export interface FormEditorState
     ending_page_template_id: EndingPageTemplateID | null;
     ending_page_i18n_overrides: EndingPageI18nOverrides | null;
   };
+
   blocks: EditorFlatFormBlock[];
   fields: FormFieldDefinition[];
 
   field_draft_init?: Partial<FormFieldInit> | null;
   focus_field_id?: string | null;
+  is_field_edit_panel_open?: boolean;
+  field_edit_panel_refresh_key?: number;
+
   available_field_ids: string[];
 
   focus_block_id?: string | null;
+
   customers?: Customer[];
   responses: {
     rows: FormResponse[];
     fields: { [key: string]: FormResponseField[] };
   };
+  realtime_responses_enabled: boolean;
+
   tables: {
     name: string;
     group: TableGroup;
     views: GDocTable[];
   }[];
-  realtime_responses_enabled: boolean;
-  is_insert_menu_open?: boolean;
-  is_field_edit_panel_open?: boolean;
-  is_block_edit_panel_open?: boolean;
-  field_edit_panel_refresh_key?: number;
+
   x_supabase_main_table?: {
     schema: GridaSupabase.JSONSChema;
     // we need a single pk for editor operations

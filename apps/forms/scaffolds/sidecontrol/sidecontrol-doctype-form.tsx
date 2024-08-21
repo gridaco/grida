@@ -1,15 +1,11 @@
-"use client";
-
 import React, { useMemo, useState } from "react";
 import {
-  Sheet,
-  SheetClose,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+  SidebarMenuSectionContent,
+  SidebarSection,
+  SidebarSectionHeaderItem,
+  SidebarSectionHeaderLabel,
+} from "@/components/sidebar";
+import { SideControlGlobal } from "./sidecontrol-global";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,9 +18,20 @@ import { MixIcon } from "@radix-ui/react-icons";
 import { Tokens } from "@/ast";
 import { KeyIcon } from "lucide-react";
 import toast from "react-hot-toast";
-import { EditBinaryExpression } from "./extensions/v-edit";
-import { PopoverClose } from "@radix-ui/react-popover";
 import { FormExpression } from "@/lib/forms/expression";
+import { PropertyLine, PropertyLineLabel } from "./ui";
+import { EditBinaryExpression } from "../panels/extensions/v-edit";
+import { PopoverClose } from "@radix-ui/react-popover";
+
+export function SideControlDoctypeForm() {
+  const [state, dispatch] = useEditorState();
+
+  if (state.focus_block_id) {
+    return <SelectedFormBlockProperties />;
+  } else {
+    return <SideControlGlobal />;
+  }
+}
 
 /**
  * NOTE - the type string represents a id, not a scalar for this component, atm.
@@ -32,9 +39,8 @@ import { FormExpression } from "@/lib/forms/expression";
  */
 type ConditionExpression = Tokens.ShorthandBooleanBinaryExpression;
 
-export function BlockEditPanel({
-  ...props
-}: React.ComponentProps<typeof Sheet> & {}) {
+function SelectedFormBlockProperties() {
+  //
   const [state, dispatch] = useEditorState();
 
   const block = useMemo(
@@ -73,46 +79,20 @@ export function BlockEditPanel({
   };
 
   return (
-    <Sheet
-      {...props}
-      open={state.is_block_edit_panel_open}
-      onOpenChange={(open) => {
-        if (!open) {
-          dispatch({
-            type: "editor/panels/block-edit",
-            open: false,
-          });
-        }
-      }}
-    >
-      <SheetContent>
-        <SheetHeader>
-          <SheetTitle>{"Block"}</SheetTitle>
-          <SheetDescription>
-            <span className="font-mono text-xs text-muted-foreground">
-              <KeyIcon className="inline w-4 h-4 me-2 align-middle" />
-              {block?.id}
-            </span>
-          </SheetDescription>
-        </SheetHeader>
-        <div className="grid gap-4 py-4">
-          <hr />
-          <Label>Logics</Label>
-          <hr />
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="phone" className="text-right">
-              Hidden
-            </Label>
+    <div key={state.focus_block_id}>
+      <SidebarSection className="border-b pb-4">
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>Block</SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuSectionContent className="space-y-2">
+          <PropertyLine>
+            <PropertyLineLabel>Hidden</PropertyLineLabel>
             <Popover>
               <PopoverTrigger>
                 <div>
                   <Button variant="outline">
                     <MixIcon className="me-2" />
-                    {_v_hidden_set ? (
-                      <>Update conditional logic</>
-                    ) : (
-                      <>Set conditional logic</>
-                    )}
+                    {_v_hidden_set ? <>Update</> : <>Set logic</>}
                   </Button>
                 </div>
               </PopoverTrigger>
@@ -145,32 +125,27 @@ export function BlockEditPanel({
                       set_condition_v_hidden(value);
                     }}
                   />
+                  <PopoverClose asChild>
+                    <Button disabled={!condition_v_hidden} onClick={onSave}>
+                      Save
+                    </Button>
+                  </PopoverClose>
                 </div>
               </PopoverContent>
             </Popover>
-            <div className="col-span-3">
-              <div className="text-muted-foreground text-sm">
-                {_v_hidden_set ? (
-                  <code>
-                    <pre>{JSON.stringify(block?.v_hidden, null, 2)}</pre>
-                  </code>
-                ) : (
-                  "No condition set"
-                )}
-              </div>
-            </div>
-          </div>
-          {/* Add logic testing tool */}
-          <hr />
-        </div>
-        <SheetFooter>
-          <SheetClose asChild>
-            <Button disabled={!condition_v_hidden} onClick={onSave}>
-              Save
-            </Button>
-          </SheetClose>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+          </PropertyLine>
+        </SidebarMenuSectionContent>
+      </SidebarSection>
+
+      {/* <div className="text-muted-foreground text-sm">
+        {_v_hidden_set ? (
+          <code>
+            <pre>{JSON.stringify(block?.v_hidden, null, 2)}</pre>
+          </code>
+        ) : (
+          "No condition set"
+        )}
+      </div> */}
+    </div>
   );
 }

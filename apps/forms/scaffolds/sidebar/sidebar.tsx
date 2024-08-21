@@ -28,7 +28,7 @@ import { ModeConnect } from "./sidebar-mode-connect";
 
 export function Sidebar() {
   const [state, dispatch] = useEditorState();
-  const { is_insert_menu_open: is_add_block_panel_open } = state;
+  const { insertmenu } = state;
 
   const onSidebarModeChange = (mode: string) => {
     dispatch({
@@ -37,16 +37,16 @@ export function Sidebar() {
     });
   };
 
-  const openInsertMenu = (open: boolean) => {
+  const onInsertMenuOpenChange = (open: boolean) => {
     dispatch({
       type: "editor/panels/insert-menu",
       open: open,
     });
   };
 
-  if (is_add_block_panel_open) {
+  if (insertmenu.open) {
     return (
-      <Dialog.Root open={is_add_block_panel_open} onOpenChange={openInsertMenu}>
+      <Dialog.Root open={insertmenu.open} onOpenChange={onInsertMenuOpenChange}>
         <Dialog.Content>
           <SidebarRoot>
             <ModeInsertBlocks />
