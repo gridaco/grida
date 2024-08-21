@@ -84,6 +84,7 @@ import type {
 } from "@/types";
 import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";
 import { GridaEditorSymbols } from "./symbols";
+import { initialDatagridState } from "./init";
 
 export function reducer(
   state: EditorState,
@@ -674,8 +675,11 @@ export function reducer(
           tableid ===
           GridaEditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID;
 
-        // clear selected rows
-        draft.datagrid_selected_rows = new Set();
+        // clear datagrid state
+        const datagridreset = initialDatagridState();
+        draft.datagrid_selected_rows = datagridreset.datagrid_selected_rows;
+        draft.datagrid_filter = datagridreset.datagrid_filter;
+        draft.datagrid_orderby = datagridreset.datagrid_orderby;
       });
     }
     case "editor/data-grid/delete/selected": {

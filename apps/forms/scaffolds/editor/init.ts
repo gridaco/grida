@@ -8,6 +8,7 @@ import type {
   EditorState,
   MenuItem,
   SiteDocumentEditorInit,
+  IDataGridState,
 } from "./state";
 import { blockstreeflat } from "@/lib/forms/tree";
 import { SYM_LOCALTZ, GridaEditorSymbols } from "./symbols";
@@ -74,6 +75,23 @@ function initialBaseDocumentEditorState(
   };
 }
 
+export function initialDatagridState(): Omit<
+  IDataGridState,
+  "datagrid_table_id"
+> {
+  return {
+    datagrid_selected_rows: new Set(),
+    datagrid_rows_per_page: 100,
+    datagrid_table_refresh_key: 0,
+    datagrid_isloading: false,
+    datagrid_filter: {
+      masking_enabled: false,
+      empty_data_hidden: true,
+    },
+    datagrid_orderby: {},
+  };
+}
+
 /**
  * // FIXME: not ready
  * @deprecated @beta
@@ -92,32 +110,26 @@ function initialDatabaseEditorState(
       nodes: [],
       templatedata: {},
     },
-    datagrid_selected_rows: new Set(),
-    datagrid_rows_per_page: 100,
-    datagrid_table_refresh_key: 0,
-    datagrid_isloading: false,
-    datagrid_filter: {
-      masking_enabled: false,
-      empty_data_hidden: true,
-    },
-    datagrid_orderby: {},
+    ...initialDatagridState(),
     // TODO:
-    // datagrid_table_id:
-    tables: init.tables.map((t) => ({
-      type: "schema",
-      name: t.name,
-      icon: "table",
-      views: [
-        {
-          // TODO:
-          id: t.name,
-          row_keyword: "row",
-          type: "table",
-          label: t.name,
-          name: t.name,
-        },
-      ],
-    })),
+    datagrid_table_id: "test",
+    // init.tables.map((t) => ({
+    tables: [
+      {
+        type: "schema",
+        name: "test",
+        icon: "table",
+        views: [
+          {
+            // TODO:
+            id: "test",
+            row_keyword: "row",
+            label: "test",
+            name: "test",
+          },
+        ],
+      },
+    ],
     // TODO: move me under a schema
     fields: [],
   };
@@ -269,18 +281,10 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
       realtime: false,
     },
     available_field_ids: block_available_field_ids,
-    datagrid_selected_rows: new Set(),
-    datagrid_rows_per_page: 100,
-    datagrid_table_refresh_key: 0,
-    datagrid_isloading: false,
+    ...initialDatagridState(),
     datagrid_table_id: is_main_table_supabase
       ? GridaEditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID
       : GridaEditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID,
-    datagrid_filter: {
-      masking_enabled: false,
-      empty_data_hidden: true,
-    },
-    datagrid_orderby: {},
     field_editor: {
       open: false,
     },

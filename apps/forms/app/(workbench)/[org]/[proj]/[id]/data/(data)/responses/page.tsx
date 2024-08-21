@@ -26,7 +26,11 @@ export default function FormResponsesPage() {
   }
 
   return (
-    <MainTable table="main">
+    <MainTable
+      table={
+        GridaEditorSymbols.Table.SYM_GRIDA_FORMS_WHATEVER_MAIN_TABLE_INDICATOR
+      }
+    >
       <ResponseFeedProvider />
       <ResponseSyncProvider />
       <ResponseSessionFeedProvider />

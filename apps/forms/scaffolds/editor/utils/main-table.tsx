@@ -7,13 +7,16 @@ export function MainTable({
   table,
   children,
 }: React.PropsWithChildren<{
-  table: GDocTableID | "main";
+  table:
+    | GDocTableID
+    | typeof GridaEditorSymbols.Table.SYM_GRIDA_FORMS_WHATEVER_MAIN_TABLE_INDICATOR;
 }>) {
   const [state, dispatch] = useEditorState();
   const [stale, setstale] = useState<boolean>(false);
 
   const tableid =
-    table === "main"
+    table ===
+    GridaEditorSymbols.Table.SYM_GRIDA_FORMS_WHATEVER_MAIN_TABLE_INDICATOR
       ? state.x_supabase_main_table
         ? GridaEditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID
         : GridaEditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID

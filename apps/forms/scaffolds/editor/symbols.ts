@@ -9,6 +9,8 @@ export function tztostr(
 
 export namespace GridaEditorSymbols {
   export namespace Table {
+    export const SYM_GRIDA_FORMS_WHATEVER_MAIN_TABLE_INDICATOR: unique symbol =
+      Symbol("grida_forms.response.x-supabase-main-table");
     export const SYM_GRIDA_FORMS_RESPONSE_TABLE_ID: unique symbol = Symbol(
       "grida_forms.response"
     );

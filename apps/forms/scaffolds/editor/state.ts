@@ -140,7 +140,7 @@ export type TableType =
   | "schema"
   | "x-supabase-auth.users";
 
-interface IDataGridState {
+export interface IDataGridState {
   /**
    * @global rows per page is not saved per table
    */
