@@ -41,6 +41,8 @@ import { Button } from "@/components/ui/button";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { useForm, Controller } from "react-hook-form";
 import toast from "react-hot-toast";
+import { PrivateEditorApi } from "@/lib/private";
+import { useRouter } from "next/navigation";
 
 export function ModeData() {
   const [state] = useEditorState();
@@ -234,6 +236,7 @@ function tablehref(
 function CreateNewTableDialog({
   ...props
 }: React.ComponentProps<typeof Dialog>) {
+  const router = useRouter();
   const [state, dispatch] = useEditorState();
   const {
     control,
@@ -248,10 +251,26 @@ function CreateNewTableDialog({
 
   const onSubmit = handleSubmit(
     async (data: { name: string; description: string }) => {
-      toast.success("Table created");
-      dispatch({
-        type: "editor/schema/table/add",
-        table: data.name,
+      const promise = PrivateEditorApi.Schema.createTable({
+        schema_id: state.document_id, // document_id is schema_id in v0_schema doctype
+        table_name: data.name,
+        description: data.description || undefined,
+      });
+
+      toast.promise(promise, {
+        loading: "Creating table...",
+        success: "Table created",
+        error: "Failed to create table",
+      });
+
+      promise.then(({ data: { data } }) => {
+        if (!data) return;
+        dispatch({
+          type: "editor/schema/table/add",
+          table: data,
+        });
+
+        // TODO: needs to handle routing in order to make the menu item to be focused
       });
     }
   );

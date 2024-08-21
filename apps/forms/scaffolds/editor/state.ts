@@ -70,6 +70,7 @@ export interface DatabaseDocumentEditorInit extends BaseDocumentEditorInit {
     id: string;
     name: string;
     description: string | null;
+    attributes: Array<FormFieldDefinition>;
   }>;
 }
 
@@ -120,6 +121,7 @@ type GDocTable = {
     }
   | {
       id: string;
+      attributes: Array<FormFieldDefinition>;
     }
 );
 
@@ -145,7 +147,7 @@ export interface IDataGridState {
    * @global rows per page is not saved per table
    */
   datagrid_rows_per_page: number;
-  datagrid_table_id: GDocTableID;
+  datagrid_table_id: GDocTableID | null;
   datagrid_table_refresh_key: number;
   datagrid_isloading: boolean;
   datagrid_filter: DataGridFilterSettings;
@@ -225,6 +227,7 @@ export interface BaseDocumentEditorState
     IEditorDateContextState,
     IEditorAssetsState,
     IInsertionMenuState,
+    IFieldEditorState,
     IEditorSidebarState,
     ICustomersDataStreamState,
     ICustomerEditorState,
@@ -298,7 +301,6 @@ export interface FormEditorState
   extends BaseDocumentEditorState,
     IFormResponseSessionDataStreamState,
     IFormResponseDataStreamState,
-    IFieldEditorState,
     IDataGridState {
   form_id: string;
   form_title: string;

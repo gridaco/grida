@@ -52,7 +52,10 @@ export function GridEditor({ rows }: { rows?: GFResponseRow[] }) {
   const supabase = useMemo(() => createClientFormsClient(), []);
 
   const { systemcolumns, columns } = useMemo(
-    () => GridData.columns(datagrid_table_id, fields),
+    () =>
+      datagrid_table_id
+        ? GridData.columns(datagrid_table_id, fields)
+        : { systemcolumns: [], columns: [] },
     [datagrid_table_id, fields]
   );
 

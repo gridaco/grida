@@ -189,6 +189,7 @@ export interface OpenEditFieldAction {
 
 export interface SaveFieldAction {
   type: "editor/field/save";
+  table_id: string;
   field_id: string;
   data: FormFieldDefinition;
 }
@@ -426,5 +427,9 @@ export interface DocumentNodeUpdatePropertyAction {
 
 export interface SchemaTableAddAction {
   type: "editor/schema/table/add";
-  table: string;
+  table: {
+    id: string;
+    name: string;
+    description?: string | null;
+  };
 }

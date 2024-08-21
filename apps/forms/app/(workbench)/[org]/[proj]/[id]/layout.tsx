@@ -316,6 +316,7 @@ export default async function Layout({
                 // TODO: this should be migrated from database
                 name: ft.title,
                 description: ft.description,
+                attributes: ft.fields,
               })),
               document_id: masterdoc_ref.id,
               document_title: masterdoc_ref.title,

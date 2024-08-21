@@ -3,7 +3,7 @@ import { useEditorState } from "../use";
 import type { GDocTableID } from "../state";
 import { GridaEditorSymbols } from "../symbols";
 
-export function MainTable({
+export function CurrentTable({
   table,
   children,
 }: React.PropsWithChildren<{

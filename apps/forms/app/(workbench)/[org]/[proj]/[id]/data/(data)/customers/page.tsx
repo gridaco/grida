@@ -11,7 +11,7 @@ import {
   TableViews,
 } from "@/scaffolds/grid-editor/components";
 import * as GridLayout from "@/scaffolds/grid-editor/components/layout";
-import { MainTable } from "@/scaffolds/editor/utils/main-table";
+import { CurrentTable } from "@/scaffolds/editor/utils/switch-table";
 import { useEditorState } from "@/scaffolds/editor";
 import { CustomerFeedProvider } from "@/scaffolds/editor/feed";
 import { useMemo } from "react";
@@ -50,7 +50,7 @@ export default function Customers() {
   }, [customers.stream, state.datagrid_filter]);
 
   return (
-    <MainTable table={GridaEditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID}>
+    <CurrentTable table={GridaEditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID}>
       <CustomerFeedProvider />
       <GridLayout.Root>
         <GridLayout.Header>
@@ -80,6 +80,6 @@ export default function Customers() {
           <GridRefresh />
         </GridLayout.Footer>
       </GridLayout.Root>
-    </MainTable>
+    </CurrentTable>
   );
 }

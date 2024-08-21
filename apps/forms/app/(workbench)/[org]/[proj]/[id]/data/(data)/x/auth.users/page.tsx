@@ -16,7 +16,7 @@ import { GridaSupabase } from "@/types";
 import { EditorApiResponse } from "@/types/private/api";
 import { priority_sorter } from "@/utils/sort";
 import { useEffect, useMemo } from "react";
-import { MainTable } from "@/scaffolds/editor/utils/main-table";
+import { CurrentTable } from "@/scaffolds/editor/utils/switch-table";
 import { GridData } from "@/scaffolds/grid-editor/grid-data";
 import { GridaEditorSymbols } from "@/scaffolds/editor/symbols";
 import useSWR from "swr";
@@ -94,7 +94,7 @@ export default function XTablePage() {
   }, [data, state.datagrid_filter]);
 
   return (
-    <MainTable
+    <CurrentTable
       table={GridaEditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID}
     >
       <GridLayout.Root>
@@ -126,6 +126,6 @@ export default function XTablePage() {
           <GridRefresh />
         </GridLayout.Footer>
       </GridLayout.Root>
-    </MainTable>
+    </CurrentTable>
   );
 }

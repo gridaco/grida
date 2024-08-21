@@ -470,38 +470,52 @@ export function reducer(
       });
     }
     case "editor/field/save": {
-      const { field_id, data } = <SaveFieldAction>action;
+      const { field_id, table_id, data } = <SaveFieldAction>action;
       return produce(state, (draft) => {
-        const field = draft.fields.find((f) => f.id === field_id);
-        if (field) {
-          Object.assign(field, { ...data });
-          field.id = field_id;
-        } else {
-          // create new field
-          draft.fields.push({
-            ...data,
-          });
+        switch (state.doctype) {
+          case "v0_form": {
+            const field = draft.fields.find((f) => f.id === field_id);
+            if (field) {
+              Object.assign(field, { ...data });
+              field.id = field_id;
+            } else {
+              // create new field
+              draft.fields.push({
+                ...data,
+              });
 
-          let unused_field_id: string | null = field_id;
+              let unused_field_id: string | null = field_id;
 
-          // clear init
-          draft.field_editor.data = { draft: null };
+              // clear init
+              draft.field_editor.data = { draft: null };
 
-          // if new field, and focus block has no assigned field, use this.
-          if (draft.focus_block_id) {
-            const block = draft.blocks.find(
-              (d) => d.id == draft.focus_block_id
-            );
+              // if new field, and focus block has no assigned field, use this.
+              if (draft.focus_block_id) {
+                const block = draft.blocks.find(
+                  (d) => d.id == draft.focus_block_id
+                );
 
-            if (block && block.type === "field" && !block.form_field_id) {
-              block.form_field_id = unused_field_id;
-              unused_field_id = null;
+                if (block && block.type === "field" && !block.form_field_id) {
+                  block.form_field_id = unused_field_id;
+                  unused_field_id = null;
+                }
+              }
+
+              // add the field_id to available_field_ids
+              if (unused_field_id)
+                draft.available_field_ids.push(unused_field_id);
             }
-          }
 
-          // add the field_id to available_field_ids
-          if (unused_field_id) draft.available_field_ids.push(unused_field_id);
+            break;
+          }
+          case "v0_schema": {
+            // TODO: add attribute to schema table
+            break;
+          }
+          default:
+            throw new Error("unsupported doctype");
         }
+
         //
       });
     }
@@ -650,7 +664,7 @@ export function reducer(
       const { ...opt } = <DataGridTableAction>action;
       return produce(state, (draft) => {
         // find the id =====
-        let tableid: GDocTableID | undefined;
+        let tableid: GDocTableID | null = null;
         if ("id" in opt) {
           tableid = opt.id;
         } else {
@@ -658,7 +672,7 @@ export function reducer(
           const group = draft.tables.find((g) =>
             g.views.some((v) => v.id === draft.datagrid_table_id)
           );
-          tableid = group?.views.find((v) => v.name === opt.name)?.id;
+          tableid = group?.views.find((v) => v.name === opt.name)?.id ?? null;
         }
         // =================
 
@@ -669,17 +683,20 @@ export function reducer(
 
         draft.datagrid_table_id = tableid;
 
-        draft.sessions.realtime =
-          tableid === GridaEditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID;
-        draft.responses.realtime =
-          tableid ===
-          GridaEditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID;
-
         // clear datagrid state
         const datagridreset = initialDatagridState();
         draft.datagrid_selected_rows = datagridreset.datagrid_selected_rows;
         draft.datagrid_filter = datagridreset.datagrid_filter;
         draft.datagrid_orderby = datagridreset.datagrid_orderby;
+
+        if (draft.doctype === "v0_form") {
+          draft.sessions.realtime =
+            tableid ===
+            GridaEditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID;
+          draft.responses.realtime =
+            tableid ===
+            GridaEditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID;
+        }
       });
     }
     case "editor/data-grid/delete/selected": {
@@ -707,7 +724,7 @@ export function reducer(
           case GridaEditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID:
           default:
             throw new Error(
-              "Unsupported table type: " + state.datagrid_table_id.toString()
+              "Unsupported table type: " + state.datagrid_table_id?.toString()
             );
         }
 
@@ -879,7 +896,7 @@ export function reducer(
           case GridaEditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID:
           default: {
             throw new Error(
-              "Unsupported table type: " + state.datagrid_table_id.toString()
+              "Unsupported table type: " + state.datagrid_table_id?.toString()
             );
           }
         }
@@ -1054,17 +1071,18 @@ export function reducer(
         draft.tables.push({
           type: "schema",
           icon: "table",
-          name: table,
+          name: table.name,
           views: [
             {
-              // TODO:
-              id: draftid(),
-              label: table,
+              id: table.id,
+              label: table.name,
               row_keyword: "row",
-              name: "table",
+              name: table.name,
+              attributes: [],
             },
           ],
         });
+        draft.datagrid_table_id = table.id;
       });
     }
     default:

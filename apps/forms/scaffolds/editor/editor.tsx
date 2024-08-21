@@ -64,6 +64,7 @@ export function DatabaseDocumentEditorProvider({
     <StateProvider state={state} dispatch={dispatch}>
       <TooltipProvider>
         {/*  */}
+        <FieldEditPanelProvider />
         {children}
       </TooltipProvider>
     </StateProvider>
@@ -133,6 +134,14 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
 
   const onSaveField = useCallback(
     (init: FormFieldSave) => {
+      // TODO: clean this up. temporary fix for supporting v0_form and v0_schema
+      const table_id =
+        state.doctype === "v0_form" ? state.form_id : state.datagrid_table_id;
+      if (!table_id || typeof table_id !== "string") {
+        toast.error("Error: see console");
+        console.error("No table_id found");
+        return;
+      }
       const data: FormFieldUpsert = {
         ...init,
         //
@@ -140,13 +149,14 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
         optgroups: init.optgroups?.length ? init.optgroups : undefined,
         //
         id: state.field_editor.id ?? undefined,
-        form_id: state.form_id,
+        form_id: table_id,
         data: init.data,
       };
 
-      // console.log("[EDITOR] saving..", data);
+      process.env.NODE_ENV === "development" &&
+        console.log("[EDITOR] saving..", data);
 
-      const promise = fetch(`/private/editor/${state.form_id}/fields`, {
+      const promise = fetch(`/private/editor/${table_id}/fields`, {
         body: JSON.stringify(data),
         method: "POST",
         headers: {
@@ -165,6 +175,7 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
             // else save the field
             dispatch({
               type: "editor/field/save",
+              table_id: table_id,
               field_id: data.id,
               data: data,
             });

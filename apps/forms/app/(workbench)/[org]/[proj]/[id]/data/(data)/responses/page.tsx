@@ -11,7 +11,7 @@ import {
 } from "@/scaffolds/editor/feed";
 import { GDocTableID } from "@/scaffolds/editor/state";
 import { GridaEditorSymbols } from "@/scaffolds/editor/symbols";
-import { MainTable } from "@/scaffolds/editor/utils/main-table";
+import { CurrentTable } from "@/scaffolds/editor/utils/switch-table";
 import { GridEditor } from "@/scaffolds/grid-editor";
 import { GridData } from "@/scaffolds/grid-editor/grid-data";
 import { GFResponseRow } from "@/scaffolds/grid/types";
@@ -26,7 +26,7 @@ export default function FormResponsesPage() {
   }
 
   return (
-    <MainTable
+    <CurrentTable
       table={
         GridaEditorSymbols.Table.SYM_GRIDA_FORMS_WHATEVER_MAIN_TABLE_INDICATOR
       }
@@ -38,7 +38,7 @@ export default function FormResponsesPage() {
       <XSupabaseMainTableSyncProvider />
       {/* wait until state fully change */}
       {allowedtable(datagrid_table_id) && <FormResponseGridEditor />}
-    </MainTable>
+    </CurrentTable>
   );
 }
 
@@ -82,7 +82,7 @@ function FormResponseGridEditor() {
   return <GridEditor rows={filtered as GFResponseRow[]} />;
 }
 
-function allowedtable(table: GDocTableID): boolean {
+function allowedtable(table: GDocTableID | null): boolean {
   return (
     table === GridaEditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID ||
     table === GridaEditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID ||

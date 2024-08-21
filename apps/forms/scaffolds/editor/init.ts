@@ -70,6 +70,9 @@ function initialBaseDocumentEditorState(
     insertmenu: {
       open: false,
     },
+    field_editor: {
+      open: false,
+    },
     dateformat: "datetime",
     datetz: SYM_LOCALTZ,
   };
@@ -105,31 +108,28 @@ function initialDatabaseEditorState(
   // @ts-ignore
   return {
     ...base,
+    connections: {},
     document: {
       pages: [],
       nodes: [],
       templatedata: {},
     },
     ...initialDatagridState(),
-    // TODO:
-    datagrid_table_id: "test",
-    // init.tables.map((t) => ({
-    tables: [
-      {
-        type: "schema",
-        name: "test",
-        icon: "table",
-        views: [
-          {
-            // TODO:
-            id: "test",
-            row_keyword: "row",
-            label: "test",
-            name: "test",
-          },
-        ],
-      },
-    ],
+    datagrid_table_id: init.tables.length > 0 ? init.tables[0].id : null,
+    tables: init.tables.map((t) => ({
+      type: "schema",
+      name: t.name,
+      icon: "table",
+      views: [
+        {
+          id: t.id,
+          row_keyword: "row",
+          label: t.name,
+          name: t.name,
+          attributes: t.attributes,
+        },
+      ],
+    })),
     // TODO: move me under a schema
     fields: [],
   };
@@ -285,9 +285,6 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
     datagrid_table_id: is_main_table_supabase
       ? GridaEditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID
       : GridaEditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID,
-    field_editor: {
-      open: false,
-    },
     x_supabase_main_table: init.connections?.supabase
       ? xsbmtinit(init.connections.supabase)
       : undefined,

@@ -1,5 +1,7 @@
 import type { GridaSupabase } from "@/types";
 import {
+  CreateNewSchemaTableRequest,
+  CreateNewSchemaTableResponse,
   CreateSignedUploadUrlRequest,
   EditorApiResponse,
   EditorApiResponseOk,
@@ -94,6 +96,15 @@ export namespace PrivateEditorApi {
       }
 
       return base;
+    }
+  }
+
+  export namespace Schema {
+    export function createTable(req: CreateNewSchemaTableRequest) {
+      return Axios.post<EditorApiResponse<CreateNewSchemaTableResponse>>(
+        `/private/editor/schema/${req.schema_id}/tables/new`,
+        req
+      );
     }
   }
 
