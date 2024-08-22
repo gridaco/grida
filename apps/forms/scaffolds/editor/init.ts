@@ -118,13 +118,14 @@ function initialDatabaseEditorState(
     sidebar: {
       mode: initial_sidebar_mode[init.doctype],
       mode_data: {
-        items: init.tables.map((t) => ({
+        tables: init.tables.map((t) => ({
           section: "Tables",
           id: t.id,
           label: t.name,
           icon: "table",
           href: tablehref(base.basepath, base.document_id, t),
         })),
+        menus: [],
       },
     },
     ...initialDatagridState(),
@@ -301,8 +302,8 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
     sidebar: {
       mode: initial_sidebar_mode[init.doctype],
       mode_data: {
-        items: [
-          ...tablemenus,
+        tables: tablemenus,
+        menus: [
           {
             id: `/${basepath}/${document_id}/data/analytics`,
             section: "Analytics",

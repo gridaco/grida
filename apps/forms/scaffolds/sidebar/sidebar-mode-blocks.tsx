@@ -42,11 +42,13 @@ export function ModeDesign() {
 
   return (
     <>
-      {renderMenuItems(pages, (page) => {
-        dispatch({
-          type: "editor/document/select-page",
-          page_id: page.id,
-        });
+      {renderMenuItems(pages, {
+        onSelect: (page) => {
+          dispatch({
+            type: "editor/document/select-page",
+            page_id: page.id,
+          });
+        },
       })}
 
       {show_hierarchy && (

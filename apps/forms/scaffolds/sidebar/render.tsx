@@ -16,45 +16,60 @@ import "core-js/features/map/group-by";
 
 export function renderMenuItems(
   items: MenuItem<any>[],
-  onSelect?: (item: MenuItem<any>) => void
+  props?: {
+    onSelect?: (item: MenuItem<any>) => void;
+    renderSectionHeader?: (props: { section: string }) => React.ReactNode;
+    renderEmptyState?: () => React.ReactNode;
+  }
 ) {
+  const { onSelect, renderSectionHeader, renderEmptyState } = props ?? {};
   const sections: Map<string, Array<MenuItem<any>>> = useMemo(
-    () =>
-      // @ts-expect-error core-js
-      Map.groupBy(items, (item: MenuItem<any>) => item.section),
+    () => Map.groupBy(items, (item: MenuItem<any>) => item.section),
     [items]
   );
 
   return (
     <>
-      {Array.from(sections.keys()).map((section) => (
-        <SidebarSection key={section}>
-          <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>
-              <span>{section}</span>
-            </SidebarSectionHeaderLabel>
-          </SidebarSectionHeaderItem>
-          <SidebarMenuList>
-            {sections.get(section)?.map((item: MenuItem<any>, i) => (
-              <SidebarMenuLink key={i} href={item.href ?? ""}>
-                <SidebarMenuItem
-                  muted
-                  level={item.level}
-                  onSelect={() => {
-                    onSelect?.(item);
-                  }}
-                >
-                  <ResourceTypeIcon
-                    type={item.icon}
-                    className="w-4 h-4 me-2 inline"
-                  />
-                  {item.label}
-                </SidebarMenuItem>
-              </SidebarMenuLink>
-            ))}
-          </SidebarMenuList>
-        </SidebarSection>
-      ))}
+      {Array.from(sections.keys()).map((section) => {
+        const items = sections.get(section);
+        return (
+          <SidebarSection key={section}>
+            {renderSectionHeader ? (
+              renderSectionHeader({ section })
+            ) : (
+              <SidebarSectionHeaderItem>
+                <SidebarSectionHeaderLabel>
+                  <span>{section}</span>
+                </SidebarSectionHeaderLabel>
+              </SidebarSectionHeaderItem>
+            )}
+            <SidebarMenuList>
+              {renderEmptyState && items?.length === 0 ? (
+                renderEmptyState?.()
+              ) : (
+                <></>
+              )}
+              {items?.map((item: MenuItem<any>, i) => (
+                <SidebarMenuLink key={i} href={item.href ?? ""}>
+                  <SidebarMenuItem
+                    muted
+                    level={item.level}
+                    onSelect={() => {
+                      onSelect?.(item);
+                    }}
+                  >
+                    <ResourceTypeIcon
+                      type={item.icon}
+                      className="w-4 h-4 me-2 inline"
+                    />
+                    {item.label}
+                  </SidebarMenuItem>
+                </SidebarMenuLink>
+              ))}
+            </SidebarMenuList>
+          </SidebarSection>
+        );
+      })}
     </>
   );
 }

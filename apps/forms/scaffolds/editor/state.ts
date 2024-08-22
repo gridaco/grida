@@ -206,7 +206,8 @@ interface IEditorSidebarState {
   sidebar: {
     mode: "project" | "build" | "data" | "connect";
     mode_data: {
-      items: MenuItem<GDocTableID>[];
+      tables: MenuItem<GDocTableID>[];
+      menus: MenuItem<GDocTableID>[];
     };
   };
 }

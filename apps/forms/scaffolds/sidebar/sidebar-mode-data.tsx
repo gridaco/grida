@@ -139,45 +139,22 @@ export function ModeData() {
   return (
     <>
       <CreateNewTableDialog {...newTableDialog} />
-      <SidebarSection>
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>
-            <span>Tables</span>
-          </SidebarSectionHeaderLabel>
-          {state.doctype == "v0_schema" && (
-            <SidebarMenuItemActions>
-              <AddActionDropdownMenu />
-            </SidebarMenuItemActions>
-          )}
-        </SidebarSectionHeaderItem>
-        {/* <SidebarMenuList>
-          {tables.length === 0 && (
-            <EmptyState/>
-          )}
-        </SidebarMenuList> */}
-      </SidebarSection>
-      {renderMenuItems(state.sidebar.mode_data.items)}
-      {state.doctype == "v0_form" && (
-        <SidebarSection>
+      {renderMenuItems(state.sidebar.mode_data.tables, {
+        renderEmptyState: () => <EmptyState />,
+        renderSectionHeader: ({ section }) => (
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>
-              <span>Analytics</span>
+              <span>Tables</span>
             </SidebarSectionHeaderLabel>
+            {state.doctype == "v0_schema" && (
+              <SidebarMenuItemActions>
+                <AddActionDropdownMenu />
+              </SidebarMenuItemActions>
+            )}
           </SidebarSectionHeaderItem>
-          <SidebarMenuList>
-            <SidebarMenuLink
-              href={`/${basepath}/${document_id}/data/analytics`}
-            >
-              <SidebarMenuItem
-                muted
-                icon={<ResourceTypeIcon type="chart" className="w-4 h-4" />}
-              >
-                Realtime
-              </SidebarMenuItem>
-            </SidebarMenuLink>
-          </SidebarMenuList>
-        </SidebarSection>
-      )}
+        ),
+      })}
+      {renderMenuItems(state.sidebar.mode_data.menus)}
     </>
   );
 }
