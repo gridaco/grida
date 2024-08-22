@@ -2,16 +2,16 @@
 
 import React from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useCurrentTableView, useEditorState } from "@/scaffolds/editor";
+import { useDatagridTable, useEditorState } from "@/scaffolds/editor";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
 
 export function TableViews() {
   const [state, dispatch] = useEditorState();
 
-  const tb = useCurrentTableView();
+  const tb = useDatagridTable();
 
   if (!tb) {
-    return <></>;
+    return <>ERR</>;
   }
 
   return (

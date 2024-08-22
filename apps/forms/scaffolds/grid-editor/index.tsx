@@ -13,7 +13,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import toast from "react-hot-toast";
-import { useCurrentTableView, useEditorState } from "../editor";
+import { useDatagridTable, useEditorState } from "../editor";
 import Link from "next/link";
 import { DownloadIcon, PieChartIcon, TrashIcon } from "@radix-ui/react-icons";
 import { Badge } from "@/components/ui/badge";
@@ -58,7 +58,7 @@ export function GridEditor({
 
   const supabase = useMemo(() => createClientFormsClient(), []);
 
-  const tb = useCurrentTableView();
+  const tb = useDatagridTable();
   const row_keyword = tb?.row_keyword ?? "row";
   const readonly = tb?.readonly ?? true;
 
@@ -230,7 +230,7 @@ function DeleteSelectedRowsButton() {
   const [state, dispatch] = useEditorState();
 
   const { datagrid_table_id, datagrid_selected_rows } = state;
-  const { row_keyword } = useCurrentTableView() || { row_keyword: "row" };
+  const { row_keyword } = useDatagridTable() || { row_keyword: "row" };
 
   const delete_selected_responses = useCallback(() => {
     const deleting = supabase
