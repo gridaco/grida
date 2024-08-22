@@ -18,15 +18,21 @@ export function renderMenuItems(
   items: MenuItem<any>[],
   props?: {
     onSelect?: (item: MenuItem<any>) => void;
+    renderFallback?: () => React.ReactNode;
     renderSectionHeader?: (props: { section: string }) => React.ReactNode;
     renderEmptyState?: () => React.ReactNode;
   }
 ) {
-  const { onSelect, renderSectionHeader, renderEmptyState } = props ?? {};
+  const { onSelect, renderSectionHeader, renderEmptyState, renderFallback } =
+    props ?? {};
   const sections: Map<string, Array<MenuItem<any>>> = useMemo(
     () => Map.groupBy(items, (item: MenuItem<any>) => item.section),
     [items]
   );
+
+  if (!sections.size) {
+    return renderFallback ? renderFallback() : <></>;
+  }
 
   return (
     <>

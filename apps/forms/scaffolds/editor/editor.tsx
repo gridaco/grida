@@ -217,10 +217,6 @@ function FormFieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
 
   const is_existing_field = !!field?.id;
 
-  if (!table_id || typeof table_id !== "string") {
-    return <Invalid />;
-  }
-
   return (
     <>
       <FieldEditPanel

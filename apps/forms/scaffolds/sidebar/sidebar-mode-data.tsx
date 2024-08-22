@@ -136,23 +136,37 @@ export function ModeData() {
     );
   }
 
+  function Header() {
+    return (
+      <SidebarSectionHeaderItem>
+        <SidebarSectionHeaderLabel>
+          <span>Tables</span>
+        </SidebarSectionHeaderLabel>
+        {state.doctype == "v0_schema" && (
+          <SidebarMenuItemActions>
+            <AddActionDropdownMenu />
+          </SidebarMenuItemActions>
+        )}
+      </SidebarSectionHeaderItem>
+    );
+  }
+
   return (
     <>
       <CreateNewTableDialog {...newTableDialog} key={newTableDialog.key} />
       {renderMenuItems(state.sidebar.mode_data.tables, {
         renderEmptyState: () => <EmptyState />,
-        renderSectionHeader: ({ section }) => (
-          <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>
-              <span>Tables</span>
-            </SidebarSectionHeaderLabel>
-            {state.doctype == "v0_schema" && (
-              <SidebarMenuItemActions>
-                <AddActionDropdownMenu />
-              </SidebarMenuItemActions>
-            )}
-          </SidebarSectionHeaderItem>
-        ),
+        renderFallback: () => {
+          return (
+            <>
+              <Header />
+              <SidebarMenuList>
+                <EmptyState />
+              </SidebarMenuList>
+            </>
+          );
+        },
+        renderSectionHeader: Header,
       })}
       {renderMenuItems(state.sidebar.mode_data.menus)}
     </>
