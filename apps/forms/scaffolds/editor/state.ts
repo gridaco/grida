@@ -1,5 +1,6 @@
 import type {
   Appearance,
+  AttributeDefinition,
   Customer,
   EndingPageI18nOverrides,
   EndingPageTemplateID,
@@ -126,7 +127,7 @@ export type GDocTable = {
 
 export type GDocSchemaTable = {
   id: string;
-  attributes: Array<FormFieldDefinition>;
+  attributes: Array<AttributeDefinition>;
 };
 
 export type GDocTableID = GDocTable["id"];

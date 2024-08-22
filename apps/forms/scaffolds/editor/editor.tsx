@@ -11,7 +11,7 @@ import {
   SiteDocumentEditorInit,
 } from "./state";
 import { initialEditorState } from "./init";
-import { FieldEditPanel, FormFieldSave } from "../panels/field-edit-panel";
+import { FieldEditPanel, FieldSave } from "../panels/field-edit-panel";
 import { FormFieldDefinition } from "@/types";
 import { FormFieldUpsert, EditorApiResponse } from "@/types/private/api";
 import { TooltipProvider } from "@radix-ui/react-tooltip";
@@ -21,6 +21,7 @@ import { MediaViewerProvider } from "../mediaviewer";
 import { AssetsBackgroundsResolver } from "./resolver/assets-backgrounds-resolver";
 import toast from "react-hot-toast";
 import { EditorSymbols } from "./symbols";
+import Invalid from "@/components/invalid";
 
 export function EditorProvider({
   initial,
@@ -65,7 +66,7 @@ export function DatabaseDocumentEditorProvider({
     <StateProvider state={state} dispatch={dispatch}>
       <TooltipProvider>
         {/*  */}
-        <FieldEditPanelProvider />
+        <FormFieldEditPanelProvider />
         {children}
       </TooltipProvider>
     </StateProvider>
@@ -103,7 +104,7 @@ export function FormDocumentEditorProvider({
     <StateProvider state={state} dispatch={dispatch}>
       <TooltipProvider>
         <MediaViewerProvider>
-          <FieldEditPanelProvider />
+          <FormFieldEditPanelProvider />
           <RowEditPanelProvider />
           <CustomerPanelProvider />
           {children}
@@ -113,16 +114,45 @@ export function FormDocumentEditorProvider({
   );
 }
 
-function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
+function SchemaAttributeEditPanelProvider({
+  children,
+}: React.PropsWithChildren<{}>) {}
+
+function useAttributes() {
+  const [state] = useEditorState();
+  switch (state.doctype) {
+    case "v0_form":
+      return state.form.fields;
+    case "v0_schema": {
+      const tb = state.tables.find((t) => t.id === state.datagrid_table_id);
+      if (!tb) return [];
+      if ("attributes" in tb) {
+        return tb.attributes;
+      }
+    }
+    default: {
+      return [];
+    }
+  }
+}
+
+function FormFieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
 
-  const fields = useFormFields();
+  // const fields = useFormFields();
+  const attributes = useAttributes();
+
+  // TODO: clean this up. temporary fix for supporting v0_form and v0_schema
+  const table_id: string =
+    state.doctype === "v0_form"
+      ? state.form_id
+      : (state.datagrid_table_id as string);
 
   const field = useMemo(() => {
-    const focusfound = fields?.find((f) => f.id === state.field_editor.id);
+    const focusfound = attributes?.find((f) => f.id === state.field_editor.id);
     if (focusfound) return focusfound;
     return state.field_editor.data?.draft;
-  }, [state.field_editor.id, fields, state.field_editor.data?.draft]);
+  }, [state.field_editor.id, attributes, state.field_editor.data?.draft]);
 
   const closeFieldPanel = useCallback(
     (options: { refresh: boolean }) => {
@@ -136,15 +166,7 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
   );
 
   const onSaveField = useCallback(
-    (init: FormFieldSave) => {
-      // TODO: clean this up. temporary fix for supporting v0_form and v0_schema
-      const table_id =
-        state.doctype === "v0_form" ? state.form_id : state.datagrid_table_id;
-      if (!table_id || typeof table_id !== "string") {
-        toast.error("Error: see console");
-        console.error("No table_id found");
-        return;
-      }
+    (init: FieldSave) => {
       const data: FormFieldUpsert = {
         ...init,
         //
@@ -177,7 +199,7 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
           if (data) {
             // else save the field
             dispatch({
-              type: "editor/field/save",
+              type: "editor/table/attribute/change",
               table_id: table_id,
               field_id: data.id,
               data: data,
@@ -197,14 +219,19 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
         error: "Failed to save field",
       });
     },
-    [closeFieldPanel, state.form_id, state.field_editor.id, dispatch]
+    [closeFieldPanel, table_id, state.field_editor.id, dispatch]
   );
 
   const is_existing_field = !!field?.id;
 
+  if (!table_id || typeof table_id !== "string") {
+    return <Invalid />;
+  }
+
   return (
     <>
       <FieldEditPanel
+        table_id={table_id}
         key={field?.name || state.field_editor.refreshkey}
         open={state.field_editor.open}
         title={is_existing_field ? "Edit Field" : "New Field"}

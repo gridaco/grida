@@ -39,7 +39,7 @@ export type BlocksEditorAction =
   | SelectResponse
   | DataGridDeleteSelectedRows
   | DeleteResponseAction
-  | SaveFieldAction
+  | TableAttributeChangeAction
   | DeleteFieldAction
   | FeedResponseAction
   | OpenResponseEditAction
@@ -187,8 +187,8 @@ export interface OpenEditFieldAction {
   refresh?: boolean;
 }
 
-export interface SaveFieldAction {
-  type: "editor/field/save";
+export interface TableAttributeChangeAction {
+  type: "editor/table/attribute/change";
   table_id: string;
   field_id: string;
   data: FormFieldDefinition;

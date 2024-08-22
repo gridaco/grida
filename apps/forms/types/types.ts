@@ -213,6 +213,8 @@ export interface FormFieldDefinition extends IFormField {
   local_index: number;
 }
 
+export type AttributeDefinition = FormFieldDefinition;
+
 export interface FormDocument {
   id: string;
   form_id: string;

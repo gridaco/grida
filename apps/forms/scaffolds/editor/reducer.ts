@@ -1,4 +1,4 @@
-import { produce } from "immer";
+import { produce, type Draft } from "immer";
 import type {
   EditorFlatFormBlock,
   EditorState,
@@ -31,7 +31,7 @@ import type {
   OpenResponseEditAction,
   ResolvePendingBlockAction,
   DataGridRowsAction,
-  SaveFieldAction,
+  TableAttributeChangeAction,
   SelectResponse,
   DataGridTableAction,
   SortBlockAction,
@@ -76,6 +76,7 @@ import { IMAGE_BLOCK_SRC_DEFAULT_VALUE } from "@/k/image_block_defaults";
 import { PDF_BLOCK_SRC_DEFAULT_VALUE } from "@/k/pdf_block_defaults";
 import { draftid } from "@/utils/id";
 import type {
+  AttributeDefinition,
   FormBlockType,
   FormInputType,
   FormResponse,
@@ -85,6 +86,7 @@ import type {
 import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";
 import { EditorSymbols } from "./symbols";
 import { initialDatagridState } from "./init";
+import assert from "assert";
 
 export function reducer(
   state: EditorState,
@@ -471,53 +473,32 @@ export function reducer(
         );
       });
     }
-    case "editor/field/save": {
-      const { field_id, table_id, data } = <SaveFieldAction>action;
+    case "editor/table/attribute/change": {
+      const { field_id, table_id, data } = <TableAttributeChangeAction>action;
+
       return produce(state, (draft) => {
-        switch (state.doctype) {
-          case "v0_form": {
-            const field = draft.form.fields.find((f) => f.id === field_id);
-            if (field) {
-              Object.assign(field, { ...data });
-              field.id = field_id;
+        // clear init
+        draft.field_editor.data = { draft: null };
+
+        // update (create) the changed attribute
+        const attributes = get_attributes(draft, table_id);
+        const { isnew } = push_or_update_attribute(attributes, data);
+
+        if (draft.doctype === "v0_form") {
+          if (isnew) {
+            // assign the field_id to the block if required
+            let unused_field_id: string | null = field_id;
+            const waiting_block = has_waiting_block_for_new_field(draft);
+
+            if (waiting_block) {
+              waiting_block.form_field_id = unused_field_id;
+              unused_field_id = null;
             } else {
-              // create new field
-              draft.form.fields.push({
-                ...data,
-              });
-
-              let unused_field_id: string | null = field_id;
-
-              // clear init
-              draft.field_editor.data = { draft: null };
-
-              // if new field, and focus block has no assigned field, use this.
-              if (draft.focus_block_id) {
-                const block = draft.blocks.find(
-                  (d) => d.id == draft.focus_block_id
-                );
-
-                if (block && block.type === "field" && !block.form_field_id) {
-                  block.form_field_id = unused_field_id;
-                  unused_field_id = null;
-                }
-              }
-
               // add the field_id to available_field_ids
-              if (unused_field_id)
-                draft.form.available_field_ids.push(unused_field_id);
+              draft.form.available_field_ids.push(unused_field_id);
             }
-
-            break;
           }
-          case "v0_schema": {
-            // TODO: add attribute to schema table
-            break;
-          }
-          default:
-            throw new Error("unsupported doctype");
         }
-
         //
       });
     }
@@ -1104,6 +1085,60 @@ export function reducer(
     }
     default:
       return state;
+  }
+}
+
+function get_attributes(draft: Draft<EditorState>, table_id: GDocTableID) {
+  switch (draft.doctype) {
+    case "v0_form":
+      return draft.form.fields;
+
+    case "v0_schema": {
+      const tb = draft.tables.find((t) => t.id === table_id);
+      assert(tb, "Table not found");
+      assert("attributes" in tb, "Not a valid table");
+      return tb.attributes;
+    }
+    default:
+      throw new Error("cannot get attributes - unsupported doctype");
+  }
+}
+
+function push_or_update_attribute(
+  attributes: Draft<Array<AttributeDefinition>>,
+  data: AttributeDefinition
+) {
+  const attribute = attributes.find((f) => f.id === data.id);
+  if (attribute) {
+    Object.assign(attribute, { ...data });
+    return {
+      isnew: false,
+      attribute,
+    };
+  } else {
+    attributes.push(data);
+    return {
+      isnew: true,
+      attribute: attributes.find((f) => f.id === data.id),
+    };
+  }
+}
+
+/**
+ * check if there is a waiting block for new field.
+ * when creating a new field on certain ux, we create the block first then open a new field panel, once saved, we may use this for finding the block.
+ * @param draft
+ * @returns
+ */
+function has_waiting_block_for_new_field(draft: Draft<EditorState>) {
+  if (draft.focus_block_id) {
+    const block = draft.blocks.find((d) => d.id == draft.focus_block_id);
+
+    if (block && block.type === "field" && !block.form_field_id) {
+      return block;
+    }
+
+    return false;
   }
 }
 

@@ -162,7 +162,9 @@ const default_field_init: {
   },
 };
 
-export type FormFieldSave = Omit<FormFieldUpsert, "form_id">;
+export type FieldSave = Omit<FormFieldUpsert, "form_id"> & {
+  table_id: string;
+};
 
 export function TypeSelect({
   value,
@@ -225,6 +227,7 @@ export function TypeSelect({
 }
 
 export function FieldEditPanel({
+  table_id,
   title,
   onSave,
   formResetKey = 0,
@@ -233,12 +236,13 @@ export function FieldEditPanel({
   mode = "edit",
   ...props
 }: React.ComponentProps<typeof SidePanel> & {
+  table_id: string;
   title?: string;
   formResetKey?: number;
   init?: Partial<FormFieldInit>;
   mode?: "edit" | "new";
   enableAI?: boolean;
-  onSave?: (field: FormFieldSave) => void;
+  onSave?: (field: FieldSave) => void;
 }) {
   const is_edit_mode = !!init?.id;
   const [state] = useEditorState();
@@ -395,6 +399,7 @@ export function FieldEditPanel({
       : undefined;
 
     onSave?.({
+      table_id,
       name,
       label,
       placeholder,
