@@ -95,7 +95,7 @@ export interface DataGridFilterSettings {
   empty_data_hidden: boolean;
 }
 
-type GDocTable = {
+export type GDocTable = {
   /**
    * keyword indicating the row, singular form (will be made plural in the UI)
    * e.g. "row" "user" "session" "customer"
@@ -119,11 +119,13 @@ type GDocTable = {
   | {
       id: typeof GridaEditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID;
     }
-  | {
-      id: string;
-      attributes: Array<FormFieldDefinition>;
-    }
+  | GDocSchemaTable
 );
+
+export type GDocSchemaTable = {
+  id: string;
+  attributes: Array<FormFieldDefinition>;
+};
 
 export type GDocTableID = GDocTable["id"];
 
@@ -346,6 +348,7 @@ export interface FormEditorState
   }[];
 
   // tables: Array<GDocTable>;
+  // tablespace: Record<string, any>;
 
   x_supabase_main_table?: {
     schema: GridaSupabase.JSONSChema;
