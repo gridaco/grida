@@ -37,3 +37,18 @@ export function useFormFields() {
 
   return form.fields;
 }
+
+/**
+ * returns a real table id, not a symbol. - used for actual db operations
+ * @returns table_id
+ */
+export function useDatabaseTableId(): string {
+  const [state] = useEditorState();
+  // TODO: clean this up. temporary fix for supporting v0_form and v0_schema
+  const table_id: string =
+    state.doctype === "v0_form"
+      ? state.form_id
+      : (state.datagrid_table_id as string);
+
+  return table_id;
+}

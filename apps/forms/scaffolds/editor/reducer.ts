@@ -18,7 +18,7 @@ import type {
   CreateNewPendingBlockAction,
   DataGridReorderColumnAction,
   DeleteBlockAction,
-  DeleteFieldAction,
+  TableAttributeDeleteAction,
   DeleteResponseAction,
   DataGridDeleteSelectedRows,
   FeedResponseAction,
@@ -474,7 +474,7 @@ export function reducer(
       });
     }
     case "editor/table/attribute/change": {
-      const { field_id, table_id, data } = <TableAttributeChangeAction>action;
+      const { table_id, field_id, data } = <TableAttributeChangeAction>action;
 
       return produce(state, (draft) => {
         // clear init
@@ -502,24 +502,32 @@ export function reducer(
         //
       });
     }
-    case "editor/field/delete": {
-      const { field_id } = <DeleteFieldAction>action;
+    case "editor/table/attribute/delete": {
+      const { table_id, field_id } = <TableAttributeDeleteAction>action;
       return produce(state, (draft) => {
-        // remove from fields
-        draft.form.fields = draft.form.fields.filter((f) => f.id !== field_id);
+        const attributes = get_attributes(draft, table_id);
 
-        // remove from available_field_ids
-        draft.form.available_field_ids = draft.form.available_field_ids.filter(
-          (id) => id !== field_id
+        // [EXECUTION ORDER MATTERS] remove from attributes (using below syntax since attribute is a const - still a draft proxy)
+        const new_attributes = attributes.filter(
+          (attr) => attr.id !== field_id
         );
+        attributes.length = 0;
+        attributes.push(...new_attributes);
+        //
 
-        // set empty to referenced blocks
-        draft.blocks = draft.blocks.map((block) => {
-          if (block.form_field_id === field_id) {
-            block.form_field_id = null;
-          }
-          return block;
-        });
+        if (draft.doctype === "v0_form") {
+          // remove from available_field_ids
+          draft.form.available_field_ids =
+            draft.form.available_field_ids.filter((id) => id !== field_id);
+
+          // set empty to referenced blocks
+          draft.blocks = draft.blocks.map((block) => {
+            if (block.form_field_id === field_id) {
+              block.form_field_id = null;
+            }
+            return block;
+          });
+        }
       });
     }
     case "editor/response/select": {

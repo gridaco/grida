@@ -40,7 +40,7 @@ export type BlocksEditorAction =
   | DataGridDeleteSelectedRows
   | DeleteResponseAction
   | TableAttributeChangeAction
-  | DeleteFieldAction
+  | TableAttributeDeleteAction
   | FeedResponseAction
   | OpenResponseEditAction
   | DataGridRowsAction
@@ -194,8 +194,9 @@ export interface TableAttributeChangeAction {
   data: FormFieldDefinition;
 }
 
-export interface DeleteFieldAction {
-  type: "editor/field/delete";
+export interface TableAttributeDeleteAction {
+  type: "editor/table/attribute/delete";
+  table_id: string;
   field_id: string;
 }
 

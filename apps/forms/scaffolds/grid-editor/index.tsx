@@ -48,6 +48,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Columns3Icon, Rows3Icon } from "lucide-react";
+import { useDatabaseTableId } from "../editor/use";
 
 export function GridEditor({
   systemcolumns,
@@ -71,6 +72,7 @@ export function GridEditor({
   const supabase = useMemo(() => createClientFormsClient(), []);
 
   const tb = useDatagridTable();
+  const table_id = useDatabaseTableId();
   const row_keyword = tb?.row_keyword ?? "row";
   const readonly = tb?.readonly ?? true;
 
@@ -107,7 +109,8 @@ export function GridEditor({
             throw error;
           }
           dispatch({
-            type: "editor/field/delete",
+            type: "editor/table/attribute/delete",
+            table_id: table_id,
             field_id: field_id,
           });
         });
@@ -118,7 +121,7 @@ export function GridEditor({
         error: "Failed to delete field",
       });
     },
-    [supabase, dispatch]
+    [table_id, supabase, dispatch]
   );
 
   const has_selected_responses = datagrid_selected_rows.size > 0;

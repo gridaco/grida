@@ -2,7 +2,7 @@
 
 import React, { useCallback, useMemo } from "react";
 import { StateProvider } from "./provider";
-import { useEditorState, useFormFields } from "./use";
+import { useEditorState, useFormFields, useDatabaseTableId } from "./use";
 import { reducer } from "./reducer";
 import {
   DatabaseDocumentEditorInit,
@@ -139,11 +139,7 @@ function FormFieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
 
   const attributes = useAttributes();
 
-  // TODO: clean this up. temporary fix for supporting v0_form and v0_schema
-  const table_id: string =
-    state.doctype === "v0_form"
-      ? state.form_id
-      : (state.datagrid_table_id as string);
+  const table_id = useDatabaseTableId();
 
   const field = useMemo(() => {
     const focusfound = attributes?.find((f) => f.id === state.field_editor.id);
