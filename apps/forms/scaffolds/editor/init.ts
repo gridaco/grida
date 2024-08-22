@@ -2,7 +2,7 @@ import { editorbasepath } from "@/lib/forms/url";
 import type {
   BaseDocumentEditorInit,
   BaseDocumentEditorState,
-  DatabaseDocumentEditorInit,
+  SchemaDocumentEditorInit,
   EditorInit,
   FormDocumentEditorInit,
   EditorState,
@@ -13,12 +13,12 @@ import type {
   GDocTable,
   TVirtualRow,
   TGlobalDataStreamState,
+  SchemaDocumentTableInit,
 } from "./state";
 import { blockstreeflat } from "@/lib/forms/tree";
 import { SYM_LOCALTZ, EditorSymbols } from "./symbols";
 import { GridaSupabase } from "@/types";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
-import produce from "immer";
 
 export function initialEditorState(init: EditorInit): EditorState {
   switch (init.doctype) {
@@ -93,6 +93,25 @@ export function initialDatagridState(): Omit<
   };
 }
 
+export function table_to_sidebar_table_menu(
+  tb: SchemaDocumentTableInit,
+  {
+    basepath,
+    document_id,
+  }: {
+    basepath: string;
+    document_id: string;
+  }
+): MenuItem<GDocTableID> {
+  return {
+    section: "Tables",
+    id: tb.id,
+    label: tb.name,
+    icon: "table",
+    href: tablehref(basepath, document_id, tb),
+  };
+}
+
 /**
  * // FIXME: not ready
  * @deprecated @beta
@@ -100,7 +119,7 @@ export function initialDatagridState(): Omit<
  * @returns
  */
 function initialDatabaseEditorState(
-  init: DatabaseDocumentEditorInit
+  init: SchemaDocumentEditorInit
 ): EditorState {
   const base = initialBaseDocumentEditorState(init);
   // @ts-ignore
@@ -115,13 +134,12 @@ function initialDatabaseEditorState(
     sidebar: {
       mode: initial_sidebar_mode[init.doctype],
       mode_data: {
-        tables: init.tables.map((t) => ({
-          section: "Tables",
-          id: t.id,
-          label: t.name,
-          icon: "table",
-          href: tablehref(base.basepath, base.document_id, t),
-        })),
+        tables: init.tables.map((t) =>
+          table_to_sidebar_table_menu(t, {
+            basepath: base.basepath,
+            document_id: base.document_id,
+          })
+        ),
         menus: [],
       },
     },
@@ -132,6 +150,7 @@ function initialDatabaseEditorState(
       row_keyword: "row",
       label: t.name,
       name: t.name,
+      description: t.description,
       icon: "table",
       readonly: false,
       attributes: t.attributes,
@@ -202,6 +221,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
           icon: "supabase",
           name: init.connections.supabase.main_supabase_table.sb_table_name,
           label: init.connections.supabase.main_supabase_table.sb_table_name,
+          description: null,
           readonly: false,
         } satisfies GDocTable,
         [EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID]: {
@@ -210,6 +230,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
           icon: "supabase",
           name: "auth.users",
           label: "auth.users",
+          description: null,
           readonly: true,
         } satisfies GDocTable,
       }
@@ -220,6 +241,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
           icon: "table",
           name: "response",
           label: "Responses",
+          description: null,
           readonly: false,
         } satisfies GDocTable,
         [EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID]: {
@@ -228,6 +250,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
           icon: "table",
           name: "session",
           label: "Sessions",
+          description: null,
           readonly: true,
         } satisfies GDocTable,
         [EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID]: {
@@ -236,6 +259,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
           icon: "user",
           name: "customer",
           label: "Customers",
+          description: null,
           readonly: true,
         } satisfies GDocTable,
       };

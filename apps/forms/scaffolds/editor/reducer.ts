@@ -2,6 +2,7 @@ import { produce, type Draft } from "immer";
 import type {
   EditorFlatFormBlock,
   EditorState,
+  GDocTable,
   GDocTableID,
   TVirtualRow,
   TVirtualRowData,
@@ -85,7 +86,7 @@ import type {
 } from "@/types";
 import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";
 import { EditorSymbols } from "./symbols";
-import { initialDatagridState } from "./init";
+import { initialDatagridState, table_to_sidebar_table_menu } from "./init";
 import assert from "assert";
 
 export function reducer(
@@ -1079,15 +1080,25 @@ export function reducer(
     case "editor/schema/table/add": {
       const { table } = <SchemaTableAddAction>action;
       return produce(state, (draft) => {
-        draft.tables.push({
+        const tb: GDocTable = {
           id: table.id,
+          name: table.name,
           label: table.name,
+          description: table.description || null,
           readonly: false,
           row_keyword: "row",
           icon: "table",
-          name: table.name,
           attributes: table.attributes,
-        });
+        };
+        draft.tables.push(tb);
+        draft.sidebar.mode_data.tables.push(
+          table_to_sidebar_table_menu(tb, {
+            basepath: draft.basepath,
+            document_id: draft.document_id,
+          })
+        );
+
+        // TODO: setting the id won't change the route. need to update the route. (where?)
         draft.datagrid_table_id = table.id;
       });
     }

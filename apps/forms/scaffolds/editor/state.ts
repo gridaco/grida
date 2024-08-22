@@ -59,20 +59,22 @@ export interface BaseDocumentEditorInit {
 export type EditorInit =
   | FormDocumentEditorInit
   | SiteDocumentEditorInit
-  | DatabaseDocumentEditorInit;
+  | SchemaDocumentEditorInit;
 
 export interface SiteDocumentEditorInit extends BaseDocumentEditorInit {
   doctype: "v0_site";
 }
 
-export interface DatabaseDocumentEditorInit extends BaseDocumentEditorInit {
+export interface SchemaDocumentTableInit {
+  id: string;
+  name: string;
+  description: string | null;
+  attributes: Array<FormFieldDefinition>;
+}
+
+export interface SchemaDocumentEditorInit extends BaseDocumentEditorInit {
   doctype: "v0_schema";
-  tables: ReadonlyArray<{
-    id: string;
-    name: string;
-    description: string | null;
-    attributes: Array<FormFieldDefinition>;
-  }>;
+  tables: ReadonlyArray<SchemaDocumentTableInit>;
 }
 
 export interface FormDocumentEditorInit extends BaseDocumentEditorInit {
@@ -103,6 +105,7 @@ export type GDocTable = {
    */
   row_keyword: string;
   name: string;
+  description: string | null;
   icon: ResourceTypeIconName;
   readonly: boolean;
   label: string;

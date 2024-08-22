@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
             label: "Date",
           },
           {
-            type: "text",
+            type: "richtext",
             name: "content",
             label: "Content",
           },
@@ -101,17 +101,17 @@ export async function POST(req: NextRequest) {
             label: "Date",
           },
           {
-            type: "text",
+            type: "image",
             name: "cover",
             label: "Cover",
           },
           {
-            type: "text",
+            type: "richtext",
             name: "content",
             label: "Content",
           },
           {
-            type: "text",
+            type: "toggle-group",
             name: "tags",
             label: "Tags",
           },

@@ -5,7 +5,7 @@ import { StateProvider } from "./provider";
 import { useEditorState, useFormFields, useDatabaseTableId } from "./use";
 import { reducer } from "./reducer";
 import {
-  DatabaseDocumentEditorInit,
+  SchemaDocumentEditorInit,
   EditorInit,
   FormDocumentEditorInit,
   SiteDocumentEditorInit,
@@ -58,7 +58,7 @@ export function EditorProvider({
 export function DatabaseDocumentEditorProvider({
   initial,
   children,
-}: React.PropsWithChildren<{ initial: DatabaseDocumentEditorInit }>) {
+}: React.PropsWithChildren<{ initial: SchemaDocumentEditorInit }>) {
   const [state, dispatch] = React.useReducer(
     reducer,
     initialEditorState(initial)
