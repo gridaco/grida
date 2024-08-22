@@ -19,9 +19,7 @@ export default function SchemaTablePage({
   const { tables, datagrid_table_id } = state;
   const { tablename } = params;
 
-  const tb = tables
-    .flatMap((table) => table.views)
-    .find((table) => table.name === tablename);
+  const tb = tables.find((table) => table.name === tablename);
 
   const isvalid = valid(tb);
 
@@ -30,7 +28,7 @@ export default function SchemaTablePage({
     return datagrid_table_id
       ? GridData.columns(datagrid_table_id, tb.attributes)
       : { systemcolumns: [], columns: [] };
-  }, [datagrid_table_id, tb]);
+  }, [datagrid_table_id, isvalid, tb]);
 
   if (!isvalid) {
     return <Invalid />;

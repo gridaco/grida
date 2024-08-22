@@ -116,7 +116,9 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
 
   const field = useMemo(() => {
-    const focusfound = state.fields.find((f) => f.id === state.field_editor.id);
+    const focusfound = state.fields?.find(
+      (f) => f.id === state.field_editor.id
+    );
     if (focusfound) return focusfound;
     return state.field_editor.data?.draft;
   }, [state.field_editor.id, state.fields, state.field_editor.data?.draft]);

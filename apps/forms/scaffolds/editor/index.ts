@@ -1,2 +1,2 @@
 export * from "./editor";
-export { useEditorState, useCurrentTableView } from "./use";
+export { useEditorState, useDatagridTable as useCurrentTableView } from "./use";

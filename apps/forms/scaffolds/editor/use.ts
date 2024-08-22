@@ -18,13 +18,11 @@ export const useEditorState = (): [EditorState, FlatDispatcher] => {
   return useMemo(() => [state, dispatch], [state, dispatch]);
 };
 
-export function useCurrentTableView() {
+export function useDatagridTable() {
   const [state] = useEditorState();
   const { datagrid_table_id, tables } = state;
 
   return useMemo(() => {
-    return tables
-      .flatMap((t) => t.views)
-      .find((table) => table.id === datagrid_table_id);
+    return tables.find((table) => table.id === datagrid_table_id);
   }, [datagrid_table_id, tables]);
 }

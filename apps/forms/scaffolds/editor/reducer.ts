@@ -667,13 +667,15 @@ export function reducer(
         let tableid: GDocTableID | null = null;
         if ("id" in opt) {
           tableid = opt.id;
-        } else {
-          // find withind current group.
-          const group = draft.tables.find((g) =>
-            g.views.some((v) => v.id === draft.datagrid_table_id)
-          );
-          tableid = group?.views.find((v) => v.name === opt.name)?.id ?? null;
         }
+        // TODO: ...
+        // else {
+        //   // find withind current group.
+        //   const group = draft.tables.find((g) =>
+        //     g.views.some((v) => v.id === draft.datagrid_table_id)
+        //   );
+        //   tableid = group?.views.find((v) => v.name === opt.name)?.id ?? null;
+        // }
         // =================
 
         if (!tableid) {
@@ -1069,18 +1071,13 @@ export function reducer(
       const { table } = <SchemaTableAddAction>action;
       return produce(state, (draft) => {
         draft.tables.push({
-          type: "schema",
+          id: table.id,
+          label: table.name,
+          readonly: false,
+          row_keyword: "row",
           icon: "table",
           name: table.name,
-          views: [
-            {
-              id: table.id,
-              label: table.name,
-              row_keyword: "row",
-              name: table.name,
-              attributes: table.attributes,
-            },
-          ],
+          attributes: table.attributes,
         });
         draft.datagrid_table_id = table.id;
       });

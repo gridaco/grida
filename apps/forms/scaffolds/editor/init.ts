@@ -9,11 +9,14 @@ import type {
   MenuItem,
   SiteDocumentEditorInit,
   IDataGridState,
+  GDocTableID,
+  GDocTable,
 } from "./state";
 import { blockstreeflat } from "@/lib/forms/tree";
 import { SYM_LOCALTZ, GridaEditorSymbols } from "./symbols";
 import { GridaSupabase } from "@/types";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
+import produce from "immer";
 
 export function initialEditorState(init: EditorInit): EditorState {
   switch (init.doctype) {
@@ -54,13 +57,11 @@ function initialBaseDocumentEditorState(
     assets: {
       backgrounds: [],
     },
-    sidebar: {
-      mode: initial_sidebar_mode[init.doctype],
-    },
     row_editor: {
       open: false,
     },
     customers: {
+      readonly: true,
       stream: undefined,
       realtime: false,
     },
@@ -114,21 +115,28 @@ function initialDatabaseEditorState(
       nodes: [],
       templatedata: {},
     },
+    sidebar: {
+      mode: initial_sidebar_mode[init.doctype],
+      mode_data: {
+        items: init.tables.map((t) => ({
+          section: "Tables",
+          id: t.id,
+          label: t.name,
+          icon: "table",
+          href: tablehref(base.basepath, base.document_id, t),
+        })),
+      },
+    },
     ...initialDatagridState(),
     datagrid_table_id: init.tables.length > 0 ? init.tables[0].id : null,
     tables: init.tables.map((t) => ({
-      type: "schema",
+      id: t.id,
+      row_keyword: "row",
+      label: t.name,
       name: t.name,
       icon: "table",
-      views: [
-        {
-          id: t.id,
-          row_keyword: "row",
-          label: t.name,
-          name: t.name,
-          attributes: t.attributes,
-        },
-      ],
+      readonly: false,
+      attributes: t.attributes,
     })),
     // TODO: move me under a schema
     fields: [],
@@ -156,14 +164,7 @@ function initialSiteEditorState(init: SiteDocumentEditorInit): EditorState {
       templatesample: "formcollection_sample_001_the_bundle",
       templatedata: {},
     },
-    tables: [
-      {
-        type: "schema",
-        name: "Campaigns",
-        icon: "table",
-        views: [],
-      },
-    ],
+    tables: [],
   };
 }
 
@@ -182,6 +183,112 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
 
   const base = initialBaseDocumentEditorState(init);
 
+  const { basepath, document_id } = base;
+
+  const tables = init.connections?.supabase?.main_supabase_table
+    ? {
+        [GridaEditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID]: {
+          id: GridaEditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID,
+          row_keyword: "row",
+          icon: "supabase",
+          name: init.connections.supabase.main_supabase_table.sb_table_name,
+          label: init.connections.supabase.main_supabase_table.sb_table_name,
+          readonly: false,
+        } satisfies GDocTable,
+        [GridaEditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID]: {
+          id: GridaEditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID,
+          row_keyword: "user",
+          icon: "supabase",
+          name: "auth.users",
+          label: "auth.users",
+          readonly: true,
+        } satisfies GDocTable,
+      }
+    : {
+        [GridaEditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID]: {
+          id: GridaEditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID,
+          row_keyword: "response",
+          icon: "table",
+          name: "response",
+          label: "Responses",
+          readonly: false,
+        } satisfies GDocTable,
+        [GridaEditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID]: {
+          id: GridaEditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID,
+          row_keyword: "session",
+          icon: "table",
+          name: "session",
+          label: "Sessions",
+          readonly: true,
+        } satisfies GDocTable,
+        [GridaEditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID]: {
+          id: GridaEditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID,
+          row_keyword: "customer",
+          icon: "user",
+          name: "customer",
+          label: "Customers",
+          readonly: true,
+        } satisfies GDocTable,
+      };
+
+  const tablemenus = init.connections?.supabase?.main_supabase_table
+    ? [
+        {
+          id: GridaEditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID,
+          href: tablehref(
+            basepath,
+            document_id,
+            (tables as any)[
+              GridaEditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID
+            ]
+          ),
+          label: "Responses",
+          icon: "supabase",
+          section: "Tables",
+        } satisfies MenuItem<GDocTableID>,
+        {
+          id: GridaEditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID,
+          href: tablehref(
+            basepath,
+            document_id,
+            (tables as any)[
+              GridaEditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID
+            ]
+          ),
+          label: "auth.users",
+          icon: "supabase",
+          section: "Tables",
+        } satisfies MenuItem<GDocTableID>,
+      ]
+    : [
+        {
+          id: GridaEditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID,
+          href: tablehref(
+            basepath,
+            document_id,
+            (tables as any)[
+              GridaEditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID
+            ]
+          ),
+          label: "Responses",
+          icon: "table",
+          section: "Tables",
+        } satisfies MenuItem<GDocTableID>,
+        {
+          id: GridaEditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID,
+          href: tablehref(
+            basepath,
+            document_id,
+            (tables as any)[
+              GridaEditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID
+            ]
+          ),
+          label: "Customers",
+          icon: "user",
+          section: "Tables",
+        } satisfies MenuItem<GDocTableID>,
+      ];
+
   return {
     ...base,
     connections: {
@@ -191,73 +298,22 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
     theme: init.theme,
     form_id: init.form_id,
     form_title: init.form_title,
-    tables: init.connections?.supabase?.main_supabase_table
-      ? [
+    sidebar: {
+      mode: initial_sidebar_mode[init.doctype],
+      mode_data: {
+        items: [
+          ...tablemenus,
           {
-            name: init.connections.supabase.main_supabase_table.sb_table_name,
-            type: "response",
-            icon: "supabase",
-            views: [
-              {
-                id: GridaEditorSymbols.Table
-                  .SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID,
-                row_keyword: "row",
-                name: init.connections.supabase.main_supabase_table
-                  .sb_table_name,
-                label:
-                  init.connections.supabase.main_supabase_table.sb_table_name,
-              },
-            ],
-          },
-          {
-            name: "auth.users",
-            type: "x-supabase-auth.users",
-            icon: "supabase",
-            views: [
-              {
-                id: GridaEditorSymbols.Table
-                  .SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID,
-                row_keyword: "user",
-                name: "auth.users",
-                label: "auth.users",
-              },
-            ],
-          },
-        ]
-      : [
-          {
-            name: "Responses",
-            type: "response",
-            icon: "table",
-            views: [
-              {
-                id: GridaEditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID,
-                row_keyword: "response",
-                name: "response",
-                label: "Responses",
-              },
-              {
-                id: GridaEditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID,
-                row_keyword: "session",
-                name: "session",
-                label: "Sessions",
-              },
-            ],
-          },
-          {
-            name: "Customers",
-            type: "customer",
-            icon: "user",
-            views: [
-              {
-                id: GridaEditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID,
-                row_keyword: "customer",
-                name: "customer",
-                label: "Customers",
-              },
-            ],
+            id: `/${basepath}/${document_id}/data/analytics`,
+            section: "Analytics",
+            href: `/${basepath}/${document_id}/data/analytics`,
+            icon: "chart",
+            label: "Realtime",
           },
         ],
+      },
+    },
+    tables: Object.values(tables),
     campaign: init.campaign,
     form_security: init.form_security,
     ending: init.ending,
@@ -273,10 +329,12 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
     },
     fields: init.fields,
     responses: {
+      readonly: false,
       realtime: true,
       stream: [],
     },
     sessions: {
+      readonly: true,
       stream: undefined,
       realtime: false,
     },
@@ -297,7 +355,7 @@ function sitedocumentpagesinit({
 }: {
   basepath: string;
   document_id: string;
-}): MenuItem[] {
+}): MenuItem<string>[] {
   return [
     {
       section: "Pages",
@@ -315,7 +373,7 @@ function formdocumentpagesinit({
 }: {
   basepath: string;
   document_id: string;
-}): MenuItem[] {
+}): MenuItem<string>[] {
   return [
     {
       section: "Design",
@@ -377,4 +435,29 @@ function xsbmtinit(conn?: GridaSupabase.SupabaseConnectionState) {
     gfpk: (parsed?.pks?.length || 0) > 0 ? parsed?.pks[0] : undefined,
     rows: [],
   };
+}
+
+function tablehref(
+  basepath: string,
+  document_id: string,
+  table: {
+    id: GDocTableID;
+    name: string;
+  }
+) {
+  switch (table.id) {
+    case GridaEditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID:
+    case GridaEditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID:
+      return `/${basepath}/${document_id}/data/responses`;
+    // TODO: session
+    case GridaEditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID:
+      return `/${basepath}/${document_id}/data/responses?view=session`;
+    case GridaEditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID:
+      return `/${basepath}/${document_id}/data/customers`;
+    case GridaEditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID:
+      return `/${basepath}/${document_id}/data/x/auth.users`;
+  }
+
+  // v0_schema table
+  return `/${basepath}/${document_id}/data/table/${table.name}`;
 }

@@ -1,21 +1,17 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import { useEditorState } from "../editor";
 import {
   SidebarMenuItem,
   SidebarMenuItemActions,
-  SidebarMenuLink,
   SidebarMenuList,
   SidebarSection,
   SidebarMenuItemAction,
   SidebarSectionHeaderItem,
   SidebarSectionHeaderLabel,
 } from "@/components/sidebar";
-import { ResourceTypeIcon } from "@/components/resource-type-icon";
-import { usePathname } from "next/navigation";
-import "core-js/features/map/group-by";
-import { EditorFlatFormBlock } from "../editor/state";
+import { EditorFlatFormBlock, MenuItem } from "../editor/state";
 import { FormBlockType, FormFieldDefinition, FormInputType } from "@/types";
 import { BlockTypeIcon } from "@/components/form-blcok-type-icon";
 import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
@@ -28,21 +24,17 @@ import { DotsHorizontalIcon } from "@radix-ui/react-icons";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { FormFieldBlockMenuItems } from "../blocks-editor/blocks/field-block";
+import { renderMenuItems } from "./render";
 
 export function ModeDesign() {
   const [state, dispatch] = useEditorState();
 
-  const pathname = usePathname();
-
   const {
     document: { pages },
   } = state;
-
-  const sections = Map.groupBy(pages, (page) => page.section);
 
   const show_hierarchy =
     state.document.selected_page_id &&
@@ -50,49 +42,13 @@ export function ModeDesign() {
 
   return (
     <>
-      {Array.from(sections.keys()).map((section) => (
-        <SidebarSection key={section}>
-          <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>
-              <span>{section}</span>
-            </SidebarSectionHeaderLabel>
-          </SidebarSectionHeaderItem>
-          <SidebarMenuList>
-            {sections.get(section)?.map((page) => (
-              <SidebarMenuLink key={page.id} href={page.href ?? ""}>
-                <SidebarMenuItem
-                  muted
-                  level={page.level}
-                  onSelect={() => {
-                    dispatch({
-                      type: "editor/document/select-page",
-                      page_id: page.id,
-                    });
-                  }}
-                >
-                  <ResourceTypeIcon
-                    type={page.icon}
-                    className="w-4 h-4 me-2 inline"
-                  />
-                  {page.label}
-                </SidebarMenuItem>
-              </SidebarMenuLink>
-              // <Link key={page.id} href={page.href ?? ""}>
-              //   <SidebarMenuItem
-              //     level={page.level}
-              //     selected={pathname === page.href}
-              //   >
-              //     <ResourceTypeIcon
-              //       type={page.icon}
-              //       className="w-4 h-4 me-2 inline"
-              //     />
-              //     {page.label}
-              //   </SidebarMenuItem>
-              // </Link>
-            ))}
-          </SidebarMenuList>
-        </SidebarSection>
-      ))}
+      {renderMenuItems(pages, (page) => {
+        dispatch({
+          type: "editor/document/select-page",
+          page_id: page.id,
+        });
+      })}
+
       {show_hierarchy && (
         <>
           <hr />

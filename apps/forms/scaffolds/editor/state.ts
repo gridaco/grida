@@ -102,6 +102,8 @@ export type GDocTable = {
    */
   row_keyword: string;
   name: string;
+  icon: ResourceTypeIconName;
+  readonly: boolean;
   label: string;
 } & (
   | {
@@ -129,12 +131,12 @@ export type GDocSchemaTable = {
 
 export type GDocTableID = GDocTable["id"];
 
-export interface MenuItem {
+export interface MenuItem<ID> {
   section: string;
-  id: string;
+  id: ID;
   level?: number;
   label: string;
-  icon: "folder" | "file" | "setting" | "table" | "chart";
+  icon: ResourceTypeIconName;
   href?: string;
 }
 
@@ -178,6 +180,7 @@ export type TVirtualRow<T = Record<string, any>, M = Record<string, any>> = {
  * Utility state for global data stream state.
  */
 interface TGlobalDataStreamState<T> {
+  readonly: boolean;
   realtime: boolean;
   stream?: Array<T>;
 }
@@ -202,6 +205,9 @@ interface IEditorDateContextState {
 interface IEditorSidebarState {
   sidebar: {
     mode: "project" | "build" | "data" | "connect";
+    mode_data: {
+      items: MenuItem<GDocTableID>[];
+    };
   };
 }
 
@@ -230,7 +236,6 @@ export interface BaseDocumentEditorState
     IEditorAssetsState,
     IInsertionMenuState,
     IFieldEditorState,
-    IEditorSidebarState,
     ICustomersDataStreamState,
     ICustomerEditorState,
     IRowEditorState {
@@ -247,7 +252,7 @@ export interface BaseDocumentEditorState
   document_title: string;
   doctype: GDocumentType;
   document: {
-    pages: MenuItem[];
+    pages: MenuItem<string>[];
     selected_page_id?: string;
     nodes: any[];
     templatesample?: string;
@@ -289,6 +294,17 @@ interface IFieldEditorState {
   }>;
 }
 
+// TODO:
+interface ITablespaceEditorState {
+  tables: Array<GDocTable>;
+  /**
+   * you can find the records for the table data here
+   *
+   * `{[table_id]: { stream: [{ id, data: {...}, meta }]} }`
+   */
+  tablespace: Record<GDocTableID, TGlobalDataStreamState<TVirtualRow>>;
+}
+
 interface IFormResponseSessionDataStreamState {
   sessions: TGlobalDataStreamState<FormResponseSession>;
 }
@@ -301,6 +317,7 @@ interface IFormResponseDataStreamState {
 
 export interface FormEditorState
   extends BaseDocumentEditorState,
+    IEditorSidebarState,
     IFormResponseSessionDataStreamState,
     IFormResponseDataStreamState,
     IDataGridState {
@@ -340,15 +357,13 @@ export interface FormEditorState
   available_field_ids: string[];
   focus_block_id?: string | null;
 
-  tables: {
-    name: string;
-    type: TableType;
-    icon: ResourceTypeIconName;
-    views: GDocTable[];
-  }[];
-
-  // tables: Array<GDocTable>;
-  // tablespace: Record<string, any>;
+  tables: GDocTable[];
+  // tables: {
+  //   name: string;
+  //   type: TableType;
+  //   icon: ResourceTypeIconName;
+  //   views: GDocTable[];
+  // }[];
 
   x_supabase_main_table?: {
     schema: GridaSupabase.JSONSChema;

@@ -26,7 +26,6 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { TableType } from "@/scaffolds/editor/state";
 import {
   Dialog,
   DialogClose,
@@ -43,6 +42,7 @@ import { useForm, Controller } from "react-hook-form";
 import toast from "react-hot-toast";
 import { PrivateEditorApi } from "@/lib/private";
 import { useRouter } from "next/navigation";
+import { renderMenuItems } from "./render";
 
 export function ModeData() {
   const [state] = useEditorState();
@@ -51,8 +51,94 @@ export function ModeData() {
 
   const newTableDialog = useDialogState<CreateNewTableDialogInit>();
 
+  function AddActionDropdownMenu() {
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <SidebarMenuItemAction>
+            <PlusIcon />
+          </SidebarMenuItemAction>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent side="right" align="start">
+          <DropdownMenuGroup>
+            <DropdownMenuLabel>CMS</DropdownMenuLabel>
+            <DropdownMenuItem onSelect={newTableDialog.openDialog}>
+              <ResourceTypeIcon type="table" className="w-4 h-4 me-2" />
+              New Empty Table
+            </DropdownMenuItem>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <ResourceTypeIcon type="table" className="w-4 h-4 me-2" />
+                Examples
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                <DropdownMenuItem
+                  onSelect={() => {
+                    newTableDialog.openDialog({
+                      name: "blog",
+                      description: "A blog table",
+                      template: "cms-blog-starter",
+                    });
+                  }}
+                >
+                  <ResourceTypeIcon type="table" className="w-4 h-4 me-2" />
+                  Blog
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => {
+                    newTableDialog.openDialog({
+                      name: "collection",
+                      description: "A collection table",
+                      template: "cms-starter",
+                    });
+                  }}
+                >
+                  <ResourceTypeIcon type="table" className="w-4 h-4 me-2" />
+                  CMS Starter
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+          </DropdownMenuGroup>
+          <DropdownMenuGroup>
+            <DropdownMenuLabel>Supabase</DropdownMenuLabel>
+            <DropdownMenuItem>
+              <SupabaseLogo className="w-4 h-4 me-2" />
+              Connect Supabase Table
+            </DropdownMenuItem>
+            <DropdownMenuItem>
+              <SupabaseLogo className="w-4 h-4 me-2" />
+              Connect Supabase Project
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  }
+
+  function EmptyState() {
+    return (
+      <div className="py-4 border border-dashed rounded-sm flex flex-col gap-2 items-center justify-center w-full">
+        <span className="text-center">
+          <h4 className="text-muted-foreground text-xs font-bold">No tables</h4>
+          <p className="text-muted-foreground text-xs">
+            Create your first table
+          </p>
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => newTableDialog.openDialog({})}
+        >
+          <PlusIcon className="w-4 h-4 me-2" />
+          New Table
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <>
+      <CreateNewTableDialog {...newTableDialog} />
       <SidebarSection>
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>
@@ -60,124 +146,17 @@ export function ModeData() {
           </SidebarSectionHeaderLabel>
           {state.doctype == "v0_schema" && (
             <SidebarMenuItemActions>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <SidebarMenuItemAction>
-                    <PlusIcon />
-                  </SidebarMenuItemAction>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent side="right" align="start">
-                  <DropdownMenuGroup>
-                    <DropdownMenuLabel>CMS</DropdownMenuLabel>
-                    <DropdownMenuItem onSelect={newTableDialog.openDialog}>
-                      <ResourceTypeIcon type="table" className="w-4 h-4 me-2" />
-                      New Empty Table
-                    </DropdownMenuItem>
-                    <DropdownMenuSub>
-                      <DropdownMenuSubTrigger>
-                        <ResourceTypeIcon
-                          type="table"
-                          className="w-4 h-4 me-2"
-                        />
-                        Examples
-                      </DropdownMenuSubTrigger>
-                      <DropdownMenuSubContent>
-                        <DropdownMenuItem
-                          onSelect={() => {
-                            newTableDialog.openDialog({
-                              name: "blog",
-                              description: "A blog table",
-                              template: "cms-blog-starter",
-                            });
-                          }}
-                        >
-                          <ResourceTypeIcon
-                            type="table"
-                            className="w-4 h-4 me-2"
-                          />
-                          Blog
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onSelect={() => {
-                            newTableDialog.openDialog({
-                              name: "collection",
-                              description: "A collection table",
-                              template: "cms-starter",
-                            });
-                          }}
-                        >
-                          <ResourceTypeIcon
-                            type="table"
-                            className="w-4 h-4 me-2"
-                          />
-                          CMS Starter
-                        </DropdownMenuItem>
-                      </DropdownMenuSubContent>
-                    </DropdownMenuSub>
-                  </DropdownMenuGroup>
-                  <DropdownMenuGroup>
-                    <DropdownMenuLabel>Supabase</DropdownMenuLabel>
-                    <DropdownMenuItem>
-                      <SupabaseLogo className="w-4 h-4 me-2" />
-                      Connect Supabase Table
-                    </DropdownMenuItem>
-                    <DropdownMenuItem>
-                      <SupabaseLogo className="w-4 h-4 me-2" />
-                      Connect Supabase Project
-                    </DropdownMenuItem>
-                  </DropdownMenuGroup>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <AddActionDropdownMenu />
             </SidebarMenuItemActions>
           )}
         </SidebarSectionHeaderItem>
-        <SidebarMenuList>
+        {/* <SidebarMenuList>
           {tables.length === 0 && (
-            <div className="py-4 border border-dashed rounded-sm flex flex-col gap-2 items-center justify-center w-full">
-              <span className="text-center">
-                <h4 className="text-muted-foreground text-xs font-bold">
-                  No tables
-                </h4>
-                <p className="text-muted-foreground text-xs">
-                  Create your first table
-                </p>
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => newTableDialog.openDialog({})}
-              >
-                <PlusIcon className="w-4 h-4 me-2" />
-                New Table
-              </Button>
-            </div>
+            <EmptyState/>
           )}
-          {tables.map((table, i) => {
-            return (
-              <SidebarMenuLink
-                key={i}
-                href={tablehref(basepath, document_id, table)}
-              >
-                <SidebarMenuItem muted>
-                  <ResourceTypeIcon
-                    type={table.icon}
-                    className="inline align-middle w-4 h-4 me-2"
-                  />
-                  {table.name}
-                </SidebarMenuItem>
-              </SidebarMenuLink>
-            );
-          })}
-          {/* <li>
-          <Link href="#">
-            <SideNavItem>
-              <FileIcon className="w-4 h-4" />
-              Files
-            </SideNavItem>
-          </Link>
-        </li> */}
-        </SidebarMenuList>
+        </SidebarMenuList> */}
       </SidebarSection>
+      {renderMenuItems(state.sidebar.mode_data.items)}
       {state.doctype == "v0_form" && (
         <SidebarSection>
           <SidebarSectionHeaderItem>
@@ -199,61 +178,8 @@ export function ModeData() {
           </SidebarMenuList>
         </SidebarSection>
       )}
-
-      {/* <label className="text-xs text-muted-foreground py-4 px-4">
-        Commerce
-      </label>
-      <li>
-        <Link
-          href={editorlink("connect/store/orders", {
-            org: organization.name,
-            proj: project.name,
-            form_id,
-          })}
-        >
-          <SideNavItem>
-            <ArchiveIcon />
-            Orders
-          </SideNavItem>
-        </Link>
-      </li>
-      <li>
-        <Link
-          href={editorlink("connect/store/products", {
-            org: organization.name,
-            proj: project.name,
-            form_id,
-          })}
-        >
-          <SideNavItem>
-            <ArchiveIcon />
-            Inventory
-          </SideNavItem>
-        </Link>
-      </li> */}
-      <CreateNewTableDialog {...newTableDialog} />
     </>
   );
-}
-
-function tablehref(
-  basepath: string,
-  document_id: string,
-  table: {
-    type: TableType;
-    name: string;
-  }
-) {
-  switch (table.type) {
-    case "response":
-      return `/${basepath}/${document_id}/data/responses`;
-    case "customer":
-      return `/${basepath}/${document_id}/data/customers`;
-    case "schema":
-      return `/${basepath}/${document_id}/data/table/${table.name}`;
-    case "x-supabase-auth.users":
-      return `/${basepath}/${document_id}/data/x/auth.users`;
-  }
 }
 
 type CreateNewTableDialogInit = Partial<{

@@ -58,7 +58,9 @@ export function GridEditor({
 
   const supabase = useMemo(() => createClientFormsClient(), []);
 
-  const { row_keyword } = useCurrentTableView() || { row_keyword: "row" };
+  const tb = useCurrentTableView();
+  const row_keyword = tb?.row_keyword ?? "row";
+  const readonly = tb?.readonly ?? true;
 
   const openNewFieldPanel = useCallback(() => {
     dispatch({
@@ -109,9 +111,6 @@ export function GridEditor({
 
   const has_selected_responses = datagrid_selected_rows.size > 0;
   const selectionDisabled =
-    datagrid_table_id ===
-    GridaEditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID;
-  const readonly =
     datagrid_table_id ===
     GridaEditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID;
 
