@@ -369,7 +369,7 @@ export interface FormCampaignPreferencesAction
 }
 
 export interface FormEndingPreferencesAction
-  extends Partial<EditorState["ending"]> {
+  extends Partial<EditorState["form"]["ending"]> {
   type: "editor/form/ending/preferences";
 }
 

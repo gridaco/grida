@@ -981,8 +981,8 @@ export function reducer(
     case "editor/form/ending/preferences": {
       const { type, ...pref } = <FormEndingPreferencesAction>action;
       return produce(state, (draft) => {
-        draft.ending = {
-          ...draft.ending,
+        draft.form.ending = {
+          ...draft.form.ending,
           ...pref,
         };
       });

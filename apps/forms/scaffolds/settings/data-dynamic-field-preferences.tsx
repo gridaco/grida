@@ -27,7 +27,9 @@ export function UnknownFieldPreferences() {
   const [state] = useEditorState();
   const {
     form_id,
-    form_security: { unknown_field_handling_strategy },
+    form: {
+      form_security: { unknown_field_handling_strategy },
+    },
   } = state;
 
   const {

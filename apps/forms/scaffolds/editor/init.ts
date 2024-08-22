@@ -325,8 +325,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
     },
     tables: values,
     campaign: init.campaign,
-    form_security: init.form_security,
-    ending: init.ending,
+
     blocks: blockstreeflat(init.blocks),
     document: {
       pages: formdocumentpagesinit({
@@ -338,7 +337,9 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
       templatedata: {},
     },
     form: {
+      ending: init.ending,
       fields: init.fields,
+      form_security: init.form_security,
       available_field_ids: block_available_field_ids,
     },
     tablespace: {

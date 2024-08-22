@@ -53,7 +53,7 @@ export function EndingPagePreferences() {
     form_title,
     form_id,
     theme: { lang },
-    ending,
+    form: { ending },
   } = state;
 
   const [customizeOpen, setCustomizeOpen] = useState(false);

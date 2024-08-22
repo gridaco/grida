@@ -53,8 +53,6 @@ function CurrentPageCanvas() {
   const [state, dispatch] = useEditorState();
 
   const {
-    form_title,
-    form_id,
     theme: { lang },
     document: { selected_page_id },
   } = state;

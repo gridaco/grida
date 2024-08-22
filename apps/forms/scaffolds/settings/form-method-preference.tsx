@@ -24,7 +24,10 @@ import { useEditorState } from "../editor";
 
 export function FormMethodPreference() {
   const [state] = useEditorState();
-  const { form_id, form_security: initial } = state;
+  const {
+    form_id,
+    form: { form_security: initial },
+  } = state;
   const {
     handleSubmit,
     control,

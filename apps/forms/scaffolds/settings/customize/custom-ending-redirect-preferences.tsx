@@ -21,7 +21,10 @@ import toast from "react-hot-toast";
 
 export function EndingRedirectPreferences() {
   const [state, dispatch] = useEditorState();
-  const { form_id, ending } = state;
+  const {
+    form_id,
+    form: { ending },
+  } = state;
 
   const {
     handleSubmit,

@@ -78,8 +78,8 @@ export interface FormDocumentEditorInit extends BaseDocumentEditorInit {
   doctype: "v0_form";
   form_id: string;
   campaign: EditorState["campaign"];
-  form_security: EditorState["form_security"];
-  ending: EditorState["ending"];
+  form_security: EditorState["form"]["form_security"];
+  ending: EditorState["form"]["ending"];
   connections?: {
     store_id?: number | null;
     supabase?: GridaSupabase.SupabaseConnectionState;
@@ -337,23 +337,23 @@ export interface FormEditorState
     scheduling_close_at: string | null;
     scheduling_tz?: string;
   };
-  form_security: {
-    unknown_field_handling_strategy: FormResponseUnknownFieldHandlingStrategyType;
-    method: FormMethod;
-  };
-  ending: {
-    is_redirect_after_response_uri_enabled: boolean;
-    redirect_after_response_uri: string | null;
-    is_ending_page_enabled: boolean;
-    ending_page_template_id: EndingPageTemplateID | null;
-    ending_page_i18n_overrides: EndingPageI18nOverrides | null;
-  };
 
   blocks: EditorFlatFormBlock[];
 
   form: {
     fields: FormFieldDefinition[];
     available_field_ids: string[];
+    ending: {
+      is_redirect_after_response_uri_enabled: boolean;
+      redirect_after_response_uri: string | null;
+      is_ending_page_enabled: boolean;
+      ending_page_template_id: EndingPageTemplateID | null;
+      ending_page_i18n_overrides: EndingPageI18nOverrides | null;
+    };
+    form_security: {
+      unknown_field_handling_strategy: FormResponseUnknownFieldHandlingStrategyType;
+      method: FormMethod;
+    };
   };
 
   focus_block_id?: string | null;
