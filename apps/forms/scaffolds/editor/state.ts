@@ -345,6 +345,8 @@ export interface FormEditorState
     views: GDocTable[];
   }[];
 
+  // tables: Array<GDocTable>;
+
   x_supabase_main_table?: {
     schema: GridaSupabase.JSONSChema;
     // we need a single pk for editor operations

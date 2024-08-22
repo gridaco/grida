@@ -54,6 +54,14 @@ function FormResponseGridEditor() {
     x_supabase_main_table,
   } = state;
 
+  const { systemcolumns, columns } = useMemo(
+    () =>
+      datagrid_table_id
+        ? GridData.columns(datagrid_table_id, fields)
+        : { systemcolumns: [], columns: [] },
+    [datagrid_table_id, fields]
+  );
+
   // Transforming the responses into the format expected by react-data-grid
   const { filtered, inputlength } = useMemo(() => {
     return GridData.rows({
@@ -79,7 +87,13 @@ function FormResponseGridEditor() {
     datagrid_filter,
   ]);
 
-  return <GridEditor rows={filtered as GFResponseRow[]} />;
+  return (
+    <GridEditor
+      systemcolumns={systemcolumns}
+      columns={columns}
+      rows={filtered as GFResponseRow[]}
+    />
+  );
 }
 
 function allowedtable(table: GDocTableID | null): boolean {

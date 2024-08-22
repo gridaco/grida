@@ -49,7 +49,7 @@ export function ModeData() {
 
   const { document_id, basepath, tables } = state;
 
-  const newTableDialog = useDialogState();
+  const newTableDialog = useDialogState<CreateNewTableDialogInit>();
 
   return (
     <>
@@ -71,7 +71,7 @@ export function ModeData() {
                     <DropdownMenuLabel>CMS</DropdownMenuLabel>
                     <DropdownMenuItem onSelect={newTableDialog.openDialog}>
                       <ResourceTypeIcon type="table" className="w-4 h-4 me-2" />
-                      New Table
+                      New Empty Table
                     </DropdownMenuItem>
                     <DropdownMenuSub>
                       <DropdownMenuSubTrigger>
@@ -82,12 +82,35 @@ export function ModeData() {
                         Examples
                       </DropdownMenuSubTrigger>
                       <DropdownMenuSubContent>
-                        <DropdownMenuItem>
+                        <DropdownMenuItem
+                          onSelect={() => {
+                            newTableDialog.openDialog({
+                              name: "blog",
+                              description: "A blog table",
+                              template: "cms-blog-starter",
+                            });
+                          }}
+                        >
                           <ResourceTypeIcon
                             type="table"
                             className="w-4 h-4 me-2"
                           />
                           Blog
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onSelect={() => {
+                            newTableDialog.openDialog({
+                              name: "collection",
+                              description: "A collection table",
+                              template: "cms-starter",
+                            });
+                          }}
+                        >
+                          <ResourceTypeIcon
+                            type="table"
+                            className="w-4 h-4 me-2"
+                          />
+                          CMS Starter
                         </DropdownMenuItem>
                       </DropdownMenuSubContent>
                     </DropdownMenuSub>
@@ -122,7 +145,7 @@ export function ModeData() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={newTableDialog.openDialog}
+                onClick={() => newTableDialog.openDialog({})}
               >
                 <PlusIcon className="w-4 h-4 me-2" />
                 New Table
@@ -233,9 +256,18 @@ function tablehref(
   }
 }
 
+type CreateNewTableDialogInit = Partial<{
+  name: string;
+  description: string;
+  template: "cms-starter" | "cms-blog-starter";
+}>;
+
 function CreateNewTableDialog({
+  data,
   ...props
-}: React.ComponentProps<typeof Dialog>) {
+}: React.ComponentProps<typeof Dialog> & {
+  data?: CreateNewTableDialogInit;
+}) {
   const router = useRouter();
   const [state, dispatch] = useEditorState();
   const {
@@ -244,17 +276,23 @@ function CreateNewTableDialog({
     formState: { isSubmitting, isSubmitSuccessful },
   } = useForm({
     defaultValues: {
-      name: "",
-      description: "",
+      name: data?.name || "",
+      description: data?.description,
+      template: data?.template,
     },
   });
 
   const onSubmit = handleSubmit(
-    async (data: { name: string; description: string }) => {
+    async (data: {
+      name: string;
+      description?: string;
+      template?: CreateNewTableDialogInit["template"];
+    }) => {
       const promise = PrivateEditorApi.Schema.createTable({
         schema_id: state.document_id, // document_id is schema_id in v0_schema doctype
         table_name: data.name,
         description: data.description || undefined,
+        template: data.template,
       });
 
       toast.promise(promise, {

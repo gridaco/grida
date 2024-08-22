@@ -18,7 +18,6 @@ import Link from "next/link";
 import { DownloadIcon, PieChartIcon, TrashIcon } from "@radix-ui/react-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { GridData } from "./grid-data";
 import clsx from "clsx";
 import {
   GridLimit,
@@ -33,11 +32,19 @@ import * as GridLayout from "./components/layout";
 import { txt_n_plural } from "@/utils/plural";
 import { editorlink } from "@/lib/forms/url";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
-import { GFResponseRow } from "../grid/types";
+import type { GFColumn, GFResponseRow, GFSystemColumn } from "../grid/types";
 import { PrivateEditorApi } from "@/lib/private";
 import { GridaEditorSymbols } from "../editor/symbols";
 
-export function GridEditor({ rows }: { rows?: GFResponseRow[] }) {
+export function GridEditor({
+  systemcolumns,
+  columns,
+  rows,
+}: {
+  systemcolumns: GFSystemColumn[];
+  columns: GFColumn[];
+  rows?: GFResponseRow[];
+}) {
   const [state, dispatch] = useEditorState();
   const deleteFieldConfirmDialog = useDialogState<{ field_id: string }>();
 
@@ -50,14 +57,6 @@ export function GridEditor({ rows }: { rows?: GFResponseRow[] }) {
   } = state;
 
   const supabase = useMemo(() => createClientFormsClient(), []);
-
-  const { systemcolumns, columns } = useMemo(
-    () =>
-      datagrid_table_id
-        ? GridData.columns(datagrid_table_id, fields)
-        : { systemcolumns: [], columns: [] },
-    [datagrid_table_id, fields]
-  );
 
   const { row_keyword } = useCurrentTableView() || { row_keyword: "row" };
 

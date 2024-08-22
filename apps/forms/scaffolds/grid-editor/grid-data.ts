@@ -8,7 +8,13 @@ import {
   GridaSupabase,
 } from "@/types";
 import { fmt_local_index } from "@/utils/fmt";
-import type { GFFile, GFResponseRow, GFSystemColumnTypes } from "../grid/types";
+import type {
+  GFColumn,
+  GFFile,
+  GFResponseRow,
+  GFSystemColumn,
+  GFSystemColumnTypes,
+} from "../grid/types";
 import type {
   DataGridFilterSettings,
   GDocTableID,
@@ -62,16 +68,8 @@ export namespace GridData {
     table: GDocTableID,
     fields: FormFieldDefinition[]
   ): {
-    systemcolumns: {
-      key: GFSystemColumnTypes;
-      name?: string;
-    }[];
-    columns: {
-      key: string;
-      name: string;
-      readonly: boolean;
-      type?: FormInputType;
-    }[];
+    systemcolumns: GFSystemColumn[];
+    columns: GFColumn[];
   } {
     const fieldcolumns = Array.from(fields)
       .sort((a, b) => a.local_index - b.local_index)
@@ -116,7 +114,7 @@ export namespace GridData {
       default:
         return {
           systemcolumns: [],
-          columns: [],
+          columns: fieldcolumns,
         };
     }
   }

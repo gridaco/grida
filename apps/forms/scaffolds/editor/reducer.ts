@@ -1078,7 +1078,7 @@ export function reducer(
               label: table.name,
               row_keyword: "row",
               name: table.name,
-              attributes: [],
+              attributes: table.attributes,
             },
           ],
         });

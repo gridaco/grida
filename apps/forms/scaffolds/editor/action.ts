@@ -431,5 +431,6 @@ export interface SchemaTableAddAction {
     id: string;
     name: string;
     description?: string | null;
+    attributes: FormFieldDefinition[];
   };
 }

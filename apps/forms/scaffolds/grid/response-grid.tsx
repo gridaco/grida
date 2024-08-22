@@ -33,8 +33,10 @@ import { FormInputType } from "@/types";
 import { JsonEditCell } from "./json-cell";
 import { useEditorState } from "../editor";
 import type {
+  GFColumn,
   GFResponseFieldData,
   GFResponseRow,
+  GFSystemColumn,
   GFSystemColumnTypes,
 } from "./types";
 import { SelectColumn } from "./select-column";
@@ -80,16 +82,8 @@ export function ResponseGrid({
   onDeleteFieldClick,
   onCellChange,
 }: {
-  systemcolumns: {
-    key: GFSystemColumnTypes;
-    name?: string;
-  }[];
-  columns: {
-    key: string;
-    name: string;
-    readonly: boolean;
-    type?: FormInputType;
-  }[];
+  systemcolumns: GFSystemColumn[];
+  columns: GFColumn[];
   rows: GFResponseRow[];
   selectionDisabled?: boolean;
   readonly?: boolean;

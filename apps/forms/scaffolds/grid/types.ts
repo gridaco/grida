@@ -5,6 +5,18 @@ export type GFSystemColumnTypes =
   | "__gf_created_at"
   | "__gf_customer_id";
 
+export type GFSystemColumn = {
+  key: GFSystemColumnTypes;
+  name?: string;
+};
+
+export type GFColumn = {
+  key: string;
+  name: string;
+  readonly: boolean;
+  type?: FormInputType;
+};
+
 export type GFResponseFieldData = {
   type?: FormInputType;
   value: any;

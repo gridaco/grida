@@ -1,8 +1,9 @@
 import type {
+  FormFieldDefinition,
   FormMethod,
   FormResponseUnknownFieldHandlingStrategyType,
   IFormField,
-} from "../index";
+} from "../types";
 import type { InventoryLevelCommit } from "../inventory";
 import * as ERR from "@/k/error";
 
@@ -112,12 +113,14 @@ export type CreateNewSchemaTableRequest = {
   schema_id: string;
   table_name: string;
   description?: string;
+  template?: "cms-starter" | "cms-blog-starter";
 };
 
 export type CreateNewSchemaTableResponse = {
   id: string;
   name: string;
   description?: string | null;
+  attributes: FormFieldDefinition[];
 };
 
 export namespace XSupabasePrivateApiTypes {

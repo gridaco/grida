@@ -1,4 +1,5 @@
 import { createRouteHandlerClient } from "@/lib/supabase/server";
+import { FormInputType } from "@/types";
 import {
   CreateNewSchemaTableRequest,
   CreateNewSchemaTableResponse,
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest) {
       title: data.table_name,
       description: data.description,
     })
-    .select()
+    .select("id")
     .single();
 
   if (new_table_ref_err) {
@@ -52,13 +53,100 @@ export async function POST(req: NextRequest) {
     return NextResponse.error();
   }
 
+  if (data.template) {
+    let fields: Array<{
+      type: FormInputType;
+      name: string;
+      label: string;
+    }>;
+    switch (data.template) {
+      case "cms-starter": {
+        // create fields
+        // title, date, content
+        fields = [
+          {
+            type: "text",
+            name: "title",
+            label: "Title",
+          },
+          {
+            type: "date",
+            name: "date",
+            label: "Date",
+          },
+          {
+            type: "text",
+            name: "content",
+            label: "Content",
+          },
+        ];
+        break;
+      }
+      case "cms-blog-starter":
+        // title, slug, date, cover, content, tags,
+        fields = [
+          {
+            type: "text",
+            name: "title",
+            label: "Title",
+          },
+          {
+            type: "text",
+            name: "slug",
+            label: "Slug",
+          },
+          {
+            type: "date",
+            name: "date",
+            label: "Date",
+          },
+          {
+            type: "text",
+            name: "cover",
+            label: "Cover",
+          },
+          {
+            type: "text",
+            name: "content",
+            label: "Content",
+          },
+          {
+            type: "text",
+            name: "tags",
+            label: "Tags",
+          },
+        ];
+        break;
+    }
+    await supabase.from("form_field").insert(
+      fields.map((field) => ({
+        form_id: new_table_ref.id,
+        type: field.type,
+        name: field.name,
+        label: field.label,
+      }))
+    );
+  }
+
+  const { data: new_table_detail, error: new_table_detail_err } = await supabase
+    .from("form")
+    .select(`*, attributes:form_field(*)`)
+    .eq("id", new_table_ref.id)
+    .single();
+
+  if (new_table_detail_err) {
+    console.error("ERR: while fetching new table detail", new_table_detail_err);
+    return NextResponse.error();
+  }
+
   //
   return NextResponse.json({
     data: {
-      id: new_table_ref.id,
+      id: new_table_detail.id,
       // TODO: shall be renamed to "name"
-      name: new_table_ref.title,
-      description: new_table_ref.description,
+      name: new_table_detail.title,
+      description: new_table_detail.description,
+      attributes: new_table_detail.attributes,
     },
   } satisfies ResponsePayload);
 }
