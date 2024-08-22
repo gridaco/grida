@@ -15,7 +15,7 @@ import { usePrevious } from "@uidotdev/usehooks";
 import { XSupabaseQuery } from "@/lib/supabase-postgrest/builder";
 import equal from "deep-equal";
 import { PrivateEditorApi } from "@/lib/private";
-import { GridaEditorSymbols } from "./symbols";
+import { EditorSymbols } from "./symbols";
 
 type RealtimeTableChangeData = {
   id: string;
@@ -82,9 +82,11 @@ export function ResponseSyncProvider({
   children,
 }: React.PropsWithChildren<{}>) {
   const [state] = useEditorState();
-  const { responses } = state;
+  const { tablespace } = state;
   const supabase = useMemo(() => createClientFormsClient(), []);
-  const prev = usePrevious(responses.stream);
+  const response_stream =
+    tablespace[EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID].stream;
+  const prev = usePrevious(response_stream);
 
   const sync = useCallback(
     async (id: string, payload: { value: any; option_id?: string | null }) => {
@@ -110,7 +112,7 @@ export function ResponseSyncProvider({
   );
 
   useEffect(() => {
-    responses.stream?.forEach((r) => {
+    response_stream?.forEach((r) => {
       r.data;
       Object.keys(r.data).forEach((attrkey) => {
         const cell = r.data[attrkey];
@@ -141,7 +143,7 @@ export function ResponseSyncProvider({
         }
       });
     });
-  }, [prev, responses.stream, sync]);
+  }, [prev, response_stream, sync]);
 
   return <>{children}</>;
 }
@@ -156,8 +158,11 @@ export function ResponseFeedProvider({
     datagrid_table_id,
     datagrid_rows_per_page,
     datagrid_table_refresh_key,
-    responses: { realtime: realtime_responses_enabled },
+    tablespace,
   } = state;
+
+  const { realtime: _realtime_responses_enabled } =
+    tablespace[EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID];
 
   const supabase = useMemo(() => createClientFormsClient(), []);
 
@@ -220,7 +225,7 @@ export function ResponseFeedProvider({
   useEffect(() => {
     if (
       datagrid_table_id !==
-      GridaEditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID
+      EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID
     ) {
       return;
     }
@@ -292,7 +297,7 @@ export function ResponseFeedProvider({
         });
       }
     },
-    enabled: realtime_responses_enabled,
+    enabled: _realtime_responses_enabled,
   });
 
   return <>{children}</>;
@@ -311,8 +316,11 @@ export function ResponseSessionFeedProvider({
     datagrid_table_id,
     datagrid_rows_per_page,
     datagrid_table_refresh_key,
-    sessions: { realtime: _realtime_sessions_enabled },
+    tablespace,
   } = state;
+
+  const { realtime: _realtime_sessions_enabled } =
+    tablespace[EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID];
 
   const realtime_sessions_enabled =
     forceEnableRealtime ?? _realtime_sessions_enabled;
@@ -350,8 +358,7 @@ export function ResponseSessionFeedProvider({
 
   useEffect(() => {
     if (
-      datagrid_table_id !==
-      GridaEditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID
+      datagrid_table_id !== EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID
     ) {
       return;
     }
@@ -431,9 +438,7 @@ export function CustomerFeedProvider({
   );
 
   useEffect(() => {
-    if (
-      datagrid_table_id !== GridaEditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID
-    )
+    if (datagrid_table_id !== EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID)
       return;
 
     setLoading(true);

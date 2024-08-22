@@ -34,7 +34,7 @@ import { editorlink } from "@/lib/forms/url";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import type { GFColumn, GFResponseRow, GFSystemColumn } from "../grid/types";
 import { PrivateEditorApi } from "@/lib/private";
-import { GridaEditorSymbols } from "../editor/symbols";
+import { EditorSymbols } from "../editor/symbols";
 
 export function GridEditor({
   systemcolumns,
@@ -111,8 +111,7 @@ export function GridEditor({
 
   const has_selected_responses = datagrid_selected_rows.size > 0;
   const selectionDisabled =
-    datagrid_table_id ===
-    GridaEditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID;
+    datagrid_table_id === EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID;
 
   return (
     <GridLayout.Root>
@@ -218,7 +217,7 @@ function TableTools() {
     <div className="flex items-center gap-1">
       <GridLocalSearch />
       {datagrid_table_id ===
-        GridaEditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID && (
+        EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID && (
         <XSupaDataGridSort />
       )}
     </div>
@@ -291,13 +290,13 @@ function DeleteSelectedRowsButton() {
 
   const onDeleteSelection = useCallback(() => {
     switch (datagrid_table_id) {
-      case GridaEditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID:
+      case EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID:
         delete_selected_responses();
         break;
-      case GridaEditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID:
+      case EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID:
         toast.error("Cannot delete sessions");
         break;
-      case GridaEditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID:
+      case EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID:
         delete_selected_x_supabase_main_table_rows();
         break;
       default:
@@ -359,7 +358,7 @@ function DeleteFieldConfirmDialog({
         <AlertDialogTitle>Delete Field</AlertDialogTitle>
         <AlertDialogDescription>
           {datagrid_table_id ===
-          GridaEditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID ? (
+          EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID ? (
             <>
               Deleting this field will remove all data associated with it
               (within Grida Forms). Are you sure you want to delete this field?

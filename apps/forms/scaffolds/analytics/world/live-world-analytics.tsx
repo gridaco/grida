@@ -23,6 +23,7 @@ import {
 } from "./use-ux-map-focus";
 import { serialize } from "../charts/serialize";
 import { format } from "date-fns";
+import { EditorSymbols } from "@/scaffolds/editor/symbols";
 
 const layerstyles: { light: CircleLayer; dark: CircleLayer } = {
   light: {
@@ -104,10 +105,18 @@ function View() {
     [size.width]
   );
 
-  const [state] = useEditorState();
   useUxInitialTransform(map, size);
   // const debounceFlyTo = useUxMapFocus(map, mapPadding, 1000, 3000);
   const debounceFlyTo = useUxMapFocus(map, mapPadding, 1000, 5000, 10); // Adjust intervals and threshold as needed
+
+  const [state] = useEditorState();
+
+  const response_stream =
+    state.tablespace[EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID]
+      .stream;
+  const session_stream =
+    state.tablespace[EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID]
+      .stream;
 
   const geojson: FeatureCollection = useMemo(
     () => ({
@@ -122,8 +131,8 @@ function View() {
   );
 
   useEffect(() => {
-    if (state.responses.stream && state.responses.stream?.length > 0) {
-      const sorted = state.responses.stream
+    if (response_stream && response_stream?.length > 0) {
+      const sorted = response_stream
         .slice()
         .sort((a, b) => a.meta.local_index - b.meta.local_index);
 
@@ -137,7 +146,7 @@ function View() {
       });
       setRecent(recent);
     }
-  }, [state.responses.stream]);
+  }, [response_stream]);
 
   useEffect(() => {
     if (recent.length === 0) return;
@@ -171,24 +180,24 @@ function View() {
   }, [debounceFlyTo, recent]);
 
   const responseChartData = useMemo(() => {
-    return serialize(state.responses.stream?.map((r) => r.meta) || [], {
+    return serialize(response_stream?.map((r) => r.meta) || [], {
       dateKey: "created_at",
       // last 15 minutes
       from: new Date(new Date().getTime() - 15 * 60 * 1000),
       to: new Date(),
       intervalMs: 15 * 1000, // 15 seconds
     });
-  }, [state.responses.stream]);
+  }, [response_stream]);
 
   const sessionChartData = useMemo(() => {
-    return serialize(state.sessions.stream || [], {
+    return serialize(session_stream || [], {
       dateKey: "created_at",
       // last 15 minutes
       from: new Date(new Date().getTime() - 15 * 60 * 1000),
       to: new Date(),
       intervalMs: 15 * 1000, // 15 seconds
     });
-  }, [state.sessions.stream]);
+  }, [session_stream]);
 
   return (
     <main className="relative p-4 w-full h-full">

@@ -10,7 +10,7 @@ import {
   XSupabaseMainTableSyncProvider,
 } from "@/scaffolds/editor/feed";
 import { GDocTableID } from "@/scaffolds/editor/state";
-import { GridaEditorSymbols } from "@/scaffolds/editor/symbols";
+import { EditorSymbols } from "@/scaffolds/editor/symbols";
 import { CurrentTable } from "@/scaffolds/editor/utils/switch-table";
 import { GridEditor } from "@/scaffolds/grid-editor";
 import { GridData } from "@/scaffolds/grid-editor/grid-data";
@@ -27,9 +27,7 @@ export default function FormResponsesPage() {
 
   return (
     <CurrentTable
-      table={
-        GridaEditorSymbols.Table.SYM_GRIDA_FORMS_WHATEVER_MAIN_TABLE_INDICATOR
-      }
+      table={EditorSymbols.Table.SYM_GRIDA_FORMS_WHATEVER_MAIN_TABLE_INDICATOR}
     >
       <ResponseFeedProvider />
       <ResponseSyncProvider />
@@ -47,12 +45,17 @@ function FormResponseGridEditor() {
   const {
     form_id,
     fields,
-    responses,
-    sessions,
+    tablespace,
     datagrid_filter,
     datagrid_table_id,
     x_supabase_main_table,
   } = state;
+
+  const sessions_stream =
+    tablespace[EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID].stream;
+
+  const responses_stream =
+    tablespace[EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID].stream;
 
   const { systemcolumns, columns } = useMemo(
     () =>
@@ -70,8 +73,8 @@ function FormResponseGridEditor() {
       table: datagrid_table_id as any,
       fields: fields,
       filter: datagrid_filter,
-      responses: responses.stream ?? [],
-      sessions: sessions.stream ?? [],
+      responses: responses_stream ?? [],
+      sessions: sessions_stream ?? [],
       data: {
         pks: x_supabase_main_table?.pks ?? [],
         rows: x_supabase_main_table?.rows ?? [],
@@ -80,9 +83,9 @@ function FormResponseGridEditor() {
   }, [
     form_id,
     datagrid_table_id,
-    sessions,
+    sessions_stream,
     fields,
-    responses,
+    responses_stream,
     x_supabase_main_table,
     datagrid_filter,
   ]);
@@ -98,8 +101,8 @@ function FormResponseGridEditor() {
 
 function allowedtable(table: GDocTableID | null): boolean {
   return (
-    table === GridaEditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID ||
-    table === GridaEditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID ||
-    table === GridaEditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID
+    table === EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID ||
+    table === EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID ||
+    table === EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID
   );
 }

@@ -17,19 +17,22 @@ import { CustomerFeedProvider } from "@/scaffolds/editor/feed";
 import { useMemo } from "react";
 import { GridData } from "@/scaffolds/grid-editor/grid-data";
 import { Customer } from "@/types";
-import { GridaEditorSymbols } from "@/scaffolds/editor/symbols";
+import { EditorSymbols } from "@/scaffolds/editor/symbols";
 
 export default function Customers() {
   const [state] = useEditorState();
 
-  const { datagrid_isloading, customers } = state;
+  const { datagrid_isloading, tablespace } = state;
+
+  const stream =
+    tablespace[EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID].stream;
 
   const rows = useMemo(() => {
     const { filtered } = GridData.rows({
       filter: state.datagrid_filter,
-      table: GridaEditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID,
+      table: EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID,
       data: {
-        rows: customers.stream || [],
+        rows: stream || [],
       },
     });
 
@@ -47,10 +50,10 @@ export default function Customers() {
       })) || [];
 
     return rows;
-  }, [customers.stream, state.datagrid_filter]);
+  }, [stream, state.datagrid_filter]);
 
   return (
-    <CurrentTable table={GridaEditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID}>
+    <CurrentTable table={EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID}>
       <CustomerFeedProvider />
       <GridLayout.Root>
         <GridLayout.Header>

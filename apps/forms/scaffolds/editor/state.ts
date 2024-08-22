@@ -20,7 +20,7 @@ import type {
   GridaSupabase,
   OrderBy,
 } from "@/types";
-import { SYM_LOCALTZ, GridaEditorSymbols } from "./symbols";
+import { SYM_LOCALTZ, EditorSymbols } from "./symbols";
 import { ZodObject } from "zod";
 import { Tokens } from "@/ast";
 import React from "react";
@@ -107,19 +107,19 @@ export type GDocTable = {
   label: string;
 } & (
   | {
-      id: typeof GridaEditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID;
+      id: typeof EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID;
     }
   | {
-      id: typeof GridaEditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID;
+      id: typeof EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID;
     }
   | {
-      id: typeof GridaEditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID;
+      id: typeof EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID;
     }
   | {
-      id: typeof GridaEditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID;
+      id: typeof EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID;
     }
   | {
-      id: typeof GridaEditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID;
+      id: typeof EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID;
     }
   | GDocSchemaTable
 );
@@ -179,7 +179,7 @@ export type TVirtualRow<T = Record<string, any>, M = Record<string, any>> = {
 /**
  * Utility state for global data stream state.
  */
-interface TGlobalDataStreamState<T> {
+export interface TGlobalDataStreamState<T> {
   readonly: boolean;
   realtime: boolean;
   stream?: Array<T>;
@@ -191,10 +191,6 @@ interface IRowEditorState {
 
 interface ICustomerEditorState {
   customer_editor: TGlobalEditorDialogState;
-}
-
-interface ICustomersDataStreamState {
-  customers: TGlobalDataStreamState<Customer>;
 }
 
 interface IEditorDateContextState {
@@ -237,7 +233,6 @@ export interface BaseDocumentEditorState
     IEditorAssetsState,
     IInsertionMenuState,
     IFieldEditorState,
-    ICustomersDataStreamState,
     ICustomerEditorState,
     IRowEditorState {
   basepath: string;
@@ -295,7 +290,6 @@ interface IFieldEditorState {
   }>;
 }
 
-// TODO:
 interface ITablespaceEditorState {
   tables: Array<GDocTable>;
   /**
@@ -303,24 +297,24 @@ interface ITablespaceEditorState {
    *
    * `{[table_id]: { stream: [{ id, data: {...}, meta }]} }`
    */
-  tablespace: Record<GDocTableID, TGlobalDataStreamState<TVirtualRow>>;
-}
-
-interface IFormResponseSessionDataStreamState {
-  sessions: TGlobalDataStreamState<FormResponseSession>;
-}
-
-interface IFormResponseDataStreamState {
-  responses: TGlobalDataStreamState<
-    TVirtualRow<FormResponseField, FormResponse>
-  >;
+  tablespace: {
+    [EditorSymbols.Table
+      .SYM_GRIDA_FORMS_RESPONSE_TABLE_ID]: TGlobalDataStreamState<
+      TVirtualRow<FormResponseField, FormResponse>
+    >;
+    [EditorSymbols.Table
+      .SYM_GRIDA_FORMS_SESSION_TABLE_ID]: TGlobalDataStreamState<FormResponseSession>;
+    [EditorSymbols.Table
+      .SYM_GRIDA_CUSTOMER_TABLE_ID]: TGlobalDataStreamState<Customer>;
+    [EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID]: never;
+    [EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID]: never;
+  } & Record<string, TGlobalDataStreamState<TVirtualRow>>;
 }
 
 export interface FormEditorState
   extends BaseDocumentEditorState,
     IEditorSidebarState,
-    IFormResponseSessionDataStreamState,
-    IFormResponseDataStreamState,
+    ITablespaceEditorState,
     IDataGridState {
   form_id: string;
   form_title: string;
@@ -357,14 +351,6 @@ export interface FormEditorState
 
   available_field_ids: string[];
   focus_block_id?: string | null;
-
-  tables: GDocTable[];
-  // tables: {
-  //   name: string;
-  //   type: TableType;
-  //   icon: ResourceTypeIconName;
-  //   views: GDocTable[];
-  // }[];
 
   x_supabase_main_table?: {
     schema: GridaSupabase.JSONSChema;

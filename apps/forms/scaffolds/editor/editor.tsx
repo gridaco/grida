@@ -20,6 +20,7 @@ import { CustomerEditPanel } from "../panels/customer-panel";
 import { MediaViewerProvider } from "../mediaviewer";
 import { AssetsBackgroundsResolver } from "./resolver/assets-backgrounds-resolver";
 import toast from "react-hot-toast";
+import { EditorSymbols } from "./symbols";
 
 export function EditorProvider({
   initial,
@@ -253,9 +254,13 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
 function RowEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
 
+  const response_stream =
+    state.tablespace[EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID]
+      .stream;
+
   const focusresponse = useMemo(() => {
-    return state.responses.stream?.find((r) => r.id === state.row_editor.id);
-  }, [state.responses.stream, state.row_editor.id]);
+    return response_stream?.find((r) => r.id === state.row_editor.id);
+  }, [response_stream, state.row_editor.id]);
 
   const focusxsupabasemaintablerow = useMemo(() => {
     const pk = state.x_supabase_main_table?.gfpk;

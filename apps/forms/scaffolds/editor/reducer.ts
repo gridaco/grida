@@ -83,7 +83,7 @@ import type {
   GridaSupabase,
 } from "@/types";
 import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";
-import { GridaEditorSymbols } from "./symbols";
+import { EditorSymbols } from "./symbols";
 import { initialDatagridState } from "./init";
 
 export function reducer(
@@ -548,7 +548,11 @@ export function reducer(
     case "editor/response/delete": {
       const { id } = <DeleteResponseAction>action;
       return produce(state, (draft) => {
-        draft.responses.stream = draft.responses.stream?.filter(
+        const response_space =
+          draft.tablespace[
+            EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID
+          ];
+        response_space.stream = response_space.stream?.filter(
           (row) => row.id !== id
         );
 
@@ -586,15 +590,20 @@ export function reducer(
         });
 
       return produce(state, (draft) => {
+        const response_space =
+          draft.tablespace[
+            EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID
+          ];
+
         if (reset) {
-          draft.responses.stream = virtualized;
+          response_space.stream = virtualized;
           return;
         }
 
         // Merge & Add new responses to the existing responses
         // Map of ids to responses for the existing responses
         // { [id] : row}
-        const existing_responses_id_map = draft.responses.stream?.reduce(
+        const existing_responses_id_map = response_space.stream?.reduce(
           (acc: any, response) => {
             acc[response.id] = response;
             return acc;
@@ -611,7 +620,7 @@ export function reducer(
             );
           } else {
             // Add new response if id does not exist
-            draft.responses.stream?.push(newResponse);
+            response_space.stream?.push(newResponse);
           }
         });
       });
@@ -626,19 +635,24 @@ export function reducer(
     case "editor/data/sessions/feed": {
       const { data, reset } = <FeedResponseSessionsAction>action;
       return produce(state, (draft) => {
-        // Initialize draft.sessions if it's not already an array
-        if (!Array.isArray(draft.sessions.stream)) {
-          draft.sessions.stream = [];
+        // Initialize session stream if it's not already an array
+        const session_space =
+          draft.tablespace[
+            EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID
+          ];
+
+        if (!Array.isArray(session_space.stream)) {
+          session_space.stream = [];
         }
 
         if (reset) {
-          draft.sessions.stream = data;
+          session_space.stream = data;
           return;
         }
 
         // Merge & Add new responses to the existing responses
         // Map of ids to responses for the existing responses
-        const existingSessionsById = draft.sessions.stream.reduce(
+        const existingSessionsById = session_space.stream.reduce(
           (acc: any, session) => {
             acc[session.id] = session;
             return acc;
@@ -655,7 +669,7 @@ export function reducer(
             );
           } else {
             // Add new response if id does not exist
-            draft.sessions.stream?.push(newSession);
+            session_space.stream?.push(newSession);
           }
         });
       });
@@ -692,12 +706,7 @@ export function reducer(
         draft.datagrid_orderby = datagridreset.datagrid_orderby;
 
         if (draft.doctype === "v0_form") {
-          draft.sessions.realtime =
-            tableid ===
-            GridaEditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID;
-          draft.responses.realtime =
-            tableid ===
-            GridaEditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID;
+          draft.tablespace[tableid].realtime = true;
         }
       });
     }
@@ -705,16 +714,20 @@ export function reducer(
       const {} = <DataGridDeleteSelectedRows>action;
       return produce(state, (draft) => {
         switch (state.datagrid_table_id) {
-          case GridaEditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID: {
+          case EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID: {
             const ids = Array.from(state.datagrid_selected_rows);
-            draft.responses.stream = draft.responses.stream?.filter(
+
+            const response_space =
+              draft.tablespace[
+                EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID
+              ];
+            response_space.stream = response_space.stream?.filter(
               (response) => !ids.includes(response.id)
             );
 
             break;
           }
-          case GridaEditorSymbols.Table
-            .SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID: {
+          case EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID: {
             const pk = state.x_supabase_main_table!.gfpk!;
             draft.x_supabase_main_table!.rows =
               draft.x_supabase_main_table!.rows.filter(
@@ -723,7 +736,7 @@ export function reducer(
 
             break;
           }
-          case GridaEditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID:
+          case EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID:
           default:
             throw new Error(
               "Unsupported table type: " + state.datagrid_table_id?.toString()
@@ -737,7 +750,9 @@ export function reducer(
     case "editor/customers/feed": {
       const { data } = <FeedCustomerAction>action;
       return produce(state, (draft) => {
-        draft.customers.stream = data;
+        draft.tablespace[
+          EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID
+        ].stream = data;
       });
     }
     case "editor/customers/edit": {
@@ -824,7 +839,7 @@ export function reducer(
     case "editor/data-grid/cell/change": {
       return produce(state, (draft) => {
         switch (state.datagrid_table_id) {
-          case GridaEditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID: {
+          case EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID: {
             const {
               row: row_id,
               column: attribute_id,
@@ -832,7 +847,11 @@ export function reducer(
             } = <DataGridCellChangeAction>action;
             const { value, option_id } = data;
 
-            const cell = draft.responses.stream?.find(
+            const response_space =
+              draft.tablespace[
+                EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID
+              ];
+            const cell = response_space.stream?.find(
               (row) => row.id === row_id
             )!.data[attribute_id];
 
@@ -843,8 +862,7 @@ export function reducer(
 
             break;
           }
-          case GridaEditorSymbols.Table
-            .SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID: {
+          case EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID: {
             const {
               row: row_pk,
               column,
@@ -895,7 +913,7 @@ export function reducer(
 
             break;
           }
-          case GridaEditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID:
+          case EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID:
           default: {
             throw new Error(
               "Unsupported table type: " + state.datagrid_table_id?.toString()

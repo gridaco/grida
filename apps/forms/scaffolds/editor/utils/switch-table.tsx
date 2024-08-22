@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useState } from "react";
 import { useEditorState } from "../use";
 import type { GDocTableID } from "../state";
-import { GridaEditorSymbols } from "../symbols";
+import { EditorSymbols } from "../symbols";
 
 export function CurrentTable({
   table,
@@ -9,17 +9,16 @@ export function CurrentTable({
 }: React.PropsWithChildren<{
   table:
     | GDocTableID
-    | typeof GridaEditorSymbols.Table.SYM_GRIDA_FORMS_WHATEVER_MAIN_TABLE_INDICATOR;
+    | typeof EditorSymbols.Table.SYM_GRIDA_FORMS_WHATEVER_MAIN_TABLE_INDICATOR;
 }>) {
   const [state, dispatch] = useEditorState();
   const [stale, setstale] = useState<boolean>(false);
 
   const tableid =
-    table ===
-    GridaEditorSymbols.Table.SYM_GRIDA_FORMS_WHATEVER_MAIN_TABLE_INDICATOR
+    table === EditorSymbols.Table.SYM_GRIDA_FORMS_WHATEVER_MAIN_TABLE_INDICATOR
       ? state.x_supabase_main_table
-        ? GridaEditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID
-        : GridaEditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID
+        ? EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID
+        : EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID
       : table;
   useLayoutEffect(() => {
     setstale(true);

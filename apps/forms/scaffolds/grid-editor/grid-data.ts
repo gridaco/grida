@@ -24,7 +24,7 @@ import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";
 import { FieldSupports } from "@/k/supported_field_types";
 import { PrivateEditorApi } from "@/lib/private";
 import { GridFilter } from "../grid-filter";
-import { GridaEditorSymbols } from "../editor/symbols";
+import { EditorSymbols } from "../editor/symbols";
 
 export namespace GridData {
   type DataGridInput =
@@ -34,15 +34,15 @@ export namespace GridData {
         filter: DataGridFilterSettings;
       } & (
         | {
-            table: typeof GridaEditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID;
+            table: typeof EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID;
             responses: Array<TVirtualRow<FormResponseField, FormResponse>>;
           }
         | {
-            table: typeof GridaEditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID;
+            table: typeof EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID;
             sessions: FormResponseSession[];
           }
         | {
-            table: typeof GridaEditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID;
+            table: typeof EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID;
             data: {
               pks: string[];
               rows: any[];
@@ -51,14 +51,14 @@ export namespace GridData {
       ))
     | {
         filter: DataGridFilterSettings;
-        table: typeof GridaEditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID;
+        table: typeof EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID;
         data: {
           rows: Customer[];
         };
       }
     | {
         filter: DataGridFilterSettings;
-        table: typeof GridaEditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID;
+        table: typeof EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID;
         data: {
           rows: any[];
         };
@@ -81,8 +81,8 @@ export namespace GridData {
       }));
 
     switch (table) {
-      case GridaEditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID:
-      case GridaEditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID: {
+      case EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID:
+      case EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID: {
         return {
           systemcolumns: [
             {
@@ -98,7 +98,7 @@ export namespace GridData {
           columns: fieldcolumns,
         };
       }
-      case GridaEditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID: {
+      case EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID: {
         return {
           systemcolumns: [
             {
@@ -144,7 +144,7 @@ export namespace GridData {
 
   export function rows(input: DataGridInput): TProcessedGridRows {
     switch (input.table) {
-      case GridaEditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID: {
+      case EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID: {
         const filtered = GridFilter.filter(
           input.responses,
           input.filter,
@@ -159,7 +159,7 @@ export namespace GridData {
           filtered: rows_from_responses(filtered, input.fields),
         };
       }
-      case GridaEditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID: {
+      case EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID: {
         return {
           type: "session",
           inputlength: input.sessions?.length || 0,
@@ -177,7 +177,7 @@ export namespace GridData {
             : [],
         };
       }
-      case GridaEditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID: {
+      case EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID: {
         return {
           type: "response",
           inputlength: input.data.rows.length,
@@ -195,7 +195,7 @@ export namespace GridData {
           }),
         };
       }
-      case GridaEditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID: {
+      case EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID: {
         return {
           type: "x-supabase-auth.users",
           inputlength: input.data.rows.length,
@@ -207,7 +207,7 @@ export namespace GridData {
           ),
         };
       }
-      case GridaEditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID: {
+      case EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID: {
         return {
           type: "customer",
           inputlength: input.data.rows.length,

@@ -21,7 +21,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { editorlink } from "@/lib/forms/url";
 import {
-  GridaEditorSymbols,
+  EditorSymbols,
   SYM_LOCALTZ,
   tztostr,
 } from "@/scaffolds/editor/symbols";
@@ -46,9 +46,8 @@ export function GridViewSettings() {
   //
   const simulator_available =
     datagrid_table_id ===
-      GridaEditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID ||
-    datagrid_table_id ===
-      GridaEditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID;
+      EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID ||
+    datagrid_table_id === EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID;
 
   return (
     <DropdownMenu>

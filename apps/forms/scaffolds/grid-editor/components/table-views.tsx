@@ -17,13 +17,13 @@ export function TableViews() {
   return (
     <div className="flex items-center gap-2">
       <Tabs
-      // value={tb?.name}
-      // onValueChange={(value) => {
-      //   dispatch({
-      //     type: "editor/data-grid/table",
-      //     name: value,
-      //   });
-      // }}
+        value={tb?.name}
+        // onValueChange={(value) => {
+        //   dispatch({
+        //     type: "editor/data-grid/table",
+        //     name: value,
+        //   });
+        // }}
       >
         <TabsList>
           <TabsTrigger key={tb.id.toString()} value={tb.name}>
