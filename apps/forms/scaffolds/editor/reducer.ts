@@ -178,7 +178,9 @@ export function reducer(
           }
 
           return produce(state, (draft) => {
-            const { available_field_ids } = state;
+            const {
+              form: { available_field_ids },
+            } = state;
 
             let field_id: string | null = null;
 
@@ -191,7 +193,7 @@ export function reducer(
               field_id = available_field_ids[0] ?? null;
               if (field_id) {
                 // remove the field id from available_field_ids
-                draft.available_field_ids = available_field_ids.filter(
+                draft.form.available_field_ids = available_field_ids.filter(
                   (id) => id !== field_id
                 );
               }
@@ -304,7 +306,7 @@ export function reducer(
         )?.form_field_id;
         // add the field_id to available_field_ids
         if (field_id) {
-          draft.available_field_ids.push(field_id);
+          draft.form.available_field_ids.push(field_id);
         }
       });
     }
@@ -344,8 +346,8 @@ export function reducer(
           block.form_field_id = field_id;
 
           // update the available_field_ids
-          draft.available_field_ids = [
-            ...draft.available_field_ids.filter((id) => id !== field_id),
+          draft.form.available_field_ids = [
+            ...draft.form.available_field_ids.filter((id) => id !== field_id),
             previous_field_id,
           ].filter(Boolean) as string[];
         }
@@ -474,13 +476,13 @@ export function reducer(
       return produce(state, (draft) => {
         switch (state.doctype) {
           case "v0_form": {
-            const field = draft.fields.find((f) => f.id === field_id);
+            const field = draft.form.fields.find((f) => f.id === field_id);
             if (field) {
               Object.assign(field, { ...data });
               field.id = field_id;
             } else {
               // create new field
-              draft.fields.push({
+              draft.form.fields.push({
                 ...data,
               });
 
@@ -503,7 +505,7 @@ export function reducer(
 
               // add the field_id to available_field_ids
               if (unused_field_id)
-                draft.available_field_ids.push(unused_field_id);
+                draft.form.available_field_ids.push(unused_field_id);
             }
 
             break;
@@ -523,10 +525,10 @@ export function reducer(
       const { field_id } = <DeleteFieldAction>action;
       return produce(state, (draft) => {
         // remove from fields
-        draft.fields = draft.fields.filter((f) => f.id !== field_id);
+        draft.form.fields = draft.form.fields.filter((f) => f.id !== field_id);
 
         // remove from available_field_ids
-        draft.available_field_ids = draft.available_field_ids.filter(
+        draft.form.available_field_ids = draft.form.available_field_ids.filter(
           (id) => id !== field_id
         );
 
@@ -772,10 +774,10 @@ export function reducer(
       const { a, b } = <DataGridReorderColumnAction>action;
       return produce(state, (draft) => {
         // update field local_index
-        const index_a = draft.fields.findIndex((f) => f.id === a);
-        const index_b = draft.fields.findIndex((f) => f.id === b);
+        const index_a = draft.form.fields.findIndex((f) => f.id === a);
+        const index_b = draft.form.fields.findIndex((f) => f.id === b);
         // TODO:
-        draft.fields = arrayMove(draft.fields, index_a, index_b);
+        draft.form.fields = arrayMove(draft.form.fields, index_a, index_b);
 
         console.error("reorder:: Not implemented yet");
       });
@@ -870,7 +872,7 @@ export function reducer(
             } = <DataGridCellChangeAction>action;
             const { value, option_id } = data;
 
-            const field = state.fields.find((f) => f.id === column);
+            const field = state.form.fields.find((f) => f.id === column);
             if (!field) return;
             const pk = state.x_supabase_main_table!.gfpk!;
 

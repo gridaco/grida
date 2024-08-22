@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo } from "react";
-import { useEditorState } from "./use";
+import { useEditorState, useFormFields } from "./use";
 import toast from "react-hot-toast";
 import {
   createClientFormsClient,
@@ -562,6 +562,8 @@ export function XSupabaseMainTableFeedProvider({
 }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
 
+  const fields = useFormFields();
+
   const {
     datagrid_rows_per_page,
     datagrid_table_refresh_key,
@@ -604,7 +606,7 @@ export function XSupabaseMainTableFeedProvider({
     dispatch({
       type: "editor/data-grid/refresh",
     });
-  }, [dispatch, state.fields]);
+  }, [dispatch, fields]);
 
   useEffect(() => {
     if (res.data?.data) {

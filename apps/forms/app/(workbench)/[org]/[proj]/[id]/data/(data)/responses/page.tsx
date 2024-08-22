@@ -1,7 +1,7 @@
 "use client";
 
 import Invalid from "@/components/invalid";
-import { useEditorState } from "@/scaffolds/editor";
+import { useEditorState, useFormFields } from "@/scaffolds/editor";
 import {
   ResponseFeedProvider,
   ResponseSessionFeedProvider,
@@ -44,12 +44,13 @@ function FormResponseGridEditor() {
   const [state, dispatch] = useEditorState();
   const {
     form_id,
-    fields,
     tablespace,
     datagrid_filter,
     datagrid_table_id,
     x_supabase_main_table,
   } = state;
+
+  const fields = useFormFields();
 
   const sessions_stream =
     tablespace[EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID].stream;

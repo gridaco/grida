@@ -26,3 +26,14 @@ export function useDatagridTable() {
     return tables.find((table) => table.id === datagrid_table_id);
   }, [datagrid_table_id, tables]);
 }
+
+export function useFormFields() {
+  const [state] = useEditorState();
+  const { doctype, form } = state;
+
+  if (doctype !== "v0_form") {
+    throw new Error("useFormFields: not a form document");
+  }
+
+  return form.fields;
+}

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useMemo, useState } from "react";
-import { useEditorState } from "../../editor";
+import { useEditorState, useFormFields } from "../../editor";
 import {
   Cross2Icon,
   DotIcon,
@@ -40,7 +40,9 @@ import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
 export function XSupaDataGridSort() {
   const [state, dispatch] = useEditorState();
 
-  const { fields, datagrid_orderby } = state;
+  const { datagrid_orderby } = state;
+
+  const fields = useFormFields();
 
   const isset = Object.keys(datagrid_orderby).length > 0;
 

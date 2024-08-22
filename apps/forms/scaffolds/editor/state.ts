@@ -290,6 +290,13 @@ interface IFieldEditorState {
   }>;
 }
 
+interface IConnectionsState {
+  connections: {
+    store_id?: number | null;
+    supabase?: GridaSupabase.SupabaseConnectionState;
+  };
+}
+
 interface ITablespaceEditorState {
   tables: Array<GDocTable>;
   /**
@@ -313,15 +320,12 @@ interface ITablespaceEditorState {
 
 export interface FormEditorState
   extends BaseDocumentEditorState,
+    IConnectionsState,
     IEditorSidebarState,
     ITablespaceEditorState,
     IDataGridState {
   form_id: string;
   form_title: string;
-  connections: {
-    store_id?: number | null;
-    supabase?: GridaSupabase.SupabaseConnectionState;
-  };
   campaign: {
     max_form_responses_by_customer: number | null;
     is_max_form_responses_by_customer_enabled: boolean;
@@ -347,9 +351,11 @@ export interface FormEditorState
 
   blocks: EditorFlatFormBlock[];
 
-  fields: FormFieldDefinition[];
+  form: {
+    fields: FormFieldDefinition[];
+    available_field_ids: string[];
+  };
 
-  available_field_ids: string[];
   focus_block_id?: string | null;
 
   x_supabase_main_table?: {

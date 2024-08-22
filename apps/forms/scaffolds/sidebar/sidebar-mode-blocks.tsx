@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { useEditorState } from "../editor";
+import { useEditorState, useFormFields } from "../editor";
 import {
   SidebarMenuItem,
   SidebarMenuItemActions,
@@ -63,6 +63,7 @@ export function ModeDesign() {
 
 function FormBlockHierarchyList() {
   const [state, dispatch] = useEditorState();
+  const fields = useFormFields();
   // const [expands, setExpands] = useState<Record<string, boolean>>({});
   const { focus_block_id } = state;
 
@@ -71,7 +72,7 @@ function FormBlockHierarchyList() {
       {state.blocks.map((b) => {
         const selected = focus_block_id === b.id;
         const { label, icon } = blocklabel(b, {
-          fields: state.fields,
+          fields,
         });
         return (
           <SidebarMenuItem

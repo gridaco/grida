@@ -13,7 +13,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { useEditorState } from "@/scaffolds/editor";
+import { useEditorState, useFormFields } from "@/scaffolds/editor";
 import { MixIcon } from "@radix-ui/react-icons";
 import { Tokens } from "@/ast";
 import { KeyIcon } from "lucide-react";
@@ -42,6 +42,7 @@ type ConditionExpression = Tokens.ShorthandBooleanBinaryExpression;
 function SelectedFormBlockProperties() {
   //
   const [state, dispatch] = useEditorState();
+  const fields = useFormFields();
 
   const block = useMemo(
     () => state.blocks.find((b) => b.id === state.focus_block_id),
@@ -106,13 +107,13 @@ function SelectedFormBlockProperties() {
                   </Label>
                   <EditBinaryExpression
                     resolvedType="boolean"
-                    leftOptions={state.fields.map((f) => ({
+                    leftOptions={fields.map((f) => ({
                       type: "form_field_value",
                       identifier: f.id,
                       label: f.name,
                     }))}
                     rightOptions={(left) =>
-                      state.fields
+                      fields
                         .find((f) => f.id === left)
                         ?.options?.map((o) => ({
                           type: "option_value_reference",

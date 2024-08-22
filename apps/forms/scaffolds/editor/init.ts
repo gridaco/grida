@@ -149,8 +149,6 @@ function initialDatabaseEditorState(
       },
       {}
     ),
-    // TODO: move me under a schema
-    fields: [],
   };
 }
 
@@ -339,7 +337,10 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
       nodes: [],
       templatedata: {},
     },
-    fields: init.fields,
+    form: {
+      fields: init.fields,
+      available_field_ids: block_available_field_ids,
+    },
     tablespace: {
       [EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID]: {
         readonly: false,
@@ -362,7 +363,6 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
       [EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID]:
         "noop" as never,
     },
-    available_field_ids: block_available_field_ids,
     ...initialDatagridState(),
     datagrid_table_id: is_main_table_supabase
       ? EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID

@@ -50,7 +50,6 @@ export function GridEditor({
 
   const {
     form_id,
-    fields,
     datagrid_table_id,
     datagrid_isloading,
     datagrid_selected_rows,

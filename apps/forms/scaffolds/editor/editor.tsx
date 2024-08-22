@@ -2,7 +2,7 @@
 
 import React, { useCallback, useMemo } from "react";
 import { StateProvider } from "./provider";
-import { useEditorState } from "./use";
+import { useEditorState, useFormFields } from "./use";
 import { reducer } from "./reducer";
 import {
   DatabaseDocumentEditorInit,
@@ -116,13 +116,13 @@ export function FormDocumentEditorProvider({
 function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
 
+  const fields = useFormFields();
+
   const field = useMemo(() => {
-    const focusfound = state.fields?.find(
-      (f) => f.id === state.field_editor.id
-    );
+    const focusfound = fields?.find((f) => f.id === state.field_editor.id);
     if (focusfound) return focusfound;
     return state.field_editor.data?.draft;
-  }, [state.field_editor.id, state.fields, state.field_editor.data?.draft]);
+  }, [state.field_editor.id, fields, state.field_editor.data?.draft]);
 
   const closeFieldPanel = useCallback(
     (options: { refresh: boolean }) => {
@@ -254,6 +254,8 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
 function RowEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
 
+  const fields = useFormFields();
+
   const response_stream =
     state.tablespace[EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID]
       .stream;
@@ -281,7 +283,7 @@ function RowEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
         open={state.row_editor.open}
         init={{
           row: focusresponse,
-          attributes: state.fields,
+          attributes: fields,
         }}
         onOpenChange={(open) => {
           dispatch({ type: "editor/responses/edit", open });
