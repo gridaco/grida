@@ -15,7 +15,13 @@ import {
 import toast from "react-hot-toast";
 import { useDatagridTable, useEditorState } from "../editor";
 import Link from "next/link";
-import { DownloadIcon, PieChartIcon, TrashIcon } from "@radix-ui/react-icons";
+import {
+  CaretDownIcon,
+  ChevronDownIcon,
+  DownloadIcon,
+  PieChartIcon,
+  TrashIcon,
+} from "@radix-ui/react-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import clsx from "clsx";
@@ -35,6 +41,13 @@ import { useDialogState } from "@/components/hooks/use-dialog-state";
 import type { GFColumn, GFResponseRow, GFSystemColumn } from "../grid/types";
 import { PrivateEditorApi } from "@/lib/private";
 import { EditorSymbols } from "../editor/symbols";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Columns3Icon, Rows3Icon } from "lucide-react";
 
 export function GridEditor({
   systemcolumns,
@@ -138,26 +151,28 @@ export function GridEditor({
             <>
               <div className="flex justify-center items-center divide-x *:px-2 first:*:pl-0 last:*:pr-0">
                 <TableViews />
-                {/* <div className="border-r"/> */}
-                <TableTools />
+                <TableQuery />
               </div>
             </>
           )}
         </GridLayout.HeaderMenus>
         <GridLayout.HeaderMenus>
-          <Link
-            href={editorlink("data/analytics", {
-              basepath: state.basepath,
-              document_id: state.document_id,
-            })}
-            className="flex"
-          >
-            <Badge variant={"outline"} className="cursor-pointer">
-              <PieChartIcon className="align-middle me-2" />
-              Realtime
-            </Badge>
-          </Link>
+          {state.doctype === "v0_form" && (
+            <Link
+              href={editorlink("data/analytics", {
+                basepath: state.basepath,
+                document_id: state.document_id,
+              })}
+              className="flex"
+            >
+              <Badge variant={"outline"} className="cursor-pointer">
+                <PieChartIcon className="align-middle me-2" />
+                Realtime
+              </Badge>
+            </Link>
+          )}
           <GridViewSettings />
+          {!tb?.readonly && <TableMod />}
         </GridLayout.HeaderMenus>
       </GridLayout.Header>
       <DeleteFieldConfirmDialog
@@ -178,8 +193,7 @@ export function GridEditor({
           onAddNewFieldClick={openNewFieldPanel}
           onEditFieldClick={openEditFieldPanel}
           onDeleteFieldClick={(field_id) => {
-            deleteFieldConfirmDialog.setData({ field_id });
-            deleteFieldConfirmDialog.openDialog();
+            deleteFieldConfirmDialog.openDialog({ field_id });
           }}
           onCellChange={(row, column, data) => {
             dispatch({
@@ -208,7 +222,7 @@ export function GridEditor({
   );
 }
 
-function TableTools() {
+function TableQuery() {
   const [state] = useEditorState();
   const { datagrid_table_id } = state;
 
@@ -219,6 +233,67 @@ function TableTools() {
         EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID && (
         <XSupaDataGridSort />
       )}
+    </div>
+  );
+}
+
+function TableMod() {
+  const [state, dispatch] = useEditorState();
+
+  const openNewTuplePanel = useCallback(() => {
+    dispatch({
+      type: "editor/responses/edit",
+      open: true,
+      response_id: undefined,
+    });
+  }, [dispatch]);
+
+  const openNewAttributePanel = useCallback(() => {
+    dispatch({
+      type: "editor/field/edit",
+      open: true,
+      refresh: true,
+    });
+  }, [dispatch]);
+
+  return (
+    <div className="flex items-center gap-1">
+      <div role="group" className="inline-flex rounded-md shadow-sm">
+        <button
+          type="button"
+          onClick={openNewTuplePanel}
+          className={clsx(
+            buttonVariants({ variant: "default", size: "sm" }),
+            "border rounded-s-lg rounded-e-none focus:z-10 focus:ring-2",
+            "gap-2"
+          )}
+        >
+          New
+        </button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className={clsx(
+                buttonVariants({ variant: "default", size: "sm" }),
+                "pl-1.5 pr-1.5 py-1 border-t border-b border-r rounded-s-none rounded-e-lg focus:z-10 focus:ring-2"
+              )}
+            >
+              <ChevronDownIcon />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="top" align="end">
+            <DropdownMenuItem onSelect={openNewTuplePanel}>
+              <Rows3Icon className="w-4 h-4 align-middle me-2" />
+              Insert Row
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={openNewAttributePanel}>
+              <Columns3Icon className="w-4 h-4 align-middle me-2" />
+              Insert Column
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     </div>
   );
 }

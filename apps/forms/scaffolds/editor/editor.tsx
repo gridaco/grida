@@ -22,6 +22,7 @@ import { AssetsBackgroundsResolver } from "./resolver/assets-backgrounds-resolve
 import toast from "react-hot-toast";
 import { EditorSymbols } from "./symbols";
 import Invalid from "@/components/invalid";
+import { fmt_local_index } from "@/utils/fmt";
 
 export function EditorProvider({
   initial,
@@ -67,6 +68,7 @@ export function DatabaseDocumentEditorProvider({
       <TooltipProvider>
         {/*  */}
         <FormFieldEditPanelProvider />
+        <RowEditPanelProvider />
         {children}
       </TooltipProvider>
     </StateProvider>
@@ -114,10 +116,6 @@ export function FormDocumentEditorProvider({
   );
 }
 
-function SchemaAttributeEditPanelProvider({
-  children,
-}: React.PropsWithChildren<{}>) {}
-
 function useAttributes() {
   const [state] = useEditorState();
   switch (state.doctype) {
@@ -139,7 +137,6 @@ function useAttributes() {
 function FormFieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
 
-  // const fields = useFormFields();
   const attributes = useAttributes();
 
   // TODO: clean this up. temporary fix for supporting v0_form and v0_schema
@@ -278,39 +275,58 @@ function FormFieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
   );
 }
 
+function useRowEditorRow() {
+  const [state, dispatch] = useEditorState();
+
+  const row = useMemo(() => {
+    switch (state.doctype) {
+      case "v0_form":
+        const response_stream =
+          state.tablespace[
+            EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID
+          ].stream;
+
+        return response_stream?.find((r) => r.id === state.row_editor.id);
+      default:
+        return undefined;
+    }
+  }, [state.tablespace, state.row_editor.id]);
+
+  return row;
+}
+
 function RowEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
 
-  const fields = useFormFields();
+  const attributes = useAttributes();
 
-  const response_stream =
-    state.tablespace[EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID]
-      .stream;
+  const row = useRowEditorRow();
 
-  const focusresponse = useMemo(() => {
-    return response_stream?.find((r) => r.id === state.row_editor.id);
-  }, [response_stream, state.row_editor.id]);
-
-  const focusxsupabasemaintablerow = useMemo(() => {
-    const pk = state.x_supabase_main_table?.gfpk;
-    if (!pk) return;
-    return state.x_supabase_main_table?.rows?.find(
-      (r) => r[pk] === state.row_editor.id // TODO: - pk
-    );
-  }, [
-    state.x_supabase_main_table?.rows,
-    state.x_supabase_main_table?.gfpk,
-    state.row_editor.id,
-  ]);
+  // const focusxsupabasemaintablerow = useMemo(() => {
+  //   const pk = state.x_supabase_main_table?.gfpk;
+  //   if (!pk) return;
+  //   return state.x_supabase_main_table?.rows?.find(
+  //     (r) => r[pk] === state.row_editor.id // TODO: - pk
+  //   );
+  // }, [
+  //   state.x_supabase_main_table?.rows,
+  //   state.x_supabase_main_table?.gfpk,
+  //   state.row_editor.id,
+  // ]);
 
   return (
     <>
       <RowEditPanel
-        key={focusresponse?.id}
+        key={row?.id}
         open={state.row_editor.open}
+        title={
+          row
+            ? `Response ${row.meta.local_index ? fmt_local_index(row.meta.local_index) : ""}`
+            : "New"
+        }
+        attributes={attributes}
         init={{
-          row: focusresponse,
-          attributes: fields,
+          row: row,
         }}
         onOpenChange={(open) => {
           dispatch({ type: "editor/responses/edit", open });

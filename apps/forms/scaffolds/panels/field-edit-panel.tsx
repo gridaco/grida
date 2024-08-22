@@ -78,7 +78,11 @@ import Link from "next/link";
 import { NameInput } from "./name-input";
 import { LockClosedIcon, MixIcon, ReloadIcon } from "@radix-ui/react-icons";
 import { Badge } from "@/components/ui/badge";
-import { FormAgentProvider, initdummy } from "@/lib/formstate";
+import {
+  DummyFormAgentStateProvider,
+  FormAgentProvider,
+  initdummy,
+} from "@/lib/formstate";
 import { SupabaseReferencesSettings } from "./extensions/field-x-sb-reference-fk-settings";
 import { SupabaseStorageSettings } from "./extensions/field-x-sb-storage-settings";
 import { XSupabaseFieldConnectionPolicyCheck } from "@/lib/supabase/check";
@@ -1033,18 +1037,6 @@ export function FieldEditPanel({
         </Button>
       </PanelFooter>
     </SidePanel>
-  );
-}
-
-/**
- * TODO: this is added while developing a v_value feature on form field. once the value computation is moved to the higher level, this can be removed.
- * @returns
- */
-function DummyFormAgentStateProvider({
-  children,
-}: React.PropsWithChildren<{}>) {
-  return (
-    <FormAgentProvider initial={initdummy()}>{children}</FormAgentProvider>
   );
 }
 

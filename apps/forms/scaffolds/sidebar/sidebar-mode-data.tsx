@@ -138,7 +138,7 @@ export function ModeData() {
 
   return (
     <>
-      <CreateNewTableDialog {...newTableDialog} />
+      <CreateNewTableDialog {...newTableDialog} key={newTableDialog.key} />
       {renderMenuItems(state.sidebar.mode_data.tables, {
         renderEmptyState: () => <EmptyState />,
         renderSectionHeader: ({ section }) => (

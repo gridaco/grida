@@ -10,7 +10,6 @@ import { GridaLogo } from "@/components/grida-logo";
 import { SlashIcon } from "@radix-ui/react-icons";
 import { Sidebar } from "@/scaffolds/sidebar/sidebar";
 import { EditorProvider, FormDocumentEditorProvider } from "@/scaffolds/editor";
-import { PreviewButton } from "@/components/preview-button";
 import { GridaXSupabaseService } from "@/services/x-supabase";
 import type {
   EndingPageTemplateID,
@@ -34,6 +33,7 @@ import { EditorHelpFab } from "@/scaffolds/help/editor-help-fab";
 import { Inter } from "next/font/google";
 import { cn } from "@/utils";
 import React from "react";
+import { PlayActions } from "@/scaffolds/workbench/play-actions";
 
 export const revalidate = 0;
 
@@ -437,9 +437,7 @@ function Header({
           <Breadcrumbs />
           <SavingIndicator />
         </div>
-        <div className="px-4 flex gap-4 items-center justify-end">
-          <PreviewButton />
-        </div>
+        <PlayActions />
       </div>
     </header>
   );

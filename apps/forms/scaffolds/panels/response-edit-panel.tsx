@@ -36,20 +36,25 @@ import { UAParser } from "ua-parser-js";
 import { AvatarIcon } from "@radix-ui/react-icons";
 import { useEditorState } from "../editor";
 import { TVirtualRow } from "../editor/state";
+import { DummyFormAgentStateProvider } from "@/lib/formstate";
+import FormField from "@/components/formfield/form-field";
 
 export function RowEditPanel({
+  title,
   onSave,
+  attributes,
   init,
   ...props
 }: React.ComponentProps<typeof SidePanel> & {
+  title: string;
+  attributes: FormFieldDefinition[];
   init?: Partial<{
     row: TVirtualRow<FormResponseField, FormResponse>;
-    attributes: FormFieldDefinition[];
   }>;
   onSave?: (field: FormFieldInit) => void;
 }) {
   const [state, dispatch] = useEditorState();
-  const { row, attributes } = init ?? {};
+  const { row } = init ?? {};
 
   const { resolvedTheme } = useTheme();
 
@@ -66,88 +71,114 @@ export function RowEditPanel({
     [dispatch]
   );
 
-  if (!row) return <></>;
+  // if (!row) return <></>;
 
   return (
     <SidePanel {...props}>
-      <PanelHeader>{`Response ${row.meta.local_index ? fmt_local_index(row.meta.local_index) : ""}`}</PanelHeader>
-      <PanelContent>
-        <PanelPropertySection>
-          <PanelPropertySectionTitle>General</PanelPropertySectionTitle>
-          <PanelPropertyFields>
-            <ResponseIdTable {...row.meta} />
-            <ResponsePropertiesTable {...row.meta} />
-          </PanelPropertyFields>
-        </PanelPropertySection>
-        <PanelPropertySection>
-          <PanelPropertySectionTitle>Customer</PanelPropertySectionTitle>
-          <PanelPropertyFields>
+      <PanelHeader>{title}</PanelHeader>
+      <PanelContent className=" divide-y">
+        {row && (
+          <>
+            <PanelPropertySection>
+              <PanelPropertySectionTitle>General</PanelPropertySectionTitle>
+              <PanelPropertyFields>
+                <ResponseIdTable {...row.meta} />
+                <ResponsePropertiesTable {...row.meta} />
+              </PanelPropertyFields>
+            </PanelPropertySection>
             {row.meta.customer_id && (
               <>
-                <ResponseCustomerMetaTable {...row.meta} />
-                <Button
-                  type="button"
-                  onClick={() =>
-                    onViewCustomerDetailsClick(row.meta.customer_id!)
-                  }
-                  variant="secondary"
-                >
-                  <AvatarIcon className="me-2 inline-flex align-middle" />
-                  More about this customer
-                </Button>
+                <PanelPropertySection>
+                  <PanelPropertySectionTitle>
+                    Customer
+                  </PanelPropertySectionTitle>
+                  <PanelPropertyFields>
+                    <ResponseCustomerMetaTable {...row.meta} />
+                    <Button
+                      type="button"
+                      onClick={() =>
+                        onViewCustomerDetailsClick(row.meta.customer_id!)
+                      }
+                      variant="secondary"
+                    >
+                      <AvatarIcon className="me-2 inline-flex align-middle" />
+                      More about this customer
+                    </Button>
+                  </PanelPropertyFields>
+                </PanelPropertySection>
               </>
             )}
-          </PanelPropertyFields>
-        </PanelPropertySection>
+          </>
+        )}
         <form>
-          <PanelPropertySection>
-            <PanelPropertySectionTitle>Response</PanelPropertySectionTitle>
-            <PanelPropertyFields>
-              {attributes?.map((attr) => {
-                const cell = row.data[attr.id];
+          <DummyFormAgentStateProvider>
+            <PanelPropertySection grid={false}>
+              {/* <PanelPropertySectionTitle>Response</PanelPropertySectionTitle> */}
+              {/* <PanelPropertyFields> */}
+              <div className="flex flex-col gap-14">
+                {attributes?.map((field) => {
+                  const cell = row?.data[field.id];
 
-                const txt = cell?.value ?? "";
-
-                return (
-                  <PanelPropertyField key={attr.id} label={attr.name}>
-                    <PropertyTextInput
-                      autoFocus={false}
-                      readOnly
-                      placeholder={attr.placeholder ?? ""}
-                      value={txt}
+                  return (
+                    <FormField
+                      //
+                      defaultValue={cell?.value}
+                      autoComplete="off"
+                      //
+                      key={field.id}
+                      id={field.id}
+                      disabled={!!!field}
+                      name={field?.name ?? ""}
+                      label={field?.label ?? ""}
+                      type={field?.type ?? "text"}
+                      required={field?.required ?? false}
+                      requiredAsterisk
+                      pattern={field?.pattern ?? ""}
+                      step={field?.step ?? undefined}
+                      min={field?.min ?? undefined}
+                      max={field?.max ?? undefined}
+                      helpText={field?.help_text ?? ""}
+                      placeholder={field?.placeholder ?? ""}
+                      options={field?.options}
+                      optgroups={field?.optgroups}
+                      multiple={field?.multiple ?? false}
+                      data={field?.data}
                     />
-                  </PanelPropertyField>
-                );
-              })}
+                  );
+                })}
+              </div>
+              {/* </PanelPropertyFields> */}
+            </PanelPropertySection>
+          </DummyFormAgentStateProvider>
+        </form>
+        {row && (
+          <PanelPropertySection>
+            <PanelPropertySectionTitle>RAW</PanelPropertySectionTitle>
+            <PanelPropertyFields>
+              <PanelPropertyField label={"raw.json (readonly)"}>
+                <Editor
+                  className="rounded overflow-hidden shadow-sm border"
+                  height={400}
+                  defaultLanguage="json"
+                  defaultValue={JSON.stringify(row.meta, null, 2)}
+                  options={{
+                    readOnly: true,
+                    padding: {
+                      top: 10,
+                    },
+                    minimap: {
+                      enabled: false,
+                    },
+                    tabSize: 2,
+                    fontSize: 13,
+                    scrollBeyondLastLine: false,
+                    glyphMargin: false,
+                  }}
+                />
+              </PanelPropertyField>
             </PanelPropertyFields>
           </PanelPropertySection>
-        </form>
-        <PanelPropertySection>
-          <PanelPropertySectionTitle>RAW</PanelPropertySectionTitle>
-          <PanelPropertyFields>
-            <PanelPropertyField label={"raw.json (readonly)"}>
-              <Editor
-                className="rounded overflow-hidden shadow-sm border"
-                height={400}
-                defaultLanguage="json"
-                defaultValue={JSON.stringify(row.meta, null, 2)}
-                options={{
-                  readOnly: true,
-                  padding: {
-                    top: 10,
-                  },
-                  minimap: {
-                    enabled: false,
-                  },
-                  tabSize: 2,
-                  fontSize: 13,
-                  scrollBeyondLastLine: false,
-                  glyphMargin: false,
-                }}
-              />
-            </PanelPropertyField>
-          </PanelPropertyFields>
-        </PanelPropertySection>
+        )}
       </PanelContent>
       <PanelFooter>
         <PanelClose>
@@ -275,6 +306,7 @@ function ResponsePropertiesTable({
     </Table>
   );
 }
+
 function ResponseIdTable({
   id,
   local_id,

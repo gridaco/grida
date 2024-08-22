@@ -6,6 +6,7 @@ import {
   HoverCardContent,
 } from "@/components/ui/hover-card";
 import { QuestionMarkCircledIcon } from "@radix-ui/react-icons";
+import { cn } from "@/utils";
 
 export function SidePanel({
   children,
@@ -140,8 +141,15 @@ export function PanelHeader({ children }: React.PropsWithChildren<{}>) {
   );
 }
 
-export function PanelContent({ children }: React.PropsWithChildren<{}>) {
-  return <div className=" relative flex-1 overflow-y-auto ">{children}</div>;
+export function PanelContent({
+  className,
+  children,
+}: React.PropsWithChildren<{ className?: string }>) {
+  return (
+    <div className={cn("relative flex-1 overflow-y-auto", className)}>
+      {children}
+    </div>
+  );
 }
 
 export function PanelClose({ children }: React.PropsWithChildren<{}>) {
