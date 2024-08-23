@@ -66,10 +66,12 @@ export function DatabaseDocumentEditorProvider({
   return (
     <StateProvider state={state} dispatch={dispatch}>
       <TooltipProvider>
-        {/*  */}
-        <FormFieldEditPanelProvider />
-        <RowEditPanelProvider />
-        {children}
+        <MediaViewerProvider>
+          {/*  */}
+          <FormFieldEditPanelProvider />
+          <RowEditPanelProvider />
+          {children}
+        </MediaViewerProvider>
       </TooltipProvider>
     </StateProvider>
   );
@@ -86,8 +88,10 @@ export function SiteDocumentEditorProvider({
   return (
     <StateProvider state={state} dispatch={dispatch}>
       <TooltipProvider>
-        {/*  */}
-        {children}
+        <MediaViewerProvider>
+          {/*  */}
+          {children}
+        </MediaViewerProvider>
       </TooltipProvider>
     </StateProvider>
   );
