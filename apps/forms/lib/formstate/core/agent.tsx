@@ -1,5 +1,5 @@
 import React from "react";
-import { FormAgentState, init, initdummy } from "./state";
+import { FormAgentState, initdummy } from "./state";
 import { reducer } from "./reducer";
 import { StateProvider } from "./provider";
 

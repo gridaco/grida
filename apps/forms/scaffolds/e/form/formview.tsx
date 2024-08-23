@@ -42,19 +42,19 @@ import { FormAgentMessagingInterfaceProvider } from "./interface";
 import { FormAgentMessagingInterface } from "./emit";
 import { useValue } from "@/lib/spock";
 
-const cls_button_submit =
-  "text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800";
-const cls_button_nuetral =
-  "py-2.5 px-5 me-2 mb-2 text-sm font-medium text-neutral-900 focus:outline-none bg-white rounded-lg border border-neutral-200 hover:bg-neutral-100 hover:text-blue-700 focus:z-10 focus:ring-4 focus:ring-neutral-100 dark:focus:ring-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:border-neutral-700 dark:hover:text-white dark:hover:bg-neutral-800";
-
 type PaymentCheckoutSession = TossPaymentsCheckoutSessionResponseData | any;
 
 const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false });
 
 type HtmlFormElementProps = Omit<
   React.FormHTMLAttributes<HTMLFormElement>,
-  "title"
+  "title" | "onSubmit"
 >;
+
+interface IOnSubmit {
+  onSubmit?: (e: React.FormEvent<HTMLFormElement>) => void;
+  onAfterSubmit?: () => void;
+}
 
 export interface FormViewTranslation {
   next: string;
@@ -70,33 +70,30 @@ const default_form_view_translation_en: FormViewTranslation = {
   pay: "Pay",
 };
 
-type FormBodyProps = {
+type FormViewRootProps = {
+  form_id: string;
   session_id?: string;
-  defaultValues?: { [key: string]: string };
   fields: FormFieldDefinition[];
   blocks: ClientRenderBlock[];
   tree: FormBlockTree<ClientRenderBlock[]>;
-  translation?: FormViewTranslation;
-  config: {
-    is_powered_by_branding_enabled: boolean;
-    optimize_for_cjk?: boolean;
-  };
-  stylesheet?: any;
-  onAfterSubmit?: () => void;
-  className?: string;
+  defaultValues?: { [key: string]: string };
 };
 
-export function FormView(
-  props: {
-    form_id: string;
-  } & FormBodyProps &
-    HtmlFormElementProps
+export function GridaFormsFormView(
+  props: FormViewRootProps & FormBodyProps & HtmlFormElementProps & IOnSubmit
 ) {
   return (
-    <Providers {...props}>
+    <FormViewRoot {...props}>
       <FormBody {...props} />
-    </Providers>
+    </FormViewRoot>
   );
+}
+
+export function FormViewRoot({
+  children,
+  ...props
+}: React.PropsWithChildren<FormViewRootProps>) {
+  return <Providers {...props}>{children}</Providers>;
 }
 
 function Providers({
@@ -106,9 +103,11 @@ function Providers({
   blocks,
   children,
   tree,
+  defaultValues,
 }: React.PropsWithChildren<{
   form_id: string;
   session_id?: string;
+  defaultValues?: { [key: string]: string };
   fields: FormFieldDefinition[];
   blocks: ClientRenderBlock[];
   tree: FormBlockTree<ClientRenderBlock[]>;
@@ -133,6 +132,7 @@ function Providers({
           fields,
           blocks,
           tree,
+          defaultValues,
         })}
       >
         <FormAgentMessagingInterfaceProvider />
@@ -147,24 +147,30 @@ function Providers({
   );
 }
 
-function FormBody({
+type FormBodyProps = {
+  translation?: FormViewTranslation;
+  config: {
+    is_powered_by_branding_enabled: boolean;
+    optimize_for_cjk?: boolean;
+  };
+  stylesheet?: any;
+};
+
+export function FormBody({
   onSubmit,
-  session_id,
-  blocks,
-  fields,
-  defaultValues,
-  tree,
+  onAfterSubmit,
+  className,
   translation = default_form_view_translation_en,
   config,
   stylesheet,
-  onAfterSubmit,
-  className,
   ...formattributes
-}: FormBodyProps & HtmlFormElementProps) {
+}: FormBodyProps & HtmlFormElementProps & IOnSubmit) {
   const [state, dispatch] = useFormAgentState();
 
   // the default value shall be fixed on the first render (since the defaultValues can be changed due to session data sync. - which might cause data loss on the form field.)
-  const initialDefaultValues = useRef(defaultValues);
+  const initialDefaultValues = useRef(state.defaultValues);
+
+  const { tree, session_id } = state;
 
   const {
     is_submitting,
@@ -402,7 +408,7 @@ function Footer({
       <TossPaymentsPayButton
         data-pay-hidden={shouldHidePay}
         className={clsx(
-          cls_button_submit,
+          "text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800",
           "w-full md:w-auto",
           "data-[pay-hidden='true']:hidden"
         )}
@@ -675,3 +681,8 @@ function FingerprintField() {
     />
   );
 }
+
+export const FormView = {
+  Root: FormViewRoot,
+  Body: FormBody,
+};

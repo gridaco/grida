@@ -6,7 +6,7 @@ import { FormPageDeveloperErrorDialog } from "@/scaffolds/e/form/error";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFingerprint } from "@/scaffolds/fingerprint";
 import { formlink } from "@/lib/forms/url";
-import { FormView, FormViewTranslation } from "./formview";
+import { GridaFormsFormView, type FormViewTranslation } from "./formview";
 import type { FormPageBackgroundSchema } from "@/types";
 import { FormPageBackground } from "./background";
 
@@ -14,7 +14,7 @@ import { useRequestFormSession, useFormSession } from "./load";
 
 const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
 
-export function Form({
+export function GridaForm({
   form_id,
   params,
   translation,
@@ -98,7 +98,7 @@ export function Form({
 
   return (
     <main className="min-h-screen flex flex-col items-center pt-10 md:pt-16">
-      <FormView
+      <GridaFormsFormView
         method={method}
         encType={method === "post" ? "multipart/form-data" : undefined}
         action={submit_action}
@@ -149,4 +149,5 @@ function SkeletonCard() {
   );
 }
 
+export { GridaFormsFormView };
 export { FormView } from "./formview";

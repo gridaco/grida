@@ -38,8 +38,6 @@ import { UAParser } from "ua-parser-js";
 import { AvatarIcon, InfoCircledIcon } from "@radix-ui/react-icons";
 import { useEditorState } from "../editor";
 import { TVirtualRow } from "../editor/state";
-import { DummyFormAgentStateProvider } from "@/lib/formstate";
-import FormField from "@/components/formfield/form-field";
 import { Toggle } from "@/components/ui/toggle";
 import { FormView } from "../e/form";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -143,33 +141,36 @@ function EditRowForm({ form_id }: { form_id: string }) {
 
   // return <>{JSON.stringify(data)}</>;
   return (
-    <FormView
-      onSubmit={(e) => {
-        e.preventDefault();
-
-        const formdata = new FormData(e.target as HTMLFormElement);
-        formdata.set("form_id", form_id);
-
-        console.log("submit", formdata);
-
-        fetch(`/submit/${form_id}`, {
-          method: "POST",
-          body: formdata,
-        }).then((res) => {
-          console.log("submit response", res);
-        });
-      }}
-      className="max-w-full"
+    <FormView.Root
       form_id={form_id}
       session_id={session}
       fields={fields}
       defaultValues={default_values}
       blocks={blocks}
       tree={tree}
-      config={{
-        is_powered_by_branding_enabled: false,
-      }}
-    />
+    >
+      <FormView.Body
+        onSubmit={(e) => {
+          e.preventDefault();
+
+          const formdata = new FormData(e.target as HTMLFormElement);
+          formdata.set("form_id", form_id);
+
+          console.log("submit", formdata);
+
+          fetch(`/submit/${form_id}`, {
+            method: "POST",
+            body: formdata,
+          }).then((res) => {
+            console.log("submit response", res);
+          });
+        }}
+        className="max-w-full"
+        config={{
+          is_powered_by_branding_enabled: false,
+        }}
+      />
+    </FormView.Root>
   );
 }
 

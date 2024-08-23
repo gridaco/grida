@@ -1,4 +1,4 @@
-import { Form } from "@/scaffolds/e/form";
+import { GridaForm } from "@/scaffolds/e/form";
 import i18next from "i18next";
 import { ssr_page_init_i18n } from "@/i18n/ssr";
 
@@ -15,7 +15,7 @@ export default async function FormPage({
   await ssr_page_init_i18n({ form_id });
 
   return (
-    <Form
+    <GridaForm
       form_id={form_id}
       params={searchParams}
       translation={{

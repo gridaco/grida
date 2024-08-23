@@ -2,7 +2,7 @@
 
 import { JSONFormRaw, parse } from "@/types/schema";
 import { FormRenderTree } from "@/lib/forms";
-import { FormView } from "@/scaffolds/e/form";
+import { GridaFormsFormView } from "@/scaffolds/e/form";
 import { useEffect, useRef, useState } from "react";
 import resources from "@/i18n";
 import { nanoid } from "nanoid";
@@ -177,7 +177,7 @@ export function PlaygroundPreviewSlave() {
               <ExclamationTriangleIcon />
             </div>
           )}
-          <FormView
+          <GridaFormsFormView
             form_id={renderer.id}
             fields={renderer.fields()}
             blocks={renderer.blocks()}
