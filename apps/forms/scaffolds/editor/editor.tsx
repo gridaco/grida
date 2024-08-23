@@ -15,7 +15,7 @@ import { FieldEditPanel, FieldSave } from "../panels/field-edit-panel";
 import { FormFieldDefinition } from "@/types";
 import { FormFieldUpsert, EditorApiResponse } from "@/types/private/api";
 import { TooltipProvider } from "@radix-ui/react-tooltip";
-import { RowEditPanel } from "../panels/response-edit-panel";
+import { RowEditPanel } from "../panels/row-edit-panel";
 import { CustomerEditPanel } from "../panels/customer-panel";
 import { MediaViewerProvider } from "../mediaviewer";
 import { AssetsBackgroundsResolver } from "./resolver/assets-backgrounds-resolver";
