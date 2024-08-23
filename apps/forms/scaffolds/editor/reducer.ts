@@ -618,10 +618,14 @@ export function reducer(
       });
     }
     case "editor/responses/edit": {
-      const { response_id, open } = <OpenResponseEditAction>action;
+      const { response_id, open, refresh } = <OpenResponseEditAction>action;
       return produce(state, (draft) => {
         draft.row_editor.open = open ?? true;
         draft.row_editor.id = response_id;
+        draft.row_editor.refreshkey = nextrefreshkey(
+          draft.row_editor.refreshkey,
+          refresh
+        );
       });
     }
     case "editor/data/sessions/feed": {

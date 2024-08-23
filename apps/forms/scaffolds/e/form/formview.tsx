@@ -34,13 +34,20 @@ import {
   ClientSectionRenderBlock,
 } from "@/lib/forms";
 import { Button } from "@/components/ui/button";
-import { FormAgentProvider, useFormAgentState, init } from "@/lib/formstate";
+import {
+  FormAgentProvider,
+  useFormAgentState,
+  init,
+  useFormAgent,
+} from "@/lib/formstate";
 import { FieldSupports } from "@/k/supported_field_types";
 import { SessionDataSyncProvider } from "./sync";
 import { MediaLoadPluginProvider } from "./mediaload";
 import { FormAgentMessagingInterfaceProvider } from "./interface";
 import { FormAgentMessagingInterface } from "./emit";
 import { useValue } from "@/lib/spock";
+
+const html_form_id = "form";
 
 type PaymentCheckoutSession = TossPaymentsCheckoutSessionResponseData | any;
 
@@ -84,7 +91,26 @@ export function GridaFormsFormView(
 ) {
   return (
     <FormViewRoot {...props}>
-      <FormBody {...props} />
+      <div
+        id="form-view"
+        data-cjk={props.config.optimize_for_cjk}
+        className={clsx(
+          "prose dark:prose-invert prose-headings:text-foreground prose-p:text-foreground prose-hr:border-border text-foreground",
+          "w-full h-full md:h-auto grow md:grow-0",
+          "relative",
+          "data-[cjk='true']:break-keep",
+          "flex flex-col",
+          props.className
+        )}
+      >
+        <GridaFormBody {...props} />
+        <GridaFormFooter
+          translation={props.translation}
+          is_powered_by_branding_enabled={
+            props.config.is_powered_by_branding_enabled
+          }
+        />
+      </div>
     </FormViewRoot>
   );
 }
@@ -121,7 +147,7 @@ function Providers({
       testmode: true,
       redirect: true,
     }).then(setCheckoutSession);
-  }, []);
+  }, [form_id]);
 
   return (
     <>
@@ -156,6 +182,8 @@ type FormBodyProps = {
   stylesheet?: any;
 };
 
+const GridaFormBody = FormBody;
+
 export function FormBody({
   onSubmit,
   onAfterSubmit,
@@ -166,172 +194,123 @@ export function FormBody({
   ...formattributes
 }: FormBodyProps & HtmlFormElementProps & IOnSubmit) {
   const [state, dispatch] = useFormAgentState();
+  const { tree, session_id, current_section_id, submit_hidden, onNext } =
+    useFormAgent();
 
   // the default value shall be fixed on the first render (since the defaultValues can be changed due to session data sync. - which might cause data loss on the form field.)
   const initialDefaultValues = useRef(state.defaultValues);
 
-  const { tree, session_id } = state;
-
-  const {
-    is_submitting,
-    sections,
-    has_sections,
-    last_section_id,
-    current_section_id,
-  } = state;
-
-  const current_section = useMemo(() => {
-    return sections.find((section) => section.id === current_section_id) as
-      | ClientSectionRenderBlock
-      | undefined;
-  }, [current_section_id, sections]);
-
-  const primary_action_override_by_payment =
-    current_section?.attributes?.contains_payment ?? false;
-
-  const submit_hidden = has_sections
-    ? primary_action_override_by_payment ||
-      last_section_id !== current_section_id
-    : false;
-
-  const pay_hidden = !primary_action_override_by_payment;
-
-  const has_previous = has_sections
-    ? current_section_id !== sections[0].id
-    : false;
-  const previous_section_button_hidden = !has_previous;
-
-  const has_next = has_sections
-    ? current_section_id !== last_section_id
-    : false;
-  const next_section_button_hidden =
-    !has_next || primary_action_override_by_payment;
-
-  const onPrevious = (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (current_section_id === sections[0].id) {
-      return;
-    }
-
-    dispatch({ type: "section/prev" });
-    // scroll to top
+  useEffect(() => {
+    // scroll to top when section changes
     window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const onNext = (e?: React.MouseEvent<HTMLButtonElement>) => {
-    // validate current section
-    // e.preventDefault();
-    // e.stopPropagation();
-
-    if (current_section_id === last_section_id) {
-      return;
-    }
-
-    dispatch({ type: "section/next" });
-
-    // scroll to top
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
+  }, [current_section_id]);
 
   const getDefaultValue = useCallback(
     (key: string) => initialDefaultValues.current?.[key],
     []
   );
 
-  const html_form_id = "form";
+  return (
+    <>
+      <form
+        {...formattributes}
+        id={html_form_id}
+        action={submit_hidden ? undefined : formattributes.action}
+        onSubmit={(e) => {
+          if (submit_hidden) {
+            e.preventDefault();
+            e.stopPropagation();
+            const valid = (e.target as HTMLFormElement).checkValidity();
+            if (valid) {
+              onNext();
+            } else {
+              // show error
+              alert("Please fill out the form correctly.");
+            }
+          } else {
+            // submit
+            FormAgentMessagingInterface.emit({ type: "submit" });
+            // disable submit button
+            dispatch({ type: "form/submit" });
+
+            onSubmit?.(e);
+            onAfterSubmit?.();
+          }
+        }}
+        className="p-4 h-full md:h-auto flex-1"
+      >
+        <div hidden>
+          <BrowserTimezoneOffsetField />
+          <FingerprintField />
+          {session_id && (
+            <input
+              type="hidden"
+              name={SYSTEM_GF_SESSION_KEY}
+              value={session_id}
+            />
+          )}
+        </div>
+        <GroupLayout>
+          {tree.children.map((b) => (
+            <BlockRenderer
+              key={b.id}
+              block={b}
+              stylesheet={stylesheet}
+              getDefaultValue={getDefaultValue}
+            />
+          ))}
+        </GroupLayout>
+        {config.is_powered_by_branding_enabled && (
+          // desktop branding
+          <div className="block md:hidden">
+            <PoweredByGridaFooter />
+          </div>
+        )}
+      </form>
+    </>
+  );
+}
+
+function GridaFormFooter({
+  is_powered_by_branding_enabled,
+  translation = default_form_view_translation_en,
+}: {
+  is_powered_by_branding_enabled: boolean;
+  translation?: FormViewTranslation;
+}) {
+  const {
+    has_previous,
+    has_next,
+    submit_hidden,
+    pay_hidden,
+    previous_section_button_hidden,
+    next_section_button_hidden,
+    is_submitting,
+    onPrevious,
+  } = useFormAgent();
 
   return (
-    <div
-      id="form-view"
-      data-cjk={config.optimize_for_cjk}
-      className={clsx(
-        "prose dark:prose-invert prose-headings:text-foreground prose-p:text-foreground prose-hr:border-border text-foreground",
-        "w-full h-full md:h-auto grow md:grow-0",
-        "relative",
-        "data-[cjk='true']:break-keep",
-        "flex flex-col",
-        className
-      )}
-    >
-      <>
-        <form
-          {...formattributes}
-          id={html_form_id}
-          action={submit_hidden ? undefined : formattributes.action}
-          onSubmit={(e) => {
-            if (submit_hidden) {
-              e.preventDefault();
-              e.stopPropagation();
-              const valid = (e.target as HTMLFormElement).checkValidity();
-              if (valid) {
-                onNext();
-              } else {
-                // show error
-                alert("Please fill out the form correctly.");
-              }
-            } else {
-              // submit
-              FormAgentMessagingInterface.emit({ type: "submit" });
-              // disable submit button
-              dispatch({ type: "form/submit" });
-
-              onSubmit?.(e);
-              onAfterSubmit?.();
-            }
-          }}
-          className="p-4 h-full md:h-auto flex-1"
-        >
-          <div hidden>
-            <BrowserTimezoneOffsetField />
-            <FingerprintField />
-            {session_id && (
-              <input
-                type="hidden"
-                name={SYSTEM_GF_SESSION_KEY}
-                value={session_id}
-              />
-            )}
-          </div>
-          <GroupLayout>
-            {tree.children.map((b) => (
-              <BlockRenderer
-                key={b.id}
-                block={b}
-                stylesheet={stylesheet}
-                getDefaultValue={getDefaultValue}
-              />
-            ))}
-          </GroupLayout>
-          {config.is_powered_by_branding_enabled && (
-            // desktop branding
-            <div className="block md:hidden">
-              <PoweredByGridaFooter />
-            </div>
-          )}
-        </form>
-        <Footer
-          html_form_element_id={html_form_id}
-          hasPrevious={has_previous}
-          shouldHidePrevious={previous_section_button_hidden}
-          onPrevious={onPrevious}
-          hasNext={has_next}
-          shouldHideNext={next_section_button_hidden}
-          shouldHideSubmit={submit_hidden}
-          shouldDisableSubmit={submit_hidden || is_submitting}
-          isSubmitting={is_submitting}
-          shouldHidePay={pay_hidden}
-          translation={translation}
-        />
-      </>
-      {config.is_powered_by_branding_enabled && (
-        // desktop branding
+    <>
+      <Footer
+        html_form_element_id={html_form_id}
+        hasPrevious={has_previous}
+        shouldHidePrevious={previous_section_button_hidden}
+        onPrevious={onPrevious}
+        hasNext={has_next}
+        shouldHideNext={next_section_button_hidden}
+        shouldHideSubmit={submit_hidden}
+        shouldDisableSubmit={submit_hidden || is_submitting}
+        isSubmitting={is_submitting}
+        shouldHidePay={pay_hidden}
+        translation={translation}
+      />
+      {/* on desktop, branding attribute is below footer */}
+      {is_powered_by_branding_enabled && (
         <div className="hidden md:block">
           <PoweredByGridaFooter />
         </div>
       )}
-    </div>
+    </>
   );
 }
 
@@ -368,6 +347,7 @@ function Footer({
       )}
     >
       <Button
+        type="button"
         variant="outline"
         data-previous-hidden={!hasPrevious}
         className={clsx(
@@ -391,20 +371,7 @@ function Footer({
       >
         {translation.next}
       </Button>
-      <Button
-        data-submit-hidden={shouldHideSubmit}
-        disabled={shouldDisableSubmit}
-        form={html_form_element_id}
-        type="submit"
-        className={clsx(
-          // cls_button_submit,
-          "w-full md:w-auto",
-          "data-[submit-hidden='true']:hidden",
-          "disabled:opacity-50 disabled:cursor-not-allowed"
-        )}
-      >
-        {translation.submit}
-      </Button>
+      <FormSubmit className="w-full md:w-auto">{translation.submit}</FormSubmit>
       <TossPaymentsPayButton
         data-pay-hidden={shouldHidePay}
         className={clsx(
@@ -419,13 +386,29 @@ function Footer({
   );
 }
 
-function BrandingAttributes() {
-  //
-}
+function FormSubmit({
+  className,
+  children,
+}: React.PropsWithChildren<{
+  className?: string;
+}>) {
+  const { submit_hidden, is_submitting } = useFormAgent();
 
-function Actions() {
-  // render actions
-  //
+  return (
+    <Button
+      data-submit-hidden={submit_hidden}
+      disabled={submit_hidden || is_submitting}
+      form={html_form_id}
+      type="submit"
+      className={clsx(
+        "data-[submit-hidden='true']:hidden",
+        "disabled:opacity-50 disabled:cursor-not-allowed",
+        className
+      )}
+    >
+      {children}
+    </Button>
+  );
 }
 
 function BlockRenderer({
@@ -685,4 +668,5 @@ function FingerprintField() {
 export const FormView = {
   Root: FormViewRoot,
   Body: FormBody,
+  Submit: FormSubmit,
 };

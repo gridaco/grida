@@ -248,6 +248,7 @@ function TableMod() {
       type: "editor/responses/edit",
       open: true,
       response_id: undefined,
+      refresh: true,
     });
   }, [dispatch]);
 

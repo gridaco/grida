@@ -131,6 +131,7 @@ function SelectCellFormatter({
     dispatch({
       type: "editor/responses/edit",
       response_id: id,
+      refresh: true,
     });
   }, [dispatch, id]);
 

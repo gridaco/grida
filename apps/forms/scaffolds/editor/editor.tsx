@@ -311,7 +311,7 @@ function RowEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
   return (
     <>
       <RowEditPanel
-        key={row?.id}
+        key={row?.id || state.row_editor.refreshkey}
         table_id={table_id}
         open={state.row_editor.open}
         title={

@@ -42,6 +42,7 @@ import { Toggle } from "@/components/ui/toggle";
 import { FormView } from "../e/form";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFormSession, useRequestFormSession } from "../e/form/load";
+import toast from "react-hot-toast";
 
 type ResponseRow = TVirtualRow<FormResponseField, FormResponse>;
 
@@ -50,7 +51,6 @@ export function RowEditPanel({
   table_id,
   attributes,
   init,
-  onSave,
   ...props
 }: React.ComponentProps<typeof SidePanel> & {
   title: string;
@@ -59,7 +59,6 @@ export function RowEditPanel({
   init?: Partial<{
     row: TVirtualRow<FormResponseField, FormResponse>;
   }>;
-  onSave?: (field: FormFieldInit) => void;
 }) {
   const { row } = init ?? {};
 
@@ -67,37 +66,62 @@ export function RowEditPanel({
 
   return (
     <SidePanel {...props}>
-      <PanelHeader>
-        <PanelHeaderTitle>{title}</PanelHeaderTitle>
-        <PanelHeaderActions>
-          <Toggle size="sm" pressed={advanced} onPressedChange={setAdvanced}>
-            <InfoCircledIcon />
-          </Toggle>
-        </PanelHeaderActions>
-      </PanelHeader>
-      <PanelContent className=" divide-y">
-        {row && advanced && (
-          <>
-            <SectionResponseGeneralDetails response={row} />
-            {row.meta.customer_id && (
-              <SectionResponseCustomerDetails response={row} />
-            )}
-            <SectionResponseMetadataJson json={row.meta} />
-          </>
-        )}
-        <EditRowForm form_id={table_id} />
-      </PanelContent>
-      <PanelFooter>
-        <PanelClose>
-          <Button variant="secondary">Close</Button>
-        </PanelClose>
-        <Button>Save</Button>
-      </PanelFooter>
+      <FormViewProvider form_id={table_id}>
+        <PanelHeader>
+          <PanelHeaderTitle>{title}</PanelHeaderTitle>
+          <PanelHeaderActions>
+            <Toggle size="sm" pressed={advanced} onPressedChange={setAdvanced}>
+              <InfoCircledIcon />
+            </Toggle>
+          </PanelHeaderActions>
+        </PanelHeader>
+        <PanelContent className=" divide-y">
+          {row && advanced && (
+            <>
+              <SectionResponseGeneralDetails response={row} />
+              {row.meta.customer_id && (
+                <SectionResponseCustomerDetails response={row} />
+              )}
+              <SectionResponseMetadataJson json={row.meta} />
+            </>
+          )}
+          <EditRowForm
+            onSubmit={(data) => {
+              const promise = fetch(`/submit/${table_id}`, {
+                method: "POST",
+                body: data,
+              });
+
+              toast.promise(promise, {
+                loading: "Saving...",
+                success: "Saved!",
+                error: "Failed to save.",
+              });
+
+              promise.then(() => {
+                props.onOpenChange?.(false);
+              });
+            }}
+          />
+        </PanelContent>
+        <PanelFooter>
+          <PanelClose>
+            <Button variant="secondary">Close</Button>
+          </PanelClose>
+          <FormView.Submit>Save</FormView.Submit>
+          {/* <Button>Save</Button> */}
+        </PanelFooter>
+      </FormViewProvider>
     </SidePanel>
   );
 }
 
-function EditRowForm({ form_id }: { form_id: string }) {
+function FormViewProvider({
+  form_id,
+  children,
+}: React.PropsWithChildren<{
+  form_id: string;
+}>) {
   const { session, clearSessionStorage } = useRequestFormSession(form_id);
   const {
     data: res,
@@ -118,15 +142,6 @@ function EditRowForm({ form_id }: { form_id: string }) {
 
   const { data, error } = res || {};
 
-  console.log({
-    form_id,
-    session,
-    data,
-    error,
-    servererror,
-    isLoading,
-  });
-
   if (isLoading || !session || !data) {
     return (
       <main className="h-screen min-h-screen">
@@ -139,7 +154,6 @@ function EditRowForm({ form_id }: { form_id: string }) {
 
   const { blocks, tree, fields, default_values } = data;
 
-  // return <>{JSON.stringify(data)}</>;
   return (
     <FormView.Root
       form_id={form_id}
@@ -149,28 +163,28 @@ function EditRowForm({ form_id }: { form_id: string }) {
       blocks={blocks}
       tree={tree}
     >
+      {children}
+    </FormView.Root>
+  );
+}
+
+function EditRowForm({ onSubmit }: { onSubmit?: (data: FormData) => void }) {
+  // return <>{JSON.stringify(data)}</>;
+  return (
+    <div className="prose dark:prose-invert prose-headings:text-foreground prose-p:text-foreground prose-hr:border-border text-foreground max-w-none">
       <FormView.Body
         onSubmit={(e) => {
           e.preventDefault();
 
           const formdata = new FormData(e.target as HTMLFormElement);
-          formdata.set("form_id", form_id);
-
-          console.log("submit", formdata);
-
-          fetch(`/submit/${form_id}`, {
-            method: "POST",
-            body: formdata,
-          }).then((res) => {
-            console.log("submit response", res);
-          });
+          onSubmit?.(formdata);
         }}
         className="max-w-full"
         config={{
           is_powered_by_branding_enabled: false,
         }}
       />
-    </FormView.Root>
+    </div>
   );
 }
 

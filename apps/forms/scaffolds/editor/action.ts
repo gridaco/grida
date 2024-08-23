@@ -227,6 +227,7 @@ export interface OpenResponseEditAction {
   response_id?: string;
   // true by default
   open?: boolean;
+  refresh?: boolean;
 }
 
 export interface FeedCustomerAction {
