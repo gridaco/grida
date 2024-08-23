@@ -78,6 +78,97 @@ const useSubscription = ({
   }, [supabase, form_id, table, enabled, onInsert, onUpdate, onDelete]);
 };
 
+function useFetchSchemaTableRows(table_id: string) {
+  const supabase = useMemo(() => createClientFormsClient(), []);
+
+  return useCallback(
+    async (limit: number = 100) => {
+      // fetch the responses
+      const { data, error } = await supabase
+        .from("response")
+        .select(
+          `
+            *,
+            fields:response_field(*)
+          `
+        )
+        .eq("form_id", table_id)
+        .order("local_index")
+        .limit(limit);
+
+      if (error) {
+        throw new Error();
+      }
+
+      return data;
+    },
+    [supabase, table_id]
+  );
+}
+
+function useFetchSchemaTableRow() {
+  const supabase = useMemo(() => createClientFormsClient(), []);
+
+  return useCallback(
+    async (id: string) => {
+      const { data, error } = await supabase
+        .from("response")
+        .select(
+          `
+            *,
+            fields:response_field(*)
+          `
+        )
+        .eq("id", id)
+        .single();
+
+      if (error) {
+        throw new Error();
+      }
+
+      return data;
+    },
+    [supabase]
+  );
+}
+
+function useFetchResponseSessions(form_id: string) {
+  const supabase = useMemo(() => createClientFormsClient(), []);
+
+  return useCallback(
+    async (limit: number = 100) => {
+      // fetch the responses
+      const { data, error } = await supabase
+        .from("response_session")
+        .select()
+        .eq("form_id", form_id)
+        .order("created_at")
+        .limit(limit);
+
+      if (error) {
+        throw new Error();
+      }
+
+      return data;
+    },
+    [supabase, form_id]
+  );
+}
+
+function useChangeDatagridLoading() {
+  const [state, dispatch] = useEditorState();
+
+  return useCallback(
+    (loading: boolean) => {
+      dispatch({
+        type: "editor/data-grid/loading",
+        isloading: loading,
+      });
+    },
+    [dispatch]
+  );
+}
+
 export function ResponseSyncProvider({
   children,
 }: React.PropsWithChildren<{}>) {
@@ -164,63 +255,11 @@ export function ResponseFeedProvider({
   const { realtime: _realtime_responses_enabled } =
     tablespace[EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID];
 
-  const supabase = useMemo(() => createClientFormsClient(), []);
+  const setLoading = useChangeDatagridLoading();
 
-  const setLoading = useCallback(
-    (loading: boolean) => {
-      dispatch({
-        type: "editor/data-grid/loading",
-        isloading: loading,
-      });
-    },
-    [dispatch]
-  );
+  const fetchResponses = useFetchSchemaTableRows(form_id);
 
-  const fetchResponses = useCallback(
-    async (limit: number = 100) => {
-      // fetch the responses
-      const { data, error } = await supabase
-        .from("response")
-        .select(
-          `
-            *,
-            fields:response_field(*)
-          `
-        )
-        .eq("form_id", form_id)
-        .order("local_index")
-        .limit(limit);
-
-      if (error) {
-        throw new Error();
-      }
-
-      return data;
-    },
-    [supabase, form_id]
-  );
-
-  const fetchResponse = useCallback(
-    async (id: string) => {
-      const { data, error } = await supabase
-        .from("response")
-        .select(
-          `
-            *,
-            fields:response_field(*)
-          `
-        )
-        .eq("id", id)
-        .single();
-
-      if (error) {
-        throw new Error();
-      }
-
-      return data;
-    },
-    [supabase]
-  );
+  const fetchResponse = useFetchSchemaTableRow();
 
   useEffect(() => {
     if (
@@ -251,6 +290,7 @@ export function ResponseFeedProvider({
   }, [
     dispatch,
     fetchResponses,
+    setLoading,
     datagrid_rows_per_page,
     datagrid_table_id,
     datagrid_table_refresh_key,
@@ -325,36 +365,9 @@ export function ResponseSessionFeedProvider({
   const realtime_sessions_enabled =
     forceEnableRealtime ?? _realtime_sessions_enabled;
 
-  const supabase = useMemo(() => createClientFormsClient(), []);
+  const setLoading = useChangeDatagridLoading();
 
-  const setLoading = useCallback(
-    (loading: boolean) => {
-      dispatch({
-        type: "editor/data-grid/loading",
-        isloading: loading,
-      });
-    },
-    [dispatch]
-  );
-
-  const fetchResponseSessions = useCallback(
-    async (limit: number = 100) => {
-      // fetch the responses
-      const { data, error } = await supabase
-        .from("response_session")
-        .select()
-        .eq("form_id", form_id)
-        .order("created_at")
-        .limit(limit);
-
-      if (error) {
-        throw new Error();
-      }
-
-      return data;
-    },
-    [supabase, form_id]
-  );
+  const fetchResponseSessions = useFetchResponseSessions(form_id);
 
   useEffect(() => {
     if (
@@ -384,10 +397,11 @@ export function ResponseSessionFeedProvider({
       });
   }, [
     dispatch,
+    fetchResponseSessions,
+    setLoading,
     datagrid_table_id,
     datagrid_rows_per_page,
     datagrid_table_refresh_key,
-    fetchResponseSessions,
   ]);
 
   useSubscription({
@@ -427,15 +441,7 @@ export function CustomerFeedProvider({
 
   const client = createClientWorkspaceClient();
 
-  const setLoading = useCallback(
-    (loading: boolean) => {
-      dispatch({
-        type: "editor/data-grid/loading",
-        isloading: loading,
-      });
-    },
-    [dispatch]
-  );
+  const setLoading = useChangeDatagridLoading();
 
   useEffect(() => {
     if (datagrid_table_id !== EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID)
@@ -458,10 +464,13 @@ export function CustomerFeedProvider({
         }
       });
   }, [
+    dispatch,
+    setLoading,
     datagrid_table_id,
     datagrid_rows_per_page,
     project_id,
     datagrid_table_refresh_key,
+    client,
   ]);
 
   return <>{children}</>;
@@ -540,23 +549,6 @@ export function XSupabaseMainTableSyncProvider({
   return <>{children}</>;
 }
 
-function rowdiff(
-  prevRow: Record<string, any>,
-  newRow: Record<string, any>,
-  ignoreKey?: (key: string) => boolean
-) {
-  const changedFields: Record<string, any> = {};
-  for (const key in newRow) {
-    if (ignoreKey && ignoreKey(key)) {
-      continue;
-    }
-    if (!equal(newRow[key], prevRow[key])) {
-      changedFields[key] = newRow[key];
-    }
-  }
-  return changedFields;
-}
-
 export function XSupabaseMainTableFeedProvider({
   children,
 }: React.PropsWithChildren<{}>) {
@@ -620,4 +612,21 @@ export function XSupabaseMainTableFeedProvider({
   }, [dispatch, res.data, state.form_id]);
 
   return <>{children}</>;
+}
+
+function rowdiff(
+  prevRow: Record<string, any>,
+  newRow: Record<string, any>,
+  ignoreKey?: (key: string) => boolean
+) {
+  const changedFields: Record<string, any> = {};
+  for (const key in newRow) {
+    if (ignoreKey && ignoreKey(key)) {
+      continue;
+    }
+    if (!equal(newRow[key], prevRow[key])) {
+      changedFields[key] = newRow[key];
+    }
+  }
+  return changedFields;
 }
