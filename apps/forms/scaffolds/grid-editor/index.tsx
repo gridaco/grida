@@ -302,14 +302,11 @@ function TableMod() {
   );
 }
 
-function DeleteSelectedRowsButton() {
-  const supabase = createClientFormsClient();
+function useDeleteSelectedSchemaTableRows() {
   const [state, dispatch] = useEditorState();
-
-  const { datagrid_table_id, datagrid_selected_rows } = state;
-  const { row_keyword } = useDatagridTable() || { row_keyword: "row" };
-
-  const delete_selected_responses = useCallback(() => {
+  const supabase = createClientFormsClient();
+  const { datagrid_selected_rows } = state;
+  return useCallback(() => {
     const deleting = supabase
       .from("response")
       .delete()
@@ -321,11 +318,20 @@ function DeleteSelectedRowsButton() {
       });
 
     toast.promise(deleting as Promise<any>, {
-      loading: "Deleting response...",
-      success: "Response deleted",
+      loading: `Deleting...`,
+      success: "Deleted",
       error: "", // this won't be shown (supabase does not return error for delete operation)
     });
   }, [supabase, datagrid_selected_rows, dispatch]);
+}
+
+function DeleteSelectedRowsButton() {
+  const [state, dispatch] = useEditorState();
+
+  const { datagrid_table_id, datagrid_selected_rows } = state;
+  const { row_keyword } = useDatagridTable() || { row_keyword: "row" };
+
+  const delete_selected_rows = useDeleteSelectedSchemaTableRows();
 
   const delete_selected_x_supabase_main_table_rows = useCallback(() => {
     if (!state.x_supabase_main_table?.gfpk) {
@@ -369,7 +375,7 @@ function DeleteSelectedRowsButton() {
   const onDeleteSelection = useCallback(() => {
     switch (datagrid_table_id) {
       case EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID:
-        delete_selected_responses();
+        delete_selected_rows();
         break;
       case EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID:
         toast.error("Cannot delete sessions");
@@ -378,11 +384,12 @@ function DeleteSelectedRowsButton() {
         delete_selected_x_supabase_main_table_rows();
         break;
       default:
-        toast.error("Cannot delete rows from this table");
+        delete_selected_rows();
+        break;
     }
   }, [
     datagrid_table_id,
-    delete_selected_responses,
+    delete_selected_rows,
     delete_selected_x_supabase_main_table_rows,
   ]);
 

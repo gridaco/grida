@@ -541,13 +541,13 @@ export function reducer(
     case "editor/response/delete": {
       const { id } = <DeleteResponseAction>action;
       return produce(state, (draft) => {
-        const response_space =
-          draft.tablespace[
-            EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID
-          ];
-        response_space.stream = response_space.stream?.filter(
-          (row) => row.id !== id
-        );
+        const space = get_tablespace_feed(draft);
+        if (!space) {
+          console.error("Table space not found");
+          return;
+        }
+
+        space.stream = space.stream?.filter((row) => row.id !== id);
 
         // also remove from selected_responses
         const new_selected_responses = new Set(state.datagrid_selected_rows);
@@ -726,11 +726,28 @@ export function reducer(
 
             break;
           }
-          case EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID:
-          default:
+          case EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID: {
             throw new Error(
               "Unsupported table type: " + state.datagrid_table_id?.toString()
             );
+          }
+          default:
+            if (draft.doctype === "v0_schema") {
+              //
+              const space = get_tablespace_feed(draft);
+
+              const ids = Array.from(state.datagrid_selected_rows);
+
+              assert(space, "Table space not found");
+
+              space.stream = space.stream?.filter(
+                (response) => !ids.includes(response.id)
+              );
+            } else {
+              throw new Error(
+                "Unsupported table type: " + state.datagrid_table_id?.toString()
+              );
+            }
         }
 
         // clear selected rows

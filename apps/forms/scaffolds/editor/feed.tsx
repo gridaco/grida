@@ -31,7 +31,7 @@ const useSubscription = ({
   enabled,
 }: {
   table: "response" | "response_session";
-  form_id: string;
+  form_id?: string | null;
   onUpdate?: (data: RealtimeTableChangeData) => void;
   onInsert?: (data: RealtimeTableChangeData) => void;
   onDelete?: (data: RealtimeTableChangeData | {}) => void;
@@ -40,6 +40,7 @@ const useSubscription = ({
   const supabase = useMemo(() => createClientFormsClient(), []);
 
   useEffect(() => {
+    if (!form_id) return;
     if (!enabled) return;
 
     const channelname = `table-filter-changes-${table}-${form_id}`;
@@ -632,14 +633,14 @@ export function SchemaTableFeedProvider({
 
   const setLoading = useChangeDatagridLoading();
 
-  const fetchResponses = useFetchSchemaTableRows(table_id);
+  const fetchTableRows = useFetchSchemaTableRows(table_id);
 
-  const fetchResponse = useFetchSchemaTableRow();
+  const fetchTableRow = useFetchSchemaTableRow();
 
   useEffect(() => {
     if (typeof table_id !== "string") return;
     setLoading(true);
-    const feed = fetchResponses(datagrid_rows_per_page).then((data) => {
+    const feed = fetchTableRows(datagrid_rows_per_page).then((data) => {
       dispatch({
         type: "editor/table/space/feed",
         data: data as any,
@@ -649,16 +650,16 @@ export function SchemaTableFeedProvider({
 
     toast
       .promise(feed, {
-        loading: "Fetching responses...",
-        success: "Responses fetched",
-        error: "Failed to fetch responses",
+        loading: "Loading...",
+        success: "Loaded",
+        error: "Failed to load",
       })
       .finally(() => {
         setLoading(false);
       });
   }, [
     dispatch,
-    fetchResponses,
+    fetchTableRows,
     setLoading,
     table_id,
     datagrid_rows_per_page,
@@ -666,49 +667,49 @@ export function SchemaTableFeedProvider({
     datagrid_table_refresh_key,
   ]);
 
-  // useSubscription({
-  //   table: "response",
-  //   form_id,
-  //   onInsert: (data) => {
-  //     setTimeout(() => {
-  //       const newresponse = fetchResponse((data as { id: string }).id).then(
-  //         (data) => {
-  //           dispatch({
-  //             type: "editor/table/space/feed",
-  //             data: [data as any],
-  //           });
-  //         }
-  //       );
+  useSubscription({
+    table: "response",
+    form_id: table_id,
+    onInsert: (data) => {
+      setTimeout(() => {
+        const newresponse = fetchTableRow((data as { id: string }).id).then(
+          (data) => {
+            dispatch({
+              type: "editor/table/space/feed",
+              data: [data as any],
+            });
+          }
+        );
 
-  //       toast.promise(
-  //         newresponse,
-  //         {
-  //           loading: "Fetching new response...",
-  //           success: "New response",
-  //           error: "Failed to fetch new response",
-  //         },
-  //         { id: data.id }
-  //       );
-  //     }, 100);
-  //   },
-  //   onUpdate: (data) => {
-  //     fetchResponse((data as { id: string }).id).then((data) => {
-  //       dispatch({
-  //         type: "editor/table/space/feed",
-  //         data: [data as any],
-  //       });
-  //     });
-  //   },
-  //   onDelete: (data) => {
-  //     if ("id" in data) {
-  //       dispatch({
-  //         type: "editor/response/delete",
-  //         id: data.id,
-  //       });
-  //     }
-  //   },
-  //   enabled: _realtime_responses_enabled,
-  // });
+        toast.promise(
+          newresponse,
+          {
+            loading: "Fetching new Entry",
+            success: "New Entry",
+            error: "Failed to fetch new Entry",
+          },
+          { id: data.id }
+        );
+      }, 100);
+    },
+    onUpdate: (data) => {
+      fetchTableRow((data as { id: string }).id).then((data) => {
+        dispatch({
+          type: "editor/table/space/feed",
+          data: [data as any],
+        });
+      });
+    },
+    onDelete: (data) => {
+      if ("id" in data) {
+        dispatch({
+          type: "editor/response/delete",
+          id: data.id,
+        });
+      }
+    },
+    enabled: _realtime_responses_enabled,
+  });
 
   return <>{children}</>;
 }
