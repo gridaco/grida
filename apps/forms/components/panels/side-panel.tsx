@@ -135,9 +135,21 @@ export function PropertyTextInput(
 
 export function PanelHeader({ children }: React.PropsWithChildren<{}>) {
   return (
-    <header className="space-y-1 py-4 px-4 bg-background sm:px-6 border-b">
+    <header className="relative space-y-1 py-4 px-4 bg-background sm:px-6 border-b">
       {children}
     </header>
+  );
+}
+
+export function PanelHeaderTitle({ children }: React.PropsWithChildren<{}>) {
+  return <h2 className="text-lg font-semibold">{children}</h2>;
+}
+
+export function PanelHeaderActions({ children }: React.PropsWithChildren<{}>) {
+  return (
+    <div className="absolute right-0 top-0 bottom-0 flex items-center space-x-2 px-4 py-4">
+      {children}
+    </div>
   );
 }
 
