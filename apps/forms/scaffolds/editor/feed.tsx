@@ -584,6 +584,8 @@ export function XSupabaseMainTableFeedProvider({
     });
   }, [datagrid_rows_per_page, datagrid_orderby, datagrid_table_refresh_key]);
 
+  const enabled = !!state.connections.supabase?.main_supabase_table_id;
+
   const request = state.connections.supabase?.main_supabase_table_id
     ? `/private/editor/connect/${state.form_id}/supabase/table/${state.connections.supabase.main_supabase_table_id}/query?${serachParams}`
     : null;
@@ -601,18 +603,20 @@ export function XSupabaseMainTableFeedProvider({
   );
 
   useEffect(() => {
+    if (!enabled) return;
     dispatch({
       type: "editor/data-grid/loading",
       isloading: res.isLoading || res.isValidating,
     });
-  }, [dispatch, res.isLoading, res.isValidating]);
+  }, [dispatch, enabled, res.isLoading, res.isValidating]);
 
   useEffect(() => {
+    if (!enabled) return;
     // trigger data refresh
     dispatch({
       type: "editor/data-grid/refresh",
     });
-  }, [dispatch, fields]);
+  }, [dispatch, enabled, fields]);
 
   useEffect(() => {
     if (res.data?.data) {

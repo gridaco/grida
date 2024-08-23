@@ -21,7 +21,6 @@ import { MediaViewerProvider } from "../mediaviewer";
 import { AssetsBackgroundsResolver } from "./resolver/assets-backgrounds-resolver";
 import toast from "react-hot-toast";
 import { EditorSymbols } from "./symbols";
-import Invalid from "@/components/invalid";
 import { fmt_local_index } from "@/utils/fmt";
 
 export function EditorProvider({
