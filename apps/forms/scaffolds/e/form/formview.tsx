@@ -37,7 +37,7 @@ import { Button } from "@/components/ui/button";
 import { FormAgentProvider, useFormAgentState, init } from "@/lib/formstate";
 import { FieldSupports } from "@/k/supported_field_types";
 import { SessionDataSyncProvider } from "./sync";
-import { MediaLoadProvider } from "./mediaload";
+import { MediaLoadPluginProvider } from "./mediaload";
 import { FormAgentMessagingInterfaceProvider } from "./interface";
 import { FormAgentMessagingInterface } from "./emit";
 import { useValue } from "@/lib/spock";
@@ -51,6 +51,11 @@ type PaymentCheckoutSession = TossPaymentsCheckoutSessionResponseData | any;
 
 const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false });
 
+type HtmlFormElementProps = Omit<
+  React.FormHTMLAttributes<HTMLFormElement>,
+  "title"
+>;
+
 export interface FormViewTranslation {
   next: string;
   back: string;
@@ -58,27 +63,38 @@ export interface FormViewTranslation {
   pay: string;
 }
 
+const default_form_view_translation_en: FormViewTranslation = {
+  next: "Next",
+  back: "Back",
+  submit: "Submit",
+  pay: "Pay",
+};
+
+type FormBodyProps = {
+  session_id?: string;
+  defaultValues?: { [key: string]: string };
+  fields: FormFieldDefinition[];
+  blocks: ClientRenderBlock[];
+  tree: FormBlockTree<ClientRenderBlock[]>;
+  translation?: FormViewTranslation;
+  config: {
+    is_powered_by_branding_enabled: boolean;
+    optimize_for_cjk?: boolean;
+  };
+  stylesheet?: any;
+  onAfterSubmit?: () => void;
+  className?: string;
+};
+
 export function FormView(
   props: {
     form_id: string;
-    session_id?: string;
-    title: string;
-    defaultValues?: { [key: string]: string };
-    fields: FormFieldDefinition[];
-    blocks: ClientRenderBlock[];
-    tree: FormBlockTree<ClientRenderBlock[]>;
-    translation: FormViewTranslation;
-    options: {
-      is_powered_by_branding_enabled: boolean;
-      optimize_for_cjk?: boolean;
-    };
-    stylesheet?: any;
-    afterSubmit?: () => void;
-  } & React.FormHTMLAttributes<HTMLFormElement>
+  } & FormBodyProps &
+    HtmlFormElementProps
 ) {
   return (
     <Providers {...props}>
-      <Body {...props} />
+      <FormBody {...props} />
     </Providers>
   );
 }
@@ -120,7 +136,7 @@ function Providers({
         })}
       >
         <FormAgentMessagingInterfaceProvider />
-        <MediaLoadProvider />
+        <MediaLoadPluginProvider />
         <SessionDataSyncProvider session_id={session_id}>
           <TossPaymentsCheckoutProvider initial={checkoutSession}>
             {children}
@@ -131,35 +147,20 @@ function Providers({
   );
 }
 
-function Body({
-  form_id,
+function FormBody({
+  onSubmit,
   session_id,
-  title,
   blocks,
   fields,
   defaultValues,
   tree,
-  translation,
-  options,
+  translation = default_form_view_translation_en,
+  config,
   stylesheet,
-  afterSubmit,
+  onAfterSubmit,
+  className,
   ...formattributes
-}: {
-  form_id: string;
-  session_id?: string;
-  title: string;
-  defaultValues?: { [key: string]: string };
-  fields: FormFieldDefinition[];
-  blocks: ClientRenderBlock[];
-  tree: FormBlockTree<ClientRenderBlock[]>;
-  translation: FormViewTranslation;
-  options: {
-    is_powered_by_branding_enabled: boolean;
-    optimize_for_cjk?: boolean;
-  };
-  stylesheet?: any;
-  afterSubmit?: () => void;
-} & React.FormHTMLAttributes<HTMLFormElement>) {
+}: FormBodyProps & HtmlFormElementProps) {
   const [state, dispatch] = useFormAgentState();
 
   // the default value shall be fixed on the first render (since the defaultValues can be changed due to session data sync. - which might cause data loss on the form field.)
@@ -180,7 +181,7 @@ function Body({
   }, [current_section_id, sections]);
 
   const primary_action_override_by_payment =
-    current_section?.attributes?.contains_payment;
+    current_section?.attributes?.contains_payment ?? false;
 
   const submit_hidden = has_sections
     ? primary_action_override_by_payment ||
@@ -189,13 +190,16 @@ function Body({
 
   const pay_hidden = !primary_action_override_by_payment;
 
-  const previous_section_button_hidden = has_sections
-    ? current_section_id === sections[0].id
-    : true;
+  const has_previous = has_sections
+    ? current_section_id !== sections[0].id
+    : false;
+  const previous_section_button_hidden = !has_previous;
 
+  const has_next = has_sections
+    ? current_section_id !== last_section_id
+    : false;
   const next_section_button_hidden =
-    (has_sections ? current_section_id === last_section_id : true) ||
-    primary_action_override_by_payment;
+    !has_next || primary_action_override_by_payment;
 
   const onPrevious = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
@@ -230,22 +234,25 @@ function Body({
     []
   );
 
+  const html_form_id = "form";
+
   return (
     <div
       id="form-view"
-      data-cjk={options.optimize_for_cjk}
+      data-cjk={config.optimize_for_cjk}
       className={clsx(
         "prose dark:prose-invert prose-headings:text-foreground prose-p:text-foreground prose-hr:border-border text-foreground",
         "w-full h-full md:h-auto grow md:grow-0",
         "relative",
         "data-[cjk='true']:break-keep",
-        "flex flex-col"
+        "flex flex-col",
+        className
       )}
     >
       <>
         <form
           {...formattributes}
-          id="form"
+          id={html_form_id}
           action={submit_hidden ? undefined : formattributes.action}
           onSubmit={(e) => {
             if (submit_hidden) {
@@ -263,7 +270,9 @@ function Body({
               FormAgentMessagingInterface.emit({ type: "submit" });
               // disable submit button
               dispatch({ type: "form/submit" });
-              afterSubmit?.();
+
+              onSubmit?.(e);
+              onAfterSubmit?.();
             }
           }}
           className="p-4 h-full md:h-auto flex-1"
@@ -289,73 +298,28 @@ function Body({
               />
             ))}
           </GroupLayout>
-          {options.is_powered_by_branding_enabled && (
+          {config.is_powered_by_branding_enabled && (
             // desktop branding
             <div className="block md:hidden">
               <PoweredByGridaFooter />
             </div>
           )}
         </form>
-        <footer
-          className={clsx(
-            "sticky bottom-0",
-            "flex gap-2 p-4 pt-4 border-t",
-            "justify-end bg-background",
-            "md:static md:justify-start md:bg-transparent md:dark:bg-transparent"
-          )}
-        >
-          <Button
-            variant="outline"
-            data-previous-hidden={previous_section_button_hidden}
-            className={clsx(
-              // cls_button_nuetral,
-              "data-[previous-hidden='true']:hidden"
-            )}
-            onClick={onPrevious}
-          >
-            {translation.back}
-          </Button>
-          <Button
-            variant="outline"
-            data-next-hidden={next_section_button_hidden}
-            form="form"
-            type="submit"
-            className={clsx(
-              // cls_button_nuetral,
-              "w-full md:w-auto",
-              "data-[next-hidden='true']:hidden"
-            )}
-            // onClick={onNext}
-          >
-            {translation.next}
-          </Button>
-          <Button
-            data-submit-hidden={submit_hidden}
-            disabled={submit_hidden || is_submitting}
-            form="form"
-            type="submit"
-            className={clsx(
-              // cls_button_submit,
-              "w-full md:w-auto",
-              "data-[submit-hidden='true']:hidden",
-              "disabled:opacity-50 disabled:cursor-not-allowed"
-            )}
-          >
-            {translation.submit}
-          </Button>
-          <TossPaymentsPayButton
-            data-pay-hidden={pay_hidden}
-            className={clsx(
-              cls_button_submit,
-              "w-full md:w-auto",
-              "data-[pay-hidden='true']:hidden"
-            )}
-          >
-            {translation.pay}
-          </TossPaymentsPayButton>
-        </footer>
+        <Footer
+          html_form_element_id={html_form_id}
+          hasPrevious={has_previous}
+          shouldHidePrevious={previous_section_button_hidden}
+          onPrevious={onPrevious}
+          hasNext={has_next}
+          shouldHideNext={next_section_button_hidden}
+          shouldHideSubmit={submit_hidden}
+          shouldDisableSubmit={submit_hidden || is_submitting}
+          isSubmitting={is_submitting}
+          shouldHidePay={pay_hidden}
+          translation={translation}
+        />
       </>
-      {options.is_powered_by_branding_enabled && (
+      {config.is_powered_by_branding_enabled && (
         // desktop branding
         <div className="hidden md:block">
           <PoweredByGridaFooter />
@@ -363,6 +327,99 @@ function Body({
       )}
     </div>
   );
+}
+
+function Footer({
+  hasPrevious,
+  hasNext,
+  translation,
+  shouldHideSubmit,
+  shouldDisableSubmit,
+  shouldHidePay,
+  isSubmitting,
+  onPrevious,
+  html_form_element_id,
+}: {
+  html_form_element_id: string;
+  hasPrevious: boolean;
+  shouldHidePrevious: boolean;
+  onPrevious: (e: React.MouseEvent<HTMLButtonElement>) => void;
+  hasNext: boolean;
+  shouldHideNext: boolean;
+  shouldHideSubmit: boolean;
+  shouldDisableSubmit: boolean;
+  isSubmitting: boolean;
+  shouldHidePay: boolean;
+  translation: FormViewTranslation;
+}) {
+  return (
+    <footer
+      className={clsx(
+        "sticky bottom-0",
+        "flex gap-2 p-4 pt-4 border-t",
+        "justify-end bg-background",
+        "md:static md:justify-start md:bg-transparent md:dark:bg-transparent"
+      )}
+    >
+      <Button
+        variant="outline"
+        data-previous-hidden={!hasPrevious}
+        className={clsx(
+          // cls_button_nuetral,
+          "data-[previous-hidden='true']:hidden"
+        )}
+        onClick={onPrevious}
+      >
+        {translation.back}
+      </Button>
+      <Button
+        variant="outline"
+        data-next-hidden={!hasNext}
+        form={html_form_element_id}
+        type="submit"
+        className={clsx(
+          // cls_button_nuetral,
+          "w-full md:w-auto",
+          "data-[next-hidden='true']:hidden"
+        )}
+      >
+        {translation.next}
+      </Button>
+      <Button
+        data-submit-hidden={shouldHideSubmit}
+        disabled={shouldDisableSubmit}
+        form={html_form_element_id}
+        type="submit"
+        className={clsx(
+          // cls_button_submit,
+          "w-full md:w-auto",
+          "data-[submit-hidden='true']:hidden",
+          "disabled:opacity-50 disabled:cursor-not-allowed"
+        )}
+      >
+        {translation.submit}
+      </Button>
+      <TossPaymentsPayButton
+        data-pay-hidden={shouldHidePay}
+        className={clsx(
+          cls_button_submit,
+          "w-full md:w-auto",
+          "data-[pay-hidden='true']:hidden"
+        )}
+      >
+        {translation.pay}
+      </TossPaymentsPayButton>
+    </footer>
+  );
+}
+
+function BrandingAttributes() {
+  //
+}
+
+function Actions() {
+  // render actions
+  //
 }
 
 function BlockRenderer({
