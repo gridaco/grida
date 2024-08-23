@@ -10,12 +10,13 @@ import {
 import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import useSWR from "swr";
 import type { EditorApiResponse } from "@/types/private/api";
-import type { GridaSupabase } from "@/types";
+import type { FormResponse, FormResponseField, GridaSupabase } from "@/types";
 import { usePrevious } from "@uidotdev/usehooks";
 import { XSupabaseQuery } from "@/lib/supabase-postgrest/builder";
 import equal from "deep-equal";
 import { PrivateEditorApi } from "@/lib/private";
 import { EditorSymbols } from "./symbols";
+import type { TVirtualRow } from "./state";
 
 type RealtimeTableChangeData = {
   id: string;
@@ -170,17 +171,10 @@ function useChangeDatagridLoading() {
   );
 }
 
-export function ResponseSyncProvider({
-  children,
-}: React.PropsWithChildren<{}>) {
-  const [state] = useEditorState();
-  const { tablespace } = state;
+function useSyncCell() {
   const supabase = useMemo(() => createClientFormsClient(), []);
-  const response_stream =
-    tablespace[EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID].stream;
-  const prev = usePrevious(response_stream);
 
-  const sync = useCallback(
+  return useCallback(
     async (id: string, payload: { value: any; option_id?: string | null }) => {
       const { data, error } = await supabase
         .from("response_field")
@@ -202,9 +196,16 @@ export function ResponseSyncProvider({
     },
     [supabase]
   );
+}
+
+function useSyncCellChangesEffect(
+  prev: Array<TVirtualRow<FormResponseField, FormResponse>> | undefined,
+  current: Array<TVirtualRow<FormResponseField, FormResponse>> | undefined
+) {
+  const sync = useSyncCell();
 
   useEffect(() => {
-    response_stream?.forEach((r) => {
+    current?.forEach((r) => {
       r.data;
       Object.keys(r.data).forEach((attrkey) => {
         const cell = r.data[attrkey];
@@ -235,7 +236,19 @@ export function ResponseSyncProvider({
         }
       });
     });
-  }, [prev, response_stream, sync]);
+  }, [prev, current, sync]);
+}
+
+export function ResponseSyncProvider({
+  children,
+}: React.PropsWithChildren<{}>) {
+  const [state] = useEditorState();
+  const { tablespace } = state;
+  const response_stream =
+    tablespace[EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID].stream;
+  const prev = usePrevious(response_stream);
+
+  useSyncCellChangesEffect(prev, response_stream);
 
   return <>{children}</>;
 }
@@ -611,6 +624,20 @@ export function XSupabaseMainTableFeedProvider({
       });
     }
   }, [dispatch, res.data, state.form_id]);
+
+  return <>{children}</>;
+}
+
+export function SchemaTableSyncProvider({
+  children,
+}: React.PropsWithChildren<{}>) {
+  const [state] = useEditorState();
+  const { tablespace } = state;
+  const table_id = useDatabaseTableId();
+  const stream = tablespace[table_id].stream;
+  const prev = usePrevious(stream);
+
+  useSyncCellChangesEffect(prev, stream);
 
   return <>{children}</>;
 }

@@ -3,7 +3,10 @@
 import EmptyWelcome from "@/components/empty";
 import Invalid from "@/components/invalid";
 import { useEditorState } from "@/scaffolds/editor";
-import { SchemaTableFeedProvider } from "@/scaffolds/editor/feed";
+import {
+  SchemaTableFeedProvider,
+  SchemaTableSyncProvider,
+} from "@/scaffolds/editor/feed";
 import { GDocSchemaTable, GDocTable } from "@/scaffolds/editor/state";
 import { useDatagridTable } from "@/scaffolds/editor/use";
 import { CurrentTable } from "@/scaffolds/editor/utils/switch-table";
@@ -45,6 +48,7 @@ export default function SchemaTablePage({
   return (
     <CurrentTable table={tb.id}>
       <SchemaTableFeedProvider />
+      <SchemaTableSyncProvider />
       <SchemaTableGridEditor />
     </CurrentTable>
   );

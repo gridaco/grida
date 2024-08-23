@@ -920,11 +920,39 @@ export function reducer(
 
             break;
           }
-          case EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID:
-          default: {
+          case EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID: {
             throw new Error(
               "Unsupported table type: " + state.datagrid_table_id?.toString()
             );
+          }
+          default: {
+            if (draft.doctype === "v0_schema") {
+              const {
+                row: row_id,
+                column: attribute_id,
+                data,
+              } = <DataGridCellChangeAction>action;
+              const { value, option_id } = data;
+
+              const space = get_tablespace_feed(draft);
+
+              assert(space, "Table space not found");
+
+              const cell = space.stream?.find((row) => row.id === row_id)!.data[
+                attribute_id
+              ];
+
+              if (!cell) return;
+
+              cell.value = value;
+              cell.form_field_option_id = option_id ?? null;
+
+              break;
+            } else {
+              throw new Error(
+                "Unsupported table type: " + state.datagrid_table_id?.toString()
+              );
+            }
           }
         }
       });
