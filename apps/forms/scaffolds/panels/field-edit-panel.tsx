@@ -6,6 +6,7 @@ import {
   PanelContent,
   PanelFooter,
   PanelHeader,
+  PanelHeaderTitle,
   PanelPropertyField,
   PanelPropertyFields,
   PanelPropertySection,
@@ -481,7 +482,9 @@ export function FieldEditPanel({
 
   return (
     <SidePanel {...props}>
-      <PanelHeader>{title}</PanelHeader>
+      <PanelHeader>
+        <PanelHeaderTitle>{title}</PanelHeaderTitle>
+      </PanelHeader>
       <PanelContent>
         <PanelPropertySection>
           <PanelPropertySectionTitle>Preview</PanelPropertySectionTitle>

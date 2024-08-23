@@ -282,7 +282,7 @@ function useRowEditorRow() {
       default:
         return undefined;
     }
-  }, [state.tablespace, state.row_editor.id]);
+  }, [state.doctype, state.tablespace, state.row_editor.id]);
 
   return row;
 }
@@ -293,6 +293,8 @@ function RowEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
   const attributes = useAttributes();
 
   const row = useRowEditorRow();
+
+  const table_id = useDatabaseTableId();
 
   // const focusxsupabasemaintablerow = useMemo(() => {
   //   const pk = state.x_supabase_main_table?.gfpk;
@@ -310,6 +312,7 @@ function RowEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
     <>
       <RowEditPanel
         key={row?.id}
+        table_id={table_id}
         open={state.row_editor.open}
         title={
           row

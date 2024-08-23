@@ -178,13 +178,12 @@ export function PlaygroundPreviewSlave() {
             </div>
           )}
           <FormView
-            title={"Form"}
             form_id={renderer.id}
             fields={renderer.fields()}
             blocks={renderer.blocks()}
             tree={renderer.tree()}
             translation={resources[lang].translation as any}
-            options={{
+            config={{
               is_powered_by_branding_enabled: true,
             }}
           />

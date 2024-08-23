@@ -1,11 +1,13 @@
 "use client";
 
-import React, { useCallback, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   PanelClose,
   PanelContent,
   PanelFooter,
   PanelHeader,
+  PanelHeaderActions,
+  PanelHeaderTitle,
   PanelPropertyField,
   PanelPropertyFields,
   PanelPropertySection,
@@ -33,33 +35,190 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { UAParser } from "ua-parser-js";
-import { AvatarIcon } from "@radix-ui/react-icons";
+import { AvatarIcon, InfoCircledIcon } from "@radix-ui/react-icons";
 import { useEditorState } from "../editor";
 import { TVirtualRow } from "../editor/state";
 import { DummyFormAgentStateProvider } from "@/lib/formstate";
 import FormField from "@/components/formfield/form-field";
+import { Toggle } from "@/components/ui/toggle";
+import { FormView } from "../e/form";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useFormSession, useRequestFormSession } from "../e/form/load";
+
+type ResponseRow = TVirtualRow<FormResponseField, FormResponse>;
 
 export function RowEditPanel({
   title,
-  onSave,
+  table_id,
   attributes,
   init,
+  onSave,
   ...props
 }: React.ComponentProps<typeof SidePanel> & {
   title: string;
+  table_id: string;
   attributes: FormFieldDefinition[];
   init?: Partial<{
     row: TVirtualRow<FormResponseField, FormResponse>;
   }>;
   onSave?: (field: FormFieldInit) => void;
 }) {
-  const [state, dispatch] = useEditorState();
   const { row } = init ?? {};
 
-  const { resolvedTheme } = useTheme();
+  const [advanced, setAdvanced] = useState<boolean>(false);
 
-  const monaco = useMonaco();
-  useMonacoTheme(monaco, resolvedTheme ?? "light");
+  return (
+    <SidePanel {...props}>
+      <PanelHeader>
+        <PanelHeaderTitle>{title}</PanelHeaderTitle>
+        <PanelHeaderActions>
+          <Toggle size="sm" pressed={advanced} onPressedChange={setAdvanced}>
+            <InfoCircledIcon />
+          </Toggle>
+        </PanelHeaderActions>
+      </PanelHeader>
+      <PanelContent className=" divide-y">
+        {row && advanced && (
+          <>
+            <SectionResponseGeneralDetails response={row} />
+            {row.meta.customer_id && (
+              <SectionResponseCustomerDetails response={row} />
+            )}
+            <SectionResponseMetadataJson json={row.meta} />
+          </>
+        )}
+        <EditRowForm form_id={table_id} />
+      </PanelContent>
+      <PanelFooter>
+        <PanelClose>
+          <Button variant="secondary">Close</Button>
+        </PanelClose>
+        <Button>Save</Button>
+      </PanelFooter>
+    </SidePanel>
+  );
+}
+
+function EditRowForm({ form_id }: { form_id: string }) {
+  const { session, clearSessionStorage } = useRequestFormSession(form_id);
+  const {
+    data: res,
+    error: servererror,
+    isLoading,
+  } = useFormSession(form_id, {
+    mode: "signed",
+    session_id: session,
+    // TODO:
+    user_id: "",
+  });
+
+  useEffect(() => {
+    return () => {
+      clearSessionStorage();
+    };
+  }, []);
+
+  const { data, error } = res || {};
+
+  console.log({
+    form_id,
+    session,
+    data,
+    error,
+    servererror,
+    isLoading,
+  });
+
+  if (isLoading || !session || !data) {
+    return (
+      <main className="h-screen min-h-screen">
+        <div className="p-4 overflow-auto flex-1">
+          <SkeletonCard />
+        </div>
+      </main>
+    );
+  }
+
+  const { blocks, tree, fields, default_values } = data;
+
+  // return <>{JSON.stringify(data)}</>;
+  return (
+    <FormView
+      onSubmit={(e) => {
+        e.preventDefault();
+
+        const formdata = new FormData(e.target as HTMLFormElement);
+        formdata.set("form_id", form_id);
+
+        console.log("submit", formdata);
+
+        fetch(`/submit/${form_id}`, {
+          method: "POST",
+          body: formdata,
+        }).then((res) => {
+          console.log("submit response", res);
+        });
+      }}
+      className="max-w-full"
+      form_id={form_id}
+      session_id={session}
+      fields={fields}
+      defaultValues={default_values}
+      blocks={blocks}
+      tree={tree}
+      config={{
+        is_powered_by_branding_enabled: false,
+      }}
+    />
+  );
+}
+
+function SkeletonCard() {
+  return (
+    <div className="flex flex-col space-y-3">
+      <Skeleton className="h-[24px] w-3/4 rounded-xl" />
+      <Skeleton className="h-[100px] w-full rounded-xl" />
+      <div className="h-10" />
+      <div className="space-y-10">
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-1/4" />
+          <Skeleton className="h-8 w-full" />
+        </div>
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-1/4" />
+          <Skeleton className="h-8 w-full" />
+        </div>
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-1/4" />
+          <Skeleton className="h-8 w-full" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SectionResponseGeneralDetails({
+  response,
+}: {
+  response: ResponseRow;
+}) {
+  return (
+    <PanelPropertySection>
+      <PanelPropertySectionTitle>General</PanelPropertySectionTitle>
+      <PanelPropertyFields>
+        <ResponseIdTable {...response.meta} />
+        <ResponsePropertiesTable {...response.meta} />
+      </PanelPropertyFields>
+    </PanelPropertySection>
+  );
+}
+
+function SectionResponseCustomerDetails({
+  response,
+}: {
+  response: ResponseRow;
+}) {
+  const [state, dispatch] = useEditorState();
 
   const onViewCustomerDetailsClick = useCallback(
     (customer_id: string) => {
@@ -71,124 +230,57 @@ export function RowEditPanel({
     [dispatch]
   );
 
-  // if (!row) return <></>;
+  return (
+    <PanelPropertySection>
+      <PanelPropertySectionTitle>Customer</PanelPropertySectionTitle>
+      <PanelPropertyFields>
+        <ResponseCustomerMetaTable {...response.meta} />
+        <Button
+          type="button"
+          onClick={() => onViewCustomerDetailsClick(response.meta.customer_id!)}
+          variant="secondary"
+        >
+          <AvatarIcon className="me-2 inline-flex align-middle" />
+          More about this customer
+        </Button>
+      </PanelPropertyFields>
+    </PanelPropertySection>
+  );
+}
+
+function SectionResponseMetadataJson({ json }: { json: Record<string, any> }) {
+  const { resolvedTheme } = useTheme();
+
+  const monaco = useMonaco();
+  useMonacoTheme(monaco, resolvedTheme ?? "light");
 
   return (
-    <SidePanel {...props}>
-      <PanelHeader>{title}</PanelHeader>
-      <PanelContent className=" divide-y">
-        {row && (
-          <>
-            <PanelPropertySection>
-              <PanelPropertySectionTitle>General</PanelPropertySectionTitle>
-              <PanelPropertyFields>
-                <ResponseIdTable {...row.meta} />
-                <ResponsePropertiesTable {...row.meta} />
-              </PanelPropertyFields>
-            </PanelPropertySection>
-            {row.meta.customer_id && (
-              <>
-                <PanelPropertySection>
-                  <PanelPropertySectionTitle>
-                    Customer
-                  </PanelPropertySectionTitle>
-                  <PanelPropertyFields>
-                    <ResponseCustomerMetaTable {...row.meta} />
-                    <Button
-                      type="button"
-                      onClick={() =>
-                        onViewCustomerDetailsClick(row.meta.customer_id!)
-                      }
-                      variant="secondary"
-                    >
-                      <AvatarIcon className="me-2 inline-flex align-middle" />
-                      More about this customer
-                    </Button>
-                  </PanelPropertyFields>
-                </PanelPropertySection>
-              </>
-            )}
-          </>
-        )}
-        <form>
-          <DummyFormAgentStateProvider>
-            <PanelPropertySection grid={false}>
-              {/* <PanelPropertySectionTitle>Response</PanelPropertySectionTitle> */}
-              {/* <PanelPropertyFields> */}
-              <div className="flex flex-col gap-14">
-                {attributes?.map((field) => {
-                  const cell = row?.data[field.id];
-
-                  return (
-                    <FormField
-                      //
-                      defaultValue={cell?.value}
-                      autoComplete="off"
-                      //
-                      key={field.id}
-                      id={field.id}
-                      disabled={!!!field}
-                      name={field?.name ?? ""}
-                      label={field?.label ?? ""}
-                      type={field?.type ?? "text"}
-                      required={field?.required ?? false}
-                      requiredAsterisk
-                      pattern={field?.pattern ?? ""}
-                      step={field?.step ?? undefined}
-                      min={field?.min ?? undefined}
-                      max={field?.max ?? undefined}
-                      helpText={field?.help_text ?? ""}
-                      placeholder={field?.placeholder ?? ""}
-                      options={field?.options}
-                      optgroups={field?.optgroups}
-                      multiple={field?.multiple ?? false}
-                      data={field?.data}
-                    />
-                  );
-                })}
-              </div>
-              {/* </PanelPropertyFields> */}
-            </PanelPropertySection>
-          </DummyFormAgentStateProvider>
-        </form>
-        {row && (
-          <PanelPropertySection>
-            <PanelPropertySectionTitle>RAW</PanelPropertySectionTitle>
-            <PanelPropertyFields>
-              <PanelPropertyField label={"raw.json (readonly)"}>
-                <Editor
-                  className="rounded overflow-hidden shadow-sm border"
-                  height={400}
-                  defaultLanguage="json"
-                  defaultValue={JSON.stringify(row.meta, null, 2)}
-                  options={{
-                    readOnly: true,
-                    padding: {
-                      top: 10,
-                    },
-                    minimap: {
-                      enabled: false,
-                    },
-                    tabSize: 2,
-                    fontSize: 13,
-                    scrollBeyondLastLine: false,
-                    glyphMargin: false,
-                  }}
-                />
-              </PanelPropertyField>
-            </PanelPropertyFields>
-          </PanelPropertySection>
-        )}
-      </PanelContent>
-      <PanelFooter>
-        <PanelClose>
-          <Button variant="secondary">Close</Button>
-        </PanelClose>
-        {/* <button onClick={onSaveClick} className="rounded p-2 bg-neutral-100">
-          Save
-        </button> */}
-      </PanelFooter>
-    </SidePanel>
+    <PanelPropertySection>
+      <PanelPropertySectionTitle>RAW</PanelPropertySectionTitle>
+      <PanelPropertyFields>
+        <PanelPropertyField label={"raw.json (readonly)"}>
+          <Editor
+            className="rounded overflow-hidden shadow-sm border"
+            height={400}
+            defaultLanguage="json"
+            defaultValue={JSON.stringify(json, null, 2)}
+            options={{
+              readOnly: true,
+              padding: {
+                top: 10,
+              },
+              minimap: {
+                enabled: false,
+              },
+              tabSize: 2,
+              fontSize: 13,
+              scrollBeyondLastLine: false,
+              glyphMargin: false,
+            }}
+          />
+        </PanelPropertyField>
+      </PanelPropertyFields>
+    </PanelPropertySection>
   );
 }
 
