@@ -62,6 +62,13 @@ export namespace GridData {
         data: {
           rows: any[];
         };
+      }
+    | {
+        filter: DataGridFilterSettings;
+        table: "v0_schema_table";
+        table_id: string;
+        attributes: FormFieldDefinition[];
+        rows: Array<TVirtualRow<FormResponseField, FormResponse>>;
       };
 
   export function columns(
@@ -225,6 +232,22 @@ export namespace GridData {
               "last_seen_at",
             ]
           ),
+        };
+      }
+      case "v0_schema_table": {
+        //
+        const filtered = GridFilter.filter(
+          input.rows,
+          input.filter,
+          (row) => row.meta.raw,
+          // response raw is saved with name: value
+          input.attributes.map((f) => f.name)
+        );
+
+        return {
+          type: "response",
+          inputlength: input.rows.length || 0,
+          filtered: rows_from_responses(filtered, input.attributes),
         };
       }
     }

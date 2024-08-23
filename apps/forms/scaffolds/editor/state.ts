@@ -98,7 +98,7 @@ export interface DataGridFilterSettings {
   empty_data_hidden: boolean;
 }
 
-export type GDocTable = {
+type GDocTableBase = {
   /**
    * keyword indicating the row, singular form (will be made plural in the UI)
    * e.g. "row" "user" "session" "customer"
@@ -109,29 +109,32 @@ export type GDocTable = {
   icon: ResourceTypeIconName;
   readonly: boolean;
   label: string;
-} & (
-  | {
-      id: typeof EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID;
-    }
-  | {
-      id: typeof EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID;
-    }
-  | {
-      id: typeof EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID;
-    }
-  | {
-      id: typeof EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID;
-    }
-  | {
-      id: typeof EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID;
-    }
-  | GDocSchemaTable
-);
+};
+
+export type GDocTable = GDocTableBase &
+  (
+    | {
+        id: typeof EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID;
+      }
+    | {
+        id: typeof EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID;
+      }
+    | {
+        id: typeof EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID;
+      }
+    | {
+        id: typeof EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID;
+      }
+    | {
+        id: typeof EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID;
+      }
+    | GDocSchemaTable
+  );
 
 export type GDocSchemaTable = {
   id: string;
   attributes: Array<AttributeDefinition>;
-};
+} & GDocTableBase;
 
 export type GDocTableID = GDocTable["id"];
 
@@ -319,7 +322,10 @@ interface ITablespaceEditorState {
       .SYM_GRIDA_CUSTOMER_TABLE_ID]: TGlobalDataStreamState<Customer>;
     [EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID]: never;
     [EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID]: never;
-  } & Record<string, TGlobalDataStreamState<TVirtualRow>>;
+  } & Record<
+    string,
+    TGlobalDataStreamState<TVirtualRow<FormResponseField, FormResponse>>
+  >;
 }
 
 export interface FormEditorState

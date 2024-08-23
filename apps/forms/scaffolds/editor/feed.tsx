@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo } from "react";
-import { useEditorState, useFormFields } from "./use";
+import { useDatabaseTableId, useEditorState, useFormFields } from "./use";
 import toast from "react-hot-toast";
 import {
   createClientFormsClient,
@@ -272,7 +272,7 @@ export function ResponseFeedProvider({
     setLoading(true);
     const feed = fetchResponses(datagrid_rows_per_page).then((data) => {
       dispatch({
-        type: "editor/response/feed",
+        type: "editor/table/space/feed",
         data: data as any,
         reset: true,
       });
@@ -304,7 +304,7 @@ export function ResponseFeedProvider({
         const newresponse = fetchResponse((data as { id: string }).id).then(
           (data) => {
             dispatch({
-              type: "editor/response/feed",
+              type: "editor/table/space/feed",
               data: [data as any],
             });
           }
@@ -324,7 +324,7 @@ export function ResponseFeedProvider({
     onUpdate: (data) => {
       fetchResponse((data as { id: string }).id).then((data) => {
         dispatch({
-          type: "editor/response/feed",
+          type: "editor/table/space/feed",
           data: [data as any],
         });
       });
@@ -610,6 +610,105 @@ export function XSupabaseMainTableFeedProvider({
       });
     }
   }, [dispatch, res.data, state.form_id]);
+
+  return <>{children}</>;
+}
+
+export function SchemaTableFeedProvider({
+  children,
+}: React.PropsWithChildren<{}>) {
+  const [state, dispatch] = useEditorState();
+
+  const {
+    datagrid_table_id,
+    datagrid_rows_per_page,
+    datagrid_table_refresh_key,
+    tablespace,
+  } = state;
+
+  const table_id = useDatabaseTableId();
+
+  const { realtime: _realtime_responses_enabled } = tablespace[table_id];
+
+  const setLoading = useChangeDatagridLoading();
+
+  const fetchResponses = useFetchSchemaTableRows(table_id);
+
+  const fetchResponse = useFetchSchemaTableRow();
+
+  useEffect(() => {
+    if (typeof table_id !== "string") return;
+    setLoading(true);
+    const feed = fetchResponses(datagrid_rows_per_page).then((data) => {
+      dispatch({
+        type: "editor/table/space/feed",
+        data: data as any,
+        reset: true,
+      });
+    });
+
+    toast
+      .promise(feed, {
+        loading: "Fetching responses...",
+        success: "Responses fetched",
+        error: "Failed to fetch responses",
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [
+    dispatch,
+    fetchResponses,
+    setLoading,
+    table_id,
+    datagrid_rows_per_page,
+    datagrid_table_id,
+    datagrid_table_refresh_key,
+  ]);
+
+  // useSubscription({
+  //   table: "response",
+  //   form_id,
+  //   onInsert: (data) => {
+  //     setTimeout(() => {
+  //       const newresponse = fetchResponse((data as { id: string }).id).then(
+  //         (data) => {
+  //           dispatch({
+  //             type: "editor/table/space/feed",
+  //             data: [data as any],
+  //           });
+  //         }
+  //       );
+
+  //       toast.promise(
+  //         newresponse,
+  //         {
+  //           loading: "Fetching new response...",
+  //           success: "New response",
+  //           error: "Failed to fetch new response",
+  //         },
+  //         { id: data.id }
+  //       );
+  //     }, 100);
+  //   },
+  //   onUpdate: (data) => {
+  //     fetchResponse((data as { id: string }).id).then((data) => {
+  //       dispatch({
+  //         type: "editor/table/space/feed",
+  //         data: [data as any],
+  //       });
+  //     });
+  //   },
+  //   onDelete: (data) => {
+  //     if ("id" in data) {
+  //       dispatch({
+  //         type: "editor/response/delete",
+  //         id: data.id,
+  //       });
+  //     }
+  //   },
+  //   enabled: _realtime_responses_enabled,
+  // });
 
   return <>{children}</>;
 }

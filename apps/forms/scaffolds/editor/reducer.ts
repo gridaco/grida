@@ -4,6 +4,7 @@ import type {
   EditorState,
   GDocTable,
   GDocTableID,
+  TGlobalDataStreamState,
   TVirtualRow,
   TVirtualRowData,
 } from "./state";
@@ -22,7 +23,7 @@ import type {
   TableAttributeDeleteAction,
   DeleteResponseAction,
   DataGridDeleteSelectedRows,
-  FeedResponseAction,
+  TablespaceFeedAction,
   FocusBlockAction,
   HtmlBlockBodyAction,
   ImageBlockSrcAction,
@@ -561,12 +562,12 @@ export function reducer(
         draft.datagrid_rows_per_page = max;
       });
     }
-    case "editor/response/feed": {
-      const { data, reset } = <FeedResponseAction>action;
+    case "editor/table/space/feed": {
+      const { data, reset } = <TablespaceFeedAction>action;
 
       const virtualized: Array<TVirtualRow<FormResponseField, FormResponse>> =
-        data.map((response) => {
-          const { fields, ...row } = response;
+        data.map((vrow) => {
+          const { fields, ...row } = vrow;
           return {
             id: row.id,
             data: fields.reduce(
@@ -582,37 +583,30 @@ export function reducer(
         });
 
       return produce(state, (draft) => {
-        const response_space =
-          draft.tablespace[
-            EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID
-          ];
+        const space = get_tablespace_feed(draft);
+
+        assert(space, "Table space not found");
 
         if (reset) {
-          response_space.stream = virtualized;
+          space.stream = virtualized;
           return;
         }
 
         // Merge & Add new responses to the existing responses
         // Map of ids to responses for the existing responses
         // { [id] : row}
-        const existing_responses_id_map = response_space.stream?.reduce(
-          (acc: any, response) => {
-            acc[response.id] = response;
-            return acc;
-          },
-          {}
-        );
+        const existing_rows_id_map = space.stream?.reduce((acc: any, row) => {
+          acc[row.id] = row;
+          return acc;
+        }, {});
 
-        virtualized.forEach((newResponse) => {
-          if (existing_responses_id_map.hasOwnProperty(newResponse.id)) {
+        virtualized.forEach((newRow) => {
+          if (existing_rows_id_map.hasOwnProperty(newRow.id)) {
             // Update existing response
-            Object.assign(
-              (existing_responses_id_map as any)[newResponse.id],
-              newResponse
-            );
+            Object.assign((existing_rows_id_map as any)[newRow.id], newRow);
           } else {
             // Add new response if id does not exist
-            response_space.stream?.push(newResponse);
+            space.stream?.push(newRow);
           }
         });
       });
@@ -1102,6 +1096,12 @@ export function reducer(
           })
         );
 
+        draft.tablespace[tb.id] = {
+          readonly: false,
+          stream: [],
+          realtime: true,
+        };
+
         // TODO: setting the id won't change the route. need to update the route. (where?)
         draft.datagrid_table_id = table.id;
       });
@@ -1109,6 +1109,23 @@ export function reducer(
     default:
       return state;
   }
+}
+
+function get_tablespace_feed(
+  draft: Draft<EditorState>
+): Draft<TGlobalDataStreamState<TVirtualRow>> | null {
+  switch (draft.doctype) {
+    case "v0_form":
+      return draft.tablespace[
+        EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID
+      ];
+    case "v0_schema":
+      if (typeof draft.datagrid_table_id === "string")
+        return draft.tablespace[draft.datagrid_table_id];
+    default:
+      return null;
+  }
+  //
 }
 
 function get_attributes(draft: Draft<EditorState>, table_id: GDocTableID) {

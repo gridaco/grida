@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useContext } from "react";
-import type { EditorState } from "./state";
+import type { EditorState, GDocTable } from "./state";
 import { useDispatch, type FlatDispatcher } from "./dispatch";
 
 import { Context } from "./provider";
@@ -18,12 +18,17 @@ export const useEditorState = (): [EditorState, FlatDispatcher] => {
   return useMemo(() => [state, dispatch], [state, dispatch]);
 };
 
-export function useDatagridTable() {
+export function useDatagridTable<T extends GDocTable>():
+  | Extract<GDocTable, T>
+  | undefined {
   const [state] = useEditorState();
   const { datagrid_table_id, tables } = state;
 
   return useMemo(() => {
-    return tables.find((table) => table.id === datagrid_table_id);
+    return tables.find((table) => table.id === datagrid_table_id) as Extract<
+      GDocTable,
+      T
+    >;
   }, [datagrid_table_id, tables]);
 }
 

@@ -41,7 +41,7 @@ export type BlocksEditorAction =
   | DeleteResponseAction
   | TableAttributeChangeAction
   | TableAttributeDeleteAction
-  | FeedResponseAction
+  | TablespaceFeedAction
   | OpenResponseEditAction
   | DataGridRowsAction
   | FeedResponseSessionsAction
@@ -200,8 +200,8 @@ export interface TableAttributeDeleteAction {
   field_id: string;
 }
 
-export interface FeedResponseAction {
-  type: "editor/response/feed";
+export interface TablespaceFeedAction {
+  type: "editor/table/space/feed";
   data: FormResponseWithFields[];
   reset?: boolean;
 }
