@@ -41,7 +41,10 @@ export default function XTablePage() {
   }, [datagrid_rows_per_page, datagrid_orderby, datagrid_table_refresh_key]);
 
   const request = state.connections.supabase?.main_supabase_table_id
-    ? `/private/editor/connect/${form_id}/supabase/table/auth.users/query?${serachParams}`
+    ? PrivateEditorApi.SupabaseConnection.url_table_auth_users_query(
+        form_id,
+        serachParams
+      )
     : null;
 
   const { data, isLoading, isValidating } = useSWR<

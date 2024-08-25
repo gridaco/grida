@@ -507,7 +507,10 @@ export function XSupabaseMainTableSyncProvider({
       if (!pkname) return;
 
       const task = fetch(
-        `/private/editor/connect/${state.form_id}/supabase/table/${state.connections.supabase.main_supabase_table_id}/query`,
+        PrivateEditorApi.SupabaseConnection.url_table_x_query(
+          state.form_id,
+          state.connections.supabase.main_supabase_table_id
+        ),
         {
           method: "PATCH",
           headers: {
@@ -587,7 +590,11 @@ export function XSupabaseMainTableFeedProvider({
   const enabled = !!state.connections.supabase?.main_supabase_table_id;
 
   const request = state.connections.supabase?.main_supabase_table_id
-    ? `/private/editor/connect/${state.form_id}/supabase/table/${state.connections.supabase.main_supabase_table_id}/query?${serachParams}`
+    ? PrivateEditorApi.SupabaseConnection.url_table_x_query(
+        state.form_id,
+        state.connections.supabase.main_supabase_table_id,
+        serachParams
+      )
     : null;
 
   const res = useSWR<EditorApiResponse<GridaSupabase.XDataRow[], any>>(

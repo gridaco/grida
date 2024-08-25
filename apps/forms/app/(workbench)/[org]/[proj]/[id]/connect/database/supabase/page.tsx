@@ -74,6 +74,37 @@ export default function ConnectSupabasePage() {
   );
 }
 
+const testSupabaseConnection = async ({
+  url,
+  anonKey,
+  schema_name,
+}: {
+  url: string;
+  anonKey: string;
+  schema_name: string;
+}) => {
+  //
+  const parsing = SupabasePostgRESTOpenApi.fetch_supabase_postgrest_swagger({
+    url,
+    anonKey,
+    schemas: [schema_name],
+  });
+
+  try {
+    await toast
+      .promise(parsing, {
+        loading: "Testing...",
+        success: "Valid Connection",
+        error: "Failed to connect to Supabase",
+      })
+      .catch(console.error);
+
+    return await parsing;
+  } catch (e) {
+    return false;
+  }
+};
+
 function ConnectSupabase({ form_id }: { form_id: string }) {
   const [url, setUrl] = useState("");
   const [anonKey, setAnonKey] = useState("");
@@ -131,52 +162,21 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
     setProject(null);
   };
 
-  const testConnection = async ({
-    url,
-    anonKey,
-    schema,
-  }: {
-    url: string;
-    anonKey: string;
-    schema: string;
-  }) => {
-    //
-    const parsing = SupabasePostgRESTOpenApi.fetch_supabase_postgrest_swagger({
-      url,
-      anonKey,
-      schemas: [schema],
-    });
-
-    try {
-      await toast
-        .promise(parsing, {
-          loading: "Testing...",
-          success: "Valid Connection",
-          error: "Failed to connect to Supabase",
-        })
-        .catch(console.error);
-
-      return await parsing;
-    } catch (e) {
-      return false;
-    }
-  };
-
   const onTestConnectionClick = async () => {
-    await testConnection({
+    await testSupabaseConnection({
       url,
       anonKey,
-      schema: "public",
+      schema_name: "public",
     }).then((res) => {
       if (res) set_schema_definitions(res.sb_schema_definitions as {});
     });
   };
 
   const onTestCustomSchemaConnection = async (schema: string) => {
-    return await testConnection({
+    return await testSupabaseConnection({
       url,
       anonKey,
-      schema: schema,
+      schema_name: schema,
     });
   };
 

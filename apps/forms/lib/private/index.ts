@@ -171,12 +171,18 @@ export namespace PrivateEditorApi {
   }
 
   export namespace SupabaseConnection {
+    /**
+     * request body for creating a new supabase project connection
+     * grida_x_supabase.supabase_project
+     */
+    export type CreateProjectConnectionRequest = {
+      sb_anon_key: string;
+      sb_project_url: string;
+    };
+
     export async function createConnection(
       form_id: string,
-      data: {
-        sb_anon_key: string;
-        sb_project_url: string;
-      }
+      data: CreateProjectConnectionRequest
     ) {
       return Axios.post(`/private/editor/connect/${form_id}/supabase`, data);
     }
@@ -245,6 +251,19 @@ export namespace PrivateEditorApi {
         error: any;
       }>(`/private/editor/connect/${form_id}/supabase/storage/buckets`);
     }
+
+    export const url_table_auth_users_query = (
+      form_id: string,
+      serachParams: URLSearchParams | string
+    ) =>
+      `/private/editor/connect/${form_id}/supabase/table/auth.users/query?${serachParams}`;
+
+    export const url_table_x_query = (
+      form_id: string,
+      supabase_table_id: number,
+      serachParams?: URLSearchParams | string
+    ) =>
+      `/private/editor/connect/${form_id}/supabase/table/${supabase_table_id}/query${serachParams ? `?${serachParams}` : ""}`;
   }
 
   export namespace SupabaseQuery {
