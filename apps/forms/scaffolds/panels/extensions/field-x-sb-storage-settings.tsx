@@ -62,14 +62,15 @@ export function SupabaseStorageSettings({
 
   // list buckets
   useEffect(() => {
+    if (!state.connections.supabase) return;
     if (enabled) {
-      PrivateEditorApi.SupabaseConnection.listBucket(state.form_id).then(
-        (res) => {
-          res.data.data && setBuckets(res.data.data);
-        }
-      );
+      PrivateEditorApi.SupabaseConnection.listBucket(
+        state.connections.supabase.id
+      ).then((res) => {
+        res.data.data && setBuckets(res.data.data);
+      });
     }
-  }, [enabled, state.form_id]);
+  }, [enabled, state.form_id, state.connections.supabase]);
 
   useEffect(() => {
     setBucket(value?.bucket);

@@ -65,11 +65,14 @@ import { useEditorState } from "@/scaffolds/editor";
 
 export default function ConnectSupabasePage() {
   const [state] = useEditorState();
-  const { form_id } = state;
+  const {
+    form_id,
+    project: { id: project_id },
+  } = state;
 
   return (
     <main className="max-w-2xl mx-auto mt-10">
-      <ConnectSupabase form_id={form_id} />
+      <ConnectSupabase project_id={project_id} form_id={form_id} />
     </main>
   );
 }
@@ -105,7 +108,13 @@ const testSupabaseConnection = async ({
   }
 };
 
-function ConnectSupabase({ form_id }: { form_id: string }) {
+function ConnectSupabase({
+  project_id,
+  form_id,
+}: {
+  project_id: number;
+  form_id: string;
+}) {
   const [url, setUrl] = useState("");
   const [anonKey, setAnonKey] = useState("");
   const [serviceKey, setServiceKey] = useState("");
@@ -116,13 +125,13 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
   } | null>(null);
   const [tableName, setTableName] = useState<string | undefined>(undefined);
 
-  const [project, setProject] = useState<
+  const [xsbproject, setXSBProject] = useState<
     GridaSupabase.SupabaseProject | null | undefined
   >(undefined);
 
   const is_loaded = schema_definitions !== null;
-  const is_connected = !!project;
-  const is_service_key_set = !!project?.sb_service_key_id;
+  const is_connected = !!xsbproject;
+  const is_service_key_set = !!xsbproject?.sb_service_key_id;
 
   const disabled = !url || !anonKey;
 
@@ -130,7 +139,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
     PrivateEditorApi.SupabaseConnection.getConnection(form_id)
       .then((res) => {
         const data = res.data.data;
-        setProject(data.supabase_project);
+        setXSBProject(data.supabase_project);
         setUrl(data.supabase_project.sb_project_url);
         setAnonKey(data.supabase_project.sb_anon_key);
         setSchemaNames(data.supabase_project.sb_schema_names);
@@ -146,7 +155,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
         );
       })
       .catch((err) => {
-        setProject(null);
+        setXSBProject(null);
       });
   }, [form_id]);
 
@@ -159,7 +168,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
     setAnonKey("");
     set_schema_definitions(null);
     setTableName(undefined);
-    setProject(null);
+    setXSBProject(null);
   };
 
   const onTestConnectionClick = async () => {
@@ -181,12 +190,13 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
   };
 
   const onUseCustomSchema = async (schema: string) => {
-    const { data } = await PrivateEditorApi.SupabaseConnection.addCustomSchema(
-      form_id,
-      {
-        schema_name: schema,
-      }
-    );
+    const { data } =
+      await PrivateEditorApi.SupabaseConnection.registerCustomSchema(
+        xsbproject!.id,
+        {
+          schema_name: schema,
+        }
+      );
 
     if (data.data) {
       setSchemaName(schema);
@@ -197,7 +207,9 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
   };
 
   const onRefreshSchemaClick = async () => {
-    const res = PrivateEditorApi.SupabaseConnection.refreshConnection(form_id);
+    const res = PrivateEditorApi.SupabaseConnection.refreshProjectSchema(
+      xsbproject!.id
+    );
     toast.promise(res, {
       loading: "Refreshing Schema...",
       success: "Schema Refreshed",
@@ -211,14 +223,13 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
 
   const onConnectClick = async () => {
     const data = {
+      project_id: project_id,
       sb_anon_key: anonKey,
       sb_project_url: url,
     };
 
-    const res = PrivateEditorApi.SupabaseConnection.createConnection(
-      form_id,
-      data
-    );
+    const res =
+      PrivateEditorApi.SupabaseConnection.createProjectConnection(data);
 
     toast
       .promise(res, {
@@ -227,7 +238,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
         error: "Failed to create connection",
       })
       .then((res) => {
-        setProject(res.data.data);
+        setXSBProject(res.data.data);
       });
   };
 
@@ -241,7 +252,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
         error: "Failed to remove connection",
       })
       .then(() => {
-        setProject(null);
+        setXSBProject(null);
         setUrl("");
         setAnonKey("");
         set_schema_definitions(null);
@@ -263,13 +274,14 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
           secret: serviceKey,
         };
 
-        const res = PrivateEditorApi.SupabaseConnection.createSecret(
-          form_id,
-          data
-        );
+        const res =
+          PrivateEditorApi.SupabaseConnection.createProjectServiceRoleKey(
+            xsbproject!.id,
+            data
+          );
 
         res.then((res) => {
-          setProject((prev) => ({
+          setXSBProject((prev) => ({
             ...prev!,
             sb_service_key_id: res.data.data,
           }));
@@ -305,7 +317,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
 
   return (
     <div className="space-y-10">
-      {project === undefined ? (
+      {xsbproject === undefined ? (
         <LoadingCard />
       ) : (
         <Card>
@@ -317,7 +329,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
               </span>
               {is_connected && (
                 <Link
-                  href={`https://supabase.com/dashboard/project/${project.sb_project_reference_id}`}
+                  href={`https://supabase.com/dashboard/project/${xsbproject.sb_project_reference_id}`}
                   target="_blank"
                 >
                   <Button variant="link">
@@ -489,8 +501,8 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
                   <RevealSecret
                     fetcher={async () => {
                       const res =
-                        await PrivateEditorApi.SupabaseConnection.revealSecret(
-                          form_id
+                        await PrivateEditorApi.SupabaseConnection.revealProjectServiceRoleKey(
+                          xsbproject!.id
                         );
                       return res.data.data;
                     }}
@@ -513,7 +525,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
           </div>
         </CardContent>
         <CardFooter className="flex justify-end">
-          <div hidden={!!project?.sb_service_key_id}>
+          <div hidden={!!xsbproject?.sb_service_key_id}>
             <Button disabled={!serviceKey} onClick={onServiceKeySaveClick}>
               Save
             </Button>
@@ -704,7 +716,7 @@ function DBSchemaSelect({
           ))}
           <SelectItem value={__add_custom}>
             <PlusIcon className="me-2 inline align-middle w-4 h-4" />
-            Add custom schema
+            Register custom schema
           </SelectItem>
         </SelectContent>
       </Select>

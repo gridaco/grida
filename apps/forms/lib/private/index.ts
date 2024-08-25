@@ -176,23 +176,61 @@ export namespace PrivateEditorApi {
      * grida_x_supabase.supabase_project
      */
     export type CreateProjectConnectionRequest = {
+      project_id: number;
       sb_anon_key: string;
       sb_project_url: string;
     };
 
-    export async function createConnection(
-      form_id: string,
+    export async function createProjectConnection(
       data: CreateProjectConnectionRequest
     ) {
-      return Axios.post(`/private/editor/connect/${form_id}/supabase`, data);
+      return Axios.post(`/private/editor/connect/supabase/projects`, data);
     }
 
-    export async function refreshConnection(form_id: string) {
-      return Axios.patch<EditorApiResponse<GridaSupabase.SupabaseProject>>(
-        `/private/editor/connect/${form_id}/supabase`
+    export async function createProjectServiceRoleKey(
+      supabase_project_id: number,
+      data: { secret: string }
+    ) {
+      return Axios.post(
+        `/private/editor/connect/supabase/projects/${supabase_project_id}/secure-service-key`,
+        data
       );
     }
 
+    export async function revealProjectServiceRoleKey(
+      supabase_project_id: number
+    ) {
+      return Axios.get(
+        `/private/editor/connect/supabase/projects/${supabase_project_id}/secure-service-key`
+      );
+    }
+
+    export async function refreshProjectSchema(supabase_project_id: number) {
+      return Axios.patch<EditorApiResponse<GridaSupabase.SupabaseProject>>(
+        `/private/editor/connect/supabase/projects/${supabase_project_id}`
+      );
+    }
+
+    export async function registerCustomSchema(
+      supabase_project_id: number,
+      data: XSupabasePrivateApiTypes.AddSchemaNameRequestData
+    ) {
+      return Axios.post<EditorApiResponse<GridaSupabase.SupabaseProject>>(
+        `/private/editor/connect/supabase/projects/${supabase_project_id}/custom-schema`,
+        data
+      );
+    }
+
+    export async function listBucket(supabase_project_id: number) {
+      return Axios.get<{
+        data: GridaSupabase.SupabaseBucket[];
+        error: any;
+      }>(
+        `/private/editor/connect/supabase/projects/${supabase_project_id}/storage/buckets`
+      );
+    }
+
+    //
     export async function getConnection(form_id: string) {
       return Axios.get<{
         data: GridaSupabase.SupabaseConnectionState;
@@ -201,32 +239,6 @@ export namespace PrivateEditorApi {
 
     export async function removeConnection(form_id: string) {
       return Axios.delete(`/private/editor/connect/${form_id}/supabase`);
-    }
-
-    export async function createSecret(
-      form_id: string,
-      data: { secret: string }
-    ) {
-      return Axios.post(
-        `/private/editor/connect/${form_id}/supabase/secure-service-key`,
-        data
-      );
-    }
-
-    export async function revealSecret(form_id: string) {
-      return Axios.get(
-        `/private/editor/connect/${form_id}/supabase/secure-service-key`
-      );
-    }
-
-    export async function addCustomSchema(
-      form_id: string,
-      data: XSupabasePrivateApiTypes.AddSchemaNameRequestData
-    ) {
-      return Axios.post<EditorApiResponse<GridaSupabase.SupabaseProject>>(
-        `/private/editor/connect/${form_id}/supabase/custom-schema`,
-        data
-      );
     }
 
     export async function createConnectionTable(
@@ -243,13 +255,6 @@ export namespace PrivateEditorApi {
       return Axios.get<{ data: GridaSupabase.SupabaseTable; error: any }>(
         `/private/editor/connect/${form_id}/supabase/table`
       );
-    }
-
-    export async function listBucket(form_id: string) {
-      return Axios.get<{
-        data: GridaSupabase.SupabaseBucket[];
-        error: any;
-      }>(`/private/editor/connect/${form_id}/supabase/storage/buckets`);
     }
 
     export const url_table_auth_users_query = (

@@ -1,45 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { XSupabasePrivateApiTypes } from "@/types/private/api";
 import { cookies } from "next/headers";
-import {
-  createRouteHandlerClient,
-  grida_xsupabase_client,
-} from "@/lib/supabase/server";
+import { createRouteHandlerXSBClient } from "@/lib/supabase/server";
 import assert from "assert";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 
 interface Context {
   params: {
-    form_id: string;
+    supabase_project_id: number;
   };
 }
 
 export async function POST(req: NextRequest, context: Context) {
   //
-  const form_id = context.params.form_id;
   const cookieStore = cookies();
-  const supabase = createRouteHandlerClient(cookieStore);
+  const supabase = createRouteHandlerXSBClient(cookieStore);
+  const { supabase_project_id } = context.params;
 
   const body: XSupabasePrivateApiTypes.AddSchemaNameRequestData =
     await req.json();
 
-  const { data: conn } = await supabase
-    .from("connection_supabase")
-    .select(`*`)
-    .eq("form_id", form_id)
-    .single();
-
-  if (!conn) {
-    return NextResponse.json(
-      { error: "Connection not found" },
-      { status: 404 }
-    );
-  }
-
-  const { supabase_project_id } = conn;
-
-  //
-  const { data: prev } = await grida_xsupabase_client
+  const { data: prev } = await supabase
     .from("supabase_project")
     .select(`id, sb_project_url, sb_anon_key, sb_schema_names`)
     .eq("id", supabase_project_id)
@@ -58,7 +39,7 @@ export async function POST(req: NextRequest, context: Context) {
       schemas: schema_names,
     });
 
-  const { data: patch, error: patch_error } = await grida_xsupabase_client
+  const { data: patch, error: patch_error } = await supabase
     .from("supabase_project")
     .update({
       sb_schema_names: Array.from(schema_names),

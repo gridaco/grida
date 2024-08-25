@@ -33,7 +33,9 @@ export async function createXSupabaseClient(
 
   let serviceRoleKey: string | null = null;
   if (config?.service_role) {
-    const { data } = await secureFetchServiceKey(supabase_project.id);
+    const { data } = await __dangerously_fetch_secure_service_role_key(
+      supabase_project.id
+    );
     serviceRoleKey = data;
     assert(serviceRoleKey, "serviceRoleKey is required");
   }
@@ -47,7 +49,15 @@ export async function createXSupabaseClient(
   return sbclient;
 }
 
-export async function secureFetchServiceKey(supabase_project_id: number) {
+/**
+ * This may only be used in a secure context.
+ *
+ * @deprecated drop this, add a new rpc with rls enabled.
+ * FIXME: this is a potential security risk.
+ */
+export async function __dangerously_fetch_secure_service_role_key(
+  supabase_project_id: number
+) {
   return secureformsclient.rpc(
     "reveal_secret_connection_supabase_service_key",
     {

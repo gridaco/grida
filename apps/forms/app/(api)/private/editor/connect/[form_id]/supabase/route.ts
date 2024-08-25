@@ -1,10 +1,5 @@
-import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
-import {
-  createRouteHandlerClient,
-  grida_xsupabase_client,
-} from "@/lib/supabase/server";
+import { createRouteHandlerClient } from "@/lib/supabase/server";
 import { GridaXSupabaseService } from "@/services/x-supabase";
-import assert from "assert";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
@@ -45,7 +40,7 @@ export async function GET(req: NextRequest, context: Context) {
     data: data,
   });
 }
-
+/*
 export async function PATCH(req: NextRequest, context: Context) {
   const form_id = context.params.form_id;
   const cookieStore = cookies();
@@ -118,13 +113,15 @@ export async function PATCH(req: NextRequest, context: Context) {
 
   return NextResponse.json({ data: patch });
 }
-
+*/
+/*
 export async function POST(req: NextRequest, context: Context) {
   const form_id = context.params.form_id;
   const cookieStore = cookies();
   const supabase = createRouteHandlerClient(cookieStore);
 
-  const data = await req.json();
+  const data: PrivateEditorApi.SupabaseConnection.CreateProjectConnectionRequest =
+    await req.json();
   const { sb_project_url, sb_anon_key } = data;
 
   const { sb_project_reference_id, sb_schema_definitions } =
@@ -174,6 +171,7 @@ export async function POST(req: NextRequest, context: Context) {
 
   return NextResponse.json({ data: conn });
 }
+  */
 
 export async function DELETE(req: NextRequest, context: Context) {
   const form_id = context.params.form_id;
