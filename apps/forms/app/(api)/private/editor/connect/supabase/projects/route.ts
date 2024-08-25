@@ -2,13 +2,50 @@ import { PrivateEditorApi } from "@/lib/private";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { createRouteHandlerXSBClient } from "@/lib/supabase/server";
 import { GridaSupabase } from "@/types";
-import { EditorApiResponse } from "@/types/private/api";
+import type {
+  EditorApiResponse,
+  XSupabasePrivateApiTypes,
+} from "@/types/private/api";
 import { DontCastJsonProperties } from "@/types/supabase-ext";
 import { cookies } from "next/headers";
+import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
 interface Context {
   params: {};
+}
+
+export async function GET(req: NextRequest, context: Context) {
+  const workbench_project_id = Number(
+    req.nextUrl.searchParams.get("grida_project_id")
+  );
+
+  const cookieStore = cookies();
+  const supabase = createRouteHandlerXSBClient(cookieStore);
+
+  const { data: supabase_project, error: rls_err } = await supabase
+    .from("supabase_project")
+    .select(
+      `
+        *,
+        tables:supabase_table(id, sb_schema_name, sb_table_name)
+      `
+    )
+    .eq("project_id", workbench_project_id)
+    .single();
+
+  if (rls_err) {
+    console.error("RLS ERR:", rls_err);
+    return notFound();
+  }
+
+  return NextResponse.json({
+    data: supabase_project satisfies DontCastJsonProperties<
+      XSupabasePrivateApiTypes.GetSupabaseProjectData,
+      "sb_public_schema" | "sb_schema_definitions"
+    >,
+  });
+  //
 }
 
 export async function POST(req: NextRequest, context: Context) {

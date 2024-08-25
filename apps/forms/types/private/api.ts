@@ -5,6 +5,7 @@ import type {
   IFormField,
 } from "../types";
 import type { InventoryLevelCommit } from "../inventory";
+import type { GridaSupabase } from "../x-supabase";
 import * as ERR from "@/k/error";
 
 export type FormSubmitErrorCode =
@@ -128,6 +129,13 @@ export namespace XSupabasePrivateApiTypes {
     schema_name: string;
     table_name: string;
   }
+
+  export type GetSupabaseProjectData = GridaSupabase.SupabaseProject & {
+    tables: Pick<
+      GridaSupabase.SupabaseTable,
+      "id" | "sb_schema_name" | "sb_table_name"
+    >[];
+  };
 
   export interface AddSchemaNameRequestData {
     schema_name: string;

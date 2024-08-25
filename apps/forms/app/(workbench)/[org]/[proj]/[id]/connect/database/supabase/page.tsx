@@ -62,6 +62,8 @@ import {
 } from "@/components/ui/dialog";
 import { SupabaseTableInfo } from "@/scaffolds/x-supabase/supabase-table-info";
 import { useEditorState } from "@/scaffolds/editor";
+import { XSupabasePrivateApiTypes } from "@/types/private/api";
+import { Sector, SectorHeader, SectorHeading } from "@/components/preferences";
 
 type SchemaDefinitions = {
   [schema: string]: SupabasePostgRESTOpenApi.SupabasePublicSchema;
@@ -130,26 +132,39 @@ function ConnectSupabase() {
   const disabled = !url || !anonKey;
 
   useEffect(() => {
+    const ondata = (data: XSupabasePrivateApiTypes.GetSupabaseProjectData) => {
+      setXSBProject(data);
+      setUrl(data.sb_project_url);
+      setAnonKey(data.sb_anon_key);
+      setSchemaNames(data.sb_schema_names);
+      set_schema_definitions(data.sb_schema_definitions as {});
+    };
+
     if (!existing_connection) {
-      setXSBProject(null);
+      PrivateEditorApi.SupabaseConnection.getXSBProjectByGridaProjectId(
+        project_id
+      )
+        .then((res) => {
+          const data = res.data.data;
+          ondata(data);
+        })
+        .catch((err) => {
+          setXSBProject(null);
+        });
       return;
     }
-    PrivateEditorApi.SupabaseConnection.getProjectConnection(
+
+    PrivateEditorApi.SupabaseConnection.getXSBProject(
       existing_connection.supabase_project_id
     )
       .then((res) => {
         const data = res.data.data;
-        console.log(data);
-        setXSBProject(data);
-        setUrl(data.sb_project_url);
-        setAnonKey(data.sb_anon_key);
-        setSchemaNames(data.sb_schema_names);
-        set_schema_definitions(data.sb_schema_definitions as {});
+        ondata(data);
       })
       .catch((err) => {
         setXSBProject(null);
       });
-  }, [existing_connection]);
+  }, [project_id, existing_connection]);
 
   const onClearClick = () => {
     setUrl("");
@@ -169,7 +184,7 @@ function ConnectSupabase() {
   };
 
   const onRefreshSchemaClick = async () => {
-    const res = PrivateEditorApi.SupabaseConnection.refreshProjectSchema(
+    const res = PrivateEditorApi.SupabaseConnection.refreshXSBProjectSchema(
       xsbproject!.id
     );
     toast.promise(res, {
@@ -184,7 +199,7 @@ function ConnectSupabase() {
   };
 
   const onConnectClick = async () => {
-    const res = PrivateEditorApi.SupabaseConnection.createProjectConnection({
+    const res = PrivateEditorApi.SupabaseConnection.createXSBProjectConnection({
       project_id: project_id,
       sb_anon_key: anonKey,
       sb_project_url: url,
@@ -202,7 +217,7 @@ function ConnectSupabase() {
   };
 
   const onRemoveConnectionClick = async () => {
-    const res = PrivateEditorApi.SupabaseConnection.deleteProjectConnection(
+    const res = PrivateEditorApi.SupabaseConnection.deleteXSBProjectConnection(
       xsbproject!.id
     );
 
@@ -377,18 +392,26 @@ function ConnectSupabase() {
         />
       )}
       {xsbproject && doctype === "v0_form" && (
-        <ConnectFormXSupabaseTable
-          form_id={form_id}
-          connection={{
-            supabase_project_id: xsbproject.id,
-            sb_project_url: xsbproject.sb_project_url,
-            sb_schema_definitions: schema_definitions!,
-            sb_schema_names: schemaNames,
-            sb_anon_key: anonKey,
-          }}
-          on_schema_names_change={setSchemaNames}
-          on_schema_definitions_change={set_schema_definitions}
-        />
+        <>
+          <hr />
+          <Sector>
+            <SectorHeader>
+              <SectorHeading>Forms Table</SectorHeading>
+            </SectorHeader>
+            <ConnectFormXSupabaseTable
+              form_id={form_id}
+              connection={{
+                supabase_project_id: xsbproject.id,
+                sb_project_url: xsbproject.sb_project_url,
+                sb_schema_definitions: schema_definitions!,
+                sb_schema_names: schemaNames,
+                sb_anon_key: anonKey,
+              }}
+              on_schema_names_change={setSchemaNames}
+              on_schema_definitions_change={set_schema_definitions}
+            />
+          </Sector>
+        </>
       )}
     </div>
   );
@@ -426,7 +449,7 @@ function ConnectServiceRoleKey({
         };
 
         const res =
-          PrivateEditorApi.SupabaseConnection.createProjectServiceRoleKey(
+          PrivateEditorApi.SupabaseConnection.createXSBProjectServiceRoleKey(
             connection.supabase_project_id,
             data
           );
@@ -492,7 +515,7 @@ function ConnectServiceRoleKey({
                 <RevealSecret
                   fetcher={async () => {
                     const res =
-                      await PrivateEditorApi.SupabaseConnection.revealProjectServiceRoleKey(
+                      await PrivateEditorApi.SupabaseConnection.revealXSBProjectServiceRoleKey(
                         connection.supabase_project_id
                       );
                     return res.data.data;
@@ -550,7 +573,7 @@ function ConnectFormXSupabaseTable({
 
   const {
     supabase_project_id,
-    sb_schema_definitions: sb_schema_definitions,
+    sb_schema_definitions,
     sb_schema_names: sb_schema_names,
     sb_project_url,
     sb_anon_key,
@@ -565,18 +588,19 @@ function ConnectFormXSupabaseTable({
   }, [schemaName]);
 
   useEffect(() => {
-    console.log(forms_supabase_connection?.main_supabase_table);
-    setTableName(forms_supabase_connection?.main_supabase_table?.sb_table_name);
-    setSchemaName(
-      forms_supabase_connection?.main_supabase_table?.sb_schema_name as string
-    );
+    if (forms_supabase_connection?.main_supabase_table) {
+      setTableName(
+        forms_supabase_connection?.main_supabase_table?.sb_table_name
+      );
+      setSchemaName(
+        forms_supabase_connection?.main_supabase_table?.sb_schema_name as string
+      );
+    }
   }, [forms_supabase_connection?.main_supabase_table]);
-
-  console.log(tableName);
 
   const onUseCustomSchema = async (schema: string) => {
     const { data } =
-      await PrivateEditorApi.SupabaseConnection.registerCustomSchema(
+      await PrivateEditorApi.SupabaseConnection.registerXSBCustomSchema(
         supabase_project_id,
         {
           schema_name: schema,
@@ -593,13 +617,14 @@ function ConnectFormXSupabaseTable({
 
   const onSaveMainTableClick = async () => {
     assert(tableName);
-    const res = PrivateEditorApi.SupabaseConnection.createConnectionTable(
-      form_id,
-      {
-        table_name: tableName,
-        schema_name: schemaName,
-      }
-    );
+    const res =
+      PrivateEditorApi.SupabaseConnection.createFormsXSBConnectionTable(
+        form_id,
+        {
+          table_name: tableName,
+          schema_name: schemaName,
+        }
+      );
 
     toast.promise(res, {
       loading: "Saving Main Table...",
@@ -620,7 +645,7 @@ function ConnectFormXSupabaseTable({
     <>
       <Card>
         <CardHeader>
-          <CardTitle>Form - Main Table Connection</CardTitle>
+          <CardTitle>Main Table Connection</CardTitle>
           <CardDescription>
             Grida Forms Allow you to connect to one of your supabase table to
             the form.

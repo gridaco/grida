@@ -1,6 +1,6 @@
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { createRouteHandlerXSBClient } from "@/lib/supabase/server";
-import { GridaSupabase } from "@/types";
+import type { XSupabasePrivateApiTypes } from "@/types/private/api";
 import { DontCastJsonProperties } from "@/types/supabase-ext";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
@@ -11,13 +11,6 @@ interface Context {
     supabase_project_id: number;
   };
 }
-
-export type GetSupabaseProjectData = GridaSupabase.SupabaseProject & {
-  tables: Pick<
-    GridaSupabase.SupabaseTable,
-    "id" | "sb_schema_name" | "sb_table_name"
-  >[];
-};
 
 export async function GET(req: NextRequest, context: Context) {
   const cookieStore = cookies();
@@ -42,7 +35,7 @@ export async function GET(req: NextRequest, context: Context) {
 
   return NextResponse.json({
     data: supabase_project satisfies DontCastJsonProperties<
-      GetSupabaseProjectData,
+      XSupabasePrivateApiTypes.GetSupabaseProjectData,
       "sb_public_schema" | "sb_schema_definitions"
     >,
   });
