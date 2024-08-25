@@ -696,7 +696,10 @@ export function reducer(
         draft.datagrid_orderby = datagridreset.datagrid_orderby;
 
         if (draft.doctype === "v0_form") {
-          draft.tablespace[tableid].realtime = true;
+          // TODO: not a best way. but for now.
+          if ((draft.tablespace[tableid] as never) !== "noop") {
+            draft.tablespace[tableid].realtime = true;
+          }
         }
       });
     }
