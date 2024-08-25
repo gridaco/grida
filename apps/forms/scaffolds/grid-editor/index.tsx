@@ -130,6 +130,13 @@ export function GridEditor({
 
   return (
     <GridLayout.Root>
+      <DeleteFieldConfirmDialog
+        open={deleteFieldConfirmDialog.open}
+        onOpenChange={deleteFieldConfirmDialog.onOpenChange}
+        onCancel={deleteFieldConfirmDialog.closeDialog}
+        field_id={deleteFieldConfirmDialog.data?.field_id}
+        onDeleteConfirm={(field_id) => onDeleteField(field_id)}
+      />
       <GridLayout.Header>
         <GridLayout.HeaderMenus>
           {has_selected_responses ? (
@@ -178,13 +185,6 @@ export function GridEditor({
           {!tb?.readonly && <TableMod />}
         </GridLayout.HeaderMenus>
       </GridLayout.Header>
-      <DeleteFieldConfirmDialog
-        open={deleteFieldConfirmDialog.open}
-        onOpenChange={deleteFieldConfirmDialog.onOpenChange}
-        onCancel={deleteFieldConfirmDialog.closeDialog}
-        field_id={deleteFieldConfirmDialog.data?.field_id}
-        onDeleteConfirm={(field_id) => onDeleteField(field_id)}
-      />
       <GridLayout.Content>
         <ResponseGrid
           systemcolumns={systemcolumns}

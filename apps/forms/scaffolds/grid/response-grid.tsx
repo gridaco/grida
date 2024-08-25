@@ -1,34 +1,20 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import DataGrid, {
   Column,
   CopyEvent,
-  PasteEvent,
   RenderCellProps,
   RenderEditCellProps,
   RenderHeaderCellProps,
 } from "react-data-grid";
 import {
   PlusIcon,
-  ChevronDownIcon,
-  EnterFullScreenIcon,
   CalendarIcon,
   Link2Icon,
-  Pencil1Icon,
-  TrashIcon,
   AvatarIcon,
   ArrowRightIcon,
-  DownloadIcon,
-  FileIcon,
 } from "@radix-ui/react-icons";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuPortal,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { FormInputType } from "@/types";
 import { JsonEditCell } from "./json-cell";
 import { useEditorState } from "../editor";
@@ -43,10 +29,7 @@ import { SelectColumn } from "./select-column";
 import "./grid.css";
 import { unwrapFeildValue } from "@/lib/forms/unwrap";
 import { Button } from "@/components/ui/button";
-import {
-  FileTypeIcon,
-  FormFieldTypeIcon,
-} from "@/components/form-field-type-icon";
+import { FileTypeIcon } from "@/components/form-field-type-icon";
 import { toZonedTime } from "date-fns-tz";
 import { tztostr } from "../editor/symbols";
 import { mask } from "./mask";
@@ -65,6 +48,7 @@ import Highlight from "@/components/highlight";
 import { FieldSupports } from "@/k/supported_field_types";
 import { format } from "date-fns";
 import { EmptyRowsRenderer } from "./empty";
+import { ColumnHeaderCell } from "./column-header-cell";
 
 function rowKeyGetter(row: GFResponseRow) {
   return row.__gf_id;
@@ -108,6 +92,7 @@ export function ResponseGrid({
   };
 
   const onColumnsReorder = (sourceKey: string, targetKey: string) => {
+    console.log("reorder", sourceKey, targetKey);
     // FIXME: the reorder won't work. we are using custom header cell, which needs a custom dnd handling.
     dispatch({
       type: "editor/data-grid/column/reorder",
@@ -116,31 +101,32 @@ export function ResponseGrid({
     });
   };
 
-  const __id_column: Column<GFResponseRow> = {
-    key: "__gf_display_id",
-    name: "id",
+  const sys_col_props = {
     frozen: true,
     resizable: true,
+    draggable: false,
+    sortable: false,
     width: 100,
+  };
+  const __id_column: Column<GFResponseRow> = {
+    ...sys_col_props,
+    key: "__gf_display_id",
+    name: "id",
     renderHeaderCell: GFSystemPropertyHeaderCell,
   };
 
   const __created_at_column: Column<GFResponseRow> = {
+    ...sys_col_props,
     key: "__gf_created_at",
     name: "time",
-    frozen: true,
-    resizable: true,
-    width: 100,
     renderHeaderCell: GFSystemPropertyHeaderCell,
     renderCell: DefaultPropertyDateCell,
   };
 
   const __customer_uuid_column: Column<GFResponseRow> = {
+    ...sys_col_props,
     key: "__gf_customer_id",
     name: "customer",
-    frozen: true,
-    resizable: true,
-    width: 100,
     renderHeaderCell: GFSystemPropertyHeaderCell,
     renderCell: DefaultPropertyCustomerCell,
   };
@@ -149,7 +135,8 @@ export function ResponseGrid({
     key: "__gf_new",
     name: "+",
     resizable: false,
-    draggable: true,
+    draggable: false,
+    sortable: false,
     width: 100,
     renderHeaderCell: (props) => (
       <NewFieldHeaderCell {...props} onClick={onAddNewFieldClick} />
@@ -179,13 +166,14 @@ export function ResponseGrid({
             key: col.key,
             name: col.name,
             resizable: true,
-            draggable: true,
             editable: true,
+            sortable: true,
+            draggable: false,
             minWidth: 140,
             maxWidth: 640,
             width: undefined,
             renderHeaderCell: (props) => (
-              <FieldHeaderCell
+              <ColumnHeaderCell
                 {...props}
                 type={col.type as FormInputType}
                 onEditClick={() => {
@@ -281,47 +269,6 @@ function DefaultPropertyIcon({ __key: key }: { __key: GFSystemColumnTypes }) {
     case "__gf_customer_id":
       return <AvatarIcon className="min-w-4" />;
   }
-}
-
-function FieldHeaderCell({
-  column,
-  type,
-  onEditClick,
-  onDeleteClick,
-}: RenderHeaderCellProps<any> & {
-  type: FormInputType;
-  onEditClick?: () => void;
-  onDeleteClick?: () => void;
-}) {
-  const { name } = column;
-
-  return (
-    <div className="flex items-center justify-between">
-      <span className="flex items-center gap-2">
-        <FormFieldTypeIcon type={type} className="w-4 h-4" />
-        <span className="font-normal">{name}</span>
-      </span>
-      <DropdownMenu modal={false}>
-        <DropdownMenuTrigger asChild>
-          <button>
-            <ChevronDownIcon />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuPortal>
-          <DropdownMenuContent className="z-50">
-            <DropdownMenuItem onClick={onEditClick}>
-              <Pencil1Icon className="me-2 align-middle" />
-              Edit Field
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onDeleteClick}>
-              <TrashIcon className="me-2 align-middle" />
-              Delete Field
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenuPortal>
-      </DropdownMenu>
-    </div>
-  );
 }
 
 function NewFieldHeaderCell({
