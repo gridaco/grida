@@ -153,7 +153,10 @@ export function ModeData() {
 
   return (
     <>
-      <CreateNewTableDialog {...newTableDialog} key={newTableDialog.key} />
+      <CreateNewSchemaTableDialog
+        {...newTableDialog}
+        key={newTableDialog.key}
+      />
       {renderMenuItems(state.sidebar.mode_data.tables, {
         renderEmptyState: () => <EmptyState />,
         renderFallback: () => {
@@ -179,7 +182,7 @@ type CreateNewTableDialogInit = Partial<{
   template: "cms-starter" | "cms-blog-starter";
 }>;
 
-function CreateNewTableDialog({
+function CreateNewSchemaTableDialog({
   data,
   ...props
 }: React.ComponentProps<typeof Dialog> & {
