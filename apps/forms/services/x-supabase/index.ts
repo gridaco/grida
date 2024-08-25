@@ -85,9 +85,9 @@ export async function secureCreateServiceKey(
 export class GridaXSupabaseService {
   constructor() {}
 
-  async getConnection(
+  async getXSBMainTableConnectionState(
     conn: SchemaTableConnectionXSupabaseMainTableJoint
-  ): Promise<GridaSupabase.SupabaseConnectionState | null> {
+  ): Promise<GridaSupabase.XSupabaseMainTableConnectionState | null> {
     const { supabase_project_id, main_supabase_table_id } = conn;
 
     const { data: supabase_project, error: supabase_project_err } =

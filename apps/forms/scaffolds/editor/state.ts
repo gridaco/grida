@@ -74,6 +74,7 @@ export interface SchemaDocumentTableInit {
 
 export interface SchemaDocumentEditorInit extends BaseDocumentEditorInit {
   doctype: "v0_schema";
+  supabase_project: GridaSupabase.SupabaseProject | null;
   tables: ReadonlyArray<SchemaDocumentTableInit>;
 }
 
@@ -85,7 +86,7 @@ export interface FormDocumentEditorInit extends BaseDocumentEditorInit {
   ending: EditorState["form"]["ending"];
   connections?: {
     store_id?: number | null;
-    supabase?: GridaSupabase.SupabaseConnectionState;
+    supabase?: GridaSupabase.XSupabaseMainTableConnectionState;
   };
   form_title: string;
   blocks: EditorFlatFormBlock[];
@@ -298,9 +299,10 @@ interface IFieldEditorState {
 }
 
 interface IConnectionsState {
+  supabase_project: GridaSupabase.SupabaseProject | null;
   connections: {
     store_id?: number | null;
-    supabase?: GridaSupabase.SupabaseConnectionState;
+    supabase?: GridaSupabase.XSupabaseMainTableConnectionState;
   };
 }
 

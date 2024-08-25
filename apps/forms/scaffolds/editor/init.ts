@@ -125,6 +125,7 @@ function initialDatabaseEditorState(
   // @ts-ignore
   return {
     ...base,
+    supabase_project: init.supabase_project,
     connections: {},
     document: {
       pages: [],
@@ -325,6 +326,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
 
   return {
     ...base,
+    supabase_project: init.connections?.supabase?.supabase_project ?? null,
     connections: {
       store_id: init.connections?.store_id,
       supabase: init.connections?.supabase,
@@ -466,7 +468,7 @@ function formdocumentpagesinit({
   ];
 }
 
-function xsbmtinit(conn?: GridaSupabase.SupabaseConnectionState) {
+function xsbmtinit(conn?: GridaSupabase.XSupabaseMainTableConnectionState) {
   // TODO: need inspection - will supbaseconn present even when main table is not present?
   // if yes, we need to adjust the state to be nullable
   if (!conn) return undefined;

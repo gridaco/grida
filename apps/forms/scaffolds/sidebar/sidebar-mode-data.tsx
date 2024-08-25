@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { PlusIcon } from "@radix-ui/react-icons";
 import { useEditorState } from "../editor";
 import { SupabaseLogo } from "@/components/logos";
@@ -27,9 +27,19 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogClose,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -43,6 +53,8 @@ import toast from "react-hot-toast";
 import { PrivateEditorApi } from "@/lib/private";
 import { useRouter } from "next/navigation";
 import { renderMenuItems } from "./render";
+import Link from "next/link";
+import { editorlink } from "@/lib/forms/url";
 
 export function ModeData() {
   const [state] = useEditorState();
@@ -50,6 +62,7 @@ export function ModeData() {
   const { document_id, basepath, tables } = state;
 
   const newTableDialog = useDialogState<CreateNewTableDialogInit>();
+  const newXSBTableDialog = useDialogState();
 
   function AddActionDropdownMenu() {
     return (
@@ -101,14 +114,21 @@ export function ModeData() {
           </DropdownMenuGroup>
           <DropdownMenuGroup>
             <DropdownMenuLabel>Supabase</DropdownMenuLabel>
-            <DropdownMenuItem>
+            <DropdownMenuItem onSelect={newXSBTableDialog.openDialog}>
               <SupabaseLogo className="w-4 h-4 me-2" />
               Connect Supabase Table
             </DropdownMenuItem>
-            <DropdownMenuItem>
-              <SupabaseLogo className="w-4 h-4 me-2" />
-              Connect Supabase Project
-            </DropdownMenuItem>
+            <Link
+              href={editorlink("connect/database/supabase", {
+                basepath: basepath,
+                document_id: document_id,
+              })}
+            >
+              <DropdownMenuItem>
+                <SupabaseLogo className="w-4 h-4 me-2" />
+                Connect Supabase Project
+              </DropdownMenuItem>
+            </Link>
           </DropdownMenuGroup>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -153,6 +173,10 @@ export function ModeData() {
 
   return (
     <>
+      <ConnectNewSupabaseTableDialog
+        {...newXSBTableDialog}
+        key={newXSBTableDialog.key}
+      />
       <CreateNewSchemaTableDialog
         {...newTableDialog}
         key={newTableDialog.key}
@@ -286,6 +310,73 @@ function CreateNewSchemaTableDialog({
         </DialogFooter>
       </DialogContent>
       {/*  */}
+    </Dialog>
+  );
+}
+
+function ConnectNewSupabaseTableDialog({
+  ...props
+}: React.ComponentProps<typeof Dialog>) {
+  const [state] = useEditorState();
+  const { supabase_project } = state;
+
+  const [table, setTable] = useState<string>();
+
+  return (
+    <Dialog {...props}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Connect Supabase Table</DialogTitle>
+          <DialogDescription>
+            Connect a table from your{" "}
+            <Link
+              className="underline"
+              href={editorlink("connect/database/supabase", {
+                basepath: state.basepath,
+                document_id: state.document_id,
+              })}
+            >
+              Supabase project
+            </Link>
+          </DialogDescription>
+        </DialogHeader>
+
+        {/*  */}
+        <Select value={table} onValueChange={setTable}>
+          <SelectTrigger>
+            <SelectValue placeholder={"Select Table"} />
+          </SelectTrigger>
+          <SelectContent>
+            {Object.keys(supabase_project?.sb_schema_definitions || {}).map(
+              (schemaName) => {
+                return (
+                  <SelectGroup key={schemaName}>
+                    <SelectLabel>{schemaName}</SelectLabel>
+                    {Object.keys(
+                      supabase_project?.sb_schema_definitions?.[schemaName] ||
+                        {}
+                    ).map((tableName) => {
+                      const fulltable = `${schemaName}.${tableName}`;
+                      return (
+                        <SelectItem key={fulltable} value={fulltable}>
+                          <span>{fulltable}</span>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectGroup>
+                );
+              }
+            )}
+          </SelectContent>
+        </Select>
+        {/*  */}
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="ghost">Cancel</Button>
+          </DialogClose>
+          <Button>Connect</Button>
+        </DialogFooter>
+      </DialogContent>
     </Dialog>
   );
 }

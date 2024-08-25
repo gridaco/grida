@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import {
   createServerComponentClient,
   createServerComponentWorkspaceClient,
+  grida_xsupabase_client,
 } from "@/lib/supabase/server";
 import { GridaLogo } from "@/components/grida-logo";
 import { SlashIcon } from "@radix-ui/react-icons";
@@ -34,6 +35,7 @@ import { Inter } from "next/font/google";
 import { cn } from "@/utils";
 import React from "react";
 import { PlayActions } from "@/scaffolds/workbench/play-actions";
+import { DontCastJsonProperties } from "@/types/supabase-ext";
 
 export const revalidate = 0;
 
@@ -150,7 +152,7 @@ export default async function Layout({
       };
 
       const supabase_connection_state = form.supabase_connection
-        ? await client.getConnection(form.supabase_connection)
+        ? await client.getXSBMainTableConnectionState(form.supabase_connection)
         : null;
 
       return (
@@ -296,6 +298,13 @@ export default async function Layout({
         .eq("id", masterdoc_ref.id)
         .single();
 
+      // get project supabase project
+      const { data: supabase_project } = await grida_xsupabase_client
+        .from("supabase_project")
+        .select("*")
+        .eq("project_id", project_ref.id)
+        .single();
+
       if (!data) {
         console.error("editorinit", id, error);
         return notFound();
@@ -306,6 +315,12 @@ export default async function Layout({
           <EditorProvider
             initial={{
               doctype: "v0_schema",
+              supabase_project: supabase_project
+                ? (supabase_project as DontCastJsonProperties<
+                    typeof supabase_project,
+                    "sb_public_schema" | "sb_schema_definitions"
+                  >)
+                : null,
               project: { id: project_ref.id, name: project_ref.name },
               organization: {
                 id: project_ref.organization!.id,

@@ -63,7 +63,8 @@ export async function GET(
         assert(supabase_connection, "No connection found");
 
         const xsupabase = new GridaXSupabaseService();
-        const conn = await xsupabase.getConnection(supabase_connection);
+        const conn =
+          await xsupabase.getXSBMainTableConnectionState(supabase_connection);
         assert(conn, "connection fetch failed");
         const {
           supabase_project: { sb_schema_definitions },

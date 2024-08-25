@@ -160,7 +160,7 @@ async function get_forms_x_supabase_table_connector({
   assert(supabase_connection, "supabase_connection is required");
 
   const x = new GridaXSupabaseService();
-  const conn = await x.getConnection(supabase_connection);
+  const conn = await x.getXSBMainTableConnectionState(supabase_connection);
   assert(conn, "connection fetch failed");
   const { main_supabase_table } = conn;
 

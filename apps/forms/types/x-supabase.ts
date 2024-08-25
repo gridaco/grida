@@ -47,7 +47,7 @@ export namespace GridaSupabase {
     sb_table_schema: JSONSChema;
   }
 
-  export type SupabaseConnectionState =
+  export type XSupabaseMainTableConnectionState =
     SchemaTableConnectionXSupabaseMainTableJoint & {
       supabase_project: GridaSupabase.SupabaseProject;
       main_supabase_table: GridaSupabase.SupabaseTable | null;

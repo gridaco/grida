@@ -17,12 +17,20 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
+  CodeIcon,
   EyeNoneIcon,
   EyeOpenIcon,
   LockClosedIcon,
   OpenInNewWindowIcon,
+  PlusCircledIcon,
   PlusIcon,
   QuestionMarkCircledIcon,
+  TableIcon,
 } from "@radix-ui/react-icons";
 import toast from "react-hot-toast";
 import { SupabaseLogo } from "@/components/logos";
@@ -64,6 +72,8 @@ import { SupabaseTableInfo } from "@/scaffolds/x-supabase/supabase-table-info";
 import { useEditorState } from "@/scaffolds/editor";
 import { XSupabasePrivateApiTypes } from "@/types/private/api";
 import { Sector, SectorHeader, SectorHeading } from "@/components/preferences";
+import { Badge } from "@/components/ui/badge";
+import { useDialogState } from "@/components/hooks/use-dialog-state";
 
 type SchemaDefinitions = {
   [schema: string]: SupabasePostgRESTOpenApi.SupabasePublicSchema;
@@ -244,7 +254,7 @@ function ConnectSupabase() {
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>
-                <SupabaseLogo size={20} className="inline me-2 align-middle" />
+                <SupabaseLogo className="w-5 h-5 inline me-2 align-middle" />
                 Connect Supabase
               </span>
               {is_connected && (
@@ -389,6 +399,19 @@ function ConnectSupabase() {
             supabase_project_id: xsbproject.id,
             sb_project_url: xsbproject.sb_project_url,
           }}
+        />
+      )}
+      {xsbproject && (
+        <ConnectSchema
+          connection={{
+            supabase_project_id: xsbproject.id,
+            sb_project_url: xsbproject.sb_project_url,
+            sb_schema_definitions: schema_definitions!,
+            sb_schema_names: schemaNames,
+            sb_anon_key: anonKey,
+          }}
+          on_schema_names_change={setSchemaNames}
+          on_schema_definitions_change={set_schema_definitions}
         />
       )}
       {xsbproject && doctype === "v0_form" && (
@@ -546,6 +569,130 @@ function ConnectServiceRoleKey({
         </div>
       </CardFooter>
     </Card>
+  );
+}
+
+function ConnectSchema({
+  connection,
+  on_schema_names_change,
+  on_schema_definitions_change,
+}: {
+  connection: {
+    supabase_project_id: number;
+    sb_project_url: string;
+    sb_anon_key: string;
+    sb_schema_names: string[];
+    sb_schema_definitions: SchemaDefinitions;
+  };
+  on_schema_names_change: (schema_names: string[]) => void;
+  on_schema_definitions_change: (schema_definitions: SchemaDefinitions) => void;
+}) {
+  const newCustomSchemaDialog = useDialogState();
+  const {
+    supabase_project_id,
+    sb_project_url,
+    sb_anon_key,
+    sb_schema_names,
+    sb_schema_definitions,
+  } = connection;
+  const onTestCustomSchemaConnection = async (schema: string) => {
+    return await testSupabaseConnection({
+      url: sb_project_url,
+      anonKey: sb_anon_key,
+      schema_name: schema,
+    });
+  };
+
+  const onUseCustomSchema = async (schema: string) => {
+    const { data } =
+      await PrivateEditorApi.SupabaseConnection.registerXSBCustomSchema(
+        supabase_project_id,
+        {
+          schema_name: schema,
+        }
+      );
+
+    if (data.data) {
+      on_schema_names_change(data.data.sb_schema_names);
+      on_schema_definitions_change(data.data.sb_schema_definitions as {});
+      return data.data;
+    }
+  };
+
+  return (
+    <>
+      <NewCustomSchemaDialog
+        {...newCustomSchemaDialog}
+        onUse={onUseCustomSchema}
+        onTestConnection={onTestCustomSchemaConnection}
+      />
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            <SupabaseLogo className="inline me-2 align-middle w-5 h-5" />
+            DB Schemas
+          </CardTitle>
+          <CardDescription>
+            Register custom schema if your main db schema is other than public.{" "}
+            <Link
+              href="https://supabase.com/docs/guides/api/using-custom-schemas"
+              target="_blank"
+              className="underline"
+            >
+              Learn More
+            </Link>
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-2">
+            {sb_schema_names.map((schema) => (
+              <Badge key={schema} variant="outline" className="font-mono">
+                {schema}
+              </Badge>
+            ))}
+            <Badge
+              variant="default"
+              className="font-mono cursor-pointer"
+              onClick={() => {
+                newCustomSchemaDialog.openDialog();
+              }}
+            >
+              <PlusCircledIcon className="me-2" />
+              Add Custom Schema
+            </Badge>
+          </div>
+          <Collapsible className="mt-4">
+            <CollapsibleTrigger>
+              <Button variant="link" size="sm">
+                <CodeIcon className="me-2 align-middle" /> View Details
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              {Object.keys(sb_schema_definitions).map((schema) => {
+                const tables = sb_schema_definitions[schema];
+                return (
+                  <div key={schema} className="mt-10 space-y-10">
+                    {Object.keys(tables).map((table) => {
+                      return (
+                        <div key={table}>
+                          <Label>
+                            <TableIcon className="me-2 inline-flex" />
+                            {schema}.{table}
+                          </Label>
+                          <SupabaseTableInfo
+                            table={tables[table] as GridaSupabase.JSONSChema}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </CollapsibleContent>
+          </Collapsible>
+        </CardContent>
+      </Card>
+    </>
   );
 }
 
@@ -722,87 +869,18 @@ function DBSchemaSelect({
   onChange: (schema: string) => void;
   onUse: (schema: string) => Promise<false | any>;
 }) {
-  const [isvalid, setIsValid] = useState(false);
-  const [testing, setTesting] = useState(false);
-  const [custom, setCustom] = useState("");
   const [open, setOpen] = useState(false);
 
   const __add_custom = "__add_custom";
 
-  useEffect(() => {
-    setIsValid(false);
-  }, [custom]);
-
-  const onTest = () => {
-    setTesting(true);
-    onTestConnection(custom)
-      .then((res) => {
-        setIsValid(!!res);
-      })
-      .finally(() => {
-        setTesting(false);
-      });
-  };
-
-  const onUseClick = () => {
-    setTesting(true);
-    onUse(custom)
-      .then((res) => {
-        if (!!res) {
-          setOpen(false);
-        }
-      })
-      .finally(() => {
-        setTesting(false);
-      });
-  };
-
   return (
     <>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              <SupabaseLogo className="inline me-2 align-middle" size={20} />
-              Enter Custom Schema
-            </DialogTitle>
-            <DialogDescription>
-              Enter the schema name to connect to.{" "}
-              <Link
-                href="https://supabase.com/docs/guides/api/using-custom-schemas"
-                target="_blank"
-                className="underline"
-              >
-                Learn More
-              </Link>
-            </DialogDescription>
-          </DialogHeader>
-          <div>
-            <Input
-              value={custom}
-              onChange={(e) => setCustom(e.target.value)}
-              disabled={testing}
-              placeholder="schema_name"
-            />
-          </div>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="secondary">Cancel</Button>
-            </DialogClose>
-            {isvalid ? (
-              <Button disabled={testing} onClick={onUseClick}>
-                {testing && <Spinner className="w-4 h-4 me-2 align-middle" />}
-                Add this schema
-              </Button>
-            ) : (
-              <Button disabled={testing || !custom} onClick={onTest}>
-                {testing && <Spinner className="w-4 h-4 me-2 align-middle" />}
-                Test Connection
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <NewCustomSchemaDialog
+        open={open}
+        onOpenChange={setOpen}
+        onUse={onUse}
+        onTestConnection={onTestConnection}
+      />
       <Select
         value={value}
         onValueChange={(v) => {
@@ -830,6 +908,94 @@ function DBSchemaSelect({
         </SelectContent>
       </Select>
     </>
+  );
+}
+
+function NewCustomSchemaDialog({
+  onUse,
+  onTestConnection,
+  ...props
+}: React.ComponentProps<typeof Dialog> & {
+  onUse: (schema: string) => Promise<false | any>;
+  onTestConnection: (schema: string) => Promise<false | any>;
+}) {
+  const [isvalid, setIsValid] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [custom, setCustom] = useState("");
+
+  useEffect(() => {
+    setIsValid(false);
+  }, [custom]);
+
+  const onTest = () => {
+    setTesting(true);
+    onTestConnection(custom)
+      .then((res) => {
+        setIsValid(!!res);
+      })
+      .finally(() => {
+        setTesting(false);
+      });
+  };
+
+  const onUseClick = () => {
+    setTesting(true);
+    onUse(custom)
+      .then((res) => {
+        if (!!res) {
+          props.onOpenChange?.(false);
+        }
+      })
+      .finally(() => {
+        setTesting(false);
+      });
+  };
+
+  return (
+    <Dialog {...props}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>
+            <SupabaseLogo className="inline me-2 align-middle" size={20} />
+            Enter Custom Schema
+          </DialogTitle>
+          <DialogDescription>
+            Enter the schema name to connect to.{" "}
+            <Link
+              href="https://supabase.com/docs/guides/api/using-custom-schemas"
+              target="_blank"
+              className="underline"
+            >
+              Learn More
+            </Link>
+          </DialogDescription>
+        </DialogHeader>
+        <div>
+          <Input
+            value={custom}
+            onChange={(e) => setCustom(e.target.value)}
+            disabled={testing}
+            placeholder="schema_name"
+          />
+        </div>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="secondary">Cancel</Button>
+          </DialogClose>
+          {isvalid ? (
+            <Button disabled={testing} onClick={onUseClick}>
+              {testing && <Spinner className="w-4 h-4 me-2 align-middle" />}
+              Add this schema
+            </Button>
+          ) : (
+            <Button disabled={testing || !custom} onClick={onTest}>
+              {testing && <Spinner className="w-4 h-4 me-2 align-middle" />}
+              Test Connection
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
