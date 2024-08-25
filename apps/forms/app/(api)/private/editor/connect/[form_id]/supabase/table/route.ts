@@ -114,3 +114,25 @@ export async function PUT(req: NextRequest, context: Context) {
 
   return NextResponse.json({ data: null, error: null }, { status: 200 });
 }
+
+// export async function DELETE(req: NextRequest, context: Context) {
+//   const form_id = context.params.form_id;
+//   const cookieStore = cookies();
+//   const supabase = createRouteHandlerClient(cookieStore);
+
+//   const { count, error } = await supabase
+//     .from("connection_supabase")
+//     .delete({ count: "exact" })
+//     .eq("form_id", form_id);
+
+//   if (error) {
+//     console.error(error);
+//     return NextResponse.error();
+//   }
+
+//   if (count) {
+//     return NextResponse.json({ data: null }, { status: 200 });
+//   }
+
+//   return NextResponse.error();
+// }

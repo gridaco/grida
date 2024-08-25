@@ -410,7 +410,7 @@ export interface Geo {
   longitude?: string | undefined;
 }
 
-export interface ConnectionSupabaseJoint {
+export interface SchemaTableConnectionXSupabaseMainTableJoint {
   created_at: string;
   form_id: string;
   id: number;

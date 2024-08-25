@@ -63,16 +63,14 @@ import {
 import { SupabaseTableInfo } from "@/scaffolds/x-supabase/supabase-table-info";
 import { useEditorState } from "@/scaffolds/editor";
 
-export default function ConnectSupabasePage() {
-  const [state] = useEditorState();
-  const {
-    form_id,
-    project: { id: project_id },
-  } = state;
+type SchemaDefinitions = {
+  [schema: string]: SupabasePostgRESTOpenApi.SupabasePublicSchema;
+};
 
+export default function ConnectSupabasePage() {
   return (
     <main className="max-w-2xl mx-auto mt-10">
-      <ConnectSupabase project_id={project_id} form_id={form_id} />
+      <ConnectSupabase />
     </main>
   );
 }
@@ -108,66 +106,55 @@ const testSupabaseConnection = async ({
   }
 };
 
-function ConnectSupabase({
-  project_id,
-  form_id,
-}: {
-  project_id: number;
-  form_id: string;
-}) {
+function ConnectSupabase() {
+  const [state] = useEditorState();
   const [url, setUrl] = useState("");
   const [anonKey, setAnonKey] = useState("");
-  const [serviceKey, setServiceKey] = useState("");
   const [schemaNames, setSchemaNames] = useState<string[]>(["public"]);
-  const [schemaName, setSchemaName] = useState<string>("public");
-  const [schema_definitions, set_schema_definitions] = useState<{
-    [schema: string]: SupabasePostgRESTOpenApi.SupabasePublicSchema;
-  } | null>(null);
-  const [tableName, setTableName] = useState<string | undefined>(undefined);
-
+  const [schema_definitions, set_schema_definitions] =
+    useState<SchemaDefinitions | null>(null);
   const [xsbproject, setXSBProject] = useState<
     GridaSupabase.SupabaseProject | null | undefined
   >(undefined);
 
+  const {
+    connections: { supabase: existing_connection },
+    form_id,
+    doctype,
+    project: { id: project_id },
+  } = state;
+
   const is_loaded = schema_definitions !== null;
   const is_connected = !!xsbproject;
-  const is_service_key_set = !!xsbproject?.sb_service_key_id;
 
   const disabled = !url || !anonKey;
 
   useEffect(() => {
-    PrivateEditorApi.SupabaseConnection.getConnection(form_id)
+    if (!existing_connection) {
+      setXSBProject(null);
+      return;
+    }
+    PrivateEditorApi.SupabaseConnection.getProjectConnection(
+      existing_connection.supabase_project_id
+    )
       .then((res) => {
         const data = res.data.data;
-        setXSBProject(data.supabase_project);
-        setUrl(data.supabase_project.sb_project_url);
-        setAnonKey(data.supabase_project.sb_anon_key);
-        setSchemaNames(data.supabase_project.sb_schema_names);
-        if (data.main_supabase_table?.sb_schema_name) {
-          setSchemaName(data.main_supabase_table.sb_schema_name as string);
-        }
-        set_schema_definitions(
-          data.supabase_project.sb_schema_definitions as {}
-        );
-        setTableName(
-          data.tables.find((t) => t.id === data.main_supabase_table_id)
-            ?.sb_table_name
-        );
+        console.log(data);
+        setXSBProject(data);
+        setUrl(data.sb_project_url);
+        setAnonKey(data.sb_anon_key);
+        setSchemaNames(data.sb_schema_names);
+        set_schema_definitions(data.sb_schema_definitions as {});
       })
       .catch((err) => {
         setXSBProject(null);
       });
-  }, [form_id]);
-
-  useEffect(() => {
-    setTableName(undefined);
-  }, [schemaName]);
+  }, [existing_connection]);
 
   const onClearClick = () => {
     setUrl("");
     setAnonKey("");
     set_schema_definitions(null);
-    setTableName(undefined);
     setXSBProject(null);
   };
 
@@ -179,31 +166,6 @@ function ConnectSupabase({
     }).then((res) => {
       if (res) set_schema_definitions(res.sb_schema_definitions as {});
     });
-  };
-
-  const onTestCustomSchemaConnection = async (schema: string) => {
-    return await testSupabaseConnection({
-      url,
-      anonKey,
-      schema_name: schema,
-    });
-  };
-
-  const onUseCustomSchema = async (schema: string) => {
-    const { data } =
-      await PrivateEditorApi.SupabaseConnection.registerCustomSchema(
-        xsbproject!.id,
-        {
-          schema_name: schema,
-        }
-      );
-
-    if (data.data) {
-      setSchemaName(schema);
-      setSchemaNames(data.data.sb_schema_names);
-      set_schema_definitions(data.data.sb_schema_definitions as {});
-      return data.data;
-    }
   };
 
   const onRefreshSchemaClick = async () => {
@@ -222,14 +184,11 @@ function ConnectSupabase({
   };
 
   const onConnectClick = async () => {
-    const data = {
+    const res = PrivateEditorApi.SupabaseConnection.createProjectConnection({
       project_id: project_id,
       sb_anon_key: anonKey,
       sb_project_url: url,
-    };
-
-    const res =
-      PrivateEditorApi.SupabaseConnection.createProjectConnection(data);
+    });
 
     toast
       .promise(res, {
@@ -243,7 +202,9 @@ function ConnectSupabase({
   };
 
   const onRemoveConnectionClick = async () => {
-    const res = PrivateEditorApi.SupabaseConnection.removeConnection(form_id);
+    const res = PrivateEditorApi.SupabaseConnection.deleteProjectConnection(
+      xsbproject!.id
+    );
 
     toast
       .promise(res, {
@@ -256,63 +217,7 @@ function ConnectSupabase({
         setUrl("");
         setAnonKey("");
         set_schema_definitions(null);
-        setTableName(undefined);
       });
-  };
-
-  const onServiceKeySaveClick = async () => {
-    // validate service key
-    // ping test
-    // TODO: to verify service_role key, we need to make a request to administartion api (below would only verify if the key is valid, not if it has the correct permissions)
-    ping({
-      url: SupabasePostgRESTOpenApi.build_supabase_rest_url(url),
-      key: serviceKey,
-    }).then((res) => {
-      if (res.status === 200) {
-        // create secret key connection
-        const data = {
-          secret: serviceKey,
-        };
-
-        const res =
-          PrivateEditorApi.SupabaseConnection.createProjectServiceRoleKey(
-            xsbproject!.id,
-            data
-          );
-
-        res.then((res) => {
-          setXSBProject((prev) => ({
-            ...prev!,
-            sb_service_key_id: res.data.data,
-          }));
-        });
-
-        toast.promise(res, {
-          loading: "Saving Service Key...",
-          success: "Service Key Saved",
-          error: "Failed to save service key",
-        });
-      } else {
-        toast.error("Service Key is invalid");
-      }
-    });
-  };
-
-  const onSaveMainTableClick = async () => {
-    assert(tableName);
-    const res = PrivateEditorApi.SupabaseConnection.createConnectionTable(
-      form_id,
-      {
-        table_name: tableName,
-        schema_name: schemaName,
-      }
-    );
-
-    toast.promise(res, {
-      loading: "Saving Main Table...",
-      success: "Main Table Saved",
-      error: "Failed to save main table",
-    });
   };
 
   return (
@@ -430,11 +335,11 @@ function ConnectSupabase({
                 <AlertDialogContent>
                   <AlertDialogHeader>
                     <AlertDialogTitle>
-                      Are you sure you want to remove the connection?
+                      Remove Connection across Project
                     </AlertDialogTitle>
                     <AlertDialogDescription>
-                      This action is irreversible. You will lose access to your
-                      database.
+                      This action is irreversible. Please make sure there is no
+                      active reference to this connection.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
 
@@ -456,85 +361,266 @@ function ConnectSupabase({
           </CardFooter>
         </Card>
       )}
-      <Card hidden={!is_connected}>
-        <CardHeader>
-          <CardTitle>
-            <LockClosedIcon className="inline me-2 align-middle w-5 h-5" />
-            Service Role Key
-          </CardTitle>
-          <CardDescription>
-            If you wish to bypass RLS and use Form as a admin, you can provide{" "}
-            <Link
-              href="https://supabase.com/docs/guides/api/api-keys"
-              target="_blank"
-            >
-              <u>service_role key.</u>
-            </Link>
-            <br />
-            We securely handle and save your service key in{" "}
-            <Link
-              href="https://supabase.com/docs/guides/database/vault"
-              target="_blank"
-            >
-              <u>supabase vault</u>
-            </Link>{" "}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-2">
-            <Label htmlFor="service_role">
-              Service Key
-              <Tooltip>
-                <TooltipTrigger>
-                  <QuestionMarkCircledIcon className="inline ms-2 align-middle" />
-                </TooltipTrigger>
-                <TooltipContent className="max-w-xs">
-                  This key has the ability to bypass Row Level Security. We
-                  never use this key on the client side. Only opt-in functions
-                  will use this key to perform the request
-                </TooltipContent>
-              </Tooltip>
-            </Label>
-            <div>
-              {is_service_key_set ? (
-                <>
-                  <RevealSecret
-                    fetcher={async () => {
-                      const res =
-                        await PrivateEditorApi.SupabaseConnection.revealProjectServiceRoleKey(
-                          xsbproject!.id
-                        );
-                      return res.data.data;
-                    }}
-                  />
-                </>
-              ) : (
-                <>
-                  <Input
-                    className="font-mono"
-                    id="service_role"
-                    name="service_role"
-                    type="password"
-                    placeholder="eyxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxx-xxxxxxxxx"
-                    value={serviceKey}
-                    onChange={(e) => setServiceKey(e.target.value)}
-                  />
-                </>
-              )}
-            </div>
+      {xsbproject && (
+        <ConnectServiceRoleKey
+          sb_service_key_id={xsbproject.sb_service_key_id}
+          on_service_key_id_change={(sb_service_key_id: string) => {
+            setXSBProject((prev) => ({
+              ...prev!,
+              sb_service_key_id,
+            }));
+          }}
+          connection={{
+            supabase_project_id: xsbproject.id,
+            sb_project_url: xsbproject.sb_project_url,
+          }}
+        />
+      )}
+      {xsbproject && doctype === "v0_form" && (
+        <ConnectFormXSupabaseTable
+          form_id={form_id}
+          connection={{
+            supabase_project_id: xsbproject.id,
+            sb_project_url: xsbproject.sb_project_url,
+            sb_schema_definitions: schema_definitions!,
+            sb_schema_names: schemaNames,
+            sb_anon_key: anonKey,
+          }}
+          on_schema_names_change={setSchemaNames}
+          on_schema_definitions_change={set_schema_definitions}
+        />
+      )}
+    </div>
+  );
+}
+
+function ConnectServiceRoleKey({
+  connection,
+  sb_service_key_id,
+  on_service_key_id_change,
+}: {
+  connection: {
+    supabase_project_id: number;
+    sb_project_url: string;
+  };
+  sb_service_key_id: string | null;
+  on_service_key_id_change: (sb_service_key_id: string) => void;
+}) {
+  const [serviceKey, setServiceKey] = useState("");
+  const is_service_key_set = !!sb_service_key_id;
+
+  const onServiceKeySaveClick = async () => {
+    // validate service key
+    // ping test
+    // TODO: to verify service_role key, we need to make a request to administartion api (below would only verify if the key is valid, not if it has the correct permissions)
+    ping({
+      url: SupabasePostgRESTOpenApi.build_supabase_rest_url(
+        connection.sb_project_url
+      ),
+      key: serviceKey,
+    }).then((res) => {
+      if (res.status === 200) {
+        // create secret key connection
+        const data = {
+          secret: serviceKey,
+        };
+
+        const res =
+          PrivateEditorApi.SupabaseConnection.createProjectServiceRoleKey(
+            connection.supabase_project_id,
+            data
+          );
+
+        res.then((res) => {
+          on_service_key_id_change(res.data.data);
+        });
+
+        toast.promise(res, {
+          loading: "Saving Service Key...",
+          success: "Service Key Saved",
+          error: "Failed to save service key",
+        });
+      } else {
+        toast.error("Service Key is invalid");
+      }
+    });
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>
+          <LockClosedIcon className="inline me-2 align-middle w-5 h-5" />
+          Service Role Key
+        </CardTitle>
+        <CardDescription>
+          If you wish to bypass RLS and use Form as a admin, you can provide{" "}
+          <Link
+            href="https://supabase.com/docs/guides/api/api-keys"
+            target="_blank"
+          >
+            <u>service_role key.</u>
+          </Link>
+          <br />
+          We securely handle and save your service key in{" "}
+          <Link
+            href="https://supabase.com/docs/guides/database/vault"
+            target="_blank"
+          >
+            <u>supabase vault</u>
+          </Link>{" "}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-2">
+          <Label htmlFor="service_role">
+            Service Key
+            <Tooltip>
+              <TooltipTrigger>
+                <QuestionMarkCircledIcon className="inline ms-2 align-middle" />
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                This key has the ability to bypass Row Level Security. We never
+                use this key on the client side. Only opt-in functions will use
+                this key to perform the request
+              </TooltipContent>
+            </Tooltip>
+          </Label>
+          <div>
+            {is_service_key_set ? (
+              <>
+                <RevealSecret
+                  fetcher={async () => {
+                    const res =
+                      await PrivateEditorApi.SupabaseConnection.revealProjectServiceRoleKey(
+                        connection.supabase_project_id
+                      );
+                    return res.data.data;
+                  }}
+                />
+              </>
+            ) : (
+              <>
+                <Input
+                  className="font-mono"
+                  id="service_role"
+                  name="service_role"
+                  type="password"
+                  placeholder="eyxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxx-xxxxxxxxx"
+                  value={serviceKey}
+                  onChange={(e) => setServiceKey(e.target.value)}
+                />
+              </>
+            )}
           </div>
-        </CardContent>
-        <CardFooter className="flex justify-end">
-          <div hidden={!!xsbproject?.sb_service_key_id}>
-            <Button disabled={!serviceKey} onClick={onServiceKeySaveClick}>
-              Save
-            </Button>
-          </div>
-        </CardFooter>
-      </Card>
-      <Card hidden={!is_connected}>
+        </div>
+      </CardContent>
+      <CardFooter className="flex justify-end">
+        <div hidden={!!sb_service_key_id}>
+          <Button disabled={!serviceKey} onClick={onServiceKeySaveClick}>
+            Save
+          </Button>
+        </div>
+      </CardFooter>
+    </Card>
+  );
+}
+
+function ConnectFormXSupabaseTable({
+  form_id,
+  connection,
+  on_schema_names_change,
+  on_schema_definitions_change,
+}: {
+  form_id: string;
+  connection: {
+    supabase_project_id: number;
+    sb_project_url: string;
+    sb_anon_key: string;
+    sb_schema_names: string[];
+    sb_schema_definitions: SchemaDefinitions;
+  };
+  on_schema_names_change: (schema_names: string[]) => void;
+  on_schema_definitions_change: (schema_definitions: SchemaDefinitions) => void;
+}) {
+  const [state] = useEditorState();
+  const {
+    connections: { supabase: forms_supabase_connection },
+  } = state;
+
+  const {
+    supabase_project_id,
+    sb_schema_definitions: sb_schema_definitions,
+    sb_schema_names: sb_schema_names,
+    sb_project_url,
+    sb_anon_key,
+  } = connection;
+  const [schemaName, setSchemaName] = useState<string>("public");
+  const [tableName, setTableName] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (schemaName) {
+      setTableName(undefined);
+    }
+  }, [schemaName]);
+
+  useEffect(() => {
+    console.log(forms_supabase_connection?.main_supabase_table);
+    setTableName(forms_supabase_connection?.main_supabase_table?.sb_table_name);
+    setSchemaName(
+      forms_supabase_connection?.main_supabase_table?.sb_schema_name as string
+    );
+  }, [forms_supabase_connection?.main_supabase_table]);
+
+  console.log(tableName);
+
+  const onUseCustomSchema = async (schema: string) => {
+    const { data } =
+      await PrivateEditorApi.SupabaseConnection.registerCustomSchema(
+        supabase_project_id,
+        {
+          schema_name: schema,
+        }
+      );
+
+    if (data.data) {
+      setSchemaName(schema);
+      on_schema_names_change(data.data.sb_schema_names);
+      on_schema_definitions_change(data.data.sb_schema_definitions as {});
+      return data.data;
+    }
+  };
+
+  const onSaveMainTableClick = async () => {
+    assert(tableName);
+    const res = PrivateEditorApi.SupabaseConnection.createConnectionTable(
+      form_id,
+      {
+        table_name: tableName,
+        schema_name: schemaName,
+      }
+    );
+
+    toast.promise(res, {
+      loading: "Saving Main Table...",
+      success: "Main Table Saved",
+      error: "Failed to save main table",
+    });
+  };
+
+  const onTestCustomSchemaConnection = async (schema: string) => {
+    return await testSupabaseConnection({
+      url: sb_project_url,
+      anonKey: sb_anon_key,
+      schema_name: schema,
+    });
+  };
+
+  return (
+    <>
+      <Card>
         <CardHeader>
-          <CardTitle>Main Table Connection</CardTitle>
+          <CardTitle>Form - Main Table Connection</CardTitle>
           <CardDescription>
             Grida Forms Allow you to connect to one of your supabase table to
             the form.
@@ -547,47 +633,45 @@ function ConnectSupabase({
               <DBSchemaSelect
                 onTestConnection={onTestCustomSchemaConnection}
                 value={schemaName}
-                options={schemaNames}
+                options={sb_schema_names}
                 onChange={setSchemaName}
                 onUse={onUseCustomSchema}
               />
             </Label>
-            {schema_definitions && (
-              <div>
-                <Label>
-                  Table
-                  <Select
-                    value={tableName}
-                    onValueChange={(value) => setTableName(value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue
-                        placeholder={`Select table from schema: ${schemaName}`}
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.keys(schema_definitions[schemaName]).map(
-                        (key) => (
-                          <SelectItem key={key} value={key}>
-                            {schemaName}.{key}
-                          </SelectItem>
-                        )
-                      )}
-                    </SelectContent>
-                  </Select>
-                </Label>
+            <div>
+              <Label>
+                Table
+                <Select
+                  value={tableName}
+                  onValueChange={(value) => setTableName(value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue
+                      placeholder={`Select table from schema: ${schemaName}`}
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.keys(sb_schema_definitions[schemaName]).map(
+                      (key) => (
+                        <SelectItem key={key} value={key}>
+                          {schemaName}.{key}
+                        </SelectItem>
+                      )
+                    )}
+                  </SelectContent>
+                </Select>
+              </Label>
 
-                {tableName && schema_definitions[schemaName][tableName] && (
-                  <SupabaseTableInfo
-                    table={
-                      schema_definitions[schemaName][
-                        tableName
-                      ] as GridaSupabase.JSONSChema
-                    }
-                  />
-                )}
-              </div>
-            )}
+              {tableName && sb_schema_definitions[schemaName][tableName] && (
+                <SupabaseTableInfo
+                  table={
+                    sb_schema_definitions[schemaName][
+                      tableName
+                    ] as GridaSupabase.JSONSChema
+                  }
+                />
+              )}
+            </div>
           </div>
         </CardContent>
         <CardFooter className="flex justify-end">
@@ -596,7 +680,7 @@ function ConnectSupabase({
           </Button>
         </CardFooter>
       </Card>
-    </div>
+    </>
   );
 }
 
@@ -754,12 +838,6 @@ function RevealSecret({ fetcher }: { fetcher: () => Promise<string> }) {
   const [isFetching, setIsFetching] = useState(false);
   const [secret, setSecret] = useState<string | undefined>(undefined);
   const [visible, setVisible] = useState(false);
-
-  // useEffect(() => {
-  //   if (visible) {
-
-  //   }
-  // }, [fetcher, visible]);
 
   const onRevealClick = async () => {
     setIsFetching(true);

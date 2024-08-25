@@ -1,9 +1,11 @@
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";
 import { grida_xsupabase_client } from "@/lib/supabase/server";
-import { FormValue } from "@/services/form";
 import { createXSupabaseClient } from "@/services/x-supabase";
-import { ConnectionSupabaseJoint, GridaSupabase, Option } from "@/types";
+import type {
+  SchemaTableConnectionXSupabaseMainTableJoint,
+  GridaSupabase,
+} from "@/types";
 import type { JSONSchemaType } from "ajv";
 
 // TODO: make it as a class to optimize performance (duplicated network requests)
@@ -13,7 +15,7 @@ export async function sbconn_insert({
   connection,
 }: {
   data: Record<string, any>;
-  connection: ConnectionSupabaseJoint;
+  connection: SchemaTableConnectionXSupabaseMainTableJoint;
 }) {
   // fetch connection table
   const { data: supabase_project, error: supabase_project_err } =
@@ -70,7 +72,7 @@ export async function sbconn_update(
     NEW: Record<string, any>;
     pks: string[];
   },
-  connection: ConnectionSupabaseJoint
+  connection: SchemaTableConnectionXSupabaseMainTableJoint
 ) {
   // fetch connection table
   const { data: supabase_project, error: supabase_project_err } =

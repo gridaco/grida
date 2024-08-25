@@ -27,7 +27,7 @@ import { OnSubmitProcessors, OnSubmit } from "./hooks";
 import { Features } from "@/lib/features/scheduling";
 import { IpInfo, ipinfo } from "@/clients/ipinfo";
 import type {
-  ConnectionSupabaseJoint,
+  SchemaTableConnectionXSupabaseMainTableJoint,
   FormFieldStorageSchema,
   Geo,
 } from "@/types";
@@ -1065,7 +1065,7 @@ class ResponseFieldFilesProcessor {
       response_id: string;
     },
     readonly connections: {
-      supabase: ConnectionSupabaseJoint | null;
+      supabase: SchemaTableConnectionXSupabaseMainTableJoint | null;
     },
     readonly context: TemplateVariables.FormConnectedDatasourcePostgresTransactionCompleteContext
   ) {}

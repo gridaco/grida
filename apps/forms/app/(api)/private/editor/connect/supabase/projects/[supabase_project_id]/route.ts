@@ -1,5 +1,7 @@
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { createRouteHandlerXSBClient } from "@/lib/supabase/server";
+import { GridaSupabase } from "@/types";
+import { DontCastJsonProperties } from "@/types/supabase-ext";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
@@ -8,6 +10,42 @@ interface Context {
   params: {
     supabase_project_id: number;
   };
+}
+
+export type GetSupabaseProjectData = GridaSupabase.SupabaseProject & {
+  tables: Pick<
+    GridaSupabase.SupabaseTable,
+    "id" | "sb_schema_name" | "sb_table_name"
+  >[];
+};
+
+export async function GET(req: NextRequest, context: Context) {
+  const cookieStore = cookies();
+  const supabase = createRouteHandlerXSBClient(cookieStore);
+  const { supabase_project_id } = context.params;
+
+  const { data: supabase_project, error: rls_err } = await supabase
+    .from("supabase_project")
+    .select(
+      `
+        *,
+        tables:supabase_table(id, sb_schema_name, sb_table_name)
+      `
+    )
+    .eq("id", supabase_project_id)
+    .single();
+
+  if (rls_err) {
+    console.error("RLS ERR:", rls_err);
+    return notFound();
+  }
+
+  return NextResponse.json({
+    data: supabase_project satisfies DontCastJsonProperties<
+      GetSupabaseProjectData,
+      "sb_public_schema" | "sb_schema_definitions"
+    >,
+  });
 }
 
 export async function PATCH(req: NextRequest, context: Context) {
@@ -76,4 +114,26 @@ export async function PATCH(req: NextRequest, context: Context) {
   }
 
   return NextResponse.json({ data: patch });
+}
+
+export async function DELETE(req: NextRequest, context: Context) {
+  const cookieStore = cookies();
+  const supabase = createRouteHandlerXSBClient(cookieStore);
+  const { supabase_project_id } = context.params;
+
+  const { count, error } = await supabase
+    .from("supabase_project")
+    .delete({ count: "exact" })
+    .eq("id", supabase_project_id);
+
+  if (error) {
+    console.error(error);
+    return NextResponse.error();
+  }
+
+  if (count) {
+    return NextResponse.json({ data: null }, { status: 200 });
+  }
+
+  return NextResponse.error();
 }

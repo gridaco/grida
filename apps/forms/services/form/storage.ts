@@ -13,7 +13,7 @@ import {
   createXSupabaseClient,
 } from "@/services/x-supabase";
 import {
-  ConnectionSupabaseJoint,
+  SchemaTableConnectionXSupabaseMainTableJoint,
   FormFieldDefinition,
   FormFieldStorageSchema,
 } from "@/types";
@@ -24,7 +24,7 @@ export class FieldStorageService {
   constructor(
     readonly field_id: string,
     readonly storage: FormFieldStorageSchema | null,
-    readonly supabase_connection: ConnectionSupabaseJoint | null
+    readonly supabase_connection: SchemaTableConnectionXSupabaseMainTableJoint | null
   ) {
     //
   }
@@ -175,7 +175,7 @@ export namespace SessionStorageServices {
       unique?: boolean;
     };
     connection: {
-      supabase_connection: ConnectionSupabaseJoint | null;
+      supabase_connection: SchemaTableConnectionXSupabaseMainTableJoint | null;
     };
   }) {
     if (field.storage) {
@@ -246,7 +246,7 @@ export namespace SessionStorageServices {
       path: string;
     };
     connection: {
-      supabase_connection: ConnectionSupabaseJoint | null;
+      supabase_connection: SchemaTableConnectionXSupabaseMainTableJoint | null;
     };
   }) {
     //

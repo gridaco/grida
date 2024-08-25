@@ -41,11 +41,15 @@ export async function POST(req: NextRequest, context: Context) {
     .select()
     .single();
 
+  if (supabase_project_err) {
+    console.error(supabase_project_err);
+    return NextResponse.error();
+  }
+
   return NextResponse.json({
     data: supabase_project as DontCastJsonProperties<
       GridaSupabase.SupabaseProject,
       "sb_public_schema" | "sb_schema_definitions"
     >,
-    error: supabase_project_err,
   } satisfies EditorApiResponse<GridaSupabase.SupabaseProject>);
 }

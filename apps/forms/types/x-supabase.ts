@@ -1,5 +1,5 @@
 import type { JSONSchemaType } from "ajv";
-import type { ConnectionSupabaseJoint } from "./types";
+import type { SchemaTableConnectionXSupabaseMainTableJoint } from "./types";
 import type { User } from "@supabase/supabase-js";
 import type { Bucket } from "@supabase/storage-js";
 export namespace GridaSupabase {
@@ -20,7 +20,7 @@ export namespace GridaSupabase {
     };
   };
 
-  export type SchemaDefinitions = {
+  export type TableSchemaDefinitions = {
     [key: string]: JSONSChema;
   };
 
@@ -32,8 +32,8 @@ export namespace GridaSupabase {
     /**
      * @deprecated use `sb_schema_definitions["public"]` instead
      */
-    sb_public_schema: SchemaDefinitions;
-    sb_schema_definitions: { [schema: string]: SchemaDefinitions };
+    sb_public_schema: TableSchemaDefinitions;
+    sb_schema_definitions: { [schema: string]: TableSchemaDefinitions };
     sb_schema_names: string[];
     sb_project_url: string;
     sb_service_key_id: string | null;
@@ -47,11 +47,12 @@ export namespace GridaSupabase {
     sb_table_schema: JSONSChema;
   }
 
-  export type SupabaseConnectionState = ConnectionSupabaseJoint & {
-    supabase_project: GridaSupabase.SupabaseProject;
-    main_supabase_table: GridaSupabase.SupabaseTable | null;
-    tables: GridaSupabase.SupabaseTable[];
-  };
+  export type SupabaseConnectionState =
+    SchemaTableConnectionXSupabaseMainTableJoint & {
+      supabase_project: GridaSupabase.SupabaseProject;
+      main_supabase_table: GridaSupabase.SupabaseTable | null;
+      tables: GridaSupabase.SupabaseTable[];
+    };
 
   export type SupabaseUser = User;
 

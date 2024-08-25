@@ -1,6 +1,9 @@
 import { grida_xsupabase_client } from "@/lib/supabase/server";
 import { secureformsclient } from "@/lib/supabase/vault";
-import { ConnectionSupabaseJoint, GridaSupabase } from "@/types";
+import {
+  SchemaTableConnectionXSupabaseMainTableJoint,
+  GridaSupabase,
+} from "@/types";
 import {
   SupabaseClient,
   SupabaseClientOptions,
@@ -83,7 +86,7 @@ export class GridaXSupabaseService {
   constructor() {}
 
   async getConnection(
-    conn: ConnectionSupabaseJoint
+    conn: SchemaTableConnectionXSupabaseMainTableJoint
   ): Promise<GridaSupabase.SupabaseConnectionState | null> {
     const { supabase_project_id, main_supabase_table_id } = conn;
 

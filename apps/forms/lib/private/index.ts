@@ -20,6 +20,7 @@ import Axios from "axios";
 import { PostgrestQuery } from "@/lib/supabase-postgrest/postgrest-query";
 import { XSupabaseQuery } from "@/lib/supabase-postgrest/builder";
 import { PostgrestSingleResponse } from "@supabase/postgrest-js";
+import type { GetSupabaseProjectData } from "@/app/(api)/private/editor/connect/supabase/projects/[supabase_project_id]/route";
 
 export namespace PrivateEditorApi {
   export namespace Files {
@@ -171,6 +172,8 @@ export namespace PrivateEditorApi {
   }
 
   export namespace SupabaseConnection {
+    // #region supabase project
+
     /**
      * request body for creating a new supabase project connection
      * grida_x_supabase.supabase_project
@@ -184,7 +187,22 @@ export namespace PrivateEditorApi {
     export async function createProjectConnection(
       data: CreateProjectConnectionRequest
     ) {
-      return Axios.post(`/private/editor/connect/supabase/projects`, data);
+      return Axios.post<EditorApiResponse<GridaSupabase.SupabaseProject>>(
+        `/private/editor/connect/supabase/projects`,
+        data
+      );
+    }
+
+    export async function getProjectConnection(supabase_project_id: number) {
+      return Axios.get<{
+        data: GetSupabaseProjectData;
+      }>(`/private/editor/connect/supabase/projects/${supabase_project_id}`);
+    }
+
+    export async function deleteProjectConnection(supabase_project_id: number) {
+      return Axios.delete(
+        `/private/editor/connect/supabase/projects/${supabase_project_id}`
+      );
     }
 
     export async function createProjectServiceRoleKey(
@@ -230,16 +248,9 @@ export namespace PrivateEditorApi {
       );
     }
 
-    //
-    export async function getConnection(form_id: string) {
-      return Axios.get<{
-        data: GridaSupabase.SupabaseConnectionState;
-      }>(`/private/editor/connect/${form_id}/supabase`);
-    }
+    // #endregion supabase project
 
-    export async function removeConnection(form_id: string) {
-      return Axios.delete(`/private/editor/connect/${form_id}/supabase`);
-    }
+    // #region table
 
     export async function createConnectionTable(
       form_id: string,
@@ -269,6 +280,8 @@ export namespace PrivateEditorApi {
       serachParams?: URLSearchParams | string
     ) =>
       `/private/editor/connect/${form_id}/supabase/table/${supabase_table_id}/query${serachParams ? `?${serachParams}` : ""}`;
+
+    // #endregion table
   }
 
   export namespace SupabaseQuery {
