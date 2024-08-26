@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { PlusIcon } from "@radix-ui/react-icons";
 import { useEditorState } from "../editor";
 import { SupabaseLogo } from "@/components/logos";
@@ -55,6 +55,10 @@ import { useRouter } from "next/navigation";
 import { renderMenuItems } from "./render";
 import Link from "next/link";
 import { editorlink } from "@/lib/forms/url";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
+import { TypeSelect } from "@/components/formfield-type-select";
+import { GridaXSupabaseTypeMap } from "@/lib/x-supabase/typemap";
 
 export function ModeData() {
   const [state] = useEditorState();
@@ -321,12 +325,20 @@ function ConnectNewSupabaseTableDialog({
   const { supabase_project } = state;
 
   const [table, setTable] = useState<string>();
+  const tableSchema = useMemo(() => {
+    if (!table) return;
+    const [schema, name] = table.split(".");
+    return supabase_project?.sb_schema_definitions?.[schema]?.[name];
+  }, [supabase_project?.sb_schema_definitions, table]);
 
   return (
     <Dialog {...props}>
-      <DialogContent>
+      <DialogContent className="max-w-4xl">
         <DialogHeader>
-          <DialogTitle>Connect Supabase Table</DialogTitle>
+          <DialogTitle>
+            <SupabaseLogo className="w-5 h-5 me-2 inline-flex" />
+            Connect Supabase Table
+          </DialogTitle>
           <DialogDescription>
             Connect a table from your{" "}
             <Link
@@ -342,34 +354,79 @@ function ConnectNewSupabaseTableDialog({
         </DialogHeader>
 
         {/*  */}
-        <Select value={table} onValueChange={setTable}>
-          <SelectTrigger>
-            <SelectValue placeholder={"Select Table"} />
-          </SelectTrigger>
-          <SelectContent>
-            {Object.keys(supabase_project?.sb_schema_definitions || {}).map(
-              (schemaName) => {
-                return (
-                  <SelectGroup key={schemaName}>
-                    <SelectLabel>{schemaName}</SelectLabel>
-                    {Object.keys(
-                      supabase_project?.sb_schema_definitions?.[schemaName] ||
-                        {}
-                    ).map((tableName) => {
-                      const fulltable = `${schemaName}.${tableName}`;
+        <div className="my-4">
+          <Select value={table} onValueChange={setTable}>
+            <SelectTrigger>
+              <SelectValue placeholder={"Select Table"} />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.keys(supabase_project?.sb_schema_definitions || {}).map(
+                (schemaName) => {
+                  return (
+                    <SelectGroup key={schemaName}>
+                      <SelectLabel>{schemaName}</SelectLabel>
+                      {Object.keys(
+                        supabase_project?.sb_schema_definitions?.[schemaName] ||
+                          {}
+                      ).map((tableName) => {
+                        const fulltable = `${schemaName}.${tableName}`;
+                        return (
+                          <SelectItem key={fulltable} value={fulltable}>
+                            <span>{fulltable}</span>
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectGroup>
+                  );
+                }
+              )}
+            </SelectContent>
+          </Select>
+
+          {table && tableSchema && (
+            <>
+              <hr />
+              <div className="mt-4 border-y">
+                <ScrollArea className="h-96">
+                  <div className="divide-y">
+                    {Object.keys(tableSchema.properties).map((key) => {
+                      const property = tableSchema.properties[key];
+                      const suggestion = GridaXSupabaseTypeMap.getSuggestion({
+                        type: property.type,
+                        format: property.format,
+                        enum: property.enum,
+                        is_array: property.is_array,
+                      });
+
                       return (
-                        <SelectItem key={fulltable} value={fulltable}>
-                          <span>{fulltable}</span>
-                        </SelectItem>
+                        <div key={key} className="flex items-center gap-2 h-14">
+                          <Checkbox defaultChecked />
+                          <div className="flex-1 grid gap-1 font-mono">
+                            <Label>{key}</Label>
+                            <span className="text-xs text-muted-foreground">
+                              {property.format}
+                            </span>
+                          </div>
+                          <div className="w-56">
+                            <TypeSelect
+                              value={suggestion?.default}
+                              options={suggestion?.suggested.map((t) => ({
+                                value: t,
+                              }))}
+                              onValueChange={() => {}}
+                            />
+                          </div>
+                        </div>
                       );
                     })}
-                  </SelectGroup>
-                );
-              }
-            )}
-          </SelectContent>
-        </Select>
+                  </div>
+                </ScrollArea>
+              </div>
+            </>
+          )}
+        </div>
         {/*  */}
+
         <DialogFooter>
           <DialogClose asChild>
             <Button variant="ghost">Cancel</Button>

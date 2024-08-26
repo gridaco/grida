@@ -258,15 +258,29 @@ function ConnectSupabase() {
                 Connect Supabase
               </span>
               {is_connected && (
-                <Link
-                  href={`https://supabase.com/dashboard/project/${xsbproject.sb_project_reference_id}`}
-                  target="_blank"
-                >
-                  <Button variant="link">
-                    <OpenInNewWindowIcon className="inline me-2 align-middle" />
-                    Dashboard
-                  </Button>
-                </Link>
+                <div className="flex gap-2">
+                  <Link
+                    href={SupabasePostgRESTOpenApi.build_supabase_openapi_url(
+                      url,
+                      anonKey
+                    )}
+                    target="_blank"
+                  >
+                    <Button variant="link">
+                      <OpenInNewWindowIcon className="inline me-2 align-middle" />
+                      Schema
+                    </Button>
+                  </Link>
+                  <Link
+                    href={`https://supabase.com/dashboard/project/${xsbproject.sb_project_reference_id}`}
+                    target="_blank"
+                  >
+                    <Button variant="link">
+                      <OpenInNewWindowIcon className="inline me-2 align-middle" />
+                      Dashboard
+                    </Button>
+                  </Link>
+                </div>
               )}
             </CardTitle>
             <CardDescription>

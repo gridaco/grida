@@ -23,7 +23,7 @@ import { CheckIcon, ChevronDownIcon } from "@radix-ui/react-icons";
 
 type FormFieldTypeSelectOptionItem = {
   value: FormInputType;
-  label: string;
+  label?: string;
   disabled?: boolean;
 };
 
@@ -85,7 +85,9 @@ export function TypeSelect({
                   />
                   <div className="flex items-center gap-2">
                     <FormFieldTypeIcon type={opt.value} className="w-4 h-4" />
-                    <span className="capitalize">{opt.label}</span>
+                    <span className="capitalize">
+                      {opt.label ?? fieldlabels[opt.value]}
+                    </span>
                   </div>
                 </CommandItem>
               ))}
