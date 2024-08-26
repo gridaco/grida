@@ -187,7 +187,7 @@ export namespace PrivateEditorApi {
       data: CreateProjectConnectionRequest
     ) {
       return Axios.post<EditorApiResponse<GridaXSupabase.SupabaseProject>>(
-        `/private/editor/connect/supabase/projects`,
+        `/private/editor/x-supabase/projects`,
         data
       );
     }
@@ -195,22 +195,20 @@ export namespace PrivateEditorApi {
     export async function getXSBProject(supabase_project_id: number) {
       return Axios.get<{
         data: XSupabasePrivateApiTypes.GetSupabaseProjectData;
-      }>(`/private/editor/connect/supabase/projects/${supabase_project_id}`);
+      }>(`/private/editor/x-supabase/projects/${supabase_project_id}`);
     }
 
     export async function getXSBProjectByGridaProjectId(project_id: number) {
       return Axios.get<{
         data: XSupabasePrivateApiTypes.GetSupabaseProjectData;
-      }>(
-        `/private/editor/connect/supabase/projects?grida_project_id=${project_id}`
-      );
+      }>(`/private/editor/x-supabase/projects?grida_project_id=${project_id}`);
     }
 
     export async function deleteXSBProjectConnection(
       supabase_project_id: number
     ) {
       return Axios.delete(
-        `/private/editor/connect/supabase/projects/${supabase_project_id}`
+        `/private/editor/x-supabase/projects/${supabase_project_id}`
       );
     }
 
@@ -219,7 +217,7 @@ export namespace PrivateEditorApi {
       data: { secret: string }
     ) {
       return Axios.post(
-        `/private/editor/connect/supabase/projects/${supabase_project_id}/secure-service-key`,
+        `/private/editor/x-supabase/projects/${supabase_project_id}/secure-service-key`,
         data
       );
     }
@@ -228,13 +226,13 @@ export namespace PrivateEditorApi {
       supabase_project_id: number
     ) {
       return Axios.get(
-        `/private/editor/connect/supabase/projects/${supabase_project_id}/secure-service-key`
+        `/private/editor/x-supabase/projects/${supabase_project_id}/secure-service-key`
       );
     }
 
     export async function refreshXSBProjectSchema(supabase_project_id: number) {
       return Axios.patch<EditorApiResponse<GridaXSupabase.SupabaseProject>>(
-        `/private/editor/connect/supabase/projects/${supabase_project_id}`
+        `/private/editor/x-supabase/projects/${supabase_project_id}`
       );
     }
 
@@ -243,7 +241,7 @@ export namespace PrivateEditorApi {
       data: XSupabasePrivateApiTypes.AddSchemaNameRequestData
     ) {
       return Axios.post<EditorApiResponse<GridaXSupabase.SupabaseProject>>(
-        `/private/editor/connect/supabase/projects/${supabase_project_id}/custom-schema`,
+        `/private/editor/x-supabase/projects/${supabase_project_id}/custom-schema`,
         data
       );
     }
@@ -253,7 +251,7 @@ export namespace PrivateEditorApi {
         data: GridaXSupabase.SupabaseBucket[];
         error: any;
       }>(
-        `/private/editor/connect/supabase/projects/${supabase_project_id}/storage/buckets`
+        `/private/editor/x-supabase/projects/${supabase_project_id}/storage/buckets`
       );
     }
 
