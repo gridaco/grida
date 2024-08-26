@@ -32,26 +32,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Check, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import {
   FieldSupports,
   supported_field_autocomplete_types,
-  supported_field_types,
-  fieldlabels,
 } from "@/k/supported_field_types";
 import {
   payments_service_providers,
@@ -72,23 +56,18 @@ import { FormFieldUpsert } from "@/types/private/api";
 import { useEditorState } from "@/scaffolds/editor";
 import { useRouter } from "next/navigation";
 import { editorlink } from "@/lib/forms/url";
-import { cn } from "@/utils";
-import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
 import { useInventory, useInventoryState } from "../options/use-inventory";
 import Link from "next/link";
 import { NameInput } from "./name-input";
-import { LockClosedIcon, MixIcon, ReloadIcon } from "@radix-ui/react-icons";
+import { LockClosedIcon, ReloadIcon } from "@radix-ui/react-icons";
 import { Badge } from "@/components/ui/badge";
-import {
-  DummyFormAgentStateProvider,
-  FormAgentProvider,
-  initdummy,
-} from "@/lib/formstate";
+import { DummyFormAgentStateProvider } from "@/lib/formstate";
 import { SupabaseReferencesSettings } from "./extensions/field-x-sb-reference-fk-settings";
 import { SupabaseStorageSettings } from "./extensions/field-x-sb-storage-settings";
-import { XSupabaseFieldConnectionPolicyCheck } from "@/lib/supabase/check";
+import { XSupabaseFieldConnectionPolicyCheck } from "@/services/x-supabase/check";
 import { FieldValueExpression } from "./extensions/field-value-expression";
 import { Tokens } from "@/ast";
+import { TypeSelect } from "@/components/formfield-type-select";
 
 // @ts-ignore
 const default_field_init: {
@@ -170,66 +149,6 @@ const default_field_init: {
 export type FieldSave = Omit<FormFieldUpsert, "form_id"> & {
   table_id: string;
 };
-
-export function TypeSelect({
-  value,
-  onValueChange,
-}: {
-  value: FormInputType;
-  onValueChange: (value: FormInputType) => void;
-}) {
-  const [open, setOpen] = React.useState(false);
-
-  return (
-    <Popover open={open} onOpenChange={setOpen} modal>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className="w-full justify-between capitalize"
-        >
-          <div className="flex gap-2 items-center">
-            <FormFieldTypeIcon type={value} className="w-4 h-4" />
-            {value ? value : "Type"}
-          </div>
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] max-h-[--radix-popover-content-available-height] p-0">
-        <Command>
-          <CommandInput placeholder="Search" />
-          <CommandEmpty>No input found.</CommandEmpty>
-          <CommandList>
-            <CommandGroup>
-              {supported_field_types.map((t) => (
-                <CommandItem
-                  key={t}
-                  value={t}
-                  onSelect={(currentValue) => {
-                    onValueChange(currentValue as FormInputType);
-                    setOpen(false);
-                  }}
-                >
-                  <Check
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      value === t ? "opacity-100" : "opacity-0"
-                    )}
-                  />
-                  <div className="flex items-center gap-2">
-                    <FormFieldTypeIcon type={t} className="w-4 h-4" />
-                    <span className="capitalize">{fieldlabels[t]}</span>
-                  </div>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
-  );
-}
 
 export function FieldEditPanel({
   table_id,
