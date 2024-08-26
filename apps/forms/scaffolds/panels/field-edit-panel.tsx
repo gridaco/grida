@@ -64,7 +64,7 @@ import { Badge } from "@/components/ui/badge";
 import { DummyFormAgentStateProvider } from "@/lib/formstate";
 import { SupabaseReferencesSettings } from "./extensions/field-x-sb-reference-fk-settings";
 import { SupabaseStorageSettings } from "./extensions/field-x-sb-storage-settings";
-import { XSupabaseFieldConnectionPolicyCheck } from "@/services/x-supabase/check";
+import { XSupabaseFieldConnectionPolicyCheck } from "@/lib/x-supabase/check";
 import { FieldValueExpression } from "./extensions/field-value-expression";
 import { Tokens } from "@/ast";
 import { TypeSelect } from "@/components/formfield-type-select";
