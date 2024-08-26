@@ -151,9 +151,7 @@ function ConnectSupabase() {
     };
 
     if (!existing_connection) {
-      PrivateEditorApi.SupabaseConnection.getXSBProjectByGridaProjectId(
-        project_id
-      )
+      PrivateEditorApi.XSupabase.getXSBProjectByGridaProjectId(project_id)
         .then((res) => {
           const data = res.data.data;
           ondata(data);
@@ -164,7 +162,7 @@ function ConnectSupabase() {
       return;
     }
 
-    PrivateEditorApi.SupabaseConnection.getXSBProject(
+    PrivateEditorApi.XSupabase.getXSBProject(
       existing_connection.supabase_project_id
     )
       .then((res) => {
@@ -194,7 +192,7 @@ function ConnectSupabase() {
   };
 
   const onRefreshSchemaClick = async () => {
-    const res = PrivateEditorApi.SupabaseConnection.refreshXSBProjectSchema(
+    const res = PrivateEditorApi.XSupabase.refreshXSBProjectSchema(
       xsbproject!.id
     );
     toast.promise(res, {
@@ -209,7 +207,7 @@ function ConnectSupabase() {
   };
 
   const onConnectClick = async () => {
-    const res = PrivateEditorApi.SupabaseConnection.createXSBProjectConnection({
+    const res = PrivateEditorApi.XSupabase.createXSBProjectConnection({
       project_id: project_id,
       sb_anon_key: anonKey,
       sb_project_url: url,
@@ -227,7 +225,7 @@ function ConnectSupabase() {
   };
 
   const onRemoveConnectionClick = async () => {
-    const res = PrivateEditorApi.SupabaseConnection.deleteXSBProjectConnection(
+    const res = PrivateEditorApi.XSupabase.deleteXSBProjectConnection(
       xsbproject!.id
     );
 
@@ -485,11 +483,10 @@ function ConnectServiceRoleKey({
           secret: serviceKey,
         };
 
-        const res =
-          PrivateEditorApi.SupabaseConnection.createXSBProjectServiceRoleKey(
-            connection.supabase_project_id,
-            data
-          );
+        const res = PrivateEditorApi.XSupabase.createXSBProjectServiceRoleKey(
+          connection.supabase_project_id,
+          data
+        );
 
         res.then((res) => {
           on_service_key_id_change(res.data.data);
@@ -552,7 +549,7 @@ function ConnectServiceRoleKey({
                 <RevealSecret
                   fetcher={async () => {
                     const res =
-                      await PrivateEditorApi.SupabaseConnection.revealXSBProjectServiceRoleKey(
+                      await PrivateEditorApi.XSupabase.revealXSBProjectServiceRoleKey(
                         connection.supabase_project_id
                       );
                     return res.data.data;
@@ -618,13 +615,12 @@ function ConnectSchema({
   };
 
   const onUseCustomSchema = async (schema: string) => {
-    const { data } =
-      await PrivateEditorApi.SupabaseConnection.registerXSBCustomSchema(
-        supabase_project_id,
-        {
-          schema_name: schema,
-        }
-      );
+    const { data } = await PrivateEditorApi.XSupabase.registerXSBCustomSchema(
+      supabase_project_id,
+      {
+        schema_name: schema,
+      }
+    );
 
     if (data.data) {
       on_schema_names_change(data.data.sb_schema_names);
@@ -760,13 +756,12 @@ function ConnectFormXSupabaseTable({
   }, [forms_supabase_connection?.main_supabase_table]);
 
   const onUseCustomSchema = async (schema: string) => {
-    const { data } =
-      await PrivateEditorApi.SupabaseConnection.registerXSBCustomSchema(
-        supabase_project_id,
-        {
-          schema_name: schema,
-        }
-      );
+    const { data } = await PrivateEditorApi.XSupabase.registerXSBCustomSchema(
+      supabase_project_id,
+      {
+        schema_name: schema,
+      }
+    );
 
     if (data.data) {
       setSchemaName(schema);
@@ -778,14 +773,10 @@ function ConnectFormXSupabaseTable({
 
   const onSaveMainTableClick = async () => {
     assert(tableName);
-    const res =
-      PrivateEditorApi.SupabaseConnection.connectFormsXSBConnectionTable(
-        form_id,
-        {
-          table_name: tableName,
-          schema_name: schemaName,
-        }
-      );
+    const res = PrivateEditorApi.Forms.connectFormsXSBConnectionTable(form_id, {
+      table_name: tableName,
+      schema_name: schemaName,
+    });
 
     toast.promise(res, {
       loading: "Saving Main Table...",

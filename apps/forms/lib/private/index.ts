@@ -170,7 +170,7 @@ export namespace PrivateEditorApi {
     }
   }
 
-  export namespace SupabaseConnection {
+  export namespace XSupabase {
     // #region supabase project
 
     /**
@@ -261,28 +261,6 @@ export namespace PrivateEditorApi {
 
     // #region table
 
-    export async function connectFormsXSBConnectionTable(
-      form_id: string,
-      data: XSupabasePrivateApiTypes.CreateConnectionTableRequestData
-    ) {
-      return Axios.put(
-        `/private/editor/forms/${form_id}/connect/with-x-sb-table`,
-        data
-      );
-    }
-
-    // TODO: safely remove
-    // export async function getFormsXSBConnectionTable(form_id: string) {
-    //   return Axios.get<{ data: GridaSupabase.SupabaseTable; error: any }>(
-    //     `/private/editor/connect/${form_id}/supabase/table`
-    //   );
-    // }
-
-    // TODO: add once ready on ui
-    // export async function deleteFormsXSBConnectionTable(form_id: string) {
-    //   return Axios.delete(`/private/editor/connect/${form_id}/supabase/table`);
-    // }
-
     export const url_table_auth_users_query = (
       form_id: string,
       serachParams: URLSearchParams | string
@@ -297,6 +275,30 @@ export namespace PrivateEditorApi {
       `/private/editor/connect/${form_id}/supabase/table/${supabase_table_id}/query${serachParams ? `?${serachParams}` : ""}`;
 
     // #endregion table
+  }
+
+  export namespace Forms {
+    export async function connectFormsXSBConnectionTable(
+      form_id: string,
+      data: XSupabasePrivateApiTypes.CreateConnectionTableRequestData
+    ) {
+      return Axios.put(
+        `/private/editor/forms/${form_id}/connect/with-x-sb-table`,
+        data
+      );
+    }
+
+    // TODO: safely remove
+    // export async function getFormsXSBConnectionTable(form_id: string) {
+    //   return Axios.get<{ data: GridaSupabase.SupabaseTable; error: any }>(
+    //     `/private/editor/forms/${form_id}/connect/with-x-sb-table`
+    //   );
+    // }
+
+    // TODO: add once ready on ui
+    // export async function deleteFormsXSBConnectionTable(form_id: string) {
+    //   return Axios.delete(`/private/editor/forms/${form_id}/connect/with-x-sb-table`);
+    // }
   }
 
   export namespace SupabaseQuery {

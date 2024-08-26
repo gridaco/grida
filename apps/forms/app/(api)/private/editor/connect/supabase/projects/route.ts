@@ -52,7 +52,7 @@ export async function POST(req: NextRequest, context: Context) {
   const cookieStore = cookies();
   const supabase = createRouteHandlerXSBClient(cookieStore);
 
-  const data: PrivateEditorApi.SupabaseConnection.CreateProjectConnectionRequest =
+  const data: PrivateEditorApi.XSupabase.CreateProjectConnectionRequest =
     await req.json();
   const { project_id, sb_project_url, sb_anon_key } = data;
 

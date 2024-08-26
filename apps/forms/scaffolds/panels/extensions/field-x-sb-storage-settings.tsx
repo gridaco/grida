@@ -64,7 +64,7 @@ export function SupabaseStorageSettings({
   useEffect(() => {
     if (!state.connections.supabase) return;
     if (enabled) {
-      PrivateEditorApi.SupabaseConnection.listXSBBucket(
+      PrivateEditorApi.XSupabase.listXSBBucket(
         state.connections.supabase.id
       ).then((res) => {
         res.data.data && setBuckets(res.data.data);

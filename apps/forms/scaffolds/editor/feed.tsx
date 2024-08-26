@@ -507,7 +507,7 @@ export function XSupabaseMainTableSyncProvider({
       if (!pkname) return;
 
       const task = fetch(
-        PrivateEditorApi.SupabaseConnection.url_table_x_query(
+        PrivateEditorApi.XSupabase.url_table_x_query(
           state.form_id,
           state.connections.supabase.main_supabase_table_id
         ),
@@ -590,7 +590,7 @@ export function XSupabaseMainTableFeedProvider({
   const enabled = !!state.connections.supabase?.main_supabase_table_id;
 
   const request = state.connections.supabase?.main_supabase_table_id
-    ? PrivateEditorApi.SupabaseConnection.url_table_x_query(
+    ? PrivateEditorApi.XSupabase.url_table_x_query(
         state.form_id,
         state.connections.supabase.main_supabase_table_id,
         serachParams
