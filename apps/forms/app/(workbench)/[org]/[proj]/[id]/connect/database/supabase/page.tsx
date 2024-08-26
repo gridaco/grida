@@ -779,7 +779,7 @@ function ConnectFormXSupabaseTable({
   const onSaveMainTableClick = async () => {
     assert(tableName);
     const res =
-      PrivateEditorApi.SupabaseConnection.createFormsXSBConnectionTable(
+      PrivateEditorApi.SupabaseConnection.connectFormsXSBConnectionTable(
         form_id,
         {
           table_name: tableName,

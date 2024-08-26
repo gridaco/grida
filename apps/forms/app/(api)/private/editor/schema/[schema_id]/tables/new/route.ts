@@ -12,11 +12,19 @@ import { NextRequest, NextResponse } from "next/server";
 
 type ResponsePayload = EditorApiResponse<CreateNewSchemaTableResponse>;
 
-export async function POST(req: NextRequest) {
-  const cookieStore = cookies();
-  const data = (await req.json()) as CreateNewSchemaTableRequest;
+type Context = {
+  params: {
+    schema_id: string;
+  };
+};
 
-  assert(data.schema_id, "schema_id is required");
+export async function POST(req: NextRequest, context: Context) {
+  const cookieStore = cookies();
+  const data = (await req.json()) as Omit<
+    CreateNewSchemaTableRequest,
+    "schema_id"
+  >;
+  const schema_id = context.params.schema_id;
   assert(data.table_name, "table_name is required");
 
   const supabase = createRouteHandlerClient(cookieStore);
@@ -24,7 +32,7 @@ export async function POST(req: NextRequest) {
   const { data: schema_ref, error: schema_ref_err } = await supabase
     .from("schema_document")
     .select()
-    .eq("id", data.schema_id)
+    .eq("id", schema_id)
     .single();
 
   if (schema_ref_err) {

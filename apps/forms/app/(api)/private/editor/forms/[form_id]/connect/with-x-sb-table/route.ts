@@ -13,6 +13,8 @@ interface Context {
   };
 }
 
+// TODO: safely remove
+/*
 export async function GET(req: NextRequest, context: Context) {
   const form_id = context.params.form_id;
   const cookieStore = cookies();
@@ -48,6 +50,7 @@ export async function GET(req: NextRequest, context: Context) {
     error: null,
   });
 }
+*/
 
 export async function PUT(req: NextRequest, context: Context) {
   const form_id = context.params.form_id;
@@ -115,6 +118,7 @@ export async function PUT(req: NextRequest, context: Context) {
   return NextResponse.json({ data: null, error: null }, { status: 200 });
 }
 
+// TODO: add once ready on ui
 // export async function DELETE(req: NextRequest, context: Context) {
 //   const form_id = context.params.form_id;
 //   const cookieStore = cookies();
