@@ -2,6 +2,7 @@ import {
   createRouteHandlerClient,
   grida_xsupabase_client,
 } from "@/lib/supabase/server";
+import { GridaXSupabase } from "@/types";
 import { XSupabasePrivateApiTypes } from "@/types/private/api";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
@@ -82,9 +83,11 @@ export async function PUT(req: NextRequest, context: Context) {
     .eq("id", conn_ref.supabase_project_id)
     .single();
 
-  const table_schema = (supabase_project!.sb_schema_definitions as any)[
-    schema_name
-  ][table_name];
+  const table_schema = (
+    supabase_project!.sb_schema_definitions as {
+      [schema: string]: GridaXSupabase.TableSchemaDefinitions;
+    }
+  )[schema_name][table_name];
 
   const { data: upserted_supabase_table, error } = await grida_xsupabase_client
     .from("supabase_table")

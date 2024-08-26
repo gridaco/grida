@@ -17,7 +17,7 @@ import type {
 } from "./state";
 import { blockstreeflat } from "@/lib/forms/tree";
 import { SYM_LOCALTZ, EditorSymbols } from "./symbols";
-import { GridaSupabase } from "@/types";
+import { GridaXSupabase } from "@/types";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 
 export function initialEditorState(init: EditorInit): EditorState {
@@ -468,7 +468,7 @@ function formdocumentpagesinit({
   ];
 }
 
-function xsbmtinit(conn?: GridaSupabase.XSupabaseMainTableConnectionState) {
+function xsbmtinit(conn?: GridaXSupabase.XSupabaseMainTableConnectionState) {
   // TODO: need inspection - will supbaseconn present even when main table is not present?
   // if yes, we need to adjust the state to be nullable
   if (!conn) return undefined;

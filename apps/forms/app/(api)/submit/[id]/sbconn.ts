@@ -4,7 +4,7 @@ import { grida_xsupabase_client } from "@/lib/supabase/server";
 import { createXSupabaseClient } from "@/services/x-supabase";
 import type {
   SchemaTableConnectionXSupabaseMainTableJoint,
-  GridaSupabase,
+  GridaXSupabase,
 } from "@/types";
 import type { JSONSchemaType } from "ajv";
 
@@ -29,7 +29,7 @@ export async function sbconn_insert({
     throw new Error("supabase_project not found");
   }
 
-  const connection_table: GridaSupabase.SupabaseTable | undefined =
+  const connection_table: GridaXSupabase.SupabaseTable | undefined =
     supabase_project!.tables.find(
       (t) => t.id === connection.main_supabase_table_id
     ) as any;
@@ -39,7 +39,7 @@ export async function sbconn_insert({
   }
   const { sb_table_name, sb_schema_name, sb_table_schema } = connection_table;
 
-  const schema = sb_table_schema as GridaSupabase.JSONSChema;
+  const schema = sb_table_schema as GridaXSupabase.JSONSChema;
 
   const { pks } =
     SupabasePostgRESTOpenApi.parse_supabase_postgrest_schema_definition(schema);
@@ -86,7 +86,7 @@ export async function sbconn_update(
     throw new Error("supabase_project not found");
   }
 
-  const connection_table: GridaSupabase.SupabaseTable | undefined =
+  const connection_table: GridaXSupabase.SupabaseTable | undefined =
     supabase_project!.tables.find(
       (t) => t.id === connection.main_supabase_table_id
     ) as any;

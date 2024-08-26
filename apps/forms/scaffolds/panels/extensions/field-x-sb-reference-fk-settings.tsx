@@ -7,7 +7,7 @@ import {
   PanelPropertySection,
   PanelPropertySectionTitle,
 } from "@/components/panels/side-panel";
-import { GridaSupabase, type FormFieldReferenceSchema } from "@/types";
+import { GridaXSupabase, type FormFieldReferenceSchema } from "@/types";
 import {
   Select,
   SelectContent,
@@ -138,11 +138,11 @@ export function SupabaseReferencesSettings({
                     (schema === "auth" && table === "users" ? (
                       <>
                         {Object.keys(
-                          GridaSupabase.SupabaseUserJsonSchema.properties
+                          GridaXSupabase.SupabaseUserJsonSchema.properties
                         ).map((key) => {
                           const property =
-                            GridaSupabase.SupabaseUserJsonSchema.properties[
-                              key as GridaSupabase.SupabaseUserColumn
+                            GridaXSupabase.SupabaseUserJsonSchema.properties[
+                              key as GridaXSupabase.SupabaseUserColumn
                             ];
                           return (
                             <SelectItem

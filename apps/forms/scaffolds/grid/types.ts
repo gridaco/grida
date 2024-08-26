@@ -1,4 +1,4 @@
-import type { FormInputType, GridaSupabase } from "@/types";
+import type { FormInputType, GridaXSupabase } from "@/types";
 
 export type GFSystemColumnTypes =
   | "__gf_display_id"
@@ -58,4 +58,4 @@ export type GRCustomerRow = {
   last_seen_at: string;
 };
 
-export type XSupabaseReferenceTableRow = GridaSupabase.SupabaseUser | any;
+export type XSupabaseReferenceTableRow = GridaXSupabase.SupabaseUser | any;

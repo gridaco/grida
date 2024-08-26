@@ -1,5 +1,5 @@
 import type { OpenAPI } from "openapi-types";
-import type { GridaSupabase } from "@/types";
+import type { GridaXSupabase } from "@/types";
 import type { ColumnType } from "./@types/column-types";
 import { XMLParser } from "fast-xml-parser";
 import { PGSupportedColumnTypeWithoutArray } from "./@types/pg";
@@ -118,7 +118,7 @@ export namespace SupabasePostgRESTOpenApi {
   };
 
   export function parse_supabase_postgrest_schema_definition(
-    schema: GridaSupabase.JSONSChema
+    schema: GridaXSupabase.JSONSChema
   ) {
     const parsed: {
       pks: string[];
@@ -218,7 +218,7 @@ export namespace SupabasePostgRESTOpenApi {
    * // }
    */
   function parse_supabase_postgrest_schema_properties_description(
-    schema: GridaSupabase.JSONSChema
+    schema: GridaXSupabase.JSONSChema
   ) {
     const result = {
       pks: [] as string[],

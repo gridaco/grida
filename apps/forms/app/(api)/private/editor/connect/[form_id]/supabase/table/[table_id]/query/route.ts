@@ -14,7 +14,7 @@ import {
 import { XSupabase } from "@/services/x-supabase";
 import type {
   FormFieldDefinition,
-  GridaSupabase,
+  GridaXSupabase,
   XSupabaseStorageSchema,
 } from "@/types";
 import assert from "assert";
@@ -72,7 +72,7 @@ export async function GET(req: NextRequest, context: Context) {
     return {
       ...row,
       __gf_storage_fields: (files as any)[pk],
-    } satisfies GridaSupabase.XDataRow;
+    } satisfies GridaXSupabase.XDataRow;
   });
 
   return NextResponse.json({

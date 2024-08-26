@@ -10,7 +10,7 @@ import {
 import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import useSWR from "swr";
 import type { EditorApiResponse } from "@/types/private/api";
-import type { FormResponse, FormResponseField, GridaSupabase } from "@/types";
+import type { FormResponse, FormResponseField, GridaXSupabase } from "@/types";
 import { usePrevious } from "@uidotdev/usehooks";
 import { XSupabaseQuery } from "@/lib/supabase-postgrest/builder";
 import equal from "deep-equal";
@@ -597,7 +597,7 @@ export function XSupabaseMainTableFeedProvider({
       )
     : null;
 
-  const res = useSWR<EditorApiResponse<GridaSupabase.XDataRow[], any>>(
+  const res = useSWR<EditorApiResponse<GridaXSupabase.XDataRow[], any>>(
     request,
     async (url: string) => {
       const res = await fetch(url);

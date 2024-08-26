@@ -2,7 +2,7 @@ import { grida_xsupabase_client } from "@/lib/supabase/server";
 import { secureformsclient } from "@/lib/supabase/vault";
 import {
   SchemaTableConnectionXSupabaseMainTableJoint,
-  GridaSupabase,
+  GridaXSupabase,
 } from "@/types";
 import {
   SupabaseClient,
@@ -87,7 +87,7 @@ export class GridaXSupabaseService {
 
   async getXSBMainTableConnectionState(
     conn: SchemaTableConnectionXSupabaseMainTableJoint
-  ): Promise<GridaSupabase.XSupabaseMainTableConnectionState | null> {
+  ): Promise<GridaXSupabase.XSupabaseMainTableConnectionState | null> {
     const { supabase_project_id, main_supabase_table_id } = conn;
 
     const { data: supabase_project, error: supabase_project_err } =
@@ -105,13 +105,13 @@ export class GridaXSupabaseService {
     return {
       ...conn,
       supabase_project:
-        supabase_project! as {} as GridaSupabase.SupabaseProject,
+        supabase_project! as {} as GridaXSupabase.SupabaseProject,
       main_supabase_table_id,
-      tables: supabase_project!.tables as any as GridaSupabase.SupabaseTable[],
+      tables: supabase_project!.tables as any as GridaXSupabase.SupabaseTable[],
       main_supabase_table:
         (supabase_project!.tables.find(
           (t) => t.id === main_supabase_table_id
-        ) as any as GridaSupabase.SupabaseTable) || null,
+        ) as any as GridaXSupabase.SupabaseTable) || null,
     };
   }
 }

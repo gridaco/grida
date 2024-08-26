@@ -1,7 +1,7 @@
 import { PrivateEditorApi } from "@/lib/private";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { createRouteHandlerXSBClient } from "@/lib/supabase/server";
-import { GridaSupabase } from "@/types";
+import { GridaXSupabase } from "@/types";
 import type {
   EditorApiResponse,
   XSupabasePrivateApiTypes,
@@ -85,8 +85,8 @@ export async function POST(req: NextRequest, context: Context) {
 
   return NextResponse.json({
     data: supabase_project as DontCastJsonProperties<
-      GridaSupabase.SupabaseProject,
+      GridaXSupabase.SupabaseProject,
       "sb_public_schema" | "sb_schema_definitions"
     >,
-  } satisfies EditorApiResponse<GridaSupabase.SupabaseProject>);
+  } satisfies EditorApiResponse<GridaXSupabase.SupabaseProject>);
 }

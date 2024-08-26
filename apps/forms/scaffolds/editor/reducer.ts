@@ -83,7 +83,7 @@ import type {
   FormInputType,
   FormResponse,
   FormResponseField,
-  GridaSupabase,
+  GridaXSupabase,
 } from "@/types";
 import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";
 import { EditorSymbols } from "./symbols";
@@ -897,7 +897,7 @@ export function reducer(
                 row,
                 field.name,
                 value
-              ) as GridaSupabase.XDataRow;
+              ) as GridaXSupabase.XDataRow;
 
               draft.x_supabase_main_table!.rows =
                 draft.x_supabase_main_table!.rows.map((r) => {

@@ -1,4 +1,4 @@
-import type { GridaSupabase } from "@/types";
+import type { GridaXSupabase } from "@/types";
 import {
   CreateNewSchemaTableRequest,
   CreateNewSchemaTableResponse,
@@ -186,7 +186,7 @@ export namespace PrivateEditorApi {
     export async function createXSBProjectConnection(
       data: CreateProjectConnectionRequest
     ) {
-      return Axios.post<EditorApiResponse<GridaSupabase.SupabaseProject>>(
+      return Axios.post<EditorApiResponse<GridaXSupabase.SupabaseProject>>(
         `/private/editor/connect/supabase/projects`,
         data
       );
@@ -233,7 +233,7 @@ export namespace PrivateEditorApi {
     }
 
     export async function refreshXSBProjectSchema(supabase_project_id: number) {
-      return Axios.patch<EditorApiResponse<GridaSupabase.SupabaseProject>>(
+      return Axios.patch<EditorApiResponse<GridaXSupabase.SupabaseProject>>(
         `/private/editor/connect/supabase/projects/${supabase_project_id}`
       );
     }
@@ -242,7 +242,7 @@ export namespace PrivateEditorApi {
       supabase_project_id: number,
       data: XSupabasePrivateApiTypes.AddSchemaNameRequestData
     ) {
-      return Axios.post<EditorApiResponse<GridaSupabase.SupabaseProject>>(
+      return Axios.post<EditorApiResponse<GridaXSupabase.SupabaseProject>>(
         `/private/editor/connect/supabase/projects/${supabase_project_id}/custom-schema`,
         data
       );
@@ -250,7 +250,7 @@ export namespace PrivateEditorApi {
 
     export async function listXSBBucket(supabase_project_id: number) {
       return Axios.get<{
-        data: GridaSupabase.SupabaseBucket[];
+        data: GridaXSupabase.SupabaseBucket[];
         error: any;
       }>(
         `/private/editor/connect/supabase/projects/${supabase_project_id}/storage/buckets`

@@ -2,7 +2,7 @@ import type { JSONSchemaType } from "ajv";
 import type { SchemaTableConnectionXSupabaseMainTableJoint } from "./types";
 import type { User } from "@supabase/supabase-js";
 import type { Bucket } from "@supabase/storage-js";
-export namespace GridaSupabase {
+export namespace GridaXSupabase {
   export type XDataRow = Record<string, any> & {
     __gf_storage_fields: Record<
       string,
@@ -49,9 +49,9 @@ export namespace GridaSupabase {
 
   export type XSupabaseMainTableConnectionState =
     SchemaTableConnectionXSupabaseMainTableJoint & {
-      supabase_project: GridaSupabase.SupabaseProject;
-      main_supabase_table: GridaSupabase.SupabaseTable | null;
-      tables: GridaSupabase.SupabaseTable[];
+      supabase_project: GridaXSupabase.SupabaseProject;
+      main_supabase_table: GridaXSupabase.SupabaseTable | null;
+      tables: GridaXSupabase.SupabaseTable[];
     };
 
   export type SupabaseUser = User;

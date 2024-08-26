@@ -18,7 +18,7 @@ import type {
   FormStyleSheetV1Schema,
   FormsPageLanguage,
   GDocumentType,
-  GridaSupabase,
+  GridaXSupabase,
   OrderBy,
 } from "@/types";
 import { SYM_LOCALTZ, EditorSymbols } from "./symbols";
@@ -74,7 +74,7 @@ export interface SchemaDocumentTableInit {
 
 export interface SchemaDocumentEditorInit extends BaseDocumentEditorInit {
   doctype: "v0_schema";
-  supabase_project: GridaSupabase.SupabaseProject | null;
+  supabase_project: GridaXSupabase.SupabaseProject | null;
   tables: ReadonlyArray<SchemaDocumentTableInit>;
 }
 
@@ -86,7 +86,7 @@ export interface FormDocumentEditorInit extends BaseDocumentEditorInit {
   ending: EditorState["form"]["ending"];
   connections?: {
     store_id?: number | null;
-    supabase?: GridaSupabase.XSupabaseMainTableConnectionState;
+    supabase?: GridaXSupabase.XSupabaseMainTableConnectionState;
   };
   form_title: string;
   blocks: EditorFlatFormBlock[];
@@ -299,10 +299,10 @@ interface IFieldEditorState {
 }
 
 interface IConnectionsState {
-  supabase_project: GridaSupabase.SupabaseProject | null;
+  supabase_project: GridaXSupabase.SupabaseProject | null;
   connections: {
     store_id?: number | null;
-    supabase?: GridaSupabase.XSupabaseMainTableConnectionState;
+    supabase?: GridaXSupabase.XSupabaseMainTableConnectionState;
   };
 }
 
@@ -371,11 +371,11 @@ export interface FormEditorState
   focus_block_id?: string | null;
 
   x_supabase_main_table?: {
-    schema: GridaSupabase.JSONSChema;
+    schema: GridaXSupabase.JSONSChema;
     // we need a single pk for editor operations
     gfpk: string | undefined;
     pks: string[];
-    rows: GridaSupabase.XDataRow[];
+    rows: GridaXSupabase.XDataRow[];
   };
 }
 

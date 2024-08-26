@@ -10,7 +10,7 @@ import type {
   FormResponseWithFields,
   FormStyleSheetV1Schema,
   FormsPageLanguage,
-  GridaSupabase,
+  GridaXSupabase,
 } from "@/types";
 import type { EditorFlatFormBlock, EditorState } from "./state";
 import type { Tokens } from "@/ast";
@@ -322,7 +322,7 @@ export interface DataGridCellChangeAction {
 
 export interface FeedXSupabaseMainTableRowsAction {
   type: "editor/x-supabase/main-table/feed";
-  data: GridaSupabase.XDataRow[];
+  data: GridaXSupabase.XDataRow[];
 }
 
 export interface EditorThemeLangAction {

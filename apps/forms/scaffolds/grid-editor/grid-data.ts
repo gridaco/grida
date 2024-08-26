@@ -5,7 +5,7 @@ import {
   FormResponse,
   FormResponseField,
   FormResponseSession,
-  GridaSupabase,
+  GridaXSupabase,
 } from "@/types";
 import { fmt_local_index } from "@/utils/fmt";
 import type {
@@ -210,7 +210,7 @@ export namespace GridData {
             input.data.rows,
             input.filter,
             undefined,
-            Object.keys(GridaSupabase.SupabaseUserJsonSchema.properties)
+            Object.keys(GridaXSupabase.SupabaseUserJsonSchema.properties)
           ),
         };
       }
@@ -384,7 +384,7 @@ export namespace GridData {
     };
 
     const filesfn = (
-      row: GridaSupabase.XDataRow,
+      row: GridaXSupabase.XDataRow,
       field: FormFieldDefinition
     ) => {
       // file field

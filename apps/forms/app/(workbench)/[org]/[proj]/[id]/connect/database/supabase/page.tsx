@@ -43,7 +43,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SupabasePostgRESTOpenApi, ping } from "@/lib/supabase-postgrest";
-import { GridaSupabase } from "@/types";
+import { GridaXSupabase } from "@/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import assert from "assert";
 import {
@@ -126,7 +126,7 @@ function ConnectSupabase() {
   const [schema_definitions, set_schema_definitions] =
     useState<SchemaDefinitions | null>(null);
   const [xsbproject, setXSBProject] = useState<
-    GridaSupabase.SupabaseProject | null | undefined
+    GridaXSupabase.SupabaseProject | null | undefined
   >(undefined);
 
   const {
@@ -690,7 +690,7 @@ function ConnectSchema({
                             {schema}.{table}
                           </Label>
                           <SupabaseTableInfo
-                            table={tables[table] as GridaSupabase.JSONSChema}
+                            table={tables[table] as GridaXSupabase.JSONSChema}
                           />
                         </div>
                       );
@@ -844,7 +844,7 @@ function ConnectFormXSupabaseTable({
                   table={
                     sb_schema_definitions[schemaName][
                       tableName
-                    ] as GridaSupabase.JSONSChema
+                    ] as GridaXSupabase.JSONSChema
                   }
                 />
               )}

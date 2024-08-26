@@ -8,7 +8,7 @@ import {
   PanelPropertySectionTitle,
   PropertyTextInput,
 } from "@/components/panels/side-panel";
-import { type FormFieldStorageSchema, GridaSupabase } from "@/types";
+import { type FormFieldStorageSchema, GridaXSupabase } from "@/types";
 import {
   Select,
   SelectContent,
@@ -42,7 +42,7 @@ export function SupabaseStorageSettings({
   };
 }) {
   const [state] = useEditorState();
-  const [buckets, setBuckets] = useState<GridaSupabase.SupabaseBucket[]>();
+  const [buckets, setBuckets] = useState<GridaXSupabase.SupabaseBucket[]>();
   const [bucket, setBucket] = useState<string | undefined>(value?.bucket);
   const [path, setPath] = useState<string | undefined>(value?.path);
   const [mode, setMode] = useState<FormFieldStorageSchema["mode"]>(

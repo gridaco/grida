@@ -20,7 +20,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
-import { GridaSupabase } from "@/types";
+import { GridaXSupabase } from "@/types";
 
 const CommandInput = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive.Input>,
@@ -225,11 +225,11 @@ function XSupabaseAuthUsersTableProperties({
           </>
         }
       >
-        {Object.keys(GridaSupabase.SupabaseUserJsonSchema.properties).map(
+        {Object.keys(GridaXSupabase.SupabaseUserJsonSchema.properties).map(
           (key) => {
             const property =
-              GridaSupabase.SupabaseUserJsonSchema.properties[
-                key as keyof typeof GridaSupabase.SupabaseUserJsonSchema.properties
+              GridaXSupabase.SupabaseUserJsonSchema.properties[
+                key as keyof typeof GridaXSupabase.SupabaseUserJsonSchema.properties
               ];
 
             const keywords = ["auth", "users"].filter(Boolean) as string[];

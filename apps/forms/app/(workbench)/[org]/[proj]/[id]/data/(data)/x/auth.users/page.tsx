@@ -12,7 +12,7 @@ import {
 } from "@/scaffolds/grid-editor/components";
 import * as GridLayout from "@/scaffolds/grid-editor/components/layout";
 import { ReferenceTableGrid } from "@/scaffolds/grid/reference-grid";
-import { GridaSupabase } from "@/types";
+import { GridaXSupabase } from "@/types";
 import { EditorApiResponse } from "@/types/private/api";
 import { priority_sorter } from "@/utils/sort";
 import { useEffect, useMemo } from "react";
@@ -69,12 +69,12 @@ export default function XTablePage() {
   }, [dispatch, isLoading, isValidating]);
 
   const sort_by_priorities = priority_sorter(
-    GridaSupabase.unknown_table_column_priorities
+    GridaXSupabase.unknown_table_column_priorities
   );
 
   const columns = useMemo(
     () =>
-      Object.keys(GridaSupabase.SupabaseUserJsonSchema.properties)
+      Object.keys(GridaXSupabase.SupabaseUserJsonSchema.properties)
         .sort(sort_by_priorities)
         .map((key) => {
           return {
