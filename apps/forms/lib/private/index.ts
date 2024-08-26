@@ -2,6 +2,8 @@ import type { GridaXSupabase } from "@/types";
 import {
   CreateNewSchemaTableRequest,
   CreateNewSchemaTableResponse,
+  CreateNewSchemaTableWithXSBTableConnectionRequest,
+  CreateNewSchemaTableWithXSBTableConnectionResponse,
   CreateSignedUploadUrlRequest,
   EditorApiResponse,
   EditorApiResponseOk,
@@ -165,6 +167,17 @@ export namespace PrivateEditorApi {
     export function createTable(req: CreateNewSchemaTableRequest) {
       return Axios.post<EditorApiResponse<CreateNewSchemaTableResponse>>(
         `/private/editor/schema/${req.schema_id}/tables/new`,
+        req
+      );
+    }
+
+    export function createTableWithXSBTable(
+      req: CreateNewSchemaTableWithXSBTableConnectionRequest
+    ) {
+      return Axios.post<
+        EditorApiResponse<CreateNewSchemaTableWithXSBTableConnectionResponse>
+      >(
+        `/private/editor/schema/${req.schema_id}/tables/new/with-x-sb-table`,
         req
       );
     }

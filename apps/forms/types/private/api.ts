@@ -1,5 +1,6 @@
 import type {
   FormFieldDefinition,
+  FormInputType,
   FormMethod,
   FormResponseUnknownFieldHandlingStrategyType,
   IFormField,
@@ -123,6 +124,27 @@ export type CreateNewSchemaTableResponse = {
   description?: string | null;
   attributes: FormFieldDefinition[];
 };
+
+export interface CreateNewSchemaTableWithXSBTableConnectionRequest {
+  schema_id: string;
+  sb_schema_name: string;
+  sb_table_name: string;
+  connect_attributes_as: {
+    [key: string]: {
+      type: FormInputType;
+    };
+  };
+}
+
+export interface CreateNewSchemaTableWithXSBTableConnectionResponse {
+  table: {
+    id: string;
+    name: string;
+    description?: string | null;
+    attributes: FormFieldDefinition[];
+  };
+  connection: {};
+}
 
 export namespace XSupabasePrivateApiTypes {
   export interface CreateConnectionTableRequestData {

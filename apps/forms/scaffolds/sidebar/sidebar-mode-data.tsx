@@ -1,7 +1,12 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { PlusIcon } from "@radix-ui/react-icons";
+import {
+  DotsHorizontalIcon,
+  Pencil1Icon,
+  PlusIcon,
+  TrashIcon,
+} from "@radix-ui/react-icons";
 import { useEditorState } from "../editor";
 import { SupabaseLogo } from "@/components/logos";
 import {
@@ -21,6 +26,7 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
@@ -198,6 +204,29 @@ export function ModeData() {
           );
         },
         renderSectionHeader: Header,
+        renderItemActions: (item) => {
+          // TODO:
+          return (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <SidebarMenuItemAction>
+                  <DotsHorizontalIcon />
+                </SidebarMenuItemAction>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="right" align="end">
+                <DropdownMenuItem>
+                  <Pencil1Icon className="me-2" />
+                  Rename Table
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>
+                  <TrashIcon className="me-2" />
+                  Delete Table
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          );
+        },
       })}
       {renderMenuItems(state.sidebar.mode_data.menus)}
     </>
@@ -321,19 +350,49 @@ function CreateNewSchemaTableDialog({
 function ConnectNewSupabaseTableDialog({
   ...props
 }: React.ComponentProps<typeof Dialog>) {
-  const [state] = useEditorState();
+  const [state, dispatch] = useEditorState();
   const { supabase_project } = state;
 
-  const [table, setTable] = useState<string>();
+  const [fulltable, setFullTable] = useState<`${string}.${string}`>();
+
   const tableSchema = useMemo(() => {
-    if (!table) return;
-    const [schema, name] = table.split(".");
+    if (!fulltable) return;
+    const [schema, name] = fulltable.split(".");
     return supabase_project?.sb_schema_definitions?.[schema]?.[name];
-  }, [supabase_project?.sb_schema_definitions, table]);
+  }, [supabase_project?.sb_schema_definitions, fulltable]);
+
+  const onConnectClick = () => {
+    if (!fulltable) return;
+    const [schema, name] = fulltable.split(".");
+
+    const promise = PrivateEditorApi.Schema.createTableWithXSBTable({
+      schema_id: state.document_id, // document_id is schema_id in v0_schema doctype
+      sb_schema_name: schema,
+      sb_table_name: name,
+      connect_attributes_as: {},
+    });
+
+    toast.promise(promise, {
+      loading: "Creating table...",
+      success: "Table created",
+      error: "Failed to create table",
+    });
+
+    promise.then(({ data: { data } }) => {
+      if (!data) return;
+      dispatch({
+        type: "editor/schema/table/add",
+        // TODO:
+        table: data.table,
+      });
+
+      // TODO: needs to handle routing in order to make the menu item to be focused
+    });
+  };
 
   return (
     <Dialog {...props}>
-      <DialogContent className="max-w-4xl">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>
             <SupabaseLogo className="w-5 h-5 me-2 inline-flex" />
@@ -355,7 +414,11 @@ function ConnectNewSupabaseTableDialog({
 
         {/*  */}
         <div className="my-4">
-          <Select value={table} onValueChange={setTable}>
+          <Select
+            value={fulltable}
+            // @ts-expect-error
+            onValueChange={setFullTable}
+          >
             <SelectTrigger>
               <SelectValue placeholder={"Select Table"} />
             </SelectTrigger>
@@ -383,7 +446,7 @@ function ConnectNewSupabaseTableDialog({
             </SelectContent>
           </Select>
 
-          {table && tableSchema && (
+          {fulltable && tableSchema && (
             <>
               <hr />
               <div className="mt-4 border-y">
@@ -400,10 +463,14 @@ function ConnectNewSupabaseTableDialog({
 
                       return (
                         <div key={key} className="flex items-center gap-2 h-14">
-                          <Checkbox defaultChecked />
+                          <div className="min-w-8">
+                            <Checkbox defaultChecked />
+                          </div>
                           <div className="flex-1 grid gap-1 font-mono">
-                            <Label>{key}</Label>
-                            <span className="text-xs text-muted-foreground">
+                            <Label className="overflow-hidden text-ellipsis">
+                              {key}
+                            </Label>
+                            <span className="overflow-hidden text-ellipsis text-xs text-muted-foreground">
                               {property.format}
                             </span>
                           </div>
@@ -431,7 +498,9 @@ function ConnectNewSupabaseTableDialog({
           <DialogClose asChild>
             <Button variant="ghost">Cancel</Button>
           </DialogClose>
-          <Button>Connect</Button>
+          <Button disabled={!fulltable} onClick={onConnectClick}>
+            Connect
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -53,6 +53,8 @@ export async function GET(req: NextRequest, context: Context) {
 }
 */
 
+// FIXME: this will fail since we don't craete connection_supabase on project connection.
+// @see https://github.com/gridaco/grida/pull/179
 export async function PUT(req: NextRequest, context: Context) {
   const form_id = context.params.form_id;
   const cookieStore = cookies();

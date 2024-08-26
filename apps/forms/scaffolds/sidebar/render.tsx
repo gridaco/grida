@@ -3,6 +3,7 @@
 import React, { useMemo } from "react";
 import {
   SidebarMenuItem,
+  SidebarMenuItemActions,
   SidebarMenuLink,
   SidebarMenuList,
   SidebarSection,
@@ -21,10 +22,16 @@ export function renderMenuItems(
     renderFallback?: () => React.ReactNode;
     renderSectionHeader?: (props: { section: string }) => React.ReactNode;
     renderEmptyState?: () => React.ReactNode;
+    renderItemActions?: (item: MenuItem<any>) => React.ReactNode;
   }
 ) {
-  const { onSelect, renderSectionHeader, renderEmptyState, renderFallback } =
-    props ?? {};
+  const {
+    onSelect,
+    renderSectionHeader,
+    renderEmptyState,
+    renderFallback,
+    renderItemActions,
+  } = props ?? {};
   const sections: Map<string, Array<MenuItem<any>>> = useMemo(
     () => Map.groupBy(items, (item: MenuItem<any>) => item.section),
     [items]
@@ -69,6 +76,11 @@ export function renderMenuItems(
                       className="w-4 h-4 me-2 inline"
                     />
                     {item.label}
+                    {renderItemActions && (
+                      <SidebarMenuItemActions>
+                        {renderItemActions(item)}
+                      </SidebarMenuItemActions>
+                    )}
                   </SidebarMenuItem>
                 </SidebarMenuLink>
               ))}

@@ -2,7 +2,11 @@ import {
   createRouteHandlerClient,
   createRouteHandlerXSBClient,
 } from "@/lib/supabase/server";
-import { FormInputType, GridaXSupabase } from "@/types";
+import { GridaXSupabase } from "@/types";
+import {
+  CreateNewSchemaTableWithXSBTableConnectionRequest,
+  CreateNewSchemaTableWithXSBTableConnectionResponse,
+} from "@/types/private/api";
 import assert from "assert";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
@@ -13,16 +17,6 @@ type Context = {
     schema_id: string;
   };
 };
-
-interface CreateNewSchemaTableWithXSBTableConnectionRequest {
-  sb_schema_name: string;
-  sb_table_name: string;
-  connect_attributes_as: {
-    [key: string]: {
-      type: FormInputType;
-    };
-  };
-}
 
 export async function POST(req: NextRequest, context: Context) {
   const cookieStore = cookies();
@@ -81,9 +75,51 @@ export async function POST(req: NextRequest, context: Context) {
 
   // #region create
 
-  // 1. create new table
-  // 2. seed attributes
-  // 3. connect x-sb main table
+  // 1. prep x-sb main table
+  // 2. create new table
+  // 3. seed attributes
+  // 4. create connection
+
+  // #region prep x-sb main table
+  // upsert the grida_x_supabase.supabase_table
+  const { data: upserted_supabase_table, error: x_sb_table_err } =
+    await grida_x_sb_client
+      .from("supabase_table")
+      .upsert(
+        {
+          supabase_project_id: xsb_project_ref.id,
+          sb_table_name: data.sb_table_name,
+          sb_schema_name: data.sb_schema_name,
+          sb_table_schema: tableschema,
+        },
+        {
+          onConflict: "supabase_project_id, sb_table_name, sb_schema_name",
+        }
+      )
+      .select()
+      .single();
+
+  if (x_sb_table_err) {
+    console.error(x_sb_table_err);
+    return NextResponse.error();
+  }
+
+  // check if connection already exists for other table
+  const { data: conn_ref, error: conn_ref_error } = await supabase
+    .from("connection_supabase")
+    .select()
+    .eq("main_supabase_table_id", upserted_supabase_table.id)
+    .eq("supabase_project_id", xsb_project_ref.id)
+    .single();
+
+  if (conn_ref_error) {
+    console.error(conn_ref_error);
+    return NextResponse.error();
+  }
+
+  assert(!conn_ref, "connection already exists for other table");
+
+  // #endregion prep x-sb main table
 
   // TODO: shall be renamed to "table"
   const { data: new_table_ref, error: new_table_ref_err } = await supabase
@@ -119,8 +155,28 @@ export async function POST(req: NextRequest, context: Context) {
     }))
   );
 
-  // connect x-sb main table
-  // TODO:
+  // create connection
+
+  const { data: conn, error: conn_err } = await supabase
+    .from("connection_supabase")
+    .upsert(
+      {
+        // TODO: shall be renamed to "table_id"
+        form_id: new_table_ref.id,
+        main_supabase_table_id: upserted_supabase_table.id,
+        supabase_project_id: xsb_project_ref.id,
+      },
+      {
+        onConflict: "form_id",
+      }
+    )
+    .select()
+    .single();
+
+  if (conn_err) {
+    console.error("ERR: while creating connection (IGNORED)", conn_err);
+    // ignore. before we migrate the entire transaction via rpc, at this point, if it fails, we let it.
+  }
 
   // get final
   const { data: new_table_detail, error: new_table_detail_err } = await supabase
@@ -136,8 +192,14 @@ export async function POST(req: NextRequest, context: Context) {
 
   return NextResponse.json({
     data: {
-      // TODO:
-      ...new_table_detail,
-    },
+      table: {
+        id: new_table_detail.id,
+        // TODO: shall be renamed to "name"
+        name: new_table_detail.title,
+        description: new_table_detail.description,
+        attributes: new_table_detail.attributes,
+      },
+      connection: conn as any,
+    } satisfies CreateNewSchemaTableWithXSBTableConnectionResponse,
   });
 }
