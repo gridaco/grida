@@ -979,13 +979,11 @@ export function reducer(
         }
       });
     }
-    case "editor/x-supabase/main-table/feed": {
-      const { data } = <FeedXSupabaseMainTableRowsAction>action;
+    case "editor/table/space/feed/x-supabase": {
+      const { data, table_id } = <FeedXSupabaseMainTableRowsAction>action;
 
       return produce(state, (draft) => {
-        draft.tablespace[
-          EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID
-        ].stream = data;
+        draft.tablespace[table_id].stream = data;
         return;
       });
       //

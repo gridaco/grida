@@ -21,11 +21,12 @@ import { XSupabaseQuery } from "@/lib/supabase-postgrest/builder";
 import equal from "deep-equal";
 import { PrivateEditorApi } from "@/lib/private";
 import { EditorSymbols } from "./symbols";
-import type {
-  GDocFormsXSBTable,
-  GDocSchemaTableProviderGrida,
-  TablespaceSchemaTableStreamType,
-  TVirtualRow,
+import {
+  GDocSchemaTableProviderXSupabase,
+  type GDocFormsXSBTable,
+  type GDocSchemaTableProviderGrida,
+  type TablespaceSchemaTableStreamType,
+  type TVirtualRow,
 } from "./state";
 import assert from "assert";
 
@@ -667,7 +668,9 @@ export function FormXSupabaseMainTableFeedProvider({
       sb_table_id: state.connections.supabase?.main_supabase_table_id,
       onFeed: (rows) => {
         dispatch({
-          type: "editor/x-supabase/main-table/feed",
+          type: "editor/table/space/feed/x-supabase",
+          table_id:
+            EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID,
           data: rows,
         });
       },
@@ -796,6 +799,30 @@ export function GridaSchemaTableFeedProvider({
   });
 
   return <>{children}</>;
+}
+
+export function GridaSchemaXSBTableFeedProvider({
+  table_id,
+  sb_table_id,
+}: {
+  table_id: string;
+  sb_table_id: number;
+}) {
+  const [state, dispatch] = useEditorState();
+
+  useXSBTableFeed({
+    table_id: table_id,
+    sb_table_id: sb_table_id,
+    onFeed: (rows) => {
+      dispatch({
+        type: "editor/table/space/feed/x-supabase",
+        table_id: table_id,
+        data: rows,
+      });
+    },
+  });
+
+  return <></>;
 }
 
 function rowdiff(

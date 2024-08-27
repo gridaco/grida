@@ -15,6 +15,7 @@ import type {
 import type {
   EditorFlatFormBlock,
   EditorState,
+  GDocTableID,
   TableXSBMainTableConnection,
 } from "./state";
 import type { Tokens } from "@/ast";
@@ -326,7 +327,8 @@ export interface DataGridCellChangeAction {
 }
 
 export interface FeedXSupabaseMainTableRowsAction {
-  type: "editor/x-supabase/main-table/feed";
+  type: "editor/table/space/feed/x-supabase";
+  table_id: GDocTableID;
   data: GridaXSupabase.XDataRow[];
 }
 
