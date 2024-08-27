@@ -1164,6 +1164,7 @@ export function reducer(
           draft.sidebar.mode_data.tables =
             draft.sidebar.mode_data.tables.filter((t) => t.id !== table_id);
           delete draft.tablespace[table_id];
+          draft.datagrid_table_id = null;
         }
       });
     }

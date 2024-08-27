@@ -640,11 +640,13 @@ export function XSupabaseMainTableFeedProvider({
 }
 
 export function SchemaTableSyncProvider({
+  table_id,
   children,
-}: React.PropsWithChildren<{}>) {
+}: React.PropsWithChildren<{
+  table_id: string;
+}>) {
   const [state] = useEditorState();
   const { tablespace } = state;
-  const table_id = useDatabaseTableId();
   const stream = tablespace[table_id].stream;
   const prev = usePrevious(stream);
 
@@ -654,18 +656,15 @@ export function SchemaTableSyncProvider({
 }
 
 export function SchemaTableFeedProvider({
+  table_id,
   children,
-}: React.PropsWithChildren<{}>) {
+}: React.PropsWithChildren<{
+  table_id: string;
+}>) {
   const [state, dispatch] = useEditorState();
 
-  const {
-    datagrid_table_id,
-    datagrid_rows_per_page,
-    datagrid_table_refresh_key,
-    tablespace,
-  } = state;
-
-  const table_id = useDatabaseTableId();
+  const { datagrid_rows_per_page, datagrid_table_refresh_key, tablespace } =
+    state;
 
   const { realtime: _realtime_responses_enabled } = tablespace[table_id];
 
@@ -701,7 +700,6 @@ export function SchemaTableFeedProvider({
     setLoading,
     table_id,
     datagrid_rows_per_page,
-    datagrid_table_id,
     datagrid_table_refresh_key,
   ]);
 

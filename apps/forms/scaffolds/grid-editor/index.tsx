@@ -98,6 +98,7 @@ export function GridEditor({
 
   const onDeleteField = useCallback(
     (field_id: string) => {
+      if (!table_id) return;
       const deleting = supabase
         .from("form_field")
         .delete({

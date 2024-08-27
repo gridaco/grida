@@ -163,6 +163,7 @@ function FormFieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
 
   const onSaveField = useCallback(
     (init: FieldSave) => {
+      if (!table_id) return;
       const data: FormFieldUpsert = {
         ...init,
         //
@@ -219,6 +220,8 @@ function FormFieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
   );
 
   const is_existing_field = !!field?.id;
+
+  if (!table_id) return <></>;
 
   return (
     <>
@@ -310,6 +313,8 @@ function RowEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
   //   state.x_supabase_main_table?.gfpk,
   //   state.row_editor.id,
   // ]);
+
+  if (!table_id) return <></>;
 
   return (
     <>

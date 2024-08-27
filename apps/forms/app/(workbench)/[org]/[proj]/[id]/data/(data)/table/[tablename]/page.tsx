@@ -8,7 +8,7 @@ import {
   SchemaTableSyncProvider,
 } from "@/scaffolds/editor/feed";
 import { GDocSchemaTable, GDocTable } from "@/scaffolds/editor/state";
-import { useDatagridTable } from "@/scaffolds/editor/use";
+import { useDatabaseTableId, useDatagridTable } from "@/scaffolds/editor/use";
 import { CurrentTable } from "@/scaffolds/editor/utils/switch-table";
 import { GridEditor } from "@/scaffolds/grid-editor";
 import { GridData } from "@/scaffolds/grid-editor/grid-data";
@@ -47,10 +47,20 @@ export default function SchemaTablePage({
 
   return (
     <CurrentTable table={tb.id}>
-      <SchemaTableFeedProvider />
-      <SchemaTableSyncProvider />
-      <SchemaTableGridEditor />
+      <CurrentTableReady />
     </CurrentTable>
+  );
+}
+
+function CurrentTableReady() {
+  const table_id = useDatabaseTableId();
+
+  return (
+    <>
+      {table_id && <SchemaTableFeedProvider table_id={table_id} />}
+      {table_id && <SchemaTableSyncProvider table_id={table_id} />}
+      <SchemaTableGridEditor />
+    </>
   );
 }
 

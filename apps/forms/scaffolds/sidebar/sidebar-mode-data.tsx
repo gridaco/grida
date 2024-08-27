@@ -82,6 +82,8 @@ export function ModeData() {
     match: string;
   }>();
 
+  const router = useRouter();
+
   function AddActionDropdownMenu() {
     return (
       <DropdownMenu>
@@ -217,6 +219,14 @@ export function ModeData() {
               table_id: id,
             });
 
+            // redirect to data home (otherwise app might crash)
+            router.replace(
+              editorlink("data", {
+                basepath: state.basepath,
+                document_id: state.document_id,
+              })
+            );
+
             return true;
           } catch (e) {
             toast.error("Failed to delete table");
@@ -238,12 +248,12 @@ export function ModeData() {
         renderEmptyState: () => <EmptyState />,
         renderFallback: () => {
           return (
-            <>
+            <SidebarSection>
               <Header />
               <SidebarMenuList>
                 <EmptyState />
               </SidebarMenuList>
-            </>
+            </SidebarSection>
           );
         },
         renderSectionHeader: Header,
@@ -386,7 +396,7 @@ function CreateNewSchemaTableDialog({
         </div>
         <DialogFooter>
           <DialogClose asChild>
-            <Button value="ghost">Cancel</Button>
+            <Button variant="outline">Cancel</Button>
           </DialogClose>
           <Button disabled={isSubmitting} onClick={onSaveClick}>
             Save
