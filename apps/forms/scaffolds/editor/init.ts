@@ -518,7 +518,7 @@ function xsbmtinit(conn?: GridaXSupabase.XSupabaseMainTableConnectionState) {
     sb_table_id: conn.main_supabase_table.id,
     sb_schema_name: conn.main_supabase_table.sb_schema_name as string,
     sb_table_name: conn.main_supabase_table.sb_table_name as string,
-    schema: conn.main_supabase_table.sb_table_schema,
+    sb_table_schema: conn.main_supabase_table.sb_table_schema,
     pks: parsed?.pks || [],
     pk: (parsed?.pks?.length || 0) > 0 ? parsed?.pks[0] : undefined,
   } satisfies TableXSBMainTableConnection;

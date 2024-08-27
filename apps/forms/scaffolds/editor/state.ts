@@ -170,7 +170,7 @@ export type TableXSBMainTableConnection = {
   // we need a single pk for editor operations - this may not always be available since pg table can have no pk
   pk: string | undefined;
   pks: string[];
-  schema: GridaXSupabase.JSONSChema;
+  sb_table_schema: GridaXSupabase.JSONSChema;
 };
 
 export interface MenuItem<ID> {

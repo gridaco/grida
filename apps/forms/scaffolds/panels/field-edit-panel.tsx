@@ -147,11 +147,11 @@ const default_field_init: {
 };
 
 export type FieldSave = Omit<FormFieldUpsert, "form_id"> & {
-  table_id: string;
+  db_table_id: string;
 };
 
 export function FieldEditPanel({
-  table_id,
+  db_table_id,
   title,
   onSave,
   formResetKey = 0,
@@ -160,7 +160,7 @@ export function FieldEditPanel({
   mode = "edit",
   ...props
 }: React.ComponentProps<typeof SidePanel> & {
-  table_id: string;
+  db_table_id: string;
   title?: string;
   formResetKey?: number;
   init?: Partial<FormFieldInit>;
@@ -323,7 +323,7 @@ export function FieldEditPanel({
       : undefined;
 
     onSave?.({
-      table_id,
+      db_table_id: db_table_id,
       name,
       label,
       placeholder,

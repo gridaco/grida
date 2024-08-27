@@ -142,7 +142,7 @@ function FormFieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
 
   const attributes = useAttributes();
 
-  const table_id = useDatabaseTableId();
+  const db_table_id = useDatabaseTableId();
 
   const field = useMemo(() => {
     const focusfound = attributes?.find((f) => f.id === state.field_editor.id);
@@ -163,7 +163,7 @@ function FormFieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
 
   const onSaveField = useCallback(
     (init: FieldSave) => {
-      if (!table_id) return;
+      if (!db_table_id) return;
       const data: FormFieldUpsert = {
         ...init,
         //
@@ -171,14 +171,14 @@ function FormFieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
         optgroups: init.optgroups?.length ? init.optgroups : undefined,
         //
         id: state.field_editor.id ?? undefined,
-        form_id: table_id,
+        form_id: db_table_id,
         data: init.data,
       };
 
       process.env.NODE_ENV === "development" &&
         console.log("[EDITOR] saving..", data);
 
-      const promise = fetch(`/private/editor/${table_id}/fields`, {
+      const promise = fetch(`/private/editor/${db_table_id}/fields`, {
         body: JSON.stringify(data),
         method: "POST",
         headers: {
@@ -197,7 +197,7 @@ function FormFieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
             // else save the field
             dispatch({
               type: "editor/table/attribute/change",
-              table_id: table_id,
+              table_id: db_table_id,
               field_id: data.id,
               data: data,
             });
@@ -216,17 +216,17 @@ function FormFieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
         error: "Failed to save field",
       });
     },
-    [closeFieldPanel, table_id, state.field_editor.id, dispatch]
+    [closeFieldPanel, db_table_id, state.field_editor.id, dispatch]
   );
 
   const is_existing_field = !!field?.id;
 
-  if (!table_id) return <></>;
+  if (!db_table_id) return <></>;
 
   return (
     <>
       <FieldEditPanel
-        table_id={table_id}
+        db_table_id={db_table_id}
         key={field?.name || state.field_editor.refreshkey}
         open={state.field_editor.open}
         title={is_existing_field ? "Edit Field" : "New Field"}

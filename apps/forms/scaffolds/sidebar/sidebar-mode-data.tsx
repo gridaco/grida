@@ -467,7 +467,7 @@ function ConnectNewSupabaseTableDialog({
             sb_table_id: data.connection.sb_table_id,
             sb_schema_name: data.connection.sb_schema_name,
             sb_table_name: data.connection.sb_table_name,
-            schema: data.connection.schema,
+            sb_table_schema: data.connection.schema,
             pks: parsed.pks,
             pk: (parsed?.pks?.length || 0) > 0 ? parsed?.pks[0] : undefined,
           },

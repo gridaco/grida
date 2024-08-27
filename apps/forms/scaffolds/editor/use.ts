@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useContext } from "react";
-import type { EditorState, GDocTable } from "./state";
+import type { EditorState, GDocTable, GDocTableID } from "./state";
 import { useDispatch, type FlatDispatcher } from "./dispatch";
 
 import { Context } from "./provider";
@@ -18,18 +18,26 @@ export const useEditorState = (): [EditorState, FlatDispatcher] => {
   return useMemo(() => [state, dispatch], [state, dispatch]);
 };
 
+export function useTable<T extends GDocTable>(
+  table_id: GDocTableID | null
+): Extract<GDocTable, T> | undefined {
+  const [state] = useEditorState();
+  const { tables } = state;
+  return useMemo(() => {
+    return tables.find((table) => table.id === table_id) as Extract<
+      GDocTable,
+      T
+    >;
+  }, [table_id, tables]);
+}
+
 export function useDatagridTable<T extends GDocTable>():
   | Extract<GDocTable, T>
   | undefined {
   const [state] = useEditorState();
   const { datagrid_table_id, tables } = state;
 
-  return useMemo(() => {
-    return tables.find((table) => table.id === datagrid_table_id) as Extract<
-      GDocTable,
-      T
-    >;
-  }, [datagrid_table_id, tables]);
+  return useTable<T>(datagrid_table_id);
 }
 
 export function useFormFields() {

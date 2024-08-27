@@ -10,7 +10,7 @@ import {
   CommandSeparator,
 } from "@/components/ui/command";
 import { useState } from "react";
-import { useEditorState } from "../editor";
+import { useDatagridTable, useEditorState } from "../editor";
 import { SupabaseLogo } from "@/components/logos";
 import { SYSTEM_GF_CUSTOMER_UUID_KEY } from "@/k/system";
 import { cn } from "@/utils";
@@ -49,6 +49,14 @@ export function NameInput({
   value?: string;
   onValueChange?: (value: string) => void;
 }) {
+  const tb = useDatagridTable();
+
+  const x_sb_main_table_connection = tb
+    ? "x_sb_main_table_connection" in tb
+      ? tb.x_sb_main_table_connection
+      : null
+    : null;
+
   const inputref = React.useRef<React.ElementRef<
     typeof CommandPrimitive.Input
   > | null>(null);
@@ -142,7 +150,7 @@ export function NameInput({
                   <span>{SYSTEM_GF_CUSTOMER_UUID_KEY}</span>
                 </CommandItem>
               </CommandGroup>
-              {state.connections.supabase?.main_supabase_table && (
+              {x_sb_main_table_connection && (
                 <>
                   <CommandSeparator />
                   <CommandGroup
@@ -151,32 +159,24 @@ export function NameInput({
                         <SupabaseLogo className="inline w-4 h-4 me-1 align-middle" />{" "}
                         Supabase{" "}
                         <code className="ms-2 text-xs font-mono text-muted-foreground">
-                          {
-                            state.connections.supabase.main_supabase_table
-                              .sb_schema_name as string
-                          }
-                          .
-                          {
-                            state.connections.supabase.main_supabase_table
-                              .sb_table_name
-                          }
+                          {x_sb_main_table_connection.sb_schema_name as string}.
+                          {x_sb_main_table_connection.sb_table_name}
                         </code>
                       </>
                     }
                   >
                     {Object.keys(
-                      state.connections.supabase?.main_supabase_table
-                        ?.sb_table_schema?.properties ?? {}
+                      x_sb_main_table_connection?.sb_table_schema?.properties ??
+                        {}
                     ).map((key) => {
                       const property =
-                        state.connections.supabase?.main_supabase_table
-                          ?.sb_table_schema?.properties[key];
+                        x_sb_main_table_connection?.sb_table_schema?.properties[
+                          key
+                        ];
 
                       const keywords = [
-                        state.connections.supabase?.main_supabase_table
-                          ?.sb_schema_name as string,
-                        state.connections.supabase?.main_supabase_table
-                          ?.sb_table_name as string,
+                        x_sb_main_table_connection?.sb_schema_name as string,
+                        x_sb_main_table_connection?.sb_table_name as string,
                       ].filter(Boolean) as string[];
 
                       return (
