@@ -7,11 +7,11 @@ import {
   useFormFields,
 } from "@/scaffolds/editor";
 import {
-  ResponseFeedProvider,
-  ResponseSessionFeedProvider,
-  ResponseSyncProvider,
-  FormsXSupabaseMainTableFeedProvider,
-  FormsXSupabaseMainTableSyncProvider,
+  FormResponseFeedProvider,
+  FormResponseSessionFeedProvider,
+  FormResponseSyncProvider,
+  FormXSupabaseMainTableFeedProvider,
+  FormXSupabaseMainTableSyncProvider,
 } from "@/scaffolds/editor/feed";
 import { GDocFormsXSBTable, GDocTableID } from "@/scaffolds/editor/state";
 import { EditorSymbols } from "@/scaffolds/editor/symbols";
@@ -48,17 +48,17 @@ function SwitchGridEditor() {
     case EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID:
       return (
         <>
-          <ResponseFeedProvider />
-          <ResponseSyncProvider />
-          <ResponseSessionFeedProvider />
+          <FormResponseFeedProvider />
+          <FormResponseSyncProvider />
+          <FormResponseSessionFeedProvider />
           <FormResponseGridEditor />
         </>
       );
     case EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID:
       return (
         <>
-          <FormsXSupabaseMainTableFeedProvider />
-          <FormsXSupabaseMainTableSyncProvider />
+          <FormXSupabaseMainTableFeedProvider />
+          <FormXSupabaseMainTableSyncProvider />
           <ModeXSBMainTable />
         </>
       );

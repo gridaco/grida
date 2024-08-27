@@ -325,7 +325,7 @@ function useXSBTableFeed(
   }, [res.data]);
 }
 
-export function ResponseSyncProvider({
+export function FormResponseSyncProvider({
   children,
 }: React.PropsWithChildren<{}>) {
   const [state] = useEditorState();
@@ -339,7 +339,7 @@ export function ResponseSyncProvider({
   return <>{children}</>;
 }
 
-export function ResponseFeedProvider({
+export function FormResponseFeedProvider({
   children,
 }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
@@ -443,7 +443,7 @@ export function ResponseFeedProvider({
   return <>{children}</>;
 }
 
-export function ResponseSessionFeedProvider({
+export function FormResponseSessionFeedProvider({
   children,
   forceEnableRealtime,
 }: React.PropsWithChildren<{
@@ -576,7 +576,7 @@ export function CustomerFeedProvider({
   return <>{children}</>;
 }
 
-export function FormsXSupabaseMainTableSyncProvider({
+export function FormXSupabaseMainTableSyncProvider({
   children,
 }: React.PropsWithChildren<{}>) {
   const [state] = useEditorState();
@@ -655,7 +655,7 @@ export function FormsXSupabaseMainTableSyncProvider({
   return <>{children}</>;
 }
 
-export function FormsXSupabaseMainTableFeedProvider({
+export function FormXSupabaseMainTableFeedProvider({
   children,
 }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
