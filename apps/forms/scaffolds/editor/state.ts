@@ -306,6 +306,13 @@ interface IConnectionsState {
   };
 }
 
+export type TableConnectionSupabase = {
+  schema: GridaXSupabase.JSONSChema;
+  // we need a single pk for editor operations - this may not always be available since pg table can have no pk
+  pk: string | undefined;
+  pks: string[];
+};
+
 interface ITablespaceEditorState {
   tables: Array<GDocTable>;
   /**
@@ -370,13 +377,8 @@ export interface FormEditorState
 
   focus_block_id?: string | null;
 
-  x_supabase_main_table?: {
-    schema: GridaXSupabase.JSONSChema;
-    // we need a single pk for editor operations
-    gfpk: string | undefined;
-    pks: string[];
-    rows: GridaXSupabase.XDataRow[];
-  };
+  x_supabase_main_table?: TableConnectionSupabase;
+  x_supabase_main_table_rows?: GridaXSupabase.XDataRow[];
 }
 
 export type EditorState = FormEditorState;

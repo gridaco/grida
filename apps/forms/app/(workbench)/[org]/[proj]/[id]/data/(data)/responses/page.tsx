@@ -48,6 +48,7 @@ function FormResponseGridEditor() {
     datagrid_filter,
     datagrid_table_id,
     x_supabase_main_table,
+    x_supabase_main_table_rows,
   } = state;
 
   const fields = useFormFields();
@@ -78,7 +79,7 @@ function FormResponseGridEditor() {
       sessions: sessions_stream ?? [],
       data: {
         pks: x_supabase_main_table?.pks ?? [],
-        rows: x_supabase_main_table?.rows ?? [],
+        rows: x_supabase_main_table_rows ?? [],
       },
     });
   }, [
@@ -88,6 +89,7 @@ function FormResponseGridEditor() {
     fields,
     responses_stream,
     x_supabase_main_table,
+    x_supabase_main_table_rows,
     datagrid_filter,
   ]);
 

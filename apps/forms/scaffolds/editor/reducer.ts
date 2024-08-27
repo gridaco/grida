@@ -722,9 +722,9 @@ export function reducer(
             break;
           }
           case EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID: {
-            const pk = state.x_supabase_main_table!.gfpk!;
-            draft.x_supabase_main_table!.rows =
-              draft.x_supabase_main_table!.rows.filter(
+            const pk = state.x_supabase_main_table!.pk!;
+            draft.x_supabase_main_table_rows =
+              draft.x_supabase_main_table_rows!.filter(
                 (row) => !state.datagrid_selected_rows.has(row[pk])
               );
 
@@ -883,12 +883,12 @@ export function reducer(
 
             const field = state.form.fields.find((f) => f.id === column);
             if (!field) return;
-            const pk = state.x_supabase_main_table!.gfpk!;
+            const pk = state.x_supabase_main_table!.pk!;
 
             // handle jsonpaths - partial object update
             if (FlatPostgREST.testPath(field.name)) {
               const { column } = FlatPostgREST.decodePath(field.name);
-              const row = state.x_supabase_main_table!.rows.find(
+              const row = state.x_supabase_main_table_rows!.find(
                 (r) => r[pk] === row_pk
               );
 
@@ -900,8 +900,8 @@ export function reducer(
                 value
               ) as GridaXSupabase.XDataRow;
 
-              draft.x_supabase_main_table!.rows =
-                draft.x_supabase_main_table!.rows.map((r) => {
+              draft.x_supabase_main_table_rows =
+                draft.x_supabase_main_table_rows!.map((r) => {
                   if (r[pk] === row_pk) {
                     return newrow;
                   }
@@ -911,8 +911,8 @@ export function reducer(
               return;
             }
 
-            draft.x_supabase_main_table!.rows =
-              draft.x_supabase_main_table!.rows.map((r) => {
+            draft.x_supabase_main_table_rows =
+              draft.x_supabase_main_table_rows!.map((r) => {
                 if (r[pk] === row_pk) {
                   return {
                     ...r,
@@ -965,7 +965,7 @@ export function reducer(
       const { data } = <FeedXSupabaseMainTableRowsAction>action;
 
       return produce(state, (draft) => {
-        draft.x_supabase_main_table!.rows = data;
+        draft.x_supabase_main_table_rows = data;
         return;
       });
       //

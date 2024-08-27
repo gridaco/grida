@@ -303,14 +303,14 @@ function RowEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
   const table_id = useDatabaseTableId();
 
   // const focusxsupabasemaintablerow = useMemo(() => {
-  //   const pk = state.x_supabase_main_table?.gfpk;
+  //   const pk = state.x_supabase_main_table?.pk;
   //   if (!pk) return;
   //   return state.x_supabase_main_table?.rows?.find(
   //     (r) => r[pk] === state.row_editor.id // TODO: - pk
   //   );
   // }, [
   //   state.x_supabase_main_table?.rows,
-  //   state.x_supabase_main_table?.gfpk,
+  //   state.x_supabase_main_table?.pk,
   //   state.row_editor.id,
   // ]);
 

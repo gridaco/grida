@@ -335,7 +335,7 @@ function DeleteSelectedRowsButton() {
   const delete_selected_rows = useDeleteSelectedSchemaTableRows();
 
   const delete_selected_x_supabase_main_table_rows = useCallback(() => {
-    if (!state.x_supabase_main_table?.gfpk) {
+    if (!state.x_supabase_main_table?.pk) {
       toast.error("Cannot delete rows without a primary key");
       return;
     }
@@ -346,7 +346,7 @@ function DeleteSelectedRowsButton() {
       filters: [
         {
           type: "in",
-          column: state.x_supabase_main_table.gfpk,
+          column: state.x_supabase_main_table.pk,
           values: Array.from(datagrid_selected_rows),
         },
       ],
@@ -368,7 +368,7 @@ function DeleteSelectedRowsButton() {
   }, [
     state.form_id,
     state.connections,
-    state.x_supabase_main_table?.gfpk,
+    state.x_supabase_main_table?.pk,
     datagrid_selected_rows,
     dispatch,
   ]);

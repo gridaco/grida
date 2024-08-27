@@ -495,11 +495,11 @@ export function XSupabaseMainTableSyncProvider({
 }: React.PropsWithChildren<{}>) {
   const [state] = useEditorState();
 
-  const { x_supabase_main_table } = state;
+  const { x_supabase_main_table, x_supabase_main_table_rows } = state;
 
-  const pref = usePrevious(x_supabase_main_table?.rows);
+  const pref = usePrevious(x_supabase_main_table_rows);
 
-  const pkname = state.x_supabase_main_table?.gfpk;
+  const pkname = state.x_supabase_main_table?.pk;
 
   const update = useCallback(
     (key: number | string, value: Record<string, any>) => {
@@ -543,11 +543,11 @@ export function XSupabaseMainTableSyncProvider({
   );
 
   useEffect(() => {
-    if (!x_supabase_main_table?.rows) return;
+    if (!x_supabase_main_table_rows) return;
     if (!pref) return;
     if (!pkname) return;
 
-    const rows = x_supabase_main_table.rows;
+    const rows = x_supabase_main_table_rows;
 
     // check if rows are updated
     for (const row of rows) {
@@ -561,7 +561,7 @@ export function XSupabaseMainTableSyncProvider({
         }
       }
     }
-  }, [pkname, pref, update, x_supabase_main_table]);
+  }, [pkname, pref, update, x_supabase_main_table_rows]);
 
   return <>{children}</>;
 }

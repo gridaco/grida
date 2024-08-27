@@ -14,6 +14,7 @@ import type {
   TVirtualRow,
   TGlobalDataStreamState,
   SchemaDocumentTableInit,
+  TableConnectionSupabase,
 } from "./state";
 import { blockstreeflat } from "@/lib/forms/tree";
 import { SYM_LOCALTZ, EditorSymbols } from "./symbols";
@@ -397,6 +398,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
     x_supabase_main_table: init.connections?.supabase
       ? xsbmtinit(init.connections.supabase)
       : undefined,
+    x_supabase_main_table_rows: [],
   };
 }
 
@@ -483,9 +485,8 @@ function xsbmtinit(conn?: GridaXSupabase.XSupabaseMainTableConnectionState) {
   return {
     schema: conn.main_supabase_table.sb_table_schema,
     pks: parsed?.pks || [],
-    gfpk: (parsed?.pks?.length || 0) > 0 ? parsed?.pks[0] : undefined,
-    rows: [],
-  };
+    pk: (parsed?.pks?.length || 0) > 0 ? parsed?.pks[0] : undefined,
+  } satisfies TableConnectionSupabase;
 }
 
 function tablehref(
