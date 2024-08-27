@@ -123,21 +123,35 @@ export type GDocTable = GDocTableBase &
     | {
         id: typeof EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID;
       }
-    | {
-        id: typeof EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID;
-      }
+    | GDocFormsXSBTable
     | {
         id: typeof EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID;
       }
     | GDocSchemaTable
   );
 
+export type GDocFormsXSBTable = {
+  id: typeof EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID;
+  x_sb_main_table_connection: TableXSBMainTableConnection;
+} & GDocTableBase;
+
 export type GDocSchemaTable = {
   id: string;
   attributes: Array<AttributeDefinition>;
+  x_sb_main_table_connection?: TableXSBMainTableConnection;
 } & GDocTableBase;
 
 export type GDocTableID = GDocTable["id"];
+
+/**
+ * this connection indicates the grida table is connected to a x-supabase table
+ */
+export type TableXSBMainTableConnection = {
+  // we need a single pk for editor operations - this may not always be available since pg table can have no pk
+  pk: string | undefined;
+  pks: string[];
+  schema: GridaXSupabase.JSONSChema;
+};
 
 export interface MenuItem<ID> {
   section: string;
@@ -306,13 +320,6 @@ interface IConnectionsState {
   };
 }
 
-export type TableConnectionSupabase = {
-  schema: GridaXSupabase.JSONSChema;
-  // we need a single pk for editor operations - this may not always be available since pg table can have no pk
-  pk: string | undefined;
-  pks: string[];
-};
-
 interface ITablespaceEditorState {
   tables: Array<GDocTable>;
   /**
@@ -329,7 +336,8 @@ interface ITablespaceEditorState {
       .SYM_GRIDA_FORMS_SESSION_TABLE_ID]: TGlobalDataStreamState<FormResponseSession>;
     [EditorSymbols.Table
       .SYM_GRIDA_CUSTOMER_TABLE_ID]: TGlobalDataStreamState<Customer>;
-    [EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID]: never;
+    [EditorSymbols.Table
+      .SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID]: TGlobalDataStreamState<GridaXSupabase.XDataRow>;
     [EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID]: never;
   } & Record<
     string,
@@ -376,9 +384,6 @@ export interface FormEditorState
   };
 
   focus_block_id?: string | null;
-
-  x_supabase_main_table?: TableConnectionSupabase;
-  x_supabase_main_table_rows?: GridaXSupabase.XDataRow[];
 }
 
 export type EditorState = FormEditorState;

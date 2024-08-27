@@ -2,6 +2,7 @@ import { produce, type Draft } from "immer";
 import type {
   EditorFlatFormBlock,
   EditorState,
+  GDocFormsXSBTable,
   GDocTable,
   GDocTableID,
   TGlobalDataStreamState,
@@ -707,7 +708,7 @@ export function reducer(
     case "editor/data-grid/delete/selected": {
       const {} = <DataGridDeleteSelectedRows>action;
       return produce(state, (draft) => {
-        switch (state.datagrid_table_id) {
+        switch (draft.datagrid_table_id) {
           case EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID: {
             const ids = Array.from(state.datagrid_selected_rows);
 
@@ -722,11 +723,21 @@ export function reducer(
             break;
           }
           case EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID: {
-            const pk = state.x_supabase_main_table!.pk!;
-            draft.x_supabase_main_table_rows =
-              draft.x_supabase_main_table_rows!.filter(
-                (row) => !state.datagrid_selected_rows.has(row[pk])
-              );
+            const tb = get_table<GDocFormsXSBTable>(
+              draft,
+              EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID
+            );
+            if (!tb) return;
+
+            const pk = tb.x_sb_main_table_connection.pk!;
+            const space =
+              draft.tablespace[
+                EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID
+              ];
+
+            space.stream = space.stream?.filter(
+              (row) => !state.datagrid_selected_rows.has(row[pk])
+            );
 
             break;
           }
@@ -849,7 +860,7 @@ export function reducer(
     }
     case "editor/data-grid/cell/change": {
       return produce(state, (draft) => {
-        switch (state.datagrid_table_id) {
+        switch (draft.datagrid_table_id) {
           case EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID: {
             const {
               row: row_id,
@@ -883,14 +894,23 @@ export function reducer(
 
             const field = state.form.fields.find((f) => f.id === column);
             if (!field) return;
-            const pk = state.x_supabase_main_table!.pk!;
+            const tb = get_table<GDocFormsXSBTable>(
+              draft,
+              EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID
+            );
+            if (!tb) return;
+
+            const space =
+              draft.tablespace[
+                EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID
+              ];
+
+            const pk = tb.x_sb_main_table_connection.pk!;
 
             // handle jsonpaths - partial object update
             if (FlatPostgREST.testPath(field.name)) {
               const { column } = FlatPostgREST.decodePath(field.name);
-              const row = state.x_supabase_main_table_rows!.find(
-                (r) => r[pk] === row_pk
-              );
+              const row = space.stream!.find((r) => r[pk] === row_pk);
 
               if (!row) return;
 
@@ -900,27 +920,25 @@ export function reducer(
                 value
               ) as GridaXSupabase.XDataRow;
 
-              draft.x_supabase_main_table_rows =
-                draft.x_supabase_main_table_rows!.map((r) => {
-                  if (r[pk] === row_pk) {
-                    return newrow;
-                  }
-                  return r;
-                });
+              space.stream = space.stream!.map((r) => {
+                if (r[pk] === row_pk) {
+                  return newrow;
+                }
+                return r;
+              });
 
               return;
             }
 
-            draft.x_supabase_main_table_rows =
-              draft.x_supabase_main_table_rows!.map((r) => {
-                if (r[pk] === row_pk) {
-                  return {
-                    ...r,
-                    [field!.name]: value,
-                  };
-                }
-                return r;
-              });
+            space.stream = space.stream!.map((r) => {
+              if (r[pk] === row_pk) {
+                return {
+                  ...r,
+                  [field!.name]: value,
+                };
+              }
+              return r;
+            });
 
             break;
           }
@@ -965,7 +983,9 @@ export function reducer(
       const { data } = <FeedXSupabaseMainTableRowsAction>action;
 
       return produce(state, (draft) => {
-        draft.x_supabase_main_table_rows = data;
+        draft.tablespace[
+          EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID
+        ].stream = data;
         return;
       });
       //
@@ -1136,8 +1156,9 @@ export function reducer(
           row_keyword: "row",
           icon: "table",
           attributes: table.attributes,
+          x_sb_main_table_connection: undefined,
         };
-        draft.tables.push(tb);
+        draft.tables.push(tb as Draft<GDocTable>);
         draft.sidebar.mode_data.tables.push(
           table_to_sidebar_table_menu(tb, {
             basepath: draft.basepath,
@@ -1171,6 +1192,15 @@ export function reducer(
     default:
       return state;
   }
+}
+
+function get_table<T extends GDocTable>(
+  draft: Draft<EditorState>,
+  table_id: GDocTableID
+): Draft<Extract<GDocTable, T>> | undefined {
+  return draft.tables.find((t) => t.id === table_id) as Draft<
+    Extract<GDocTable, T>
+  >;
 }
 
 function get_tablespace_feed(

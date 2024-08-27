@@ -16,7 +16,11 @@ export function CurrentTable({
 
   const tableid =
     table === EditorSymbols.Table.SYM_GRIDA_FORMS_WHATEVER_MAIN_TABLE_INDICATOR
-      ? state.x_supabase_main_table
+      ? state.tables.find(
+          (t) =>
+            t.id ===
+            EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID
+        )
         ? EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID
         : EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID
       : table;

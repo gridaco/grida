@@ -1,7 +1,11 @@
 "use client";
 
 import Invalid from "@/components/invalid";
-import { useEditorState, useFormFields } from "@/scaffolds/editor";
+import {
+  useDatagridTable,
+  useEditorState,
+  useFormFields,
+} from "@/scaffolds/editor";
 import {
   ResponseFeedProvider,
   ResponseSessionFeedProvider,
@@ -9,7 +13,7 @@ import {
   XSupabaseMainTableFeedProvider,
   XSupabaseMainTableSyncProvider,
 } from "@/scaffolds/editor/feed";
-import { GDocTableID } from "@/scaffolds/editor/state";
+import { GDocFormsXSBTable, GDocTableID } from "@/scaffolds/editor/state";
 import { EditorSymbols } from "@/scaffolds/editor/symbols";
 import { CurrentTable } from "@/scaffolds/editor/utils/switch-table";
 import { GridEditor } from "@/scaffolds/grid-editor";
@@ -32,24 +36,30 @@ export default function FormResponsesPage() {
       <ResponseFeedProvider />
       <ResponseSyncProvider />
       <ResponseSessionFeedProvider />
-      <XSupabaseMainTableFeedProvider />
-      <XSupabaseMainTableSyncProvider />
       {/* wait until state fully change */}
-      {allowedtable(datagrid_table_id) && <FormResponseGridEditor />}
+      {allowedtable(datagrid_table_id) && <SwitchGridEditor />}
     </CurrentTable>
   );
 }
 
+function SwitchGridEditor() {
+  const [state] = useEditorState();
+  const { datagrid_table_id } = state;
+
+  switch (datagrid_table_id) {
+    case EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID:
+    case EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID:
+      return <FormResponseGridEditor />;
+    case EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID:
+      return <ModeXSBMainTable />;
+    default:
+      return <Invalid />;
+  }
+}
+
 function FormResponseGridEditor() {
   const [state, dispatch] = useEditorState();
-  const {
-    form_id,
-    tablespace,
-    datagrid_filter,
-    datagrid_table_id,
-    x_supabase_main_table,
-    x_supabase_main_table_rows,
-  } = state;
+  const { form_id, tablespace, datagrid_filter, datagrid_table_id } = state;
 
   const fields = useFormFields();
 
@@ -77,10 +87,6 @@ function FormResponseGridEditor() {
       filter: datagrid_filter,
       responses: responses_stream ?? [],
       sessions: sessions_stream ?? [],
-      data: {
-        pks: x_supabase_main_table?.pks ?? [],
-        rows: x_supabase_main_table_rows ?? [],
-      },
     });
   }, [
     form_id,
@@ -88,8 +94,6 @@ function FormResponseGridEditor() {
     sessions_stream,
     fields,
     responses_stream,
-    x_supabase_main_table,
-    x_supabase_main_table_rows,
     datagrid_filter,
   ]);
 
@@ -99,6 +103,60 @@ function FormResponseGridEditor() {
       columns={columns}
       rows={filtered as GFResponseRow[]}
     />
+  );
+}
+
+function ModeXSBMainTable() {
+  const [state, dispatch] = useEditorState();
+
+  const { form_id, tablespace, datagrid_filter, datagrid_table_id } = state;
+
+  const tb = useDatagridTable<GDocFormsXSBTable>();
+
+  const fields = useFormFields();
+
+  const stream =
+    tablespace[EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID]
+      .stream;
+
+  const { systemcolumns, columns } = useMemo(
+    () =>
+      datagrid_table_id
+        ? GridData.columns(
+            EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID,
+            fields
+          )
+        : { systemcolumns: [], columns: [] },
+    [datagrid_table_id, fields]
+  );
+
+  const { filtered } = useMemo(() => {
+    return GridData.rows({
+      form_id: form_id,
+      table: EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID,
+      fields: fields,
+      filter: datagrid_filter,
+      data: {
+        pks: tb?.x_sb_main_table_connection.pks ?? [],
+        rows: stream ?? [],
+      },
+    });
+  }, [form_id, fields, tb, stream, datagrid_filter]);
+
+  if (!tb) {
+    return <Invalid />;
+  }
+
+  return (
+    <>
+      <XSupabaseMainTableFeedProvider />
+      <XSupabaseMainTableSyncProvider />
+      <GridEditor
+        systemcolumns={systemcolumns}
+        columns={columns}
+        rows={filtered as GFResponseRow[]}
+      />
+    </>
   );
 }
 

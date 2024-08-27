@@ -1,7 +1,12 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo } from "react";
-import { useDatabaseTableId, useEditorState, useFormFields } from "./use";
+import {
+  useDatabaseTableId,
+  useDatagridTable,
+  useEditorState,
+  useFormFields,
+} from "./use";
 import toast from "react-hot-toast";
 import {
   createClientFormsClient,
@@ -16,7 +21,7 @@ import { XSupabaseQuery } from "@/lib/supabase-postgrest/builder";
 import equal from "deep-equal";
 import { PrivateEditorApi } from "@/lib/private";
 import { EditorSymbols } from "./symbols";
-import type { TVirtualRow } from "./state";
+import type { GDocFormsXSBTable, TVirtualRow } from "./state";
 
 type RealtimeTableChangeData = {
   id: string;
@@ -495,11 +500,16 @@ export function XSupabaseMainTableSyncProvider({
 }: React.PropsWithChildren<{}>) {
   const [state] = useEditorState();
 
-  const { x_supabase_main_table, x_supabase_main_table_rows } = state;
+  const tb = useDatagridTable<GDocFormsXSBTable>();
+  const { tablespace } = state;
 
-  const pref = usePrevious(x_supabase_main_table_rows);
+  const stream =
+    tablespace[EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID]
+      .stream;
 
-  const pkname = state.x_supabase_main_table?.pk;
+  const pref = usePrevious(stream);
+
+  const pkname = tb?.x_sb_main_table_connection.pk;
 
   const update = useCallback(
     (key: number | string, value: Record<string, any>) => {
@@ -543,14 +553,12 @@ export function XSupabaseMainTableSyncProvider({
   );
 
   useEffect(() => {
-    if (!x_supabase_main_table_rows) return;
+    if (!stream) return;
     if (!pref) return;
     if (!pkname) return;
 
-    const rows = x_supabase_main_table_rows;
-
     // check if rows are updated
-    for (const row of rows) {
+    for (const row of stream) {
       const prevRow = pref.find((r) => r.id === row.id);
 
       if (prevRow) {
@@ -561,7 +569,7 @@ export function XSupabaseMainTableSyncProvider({
         }
       }
     }
-  }, [pkname, pref, update, x_supabase_main_table_rows]);
+  }, [pkname, pref, update, stream]);
 
   return <>{children}</>;
 }

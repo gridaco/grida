@@ -14,7 +14,7 @@ import type {
   TVirtualRow,
   TGlobalDataStreamState,
   SchemaDocumentTableInit,
-  TableConnectionSupabase,
+  TableXSBMainTableConnection,
 } from "./state";
 import { blockstreeflat } from "@/lib/forms/tree";
 import { SYM_LOCALTZ, EditorSymbols } from "./symbols";
@@ -225,6 +225,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
           label: init.connections.supabase.main_supabase_table.sb_table_name,
           description: null,
           readonly: false,
+          x_sb_main_table_connection: xsbmtinit(init.connections.supabase)!,
         } satisfies GDocTable,
         [EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID]: {
           id: EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID,
@@ -385,9 +386,12 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
         stream: undefined,
         realtime: false,
       },
+      [EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID]: {
+        readonly: true,
+        stream: [],
+        realtime: false,
+      },
       // noop
-      [EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID]:
-        "noop" as never,
       [EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID]:
         "noop" as never,
     },
@@ -395,10 +399,6 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
     datagrid_table_id: is_main_table_supabase
       ? EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID
       : EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID,
-    x_supabase_main_table: init.connections?.supabase
-      ? xsbmtinit(init.connections.supabase)
-      : undefined,
-    x_supabase_main_table_rows: [],
   };
 }
 
@@ -486,7 +486,7 @@ function xsbmtinit(conn?: GridaXSupabase.XSupabaseMainTableConnectionState) {
     schema: conn.main_supabase_table.sb_table_schema,
     pks: parsed?.pks || [],
     pk: (parsed?.pks?.length || 0) > 0 ? parsed?.pks[0] : undefined,
-  } satisfies TableConnectionSupabase;
+  } satisfies TableXSBMainTableConnection;
 }
 
 function tablehref(

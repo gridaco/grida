@@ -329,13 +329,21 @@ function useDeleteSelectedSchemaTableRows() {
 function DeleteSelectedRowsButton() {
   const [state, dispatch] = useEditorState();
 
+  const tb = useDatagridTable();
   const { datagrid_table_id, datagrid_selected_rows } = state;
   const { row_keyword } = useDatagridTable() || { row_keyword: "row" };
 
   const delete_selected_rows = useDeleteSelectedSchemaTableRows();
 
   const delete_selected_x_supabase_main_table_rows = useCallback(() => {
-    if (!state.x_supabase_main_table?.pk) {
+    if (
+      tb?.id !== EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID
+    ) {
+      toast.error("Something went wrong. Please refresh the page.");
+      return;
+    }
+
+    if (!tb.x_sb_main_table_connection.pk) {
       toast.error("Cannot delete rows without a primary key");
       return;
     }
@@ -346,7 +354,7 @@ function DeleteSelectedRowsButton() {
       filters: [
         {
           type: "in",
-          column: state.x_supabase_main_table.pk,
+          column: tb.x_sb_main_table_connection.pk,
           values: Array.from(datagrid_selected_rows),
         },
       ],
@@ -365,13 +373,7 @@ function DeleteSelectedRowsButton() {
       success: "Deleted",
       error: "Failed",
     });
-  }, [
-    state.form_id,
-    state.connections,
-    state.x_supabase_main_table?.pk,
-    datagrid_selected_rows,
-    dispatch,
-  ]);
+  }, [tb, state.form_id, state.connections, datagrid_selected_rows, dispatch]);
 
   const onDeleteSelection = useCallback(() => {
     switch (datagrid_table_id) {
