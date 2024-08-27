@@ -59,7 +59,7 @@ function CurrentTableReady() {
     <>
       {table_id && <SchemaTableFeedProvider table_id={table_id} />}
       {table_id && <SchemaTableSyncProvider table_id={table_id} />}
-      <SchemaTableGridEditor />
+      {table_id && <SchemaTableGridEditor />}
     </>
   );
 }

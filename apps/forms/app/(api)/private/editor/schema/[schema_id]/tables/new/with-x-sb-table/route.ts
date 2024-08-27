@@ -100,24 +100,23 @@ export async function POST(req: NextRequest, context: Context) {
       .single();
 
   if (x_sb_table_err) {
-    console.error(x_sb_table_err);
+    console.error("ERR: while upserting x-sb table", x_sb_table_err);
     return NextResponse.error();
   }
 
   // check if connection already exists for other table
-  const { data: conn_ref, error: conn_ref_error } = await supabase
+  const { count: conn_ref_count, error: conn_ref_error } = await supabase
     .from("connection_supabase")
-    .select()
+    .select("id", { count: "exact" })
     .eq("main_supabase_table_id", upserted_supabase_table.id)
-    .eq("supabase_project_id", xsb_project_ref.id)
-    .single();
+    .eq("supabase_project_id", xsb_project_ref.id);
 
   if (conn_ref_error) {
-    console.error(conn_ref_error);
+    console.error("ERR: while validatting existing connection", conn_ref_error);
     return NextResponse.error();
   }
 
-  assert(!conn_ref, "connection already exists for other table");
+  assert(conn_ref_count === 0, "connection already exists for other table");
 
   // #endregion prep x-sb main table
 
@@ -199,7 +198,12 @@ export async function POST(req: NextRequest, context: Context) {
         description: new_table_detail.description,
         attributes: new_table_detail.attributes,
       },
-      connection: conn as any,
+      connection: {
+        sb_schema_name: data.sb_schema_name,
+        sb_table_name: data.sb_table_name,
+        sb_table_id: conn!.main_supabase_table_id!,
+        schema: tableschema,
+      },
     } satisfies CreateNewSchemaTableWithXSBTableConnectionResponse,
   });
 }
