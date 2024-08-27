@@ -27,6 +27,11 @@ export async function POST(req: NextRequest, context: Context) {
   const data: CreateNewSchemaTableWithXSBTableConnectionRequest =
     await req.json();
 
+  console.log("CREATE NEW TABLE WITH XSB TABLE CONNECTION", {
+    schema_id,
+    data: data,
+  });
+
   const { data: schema_ref, error: schema_ref_err } = await supabase
     .from("schema_document")
     .select()
@@ -149,13 +154,19 @@ export async function POST(req: NextRequest, context: Context) {
     })
   );
 
-  await supabase.from("form_field").insert(
+  const { error: fields_init_err } = await supabase.from("form_field").insert(
     fields_init.map((field) => ({
       form_id: new_table_ref.id,
-      type: field.type,
+      type: field.type ?? "text",
       name: field.name,
     }))
   );
+
+  if (fields_init_err) {
+    console.error("ERR: while seeding attributes [IGNORED]", fields_init_err, {
+      fields_init,
+    });
+  }
 
   // create connection
 

@@ -29,7 +29,10 @@ export async function DELETE(req: NextRequest, context: Context) {
     .single();
 
   if (ref_err) {
-    console.error("ERR: while fetching schema table", ref_err);
+    console.error("ERR: while fetching schema table", ref_err, {
+      schema_id,
+      table_id,
+    });
     return notFound();
   }
 
@@ -44,7 +47,10 @@ export async function DELETE(req: NextRequest, context: Context) {
     .eq("id", table_id)
     .eq("schema_id", schema_id);
 
-  assert(count === 1, "Failed to delete table - count is not 1");
+  assert(
+    count === 1,
+    `Failed to delete table - count is not 1. count: ${count} id: ${table_id}`
+  );
   if (error) {
     // although on delete operation, supabase won't throw any errors.
     console.error("ERR: while deleting schema table", error);

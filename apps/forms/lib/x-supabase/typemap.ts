@@ -51,7 +51,10 @@ export namespace GridaXSupabaseTypeMap {
     switch (format) {
       case "jsonb":
       case "json":
-        return undefined;
+        return {
+          default: "json",
+          suggested: ["json"],
+        };
       case "character varying":
         return postgrest_property_type_map.string;
       case "timestamp with time zone":

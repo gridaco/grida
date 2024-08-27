@@ -33,6 +33,7 @@ export const fieldlabels: Record<FormInputType, string> = {
   signature: "Signature",
   range: "Range",
   search: "Search for Reference",
+  json: "JSON",
 };
 
 export const supported_field_types: FormInputType[] = [
@@ -72,6 +73,7 @@ if (process.env.NODE_ENV === "development") {
     "signature",
     "payment",
     "toggle",
+    "json",
   ] as const;
   supported_field_types.push(...dev);
 }
