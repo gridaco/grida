@@ -69,6 +69,7 @@ import type {
   FormEndingPreferencesAction,
   EditorThemeAppearanceAction,
   SchemaTableAddAction,
+  SchemaTableDeleteAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { blockstreeflat } from "@/lib/forms/tree";
@@ -1152,6 +1153,18 @@ export function reducer(
 
         // TODO: setting the id won't change the route. need to update the route. (where?)
         draft.datagrid_table_id = table.id;
+      });
+    }
+    case "editor/schema/table/delete": {
+      const { table_id } = <SchemaTableDeleteAction>action;
+      return produce(state, (draft) => {
+        const table = draft.tables.find((t) => t.id === table_id);
+        if (table) {
+          draft.tables = draft.tables.filter((t) => t.id !== table_id);
+          draft.sidebar.mode_data.tables =
+            draft.sidebar.mode_data.tables.filter((t) => t.id !== table_id);
+          delete draft.tablespace[table_id];
+        }
       });
     }
     default:

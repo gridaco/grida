@@ -77,7 +77,8 @@ export type BlocksEditorAction =
   | DocumentNodeUpdateStyleAction
   | DocumentNodeUpdateAttributeAction
   | DocumentNodeUpdatePropertyAction
-  | SchemaTableAddAction;
+  | SchemaTableAddAction
+  | SchemaTableDeleteAction;
 
 export type GlobalSavingAction = {
   type: "saving";
@@ -435,4 +436,9 @@ export interface SchemaTableAddAction {
     description?: string | null;
     attributes: FormFieldDefinition[];
   };
+}
+
+export interface SchemaTableDeleteAction {
+  type: "editor/schema/table/delete";
+  table_id: string;
 }

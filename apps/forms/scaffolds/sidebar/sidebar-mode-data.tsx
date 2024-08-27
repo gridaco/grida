@@ -65,14 +65,22 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TypeSelect } from "@/components/formfield-type-select";
 import { GridaXSupabaseTypeMap } from "@/lib/x-supabase/typemap";
+import {
+  DeleteConfirmationAlertDialog,
+  DeleteConfirmationSnippet,
+} from "@/components/delete-confirmation-dialog";
 
 export function ModeData() {
-  const [state] = useEditorState();
+  const [state, dispatch] = useEditorState();
 
   const { document_id, basepath, tables } = state;
 
   const newTableDialog = useDialogState<CreateNewTableDialogInit>();
   const newXSBTableDialog = useDialogState();
+  const deleteTableDialog = useDialogState<{
+    id: string;
+    match: string;
+  }>();
 
   function AddActionDropdownMenu() {
     return (
@@ -183,6 +191,41 @@ export function ModeData() {
 
   return (
     <>
+      <DeleteConfirmationAlertDialog
+        title="Delete Table"
+        description={
+          <>
+            This action cannot be undone. All records will be deleted. Type{" "}
+            <DeleteConfirmationSnippet>
+              {deleteTableDialog.data?.match}
+            </DeleteConfirmationSnippet>{" "}
+            to delete this table
+          </>
+        }
+        placeholder={deleteTableDialog.data?.match}
+        match={deleteTableDialog.data?.match}
+        onDelete={async ({ id }, user_confirmation_txt) => {
+          try {
+            await PrivateEditorApi.Schema.deleteTable({
+              schema_id: state.document_id,
+              table_id: id,
+              user_confirmation_txt: user_confirmation_txt,
+            });
+
+            dispatch({
+              type: "editor/schema/table/delete",
+              table_id: id,
+            });
+
+            return true;
+          } catch (e) {
+            toast.error("Failed to delete table");
+            return false;
+          }
+        }}
+        {...deleteTableDialog}
+        key={deleteTableDialog.key}
+      />
       <ConnectNewSupabaseTableDialog
         {...newXSBTableDialog}
         key={newXSBTableDialog.key}
@@ -214,12 +257,20 @@ export function ModeData() {
                 </SidebarMenuItemAction>
               </DropdownMenuTrigger>
               <DropdownMenuContent side="right" align="end">
-                <DropdownMenuItem>
+                <DropdownMenuItem disabled>
                   <Pencil1Icon className="me-2" />
                   Rename Table
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => {
+                    deleteTableDialog.openDialog({
+                      id: item.id,
+                      // TODO: use safe value - name.
+                      match: `DELETE ${item.label}`,
+                    });
+                  }}
+                >
                   <TrashIcon className="me-2" />
                   Delete Table
                 </DropdownMenuItem>

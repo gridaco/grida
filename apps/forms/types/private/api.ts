@@ -146,6 +146,12 @@ export interface CreateNewSchemaTableWithXSBTableConnectionResponse {
   connection: {};
 }
 
+export type DeleteSchemaTableRequest = {
+  schema_id: string;
+  table_id: string;
+  user_confirmation_txt: string;
+};
+
 export namespace XSupabasePrivateApiTypes {
   export interface CreateConnectionTableRequestData {
     schema_name: string;

@@ -5,6 +5,7 @@ import {
   CreateNewSchemaTableWithXSBTableConnectionRequest,
   CreateNewSchemaTableWithXSBTableConnectionResponse,
   CreateSignedUploadUrlRequest,
+  DeleteSchemaTableRequest,
   EditorApiResponse,
   EditorApiResponseOk,
   SignedUploadUrlData,
@@ -179,6 +180,17 @@ export namespace PrivateEditorApi {
       >(
         `/private/editor/schema/${req.schema_id}/tables/new/with-x-sb-table`,
         req
+      );
+    }
+
+    export function deleteTable(req: DeleteSchemaTableRequest) {
+      return Axios.delete<EditorApiResponse<CreateNewSchemaTableResponse>>(
+        `/private/editor/schema/${req.schema_id}/tables/${req.table_id}`,
+        {
+          data: {
+            user_confirmation_txt: req.user_confirmation_txt,
+          },
+        }
       );
     }
   }
