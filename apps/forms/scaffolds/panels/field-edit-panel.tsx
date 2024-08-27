@@ -62,7 +62,7 @@ import { NameInput } from "./name-input";
 import { LockClosedIcon, ReloadIcon } from "@radix-ui/react-icons";
 import { Badge } from "@/components/ui/badge";
 import { DummyFormAgentStateProvider } from "@/lib/formstate";
-import { SupabaseReferencesSettings } from "./extensions/field-x-sb-reference-fk-settings";
+import { SupabaseFKReferenceSettings } from "./extensions/field-x-sb-reference-fk-settings";
 import { SupabaseStorageSettings } from "./extensions/field-x-sb-storage-settings";
 import { XSupabaseFieldConnectionPolicyCheck } from "@/lib/x-supabase/check";
 import { FieldValueExpression } from "./extensions/field-value-expression";
@@ -936,7 +936,7 @@ export function FieldEditPanel({
           {FieldSupports.fk(type) && state.connections.supabase && !!name && (
             <>
               <hr />
-              <SupabaseReferencesSettings
+              <SupabaseFKReferenceSettings
                 format={
                   state.connections.supabase.main_supabase_table
                     ?.sb_table_schema?.properties?.[name]?.format

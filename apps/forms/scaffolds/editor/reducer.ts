@@ -5,7 +5,7 @@ import type {
   GDocFormsXSBTable,
   GDocTable,
   GDocTableID,
-  ITablespace,
+  TTablespace,
   TVirtualRow,
   TVirtualRowData,
 } from "./state";
@@ -1147,17 +1147,30 @@ export function reducer(
     case "editor/schema/table/add": {
       const { table } = <SchemaTableAddAction>action;
       return produce(state, (draft) => {
-        const tb: GDocTable = {
-          id: table.id,
-          name: table.name,
-          label: table.name,
-          description: table.description || null,
-          readonly: false,
-          row_keyword: "row",
-          icon: "table",
-          attributes: table.attributes,
-          x_sb_main_table_connection: table.x_sb_main_table_connection,
-        };
+        const tb: GDocTable = table.x_sb_main_table_connection
+          ? {
+              provider: "x-supabase",
+              id: table.id,
+              name: table.name,
+              label: table.name,
+              description: table.description || null,
+              readonly: false,
+              row_keyword: "row",
+              icon: "table",
+              attributes: table.attributes,
+              x_sb_main_table_connection: table.x_sb_main_table_connection,
+            }
+          : {
+              provider: "grida",
+              id: table.id,
+              name: table.name,
+              label: table.name,
+              description: table.description || null,
+              readonly: false,
+              row_keyword: "row",
+              icon: "table",
+              attributes: table.attributes,
+            };
         draft.tables.push(tb as Draft<GDocTable>);
         draft.sidebar.mode_data.tables.push(
           table_to_sidebar_table_menu(tb, {
@@ -1166,11 +1179,21 @@ export function reducer(
           })
         );
 
-        draft.tablespace[tb.id] = {
-          readonly: false,
-          stream: [],
-          realtime: true,
-        };
+        if (table.x_sb_main_table_connection) {
+          draft.tablespace[tb.id] = {
+            provider: "x-supabase",
+            readonly: false,
+            stream: [],
+            realtime: false,
+          };
+        } else {
+          draft.tablespace[tb.id] = {
+            provider: "grida",
+            readonly: false,
+            stream: [],
+            realtime: true,
+          };
+        }
 
         // TODO: setting the id won't change the route. need to update the route. (where?)
         draft.datagrid_table_id = table.id;
@@ -1205,7 +1228,7 @@ function get_table<T extends GDocTable>(
 
 function get_tablespace_feed(
   draft: Draft<EditorState>
-): Draft<ITablespace<TVirtualRow>> | null {
+): Draft<TTablespace> | null {
   switch (draft.doctype) {
     case "v0_form":
       return draft.tablespace[
@@ -1213,7 +1236,7 @@ function get_tablespace_feed(
       ];
     case "v0_schema":
       if (typeof draft.datagrid_table_id === "string")
-        return draft.tablespace[draft.datagrid_table_id];
+        return draft.tablespace[draft.datagrid_table_id] as TTablespace;
     default:
       return null;
   }

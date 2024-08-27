@@ -10,8 +10,8 @@ import {
   ResponseFeedProvider,
   ResponseSessionFeedProvider,
   ResponseSyncProvider,
-  XSupabaseMainTableFeedProvider,
-  XSupabaseMainTableSyncProvider,
+  FormsXSupabaseMainTableFeedProvider,
+  FormsXSupabaseMainTableSyncProvider,
 } from "@/scaffolds/editor/feed";
 import { GDocFormsXSBTable, GDocTableID } from "@/scaffolds/editor/state";
 import { EditorSymbols } from "@/scaffolds/editor/symbols";
@@ -33,9 +33,6 @@ export default function FormResponsesPage() {
     <CurrentTable
       table={EditorSymbols.Table.SYM_GRIDA_FORMS_WHATEVER_MAIN_TABLE_INDICATOR}
     >
-      <ResponseFeedProvider />
-      <ResponseSyncProvider />
-      <ResponseSessionFeedProvider />
       {/* wait until state fully change */}
       {allowedtable(datagrid_table_id) && <SwitchGridEditor />}
     </CurrentTable>
@@ -49,9 +46,22 @@ function SwitchGridEditor() {
   switch (datagrid_table_id) {
     case EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID:
     case EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID:
-      return <FormResponseGridEditor />;
+      return (
+        <>
+          <ResponseFeedProvider />
+          <ResponseSyncProvider />
+          <ResponseSessionFeedProvider />
+          <FormResponseGridEditor />
+        </>
+      );
     case EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID:
-      return <ModeXSBMainTable />;
+      return (
+        <>
+          <FormsXSupabaseMainTableFeedProvider />
+          <FormsXSupabaseMainTableSyncProvider />
+          <ModeXSBMainTable />
+        </>
+      );
     default:
       return <Invalid />;
   }
@@ -98,11 +108,13 @@ function FormResponseGridEditor() {
   ]);
 
   return (
-    <GridEditor
-      systemcolumns={systemcolumns}
-      columns={columns}
-      rows={filtered as GFResponseRow[]}
-    />
+    <>
+      <GridEditor
+        systemcolumns={systemcolumns}
+        columns={columns}
+        rows={filtered as GFResponseRow[]}
+      />
+    </>
   );
 }
 
@@ -149,8 +161,6 @@ function ModeXSBMainTable() {
 
   return (
     <>
-      <XSupabaseMainTableFeedProvider />
-      <XSupabaseMainTableSyncProvider />
       <GridEditor
         systemcolumns={systemcolumns}
         columns={columns}

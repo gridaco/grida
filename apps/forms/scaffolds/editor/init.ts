@@ -11,11 +11,8 @@ import type {
   IDataGridState,
   GDocTableID,
   GDocTable,
-  TVirtualRow,
-  ITablespace,
-  SchemaDocumentTableInit,
+  TTablespace,
   TableXSBMainTableConnection,
-  GDocSchemaTable,
 } from "./state";
 import { blockstreeflat } from "@/lib/forms/tree";
 import { SYM_LOCALTZ, EditorSymbols } from "./symbols";
@@ -152,25 +149,46 @@ function initialDatabaseEditorState(
     },
     ...initialDatagridState(),
     datagrid_table_id: init.tables.length > 0 ? init.tables[0].id : null,
-    tables: init.tables.map((t) => ({
-      id: t.id,
-      row_keyword: "row",
-      label: t.name,
-      name: t.name,
-      description: t.description,
-      icon: "table",
-      readonly: false,
-      attributes: t.attributes,
-    })),
+    tables: init.tables.map((t) => {
+      if (t.x_sb_main_table_connection) {
+        return {
+          provider: "x-supabase",
+          id: t.id,
+          row_keyword: "row",
+          label: t.name,
+          name: t.name,
+          description: t.description,
+          icon: "table",
+          readonly: false,
+          attributes: t.attributes,
+          x_sb_main_table_connection: t.x_sb_main_table_connection,
+        };
+      } else {
+        return {
+          provider: "grida",
+          id: t.id,
+          row_keyword: "row",
+          label: t.name,
+          name: t.name,
+          description: t.description,
+          icon: "table",
+          readonly: false,
+          attributes: t.attributes,
+        };
+      }
+    }),
 
     // @ts-expect-error
     tablespace: init.tables.reduce(
-      (acc: Record<GDocTableID, ITablespace<TVirtualRow>>, t) => {
+      (acc: Record<GDocTableID, TTablespace>, t) => {
+        // @ts-expect-error
         acc[t.id] = {
+          // @ts-expect-error
+          provider: t.x_sb_main_table_connection ? "supabase" : "grida",
           readonly: false,
           realtime: true,
           stream: [],
-        } satisfies ITablespace<TVirtualRow>;
+        } satisfies TTablespace;
         return acc;
       },
       {}
@@ -224,6 +242,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
     ? {
         [EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID]: {
           id: EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID,
+          provider: "x-supabase",
           row_keyword: "row",
           icon: "supabase",
           name: init.connections.supabase.main_supabase_table.sb_table_name,
@@ -233,6 +252,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
           x_sb_main_table_connection: xsbmtinit(init.connections.supabase)!,
         } satisfies GDocTable,
         [EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID]: {
+          provider: "x-supabase",
           id: EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID,
           row_keyword: "user",
           icon: "supabase",
@@ -245,6 +265,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
     : {
         [EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID]: {
           id: EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID,
+          provider: "grida",
           row_keyword: "response",
           icon: "table",
           name: "response",
@@ -254,6 +275,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
         } satisfies GDocTable,
         [EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID]: {
           id: EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID,
+          provider: "custom",
           row_keyword: "session",
           icon: "table",
           name: "session",
@@ -263,6 +285,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
         } satisfies GDocTable,
         [EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID]: {
           id: EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID,
+          provider: "custom",
           row_keyword: "customer",
           icon: "user",
           name: "customer",
@@ -377,21 +400,25 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
     },
     tablespace: {
       [EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID]: {
+        provider: "grida",
         readonly: false,
         realtime: true,
         stream: [],
       },
       [EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID]: {
+        provider: "custom",
         readonly: true,
         stream: undefined,
         realtime: false,
       },
       [EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID]: {
+        provider: "custom",
         readonly: true,
         stream: undefined,
         realtime: false,
       },
       [EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID]: {
+        provider: "x-supabase",
         readonly: true,
         stream: [],
         realtime: false,

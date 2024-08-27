@@ -21,7 +21,13 @@ import { XSupabaseQuery } from "@/lib/supabase-postgrest/builder";
 import equal from "deep-equal";
 import { PrivateEditorApi } from "@/lib/private";
 import { EditorSymbols } from "./symbols";
-import type { GDocFormsXSBTable, TVirtualRow } from "./state";
+import type {
+  GDocFormsXSBTable,
+  GDocSchemaTableProviderGrida,
+  TablespaceSchemaTableStreamType,
+  TVirtualRow,
+} from "./state";
+import assert from "assert";
 
 type RealtimeTableChangeData = {
   id: string;
@@ -242,6 +248,81 @@ function useSyncCellChangesEffect(
       });
     });
   }, [prev, current, sync]);
+}
+
+function useXSBTableFeed(
+  {
+    table_id,
+    sb_table_id,
+    onFeed,
+  }: {
+    table_id: string;
+    sb_table_id?: number | null;
+    onFeed?: (data: GridaXSupabase.XDataRow[]) => void;
+  },
+  dpes?: React.DependencyList
+) {
+  const [state, dispatch] = useEditorState();
+  const enabled = !!sb_table_id;
+
+  const {
+    datagrid_rows_per_page,
+    datagrid_table_refresh_key,
+    datagrid_orderby,
+  } = state;
+
+  const serachParams = useMemo(() => {
+    return PrivateEditorApi.SupabaseQuery.makeQueryParams({
+      limit: datagrid_rows_per_page,
+      order: datagrid_orderby,
+      refreshKey: datagrid_table_refresh_key,
+    });
+  }, [datagrid_rows_per_page, datagrid_orderby, datagrid_table_refresh_key]);
+
+  const request = sb_table_id
+    ? PrivateEditorApi.XSupabase.url_table_x_query(
+        table_id,
+        sb_table_id,
+        serachParams
+      )
+    : null;
+
+  const res = useSWR<EditorApiResponse<GridaXSupabase.XDataRow[], any>>(
+    request,
+    async (url: string) => {
+      const res = await fetch(url);
+      return res.json();
+    },
+    {
+      // disable this since this feed replaces (not updates) the data, which causes the ui to refresh, causing certain ux fails (e.g. dialog on cell)
+      revalidateOnFocus: false,
+    }
+  );
+
+  useEffect(() => {
+    if (!enabled) return;
+    dispatch({
+      type: "editor/data-grid/loading",
+      isloading: res.isLoading || res.isValidating,
+    });
+  }, [dispatch, enabled, res.isLoading, res.isValidating]);
+
+  const stableDeps = useMemo(() => dpes ?? [], [dpes]);
+
+  useEffect(() => {
+    if (!enabled) return;
+    // trigger data refresh
+    dispatch({
+      type: "editor/data-grid/refresh",
+    });
+  }, [dispatch, enabled, ...stableDeps]);
+
+  useEffect(() => {
+    if (res.data?.data) {
+      const rows = res.data.data;
+      onFeed?.(rows);
+    }
+  }, [res.data]);
 }
 
 export function ResponseSyncProvider({
@@ -495,7 +576,7 @@ export function CustomerFeedProvider({
   return <>{children}</>;
 }
 
-export function XSupabaseMainTableSyncProvider({
+export function FormsXSupabaseMainTableSyncProvider({
   children,
 }: React.PropsWithChildren<{}>) {
   const [state] = useEditorState();
@@ -574,80 +655,30 @@ export function XSupabaseMainTableSyncProvider({
   return <>{children}</>;
 }
 
-export function XSupabaseMainTableFeedProvider({
+export function FormsXSupabaseMainTableFeedProvider({
   children,
 }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
-
   const fields = useFormFields();
 
-  const {
-    datagrid_rows_per_page,
-    datagrid_table_refresh_key,
-    datagrid_orderby,
-  } = state;
-
-  const serachParams = useMemo(() => {
-    return PrivateEditorApi.SupabaseQuery.makeQueryParams({
-      limit: datagrid_rows_per_page,
-      order: datagrid_orderby,
-      refreshKey: datagrid_table_refresh_key,
-    });
-  }, [datagrid_rows_per_page, datagrid_orderby, datagrid_table_refresh_key]);
-
-  const enabled = !!state.connections.supabase?.main_supabase_table_id;
-
-  const request = state.connections.supabase?.main_supabase_table_id
-    ? PrivateEditorApi.XSupabase.url_table_x_query(
-        state.form_id,
-        state.connections.supabase.main_supabase_table_id,
-        serachParams
-      )
-    : null;
-
-  const res = useSWR<EditorApiResponse<GridaXSupabase.XDataRow[], any>>(
-    request,
-    async (url: string) => {
-      const res = await fetch(url);
-      return res.json();
-    },
+  useXSBTableFeed(
     {
-      // disable this since this feed replaces (not updates) the data, which causes the ui to refresh, causing certain ux fails (e.g. dialog on cell)
-      revalidateOnFocus: false,
-    }
+      table_id: state.form_id,
+      sb_table_id: state.connections.supabase?.main_supabase_table_id,
+      onFeed: (rows) => {
+        dispatch({
+          type: "editor/x-supabase/main-table/feed",
+          data: rows,
+        });
+      },
+    },
+    [fields]
   );
-
-  useEffect(() => {
-    if (!enabled) return;
-    dispatch({
-      type: "editor/data-grid/loading",
-      isloading: res.isLoading || res.isValidating,
-    });
-  }, [dispatch, enabled, res.isLoading, res.isValidating]);
-
-  useEffect(() => {
-    if (!enabled) return;
-    // trigger data refresh
-    dispatch({
-      type: "editor/data-grid/refresh",
-    });
-  }, [dispatch, enabled, fields]);
-
-  useEffect(() => {
-    if (res.data?.data) {
-      const rows = res.data.data;
-
-      dispatch({
-        type: "editor/x-supabase/main-table/feed",
-        data: rows,
-      });
-    }
-  }, [dispatch, res.data, state.form_id]);
 
   return <>{children}</>;
 }
 
-export function SchemaTableSyncProvider({
+export function GridaSchemaTableSyncProvider({
   table_id,
   children,
 }: React.PropsWithChildren<{
@@ -655,15 +686,24 @@ export function SchemaTableSyncProvider({
 }>) {
   const [state] = useEditorState();
   const { tablespace } = state;
-  const stream = tablespace[table_id].stream;
+
+  const tb = useDatagridTable();
+
+  assert(tb?.provider === "grida", "Table provider is not grida");
+
+  const stream = tablespace[table_id].stream as unknown as Array<
+    TablespaceSchemaTableStreamType<GDocSchemaTableProviderGrida>
+  >;
+
   const prev = usePrevious(stream);
 
+  // FIXME:
   useSyncCellChangesEffect(prev, stream);
 
   return <>{children}</>;
 }
 
-export function SchemaTableFeedProvider({
+export function GridaSchemaTableFeedProvider({
   table_id,
   children,
 }: React.PropsWithChildren<{

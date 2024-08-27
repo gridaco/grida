@@ -17,7 +17,11 @@ import type {
 } from "../grid/types";
 import type {
   DataGridFilterSettings,
+  GDocSchemaTable,
+  GDocSchemaTableProviderGrida,
+  GDocSchemaTableProviderXSupabase,
   GDocTableID,
+  TablespaceSchemaTableStreamType,
   TVirtualRow,
 } from "../editor/state";
 import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";
@@ -63,13 +67,29 @@ export namespace GridData {
           rows: any[];
         };
       }
-    | {
-        filter: DataGridFilterSettings;
-        table: "v0_schema_table";
-        table_id: string;
-        attributes: FormFieldDefinition[];
-        rows: Array<TVirtualRow<FormResponseField, FormResponse>>;
-      };
+    | (
+        | {
+            filter: DataGridFilterSettings;
+            table: "v0_schema_table";
+            provider: "grida";
+            table_id: string;
+            attributes: FormFieldDefinition[];
+            rows: Array<
+              TablespaceSchemaTableStreamType<GDocSchemaTableProviderGrida>
+            >;
+          }
+        | {
+            filter: DataGridFilterSettings;
+            table: "v0_schema_table";
+            provider: "x-supabase";
+            table_id: string;
+            attributes: FormFieldDefinition[];
+            pks: string[];
+            rows: Array<
+              TablespaceSchemaTableStreamType<GDocSchemaTableProviderXSupabase>
+            >;
+          }
+      );
 
   export function columns(
     table: GDocTableID,
@@ -236,19 +256,41 @@ export namespace GridData {
       }
       case "v0_schema_table": {
         //
-        const filtered = GridFilter.filter(
-          input.rows,
-          input.filter,
-          (row) => row.meta.raw,
-          // response raw is saved with name: value
-          input.attributes.map((f) => f.name)
-        );
+        switch (input.provider) {
+          case "grida": {
+            const filtered = GridFilter.filter(
+              input.rows,
+              input.filter,
+              (row) => row.meta.raw,
+              // response raw is saved with name: value
+              input.attributes.map((f) => f.name)
+            );
 
-        return {
-          type: "response",
-          inputlength: input.rows.length || 0,
-          filtered: rows_from_responses(filtered, input.attributes),
-        };
+            return {
+              type: "response",
+              inputlength: input.rows.length || 0,
+              filtered: rows_from_responses(filtered, input.attributes),
+            };
+          }
+          case "x-supabase": {
+            return {
+              type: "response",
+              inputlength: input.rows.length,
+              filtered: rows_from_x_supabase_main_table({
+                form_id: input.table_id,
+                // TODO: support multiple PKs
+                pk: input.pks.length > 0 ? input.pks[0] : null,
+                fields: input.attributes,
+                rows: GridFilter.filter(
+                  input.rows,
+                  input.filter,
+                  undefined,
+                  input.attributes.map((f) => f.name)
+                ),
+              }),
+            };
+          }
+        }
       }
     }
   }

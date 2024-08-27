@@ -130,7 +130,7 @@ function ConnectSupabase() {
   >(undefined);
 
   const {
-    connections: { supabase: existing_connection },
+    supabase_project: existing_connection,
     form_id,
     doctype,
     project: { id: project_id },
@@ -162,9 +162,7 @@ function ConnectSupabase() {
       return;
     }
 
-    PrivateEditorApi.XSupabase.getXSBProject(
-      existing_connection.supabase_project_id
-    )
+    PrivateEditorApi.XSupabase.getXSBProject(existing_connection.id)
       .then((res) => {
         const data = res.data.data;
         ondata(data);

@@ -116,31 +116,47 @@ type GDocTableBase = {
 export type GDocTable = GDocTableBase &
   (
     | {
+        provider: "grida";
         id: typeof EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID;
       }
     | {
+        provider: "custom";
         id: typeof EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID;
       }
     | {
+        provider: "custom";
         id: typeof EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID;
       }
     | GDocFormsXSBTable
     | {
+        provider: "x-supabase";
         id: typeof EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID;
       }
     | GDocSchemaTable
   );
 
 export type GDocFormsXSBTable = {
+  provider: "x-supabase";
   id: typeof EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID;
   x_sb_main_table_connection: TableXSBMainTableConnection;
 } & GDocTableBase;
 
-export type GDocSchemaTable = {
+export type GDocSchemaTableProviderGrida = {
+  provider: "grida";
   id: string;
   attributes: Array<AttributeDefinition>;
-  x_sb_main_table_connection?: TableXSBMainTableConnection;
 } & GDocTableBase;
+
+export type GDocSchemaTableProviderXSupabase = {
+  provider: "x-supabase";
+  id: string;
+  attributes: Array<AttributeDefinition>;
+  x_sb_main_table_connection: TableXSBMainTableConnection;
+} & GDocTableBase;
+
+export type GDocSchemaTable =
+  | GDocSchemaTableProviderGrida
+  | GDocSchemaTableProviderXSupabase;
 
 export type GDocTableID = GDocTable["id"];
 
@@ -205,11 +221,43 @@ export type TVirtualRow<T = Record<string, any>, M = Record<string, any>> = {
 /**
  * Utility state for global data stream state.
  */
-export interface ITablespace<T> {
+export type ITablespace<T> = {
+  provider: TTablespace["provider"];
   readonly: boolean;
   realtime: boolean;
   stream?: Array<T>;
-}
+};
+
+export type TTablespace =
+  | TCustomDataTablespace<any>
+  | TXSupabaseDataTablespace
+  | TGridaDataTablespace;
+
+type TCustomDataTablespace<T> = {
+  provider: "custom";
+  readonly: boolean;
+  realtime: boolean;
+  stream?: Array<T>;
+};
+
+type TXSupabaseDataTablespace = {
+  provider: "x-supabase";
+  readonly: boolean;
+  realtime: false;
+  stream?: Array<GridaXSupabase.XDataRow>;
+};
+
+type TGridaDataTablespace = {
+  provider: "grida";
+  readonly: boolean;
+  realtime: boolean;
+  stream?: Array<TVirtualRow<FormResponseField, FormResponse>>;
+};
+
+export type GridaSchemaTableVirtualRow = TVirtualRow<
+  FormResponseField,
+  FormResponse
+>;
 
 interface IRowEditorState {
   row_editor: TGlobalEditorDialogState;
@@ -330,8 +378,8 @@ interface IConnectionsState {
  * - If the table is a `GDocSchemaTable` and has an `x_sb_main_table_connection`,
  *   the stream type will be `GridaXSupabase.XDataRow`.
  * - If the table is a `GDocSchemaTable` but does not have an `x_sb_main_table_connection`,
- *   the stream type will default to `TVirtualRow<FormResponseField, FormResponse>`.
- * - For any other table type, the stream type will be `TVirtualRow<FormResponseField, FormResponse>`.
+ *   the stream type will default to `GridaSchemaTableVirtualRow`.
+ * - For any other table type, the stream type will be `GridaSchemaTableVirtualRow`.
  *
  * @template T The table type, which extends from `GDocTableBase`.
  *
@@ -343,19 +391,19 @@ interface IConnectionsState {
  * @example
  * // For a GDocSchemaTable without x_sb_main_table_connection:
  * type StreamType = TablespaceSchemaTableStreamType<GDocSchemaTableWithoutConnection>;
- * // StreamType will be TVirtualRow<FormResponseField, FormResponse>
+ * // StreamType will be GridaSchemaTableVirtualRow
  *
  * @example
  * // For a non-schema table (e.g., GDocFormsTable):
  * type StreamType = TablespaceSchemaTableStreamType<GDocFormsTable>;
- * // StreamType will default to TVirtualRow<FormResponseField, FormResponse>
+ * // StreamType will default to GridaSchemaTableVirtualRow
  */
-type TablespaceSchemaTableStreamType<T extends GDocTableBase> =
+export type TablespaceSchemaTableStreamType<T extends GDocTableBase> =
   T extends GDocSchemaTable
-    ? T["x_sb_main_table_connection"] extends TableXSBMainTableConnection
-      ? GridaXSupabase.XDataRow // If x_sb_main_table_connection is defined, use GridaXSupabase.XDataRow
-      : TVirtualRow<FormResponseField, FormResponse> // Otherwise, use TVirtualRow
-    : TVirtualRow<FormResponseField, FormResponse>; // Default for other table types
+    ? T["provider"] extends "x-supabase"
+      ? GridaXSupabase.XDataRow
+      : GridaSchemaTableVirtualRow
+    : GridaSchemaTableVirtualRow;
 
 interface ITablespaceEditorState {
   tables: Array<GDocTable>;
@@ -365,26 +413,20 @@ interface ITablespaceEditorState {
    * `{[table_id]: { stream: [{ id, data: {...}, meta }]} }`
    */
   tablespace: {
-    [EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID]: ITablespace<
-      TVirtualRow<FormResponseField, FormResponse>
-    >;
     [EditorSymbols.Table
-      .SYM_GRIDA_FORMS_SESSION_TABLE_ID]: ITablespace<FormResponseSession>;
-    [EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID]: ITablespace<Customer>;
+      .SYM_GRIDA_FORMS_RESPONSE_TABLE_ID]: TGridaDataTablespace;
     [EditorSymbols.Table
-      .SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID]: ITablespace<GridaXSupabase.XDataRow>;
+      .SYM_GRIDA_FORMS_SESSION_TABLE_ID]: TCustomDataTablespace<FormResponseSession>;
+    [EditorSymbols.Table
+      .SYM_GRIDA_CUSTOMER_TABLE_ID]: TCustomDataTablespace<Customer>;
+    [EditorSymbols.Table
+      .SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID]: TXSupabaseDataTablespace;
     [EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID]: never;
   } & {
     [T in GDocTable as Extract<T["id"], string>]: ITablespace<
       TablespaceSchemaTableStreamType<T>
     >;
   };
-  // & Record<
-  //   string,
-  //   ITablespace<
-  //     TVirtualRow<FormResponseField, FormResponse> | GridaXSupabase.XDataRow
-  //   >
-  // >;
 }
 
 export interface FormEditorState

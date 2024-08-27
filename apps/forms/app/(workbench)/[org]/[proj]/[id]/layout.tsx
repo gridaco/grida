@@ -320,7 +320,9 @@ export default async function Layout({
         .select("*")
         .in(
           "id",
-          data.tables.map((t) => t.supabase_connection?.main_supabase_table_id)
+          data.tables
+            .map((t) => t.supabase_connection?.main_supabase_table_id)
+            .filter((x) => x)
         );
 
       if (xsb_tables_err) {

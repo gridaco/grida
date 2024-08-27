@@ -4,10 +4,16 @@ import EmptyWelcome from "@/components/empty";
 import Invalid from "@/components/invalid";
 import { useEditorState } from "@/scaffolds/editor";
 import {
-  SchemaTableFeedProvider,
-  SchemaTableSyncProvider,
+  GridaSchemaTableFeedProvider,
+  GridaSchemaTableSyncProvider,
 } from "@/scaffolds/editor/feed";
-import { GDocSchemaTable, GDocTable } from "@/scaffolds/editor/state";
+import {
+  GDocSchemaTable,
+  GDocSchemaTableProviderGrida,
+  GDocSchemaTableProviderXSupabase,
+  GDocTable,
+  TablespaceSchemaTableStreamType,
+} from "@/scaffolds/editor/state";
 import { useDatabaseTableId, useDatagridTable } from "@/scaffolds/editor/use";
 import { CurrentTable } from "@/scaffolds/editor/utils/switch-table";
 import { GridEditor } from "@/scaffolds/grid-editor";
@@ -47,28 +53,38 @@ export default function SchemaTablePage({
 
   return (
     <CurrentTable table={tb.id}>
-      <CurrentTableReady />
+      <SwitchGridEditor />
     </CurrentTable>
   );
 }
 
-function CurrentTableReady() {
-  const table_id = useDatabaseTableId();
+function SwitchGridEditor() {
+  const tb = useDatagridTable<GDocSchemaTable>();
 
-  return (
-    <>
-      {table_id && <SchemaTableFeedProvider table_id={table_id} />}
-      {table_id && <SchemaTableSyncProvider table_id={table_id} />}
-      {table_id && <SchemaTableGridEditor />}
-    </>
-  );
+  if (!tb) return <Invalid />;
+  switch (tb.provider) {
+    case "grida":
+      return (
+        <>
+          <GridaSchemaTableFeedProvider table_id={tb.id} />
+          <GridaSchemaTableSyncProvider table_id={tb.id} />
+          <ModeProviderGrida />
+        </>
+      );
+    case "x-supabase":
+      return (
+        <>
+          <ModeProviderXSB />
+        </>
+      );
+  }
 }
 
-function SchemaTableGridEditor() {
+function ModeProviderGrida() {
   const [state] = useEditorState();
   const { tablespace, datagrid_filter } = state;
 
-  const tb = useDatagridTable<GDocSchemaTable>();
+  const tb = useDatagridTable<GDocSchemaTableProviderGrida>();
 
   assert(tb, "table not found");
 
@@ -82,9 +98,49 @@ function SchemaTableGridEditor() {
     return GridData.rows({
       table_id: tb.id,
       table: "v0_schema_table",
+      provider: "grida",
       attributes: tb.attributes,
       filter: datagrid_filter,
-      rows: stream!,
+      rows: (stream as unknown as Array<
+        TablespaceSchemaTableStreamType<GDocSchemaTableProviderGrida>
+      >)!,
+    });
+  }, [stream, tb, datagrid_filter]);
+
+  return (
+    <GridEditor
+      systemcolumns={systemcolumns}
+      columns={columns}
+      rows={filtered as GFResponseRow[]}
+    />
+  );
+}
+
+function ModeProviderXSB() {
+  const [state] = useEditorState();
+  const { tablespace, datagrid_filter } = state;
+
+  const tb = useDatagridTable<GDocSchemaTableProviderXSupabase>();
+
+  assert(tb, "table not found");
+
+  const stream = tablespace[tb.id].stream;
+
+  const { systemcolumns, columns } = useMemo(() => {
+    return GridData.columns(tb.id, tb.attributes);
+  }, [tb]);
+
+  const { filtered, inputlength } = useMemo(() => {
+    return GridData.rows({
+      table_id: tb.id,
+      table: "v0_schema_table",
+      provider: "x-supabase",
+      attributes: tb.attributes,
+      filter: datagrid_filter,
+      pks: tb.x_sb_main_table_connection.pks,
+      rows: (stream as unknown as Array<
+        TablespaceSchemaTableStreamType<GDocSchemaTableProviderXSupabase>
+      >)!,
     });
   }, [stream, tb, datagrid_filter]);
 
