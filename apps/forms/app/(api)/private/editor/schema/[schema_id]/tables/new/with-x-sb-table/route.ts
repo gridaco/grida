@@ -69,7 +69,10 @@ export async function POST(req: NextRequest, context: Context) {
 
   // validate attributes (if exists)
   for (const [key, { type }] of Object.entries(data.connect_attributes_as)) {
-    assert(tableschema[key], `attribute ${key} not found in the table schema`);
+    assert(
+      tableschema.properties[key],
+      `attribute "${key}" not found in the table schema`
+    );
   }
   // #endregion validations
 

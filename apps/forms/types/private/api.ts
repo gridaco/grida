@@ -131,7 +131,7 @@ export interface CreateNewSchemaTableWithXSBTableConnectionRequest {
   sb_table_name: string;
   connect_attributes_as: {
     [key: string]: {
-      type: FormInputType;
+      type?: FormInputType;
     };
   };
 }

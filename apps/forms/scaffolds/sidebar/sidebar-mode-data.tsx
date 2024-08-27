@@ -71,6 +71,7 @@ import {
   DeleteConfirmationSnippet,
 } from "@/components/delete-confirmation-dialog";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
+import { FormInputType } from "@/types";
 
 export function ModeData() {
   const [state, dispatch] = useEditorState();
@@ -83,7 +84,9 @@ export function ModeData() {
       refreshkey: true,
     }
   );
-  const newXSBTableDialog = useDialogState();
+  const newXSBTableDialog = useDialogState("new-xsb-table-dialog", {
+    refreshkey: true,
+  });
   const deleteTableDialog = useDialogState<{
     id: string;
     match: string;
@@ -209,7 +212,9 @@ export function ModeData() {
         title="Delete Table"
         description={
           <>
-            This action cannot be undone. All records will be deleted. Type{" "}
+            This action cannot be undone. All records will be deleted within
+            Grida (If you are using external datasource, the origin data will
+            stay untouched). Type{" "}
             <DeleteConfirmationSnippet>
               {deleteTableDialog.data?.match}
             </DeleteConfirmationSnippet>{" "}
@@ -247,7 +252,10 @@ export function ModeData() {
         }}
         {...deleteTableDialog}
       />
-      <ConnectNewSupabaseTableDialog {...newXSBTableDialog} />
+      <ConnectNewSupabaseTableDialog
+        {...newXSBTableDialog}
+        key={newXSBTableDialog.refreshkey}
+      />
       <CreateNewSchemaTableDialog
         {...newTableDialog}
         key={newTableDialog.refreshkey}
@@ -426,12 +434,49 @@ function ConnectNewSupabaseTableDialog({
   const { supabase_project } = state;
 
   const [fulltable, setFullTable] = useState<`${string}.${string}`>();
+  const [attributes_as, set_attributes_as] = useState<
+    Record<
+      string,
+      {
+        enabled?: boolean;
+        value?: FormInputType;
+        options?: FormInputType[];
+      }
+    >
+  >({});
 
   const tableSchema = useMemo(() => {
     if (!fulltable) return;
     const [schema, name] = fulltable.split(".");
     return supabase_project?.sb_schema_definitions?.[schema]?.[name];
   }, [supabase_project?.sb_schema_definitions, fulltable]);
+
+  useEffect(() => {
+    if (!tableSchema) return;
+    //
+    const result = Object.fromEntries(
+      Object.keys(tableSchema.properties).map((key) => {
+        const property = tableSchema.properties[key];
+        const suggestion = GridaXSupabaseTypeMap.getSuggestion({
+          type: property.type,
+          format: property.format,
+          enum: property.enum,
+          is_array: property.is_array,
+        });
+
+        return [
+          key,
+          {
+            enabled: true,
+            value: suggestion?.default,
+            options: suggestion?.suggested,
+          },
+        ] as const;
+      })
+    );
+
+    set_attributes_as(result);
+  }, [tableSchema]);
 
   const onConnectClick = () => {
     if (!fulltable) return;
@@ -441,8 +486,13 @@ function ConnectNewSupabaseTableDialog({
       schema_id: state.document_id, // document_id is schema_id in v0_schema doctype
       sb_schema_name: schema,
       sb_table_name: name,
-      // TODO:
-      connect_attributes_as: {},
+      connect_attributes_as: Object.fromEntries(
+        Object.entries(attributes_as)
+          .map(([key, value]) => {
+            return [key, { type: value.value }];
+          })
+          .filter(([key]) => key)
+      ),
     });
 
     toast.promise(promise, {
@@ -552,17 +602,25 @@ function ConnectNewSupabaseTableDialog({
                   <div className="divide-y">
                     {Object.keys(tableSchema.properties).map((key) => {
                       const property = tableSchema.properties[key];
-                      const suggestion = GridaXSupabaseTypeMap.getSuggestion({
-                        type: property.type,
-                        format: property.format,
-                        enum: property.enum,
-                        is_array: property.is_array,
-                      });
-
+                      const { enabled, value, options } =
+                        attributes_as[key] ?? {};
                       return (
                         <div key={key} className="flex items-center gap-2 h-14">
                           <div className="min-w-8">
-                            <Checkbox defaultChecked />
+                            <Checkbox
+                              checked={enabled}
+                              onCheckedChange={(checked) => {
+                                set_attributes_as((prev) => {
+                                  return {
+                                    ...prev,
+                                    [key]: {
+                                      ...prev[key],
+                                      enabled: checked === true,
+                                    },
+                                  };
+                                });
+                              }}
+                            />
                           </div>
                           <div className="flex-1 grid gap-1 font-mono">
                             <Label className="overflow-hidden text-ellipsis">
@@ -574,11 +632,21 @@ function ConnectNewSupabaseTableDialog({
                           </div>
                           <div className="w-56">
                             <TypeSelect
-                              value={suggestion?.default}
-                              options={suggestion?.suggested.map((t) => ({
+                              value={value}
+                              options={options?.map((t) => ({
                                 value: t,
                               }))}
-                              onValueChange={() => {}}
+                              onValueChange={(value) => {
+                                set_attributes_as((prev) => {
+                                  return {
+                                    ...prev,
+                                    [key]: {
+                                      ...prev[key],
+                                      value: value,
+                                    },
+                                  };
+                                });
+                              }}
                             />
                           </div>
                         </div>
