@@ -1,45 +1,53 @@
 import type { FormSubmitErrorCode } from "@/types/private/api";
 import * as ERR from "@/k/error";
 
-export function editorlink(
-  page:
-    | "."
-    | "form"
-    | "form/edit"
-    | "settings"
-    // | "settings/general"
-    // | "settings/customize"
-    | "data"
-    | "data/responses"
-    | "data/analytics"
-    | "data/simulator"
-    | "connect"
-    | "connect/share"
-    | "connect/parameters"
-    | "connect/customer"
-    | "connect/channels"
-    | "connect/store"
-    | "connect/store/get-started"
-    | "connect/store/products"
-    | "connect/database/supabase",
+type BaseEditorLinkParamsOptionalSeed =
+  | {
+      org: string;
+      proj: string;
+    }
+  | {
+      basepath: string;
+    };
+
+type BaseEditorLinkParams = {
+  origin?: string;
+  document_id: string;
+} & BaseEditorLinkParamsOptionalSeed;
+
+// Define a type map for each route, associating it with its required parameters
+type EditorPageParamsMap = {
+  ".": {};
+  form: {};
+  "form/edit": {};
+  settings: {};
+  data: {};
+  "data/responses": {};
+  "data/analytics": {};
+  "data/simulator": {};
+  "data/table/[tablename]": { tablename: string }; // Requires tablename in addition to shared params
+  connect: {};
+  "connect/share": {};
+  "connect/parameters": {};
+  "connect/customer": {};
+  "connect/channels": {};
+  "connect/store": {};
+  "connect/store/get-started": {};
+  "connect/store/products": {};
+  "connect/database/supabase": {};
+};
+
+type EditorPageType = keyof EditorPageParamsMap;
+
+export function editorlink<P extends EditorPageType>(
+  page: P,
   {
     origin = "",
     document_id: id,
-    ...path
-  }: {
-    origin?: string;
-    document_id: string;
-  } & (
-    | {
-        org: string;
-        proj: string;
-      }
-    | {
-        basepath: string;
-      }
-  )
+    ...params
+  }: BaseEditorLinkParams & EditorPageParamsMap[P]
 ) {
-  const basepath = editorbasepath(path);
+  const basepath = editorbasepath(params);
   switch (page) {
     case ".":
       return `${origin}/${basepath}/${id}`;
@@ -79,7 +87,12 @@ export function editorlink(
       return `${origin}/${basepath}/${id}/connect/store/products`;
     case "connect/database/supabase":
       return `${origin}/${basepath}/${id}/connect/database/supabase`;
+    case "data/table/[tablename]":
+      const { tablename } = params as unknown as { tablename: string };
+      return `${origin}/${basepath}/${id}/data/table/${tablename}`;
   }
+
+  return "";
 }
 
 export function editorbasepath(
