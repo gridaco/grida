@@ -12,9 +12,10 @@ import type {
   GDocTableID,
   GDocTable,
   TVirtualRow,
-  TGlobalDataStreamState,
+  ITablespace,
   SchemaDocumentTableInit,
   TableXSBMainTableConnection,
+  GDocSchemaTable,
 } from "./state";
 import { blockstreeflat } from "@/lib/forms/tree";
 import { SYM_LOCALTZ, EditorSymbols } from "./symbols";
@@ -95,7 +96,11 @@ export function initialDatagridState(): Omit<
 }
 
 export function table_to_sidebar_table_menu(
-  tb: SchemaDocumentTableInit,
+  tb: {
+    id: GDocTableID;
+    name: string;
+    x_sb_main_table_connection?: TableXSBMainTableConnection;
+  },
   {
     basepath,
     document_id,
@@ -108,7 +113,7 @@ export function table_to_sidebar_table_menu(
     section: "Tables",
     id: tb.id,
     label: tb.name,
-    icon: "table",
+    icon: tb.x_sb_main_table_connection ? "supabase" : "table",
     href: tablehref(basepath, document_id, tb),
   };
 }
@@ -160,12 +165,12 @@ function initialDatabaseEditorState(
 
     // @ts-expect-error
     tablespace: init.tables.reduce(
-      (acc: Record<GDocTableID, TGlobalDataStreamState<TVirtualRow>>, t) => {
+      (acc: Record<GDocTableID, ITablespace<TVirtualRow>>, t) => {
         acc[t.id] = {
           readonly: false,
           realtime: true,
           stream: [],
-        } satisfies TGlobalDataStreamState<TVirtualRow>;
+        } satisfies ITablespace<TVirtualRow>;
         return acc;
       },
       {}
@@ -483,6 +488,9 @@ function xsbmtinit(conn?: GridaXSupabase.XSupabaseMainTableConnectionState) {
     : undefined;
 
   return {
+    sb_table_id: conn.main_supabase_table.id,
+    sb_schema_name: conn.main_supabase_table.sb_schema_name as string,
+    sb_table_name: conn.main_supabase_table.sb_table_name as string,
     schema: conn.main_supabase_table.sb_table_schema,
     pks: parsed?.pks || [],
     pk: (parsed?.pks?.length || 0) > 0 ? parsed?.pks[0] : undefined,

@@ -70,6 +70,7 @@ export interface SchemaDocumentTableInit {
   name: string;
   description: string | null;
   attributes: Array<FormFieldDefinition>;
+  x_sb_main_table_connection?: TableXSBMainTableConnection;
 }
 
 export interface SchemaDocumentEditorInit extends BaseDocumentEditorInit {
@@ -147,6 +148,9 @@ export type GDocTableID = GDocTable["id"];
  * this connection indicates the grida table is connected to a x-supabase table
  */
 export type TableXSBMainTableConnection = {
+  sb_schema_name: string;
+  sb_table_name: string;
+  sb_table_id: number;
   // we need a single pk for editor operations - this may not always be available since pg table can have no pk
   pk: string | undefined;
   pks: string[];
@@ -201,7 +205,7 @@ export type TVirtualRow<T = Record<string, any>, M = Record<string, any>> = {
 /**
  * Utility state for global data stream state.
  */
-export interface TGlobalDataStreamState<T> {
+export interface ITablespace<T> {
   readonly: boolean;
   realtime: boolean;
   stream?: Array<T>;
@@ -320,6 +324,39 @@ interface IConnectionsState {
   };
 }
 
+/**
+ * A utility type that determines the stream type for a table based on its schema.
+ *
+ * - If the table is a `GDocSchemaTable` and has an `x_sb_main_table_connection`,
+ *   the stream type will be `GridaXSupabase.XDataRow`.
+ * - If the table is a `GDocSchemaTable` but does not have an `x_sb_main_table_connection`,
+ *   the stream type will default to `TVirtualRow<FormResponseField, FormResponse>`.
+ * - For any other table type, the stream type will be `TVirtualRow<FormResponseField, FormResponse>`.
+ *
+ * @template T The table type, which extends from `GDocTableBase`.
+ *
+ * @example
+ * // For a GDocSchemaTable with x_sb_main_table_connection:
+ * type StreamType = TablespaceSchemaTableStreamType<GDocSchemaTableWithConnection>;
+ * // StreamType will be GridaXSupabase.XDataRow
+ *
+ * @example
+ * // For a GDocSchemaTable without x_sb_main_table_connection:
+ * type StreamType = TablespaceSchemaTableStreamType<GDocSchemaTableWithoutConnection>;
+ * // StreamType will be TVirtualRow<FormResponseField, FormResponse>
+ *
+ * @example
+ * // For a non-schema table (e.g., GDocFormsTable):
+ * type StreamType = TablespaceSchemaTableStreamType<GDocFormsTable>;
+ * // StreamType will default to TVirtualRow<FormResponseField, FormResponse>
+ */
+type TablespaceSchemaTableStreamType<T extends GDocTableBase> =
+  T extends GDocSchemaTable
+    ? T["x_sb_main_table_connection"] extends TableXSBMainTableConnection
+      ? GridaXSupabase.XDataRow // If x_sb_main_table_connection is defined, use GridaXSupabase.XDataRow
+      : TVirtualRow<FormResponseField, FormResponse> // Otherwise, use TVirtualRow
+    : TVirtualRow<FormResponseField, FormResponse>; // Default for other table types
+
 interface ITablespaceEditorState {
   tables: Array<GDocTable>;
   /**
@@ -328,21 +365,26 @@ interface ITablespaceEditorState {
    * `{[table_id]: { stream: [{ id, data: {...}, meta }]} }`
    */
   tablespace: {
-    [EditorSymbols.Table
-      .SYM_GRIDA_FORMS_RESPONSE_TABLE_ID]: TGlobalDataStreamState<
+    [EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID]: ITablespace<
       TVirtualRow<FormResponseField, FormResponse>
     >;
     [EditorSymbols.Table
-      .SYM_GRIDA_FORMS_SESSION_TABLE_ID]: TGlobalDataStreamState<FormResponseSession>;
+      .SYM_GRIDA_FORMS_SESSION_TABLE_ID]: ITablespace<FormResponseSession>;
+    [EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID]: ITablespace<Customer>;
     [EditorSymbols.Table
-      .SYM_GRIDA_CUSTOMER_TABLE_ID]: TGlobalDataStreamState<Customer>;
-    [EditorSymbols.Table
-      .SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID]: TGlobalDataStreamState<GridaXSupabase.XDataRow>;
+      .SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID]: ITablespace<GridaXSupabase.XDataRow>;
     [EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID]: never;
-  } & Record<
-    string,
-    TGlobalDataStreamState<TVirtualRow<FormResponseField, FormResponse>>
-  >;
+  } & {
+    [T in GDocTable as Extract<T["id"], string>]: ITablespace<
+      TablespaceSchemaTableStreamType<T>
+    >;
+  };
+  // & Record<
+  //   string,
+  //   ITablespace<
+  //     TVirtualRow<FormResponseField, FormResponse> | GridaXSupabase.XDataRow
+  //   >
+  // >;
 }
 
 export interface FormEditorState

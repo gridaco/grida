@@ -12,7 +12,11 @@ import type {
   FormsPageLanguage,
   GridaXSupabase,
 } from "@/types";
-import type { EditorFlatFormBlock, EditorState } from "./state";
+import type {
+  EditorFlatFormBlock,
+  EditorState,
+  TableXSBMainTableConnection,
+} from "./state";
 import type { Tokens } from "@/ast";
 import { SYM_LOCALTZ } from "./symbols";
 import { ZodObject } from "zod";
@@ -435,6 +439,7 @@ export interface SchemaTableAddAction {
     name: string;
     description?: string | null;
     attributes: FormFieldDefinition[];
+    x_sb_main_table_connection?: TableXSBMainTableConnection;
   };
 }
 

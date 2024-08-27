@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   DotsHorizontalIcon,
+  GearIcon,
   Pencil1Icon,
   PlusIcon,
   TrashIcon,
@@ -69,6 +70,7 @@ import {
   DeleteConfirmationAlertDialog,
   DeleteConfirmationSnippet,
 } from "@/components/delete-confirmation-dialog";
+import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 
 export function ModeData() {
   const [state, dispatch] = useEditorState();
@@ -134,10 +136,13 @@ export function ModeData() {
           </DropdownMenuGroup>
           <DropdownMenuGroup>
             <DropdownMenuLabel>Supabase</DropdownMenuLabel>
-            <DropdownMenuItem onSelect={newXSBTableDialog.openDialog}>
-              <SupabaseLogo className="w-4 h-4 me-2" />
-              Connect Supabase Table
-            </DropdownMenuItem>
+            {state.supabase_project && (
+              <DropdownMenuItem onSelect={newXSBTableDialog.openDialog}>
+                <SupabaseLogo className="w-4 h-4 me-2" />
+                Connect Table
+              </DropdownMenuItem>
+            )}
+
             <Link
               href={editorlink("connect/database/supabase", {
                 basepath: basepath,
@@ -146,7 +151,9 @@ export function ModeData() {
             >
               <DropdownMenuItem>
                 <SupabaseLogo className="w-4 h-4 me-2" />
-                Connect Supabase Project
+                {state.supabase_project
+                  ? "Configure Connection"
+                  : "View Connection"}
               </DropdownMenuItem>
             </Link>
           </DropdownMenuGroup>
@@ -311,7 +318,7 @@ function CreateNewSchemaTableDialog({
   const {
     control,
     handleSubmit,
-    formState: { isSubmitting, isSubmitSuccessful },
+    formState: { isSubmitting },
   } = useForm({
     defaultValues: {
       name: data?.name || "",
@@ -346,7 +353,16 @@ function CreateNewSchemaTableDialog({
           table: data,
         });
 
-        // TODO: needs to handle routing in order to make the menu item to be focused
+        // close
+        props.onOpenChange?.(false);
+
+        router.push(
+          editorlink("data/table/[tablename]", {
+            basepath: state.basepath,
+            document_id: state.document_id,
+            tablename: data.name,
+          })
+        );
       });
     }
   );
@@ -354,13 +370,6 @@ function CreateNewSchemaTableDialog({
   const onSaveClick = () => {
     onSubmit();
   };
-
-  useEffect(() => {
-    if (isSubmitSuccessful) {
-      // close
-      props.onOpenChange?.(false);
-    }
-  }, [isSubmitSuccessful]);
 
   return (
     <Dialog {...props}>
@@ -411,6 +420,7 @@ function CreateNewSchemaTableDialog({
 function ConnectNewSupabaseTableDialog({
   ...props
 }: React.ComponentProps<typeof Dialog>) {
+  const router = useRouter();
   const [state, dispatch] = useEditorState();
   const { supabase_project } = state;
 
@@ -430,6 +440,7 @@ function ConnectNewSupabaseTableDialog({
       schema_id: state.document_id, // document_id is schema_id in v0_schema doctype
       sb_schema_name: schema,
       sb_table_name: name,
+      // TODO:
       connect_attributes_as: {},
     });
 
@@ -441,13 +452,37 @@ function ConnectNewSupabaseTableDialog({
 
     promise.then(({ data: { data } }) => {
       if (!data) return;
+
+      const parsed =
+        SupabasePostgRESTOpenApi.parse_supabase_postgrest_schema_definition(
+          data.connection.schema
+        );
+
       dispatch({
         type: "editor/schema/table/add",
-        // TODO:
-        table: data.table,
+        table: {
+          ...data.table,
+          x_sb_main_table_connection: {
+            sb_table_id: data.connection.sb_table_id,
+            sb_schema_name: data.connection.sb_schema_name,
+            sb_table_name: data.connection.sb_table_name,
+            schema: data.connection.schema,
+            pks: parsed.pks,
+            pk: (parsed?.pks?.length || 0) > 0 ? parsed?.pks[0] : undefined,
+          },
+        },
       });
 
-      // TODO: needs to handle routing in order to make the menu item to be focused
+      // close
+      props.onOpenChange?.(false);
+
+      router.push(
+        editorlink("data/table/[tablename]", {
+          basepath: state.basepath,
+          document_id: state.document_id,
+          tablename: data.table.name,
+        })
+      );
     });
   };
 
@@ -469,6 +504,7 @@ function ConnectNewSupabaseTableDialog({
               })}
             >
               Supabase project
+              <GearIcon className="ml-0.5 inline-flex" />
             </Link>
           </DialogDescription>
         </DialogHeader>

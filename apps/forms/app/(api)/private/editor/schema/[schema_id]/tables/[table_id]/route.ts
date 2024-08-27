@@ -44,7 +44,7 @@ export async function DELETE(req: NextRequest, context: Context) {
     .eq("id", table_id)
     .eq("schema_id", schema_id);
 
-  assert(count === 1, "Failed to delete table");
+  assert(count === 1, "Failed to delete table - count is not 1");
   if (error) {
     // although on delete operation, supabase won't throw any errors.
     console.error("ERR: while deleting schema table", error);

@@ -5,7 +5,7 @@ import type {
   GDocFormsXSBTable,
   GDocTable,
   GDocTableID,
-  TGlobalDataStreamState,
+  ITablespace,
   TVirtualRow,
   TVirtualRowData,
 } from "./state";
@@ -1156,7 +1156,7 @@ export function reducer(
           row_keyword: "row",
           icon: "table",
           attributes: table.attributes,
-          x_sb_main_table_connection: undefined,
+          x_sb_main_table_connection: table.x_sb_main_table_connection,
         };
         draft.tables.push(tb as Draft<GDocTable>);
         draft.sidebar.mode_data.tables.push(
@@ -1205,7 +1205,7 @@ function get_table<T extends GDocTable>(
 
 function get_tablespace_feed(
   draft: Draft<EditorState>
-): Draft<TGlobalDataStreamState<TVirtualRow>> | null {
+): Draft<ITablespace<TVirtualRow>> | null {
   switch (draft.doctype) {
     case "v0_form":
       return draft.tablespace[

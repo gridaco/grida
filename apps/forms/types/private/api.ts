@@ -143,7 +143,12 @@ export interface CreateNewSchemaTableWithXSBTableConnectionResponse {
     description?: string | null;
     attributes: FormFieldDefinition[];
   };
-  connection: {};
+  connection: {
+    sb_schema_name: string;
+    sb_table_name: string;
+    sb_table_id: number;
+    schema: GridaXSupabase.JSONSChema;
+  };
 }
 
 export type DeleteSchemaTableRequest = {

@@ -3,6 +3,7 @@ import { EditableDocumentTitle } from "@/scaffolds/editable-document-title";
 import { notFound, redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import {
+  createRouteHandlerXSBClient,
   createServerComponentClient,
   createServerComponentWorkspaceClient,
   grida_xsupabase_client,
@@ -23,6 +24,7 @@ import type {
 import type {
   GDocEditorRouteParams,
   FormDocumentEditorInit,
+  TableXSBMainTableConnection,
 } from "@/scaffolds/editor/state";
 import { Breadcrumbs } from "@/scaffolds/workbench/breadcrumb";
 import assert from "assert";
@@ -36,6 +38,7 @@ import { cn } from "@/utils";
 import React from "react";
 import { PlayActions } from "@/scaffolds/workbench/play-actions";
 import { DontCastJsonProperties } from "@/types/supabase-ext";
+import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 
 export const revalidate = 0;
 
@@ -310,6 +313,41 @@ export default async function Layout({
         return notFound();
       }
 
+      // get x-supabase coonnected tables
+      const xsb_client = createRouteHandlerXSBClient(cookieStore);
+      const { data: xsb_tables, error: xsb_tables_err } = await xsb_client
+        .from("supabase_table")
+        .select("*")
+        .in(
+          "id",
+          data.tables.map((t) => t.supabase_connection?.main_supabase_table_id)
+        );
+
+      if (xsb_tables_err) {
+        console.error("xsb_tables_err", xsb_tables_err);
+      }
+
+      const makeconn = (
+        sb_table_id: number
+      ): TableXSBMainTableConnection | undefined => {
+        const t = xsb_tables?.find((t) => t.id === sb_table_id);
+        if (!t) return undefined;
+
+        const { pks } =
+          SupabasePostgRESTOpenApi.parse_supabase_postgrest_schema_definition(
+            t.sb_table_schema as any
+          );
+
+        return {
+          pks: pks,
+          pk: pks[0],
+          sb_table_id: sb_table_id,
+          sb_schema_name: t.sb_schema_name,
+          sb_table_name: t.sb_table_name,
+          schema: t.sb_table_schema as any,
+        };
+      };
+
       return (
         <Html>
           <EditorProvider
@@ -332,6 +370,10 @@ export default async function Layout({
                 name: ft.title,
                 description: ft.description,
                 attributes: ft.fields,
+                x_sb_main_table_connection: ft.supabase_connection
+                  ?.main_supabase_table_id
+                  ? makeconn(ft.supabase_connection.main_supabase_table_id)
+                  : undefined,
               })),
               document_id: masterdoc_ref.id,
               document_title: masterdoc_ref.title,
