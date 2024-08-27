@@ -77,7 +77,12 @@ export function ModeData() {
 
   const { document_id, basepath, tables } = state;
 
-  const newTableDialog = useDialogState<CreateNewTableDialogInit>();
+  const newTableDialog = useDialogState<CreateNewTableDialogInit>(
+    "new-table-dialog",
+    {
+      refreshkey: true,
+    }
+  );
   const newXSBTableDialog = useDialogState();
   const deleteTableDialog = useDialogState<{
     id: string;
@@ -241,15 +246,11 @@ export function ModeData() {
           }
         }}
         {...deleteTableDialog}
-        key={deleteTableDialog.key}
       />
-      <ConnectNewSupabaseTableDialog
-        {...newXSBTableDialog}
-        key={newXSBTableDialog.key}
-      />
+      <ConnectNewSupabaseTableDialog {...newXSBTableDialog} />
       <CreateNewSchemaTableDialog
         {...newTableDialog}
-        key={newTableDialog.key}
+        key={newTableDialog.refreshkey}
       />
       {renderMenuItems(state.sidebar.mode_data.tables, {
         renderEmptyState: () => <EmptyState />,

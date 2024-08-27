@@ -63,7 +63,7 @@ export function renderMenuItems(
                 <></>
               )}
               {items?.map((item: MenuItem<any>, i) => (
-                <SidebarMenuLink key={i} href={item.href ?? ""}>
+                <SidebarMenuLink key={item.id} href={item.href ?? ""}>
                   <SidebarMenuItem
                     muted
                     level={item.level}
