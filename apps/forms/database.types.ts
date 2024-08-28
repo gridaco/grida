@@ -1999,9 +1999,7 @@ export type Database = {
         Row: {
           created_at: string
           id: number
-          sb_postgrest_methods:
-            | Database["grida_x_supabase"]["Enums"]["sb_postgrest_method"][]
-            | null
+          sb_postgrest_methods: Database["grida_x_supabase"]["Enums"]["sb_postgrest_method"][]
           sb_schema_name: string
           sb_table_name: string
           sb_table_schema: Json
@@ -2011,9 +2009,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: number
-          sb_postgrest_methods?:
-            | Database["grida_x_supabase"]["Enums"]["sb_postgrest_method"][]
-            | null
+          sb_postgrest_methods: Database["grida_x_supabase"]["Enums"]["sb_postgrest_method"][]
           sb_schema_name: string
           sb_table_name: string
           sb_table_schema: Json
@@ -2023,9 +2019,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: number
-          sb_postgrest_methods?:
-            | Database["grida_x_supabase"]["Enums"]["sb_postgrest_method"][]
-            | null
+          sb_postgrest_methods?: Database["grida_x_supabase"]["Enums"]["sb_postgrest_method"][]
           sb_schema_name?: string
           sb_table_name?: string
           sb_table_schema?: Json
