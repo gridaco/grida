@@ -9,8 +9,14 @@ export function GridCount({
   keyword: string;
 }) {
   return (
-    <span className="text-sm font-medium">
-      {count === undefined ? <Spinner /> : txt_n_plural(count, keyword)}
-    </span>
+    <div>
+      {count === undefined ? (
+        <Spinner />
+      ) : (
+        <span className="text-sm font-medium text-muted-foreground">
+          {txt_n_plural(count, keyword)}
+        </span>
+      )}
+    </div>
   );
 }

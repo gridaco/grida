@@ -254,7 +254,7 @@ type TGridaDataTablespace = {
   provider: "grida";
   readonly: boolean;
   realtime: boolean;
-  stream?: Array<TVirtualRow<FormResponseField, FormResponse>>;
+  stream?: Array<GridaSchemaTableVirtualRow>;
 };
 
 export type GridaSchemaTableVirtualRow = TVirtualRow<
@@ -433,9 +433,10 @@ interface ITablespaceEditorState {
       .SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID]: TXSupabaseDataTablespace;
     [EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID]: never;
   } & {
-    [T in GDocTable as Extract<T["id"], string>]: ITablespace<
-      TablespaceSchemaTableStreamType<T>
-    >;
+    [table_id: string]: TXSupabaseDataTablespace | TGridaDataTablespace;
+    // [T in GDocTable as Extract<T["id"], string>]: ITablespace<
+    //   TablespaceSchemaTableStreamType<T>
+    // >;
   };
 }
 

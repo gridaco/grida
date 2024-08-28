@@ -4,4 +4,6 @@ export {
   useTable,
   useDatagridTable,
   useFormFields,
+  useDatagridTableSpace,
+  useDatagridTableAttributes,
 } from "./use";

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import DataGrid, {
   Column,
   CopyEvent,
@@ -49,6 +49,18 @@ import { format } from "date-fns";
 import { EmptyRowsRenderer } from "./empty";
 import { ColumnHeaderCell } from "./column-header-cell";
 import "./grid.css";
+
+function useMasking() {
+  const [state] = useEditorState();
+  return useCallback(
+    (txt: string): string => {
+      return state.datagrid_filter.masking_enabled && typeof txt === "string"
+        ? mask(txt)
+        : txt.toString();
+    },
+    [state.datagrid_filter.masking_enabled]
+  );
+}
 
 function rowKeyGetter(row: GFResponseRow) {
   return row.__gf_id;
@@ -386,6 +398,8 @@ function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
 
   const { type, value, options, multiple, files } = data;
 
+  const masker = useMasking();
+
   // FIXME: we need to use other parser for db-oriented data.
   // at the moment, we are using type check on value to use the value as is or not.
   const parsed =
@@ -505,13 +519,10 @@ function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
       );
     }
     case "json": {
-      return <code>{JSON.stringify(unwrapped)}</code>;
+      return <code>{masker(JSON.stringify(unwrapped))}</code>;
     }
     default:
-      const display =
-        state.datagrid_filter.masking_enabled && typeof unwrapped === "string"
-          ? mask(unwrapped)
-          : unwrapped?.toString();
+      const display = masker(unwrapped?.toString() ?? "");
       return (
         <div>
           <Highlight
@@ -591,7 +602,8 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
         break;
       }
       case "number":
-        val = parseFloat(val);
+        if (!val) val = null;
+        else val = parseFloat(val);
         break;
       case "datetime-local": {
         try {

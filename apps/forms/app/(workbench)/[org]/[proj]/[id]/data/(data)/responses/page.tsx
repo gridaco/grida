@@ -13,7 +13,11 @@ import {
   FormXSupabaseMainTableFeedProvider,
   FormXSupabaseMainTableSyncProvider,
 } from "@/scaffolds/editor/feed";
-import { GDocFormsXSBTable, GDocTableID } from "@/scaffolds/editor/state";
+import {
+  GDocFormsXSBTable,
+  GDocTable,
+  GDocTableID,
+} from "@/scaffolds/editor/state";
 import { EditorSymbols } from "@/scaffolds/editor/symbols";
 import { CurrentTable } from "@/scaffolds/editor/utils/switch-table";
 import { GridEditor } from "@/scaffolds/grid-editor";
@@ -71,6 +75,8 @@ function FormResponseGridEditor() {
   const [state, dispatch] = useEditorState();
   const { form_id, tablespace, datagrid_filter, datagrid_table_id } = state;
 
+  const tb = useDatagridTable<GDocTable>();
+
   const fields = useFormFields();
 
   const sessions_stream =
@@ -113,6 +119,9 @@ function FormResponseGridEditor() {
         systemcolumns={systemcolumns}
         columns={columns}
         rows={filtered as GFResponseRow[]}
+        readonly={tb ? tb.readonly : true}
+        selection={tb ? (tb.readonly ? "off" : "on") : "off"}
+        deletion={tb ? (tb.readonly ? "off" : "on") : "off"}
       />
     </>
   );
@@ -165,6 +174,9 @@ function ModeXSBMainTable() {
         systemcolumns={systemcolumns}
         columns={columns}
         rows={filtered as GFResponseRow[]}
+        readonly={tb.readonly}
+        selection="on"
+        deletion="on"
       />
     </>
   );

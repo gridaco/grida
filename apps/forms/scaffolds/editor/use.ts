@@ -40,6 +40,15 @@ export function useDatagridTable<T extends GDocTable>():
   return useTable<T>(datagrid_table_id);
 }
 
+export function useDatagridTableSpace() {
+  const [state] = useEditorState();
+  const { tablespace } = state;
+
+  const tb = useDatagridTable();
+
+  return tb && tablespace[tb.id];
+}
+
 export function useFormFields() {
   const [state] = useEditorState();
   const { doctype, form } = state;
@@ -49,6 +58,27 @@ export function useFormFields() {
   }
 
   return form.fields;
+}
+
+/**
+ * TODO: will be removed or fixed after state migration - all table shall have `attributes` property
+ *
+ * @deprecated
+ */
+export function useDatagridTableAttributes() {
+  const [state] = useEditorState();
+  const { doctype, form } = state;
+  const tb = useDatagridTable();
+
+  switch (doctype) {
+    case "v0_form":
+      return state.form.fields;
+    case "v0_schema":
+      return tb ? ("attributes" in tb ? tb.attributes : null) : null;
+    case "v0_site":
+    default:
+      throw new Error("useDatagridTableAttributes: not a table document");
+  }
 }
 
 /**

@@ -64,7 +64,7 @@ export function Sidebar() {
             <TabsTrigger value="project">
               <ResourceTypeIcon type="project" className="w-4 h-4" />
             </TabsTrigger>
-            <TabsTrigger value="build">
+            <TabsTrigger value="build" disabled={state.doctype === "v0_schema"}>
               <HammerIcon className="w-4 h-4" />
             </TabsTrigger>
             <TabsTrigger value="data">

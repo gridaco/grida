@@ -131,6 +131,7 @@ export namespace GridData {
             {
               key: "__gf_display_id",
               // TODO:
+              // name: "ID",
               // 1. pass the name of pk
               // 2. allow multiple PKs
             },

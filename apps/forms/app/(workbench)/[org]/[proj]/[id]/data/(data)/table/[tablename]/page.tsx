@@ -125,6 +125,9 @@ function ModeProviderGrida() {
       systemcolumns={systemcolumns}
       columns={columns}
       rows={filtered as GFResponseRow[]}
+      readonly={tb.readonly}
+      selection="on"
+      deletion="on"
     />
   );
 }
@@ -162,6 +165,9 @@ function ModeProviderXSB() {
       systemcolumns={systemcolumns}
       columns={columns}
       rows={filtered as GFResponseRow[]}
+      readonly={tb.readonly}
+      selection="on"
+      deletion="on"
     />
   );
 }

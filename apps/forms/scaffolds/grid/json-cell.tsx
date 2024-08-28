@@ -41,13 +41,13 @@ export function JsonPopupEditorCell({
   }, []);
 
   const onCommit = () => {
+    if (readonly) return;
     if (valid) {
       if (onCommitValue) {
         const finalval = safeParseJson(txt);
         if (safeStringifyJson(finalval) !== safeStringifyJson(initialValue)) {
+          // only commit if diff
           onCommitValue(finalval);
-        } else {
-          toast("No changes to save");
         }
       }
       setOpen(false);

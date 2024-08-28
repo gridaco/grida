@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo } from "react";
 import { ResponseGrid } from "../grid";
 import { createClientFormsClient } from "@/lib/supabase/client";
 import {
@@ -16,8 +16,8 @@ import toast from "react-hot-toast";
 import { useDatagridTable, useEditorState } from "../editor";
 import Link from "next/link";
 import {
-  CaretDownIcon,
   ChevronDownIcon,
+  Cross2Icon,
   DownloadIcon,
   PieChartIcon,
   TrashIcon,
@@ -48,33 +48,49 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Columns3Icon, Rows3Icon } from "lucide-react";
-import { useDatabaseTableId } from "../editor/use";
+import {
+  useDatabaseTableId,
+  useDatagridTableAttributes,
+  useDatagridTableSpace,
+} from "@/scaffolds/editor/use";
+import { saveAs } from "file-saver";
+import Papa from "papaparse";
+import { TVirtualRow } from "../editor/state";
+import { FormResponseField } from "@/types";
 
 export function GridEditor({
   systemcolumns,
   columns,
   rows,
+  readonly,
+  selection,
+  deletion,
 }: {
   systemcolumns: GFSystemColumn[];
   columns: GFColumn[];
   rows?: GFResponseRow[];
+  readonly?: boolean;
+  selection: "on" | "off";
+  deletion: "on" | "off";
 }) {
-  const [state, dispatch] = useEditorState();
-  const deleteFieldConfirmDialog = useDialogState<{ field_id: string }>();
-
-  const {
-    form_id,
-    datagrid_table_id,
-    datagrid_isloading,
-    datagrid_selected_rows,
-  } = state;
-
   const supabase = useMemo(() => createClientFormsClient(), []);
+  const [state, dispatch] = useEditorState();
+  const { datagrid_isloading, datagrid_selected_rows } = state;
+
+  const deleteFieldConfirmDialog = useDialogState<{ field_id: string }>();
 
   const tb = useDatagridTable();
   const table_id = useDatabaseTableId();
   const row_keyword = tb?.row_keyword ?? "row";
-  const readonly = tb?.readonly ?? true;
+  const has_selected_rows = datagrid_selected_rows.size > 0;
+  const selectionDisabled = selection !== "on";
+
+  const onClearSelection = useCallback(() => {
+    dispatch({
+      type: "editor/response/select",
+      selection: new Set(),
+    });
+  }, [dispatch]);
 
   const openNewFieldPanel = useCallback(() => {
     dispatch({
@@ -125,10 +141,6 @@ export function GridEditor({
     [table_id, supabase, dispatch]
   );
 
-  const has_selected_responses = datagrid_selected_rows.size > 0;
-  const selectionDisabled =
-    datagrid_table_id === EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID;
-
   return (
     <GridLayout.Root>
       <DeleteFieldConfirmDialog
@@ -140,25 +152,42 @@ export function GridEditor({
       />
       <GridLayout.Header>
         <GridLayout.HeaderMenus>
-          {has_selected_responses ? (
+          {has_selected_rows ? (
             <div
               className={clsx(
                 "flex items-center",
-                !has_selected_responses || selectionDisabled ? "hidden" : ""
+                !has_selected_rows || selectionDisabled ? "hidden" : ""
               )}
             >
               <div className="flex gap-2 items-center">
-                <span
-                  className="text-sm font-normal text-neutral-500"
-                  aria-label="selected responses"
-                >
-                  {txt_n_plural(datagrid_selected_rows.size, row_keyword)}{" "}
-                  selected
-                </span>
-                <DeleteSelectedRowsButton
-                  disabled={readonly}
-                  className={readonly ? "cursor-not-allowed" : ""}
-                />
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    className="w-7 h-7"
+                    onClick={onClearSelection}
+                  >
+                    <Cross2Icon />
+                  </Button>
+                  <span
+                    className="text-sm font-norma text-muted-foreground"
+                    aria-label="selected responses"
+                  >
+                    {txt_n_plural(datagrid_selected_rows.size, row_keyword)}{" "}
+                    selected
+                  </span>
+                </div>
+                <GridLayout.HeaderSeparator />
+                <SelectionExport />
+                {deletion === "on" && (
+                  <>
+                    <GridLayout.HeaderSeparator />
+                    <DeleteSelectedRowsButton
+                      disabled={readonly}
+                      className={readonly ? "cursor-not-allowed" : ""}
+                    />
+                  </>
+                )}
               </div>
             </div>
           ) : (
@@ -214,19 +243,161 @@ export function GridEditor({
         />
       </GridLayout.Content>
       <GridLayout.Footer>
-        <div className="flex gap-2 items-center">
+        <div className="flex gap-4 items-center">
           <GridLimit />
           <GridCount count={rows?.length} keyword={row_keyword} />
         </div>
-        <Link href={`/v1/${form_id}/export/csv`} download target="_blank">
-          <Button variant="ghost">
-            Export to CSV
-            <DownloadIcon />
-          </Button>
-        </Link>
+        <GridLayout.FooterSeparator />
         <GridRefresh />
+        {state.doctype === "v0_form" && tb?.provider === "grida" && (
+          <>
+            <GridLayout.FooterSeparator />
+            <GridaFormsResponsesExportCSV />
+          </>
+        )}
       </GridLayout.Footer>
     </GridLayout.Root>
+  );
+}
+
+function SelectionExport() {
+  const [state] = useEditorState();
+
+  const { datagrid_selected_rows } = state;
+  const tb = useDatagridTable();
+  const space = useDatagridTableSpace();
+  const attributes = useDatagridTableAttributes();
+
+  const onExportCSV = useCallback(() => {
+    //
+    // TODO: does not work with pgjsonpath
+    //
+
+    if (!tb || !attributes || !space || !space.stream) {
+      toast.error("Something went wrong. Please refresh the page.");
+      return;
+    }
+
+    // BOM for CJK characters in file content
+    const BOM = "\uFEFF";
+    let csvtxt = "";
+
+    const columns = [...attributes]
+      .sort((a, b) => a.local_index - b.local_index)
+      .map((attr) => {
+        return {
+          id: attr.id,
+          name: attr.name,
+          type: attr.type,
+        };
+      });
+
+    const headers = columns.map((col) => col.name);
+
+    const csvstrfycell = (cell: any) => {
+      if (cell === null || cell === undefined) {
+        return "";
+      }
+      if (typeof cell === "object") {
+        return JSON.stringify(cell);
+      }
+      return cell;
+    };
+
+    switch (space.provider) {
+      case "custom":
+        toast.error("Export to CSV is not supported for this table");
+        return;
+      case "grida": {
+        const rows = space.stream
+          .filter((row) => datagrid_selected_rows.has(row.id))
+          .map((row) => {
+            // [col0, col1, col2, col3] by col.id
+            return columns.map((col) => {
+              const cell = row.data[col.id].value;
+              return csvstrfycell(cell);
+            });
+          });
+
+        // csvtxt
+        csvtxt = Papa.unparse([headers, ...rows], {
+          header: true,
+        });
+        break;
+      }
+      case "x-supabase": {
+        if (
+          !(
+            "x_sb_main_table_connection" in tb &&
+            !!tb.x_sb_main_table_connection.pk
+          )
+        ) {
+          toast.error("Export to CSV is not supported for this table");
+          return;
+        }
+
+        const rows = space.stream
+          .filter((row) =>
+            datagrid_selected_rows.has(row[tb.x_sb_main_table_connection.pk!])
+          )
+          .map((row) => {
+            // [col0, col1, col2, col3] by col.id
+            return columns.map((col) => {
+              const cell = row[col.name];
+              return csvstrfycell(cell);
+            });
+          });
+
+        // csvtxt
+        csvtxt = Papa.unparse([headers, ...rows], {
+          header: true,
+        });
+        break;
+      }
+    }
+
+    saveAs(
+      new Blob([BOM + csvtxt], { type: "text/csv;charset=utf-8" }),
+      `${tb.name}.csv`
+    );
+  }, [datagrid_selected_rows, tb?.id, attributes, space?.stream]);
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="default" size="sm">
+          <DownloadIcon className="w-4 h-4 align-middle inline-flex me-2" />
+          Export
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent side="top" align="start">
+        <DropdownMenuItem onClick={onExportCSV}>Export to CSV</DropdownMenuItem>
+        <DropdownMenuItem disabled>
+          Export to JSON
+          <Badge variant="outline" className="ms-2">
+            soon
+          </Badge>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function GridaFormsResponsesExportCSV() {
+  const table_id = useDatabaseTableId();
+
+  return (
+    <Link
+      href={`/v1/${table_id}/export/csv`}
+      download
+      target="_blank"
+      prefetch={false}
+    >
+      <Button variant="outline" size="sm">
+        <DownloadIcon className="w-4 h-4 align-middle inline-flex me-2" />
+        Export to CSV
+      </Button>
+    </Link>
   );
 }
 

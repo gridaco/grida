@@ -21,7 +21,9 @@ export function PlayActions() {
           <Tooltip>
             <TooltipTrigger asChild>
               <div>
-                <Button disabled>Preview</Button>
+                <Button variant="outline" disabled>
+                  Preview
+                </Button>
               </div>
             </TooltipTrigger>
             <TooltipContent>

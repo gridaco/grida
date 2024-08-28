@@ -14,9 +14,18 @@ export function GridRefresh() {
   }, [dispatch]);
 
   return (
-    <Button disabled={datagrid_isloading} onClick={onRefresh} variant="ghost">
+    <Button
+      disabled={datagrid_isloading}
+      onClick={onRefresh}
+      variant="outline"
+      size="sm"
+    >
       <span className="me-2">
-        {datagrid_isloading ? <Spinner /> : <ReloadIcon />}
+        {datagrid_isloading ? (
+          <Spinner />
+        ) : (
+          <ReloadIcon className="w-3.5 h-3.5" />
+        )}
       </span>
       Refresh
     </Button>
