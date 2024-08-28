@@ -54,6 +54,10 @@ export function XSupaDataGridSort() {
 
   const isset = Object.keys(datagrid_orderby).length > 0;
 
+  const keys = Object.keys(properties);
+  const usedkeys = Object.keys(datagrid_orderby);
+  const unusedkeys = keys.filter((key) => !usedkeys.includes(key));
+
   const onReset = useCallback(() => {
     dispatch({ type: "editor/data-grid/orderby/reset" });
   }, [dispatch]);
@@ -107,18 +111,15 @@ export function XSupaDataGridSort() {
           {isset && <DotIcon className="absolute top-0.5 right-0.5" />}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="p-2 max-w-none">
-        <section
-          className="py-2"
-          hidden={Object.keys(datagrid_orderby).length === 0}
-        >
-          <div className="flex flex-col space-y-2">
-            {Object.keys(datagrid_orderby).map((col) => {
+      <PopoverContent className="p-2 w-full">
+        <section className="py-2" hidden={!isset}>
+          <div className="flex flex-col space-y-2 w-full">
+            {usedkeys.map((col) => {
               const orderby = datagrid_orderby[col];
               return (
-                <div key={col} className="flex gap-2 px-2">
+                <div key={col} className="flex gap-2 px-2 w-full">
                   <div className="flex items-center gap-2 flex-1">
-                    <div>
+                    <div className="flex-1">
                       <Select
                         disabled
                         value={orderby.column}
@@ -159,7 +160,7 @@ export function XSupaDataGridSort() {
                   </div>
                   <Button
                     size="icon"
-                    variant="ghost"
+                    variant="outline"
                     onClick={() => onRemove(col)}
                   >
                     <Cross2Icon />
@@ -178,7 +179,7 @@ export function XSupaDataGridSort() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
-              {Object.keys(properties).map((key) => (
+              {unusedkeys.map((key) => (
                 <DropdownMenuItem key={key} onSelect={() => onAdd(key)}>
                   {key}{" "}
                   <span className="ms-2 text-xs text-muted-foreground">
