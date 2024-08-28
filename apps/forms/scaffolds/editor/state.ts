@@ -242,7 +242,7 @@ type TCustomDataTablespace<T> = {
   stream?: Array<T>;
 };
 
-type TXSupabaseDataTablespace = {
+export type TXSupabaseDataTablespace = {
   provider: "x-supabase";
   readonly: boolean;
   realtime: false;

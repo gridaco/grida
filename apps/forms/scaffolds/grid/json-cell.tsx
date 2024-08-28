@@ -18,7 +18,7 @@ import toast from "react-hot-toast";
 
 // expand
 export function JsonPopupEditorCell({
-  value,
+  value: initialValue,
   onCommitValue,
   readonly,
 }: {
@@ -27,7 +27,9 @@ export function JsonPopupEditorCell({
   readonly?: boolean;
 }) {
   const [open, setOpen] = useState(true);
-  const [txt, setTxt] = useState<string>(safeStringifyJson(value, null, 2));
+  const [txt, setTxt] = useState<string>(
+    safeStringifyJson(initialValue, null, 2)
+  );
   const [valid, setValid] = useState(true);
 
   useEffect(() => {
@@ -38,19 +40,21 @@ export function JsonPopupEditorCell({
     setOpen(false);
   }, []);
 
-  const onCommit = useCallback(() => {
+  const onCommit = () => {
     if (valid) {
       if (onCommitValue) {
         const finalval = safeParseJson(txt);
-        if (safeStringifyJson(finalval) !== safeStringifyJson(value)) {
+        if (safeStringifyJson(finalval) !== safeStringifyJson(initialValue)) {
           onCommitValue(finalval);
+        } else {
+          toast("No changes to save");
         }
       }
       setOpen(false);
     } else {
       toast.error("Invalid JSON");
     }
-  }, [txt, valid]);
+  };
 
   return (
     <Popover open={open}>
@@ -65,7 +69,7 @@ export function JsonPopupEditorCell({
         className="w-[--radix-popover-trigger-width] max-h-[--radix-popover-content-available-height] p-0"
       >
         <div className="bg-background border rounded shadow-lg overflow-hidden">
-          <BlockKeys value={null} onEscape={cancelChanges} onEnter={onCommit}>
+          <BlockKeys value={txt} onEscape={cancelChanges} onEnter={onCommit}>
             <header className="p-2 border-b">
               <Badge
                 variant="outline"

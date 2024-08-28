@@ -205,6 +205,7 @@ export function GridEditor({
           onCellChange={(row, column, data) => {
             dispatch({
               type: "editor/data-grid/cell/change",
+              table_id: table_id!,
               row: row.__gf_id,
               column: column,
               data: data,
@@ -235,8 +236,6 @@ function TableQuery() {
   const tb = useDatagridTable();
 
   if (!tb) return <></>;
-
-
 
   return (
     <div className="flex items-center gap-1">

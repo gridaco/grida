@@ -3,11 +3,13 @@ import type {
   EditorFlatFormBlock,
   EditorState,
   GDocFormsXSBTable,
+  GDocSchemaTableProviderXSupabase,
   GDocTable,
   GDocTableID,
   TTablespace,
   TVirtualRow,
   TVirtualRowData,
+  TXSupabaseDataTablespace,
 } from "./state";
 import type {
   GlobalSavingAction,
@@ -889,61 +891,19 @@ export function reducer(
             break;
           }
           case EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID: {
-            const {
-              row: row_pk,
-              column,
-              data,
-            } = <DataGridCellChangeAction>action;
-            const { value, option_id } = data;
-
-            const field = state.form.fields.find((f) => f.id === column);
-            if (!field) return;
-            const tb = get_table<GDocFormsXSBTable>(
-              draft,
-              EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID
-            );
-            if (!tb) return;
-
             const space =
               draft.tablespace[
                 EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID
               ];
 
+            const tb = get_table<GDocFormsXSBTable>(
+              draft,
+              EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID
+            );
+            if (!tb) return;
             const pk = tb.x_sb_main_table_connection.pk!;
 
-            // handle jsonpaths - partial object update
-            if (FlatPostgREST.testPath(field.name)) {
-              const { column } = FlatPostgREST.decodePath(field.name);
-              const row = space.stream!.find((r) => r[pk] === row_pk);
-
-              if (!row) return;
-
-              const newrow = FlatPostgREST.update(
-                row,
-                field.name,
-                value
-              ) as GridaXSupabase.XDataRow;
-
-              space.stream = space.stream!.map((r) => {
-                if (r[pk] === row_pk) {
-                  return newrow;
-                }
-                return r;
-              });
-
-              return;
-            }
-
-            space.stream = space.stream!.map((r) => {
-              if (r[pk] === row_pk) {
-                return {
-                  ...r,
-                  [field!.name]: value,
-                };
-              }
-              return r;
-            });
-
+            update_xsbtablespace(pk, space, draft, action);
             break;
           }
           case EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID: {
@@ -975,7 +935,25 @@ export function reducer(
                   break;
                 }
                 case "x-supabase": {
-                  console.log("TODO: x-supabase cell update");
+                  console.log("x-supabase", action);
+                  const space = draft.tablespace[action.table_id];
+                  assert(space.provider === "x-supabase");
+
+                  const tb = get_table<GDocSchemaTableProviderXSupabase>(
+                    draft,
+                    action.table_id
+                  );
+
+                  if (!tb) return;
+
+                  const pk = tb.x_sb_main_table_connection.pk!;
+
+                  update_xsbtablespace(
+                    pk,
+                    space as TXSupabaseDataTablespace,
+                    draft,
+                    action
+                  );
                   break;
                 }
                 case "custom":
@@ -1206,6 +1184,53 @@ export function reducer(
     default:
       return state;
   }
+}
+
+function update_xsbtablespace(
+  pk: string,
+  space: Draft<TXSupabaseDataTablespace>,
+  draft: Draft<EditorState>,
+  action: DataGridCellChangeAction
+) {
+  const { row: row_pk, table_id, column, data } = action;
+  const { value, option_id } = data;
+
+  const attributes = get_attributes(draft, table_id);
+  const attribute = attributes.find((f) => f.id === column);
+  if (!attribute) return;
+
+  // handle jsonpaths - partial object update
+  if (FlatPostgREST.testPath(attribute.name)) {
+    const { column } = FlatPostgREST.decodePath(attribute.name);
+    const row = space.stream!.find((r) => r[pk] === row_pk);
+
+    if (!row) return;
+
+    const newrow = FlatPostgREST.update(
+      row,
+      attribute.name,
+      value
+    ) as GridaXSupabase.XDataRow;
+
+    space.stream = space.stream!.map((r) => {
+      if (r[pk] === row_pk) {
+        return newrow;
+      }
+      return r;
+    });
+
+    return;
+  }
+
+  space.stream = space.stream!.map((r) => {
+    if (r[pk] === row_pk) {
+      return {
+        ...r,
+        [attribute!.name]: value,
+      };
+    }
+    return r;
+  });
 }
 
 function get_table<T extends GDocTable>(

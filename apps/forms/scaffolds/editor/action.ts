@@ -321,6 +321,7 @@ export interface DataTableLoadingAction {
 
 export interface DataGridCellChangeAction {
   type: "editor/data-grid/cell/change";
+  table_id: string;
   row: string;
   column: string;
   data: { value: any; option_id?: string | null };
