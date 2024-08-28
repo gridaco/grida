@@ -67,7 +67,16 @@ export async function POST(req: NextRequest, context: Context) {
 
   assert(tableschema, "table not found in the schema");
 
-  // validate attributes (if exists)
+  // validate at least one attribute is connected (unless readonly pg view)
+  assert(
+    Object.keys(data.connect_attributes_as).length > 0,
+    "at least one attribute should be connected"
+  );
+
+  // TODO: validate if at least one pk is connected
+  // .....
+
+  // validate attributes
   for (const [key, { type }] of Object.entries(data.connect_attributes_as)) {
     assert(
       tableschema.properties[key],

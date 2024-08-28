@@ -264,7 +264,7 @@ function ConnectSupabase() {
                   >
                     <Button variant="link">
                       <OpenInNewWindowIcon className="inline me-2 align-middle" />
-                      Schema
+                      OpenAPI
                     </Button>
                   </Link>
                   <Link
