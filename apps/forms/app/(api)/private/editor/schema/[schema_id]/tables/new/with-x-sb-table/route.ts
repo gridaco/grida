@@ -236,10 +236,11 @@ export async function POST(req: NextRequest, context: Context) {
         attributes: new_table_detail.attributes,
       },
       connection: {
-        sb_schema_name: data.sb_schema_name,
-        sb_table_name: data.sb_table_name,
-        sb_table_id: conn!.main_supabase_table_id!,
-        schema: tableschema,
+        sb_schema_name: upserted_supabase_table.sb_schema_name,
+        sb_table_name: upserted_supabase_table.sb_table_name,
+        sb_table_id: upserted_supabase_table.id,
+        sb_postgrest_methods: upserted_supabase_table.sb_postgrest_methods,
+        sb_table_schema: tableschema,
       },
     } satisfies CreateNewSchemaTableWithXSBTableConnectionResponse,
   });

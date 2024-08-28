@@ -505,7 +505,7 @@ function ConnectNewSupabaseTableDialog({
 
       const parsed =
         SupabasePostgRESTOpenApi.parse_supabase_postgrest_schema_definition(
-          data.connection.schema
+          data.connection.sb_table_schema
         );
 
       dispatch({
@@ -516,9 +516,10 @@ function ConnectNewSupabaseTableDialog({
             sb_table_id: data.connection.sb_table_id,
             sb_schema_name: data.connection.sb_schema_name,
             sb_table_name: data.connection.sb_table_name,
-            sb_table_schema: data.connection.schema,
+            sb_table_schema: data.connection.sb_table_schema,
+            sb_postgrest_methods: data.connection.sb_postgrest_methods,
             pks: parsed.pks,
-            pk: (parsed?.pks?.length || 0) > 0 ? parsed?.pks[0] : undefined,
+            pk: parsed.pks[0],
           },
         },
       });

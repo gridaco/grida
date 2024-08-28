@@ -347,6 +347,7 @@ export default async function Layout({
           sb_schema_name: t.sb_schema_name,
           sb_table_name: t.sb_table_name,
           sb_table_schema: t.sb_table_schema as any,
+          sb_postgrest_methods: t.sb_postgrest_methods,
         };
       };
 

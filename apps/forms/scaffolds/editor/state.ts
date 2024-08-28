@@ -171,6 +171,7 @@ export type TableXSBMainTableConnection = {
   pk: string | undefined;
   pks: string[];
   sb_table_schema: GridaXSupabase.JSONSChema;
+  sb_postgrest_methods: GridaXSupabase.XSBPostgrestMethod[];
 };
 
 export interface MenuItem<ID> {

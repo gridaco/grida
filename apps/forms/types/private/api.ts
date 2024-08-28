@@ -147,7 +147,8 @@ export interface CreateNewSchemaTableWithXSBTableConnectionResponse {
     sb_schema_name: string;
     sb_table_name: string;
     sb_table_id: number;
-    schema: GridaXSupabase.JSONSChema;
+    sb_postgrest_methods: GridaXSupabase.XSBPostgrestMethod[];
+    sb_table_schema: GridaXSupabase.JSONSChema;
   };
 }
 
