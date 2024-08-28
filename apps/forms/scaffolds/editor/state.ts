@@ -145,6 +145,7 @@ export type GDocSchemaTableProviderGrida = {
   provider: "grida";
   id: string;
   attributes: Array<AttributeDefinition>;
+  readonly: false;
 } & GDocTableBase;
 
 export type GDocSchemaTableProviderXSupabase = {

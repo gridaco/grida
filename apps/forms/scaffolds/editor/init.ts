@@ -512,9 +512,12 @@ export function schematableinit(table: {
   x_sb_main_table_connection?: TableXSBMainTableConnection;
 }): GDocSchemaTable {
   if (table.x_sb_main_table_connection) {
-    const readonly = SupabasePostgRESTOpenApi.table_methods_is_get_only(
-      table.x_sb_main_table_connection.sb_postgrest_methods
-    );
+    // table shall be readonly if it is a view or if it has no primary key
+    // we don't support patch operations without pk
+    const readonly =
+      SupabasePostgRESTOpenApi.table_methods_is_get_only(
+        table.x_sb_main_table_connection.sb_postgrest_methods
+      ) || table.x_sb_main_table_connection.pk === undefined;
 
     return {
       provider: "x-supabase",

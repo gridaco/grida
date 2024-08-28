@@ -7,6 +7,7 @@ import {
   GridaSchemaTableFeedProvider,
   GridaSchemaTableSyncProvider,
   GridaSchemaXSBTableFeedProvider,
+  GridaSchemaXSBTableSyncProvider,
 } from "@/scaffolds/editor/feed";
 import {
   GDocSchemaTable,
@@ -75,6 +76,13 @@ function SwitchGridEditor() {
     case "x-supabase":
       return (
         <>
+          {!tb.readonly && (
+            <GridaSchemaXSBTableSyncProvider
+              pk={tb.x_sb_main_table_connection.pk!}
+              table_id={tb.id}
+              sb_table_id={tb.x_sb_main_table_connection.sb_table_id}
+            />
+          )}
           <GridaSchemaXSBTableFeedProvider
             table_id={tb.id}
             sb_table_id={tb.x_sb_main_table_connection.sb_table_id}

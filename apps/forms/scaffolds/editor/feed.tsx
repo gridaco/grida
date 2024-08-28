@@ -27,6 +27,7 @@ import {
   type GDocSchemaTableProviderGrida,
   type TablespaceSchemaTableStreamType,
   type TVirtualRow,
+  TXSupabaseDataTablespace,
 } from "./state";
 import assert from "assert";
 
@@ -326,6 +327,87 @@ function useXSBTableFeed(
   }, [res.data]);
 }
 
+function useXSBSyncCell({
+  table_id,
+  sb_table_id,
+  pk,
+}: {
+  table_id: string;
+  sb_table_id?: number | null;
+  pk: string | undefined;
+}) {
+  return useCallback(
+    (key: number | string, value: Record<string, any>) => {
+      if (!sb_table_id) return;
+      if (!pk) return;
+
+      const task = fetch(
+        PrivateEditorApi.XSupabase.url_table_x_query(table_id, sb_table_id),
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            values: value,
+            filters: [
+              {
+                type: "eq",
+                column: pk,
+                value: key,
+              },
+            ],
+          } satisfies XSupabaseQuery.Body),
+        }
+      );
+
+      toast
+        .promise(task, {
+          loading: "Updating...",
+          success: "Updated",
+          error: "Failed",
+        })
+        .then((data) => {
+          // NOTE: Do not dispatch data based on this result. this does not contain extended data
+        });
+    },
+    [pk, table_id, sb_table_id]
+  );
+}
+
+function useXSBSyncCellChangesEffect(
+  prev: Array<GridaXSupabase.XDataRow> | undefined,
+  current: Array<GridaXSupabase.XDataRow> | undefined,
+  queryprops: {
+    table_id: string;
+    sb_table_id?: number | null;
+    pk: string | undefined;
+  }
+) {
+  const pk = queryprops.pk;
+
+  const update = useXSBSyncCell(queryprops);
+
+  useEffect(() => {
+    if (!current) return;
+    if (!prev) return;
+    if (!pk) return;
+
+    // check if rows are updated
+    for (const row of current) {
+      const prevRow = prev.find((r) => r.id === row.id);
+
+      if (prevRow) {
+        // get changed fields
+        const diff = rowdiff(prevRow, row, (key) => key.startsWith("__gf_"));
+        if (Object.keys(diff).length > 0) {
+          update(row[pk], diff);
+        }
+      }
+    }
+  }, [pk, prev, update, current]);
+}
+
 export function FormResponseSyncProvider({
   children,
 }: React.PropsWithChildren<{}>) {
@@ -583,75 +665,22 @@ export function FormXSupabaseMainTableSyncProvider({
   const [state] = useEditorState();
 
   const tb = useDatagridTable<GDocFormsXSBTable>();
+
   const { tablespace } = state;
 
-  const stream =
+  const current =
     tablespace[EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID]
       .stream;
 
-  const pref = usePrevious(stream);
+  const prev = usePrevious(current);
 
-  const pkname = tb?.x_sb_main_table_connection.pk;
+  const pk = tb?.x_sb_main_table_connection.pk;
 
-  const update = useCallback(
-    (key: number | string, value: Record<string, any>) => {
-      if (!state.connections.supabase?.main_supabase_table_id) return;
-      if (!pkname) return;
-
-      const task = fetch(
-        PrivateEditorApi.XSupabase.url_table_x_query(
-          state.form_id,
-          state.connections.supabase.main_supabase_table_id
-        ),
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            values: value,
-            filters: [
-              {
-                type: "eq",
-                column: pkname,
-                value: key,
-              },
-            ],
-          } satisfies XSupabaseQuery.Body),
-        }
-      );
-
-      toast
-        .promise(task, {
-          loading: "Updating...",
-          success: "Updated",
-          error: "Failed",
-        })
-        .then((data) => {
-          // NOTE: Do not dispatch data based on this result. this does not contain extended data
-        });
-    },
-    [pkname, state.connections.supabase?.main_supabase_table_id, state.form_id]
-  );
-
-  useEffect(() => {
-    if (!stream) return;
-    if (!pref) return;
-    if (!pkname) return;
-
-    // check if rows are updated
-    for (const row of stream) {
-      const prevRow = pref.find((r) => r.id === row.id);
-
-      if (prevRow) {
-        // get changed fields
-        const diff = rowdiff(prevRow, row, (key) => key.startsWith("__gf_"));
-        if (Object.keys(diff).length > 0) {
-          update(row[pkname], diff);
-        }
-      }
-    }
-  }, [pkname, pref, update, stream]);
+  useXSBSyncCellChangesEffect(prev, current, {
+    table_id: state.form_id,
+    pk: pk,
+    sb_table_id: state.connections.supabase?.main_supabase_table_id,
+  });
 
   return <>{children}</>;
 }
@@ -796,6 +825,33 @@ export function GridaSchemaTableFeedProvider({
       }
     },
     enabled: _realtime_responses_enabled,
+  });
+
+  return <>{children}</>;
+}
+
+export function GridaSchemaXSBTableSyncProvider({
+  pk,
+  table_id,
+  sb_table_id,
+  children,
+}: React.PropsWithChildren<{
+  table_id: string;
+  sb_table_id: number;
+  pk: string;
+}>) {
+  const [state] = useEditorState();
+
+  const { tablespace } = state;
+
+  const current = (tablespace[table_id] as TXSupabaseDataTablespace).stream;
+
+  const prev = usePrevious(current);
+
+  useXSBSyncCellChangesEffect(prev, current, {
+    table_id: table_id,
+    pk: pk,
+    sb_table_id: sb_table_id,
   });
 
   return <>{children}</>;

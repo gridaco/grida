@@ -935,7 +935,6 @@ export function reducer(
                   break;
                 }
                 case "x-supabase": {
-                  console.log("x-supabase", action);
                   const space = draft.tablespace[action.table_id];
                   assert(space.provider === "x-supabase");
 
