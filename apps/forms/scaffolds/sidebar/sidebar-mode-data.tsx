@@ -283,7 +283,7 @@ export function ModeData() {
             />
             {item.label}
             {item.data.readonly && (
-              <EyeOpenIcon className="w-4 h-4 ms-2 inline" />
+              <EyeOpenIcon className="w-4 h-4 ms-2 inline text-muted-foreground" />
             )}
             <SidebarMenuItemActions>
               <DropdownMenu>

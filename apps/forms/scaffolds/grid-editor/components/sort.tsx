@@ -107,8 +107,10 @@ export function XSupaDataGridSort() {
             isset && " text-accent-foreground"
           )}
         >
-          <ArrowDownUpIcon className="w-4 h-4" />
-          {isset && <DotIcon className="absolute top-0.5 right-0.5" />}
+          <ArrowDownUpIcon className="w-4 h-4 text-muted-foreground" />
+          {isset && (
+            <DotIcon className="absolute top-0.5 right-0.5 text-blue-500" />
+          )}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="p-2 w-full">
