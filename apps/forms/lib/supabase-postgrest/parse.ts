@@ -145,6 +145,18 @@ export namespace SupabasePostgRESTOpenApi {
     };
   }
 
+  export function table_is_get_only(
+    apidoc: SupabaseOpenAPIDocument,
+    table: string
+  ) {
+    const { methods } = parse_supabase_postgrest_table_path(apidoc, table);
+    return table_methods_is_get_only(methods);
+  }
+
+  export function table_methods_is_get_only(methods: PostgrestPathMethod[]) {
+    return methods.length === 1 && methods[0] === "get";
+  }
+
   export type FKMeta = {
     column: string;
     table: string;

@@ -36,7 +36,7 @@ export async function GET(req: NextRequest, context: Context) {
   return NextResponse.json({
     data: supabase_project satisfies DontCastJsonProperties<
       XSupabasePrivateApiTypes.GetSupabaseProjectData,
-      "sb_public_schema" | "sb_schema_definitions"
+      "sb_public_schema" | "sb_schema_definitions" | "sb_schema_openapi_docs"
     >,
   });
 }

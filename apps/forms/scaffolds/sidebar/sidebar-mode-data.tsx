@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   DotsHorizontalIcon,
+  EyeOpenIcon,
   GearIcon,
   Pencil1Icon,
   PlusIcon,
@@ -39,6 +40,7 @@ import {
   SelectGroup,
   SelectItem,
   SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -72,6 +74,7 @@ import {
 } from "@/components/delete-confirmation-dialog";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { FormInputType } from "@/types";
+import { Badge } from "@/components/ui/badge";
 
 export function ModeData() {
   const [state, dispatch] = useEditorState();
@@ -272,37 +275,46 @@ export function ModeData() {
           );
         },
         renderSectionHeader: Header,
-        renderItemActions: (item) => {
-          // TODO:
-          return (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuItemAction>
-                  <DotsHorizontalIcon />
-                </SidebarMenuItemAction>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent side="right" align="end">
-                <DropdownMenuItem disabled>
-                  <Pencil1Icon className="me-2" />
-                  Rename Table
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onSelect={() => {
-                    deleteTableDialog.openDialog({
-                      id: item.id,
-                      // TODO: use safe value - name.
-                      match: `DELETE ${item.label}`,
-                    });
-                  }}
-                >
-                  <TrashIcon className="me-2" />
-                  Delete Table
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          );
-        },
+        renderMenuItem: ({ item, onSelect }) => (
+          <SidebarMenuItem muted level={item.level} onSelect={onSelect}>
+            <ResourceTypeIcon
+              type={item.icon}
+              className="w-4 h-4 min-w-4 me-2 inline"
+            />
+            {item.label}
+            {item.data.readonly && (
+              <EyeOpenIcon className="w-4 h-4 ms-2 inline" />
+            )}
+            <SidebarMenuItemActions>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <SidebarMenuItemAction>
+                    <DotsHorizontalIcon />
+                  </SidebarMenuItemAction>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent side="right" align="end">
+                  <DropdownMenuItem disabled>
+                    <Pencil1Icon className="me-2" />
+                    Rename Table
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      deleteTableDialog.openDialog({
+                        id: item.id as string,
+                        // TODO: use safe value - name.
+                        match: `DELETE ${item.label}`,
+                      });
+                    }}
+                  >
+                    <TrashIcon className="me-2" />
+                    Delete Table
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </SidebarMenuItemActions>
+          </SidebarMenuItem>
+        ),
       })}
       {renderMenuItems(state.sidebar.mode_data.menus)}
     </>
@@ -581,12 +593,32 @@ function ConnectNewSupabaseTableDialog({
                           {}
                       ).map((tableName) => {
                         const fulltable = `${schemaName}.${tableName}`;
+                        const openapidoc =
+                          supabase_project!.sb_schema_openapi_docs[schemaName];
+
+                        const readonly =
+                          SupabasePostgRESTOpenApi.table_is_get_only(
+                            openapidoc,
+                            tableName
+                          );
+
                         return (
                           <SelectItem key={fulltable} value={fulltable}>
-                            <span>{fulltable}</span>
+                            <span>
+                              {fulltable}{" "}
+                              {readonly && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-xs font-mono"
+                                >
+                                  READONLY
+                                </Badge>
+                              )}
+                            </span>
                           </SelectItem>
                         );
                       })}
+                      <SelectSeparator />
                     </SelectGroup>
                   );
                 }

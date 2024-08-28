@@ -359,7 +359,9 @@ export default async function Layout({
               supabase_project: supabase_project
                 ? (supabase_project as DontCastJsonProperties<
                     typeof supabase_project,
-                    "sb_public_schema" | "sb_schema_definitions"
+                    | "sb_public_schema"
+                    | "sb_schema_definitions"
+                    | "sb_schema_openapi_docs"
                   >)
                 : null,
               project: { id: project_ref.id, name: project_ref.name },

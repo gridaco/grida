@@ -13,10 +13,12 @@ import type {
   GDocTable,
   TTablespace,
   TableXSBMainTableConnection,
+  GDocSchemaTable,
+  TableMenuItem,
 } from "./state";
 import { blockstreeflat } from "@/lib/forms/tree";
 import { SYM_LOCALTZ, EditorSymbols } from "./symbols";
-import { GridaXSupabase } from "@/types";
+import { FormFieldDefinition, GridaXSupabase } from "@/types";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 
 export function initialEditorState(init: EditorInit): EditorState {
@@ -105,13 +107,20 @@ export function table_to_sidebar_table_menu(
     basepath: string;
     document_id: string;
   }
-): MenuItem<GDocTableID> {
+): TableMenuItem {
   return {
     section: "Tables",
     id: tb.id,
     label: tb.name,
     icon: tb.x_sb_main_table_connection ? "supabase" : "table",
     href: tablehref(basepath, document_id, tb),
+    data: {
+      readonly: tb.x_sb_main_table_connection
+        ? SupabasePostgRESTOpenApi.table_methods_is_get_only(
+            tb.x_sb_main_table_connection?.sb_postgrest_methods
+          )
+        : false,
+    },
   };
 }
 
@@ -150,32 +159,7 @@ function initialDatabaseEditorState(
     ...initialDatagridState(),
     datagrid_table_id: init.tables.length > 0 ? init.tables[0].id : null,
     tables: init.tables.map((t) => {
-      if (t.x_sb_main_table_connection) {
-        return {
-          provider: "x-supabase",
-          id: t.id,
-          row_keyword: "row",
-          label: t.name,
-          name: t.name,
-          description: t.description,
-          icon: "table",
-          readonly: false,
-          attributes: t.attributes,
-          x_sb_main_table_connection: t.x_sb_main_table_connection,
-        };
-      } else {
-        return {
-          provider: "grida",
-          id: t.id,
-          row_keyword: "row",
-          label: t.name,
-          name: t.name,
-          description: t.description,
-          icon: "table",
-          readonly: false,
-          attributes: t.attributes,
-        };
-      }
+      return schematableinit(t);
     }),
 
     // @ts-expect-error
@@ -309,7 +293,10 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
           label: "Responses",
           icon: "supabase",
           section: "Tables",
-        } satisfies MenuItem<GDocTableID>,
+          data: {
+            readonly: false,
+          },
+        } satisfies TableMenuItem,
         {
           id: EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID,
           href: tablehref(
@@ -322,7 +309,10 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
           label: "auth.users",
           icon: "supabase",
           section: "Tables",
-        } satisfies MenuItem<GDocTableID>,
+          data: {
+            readonly: true,
+          },
+        } satisfies TableMenuItem,
       ]
     : [
         {
@@ -337,7 +327,10 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
           label: "Responses",
           icon: "table",
           section: "Tables",
-        } satisfies MenuItem<GDocTableID>,
+          data: {
+            readonly: false,
+          },
+        } satisfies TableMenuItem,
         {
           id: EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID,
           href: tablehref(
@@ -348,7 +341,10 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
           label: "Customers",
           icon: "user",
           section: "Tables",
-        } satisfies MenuItem<GDocTableID>,
+          data: {
+            readonly: true,
+          },
+        } satisfies TableMenuItem,
       ];
 
   const tableids = Object.getOwnPropertySymbols(tables);
@@ -375,6 +371,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
             href: `/${basepath}/${document_id}/data/analytics`,
             icon: "chart",
             label: "Realtime",
+            data: {},
           },
         ],
       },
@@ -448,6 +445,7 @@ function sitedocumentpagesinit({
       label: "home",
       href: `/${basepath}/${document_id}/design`,
       icon: "file",
+      data: {},
     },
   ];
 }
@@ -466,6 +464,7 @@ function formdocumentpagesinit({
       label: "Campaign",
       href: `/${basepath}/${document_id}/form`,
       icon: "folder",
+      data: {},
     },
     // {
     //   section: "Form",
@@ -482,6 +481,7 @@ function formdocumentpagesinit({
       href: `/${basepath}/${document_id}/form/edit`,
       icon: "file",
       level: 1,
+      data: {},
     },
     {
       section: "Design",
@@ -490,6 +490,7 @@ function formdocumentpagesinit({
       href: `/${basepath}/${document_id}/form/end`,
       icon: "file",
       level: 1,
+      data: {},
     },
     {
       section: "Design",
@@ -498,11 +499,53 @@ function formdocumentpagesinit({
       href: `/${basepath}/${document_id}/data/responses`,
       icon: "table",
       level: 1,
+      data: {},
     },
   ];
 }
 
-function xsbmtinit(conn?: GridaXSupabase.XSupabaseMainTableConnectionState) {
+export function schematableinit(table: {
+  id: string;
+  name: string;
+  description?: string | null;
+  attributes: FormFieldDefinition[];
+  x_sb_main_table_connection?: TableXSBMainTableConnection;
+}): GDocSchemaTable {
+  if (table.x_sb_main_table_connection) {
+    const readonly = SupabasePostgRESTOpenApi.table_methods_is_get_only(
+      table.x_sb_main_table_connection.sb_postgrest_methods
+    );
+
+    return {
+      provider: "x-supabase",
+      id: table.id,
+      name: table.name,
+      label: table.name,
+      description: table.description || null,
+      readonly: readonly,
+      row_keyword: "row",
+      icon: "supabase",
+      attributes: table.attributes,
+      x_sb_main_table_connection: table.x_sb_main_table_connection,
+    } satisfies GDocSchemaTable;
+  } else {
+    return {
+      provider: "grida",
+      id: table.id,
+      name: table.name,
+      label: table.name,
+      description: table.description || null,
+      readonly: false,
+      row_keyword: "row",
+      icon: "table",
+      attributes: table.attributes,
+    } satisfies GDocSchemaTable;
+  }
+}
+
+function xsbmtinit(
+  conn?: GridaXSupabase.XSupabaseMainTableConnectionState
+): TableXSBMainTableConnection | undefined {
   // TODO: need inspection - will supbaseconn present even when main table is not present?
   // if yes, we need to adjust the state to be nullable
   if (!conn) return undefined;

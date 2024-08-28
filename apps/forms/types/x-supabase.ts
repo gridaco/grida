@@ -2,6 +2,7 @@ import type { JSONSchemaType } from "ajv";
 import type { SchemaTableConnectionXSupabaseMainTableJoint } from "./types";
 import type { User } from "@supabase/supabase-js";
 import type { Bucket } from "@supabase/storage-js";
+import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 export namespace GridaXSupabase {
   export type XSBPostgrestMethod = "get" | "post" | "delete" | "patch";
 
@@ -39,6 +40,9 @@ export namespace GridaXSupabase {
     sb_schema_names: string[];
     sb_project_url: string;
     sb_service_key_id: string | null;
+    sb_schema_openapi_docs: {
+      [schema: string]: SupabasePostgRESTOpenApi.SupabaseOpenAPIDocument;
+    };
   }
 
   export interface SupabaseTable {

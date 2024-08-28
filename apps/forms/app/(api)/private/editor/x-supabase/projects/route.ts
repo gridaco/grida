@@ -42,7 +42,7 @@ export async function GET(req: NextRequest, context: Context) {
   return NextResponse.json({
     data: supabase_project satisfies DontCastJsonProperties<
       XSupabasePrivateApiTypes.GetSupabaseProjectData,
-      "sb_public_schema" | "sb_schema_definitions"
+      "sb_public_schema" | "sb_schema_definitions" | "sb_schema_openapi_docs"
     >,
   });
   //
@@ -68,7 +68,6 @@ export async function POST(req: NextRequest, context: Context) {
 
   // 1. create supabase project
   const { data: supabase_project, error: supabase_project_err } = await supabase
-    // TODO:
     .from("supabase_project")
     .insert({
       project_id: project_id,
@@ -91,7 +90,7 @@ export async function POST(req: NextRequest, context: Context) {
   return NextResponse.json({
     data: supabase_project as DontCastJsonProperties<
       GridaXSupabase.SupabaseProject,
-      "sb_public_schema" | "sb_schema_definitions"
+      "sb_public_schema" | "sb_schema_definitions" | "sb_schema_openapi_docs"
     >,
   } satisfies EditorApiResponse<GridaXSupabase.SupabaseProject>);
 }

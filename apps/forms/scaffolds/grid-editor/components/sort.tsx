@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useCallback, useMemo, useState } from "react";
-import { useEditorState, useFormFields } from "../../editor";
+import React, { useCallback } from "react";
+import { useDatagridTable, useEditorState } from "@/scaffolds/editor";
 import {
   Cross2Icon,
   DotIcon,
@@ -21,7 +21,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   Popover,
   PopoverContent,
@@ -30,7 +30,10 @@ import {
 import { ArrowDownUpIcon } from "lucide-react";
 import { cn } from "@/utils";
 import { PopoverClose } from "@radix-ui/react-popover";
-import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
+import {
+  GDocFormsXSBTable,
+  GDocSchemaTableProviderXSupabase,
+} from "@/scaffolds/editor/state";
 
 /**
  * this can also be used for form query, but at this moment, form does not have a db level field sorting query.
@@ -42,7 +45,12 @@ export function XSupaDataGridSort() {
 
   const { datagrid_orderby } = state;
 
-  const fields = useFormFields();
+  const tb = useDatagridTable<
+    GDocFormsXSBTable | GDocSchemaTableProviderXSupabase
+  >();
+
+  const properties =
+    tb?.x_sb_main_table_connection.sb_table_schema.properties ?? {};
 
   const isset = Object.keys(datagrid_orderby).length > 0;
 
@@ -100,7 +108,10 @@ export function XSupaDataGridSort() {
         </Button>
       </PopoverTrigger>
       <PopoverContent className="p-2 max-w-none">
-        <section className="py-2">
+        <section
+          className="py-2"
+          hidden={Object.keys(datagrid_orderby).length === 0}
+        >
           <div className="flex flex-col space-y-2">
             {Object.keys(datagrid_orderby).map((col) => {
               const orderby = datagrid_orderby[col];
@@ -119,9 +130,9 @@ export function XSupaDataGridSort() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {fields.map((field) => (
-                            <SelectItem key={field.name} value={field.name}>
-                              {field.name}
+                          {Object.keys(properties).map((key) => (
+                            <SelectItem key={key} value={key}>
+                              {key}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -162,20 +173,17 @@ export function XSupaDataGridSort() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" className="flex justify-start">
-                <PlusIcon className="w-4 h-4 me-2 align-middle" /> Add sort
+                <PlusIcon className="w-4 h-4 me-2 align-middle" /> Pick a column
+                to sort by
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              {fields.map((field) => (
-                <DropdownMenuItem
-                  key={field.name}
-                  onSelect={() => onAdd(field.name)}
-                >
-                  <FormFieldTypeIcon
-                    type={field.type}
-                    className="w-4 h-4 me-2 align-middle"
-                  />
-                  {field.name}
+            <DropdownMenuContent align="start">
+              {Object.keys(properties).map((key) => (
+                <DropdownMenuItem key={key} onSelect={() => onAdd(key)}>
+                  {key}{" "}
+                  <span className="ms-2 text-xs text-muted-foreground">
+                    {properties[key].format}
+                  </span>
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>

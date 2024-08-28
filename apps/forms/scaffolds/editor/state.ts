@@ -174,14 +174,15 @@ export type TableXSBMainTableConnection = {
   sb_postgrest_methods: GridaXSupabase.XSBPostgrestMethod[];
 };
 
-export interface MenuItem<ID> {
+export type MenuItem<ID, T = {}> = {
   section: string;
   id: ID;
   level?: number;
   label: string;
   icon: ResourceTypeIconName;
   href?: string;
-}
+  data: T;
+};
 
 export type TableType =
   | "response"
@@ -273,11 +274,18 @@ interface IEditorDateContextState {
   datetz: typeof SYM_LOCALTZ | string;
 }
 
+export type TableMenuItem = MenuItem<
+  GDocTableID,
+  {
+    readonly: boolean;
+  }
+>;
+
 interface IEditorSidebarState {
   sidebar: {
     mode: "project" | "build" | "data" | "connect";
     mode_data: {
-      tables: MenuItem<GDocTableID>[];
+      tables: TableMenuItem[];
       menus: MenuItem<GDocTableID>[];
     };
   };

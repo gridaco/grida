@@ -89,7 +89,11 @@ import type {
 } from "@/types";
 import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";
 import { EditorSymbols } from "./symbols";
-import { initialDatagridState, table_to_sidebar_table_menu } from "./init";
+import {
+  initialDatagridState,
+  schematableinit,
+  table_to_sidebar_table_menu,
+} from "./init";
 import assert from "assert";
 
 export function reducer(
@@ -1145,30 +1149,7 @@ export function reducer(
     case "editor/schema/table/add": {
       const { table } = <SchemaTableAddAction>action;
       return produce(state, (draft) => {
-        const tb: GDocTable = table.x_sb_main_table_connection
-          ? {
-              provider: "x-supabase",
-              id: table.id,
-              name: table.name,
-              label: table.name,
-              description: table.description || null,
-              readonly: false,
-              row_keyword: "row",
-              icon: "table",
-              attributes: table.attributes,
-              x_sb_main_table_connection: table.x_sb_main_table_connection,
-            }
-          : {
-              provider: "grida",
-              id: table.id,
-              name: table.name,
-              label: table.name,
-              description: table.description || null,
-              readonly: false,
-              row_keyword: "row",
-              icon: "table",
-              attributes: table.attributes,
-            };
+        const tb = schematableinit(table);
         draft.tables.push(tb as Draft<GDocTable>);
         draft.sidebar.mode_data.tables.push(
           table_to_sidebar_table_menu(tb, {

@@ -155,7 +155,10 @@ export function GridEditor({
                   {txt_n_plural(datagrid_selected_rows.size, row_keyword)}{" "}
                   selected
                 </span>
-                <DeleteSelectedRowsButton />
+                <DeleteSelectedRowsButton
+                  disabled={readonly}
+                  className={readonly ? "cursor-not-allowed" : ""}
+                />
               </div>
             </div>
           ) : (
@@ -228,15 +231,17 @@ export function GridEditor({
 
 function TableQuery() {
   const [state] = useEditorState();
-  const { datagrid_table_id } = state;
+  // const { datagrid_table_id } = state;
+  const tb = useDatagridTable();
+
+  if (!tb) return <></>;
+
+
 
   return (
     <div className="flex items-center gap-1">
       <GridLocalSearch />
-      {datagrid_table_id ===
-        EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID && (
-        <XSupaDataGridSort />
-      )}
+      {"x_sb_main_table_connection" in tb && <XSupaDataGridSort />}
     </div>
   );
 }
@@ -326,7 +331,10 @@ function useDeleteSelectedSchemaTableRows() {
   }, [supabase, datagrid_selected_rows, dispatch]);
 }
 
-function DeleteSelectedRowsButton() {
+function DeleteSelectedRowsButton({
+  className,
+  ...props
+}: React.ComponentProps<typeof Button>) {
   const [state, dispatch] = useEditorState();
 
   const tb = useDatagridTable();
@@ -399,10 +407,10 @@ function DeleteSelectedRowsButton() {
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <button className="flex items-center gap-1 p-2 rounded-md border text-sm">
+        <Button variant="outline" size="sm" {...props} className={className}>
           <TrashIcon />
           Delete {txt_n_plural(datagrid_selected_rows.size, row_keyword)}
-        </button>
+        </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogTitle>
