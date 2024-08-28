@@ -17,10 +17,12 @@ import { Spinner } from "@/components/spinner";
 // cancel
 // expand
 export function JsonEditCell({ column, row }: RenderEditCellProps<any>) {
-  const data = row[column.key];
+  const data = row.fields[column.key];
   const { value: initialValue } = data ?? {};
   const [open, setOpen] = useState(true);
-  const [value, setValue] = useState<string | null>(initialValue);
+  const [value, setValue] = useState<string | null>(
+    JSON.stringify(initialValue, null, 2)
+  );
 
   const { resolvedTheme } = useTheme();
   const monaco = useMonaco();
@@ -49,7 +51,7 @@ export function JsonEditCell({ column, row }: RenderEditCellProps<any>) {
               onMount={(editor) => {
                 editor.focus();
               }}
-              width={300}
+              width="100%"
               height={200}
               value={value ?? ""}
               defaultLanguage="json"

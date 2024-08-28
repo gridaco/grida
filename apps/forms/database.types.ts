@@ -841,7 +841,7 @@ export type Database = {
           {
             foreignKeyName: "connection_supabase_supabase_project_id_fkey"
             columns: ["supabase_project_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "supabase_project"
             referencedColumns: ["id"]
           },
@@ -1825,6 +1825,7 @@ export type Database = {
         | "search"
         | "audio"
         | "video"
+        | "json"
       form_method: "post" | "get" | "dialog"
       form_page_language:
         | "en"
@@ -1971,7 +1972,7 @@ export type Database = {
           {
             foreignKeyName: "connection_supabase_project_id_fkey"
             columns: ["project_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "project"
             referencedColumns: ["id"]
           },
@@ -2510,12 +2511,6 @@ export type Database = {
         }
         Returns: number[]
       }
-      is_organization_member: {
-        Args: {
-          project_id: number
-        }
-        Returns: boolean
-      }
       recursive_option_combinations:
         | {
             Args: {
@@ -2548,6 +2543,12 @@ export type Database = {
       rls_organization: {
         Args: {
           p_organization_id: number
+        }
+        Returns: boolean
+      }
+      rls_project: {
+        Args: {
+          project_id: number
         }
         Returns: boolean
       }

@@ -499,6 +499,9 @@ function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
         </div>
       );
     }
+    case "json": {
+      return <code>{JSON.stringify(unwrapped)}</code>;
+    }
     default:
       const display =
         state.datagrid_filter.masking_enabled && typeof unwrapped === "string"
@@ -754,6 +757,9 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
             </SelectContent>
           </Select>
         );
+      case "json":
+        console.log("json", props, unwrapped);
+        return <JsonEditCell {...props} />;
       // not supported
       case "checkboxes":
       case "signature":

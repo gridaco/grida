@@ -26,6 +26,7 @@ import {
   HashIcon,
   ClockIcon,
   PhoneIcon,
+  BracesIcon,
 } from "lucide-react";
 
 export function FormFieldTypeIcon({
@@ -96,6 +97,8 @@ export function FormFieldTypeIcon({
       return <MapPinnedIcon {...props} />;
     case "country":
       return <GlobeIcon {...props} />;
+    case "json":
+      return <BracesIcon {...props} />;
     default:
       return <TextIcon {...props} />;
   }

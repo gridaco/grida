@@ -92,7 +92,8 @@ export type FormInputType =
   | "hidden"
   | "signature"
   | "range"
-  | "search";
+  | "search"
+  | "json";
 
 export type FormFieldAutocompleteType =
   | "off"

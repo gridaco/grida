@@ -90,7 +90,7 @@ export function ModeData() {
   const deleteTableDialog = useDialogState<{
     id: string;
     match: string;
-  }>();
+  }>("delete-table-dialog", { refreshkey: true });
 
   const router = useRouter();
 
@@ -159,9 +159,7 @@ export function ModeData() {
             >
               <DropdownMenuItem>
                 <SupabaseLogo className="w-4 h-4 me-2" />
-                {state.supabase_project
-                  ? "Configure Connection"
-                  : "View Connection"}
+                {state.supabase_project ? "View" : "Configure"}
               </DropdownMenuItem>
             </Link>
           </DropdownMenuGroup>
@@ -251,6 +249,7 @@ export function ModeData() {
           }
         }}
         {...deleteTableDialog}
+        key={deleteTableDialog.refreshkey}
       />
       <ConnectNewSupabaseTableDialog
         {...newXSBTableDialog}
