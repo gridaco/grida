@@ -1939,6 +1939,7 @@ export type Database = {
           sb_public_schema: Json
           sb_schema_definitions: Json
           sb_schema_names: string[]
+          sb_schema_openapi_docs: Json
           sb_service_key_id: string | null
           updated_at: string
         }
@@ -1952,6 +1953,7 @@ export type Database = {
           sb_public_schema: Json
           sb_schema_definitions: Json
           sb_schema_names?: string[]
+          sb_schema_openapi_docs: Json
           sb_service_key_id?: string | null
           updated_at?: string
         }
@@ -1965,6 +1967,7 @@ export type Database = {
           sb_public_schema?: Json
           sb_schema_definitions?: Json
           sb_schema_names?: string[]
+          sb_schema_openapi_docs?: Json
           sb_service_key_id?: string | null
           updated_at?: string
         }
@@ -1996,6 +1999,9 @@ export type Database = {
         Row: {
           created_at: string
           id: number
+          sb_postgrest_methods:
+            | Database["grida_x_supabase"]["Enums"]["sb_postgrest_method"][]
+            | null
           sb_schema_name: string
           sb_table_name: string
           sb_table_schema: Json
@@ -2005,6 +2011,9 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: number
+          sb_postgrest_methods?:
+            | Database["grida_x_supabase"]["Enums"]["sb_postgrest_method"][]
+            | null
           sb_schema_name: string
           sb_table_name: string
           sb_table_schema: Json
@@ -2014,6 +2023,9 @@ export type Database = {
         Update: {
           created_at?: string
           id?: number
+          sb_postgrest_methods?:
+            | Database["grida_x_supabase"]["Enums"]["sb_postgrest_method"][]
+            | null
           sb_schema_name?: string
           sb_table_name?: string
           sb_table_schema?: Json
@@ -2038,7 +2050,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      sb_postgrest_method: "get" | "post" | "delete" | "patch"
     }
     CompositeTypes: {
       [_ in never]: never

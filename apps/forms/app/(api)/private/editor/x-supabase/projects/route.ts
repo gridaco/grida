@@ -56,15 +56,19 @@ export async function POST(req: NextRequest, context: Context) {
     await req.json();
   const { project_id, sb_project_url, sb_anon_key } = data;
 
-  const { sb_project_reference_id, sb_schema_definitions } =
-    await SupabasePostgRESTOpenApi.fetch_supabase_postgrest_swagger({
-      url: sb_project_url,
-      anonKey: sb_anon_key,
-      schemas: ["public"],
-    });
+  const {
+    sb_project_reference_id,
+    sb_schema_definitions,
+    sb_schema_openapi_docs,
+  } = await SupabasePostgRESTOpenApi.fetch_supabase_postgrest_openapi_doc({
+    url: sb_project_url,
+    anonKey: sb_anon_key,
+    schemas: ["public"],
+  });
 
   // 1. create supabase project
   const { data: supabase_project, error: supabase_project_err } = await supabase
+    // TODO:
     .from("supabase_project")
     .insert({
       project_id: project_id,
@@ -72,6 +76,7 @@ export async function POST(req: NextRequest, context: Context) {
       sb_project_reference_id,
       sb_public_schema: sb_schema_definitions["public"],
       sb_schema_definitions,
+      sb_schema_openapi_docs: sb_schema_openapi_docs as {},
       sb_schema_names: ["public"],
       sb_project_url,
     })

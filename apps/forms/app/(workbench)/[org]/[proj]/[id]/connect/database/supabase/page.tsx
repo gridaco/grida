@@ -97,11 +97,13 @@ const testSupabaseConnection = async ({
   schema_name: string;
 }) => {
   //
-  const parsing = SupabasePostgRESTOpenApi.fetch_supabase_postgrest_swagger({
-    url,
-    anonKey,
-    schemas: [schema_name],
-  });
+  const parsing = SupabasePostgRESTOpenApi.fetch_supabase_postgrest_openapi_doc(
+    {
+      url,
+      anonKey,
+      schemas: [schema_name],
+    }
+  );
 
   try {
     await toast

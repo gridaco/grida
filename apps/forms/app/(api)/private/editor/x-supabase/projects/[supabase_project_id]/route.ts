@@ -64,8 +64,8 @@ export async function PATCH(req: NextRequest, context: Context) {
     return notFound();
   }
 
-  const { sb_schema_definitions } =
-    await SupabasePostgRESTOpenApi.fetch_supabase_postgrest_swagger({
+  const { sb_schema_definitions, sb_schema_openapi_docs } =
+    await SupabasePostgRESTOpenApi.fetch_supabase_postgrest_openapi_doc({
       url: supabase_project!.sb_project_url,
       anonKey: supabase_project!.sb_anon_key,
       schemas: supabase_project!.sb_schema_names,
@@ -92,10 +92,12 @@ export async function PATCH(req: NextRequest, context: Context) {
   }
 
   const { data: patch, error: patch_error } = await supabase
+    // TODO:
     .from("supabase_project")
     .update({
       sb_public_schema: sb_schema_definitions["public"],
       sb_schema_definitions,
+      sb_schema_openapi_docs: sb_schema_openapi_docs as {},
     })
     .eq("id", supabase_project_id)
     .select(`*, tables:supabase_table(*)`)

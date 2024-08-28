@@ -32,8 +32,8 @@ export async function POST(req: NextRequest, context: Context) {
     new Set([...prev.sb_schema_names, body.schema_name])
   );
 
-  const { sb_schema_definitions } =
-    await SupabasePostgRESTOpenApi.fetch_supabase_postgrest_swagger({
+  const { sb_schema_definitions, sb_schema_openapi_docs } =
+    await SupabasePostgRESTOpenApi.fetch_supabase_postgrest_openapi_doc({
       url: prev.sb_project_url,
       anonKey: prev.sb_anon_key,
       schemas: schema_names,
@@ -45,6 +45,7 @@ export async function POST(req: NextRequest, context: Context) {
       sb_schema_names: Array.from(schema_names),
       sb_public_schema: sb_schema_definitions["public"],
       sb_schema_definitions,
+      sb_schema_openapi_docs: sb_schema_openapi_docs as {},
     })
     .eq("id", supabase_project_id)
     .select(`*, tables:supabase_table(*)`)

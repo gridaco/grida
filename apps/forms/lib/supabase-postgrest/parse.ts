@@ -39,7 +39,7 @@ export namespace SupabasePostgRESTOpenApi {
     return `${url}/rest/v1/?apikey=${apiKey}`;
   }
 
-  export async function fetch_supabase_postgrest_swagger({
+  export async function fetch_supabase_postgrest_openapi_doc({
     url,
     anonKey,
     schemas = ["public"],
@@ -51,6 +51,7 @@ export namespace SupabasePostgRESTOpenApi {
     sb_anon_key: string;
     sb_project_reference_id: string;
     sb_schema_names: string[];
+    sb_schema_openapi_docs: { [schema: string]: SupabaseOpenAPIDocument };
     sb_schema_definitions: { [schema: string]: { [key: string]: any } };
     sb_project_url: string;
   }> {
@@ -61,6 +62,7 @@ export namespace SupabasePostgRESTOpenApi {
         const route = build_supabase_openapi_url(url, anonKey);
 
         const schema_definitions: { [schema: string]: any } = {};
+        const schema_apidocs: { [schema: string]: any } = {};
 
         // can be optimized
         for (const schema of schemas) {
@@ -69,12 +71,14 @@ export namespace SupabasePostgRESTOpenApi {
           if (!apidoc || !("definitions" in apidoc)) {
             return reject();
           }
+          schema_apidocs[schema] = apidoc;
           schema_definitions[schema] = apidoc.definitions;
         }
 
         return resolve({
           sb_anon_key: anonKey,
           sb_project_reference_id: projectref,
+          sb_schema_openapi_docs: schema_apidocs,
           sb_schema_definitions: schema_definitions,
           sb_schema_names: schemas,
           sb_project_url: url,
