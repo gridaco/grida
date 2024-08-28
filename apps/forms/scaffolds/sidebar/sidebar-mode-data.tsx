@@ -162,7 +162,7 @@ export function ModeData() {
             >
               <DropdownMenuItem>
                 <SupabaseLogo className="w-4 h-4 me-2" />
-                {state.supabase_project ? "View" : "Configure"}
+                {state.supabase_project ? "Settings" : "Connect"}
               </DropdownMenuItem>
             </Link>
           </DropdownMenuGroup>

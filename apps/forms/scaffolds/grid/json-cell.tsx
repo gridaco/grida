@@ -6,32 +6,51 @@ import {
   PopoverTrigger,
   PopoverContent,
 } from "@/components/ui/popover";
-import { useCallback, useEffect, useState } from "react";
-import { RenderEditCellProps } from "react-data-grid";
+import React, { useCallback, useEffect, useState } from "react";
 import { BlockKeys } from "./block-keys";
 import { useMonacoTheme } from "@/components/monaco";
 import { useTheme } from "next-themes";
 import { Spinner } from "@/components/spinner";
+import { JSONValue } from "@/types";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import toast from "react-hot-toast";
 
-// save value
-// cancel
 // expand
-export function JsonEditCell({ column, row }: RenderEditCellProps<any>) {
-  const data = row.fields[column.key];
-  const { value: initialValue } = data ?? {};
+export function JsonPopupEditorCell({
+  value,
+  onCommitValue,
+  readonly,
+}: {
+  value: JSONValue;
+  onCommitValue?: (value: JSONValue) => void;
+  readonly?: boolean;
+}) {
   const [open, setOpen] = useState(true);
-  const [value, setValue] = useState<string | null>(
-    JSON.stringify(initialValue, null, 2)
-  );
+  const [txt, setTxt] = useState<string>(safeStringifyJson(value, null, 2));
+  const [valid, setValid] = useState(true);
 
-  const { resolvedTheme } = useTheme();
-  const monaco = useMonaco();
-
-  useMonacoTheme(monaco, resolvedTheme ?? "light");
+  useEffect(() => {
+    setValid(isValidJson(txt));
+  }, [txt]);
 
   const cancelChanges = useCallback(() => {
     setOpen(false);
   }, []);
+
+  const onCommit = useCallback(() => {
+    if (valid) {
+      if (onCommitValue) {
+        const finalval = safeParseJson(txt);
+        if (safeStringifyJson(finalval) !== safeStringifyJson(value)) {
+          onCommitValue(finalval);
+        }
+      }
+      setOpen(false);
+    } else {
+      toast.error("Invalid JSON");
+    }
+  }, [txt, valid]);
 
   return (
     <Popover open={open}>
@@ -45,18 +64,30 @@ export function JsonEditCell({ column, row }: RenderEditCellProps<any>) {
         asChild
         className="w-[--radix-popover-trigger-width] max-h-[--radix-popover-content-available-height] p-0"
       >
-        <div className="bg-white border border-neutral-200 rounded shadow-lg overflow-hidden">
-          <BlockKeys value={value} onEscape={cancelChanges} onEnter={() => {}}>
-            <Editor
+        <div className="bg-background border rounded shadow-lg overflow-hidden">
+          <BlockKeys value={null} onEscape={cancelChanges} onEnter={onCommit}>
+            <header className="p-2 border-b">
+              <Badge
+                variant="outline"
+                className="text-xs text-muted-foreground font-mono"
+              >
+                {readonly ? <>READONLY</> : <>EDIT JSON</>}
+              </Badge>
+            </header>
+            <ThemedMonacoEditor
               onMount={(editor) => {
                 editor.focus();
               }}
               width="100%"
-              height={200}
-              value={value ?? ""}
+              height={240}
+              value={txt ?? ""}
+              onChange={(value) => {
+                setTxt(value ?? "");
+              }}
               defaultLanguage="json"
               loading={<Spinner />}
               options={{
+                readOnly: readonly,
                 // top padding
                 padding: {
                   top: 10,
@@ -74,14 +105,56 @@ export function JsonEditCell({ column, row }: RenderEditCellProps<any>) {
                 wordWrap: "on",
               }}
             />
+            {/* TODO: add edit-save feature */}
+            <footer className="flex justify-between p-2 border-t">
+              <Button variant="outline" size="sm" onClick={cancelChanges}>
+                Cancel
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!valid || readonly}
+                onClick={onCommit}
+              >
+                Save
+              </Button>
+            </footer>
           </BlockKeys>
-          {/* TODO: add edit-save feature */}
-          {/* <footer className="flex justify-between p-2 border-t border-neutral-200">
-              <button onClick={cancelChanges}>Cancel</button>
-              <button>Save</button>
-            </footer> */}
         </div>
       </PopoverContent>
     </Popover>
   );
+}
+
+function ThemedMonacoEditor(props: React.ComponentProps<typeof Editor>) {
+  const { resolvedTheme } = useTheme();
+
+  const monaco = useMonaco();
+  useMonacoTheme(monaco, resolvedTheme ?? "light");
+
+  return <Editor {...props} />;
+}
+
+function safeStringifyJson(
+  json: any,
+  replacer?: (number | string)[] | null,
+  space?: string | number
+) {
+  if (json === null) return "";
+  return JSON.stringify(json, replacer, space);
+}
+
+function safeParseJson(jsonString: string) {
+  if (jsonString === "") return null;
+  return JSON.parse(jsonString);
+}
+
+function isValidJson(jsonString: string) {
+  if (jsonString === "") return true;
+  try {
+    JSON.parse(jsonString);
+    return true;
+  } catch (e) {
+    return false;
+  }
 }

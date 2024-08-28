@@ -16,7 +16,7 @@ import {
   ArrowRightIcon,
 } from "@radix-ui/react-icons";
 import { FormInputType } from "@/types";
-import { JsonEditCell } from "./json-cell";
+import { JsonPopupEditorCell } from "./json-cell";
 import { useEditorState } from "../editor";
 import type {
   GFColumn,
@@ -26,7 +26,6 @@ import type {
   GFSystemColumnTypes,
 } from "./types";
 import { SelectColumn } from "./select-column";
-import "./grid.css";
 import { unwrapFeildValue } from "@/lib/forms/unwrap";
 import { Button } from "@/components/ui/button";
 import { FileTypeIcon } from "@/components/form-field-type-icon";
@@ -49,6 +48,7 @@ import { FieldSupports } from "@/k/supported_field_types";
 import { format } from "date-fns";
 import { EmptyRowsRenderer } from "./empty";
 import { ColumnHeaderCell } from "./column-header-cell";
+import "./grid.css";
 
 function rowKeyGetter(row: GFResponseRow) {
   return row.__gf_id;
@@ -169,7 +169,7 @@ export function ResponseGrid({
             editable: true,
             sortable: true,
             draggable: false,
-            minWidth: 140,
+            minWidth: 160,
             maxWidth: 640,
             width: undefined,
             renderHeaderCell: (props) => (
@@ -225,6 +225,11 @@ export function ResponseGrid({
       className="flex-grow select-none"
       rowKeyGetter={rowKeyGetter}
       columns={allcolumns}
+      onCellDoubleClick={() => {
+        if (readonly) {
+          toast("This table is readonly", { icon: "🔒" });
+        }
+      }}
       onColumnsReorder={onColumnsReorder}
       selectedRows={selectionDisabled ? undefined : selected_responses}
       onCopy={onCopy}
@@ -758,8 +763,14 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
           </Select>
         );
       case "json":
-        console.log("json", props, unwrapped);
-        return <JsonEditCell {...props} />;
+        return (
+          <JsonPopupEditorCell
+            value={unwrapped ?? null}
+            onCommitValue={(v) => {
+              commit({ value: v });
+            }}
+          />
+        );
       // not supported
       case "checkboxes":
       case "signature":
@@ -769,7 +780,14 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
     }
   } catch (e) {
     console.error(e);
-    return <JsonEditCell {...props} />;
+    return (
+      <JsonPopupEditorCell
+        value={value}
+        onCommitValue={(v) => {
+          commit({ value: v });
+        }}
+      />
+    );
   }
 }
 

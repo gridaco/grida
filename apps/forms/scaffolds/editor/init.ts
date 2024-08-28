@@ -167,11 +167,11 @@ function initialDatabaseEditorState(
       (acc: Record<GDocTableID, TTablespace>, t) => {
         // @ts-expect-error
         acc[t.id] = {
-          // @ts-expect-error
-          provider: t.x_sb_main_table_connection ? "supabase" : "grida",
+          provider: t.x_sb_main_table_connection ? "x-supabase" : "grida",
           readonly: false,
           realtime: true,
           stream: [],
+          // @ts-expect-error
         } satisfies TTablespace;
         return acc;
       },

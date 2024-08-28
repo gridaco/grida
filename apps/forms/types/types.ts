@@ -4,6 +4,14 @@ import type { Tokens } from "@/ast";
 
 type UUID = string;
 
+export type JSONValue =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: JSONValue | undefined }
+  | JSONValue[];
+
 export type FormMethod = "get" | "post" | "dialog";
 
 export interface Form {

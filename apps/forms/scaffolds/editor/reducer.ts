@@ -961,17 +961,29 @@ export function reducer(
               const { value, option_id } = data;
 
               const space = get_tablespace_feed(draft);
-
               assert(space, "Table space not found");
 
-              const cell = space.stream?.find((row) => row.id === row_id)!.data[
-                attribute_id
-              ];
+              switch (space?.provider) {
+                case "grida": {
+                  const cell = space.stream?.find((row) => row.id === row_id)!
+                    .data[attribute_id];
 
-              if (!cell) return;
+                  if (!cell) return;
 
-              cell.value = value;
-              cell.form_field_option_id = option_id ?? null;
+                  cell.value = value;
+                  cell.form_field_option_id = option_id ?? null;
+                  break;
+                }
+                case "x-supabase": {
+                  console.log("TODO: x-supabase cell update");
+                  break;
+                }
+                case "custom":
+                default:
+                  throw new Error(
+                    "Unsupported table provider: " + space?.provider
+                  );
+              }
 
               break;
             } else {
