@@ -1,9 +1,11 @@
+import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import {
   createRouteHandlerClient,
   grida_xsupabase_client,
 } from "@/lib/supabase/server";
 import { GridaXSupabase } from "@/types";
 import { XSupabasePrivateApiTypes } from "@/types/private/api";
+import assert from "assert";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
@@ -81,15 +83,29 @@ export async function PUT(req: NextRequest, context: Context) {
 
   const { data: supabase_project } = await grida_xsupabase_client
     .from("supabase_project")
-    .select("sb_schema_definitions, tables:supabase_table(*)")
+    .select(
+      "sb_schema_definitions, sb_schema_openapi_docs, tables:supabase_table(*)"
+    )
     .eq("id", conn_ref.supabase_project_id)
     .single();
 
+  assert(supabase_project, "supbase_project not found");
+
   const table_schema = (
-    supabase_project!.sb_schema_definitions as {
+    supabase_project.sb_schema_definitions as {
       [schema: string]: GridaXSupabase.TableSchemaDefinitions;
     }
   )[schema_name][table_name];
+
+  const { methods: sb_postgrest_methods } =
+    SupabasePostgRESTOpenApi.parse_supabase_postgrest_table_path(
+      (
+        supabase_project.sb_schema_openapi_docs as any as {
+          [schema: string]: SupabasePostgRESTOpenApi.SupabaseOpenAPIDocument;
+        }
+      )[schema_name],
+      table_name
+    );
 
   const { data: upserted_supabase_table, error } = await grida_xsupabase_client
     .from("supabase_table")
@@ -99,6 +115,7 @@ export async function PUT(req: NextRequest, context: Context) {
         sb_table_name: table_name,
         sb_schema_name: schema_name,
         sb_table_schema: table_schema,
+        sb_postgrest_methods,
       },
       {
         onConflict: "supabase_project_id, sb_table_name, sb_schema_name",

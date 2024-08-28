@@ -74,12 +74,20 @@ export async function PATCH(req: NextRequest, context: Context) {
   for (const { id, sb_schema_name, sb_table_name } of supabase_project.tables) {
     const new_schema: {} | undefined =
       sb_schema_definitions[sb_schema_name]?.[sb_table_name];
+
+    const { methods } =
+      SupabasePostgRESTOpenApi.parse_supabase_postgrest_table_path(
+        sb_schema_openapi_docs[sb_schema_name],
+        sb_table_name
+      );
+
     const might_be_deleted = !new_schema;
     const { error } = await supabase
       .from("supabase_table")
       .update({
         sb_table_schema: might_be_deleted ? undefined : new_schema,
         // is_deleted: might_be_deleted, // TODO:
+        sb_postgrest_methods: methods,
       })
       .eq("id", id);
     if (error) {

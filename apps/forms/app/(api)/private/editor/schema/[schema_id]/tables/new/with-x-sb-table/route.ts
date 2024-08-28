@@ -1,3 +1,4 @@
+import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import {
   createRouteHandlerClient,
   createRouteHandlerXSBClient,
@@ -55,7 +56,8 @@ export async function POST(req: NextRequest, context: Context) {
     .single();
 
   assert(xsb_project_ref, "supabase project not found for the project");
-  const { sb_schema_definitions, sb_schema_names } = xsb_project_ref;
+  const { sb_schema_definitions, sb_schema_names, sb_schema_openapi_docs } =
+    xsb_project_ref;
 
   // validate target schema name is registered
   assert(
@@ -99,6 +101,17 @@ export async function POST(req: NextRequest, context: Context) {
 
   // #region prep x-sb main table
   // upsert the grida_x_supabase.supabase_table
+
+  const { methods: sb_postgrest_methods } =
+    SupabasePostgRESTOpenApi.parse_supabase_postgrest_table_path(
+      (
+        sb_schema_openapi_docs as any as {
+          [schema: string]: SupabasePostgRESTOpenApi.SupabaseOpenAPIDocument;
+        }
+      )[data.sb_schema_name],
+      data.sb_table_name
+    );
+
   const { data: upserted_supabase_table, error: x_sb_table_err } =
     await grida_x_sb_client
       .from("supabase_table")
@@ -108,6 +121,7 @@ export async function POST(req: NextRequest, context: Context) {
           sb_table_name: data.sb_table_name,
           sb_schema_name: data.sb_schema_name,
           sb_table_schema: tableschema,
+          sb_postgrest_methods: sb_postgrest_methods,
         },
         {
           onConflict: "supabase_project_id, sb_table_name, sb_schema_name",
