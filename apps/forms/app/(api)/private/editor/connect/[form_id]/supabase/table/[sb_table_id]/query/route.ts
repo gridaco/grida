@@ -23,7 +23,7 @@ import { PostgrestQuery } from "@/lib/supabase-postgrest/postgrest-query";
 type Context = {
   params: {
     form_id: string;
-    table_id: string;
+    sb_table_id: string;
   };
 };
 
@@ -33,13 +33,13 @@ export async function GET(req: NextRequest, context: Context) {
   const _q_order = req.nextUrl.searchParams.get("order");
   const order = PostgrestQuery.parseOrderByQueryString(_q_order || "");
 
-  const { form_id, table_id: _table_id } = context.params;
-  const table_id = parseInt(_table_id);
+  const { form_id, sb_table_id: _sb_table_id } = context.params;
+  const sb_table_id = parseInt(_sb_table_id);
 
   const { form, main_supabase_table, x_client, x_storage_client } =
     await get_forms_x_supabase_table_connector({
       form_id,
-      table_id,
+      sb_table_id: sb_table_id,
     });
 
   const { fields } = form;
@@ -82,13 +82,13 @@ export async function GET(req: NextRequest, context: Context) {
 }
 
 export async function PATCH(req: NextRequest, context: Context) {
-  const { form_id, table_id: _table_id } = context.params;
-  const table_id = parseInt(_table_id);
+  const { form_id, sb_table_id: _sb_table_id } = context.params;
+  const sb_table_id = parseInt(_sb_table_id);
 
   const { main_supabase_table, x_client } =
     await get_forms_x_supabase_table_connector({
       form_id,
-      table_id,
+      sb_table_id: sb_table_id,
     });
 
   const body: XSupabaseQuery.Body = await req.json();
@@ -108,13 +108,13 @@ export async function PATCH(req: NextRequest, context: Context) {
 }
 
 export async function DELETE(req: NextRequest, context: Context) {
-  const { form_id, table_id: _table_id } = context.params;
-  const table_id = parseInt(_table_id);
+  const { form_id, sb_table_id: _sb_table_id } = context.params;
+  const sb_table_id = parseInt(_sb_table_id);
 
   const { main_supabase_table, x_client } =
     await get_forms_x_supabase_table_connector({
       form_id,
-      table_id,
+      sb_table_id: sb_table_id,
     });
 
   const body: XSupabaseQuery.Body = await req.json();
@@ -132,10 +132,10 @@ export async function DELETE(req: NextRequest, context: Context) {
 
 async function get_forms_x_supabase_table_connector({
   form_id,
-  table_id,
+  sb_table_id,
 }: {
   form_id: string;
-  table_id: number;
+  sb_table_id: number;
 }) {
   const cookieStore = cookies();
   const grida_forms_client = createRouteHandlerClient(cookieStore);
@@ -164,7 +164,10 @@ async function get_forms_x_supabase_table_connector({
   assert(conn, "connection fetch failed");
   const { main_supabase_table } = conn;
 
-  assert(main_supabase_table?.id === table_id, "only supports main table atm");
+  assert(
+    main_supabase_table?.id === sb_table_id,
+    "only supports main table atm"
+  );
 
   const x_client = await createXSupabaseClient(
     supabase_connection.supabase_project_id,
