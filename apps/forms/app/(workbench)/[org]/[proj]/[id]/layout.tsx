@@ -415,7 +415,9 @@ function Html({ children }: React.PropsWithChildren<{}>) {
         className={cn(
           inter.className,
           // to prevent the whole page from scrolling by sr-only or other hidden absolute elements
-          "h-screen overflow-hidden"
+          "h-screen overflow-hidden",
+          // apply slightly dimmed background for main content
+          "bg-secondary/10"
         )}
       >
         {children}
@@ -461,10 +463,7 @@ function BaseLayout({
             <aside className="hidden lg:flex h-full">
               <Sidebar />
             </aside>
-            {/* apply slightly dimmed background for main content */}
-            <div className="w-full h-full overflow-x-hidden bg-secondary/50">
-              {children}
-            </div>
+            <div className="w-full h-full overflow-x-hidden">{children}</div>
           </div>
         </div>
         <EditorHelpFab />

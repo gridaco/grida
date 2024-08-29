@@ -23,7 +23,9 @@ export default function RootLayout({
         className={clsx(
           inter.className,
           // to prevent the whole page from scrolling by sr-only or other hidden absolute elements
-          "h-screen overflow-hidden"
+          "h-screen overflow-hidden",
+          // apply slightly dimmed background for main content
+          "bg-secondary/10"
         )}
       >
         {process.env.NEXT_PUBLIC_GAID && (

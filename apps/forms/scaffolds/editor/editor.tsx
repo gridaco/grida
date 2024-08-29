@@ -31,21 +31,18 @@ export function EditorProvider({
     case "v0_form":
       return (
         <FormDocumentEditorProvider initial={initial}>
-          <AssetsBackgroundsResolver />
           {children}
         </FormDocumentEditorProvider>
       );
     case "v0_site":
       return (
         <SiteDocumentEditorProvider initial={initial}>
-          <AssetsBackgroundsResolver />
           {children}
         </SiteDocumentEditorProvider>
       );
     case "v0_schema":
       return (
         <DatabaseDocumentEditorProvider initial={initial}>
-          <AssetsBackgroundsResolver />
           {children}
         </DatabaseDocumentEditorProvider>
       );
@@ -65,6 +62,7 @@ export function DatabaseDocumentEditorProvider({
   return (
     <StateProvider state={state} dispatch={dispatch}>
       <TooltipProvider>
+        <AssetsBackgroundsResolver />
         <MediaViewerProvider>
           {/*  */}
           <FormFieldEditPanelProvider />
@@ -87,6 +85,7 @@ export function SiteDocumentEditorProvider({
   return (
     <StateProvider state={state} dispatch={dispatch}>
       <TooltipProvider>
+        <AssetsBackgroundsResolver />
         <MediaViewerProvider>
           {/*  */}
           {children}
@@ -108,6 +107,7 @@ export function FormDocumentEditorProvider({
   return (
     <StateProvider state={state} dispatch={dispatch}>
       <TooltipProvider>
+        <AssetsBackgroundsResolver />
         <MediaViewerProvider>
           <FormFieldEditPanelProvider />
           <RowEditPanelProvider />
