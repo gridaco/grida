@@ -185,7 +185,7 @@ export function ResponseGrid({
             sortable: true,
             draggable: false,
             minWidth: 160,
-            maxWidth: 640,
+            maxWidth: columns.length <= 1 ? undefined : 640,
             width: undefined,
             renderHeaderCell: (props) => (
               <ColumnHeaderCell
