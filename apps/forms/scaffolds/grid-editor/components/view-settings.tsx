@@ -162,8 +162,9 @@ function DoctypeFormsCampaignTZ() {
   const [state] = useEditorState();
 
   const {
-    //
-    campaign: { scheduling_tz },
+    form: {
+      campaign: { scheduling_tz },
+    },
   } = state;
 
   const tzoffset_scheduling_tz = useMemo(

@@ -391,7 +391,6 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
       },
     },
     tables: values,
-    campaign: init.campaign,
 
     blocks: blockstreeflat(init.blocks),
     document: {
@@ -406,6 +405,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
     form: {
       form_id: init.form_id,
       form_title: init.form_title,
+      campaign: init.campaign,
       ending: init.ending,
       fields: init.fields,
       form_security: init.form_security,

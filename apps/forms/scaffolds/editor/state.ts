@@ -82,7 +82,7 @@ export interface SchemaDocumentEditorInit extends BaseDocumentEditorInit {
 export interface FormDocumentEditorInit extends BaseDocumentEditorInit {
   doctype: "v0_form";
   form_id: string;
-  campaign: EditorState["campaign"];
+  campaign: EditorState["form"]["campaign"];
   form_security: EditorState["form"]["form_security"];
   ending: EditorState["form"]["ending"];
   connections?: {
@@ -446,18 +446,6 @@ export interface FormEditorState
     IEditorSidebarState,
     ITablespaceEditorState,
     IDataGridState {
-  campaign: {
-    max_form_responses_by_customer: number | null;
-    is_max_form_responses_by_customer_enabled: boolean;
-    max_form_responses_in_total: number | null;
-    is_max_form_responses_in_total_enabled: boolean;
-    is_force_closed: boolean;
-    is_scheduling_enabled: boolean;
-    scheduling_open_at: string | null;
-    scheduling_close_at: string | null;
-    scheduling_tz?: string;
-  };
-
   blocks: EditorFlatFormBlock[];
 
   form: {
@@ -465,6 +453,17 @@ export interface FormEditorState
     form_title: string;
     fields: FormFieldDefinition[];
     available_field_ids: string[];
+    campaign: {
+      max_form_responses_by_customer: number | null;
+      is_max_form_responses_by_customer_enabled: boolean;
+      max_form_responses_in_total: number | null;
+      is_max_form_responses_in_total_enabled: boolean;
+      is_force_closed: boolean;
+      is_scheduling_enabled: boolean;
+      scheduling_open_at: string | null;
+      scheduling_close_at: string | null;
+      scheduling_tz?: string;
+    };
     ending: {
       is_redirect_after_response_uri_enabled: boolean;
       redirect_after_response_uri: string | null;

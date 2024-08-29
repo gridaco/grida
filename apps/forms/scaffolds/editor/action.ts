@@ -374,7 +374,7 @@ export interface EditorThemeBackgroundAction {
 }
 
 export interface FormCampaignPreferencesAction
-  extends Partial<EditorState["campaign"]> {
+  extends Partial<EditorState["form"]["campaign"]> {
   type: "editor/form/campaign/preferences";
 }
 

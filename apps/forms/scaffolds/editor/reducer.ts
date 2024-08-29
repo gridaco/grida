@@ -1020,8 +1020,8 @@ export function reducer(
     case "editor/form/campaign/preferences": {
       const { type, ...pref } = <FormCampaignPreferencesAction>action;
       return produce(state, (draft) => {
-        draft.campaign = {
-          ...draft.campaign,
+        draft.form.campaign = {
+          ...draft.form.campaign,
           ...pref,
         };
       });

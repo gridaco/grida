@@ -18,7 +18,7 @@ import { useEditorState } from "@/scaffolds/editor";
 
 export function ClosingFormPreferences() {
   const [state, dispatch] = useEditorState();
-  const { form, campaign } = state;
+  const { form } = state;
 
   const {
     handleSubmit,
@@ -27,7 +27,7 @@ export function ClosingFormPreferences() {
     reset,
   } = useForm({
     defaultValues: {
-      is_force_closed: campaign.is_force_closed,
+      is_force_closed: form.campaign.is_force_closed,
     },
   });
 

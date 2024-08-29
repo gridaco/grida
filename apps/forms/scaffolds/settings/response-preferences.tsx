@@ -30,7 +30,7 @@ import { useEditorState } from "../editor";
 export function RestrictNumberOfResponseByCustomer() {
   const [state, dispatch] = useEditorState();
 
-  const { form, campaign } = state;
+  const { form } = state;
 
   const {
     handleSubmit,
@@ -40,8 +40,8 @@ export function RestrictNumberOfResponseByCustomer() {
     watch,
   } = useForm({
     defaultValues: {
-      enabled: campaign.is_max_form_responses_by_customer_enabled,
-      max: campaign.max_form_responses_by_customer || 1,
+      enabled: form.campaign.is_max_form_responses_by_customer_enabled,
+      max: form.campaign.max_form_responses_by_customer || 1,
     },
   });
 
@@ -192,7 +192,7 @@ function MaxResponsesByCustomerHelpWarning() {
 export function MaxRespoonses() {
   const [state, dispatch] = useEditorState();
 
-  const { form, campaign } = state;
+  const { form } = state;
 
   const {
     handleSubmit,
@@ -202,8 +202,8 @@ export function MaxRespoonses() {
     watch,
   } = useForm({
     defaultValues: {
-      enabled: campaign.is_max_form_responses_in_total_enabled,
-      max: campaign.max_form_responses_in_total || 100,
+      enabled: form.campaign.is_max_form_responses_in_total_enabled,
+      max: form.campaign.max_form_responses_in_total || 100,
     },
   });
 
