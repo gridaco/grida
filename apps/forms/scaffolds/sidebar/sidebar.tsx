@@ -124,7 +124,7 @@ function ModeProjectHiearchy() {
               {current_project_documents.map((d) => (
                 <Link
                   key={d.id}
-                  href={editorlink("form/edit", {
+                  href={editorlink(".", {
                     document_id: d.id,
                     basepath,
                   })}

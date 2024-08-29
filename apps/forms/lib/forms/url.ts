@@ -26,6 +26,7 @@ type EditorPageParamsMap = {
   "data/analytics": {};
   "data/simulator": {};
   "data/table/[tablename]": { tablename: string }; // Requires tablename in addition to shared params
+  "data/table/~new": {};
   connect: {};
   "connect/share": {};
   "connect/parameters": {};
@@ -87,6 +88,8 @@ export function editorlink<P extends EditorPageType>(
       return `${origin}/${basepath}/${id}/connect/store/products`;
     case "connect/database/supabase":
       return `${origin}/${basepath}/${id}/connect/database/supabase`;
+    case "data/table/~new":
+      return `${origin}/${basepath}/${id}/data/table/~new`;
     case "data/table/[tablename]":
       const { tablename } = params as unknown as { tablename: string };
       return `${origin}/${basepath}/${id}/data/table/${tablename}`;

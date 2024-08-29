@@ -134,6 +134,23 @@ function initialDatabaseEditorState(
   init: SchemaDocumentEditorInit
 ): EditorState {
   const base = initialBaseDocumentEditorState(init);
+
+  const tables: GDocTable[] = [...init.tables.map(schematableinit)];
+
+  const sb_auth_users = {
+    provider: "x-supabase",
+    id: EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID,
+    row_keyword: "user",
+    icon: "supabase",
+    name: "auth.users",
+    label: "auth.users",
+    description: null,
+    readonly: true,
+  } satisfies GDocTable;
+
+  const should_add_sb_auth_users =
+    init.supabase_project && tables.some((t) => t.provider === "x-supabase");
+
   // @ts-ignore
   return {
     ...base,
@@ -147,24 +164,44 @@ function initialDatabaseEditorState(
     sidebar: {
       mode: initial_sidebar_mode[init.doctype],
       mode_data: {
-        tables: init.tables.map((t) =>
-          table_to_sidebar_table_menu(t, {
-            basepath: base.basepath,
-            document_id: base.document_id,
-          })
-        ),
+        tables: init.tables
+          .map((t) =>
+            table_to_sidebar_table_menu(t, {
+              basepath: base.basepath,
+              document_id: base.document_id,
+            })
+          )
+          .concat(
+            should_add_sb_auth_users
+              ? [
+                  {
+                    id: EditorSymbols.Table
+                      .SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID,
+                    href: tablehref(
+                      base.basepath,
+                      base.document_id,
+                      sb_auth_users
+                    ),
+                    label: "auth.users",
+                    icon: "supabase",
+                    section: "Tables",
+                    data: {
+                      readonly: true,
+                    },
+                  } satisfies TableMenuItem,
+                ]
+              : []
+          ),
         menus: [],
       },
     },
     ...initialDatagridState(),
     datagrid_table_id: init.tables.length > 0 ? init.tables[0].id : null,
-    tables: init.tables.map((t) => {
-      return schematableinit(t);
-    }),
-
+    tables: tables.concat(should_add_sb_auth_users ? [sb_auth_users] : []),
     // @ts-expect-error
-    tablespace: init.tables.reduce(
-      (acc: Record<GDocTableID, TTablespace>, t) => {
+    tablespace: {
+      // @ts-expect-error
+      ...init.tables.reduce((acc: Record<GDocTableID, TTablespace>, t) => {
         // @ts-expect-error
         acc[t.id] = {
           provider: t.x_sb_main_table_connection ? "x-supabase" : "grida",
@@ -174,9 +211,10 @@ function initialDatabaseEditorState(
           // @ts-expect-error
         } satisfies TTablespace;
         return acc;
-      },
-      {}
-    ),
+      }, {}),
+      [EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID]:
+        "noop" as never,
+    },
   };
 }
 
@@ -200,6 +238,10 @@ function initialSiteEditorState(init: SiteDocumentEditorInit): EditorState {
       nodes: [],
       templatesample: "formcollection_sample_001_the_bundle",
       templatedata: {},
+    },
+    sidebar: {
+      mode: initial_sidebar_mode[init.doctype],
+      mode_data: { tables: [], menus: [] },
     },
     tables: [],
   };
@@ -234,16 +276,6 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
           description: null,
           readonly: false,
           x_sb_main_table_connection: xsbmtinit(init.connections.supabase)!,
-        } satisfies GDocTable,
-        [EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID]: {
-          provider: "x-supabase",
-          id: EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID,
-          row_keyword: "user",
-          icon: "supabase",
-          name: "auth.users",
-          label: "auth.users",
-          description: null,
-          readonly: true,
         } satisfies GDocTable,
       }
     : {
@@ -295,22 +327,6 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
           section: "Tables",
           data: {
             readonly: false,
-          },
-        } satisfies TableMenuItem,
-        {
-          id: EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID,
-          href: tablehref(
-            basepath,
-            document_id,
-            (tables as any)[
-              EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID
-            ]
-          ),
-          label: "auth.users",
-          icon: "supabase",
-          section: "Tables",
-          data: {
-            readonly: true,
           },
         } satisfies TableMenuItem,
       ]

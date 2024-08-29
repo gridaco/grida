@@ -41,7 +41,7 @@ export default function SchemaTablePage({
   const isvalid = valid(tb);
 
   if (!isvalid) {
-    if (tablename === "new") {
+    if (tablename === "~new") {
       return (
         <EmptyWelcome
           art={<TableIcon className="w-10 h-10 text-muted-foreground" />}
