@@ -622,7 +622,7 @@ export function CustomerFeedProvider({
     datagrid_table_refresh_key,
   } = state;
 
-  const client = createClientWorkspaceClient();
+  const client = useMemo(() => createClientWorkspaceClient(), []);
 
   const setLoading = useChangeDatagridLoading();
 
