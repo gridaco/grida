@@ -120,6 +120,9 @@ export function table_to_sidebar_table_menu(
             tb.x_sb_main_table_connection?.sb_postgrest_methods
           )
         : false,
+      rules: {
+        delete_restricted: false,
+      },
     },
   };
 }
@@ -146,6 +149,9 @@ function initialDatabaseEditorState(
     label: "auth.users",
     description: null,
     readonly: true,
+    rules: {
+      delete_restricted: true,
+    },
   } satisfies GDocTable;
 
   const should_add_sb_auth_users =
@@ -187,6 +193,9 @@ function initialDatabaseEditorState(
                     section: "Tables",
                     data: {
                       readonly: true,
+                      rules: {
+                        delete_restricted: true,
+                      },
                     },
                   } satisfies TableMenuItem,
                 ]
@@ -276,6 +285,9 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
           description: null,
           readonly: false,
           x_sb_main_table_connection: xsbmtinit(init.connections.supabase)!,
+          rules: {
+            delete_restricted: true,
+          },
         } satisfies GDocTable,
       }
     : {
@@ -288,6 +300,9 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
           label: "Responses",
           description: null,
           readonly: false,
+          rules: {
+            delete_restricted: true,
+          },
         } satisfies GDocTable,
         [EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID]: {
           id: EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID,
@@ -298,6 +313,9 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
           label: "Sessions",
           description: null,
           readonly: true,
+          rules: {
+            delete_restricted: true,
+          },
         } satisfies GDocTable,
         [EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID]: {
           id: EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID,
@@ -308,6 +326,9 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
           label: "Customers",
           description: null,
           readonly: true,
+          rules: {
+            delete_restricted: true,
+          },
         } satisfies GDocTable,
       };
 
@@ -327,6 +348,9 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
           section: "Tables",
           data: {
             readonly: false,
+            rules: {
+              delete_restricted: true,
+            },
           },
         } satisfies TableMenuItem,
       ]
@@ -345,6 +369,9 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
           section: "Tables",
           data: {
             readonly: false,
+            rules: {
+              delete_restricted: true,
+            },
           },
         } satisfies TableMenuItem,
         {
@@ -359,6 +386,9 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
           section: "Tables",
           data: {
             readonly: true,
+            rules: {
+              delete_restricted: true,
+            },
           },
         } satisfies TableMenuItem,
       ];
@@ -546,6 +576,9 @@ export function schematableinit(table: {
       icon: "supabase",
       attributes: table.attributes,
       x_sb_main_table_connection: table.x_sb_main_table_connection,
+      rules: {
+        delete_restricted: false,
+      },
     } satisfies GDocSchemaTable;
   } else {
     return {
@@ -558,6 +591,9 @@ export function schematableinit(table: {
       row_keyword: "row",
       icon: "table",
       attributes: table.attributes,
+      rules: {
+        delete_restricted: false,
+      },
     } satisfies GDocSchemaTable;
   }
 }

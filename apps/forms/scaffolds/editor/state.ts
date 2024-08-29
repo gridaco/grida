@@ -110,6 +110,9 @@ type GDocTableBase = {
   description: string | null;
   icon: ResourceTypeIconName;
   readonly: boolean;
+  rules: {
+    delete_restricted: boolean;
+  };
   label: string;
 };
 
@@ -279,6 +282,9 @@ export type TableMenuItem = MenuItem<
   GDocTableID,
   {
     readonly: boolean;
+    rules: {
+      delete_restricted: boolean;
+    };
   }
 >;
 
