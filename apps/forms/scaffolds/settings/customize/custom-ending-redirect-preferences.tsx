@@ -22,7 +22,7 @@ import toast from "react-hot-toast";
 export function EndingRedirectPreferences() {
   const [state, dispatch] = useEditorState();
   const {
-    form_id,
+    form,
     form: { ending },
   } = state;
 
@@ -45,7 +45,7 @@ export function EndingRedirectPreferences() {
     redirect_after_response_uri: string | null;
   }) => {
     const req = PrivateEditorApi.Settings.updateFormRedirectAfterSubmission({
-      form_id,
+      form_id: form.form_id,
       ...data,
     });
 
@@ -75,7 +75,6 @@ export function EndingRedirectPreferences() {
       <PreferenceBoxHeader heading={<>Custom Redirect URI</>} />
       <PreferenceBody>
         <form id="redirect-uri" onSubmit={handleSubmit(onSubmit)}>
-          <input type="hidden" name="form_id" value={form_id} />
           <div className="flex flex-col gap-2">
             <div className="flex items-center space-x-2">
               <Controller

@@ -10,7 +10,7 @@ export function useUploadFile() {
   return useCallback(
     async (file: Blob | File) => {
       if (!file) throw new Error("No file provided");
-      const fileKey = `${state.form_id}/${nanoid()}`;
+      const fileKey = `${state.form.form_id}/${nanoid()}`;
       return await supabase.storage
         .from("grida-forms")
         .upload(fileKey, file, {
@@ -24,6 +24,6 @@ export function useUploadFile() {
             .publicUrl;
         });
     },
-    [supabase.storage, state.form_id]
+    [supabase.storage, state.form.form_id]
   );
 }

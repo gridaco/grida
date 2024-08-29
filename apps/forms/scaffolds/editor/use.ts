@@ -90,7 +90,7 @@ export function useDatabaseTableId(): string | null {
   // TODO: clean this up. temporary fix for supporting v0_form and v0_schema
   const table_id: string =
     state.doctype === "v0_form"
-      ? state.form_id
+      ? state.form.form_id
       : (state.datagrid_table_id as string);
 
   return table_id;

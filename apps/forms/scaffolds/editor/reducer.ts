@@ -147,7 +147,7 @@ export function reducer(
       const __shared: EditorFlatFormBlock = {
         id,
         created_at: new Date().toISOString(),
-        form_id: state.form_id,
+        form_id: state.form.form_id,
         form_page_id: state.document_id,
         parent_id: block === "section" ? null : parent_id,
         type: block,

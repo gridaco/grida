@@ -70,7 +70,7 @@ export function SupabaseStorageSettings({
         res.data.data && setBuckets(res.data.data);
       });
     }
-  }, [enabled, state.form_id, state.connections.supabase]);
+  }, [enabled, state.connections.supabase]);
 
   useEffect(() => {
     setBucket(value?.bucket);

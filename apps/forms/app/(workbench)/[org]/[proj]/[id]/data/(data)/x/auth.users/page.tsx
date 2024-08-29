@@ -25,7 +25,7 @@ export default function XTablePage() {
   const [state, dispatch] = useEditorState();
 
   const {
-    form_id,
+    form,
     datagrid_rows_per_page,
     datagrid_orderby,
     datagrid_table_refresh_key,
@@ -42,7 +42,7 @@ export default function XTablePage() {
 
   const request = state.connections.supabase?.main_supabase_table_id
     ? PrivateEditorApi.XSupabase.url_table_auth_users_query(
-        form_id,
+        form.form_id,
         serachParams
       )
     : null;

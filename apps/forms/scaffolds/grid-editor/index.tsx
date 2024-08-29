@@ -527,7 +527,7 @@ function DeleteSelectedRowsButton({
     }
 
     const res = PrivateEditorApi.SupabaseQuery.qdelete({
-      form_id: state.form_id,
+      form_id: state.form.form_id,
       main_table_id: state.connections!.supabase!.main_supabase_table_id!,
       filters: [
         {
@@ -551,7 +551,13 @@ function DeleteSelectedRowsButton({
       success: "Deleted",
       error: "Failed",
     });
-  }, [tb, state.form_id, state.connections, datagrid_selected_rows, dispatch]);
+  }, [
+    tb,
+    state.form.form_id,
+    state.connections,
+    datagrid_selected_rows,
+    dispatch,
+  ]);
 
   const onDeleteSelection = useCallback(() => {
     switch (datagrid_table_id) {

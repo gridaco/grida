@@ -21,6 +21,7 @@ type EditorPageParamsMap = {
   form: {};
   "form/edit": {};
   settings: {};
+  design: {};
   data: {};
   "data/responses": {};
   "data/analytics": {};
@@ -62,6 +63,8 @@ export function editorlink<P extends EditorPageType>(
     //   return `${origin}/${basepath}/${form_id}/settings/customize`;
     // case "settings/general":
     //   return `${origin}/${basepath}/${form_id}/settings/general`;
+    case "design":
+      return `${origin}/${basepath}/${id}/design`;
     case "data":
       return `${origin}/${basepath}/${id}/data`;
     case "data/responses":

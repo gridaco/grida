@@ -446,7 +446,6 @@ export interface FormEditorState
     IEditorSidebarState,
     ITablespaceEditorState,
     IDataGridState {
-  form_id: string;
   form_title: string;
   campaign: {
     max_form_responses_by_customer: number | null;
@@ -463,6 +462,7 @@ export interface FormEditorState
   blocks: EditorFlatFormBlock[];
 
   form: {
+    form_id: string;
     fields: FormFieldDefinition[];
     available_field_ids: string[];
     ending: {

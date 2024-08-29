@@ -428,7 +428,7 @@ export function FormResponseFeedProvider({
   const [state, dispatch] = useEditorState();
 
   const {
-    form_id,
+    form,
     datagrid_table_id,
     datagrid_rows_per_page,
     datagrid_table_refresh_key,
@@ -440,7 +440,7 @@ export function FormResponseFeedProvider({
 
   const setLoading = useChangeDatagridLoading();
 
-  const fetchResponses = useFetchSchemaTableRows(form_id);
+  const fetchResponses = useFetchSchemaTableRows(form.form_id);
 
   const fetchResponse = useFetchSchemaTableRow();
 
@@ -481,7 +481,7 @@ export function FormResponseFeedProvider({
 
   useSubscription({
     table: "response",
-    form_id,
+    form_id: form.form_id,
     onInsert: (data) => {
       setTimeout(() => {
         const newresponse = fetchResponse((data as { id: string }).id).then(
@@ -535,7 +535,7 @@ export function FormResponseSessionFeedProvider({
   const [state, dispatch] = useEditorState();
 
   const {
-    form_id,
+    form,
     datagrid_table_id,
     datagrid_rows_per_page,
     datagrid_table_refresh_key,
@@ -550,7 +550,7 @@ export function FormResponseSessionFeedProvider({
 
   const setLoading = useChangeDatagridLoading();
 
-  const fetchResponseSessions = useFetchResponseSessions(form_id);
+  const fetchResponseSessions = useFetchResponseSessions(form.form_id);
 
   useEffect(() => {
     if (
@@ -589,7 +589,7 @@ export function FormResponseSessionFeedProvider({
 
   useSubscription({
     table: "response_session",
-    form_id,
+    form_id: form.form_id,
     onInsert: (data) => {
       dispatch({
         type: "editor/data/sessions/feed",
@@ -677,7 +677,7 @@ export function FormXSupabaseMainTableSyncProvider({
   const pk = tb?.x_sb_main_table_connection.pk;
 
   useXSBSyncCellChangesEffect(prev, current, {
-    table_id: state.form_id,
+    table_id: state.form.form_id,
     pk: pk,
     sb_table_id: state.connections.supabase?.main_supabase_table_id,
   });
@@ -693,7 +693,7 @@ export function FormXSupabaseMainTableFeedProvider({
 
   useXSBTableFeed(
     {
-      table_id: state.form_id,
+      table_id: state.form.form_id,
       sb_table_id: state.connections.supabase?.main_supabase_table_id,
       onFeed: (rows) => {
         dispatch({

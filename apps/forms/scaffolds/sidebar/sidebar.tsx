@@ -148,7 +148,7 @@ function ModeProjectHiearchy() {
 
 function ModeSettings() {
   const [state] = useEditorState();
-  const { form_id, organization, project } = state;
+  // const { form, organization, project } = state;
   return (
     <>
       <SidebarSection>

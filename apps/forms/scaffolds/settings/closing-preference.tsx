@@ -18,7 +18,7 @@ import { useEditorState } from "@/scaffolds/editor";
 
 export function ClosingFormPreferences() {
   const [state, dispatch] = useEditorState();
-  const { form_id, campaign } = state;
+  const { form, campaign } = state;
 
   const {
     handleSubmit,
@@ -33,7 +33,7 @@ export function ClosingFormPreferences() {
 
   const onSubmit = async (data: { is_force_closed: boolean }) => {
     const req = PrivateEditorApi.Settings.updateFormAccessForceClose({
-      form_id,
+      form_id: form.form_id,
       closed: data.is_force_closed,
     });
 

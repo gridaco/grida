@@ -374,7 +374,6 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
       supabase: init.connections?.supabase,
     },
     theme: init.theme,
-    form_id: init.form_id,
     form_title: init.form_title,
     sidebar: {
       mode: initial_sidebar_mode[init.doctype],
@@ -406,6 +405,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
       templatedata: {},
     },
     form: {
+      form_id: init.form_id,
       ending: init.ending,
       fields: init.fields,
       form_security: init.form_security,

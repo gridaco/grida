@@ -133,7 +133,7 @@ function ConnectSupabase() {
 
   const {
     supabase_project: existing_connection,
-    form_id,
+    form,
     doctype,
     project: { id: project_id },
   } = state;
@@ -434,7 +434,7 @@ function ConnectSupabase() {
               <SectorHeading>Forms Table</SectorHeading>
             </SectorHeader>
             <ConnectFormXSupabaseTable
-              form_id={form_id}
+              form_id={form.form_id}
               connection={{
                 supabase_project_id: xsbproject.id,
                 sb_project_url: xsbproject.sb_project_url,

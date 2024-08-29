@@ -15,9 +15,9 @@ import { useEditorState } from "@/scaffolds/editor";
 export function PreviewButton() {
   const [state] = useEditorState();
 
-  const { form_id, document_id, organization, project } = state;
+  const { form, document_id, organization, project } = state;
 
-  const built_in_agent_url = formlink("", form_id);
+  const built_in_agent_url = formlink("", form.form_id);
 
   return (
     <div role="group" className="inline-flex rounded-md shadow-sm">

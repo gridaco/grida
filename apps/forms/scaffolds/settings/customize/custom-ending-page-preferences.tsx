@@ -51,7 +51,7 @@ export function EndingPagePreferences() {
 
   const {
     form_title,
-    form_id,
+    form,
     theme: { lang },
     form: { ending },
   } = state;
@@ -97,7 +97,7 @@ export function EndingPagePreferences() {
           : undefined,
       })
       // TODO: change to document id after migration
-      .eq("form_id", form_id);
+      .eq("form_id", form.form_id);
 
     if (error) throw error;
 
@@ -174,7 +174,7 @@ export function EndingPagePreferences() {
       </PreferenceBody>
       <CustomizeTemplate
         key={template}
-        form_id={form_id}
+        form_id={form.form_id}
         title={form_title}
         lang={lang}
         init={{

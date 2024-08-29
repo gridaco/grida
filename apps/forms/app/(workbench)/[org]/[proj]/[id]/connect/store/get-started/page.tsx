@@ -103,7 +103,7 @@ function ConnectStoreForm() {
   return (
     <form
       id="connect-store-form"
-      action={`/private/editor/connect/${state.form_id}/store/connection?next=${next}`}
+      action={`/private/editor/connect/${state.form.form_id}/store/connection?next=${next}`}
       method="POST"
       className="prose dark:prose-invert"
     >

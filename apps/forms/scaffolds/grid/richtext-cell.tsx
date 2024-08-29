@@ -44,7 +44,7 @@ export function RichTextEditCell({
   const [state] = useEditorState();
   const uploader = async (file: File) => {
     const createsignedres = await PrivateEditorApi.Files.createSignedUploadUrl({
-      form_id: state.form_id,
+      form_id: state.form.form_id,
       field_id: field_id,
       row_id: row_id,
       file: filemeta(file),
@@ -70,7 +70,7 @@ export function RichTextEditCell({
 
     const publicurlres = await PrivateEditorApi.FormFieldFile.getPublicUrl({
       field_id: field_id,
-      form_id: state.form_id,
+      form_id: state.form.form_id,
       filepath: path,
     });
 

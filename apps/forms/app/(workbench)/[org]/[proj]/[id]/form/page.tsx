@@ -25,7 +25,7 @@ export default function FormDashboard() {
   const [state, dispatch] = useEditorState();
 
   const {
-    form_id,
+    form,
     theme: { lang },
     document: { selected_page_id },
   } = state;
@@ -36,7 +36,7 @@ export default function FormDashboard() {
         <SectorHeader>
           <SectorHeading>General</SectorHeading>
         </SectorHeader>
-        <AboutThisForm form_id={form_id} />
+        <AboutThisForm form_id={form.form_id} />
       </Sector>
       <Sector id="access">
         <SectorHeader>

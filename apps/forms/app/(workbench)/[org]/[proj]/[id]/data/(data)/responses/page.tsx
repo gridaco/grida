@@ -73,7 +73,7 @@ function SwitchGridEditor() {
 
 function FormResponseGridEditor() {
   const [state, dispatch] = useEditorState();
-  const { form_id, tablespace, datagrid_filter, datagrid_table_id } = state;
+  const { form, tablespace, datagrid_filter, datagrid_table_id } = state;
 
   const tb = useDatagridTable<GDocTable>();
 
@@ -96,7 +96,7 @@ function FormResponseGridEditor() {
   // Transforming the responses into the format expected by react-data-grid
   const { filtered, inputlength } = useMemo(() => {
     return GridData.rows({
-      form_id: form_id,
+      form_id: form.form_id,
       // TODO: types with symbols not working ?
       table: datagrid_table_id as any,
       fields: fields,
@@ -105,7 +105,7 @@ function FormResponseGridEditor() {
       sessions: sessions_stream ?? [],
     });
   }, [
-    form_id,
+    form.form_id,
     datagrid_table_id,
     sessions_stream,
     fields,
@@ -130,7 +130,7 @@ function FormResponseGridEditor() {
 function ModeXSBMainTable() {
   const [state, dispatch] = useEditorState();
 
-  const { form_id, tablespace, datagrid_filter, datagrid_table_id } = state;
+  const { form, tablespace, datagrid_filter, datagrid_table_id } = state;
 
   const tb = useDatagridTable<GDocFormsXSBTable>();
 
@@ -153,7 +153,7 @@ function ModeXSBMainTable() {
 
   const { filtered } = useMemo(() => {
     return GridData.rows({
-      form_id: form_id,
+      form_id: form.form_id,
       table: EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID,
       fields: fields,
       filter: datagrid_filter,
@@ -162,7 +162,7 @@ function ModeXSBMainTable() {
         rows: stream ?? [],
       },
     });
-  }, [form_id, fields, tb, stream, datagrid_filter]);
+  }, [form.form_id, fields, tb, stream, datagrid_filter]);
 
   if (!tb) {
     return <Invalid />;

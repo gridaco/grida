@@ -54,7 +54,7 @@ const START_COUNTDOWN = 5 * 1000;
 
 export default function SimulatorPage() {
   const [state] = useEditorState();
-  const { form_id } = state;
+  const { form } = state;
   const [status, setStatus] = useState<SimulatorStatus>("none");
   const [startsAt, setStartsAt] = useState<Date | null>(null);
   const [plan, setPlan] = useState<SimulationPlan | null>(null);
@@ -95,7 +95,9 @@ export default function SimulatorPage() {
           }}
         />
       )}
-      {status === "running" && <TaskHandler form_id={form_id} plan={plan!} />}
+      {status === "running" && (
+        <TaskHandler form_id={form.form_id} plan={plan!} />
+      )}
     </main>
   );
 }

@@ -31,7 +31,7 @@ import { useEditorState } from "@/scaffolds/editor";
 
 export function SchedulingPreferences() {
   const [state, dispatch] = useEditorState();
-  const { form_id, campaign } = state;
+  const { form, campaign } = state;
 
   const initialTZ =
     campaign.scheduling_tz || Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -94,7 +94,7 @@ export function SchedulingPreferences() {
     }
 
     const payload = {
-      form_id: form_id,
+      form_id: form.form_id,
       enabled: data.is_scheduling_enabled,
       open_at: scheduling_open_at
         ? fromZonedTime(scheduling_open_at, openTz).toISOString()
@@ -142,7 +142,6 @@ export function SchedulingPreferences() {
           id="scheduling-preferences-form"
           onSubmit={handleSubmit(handleSave)}
         >
-          <input type="hidden" name="form_id" value={form_id} />
           <div className="flex gap-2 items-center">
             <Controller
               name="is_scheduling_enabled"

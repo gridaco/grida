@@ -30,7 +30,7 @@ import { useEditorState } from "../editor";
 export function RestrictNumberOfResponseByCustomer() {
   const [state, dispatch] = useEditorState();
 
-  const { form_id, campaign } = state;
+  const { form, campaign } = state;
 
   const {
     handleSubmit,
@@ -48,7 +48,7 @@ export function RestrictNumberOfResponseByCustomer() {
   const onSubmit = async (data: { enabled: boolean; max: number }) => {
     const req =
       PrivateEditorApi.Settings.updateFormAccessMaxResponsesByCustomer({
-        form_id,
+        form_id: form.form_id,
         ...data,
       });
 
@@ -81,7 +81,6 @@ export function RestrictNumberOfResponseByCustomer() {
       />
       <PreferenceBody>
         <form id="max-responses-by-customer" onSubmit={handleSubmit(onSubmit)}>
-          <input type="hidden" name="form_id" value={form_id} />
           <div className="flex flex-col gap-2">
             <div className="flex items-center space-x-2">
               <Controller
@@ -193,7 +192,7 @@ function MaxResponsesByCustomerHelpWarning() {
 export function MaxRespoonses() {
   const [state, dispatch] = useEditorState();
 
-  const { form_id, campaign } = state;
+  const { form, campaign } = state;
 
   const {
     handleSubmit,
@@ -210,7 +209,7 @@ export function MaxRespoonses() {
 
   const onSubmit = async (data: { enabled: boolean; max: number }) => {
     const req = PrivateEditorApi.Settings.updateFormAccessMaxResponsesInTotal({
-      form_id,
+      form_id: form.form_id,
       ...data,
     });
 
@@ -247,7 +246,6 @@ export function MaxRespoonses() {
       />
       <PreferenceBody>
         <form id="max-responses-in-total" onSubmit={handleSubmit(onSubmit)}>
-          <input type="hidden" name="form_id" value={form_id} />
           <div className="flex flex-col">
             <div className="flex items-center space-x-2">
               <Controller
