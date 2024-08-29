@@ -50,7 +50,6 @@ export function EndingPagePreferences() {
   const [state] = useEditorState();
 
   const {
-    form_title,
     form,
     theme: { lang },
     form: { ending },
@@ -163,7 +162,7 @@ export function EndingPagePreferences() {
           {template && (
             <div className="flex justify-center items-center min-h-96">
               <Preview
-                title={form_title}
+                title={form.form_title}
                 lang={lang}
                 template={template}
                 overrides={overrides}
@@ -175,7 +174,7 @@ export function EndingPagePreferences() {
       <CustomizeTemplate
         key={template}
         form_id={form.form_id}
-        title={form_title}
+        title={form.form_title}
         lang={lang}
         init={{
           template_id: template ?? "default",

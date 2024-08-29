@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 export function DeleteFormSection() {
   const [state] = useEditorState();
 
-  const confirmationText = "DELETE " + state.form_title;
+  const confirmationText = "DELETE " + state.form.form_title;
 
   return (
     <div className="border border-destructive/30 text-sm rounded-lg p-4">

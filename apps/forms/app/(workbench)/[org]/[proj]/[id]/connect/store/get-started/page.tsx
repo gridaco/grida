@@ -136,7 +136,7 @@ function ConnectStoreForm() {
               id="name"
               name="name"
               autoFocus
-              defaultValue={generated_form_store_name(state.form_title)}
+              defaultValue={generated_form_store_name(state.form.form_title)}
               placeholder="Store Name"
             />
           </div>
