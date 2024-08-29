@@ -247,6 +247,7 @@ export function ModeData() {
 
             return true;
           } catch (e) {
+            console.error(e);
             toast.error("Failed to delete table");
             return false;
           }

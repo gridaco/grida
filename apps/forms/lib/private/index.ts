@@ -280,15 +280,15 @@ export namespace PrivateEditorApi {
       );
     }
 
+    export const url_x_auth_users_get = (
+      supabase_project_id: number,
+      serachParams: URLSearchParams | string
+    ) =>
+      `/private/editor/x-supabase/projects/${supabase_project_id}/x/auth.users/query?${serachParams}`;
+
     // #endregion supabase project
 
     // #region table
-
-    export const url_table_auth_users_query = (
-      form_id: string,
-      serachParams: URLSearchParams | string
-    ) =>
-      `/private/editor/connect/${form_id}/supabase/table/auth.users/query?${serachParams}`;
 
     export const url_table_x_query = (
       form_id: string,
