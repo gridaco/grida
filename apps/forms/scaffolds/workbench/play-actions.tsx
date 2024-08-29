@@ -15,7 +15,22 @@ export function PlayActions() {
   return (
     <div className="px-4 flex gap-4 items-center justify-end">
       {doctype === "v0_form" && <PreviewButton />}
-      {doctype === "v0_site" && <PreviewButton />}
+      {doctype === "v0_site" && (
+        <>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div>
+                <Button variant="outline" disabled>
+                  Preview
+                </Button>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              Preview is not available for database documents
+            </TooltipContent>
+          </Tooltip>
+        </>
+      )}
       {doctype === "v0_schema" && (
         <>
           <Tooltip>

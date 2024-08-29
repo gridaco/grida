@@ -49,6 +49,7 @@ import { format } from "date-fns";
 import { EmptyRowsRenderer } from "./empty";
 import { ColumnHeaderCell } from "./column-header-cell";
 import "./grid.css";
+import { cn } from "@/utils";
 
 function useMasking() {
   const [state] = useEditorState();
@@ -77,6 +78,7 @@ export function ResponseGrid({
   onEditFieldClick,
   onDeleteFieldClick,
   onCellChange,
+  className,
 }: {
   systemcolumns: GFSystemColumn[];
   columns: GFColumn[];
@@ -92,6 +94,7 @@ export function ResponseGrid({
     column: string,
     data: GFResponseFieldData
   ) => void;
+  className?: string;
 }) {
   const [state, dispatch] = useEditorState();
   const { datagrid_selected_rows: selected_responses } = state;
@@ -234,7 +237,7 @@ export function ResponseGrid({
 
   return (
     <DataGrid
-      className="flex-grow select-none"
+      className={cn("flex-grow select-none", className)}
       rowKeyGetter={rowKeyGetter}
       columns={allcolumns}
       onCellDoubleClick={() => {

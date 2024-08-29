@@ -220,6 +220,7 @@ export function GridEditor({
       </GridLayout.Header>
       <GridLayout.Content>
         <ResponseGrid
+          className="bg-transparent"
           systemcolumns={systemcolumns}
           columns={columns}
           rows={rows ?? []}
@@ -314,7 +315,7 @@ function SelectionExport() {
           .map((row) => {
             // [col0, col1, col2, col3] by col.id
             return columns.map((col) => {
-              const cell = row.data[col.id].value;
+              const cell = row.data[col.id]?.value;
               return csvstrfycell(cell);
             });
           });
@@ -508,6 +509,7 @@ function DeleteSelectedRowsButton({
   const [state, dispatch] = useEditorState();
 
   const tb = useDatagridTable();
+  const db_table_id = useDatabaseTableId();
   const { datagrid_table_id, datagrid_selected_rows } = state;
   const { row_keyword } = useDatagridTable() || { row_keyword: "row" };
 
@@ -515,6 +517,7 @@ function DeleteSelectedRowsButton({
 
   const delete_selected_x_supabase_main_table_rows = useCallback(() => {
     if (
+      !db_table_id ||
       tb?.id !== EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID
     ) {
       toast.error("Something went wrong. Please refresh the page.");
@@ -527,8 +530,8 @@ function DeleteSelectedRowsButton({
     }
 
     const res = PrivateEditorApi.SupabaseQuery.qdelete({
-      form_id: state.form.form_id,
-      main_table_id: state.connections!.supabase!.main_supabase_table_id!,
+      form_id: db_table_id,
+      main_table_id: tb.x_sb_main_table_connection.sb_table_id,
       filters: [
         {
           type: "in",
@@ -551,13 +554,7 @@ function DeleteSelectedRowsButton({
       success: "Deleted",
       error: "Failed",
     });
-  }, [
-    tb,
-    state.form.form_id,
-    state.connections,
-    datagrid_selected_rows,
-    dispatch,
-  ]);
+  }, [tb, db_table_id, datagrid_selected_rows, dispatch]);
 
   const onDeleteSelection = useCallback(() => {
     switch (datagrid_table_id) {

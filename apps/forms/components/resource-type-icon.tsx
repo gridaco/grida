@@ -10,6 +10,7 @@ import {
   SparkleIcon,
   Code2Icon,
   AppWindowIcon,
+  LanguagesIcon,
 } from "lucide-react";
 import { SupabaseLogo } from "./logos";
 
@@ -27,6 +28,7 @@ export type ResourceTypeIconName =
   | "chart"
   | "commerce"
   | "user"
+  | "i18n"
   | "supabase"
   | "form-x-supabase"
   | "v0_form"
@@ -77,6 +79,8 @@ export function ResourceTypeIcon({
       return <ShoppingBagIcon {...props} />;
     case "user":
       return <AvatarIcon {...props} />;
+    case "i18n":
+      return <LanguagesIcon {...props} />;
     default:
       return null;
   }

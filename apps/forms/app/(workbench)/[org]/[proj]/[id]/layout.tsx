@@ -461,7 +461,10 @@ function BaseLayout({
             <aside className="hidden lg:flex h-full">
               <Sidebar />
             </aside>
-            <div className="w-full h-full overflow-x-hidden">{children}</div>
+            {/* apply slightly dimmed background for main content */}
+            <div className="w-full h-full overflow-x-hidden bg-secondary/50">
+              {children}
+            </div>
           </div>
         </div>
         <EditorHelpFab />

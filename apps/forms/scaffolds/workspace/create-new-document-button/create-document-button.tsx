@@ -229,9 +229,19 @@ export function CreateNewDocumentButton({
                 soon
               </Badge>
             </DropdownMenuItem>
-            {/* </button>
-          </form> */}
-
+            <DropdownMenuItem
+              disabled={IS_PRODUCTION}
+              onSelect={() => alert("coming soon")}
+            >
+              <ResourceTypeIcon
+                type="i18n"
+                className="w-4 h-4 me-2 align-middle"
+              />
+              Localization
+              <Badge variant="outline" className="ms-auto">
+                soon
+              </Badge>
+            </DropdownMenuItem>
             <DropdownMenuItem disabled>
               <ResourceTypeIcon
                 type="commerce"
@@ -359,7 +369,8 @@ function CreateNewDatabaseDialog({
               <article className="prose prose-sm dark:prose-invert">
                 <p>
                   <InfoCircledIcon className="inline w-4 h-4 me-1" />
-                  To add a new table, open a database and click '+' button.
+                  To add a new table, open a database and click &lsquo;+&rsquo;
+                  button.
                 </p>
               </article>
             </TabsContent>
