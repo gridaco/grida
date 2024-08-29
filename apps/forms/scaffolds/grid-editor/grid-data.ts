@@ -1,7 +1,6 @@
 import {
   Customer,
   FormFieldDefinition,
-  FormInputType,
   FormResponse,
   FormResponseField,
   FormResponseSession,
@@ -13,11 +12,9 @@ import type {
   GFFile,
   GFResponseRow,
   GFSystemColumn,
-  GFSystemColumnTypes,
 } from "../grid/types";
 import type {
   DataGridFilterSettings,
-  GDocSchemaTable,
   GDocSchemaTableProviderGrida,
   GDocSchemaTableProviderXSupabase,
   GDocTableID,
@@ -91,14 +88,35 @@ export namespace GridData {
           }
       );
 
-  export function columns(
-    table: GDocTableID,
-    fields: FormFieldDefinition[]
-  ): {
+  type ColumSbuilderParams =
+    | {
+        table_id:
+          | typeof EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID
+          | typeof EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID;
+        fields: FormFieldDefinition[];
+      }
+    | {
+        table_id: typeof EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID;
+        fields: FormFieldDefinition[];
+        x_table_constraints: {
+          pk?: string;
+          pks: string[];
+        };
+      }
+    | {
+        table_id: string;
+        fields: FormFieldDefinition[];
+        x_table_constraints?: {
+          pk?: string;
+          pks: string[];
+        };
+      };
+
+  export function columns(params: ColumSbuilderParams): {
     systemcolumns: GFSystemColumn[];
     columns: GFColumn[];
   } {
-    const fieldcolumns = Array.from(fields)
+    const fieldcolumns = Array.from(params.fields)
       .sort((a, b) => a.local_index - b.local_index)
       .map((field) => ({
         key: field.id,
@@ -107,7 +125,7 @@ export namespace GridData {
         type: field.type,
       }));
 
-    switch (table) {
+    switch (params.table_id) {
       case EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID:
       case EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID: {
         return {
@@ -124,27 +142,54 @@ export namespace GridData {
           ],
           columns: fieldcolumns,
         };
+        break;
       }
       case EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID: {
-        return {
-          systemcolumns: [
-            {
-              key: "__gf_display_id",
-              // TODO:
-              // name: "ID",
-              // 1. pass the name of pk
+        const { pk, pks } = params.x_table_constraints;
+        if (pk) {
+          return {
+            systemcolumns: [
+              {
+                key: "__gf_display_id",
+                name: pk,
+              },
               // 2. allow multiple PKs
-            },
-          ],
-          columns: fieldcolumns,
-        };
+            ],
+            columns: fieldcolumns.filter((f) => f.name !== pk),
+          };
+        }
+        break;
       }
       default:
-        return {
-          systemcolumns: [],
-          columns: fieldcolumns,
-        };
+        if (params.x_table_constraints) {
+          const { pk, pks } = params.x_table_constraints;
+          if (pk) {
+            return {
+              systemcolumns: [
+                {
+                  key: "__gf_display_id",
+                  name: pk,
+                },
+                // 2. allow multiple PKs
+              ],
+              columns: fieldcolumns.filter((f) => f.name !== pk),
+            };
+          }
+        }
+        break;
     }
+
+    return {
+      systemcolumns: [
+        {
+          key: "__gf_display_id",
+        },
+        {
+          key: "__gf_created_at",
+        },
+      ],
+      columns: fieldcolumns,
+    };
   }
 
   type TProcessedGridRows =

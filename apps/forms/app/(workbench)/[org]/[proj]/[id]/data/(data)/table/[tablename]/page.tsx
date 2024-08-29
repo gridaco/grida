@@ -69,7 +69,7 @@ function SwitchGridEditor() {
       return (
         <>
           <GridaSchemaTableFeedProvider table_id={tb.id} />
-          <GridaSchemaTableSyncProvider table_id={tb.id} />
+          {!tb.readonly && <GridaSchemaTableSyncProvider table_id={tb.id} />}
           <ModeProviderGrida />
         </>
       );
@@ -104,7 +104,7 @@ function ModeProviderGrida() {
   const stream = tablespace[tb.id].stream;
 
   const { systemcolumns, columns } = useMemo(() => {
-    return GridData.columns(tb.id, tb.attributes);
+    return GridData.columns({ table_id: tb.id, fields: tb.attributes });
   }, [tb]);
 
   const { filtered, inputlength } = useMemo(() => {
@@ -143,7 +143,14 @@ function ModeProviderXSB() {
   const stream = tablespace[tb.id].stream;
 
   const { systemcolumns, columns } = useMemo(() => {
-    return GridData.columns(tb.id, tb.attributes);
+    return GridData.columns({
+      table_id: tb.id,
+      fields: tb.attributes,
+      x_table_constraints: {
+        pk: tb.x_sb_main_table_connection.pk,
+        pks: tb.x_sb_main_table_connection.pks,
+      },
+    });
   }, [tb]);
 
   const { filtered, inputlength } = useMemo(() => {

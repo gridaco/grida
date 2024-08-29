@@ -79,16 +79,21 @@ function FormResponseGridEditor() {
 
   const fields = useFormFields();
 
-  const sessions_stream =
-    tablespace[EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID].stream;
-
   const responses_stream =
     tablespace[EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID].stream;
+
+  const sessions_stream =
+    tablespace[EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID].stream;
 
   const { systemcolumns, columns } = useMemo(
     () =>
       datagrid_table_id
-        ? GridData.columns(datagrid_table_id, fields)
+        ? GridData.columns({
+            table_id: datagrid_table_id as
+              | typeof EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID
+              | typeof EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID,
+            fields,
+          })
         : { systemcolumns: [], columns: [] },
     [datagrid_table_id, fields]
   );
@@ -143,12 +148,17 @@ function ModeXSBMainTable() {
   const { systemcolumns, columns } = useMemo(
     () =>
       datagrid_table_id
-        ? GridData.columns(
-            EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID,
-            fields
-          )
+        ? GridData.columns({
+            table_id:
+              EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID,
+            fields,
+            x_table_constraints: {
+              pk: tb?.x_sb_main_table_connection.pk,
+              pks: tb?.x_sb_main_table_connection.pks ?? [],
+            },
+          })
         : { systemcolumns: [], columns: [] },
-    [datagrid_table_id, fields]
+    [datagrid_table_id, fields, tb]
   );
 
   const { filtered } = useMemo(() => {
