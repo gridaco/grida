@@ -375,6 +375,25 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
           },
         } satisfies TableMenuItem,
         {
+          id: EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID,
+          href: tablehref(
+            basepath,
+            document_id,
+            (tables as any)[
+              EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID
+            ]
+          ),
+          label: "Sessions",
+          icon: "table",
+          section: "Tables",
+          data: {
+            readonly: true,
+            rules: {
+              delete_restricted: true,
+            },
+          },
+        } satisfies TableMenuItem,
+        {
           id: EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID,
           href: tablehref(
             basepath,
@@ -635,9 +654,8 @@ function tablehref(
     case EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID:
     case EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID:
       return `/${basepath}/${document_id}/data/responses`;
-    // TODO: session
     case EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID:
-      return `/${basepath}/${document_id}/data/responses?view=session`;
+      return `/${basepath}/${document_id}/data/responses/sessions`;
     case EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID:
       return `/${basepath}/${document_id}/data/customers`;
     case EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID:

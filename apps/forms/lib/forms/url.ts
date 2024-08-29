@@ -24,6 +24,7 @@ type EditorPageParamsMap = {
   design: {};
   data: {};
   "data/responses": {};
+  "data/responses/sessions": {};
   "data/analytics": {};
   "data/simulator": {};
   "data/table/[tablename]": { tablename: string }; // Requires tablename in addition to shared params
@@ -69,6 +70,8 @@ export function editorlink<P extends EditorPageType>(
       return `${origin}/${basepath}/${id}/data`;
     case "data/responses":
       return `${origin}/${basepath}/${id}/data/responses`;
+    case "data/responses/sessions":
+      return `${origin}/${basepath}/${id}/data/responses/sessions`;
     case "data/analytics":
       return `${origin}/${basepath}/${id}/data/analytics`;
     case "data/simulator":

@@ -8,7 +8,6 @@ import {
 } from "@/scaffolds/editor";
 import {
   FormResponseFeedProvider,
-  FormResponseSessionFeedProvider,
   FormResponseSyncProvider,
   FormXSupabaseMainTableFeedProvider,
   FormXSupabaseMainTableSyncProvider,
@@ -49,12 +48,10 @@ function SwitchGridEditor() {
 
   switch (datagrid_table_id) {
     case EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID:
-    case EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID:
       return (
         <>
           <FormResponseFeedProvider />
           <FormResponseSyncProvider />
-          <FormResponseSessionFeedProvider />
           <FormResponseGridEditor />
         </>
       );
@@ -82,16 +79,12 @@ function FormResponseGridEditor() {
   const responses_stream =
     tablespace[EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID].stream;
 
-  const sessions_stream =
-    tablespace[EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID].stream;
-
   const { systemcolumns, columns } = useMemo(
     () =>
       datagrid_table_id
         ? GridData.columns({
-            table_id: datagrid_table_id as
-              | typeof EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID
-              | typeof EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID,
+            table_id:
+              typeof EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID,
             fields,
           })
         : { systemcolumns: [], columns: [] },
@@ -107,12 +100,10 @@ function FormResponseGridEditor() {
       fields: fields,
       filter: datagrid_filter,
       responses: responses_stream ?? [],
-      sessions: sessions_stream ?? [],
     });
   }, [
     form.form_id,
     datagrid_table_id,
-    sessions_stream,
     fields,
     responses_stream,
     datagrid_filter,
@@ -124,9 +115,9 @@ function FormResponseGridEditor() {
         systemcolumns={systemcolumns}
         columns={columns}
         rows={filtered as GFResponseRow[]}
-        readonly={tb ? tb.readonly : true}
-        selection={tb ? (tb.readonly ? "off" : "on") : "off"}
-        deletion={tb ? (tb.readonly ? "off" : "on") : "off"}
+        readonly={false}
+        selection={"on"}
+        deletion={"on"}
       />
     </>
   );
@@ -195,7 +186,6 @@ function ModeXSBMainTable() {
 function allowedtable(table: GDocTableID | null): boolean {
   return (
     table === EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID ||
-    table === EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID ||
     table === EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID
   );
 }
