@@ -37,6 +37,15 @@ export default function DataIndexPage() {
         }
         break;
       }
+      case "v0_site": {
+        router.replace(
+          editorlink("design", {
+            basepath: state.basepath,
+            document_id: state.document_id,
+          })
+        );
+        break;
+      }
     }
   }, [router, state.doctype, state.basepath, state.document_id, state.tables]);
 
