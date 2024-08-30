@@ -278,32 +278,11 @@ function GridaFormFooter({
   is_powered_by_branding_enabled: boolean;
   translation?: FormViewTranslation;
 }) {
-  const {
-    has_previous,
-    has_next,
-    submit_hidden,
-    pay_hidden,
-    previous_section_button_hidden,
-    next_section_button_hidden,
-    is_submitting,
-    onPrevious,
-  } = useFormAgent();
+  const { pay_hidden } = useFormAgent();
 
   return (
     <>
-      <Footer
-        html_form_element_id={html_form_id}
-        hasPrevious={has_previous}
-        shouldHidePrevious={previous_section_button_hidden}
-        onPrevious={onPrevious}
-        hasNext={has_next}
-        shouldHideNext={next_section_button_hidden}
-        shouldHideSubmit={submit_hidden}
-        shouldDisableSubmit={submit_hidden || is_submitting}
-        isSubmitting={is_submitting}
-        shouldHidePay={pay_hidden}
-        translation={translation}
-      />
+      <Footer shouldHidePay={pay_hidden} translation={translation} />
       {/* on desktop, branding attribute is below footer */}
       {is_powered_by_branding_enabled && (
         <div className="hidden md:block">
@@ -315,25 +294,9 @@ function GridaFormFooter({
 }
 
 function Footer({
-  hasPrevious,
-  hasNext,
   translation,
-  shouldHideSubmit,
-  shouldDisableSubmit,
   shouldHidePay,
-  isSubmitting,
-  onPrevious,
-  html_form_element_id,
 }: {
-  html_form_element_id: string;
-  hasPrevious: boolean;
-  shouldHidePrevious: boolean;
-  onPrevious: (e: React.MouseEvent<HTMLButtonElement>) => void;
-  hasNext: boolean;
-  shouldHideNext: boolean;
-  shouldHideSubmit: boolean;
-  shouldDisableSubmit: boolean;
-  isSubmitting: boolean;
   shouldHidePay: boolean;
   translation: FormViewTranslation;
 }) {
@@ -346,31 +309,8 @@ function Footer({
         "md:static md:justify-start md:bg-transparent md:dark:bg-transparent"
       )}
     >
-      <Button
-        type="button"
-        variant="outline"
-        data-previous-hidden={!hasPrevious}
-        className={clsx(
-          // cls_button_nuetral,
-          "data-[previous-hidden='true']:hidden"
-        )}
-        onClick={onPrevious}
-      >
-        {translation.back}
-      </Button>
-      <Button
-        variant="outline"
-        data-next-hidden={!hasNext}
-        form={html_form_element_id}
-        type="submit"
-        className={clsx(
-          // cls_button_nuetral,
-          "w-full md:w-auto",
-          "data-[next-hidden='true']:hidden"
-        )}
-      >
-        {translation.next}
-      </Button>
+      <FormPrev>{translation.back}</FormPrev>
+      <FormNext className="w-full md:w-auto">{translation.next}</FormNext>
       <FormSubmit className="w-full md:w-auto">{translation.submit}</FormSubmit>
       <TossPaymentsPayButton
         data-pay-hidden={shouldHidePay}
@@ -383,6 +323,47 @@ function Footer({
         {translation.pay}
       </TossPaymentsPayButton>
     </footer>
+  );
+}
+
+function FormPrev({
+  className,
+  children,
+}: React.PropsWithChildren<{
+  className?: string;
+}>) {
+  const { has_previous, onPrevious } = useFormAgent();
+
+  return (
+    <Button
+      variant="outline"
+      data-next-hidden={!has_previous}
+      className={clsx("data-[next-hidden='true']:hidden", className)}
+      onClick={onPrevious}
+    >
+      {children}
+    </Button>
+  );
+}
+
+function FormNext({
+  className,
+  children,
+}: React.PropsWithChildren<{
+  className?: string;
+}>) {
+  const { has_next } = useFormAgent();
+
+  return (
+    <Button
+      variant="outline"
+      data-next-hidden={!has_next}
+      form={html_form_id}
+      type="submit"
+      className={clsx("data-[next-hidden='true']:hidden", className)}
+    >
+      {children}
+    </Button>
   );
 }
 
@@ -668,5 +649,7 @@ function FingerprintField() {
 export const FormView = {
   Root: FormViewRoot,
   Body: FormBody,
+  Prev: FormPrev,
+  Next: FormNext,
   Submit: FormSubmit,
 };

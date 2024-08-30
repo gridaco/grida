@@ -108,6 +108,8 @@ export function RowEditPanel({
           <PanelClose>
             <Button variant="secondary">Close</Button>
           </PanelClose>
+          <FormView.Prev>Previous</FormView.Prev>
+          <FormView.Next>Next</FormView.Next>
           <FormView.Submit>Save</FormView.Submit>
           {/* <Button>Save</Button> */}
         </PanelFooter>
