@@ -4,12 +4,6 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 export async function middleware(req: NextRequest) {
-  const country = req.geo?.country;
-  const city = req.geo?.city;
-  const region = req.geo?.region;
-
-  console.log("geo", req.geo);
-
   const res = NextResponse.next();
 
   // Check if the request path starts with /dev/ and NODE_ENV is not development
