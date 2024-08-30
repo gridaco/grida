@@ -1,6 +1,6 @@
 .rdg {
   --rdg-color: hsl(var(--foreground));
-  --rdg-border-color: hsl(var(--border));
+  --rdg-border-color: hsl(var(--border) / 0.25);
   --rdg-summary-border-color: hsl(var(--border));
   --rdg-background-color: hsl(var(--background));
   --rdg-header-background-color: hsl(var(--background));
@@ -15,7 +15,7 @@
 
   --rdg-selection-color: hsl(var(--ring));
   --rdg-font-size: 13px;
-  --rdg-cell-frozen-box-shadow: calc(2px * var(--rdg-sign)) 0 5px -2px rgba(136, 136, 136, 0.3);
+  --rdg-cell-frozen-box-shadow: calc(2px * var(--rdg-sign)) 0 5px -2px var(--rdg-border-color);
 }
 
 /* edit button */
@@ -36,6 +36,10 @@
   border-bottom: 1px solid hsl(var(--border));
 }
 
+.rdg-row > .rdg-cell {
+  border: 1px solid var(--rdg-border-color);
+}
+
 .rdg-cell[aria-selected="true"] {
   box-shadow: inset 0 0 0 1px var(--rdg-selection-color);
   outline: 2px solid var(--rdg-selection-color);
@@ -43,6 +47,10 @@
 
 .rdg-cell-frozen {
   box-shadow: var(--rdg-cell-frozen-box-shadow);
+}
+
+.rdg-cell-copied {
+  background-color: hsl(var(--accent));
 }
 
 .rdg-cell-frozen-last {
