@@ -81,14 +81,11 @@ function FormResponseGridEditor() {
 
   const { systemcolumns, columns } = useMemo(
     () =>
-      datagrid_table_id
-        ? GridData.columns({
-            table_id:
-              typeof EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID,
-            fields,
-          })
-        : { systemcolumns: [], columns: [] },
-    [datagrid_table_id, fields]
+      GridData.columns({
+        table_id: EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID,
+        fields,
+      }),
+    [fields]
   );
 
   // Transforming the responses into the format expected by react-data-grid

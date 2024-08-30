@@ -367,7 +367,7 @@ function DefaultPropertyCustomerCell({
   }
 
   return (
-    <div className="w-full flex justify-between">
+    <div className="w-full flex justify-between items-center">
       <span className="font-mono text-ellipsis flex-1 overflow-hidden">
         {data}
       </span>
@@ -386,7 +386,12 @@ function DefaultPropertyCustomerCell({
 
 function FKButton({ onClick }: { onClick?: () => void }) {
   return (
-    <Button variant="outline" className="m-1 p-2" onClick={onClick}>
+    <Button
+      variant="outline"
+      size="icon"
+      className="p-1 w-5 h-5"
+      onClick={onClick}
+    >
       <ArrowRightIcon className="w-3 h-3" />
     </Button>
   );
