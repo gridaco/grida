@@ -11,8 +11,7 @@ import type { FormPageBackgroundSchema } from "@/types";
 import { FormPageBackground } from "./background";
 
 import { useRequestFormSession, useFormSession } from "./load";
-
-const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
+import { Env } from "@/env";
 
 export function GridaForm({
   form_id,
@@ -78,7 +77,7 @@ export function GridaForm({
       case "FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED":
         const { __gf_fp_fingerprintjs_visitorid, customer_id } = error;
         return redirect(
-          formlink(HOST_NAME, form_id, "alreadyresponded", {
+          formlink(Env.client.HOST, form_id, "alreadyresponded", {
             fingerprint: __gf_fp_fingerprintjs_visitorid,
             customer_id: customer_id,
             session_id: session,

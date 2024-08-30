@@ -1,3 +1,4 @@
+import { Env } from "@/env";
 import {
   TossPaymentsCheckoutSessionRequest,
   TossPaymentsCheckoutSessionResponseData,
@@ -7,16 +8,15 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const revalidate = 0;
 
-const HOST = process.env.HOST || "http://localhost:3000";
 const INTEGRATIONS_TEST_TOSSPAYMENTS_CUSTOMER_KEY =
   process.env.INTEGRATIONS_TEST_TOSSPAYMENTS_CUSTOMER_KEY;
 
 function build_toss_payments_success_url() {
-  return `${HOST}/integrations/tosspayments/payments/success`;
+  return `${Env.server.HOST}/integrations/tosspayments/payments/success`;
 }
 
 function build_toss_payments_fail_url() {
-  return `${HOST}/integrations/tosspayments/payments/fail`;
+  return `${Env.server.HOST}/integrations/tosspayments/payments/fail`;
 }
 
 async function get_tosspayments_customer_key(

@@ -1,6 +1,5 @@
+import { Env } from "@/env";
 import { NextRequest, NextResponse } from "next/server";
-
-const HOST = process.env.HOST;
 
 export async function GET(
   req: NextRequest,
@@ -8,8 +7,8 @@ export async function GET(
 ) {
   const form_id = context.params.id;
   return NextResponse.json({
-    url: `${HOST}/d/e/${form_id}`,
-    embed: `${HOST}/embed/${form_id}`,
-    submit: `${HOST}/submit/${form_id}`,
+    url: `${Env.server.HOST}/d/e/${form_id}`,
+    embed: `${Env.server.HOST}/embed/${form_id}`,
+    submit: `${Env.server.HOST}/submit/${form_id}`,
   });
 }

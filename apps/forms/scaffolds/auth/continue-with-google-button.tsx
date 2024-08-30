@@ -1,16 +1,15 @@
 "use client";
 
+import { Env } from "@/env";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useSearchParams } from "next/navigation";
-
-const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
 
 export function ContinueWithGoogleButton() {
   const supabase = createClientComponentClient();
   const search = useSearchParams();
   const next = search.get("next");
 
-  const url = new URL(`${HOST_NAME}/auth/callback`);
+  const url = new URL(`${Env.client.HOST}/auth/callback`);
 
   if (next) {
     url.searchParams.set("next", next);

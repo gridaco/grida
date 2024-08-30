@@ -43,8 +43,7 @@ import { BanIcon } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";
 import { FormAgentState } from "@/lib/formstate";
-
-const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
+import { Env } from "@/env";
 
 export function Playground({
   initial,
@@ -218,7 +217,7 @@ export function Playground({
               onClick={() => {
                 // copy to clipboard
                 navigator.clipboard.writeText(
-                  `${HOST_NAME}/playground/${initial.slug}`
+                  `${Env.client.HOST}/playground/${initial.slug}`
                 );
                 toast.success("Copied");
               }}

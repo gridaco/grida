@@ -1,3 +1,4 @@
+import { Env } from "@/env";
 import { editorlink, formlink } from "@/lib/forms/url";
 import {
   createRouteHandlerClient,
@@ -13,8 +14,6 @@ import { NextRequest, NextResponse } from "next/server";
 const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
 // custom nanoid to set to meet organization name pattern - '^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$'
 const nanoid = customAlphabet(alphabet, 39);
-
-const HOST = process.env.HOST || "http://localhost:3000";
 
 /**
  * FIXME: this uses generated / default flow instead of letting user to choose the project
@@ -58,7 +57,7 @@ export async function POST(req: NextRequest) {
   if (!auth?.user) {
     // redirect back to playground, atm, user need to click the publish button again.
     return NextResponse.redirect(
-      HOST + `/sign-in?next=/playground/${data.slug}`,
+      Env.server.HOST + `/sign-in?next=/playground/${data.slug}`,
       {
         status: 302,
       }
@@ -137,7 +136,7 @@ export async function POST(req: NextRequest) {
     editorlink("form/edit", {
       org: ORG.name,
       proj: PROJECT.name,
-      origin: HOST,
+      origin: Env.server.HOST,
       document_id: form_document_id,
     }),
     {

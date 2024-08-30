@@ -12,8 +12,7 @@ import Footer from "@/www/footer";
 import Image from "next/image";
 import { fetchTemplates } from "./actions";
 import { formlink } from "@/lib/forms/url";
-
-const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
+import { Env } from "@/env";
 
 export default async function TemplatesPage() {
   const data = await fetchTemplates();
@@ -91,7 +90,7 @@ function ItemCard({
   return (
     <Card className="group overflow-hidden">
       <Link
-        href={formlink(HOST_NAME, form_id)}
+        href={formlink(Env.client.HOST, form_id)}
         target="_blank"
         prefetch={false}
       >

@@ -12,8 +12,7 @@ import type {
   FormClientFetchResponseData,
   FormClientFetchResponseError,
 } from "@/app/(api)/v1/[id]/route";
-
-const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
+import { Env } from "@/env";
 
 export function useRequestFormSession(form_id: string) {
   const storekey = SYSTEM_GF_SESSION_KEY + "/" + form_id;
@@ -51,7 +50,7 @@ export function useRequestFormSession(form_id: string) {
 }
 
 function makeurl_formsessioninit(form_id: string) {
-  return HOST_NAME + `/v1/${form_id}/session`;
+  return Env.client.HOST + `/v1/${form_id}/session`;
 }
 
 export function makeurl_forminit({
@@ -79,7 +78,7 @@ export function makeurl_forminit({
     params[SYSTEM_GF_FINGERPRINT_VISITORID_KEY] = fingerprint.visitorId;
   }
 
-  return HOST_NAME + `/v1/${form_id}?${new URLSearchParams(params)}`;
+  return Env.client.HOST + `/v1/${form_id}?${new URLSearchParams(params)}`;
 }
 
 export function useFormSession(
