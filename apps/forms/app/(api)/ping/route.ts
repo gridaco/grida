@@ -5,9 +5,20 @@ export function GET(req: NextRequest) {
     country: req.geo?.country,
     latitude: req.geo?.latitude,
   };
-  const xforwardedfor = req.headers.get("x-forwarded-for");
+
+  const headers: Record<string, string> = {};
+  req.headers.forEach((value, key) => {
+    headers[key] = value;
+  });
+
+  const searchparams: Record<string, string> = {};
+  req.nextUrl.searchParams.forEach((value, key) => {
+    searchparams[key] = value;
+  });
+
   return NextResponse.json({
     geo,
-    "x-forwarded-for": xforwardedfor,
+    headers,
+    searchparams,
   });
 }
