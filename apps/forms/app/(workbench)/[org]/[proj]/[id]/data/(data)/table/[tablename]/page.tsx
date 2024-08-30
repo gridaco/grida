@@ -16,7 +16,7 @@ import {
   GDocTable,
   TablespaceSchemaTableStreamType,
 } from "@/scaffolds/editor/state";
-import { useDatabaseTableId, useDatagridTable } from "@/scaffolds/editor/use";
+import { useDatagridTable } from "@/scaffolds/editor/use";
 import { CurrentTable } from "@/scaffolds/editor/utils/switch-table";
 import { GridEditor } from "@/scaffolds/grid-editor";
 import { GridData } from "@/scaffolds/grid-editor/grid-data";
@@ -24,6 +24,8 @@ import { GFResponseRow } from "@/scaffolds/grid/types";
 import { TableIcon } from "@radix-ui/react-icons";
 import assert from "assert";
 import { useMemo } from "react";
+import { Spinner } from "@/components/spinner";
+import * as GridLayout from "@/scaffolds/grid-editor/components/layout";
 
 export default function SchemaTablePage({
   params,
@@ -54,7 +56,16 @@ export default function SchemaTablePage({
   }
 
   return (
-    <CurrentTable table={tb.id}>
+    <CurrentTable
+      table={tb.id}
+      fallback={
+        <GridLayout.Root>
+          <div className="w-full h-full flex items-center justify-center">
+            <Spinner />
+          </div>
+        </GridLayout.Root>
+      }
+    >
       <SwitchGridEditor />
     </CurrentTable>
   );
