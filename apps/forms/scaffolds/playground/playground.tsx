@@ -217,7 +217,7 @@ export function Playground({
               onClick={() => {
                 // copy to clipboard
                 navigator.clipboard.writeText(
-                  `${Env.client.HOST}/playground/${initial.slug}`
+                  `${Env.web.HOST}/playground/${initial.slug}`
                 );
                 toast.success("Copied");
               }}

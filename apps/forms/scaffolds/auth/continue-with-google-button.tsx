@@ -9,7 +9,7 @@ export function ContinueWithGoogleButton() {
   const search = useSearchParams();
   const next = search.get("next");
 
-  const url = new URL(`${Env.client.HOST}/auth/callback`);
+  const url = new URL(`${Env.web.HOST}/auth/callback`);
 
   if (next) {
     url.searchParams.set("next", next);

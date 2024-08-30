@@ -1014,7 +1014,7 @@ async function submit({
     case "text/html": {
       if (is_ending_page_enabled && ending_page_template_id) {
         return NextResponse.redirect(
-          formlink(Env.server.HOST, form_id, "complete", {
+          formlink(Env.web.HOST, form_id, "complete", {
             rid: response_reference_obj.id,
           }),
           {
@@ -1033,7 +1033,7 @@ async function submit({
       }
 
       return NextResponse.redirect(
-        formlink(Env.server.HOST, form_id, "complete", {
+        formlink(Env.web.HOST, form_id, "complete", {
           rid: response_reference_obj.id,
         }),
         {
@@ -1323,7 +1323,7 @@ function error(
       }
       case 400: {
         return NextResponse.redirect(
-          formlink(Env.server.HOST, form_id, "badrequest"),
+          formlink(Env.web.HOST, form_id, "badrequest"),
           {
             status: 303,
           }
@@ -1331,7 +1331,7 @@ function error(
       }
       case 500: {
         return NextResponse.redirect(
-          formlink(Env.server.HOST, form_id, "badrequest"),
+          formlink(Env.web.HOST, form_id, "badrequest"),
           {
             status: 303,
           }
@@ -1347,12 +1347,9 @@ function error(
       case "FORM_SCHEDULE_NOT_IN_RANGE":
       case "FORM_SOLD_OUT":
       case "FORM_OPTION_UNAVAILABLE": {
-        return NextResponse.redirect(
-          formerrorlink(Env.server.HOST, code, data),
-          {
-            status: 307,
-          }
-        );
+        return NextResponse.redirect(formerrorlink(Env.web.HOST, code, data), {
+          status: 307,
+        });
       }
     }
   } else {

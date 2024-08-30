@@ -50,7 +50,7 @@ export function useRequestFormSession(form_id: string) {
 }
 
 function makeurl_formsessioninit(form_id: string) {
-  return Env.client.HOST + `/v1/${form_id}/session`;
+  return Env.web.HOST + `/v1/${form_id}/session`;
 }
 
 export function makeurl_forminit({
@@ -78,7 +78,7 @@ export function makeurl_forminit({
     params[SYSTEM_GF_FINGERPRINT_VISITORID_KEY] = fingerprint.visitorId;
   }
 
-  return Env.client.HOST + `/v1/${form_id}?${new URLSearchParams(params)}`;
+  return Env.web.HOST + `/v1/${form_id}?${new URLSearchParams(params)}`;
 }
 
 export function useFormSession(

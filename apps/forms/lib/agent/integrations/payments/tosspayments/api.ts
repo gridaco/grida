@@ -9,7 +9,7 @@ export async function request_toss_payments_checkout_session(
   req: TossPaymentsCheckoutSessionRequest
 ) {
   const res = await fetch(
-    Env.client.HOST + "/integrations/tosspayments/payments/session",
+    Env.web.HOST + "/integrations/tosspayments/payments/session",
     {
       method: "POST",
       headers: {

@@ -7,8 +7,8 @@ export async function GET(
 ) {
   const form_id = context.params.id;
   return NextResponse.json({
-    url: `${Env.server.HOST}/d/e/${form_id}`,
-    embed: `${Env.server.HOST}/embed/${form_id}`,
-    submit: `${Env.server.HOST}/submit/${form_id}`,
+    url: `${Env.web.HOST}/d/e/${form_id}`,
+    embed: `${Env.web.HOST}/embed/${form_id}`,
+    submit: `${Env.web.HOST}/submit/${form_id}`,
   });
 }

@@ -1,6 +1,6 @@
 export namespace Env {
   /**
-   * available on server side only
+   * for server requests
    */
   export namespace server {
     export const HOST = process.env.VERCEL_URL
@@ -9,10 +9,13 @@ export namespace Env {
       : "http://localhost:3000";
   }
 
-  export namespace client {
-    export const HOST = process.env.NEXT_PUBLIC_VERCEL_URL
+  /**
+   * anything related to web & client side
+   */
+  export namespace web {
+    export const HOST = process.env.NEXT_PUBLIC_URL
       ? // VERCEL_URL does not have protocol
-        "https://" + process.env.NEXT_PUBLIC_VERCEL_URL
+        "https://" + process.env.NEXT_PUBLIC_URL
       : "http://localhost:3000";
   }
 }

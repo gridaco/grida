@@ -6,7 +6,7 @@ export const examples = [
     name: "Hello World",
     template: {
       schema: {
-        src: `${Env.client.HOST}/schema/examples/001-hello-world/form.json`,
+        src: `${Env.web.HOST}/schema/examples/001-hello-world/form.json`,
       },
     },
   },
@@ -15,7 +15,7 @@ export const examples = [
     name: "iPhone Pre-Order",
     template: {
       schema: {
-        src: `${Env.client.HOST}/schema/examples/002-iphone-pre-order/form.json`,
+        src: `${Env.web.HOST}/schema/examples/002-iphone-pre-order/form.json`,
       },
     },
   },
@@ -24,7 +24,7 @@ export const examples = [
     name: "Fields",
     template: {
       schema: {
-        src: `${Env.client.HOST}/schema/examples/003-fields/form.json`,
+        src: `${Env.web.HOST}/schema/examples/003-fields/form.json`,
       },
     },
   },
@@ -33,7 +33,7 @@ export const examples = [
     name: "Job Application",
     template: {
       schema: {
-        src: `${Env.client.HOST}/schema/examples/004-job-application/form.json`,
+        src: `${Env.web.HOST}/schema/examples/004-job-application/form.json`,
       },
     },
   },
@@ -42,7 +42,7 @@ export const examples = [
     name: "Logics",
     template: {
       schema: {
-        src: `${Env.client.HOST}/schema/examples/005-logics/form.json`,
+        src: `${Env.web.HOST}/schema/examples/005-logics/form.json`,
       },
     },
   },
@@ -51,7 +51,7 @@ export const examples = [
     name: "Computed Fields",
     template: {
       schema: {
-        src: `${Env.client.HOST}/schema/examples/006-computed-fields/form.json`,
+        src: `${Env.web.HOST}/schema/examples/006-computed-fields/form.json`,
       },
     },
   },
@@ -60,7 +60,7 @@ export const examples = [
     name: "Data Transform",
     template: {
       schema: {
-        src: `${Env.client.HOST}/schema/examples/007-data-transform/form.json`,
+        src: `${Env.web.HOST}/schema/examples/007-data-transform/form.json`,
       },
     },
   },

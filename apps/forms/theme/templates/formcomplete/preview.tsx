@@ -15,7 +15,7 @@ export function EndingPageEmbeddedPreview({
         <iframe
           key={template}
           src={
-            Env.client.HOST +
+            Env.web.HOST +
             `/templates/embed/${lng}/formcomplete/${template}?title=${encodeURIComponent(title)}`
           }
           className="w-full h-96"
@@ -28,7 +28,7 @@ export function EndingPageEmbeddedPreview({
         <iframe
           key={template}
           src={
-            Env.client.HOST +
+            Env.web.HOST +
             `/templates/embed/${lng}/formcomplete/default?title=${encodeURIComponent(title)}`
           }
           className="w-full h-96"

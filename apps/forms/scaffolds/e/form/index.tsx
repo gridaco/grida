@@ -77,7 +77,7 @@ export function GridaForm({
       case "FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED":
         const { __gf_fp_fingerprintjs_visitorid, customer_id } = error;
         return redirect(
-          formlink(Env.client.HOST, form_id, "alreadyresponded", {
+          formlink(Env.web.HOST, form_id, "alreadyresponded", {
             fingerprint: __gf_fp_fingerprintjs_visitorid,
             customer_id: customer_id,
             session_id: session,

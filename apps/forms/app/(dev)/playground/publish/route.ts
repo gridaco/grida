@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
   if (!auth?.user) {
     // redirect back to playground, atm, user need to click the publish button again.
     return NextResponse.redirect(
-      Env.server.HOST + `/sign-in?next=/playground/${data.slug}`,
+      Env.web.HOST + `/sign-in?next=/playground/${data.slug}`,
       {
         status: 302,
       }
@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
     editorlink("form/edit", {
       org: ORG.name,
       proj: PROJECT.name,
-      origin: Env.server.HOST,
+      origin: Env.web.HOST,
       document_id: form_document_id,
     }),
     {
