@@ -237,9 +237,15 @@ export function ResponseGrid({
 
   return (
     <DataGrid
-      className={cn("flex-grow select-none", className)}
+      className={cn(
+        "flex-grow select-none text-xs text-foreground/80",
+        className
+      )}
       rowKeyGetter={rowKeyGetter}
       columns={allcolumns}
+      rows={rows}
+      rowHeight={32}
+      headerRowHeight={36}
       onCellDoubleClick={() => {
         if (readonly) {
           toast("This table is readonly", { icon: "🔒" });
@@ -263,8 +269,6 @@ export function ResponseGrid({
         selectionDisabled ? undefined : onSelectedRowsChange
       }
       renderers={{ noRowsFallback: <EmptyRowsRenderer loading={loading} /> }}
-      rows={rows}
-      rowHeight={44}
     />
   );
 }
@@ -486,7 +490,7 @@ function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
               <img
                 src={file.src}
                 alt={file.name}
-                className="h-full min-w-10 aspect-square rounded overflow-hidden object-cover bg-neutral-500"
+                className="h-full min-w-8 aspect-square rounded overflow-hidden object-cover bg-neutral-500"
                 loading="lazy"
               />
               {/* <figcaption>{file.name}</figcaption> */}

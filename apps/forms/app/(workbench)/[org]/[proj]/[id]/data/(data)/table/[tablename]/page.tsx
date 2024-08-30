@@ -41,8 +41,6 @@ export default function SchemaTablePage({
 
   const isvalid = valid(tb);
 
-  console.log(datagrid_table_id);
-
   if (!isvalid) {
     if (tablename === "~new") {
       return (
@@ -153,8 +151,6 @@ function ModeProviderXSB() {
   assert(tb, "table not found");
 
   const stream = tablespace[tb.id].stream;
-
-  console.log(tb.name, stream?.length, tb.id);
 
   const { systemcolumns, columns } = useMemo(() => {
     return GridData.columns({
