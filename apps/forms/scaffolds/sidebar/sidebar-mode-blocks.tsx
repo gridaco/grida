@@ -1,21 +1,17 @@
 "use client";
 
-import React, { useState } from "react";
-import { useEditorState } from "../editor";
+import React from "react";
+import { useEditorState, useFormFields } from "../editor";
 import {
   SidebarMenuItem,
   SidebarMenuItemActions,
-  SidebarMenuLink,
   SidebarMenuList,
   SidebarSection,
   SidebarMenuItemAction,
   SidebarSectionHeaderItem,
   SidebarSectionHeaderLabel,
 } from "@/components/sidebar";
-import { ResourceTypeIcon } from "@/components/resource-type-icon";
-import { usePathname } from "next/navigation";
-import "core-js/features/map/group-by";
-import { EditorFlatFormBlock } from "../editor/state";
+import { EditorFlatFormBlock, MenuItem } from "../editor/state";
 import { FormBlockType, FormFieldDefinition, FormInputType } from "@/types";
 import { BlockTypeIcon } from "@/components/form-blcok-type-icon";
 import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
@@ -28,76 +24,108 @@ import { DotsHorizontalIcon } from "@radix-ui/react-icons";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { FormFieldBlockMenuItems } from "../blocks-editor/blocks/field-block";
+import { renderMenuItems } from "./render";
 
 export function ModeDesign() {
   const [state, dispatch] = useEditorState();
-
-  const pathname = usePathname();
 
   const {
     document: { pages },
   } = state;
 
-  const sections = Map.groupBy(pages, (page) => page.section);
+  const show_hierarchy =
+    state.document.selected_page_id &&
+    ["form", "collection"].includes(state.document.selected_page_id);
 
   return (
     <>
-      {Array.from(sections.keys()).map((section) => (
-        <SidebarSection key={section}>
-          <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>
-              <span>{section}</span>
-            </SidebarSectionHeaderLabel>
-          </SidebarSectionHeaderItem>
-          <SidebarMenuList>
-            {sections.get(section)?.map((page) => (
-              <SidebarMenuLink key={page.id} href={page.href ?? ""}>
-                <SidebarMenuItem
-                  muted
-                  level={page.level}
-                  onSelect={() => {
-                    dispatch({
-                      type: "editor/document/select-page",
-                      page_id: page.id,
-                    });
-                  }}
-                >
-                  <ResourceTypeIcon
-                    type={page.icon}
-                    className="w-4 h-4 me-2 inline"
-                  />
-                  {page.label}
-                </SidebarMenuItem>
-              </SidebarMenuLink>
-              // <Link key={page.id} href={page.href ?? ""}>
-              //   <SidebarMenuItem
-              //     level={page.level}
-              //     selected={pathname === page.href}
-              //   >
-              //     <ResourceTypeIcon
-              //       type={page.icon}
-              //       className="w-4 h-4 me-2 inline"
-              //     />
-              //     {page.label}
-              //   </SidebarMenuItem>
-              // </Link>
-            ))}
-          </SidebarMenuList>
-        </SidebarSection>
-      ))}
-      {state.document.selected_page_id === "form" && <HierarchyView />}
+      {renderMenuItems(pages, {
+        onSelect: (page) => {
+          dispatch({
+            type: "editor/document/select-page",
+            page_id: page.id,
+          });
+        },
+      })}
+
+      {show_hierarchy && (
+        <>
+          <hr />
+          <HierarchyView />
+        </>
+      )}
     </>
   );
 }
 
-function HierarchyView() {
+function FormBlockHierarchyList() {
   const [state, dispatch] = useEditorState();
+  const fields = useFormFields();
   // const [expands, setExpands] = useState<Record<string, boolean>>({});
   const { focus_block_id } = state;
+
+  return (
+    <>
+      {state.blocks.map((b) => {
+        const selected = focus_block_id === b.id;
+        const { label, icon } = blocklabel(b, {
+          fields,
+        });
+        return (
+          <SidebarMenuItem
+            key={b.id}
+            muted
+            // expandable={b.type === "section"}
+            // expanded={expands[b.id]}
+            // onExpandChange={(expanded) => {
+            //   setExpands((expands) => ({
+            //     ...expands,
+            //     [b.id]: expanded,
+            //   }));
+            // }}
+            level={b.parent_id ? 1 : 0}
+            selected={selected}
+            onSelect={() => {
+              dispatch({
+                type: "blocks/focus",
+                block_id: b.id,
+              });
+            }}
+            icon={<FormHierarchyItemIcon icon={icon} className="w-4 h-4" />}
+          >
+            {label}
+            <SidebarMenuItemActions>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <SidebarMenuItemAction>
+                    <DotsHorizontalIcon />
+                  </SidebarMenuItemAction>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <FormFieldBlockMenuItems
+                    block_id={b.id}
+                    form_field_id={b.form_field_id}
+                  />
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </SidebarMenuItemActions>
+          </SidebarMenuItem>
+        );
+      })}
+    </>
+  );
+}
+
+function SiteLayerHierarchyList() {
+  return <></>;
+}
+
+function HierarchyView() {
+  const [state] = useEditorState();
+  const { doctype } = state;
 
   return (
     <Collapsible defaultOpen>
@@ -111,54 +139,8 @@ function HierarchyView() {
         </CollapsibleTrigger>
         <CollapsibleContent>
           <SidebarMenuList>
-            {state.blocks.map((b) => {
-              const selected = focus_block_id === b.id;
-              const { label, icon } = blocklabel(b, {
-                fields: state.fields,
-              });
-              return (
-                <SidebarMenuItem
-                  key={b.id}
-                  muted
-                  // expandable={b.type === "section"}
-                  // expanded={expands[b.id]}
-                  // onExpandChange={(expanded) => {
-                  //   setExpands((expands) => ({
-                  //     ...expands,
-                  //     [b.id]: expanded,
-                  //   }));
-                  // }}
-                  level={b.parent_id ? 1 : 0}
-                  selected={selected}
-                  onSelect={() => {
-                    dispatch({
-                      type: "blocks/focus",
-                      block_id: b.id,
-                    });
-                  }}
-                  icon={
-                    <FormHierarchyItemIcon icon={icon} className="w-4 h-4" />
-                  }
-                >
-                  {label}
-                  <SidebarMenuItemActions>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <SidebarMenuItemAction>
-                          <DotsHorizontalIcon />
-                        </SidebarMenuItemAction>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent>
-                        <FormFieldBlockMenuItems
-                          block_id={b.id}
-                          form_field_id={b.form_field_id}
-                        />
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </SidebarMenuItemActions>
-                </SidebarMenuItem>
-              );
-            })}
+            {doctype === "v0_form" && <FormBlockHierarchyList />}
+            {doctype === "v0_site" && <SiteLayerHierarchyList />}
           </SidebarMenuList>
         </CollapsibleContent>
       </SidebarSection>

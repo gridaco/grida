@@ -38,6 +38,7 @@ import type {
   FormMethod,
   FormDocument,
   Option,
+  FormsPageLanguage,
 } from "@/types";
 import { Features } from "@/lib/features/scheduling";
 import { requesterurl, resolverurl } from "@/services/form/session-storage";
@@ -200,21 +201,24 @@ export async function GET(
     store_connection,
   } = data;
 
-  const {
-    //
-    method,
-    is_powered_by_branding_enabled,
-    lang,
-  } = (default_page as unknown as FormDocument) || {};
+  const lang: FormsPageLanguage =
+    (default_page as unknown as FormDocument | null)?.lang ?? "en";
+  const is_powered_by_branding_enabled =
+    (default_page as unknown as FormDocument | null)
+      ?.is_powered_by_branding_enabled ?? true;
+  const method: FormMethod =
+    (default_page as unknown as FormDocument | null)?.method ?? "post";
 
+  // load serverside i18n
   await i18next.init({
     lng: lang,
-    debug: false, //!IS_PRODUTION,
+    debug: false,
     resources: resources,
     preload: [lang],
   });
 
-  const page_blocks = (data.default_page as unknown as FormDocument).blocks;
+  const page_blocks = (data.default_page as unknown as FormDocument | null)
+    ?.blocks;
 
   const __gf_fp_fingerprintjs_visitorid =
     system_keys[SYSTEM_GF_FINGERPRINT_VISITORID_KEY];
@@ -483,8 +487,10 @@ export async function GET(
       is_powered_by_branding_enabled,
       optimize_for_cjk: cjk.includes(lang),
     },
-    background: (data.default_page as unknown as FormDocument).background,
-    stylesheet: (data.default_page as unknown as FormDocument).stylesheet,
+    background: (data.default_page as unknown as FormDocument | null)
+      ?.background,
+    stylesheet: (data.default_page as unknown as FormDocument | null)
+      ?.stylesheet,
 
     // default value
     default_values: default_values,
@@ -507,6 +513,8 @@ export async function GET(
   };
 
   response.data = payload;
+
+  // console.log("v1: response", response);
 
   return NextResponse.json(response);
 }

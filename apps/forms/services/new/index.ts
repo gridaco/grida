@@ -4,6 +4,10 @@ import type {
   GDocumentType,
 } from "@/types";
 import assert from "assert";
+import {
+  isValidSchemaName,
+  schemaname_validation_messages,
+} from "../utils/regex";
 
 /**
  * NO RLS - use with caution
@@ -37,16 +41,108 @@ class DocumentSetupAssistantService {
     this.document_id = document_ref.id;
     return document_ref;
   }
+
+  protected async rollback() {
+    try {
+      if (!this.document_id) return;
+
+      await workspaceclient
+        .from("document")
+        .delete()
+        .eq("id", this.document_id);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+}
+
+export class SchemaDocumentSetupAssistantService extends DocumentSetupAssistantService {
+  constructor(
+    readonly project_id: number,
+    private readonly seed: { name: string }
+  ) {
+    super(project_id, "v0_schema");
+  }
+
+  private async validateName(): Promise<true | "taken" | "invalid"> {
+    if (!isValidSchemaName(this.seed.name)) {
+      return "invalid";
+    }
+
+    // check for duplicate
+    const { error, count } = await grida_forms_client
+      .from("schema_document")
+      .select("id", { count: "exact" })
+      .eq("name", this.seed.name)
+      .eq("project_id", this.project_id);
+
+    if (error) {
+      console.error(error);
+      throw error;
+    }
+
+    if (count === null) {
+      throw new Error("Unexpected error");
+    }
+
+    if (count > 0) {
+      return "taken";
+    }
+
+    return true;
+  }
+
+  async createSchemaDocument() {
+    const { name } = this.seed;
+
+    // pre-validation
+    const isvalidname = await this.validateName();
+    if (isvalidname !== true) {
+      if (isvalidname === "taken") {
+        throw new Error("Schema name already exists");
+      } else {
+        throw new Error(schemaname_validation_messages.invalid);
+      }
+    }
+
+    const masterdoc_ref = await this.createMasterDocument({
+      title: name,
+    });
+
+    const { data, error } = await grida_forms_client
+      .from("schema_document")
+      .insert({
+        id: masterdoc_ref.id,
+        name: name,
+        project_id: this.project_id,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      await this.rollback();
+      if (error.code === "23505") {
+        throw new Error("Schema name already exists");
+      }
+      console.error(error);
+      throw error;
+    }
+
+    return data;
+  }
 }
 
 export class SiteDocumentSetupAssistantService extends DocumentSetupAssistantService {
-  constructor(readonly project_id: number) {
+  constructor(
+    readonly project_id: number,
+    private readonly seed: Partial<{ title: string }>
+  ) {
     super(project_id, "v0_site");
   }
 
   async createSiteDocument() {
     return this.createMasterDocument({
-      title: "Untitled Site",
+      title: this.seed.title ?? "Untitled Site",
     });
   }
 }

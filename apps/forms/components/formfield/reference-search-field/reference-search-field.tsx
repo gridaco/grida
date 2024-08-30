@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/sheet";
 import { useFormAgentState } from "@/lib/formstate";
 import { ReferenceTableGrid } from "@/scaffolds/grid/reference-grid";
-import { GridaSupabase } from "@/types";
+import { GridaXSupabase } from "@/types";
 import useSWR from "swr";
 import { useMemo, useState } from "react";
 import Fuse from "fuse.js";
@@ -36,7 +36,7 @@ export function ReferenceSearchPreview(
 type SearchRes = {
   schema_name: string;
   table_name: string;
-  table_schema: GridaSupabase.SupabaseTable["sb_table_schema"];
+  table_schema: GridaXSupabase.SupabaseTable["sb_table_schema"];
   column: string;
   rows: Record<string, any>[];
 };
@@ -88,7 +88,7 @@ export function ReferenceSearch({
   }, [fuse, localSearch, _rows]);
 
   const sort_by_priorities = priority_sorter(
-    GridaSupabase.unknown_table_column_priorities
+    GridaXSupabase.unknown_table_column_priorities
   );
 
   return (
@@ -163,11 +163,11 @@ export function ReferenceSearch({
 }
 
 const _auth_user_columns = Object.keys(
-  GridaSupabase.SupabaseUserJsonSchema.properties
+  GridaXSupabase.SupabaseUserJsonSchema.properties
 ).map((key) => {
   const _ =
-    GridaSupabase.SupabaseUserJsonSchema.properties[
-      key as GridaSupabase.SupabaseUserColumn
+    GridaXSupabase.SupabaseUserJsonSchema.properties[
+      key as GridaXSupabase.SupabaseUserColumn
     ];
 
   return {

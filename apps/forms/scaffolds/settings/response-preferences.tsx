@@ -30,7 +30,7 @@ import { useEditorState } from "../editor";
 export function RestrictNumberOfResponseByCustomer() {
   const [state, dispatch] = useEditorState();
 
-  const { form_id, campaign } = state;
+  const { form } = state;
 
   const {
     handleSubmit,
@@ -40,15 +40,15 @@ export function RestrictNumberOfResponseByCustomer() {
     watch,
   } = useForm({
     defaultValues: {
-      enabled: campaign.is_max_form_responses_by_customer_enabled,
-      max: campaign.max_form_responses_by_customer || 1,
+      enabled: form.campaign.is_max_form_responses_by_customer_enabled,
+      max: form.campaign.max_form_responses_by_customer || 1,
     },
   });
 
   const onSubmit = async (data: { enabled: boolean; max: number }) => {
     const req =
       PrivateEditorApi.Settings.updateFormAccessMaxResponsesByCustomer({
-        form_id,
+        form_id: form.form_id,
         ...data,
       });
 
@@ -81,7 +81,6 @@ export function RestrictNumberOfResponseByCustomer() {
       />
       <PreferenceBody>
         <form id="max-responses-by-customer" onSubmit={handleSubmit(onSubmit)}>
-          <input type="hidden" name="form_id" value={form_id} />
           <div className="flex flex-col gap-2">
             <div className="flex items-center space-x-2">
               <Controller
@@ -193,7 +192,7 @@ function MaxResponsesByCustomerHelpWarning() {
 export function MaxRespoonses() {
   const [state, dispatch] = useEditorState();
 
-  const { form_id, campaign } = state;
+  const { form } = state;
 
   const {
     handleSubmit,
@@ -203,14 +202,14 @@ export function MaxRespoonses() {
     watch,
   } = useForm({
     defaultValues: {
-      enabled: campaign.is_max_form_responses_in_total_enabled,
-      max: campaign.max_form_responses_in_total || 100,
+      enabled: form.campaign.is_max_form_responses_in_total_enabled,
+      max: form.campaign.max_form_responses_in_total || 100,
     },
   });
 
   const onSubmit = async (data: { enabled: boolean; max: number }) => {
     const req = PrivateEditorApi.Settings.updateFormAccessMaxResponsesInTotal({
-      form_id,
+      form_id: form.form_id,
       ...data,
     });
 
@@ -247,7 +246,6 @@ export function MaxRespoonses() {
       />
       <PreferenceBody>
         <form id="max-responses-in-total" onSubmit={handleSubmit(onSubmit)}>
-          <input type="hidden" name="form_id" value={form_id} />
           <div className="flex flex-col">
             <div className="flex items-center space-x-2">
               <Controller

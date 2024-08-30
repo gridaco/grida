@@ -1,7 +1,12 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo } from "react";
-import { useEditorState } from "./provider";
+import {
+  useDatabaseTableId,
+  useDatagridTable,
+  useEditorState,
+  useFormFields,
+} from "./use";
 import toast from "react-hot-toast";
 import {
   createClientFormsClient,
@@ -10,11 +15,21 @@ import {
 import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import useSWR from "swr";
 import type { EditorApiResponse } from "@/types/private/api";
-import type { FormResponseField, GridaSupabase } from "@/types";
+import type { FormResponse, FormResponseField, GridaXSupabase } from "@/types";
 import { usePrevious } from "@uidotdev/usehooks";
 import { XSupabaseQuery } from "@/lib/supabase-postgrest/builder";
 import equal from "deep-equal";
 import { PrivateEditorApi } from "@/lib/private";
+import { EditorSymbols } from "./symbols";
+import {
+  GDocSchemaTableProviderXSupabase,
+  type GDocFormsXSBTable,
+  type GDocSchemaTableProviderGrida,
+  type TablespaceSchemaTableStreamType,
+  type TVirtualRow,
+  TXSupabaseDataTablespace,
+} from "./state";
+import assert from "assert";
 
 type RealtimeTableChangeData = {
   id: string;
@@ -30,7 +45,7 @@ const useSubscription = ({
   enabled,
 }: {
   table: "response" | "response_session";
-  form_id: string;
+  form_id?: string | null;
   onUpdate?: (data: RealtimeTableChangeData) => void;
   onInsert?: (data: RealtimeTableChangeData) => void;
   onDelete?: (data: RealtimeTableChangeData | {}) => void;
@@ -39,6 +54,7 @@ const useSubscription = ({
   const supabase = useMemo(() => createClientFormsClient(), []);
 
   useEffect(() => {
+    if (!form_id) return;
     if (!enabled) return;
 
     const channelname = `table-filter-changes-${table}-${form_id}`;
@@ -77,14 +93,101 @@ const useSubscription = ({
   }, [supabase, form_id, table, enabled, onInsert, onUpdate, onDelete]);
 };
 
-export function ResponseSyncProvider({
-  children,
-}: React.PropsWithChildren<{}>) {
-  const [state] = useEditorState();
+function useFetchSchemaTableRows(table_id: string) {
   const supabase = useMemo(() => createClientFormsClient(), []);
-  const prev = usePrevious(state.responses);
 
-  const sync = useCallback(
+  return useCallback(
+    async (limit: number = 100) => {
+      // fetch the responses
+      const { data, error } = await supabase
+        .from("response")
+        .select(
+          `
+            *,
+            fields:response_field(*)
+          `
+        )
+        .eq("form_id", table_id)
+        .order("local_index")
+        .limit(limit);
+
+      if (error) {
+        throw new Error();
+      }
+
+      return data;
+    },
+    [supabase, table_id]
+  );
+}
+
+function useFetchSchemaTableRow() {
+  const supabase = useMemo(() => createClientFormsClient(), []);
+
+  return useCallback(
+    async (id: string) => {
+      const { data, error } = await supabase
+        .from("response")
+        .select(
+          `
+            *,
+            fields:response_field(*)
+          `
+        )
+        .eq("id", id)
+        .single();
+
+      if (error) {
+        throw new Error();
+      }
+
+      return data;
+    },
+    [supabase]
+  );
+}
+
+function useFetchResponseSessions(form_id: string) {
+  const supabase = useMemo(() => createClientFormsClient(), []);
+
+  return useCallback(
+    async (limit: number = 100) => {
+      // fetch the responses
+      const { data, error } = await supabase
+        .from("response_session")
+        .select()
+        .eq("form_id", form_id)
+        .order("created_at")
+        .limit(limit);
+
+      if (error) {
+        throw new Error();
+      }
+
+      return data;
+    },
+    [supabase, form_id]
+  );
+}
+
+function useChangeDatagridLoading() {
+  const [state, dispatch] = useEditorState();
+
+  return useCallback(
+    (loading: boolean) => {
+      dispatch({
+        type: "editor/data-grid/loading",
+        isloading: loading,
+      });
+    },
+    [dispatch]
+  );
+}
+
+function useSyncCell() {
+  const supabase = useMemo(() => createClientFormsClient(), []);
+
+  return useCallback(
     async (id: string, payload: { value: any; option_id?: string | null }) => {
       const { data, error } = await supabase
         .from("response_field")
@@ -106,129 +209,254 @@ export function ResponseSyncProvider({
     },
     [supabase]
   );
+}
+
+function useSyncCellChangesEffect(
+  prev: Array<TVirtualRow<FormResponseField, FormResponse>> | undefined,
+  current: Array<TVirtualRow<FormResponseField, FormResponse>> | undefined
+) {
+  const sync = useSyncCell();
 
   useEffect(() => {
-    //
+    current?.forEach((r) => {
+      r.data;
+      Object.keys(r.data).forEach((attrkey) => {
+        const cell = r.data[attrkey];
+        const prevcell = prev?.find((pr) => pr.id === r.id)?.data[attrkey];
+        // skip
+        if (!prevcell) return;
 
-    Object.keys(state.responses.fields).forEach((key) => {
-      const fields = state.responses.fields[key];
+        // check if field value is updated
+        if (!equal(prevcell.value, cell.value)) {
+          const _ = sync(cell.id, {
+            value: cell.value,
+            option_id: cell.form_field_option_id,
+          });
 
-      // - if field id is draft and value is not empty, create a new response field - we don't handle this case - there will be no empty cells (db trigger)
-      // - if field id is not draft and value is updated, update the response field
-      // - we don't handle delete since field can't be deleted individually (deletes when row deleted)
-
-      for (const cell of fields) {
-        const prevField = prev?.fields[key]?.find(
-          (f: FormResponseField) => f.id === cell.id
-        );
-
-        if (prevField) {
-          // check if field value is updated
-          if (!equal(prevField.value, cell.value)) {
-            const _ = sync(cell.id, {
-              value: cell.value,
-              option_id: cell.form_field_option_id,
+          toast
+            .promise(_, {
+              loading: "Updating...",
+              success: "Updated",
+              error: "Failed",
+            })
+            .then((data) => {
+              // TODO:
+              // update state (although its already updated, but let's update it again with db response - triggers & other metadata)
+            })
+            .catch((error) => {
+              // else revert the change
             });
+        }
+      });
+    });
+  }, [prev, current, sync]);
+}
 
-            toast
-              .promise(_, {
-                loading: "Updating...",
-                success: "Updated",
-                error: "Failed",
-              })
-              .then((data) => {
-                // TODO:
-                // update state (although its already updated, but let's update it again with db response - triggers & other metadata)
-              })
-              .catch((error) => {
-                // else revert the change
-              });
-          }
+function useXSBTableFeed(
+  {
+    table_id,
+    sb_table_id,
+    onFeed,
+  }: {
+    table_id: string;
+    sb_table_id?: number | null;
+    onFeed?: (data: GridaXSupabase.XDataRow[]) => void;
+  },
+  dpes?: React.DependencyList
+) {
+  const [state, dispatch] = useEditorState();
+  const enabled = !!sb_table_id;
+
+  const {
+    datagrid_rows_per_page,
+    datagrid_table_refresh_key,
+    datagrid_orderby,
+  } = state;
+
+  const serachParams = useMemo(() => {
+    return PrivateEditorApi.SupabaseQuery.makeQueryParams({
+      limit: datagrid_rows_per_page,
+      order: datagrid_orderby,
+      refreshKey: datagrid_table_refresh_key,
+    });
+  }, [datagrid_rows_per_page, datagrid_orderby, datagrid_table_refresh_key]);
+
+  const request = sb_table_id
+    ? PrivateEditorApi.XSupabase.url_table_x_query(
+        table_id,
+        sb_table_id,
+        serachParams
+      )
+    : null;
+
+  const res = useSWR<EditorApiResponse<GridaXSupabase.XDataRow[], any>>(
+    request,
+    async (url: string) => {
+      const res = await fetch(url);
+      return res.json();
+    },
+    {
+      // disable this since this feed replaces (not updates) the data, which causes the ui to refresh, causing certain ux fails (e.g. dialog on cell)
+      revalidateOnFocus: false,
+    }
+  );
+
+  useEffect(() => {
+    if (!enabled) return;
+    dispatch({
+      type: "editor/data-grid/loading",
+      isloading: res.isLoading || res.isValidating,
+    });
+  }, [dispatch, enabled, res.isLoading, res.isValidating]);
+
+  const stableDeps = useMemo(() => dpes ?? [], [dpes]);
+
+  useEffect(() => {
+    if (!enabled) return;
+    // trigger data refresh
+    dispatch({
+      type: "editor/data-grid/refresh",
+    });
+  }, [dispatch, enabled, ...stableDeps]);
+
+  useEffect(() => {
+    if (res.data?.data) {
+      const rows = res.data.data;
+      onFeed?.(rows);
+    }
+  }, [res.data]);
+}
+
+function useXSBSyncCell({
+  table_id,
+  sb_table_id,
+  pk,
+}: {
+  table_id: string;
+  sb_table_id?: number | null;
+  pk: string | undefined;
+}) {
+  return useCallback(
+    (key: number | string, value: Record<string, any>) => {
+      if (!sb_table_id) return;
+      if (!pk) return;
+
+      const task = fetch(
+        PrivateEditorApi.XSupabase.url_table_x_query(table_id, sb_table_id),
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            values: value,
+            filters: [
+              {
+                type: "eq",
+                column: pk,
+                value: key,
+              },
+            ],
+          } satisfies XSupabaseQuery.Body),
+        }
+      );
+
+      toast
+        .promise(task, {
+          loading: "Updating...",
+          success: "Updated",
+          error: "Failed",
+        })
+        .then((data) => {
+          // NOTE: Do not dispatch data based on this result. this does not contain extended data
+        });
+    },
+    [pk, table_id, sb_table_id]
+  );
+}
+
+function useXSBSyncCellChangesEffect(
+  prev: Array<GridaXSupabase.XDataRow> | undefined,
+  current: Array<GridaXSupabase.XDataRow> | undefined,
+  queryprops: {
+    table_id: string;
+    sb_table_id?: number | null;
+    pk: string | undefined;
+  }
+) {
+  const pk = queryprops.pk;
+
+  const update = useXSBSyncCell(queryprops);
+
+  useEffect(() => {
+    if (!current) return;
+    if (!prev) return;
+    if (!pk) return;
+
+    // check if rows are updated
+    for (const row of current) {
+      const prevRow = prev.find((r) => r.id === row.id);
+
+      if (prevRow) {
+        // get changed fields
+        const diff = rowdiff(prevRow, row, (key) => key.startsWith("__gf_"));
+        if (Object.keys(diff).length > 0) {
+          update(row[pk], diff);
         }
       }
-    });
-  }, [prev?.fields, state.responses, sync]);
+    }
+  }, [pk, prev, update, current]);
+}
+
+export function FormResponseSyncProvider({
+  children,
+}: React.PropsWithChildren<{}>) {
+  const [state] = useEditorState();
+  const { tablespace } = state;
+  const response_stream =
+    tablespace[EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID].stream;
+  const prev = usePrevious(response_stream);
+
+  useSyncCellChangesEffect(prev, response_stream);
 
   return <>{children}</>;
 }
 
-export function ResponseFeedProvider({
+export function FormResponseFeedProvider({
   children,
 }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
 
   const {
-    form_id,
-    datagrid_table,
+    form,
+    datagrid_table_id,
     datagrid_rows_per_page,
     datagrid_table_refresh_key,
-    realtime_responses_enabled,
+    tablespace,
   } = state;
 
-  const supabase = useMemo(() => createClientFormsClient(), []);
+  const { realtime: _realtime_responses_enabled } =
+    tablespace[EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID];
 
-  const setLoading = useCallback(
-    (loading: boolean) => {
-      dispatch({
-        type: "editor/data-grid/loading",
-        isloading: loading,
-      });
-    },
-    [dispatch]
-  );
+  const setLoading = useChangeDatagridLoading();
 
-  const fetchResponses = useCallback(
-    async (limit: number = 100) => {
-      // fetch the responses
-      const { data, error } = await supabase
-        .from("response")
-        .select(
-          `
-            *,
-            fields:response_field(*)
-          `
-        )
-        .eq("form_id", form_id)
-        .order("local_index")
-        .limit(limit);
+  const fetchResponses = useFetchSchemaTableRows(form.form_id);
 
-      if (error) {
-        throw new Error();
-      }
-
-      return data;
-    },
-    [supabase, form_id]
-  );
-
-  const fetchResponse = useCallback(
-    async (id: string) => {
-      const { data, error } = await supabase
-        .from("response")
-        .select(
-          `
-            *,
-            fields:response_field(*)
-          `
-        )
-        .eq("id", id)
-        .single();
-
-      if (error) {
-        throw new Error();
-      }
-
-      return data;
-    },
-    [supabase]
-  );
+  const fetchResponse = useFetchSchemaTableRow();
 
   useEffect(() => {
-    if (datagrid_table !== "response") return;
+    if (
+      datagrid_table_id !==
+      EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID
+    ) {
+      return;
+    }
+
     setLoading(true);
     const feed = fetchResponses(datagrid_rows_per_page).then((data) => {
       dispatch({
-        type: "editor/response/feed",
+        table_id: EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID,
+        type: "editor/table/space/feed",
         data: data as any,
         reset: true,
       });
@@ -246,20 +474,22 @@ export function ResponseFeedProvider({
   }, [
     dispatch,
     fetchResponses,
+    setLoading,
     datagrid_rows_per_page,
-    datagrid_table,
+    datagrid_table_id,
     datagrid_table_refresh_key,
   ]);
 
   useSubscription({
     table: "response",
-    form_id,
+    form_id: form.form_id,
     onInsert: (data) => {
       setTimeout(() => {
         const newresponse = fetchResponse((data as { id: string }).id).then(
           (data) => {
             dispatch({
-              type: "editor/response/feed",
+              table_id: EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID,
+              type: "editor/table/space/feed",
               data: [data as any],
             });
           }
@@ -279,7 +509,8 @@ export function ResponseFeedProvider({
     onUpdate: (data) => {
       fetchResponse((data as { id: string }).id).then((data) => {
         dispatch({
-          type: "editor/response/feed",
+          table_id: EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID,
+          type: "editor/table/space/feed",
           data: [data as any],
         });
       });
@@ -292,13 +523,13 @@ export function ResponseFeedProvider({
         });
       }
     },
-    enabled: realtime_responses_enabled,
+    enabled: _realtime_responses_enabled,
   });
 
   return <>{children}</>;
 }
 
-export function ResponseSessionFeedProvider({
+export function FormResponseSessionFeedProvider({
   children,
   forceEnableRealtime,
 }: React.PropsWithChildren<{
@@ -307,49 +538,30 @@ export function ResponseSessionFeedProvider({
   const [state, dispatch] = useEditorState();
 
   const {
-    form_id,
-    datagrid_table,
+    form,
+    datagrid_table_id,
     datagrid_rows_per_page,
     datagrid_table_refresh_key,
-    realtime_sessions_enabled: _realtime_sessions_enabled,
+    tablespace,
   } = state;
+
+  const { realtime: _realtime_sessions_enabled } =
+    tablespace[EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID];
 
   const realtime_sessions_enabled =
     forceEnableRealtime ?? _realtime_sessions_enabled;
 
-  const supabase = useMemo(() => createClientFormsClient(), []);
+  const setLoading = useChangeDatagridLoading();
 
-  const setLoading = useCallback(
-    (loading: boolean) => {
-      dispatch({
-        type: "editor/data-grid/loading",
-        isloading: loading,
-      });
-    },
-    [dispatch]
-  );
-
-  const fetchResponseSessions = useCallback(
-    async (limit: number = 100) => {
-      // fetch the responses
-      const { data, error } = await supabase
-        .from("response_session")
-        .select()
-        .eq("form_id", form_id)
-        .order("created_at")
-        .limit(limit);
-
-      if (error) {
-        throw new Error();
-      }
-
-      return data;
-    },
-    [supabase, form_id]
-  );
+  const fetchResponseSessions = useFetchResponseSessions(form.form_id);
 
   useEffect(() => {
-    if (datagrid_table !== "session") return;
+    if (
+      datagrid_table_id !== EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID
+    ) {
+      return;
+    }
+
     setLoading(true);
 
     const feed = fetchResponseSessions(datagrid_rows_per_page).then((data) => {
@@ -371,15 +583,16 @@ export function ResponseSessionFeedProvider({
       });
   }, [
     dispatch,
-    datagrid_table,
+    fetchResponseSessions,
+    setLoading,
+    datagrid_table_id,
     datagrid_rows_per_page,
     datagrid_table_refresh_key,
-    fetchResponseSessions,
   ]);
 
   useSubscription({
     table: "response_session",
-    form_id,
+    form_id: form.form_id,
     onInsert: (data) => {
       dispatch({
         type: "editor/data/sessions/feed",
@@ -407,25 +620,18 @@ export function CustomerFeedProvider({
   const [state, dispatch] = useEditorState();
   const {
     project: { id: project_id },
-    datagrid_table,
+    datagrid_table_id,
     datagrid_rows_per_page,
     datagrid_table_refresh_key,
   } = state;
 
-  const client = createClientWorkspaceClient();
+  const client = useMemo(() => createClientWorkspaceClient(), []);
 
-  const setLoading = useCallback(
-    (loading: boolean) => {
-      dispatch({
-        type: "editor/data-grid/loading",
-        isloading: loading,
-      });
-    },
-    [dispatch]
-  );
+  const setLoading = useChangeDatagridLoading();
 
   useEffect(() => {
-    if (datagrid_table !== "customer") return;
+    if (datagrid_table_id !== EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID)
+      return;
 
     setLoading(true);
     client
@@ -444,86 +650,241 @@ export function CustomerFeedProvider({
         }
       });
   }, [
-    datagrid_table,
+    dispatch,
+    setLoading,
+    datagrid_table_id,
     datagrid_rows_per_page,
     project_id,
     datagrid_table_refresh_key,
+    client,
   ]);
 
   return <>{children}</>;
 }
 
-export function XSupabaseMainTableSyncProvider({
+export function FormXSupabaseMainTableSyncProvider({
   children,
 }: React.PropsWithChildren<{}>) {
   const [state] = useEditorState();
 
-  const { x_supabase_main_table } = state;
+  const tb = useDatagridTable<GDocFormsXSBTable>();
 
-  const pref = usePrevious(x_supabase_main_table?.rows);
+  const { tablespace } = state;
 
-  const pkname = state.x_supabase_main_table?.gfpk;
+  const current =
+    tablespace[EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID]
+      .stream;
 
-  const update = useCallback(
-    (key: number | string, value: Record<string, any>) => {
-      if (!state.connections.supabase?.main_supabase_table_id) return;
-      if (!pkname) return;
+  const prev = usePrevious(current);
 
-      const task = fetch(
-        `/private/editor/connect/${state.form_id}/supabase/table/${state.connections.supabase.main_supabase_table_id}/query`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            values: value,
-            filters: [
-              {
-                type: "eq",
-                column: pkname,
-                value: key,
-              },
-            ],
-          } satisfies XSupabaseQuery.Body),
-        }
-      );
+  const pk = tb?.x_sb_main_table_connection.pk;
 
-      toast
-        .promise(task, {
-          loading: "Updating...",
-          success: "Updated",
-          error: "Failed",
-        })
-        .then((data) => {
-          // NOTE: Do not dispatch data based on this result. this does not contain extended data
-        });
-    },
-    [pkname, state.connections.supabase?.main_supabase_table_id, state.form_id]
-  );
-
-  useEffect(() => {
-    if (!x_supabase_main_table?.rows) return;
-    if (!pref) return;
-    if (!pkname) return;
-
-    const rows = x_supabase_main_table.rows;
-
-    // check if rows are updated
-    for (const row of rows) {
-      const prevRow = pref.find((r) => r.id === row.id);
-
-      if (prevRow) {
-        // get changed fields
-        const diff = rowdiff(prevRow, row, (key) => key.startsWith("__gf_"));
-        if (Object.keys(diff).length > 0) {
-          update(row[pkname], diff);
-        }
-      }
-    }
-  }, [pkname, pref, update, x_supabase_main_table]);
+  useXSBSyncCellChangesEffect(prev, current, {
+    table_id: state.form.form_id,
+    pk: pk,
+    sb_table_id: state.connections.supabase?.main_supabase_table_id,
+  });
 
   return <>{children}</>;
+}
+
+export function FormXSupabaseMainTableFeedProvider({
+  children,
+}: React.PropsWithChildren<{}>) {
+  const [state, dispatch] = useEditorState();
+  const fields = useFormFields();
+
+  useXSBTableFeed(
+    {
+      table_id: state.form.form_id,
+      sb_table_id: state.connections.supabase?.main_supabase_table_id,
+      onFeed: (rows) => {
+        dispatch({
+          type: "editor/table/space/feed/x-supabase",
+          table_id:
+            EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID,
+          data: rows,
+        });
+      },
+    },
+    [fields]
+  );
+
+  return <>{children}</>;
+}
+
+export function GridaSchemaTableSyncProvider({
+  table_id,
+  children,
+}: React.PropsWithChildren<{
+  table_id: string;
+}>) {
+  const [state] = useEditorState();
+  const { tablespace } = state;
+
+  const tb = useDatagridTable();
+
+  assert(tb?.provider === "grida", "Table provider is not grida");
+
+  const stream = tablespace[table_id].stream as unknown as Array<
+    TablespaceSchemaTableStreamType<GDocSchemaTableProviderGrida>
+  >;
+
+  const prev = usePrevious(stream);
+
+  // FIXME:
+  useSyncCellChangesEffect(prev, stream);
+
+  return <>{children}</>;
+}
+
+export function GridaSchemaTableFeedProvider({
+  table_id,
+  children,
+}: React.PropsWithChildren<{
+  table_id: string;
+}>) {
+  const [state, dispatch] = useEditorState();
+
+  const { datagrid_rows_per_page, datagrid_table_refresh_key, tablespace } =
+    state;
+
+  const { realtime: _realtime_responses_enabled } = tablespace[table_id];
+
+  const setLoading = useChangeDatagridLoading();
+
+  const fetchTableRows = useFetchSchemaTableRows(table_id);
+
+  const fetchTableRow = useFetchSchemaTableRow();
+
+  useEffect(() => {
+    if (typeof table_id !== "string") return;
+    setLoading(true);
+    const feed = fetchTableRows(datagrid_rows_per_page).then((data) => {
+      dispatch({
+        type: "editor/table/space/feed",
+        table_id: table_id,
+        data: data as any,
+        reset: true,
+      });
+    });
+
+    toast
+      .promise(feed, {
+        loading: "Loading...",
+        success: "Loaded",
+        error: "Failed to load",
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [
+    dispatch,
+    fetchTableRows,
+    setLoading,
+    table_id,
+    datagrid_rows_per_page,
+    datagrid_table_refresh_key,
+  ]);
+
+  useSubscription({
+    table: "response",
+    form_id: table_id,
+    onInsert: (data) => {
+      setTimeout(() => {
+        const newresponse = fetchTableRow((data as { id: string }).id).then(
+          (data) => {
+            dispatch({
+              table_id: table_id,
+              type: "editor/table/space/feed",
+              data: [data as any],
+            });
+          }
+        );
+
+        toast.promise(
+          newresponse,
+          {
+            loading: "Fetching new Entry",
+            success: "New Entry",
+            error: "Failed to fetch new Entry",
+          },
+          { id: data.id }
+        );
+      }, 100);
+    },
+    onUpdate: (data) => {
+      fetchTableRow((data as { id: string }).id).then((data) => {
+        dispatch({
+          table_id: table_id,
+          type: "editor/table/space/feed",
+          data: [data as any],
+        });
+      });
+    },
+    onDelete: (data) => {
+      if ("id" in data) {
+        dispatch({
+          type: "editor/response/delete",
+          id: data.id,
+        });
+      }
+    },
+    enabled: _realtime_responses_enabled,
+  });
+
+  return <>{children}</>;
+}
+
+export function GridaSchemaXSBTableSyncProvider({
+  pk,
+  table_id,
+  sb_table_id,
+  children,
+}: React.PropsWithChildren<{
+  table_id: string;
+  sb_table_id: number;
+  pk: string;
+}>) {
+  const [state] = useEditorState();
+
+  const { tablespace } = state;
+
+  const current = (tablespace[table_id] as TXSupabaseDataTablespace).stream;
+
+  const prev = usePrevious(current);
+
+  useXSBSyncCellChangesEffect(prev, current, {
+    table_id: table_id,
+    pk: pk,
+    sb_table_id: sb_table_id,
+  });
+
+  return <>{children}</>;
+}
+
+export function GridaSchemaXSBTableFeedProvider({
+  table_id,
+  sb_table_id,
+}: {
+  table_id: string;
+  sb_table_id: number;
+}) {
+  const [state, dispatch] = useEditorState();
+
+  useXSBTableFeed({
+    table_id: table_id,
+    sb_table_id: sb_table_id,
+    onFeed: (rows) => {
+      dispatch({
+        type: "editor/table/space/feed/x-supabase",
+        table_id: table_id,
+        data: rows,
+      });
+    },
+  });
+
+  return <></>;
 }
 
 function rowdiff(
@@ -541,67 +902,4 @@ function rowdiff(
     }
   }
   return changedFields;
-}
-
-export function XSupabaseMainTableFeedProvider({
-  children,
-}: React.PropsWithChildren<{}>) {
-  const [state, dispatch] = useEditorState();
-
-  const {
-    datagrid_rows_per_page,
-    datagrid_table_refresh_key,
-    datagrid_orderby,
-  } = state;
-
-  const serachParams = useMemo(() => {
-    return PrivateEditorApi.SupabaseQuery.makeQueryParams({
-      limit: datagrid_rows_per_page,
-      order: datagrid_orderby,
-      refreshKey: datagrid_table_refresh_key,
-    });
-  }, [datagrid_rows_per_page, datagrid_orderby, datagrid_table_refresh_key]);
-
-  const request = state.connections.supabase?.main_supabase_table_id
-    ? `/private/editor/connect/${state.form_id}/supabase/table/${state.connections.supabase.main_supabase_table_id}/query?${serachParams}`
-    : null;
-
-  const res = useSWR<EditorApiResponse<GridaSupabase.XDataRow[], any>>(
-    request,
-    async (url: string) => {
-      const res = await fetch(url);
-      return res.json();
-    },
-    {
-      // disable this since this feed replaces (not updates) the data, which causes the ui to refresh, causing certain ux fails (e.g. dialog on cell)
-      revalidateOnFocus: false,
-    }
-  );
-
-  useEffect(() => {
-    dispatch({
-      type: "editor/data-grid/loading",
-      isloading: res.isLoading || res.isValidating,
-    });
-  }, [dispatch, res.isLoading, res.isValidating]);
-
-  useEffect(() => {
-    // trigger data refresh
-    dispatch({
-      type: "editor/data-grid/refresh",
-    });
-  }, [dispatch, state.fields]);
-
-  useEffect(() => {
-    if (res.data?.data) {
-      const rows = res.data.data;
-
-      dispatch({
-        type: "editor/x-supabase/main-table/feed",
-        data: rows,
-      });
-    }
-  }, [dispatch, res.data, state.form_id]);
-
-  return <>{children}</>;
 }

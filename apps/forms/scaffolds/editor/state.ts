@@ -1,7 +1,6 @@
-import { blockstreeflat } from "@/lib/forms/tree";
 import type {
   Appearance,
-  ConnectionSupabaseJoint,
+  AttributeDefinition,
   Customer,
   EndingPageI18nOverrides,
   EndingPageTemplateID,
@@ -18,15 +17,15 @@ import type {
   FormResponseUnknownFieldHandlingStrategyType,
   FormStyleSheetV1Schema,
   FormsPageLanguage,
-  GridaSupabase,
+  GDocumentType,
+  GridaXSupabase,
   OrderBy,
 } from "@/types";
-import { LOCALTZ } from "./symbols";
-import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
+import { SYM_LOCALTZ, EditorSymbols } from "./symbols";
 import { ZodObject } from "zod";
 import { Tokens } from "@/ast";
 import React from "react";
-import { editorbasepath } from "@/lib/forms/url";
+import { ResourceTypeIconName } from "@/components/resource-type-icon";
 
 export type GDocEditorRouteParams = {
   org: string;
@@ -38,7 +37,11 @@ export type DraftID = `[draft]${string}`;
 export const DRAFT_ID_START_WITH = "[draft]";
 const ISDEV = process.env.NODE_ENV === "development";
 
-export interface FormEditorInit {
+export interface EditorFlatFormBlock<T = FormBlockType> extends FormBlock<T> {
+  id: string | DraftID;
+}
+
+export interface BaseDocumentEditorInit {
   organization: {
     name: string;
     id: number;
@@ -47,214 +50,48 @@ export interface FormEditorInit {
     name: string;
     id: number;
   };
-  form_id: string;
-  campaign: FormEditorState["campaign"];
-  form_security: FormEditorState["form_security"];
-  ending: FormEditorState["ending"];
-  connections?: {
-    store_id?: number | null;
-    supabase?: GridaSupabase.SupabaseConnectionState;
-  };
-  theme: FormEditorState["theme"];
-  form_title: string;
   document_id: string;
   document_title: string;
+  doctype: GDocumentType;
+  theme: EditorState["theme"];
+}
+
+export type EditorInit =
+  | FormDocumentEditorInit
+  | SiteDocumentEditorInit
+  | SchemaDocumentEditorInit;
+
+export interface SiteDocumentEditorInit extends BaseDocumentEditorInit {
+  doctype: "v0_site";
+}
+
+export interface SchemaDocumentTableInit {
+  id: string;
+  name: string;
+  description: string | null;
+  attributes: Array<FormFieldDefinition>;
+  x_sb_main_table_connection?: TableXSBMainTableConnection;
+}
+
+export interface SchemaDocumentEditorInit extends BaseDocumentEditorInit {
+  doctype: "v0_schema";
+  supabase_project: GridaXSupabase.SupabaseProject | null;
+  tables: ReadonlyArray<SchemaDocumentTableInit>;
+}
+
+export interface FormDocumentEditorInit extends BaseDocumentEditorInit {
+  doctype: "v0_form";
+  form_id: string;
+  campaign: EditorState["form"]["campaign"];
+  form_security: EditorState["form"]["form_security"];
+  ending: EditorState["form"]["ending"];
+  connections?: {
+    store_id?: number | null;
+    supabase?: GridaXSupabase.XSupabaseMainTableConnectionState;
+  };
+  form_title: string;
   blocks: EditorFlatFormBlock[];
   fields: FormFieldDefinition[];
-}
-
-export function initialFormEditorState(init: FormEditorInit): FormEditorState {
-  // prepare initial available_field_ids
-  const field_ids = init.fields.map((f) => f.id);
-  const block_referenced_field_ids = init.blocks
-    .map((b) => b.form_field_id)
-    .filter((id) => id !== null) as string[];
-  const block_available_field_ids = field_ids.filter(
-    (id) => !block_referenced_field_ids.includes(id)
-  );
-
-  const is_main_table_supabase =
-    !!init.connections?.supabase?.main_supabase_table;
-
-  const basepath = editorbasepath({
-    org: init.organization.name,
-    proj: init.project.name,
-  });
-
-  return {
-    saving: false,
-    basepath: basepath,
-    project: init.project,
-    organization: init.organization,
-    connections: {
-      store_id: init.connections?.store_id,
-      supabase: init.connections?.supabase,
-    },
-    theme: init.theme,
-    form_id: init.form_id,
-    form_title: init.form_title,
-    tables: init.connections?.supabase?.main_supabase_table
-      ? [
-          {
-            name: init.connections.supabase.main_supabase_table.sb_table_name,
-            group: "x-supabase-main-table",
-            views: [
-              {
-                type: "x-supabase-main-table",
-                name: init.connections.supabase.main_supabase_table
-                  .sb_table_name,
-                label:
-                  init.connections.supabase.main_supabase_table.sb_table_name,
-              },
-            ],
-          },
-          {
-            name: "auth.users",
-            group: "x-supabase-auth.users",
-            views: [
-              {
-                type: "x-supabase-auth.users",
-                name: "auth.users",
-                label: "auth.users",
-              },
-            ],
-          },
-        ]
-      : [
-          {
-            name: "Responses",
-            group: "response",
-            views: [
-              { type: "response", name: "response", label: "Responses" },
-              { type: "session", name: "session", label: "Sessions" },
-            ],
-          },
-          {
-            name: "Customers",
-            group: "customer",
-            views: [{ type: "customer", name: "customer", label: "Customers" }],
-          },
-        ],
-    campaign: init.campaign,
-    form_security: init.form_security,
-    ending: init.ending,
-    document_id: init.document_id,
-    document_title: init.document_title,
-    blocks: blockstreeflat(init.blocks),
-    document: {
-      pages: formpagesinit({ basepath, document_id: init.document_id }),
-      selected_page_id: "", // "form",
-      nodes: [],
-      templatesample: "formcollection_sample_001_the_bundle",
-      templatedata: {},
-    },
-    fields: init.fields,
-    assets: {
-      backgrounds: [],
-    },
-    customers: undefined,
-    responses: {
-      rows: [],
-      fields: {},
-    },
-    selected_rows: new Set(),
-    available_field_ids: block_available_field_ids,
-    datagrid_rows_per_page: 100,
-    datagrid_table_refresh_key: 0,
-    datagrid_table_row_keyword: "row",
-    datagrid_isloading: false,
-    dateformat: "datetime",
-    datetz: LOCALTZ,
-    datagrid_table: is_main_table_supabase
-      ? "x-supabase-main-table"
-      : "response",
-    datagrid_filter: {
-      masking_enabled: false,
-      empty_data_hidden: true,
-    },
-    datagrid_orderby: {},
-    realtime_responses_enabled: true,
-    realtime_sessions_enabled: false,
-    x_supabase_main_table: init.connections?.supabase
-      ? xsbmtinit(init.connections.supabase)
-      : undefined,
-  };
-}
-
-function formpagesinit({
-  basepath,
-  document_id,
-}: {
-  basepath: string;
-  document_id: string;
-}): MenuItem[] {
-  return [
-    {
-      section: "Design",
-      id: "campaign",
-      label: "Campaign",
-      href: `/${basepath}/${document_id}/form`,
-      icon: "folder",
-    },
-    // {
-    //   section: "Form",
-    //   id: "start",
-    //   label: "Start Page",
-    //   href: `/${basepath}/${form_id}/form/start`,
-    //   icon: "file",
-    //   level: 1,
-    // },
-    {
-      section: "Design",
-      id: "form",
-      label: "Form Page",
-      href: `/${basepath}/${document_id}/form/edit`,
-      icon: "file",
-      level: 1,
-    },
-    {
-      section: "Design",
-      id: "ending",
-      label: "Ending Page",
-      href: `/${basepath}/${document_id}/form/end`,
-      icon: "file",
-      level: 1,
-    },
-    {
-      section: "Data",
-      id: "responses",
-      label: "Responses",
-      href: `/${basepath}/${document_id}/data/responses`,
-      icon: "table",
-    },
-    {
-      section: "Analytics",
-      id: "realtime",
-      label: "Realtime",
-      href: `/${basepath}/${document_id}/data/analytics`,
-      icon: "chart",
-    },
-  ];
-}
-
-function xsbmtinit(conn?: GridaSupabase.SupabaseConnectionState) {
-  // TODO: need inspection - will supbaseconn present even when main table is not present?
-  // if yes, we need to adjust the state to be nullable
-  if (!conn) return undefined;
-  if (!conn.main_supabase_table) return undefined;
-
-  const parsed = conn.main_supabase_table.sb_table_schema
-    ? SupabasePostgRESTOpenApi.parse_supabase_postgrest_schema_definition(
-        conn.main_supabase_table?.sb_table_schema
-      )
-    : undefined;
-
-  return {
-    schema: conn.main_supabase_table.sb_table_schema,
-    pks: parsed?.pks || [],
-    gfpk: (parsed?.pks?.length || 0) > 0 ? parsed?.pks[0] : undefined,
-    rows: [],
-  };
 }
 
 export interface DataGridFilterSettings {
@@ -263,34 +100,231 @@ export interface DataGridFilterSettings {
   empty_data_hidden: boolean;
 }
 
-type GFTable =
-  | {
-      type: "response" | "session";
-      name: string;
-      label: string;
-    }
-  | {
-      type: "customer";
-      name: string;
-      label: string;
-    }
-  | {
-      type: "x-supabase-main-table" | "x-supabase-auth.users";
-      name: string;
-      label: string;
-    };
+type GDocTableBase = {
+  /**
+   * keyword indicating the row, singular form (will be made plural in the UI)
+   * e.g. "row" "user" "session" "customer"
+   */
+  row_keyword: string;
+  name: string;
+  description: string | null;
+  icon: ResourceTypeIconName;
+  readonly: boolean;
+  rules: {
+    delete_restricted: boolean;
+  };
+  label: string;
+};
 
-interface MenuItem {
-  section: string;
+export type GDocTable = GDocTableBase &
+  (
+    | {
+        provider: "grida";
+        id: typeof EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID;
+      }
+    | {
+        provider: "custom";
+        id: typeof EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID;
+      }
+    | {
+        provider: "custom";
+        id: typeof EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID;
+      }
+    | GDocFormsXSBTable
+    | {
+        provider: "x-supabase";
+        id: typeof EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID;
+      }
+    | GDocSchemaTable
+  );
+
+export type GDocFormsXSBTable = {
+  provider: "x-supabase";
+  id: typeof EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID;
+  x_sb_main_table_connection: TableXSBMainTableConnection;
+} & GDocTableBase;
+
+export type GDocSchemaTableProviderGrida = {
+  provider: "grida";
   id: string;
+  attributes: Array<AttributeDefinition>;
+  readonly: false;
+} & GDocTableBase;
+
+export type GDocSchemaTableProviderXSupabase = {
+  provider: "x-supabase";
+  id: string;
+  attributes: Array<AttributeDefinition>;
+  x_sb_main_table_connection: TableXSBMainTableConnection;
+} & GDocTableBase;
+
+export type GDocSchemaTable =
+  | GDocSchemaTableProviderGrida
+  | GDocSchemaTableProviderXSupabase;
+
+export type GDocTableID = GDocTable["id"];
+
+/**
+ * this connection indicates the grida table is connected to a x-supabase table
+ */
+export type TableXSBMainTableConnection = {
+  sb_schema_name: string;
+  sb_table_name: string;
+  sb_table_id: number;
+  // we need a single pk for editor operations - this may not always be available since pg table can have no pk
+  pk: string | undefined;
+  pks: string[];
+  sb_table_schema: GridaXSupabase.JSONSChema;
+  sb_postgrest_methods: GridaXSupabase.XSBPostgrestMethod[];
+};
+
+export type MenuItem<ID, T = {}> = {
+  section: string;
+  id: ID;
   level?: number;
   label: string;
-  icon: "folder" | "file" | "setting" | "table" | "chart";
+  icon: ResourceTypeIconName;
   href?: string;
+  data: T;
+};
+
+export type TableType =
+  | "response"
+  | "customer"
+  | "schema"
+  | "x-supabase-auth.users";
+
+export interface IDataGridState {
+  /**
+   * @global rows per page is not saved per table
+   */
+  datagrid_rows_per_page: number;
+  datagrid_table_id: GDocTableID | null;
+  datagrid_table_refresh_key: number;
+  datagrid_isloading: boolean;
+  datagrid_filter: DataGridFilterSettings;
+  datagrid_orderby: { [key: string]: OrderBy };
+  datagrid_selected_rows: Set<string>;
 }
 
-export interface FormEditorState {
+/**
+ * Utility state for entity edit dialog. id shall be processed within the correct context.
+ */
+interface TGlobalEditorDialogState<T = never> {
+  id?: string;
+  refreshkey?: number;
+  open: boolean;
+  data?: T;
+}
+
+export type TVirtualRowData<T> = { [attributekey: string]: T };
+export type TVirtualRow<T = Record<string, any>, M = Record<string, any>> = {
+  id: string;
+  data: TVirtualRowData<T>;
+  meta: M;
+};
+
+/**
+ * Utility state for global data stream state.
+ */
+export type ITablespace<T> = {
+  provider: TTablespace["provider"];
+  readonly: boolean;
+  realtime: boolean;
+  stream?: Array<T>;
+};
+
+export type TTablespace =
+  | TCustomDataTablespace<any>
+  | TXSupabaseDataTablespace
+  | TGridaDataTablespace;
+
+type TCustomDataTablespace<T> = {
+  provider: "custom";
+  readonly: boolean;
+  realtime: boolean;
+  stream?: Array<T>;
+};
+
+export type TXSupabaseDataTablespace = {
+  provider: "x-supabase";
+  readonly: boolean;
+  realtime: false;
+  stream?: Array<GridaXSupabase.XDataRow>;
+};
+
+export type TGridaDataTablespace = {
+  provider: "grida";
+  readonly: boolean;
+  realtime: boolean;
+  stream?: Array<GridaSchemaTableVirtualRow>;
+};
+
+export type GridaSchemaTableVirtualRow = TVirtualRow<
+  FormResponseField,
+  FormResponse
+>;
+
+interface IRowEditorState {
+  row_editor: TGlobalEditorDialogState;
+}
+
+interface ICustomerEditorState {
+  customer_editor: TGlobalEditorDialogState;
+}
+
+interface IEditorDateContextState {
+  dateformat: "date" | "time" | "datetime";
+  datetz: typeof SYM_LOCALTZ | string;
+}
+
+export type TableMenuItem = MenuItem<
+  GDocTableID,
+  {
+    readonly: boolean;
+    rules: {
+      delete_restricted: boolean;
+    };
+  }
+>;
+
+interface IEditorSidebarState {
+  sidebar: {
+    mode: "project" | "build" | "data" | "connect";
+    mode_data: {
+      tables: TableMenuItem[];
+      menus: MenuItem<GDocTableID>[];
+    };
+  };
+}
+
+interface IEditorGlobalSavingState {
   saving: boolean;
+}
+
+interface IEditorAssetsState {
+  assets: {
+    backgrounds: {
+      name: string;
+      title: string;
+      embed: string;
+      preview: [string] | [string, string];
+    }[];
+  };
+}
+
+interface IInsertionMenuState {
+  insertmenu: TGlobalEditorDialogState;
+}
+
+export interface BaseDocumentEditorState
+  extends IEditorGlobalSavingState,
+    IEditorDateContextState,
+    IEditorAssetsState,
+    IInsertionMenuState,
+    IFieldEditorState,
+    ICustomerEditorState,
+    IRowEditorState {
   basepath: string;
   organization: {
     name: string;
@@ -300,42 +334,14 @@ export interface FormEditorState {
     name: string;
     id: number;
   };
-  connections: {
-    store_id?: number | null;
-    supabase?: GridaSupabase.SupabaseConnectionState;
-  };
-  form_id: string;
-  form_title: string;
-  campaign: {
-    max_form_responses_by_customer: number | null;
-    is_max_form_responses_by_customer_enabled: boolean;
-    max_form_responses_in_total: number | null;
-    is_max_form_responses_in_total_enabled: boolean;
-    is_force_closed: boolean;
-    is_scheduling_enabled: boolean;
-    scheduling_open_at: string | null;
-    scheduling_close_at: string | null;
-    scheduling_tz?: string;
-  };
-  form_security: {
-    unknown_field_handling_strategy: FormResponseUnknownFieldHandlingStrategyType;
-    method: FormMethod;
-  };
-  ending: {
-    is_redirect_after_response_uri_enabled: boolean;
-    redirect_after_response_uri: string | null;
-    is_ending_page_enabled: boolean;
-    ending_page_template_id: EndingPageTemplateID | null;
-    ending_page_i18n_overrides: EndingPageI18nOverrides | null;
-  };
   document_id: string;
   document_title: string;
-  blocks: EditorFlatFormBlock[];
+  doctype: GDocumentType;
   document: {
-    pages: MenuItem[];
-    selected_page_id: string;
+    pages: MenuItem<string>[];
+    selected_page_id?: string;
     nodes: any[];
-    templatesample: string;
+    templatesample?: string;
     templatedata: {
       [key: string]: {
         text?: Tokens.StringValueExpression;
@@ -356,13 +362,6 @@ export interface FormEditorState {
     selected_node_default_text?: Tokens.StringValueExpression;
     selected_node_context?: Record<string, any>;
   };
-  fields: FormFieldDefinition[];
-  field_draft_init?: Partial<FormFieldInit> | null;
-  focus_field_id?: string | null;
-  focus_response_id?: string;
-  focus_customer_id?: string;
-  focus_block_id?: string | null;
-  available_field_ids: string[];
   theme: {
     is_powered_by_branding_enabled: boolean;
     lang: FormsPageLanguage;
@@ -373,61 +372,118 @@ export interface FormEditorState {
     section?: FormStyleSheetV1Schema["section"];
     background?: FormPageBackgroundSchema;
   };
-  assets: {
-    backgrounds: {
-      name: string;
-      title: string;
-      embed: string;
-      preview: [string] | [string, string];
-    }[];
-  };
-  customers?: Customer[];
-  selected_rows: Set<string>;
-  responses: {
-    rows: FormResponse[];
-    fields: { [key: string]: FormResponseField[] };
-  };
-  sessions?: FormResponseSession[];
-  tables: {
-    name: string;
-    group:
-      | "response"
-      | "customer"
-      | "x-supabase-main-table"
-      | "x-supabase-auth.users";
-    views: GFTable[];
-  }[];
-  datagrid_rows_per_page: number;
-  datagrid_table:
-    | "response"
-    | "session"
-    | "customer"
-    | "x-supabase-main-table"
-    | "x-supabase-auth.users";
-  datagrid_table_refresh_key: number;
-  datagrid_table_row_keyword: string;
-  datagrid_isloading: boolean;
-  datagrid_filter: DataGridFilterSettings;
-  datagrid_orderby: { [key: string]: OrderBy };
-  realtime_sessions_enabled: boolean;
-  realtime_responses_enabled: boolean;
-  is_insert_menu_open?: boolean;
-  is_field_edit_panel_open?: boolean;
-  is_response_edit_panel_open?: boolean;
-  is_customer_edit_panel_open?: boolean;
-  is_block_edit_panel_open?: boolean;
-  field_edit_panel_refresh_key?: number;
-  dateformat: "date" | "time" | "datetime";
-  datetz: typeof LOCALTZ | string;
-  x_supabase_main_table?: {
-    schema: GridaSupabase.JSONSChema;
-    // we need a single pk for editor operations
-    gfpk: string | undefined;
-    pks: string[];
-    rows: GridaSupabase.XDataRow[];
+}
+
+interface IFieldEditorState {
+  field_editor: TGlobalEditorDialogState<{
+    draft: Partial<FormFieldInit> | null;
+  }>;
+}
+
+interface IConnectionsState {
+  supabase_project: GridaXSupabase.SupabaseProject | null;
+  connections: {
+    store_id?: number | null;
+    supabase?: GridaXSupabase.XSupabaseMainTableConnectionState;
   };
 }
 
-export interface EditorFlatFormBlock<T = FormBlockType> extends FormBlock<T> {
-  id: string | DraftID;
+/**
+ * A utility type that determines the stream type for a table based on its schema.
+ *
+ * - If the table is a `GDocSchemaTable` and has an `x_sb_main_table_connection`,
+ *   the stream type will be `GridaXSupabase.XDataRow`.
+ * - If the table is a `GDocSchemaTable` but does not have an `x_sb_main_table_connection`,
+ *   the stream type will default to `GridaSchemaTableVirtualRow`.
+ * - For any other table type, the stream type will be `GridaSchemaTableVirtualRow`.
+ *
+ * @template T The table type, which extends from `GDocTableBase`.
+ *
+ * @example
+ * // For a GDocSchemaTable with x_sb_main_table_connection:
+ * type StreamType = TablespaceSchemaTableStreamType<GDocSchemaTableWithConnection>;
+ * // StreamType will be GridaXSupabase.XDataRow
+ *
+ * @example
+ * // For a GDocSchemaTable without x_sb_main_table_connection:
+ * type StreamType = TablespaceSchemaTableStreamType<GDocSchemaTableWithoutConnection>;
+ * // StreamType will be GridaSchemaTableVirtualRow
+ *
+ * @example
+ * // For a non-schema table (e.g., GDocFormsTable):
+ * type StreamType = TablespaceSchemaTableStreamType<GDocFormsTable>;
+ * // StreamType will default to GridaSchemaTableVirtualRow
+ */
+export type TablespaceSchemaTableStreamType<T extends GDocTableBase> =
+  T extends GDocSchemaTable
+    ? T["provider"] extends "x-supabase"
+      ? GridaXSupabase.XDataRow
+      : GridaSchemaTableVirtualRow
+    : GridaSchemaTableVirtualRow;
+
+interface ITablespaceEditorState {
+  tables: Array<GDocTable>;
+  /**
+   * you can find the records for the table data here
+   *
+   * `{[table_id]: { stream: [{ id, data: {...}, meta }]} }`
+   */
+  tablespace: {
+    [EditorSymbols.Table
+      .SYM_GRIDA_FORMS_RESPONSE_TABLE_ID]: TGridaDataTablespace;
+    [EditorSymbols.Table
+      .SYM_GRIDA_FORMS_SESSION_TABLE_ID]: TCustomDataTablespace<FormResponseSession>;
+    [EditorSymbols.Table
+      .SYM_GRIDA_CUSTOMER_TABLE_ID]: TCustomDataTablespace<Customer>;
+    [EditorSymbols.Table
+      .SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID]: TXSupabaseDataTablespace;
+    [EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID]: never;
+  } & {
+    [table_id: string]: TXSupabaseDataTablespace | TGridaDataTablespace;
+    // [T in GDocTable as Extract<T["id"], string>]: ITablespace<
+    //   TablespaceSchemaTableStreamType<T>
+    // >;
+  };
 }
+
+export interface FormEditorState
+  extends BaseDocumentEditorState,
+    IConnectionsState,
+    IEditorSidebarState,
+    ITablespaceEditorState,
+    IDataGridState {
+  blocks: EditorFlatFormBlock[];
+
+  form: {
+    form_id: string;
+    form_title: string;
+    fields: FormFieldDefinition[];
+    available_field_ids: string[];
+    campaign: {
+      max_form_responses_by_customer: number | null;
+      is_max_form_responses_by_customer_enabled: boolean;
+      max_form_responses_in_total: number | null;
+      is_max_form_responses_in_total_enabled: boolean;
+      is_force_closed: boolean;
+      is_scheduling_enabled: boolean;
+      scheduling_open_at: string | null;
+      scheduling_close_at: string | null;
+      scheduling_tz?: string;
+    };
+    ending: {
+      is_redirect_after_response_uri_enabled: boolean;
+      redirect_after_response_uri: string | null;
+      is_ending_page_enabled: boolean;
+      ending_page_template_id: EndingPageTemplateID | null;
+      ending_page_i18n_overrides: EndingPageI18nOverrides | null;
+    };
+    form_security: {
+      unknown_field_handling_strategy: FormResponseUnknownFieldHandlingStrategyType;
+      method: FormMethod;
+    };
+  };
+
+  focus_block_id?: string | null;
+}
+
+export type EditorState = FormEditorState;

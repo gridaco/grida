@@ -1,9 +1,21 @@
-import type { FormInputType, GridaSupabase } from "@/types";
+import type { FormInputType, GridaXSupabase } from "@/types";
 
 export type GFSystemColumnTypes =
   | "__gf_display_id"
   | "__gf_created_at"
   | "__gf_customer_id";
+
+export type GFSystemColumn = {
+  key: GFSystemColumnTypes;
+  name?: string;
+};
+
+export type GFColumn = {
+  key: string;
+  name: string;
+  readonly: boolean;
+  type?: FormInputType;
+};
 
 export type GFResponseFieldData = {
   type?: FormInputType;
@@ -36,7 +48,7 @@ export type GFResponseRow = {
   fields: Record<string, GFResponseFieldData>;
 };
 
-export type CFCustomerRow = {
+export type GRCustomerRow = {
   uid: string;
   email: string | null;
   // name: string;
@@ -46,4 +58,4 @@ export type CFCustomerRow = {
   last_seen_at: string;
 };
 
-export type XSupabaseReferenceTableRow = GridaSupabase.SupabaseUser | any;
+export type XSupabaseReferenceTableRow = GridaXSupabase.SupabaseUser | any;

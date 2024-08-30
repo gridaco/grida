@@ -8,7 +8,7 @@ import { CommandItem } from "@/components/ui/command";
 
 export function InsertMenuTrigger() {
   const [state, dispatch] = useEditorState();
-  const { is_insert_menu_open } = state;
+  const { insertmenu } = state;
 
   const openInsertMenu = (open: boolean) => {
     dispatch({
@@ -20,7 +20,7 @@ export function InsertMenuTrigger() {
   return (
     <Button
       role="combobox"
-      variant={is_insert_menu_open ? "default" : "outline"}
+      variant={insertmenu.open ? "default" : "outline"}
       size="icon"
       className="rounded-full"
       onPointerDown={(e) => {

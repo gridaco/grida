@@ -3,7 +3,7 @@ import {
   GridaXSupabaseService,
   createXSupabaseClient,
 } from "@/services/x-supabase";
-import { FormFieldReferenceSchema, GridaSupabase } from "@/types";
+import { FormFieldReferenceSchema, GridaXSupabase } from "@/types";
 import assert from "assert";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
@@ -11,7 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 type SearchRes = {
   schema_name: string;
   table_name: string;
-  table_schema: GridaSupabase.SupabaseTable["sb_table_schema"];
+  table_schema: GridaXSupabase.SupabaseTable["sb_table_schema"];
   column: string;
   rows: Record<string, any>[];
 };
@@ -63,7 +63,8 @@ export async function GET(
         assert(supabase_connection, "No connection found");
 
         const xsupabase = new GridaXSupabaseService();
-        const conn = await xsupabase.getConnection(supabase_connection);
+        const conn =
+          await xsupabase.getXSBMainTableConnectionState(supabase_connection);
         assert(conn, "connection fetch failed");
         const {
           supabase_project: { sb_schema_definitions },
@@ -99,7 +100,7 @@ export async function GET(
               data: {
                 schema_name: schema as string,
                 table_name: table,
-                table_schema: GridaSupabase.SupabaseUserJsonSchema as any,
+                table_schema: GridaXSupabase.SupabaseUserJsonSchema as any,
                 column: column,
                 rows: data.users,
               } satisfies SearchRes,

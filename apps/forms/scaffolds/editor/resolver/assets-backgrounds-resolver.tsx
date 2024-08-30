@@ -2,7 +2,7 @@
 
 import React, { useEffect } from "react";
 import useSWR from "swr";
-import { useEditorState } from "../provider";
+import { useEditorState } from "../use";
 
 export function AssetsBackgroundsResolver({
   children,

@@ -53,15 +53,26 @@ export function reducer(
     }
     case "section/prev": {
       return produce(state, (draft) => {
-        const currindex = state.sections.findIndex(
-          (section) => section.id === state.current_section_id
+        if (draft.current_section_id === draft.sections[0].id) {
+          // do nothing
+          return;
+        }
+
+        const currindex = draft.sections.findIndex(
+          (section) => section.id === draft.current_section_id
         );
+
         const previndex = currindex - 1;
         draft.current_section_id = state.sections[previndex].id;
       });
     }
     case "section/next": {
       return produce(state, (draft) => {
+        if (draft.current_section_id === draft.last_section_id) {
+          // do nothing
+          return;
+        }
+
         const currindex = state.sections.findIndex(
           (section) => section.id === state.current_section_id
         );

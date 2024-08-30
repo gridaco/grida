@@ -17,7 +17,7 @@ export default function EditFormPage() {
         </AgentThemeProvider>
       </CanvasEventTarget>
       <aside className="hidden lg:flex h-full">
-        <SideControl mode="design" />
+        <SideControl />
       </aside>
     </main>
   );
@@ -53,8 +53,6 @@ function CurrentPageCanvas() {
   const [state, dispatch] = useEditorState();
 
   const {
-    form_title,
-    form_id,
     theme: { lang },
     document: { selected_page_id },
   } = state;

@@ -1,4 +1,4 @@
-import { FileIcon, HomeIcon } from "@radix-ui/react-icons";
+import { AvatarIcon, FileIcon, HomeIcon } from "@radix-ui/react-icons";
 import {
   FolderDotIcon,
   PanelsTopLeftIcon,
@@ -10,29 +10,36 @@ import {
   SparkleIcon,
   Code2Icon,
   AppWindowIcon,
+  LanguagesIcon,
 } from "lucide-react";
 import { SupabaseLogo } from "./logos";
+
+export type ResourceTypeIconName =
+  | "folder"
+  | "file"
+  | "setting"
+  | "home"
+  | "ai"
+  | "dev"
+  | "database"
+  | "table"
+  | "project"
+  | "form"
+  | "chart"
+  | "commerce"
+  | "user"
+  | "i18n"
+  | "supabase"
+  | "form-x-supabase"
+  | "v0_form"
+  | "v0_site"
+  | "v0_schema";
 
 export function ResourceTypeIcon({
   type,
   className,
 }: {
-  type:
-    | "folder"
-    | "file"
-    | "setting"
-    | "home"
-    | "ai"
-    | "dev"
-    | "database"
-    | "table"
-    | "project"
-    | "form"
-    | "chart"
-    | "commerce"
-    | "form-x-supabase"
-    | "v0_form"
-    | "v0_site";
+  type: ResourceTypeIconName;
   className?: string;
 }) {
   const props = {
@@ -51,6 +58,7 @@ export function ResourceTypeIcon({
       return <FolderDotIcon {...props} />;
     case "file":
       return <FileIcon {...props} />;
+    case "v0_schema":
     case "database":
       return <DatabaseIcon {...props} />;
     case "table":
@@ -63,11 +71,16 @@ export function ResourceTypeIcon({
     case "v0_site":
       return <AppWindowIcon {...props} />;
     case "form-x-supabase":
+    case "supabase":
       return <SupabaseLogo {...props} />;
     case "setting":
       return <SettingsIcon {...props} />;
     case "commerce":
       return <ShoppingBagIcon {...props} />;
+    case "user":
+      return <AvatarIcon {...props} />;
+    case "i18n":
+      return <LanguagesIcon {...props} />;
     default:
       return null;
   }

@@ -7,7 +7,7 @@ import {
   PanelPropertySection,
   PanelPropertySectionTitle,
 } from "@/components/panels/side-panel";
-import { GridaSupabase, type FormFieldReferenceSchema } from "@/types";
+import { GridaXSupabase, type FormFieldReferenceSchema } from "@/types";
 import {
   Select,
   SelectContent,
@@ -21,7 +21,7 @@ import { Switch } from "@/components/ui/switch";
 import { useEditorState } from "@/scaffolds/editor";
 import { SupabaseLogo } from "@/components/logos";
 
-export function SupabaseReferencesSettings({
+export function SupabaseFKReferenceSettings({
   format,
   value,
   onValueChange,
@@ -36,7 +36,7 @@ export function SupabaseReferencesSettings({
 }) {
   const [state] = useEditorState();
 
-  const { supabase_project } = state.connections.supabase!;
+  const { supabase_project } = state;
 
   const { schema, table, column } = value || {};
 
@@ -98,13 +98,13 @@ export function SupabaseReferencesSettings({
                       <span>auth.users</span>
                     </SelectItem>
                   </SelectGroup>
-                  {Object.keys(supabase_project.sb_schema_definitions).map(
+                  {Object.keys(supabase_project!.sb_schema_definitions).map(
                     (schemaName) => {
                       return (
                         <SelectGroup key={schemaName}>
                           <SelectLabel>{schemaName}</SelectLabel>
                           {Object.keys(
-                            supabase_project.sb_schema_definitions[schemaName]
+                            supabase_project!.sb_schema_definitions[schemaName]
                           ).map((tableName) => {
                             const fulltable = `${schemaName}.${tableName}`;
                             return (
@@ -138,11 +138,11 @@ export function SupabaseReferencesSettings({
                     (schema === "auth" && table === "users" ? (
                       <>
                         {Object.keys(
-                          GridaSupabase.SupabaseUserJsonSchema.properties
+                          GridaXSupabase.SupabaseUserJsonSchema.properties
                         ).map((key) => {
                           const property =
-                            GridaSupabase.SupabaseUserJsonSchema.properties[
-                              key as GridaSupabase.SupabaseUserColumn
+                            GridaXSupabase.SupabaseUserJsonSchema.properties[
+                              key as GridaXSupabase.SupabaseUserColumn
                             ];
                           return (
                             <SelectItem
@@ -161,11 +161,11 @@ export function SupabaseReferencesSettings({
                     ) : (
                       <>
                         {Object.keys(
-                          supabase_project.sb_schema_definitions[schema][table]
+                          supabase_project!.sb_schema_definitions[schema][table]
                             ?.properties ?? {}
                         )?.map((key) => {
                           const property =
-                            supabase_project.sb_schema_definitions[schema][
+                            supabase_project!.sb_schema_definitions[schema][
                               table
                             ].properties?.[key];
                           return (

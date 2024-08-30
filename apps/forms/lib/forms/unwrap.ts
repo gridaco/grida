@@ -1,9 +1,9 @@
-import type { FormInputType } from "@/types";
+import type { FormInputType, JSONValue } from "@/types";
 
 export function unwrapFeildValue(
   value: any,
   type?: FormInputType
-): object | string | number | boolean | undefined | null {
+): JSONValue | string | number | boolean | undefined | null {
   if (value === null) return null;
   if (value === undefined) return undefined;
 

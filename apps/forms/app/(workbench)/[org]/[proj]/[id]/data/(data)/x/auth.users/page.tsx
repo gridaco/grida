@@ -12,19 +12,20 @@ import {
 } from "@/scaffolds/grid-editor/components";
 import * as GridLayout from "@/scaffolds/grid-editor/components/layout";
 import { ReferenceTableGrid } from "@/scaffolds/grid/reference-grid";
-import { GridaSupabase } from "@/types";
+import { GridaXSupabase } from "@/types";
 import { EditorApiResponse } from "@/types/private/api";
 import { priority_sorter } from "@/utils/sort";
 import { useEffect, useMemo } from "react";
-import { MainTable } from "@/scaffolds/editor/utils/main-table";
-import useSWR from "swr";
+import { CurrentTable } from "@/scaffolds/editor/utils/switch-table";
 import { GridData } from "@/scaffolds/grid-editor/grid-data";
+import { EditorSymbols } from "@/scaffolds/editor/symbols";
+import useSWR from "swr";
 
 export default function XTablePage() {
   const [state, dispatch] = useEditorState();
 
   const {
-    form_id,
+    supabase_project,
     datagrid_rows_per_page,
     datagrid_orderby,
     datagrid_table_refresh_key,
@@ -39,8 +40,11 @@ export default function XTablePage() {
     });
   }, [datagrid_rows_per_page, datagrid_orderby, datagrid_table_refresh_key]);
 
-  const request = state.connections.supabase?.main_supabase_table_id
-    ? `/private/editor/connect/${state.form_id}/supabase/table/auth.users/query?${serachParams}`
+  const request = supabase_project
+    ? PrivateEditorApi.XSupabase.url_x_auth_users_get(
+        supabase_project.id,
+        serachParams
+      )
     : null;
 
   const { data, isLoading, isValidating } = useSWR<
@@ -65,12 +69,12 @@ export default function XTablePage() {
   }, [dispatch, isLoading, isValidating]);
 
   const sort_by_priorities = priority_sorter(
-    GridaSupabase.unknown_table_column_priorities
+    GridaXSupabase.unknown_table_column_priorities
   );
 
   const columns = useMemo(
     () =>
-      Object.keys(GridaSupabase.SupabaseUserJsonSchema.properties)
+      Object.keys(GridaXSupabase.SupabaseUserJsonSchema.properties)
         .sort(sort_by_priorities)
         .map((key) => {
           return {
@@ -85,7 +89,7 @@ export default function XTablePage() {
   const { filtered, inputlength } = useMemo(() => {
     return GridData.rows({
       filter: state.datagrid_filter,
-      table: "x-supabase-auth.users",
+      table: EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID,
       data: {
         rows: data?.data?.users ?? [],
       },
@@ -93,7 +97,9 @@ export default function XTablePage() {
   }, [data, state.datagrid_filter]);
 
   return (
-    <MainTable table="x-supabase-auth.users">
+    <CurrentTable
+      table={EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID}
+    >
       <GridLayout.Root>
         <GridLayout.Header>
           <GridLayout.HeaderMenus>
@@ -119,10 +125,10 @@ export default function XTablePage() {
         </GridLayout.Content>
         <GridLayout.Footer>
           <GridLimit />
-          <GridCount count={filtered.length} />
+          <GridCount count={filtered.length} keyword="user" />
           <GridRefresh />
         </GridLayout.Footer>
       </GridLayout.Root>
-    </MainTable>
+    </CurrentTable>
   );
 }

@@ -8,3 +8,7 @@ export type InsertDto<T extends keyof Database[typeof schema]["Tables"]> =
   Database[typeof schema]["Tables"][T]["Insert"];
 export type UpdateDto<T extends keyof Database[typeof schema]["Tables"]> =
   Database[typeof schema]["Tables"][T]["Update"];
+
+export type DontCastJsonProperties<T, K extends keyof T> = Omit<T, K> & {
+  [P in K]: any;
+};

@@ -50,10 +50,9 @@ export function EndingPagePreferences() {
   const [state] = useEditorState();
 
   const {
-    form_title,
-    form_id,
+    form,
     theme: { lang },
-    ending,
+    form: { ending },
   } = state;
 
   const [customizeOpen, setCustomizeOpen] = useState(false);
@@ -97,7 +96,7 @@ export function EndingPagePreferences() {
           : undefined,
       })
       // TODO: change to document id after migration
-      .eq("form_id", form_id);
+      .eq("form_id", form.form_id);
 
     if (error) throw error;
 
@@ -163,7 +162,7 @@ export function EndingPagePreferences() {
           {template && (
             <div className="flex justify-center items-center min-h-96">
               <Preview
-                title={form_title}
+                title={form.form_title}
                 lang={lang}
                 template={template}
                 overrides={overrides}
@@ -174,8 +173,8 @@ export function EndingPagePreferences() {
       </PreferenceBody>
       <CustomizeTemplate
         key={template}
-        form_id={form_id}
-        title={form_title}
+        form_id={form.form_id}
+        title={form.form_title}
         lang={lang}
         init={{
           template_id: template ?? "default",

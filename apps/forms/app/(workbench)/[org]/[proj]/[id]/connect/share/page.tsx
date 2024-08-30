@@ -20,16 +20,16 @@ const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export default function WithLink() {
   const [state] = useEditorState();
-  const { form_id } = state;
+  const { form } = state;
 
-  const { data } = useSWR(`/v1/${form_id}/share`, fetcher);
+  const { data } = useSWR(`/v1/${form.form_id}/share`, fetcher);
 
   const { url, submit, embed } = data || {};
 
   return (
     <main className="max-w-2xl mx-auto">
       <Sector>
-        <AboutThisForm form_id={form_id} />
+        <AboutThisForm form_id={form.form_id} />
       </Sector>
       <Sector>
         <SectorHeader>

@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from "react";
  * this component will load attatched files (medias - audio / video) and emmit properties that are not available in the form state.
  * - duration
  */
-export function MediaLoadProvider() {
+export function MediaLoadPluginProvider() {
   const [state, dispatch] = useFormAgentState();
 
   const onMediaFileMetaLoad = useCallback(

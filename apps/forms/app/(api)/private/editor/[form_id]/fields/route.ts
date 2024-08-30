@@ -31,6 +31,7 @@ export async function POST(
   const init = (await req.json()) as FormFieldUpsert;
   const operation = init.id ? "update" : "create";
 
+  assert(form_id, "form_id is required");
   assert(form_id === init.form_id, "form_id mismatch");
   // console.log("POST /private/editor/fields", init);
 

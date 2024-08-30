@@ -1,6 +1,9 @@
 import { grida_xsupabase_client } from "@/lib/supabase/server";
 import { secureformsclient } from "@/lib/supabase/vault";
-import { ConnectionSupabaseJoint, GridaSupabase } from "@/types";
+import {
+  SchemaTableConnectionXSupabaseMainTableJoint,
+  GridaXSupabase,
+} from "@/types";
 import {
   SupabaseClient,
   SupabaseClientOptions,
@@ -33,7 +36,9 @@ export async function createXSupabaseClient(
 
   let serviceRoleKey: string | null = null;
   if (config?.service_role) {
-    const { data } = await secureFetchServiceKey(supabase_project.id);
+    const { data } = await __dangerously_fetch_secure_service_role_key(
+      supabase_project.id
+    );
     serviceRoleKey = data;
     assert(serviceRoleKey, "serviceRoleKey is required");
   }
@@ -47,7 +52,15 @@ export async function createXSupabaseClient(
   return sbclient;
 }
 
-export async function secureFetchServiceKey(supabase_project_id: number) {
+/**
+ * This may only be used in a secure context.
+ *
+ * @deprecated drop this, add a new rpc with rls enabled.
+ * FIXME: this is a potential security risk.
+ */
+export async function __dangerously_fetch_secure_service_role_key(
+  supabase_project_id: number
+) {
   return secureformsclient.rpc(
     "reveal_secret_connection_supabase_service_key",
     {
@@ -72,9 +85,9 @@ export async function secureCreateServiceKey(
 export class GridaXSupabaseService {
   constructor() {}
 
-  async getConnection(
-    conn: ConnectionSupabaseJoint
-  ): Promise<GridaSupabase.SupabaseConnectionState | null> {
+  async getXSBMainTableConnectionState(
+    conn: SchemaTableConnectionXSupabaseMainTableJoint
+  ): Promise<GridaXSupabase.XSupabaseMainTableConnectionState | null> {
     const { supabase_project_id, main_supabase_table_id } = conn;
 
     const { data: supabase_project, error: supabase_project_err } =
@@ -92,13 +105,13 @@ export class GridaXSupabaseService {
     return {
       ...conn,
       supabase_project:
-        supabase_project! as {} as GridaSupabase.SupabaseProject,
+        supabase_project! as {} as GridaXSupabase.SupabaseProject,
       main_supabase_table_id,
-      tables: supabase_project!.tables as any as GridaSupabase.SupabaseTable[],
+      tables: supabase_project!.tables as any as GridaXSupabase.SupabaseTable[],
       main_supabase_table:
         (supabase_project!.tables.find(
           (t) => t.id === main_supabase_table_id
-        ) as any as GridaSupabase.SupabaseTable) || null,
+        ) as any as GridaXSupabase.SupabaseTable) || null,
     };
   }
 }

@@ -10,15 +10,21 @@ import type {
   FormResponseWithFields,
   FormStyleSheetV1Schema,
   FormsPageLanguage,
-  GridaSupabase,
+  GridaXSupabase,
 } from "@/types";
-import type { EditorFlatFormBlock, FormEditorState } from "./state";
+import type {
+  EditorFlatFormBlock,
+  EditorState,
+  GDocTableID,
+  TableXSBMainTableConnection,
+} from "./state";
 import type { Tokens } from "@/ast";
-import { LOCALTZ } from "./symbols";
+import { SYM_LOCALTZ } from "./symbols";
 import { ZodObject } from "zod";
 
 export type BlocksEditorAction =
   | GlobalSavingAction
+  | EditorSidebarModeAction
   | CreateNewPendingBlockAction
   | ResolvePendingBlockAction
   | DeleteBlockAction
@@ -27,7 +33,6 @@ export type BlocksEditorAction =
   | FocusBlockAction
   | BlurBlockAction
   | InitAssetAction
-  | FocusFieldAction
   | ChangeBlockFieldAction
   | CreateFielFromBlockdAction
   | BlockVHiddenAction
@@ -39,16 +44,15 @@ export type BlocksEditorAction =
   | SelectResponse
   | DataGridDeleteSelectedRows
   | DeleteResponseAction
-  | SaveFieldAction
-  | DeleteFieldAction
-  | FeedResponseAction
+  | TableAttributeChangeAction
+  | TableAttributeDeleteAction
+  | TablespaceFeedAction
   | OpenResponseEditAction
   | DataGridRowsAction
   | FeedResponseSessionsAction
   | DataGridTableAction
   | FeedCustomerAction
   | OpenCustomerEditAction
-  | OpenBlockEditPanelAction
   | OpenInsertMenuPanelAction
   | DataGridReorderColumnAction
   | DataGridDateFormatAction
@@ -77,12 +81,19 @@ export type BlocksEditorAction =
   | DocumentNodeChangeTextAction
   | DocumentNodeUpdateStyleAction
   | DocumentNodeUpdateAttributeAction
-  | DocumentNodeUpdatePropertyAction;
+  | DocumentNodeUpdatePropertyAction
+  | SchemaTableAddAction
+  | SchemaTableDeleteAction;
 
 export type GlobalSavingAction = {
   type: "saving";
   saving: boolean;
 };
+
+export interface EditorSidebarModeAction {
+  type: "editor/sidebar/mode";
+  mode: "project" | "build" | "data" | "connect";
+}
 
 export type CreateNewPendingBlockAction =
   | {
@@ -170,13 +181,8 @@ export interface BlurBlockAction {
   type: "blocks/blur";
 }
 
-export interface InitAssetAction extends Partial<FormEditorState["assets"]> {
+export interface InitAssetAction extends Partial<EditorState["assets"]> {
   type: "editor/assets/init";
-}
-
-export interface FocusFieldAction {
-  type: "editor/field/focus";
-  field_id: string;
 }
 
 export interface OpenEditFieldAction {
@@ -187,19 +193,22 @@ export interface OpenEditFieldAction {
   refresh?: boolean;
 }
 
-export interface SaveFieldAction {
-  type: "editor/field/save";
+export interface TableAttributeChangeAction {
+  type: "editor/table/attribute/change";
+  table_id: string;
   field_id: string;
   data: FormFieldDefinition;
 }
 
-export interface DeleteFieldAction {
-  type: "editor/field/delete";
+export interface TableAttributeDeleteAction {
+  type: "editor/table/attribute/delete";
+  table_id: string;
   field_id: string;
 }
 
-export interface FeedResponseAction {
-  type: "editor/response/feed";
+export interface TablespaceFeedAction {
+  type: "editor/table/space/feed";
+  table_id: GDocTableID;
   data: FormResponseWithFields[];
   reset?: boolean;
 }
@@ -225,6 +234,7 @@ export interface OpenResponseEditAction {
   response_id?: string;
   // true by default
   open?: boolean;
+  refresh?: boolean;
 }
 
 export interface FeedCustomerAction {
@@ -235,13 +245,6 @@ export interface FeedCustomerAction {
 export interface OpenCustomerEditAction {
   type: "editor/customers/edit";
   customer_id?: string;
-  // true by default
-  open?: boolean;
-}
-
-export interface OpenBlockEditPanelAction {
-  type: "editor/panels/block-edit";
-  block_id?: string;
   // true by default
   open?: boolean;
 }
@@ -265,13 +268,21 @@ export interface DataGridDateFormatAction {
 
 export interface DataGridDateTZAction {
   type: "editor/data-grid/tz";
-  tz: typeof LOCALTZ | string;
+  tz: typeof SYM_LOCALTZ | string;
 }
 
-export interface DataGridTableAction {
+export type DataGridTableAction = {
   type: "editor/data-grid/table";
-  table: FormEditorState["datagrid_table"];
-}
+} & (
+  | {
+      id: EditorState["datagrid_table_id"];
+    }
+  | {
+      // using name as a query will swith the table within the current group
+      // this is useful when can't use the id (symbol), like in select ui, where value is a string
+      name: string;
+    }
+);
 
 export interface DataGridRowsAction {
   type: "editor/data-grid/rows";
@@ -283,7 +294,7 @@ export interface DataGridDeleteSelectedRows {
 }
 
 export interface DataGridFilterAction
-  extends Partial<FormEditorState["datagrid_filter"]> {
+  extends Partial<EditorState["datagrid_filter"]> {
   type: "editor/data-grid/filter";
 }
 
@@ -311,14 +322,16 @@ export interface DataTableLoadingAction {
 
 export interface DataGridCellChangeAction {
   type: "editor/data-grid/cell/change";
+  table_id: string;
   row: string;
   column: string;
   data: { value: any; option_id?: string | null };
 }
 
 export interface FeedXSupabaseMainTableRowsAction {
-  type: "editor/x-supabase/main-table/feed";
-  data: GridaSupabase.XDataRow[];
+  type: "editor/table/space/feed/x-supabase";
+  table_id: GDocTableID;
+  data: GridaXSupabase.XDataRow[];
 }
 
 export interface EditorThemeLangAction {
@@ -362,12 +375,12 @@ export interface EditorThemeBackgroundAction {
 }
 
 export interface FormCampaignPreferencesAction
-  extends Partial<FormEditorState["campaign"]> {
+  extends Partial<EditorState["form"]["campaign"]> {
   type: "editor/form/campaign/preferences";
 }
 
 export interface FormEndingPreferencesAction
-  extends Partial<FormEditorState["ending"]> {
+  extends Partial<EditorState["form"]["ending"]> {
   type: "editor/form/ending/preferences";
 }
 
@@ -421,4 +434,20 @@ export interface DocumentNodeUpdatePropertyAction {
   type: "editor/document/node/property";
   node_id: string;
   data: { [key: string]: any };
+}
+
+export interface SchemaTableAddAction {
+  type: "editor/schema/table/add";
+  table: {
+    id: string;
+    name: string;
+    description?: string | null;
+    attributes: FormFieldDefinition[];
+    x_sb_main_table_connection?: TableXSBMainTableConnection;
+  };
+}
+
+export interface SchemaTableDeleteAction {
+  type: "editor/schema/table/delete";
+  table_id: string;
 }

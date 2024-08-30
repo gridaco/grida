@@ -1,8 +1,9 @@
 import type { OpenAPI } from "openapi-types";
-import type { GridaSupabase } from "@/types";
+import type { GridaXSupabase } from "@/types";
 import type { ColumnType } from "./@types/column-types";
 import { XMLParser } from "fast-xml-parser";
 import { PGSupportedColumnTypeWithoutArray } from "./@types/pg";
+import assert from "assert";
 
 export namespace SupabasePostgRESTOpenApi {
   export type SupabaseOpenAPIDocument = OpenAPI.Document & {
@@ -39,7 +40,7 @@ export namespace SupabasePostgRESTOpenApi {
     return `${url}/rest/v1/?apikey=${apiKey}`;
   }
 
-  export async function fetch_supabase_postgrest_swagger({
+  export async function fetch_supabase_postgrest_openapi_doc({
     url,
     anonKey,
     schemas = ["public"],
@@ -51,6 +52,7 @@ export namespace SupabasePostgRESTOpenApi {
     sb_anon_key: string;
     sb_project_reference_id: string;
     sb_schema_names: string[];
+    sb_schema_openapi_docs: { [schema: string]: SupabaseOpenAPIDocument };
     sb_schema_definitions: { [schema: string]: { [key: string]: any } };
     sb_project_url: string;
   }> {
@@ -61,6 +63,7 @@ export namespace SupabasePostgRESTOpenApi {
         const route = build_supabase_openapi_url(url, anonKey);
 
         const schema_definitions: { [schema: string]: any } = {};
+        const schema_apidocs: { [schema: string]: any } = {};
 
         // can be optimized
         for (const schema of schemas) {
@@ -69,12 +72,14 @@ export namespace SupabasePostgRESTOpenApi {
           if (!apidoc || !("definitions" in apidoc)) {
             return reject();
           }
+          schema_apidocs[schema] = apidoc;
           schema_definitions[schema] = apidoc.definitions;
         }
 
         return resolve({
           sb_anon_key: anonKey,
           sb_project_reference_id: projectref,
+          sb_schema_openapi_docs: schema_apidocs,
           sb_schema_definitions: schema_definitions,
           sb_schema_names: schemas,
           sb_project_url: url,
@@ -100,6 +105,58 @@ export namespace SupabasePostgRESTOpenApi {
     return apidoc;
   }
 
+  type PostgrestPathMethod = "get" | "post" | "delete" | "patch";
+  /**
+   *
+   * the open api doc contains paths as `"/[table]": { ... }`
+   * with this, we can tell if postgrest table is readonly or writable.
+   *
+   * ```js
+   * "paths": {
+   *  ...
+   *  "/table": {
+   *    "get": {...},
+   *    "post": {...},
+   *    "delete": {...},
+   *    "patch": {...}
+   *  },
+   *  ...
+   * }
+   *
+   * ```
+   * @param doc
+   * @param table
+   */
+  export function parse_supabase_postgrest_table_path(
+    doc: SupabaseOpenAPIDocument,
+    table: string
+  ): { methods: PostgrestPathMethod[] } {
+    const paths = doc.paths?.["/" + table];
+    if (!paths) return { methods: [] };
+
+    const methodkeys = Object.keys(paths);
+
+    for (const key of methodkeys) {
+      assert(["get", "post", "delete", "patch"].includes(key));
+    }
+
+    return {
+      methods: Array.from(new Set(methodkeys)) as PostgrestPathMethod[],
+    };
+  }
+
+  export function table_is_get_only(
+    apidoc: SupabaseOpenAPIDocument,
+    table: string
+  ) {
+    const { methods } = parse_supabase_postgrest_table_path(apidoc, table);
+    return table_methods_is_get_only(methods);
+  }
+
+  export function table_methods_is_get_only(methods: PostgrestPathMethod[]) {
+    return methods.length === 1 && methods[0] === "get";
+  }
+
   export type FKMeta = {
     column: string;
     table: string;
@@ -118,7 +175,7 @@ export namespace SupabasePostgRESTOpenApi {
   };
 
   export function parse_supabase_postgrest_schema_definition(
-    schema: GridaSupabase.JSONSChema
+    schema: GridaXSupabase.JSONSChema
   ) {
     const parsed: {
       pks: string[];
@@ -218,7 +275,7 @@ export namespace SupabasePostgRESTOpenApi {
    * // }
    */
   function parse_supabase_postgrest_schema_properties_description(
-    schema: GridaSupabase.JSONSChema
+    schema: GridaXSupabase.JSONSChema
   ) {
     const result = {
       pks: [] as string[],

@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 export function DeleteFormSection() {
   const [state] = useEditorState();
 
-  const confirmationText = "DELETE " + state.form_title;
+  const confirmationText = "DELETE " + state.form.form_title;
 
   return (
     <div className="border border-destructive/30 text-sm rounded-lg p-4">
@@ -58,7 +58,7 @@ export function DeleteFormSection() {
               method="POST"
               className="flex flex-col gap-4"
             >
-              <input type="hidden" name="form_id" value={state.form_id} />
+              <input type="hidden" name="form_id" value={state.form.form_id} />
               <Input
                 required
                 autoCorrect="off"

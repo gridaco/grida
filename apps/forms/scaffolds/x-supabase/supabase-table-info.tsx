@@ -16,14 +16,14 @@ import {
 } from "@/components/ui/collapsible";
 import { KeyIcon, LinkIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { GridaSupabase } from "@/types";
+import { GridaXSupabase } from "@/types";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { CodeIcon } from "@radix-ui/react-icons";
 
 export function SupabaseTableInfo({
   table,
 }: {
-  table: GridaSupabase.JSONSChema;
+  table: GridaXSupabase.JSONSChema;
 }) {
   const { properties } = useMemo(
     () =>

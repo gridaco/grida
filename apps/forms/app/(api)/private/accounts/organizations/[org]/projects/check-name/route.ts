@@ -1,5 +1,8 @@
 import { createRouteHandlerWorkspaceClient } from "@/lib/supabase/server";
-import { isValidUsername, messages } from "@/services/utils/username";
+import {
+  isValidUsername,
+  username_validation_messages,
+} from "@/services/utils/regex";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
@@ -55,8 +58,8 @@ export async function POST(
     ok: available && valid,
     message: available
       ? valid
-        ? messages.available
-        : messages.invalid
-      : messages.taken,
+        ? username_validation_messages.available
+        : username_validation_messages.invalid
+      : username_validation_messages.taken,
   });
 }

@@ -16,12 +16,32 @@ export function SidebarRoot({
   return (
     <nav
       className={cn(
-        "relative w-60 h-full shrink-0 bg-background overflow-y-auto",
+        "relative w-60 h-full shrink-0 overflow-y-auto",
+        // apply slightly dimmed background for main content
+        "bg-workbench-panel",
         side === "left" ? "border-e" : "border-s"
       )}
     >
       {children}
     </nav>
+  );
+}
+
+export function SidebarHeader({
+  className,
+  children,
+}: React.PropsWithChildren<{ className?: string }>) {
+  return (
+    <header
+      className={cn(
+        "sticky top-0 w-full px-2 py-2 border-b z-10",
+        // apply slightly dimmed background for main content
+        "bg-workbench-panel backdrop-blur-md",
+        className
+      )}
+    >
+      {children}
+    </header>
   );
 }
 
@@ -71,7 +91,7 @@ export function SidebarMenuGridItem({
   );
 }
 
-export const SidebarMenuLink = React.forwardRef(function SidebarMenuLink({
+export function SidebarMenuLink({
   href,
   children,
 }: React.PropsWithChildren<{
@@ -87,7 +107,7 @@ export const SidebarMenuLink = React.forwardRef(function SidebarMenuLink({
       {React.cloneElement(children as any, { selected })}
     </Link>
   );
-});
+}
 
 export const SidebarMenuItem = React.forwardRef(function SidebarMenuItem(
   {
@@ -220,9 +240,17 @@ export function SidebarSectionHeaderLabel({
 
 export function SidebarMenuItemActions({
   children,
-}: React.PropsWithChildren<{}>) {
+  className,
+  ...props
+}: React.PropsWithChildren<React.HTMLAttributes<HTMLDivElement>>) {
   return (
-    <div className="absolute right-1 top-0 bottom-0 flex gap-2 items-center bg-background opacity-0 group-hover:opacity-100 group-hover:bg-accent transition-opacity rounded">
+    <div
+      {...props}
+      className={cn(
+        "absolute right-1 top-0 bottom-0 flex gap-2 items-center bg-background opacity-0 group-hover:opacity-100 group-hover:bg-accent transition-opacity rounded",
+        className
+      )}
+    >
       {children}
     </div>
   );

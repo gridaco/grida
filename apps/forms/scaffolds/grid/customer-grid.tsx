@@ -6,7 +6,7 @@ import DataGrid, {
   RenderCellProps,
   RenderHeaderCellProps,
 } from "react-data-grid";
-import { CFCustomerRow } from "./types";
+import { GRCustomerRow } from "./types";
 import { EmptyRowsRenderer } from "./empty";
 import "./grid.css";
 import { CalendarIcon, EnvelopeClosedIcon } from "@radix-ui/react-icons";
@@ -22,12 +22,12 @@ export function CustomerGrid({
   masked,
   loading,
 }: {
-  rows: CFCustomerRow[];
+  rows: GRCustomerRow[];
   rowKey?: string;
   tokens?: string[];
   masked?: boolean;
   loading?: boolean;
-  onSelected?: (key: string, row: CFCustomerRow) => void;
+  onSelected?: (key: string, row: GRCustomerRow) => void;
 }) {
   const columns = [
     {
@@ -62,7 +62,7 @@ export function CustomerGrid({
         width: undefined,
         renderHeaderCell: HeaderCell,
         renderCell: ({ row, column }: RenderCellProps<any>) => {
-          const val = row[col.key as keyof CFCustomerRow];
+          const val = row[col.key as keyof GRCustomerRow];
           const display = masked
             ? val
               ? mask(val.toString())
@@ -82,7 +82,7 @@ export function CustomerGrid({
 
   const rows = _rows.map((row) => {
     return Object.keys(row).reduce((acc, k) => {
-      const val = row[k as keyof CFCustomerRow];
+      const val = row[k as keyof GRCustomerRow];
       if (typeof val === "object") {
         return { ...acc, [k]: JSON.stringify(val) };
       }

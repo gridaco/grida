@@ -103,7 +103,7 @@ function ConnectStoreForm() {
   return (
     <form
       id="connect-store-form"
-      action={`/private/editor/connect/${state.form_id}/store/connection?next=${next}`}
+      action={`/private/editor/connect/${state.form.form_id}/store/connection?next=${next}`}
       method="POST"
       className="prose dark:prose-invert"
     >
@@ -136,7 +136,7 @@ function ConnectStoreForm() {
               id="name"
               name="name"
               autoFocus
-              defaultValue={generated_form_store_name(state.form_title)}
+              defaultValue={generated_form_store_name(state.form.form_title)}
               placeholder="Store Name"
             />
           </div>

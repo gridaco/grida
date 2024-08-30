@@ -1,16 +1,12 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import React from "react";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
   HoverCard,
   HoverCardTrigger,
   HoverCardContent,
 } from "@/components/ui/hover-card";
 import { QuestionMarkCircledIcon } from "@radix-ui/react-icons";
+import { cn } from "@/utils";
 
 export function SidePanel({
   children,
@@ -139,14 +135,33 @@ export function PropertyTextInput(
 
 export function PanelHeader({ children }: React.PropsWithChildren<{}>) {
   return (
-    <header className="space-y-1 py-4 px-4 bg-background sm:px-6 border-b">
+    <header className="relative space-y-1 py-4 px-4 bg-background sm:px-6 border-b">
       {children}
     </header>
   );
 }
 
-export function PanelContent({ children }: React.PropsWithChildren<{}>) {
-  return <div className=" relative flex-1 overflow-y-auto ">{children}</div>;
+export function PanelHeaderTitle({ children }: React.PropsWithChildren<{}>) {
+  return <h2 className="text-lg font-semibold">{children}</h2>;
+}
+
+export function PanelHeaderActions({ children }: React.PropsWithChildren<{}>) {
+  return (
+    <div className="absolute right-0 top-0 bottom-0 flex items-center space-x-2 px-4 py-4">
+      {children}
+    </div>
+  );
+}
+
+export function PanelContent({
+  className,
+  children,
+}: React.PropsWithChildren<{ className?: string }>) {
+  return (
+    <div className={cn("relative flex-1 overflow-y-auto", className)}>
+      {children}
+    </div>
+  );
 }
 
 export function PanelClose({ children }: React.PropsWithChildren<{}>) {

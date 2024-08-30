@@ -24,7 +24,10 @@ import { useEditorState } from "../editor";
 
 export function FormMethodPreference() {
   const [state] = useEditorState();
-  const { form_id, form_security: initial } = state;
+  const {
+    form,
+    form: { form_security: initial },
+  } = state;
   const {
     handleSubmit,
     control,
@@ -39,7 +42,7 @@ export function FormMethodPreference() {
 
   const onSubmit = async (data: { method: FormMethod }) => {
     const req = PrivateEditorApi.Settings.updateFormMethod({
-      form_id,
+      form_id: form.form_id,
       ...data,
     });
 
@@ -68,7 +71,6 @@ export function FormMethodPreference() {
       />
       <PreferenceBody>
         <form id="form-method" onSubmit={handleSubmit(onSubmit)}>
-          <input type="hidden" name="form_id" value={form_id} />
           <div className="flex flex-col gap-8">
             <section>
               <div className="mt-4 flex flex-col gap-1">

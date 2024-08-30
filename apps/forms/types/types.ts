@@ -4,6 +4,14 @@ import type { Tokens } from "@/ast";
 
 type UUID = string;
 
+export type JSONValue =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: JSONValue | undefined }
+  | JSONValue[];
+
 export type FormMethod = "get" | "post" | "dialog";
 
 export interface Form {
@@ -92,7 +100,8 @@ export type FormInputType =
   | "hidden"
   | "signature"
   | "range"
-  | "search";
+  | "search"
+  | "json";
 
 export type FormFieldAutocompleteType =
   | "off"
@@ -212,6 +221,8 @@ export interface FormFieldDefinition extends IFormField {
   id: UUID;
   local_index: number;
 }
+
+export type AttributeDefinition = FormFieldDefinition;
 
 export interface FormDocument {
   id: string;
@@ -408,7 +419,7 @@ export interface Geo {
   longitude?: string | undefined;
 }
 
-export interface ConnectionSupabaseJoint {
+export interface SchemaTableConnectionXSupabaseMainTableJoint {
   created_at: string;
   form_id: string;
   id: number;
@@ -435,7 +446,7 @@ export interface Project {
   created_at: string;
 }
 
-export type GDocumentType = "v0_form" | "v0_site";
+export type GDocumentType = "v0_form" | "v0_site" | "v0_schema";
 
 export interface GDocument {
   id: string;

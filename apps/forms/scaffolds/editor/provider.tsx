@@ -1,22 +1,17 @@
 "use client";
 
-import React, { memo, useMemo, useContext } from "react";
-import type { FormEditorState } from "./state";
-import {
-  DispatchContext,
-  useDispatch,
-  type Dispatcher,
-  type FlatDispatcher,
-} from "./dispatch";
+import React, { memo } from "react";
+import type { EditorState } from "./state";
+import { DispatchContext, type Dispatcher } from "./dispatch";
 
-const Context = React.createContext<FormEditorState | undefined>(undefined);
+export const Context = React.createContext<EditorState | undefined>(undefined);
 
 export const StateProvider = memo(function StateProvider({
   state,
   dispatch,
   children,
 }: {
-  state: FormEditorState;
+  state: EditorState;
   dispatch?: Dispatcher;
   children?: React.ReactNode;
 }) {
@@ -30,15 +25,3 @@ export const StateProvider = memo(function StateProvider({
 });
 
 const __noop = () => {};
-
-export const useEditorState = (): [FormEditorState, FlatDispatcher] => {
-  const state = useContext(Context);
-
-  if (!state) {
-    throw new Error(`No StateProvider: this is a logical error.`);
-  }
-
-  const dispatch = useDispatch();
-
-  return useMemo(() => [state, dispatch], [state, dispatch]);
-};

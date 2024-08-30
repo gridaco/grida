@@ -1,9 +1,12 @@
 import type {
+  FormFieldDefinition,
+  FormInputType,
   FormMethod,
   FormResponseUnknownFieldHandlingStrategyType,
   IFormField,
-} from "../index";
+} from "../types";
 import type { InventoryLevelCommit } from "../inventory";
+import type { GridaXSupabase } from "../x-supabase";
 import * as ERR from "@/k/error";
 
 export type FormSubmitErrorCode =
@@ -108,11 +111,65 @@ export type UpdateFormUnknownFieldsHandlingStrategyRequest = {
   strategy?: FormResponseUnknownFieldHandlingStrategyType;
 };
 
+export type CreateNewSchemaTableRequest = {
+  schema_id: string;
+  table_name: string;
+  description?: string;
+  template?: "cms-starter" | "cms-blog-starter";
+};
+
+export type CreateNewSchemaTableResponse = {
+  id: string;
+  name: string;
+  description?: string | null;
+  attributes: FormFieldDefinition[];
+};
+
+export interface CreateNewSchemaTableWithXSBTableConnectionRequest {
+  schema_id: string;
+  sb_schema_name: string;
+  sb_table_name: string;
+  connect_attributes_as: {
+    [key: string]: {
+      type?: FormInputType;
+    };
+  };
+}
+
+export interface CreateNewSchemaTableWithXSBTableConnectionResponse {
+  table: {
+    id: string;
+    name: string;
+    description?: string | null;
+    attributes: FormFieldDefinition[];
+  };
+  connection: {
+    sb_schema_name: string;
+    sb_table_name: string;
+    sb_table_id: number;
+    sb_postgrest_methods: GridaXSupabase.XSBPostgrestMethod[];
+    sb_table_schema: GridaXSupabase.JSONSChema;
+  };
+}
+
+export type DeleteSchemaTableRequest = {
+  schema_id: string;
+  table_id: string;
+  user_confirmation_txt: string;
+};
+
 export namespace XSupabasePrivateApiTypes {
   export interface CreateConnectionTableRequestData {
     schema_name: string;
     table_name: string;
   }
+
+  export type GetSupabaseProjectData = GridaXSupabase.SupabaseProject & {
+    tables: Pick<
+      GridaXSupabase.SupabaseTable,
+      "id" | "sb_schema_name" | "sb_table_name"
+    >[];
+  };
 
   export interface AddSchemaNameRequestData {
     schema_name: string;

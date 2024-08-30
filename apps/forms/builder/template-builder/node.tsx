@@ -44,9 +44,7 @@ export function SlotNode<P extends Record<string, any>>({
   const overlayRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const portal = useMemo(() => {
-    return document.getElementById("canvas-overlay-portal")!;
-  }, []);
+  const portal = document.getElementById("canvas-overlay-portal")!;
 
   const {
     document: { selected_node_id },

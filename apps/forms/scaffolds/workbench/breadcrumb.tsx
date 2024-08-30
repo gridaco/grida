@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { useEditorState } from "../editor";
 import { usePathname } from "next/navigation";
+import { ResourceTypeIcon } from "@/components/resource-type-icon";
 
 export function Breadcrumbs() {
   const [state] = useEditorState();
@@ -20,6 +21,7 @@ export function Breadcrumbs() {
     organization: { name: org },
     project: { name: proj },
     document_title,
+    doctype,
   } = state;
 
   const [__org, __proj, id, ...paths] = pathname.split("/").slice(1);
@@ -32,7 +34,13 @@ export function Breadcrumbs() {
         </BreadcrumbItem>
         <BreadcrumbSeparator />
         <BreadcrumbItem>
-          <BreadcrumbPage>{document_title}</BreadcrumbPage>
+          <BreadcrumbPage>
+            <ResourceTypeIcon
+              type={doctype}
+              className="inline w-4 h-4 me-2 align-middle"
+            />
+            {document_title}
+          </BreadcrumbPage>
         </BreadcrumbItem>
         {paths.map((path, i) => (
           <React.Fragment key={i}>

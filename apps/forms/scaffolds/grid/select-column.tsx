@@ -131,11 +131,12 @@ function SelectCellFormatter({
     dispatch({
       type: "editor/responses/edit",
       response_id: id,
+      refresh: true,
     });
   }, [dispatch, id]);
 
   return (
-    <div className="group sb-grid-select-cell__formatter">
+    <div className="group">
       <Checkbox
         aria-label={ariaLabel}
         aria-labelledby={ariaLabelledBy}

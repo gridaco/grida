@@ -39,11 +39,11 @@ const nextConfig = withMDX()({
       //   destination: "/:org/:proj/:id/data",
       //   permanent: true,
       // },
-      {
-        source: "/:org/:proj/:id/data",
-        destination: "/:org/:proj/:id/data/responses",
-        permanent: true,
-      },
+      // {
+      //   source: "/:org/:proj/:id/data",
+      //   destination: "/:org/:proj/:id/data/responses",
+      //   permanent: true,
+      // },
       // {
       //   source: "/:org/:proj/:id/settings",
       //   destination: "/:org/:proj/:id/settings/general",
@@ -52,14 +52,14 @@ const nextConfig = withMDX()({
       {
         source: "/:org/:proj/:id/connect",
         destination: "/:org/:proj/:id/connect/share",
-        permanent: true,
+        permanent: false,
       },
       {
         // REMOVE ME when migration is complete.
         // 1. db, 2. site static values
         source: "/theme/embed/backgrounds/:path*",
         destination: "https://bg.grida.co/embed/:path*",
-        permanent: true,
+        permanent: false,
       },
     ];
   },

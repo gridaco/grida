@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -16,22 +16,21 @@ import {
 import { CommitIcon, GearIcon } from "@radix-ui/react-icons";
 import { format, startOfDay, addSeconds } from "date-fns";
 import { format as formatTZ } from "date-fns-tz";
-import { LOCALTZ, tztostr } from "../../editor/symbols";
 import { useEditorState } from "@/scaffolds/editor";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { editorlink } from "@/lib/forms/url";
+import {
+  EditorSymbols,
+  SYM_LOCALTZ,
+  tztostr,
+} from "@/scaffolds/editor/symbols";
 
 export function GridViewSettings() {
   const [state, dispatch] = useEditorState();
 
-  const {
-    campaign: { scheduling_tz },
-    datetz,
-    dateformat,
-    datagrid_filter,
-    datagrid_table,
-  } = state;
+  const { doctype, datetz, dateformat, datagrid_filter, datagrid_table_id } =
+    state;
 
   // dummy example date - happy star wars day!
   const starwarsday = useMemo(
@@ -44,15 +43,11 @@ export function GridViewSettings() {
     []
   );
 
-  const tzoffset_scheduling_tz = useMemo(
-    () =>
-      scheduling_tz
-        ? formatTZ(new Date(), "XXX", { timeZone: scheduling_tz })
-        : undefined,
-    [scheduling_tz]
-  );
-
-  const simulator_available = datagrid_table !== "x-supabase-main-table";
+  //
+  const simulator_available =
+    datagrid_table_id ===
+      EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID ||
+    datagrid_table_id === EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID;
 
   return (
     <DropdownMenu>
@@ -123,7 +118,7 @@ export function GridViewSettings() {
           onValueChange={(tz) => {
             switch (tz) {
               case "browser":
-                dispatch({ type: "editor/data-grid/tz", tz: LOCALTZ });
+                dispatch({ type: "editor/data-grid/tz", tz: SYM_LOCALTZ });
                 return;
               default:
                 dispatch({ type: "editor/data-grid/tz", tz: tz });
@@ -139,19 +134,7 @@ export function GridViewSettings() {
             UTC Time
             <DropdownMenuShortcut>(UTC+0)</DropdownMenuShortcut>
           </DropdownMenuRadioItem>
-          <DropdownMenuRadioItem
-            disabled={!scheduling_tz}
-            value={scheduling_tz ?? "N/A"}
-          >
-            Scheduling Time
-            {scheduling_tz && (
-              <DropdownMenuShortcut className="text-end">
-                {scheduling_tz}
-                <br />
-                (UTC{tzoffset_scheduling_tz})
-              </DropdownMenuShortcut>
-            )}
-          </DropdownMenuRadioItem>
+          {doctype === "v0_form" && <DoctypeFormsCampaignTZ />}
         </DropdownMenuRadioGroup>
         {simulator_available && (
           <>
@@ -172,6 +155,40 @@ export function GridViewSettings() {
         )}
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+function DoctypeFormsCampaignTZ() {
+  const [state] = useEditorState();
+
+  const {
+    form: {
+      campaign: { scheduling_tz },
+    },
+  } = state;
+
+  const tzoffset_scheduling_tz = useMemo(
+    () =>
+      scheduling_tz
+        ? formatTZ(new Date(), "XXX", { timeZone: scheduling_tz })
+        : undefined,
+    [scheduling_tz]
+  );
+
+  return (
+    <DropdownMenuRadioItem
+      disabled={!scheduling_tz}
+      value={scheduling_tz ?? "N/A"}
+    >
+      Scheduling Time
+      {scheduling_tz && (
+        <DropdownMenuShortcut className="text-end">
+          {scheduling_tz}
+          <br />
+          (UTC{tzoffset_scheduling_tz})
+        </DropdownMenuShortcut>
+      )}
+    </DropdownMenuRadioItem>
   );
 }
 

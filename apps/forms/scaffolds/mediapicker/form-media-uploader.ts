@@ -30,7 +30,7 @@ export function useFormMediaUploader() {
   const [state] = useEditorState();
 
   return useStorageUploader("grida-forms", () => {
-    return `${state.form_id}/${nanoid()}`;
+    return `${state.form.form_id}/${nanoid()}`;
   });
 }
 

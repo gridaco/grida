@@ -7,10 +7,6 @@ import {
   PreferenceBoxFooter,
   PreferenceBoxHeader,
 } from "@/components/preferences";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-
 import {
   Table,
   TableBody,
@@ -19,8 +15,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { useTimestampTZ } from "@/hooks/use-timestamptz";
-import toast from "react-hot-toast";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import { toZonedTime, format as tzFormat, fromZonedTime } from "date-fns-tz";
 import { Spinner } from "@/components/spinner";
@@ -28,13 +26,15 @@ import { PrivateEditorApi } from "@/lib/private";
 import { CalendarIcon, InfoCircledIcon } from "@radix-ui/react-icons";
 import { DatePicker, TZPicker, TimePicker } from "./pickers";
 import { useEditorState } from "@/scaffolds/editor";
+import toast from "react-hot-toast";
 
 export function SchedulingPreferences() {
   const [state, dispatch] = useEditorState();
-  const { form_id, campaign } = state;
+  const { form } = state;
 
   const initialTZ =
-    campaign.scheduling_tz || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    form.campaign.scheduling_tz ||
+    Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   const {
     date: scheduling_open_at,
@@ -43,7 +43,7 @@ export function SchedulingPreferences() {
     setDate: set_scheduling_open_at,
     setTime: setOpenTime,
     setTimezone: setOpenTimezone,
-  } = useTimestampTZ(campaign.scheduling_open_at || undefined, initialTZ);
+  } = useTimestampTZ(form.campaign.scheduling_open_at || undefined, initialTZ);
 
   const {
     date: scheduling_close_at,
@@ -52,7 +52,7 @@ export function SchedulingPreferences() {
     setDate: set_scheduling_close_at,
     setTime: setCloseTime,
     setTimezone: setCloseTimezone,
-  } = useTimestampTZ(campaign.scheduling_close_at || undefined, initialTZ);
+  } = useTimestampTZ(form.campaign.scheduling_close_at || undefined, initialTZ);
 
   // Function to synchronize timezones
   const synchronizeTimezones = (newTz: string) => {
@@ -69,7 +69,7 @@ export function SchedulingPreferences() {
     setValue,
   } = useForm({
     defaultValues: {
-      is_scheduling_enabled: campaign.is_scheduling_enabled,
+      is_scheduling_enabled: form.campaign.is_scheduling_enabled,
       scheduling_open_at: scheduling_open_at,
       scheduling_close_at: scheduling_close_at,
       scheduling_tz: initialTZ,
@@ -94,7 +94,7 @@ export function SchedulingPreferences() {
     }
 
     const payload = {
-      form_id: form_id,
+      form_id: form.form_id,
       enabled: data.is_scheduling_enabled,
       open_at: scheduling_open_at
         ? fromZonedTime(scheduling_open_at, openTz).toISOString()
@@ -142,7 +142,6 @@ export function SchedulingPreferences() {
           id="scheduling-preferences-form"
           onSubmit={handleSubmit(handleSave)}
         >
-          <input type="hidden" name="form_id" value={form_id} />
           <div className="flex gap-2 items-center">
             <Controller
               name="is_scheduling_enabled"

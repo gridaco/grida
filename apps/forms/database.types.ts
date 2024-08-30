@@ -841,7 +841,7 @@ export type Database = {
           {
             foreignKeyName: "connection_supabase_supabase_project_id_fkey"
             columns: ["supabase_project_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "supabase_project"
             referencedColumns: ["id"]
           },
@@ -863,6 +863,7 @@ export type Database = {
           scheduling_close_at: string | null
           scheduling_open_at: string | null
           scheduling_tz: string | null
+          schema_id: string | null
           title: string
           unknown_field_handling_strategy: Database["grida_forms"]["Enums"]["form_response_unknown_field_handling_strategy_type"]
           updated_at: string
@@ -882,6 +883,7 @@ export type Database = {
           scheduling_close_at?: string | null
           scheduling_open_at?: string | null
           scheduling_tz?: string | null
+          schema_id?: string | null
           title?: string
           unknown_field_handling_strategy?: Database["grida_forms"]["Enums"]["form_response_unknown_field_handling_strategy_type"]
           updated_at?: string
@@ -901,11 +903,19 @@ export type Database = {
           scheduling_close_at?: string | null
           scheduling_open_at?: string | null
           scheduling_tz?: string | null
+          schema_id?: string | null
           title?: string
           unknown_field_handling_strategy?: Database["grida_forms"]["Enums"]["form_response_unknown_field_handling_strategy_type"]
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "form_schema_id_fkey"
+            columns: ["schema_id"]
+            isOneToOne: false
+            referencedRelation: "schema_document"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "grida_forms_form_default_form_page_id_fkey"
             columns: ["default_form_page_id"]
@@ -1654,6 +1664,39 @@ export type Database = {
           },
         ]
       }
+      schema_document: {
+        Row: {
+          id: string
+          name: string
+          project_id: number
+        }
+        Insert: {
+          id: string
+          name: string
+          project_id: number
+        }
+        Update: {
+          id?: string
+          name?: string
+          project_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schema_document_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "document"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schema_document_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -1782,6 +1825,7 @@ export type Database = {
         | "search"
         | "audio"
         | "video"
+        | "json"
       form_method: "post" | "get" | "dialog"
       form_page_language:
         | "en"
@@ -1895,6 +1939,7 @@ export type Database = {
           sb_public_schema: Json
           sb_schema_definitions: Json
           sb_schema_names: string[]
+          sb_schema_openapi_docs: Json
           sb_service_key_id: string | null
           updated_at: string
         }
@@ -1908,6 +1953,7 @@ export type Database = {
           sb_public_schema: Json
           sb_schema_definitions: Json
           sb_schema_names?: string[]
+          sb_schema_openapi_docs: Json
           sb_service_key_id?: string | null
           updated_at?: string
         }
@@ -1921,6 +1967,7 @@ export type Database = {
           sb_public_schema?: Json
           sb_schema_definitions?: Json
           sb_schema_names?: string[]
+          sb_schema_openapi_docs?: Json
           sb_service_key_id?: string | null
           updated_at?: string
         }
@@ -1928,7 +1975,7 @@ export type Database = {
           {
             foreignKeyName: "connection_supabase_project_id_fkey"
             columns: ["project_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "project"
             referencedColumns: ["id"]
           },
@@ -1952,6 +1999,7 @@ export type Database = {
         Row: {
           created_at: string
           id: number
+          sb_postgrest_methods: Database["grida_x_supabase"]["Enums"]["sb_postgrest_method"][]
           sb_schema_name: string
           sb_table_name: string
           sb_table_schema: Json
@@ -1961,6 +2009,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: number
+          sb_postgrest_methods: Database["grida_x_supabase"]["Enums"]["sb_postgrest_method"][]
           sb_schema_name: string
           sb_table_name: string
           sb_table_schema: Json
@@ -1970,6 +2019,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: number
+          sb_postgrest_methods?: Database["grida_x_supabase"]["Enums"]["sb_postgrest_method"][]
           sb_schema_name?: string
           sb_table_name?: string
           sb_table_schema?: Json
@@ -1994,7 +2044,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      sb_postgrest_method: "get" | "post" | "delete" | "patch"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2467,12 +2517,6 @@ export type Database = {
         }
         Returns: number[]
       }
-      is_organization_member: {
-        Args: {
-          project_id: number
-        }
-        Returns: boolean
-      }
       recursive_option_combinations:
         | {
             Args: {
@@ -2508,6 +2552,12 @@ export type Database = {
         }
         Returns: boolean
       }
+      rls_project: {
+        Args: {
+          project_id: number
+        }
+        Returns: boolean
+      }
       workspace_documents: {
         Args: {
           p_organization_id: number
@@ -2528,7 +2578,7 @@ export type Database = {
       }
     }
     Enums: {
-      doctype: "v0_form" | "v0_site"
+      doctype: "v0_form" | "v0_site" | "v0_schema"
     }
     CompositeTypes: {
       [_ in never]: never

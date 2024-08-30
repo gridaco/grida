@@ -1,6 +1,11 @@
-import type { GridaSupabase } from "@/types";
+import type { GridaXSupabase } from "@/types";
 import {
+  CreateNewSchemaTableRequest,
+  CreateNewSchemaTableResponse,
+  CreateNewSchemaTableWithXSBTableConnectionRequest,
+  CreateNewSchemaTableWithXSBTableConnectionResponse,
   CreateSignedUploadUrlRequest,
+  DeleteSchemaTableRequest,
   EditorApiResponse,
   EditorApiResponseOk,
   SignedUploadUrlData,
@@ -15,7 +20,9 @@ import {
   XSupabasePrivateApiTypes,
 } from "@/types/private/api";
 import Axios from "axios";
-import { PostgrestQuery } from "../supabase-postgrest/postgrest-query";
+import { PostgrestQuery } from "@/lib/supabase-postgrest/postgrest-query";
+import { XSupabaseQuery } from "@/lib/supabase-postgrest/builder";
+import { PostgrestSingleResponse } from "@supabase/postgrest-js";
 
 export namespace PrivateEditorApi {
   export namespace Files {
@@ -157,81 +164,164 @@ export namespace PrivateEditorApi {
     }
   }
 
-  export namespace SupabaseConnection {
-    export async function createConnection(
-      form_id: string,
-      data: {
-        sb_anon_key: string;
-        sb_project_url: string;
-      }
-    ) {
-      return Axios.post(`/private/editor/connect/${form_id}/supabase`, data);
-    }
-
-    export async function refreshConnection(form_id: string) {
-      return Axios.patch<EditorApiResponse<GridaSupabase.SupabaseProject>>(
-        `/private/editor/connect/${form_id}/supabase`
+  export namespace Schema {
+    export function createTable(req: CreateNewSchemaTableRequest) {
+      return Axios.post<EditorApiResponse<CreateNewSchemaTableResponse>>(
+        `/private/editor/schema/${req.schema_id}/tables/new`,
+        req
       );
     }
 
-    export async function getConnection(form_id: string) {
+    export function createTableWithXSBTable(
+      req: CreateNewSchemaTableWithXSBTableConnectionRequest
+    ) {
+      return Axios.post<
+        EditorApiResponse<CreateNewSchemaTableWithXSBTableConnectionResponse>
+      >(
+        `/private/editor/schema/${req.schema_id}/tables/new/with-x-sb-table`,
+        req
+      );
+    }
+
+    export function deleteTable(req: DeleteSchemaTableRequest) {
+      return Axios.delete<EditorApiResponse<CreateNewSchemaTableResponse>>(
+        `/private/editor/schema/${req.schema_id}/tables/${req.table_id}`,
+        {
+          data: {
+            user_confirmation_txt: req.user_confirmation_txt,
+          },
+        }
+      );
+    }
+  }
+
+  export namespace XSupabase {
+    // #region supabase project
+
+    /**
+     * request body for creating a new supabase project connection
+     * grida_x_supabase.supabase_project
+     */
+    export type CreateProjectConnectionRequest = {
+      project_id: number;
+      sb_anon_key: string;
+      sb_project_url: string;
+    };
+
+    export async function createXSBProjectConnection(
+      data: CreateProjectConnectionRequest
+    ) {
+      return Axios.post<EditorApiResponse<GridaXSupabase.SupabaseProject>>(
+        `/private/editor/x-supabase/projects`,
+        data
+      );
+    }
+
+    export async function getXSBProject(supabase_project_id: number) {
       return Axios.get<{
-        data: GridaSupabase.SupabaseConnectionState;
-      }>(`/private/editor/connect/${form_id}/supabase`);
+        data: XSupabasePrivateApiTypes.GetSupabaseProjectData;
+      }>(`/private/editor/x-supabase/projects/${supabase_project_id}`);
     }
 
-    export async function removeConnection(form_id: string) {
-      return Axios.delete(`/private/editor/connect/${form_id}/supabase`);
+    export async function getXSBProjectByGridaProjectId(project_id: number) {
+      return Axios.get<{
+        data: XSupabasePrivateApiTypes.GetSupabaseProjectData;
+      }>(`/private/editor/x-supabase/projects?grida_project_id=${project_id}`);
     }
 
-    export async function createSecret(
-      form_id: string,
+    export async function deleteXSBProjectConnection(
+      supabase_project_id: number
+    ) {
+      return Axios.delete(
+        `/private/editor/x-supabase/projects/${supabase_project_id}`
+      );
+    }
+
+    export async function createXSBProjectServiceRoleKey(
+      supabase_project_id: number,
       data: { secret: string }
     ) {
       return Axios.post(
-        `/private/editor/connect/${form_id}/supabase/secure-service-key`,
+        `/private/editor/x-supabase/projects/${supabase_project_id}/secure-service-key`,
         data
       );
     }
 
-    export async function revealSecret(form_id: string) {
+    export async function revealXSBProjectServiceRoleKey(
+      supabase_project_id: number
+    ) {
       return Axios.get(
-        `/private/editor/connect/${form_id}/supabase/secure-service-key`
+        `/private/editor/x-supabase/projects/${supabase_project_id}/secure-service-key`
       );
     }
 
-    export async function addCustomSchema(
-      form_id: string,
+    export async function refreshXSBProjectSchema(supabase_project_id: number) {
+      return Axios.patch<EditorApiResponse<GridaXSupabase.SupabaseProject>>(
+        `/private/editor/x-supabase/projects/${supabase_project_id}`
+      );
+    }
+
+    export async function registerXSBCustomSchema(
+      supabase_project_id: number,
       data: XSupabasePrivateApiTypes.AddSchemaNameRequestData
     ) {
-      return Axios.post<EditorApiResponse<GridaSupabase.SupabaseProject>>(
-        `/private/editor/connect/${form_id}/supabase/custom-schema`,
+      return Axios.post<EditorApiResponse<GridaXSupabase.SupabaseProject>>(
+        `/private/editor/x-supabase/projects/${supabase_project_id}/custom-schema`,
         data
       );
     }
 
-    export async function createConnectionTable(
+    export async function listXSBBucket(supabase_project_id: number) {
+      return Axios.get<{
+        data: GridaXSupabase.SupabaseBucket[];
+        error: any;
+      }>(
+        `/private/editor/x-supabase/projects/${supabase_project_id}/storage/buckets`
+      );
+    }
+
+    export const url_x_auth_users_get = (
+      supabase_project_id: number,
+      serachParams: URLSearchParams | string
+    ) =>
+      `/private/editor/x-supabase/projects/${supabase_project_id}/x/auth.users/query?${serachParams}`;
+
+    // #endregion supabase project
+
+    // #region table
+
+    export const url_table_x_query = (
+      form_id: string,
+      supabase_table_id: number,
+      serachParams?: URLSearchParams | string
+    ) =>
+      `/private/editor/connect/${form_id}/supabase/table/${supabase_table_id}/query${serachParams ? `?${serachParams}` : ""}`;
+
+    // #endregion table
+  }
+
+  export namespace Forms {
+    export async function connectFormsXSBConnectionTable(
       form_id: string,
       data: XSupabasePrivateApiTypes.CreateConnectionTableRequestData
     ) {
       return Axios.put(
-        `/private/editor/connect/${form_id}/supabase/table`,
+        `/private/editor/forms/${form_id}/connect/with-x-sb-table`,
         data
       );
     }
 
-    export async function getConnectionTable(form_id: string) {
-      return Axios.get<{ data: GridaSupabase.SupabaseTable; error: any }>(
-        `/private/editor/connect/${form_id}/supabase/table`
-      );
-    }
+    // TODO: safely remove
+    // export async function getFormsXSBConnectionTable(form_id: string) {
+    //   return Axios.get<{ data: GridaSupabase.SupabaseTable; error: any }>(
+    //     `/private/editor/forms/${form_id}/connect/with-x-sb-table`
+    //   );
+    // }
 
-    export async function listBucket(form_id: string) {
-      return Axios.get<{
-        data: GridaSupabase.SupabaseBucket[];
-        error: any;
-      }>(`/private/editor/connect/${form_id}/supabase/storage/buckets`);
-    }
+    // TODO: add once ready on ui
+    // export async function deleteFormsXSBConnectionTable(form_id: string) {
+    //   return Axios.delete(`/private/editor/forms/${form_id}/connect/with-x-sb-table`);
+    // }
   }
 
   export namespace SupabaseQuery {
@@ -255,6 +345,22 @@ export namespace PrivateEditorApi {
       if (refreshKey) params.append("r", refreshKey.toString());
 
       return params;
+    }
+
+    export async function qdelete({
+      form_id,
+      main_table_id,
+      filters,
+    }: {
+      form_id: string;
+      main_table_id: number;
+      filters: ReadonlyArray<XSupabaseQuery.Filter>;
+    }) {
+      return Axios.request<PostgrestSingleResponse<any>>({
+        method: "DELETE",
+        url: `/private/editor/connect/${form_id}/supabase/table/${main_table_id}/query`,
+        data: { filters } satisfies XSupabaseQuery.Body,
+      });
     }
   }
 }

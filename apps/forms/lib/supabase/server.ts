@@ -93,6 +93,20 @@ export const createRouteHandlerClient = (cookieStore: ReadonlyRequestCookies) =>
     }
   );
 
+export const createRouteHandlerXSBClient = (
+  cookieStore: ReadonlyRequestCookies
+) =>
+  _createRouteHandlerClient<Database, "grida_x_supabase">(
+    {
+      cookies: () => cookieStore,
+    },
+    {
+      options: {
+        db: { schema: "grida_x_supabase" },
+      },
+    }
+  );
+
 export const createRouteHandlerWorkspaceClient = (
   cookieStore: ReadonlyRequestCookies
 ) =>

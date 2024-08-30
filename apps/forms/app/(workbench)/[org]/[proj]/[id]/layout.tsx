@@ -1,16 +1,17 @@
 import Link from "next/link";
 import { EditableDocumentTitle } from "@/scaffolds/editable-document-title";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import {
+  createRouteHandlerXSBClient,
   createServerComponentClient,
   createServerComponentWorkspaceClient,
+  grida_xsupabase_client,
 } from "@/lib/supabase/server";
 import { GridaLogo } from "@/components/grida-logo";
 import { SlashIcon } from "@radix-ui/react-icons";
 import { Sidebar } from "@/scaffolds/sidebar/sidebar";
-import { FormEditorProvider } from "@/scaffolds/editor";
-import { PreviewButton } from "@/components/preview-button";
+import { EditorProvider, FormDocumentEditorProvider } from "@/scaffolds/editor";
 import { GridaXSupabaseService } from "@/services/x-supabase";
 import type {
   EndingPageTemplateID,
@@ -22,7 +23,8 @@ import type {
 } from "@/types";
 import type {
   GDocEditorRouteParams,
-  FormEditorInit,
+  FormDocumentEditorInit,
+  TableXSBMainTableConnection,
 } from "@/scaffolds/editor/state";
 import { Breadcrumbs } from "@/scaffolds/workbench/breadcrumb";
 import assert from "assert";
@@ -33,6 +35,10 @@ import { ToasterWithMax } from "@/components/toaster";
 import { EditorHelpFab } from "@/scaffolds/help/editor-help-fab";
 import { Inter } from "next/font/google";
 import { cn } from "@/utils";
+import React from "react";
+import { PlayActions } from "@/scaffolds/workbench/play-actions";
+import { DontCastJsonProperties } from "@/types/supabase-ext";
+import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 
 export const revalidate = 0;
 
@@ -106,10 +112,12 @@ export default async function Layout({
     return notFound();
   }
 
-  const { data, error } = await supabase
-    .from("form_document")
-    .select(
-      `
+  switch (masterdoc_ref.doctype) {
+    case "v0_form": {
+      const { data, error } = await supabase
+        .from("form_document")
+        .select(
+          `
         *,
         blocks:form_block(*),
         form!form_id(
@@ -123,46 +131,39 @@ export default async function Layout({
           supabase_connection:connection_supabase(*)
         )
       `
-    )
-    .eq("project_id", project_ref.id)
-    .eq("id", masterdoc_ref.id)
-    .single();
+        )
+        .eq("project_id", project_ref.id)
+        .eq("id", masterdoc_ref.id)
+        .single();
 
-  if (!data) {
-    console.error("editorinit", id, error);
-    return notFound();
-  }
+      if (!data) {
+        console.error("editorinit", id, error);
+        return notFound();
+      }
 
-  const client = new GridaXSupabaseService();
+      const appearance =
+        (data.stylesheet as FormStyleSheetV1Schema)?.appearance ?? "system";
 
-  const { form: _form } = data;
-  assert(_form);
-  const form = _form as any as Form & {
-    supabase_connection: any;
-    store_connection: any;
-    fields: FormFieldDefinition[];
-  };
+      const client = new GridaXSupabaseService();
 
-  const supabase_connection_state = form.supabase_connection
-    ? await client.getConnection(form.supabase_connection)
-    : null;
+      const { form: _form } = data;
+      assert(_form);
+      const form = _form as any as Form & {
+        supabase_connection: any;
+        store_connection: any;
+        fields: FormFieldDefinition[];
+      };
 
-  const appearance =
-    (data.stylesheet as FormStyleSheetV1Schema)?.appearance ?? "system";
+      const supabase_connection_state = form.supabase_connection
+        ? await client.getXSBMainTableConnectionState(form.supabase_connection)
+        : null;
 
-  return (
-    <html lang="en" suppressHydrationWarning>
-      <body
-        className={cn(
-          inter.className,
-          // to prevent the whole page from scrolling by sr-only or other hidden absolute elements
-          "h-screen overflow-hidden"
-        )}
-      >
-        <div className="h-screen flex flex-col">
-          <FormEditorProvider
+      return (
+        <Html>
+          <FormDocumentEditorProvider
             initial={
               {
+                doctype: "v0_form",
                 project: { id: project_ref.id, name: project_ref.name },
                 organization: {
                   id: project_ref.organization!.id,
@@ -225,42 +226,248 @@ export default async function Layout({
                 document_title: masterdoc_ref.title,
                 fields: form.fields,
                 blocks: data.blocks as FormBlock[],
-              } satisfies FormEditorInit
+              } satisfies FormDocumentEditorInit
             }
           >
-            <ThemeProvider
-              attribute="class"
-              defaultTheme={appearance}
-              enableSystem
-              disableTransitionOnChange
-              storageKey={`theme-workbench-${id}`}
+            <BaseLayout
+              docid={masterdoc_ref.id}
+              doctitle={masterdoc_ref.title}
+              appearance={appearance}
+              org={org}
+              proj={proj}
             >
-              <Header
-                org={params.org}
-                proj={params.proj}
-                document={{
-                  id: masterdoc_ref.id,
-                  title: masterdoc_ref.title,
-                }}
-              />
-              <div className="flex flex-1 overflow-y-auto">
-                <div className="h-full flex flex-1 w-full">
-                  {/* side */}
-                  <aside className="hidden lg:flex h-full">
-                    <Sidebar />
-                  </aside>
-                  <div className="w-full h-full overflow-x-hidden">
-                    {children}
-                  </div>
-                </div>
-              </div>
-              <EditorHelpFab />
-              <ToasterWithMax position="bottom-center" max={5} />
-            </ThemeProvider>
-          </FormEditorProvider>
-        </div>
+              {children}
+            </BaseLayout>
+          </FormDocumentEditorProvider>
+        </Html>
+      );
+    }
+    case "v0_site": {
+      return (
+        <Html>
+          <EditorProvider
+            initial={{
+              doctype: "v0_site",
+              project: { id: project_ref.id, name: project_ref.name },
+              organization: {
+                id: project_ref.organization!.id,
+                name: project_ref.organization!.name,
+              },
+              document_id: masterdoc_ref.id,
+              document_title: masterdoc_ref.title,
+              theme: {
+                appearance: "system",
+                fontFamily: "inter",
+                lang: "en",
+                is_powered_by_branding_enabled: true,
+              },
+            }}
+          >
+            <BaseLayout
+              docid={masterdoc_ref.id}
+              doctitle={masterdoc_ref.title}
+              org={org}
+              proj={proj}
+            >
+              {/* <p>
+                This document is a site document. Site documents are not
+                supported yet.
+              </p> */}
+              {children}
+            </BaseLayout>
+          </EditorProvider>
+        </Html>
+      );
+    }
+    case "v0_schema": {
+      const { data, error } = await supabase
+        .from("schema_document")
+        .select(
+          `
+            *,
+            tables:form(
+              *,
+              fields:form_field(
+                *,
+                options:form_field_option(*),
+                optgroups:optgroup(*)
+              ),
+              store_connection:connection_commerce_store(*),
+              supabase_connection:connection_supabase(*)
+            )
+          `
+        )
+        .eq("project_id", project_ref.id)
+        .eq("id", masterdoc_ref.id)
+        .single();
+
+      // get project supabase project
+      const { data: supabase_project } = await grida_xsupabase_client
+        .from("supabase_project")
+        .select("*")
+        .eq("project_id", project_ref.id)
+        .single();
+
+      if (!data) {
+        console.error("editorinit", id, error);
+        return notFound();
+      }
+
+      // get x-supabase coonnected tables
+      const xsb_client = createRouteHandlerXSBClient(cookieStore);
+      const { data: xsb_tables, error: xsb_tables_err } = await xsb_client
+        .from("supabase_table")
+        .select("*")
+        .in(
+          "id",
+          data.tables
+            .map((t) => t.supabase_connection?.main_supabase_table_id)
+            .filter((x) => x)
+        );
+
+      if (xsb_tables_err) {
+        console.error("xsb_tables_err", xsb_tables_err);
+      }
+
+      const makeconn = (
+        sb_table_id: number
+      ): TableXSBMainTableConnection | undefined => {
+        const t = xsb_tables?.find((t) => t.id === sb_table_id);
+        if (!t) return undefined;
+
+        const { pks } =
+          SupabasePostgRESTOpenApi.parse_supabase_postgrest_schema_definition(
+            t.sb_table_schema as any
+          );
+
+        return {
+          pks: pks,
+          pk: pks[0],
+          sb_table_id: sb_table_id,
+          sb_schema_name: t.sb_schema_name,
+          sb_table_name: t.sb_table_name,
+          sb_table_schema: t.sb_table_schema as any,
+          sb_postgrest_methods: t.sb_postgrest_methods,
+        };
+      };
+
+      return (
+        <Html>
+          <EditorProvider
+            initial={{
+              doctype: "v0_schema",
+              supabase_project: supabase_project
+                ? (supabase_project as DontCastJsonProperties<
+                    typeof supabase_project,
+                    | "sb_public_schema"
+                    | "sb_schema_definitions"
+                    | "sb_schema_openapi_docs"
+                  >)
+                : null,
+              project: { id: project_ref.id, name: project_ref.name },
+              organization: {
+                id: project_ref.organization!.id,
+                name: project_ref.organization!.name,
+              },
+              tables: data.tables.map((ft) => ({
+                id: ft.id,
+                // TODO: this should be migrated from database
+                name: ft.title,
+                description: ft.description,
+                attributes: ft.fields,
+                x_sb_main_table_connection: ft.supabase_connection
+                  ?.main_supabase_table_id
+                  ? makeconn(ft.supabase_connection.main_supabase_table_id)
+                  : undefined,
+              })),
+              document_id: masterdoc_ref.id,
+              document_title: masterdoc_ref.title,
+              theme: {
+                appearance: "system",
+                fontFamily: "inter",
+                lang: "en",
+                is_powered_by_branding_enabled: true,
+              },
+            }}
+          >
+            <BaseLayout
+              docid={masterdoc_ref.id}
+              doctitle={masterdoc_ref.title}
+              org={org}
+              proj={proj}
+            >
+              {children}
+            </BaseLayout>
+          </EditorProvider>
+        </Html>
+      );
+    }
+    default: {
+      redirect("/");
+    }
+  }
+}
+
+function Html({ children }: React.PropsWithChildren<{}>) {
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <body
+        className={cn(
+          inter.className,
+          // to prevent the whole page from scrolling by sr-only or other hidden absolute elements
+          "h-screen overflow-hidden"
+        )}
+      >
+        {children}
       </body>
     </html>
+  );
+}
+
+function BaseLayout({
+  docid,
+  doctitle,
+  org,
+  proj,
+  appearance,
+  children,
+}: React.PropsWithChildren<{
+  docid: string;
+  doctitle: string;
+  appearance?: string;
+  org: string;
+  proj: string;
+}>) {
+  return (
+    <div className="h-screen flex flex-col">
+      <ThemeProvider
+        attribute="class"
+        defaultTheme={appearance}
+        enableSystem
+        disableTransitionOnChange
+        storageKey={`theme-workbench-${docid}`}
+      >
+        <Header
+          org={org}
+          proj={proj}
+          document={{
+            id: docid,
+            title: doctitle,
+          }}
+        />
+        <div className="flex flex-1 overflow-y-auto">
+          <div className="h-full flex flex-1 w-full">
+            {/* side */}
+            <aside className="hidden lg:flex h-full">
+              <Sidebar />
+            </aside>
+            <div className="w-full h-full overflow-x-hidden">{children}</div>
+          </div>
+        </div>
+        <EditorHelpFab />
+        <ToasterWithMax position="bottom-center" max={5} />
+      </ThemeProvider>
+    </div>
   );
 }
 
@@ -277,7 +484,7 @@ function Header({
   };
 }) {
   return (
-    <header className="flex w-full gap-4 bg-background border-b z-10 h-12">
+    <header className="flex w-full gap-4 border-b z-10 h-12 bg-workbench-panel">
       <div className="h-full px-4 min-w-60 w-min flex items-center lg:border-e">
         <Link href={`/${org}/${proj}`} prefetch={false}>
           <span className="flex items-center gap-2 text-md font-black select-none">
@@ -292,9 +499,7 @@ function Header({
           <Breadcrumbs />
           <SavingIndicator />
         </div>
-        <div className="px-4 flex gap-4 items-center justify-end">
-          <PreviewButton />
-        </div>
+        <PlayActions />
       </div>
     </header>
   );

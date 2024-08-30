@@ -34,22 +34,34 @@ import {
   ClientSectionRenderBlock,
 } from "@/lib/forms";
 import { Button } from "@/components/ui/button";
-import { FormAgentProvider, useFormAgentState, init } from "@/lib/formstate";
+import {
+  FormAgentProvider,
+  useFormAgentState,
+  init,
+  useFormAgent,
+} from "@/lib/formstate";
 import { FieldSupports } from "@/k/supported_field_types";
 import { SessionDataSyncProvider } from "./sync";
-import { MediaLoadProvider } from "./mediaload";
+import { MediaLoadPluginProvider } from "./mediaload";
 import { FormAgentMessagingInterfaceProvider } from "./interface";
 import { FormAgentMessagingInterface } from "./emit";
 import { useValue } from "@/lib/spock";
 
-const cls_button_submit =
-  "text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800";
-const cls_button_nuetral =
-  "py-2.5 px-5 me-2 mb-2 text-sm font-medium text-neutral-900 focus:outline-none bg-white rounded-lg border border-neutral-200 hover:bg-neutral-100 hover:text-blue-700 focus:z-10 focus:ring-4 focus:ring-neutral-100 dark:focus:ring-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:border-neutral-700 dark:hover:text-white dark:hover:bg-neutral-800";
+const html_form_id = "form";
 
 type PaymentCheckoutSession = TossPaymentsCheckoutSessionResponseData | any;
 
 const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false });
+
+type HtmlFormElementProps = Omit<
+  React.FormHTMLAttributes<HTMLFormElement>,
+  "title" | "onSubmit"
+>;
+
+interface IOnSubmit {
+  onSubmit?: (e: React.FormEvent<HTMLFormElement>) => void;
+  onAfterSubmit?: () => void;
+}
 
 export interface FormViewTranslation {
   next: string;
@@ -58,29 +70,56 @@ export interface FormViewTranslation {
   pay: string;
 }
 
-export function FormView(
-  props: {
-    form_id: string;
-    session_id?: string;
-    title: string;
-    defaultValues?: { [key: string]: string };
-    fields: FormFieldDefinition[];
-    blocks: ClientRenderBlock[];
-    tree: FormBlockTree<ClientRenderBlock[]>;
-    translation: FormViewTranslation;
-    options: {
-      is_powered_by_branding_enabled: boolean;
-      optimize_for_cjk?: boolean;
-    };
-    stylesheet?: any;
-    afterSubmit?: () => void;
-  } & React.FormHTMLAttributes<HTMLFormElement>
+const default_form_view_translation_en: FormViewTranslation = {
+  next: "Next",
+  back: "Back",
+  submit: "Submit",
+  pay: "Pay",
+};
+
+type FormViewRootProps = {
+  form_id: string;
+  session_id?: string;
+  fields: FormFieldDefinition[];
+  blocks: ClientRenderBlock[];
+  tree: FormBlockTree<ClientRenderBlock[]>;
+  defaultValues?: { [key: string]: string };
+};
+
+export function GridaFormsFormView(
+  props: FormViewRootProps & FormBodyProps & HtmlFormElementProps & IOnSubmit
 ) {
   return (
-    <Providers {...props}>
-      <Body {...props} />
-    </Providers>
+    <FormViewRoot {...props}>
+      <div
+        id="form-view"
+        data-cjk={props.config.optimize_for_cjk}
+        className={clsx(
+          "prose dark:prose-invert prose-headings:text-foreground prose-p:text-foreground prose-hr:border-border text-foreground",
+          "w-full h-full md:h-auto grow md:grow-0",
+          "relative",
+          "data-[cjk='true']:break-keep",
+          "flex flex-col",
+          props.className
+        )}
+      >
+        <GridaFormBody {...props} />
+        <GridaFormFooter
+          translation={props.translation}
+          is_powered_by_branding_enabled={
+            props.config.is_powered_by_branding_enabled
+          }
+        />
+      </div>
+    </FormViewRoot>
   );
+}
+
+export function FormViewRoot({
+  children,
+  ...props
+}: React.PropsWithChildren<FormViewRootProps>) {
+  return <Providers {...props}>{children}</Providers>;
 }
 
 function Providers({
@@ -90,9 +129,11 @@ function Providers({
   blocks,
   children,
   tree,
+  defaultValues,
 }: React.PropsWithChildren<{
   form_id: string;
   session_id?: string;
+  defaultValues?: { [key: string]: string };
   fields: FormFieldDefinition[];
   blocks: ClientRenderBlock[];
   tree: FormBlockTree<ClientRenderBlock[]>;
@@ -106,7 +147,7 @@ function Providers({
       testmode: true,
       redirect: true,
     }).then(setCheckoutSession);
-  }, []);
+  }, [form_id]);
 
   return (
     <>
@@ -117,10 +158,11 @@ function Providers({
           fields,
           blocks,
           tree,
+          defaultValues,
         })}
       >
         <FormAgentMessagingInterfaceProvider />
-        <MediaLoadProvider />
+        <MediaLoadPluginProvider />
         <SessionDataSyncProvider session_id={session_id}>
           <TossPaymentsCheckoutProvider initial={checkoutSession}>
             {children}
@@ -131,99 +173,37 @@ function Providers({
   );
 }
 
-function Body({
-  form_id,
-  session_id,
-  title,
-  blocks,
-  fields,
-  defaultValues,
-  tree,
-  translation,
-  options,
-  stylesheet,
-  afterSubmit,
-  ...formattributes
-}: {
-  form_id: string;
-  session_id?: string;
-  title: string;
-  defaultValues?: { [key: string]: string };
-  fields: FormFieldDefinition[];
-  blocks: ClientRenderBlock[];
-  tree: FormBlockTree<ClientRenderBlock[]>;
-  translation: FormViewTranslation;
-  options: {
+type FormBodyProps = {
+  translation?: FormViewTranslation;
+  config: {
     is_powered_by_branding_enabled: boolean;
     optimize_for_cjk?: boolean;
   };
   stylesheet?: any;
-  afterSubmit?: () => void;
-} & React.FormHTMLAttributes<HTMLFormElement>) {
+};
+
+const GridaFormBody = FormBody;
+
+export function FormBody({
+  onSubmit,
+  onAfterSubmit,
+  className,
+  translation = default_form_view_translation_en,
+  config,
+  stylesheet,
+  ...formattributes
+}: FormBodyProps & HtmlFormElementProps & IOnSubmit) {
   const [state, dispatch] = useFormAgentState();
+  const { tree, session_id, current_section_id, submit_hidden, onNext } =
+    useFormAgent();
 
   // the default value shall be fixed on the first render (since the defaultValues can be changed due to session data sync. - which might cause data loss on the form field.)
-  const initialDefaultValues = useRef(defaultValues);
+  const initialDefaultValues = useRef(state.defaultValues);
 
-  const {
-    is_submitting,
-    sections,
-    has_sections,
-    last_section_id,
-    current_section_id,
-  } = state;
-
-  const current_section = useMemo(() => {
-    return sections.find((section) => section.id === current_section_id) as
-      | ClientSectionRenderBlock
-      | undefined;
-  }, [current_section_id, sections]);
-
-  const primary_action_override_by_payment =
-    current_section?.attributes?.contains_payment;
-
-  const submit_hidden = has_sections
-    ? primary_action_override_by_payment ||
-      last_section_id !== current_section_id
-    : false;
-
-  const pay_hidden = !primary_action_override_by_payment;
-
-  const previous_section_button_hidden = has_sections
-    ? current_section_id === sections[0].id
-    : true;
-
-  const next_section_button_hidden =
-    (has_sections ? current_section_id === last_section_id : true) ||
-    primary_action_override_by_payment;
-
-  const onPrevious = (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (current_section_id === sections[0].id) {
-      return;
-    }
-
-    dispatch({ type: "section/prev" });
-    // scroll to top
+  useEffect(() => {
+    // scroll to top when section changes
     window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const onNext = (e?: React.MouseEvent<HTMLButtonElement>) => {
-    // validate current section
-    // e.preventDefault();
-    // e.stopPropagation();
-
-    if (current_section_id === last_section_id) {
-      return;
-    }
-
-    dispatch({ type: "section/next" });
-
-    // scroll to top
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
+  }, [current_section_id]);
 
   const getDefaultValue = useCallback(
     (key: string) => initialDefaultValues.current?.[key],
@@ -231,137 +211,184 @@ function Body({
   );
 
   return (
-    <div
-      id="form-view"
-      data-cjk={options.optimize_for_cjk}
-      className={clsx(
-        "prose dark:prose-invert prose-headings:text-foreground prose-p:text-foreground prose-hr:border-border text-foreground",
-        "w-full h-full md:h-auto grow md:grow-0",
-        "relative",
-        "data-[cjk='true']:break-keep",
-        "flex flex-col"
-      )}
-    >
-      <>
-        <form
-          {...formattributes}
-          id="form"
-          action={submit_hidden ? undefined : formattributes.action}
-          onSubmit={(e) => {
-            if (submit_hidden) {
-              e.preventDefault();
-              e.stopPropagation();
-              const valid = (e.target as HTMLFormElement).checkValidity();
-              if (valid) {
-                onNext();
-              } else {
-                // show error
-                alert("Please fill out the form correctly.");
-              }
+    <>
+      <form
+        {...formattributes}
+        id={html_form_id}
+        action={submit_hidden ? undefined : formattributes.action}
+        onSubmit={(e) => {
+          if (submit_hidden) {
+            e.preventDefault();
+            e.stopPropagation();
+            const valid = (e.target as HTMLFormElement).checkValidity();
+            if (valid) {
+              onNext();
             } else {
-              // submit
-              FormAgentMessagingInterface.emit({ type: "submit" });
-              // disable submit button
-              dispatch({ type: "form/submit" });
-              afterSubmit?.();
+              // show error
+              alert("Please fill out the form correctly.");
             }
-          }}
-          className="p-4 h-full md:h-auto flex-1"
-        >
-          <div hidden>
-            <BrowserTimezoneOffsetField />
-            <FingerprintField />
-            {session_id && (
-              <input
-                type="hidden"
-                name={SYSTEM_GF_SESSION_KEY}
-                value={session_id}
-              />
-            )}
+          } else {
+            // submit
+            FormAgentMessagingInterface.emit({ type: "submit" });
+            // disable submit button
+            dispatch({ type: "form/submit" });
+
+            onSubmit?.(e);
+            onAfterSubmit?.();
+          }
+        }}
+        className="p-4 h-full md:h-auto flex-1"
+      >
+        <div hidden>
+          <BrowserTimezoneOffsetField />
+          <FingerprintField />
+          {session_id && (
+            <input
+              type="hidden"
+              name={SYSTEM_GF_SESSION_KEY}
+              value={session_id}
+            />
+          )}
+        </div>
+        <GroupLayout>
+          {tree.children.map((b) => (
+            <BlockRenderer
+              key={b.id}
+              block={b}
+              stylesheet={stylesheet}
+              getDefaultValue={getDefaultValue}
+            />
+          ))}
+        </GroupLayout>
+        {config.is_powered_by_branding_enabled && (
+          // desktop branding
+          <div className="block md:hidden">
+            <PoweredByGridaFooter />
           </div>
-          <GroupLayout>
-            {tree.children.map((b) => (
-              <BlockRenderer
-                key={b.id}
-                block={b}
-                stylesheet={stylesheet}
-                getDefaultValue={getDefaultValue}
-              />
-            ))}
-          </GroupLayout>
-          {options.is_powered_by_branding_enabled && (
-            // desktop branding
-            <div className="block md:hidden">
-              <PoweredByGridaFooter />
-            </div>
-          )}
-        </form>
-        <footer
-          className={clsx(
-            "sticky bottom-0",
-            "flex gap-2 p-4 pt-4 border-t",
-            "justify-end bg-background",
-            "md:static md:justify-start md:bg-transparent md:dark:bg-transparent"
-          )}
-        >
-          <Button
-            variant="outline"
-            data-previous-hidden={previous_section_button_hidden}
-            className={clsx(
-              // cls_button_nuetral,
-              "data-[previous-hidden='true']:hidden"
-            )}
-            onClick={onPrevious}
-          >
-            {translation.back}
-          </Button>
-          <Button
-            variant="outline"
-            data-next-hidden={next_section_button_hidden}
-            form="form"
-            type="submit"
-            className={clsx(
-              // cls_button_nuetral,
-              "w-full md:w-auto",
-              "data-[next-hidden='true']:hidden"
-            )}
-            // onClick={onNext}
-          >
-            {translation.next}
-          </Button>
-          <Button
-            data-submit-hidden={submit_hidden}
-            disabled={submit_hidden || is_submitting}
-            form="form"
-            type="submit"
-            className={clsx(
-              // cls_button_submit,
-              "w-full md:w-auto",
-              "data-[submit-hidden='true']:hidden",
-              "disabled:opacity-50 disabled:cursor-not-allowed"
-            )}
-          >
-            {translation.submit}
-          </Button>
-          <TossPaymentsPayButton
-            data-pay-hidden={pay_hidden}
-            className={clsx(
-              cls_button_submit,
-              "w-full md:w-auto",
-              "data-[pay-hidden='true']:hidden"
-            )}
-          >
-            {translation.pay}
-          </TossPaymentsPayButton>
-        </footer>
-      </>
-      {options.is_powered_by_branding_enabled && (
-        // desktop branding
+        )}
+      </form>
+    </>
+  );
+}
+
+function GridaFormFooter({
+  is_powered_by_branding_enabled,
+  translation = default_form_view_translation_en,
+}: {
+  is_powered_by_branding_enabled: boolean;
+  translation?: FormViewTranslation;
+}) {
+  const { pay_hidden } = useFormAgent();
+
+  return (
+    <>
+      <Footer shouldHidePay={pay_hidden} translation={translation} />
+      {/* on desktop, branding attribute is below footer */}
+      {is_powered_by_branding_enabled && (
         <div className="hidden md:block">
           <PoweredByGridaFooter />
         </div>
       )}
-    </div>
+    </>
+  );
+}
+
+function Footer({
+  translation,
+  shouldHidePay,
+}: {
+  shouldHidePay: boolean;
+  translation: FormViewTranslation;
+}) {
+  return (
+    <footer
+      className={clsx(
+        "sticky bottom-0",
+        "flex gap-2 p-4 pt-4 border-t",
+        "justify-end bg-background",
+        "md:static md:justify-start md:bg-transparent md:dark:bg-transparent"
+      )}
+    >
+      <FormPrev>{translation.back}</FormPrev>
+      <FormNext className="w-full md:w-auto">{translation.next}</FormNext>
+      <FormSubmit className="w-full md:w-auto">{translation.submit}</FormSubmit>
+      <TossPaymentsPayButton
+        data-pay-hidden={shouldHidePay}
+        className={clsx(
+          "text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800",
+          "w-full md:w-auto",
+          "data-[pay-hidden='true']:hidden"
+        )}
+      >
+        {translation.pay}
+      </TossPaymentsPayButton>
+    </footer>
+  );
+}
+
+function FormPrev({
+  className,
+  children,
+}: React.PropsWithChildren<{
+  className?: string;
+}>) {
+  const { has_previous, onPrevious } = useFormAgent();
+
+  return (
+    <Button
+      variant="outline"
+      data-next-hidden={!has_previous}
+      className={clsx("data-[next-hidden='true']:hidden", className)}
+      onClick={onPrevious}
+    >
+      {children}
+    </Button>
+  );
+}
+
+function FormNext({
+  className,
+  children,
+}: React.PropsWithChildren<{
+  className?: string;
+}>) {
+  const { has_next } = useFormAgent();
+
+  return (
+    <Button
+      variant="outline"
+      data-next-hidden={!has_next}
+      form={html_form_id}
+      type="submit"
+      className={clsx("data-[next-hidden='true']:hidden", className)}
+    >
+      {children}
+    </Button>
+  );
+}
+
+function FormSubmit({
+  className,
+  children,
+}: React.PropsWithChildren<{
+  className?: string;
+}>) {
+  const { submit_hidden, is_submitting } = useFormAgent();
+
+  return (
+    <Button
+      data-submit-hidden={submit_hidden}
+      disabled={submit_hidden || is_submitting}
+      form={html_form_id}
+      type="submit"
+      className={clsx(
+        "data-[submit-hidden='true']:hidden",
+        "disabled:opacity-50 disabled:cursor-not-allowed",
+        className
+      )}
+    >
+      {children}
+    </Button>
   );
 }
 
@@ -618,3 +645,11 @@ function FingerprintField() {
     />
   );
 }
+
+export const FormView = {
+  Root: FormViewRoot,
+  Body: FormBody,
+  Prev: FormPrev,
+  Next: FormNext,
+  Submit: FormSubmit,
+};

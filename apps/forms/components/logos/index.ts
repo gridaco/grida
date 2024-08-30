@@ -4,3 +4,4 @@ export * from "./supabase";
 export * from "./whatsapp";
 export * from "./stripe";
 export * from "./toss";
+export * from "./postgresql";

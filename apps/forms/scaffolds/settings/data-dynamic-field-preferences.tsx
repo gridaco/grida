@@ -26,8 +26,10 @@ import { useEditorState } from "../editor";
 export function UnknownFieldPreferences() {
   const [state] = useEditorState();
   const {
-    form_id,
-    form_security: { unknown_field_handling_strategy },
+    form,
+    form: {
+      form_security: { unknown_field_handling_strategy },
+    },
   } = state;
 
   const {
@@ -46,7 +48,7 @@ export function UnknownFieldPreferences() {
     strategy: FormResponseUnknownFieldHandlingStrategyType;
   }) => {
     const req = PrivateEditorApi.Settings.updateUnknownFieldsHandlingStrategy({
-      form_id,
+      form_id: form.form_id,
       strategy: data.strategy,
     });
 
@@ -76,7 +78,6 @@ export function UnknownFieldPreferences() {
       />
       <PreferenceBody>
         <form id="unknown-fields" onSubmit={handleSubmit(onSubmit)}>
-          <input type="hidden" name="form_id" value={form_id} />
           <div className="flex flex-col gap-8">
             <section>
               <div className="mt-4 flex flex-col gap-1">

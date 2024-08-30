@@ -1,50 +1,34 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import DataGrid, {
   Column,
   CopyEvent,
-  PasteEvent,
   RenderCellProps,
   RenderEditCellProps,
   RenderHeaderCellProps,
 } from "react-data-grid";
 import {
   PlusIcon,
-  ChevronDownIcon,
-  EnterFullScreenIcon,
   CalendarIcon,
   Link2Icon,
-  Pencil1Icon,
-  TrashIcon,
   AvatarIcon,
   ArrowRightIcon,
-  DownloadIcon,
-  FileIcon,
 } from "@radix-ui/react-icons";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuPortal,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { FormInputType } from "@/types";
-import { JsonEditCell } from "./json-cell";
+import { JsonPopupEditorCell } from "./json-cell";
 import { useEditorState } from "../editor";
 import type {
+  GFColumn,
   GFResponseFieldData,
   GFResponseRow,
+  GFSystemColumn,
   GFSystemColumnTypes,
 } from "./types";
 import { SelectColumn } from "./select-column";
-import "./grid.css";
 import { unwrapFeildValue } from "@/lib/forms/unwrap";
 import { Button } from "@/components/ui/button";
-import {
-  FileTypeIcon,
-  FormFieldTypeIcon,
-} from "@/components/form-field-type-icon";
+import { FileTypeIcon } from "@/components/form-field-type-icon";
 import { toZonedTime } from "date-fns-tz";
 import { tztostr } from "../editor/symbols";
 import { mask } from "./mask";
@@ -63,6 +47,21 @@ import Highlight from "@/components/highlight";
 import { FieldSupports } from "@/k/supported_field_types";
 import { format } from "date-fns";
 import { EmptyRowsRenderer } from "./empty";
+import { ColumnHeaderCell } from "./column-header-cell";
+import "./grid.css";
+import { cn } from "@/utils";
+
+function useMasking() {
+  const [state] = useEditorState();
+  return useCallback(
+    (txt: string): string => {
+      return state.datagrid_filter.masking_enabled && typeof txt === "string"
+        ? mask(txt)
+        : txt.toString();
+    },
+    [state.datagrid_filter.masking_enabled]
+  );
+}
 
 function rowKeyGetter(row: GFResponseRow) {
   return row.__gf_id;
@@ -79,17 +78,10 @@ export function ResponseGrid({
   onEditFieldClick,
   onDeleteFieldClick,
   onCellChange,
+  className,
 }: {
-  systemcolumns: {
-    key: GFSystemColumnTypes;
-    name?: string;
-  }[];
-  columns: {
-    key: string;
-    name: string;
-    readonly: boolean;
-    type?: FormInputType;
-  }[];
+  systemcolumns: GFSystemColumn[];
+  columns: GFColumn[];
   rows: GFResponseRow[];
   selectionDisabled?: boolean;
   readonly?: boolean;
@@ -102,9 +94,10 @@ export function ResponseGrid({
     column: string,
     data: GFResponseFieldData
   ) => void;
+  className?: string;
 }) {
   const [state, dispatch] = useEditorState();
-  const { selected_rows: selected_responses } = state;
+  const { datagrid_selected_rows: selected_responses } = state;
 
   const onSelectedRowsChange = (selectedRows: ReadonlySet<string>) => {
     dispatch({
@@ -114,6 +107,7 @@ export function ResponseGrid({
   };
 
   const onColumnsReorder = (sourceKey: string, targetKey: string) => {
+    console.log("reorder", sourceKey, targetKey);
     // FIXME: the reorder won't work. we are using custom header cell, which needs a custom dnd handling.
     dispatch({
       type: "editor/data-grid/column/reorder",
@@ -122,31 +116,32 @@ export function ResponseGrid({
     });
   };
 
-  const __id_column: Column<GFResponseRow> = {
-    key: "__gf_display_id",
-    name: "id",
+  const sys_col_props = {
     frozen: true,
     resizable: true,
+    draggable: false,
+    sortable: false,
     width: 100,
+  };
+  const __id_column: Column<GFResponseRow> = {
+    ...sys_col_props,
+    key: "__gf_display_id",
+    name: "id",
     renderHeaderCell: GFSystemPropertyHeaderCell,
   };
 
   const __created_at_column: Column<GFResponseRow> = {
+    ...sys_col_props,
     key: "__gf_created_at",
     name: "time",
-    frozen: true,
-    resizable: true,
-    width: 100,
     renderHeaderCell: GFSystemPropertyHeaderCell,
     renderCell: DefaultPropertyDateCell,
   };
 
   const __customer_uuid_column: Column<GFResponseRow> = {
+    ...sys_col_props,
     key: "__gf_customer_id",
     name: "customer",
-    frozen: true,
-    resizable: true,
-    width: 100,
     renderHeaderCell: GFSystemPropertyHeaderCell,
     renderCell: DefaultPropertyCustomerCell,
   };
@@ -155,7 +150,8 @@ export function ResponseGrid({
     key: "__gf_new",
     name: "+",
     resizable: false,
-    draggable: true,
+    draggable: false,
+    sortable: false,
     width: 100,
     renderHeaderCell: (props) => (
       <NewFieldHeaderCell {...props} onClick={onAddNewFieldClick} />
@@ -185,13 +181,14 @@ export function ResponseGrid({
             key: col.key,
             name: col.name,
             resizable: true,
-            draggable: true,
             editable: true,
-            minWidth: 140,
-            maxWidth: 640,
+            sortable: true,
+            draggable: false,
+            minWidth: 160,
+            maxWidth: columns.length <= 1 ? undefined : 640,
             width: undefined,
             renderHeaderCell: (props) => (
-              <FieldHeaderCell
+              <ColumnHeaderCell
                 {...props}
                 type={col.type as FormInputType}
                 onEditClick={() => {
@@ -240,9 +237,20 @@ export function ResponseGrid({
 
   return (
     <DataGrid
-      className="flex-grow select-none"
+      className={cn(
+        "flex-grow select-none text-xs text-foreground/80",
+        className
+      )}
       rowKeyGetter={rowKeyGetter}
       columns={allcolumns}
+      rows={rows}
+      rowHeight={32}
+      headerRowHeight={36}
+      onCellDoubleClick={() => {
+        if (readonly) {
+          toast("This table is readonly", { icon: "🔒" });
+        }
+      }}
       onColumnsReorder={onColumnsReorder}
       selectedRows={selectionDisabled ? undefined : selected_responses}
       onCopy={onCopy}
@@ -261,8 +269,6 @@ export function ResponseGrid({
         selectionDisabled ? undefined : onSelectedRowsChange
       }
       renderers={{ noRowsFallback: <EmptyRowsRenderer loading={loading} /> }}
-      rows={rows}
-      rowHeight={44}
     />
   );
 }
@@ -287,47 +293,6 @@ function DefaultPropertyIcon({ __key: key }: { __key: GFSystemColumnTypes }) {
     case "__gf_customer_id":
       return <AvatarIcon className="min-w-4" />;
   }
-}
-
-function FieldHeaderCell({
-  column,
-  type,
-  onEditClick,
-  onDeleteClick,
-}: RenderHeaderCellProps<any> & {
-  type: FormInputType;
-  onEditClick?: () => void;
-  onDeleteClick?: () => void;
-}) {
-  const { name } = column;
-
-  return (
-    <div className="flex items-center justify-between">
-      <span className="flex items-center gap-2">
-        <FormFieldTypeIcon type={type} className="w-4 h-4" />
-        <span className="font-normal">{name}</span>
-      </span>
-      <DropdownMenu modal={false}>
-        <DropdownMenuTrigger asChild>
-          <button>
-            <ChevronDownIcon />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuPortal>
-          <DropdownMenuContent className="z-50">
-            <DropdownMenuItem onClick={onEditClick}>
-              <Pencil1Icon className="me-2 align-middle" />
-              Edit Field
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onDeleteClick}>
-              <TrashIcon className="me-2 align-middle" />
-              Delete Field
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenuPortal>
-      </DropdownMenu>
-    </div>
-  );
 }
 
 function NewFieldHeaderCell({
@@ -402,7 +367,7 @@ function DefaultPropertyCustomerCell({
   }
 
   return (
-    <div className="w-full flex justify-between">
+    <div className="w-full flex justify-between items-center">
       <span className="font-mono text-ellipsis flex-1 overflow-hidden">
         {data}
       </span>
@@ -421,7 +386,12 @@ function DefaultPropertyCustomerCell({
 
 function FKButton({ onClick }: { onClick?: () => void }) {
   return (
-    <Button variant="outline" className="m-1 p-2" onClick={onClick}>
+    <Button
+      variant="outline"
+      size="icon"
+      className="p-1 w-5 h-5"
+      onClick={onClick}
+    >
       <ArrowRightIcon className="w-3 h-3" />
     </Button>
   );
@@ -439,6 +409,8 @@ function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
   }
 
   const { type, value, options, multiple, files } = data;
+
+  const masker = useMasking();
 
   // FIXME: we need to use other parser for db-oriented data.
   // at the moment, we are using type check on value to use the value as is or not.
@@ -523,7 +495,7 @@ function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
               <img
                 src={file.src}
                 alt={file.name}
-                className="h-full min-w-10 aspect-square rounded overflow-hidden object-cover bg-neutral-500"
+                className="h-full min-w-8 aspect-square rounded overflow-hidden object-cover bg-neutral-500"
                 loading="lazy"
               />
               {/* <figcaption>{file.name}</figcaption> */}
@@ -558,11 +530,11 @@ function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
         </div>
       );
     }
+    case "json": {
+      return <code>{masker(JSON.stringify(unwrapped))}</code>;
+    }
     default:
-      const display =
-        state.datagrid_filter.masking_enabled && typeof unwrapped === "string"
-          ? mask(unwrapped)
-          : unwrapped?.toString();
+      const display = masker(unwrapped?.toString() ?? "");
       return (
         <div>
           <Highlight
@@ -642,7 +614,8 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
         break;
       }
       case "number":
-        val = parseFloat(val);
+        if (!val) val = null;
+        else val = parseFloat(val);
         break;
       case "datetime-local": {
         try {
@@ -813,6 +786,15 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
             </SelectContent>
           </Select>
         );
+      case "json":
+        return (
+          <JsonPopupEditorCell
+            value={unwrapped ?? null}
+            onCommitValue={(v) => {
+              commit({ value: v });
+            }}
+          />
+        );
       // not supported
       case "checkboxes":
       case "signature":
@@ -822,7 +804,14 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
     }
   } catch (e) {
     console.error(e);
-    return <JsonEditCell {...props} />;
+    return (
+      <JsonPopupEditorCell
+        value={value}
+        onCommitValue={(v) => {
+          commit({ value: v });
+        }}
+      />
+    );
   }
 }
 

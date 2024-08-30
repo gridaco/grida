@@ -1,36 +1,120 @@
 "use client";
 
 import React, { useCallback, useMemo } from "react";
-import { StateProvider, useEditorState } from "./provider";
+import { StateProvider } from "./provider";
+import {
+  useEditorState,
+  useFormFields,
+  useDatabaseTableId,
+  useDatagridTable,
+} from "./use";
 import { reducer } from "./reducer";
-import { FormEditorInit, initialFormEditorState } from "./state";
-import { FieldEditPanel, FormFieldSave } from "../panels/field-edit-panel";
+import {
+  SchemaDocumentEditorInit,
+  EditorInit,
+  FormDocumentEditorInit,
+  SiteDocumentEditorInit,
+} from "./state";
+import { initialEditorState } from "./init";
+import { FieldEditPanel, FieldSave } from "../panels/field-edit-panel";
 import { FormFieldDefinition } from "@/types";
 import { FormFieldUpsert, EditorApiResponse } from "@/types/private/api";
 import { TooltipProvider } from "@radix-ui/react-tooltip";
-import { RowEditPanel } from "../panels/response-edit-panel";
+import { RowEditPanel } from "../panels/row-edit-panel";
 import { CustomerEditPanel } from "../panels/customer-panel";
-import { BlockEditPanel } from "../panels/block-edit-panel";
 import { MediaViewerProvider } from "../mediaviewer";
 import { AssetsBackgroundsResolver } from "./resolver/assets-backgrounds-resolver";
 import toast from "react-hot-toast";
+import { EditorSymbols } from "./symbols";
+import { fmt_local_index } from "@/utils/fmt";
 
-export function FormEditorProvider({
+export function EditorProvider({
   initial,
   children,
-}: React.PropsWithChildren<{ initial: FormEditorInit }>) {
+}: React.PropsWithChildren<{ initial: EditorInit }>) {
+  switch (initial.doctype) {
+    case "v0_form":
+      return (
+        <FormDocumentEditorProvider initial={initial}>
+          {children}
+        </FormDocumentEditorProvider>
+      );
+    case "v0_site":
+      return (
+        <SiteDocumentEditorProvider initial={initial}>
+          {children}
+        </SiteDocumentEditorProvider>
+      );
+    case "v0_schema":
+      return (
+        <DatabaseDocumentEditorProvider initial={initial}>
+          {children}
+        </DatabaseDocumentEditorProvider>
+      );
+    default:
+      throw new Error("unsupported doctype");
+  }
+}
+
+export function DatabaseDocumentEditorProvider({
+  initial,
+  children,
+}: React.PropsWithChildren<{ initial: SchemaDocumentEditorInit }>) {
   const [state, dispatch] = React.useReducer(
     reducer,
-    initialFormEditorState(initial)
+    initialEditorState(initial)
+  );
+  return (
+    <StateProvider state={state} dispatch={dispatch}>
+      <TooltipProvider>
+        <AssetsBackgroundsResolver />
+        <MediaViewerProvider>
+          {/*  */}
+          <FormFieldEditPanelProvider />
+          <RowEditPanelProvider />
+          {children}
+        </MediaViewerProvider>
+      </TooltipProvider>
+    </StateProvider>
+  );
+}
+
+export function SiteDocumentEditorProvider({
+  initial,
+  children,
+}: React.PropsWithChildren<{ initial: SiteDocumentEditorInit }>) {
+  const [state, dispatch] = React.useReducer(
+    reducer,
+    initialEditorState(initial)
+  );
+  return (
+    <StateProvider state={state} dispatch={dispatch}>
+      <TooltipProvider>
+        <AssetsBackgroundsResolver />
+        <MediaViewerProvider>
+          {/*  */}
+          {children}
+        </MediaViewerProvider>
+      </TooltipProvider>
+    </StateProvider>
+  );
+}
+
+export function FormDocumentEditorProvider({
+  initial,
+  children,
+}: React.PropsWithChildren<{ initial: FormDocumentEditorInit }>) {
+  const [state, dispatch] = React.useReducer(
+    reducer,
+    initialEditorState(initial)
   );
 
   return (
     <StateProvider state={state} dispatch={dispatch}>
-      <AssetsBackgroundsResolver />
       <TooltipProvider>
+        <AssetsBackgroundsResolver />
         <MediaViewerProvider>
-          <BlockEditPanel />
-          <FieldEditPanelProvider />
+          <FormFieldEditPanelProvider />
           <RowEditPanelProvider />
           <CustomerPanelProvider />
           {children}
@@ -40,14 +124,36 @@ export function FormEditorProvider({
   );
 }
 
-function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
+function useAttributes() {
+  const [state] = useEditorState();
+  switch (state.doctype) {
+    case "v0_form":
+      return state.form.fields;
+    case "v0_schema": {
+      const tb = state.tables.find((t) => t.id === state.datagrid_table_id);
+      if (!tb) return [];
+      if ("attributes" in tb) {
+        return tb.attributes;
+      }
+    }
+    default: {
+      return [];
+    }
+  }
+}
+
+function FormFieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
 
+  const attributes = useAttributes();
+
+  const db_table_id = useDatabaseTableId();
+
   const field = useMemo(() => {
-    const focusfound = state.fields.find((f) => f.id === state.focus_field_id);
+    const focusfound = attributes?.find((f) => f.id === state.field_editor.id);
     if (focusfound) return focusfound;
-    return state.field_draft_init;
-  }, [state.focus_field_id, state.fields, state.field_draft_init]);
+    return state.field_editor.data?.draft;
+  }, [state.field_editor.id, attributes, state.field_editor.data?.draft]);
 
   const closeFieldPanel = useCallback(
     (options: { refresh: boolean }) => {
@@ -61,21 +167,23 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
   );
 
   const onSaveField = useCallback(
-    (init: FormFieldSave) => {
+    (init: FieldSave) => {
+      if (!db_table_id) return;
       const data: FormFieldUpsert = {
         ...init,
         //
         options: init.options?.length ? init.options : undefined,
         optgroups: init.optgroups?.length ? init.optgroups : undefined,
         //
-        id: state.focus_field_id ?? undefined,
-        form_id: state.form_id,
+        id: state.field_editor.id ?? undefined,
+        form_id: db_table_id,
         data: init.data,
       };
 
-      // console.log("[EDITOR] saving..", data);
+      process.env.NODE_ENV === "development" &&
+        console.log("[EDITOR] saving..", data);
 
-      const promise = fetch(`/private/editor/${state.form_id}/fields`, {
+      const promise = fetch(`/private/editor/${db_table_id}/fields`, {
         body: JSON.stringify(data),
         method: "POST",
         headers: {
@@ -93,7 +201,8 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
           if (data) {
             // else save the field
             dispatch({
-              type: "editor/field/save",
+              type: "editor/table/attribute/change",
+              table_id: db_table_id,
               field_id: data.id,
               data: data,
             });
@@ -112,20 +221,23 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
         error: "Failed to save field",
       });
     },
-    [closeFieldPanel, state.form_id, state.focus_field_id, dispatch]
+    [closeFieldPanel, db_table_id, state.field_editor.id, dispatch]
   );
 
   const is_existing_field = !!field?.id;
 
+  if (!db_table_id) return <></>;
+
   return (
     <>
       <FieldEditPanel
-        key={field?.name || state.field_edit_panel_refresh_key}
-        open={state.is_field_edit_panel_open}
+        db_table_id={db_table_id}
+        key={field?.name || state.field_editor.refreshkey}
+        open={state.field_editor.open}
         title={is_existing_field ? "Edit Field" : "New Field"}
         enableAI={!is_existing_field}
         mode={is_existing_field ? "edit" : "new"}
-        formResetKey={state.field_edit_panel_refresh_key}
+        formResetKey={state.field_editor.refreshkey}
         init={
           field
             ? {
@@ -166,36 +278,75 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
   );
 }
 
+/**
+ * @deprecated MIGRATE
+ * @returns
+ */
+function useRowEditorRow() {
+  const [state, dispatch] = useEditorState();
+
+  const row = useMemo(() => {
+    switch (state.doctype) {
+      case "v0_form":
+        const response_stream =
+          state.tablespace[
+            EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID
+          ].stream;
+
+        return response_stream?.find((r) => r.id === state.row_editor.id);
+      default:
+        return undefined;
+    }
+  }, [state.doctype, state.tablespace, state.row_editor.id]);
+
+  // const focusxsupabasemaintablerow = useMemo(() => {
+  //   const pk = state.x_supabase_main_table?.pk;
+  //   if (!pk) return;
+  //   return state.x_supabase_main_table?.rows?.find(
+  //     (r) => r[pk] === state.row_editor.id // TODO: - pk
+  //   );
+  // }, [
+  //   state.x_supabase_main_table?.rows,
+  //   state.x_supabase_main_table?.pk,
+  //   state.row_editor.id,
+  // ]);
+
+  return row;
+}
+
 function RowEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
 
-  const focusresponse = useMemo(() => {
-    return state.responses?.rows?.find((r) => r.id === state.focus_response_id);
-  }, [state.responses, state.focus_response_id]);
+  const attributes = useAttributes();
 
-  const focusxsupabasemaintablerow = useMemo(() => {
-    const pk = state.x_supabase_main_table?.gfpk;
-    if (!pk) return;
-    return state.x_supabase_main_table?.rows?.find(
-      (r) => r[pk] === state.focus_response_id // TODO: - pk
-    );
-  }, [
-    state.x_supabase_main_table?.rows,
-    state.x_supabase_main_table?.gfpk,
-    state.focus_response_id,
-  ]);
+  const row = useRowEditorRow();
+
+  const tb = useDatagridTable();
+  const table_id = useDatabaseTableId();
+
+  if (!tb || !table_id) return <></>;
+
+  const mode = tb.readonly
+    ? ("read" as const)
+    : row
+      ? ("update" as const)
+      : ("create" as const);
 
   return (
     <>
       <RowEditPanel
-        key={focusresponse?.id}
-        open={state.is_response_edit_panel_open}
+        key={row?.id || state.row_editor.refreshkey}
+        table_id={table_id}
+        mode={mode}
+        open={state.row_editor.open}
+        title={
+          row
+            ? `Response ${row.meta.local_index ? fmt_local_index(row.meta.local_index) : ""}`
+            : "New"
+        }
+        attributes={attributes}
         init={{
-          response: focusresponse,
-          response_fields: focusresponse?.id
-            ? state.responses.fields[focusresponse?.id]
-            : [],
-          field_defs: state.fields,
+          row: row,
         }}
         onOpenChange={(open) => {
           dispatch({ type: "editor/responses/edit", open });
@@ -212,9 +363,9 @@ function CustomerPanelProvider({ children }: React.PropsWithChildren<{}>) {
   return (
     <>
       <CustomerEditPanel
-        key={state.focus_customer_id}
-        customer_id={state.focus_customer_id}
-        open={state.is_customer_edit_panel_open}
+        key={state.customer_editor.id}
+        customer_id={state.customer_editor.id}
+        open={state.customer_editor.open}
         onOpenChange={(open) => {
           dispatch({ type: "editor/customers/edit", open });
         }}

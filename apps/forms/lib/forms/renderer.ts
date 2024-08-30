@@ -189,7 +189,7 @@ export class FormRenderTree {
     readonly description: string | null | undefined,
     readonly lang: FormsPageLanguage | null | undefined,
     private readonly _m_fields: FormFieldDefinition[] = [],
-    private readonly _m_blocks?: FormBlock[],
+    private readonly _m_blocks?: FormBlock[] | null,
     private readonly config?: RenderTreeConfig,
     private readonly plugins?: {
       option_renderer: (option: Option) => Option;
@@ -197,95 +197,96 @@ export class FormRenderTree {
       file_resolver?: (field_id: string) => FileResolveStrategy;
     }
   ) {
-    this._m_render_blocks = _m_blocks
-      ?.map((block: FormBlock) => {
-        const is_field = block.type === "field";
-        const field = is_field
-          ? _m_fields.find((f: any) => f.id === block.form_field_id) ?? null
-          : null;
+    this._m_render_blocks =
+      (_m_blocks
+        ?.map((block: FormBlock) => {
+          const is_field = block.type === "field";
+          const field = is_field
+            ? _m_fields.find((f: any) => f.id === block.form_field_id) ?? null
+            : null;
 
-        const shared: Partial<BaseRenderBlock> = {
-          id: block.id,
-          local_index: block.local_index,
-          parent_id: block.parent_id,
-          v_hidden: block.v_hidden,
-        } as const;
+          const shared: Partial<BaseRenderBlock> = {
+            id: block.id,
+            local_index: block.local_index,
+            parent_id: block.parent_id,
+            v_hidden: block.v_hidden,
+          } as const;
 
-        if (is_field) {
-          // assert fiel to be not null
-          if (!field) {
-            return null; // this will be filtered out
-          }
+          if (is_field) {
+            // assert fiel to be not null
+            if (!field) {
+              return null; // this will be filtered out
+            }
 
-          return <ClientFieldRenderBlock | ClientFileUploadFieldRenderBlock>{
-            ...shared,
-            type: "field",
-            field: this._field_block_field_definition(field),
-          };
-        }
-
-        switch (block.type) {
-          case "html": {
-            return <ClientHtmlRenderBlock>{
+            return <ClientFieldRenderBlock | ClientFileUploadFieldRenderBlock>{
               ...shared,
-              type: "html",
-              html: block.body_html,
+              type: "field",
+              field: this._field_block_field_definition(field),
             };
           }
-          case "header": {
-            return <ClientHeaderRenderBlock>{
-              ...shared,
-              type: "header",
-              title_html: block.title_html,
-              description_html: block.description_html,
-            };
-          }
-          case "image":
-          case "video": {
-            return <ClientImageRenderBlock>{
-              ...shared,
-              type: block.type,
-              src: block.src,
-            };
-          }
-          case "pdf": {
-            return <ClientPdfRenderBlock>{
-              ...shared,
-              type: "pdf",
-              // for pdf, as the standard is <object> we use data instead of src
-              data: block.src,
-            };
-          }
-          case "section": {
-            const children_ids = _m_blocks.filter(
-              (b) => b.parent_id === block.id
-            );
 
-            const contains_payment = children_ids.some(
-              (b) =>
-                b.type === "field" &&
-                _m_fields.find((f) => f.id === b.form_field_id)?.type ===
-                  "payment"
-            );
+          switch (block.type) {
+            case "html": {
+              return <ClientHtmlRenderBlock>{
+                ...shared,
+                type: "html",
+                html: block.body_html,
+              };
+            }
+            case "header": {
+              return <ClientHeaderRenderBlock>{
+                ...shared,
+                type: "header",
+                title_html: block.title_html,
+                description_html: block.description_html,
+              };
+            }
+            case "image":
+            case "video": {
+              return <ClientImageRenderBlock>{
+                ...shared,
+                type: block.type,
+                src: block.src,
+              };
+            }
+            case "pdf": {
+              return <ClientPdfRenderBlock>{
+                ...shared,
+                type: "pdf",
+                // for pdf, as the standard is <object> we use data instead of src
+                data: block.src,
+              };
+            }
+            case "section": {
+              const children_ids = _m_blocks?.filter(
+                (b) => b.parent_id === block.id
+              );
 
-            return <ClientSectionRenderBlock>{
-              ...shared,
-              type: "section",
-              attributes: {
-                contains_payment,
-              },
-            };
+              const contains_payment = children_ids.some(
+                (b) =>
+                  b.type === "field" &&
+                  _m_fields.find((f) => f.id === b.form_field_id)?.type ===
+                    "payment"
+              );
+
+              return <ClientSectionRenderBlock>{
+                ...shared,
+                type: "section",
+                attributes: {
+                  contains_payment,
+                },
+              };
+            }
+            case "divider":
+            default: {
+              return <BaseRenderBlock>{
+                ...shared,
+                type: block.type,
+              };
+            }
           }
-          case "divider":
-          default: {
-            return <BaseRenderBlock>{
-              ...shared,
-              type: block.type,
-            };
-          }
-        }
-      })
-      .filter(Boolean) as ClientRenderBlock[];
+        })
+        ?.filter(Boolean) as ClientRenderBlock[]) ?? [];
 
     const _field_blocks: ClientFieldRenderBlock[] =
       this._m_render_blocks.filter(

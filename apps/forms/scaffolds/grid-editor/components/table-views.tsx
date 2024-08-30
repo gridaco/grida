@@ -2,49 +2,56 @@
 
 import React from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useEditorState } from "@/scaffolds/editor";
-import { TableTypeIcon } from "@/components/table-type-icon";
-import { Button } from "@/components/ui/button";
-import { PlusIcon } from "@radix-ui/react-icons";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { useDatagridTable, useEditorState } from "@/scaffolds/editor";
+import { ResourceTypeIcon } from "@/components/resource-type-icon";
 
 export function TableViews() {
   const [state, dispatch] = useEditorState();
 
-  const { datagrid_table } = state;
+  const tb = useDatagridTable();
 
-  const tablegroup = state.tables.find((table) =>
-    table.views.some((v) => v.type === datagrid_table)
-  );
+  if (!tb) {
+    return <>ERR</>;
+  }
 
   return (
     <div className="flex items-center gap-2">
       <Tabs
-        value={state.datagrid_table}
-        onValueChange={(value) => {
-          dispatch({
-            type: "editor/data-grid/table",
-            table: value as any,
-          });
-        }}
+        value={tb?.name}
+        // onValueChange={(value) => {
+        //   dispatch({
+        //     type: "editor/data-grid/table",
+        //     name: value,
+        //   });
+        // }}
       >
         <TabsList>
-          {tablegroup?.views.map((table) => {
+          <TabsTrigger key={tb.id.toString()} value={tb.name}>
+            <ResourceTypeIcon
+              type={tb.icon}
+              className="inline align-middle w-4 h-4 me-2"
+            />
+            {tb.readonly && (
+              <span className="me-2 text-xs font-mono text-muted-foreground">
+                READONLY
+              </span>
+            )}
+            {tb.label}
+          </TabsTrigger>
+        </TabsList>
+        {/* <TabsList>
+          {table?.views.map((table) => {
             return (
-              <TabsTrigger key={table.type + table.name} value={table.type}>
-                <TableTypeIcon
-                  type={tablegroup.group}
+              <TabsTrigger key={table.id.toString()} value={table.name}>
+                <ResourceTypeIcon
+                  type={table.icon}
                   className="inline align-middle w-4 h-4 me-2"
                 />
                 {table.label}
               </TabsTrigger>
             );
           })}
-        </TabsList>
+        </TabsList> */}
       </Tabs>
       {/* <Tooltip>
         <TooltipTrigger asChild>

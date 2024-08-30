@@ -94,7 +94,7 @@ function PendingBlocksResolver() {
       const { data, error } = await supabase
         .from("form_block")
         .insert({
-          form_id: state.form_id,
+          form_id: state.form.form_id,
           type: block.type,
           form_page_id: state.document_id,
           parent_id: block.parent_id?.startsWith(DRAFT_ID_START_WITH)
@@ -114,7 +114,7 @@ function PendingBlocksResolver() {
 
       return data;
     },
-    [state.form_id, state.document_id, supabase]
+    [state.form.form_id, state.document_id, supabase]
   );
 
   useEffect(() => {

@@ -1,7 +1,20 @@
-import { produce } from "immer";
-import { EditorFlatFormBlock, FormEditorState } from "./state";
+import { produce, type Draft } from "immer";
+import type {
+  EditorFlatFormBlock,
+  EditorState,
+  GDocFormsXSBTable,
+  GDocSchemaTableProviderXSupabase,
+  GDocTable,
+  GDocTableID,
+  TGridaDataTablespace,
+  TTablespace,
+  TVirtualRow,
+  TVirtualRowData,
+  TXSupabaseDataTablespace,
+} from "./state";
 import type {
   GlobalSavingAction,
+  EditorSidebarModeAction,
   BlockDescriptionAction,
   BlockTitleAction,
   BlockVHiddenAction,
@@ -11,22 +24,20 @@ import type {
   CreateNewPendingBlockAction,
   DataGridReorderColumnAction,
   DeleteBlockAction,
-  DeleteFieldAction,
+  TableAttributeDeleteAction,
   DeleteResponseAction,
   DataGridDeleteSelectedRows,
-  FeedResponseAction,
+  TablespaceFeedAction,
   FocusBlockAction,
-  FocusFieldAction,
   HtmlBlockBodyAction,
   ImageBlockSrcAction,
-  OpenBlockEditPanelAction,
   OpenInsertMenuPanelAction,
   OpenCustomerEditAction,
   OpenEditFieldAction,
   OpenResponseEditAction,
   ResolvePendingBlockAction,
   DataGridRowsAction,
-  SaveFieldAction,
+  TableAttributeChangeAction,
   SelectResponse,
   DataGridTableAction,
   SortBlockAction,
@@ -61,6 +72,8 @@ import type {
   FormCampaignPreferencesAction,
   FormEndingPreferencesAction,
   EditorThemeAppearanceAction,
+  SchemaTableAddAction,
+  SchemaTableDeleteAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { blockstreeflat } from "@/lib/forms/tree";
@@ -69,18 +82,38 @@ import { VIDEO_BLOCK_SRC_DEFAULT_VALUE } from "@/k/video_block_defaults";
 import { IMAGE_BLOCK_SRC_DEFAULT_VALUE } from "@/k/image_block_defaults";
 import { PDF_BLOCK_SRC_DEFAULT_VALUE } from "@/k/pdf_block_defaults";
 import { draftid } from "@/utils/id";
-import type { FormBlockType, FormInputType, GridaSupabase } from "@/types";
+import type {
+  AttributeDefinition,
+  FormBlockType,
+  FormInputType,
+  FormResponse,
+  FormResponseField,
+  GridaXSupabase,
+} from "@/types";
 import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";
+import { EditorSymbols } from "./symbols";
+import {
+  initialDatagridState,
+  schematableinit,
+  table_to_sidebar_table_menu,
+} from "./init";
+import assert from "assert";
 
 export function reducer(
-  state: FormEditorState,
+  state: EditorState,
   action: BlocksEditorAction
-): FormEditorState {
+): EditorState {
   switch (action.type) {
     case "saving": {
       const { saving } = <GlobalSavingAction>action;
       return produce(state, (draft) => {
         draft.saving = saving;
+      });
+    }
+    case "editor/sidebar/mode": {
+      const { mode } = <EditorSidebarModeAction>action;
+      return produce(state, (draft) => {
+        draft.sidebar.mode = mode;
       });
     }
     case "blocks/new": {
@@ -115,7 +148,7 @@ export function reducer(
       const __shared: EditorFlatFormBlock = {
         id,
         created_at: new Date().toISOString(),
-        form_id: state.form_id,
+        form_id: state.form.form_id,
         form_page_id: state.document_id,
         parent_id: block === "section" ? null : parent_id,
         type: block,
@@ -158,20 +191,22 @@ export function reducer(
           }
 
           return produce(state, (draft) => {
-            const { available_field_ids } = state;
+            const {
+              form: { available_field_ids },
+            } = state;
 
             let field_id: string | null = null;
 
             if (init) {
               // if init provided, always create new.
-              draft.field_draft_init = init;
+              draft.field_editor.data = { draft: init };
             } else {
-              draft.field_draft_init = null;
+              draft.field_editor.data = { draft: null };
               // find unused field id (if any)
               field_id = available_field_ids[0] ?? null;
               if (field_id) {
                 // remove the field id from available_field_ids
-                draft.available_field_ids = available_field_ids.filter(
+                draft.form.available_field_ids = available_field_ids.filter(
                   (id) => id !== field_id
                 );
               }
@@ -196,8 +231,8 @@ export function reducer(
 
             if (!field_id) {
               // if no available field, but field block provided, open a field editor panel
-              draft.focus_field_id = null;
-              draft.is_field_edit_panel_open = true;
+              draft.field_editor.id = undefined;
+              draft.field_editor.open = true;
               //
             }
           });
@@ -233,12 +268,14 @@ export function reducer(
       const { block_id } = <CreateFielFromBlockdAction>action;
       // trigger new field from empty field block
       return produce(state, (draft) => {
-        draft.field_draft_init = null;
         // update focus block id
         draft.focus_block_id = block_id;
-        draft.focus_field_id = null;
         // open a field editor panel
-        draft.is_field_edit_panel_open = true;
+        draft.field_editor.open = true;
+        draft.field_editor.id = undefined;
+        draft.field_editor.data = {
+          draft: null,
+        };
       });
     }
     case "blocks/resolve": {
@@ -282,7 +319,7 @@ export function reducer(
         )?.form_field_id;
         // add the field_id to available_field_ids
         if (field_id) {
-          draft.available_field_ids.push(field_id);
+          draft.form.available_field_ids.push(field_id);
         }
       });
     }
@@ -322,8 +359,8 @@ export function reducer(
           block.form_field_id = field_id;
 
           // update the available_field_ids
-          draft.available_field_ids = [
-            ...draft.available_field_ids.filter((id) => id !== field_id),
+          draft.form.available_field_ids = [
+            ...draft.form.available_field_ids.filter((id) => id !== field_id),
             previous_field_id,
           ].filter(Boolean) as string[];
         }
@@ -436,97 +473,96 @@ export function reducer(
         };
       });
     }
-    case "editor/field/focus": {
-      const { field_id } = <FocusFieldAction>action;
-      return produce(state, (draft) => {
-        draft.focus_field_id = field_id;
-      });
-    }
     case "editor/field/edit": {
       const { field_id, open, refresh } = <OpenEditFieldAction>action;
       return produce(state, (draft) => {
-        draft.is_field_edit_panel_open = open ?? true;
-        draft.focus_field_id = field_id;
-        if (refresh) {
-          draft.field_edit_panel_refresh_key =
-            (draft.field_edit_panel_refresh_key ?? 0) + 1;
-        }
+        draft.field_editor.open = open ?? true;
+        draft.field_editor.id = field_id;
+        draft.field_editor.refreshkey = nextrefreshkey(
+          draft.field_editor.refreshkey,
+          refresh
+        );
       });
     }
-    case "editor/field/save": {
-      const { field_id, data } = <SaveFieldAction>action;
+    case "editor/table/attribute/change": {
+      const { table_id, field_id, data } = <TableAttributeChangeAction>action;
+
       return produce(state, (draft) => {
-        const field = draft.fields.find((f) => f.id === field_id);
-        if (field) {
-          Object.assign(field, { ...data });
-          field.id = field_id;
-        } else {
-          // create new field
-          draft.fields.push({
-            ...data,
-          });
+        // clear init
+        draft.field_editor.data = { draft: null };
 
-          let unused_field_id: string | null = field_id;
+        // update (create) the changed attribute
+        const attributes = get_attributes(draft, table_id);
+        const { isnew } = push_or_update_attribute(attributes, data);
 
-          // clear init
-          draft.field_draft_init = null;
+        if (draft.doctype === "v0_form") {
+          if (isnew) {
+            // assign the field_id to the block if required
+            let unused_field_id: string | null = field_id;
+            const waiting_block = has_waiting_block_for_new_field(draft);
 
-          // if new field, and focus block has no assigned field, use this.
-          if (draft.focus_block_id) {
-            const block = draft.blocks.find(
-              (d) => d.id == draft.focus_block_id
-            );
-
-            if (block && block.type === "field" && !block.form_field_id) {
-              block.form_field_id = unused_field_id;
+            if (waiting_block) {
+              waiting_block.form_field_id = unused_field_id;
               unused_field_id = null;
+            } else {
+              // add the field_id to available_field_ids
+              draft.form.available_field_ids.push(unused_field_id);
             }
           }
-
-          // add the field_id to available_field_ids
-          if (unused_field_id) draft.available_field_ids.push(unused_field_id);
         }
         //
       });
     }
-    case "editor/field/delete": {
-      const { field_id } = <DeleteFieldAction>action;
+    case "editor/table/attribute/delete": {
+      const { table_id, field_id } = <TableAttributeDeleteAction>action;
       return produce(state, (draft) => {
-        // remove from fields
-        draft.fields = draft.fields.filter((f) => f.id !== field_id);
+        const attributes = get_attributes(draft, table_id);
 
-        // remove from available_field_ids
-        draft.available_field_ids = draft.available_field_ids.filter(
-          (id) => id !== field_id
+        // [EXECUTION ORDER MATTERS] remove from attributes (using below syntax since attribute is a const - still a draft proxy)
+        const new_attributes = attributes.filter(
+          (attr) => attr.id !== field_id
         );
+        attributes.length = 0;
+        attributes.push(...new_attributes);
+        //
 
-        // set empty to referenced blocks
-        draft.blocks = draft.blocks.map((block) => {
-          if (block.form_field_id === field_id) {
-            block.form_field_id = null;
-          }
-          return block;
-        });
+        if (draft.doctype === "v0_form") {
+          // remove from available_field_ids
+          draft.form.available_field_ids =
+            draft.form.available_field_ids.filter((id) => id !== field_id);
+
+          // set empty to referenced blocks
+          draft.blocks = draft.blocks.map((block) => {
+            if (block.form_field_id === field_id) {
+              block.form_field_id = null;
+            }
+            return block;
+          });
+        }
       });
     }
     case "editor/response/select": {
       const { selection } = <SelectResponse>action;
       return produce(state, (draft) => {
-        draft.selected_rows = new Set(selection);
+        draft.datagrid_selected_rows = new Set(selection);
       });
     }
     case "editor/response/delete": {
       const { id } = <DeleteResponseAction>action;
       return produce(state, (draft) => {
-        draft.responses.rows = draft.responses.rows.filter(
-          (response) => response.id !== id
-        );
+        const space = get_tablespace_feed(draft);
+        if (!space) {
+          console.error("Table space not found");
+          return;
+        }
+
+        space.stream = space.stream?.filter((row) => row.id !== id);
 
         // also remove from selected_responses
-        const new_selected_responses = new Set(state.selected_rows);
+        const new_selected_responses = new Set(state.datagrid_selected_rows);
         new_selected_responses.delete(id);
 
-        draft.selected_rows = new_selected_responses;
+        draft.datagrid_selected_rows = new_selected_responses;
       });
     }
     case "editor/data-grid/rows": {
@@ -535,73 +571,88 @@ export function reducer(
         draft.datagrid_rows_per_page = max;
       });
     }
-    case "editor/response/feed": {
-      const { data, reset } = <FeedResponseAction>action;
+    case "editor/table/space/feed": {
+      const { table_id, data, reset } = <TablespaceFeedAction>action;
 
-      const responses = {
-        rows: data,
-        fields: data.reduce((acc: any, response) => {
-          acc[response.id] = response.fields;
-          return acc;
-        }, {}),
-      };
+      const virtualized: Array<TVirtualRow<FormResponseField, FormResponse>> =
+        data.map((vrow) => {
+          const { fields, ...row } = vrow;
+          return {
+            id: row.id,
+            data: fields.reduce(
+              (acc: TVirtualRowData<FormResponseField>, field) => {
+                const attrkey = field.form_field_id;
+                acc[attrkey] = field;
+                return acc;
+              },
+              {}
+            ),
+            meta: row,
+          };
+        });
 
       return produce(state, (draft) => {
+        const space = get_tablespace(draft, table_id) as TGridaDataTablespace;
+
+        assert(space, "Table space not found");
+        assert(space.provider === "grida", "Table space provider is not grida");
+
         if (reset) {
-          draft.responses = responses;
+          space.stream = virtualized;
           return;
         }
 
         // Merge & Add new responses to the existing responses
         // Map of ids to responses for the existing responses
-        const existingResponsesById = draft.responses.rows.reduce(
-          (acc: any, response) => {
-            acc[response.id] = response;
-            return acc;
-          },
-          {}
-        );
+        // { [id] : row}
+        const existing_rows_id_map = space.stream?.reduce((acc: any, row) => {
+          acc[row.id] = row;
+          return acc;
+        }, {});
 
-        responses.rows.forEach((newResponse) => {
-          if (existingResponsesById.hasOwnProperty(newResponse.id)) {
+        virtualized.forEach((newRow) => {
+          if (existing_rows_id_map.hasOwnProperty(newRow.id)) {
             // Update existing response
-            Object.assign(
-              (existingResponsesById as any)[newResponse.id],
-              newResponse
-            );
+            Object.assign((existing_rows_id_map as any)[newRow.id], newRow);
           } else {
             // Add new response if id does not exist
-            draft.responses.rows.push(newResponse);
+            space.stream?.push(newRow);
           }
-
-          // Update fields
-          draft.responses.fields[newResponse.id] = newResponse.fields;
         });
       });
     }
     case "editor/responses/edit": {
-      const { response_id, open } = <OpenResponseEditAction>action;
+      const { response_id, open, refresh } = <OpenResponseEditAction>action;
       return produce(state, (draft) => {
-        draft.is_response_edit_panel_open = open ?? true;
-        draft.focus_response_id = response_id;
+        draft.row_editor.open = open ?? true;
+        draft.row_editor.id = response_id;
+        draft.row_editor.refreshkey = nextrefreshkey(
+          draft.row_editor.refreshkey,
+          refresh
+        );
       });
     }
     case "editor/data/sessions/feed": {
       const { data, reset } = <FeedResponseSessionsAction>action;
       return produce(state, (draft) => {
-        // Initialize draft.sessions if it's not already an array
-        if (!Array.isArray(draft.sessions)) {
-          draft.sessions = [];
+        // Initialize session stream if it's not already an array
+        const session_space =
+          draft.tablespace[
+            EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID
+          ];
+
+        if (!Array.isArray(session_space.stream)) {
+          session_space.stream = [];
         }
 
         if (reset) {
-          draft.sessions = data;
+          session_space.stream = data;
           return;
         }
 
         // Merge & Add new responses to the existing responses
         // Map of ids to responses for the existing responses
-        const existingSessionsById = draft.sessions.reduce(
+        const existingSessionsById = session_space.stream.reduce(
           (acc: any, session) => {
             acc[session.id] = session;
             return acc;
@@ -618,88 +669,143 @@ export function reducer(
             );
           } else {
             // Add new response if id does not exist
-            draft.sessions!.push(newSession);
+            session_space.stream?.push(newSession);
           }
         });
       });
     }
     case "editor/data-grid/table": {
-      const { table } = <DataGridTableAction>action;
+      const { ...opt } = <DataGridTableAction>action;
       return produce(state, (draft) => {
-        draft.datagrid_table = table;
-        draft.datagrid_table_row_keyword = table_keyword(table);
+        // find the id =====
+        let tableid: GDocTableID | null = null;
+        if ("id" in opt) {
+          tableid = opt.id;
+        }
+        // TODO: ...
+        // else {
+        //   // find withind current group.
+        //   const group = draft.tables.find((g) =>
+        //     g.views.some((v) => v.id === draft.datagrid_table_id)
+        //   );
+        //   tableid = group?.views.find((v) => v.name === opt.name)?.id ?? null;
+        // }
+        // =================
 
-        draft.realtime_sessions_enabled = table === "session";
-        draft.realtime_responses_enabled = table === "response";
+        if (!tableid) {
+          console.error("Table not found", opt);
+          return;
+        }
 
-        // clear selected rows
-        draft.selected_rows = new Set();
+        draft.datagrid_table_id = tableid;
+
+        // clear datagrid state
+        const datagridreset = initialDatagridState();
+        draft.datagrid_selected_rows = datagridreset.datagrid_selected_rows;
+        draft.datagrid_filter = datagridreset.datagrid_filter;
+        draft.datagrid_orderby = datagridreset.datagrid_orderby;
+
+        if (draft.doctype === "v0_form") {
+          // TODO: not a best way. but for now.
+          if ((draft.tablespace[tableid] as never) !== "noop") {
+            draft.tablespace[tableid].realtime = true;
+          }
+        }
       });
     }
     case "editor/data-grid/delete/selected": {
       const {} = <DataGridDeleteSelectedRows>action;
       return produce(state, (draft) => {
-        switch (state.datagrid_table) {
-          case "response": {
-            const ids = Array.from(state.selected_rows);
-            draft.responses.rows = draft.responses.rows.filter(
+        switch (draft.datagrid_table_id) {
+          case EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID: {
+            const ids = Array.from(state.datagrid_selected_rows);
+
+            const response_space =
+              draft.tablespace[
+                EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID
+              ];
+            response_space.stream = response_space.stream?.filter(
               (response) => !ids.includes(response.id)
             );
 
             break;
           }
-          case "x-supabase-main-table": {
-            const pk = state.x_supabase_main_table!.gfpk!;
-            draft.x_supabase_main_table!.rows =
-              draft.x_supabase_main_table!.rows.filter(
-                (row) => !state.selected_rows.has(row[pk])
-              );
+          case EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID: {
+            const tb = get_table<GDocFormsXSBTable>(
+              draft,
+              EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID
+            );
+            if (!tb) return;
+
+            const pk = tb.x_sb_main_table_connection.pk!;
+            const space =
+              draft.tablespace[
+                EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID
+              ];
+
+            space.stream = space.stream?.filter(
+              (row) => !state.datagrid_selected_rows.has(row[pk])
+            );
 
             break;
           }
-          case "session":
+          case EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID: {
+            throw new Error(
+              "Unsupported table type: " + state.datagrid_table_id?.toString()
+            );
+          }
           default:
-            throw new Error("Unsupported table type: " + state.datagrid_table);
+            if (draft.doctype === "v0_schema") {
+              //
+              const space = get_tablespace_feed(draft);
+
+              const ids = Array.from(state.datagrid_selected_rows);
+
+              assert(space, "Table space not found");
+
+              space.stream = space.stream?.filter(
+                (response) => !ids.includes(response.id)
+              );
+            } else {
+              throw new Error(
+                "Unsupported table type: " + state.datagrid_table_id?.toString()
+              );
+            }
         }
 
         // clear selected rows
-        draft.selected_rows = new Set();
+        draft.datagrid_selected_rows = new Set();
       });
     }
     case "editor/customers/feed": {
       const { data } = <FeedCustomerAction>action;
       return produce(state, (draft) => {
-        draft.customers = data;
+        draft.tablespace[
+          EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID
+        ].stream = data;
       });
     }
     case "editor/customers/edit": {
       const { customer_id, open } = <OpenCustomerEditAction>action;
       return produce(state, (draft) => {
-        draft.is_customer_edit_panel_open = open ?? true;
-        draft.focus_customer_id = customer_id;
-      });
-    }
-    case "editor/panels/block-edit": {
-      const { block_id, open } = <OpenBlockEditPanelAction>action;
-      return produce(state, (draft) => {
-        draft.is_block_edit_panel_open = open ?? true;
-        draft.focus_block_id = block_id;
+        draft.customer_editor.open = open ?? true;
+        draft.customer_editor.id = customer_id;
       });
     }
     case "editor/panels/insert-menu": {
       const { open } = <OpenInsertMenuPanelAction>action;
       return produce(state, (draft) => {
-        draft.is_insert_menu_open = open ?? true;
+        draft.insertmenu.open = open ?? true;
       });
     }
     case "editor/data-grid/column/reorder": {
       const { a, b } = <DataGridReorderColumnAction>action;
       return produce(state, (draft) => {
         // update field local_index
-        const index_a = draft.fields.findIndex((f) => f.id === a);
-        const index_b = draft.fields.findIndex((f) => f.id === b);
+        const index_a = draft.form.fields.findIndex((f) => f.id === a);
+        const index_b = draft.form.fields.findIndex((f) => f.id === b);
         // TODO:
-        draft.fields = arrayMove(draft.fields, index_a, index_b);
+        draft.form.fields = arrayMove(draft.form.fields, index_a, index_b);
 
         console.error("reorder:: Not implemented yet");
       });
@@ -762,93 +868,117 @@ export function reducer(
     }
     case "editor/data-grid/cell/change": {
       return produce(state, (draft) => {
-        switch (state.datagrid_table) {
-          case "response": {
-            const { row, column, data } = <DataGridCellChangeAction>action;
-            const { value, option_id } = data;
-
-            const cellid = state.responses.fields[row].find(
-              (f) => f.form_field_id === column && f.response_id === row
-            )?.id;
-
-            draft.responses.fields[row] = draft.responses.fields[row].map(
-              (f) => {
-                if (f.id === cellid) {
-                  return {
-                    ...f,
-                    form_field_option_id: option_id ?? null,
-                    value,
-                  };
-                }
-                return f;
-              }
-            );
-
-            break;
-          }
-          case "x-supabase-main-table": {
+        switch (draft.datagrid_table_id) {
+          case EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID: {
             const {
-              row: row_pk,
-              column,
+              row: row_id,
+              column: attribute_id,
               data,
             } = <DataGridCellChangeAction>action;
             const { value, option_id } = data;
 
-            const field = state.fields.find((f) => f.id === column);
-            if (!field) return;
-            const pk = state.x_supabase_main_table!.gfpk!;
+            const response_space =
+              draft.tablespace[
+                EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID
+              ];
+            const cell = response_space.stream?.find(
+              (row) => row.id === row_id
+            )!.data[attribute_id];
 
-            // handle jsonpaths - partial object update
-            if (FlatPostgREST.testPath(field.name)) {
-              const { column } = FlatPostgREST.decodePath(field.name);
-              const row = state.x_supabase_main_table!.rows.find(
-                (r) => r[pk] === row_pk
-              );
+            if (!cell) return;
 
-              if (!row) return;
-
-              const newrow = FlatPostgREST.update(
-                row,
-                field.name,
-                value
-              ) as GridaSupabase.XDataRow;
-
-              draft.x_supabase_main_table!.rows =
-                draft.x_supabase_main_table!.rows.map((r) => {
-                  if (r[pk] === row_pk) {
-                    return newrow;
-                  }
-                  return r;
-                });
-
-              return;
-            }
-
-            draft.x_supabase_main_table!.rows =
-              draft.x_supabase_main_table!.rows.map((r) => {
-                if (r[pk] === row_pk) {
-                  return {
-                    ...r,
-                    [field!.name]: value,
-                  };
-                }
-                return r;
-              });
+            cell.value = value;
+            cell.form_field_option_id = option_id ?? null;
 
             break;
           }
-          case "session":
+          case EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID: {
+            const space =
+              draft.tablespace[
+                EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID
+              ];
+
+            const tb = get_table<GDocFormsXSBTable>(
+              draft,
+              EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID
+            );
+            if (!tb) return;
+            const pk = tb.x_sb_main_table_connection.pk!;
+
+            update_xsbtablespace(pk, space, draft, action);
+            break;
+          }
+          case EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID: {
+            throw new Error(
+              "Unsupported table type: " + state.datagrid_table_id?.toString()
+            );
+          }
           default: {
-            throw new Error("Unsupported table type: " + state.datagrid_table);
+            if (draft.doctype === "v0_schema") {
+              const {
+                row: row_id,
+                column: attribute_id,
+                data,
+              } = <DataGridCellChangeAction>action;
+              const { value, option_id } = data;
+
+              const space = get_tablespace_feed(draft);
+              assert(space, "Table space not found");
+
+              switch (space?.provider) {
+                case "grida": {
+                  const cell = space.stream?.find((row) => row.id === row_id)!
+                    .data[attribute_id];
+
+                  if (!cell) return;
+
+                  cell.value = value;
+                  cell.form_field_option_id = option_id ?? null;
+                  break;
+                }
+                case "x-supabase": {
+                  const space = draft.tablespace[action.table_id];
+                  assert(space.provider === "x-supabase");
+
+                  const tb = get_table<GDocSchemaTableProviderXSupabase>(
+                    draft,
+                    action.table_id
+                  );
+
+                  if (!tb) return;
+
+                  const pk = tb.x_sb_main_table_connection.pk!;
+
+                  update_xsbtablespace(
+                    pk,
+                    space as TXSupabaseDataTablespace,
+                    draft,
+                    action
+                  );
+                  break;
+                }
+                case "custom":
+                default:
+                  throw new Error(
+                    "Unsupported table provider: " + space?.provider
+                  );
+              }
+
+              break;
+            } else {
+              throw new Error(
+                "Unsupported table type: " + state.datagrid_table_id?.toString()
+              );
+            }
           }
         }
       });
     }
-    case "editor/x-supabase/main-table/feed": {
-      const { data } = <FeedXSupabaseMainTableRowsAction>action;
+    case "editor/table/space/feed/x-supabase": {
+      const { data, table_id } = <FeedXSupabaseMainTableRowsAction>action;
 
       return produce(state, (draft) => {
-        draft.x_supabase_main_table!.rows = data;
+        draft.tablespace[table_id].stream = data;
         return;
       });
       //
@@ -892,8 +1022,8 @@ export function reducer(
     case "editor/form/campaign/preferences": {
       const { type, ...pref } = <FormCampaignPreferencesAction>action;
       return produce(state, (draft) => {
-        draft.campaign = {
-          ...draft.campaign,
+        draft.form.campaign = {
+          ...draft.form.campaign,
           ...pref,
         };
       });
@@ -901,8 +1031,8 @@ export function reducer(
     case "editor/form/ending/preferences": {
       const { type, ...pref } = <FormEndingPreferencesAction>action;
       return produce(state, (draft) => {
-        draft.ending = {
-          ...draft.ending,
+        draft.form.ending = {
+          ...draft.form.ending,
           ...pref,
         };
       });
@@ -1007,8 +1137,188 @@ export function reducer(
         };
       });
     }
+    case "editor/schema/table/add": {
+      const { table } = <SchemaTableAddAction>action;
+      return produce(state, (draft) => {
+        const tb = schematableinit(table);
+        draft.tables.push(tb as Draft<GDocTable>);
+        draft.sidebar.mode_data.tables.push(
+          table_to_sidebar_table_menu(tb, {
+            basepath: draft.basepath,
+            document_id: draft.document_id,
+          })
+        );
+
+        if (table.x_sb_main_table_connection) {
+          draft.tablespace[tb.id] = {
+            provider: "x-supabase",
+            readonly: false,
+            stream: [],
+            realtime: false,
+          };
+        } else {
+          draft.tablespace[tb.id] = {
+            provider: "grida",
+            readonly: false,
+            stream: [],
+            realtime: true,
+          };
+        }
+
+        // TODO: setting the id won't change the route. need to update the route. (where?)
+        draft.datagrid_table_id = table.id;
+      });
+    }
+    case "editor/schema/table/delete": {
+      const { table_id } = <SchemaTableDeleteAction>action;
+      return produce(state, (draft) => {
+        const table = draft.tables.find((t) => t.id === table_id);
+        if (table) {
+          draft.tables = draft.tables.filter((t) => t.id !== table_id);
+          draft.sidebar.mode_data.tables =
+            draft.sidebar.mode_data.tables.filter((t) => t.id !== table_id);
+          delete draft.tablespace[table_id];
+          draft.datagrid_table_id = null;
+        }
+      });
+    }
     default:
       return state;
+  }
+}
+
+function update_xsbtablespace(
+  pk: string,
+  space: Draft<TXSupabaseDataTablespace>,
+  draft: Draft<EditorState>,
+  action: DataGridCellChangeAction
+) {
+  const { row: row_pk, table_id, column, data } = action;
+  const { value, option_id } = data;
+
+  const attributes = get_attributes(draft, table_id);
+  const attribute = attributes.find((f) => f.id === column);
+  if (!attribute) return;
+
+  // handle jsonpaths - partial object update
+  if (FlatPostgREST.testPath(attribute.name)) {
+    const { column } = FlatPostgREST.decodePath(attribute.name);
+    const row = space.stream!.find((r) => r[pk] === row_pk);
+
+    if (!row) return;
+
+    const newrow = FlatPostgREST.update(
+      row,
+      attribute.name,
+      value
+    ) as GridaXSupabase.XDataRow;
+
+    space.stream = space.stream!.map((r) => {
+      if (r[pk] === row_pk) {
+        return newrow;
+      }
+      return r;
+    });
+
+    return;
+  }
+
+  space.stream = space.stream!.map((r) => {
+    if (r[pk] === row_pk) {
+      return {
+        ...r,
+        [attribute!.name]: value,
+      };
+    }
+    return r;
+  });
+}
+
+function get_table<T extends GDocTable>(
+  draft: Draft<EditorState>,
+  table_id: GDocTableID
+): Draft<Extract<GDocTable, T>> | undefined {
+  return draft.tables.find((t) => t.id === table_id) as Draft<
+    Extract<GDocTable, T>
+  >;
+}
+
+function get_tablespace(draft: Draft<EditorState>, table_id: GDocTableID) {
+  return draft.tablespace[table_id];
+}
+
+/**
+ * @deprecated
+ * @returns
+ */
+function get_tablespace_feed(
+  draft: Draft<EditorState>
+): Draft<TTablespace> | null {
+  switch (draft.doctype) {
+    case "v0_form":
+      return draft.tablespace[
+        EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID
+      ];
+    case "v0_schema":
+      if (typeof draft.datagrid_table_id === "string")
+        return draft.tablespace[draft.datagrid_table_id] as TTablespace;
+    default:
+      return null;
+  }
+  //
+}
+
+function get_attributes(draft: Draft<EditorState>, table_id: GDocTableID) {
+  switch (draft.doctype) {
+    case "v0_form":
+      return draft.form.fields;
+
+    case "v0_schema": {
+      const tb = draft.tables.find((t) => t.id === table_id);
+      assert(tb, "Table not found");
+      assert("attributes" in tb, "Not a valid table");
+      return tb.attributes;
+    }
+    default:
+      throw new Error("cannot get attributes - unsupported doctype");
+  }
+}
+
+function push_or_update_attribute(
+  attributes: Draft<Array<AttributeDefinition>>,
+  data: AttributeDefinition
+) {
+  const attribute = attributes.find((f) => f.id === data.id);
+  if (attribute) {
+    Object.assign(attribute, { ...data });
+    return {
+      isnew: false,
+      attribute,
+    };
+  } else {
+    attributes.push(data);
+    return {
+      isnew: true,
+      attribute: attributes.find((f) => f.id === data.id),
+    };
+  }
+}
+
+/**
+ * check if there is a waiting block for new field.
+ * when creating a new field on certain ux, we create the block first then open a new field panel, once saved, we may use this for finding the block.
+ * @param draft
+ * @returns
+ */
+function has_waiting_block_for_new_field(draft: Draft<EditorState>) {
+  if (draft.focus_block_id) {
+    const block = draft.blocks.find((d) => d.id == draft.focus_block_id);
+
+    if (block && block.type === "field" && !block.form_field_id) {
+      return block;
+    }
+
+    return false;
   }
 }
 
@@ -1049,19 +1359,12 @@ function init_block(
   }
 }
 
-function table_keyword(table: FormEditorState["datagrid_table"]) {
-  switch (table) {
-    case "response":
-      return "response";
-    case "session":
-      return "session";
-    case "customer":
-      return "customer";
-    case "x-supabase-main-table":
-      return "row";
-    case "x-supabase-auth.users":
-      return "user";
-    default:
-      return "row";
+/**
+ * refresh by adding 1 to number based refresh key
+ */
+function nextrefreshkey(curr: number | undefined, refresh: boolean = true) {
+  if (refresh) {
+    return curr ? curr + 1 : 0;
   }
+  return curr;
 }

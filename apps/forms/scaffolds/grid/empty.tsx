@@ -1,3 +1,4 @@
+import EmptyWelcome from "@/components/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function EmptyRowsRenderer({ loading }: { loading?: boolean }) {
@@ -11,5 +12,12 @@ export function EmptyRowsRenderer({ loading }: { loading?: boolean }) {
         </div>
       </div>
     );
-  return <></>;
+  return (
+    <div className="col-span-full w-full h-full flex items-center justify-center">
+      <EmptyWelcome
+        title={<span>Table is empty</span>}
+        paragraph={<span>Create a new record to get started</span>}
+      />
+    </div>
+  );
 }

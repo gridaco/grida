@@ -11,30 +11,49 @@ import {
   TableViews,
 } from "@/scaffolds/grid-editor/components";
 import * as GridLayout from "@/scaffolds/grid-editor/components/layout";
-import { MainTable } from "@/scaffolds/editor/utils/main-table";
+import { CurrentTable } from "@/scaffolds/editor/utils/switch-table";
 import { useEditorState } from "@/scaffolds/editor";
 import { CustomerFeedProvider } from "@/scaffolds/editor/feed";
 import { useMemo } from "react";
 import { GridData } from "@/scaffolds/grid-editor/grid-data";
 import { Customer } from "@/types";
+import { EditorSymbols } from "@/scaffolds/editor/symbols";
 
 export default function Customers() {
   const [state] = useEditorState();
 
-  const { datagrid_isloading, customers } = state;
+  const { datagrid_isloading, tablespace } = state;
 
-  const { filtered, inputlength } = useMemo(() => {
-    return GridData.rows({
+  const stream =
+    tablespace[EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID].stream;
+
+  const rows = useMemo(() => {
+    const { filtered } = GridData.rows({
       filter: state.datagrid_filter,
-      table: "customer",
+      table: EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID,
       data: {
-        rows: customers || [],
+        rows: stream || [],
       },
     });
-  }, [customers, state.datagrid_filter]);
+
+    const rows =
+      (filtered as Customer[])?.map((customer: Customer) => ({
+        uid: customer.uid,
+        email: provisional(customer.email, customer.email_provisional).join(
+          ", "
+        ),
+        phone: provisional(customer.phone, customer.phone_provisional).join(
+          ", "
+        ),
+        created_at: customer.created_at,
+        last_seen_at: customer.last_seen_at,
+      })) || [];
+
+    return rows;
+  }, [stream, state.datagrid_filter]);
 
   return (
-    <MainTable table="customer">
+    <CurrentTable table={EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID}>
       <CustomerFeedProvider />
       <GridLayout.Root>
         <GridLayout.Header>
@@ -55,29 +74,15 @@ export default function Customers() {
                 : []
             }
             masked={state.datagrid_filter.masking_enabled}
-            rows={
-              filtered?.map((customer: Customer) => ({
-                uid: customer.uid,
-                email: provisional(
-                  customer.email,
-                  customer.email_provisional
-                ).join(", "),
-                phone: provisional(
-                  customer.phone,
-                  customer.phone_provisional
-                ).join(", "),
-                created_at: customer.created_at,
-                last_seen_at: customer.last_seen_at,
-              })) || []
-            }
+            rows={rows}
           />
         </GridLayout.Content>
         <GridLayout.Footer>
           <GridLimit />
-          <GridCount count={filtered.length} />
+          <GridCount count={rows.length} keyword="customer" />
           <GridRefresh />
         </GridLayout.Footer>
       </GridLayout.Root>
-    </MainTable>
+    </CurrentTable>
   );
 }

@@ -1,8 +1,11 @@
 import type { JSONSchemaType } from "ajv";
-import type { ConnectionSupabaseJoint } from "./types";
+import type { SchemaTableConnectionXSupabaseMainTableJoint } from "./types";
 import type { User } from "@supabase/supabase-js";
 import type { Bucket } from "@supabase/storage-js";
-export namespace GridaSupabase {
+import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
+export namespace GridaXSupabase {
+  export type XSBPostgrestMethod = "get" | "post" | "delete" | "patch";
+
   export type XDataRow = Record<string, any> & {
     __gf_storage_fields: Record<
       string,
@@ -20,7 +23,7 @@ export namespace GridaSupabase {
     };
   };
 
-  export type SchemaDefinitions = {
+  export type TableSchemaDefinitions = {
     [key: string]: JSONSChema;
   };
 
@@ -32,11 +35,14 @@ export namespace GridaSupabase {
     /**
      * @deprecated use `sb_schema_definitions["public"]` instead
      */
-    sb_public_schema: SchemaDefinitions;
-    sb_schema_definitions: { [schema: string]: SchemaDefinitions };
+    sb_public_schema: TableSchemaDefinitions;
+    sb_schema_definitions: { [schema: string]: TableSchemaDefinitions };
     sb_schema_names: string[];
     sb_project_url: string;
     sb_service_key_id: string | null;
+    sb_schema_openapi_docs: {
+      [schema: string]: SupabasePostgRESTOpenApi.SupabaseOpenAPIDocument;
+    };
   }
 
   export interface SupabaseTable {
@@ -45,13 +51,15 @@ export namespace GridaSupabase {
     sb_schema_name: "public" | (string | {});
     sb_table_name: string;
     sb_table_schema: JSONSChema;
+    sb_postgrest_methods: XSBPostgrestMethod[];
   }
 
-  export type SupabaseConnectionState = ConnectionSupabaseJoint & {
-    supabase_project: GridaSupabase.SupabaseProject;
-    main_supabase_table: GridaSupabase.SupabaseTable | null;
-    tables: GridaSupabase.SupabaseTable[];
-  };
+  export type XSupabaseMainTableConnectionState =
+    SchemaTableConnectionXSupabaseMainTableJoint & {
+      supabase_project: GridaXSupabase.SupabaseProject;
+      main_supabase_table: GridaXSupabase.SupabaseTable | null;
+      tables: GridaXSupabase.SupabaseTable[];
+    };
 
   export type SupabaseUser = User;
 

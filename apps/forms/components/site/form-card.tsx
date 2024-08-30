@@ -1,7 +1,7 @@
 import React from "react";
 import Image from "next/image";
 import { ResourceTypeIcon } from "../resource-type-icon";
-import type { ConnectionSupabaseJoint, Form, GDocument } from "@/types";
+import type { GDocument } from "@/types";
 
 export function GridCard({
   title,

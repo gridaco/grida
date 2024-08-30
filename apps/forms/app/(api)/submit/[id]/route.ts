@@ -27,7 +27,7 @@ import { OnSubmitProcessors, OnSubmit } from "./hooks";
 import { Features } from "@/lib/features/scheduling";
 import { IpInfo, ipinfo } from "@/clients/ipinfo";
 import type {
-  ConnectionSupabaseJoint,
+  SchemaTableConnectionXSupabaseMainTableJoint,
   FormFieldStorageSchema,
   Geo,
 } from "@/types";
@@ -645,7 +645,7 @@ async function submit({
           if (FieldSupports.file_alias(type)) {
             const files = (formdata as FormData).getAll(name);
 
-            console.log("submit/files", files);
+            // console.log("submit/files", files);
 
             field_file_uploads[field.id] =
               field_file_processor.process_field_files(
@@ -660,7 +660,7 @@ async function submit({
             const { staged_file_paths } =
               RichTextStagedFileUtils.parseDocument(value);
 
-            console.log("submit/richtext/files", staged_file_paths);
+            // console.log("submit/richtext/files", staged_file_paths);
 
             // 2. upload the files
             field_file_uploads[field.id] =
@@ -723,9 +723,10 @@ async function submit({
   // ==================================================
 
   if (supabase_connection) {
-    const conn = await new GridaXSupabaseService().getConnection(
-      supabase_connection
-    );
+    const conn =
+      await new GridaXSupabaseService().getXSBMainTableConnectionState(
+        supabase_connection
+      );
 
     assert(conn?.main_supabase_table);
 
@@ -1065,7 +1066,7 @@ class ResponseFieldFilesProcessor {
       response_id: string;
     },
     readonly connections: {
-      supabase: ConnectionSupabaseJoint | null;
+      supabase: SchemaTableConnectionXSupabaseMainTableJoint | null;
     },
     readonly context: TemplateVariables.FormConnectedDatasourcePostgresTransactionCompleteContext
   ) {}

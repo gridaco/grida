@@ -1,19 +1,31 @@
 import {
   Customer,
   FormFieldDefinition,
-  FormInputType,
   FormResponse,
   FormResponseField,
   FormResponseSession,
-  GridaSupabase,
+  GridaXSupabase,
 } from "@/types";
 import { fmt_local_index } from "@/utils/fmt";
-import type { GFFile, GFResponseRow, GFSystemColumnTypes } from "../grid/types";
-import type { DataGridFilterSettings, FormEditorState } from "../editor/state";
+import type {
+  GFColumn,
+  GFFile,
+  GFResponseRow,
+  GFSystemColumn,
+} from "../grid/types";
+import type {
+  DataGridFilterSettings,
+  GDocSchemaTableProviderGrida,
+  GDocSchemaTableProviderXSupabase,
+  GDocTableID,
+  TablespaceSchemaTableStreamType,
+  TVirtualRow,
+} from "../editor/state";
 import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";
 import { FieldSupports } from "@/k/supported_field_types";
 import { PrivateEditorApi } from "@/lib/private";
 import { GridFilter } from "../grid-filter";
+import { EditorSymbols } from "../editor/symbols";
 
 export namespace GridData {
   type DataGridInput =
@@ -23,18 +35,15 @@ export namespace GridData {
         filter: DataGridFilterSettings;
       } & (
         | {
-            table: "session";
+            table: typeof EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID;
+            responses: Array<TVirtualRow<FormResponseField, FormResponse>>;
+          }
+        | {
+            table: typeof EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID;
             sessions: FormResponseSession[];
           }
         | {
-            table: "response";
-            responses: {
-              rows: FormResponse[];
-              fields: { [key: string]: FormResponseField[] };
-            };
-          }
-        | {
-            table: "x-supabase-main-table";
+            table: typeof EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID;
             data: {
               pks: string[];
               rows: any[];
@@ -43,35 +52,71 @@ export namespace GridData {
       ))
     | {
         filter: DataGridFilterSettings;
-        table: "customer";
+        table: typeof EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID;
         data: {
           rows: Customer[];
         };
       }
     | {
         filter: DataGridFilterSettings;
-        table: "x-supabase-auth.users";
+        table: typeof EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID;
         data: {
           rows: any[];
         };
+      }
+    | (
+        | {
+            filter: DataGridFilterSettings;
+            table: "v0_schema_table";
+            provider: "grida";
+            table_id: string;
+            attributes: FormFieldDefinition[];
+            rows: Array<
+              TablespaceSchemaTableStreamType<GDocSchemaTableProviderGrida>
+            >;
+          }
+        | {
+            filter: DataGridFilterSettings;
+            table: "v0_schema_table";
+            provider: "x-supabase";
+            table_id: string;
+            attributes: FormFieldDefinition[];
+            pks: string[];
+            rows: Array<
+              TablespaceSchemaTableStreamType<GDocSchemaTableProviderXSupabase>
+            >;
+          }
+      );
+
+  type ColumSbuilderParams =
+    | {
+        table_id:
+          | typeof EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID
+          | typeof EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID;
+        fields: FormFieldDefinition[];
+      }
+    | {
+        table_id: typeof EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID;
+        fields: FormFieldDefinition[];
+        x_table_constraints: {
+          pk?: string;
+          pks: string[];
+        };
+      }
+    | {
+        table_id: string;
+        fields: FormFieldDefinition[];
+        x_table_constraints?: {
+          pk?: string;
+          pks: string[];
+        };
       };
 
-  export function columns(
-    table: FormEditorState["datagrid_table"],
-    fields: FormFieldDefinition[]
-  ): {
-    systemcolumns: {
-      key: GFSystemColumnTypes;
-      name?: string;
-    }[];
-    columns: {
-      key: string;
-      name: string;
-      readonly: boolean;
-      type?: FormInputType;
-    }[];
+  export function columns(params: ColumSbuilderParams): {
+    systemcolumns: GFSystemColumn[];
+    columns: GFColumn[];
   } {
-    const fieldcolumns = Array.from(fields)
+    const fieldcolumns = Array.from(params.fields)
       .sort((a, b) => a.local_index - b.local_index)
       .map((field) => ({
         key: field.id,
@@ -80,9 +125,9 @@ export namespace GridData {
         type: field.type,
       }));
 
-    switch (table) {
-      case "response":
-      case "session": {
+    switch (params.table_id) {
+      case EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID:
+      case EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID: {
         return {
           systemcolumns: [
             {
@@ -97,52 +142,99 @@ export namespace GridData {
           ],
           columns: fieldcolumns,
         };
+        break;
       }
-      case "x-supabase-main-table": {
-        return {
-          systemcolumns: [
-            {
-              key: "__gf_display_id",
-              // TODO:
-              // 1. pass the name of pk
+      case EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID: {
+        const { pk, pks } = params.x_table_constraints;
+        if (pk) {
+          return {
+            systemcolumns: [
+              {
+                key: "__gf_display_id",
+                name: pk,
+              },
               // 2. allow multiple PKs
-            },
-          ],
-          columns: fieldcolumns,
-        };
+            ],
+            columns: fieldcolumns.filter((f) => f.name !== pk),
+          };
+        }
+        break;
       }
       default:
-        return {
-          systemcolumns: [],
-          columns: [],
-        };
+        if (params.x_table_constraints) {
+          const { pk, pks } = params.x_table_constraints;
+          if (pk) {
+            return {
+              systemcolumns: [
+                {
+                  key: "__gf_display_id",
+                  name: pk,
+                },
+                // 2. allow multiple PKs
+              ],
+              columns: fieldcolumns.filter((f) => f.name !== pk),
+            };
+          }
+        }
+        break;
     }
+
+    return {
+      systemcolumns: [
+        {
+          key: "__gf_display_id",
+        },
+        {
+          key: "__gf_created_at",
+        },
+      ],
+      columns: fieldcolumns,
+    };
   }
 
-  export function rows(input: DataGridInput) {
+  type TProcessedGridRows =
+    | {
+        type: "response";
+        inputlength: number;
+        filtered: GFResponseRow[];
+      }
+    | {
+        type: "session";
+        inputlength: number;
+        filtered: GFResponseRow[];
+      }
+    | {
+        type: "customer";
+        inputlength: number;
+        filtered: Customer[];
+      }
+    | {
+        type: "x-supabase-auth.users";
+        inputlength: number;
+        // FIXME: add type
+        filtered: any[];
+      };
+
+  export function rows(input: DataGridInput): TProcessedGridRows {
     switch (input.table) {
-      case "response": {
+      case EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID: {
+        const filtered = GridFilter.filter(
+          input.responses,
+          input.filter,
+          (row) => row.meta.raw,
+          // response raw is saved with name: value
+          input.fields.map((f) => f.name)
+        );
+
         return {
-          inputlength: input.responses?.rows.length || 0,
-          filtered: input.responses
-            ? rows_from_responses(
-                {
-                  rows: GridFilter.filter(
-                    input.responses.rows,
-                    input.filter,
-                    "raw",
-                    // response raw is saved with name: value
-                    input.fields.map((f) => f.name)
-                  ),
-                  fields: input.responses.fields,
-                },
-                input.fields
-              )
-            : [],
+          type: "response",
+          inputlength: input.responses.length || 0,
+          filtered: rows_from_responses(filtered, input.fields),
         };
       }
-      case "session": {
+      case EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID: {
         return {
+          type: "session",
           inputlength: input.sessions?.length || 0,
           filtered: input.sessions
             ? rows_from_sessions(
@@ -158,8 +250,9 @@ export namespace GridData {
             : [],
         };
       }
-      case "x-supabase-main-table": {
+      case EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID: {
         return {
+          type: "response",
           inputlength: input.data.rows.length,
           filtered: rows_from_x_supabase_main_table({
             form_id: input.form_id,
@@ -175,20 +268,23 @@ export namespace GridData {
           }),
         };
       }
-      case "x-supabase-auth.users": {
+      case EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID: {
         return {
+          type: "x-supabase-auth.users",
           inputlength: input.data.rows.length,
           filtered: GridFilter.filter(
             input.data.rows,
             input.filter,
             undefined,
-            Object.keys(GridaSupabase.SupabaseUserJsonSchema.properties)
+            Object.keys(GridaXSupabase.SupabaseUserJsonSchema.properties)
           ),
         };
       }
-      case "customer": {
+      case EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID: {
         return {
+          type: "customer",
           inputlength: input.data.rows.length,
+          // @ts-ignore - FIXME:
           filtered: GridFilter.filter(
             input.data.rows,
             input.filter,
@@ -204,37 +300,71 @@ export namespace GridData {
           ),
         };
       }
+      case "v0_schema_table": {
+        //
+        switch (input.provider) {
+          case "grida": {
+            const filtered = GridFilter.filter(
+              input.rows,
+              input.filter,
+              (row) => row.meta.raw,
+              // response raw is saved with name: value
+              input.attributes.map((f) => f.name)
+            );
+
+            return {
+              type: "response",
+              inputlength: input.rows.length || 0,
+              filtered: rows_from_responses(filtered, input.attributes),
+            };
+          }
+          case "x-supabase": {
+            return {
+              type: "response",
+              inputlength: input.rows.length,
+              filtered: rows_from_x_supabase_main_table({
+                form_id: input.table_id,
+                // TODO: support multiple PKs
+                pk: input.pks.length > 0 ? input.pks[0] : null,
+                fields: input.attributes,
+                rows: GridFilter.filter(
+                  input.rows,
+                  input.filter,
+                  undefined,
+                  input.attributes.map((f) => f.name)
+                ),
+              }),
+            };
+          }
+        }
+      }
     }
   }
 
   function rows_from_responses(
-    responses: {
-      rows: FormResponse[];
-      fields: { [key: string]: FormResponseField[] };
-    },
-    fields: FormFieldDefinition[]
-  ) {
+    responses: Array<TVirtualRow<FormResponseField, FormResponse>>,
+    attributes: FormFieldDefinition[]
+  ): Array<GFResponseRow> {
     return (
-      responses.rows.map((response, index) => {
+      responses.map((response, index) => {
         const row: GFResponseRow = {
           __gf_id: response.id,
-          __gf_display_id: fmt_local_index(response.local_index),
-          __gf_created_at: response.created_at,
-          __gf_customer_id: response.customer_id,
+          __gf_display_id: fmt_local_index(response.meta.local_index),
+          __gf_created_at: response.meta.created_at,
+          __gf_customer_id: response.meta.customer_id,
           fields: {},
         }; // react-data-grid expects each row to have a unique 'id' property
 
-        fields.forEach((field) => {
-          const responseField = responses.fields[response.id]?.find(
-            (f) => f.form_field_id === field.id
-          );
-          row.fields[field.id] = {
-            type: responseField?.type || field.type,
-            value: responseField?.value,
-            readonly: field.readonly || false,
-            multiple: field.multiple || false,
-            option_id: responseField?.form_field_option_id,
-            options: field.options?.reduce(
+        attributes.forEach((attribute) => {
+          const cell: FormResponseField = response.data[attribute.id];
+
+          row.fields[attribute.id] = {
+            type: cell?.type || attribute.type,
+            value: cell?.value,
+            readonly: attribute.readonly || false,
+            multiple: attribute.multiple || false,
+            option_id: cell?.form_field_option_id,
+            options: attribute.options?.reduce(
               (
                 acc: { [key: string]: { value: string; label?: string } },
                 option
@@ -248,10 +378,10 @@ export namespace GridData {
               {}
             ),
             files:
-              responseField?.storage_object_paths?.map((path) => {
+              cell?.storage_object_paths?.map((path) => {
                 return gf_response_file({
-                  form_id: response.form_id,
-                  field_id: field.id,
+                  form_id: response.meta.form_id,
+                  field_id: attribute.id,
                   filepath: path,
                 });
               }) || [],
@@ -342,7 +472,7 @@ export namespace GridData {
     };
 
     const filesfn = (
-      row: GridaSupabase.XDataRow,
+      row: GridaXSupabase.XDataRow,
       field: FormFieldDefinition
     ) => {
       // file field

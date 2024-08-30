@@ -23,7 +23,7 @@ import {
   useBlockFocus,
   useDeleteBlock,
 } from "./base-block";
-import { useEditorState } from "@/scaffolds/editor";
+import { useEditorState, useFormFields } from "@/scaffolds/editor";
 import { FormFieldDefinition } from "@/types";
 import Link from "next/link";
 import FormFieldPreview from "@/components/formfield";
@@ -56,15 +56,19 @@ export function FieldBlock({
   const [state, dispatch] = useEditorState();
   const [focused, setFocus] = useBlockFocus(id);
 
+  const fields = useFormFields();
+
   const { document_id, basepath } = state;
 
-  const form_field: FormFieldDefinition | undefined = state.fields.find(
+  const form_field: FormFieldDefinition | undefined = fields.find(
     (f) => f.id === form_field_id
   );
 
   const is_hidden_field = form_field?.type === "hidden";
 
-  const { available_field_ids, fields } = state;
+  const {
+    form: { available_field_ids },
+  } = state;
   const [advanced, setAdvanced] = useState(false);
 
   const can_advanced_mode = fields.length > 0;
@@ -137,7 +141,7 @@ export function FieldBlock({
                       <SelectValue placeholder="Select Field" />
                     </SelectTrigger>
                     <SelectContent>
-                      {state.fields.map((f) => (
+                      {fields.map((f) => (
                         <SelectItem key={f.id} value={f.id} disabled={false}>
                           {f.name}{" "}
                           <small>
@@ -193,7 +197,7 @@ export function FieldBlock({
                     <SelectValue placeholder="Select Field" />
                   </SelectTrigger>
                   <SelectContent>
-                    {state.fields.map((f) => (
+                    {fields.map((f) => (
                       <SelectItem
                         key={f.id}
                         value={f.id}
@@ -315,14 +319,6 @@ export function FormFieldBlockMenuItems({
     });
   }, [dispatch, form_field_id]);
 
-  const onLogicEditClick = useCallback(() => {
-    dispatch({
-      type: "editor/panels/block-edit",
-      block_id: block_id,
-      open: true,
-    });
-  }, [dispatch, block_id]);
-
   const deleteBlock = useDeleteBlock();
 
   return (
@@ -333,10 +329,6 @@ export function FormFieldBlockMenuItems({
           Edit Field Definition
         </DropdownMenuItem>
       )}
-      <DropdownMenuItem onClick={onLogicEditClick}>
-        <MixIcon className="me-2 align-middle" />
-        Logic
-      </DropdownMenuItem>
       <DropdownMenuItem onClick={() => deleteBlock(block_id)}>
         <TrashIcon className="me-2 align-middle" />
         Delete Block

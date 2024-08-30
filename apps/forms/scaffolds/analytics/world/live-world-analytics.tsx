@@ -3,8 +3,8 @@
 import { fmtnum } from "@/scaffolds/analytics/stats";
 import { useEditorState } from "@/scaffolds/editor";
 import {
-  ResponseFeedProvider,
-  ResponseSessionFeedProvider,
+  FormResponseFeedProvider,
+  FormResponseSessionFeedProvider,
 } from "@/scaffolds/editor/feed";
 import { MapGL } from "@/theme/templates/formstart/default/mapgl";
 import React, { useEffect, useMemo, useState } from "react";
@@ -23,6 +23,7 @@ import {
 } from "./use-ux-map-focus";
 import { serialize } from "../charts/serialize";
 import { format } from "date-fns";
+import { EditorSymbols } from "@/scaffolds/editor/symbols";
 
 const layerstyles: { light: CircleLayer; dark: CircleLayer } = {
   light: {
@@ -68,13 +69,13 @@ const DisableSwipeBack = ({ children }: React.PropsWithChildren<{}>) => {
 export default function LiveWorldAnalytics() {
   return (
     <DisableSwipeBack>
-      <ResponseFeedProvider>
-        <ResponseSessionFeedProvider forceEnableRealtime>
+      <FormResponseFeedProvider>
+        <FormResponseSessionFeedProvider forceEnableRealtime>
           <MapProvider>
             <View />
           </MapProvider>
-        </ResponseSessionFeedProvider>
-      </ResponseFeedProvider>
+        </FormResponseSessionFeedProvider>
+      </FormResponseFeedProvider>
     </DisableSwipeBack>
   );
 }
@@ -104,10 +105,18 @@ function View() {
     [size.width]
   );
 
-  const [state] = useEditorState();
   useUxInitialTransform(map, size);
   // const debounceFlyTo = useUxMapFocus(map, mapPadding, 1000, 3000);
   const debounceFlyTo = useUxMapFocus(map, mapPadding, 1000, 5000, 10); // Adjust intervals and threshold as needed
+
+  const [state] = useEditorState();
+
+  const response_stream =
+    state.tablespace[EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID]
+      .stream;
+  const session_stream =
+    state.tablespace[EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID]
+      .stream;
 
   const geojson: FeatureCollection = useMemo(
     () => ({
@@ -122,22 +131,22 @@ function View() {
   );
 
   useEffect(() => {
-    if (state.responses && state.responses.rows.length > 0) {
-      const sorted = state.responses.rows
+    if (response_stream && response_stream?.length > 0) {
+      const sorted = response_stream
         .slice()
-        .sort((a, b) => a.local_index - b.local_index);
+        .sort((a, b) => a.meta.local_index - b.meta.local_index);
 
       const recent = sorted.slice(-RECENT_N).map((r) => {
         return {
           id: r.id,
-          at: new Date(r.created_at),
-          latitude: Number(r.geo?.latitude) || 0,
-          longitude: Number(r.geo?.longitude) || 0,
+          at: new Date(r.meta.created_at),
+          latitude: Number(r.meta.geo?.latitude) || 0,
+          longitude: Number(r.meta.geo?.longitude) || 0,
         };
       });
       setRecent(recent);
     }
-  }, [state.responses]);
+  }, [response_stream]);
 
   useEffect(() => {
     if (recent.length === 0) return;
@@ -171,24 +180,24 @@ function View() {
   }, [debounceFlyTo, recent]);
 
   const responseChartData = useMemo(() => {
-    return serialize(state.responses?.rows || [], {
+    return serialize(response_stream?.map((r) => r.meta) || [], {
       dateKey: "created_at",
       // last 15 minutes
       from: new Date(new Date().getTime() - 15 * 60 * 1000),
       to: new Date(),
       intervalMs: 15 * 1000, // 15 seconds
     });
-  }, [state.responses]);
+  }, [response_stream]);
 
   const sessionChartData = useMemo(() => {
-    return serialize(state.sessions || [], {
+    return serialize(session_stream || [], {
       dateKey: "created_at",
       // last 15 minutes
       from: new Date(new Date().getTime() - 15 * 60 * 1000),
       to: new Date(),
       intervalMs: 15 * 1000, // 15 seconds
     });
-  }, [state.sessions]);
+  }, [session_stream]);
 
   return (
     <main className="relative p-4 w-full h-full">

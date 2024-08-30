@@ -23,7 +23,7 @@ import { blocklabels, supported_block_types } from "@/k/supported_block_types";
 import { BlockTypeIcon } from "@/components/form-blcok-type-icon";
 import type { FormBlockType, FormInputType } from "@/types";
 import { SearchInput } from "@/components/extension/search-input";
-import { FormAgentProvider, initdummy } from "@/lib/formstate";
+import { DummyFormAgentStateProvider } from "@/lib/formstate";
 import Fuse from "fuse.js";
 
 export function ModeInsertBlocks() {
@@ -219,17 +219,5 @@ export function ModeInsertBlocks() {
         </SidebarMenuGrid>
       </SidebarSection>
     </>
-  );
-}
-
-/**
- * TODO: this is added while developing a v_value feature on form field. once the value computation is moved to the higher level, this can be removed.
- * @returns
- */
-function DummyFormAgentStateProvider({
-  children,
-}: React.PropsWithChildren<{}>) {
-  return (
-    <FormAgentProvider initial={initdummy()}>{children}</FormAgentProvider>
   );
 }

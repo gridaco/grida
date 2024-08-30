@@ -8,7 +8,7 @@ import {
   PanelPropertySectionTitle,
   PropertyTextInput,
 } from "@/components/panels/side-panel";
-import { type FormFieldStorageSchema, GridaSupabase } from "@/types";
+import { type FormFieldStorageSchema, GridaXSupabase } from "@/types";
 import {
   Select,
   SelectContent,
@@ -42,7 +42,7 @@ export function SupabaseStorageSettings({
   };
 }) {
   const [state] = useEditorState();
-  const [buckets, setBuckets] = useState<GridaSupabase.SupabaseBucket[]>();
+  const [buckets, setBuckets] = useState<GridaXSupabase.SupabaseBucket[]>();
   const [bucket, setBucket] = useState<string | undefined>(value?.bucket);
   const [path, setPath] = useState<string | undefined>(value?.path);
   const [mode, setMode] = useState<FormFieldStorageSchema["mode"]>(
@@ -62,14 +62,15 @@ export function SupabaseStorageSettings({
 
   // list buckets
   useEffect(() => {
+    if (!state.connections.supabase) return;
     if (enabled) {
-      PrivateEditorApi.SupabaseConnection.listBucket(state.form_id).then(
-        (res) => {
-          res.data.data && setBuckets(res.data.data);
-        }
-      );
+      PrivateEditorApi.XSupabase.listXSBBucket(
+        state.connections.supabase.id
+      ).then((res) => {
+        res.data.data && setBuckets(res.data.data);
+      });
     }
-  }, [enabled, state.form_id]);
+  }, [enabled, state.connections.supabase]);
 
   useEffect(() => {
     setBucket(value?.bucket);

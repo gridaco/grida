@@ -65,7 +65,7 @@ const SMS_DEFAULT_ORIGINATOR = process.env
 
 export default function ConnectChannels() {
   const [state] = useEditorState();
-  const { form_id } = state;
+  const { form } = state;
 
   return (
     <main className="max-w-2xl mx-auto">
@@ -130,7 +130,7 @@ export default function ConnectChannels() {
               </section>
               <section className="my-10">
                 <AboutSMSFees />
-                <TestSMS form_id={form_id} />
+                <TestSMS form_id={form.form_id} />
               </section>
             </PreferenceBody>
           </PreferenceBox>

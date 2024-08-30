@@ -13,14 +13,13 @@ import { Button } from "@/components/ui/button";
 import { EditValueExpression } from "./v-edit";
 import PropertyAccessDropdownMenu from "@/scaffolds/sidecontrol/controls/context/variable";
 import { TProperties, TProperty, TSchema } from "@/lib/spock";
-import { useEditorState } from "@/scaffolds/editor";
+import { useEditorState, useFormFields } from "@/scaffolds/editor";
 import { FormExpression } from "@/lib/forms/expression";
 import toast from "react-hot-toast";
 import { Tokens } from "@/ast";
 
 function useFormSchema() {
-  const [state] = useEditorState();
-  const { fields } = state;
+  const fields = useFormFields();
 
   return useMemo(
     () =>
@@ -46,8 +45,7 @@ export function FieldValueExpression({
   expression?: Tokens.TValueExpression;
   onChange?: (expression: Tokens.TValueExpression) => void;
 }) {
-  const [state] = useEditorState();
-  const { fields } = state;
+  const fields = useFormFields();
   const schema = useFormSchema();
 
   const onPropertySelect = (path: string[], { data }: any) => {

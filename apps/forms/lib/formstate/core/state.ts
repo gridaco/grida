@@ -1,5 +1,5 @@
-import type { ClientRenderBlock, ClientSectionRenderBlock } from "@/lib/forms";
 import { FormBlockTree } from "@/lib/forms/types";
+import type { ClientRenderBlock, ClientSectionRenderBlock } from "@/lib/forms";
 import type { FormFieldDefinition } from "@/types";
 
 export type VirtualFileValueProxy = {
@@ -15,6 +15,7 @@ export type VirtualFileValueProxy = {
 export interface FormAgentState {
   form_id: string;
   session_id?: string;
+  tree: FormBlockTree<ClientRenderBlock[]>;
   // do not change the keys
   // #/fields/[key]/value
   fields: {
@@ -37,9 +38,11 @@ export interface FormAgentState {
   last_section_id: string | null;
   is_submitting: boolean;
   sections: ClientSectionRenderBlock[];
+  //
+  defaultValues?: Record<string, any>;
 }
 
-export function initdummy() {
+export function initdummy(): FormAgentState {
   return {
     form_id: "",
     fields: {},
@@ -50,6 +53,7 @@ export function initdummy() {
     last_section_id: null,
     current_section_id: null,
     is_submitting: false,
+    tree: { children: [], depth: 0 },
   };
 }
 
@@ -59,12 +63,14 @@ export function init({
   fields,
   blocks,
   tree,
+  defaultValues,
 }: {
   form_id: string;
   session_id?: string;
   fields: FormFieldDefinition[];
   blocks: ClientRenderBlock[];
   tree: FormBlockTree<ClientRenderBlock[]>;
+  defaultValues?: Record<string, any>;
 }): FormAgentState {
   const sections = tree.children.filter(
     (block) => block.type === "section"
@@ -109,6 +115,7 @@ export function init({
   return {
     form_id,
     session_id,
+    tree,
     rawfiles: {},
     fields: fields_state,
     blocks: blocks_state,
@@ -117,5 +124,6 @@ export function init({
     last_section_id,
     current_section_id: initial_section_id,
     is_submitting: false,
+    defaultValues,
   };
 }

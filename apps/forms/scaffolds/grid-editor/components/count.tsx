@@ -1,13 +1,22 @@
-import { useEditorState } from "@/scaffolds/editor";
+import { Spinner } from "@/components/spinner";
 import { txt_n_plural } from "@/utils/plural";
 
-export function GridCount({ count }: { count: number }) {
-  const [state] = useEditorState();
-  const { datagrid_table_row_keyword } = state;
-
+export function GridCount({
+  count,
+  keyword,
+}: {
+  count?: number;
+  keyword: string;
+}) {
   return (
-    <span className="text-sm font-medium">
-      {txt_n_plural(count, datagrid_table_row_keyword)}
-    </span>
+    <div>
+      {count === undefined ? (
+        <Spinner />
+      ) : (
+        <span className="text-sm font-medium text-muted-foreground">
+          {txt_n_plural(count, keyword)}
+        </span>
+      )}
+    </div>
   );
 }
