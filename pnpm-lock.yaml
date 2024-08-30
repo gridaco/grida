@@ -419,6 +419,9 @@ importers:
       '@use-gesture/react':
         specifier: ^10.2.11
         version: 10.3.1(react@18.3.1)
+      '@vercel/functions':
+        specifier: ^1.4.1
+        version: 1.4.1
       '@visx/responsive':
         specifier: ^3.10.2
         version: 3.10.2(react@18.3.1)
@@ -22568,6 +22571,16 @@ packages:
     dependencies:
       '@use-gesture/core': 10.3.1
       react: 18.3.1
+    dev: false
+
+  /@vercel/functions@1.4.1:
+    resolution: {integrity: sha512-987mKpoDCI18x2rDjrDbiuGOtxDMK/UhfhDZoN3A2SAt40BMaj8HEKwVqL6fOian5j/3RZcOuJnMOpatQGgpjw==}
+    engines: {node: '>= 16'}
+    peerDependencies:
+      '@aws-sdk/credential-provider-web-identity': '*'
+    peerDependenciesMeta:
+      '@aws-sdk/credential-provider-web-identity':
+        optional: true
     dev: false
 
   /@visx/annotation@3.3.0(react-dom@18.3.1)(react@18.3.1):

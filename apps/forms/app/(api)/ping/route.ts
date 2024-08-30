@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { geolocation } from "@vercel/functions";
 
 export function GET(req: NextRequest) {
-  const geo = {
-    country: req.geo?.country,
-    latitude: req.geo?.latitude,
-  };
+  const geo = geolocation(req);
 
   const headers: Record<string, string> = {};
   req.headers.forEach((value, key) => {
