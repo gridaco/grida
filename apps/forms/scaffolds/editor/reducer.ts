@@ -6,6 +6,7 @@ import type {
   GDocSchemaTableProviderXSupabase,
   GDocTable,
   GDocTableID,
+  TGridaDataTablespace,
   TTablespace,
   TVirtualRow,
   TVirtualRowData,
@@ -571,7 +572,7 @@ export function reducer(
       });
     }
     case "editor/table/space/feed": {
-      const { data, reset } = <TablespaceFeedAction>action;
+      const { table_id, data, reset } = <TablespaceFeedAction>action;
 
       const virtualized: Array<TVirtualRow<FormResponseField, FormResponse>> =
         data.map((vrow) => {
@@ -591,9 +592,10 @@ export function reducer(
         });
 
       return produce(state, (draft) => {
-        const space = get_tablespace_feed(draft);
+        const space = get_tablespace(draft, table_id) as TGridaDataTablespace;
 
         assert(space, "Table space not found");
+        assert(space.provider === "grida", "Table space provider is not grida");
 
         if (reset) {
           space.stream = virtualized;
@@ -1241,6 +1243,14 @@ function get_table<T extends GDocTable>(
   >;
 }
 
+function get_tablespace(draft: Draft<EditorState>, table_id: GDocTableID) {
+  return draft.tablespace[table_id];
+}
+
+/**
+ * @deprecated
+ * @returns
+ */
 function get_tablespace_feed(
   draft: Draft<EditorState>
 ): Draft<TTablespace> | null {

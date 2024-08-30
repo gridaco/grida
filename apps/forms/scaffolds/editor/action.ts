@@ -208,6 +208,7 @@ export interface TableAttributeDeleteAction {
 
 export interface TablespaceFeedAction {
   type: "editor/table/space/feed";
+  table_id: GDocTableID;
   data: FormResponseWithFields[];
   reset?: boolean;
 }

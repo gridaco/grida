@@ -34,13 +34,14 @@ export default function SchemaTablePage({
     tablename: string;
   };
 }) {
-  const [state] = useEditorState();
-  const { tables } = state;
+  const [{ tables, datagrid_table_id }] = useEditorState();
   const { tablename } = params;
 
   const tb = tables.find((table) => table.name === tablename);
 
   const isvalid = valid(tb);
+
+  console.log(datagrid_table_id);
 
   if (!isvalid) {
     if (tablename === "~new") {
@@ -66,7 +67,7 @@ export default function SchemaTablePage({
         </GridLayout.Root>
       }
     >
-      <SwitchGridEditor />
+      <SwitchGridEditor key={tb.id} />
     </CurrentTable>
   );
 }
@@ -152,6 +153,8 @@ function ModeProviderXSB() {
   assert(tb, "table not found");
 
   const stream = tablespace[tb.id].stream;
+
+  console.log(tb.name, stream?.length, tb.id);
 
   const { systemcolumns, columns } = useMemo(() => {
     return GridData.columns({

@@ -455,6 +455,7 @@ export function FormResponseFeedProvider({
     setLoading(true);
     const feed = fetchResponses(datagrid_rows_per_page).then((data) => {
       dispatch({
+        table_id: EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID,
         type: "editor/table/space/feed",
         data: data as any,
         reset: true,
@@ -487,6 +488,7 @@ export function FormResponseFeedProvider({
         const newresponse = fetchResponse((data as { id: string }).id).then(
           (data) => {
             dispatch({
+              table_id: EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID,
               type: "editor/table/space/feed",
               data: [data as any],
             });
@@ -507,6 +509,7 @@ export function FormResponseFeedProvider({
     onUpdate: (data) => {
       fetchResponse((data as { id: string }).id).then((data) => {
         dispatch({
+          table_id: EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID,
           type: "editor/table/space/feed",
           data: [data as any],
         });
@@ -760,6 +763,7 @@ export function GridaSchemaTableFeedProvider({
     const feed = fetchTableRows(datagrid_rows_per_page).then((data) => {
       dispatch({
         type: "editor/table/space/feed",
+        table_id: table_id,
         data: data as any,
         reset: true,
       });
@@ -791,6 +795,7 @@ export function GridaSchemaTableFeedProvider({
         const newresponse = fetchTableRow((data as { id: string }).id).then(
           (data) => {
             dispatch({
+              table_id: table_id,
               type: "editor/table/space/feed",
               data: [data as any],
             });
@@ -811,6 +816,7 @@ export function GridaSchemaTableFeedProvider({
     onUpdate: (data) => {
       fetchTableRow((data as { id: string }).id).then((data) => {
         dispatch({
+          table_id: table_id,
           type: "editor/table/space/feed",
           data: [data as any],
         });

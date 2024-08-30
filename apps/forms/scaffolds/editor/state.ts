@@ -253,7 +253,7 @@ export type TXSupabaseDataTablespace = {
   stream?: Array<GridaXSupabase.XDataRow>;
 };
 
-type TGridaDataTablespace = {
+export type TGridaDataTablespace = {
   provider: "grida";
   readonly: boolean;
   realtime: boolean;
