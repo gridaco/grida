@@ -2,7 +2,12 @@
 
 import React, { useCallback, useMemo } from "react";
 import { StateProvider } from "./provider";
-import { useEditorState, useFormFields, useDatabaseTableId } from "./use";
+import {
+  useEditorState,
+  useFormFields,
+  useDatabaseTableId,
+  useDatagridTable,
+} from "./use";
 import { reducer } from "./reducer";
 import {
   SchemaDocumentEditorInit,
@@ -273,6 +278,10 @@ function FormFieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
   );
 }
 
+/**
+ * @deprecated MIGRATE
+ * @returns
+ */
 function useRowEditorRow() {
   const [state, dispatch] = useEditorState();
 
@@ -290,18 +299,6 @@ function useRowEditorRow() {
     }
   }, [state.doctype, state.tablespace, state.row_editor.id]);
 
-  return row;
-}
-
-function RowEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
-  const [state, dispatch] = useEditorState();
-
-  const attributes = useAttributes();
-
-  const row = useRowEditorRow();
-
-  const table_id = useDatabaseTableId();
-
   // const focusxsupabasemaintablerow = useMemo(() => {
   //   const pk = state.x_supabase_main_table?.pk;
   //   if (!pk) return;
@@ -314,13 +311,33 @@ function RowEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
   //   state.row_editor.id,
   // ]);
 
-  if (!table_id) return <></>;
+  return row;
+}
+
+function RowEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
+  const [state, dispatch] = useEditorState();
+
+  const attributes = useAttributes();
+
+  const row = useRowEditorRow();
+
+  const tb = useDatagridTable();
+  const table_id = useDatabaseTableId();
+
+  if (!tb || !table_id) return <></>;
+
+  const mode = tb.readonly
+    ? ("read" as const)
+    : row
+      ? ("update" as const)
+      : ("create" as const);
 
   return (
     <>
       <RowEditPanel
         key={row?.id || state.row_editor.refreshkey}
         table_id={table_id}
+        mode={mode}
         open={state.row_editor.open}
         title={
           row

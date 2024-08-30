@@ -210,23 +210,15 @@ export function CreateNewDocumentButton({
             <DropdownMenuSeparator />
           </DropdownMenuGroup>
           <DropdownMenuGroup>
-            <DropdownMenuLabel>
-              CMS / Commerce
-              <div className="inline-flex ms-auto pl-4">
-                <Badge variant="outline">soon</Badge>
-              </div>
-            </DropdownMenuLabel>
-            <DropdownMenuItem
-              disabled={IS_PRODUCTION}
-              onSelect={() => newDatabaseDialog.openDialog()}
-            >
+            <DropdownMenuLabel>CMS / Commerce</DropdownMenuLabel>
+            <DropdownMenuItem onSelect={() => newDatabaseDialog.openDialog()}>
               <ResourceTypeIcon
                 type="database"
                 className="w-4 h-4 me-2 align-middle"
               />
               Database
               <Badge variant="outline" className="ms-auto">
-                soon
+                beta
               </Badge>
             </DropdownMenuItem>
             <DropdownMenuItem

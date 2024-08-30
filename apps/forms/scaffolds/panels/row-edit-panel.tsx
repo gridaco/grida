@@ -50,70 +50,123 @@ export function RowEditPanel({
   title,
   table_id,
   attributes,
+  mode,
   init,
   ...props
 }: React.ComponentProps<typeof SidePanel> & {
   title: string;
   table_id: string;
   attributes: FormFieldDefinition[];
+  mode: "create" | "update" | "read";
   init?: Partial<{
     row: TVirtualRow<FormResponseField, FormResponse>;
   }>;
 }) {
   const { row } = init ?? {};
 
-  const [advanced, setAdvanced] = useState<boolean>(false);
+  const [advanced, setAdvanced] = useState<boolean>(mode === "update");
 
   return (
     <SidePanel {...props}>
-      <FormViewProvider form_id={table_id}>
-        <PanelHeader>
-          <PanelHeaderTitle>{title}</PanelHeaderTitle>
-          <PanelHeaderActions>
-            <Toggle size="sm" pressed={advanced} onPressedChange={setAdvanced}>
-              <InfoCircledIcon />
-            </Toggle>
-          </PanelHeaderActions>
-        </PanelHeader>
-        <PanelContent className=" divide-y">
-          {row && advanced && (
-            <>
-              <SectionResponseGeneralDetails response={row} />
-              {row.meta.customer_id && (
-                <SectionResponseCustomerDetails response={row} />
+      {mode === "create" && (
+        <>
+          <FormViewProvider form_id={table_id}>
+            <PanelHeader>
+              <PanelHeaderTitle>{title}</PanelHeaderTitle>
+            </PanelHeader>
+            <PanelContent className=" divide-y">
+              {row && advanced && (
+                <>
+                  <SectionResponseGeneralDetails response={row} />
+                  {row.meta.customer_id && (
+                    <SectionResponseCustomerDetails response={row} />
+                  )}
+                  <SectionResponseMetadataJson json={row.meta} />
+                </>
               )}
-              <SectionResponseMetadataJson json={row.meta} />
-            </>
-          )}
-          <EditRowForm
-            onSubmit={(data) => {
-              const promise = fetch(`/submit/${table_id}`, {
-                method: "POST",
-                body: data,
-              });
+              <EditRowForm
+                onSubmit={(data) => {
+                  const promise = fetch(`/submit/${table_id}`, {
+                    method: "POST",
+                    body: data,
+                  });
 
-              toast.promise(promise, {
-                loading: "Saving...",
-                success: "Saved!",
-                error: "Failed to save.",
-              });
+                  toast.promise(promise, {
+                    loading: "Saving...",
+                    success: "Saved!",
+                    error: "Failed to save.",
+                  });
 
-              promise.then(() => {
-                props.onOpenChange?.(false);
-              });
-            }}
-          />
-        </PanelContent>
-        <PanelFooter>
-          <PanelClose>
-            <Button variant="secondary">Close</Button>
-          </PanelClose>
-          <FormView.Prev>Previous</FormView.Prev>
-          <FormView.Next>Next</FormView.Next>
-          <FormView.Submit>Save</FormView.Submit>
-          {/* <Button>Save</Button> */}
-        </PanelFooter>
-      </FormViewProvider>
+                  promise.then(() => {
+                    props.onOpenChange?.(false);
+                  });
+                }}
+              />
+            </PanelContent>
+            <PanelFooter>
+              <PanelClose>
+                <Button variant="secondary">Close</Button>
+              </PanelClose>
+              <FormView.Prev>Previous</FormView.Prev>
+              <FormView.Next>Next</FormView.Next>
+              <FormView.Submit>Save</FormView.Submit>
+            </PanelFooter>
+          </FormViewProvider>
+        </>
+      )}
+      {mode === "update" && (
+        <>
+          <PanelHeader>
+            <PanelHeaderTitle>{title}</PanelHeaderTitle>
+            <PanelHeaderActions>
+              <Toggle
+                size="sm"
+                pressed={advanced}
+                onPressedChange={setAdvanced}
+              >
+                <InfoCircledIcon />
+              </Toggle>
+            </PanelHeaderActions>
+          </PanelHeader>
+          <PanelContent className=" divide-y">
+            {row && advanced && (
+              <>
+                <SectionResponseGeneralDetails response={row} />
+                {row.meta.customer_id && (
+                  <SectionResponseCustomerDetails response={row} />
+                )}
+                <SectionResponseMetadataJson json={row.meta} />
+              </>
+            )}
+            <PanelPropertySection>
+              <PanelPropertySectionTitle>Response</PanelPropertySectionTitle>
+              <PanelPropertyFields>
+                {attributes?.map((def) => {
+                  const record = row?.data?.[def.id];
+
+                  const txt = record?.value ?? "";
+
+                  return (
+                    <PanelPropertyField key={def.id} label={def.name}>
+                      <PropertyTextInput
+                        autoFocus={false}
+                        readOnly
+                        placeholder={def.placeholder ?? ""}
+                        value={txt}
+                      />
+                    </PanelPropertyField>
+                  );
+                })}
+              </PanelPropertyFields>
+            </PanelPropertySection>
+          </PanelContent>
+          <PanelFooter>
+            <PanelClose>
+              <Button variant="secondary">Close</Button>
+            </PanelClose>
+          </PanelFooter>
+        </>
+      )}
     </SidePanel>
   );
 }
@@ -132,7 +185,7 @@ function FormViewProvider({
   } = useFormSession(form_id, {
     mode: "signed",
     session_id: session,
-    // TODO:
+    // TODO: not implemented
     user_id: "",
   });
 
