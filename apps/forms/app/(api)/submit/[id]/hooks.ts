@@ -2,6 +2,7 @@ import { Resend } from "resend";
 import { EmailTemplate } from "@/theme/templates-email/formcomplete/default";
 import { Bird } from "@/clients/bird";
 import { toArrayOf } from "@/types/utility";
+import { Env } from "@/env";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const bird = new Bird(
@@ -11,8 +12,6 @@ const bird = new Bird(
     access_key: process.env.BIRD_API_KEY as string,
   }
 );
-
-const HOST = process.env.HOST || "http://localhost:3000";
 
 export namespace OnSubmit {
   export async function clearsession({
@@ -24,7 +23,7 @@ export namespace OnSubmit {
     response_id: string;
     session_id: string;
   }) {
-    return fetch(`${HOST}/submit/${form_id}/hooks/clearsession`, {
+    return fetch(`${Env.server.HOST}/submit/${form_id}/hooks/clearsession`, {
       headers: {
         "Content-Type": "application/json",
       },
@@ -43,7 +42,7 @@ export namespace OnSubmit {
     form_id: string;
     response_id: string;
   }) {
-    return fetch(`${HOST}/submit/${form_id}/hooks/postindexing`, {
+    return fetch(`${Env.server.HOST}/submit/${form_id}/hooks/postindexing`, {
       headers: {
         "Content-Type": "application/json",
       },

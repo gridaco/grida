@@ -57,8 +57,7 @@ import { FormValue } from "@/services/form";
 import { XSupabase } from "@/services/x-supabase";
 import { TemplateVariables } from "@/lib/templating";
 import { RichTextStagedFileUtils } from "@/services/form/utils";
-
-const HOST = process.env.HOST || "http://localhost:3000";
+import { Env } from "@/env";
 
 export const revalidate = 0;
 
@@ -1015,7 +1014,7 @@ async function submit({
     case "text/html": {
       if (is_ending_page_enabled && ending_page_template_id) {
         return NextResponse.redirect(
-          formlink(HOST, form_id, "complete", {
+          formlink(Env.server.HOST, form_id, "complete", {
             rid: response_reference_obj.id,
           }),
           {
@@ -1034,7 +1033,7 @@ async function submit({
       }
 
       return NextResponse.redirect(
-        formlink(HOST, form_id, "complete", {
+        formlink(Env.server.HOST, form_id, "complete", {
           rid: response_reference_obj.id,
         }),
         {
@@ -1323,14 +1322,20 @@ function error(
         return notFound();
       }
       case 400: {
-        return NextResponse.redirect(formlink(HOST, form_id, "badrequest"), {
-          status: 303,
-        });
+        return NextResponse.redirect(
+          formlink(Env.server.HOST, form_id, "badrequest"),
+          {
+            status: 303,
+          }
+        );
       }
       case 500: {
-        return NextResponse.redirect(formlink(HOST, form_id, "badrequest"), {
-          status: 303,
-        });
+        return NextResponse.redirect(
+          formlink(Env.server.HOST, form_id, "badrequest"),
+          {
+            status: 303,
+          }
+        );
       }
       case "INTERNAL_SERVER_ERROR":
       case "MISSING_REQUIRED_HIDDEN_FIELDS":
@@ -1342,9 +1347,12 @@ function error(
       case "FORM_SCHEDULE_NOT_IN_RANGE":
       case "FORM_SOLD_OUT":
       case "FORM_OPTION_UNAVAILABLE": {
-        return NextResponse.redirect(formerrorlink(HOST, code, data), {
-          status: 307,
-        });
+        return NextResponse.redirect(
+          formerrorlink(Env.server.HOST, code, data),
+          {
+            status: 307,
+          }
+        );
       }
     }
   } else {

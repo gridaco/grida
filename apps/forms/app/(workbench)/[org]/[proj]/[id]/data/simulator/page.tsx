@@ -31,6 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Env } from "@/env";
 import { formerrorlink, formlink } from "@/lib/forms/url";
 import {
   SimulationPlan,
@@ -45,8 +46,6 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useStopwatch, useTimer } from "react-timer-hook";
-
-const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
 
 type SimulatorStatus = "none" | "idle" | "running" | "paused";
 
@@ -227,7 +226,7 @@ function TaskHandler({
                       <Link
                         href={
                           request.response.id
-                            ? formlink(HOST_NAME, form_id, "complete", {
+                            ? formlink(Env.client.HOST, form_id, "complete", {
                                 rid: request.response?.id,
                               })
                             : "#"
@@ -288,7 +287,7 @@ function ErrorCodeLink({
     return <>--</>;
   }
 
-  let href = formerrorlink(HOST_NAME, code, { form_id });
+  let href = formerrorlink(Env.client.HOST, code, { form_id });
 
   return (
     <Link href={href} target="_blank" prefetch={false}>

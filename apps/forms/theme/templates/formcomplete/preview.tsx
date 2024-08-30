@@ -1,4 +1,4 @@
-const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
+import { Env } from "@/env";
 
 export function EndingPageEmbeddedPreview({
   template,
@@ -15,7 +15,7 @@ export function EndingPageEmbeddedPreview({
         <iframe
           key={template}
           src={
-            HOST_NAME +
+            Env.client.HOST +
             `/templates/embed/${lng}/formcomplete/${template}?title=${encodeURIComponent(title)}`
           }
           className="w-full h-96"
@@ -28,7 +28,7 @@ export function EndingPageEmbeddedPreview({
         <iframe
           key={template}
           src={
-            HOST_NAME +
+            Env.client.HOST +
             `/templates/embed/${lng}/formcomplete/default?title=${encodeURIComponent(title)}`
           }
           className="w-full h-96"
