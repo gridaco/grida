@@ -9,7 +9,7 @@ import "../editor.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata = {
-  title: "Grida Forms",
+  title: "Grida",
 };
 
 export default function RootLayout({
