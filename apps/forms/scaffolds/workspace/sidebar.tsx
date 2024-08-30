@@ -21,6 +21,7 @@ import {
   SidebarRoot,
   SidebarSection,
   SidebarMenuItemLabel,
+  SidebarHeader,
 } from "@/components/sidebar";
 import { CreateNewProjectDialog } from "./new-project-dialog";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
@@ -35,7 +36,7 @@ export function WorkspaceSidebar() {
 
   return (
     <SidebarRoot>
-      <header className="sticky top-0 mx-2 pt-4 py-2 bg-background border-b z-10">
+      <SidebarHeader className="pt-4">
         <WorkspaceMenu current={organization.id}>
           <SidebarMenuItem className="py-2">
             <OrganizationAvatar
@@ -71,7 +72,7 @@ export function WorkspaceSidebar() {
             </li>
           </ul>
         </section>
-      </header>
+      </SidebarHeader>
       <div className="h-full">
         <SidebarSection>
           <SidebarSectionHeaderItem>

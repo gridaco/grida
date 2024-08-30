@@ -415,9 +415,7 @@ function Html({ children }: React.PropsWithChildren<{}>) {
         className={cn(
           inter.className,
           // to prevent the whole page from scrolling by sr-only or other hidden absolute elements
-          "h-screen overflow-hidden",
-          // apply slightly dimmed background for main content
-          "bg-secondary/10"
+          "h-screen overflow-hidden"
         )}
       >
         {children}
@@ -486,7 +484,7 @@ function Header({
   };
 }) {
   return (
-    <header className="flex w-full gap-4 bg-background border-b z-10 h-12">
+    <header className="flex w-full gap-4 border-b z-10 h-12 bg-workbench-panel">
       <div className="h-full px-4 min-w-60 w-min flex items-center lg:border-e">
         <Link href={`/${org}/${proj}`} prefetch={false}>
           <span className="flex items-center gap-2 text-md font-black select-none">

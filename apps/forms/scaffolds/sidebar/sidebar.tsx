@@ -7,6 +7,7 @@ import { useEditorState } from "../editor";
 import { DatabaseIcon, HammerIcon, PlugIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
+  SidebarHeader,
   SidebarMenuItem,
   SidebarMenuItemLabel,
   SidebarMenuList,
@@ -59,7 +60,7 @@ export function Sidebar() {
   return (
     <SidebarRoot>
       <Tabs value={state.sidebar.mode} onValueChange={onSidebarModeChange}>
-        <header className="sticky h-12 px-2 flex justify-center items-center top-0 bg-background border-b z-10">
+        <SidebarHeader className="h-12 py-0 flex justify-center items-center">
           <TabsList className="w-full max-w-full">
             <TabsTrigger value="project">
               <ResourceTypeIcon type="project" className="w-4 h-4" />
@@ -74,7 +75,7 @@ export function Sidebar() {
               <PlugIcon className="w-4 h-4" />
             </TabsTrigger>
           </TabsList>
-        </header>
+        </SidebarHeader>
         <TabsContent value="project">
           <ModeProjectHiearchy />
         </TabsContent>

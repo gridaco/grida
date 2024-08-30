@@ -47,6 +47,10 @@ module.exports = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        // custom extended
+        "workbench-panel": {
+          DEFAULT: "hsl(var(--secondary) / 10%)",
+        },
       },
       borderRadius: {
         lg: `var(--radius)`,

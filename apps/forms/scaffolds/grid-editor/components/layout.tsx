@@ -44,7 +44,7 @@ export function Footer({
   return (
     <footer
       className={cn(
-        "flex gap-4 min-h-8 overflow-hidden items-center px-2 py-1.5 w-full border-t",
+        "flex gap-4 min-h-8 overflow-hidden items-center px-2 py-1.5 w-full border-t bg-workbench-panel",
         className
       )}
     >

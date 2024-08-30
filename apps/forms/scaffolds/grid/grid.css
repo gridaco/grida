@@ -3,7 +3,7 @@
   --rdg-border-color: hsl(var(--border));
   --rdg-summary-border-color: hsl(var(--border));
   --rdg-background-color: hsl(var(--background));
-  --rdg-header-background-color: hsl(var(--secondary) / 0.2);
+  --rdg-header-background-color: hsl(var(--background));
   --rdg-header-draggable-background-color: hsl(var(--background));
   --rdg-row-hover-background-color: hsl(var(--accent));
   --rdg-row-selected-background-color: hsl(var(--accent));

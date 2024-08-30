@@ -16,12 +16,32 @@ export function SidebarRoot({
   return (
     <nav
       className={cn(
-        "relative w-60 h-full shrink-0 bg-background overflow-y-auto",
+        "relative w-60 h-full shrink-0 overflow-y-auto",
+        // apply slightly dimmed background for main content
+        "bg-workbench-panel",
         side === "left" ? "border-e" : "border-s"
       )}
     >
       {children}
     </nav>
+  );
+}
+
+export function SidebarHeader({
+  className,
+  children,
+}: React.PropsWithChildren<{ className?: string }>) {
+  return (
+    <header
+      className={cn(
+        "sticky top-0 w-full px-2 py-2 border-b z-10",
+        // apply slightly dimmed background for main content
+        "bg-workbench-panel backdrop-blur-md",
+        className
+      )}
+    >
+      {children}
+    </header>
   );
 }
 
