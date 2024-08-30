@@ -15,8 +15,8 @@ export function EmptyRowsRenderer({ loading }: { loading?: boolean }) {
   return (
     <div className="col-span-full w-full h-full flex items-center justify-center">
       <EmptyWelcome
-        title={<span>No rows found</span>}
-        paragraph={<span>Create a new row to get started</span>}
+        title={<span>Table is empty</span>}
+        paragraph={<span>Create a new record to get started</span>}
       />
     </div>
   );
