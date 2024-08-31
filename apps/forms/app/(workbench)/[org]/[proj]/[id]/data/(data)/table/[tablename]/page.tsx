@@ -1,6 +1,5 @@
 "use client";
 
-import EmptyWelcome from "@/components/empty";
 import Invalid from "@/components/invalid";
 import { useEditorState } from "@/scaffolds/editor";
 import {
@@ -21,7 +20,6 @@ import { CurrentTable } from "@/scaffolds/editor/utils/switch-table";
 import { GridEditor } from "@/scaffolds/grid-editor";
 import { GridData } from "@/scaffolds/grid-editor/grid-data";
 import { GFResponseRow } from "@/scaffolds/grid/types";
-import { TableIcon } from "@radix-ui/react-icons";
 import assert from "assert";
 import { useMemo } from "react";
 import { Spinner } from "@/components/spinner";
@@ -34,7 +32,7 @@ export default function SchemaTablePage({
     tablename: string;
   };
 }) {
-  const [{ tables, datagrid_table_id }] = useEditorState();
+  const [{ tables }] = useEditorState();
   const { tablename } = params;
 
   const tb = tables.find((table) => table.name === tablename);
@@ -42,15 +40,6 @@ export default function SchemaTablePage({
   const isvalid = valid(tb);
 
   if (!isvalid) {
-    if (tablename === "~new") {
-      return (
-        <EmptyWelcome
-          art={<TableIcon className="w-10 h-10 text-muted-foreground" />}
-          title={"Create your first table"}
-          paragraph={"Let's get started by creating your first table."}
-        />
-      );
-    }
     return <Invalid />;
   }
 

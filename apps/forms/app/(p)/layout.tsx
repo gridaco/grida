@@ -6,7 +6,7 @@ import "../editor.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Grida Forms",
+  title: "Grida Customer Portal",
 };
 
 export default function RootLayout({

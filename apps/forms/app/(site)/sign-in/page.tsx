@@ -16,7 +16,7 @@ export default function SigninPage() {
               <div className="flex items-center justify-between w-full md:w-auto">
                 <Link className="flex gap-2 items-center" href="/">
                   <GridaLogo />
-                  <span className="font-bold">Grida Forms</span>
+                  <span className="font-bold">Grida</span>
                 </Link>
               </div>
             </div>
@@ -40,7 +40,7 @@ export default function SigninPage() {
               <div className="mb-10">
                 <h1 className="mt-8 mb-2 font-semibold text-2xl lg:text-3xl">
                   Welcome to
-                  <br /> Grida Forms
+                  <br /> Grida
                 </h1>
                 <h2 className="text-sm text-foreground-light">
                   Sign up or Sign in to your account

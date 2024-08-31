@@ -170,7 +170,7 @@ function DocumentsGrid({
           Form
           <span className="ml-2 text-xs opacity-50">{documents.length}</span>
         </span>
-        <span className="w-32">Responses</span>
+        <span className="w-32">Entries</span>
         <span className="w-44">Updated At</span>
       </header>
       {documents?.map((doc, i) => (

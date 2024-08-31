@@ -472,58 +472,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      create_option_combinations:
-        | {
-            Args: {
-              p_store_id: number
-              p_product_id: number
-              p_option_values: string[]
-            }
-            Returns: undefined
-          }
-        | {
-            Args: {
-              p_store_id: number
-              p_product_id: number
-              p_option_values: Json
-            }
-            Returns: undefined
-          }
-      generate_combinations:
-        | {
-            Args: {
-              option_ids: number[]
-              product_id: number
-              store_id: number
-            }
-            Returns: undefined
-          }
-        | {
-            Args: {
-              options: Json
-              index: number
-              current: Json
-            }
-            Returns: Json
-          }
-      generate_combinations_recursive: {
+      generate_combinations: {
         Args: {
-          option_values_list: number[]
-          current_combination: number[]
-          product_id: number
-          store_id: number
+          options: Json
+          index: number
+          current: Json
         }
-        Returns: undefined
-      }
-      get_existing_option_values: {
-        Args: {
-          p_product_id: number
-          p_exclude_option_id: number
-        }
-        Returns: {
-          option_id: number
-          value: string
-        }[]
+        Returns: Json
       }
       get_inventory_items_with_committed: {
         Args: {
@@ -541,38 +496,23 @@ export type Database = {
           committed: number
         }[]
       }
-      get_inventory_with_committed:
-        | {
-            Args: Record<PropertyKey, never>
-            Returns: {
-              id: number
-              created_at: string
-              sku: string
-              store_id: number
-              product_id: number
-              variant_id: number
-              cost: number
-              available: number
-              committed: number
-            }[]
-          }
-        | {
-            Args: {
-              p_store_id: number
-              p_sku: string
-            }
-            Returns: {
-              id: number
-              created_at: string
-              sku: string
-              store_id: number
-              product_id: number
-              variant_id: number
-              cost: number
-              available: number
-              committed: number
-            }[]
-          }
+      get_inventory_with_committed: {
+        Args: {
+          p_store_id: number
+          p_sku: string
+        }
+        Returns: {
+          id: number
+          created_at: string
+          sku: string
+          store_id: number
+          product_id: number
+          variant_id: number
+          cost: number
+          available: number
+          committed: number
+        }[]
+      }
     }
     Enums: {
       currency:
@@ -2166,7 +2106,7 @@ export type Database = {
           jsonb: Json | null
           numeric: number | null
           richtext: Json | null
-          text: string
+          text: string | null
           text_arr: string[] | null
           timestamptz: string | null
           user_id: string | null
@@ -2184,7 +2124,7 @@ export type Database = {
           jsonb?: Json | null
           numeric?: number | null
           richtext?: Json | null
-          text: string
+          text?: string | null
           text_arr?: string[] | null
           timestamptz?: string | null
           user_id?: string | null
@@ -2202,7 +2142,7 @@ export type Database = {
           jsonb?: Json | null
           numeric?: number | null
           richtext?: Json | null
-          text?: string
+          text?: string | null
           text_arr?: string[] | null
           timestamptz?: string | null
           user_id?: string | null
@@ -2431,55 +2371,6 @@ export type Database = {
       }
     }
     Functions: {
-      create_new_combination_maps: {
-        Args: {
-          new_store_id: number
-          new_product_id: number
-          new_option_id: number
-          new_value_id: number
-          new_value_text: string
-        }
-        Returns: undefined
-      }
-      create_single_option_map: {
-        Args: {
-          new_store_id: number
-          new_product_id: number
-          new_option_id: number
-          new_option_value_id: number
-          value_name: string
-        }
-        Returns: number
-      }
-      extend_existing_map_with_new_value:
-        | {
-            Args: {
-              new_store_id: number
-              new_product_id: number
-              new_option_id: number
-              new_value_id: number
-              new_value_text: string
-            }
-            Returns: undefined
-          }
-        | {
-            Args: {
-              product_id: number
-              new_option_id: number
-              new_value_id: number
-              new_value_text: string
-            }
-            Returns: undefined
-          }
-      generate_combination_recursive: {
-        Args: {
-          product_id: number
-          option_value_combinations: number[]
-          combination: number[]
-          level: number
-        }
-        Returns: undefined
-      }
       generate_combinations:
         | {
             Args: {
@@ -2496,15 +2387,6 @@ export type Database = {
             }
             Returns: undefined
           }
-      generate_combinations_recursive: {
-        Args: {
-          option_values_list: number[]
-          current_combination: number[]
-          product_id: number
-          store_id: number
-        }
-        Returns: undefined
-      }
       get_organizations_for_user: {
         Args: {
           user_id: string
@@ -2517,35 +2399,6 @@ export type Database = {
         }
         Returns: number[]
       }
-      recursive_option_combinations:
-        | {
-            Args: {
-              option_values: Json[]
-              combination: Json[]
-              level: number
-              option_count: number
-            }
-            Returns: undefined
-          }
-        | {
-            Args: {
-              option_values: Json
-              combination: Json
-              option_count: number
-            }
-            Returns: Json[]
-          }
-        | {
-            Args: {
-              product_id: number
-              store_id: number
-              option_values: Json[]
-              combination: Json[]
-              level: number
-              option_count: number
-            }
-            Returns: undefined
-          }
       rls_organization: {
         Args: {
           p_organization_id: number

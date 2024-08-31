@@ -5,8 +5,8 @@ import { ThemeProvider } from "@/components/theme-provider";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata = {
-  title: "Grida Forms Themes Collection",
-  description: "Embeddable Themes CDN directory for Grida Forms",
+  title: "Grida Themes Collection",
+  description: "Embeddable Themes CDN directory for Grida",
 };
 
 export default function RootLayout({

@@ -157,21 +157,17 @@ export function CreateNewDocumentButton({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" sideOffset={8}>
           {/* TODO: alpha feature */}
-          <DropdownMenuGroup hidden={IS_PRODUCTION}>
+          <DropdownMenuGroup>
             <DropdownMenuLabel>Sites</DropdownMenuLabel>
-            <DropdownMenuItem onSelect={new_default_site}>
+            <DropdownMenuItem
+              disabled={IS_PRODUCTION}
+              onSelect={new_default_site}
+            >
               <ResourceTypeIcon
                 type="v0_site"
                 className="w-4 h-4 me-2 align-middle"
               />
               Blank Site
-            </DropdownMenuItem>
-            <DropdownMenuItem disabled>
-              <ResourceTypeIcon
-                type="v0_site"
-                className="w-4 h-4 me-2 align-middle"
-              />
-              Admin Console
               <Badge variant="outline" className="ms-auto">
                 soon
               </Badge>
