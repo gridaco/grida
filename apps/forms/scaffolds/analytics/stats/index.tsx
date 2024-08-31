@@ -366,7 +366,7 @@ export function Responses({
   return (
     <Card className="overflow-hidden">
       <CardHeader>
-        <h1 className="text-lg font-semibold">New Responses</h1>
+        <h1 className="text-lg font-semibold">New Entries</h1>
         {loading ? (
           <NumberSkeleton />
         ) : (
