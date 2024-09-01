@@ -383,6 +383,9 @@ importers:
       '@react-email/components':
         specifier: ^0.0.18
         version: 0.0.18(@types/react@18.2.58)(react@18.3.1)
+      '@stepperize/react':
+        specifier: ^3.0.1
+        version: 3.0.1(react@18.3.1)
       '@supabase/auth-helpers-nextjs':
         specifier: ^0.9.0
         version: 0.9.0(@supabase/supabase-js@2.43.5)
@@ -18627,6 +18630,14 @@ packages:
     dependencies:
       '@stdlib/utils-constructor-name': 0.0.8
       '@stdlib/utils-global': 0.0.7
+    dev: false
+
+  /@stepperize/react@3.0.1(react@18.3.1):
+    resolution: {integrity: sha512-1U9oN3hVghVvGpQSo7ZTPYunY+9YcqTk3qL+T6f4yQ6gi8Tv+5mpqovuOlsN6Ao3Zu7e60FUz7WtidZt/ll6SQ==}
+    peerDependencies:
+      react: ^18.2.0
+    dependencies:
+      react: 18.3.1
     dev: false
 
   /@stitches/react@1.2.8(react@18.3.1):
