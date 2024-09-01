@@ -36,13 +36,11 @@ export async function generateMetadata({
   // room for improvement - query optimization via rpc or meta from client side
   const id = params.id;
 
-  // FIXME: drop `name` and use document.title instead
-  const { data } = await grida_forms_client
+  const { data: formdoc, error: formdoc_err } = await grida_forms_client
     .from("form_document")
     .select(
       `
         id,
-        name,
         is_powered_by_branding_enabled
       `
     )
@@ -50,21 +48,22 @@ export async function generateMetadata({
     .eq("form_id", id)
     .single();
 
-  if (!data) {
+  if (!formdoc) {
+    formdoc_err && console.error("ERR: ", formdoc_err);
     return notFound();
   }
 
   const { data: doc } = await workspaceclient
     .from("document")
     .select("*")
-    .eq("id", data.id)
+    .eq("id", formdoc.id)
     .single();
 
   if (!doc) {
     return notFound();
   }
 
-  const { is_powered_by_branding_enabled } = data;
+  const { is_powered_by_branding_enabled } = formdoc;
   const { title } = doc;
 
   return {
