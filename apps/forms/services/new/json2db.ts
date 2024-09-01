@@ -93,6 +93,7 @@ export class JSONFrom2DB {
       .insert({
         project_id: this.project_id,
         doctype: "v0_form",
+        title: this.renderer.title ?? undefined,
       })
       .select()
       .single();
