@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { FormAgentState, initdummy } from "./state";
 import { reducer } from "./reducer";
 import { StateProvider } from "./provider";
@@ -8,6 +8,12 @@ export function FormAgentProvider({
   children,
 }: React.PropsWithChildren<{ initial: FormAgentState }>) {
   const [state, dispatch] = React.useReducer(reducer, initial);
+
+  // console.log("FormAgentProvider", state.tree, initial.tree);
+
+  useEffect(() => {
+    dispatch({ type: "refresh", state: initial });
+  }, [initial.tree]);
 
   return (
     <StateProvider state={state} dispatch={dispatch}>

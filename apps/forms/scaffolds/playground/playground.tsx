@@ -418,9 +418,15 @@ export function Playground({
         <div className="h-full border-r" />
         <aside className="flex-1 h-full overflow-y-scroll">
           <PlaygroundPreview
+            key={exampleId}
             schema={__schema_txt || ""}
             css={(__variablecss_txt || "") + "\n" + (__customcss_txt || "")}
             dark={dark}
+            onEvent={{
+              change: (e) => {
+                setFormstate(e.data);
+              },
+            }}
             onMessage={(msg) => {
               setLogs((prev) => [
                 ...prev,
@@ -431,7 +437,6 @@ export function Playground({
                 },
               ]);
             }}
-            onChange={setFormstate}
           />
         </aside>
       </div>

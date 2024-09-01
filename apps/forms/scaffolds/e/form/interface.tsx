@@ -20,8 +20,22 @@ export function FormAgentGlobalWindowMessagingInterface({
   children,
 }: React.PropsWithChildren<{}>) {
   useEffect(() => {
+    const cb_onload_interface_ready = () => {
+      console.log("[MESSAGE] | forms.grida.co | onload");
+      FormAgentMessagingInterface.emit({
+        type: "form_view_loaded",
+        loaded: true,
+      });
+
+      FormAgentMessagingInterface.emit({
+        type: "messaging_interface_ready",
+        ready: true,
+        initial: true,
+      });
+    };
+
     const cb_hashchange = (ev: HashChangeEvent) => {
-      console.log("hashchange", ev);
+      console.log("[MESSAGE] | forms.grida.co | hashchange", ev);
       FormAgentMessagingInterface.emit({
         type: "hashchange",
         newURL: ev.newURL,
@@ -32,6 +46,13 @@ export function FormAgentGlobalWindowMessagingInterface({
     const cb_popstate = (ev: PopStateEvent) => {
       FormAgentMessagingInterface.emit({ type: "popstate" });
     };
+
+    // Check if the document is already loaded
+    if (document.readyState === "complete") {
+      cb_onload_interface_ready(); // Manually invoke if already loaded
+    } else {
+      window.addEventListener("load", cb_onload_interface_ready);
+    }
 
     window.addEventListener("hashchange", cb_hashchange);
     window.addEventListener("popstate", cb_popstate);
