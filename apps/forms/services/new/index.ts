@@ -156,6 +156,7 @@ export class FormDocumentSetupAssistantService extends DocumentSetupAssistantSer
     private readonly seed: Partial<{
       description?: string | null;
       title?: string;
+      table_name?: string;
       unknown_field_handling_strategy?: FormResponseUnknownFieldHandlingStrategyType;
     }> = {}
   ) {
@@ -170,7 +171,12 @@ export class FormDocumentSetupAssistantService extends DocumentSetupAssistantSer
       .from("form")
       .insert({
         project_id: this.project_id,
-        ...this.seed,
+        name: to_form_response_table_name(
+          this.seed.table_name ?? this.seed.title ?? "untitled"
+        ),
+        description: this.seed.description,
+        unknown_field_handling_strategy:
+          this.seed.unknown_field_handling_strategy,
       })
       .select("*")
       .single();
@@ -207,7 +213,6 @@ export class FormDocumentSetupAssistantService extends DocumentSetupAssistantSer
           id: document_ref.id,
           form_id: this.form_id,
           project_id: this.project_id,
-          name: document_ref.title,
         })
         .select("id")
         .single();
@@ -283,4 +288,30 @@ async function seed_form_document_blocks({
       local_index: 0,
     },
   ]);
+}
+
+/**
+ *
+ * convert title to a table name
+ *
+ * @param title user input title
+ * @returns
+ */
+function to_form_response_table_name(title: string) {
+  return `form_response_${to_table_name(title)}`;
+}
+
+/**
+ * Converts user input text to a valid Postgres compatible table name.
+ * - no spaces (replaced with underscores)
+ * - no special characters (except underscores)
+ * - non-ASCII characters are allowed
+ * @param txt
+ * @returns string
+ */
+function to_table_name(txt: string): string {
+  return txt
+    .replace(/\s/g, "_") // Replace spaces with underscores
+    .replace(/[^\w\u00C0-\u024F\u1E00-\u1EFF]/g, "") // Remove special characters except underscores and keep non-ASCII
+    .toLowerCase(); // Convert to lowercase
 }
