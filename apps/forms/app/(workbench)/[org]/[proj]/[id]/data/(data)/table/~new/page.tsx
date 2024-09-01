@@ -20,9 +20,10 @@ export default function WelcomeNewPage() {
 
   useEffect(() => {
     // ux delay. open dialog after x
-    const timer = setTimeout(() => {
+    setTimeout(() => {
       welcome.openDialog();
     }, 100);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
