@@ -7,6 +7,24 @@ export function reducer(
   action: FormAgentAction
 ): FormAgentState {
   switch (action.type) {
+    case "refresh": {
+      return produce(state, (draft) => {
+        draft.tree = action.state.tree ?? state.tree;
+        draft.sections = action.state.sections ?? state.sections;
+        draft.has_sections = action.state.has_sections ?? state.has_sections;
+        draft.last_section_id =
+          action.state.last_section_id ?? state.last_section_id;
+
+        if (action.state.fields) {
+          //  only append new fields, leave the rest as is
+          draft.fields = { ...action.state.fields, ...state.fields };
+        }
+        if (action.state.blocks) {
+          // only append new blocks, leave the rest as is
+          draft.blocks = { ...action.state.blocks, ...state.blocks };
+        }
+      });
+    }
     case "fields/value/change": {
       const { id, value } = action;
       return produce(state, (draft) => {

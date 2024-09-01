@@ -1,4 +1,7 @@
+import type { FormAgentState } from "./state";
+
 export type FormAgentAction =
+  | RefreshTreeAction
   | FieldValueCahngeAction
   | FieldFileCahngeAction
   | FieldFileMetadataCahngeAction
@@ -6,6 +9,11 @@ export type FormAgentAction =
   | SectionNextAction
   | SectionPrevAction
   | SubmitAction;
+
+type RefreshTreeAction = {
+  type: "refresh";
+  state: Partial<FormAgentState>;
+};
 
 type FieldValueCahngeAction = {
   type: "fields/value/change";
