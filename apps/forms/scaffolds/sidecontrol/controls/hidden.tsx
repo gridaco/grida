@@ -1,4 +1,5 @@
 import { Switch } from "@/components/ui/switch";
+import { PropertyLineControlRoot } from "../ui";
 
 export function HiddenControl({
   value,
@@ -7,5 +8,9 @@ export function HiddenControl({
   value?: boolean;
   onValueChange?: (value: boolean) => void;
 }) {
-  return <Switch checked={value} onCheckedChange={onValueChange} />;
+  return (
+    <PropertyLineControlRoot>
+      <Switch checked={value} onCheckedChange={onValueChange} />
+    </PropertyLineControlRoot>
+  );
 }

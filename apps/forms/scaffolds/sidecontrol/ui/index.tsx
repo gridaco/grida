@@ -15,3 +15,13 @@ export function PropertyLineLabel({ children }: React.PropsWithChildren<{}>) {
     </Label>
   );
 }
+
+/**
+ * use for matching the height with the label - useful with `<Switch/>`
+ * @returns
+ */
+export function PropertyLineControlRoot({
+  children,
+}: React.PropsWithChildren<{}>) {
+  return <div className="flex items-center h-8">{children}</div>;
+}
