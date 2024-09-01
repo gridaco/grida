@@ -24,6 +24,10 @@ import { usePrevious } from "@uidotdev/usehooks";
 import equal from "deep-equal";
 import { FormPageBackgroundSchema, FormStyleSheetV1Schema } from "@/types";
 import { FormAgentProvider, initdummy } from "@/lib/formstate";
+import { Button } from "@/components/ui/button";
+import { PoweredByGridaFooter } from "@/scaffolds/e/form/powered-by-brand-footer";
+import clsx from "clsx";
+import common from "@/i18n/resources.common";
 
 export default function BlocksEditorRoot() {
   return (
@@ -311,8 +315,39 @@ function BlocksEditor() {
             </SectionStyle>
           </SortableContext>
         </BlocksCanvas>
+        <FooterPreview />
       </div>
     </div>
+  );
+}
+
+function FooterPreview() {
+  const [state] = useEditorState();
+
+  const {
+    theme: { is_powered_by_branding_enabled, lang },
+  } = state;
+
+  return (
+    <>
+      <footer
+        className={clsx(
+          "mt-4",
+          "sticky bottom-0",
+          "flex gap-2 p-4 pt-4 border-t",
+          "justify-end bg-background",
+          "md:static md:justify-start md:bg-transparent md:dark:bg-transparent",
+          "w-full md:w-auto"
+        )}
+      >
+        <Button type="button">{common[lang].submit}</Button>
+      </footer>
+      {is_powered_by_branding_enabled && (
+        <div className="hidden md:block">
+          <PoweredByGridaFooter />
+        </div>
+      )}
+    </>
   );
 }
 
