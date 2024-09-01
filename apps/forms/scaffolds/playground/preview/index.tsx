@@ -14,21 +14,28 @@ import type {
   FormEventMessage,
   PlaygroundWindowMessageAction,
 } from "@/lib/forms/messages";
-import { FormAgentState } from "@/lib/formstate";
+import { FormAgentGlobalWindowMessagingInterface } from "@/scaffolds/e/form/interface";
+
+type EventHandlersMap = Partial<{
+  [K in FormEventMessage["type"]]: (
+    event: MessageEvent<Extract<FormEventMessage, { type: K }>>
+  ) => void;
+}>;
 
 export default function PlaygroundPreview({
   schema,
   css,
   dark,
   onMessage,
-  onChange,
+  onEvent,
 }: {
   schema: string;
   css: string;
   dark?: boolean;
   onMessage?: (event: MessageEvent<FormEventMessage>) => void;
-  onChange?: (state: FormAgentState) => void;
+  onEvent?: EventHandlersMap;
 }) {
+  const [ready, setReady] = useState(false);
   const ref = useRef<HTMLIFrameElement>(null);
 
   const message = (data: PlaygroundWindowMessageAction) => {
@@ -39,19 +46,19 @@ export default function PlaygroundPreview({
     if (ref.current) {
       message({ type: "set_schema", schema });
     }
-  }, [schema]);
+  }, [schema, ready]);
 
   useEffect(() => {
     if (ref.current) {
       message({ type: "set_variablescss", variablescss: css });
     }
-  }, [css]);
+  }, [css, ready]);
 
   useEffect(() => {
     if (ref.current) {
       message({ type: "set_dark_mode", dark: dark || false });
     }
-  }, [dark]);
+  }, [dark, ready]);
 
   // forward messages
   useEffect(() => {
@@ -61,15 +68,12 @@ export default function PlaygroundPreview({
         event.data.namespace.includes("grida.co")
       ) {
         onMessage?.(event);
-        switch (event.data.type) {
-          case "change": {
-            // @ts-expect-error
-            delete event.data.namespace;
-            // @ts-expect-error
-            delete event.data.type;
+        onEvent?.[event.data.type]?.(event as any);
 
-            onChange?.(event.data);
-          }
+        switch (event.data.type) {
+          case "messaging_interface_ready":
+            setReady(true);
+            break;
         }
       } else {
         // 3rd party junks
@@ -170,31 +174,33 @@ export function PlaygroundPreviewSlave() {
 
   return (
     <>
-      {renderer ? (
-        <>
-          {invalid && (
-            <div className="absolute top-2 right-2 bg-red-500 p-2 rounded shadow">
-              <ExclamationTriangleIcon />
+      <FormAgentGlobalWindowMessagingInterface>
+        {renderer ? (
+          <>
+            {invalid && (
+              <div className="absolute top-2 right-2 bg-red-500 p-2 rounded shadow">
+                <ExclamationTriangleIcon />
+              </div>
+            )}
+            <GridaFormsFormView
+              form_id={renderer.id}
+              fields={renderer.fields()}
+              blocks={renderer.blocks()}
+              tree={renderer.tree()}
+              translation={resources[lang].translation as any}
+              config={{
+                is_powered_by_branding_enabled: true,
+              }}
+            />
+          </>
+        ) : (
+          <>
+            <div className="grow flex items-center justify-center p-4 text-center text-gray-500">
+              Invalid schema
             </div>
-          )}
-          <GridaFormsFormView
-            form_id={renderer.id}
-            fields={renderer.fields()}
-            blocks={renderer.blocks()}
-            tree={renderer.tree()}
-            translation={resources[lang].translation as any}
-            config={{
-              is_powered_by_branding_enabled: true,
-            }}
-          />
-        </>
-      ) : (
-        <>
-          <div className="grow flex items-center justify-center p-4 text-center text-gray-500">
-            Invalid schema
-          </div>
-        </>
-      )}
+          </>
+        )}
+      </FormAgentGlobalWindowMessagingInterface>
     </>
   );
 }

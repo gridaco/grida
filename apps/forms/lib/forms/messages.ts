@@ -33,8 +33,7 @@ export type FormEventMessagePayload =
 /**
  * when form is ready to handle incoming messages
  * this event will be sent initially once ready, and every 1 second after that
- * @deprecated
- * @todo NOT IMPLEMENTED YET
+ * @todo NOT IMPLEMENTED YET - interval
  */
 type FormReadyEventMessage = {
   type: "messaging_interface_ready";
@@ -44,8 +43,6 @@ type FormReadyEventMessage = {
 
 /**
  * when the main form view is loaded
- * @deprecated
- * @todo NOT IMPLEMENTED YET
  */
 type FormLoadedEventMessage = {
   type: "form_view_loaded";
