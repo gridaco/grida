@@ -5,7 +5,7 @@ import type {
   FormFieldDefinition,
   FormBlock,
   Option,
-  FormsPageLanguage,
+  LanguageCode,
 } from "@/types";
 import { blockstree } from "./tree";
 import { FormBlockTree } from "./types";
@@ -187,7 +187,7 @@ export class FormRenderTree {
     readonly id: string,
     readonly title: string | null | undefined,
     readonly description: string | null | undefined,
-    readonly lang: FormsPageLanguage | null | undefined,
+    readonly lang: LanguageCode | null | undefined,
     private readonly _m_fields: FormFieldDefinition[] = [],
     private readonly _m_blocks?: FormBlock[] | null,
     private readonly config?: RenderTreeConfig,

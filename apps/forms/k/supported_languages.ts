@@ -1,11 +1,11 @@
-import { FormsPageLanguage } from "@/types";
+import { LanguageCode } from "@/types";
 import resources from "@/i18n";
 
-export const supported_form_page_languages: FormsPageLanguage[] = Object.keys(
+export const supported_form_page_languages: LanguageCode[] = Object.keys(
   resources
-) as FormsPageLanguage[];
+) as LanguageCode[];
 
-export const language_label_map: Record<FormsPageLanguage, string> = {
+export const language_label_map: Record<LanguageCode, string> = {
   en: "English",
   es: "Spanish / Español",
   de: "German / Deutsch",

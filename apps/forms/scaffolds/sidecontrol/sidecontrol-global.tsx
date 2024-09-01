@@ -26,7 +26,7 @@ import {
   Appearance,
   FontFamily,
   FormStyleSheetV1Schema,
-  FormsPageLanguage,
+  LanguageCode,
 } from "@/types";
 import * as _variants from "@/theme/palettes";
 import { PaletteColorChip } from "@/components/design/palette-color-chip";
@@ -516,7 +516,7 @@ function Settings() {
   } = state;
 
   const onLangChange = useCallback(
-    (lang: FormsPageLanguage) => {
+    (lang: LanguageCode) => {
       dispatch({
         type: "editor/theme/lang",
         lang,

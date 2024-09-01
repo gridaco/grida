@@ -3,7 +3,7 @@ import type {
   FormFieldAutocompleteType,
   FormFieldDefinition,
   FormInputType,
-  FormsPageLanguage,
+  LanguageCode,
   Option,
 } from "./types";
 import { toArrayOf, MaybeArray } from "./utility";
@@ -44,7 +44,7 @@ interface _JSONForm<T> {
   title?: string;
   name: string;
   description?: string;
-  lang?: FormsPageLanguage;
+  lang?: LanguageCode;
   action?: string;
   enctype?:
     | "application/x-www-form-urlencoded"

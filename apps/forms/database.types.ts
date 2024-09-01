@@ -799,6 +799,7 @@ export type Database = {
           is_scheduling_enabled: boolean
           max_form_responses_by_customer: number | null
           max_form_responses_in_total: number | null
+          name: string
           project_id: number
           scheduling_close_at: string | null
           scheduling_open_at: string | null
@@ -819,6 +820,7 @@ export type Database = {
           is_scheduling_enabled?: boolean
           max_form_responses_by_customer?: number | null
           max_form_responses_in_total?: number | null
+          name?: string
           project_id: number
           scheduling_close_at?: string | null
           scheduling_open_at?: string | null
@@ -839,6 +841,7 @@ export type Database = {
           is_scheduling_enabled?: boolean
           max_form_responses_by_customer?: number | null
           max_form_responses_in_total?: number | null
+          name?: string
           project_id?: number
           scheduling_close_at?: string | null
           scheduling_open_at?: string | null
@@ -957,6 +960,7 @@ export type Database = {
       }
       form_document: {
         Row: {
+          __name: string
           background: Json | null
           created_at: string
           ending_page_i18n_overrides: Json | null
@@ -966,14 +970,14 @@ export type Database = {
           is_ending_page_enabled: boolean
           is_powered_by_branding_enabled: boolean
           is_redirect_after_response_uri_enabled: boolean
-          lang: Database["grida_forms"]["Enums"]["form_page_language"]
+          lang: Database["public"]["Enums"]["language_code"]
           method: Database["grida_forms"]["Enums"]["form_method"]
-          name: string
           project_id: number
           redirect_after_response_uri: string | null
           stylesheet: Json | null
         }
         Insert: {
+          __name?: string
           background?: Json | null
           created_at?: string
           ending_page_i18n_overrides?: Json | null
@@ -983,14 +987,14 @@ export type Database = {
           is_ending_page_enabled?: boolean
           is_powered_by_branding_enabled?: boolean
           is_redirect_after_response_uri_enabled?: boolean
-          lang?: Database["grida_forms"]["Enums"]["form_page_language"]
+          lang?: Database["public"]["Enums"]["language_code"]
           method?: Database["grida_forms"]["Enums"]["form_method"]
-          name?: string
           project_id: number
           redirect_after_response_uri?: string | null
           stylesheet?: Json | null
         }
         Update: {
+          __name?: string
           background?: Json | null
           created_at?: string
           ending_page_i18n_overrides?: Json | null
@@ -1000,9 +1004,8 @@ export type Database = {
           is_ending_page_enabled?: boolean
           is_powered_by_branding_enabled?: boolean
           is_redirect_after_response_uri_enabled?: boolean
-          lang?: Database["grida_forms"]["Enums"]["form_page_language"]
+          lang?: Database["public"]["Enums"]["language_code"]
           method?: Database["grida_forms"]["Enums"]["form_method"]
-          name?: string
           project_id?: number
           redirect_after_response_uri?: string | null
           stylesheet?: Json | null
@@ -1767,20 +1770,6 @@ export type Database = {
         | "video"
         | "json"
       form_method: "post" | "get" | "dialog"
-      form_page_language:
-        | "en"
-        | "ko"
-        | "es"
-        | "de"
-        | "ja"
-        | "fr"
-        | "pt"
-        | "it"
-        | "ru"
-        | "zh"
-        | "ar"
-        | "hi"
-        | "nl"
       form_response_unknown_field_handling_strategy_type:
         | "ignore"
         | "accept"
@@ -2432,6 +2421,20 @@ export type Database = {
     }
     Enums: {
       doctype: "v0_form" | "v0_site" | "v0_schema"
+      language_code:
+        | "en"
+        | "ko"
+        | "es"
+        | "de"
+        | "ja"
+        | "fr"
+        | "pt"
+        | "it"
+        | "ru"
+        | "zh"
+        | "ar"
+        | "hi"
+        | "nl"
     }
     CompositeTypes: {
       [_ in never]: never

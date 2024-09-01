@@ -29,7 +29,7 @@ import toast from "react-hot-toast";
 import type {
   EndingPageI18nOverrides,
   EndingPageTemplateID,
-  FormsPageLanguage,
+  LanguageCode,
 } from "@/types";
 import {
   render,
@@ -220,7 +220,7 @@ function Preview({
 }: {
   template: EndingPageTemplateID;
   title: string;
-  lang: FormsPageLanguage;
+  lang: LanguageCode;
   overrides?: Record<string, string>;
 }) {
   const { t } = useTranslation();
@@ -288,7 +288,7 @@ function CustomizeTemplate({
     template_id?: EndingPageTemplateID;
     i18n_overrides?: Record<string, string>;
   };
-  lang: FormsPageLanguage;
+  lang: LanguageCode;
   title: string;
   form_id: string;
   onSave?: (template_id: string, data: Record<string, string>) => void;

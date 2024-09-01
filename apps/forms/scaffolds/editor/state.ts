@@ -16,7 +16,7 @@ import type {
   FormResponseSession,
   FormResponseUnknownFieldHandlingStrategyType,
   FormStyleSheetV1Schema,
-  FormsPageLanguage,
+  LanguageCode,
   GDocumentType,
   GridaXSupabase,
   OrderBy,
@@ -317,26 +317,7 @@ interface IInsertionMenuState {
   insertmenu: TGlobalEditorDialogState;
 }
 
-export interface BaseDocumentEditorState
-  extends IEditorGlobalSavingState,
-    IEditorDateContextState,
-    IEditorAssetsState,
-    IInsertionMenuState,
-    IFieldEditorState,
-    ICustomerEditorState,
-    IRowEditorState {
-  basepath: string;
-  organization: {
-    name: string;
-    id: number;
-  };
-  project: {
-    name: string;
-    id: number;
-  };
-  document_id: string;
-  document_title: string;
-  doctype: GDocumentType;
+interface IEditorDocumentState {
   document: {
     pages: MenuItem<string>[];
     selected_page_id?: string;
@@ -362,9 +343,12 @@ export interface BaseDocumentEditorState
     selected_node_default_text?: Tokens.StringValueExpression;
     selected_node_context?: Record<string, any>;
   };
+}
+
+interface IEditorDocumentThemeState {
   theme: {
     is_powered_by_branding_enabled: boolean;
-    lang: FormsPageLanguage;
+    lang: LanguageCode;
     appearance: Appearance;
     palette?: FormStyleSheetV1Schema["palette"];
     fontFamily: FontFamily;
@@ -372,6 +356,30 @@ export interface BaseDocumentEditorState
     section?: FormStyleSheetV1Schema["section"];
     background?: FormPageBackgroundSchema;
   };
+}
+
+export interface BaseDocumentEditorState
+  extends IEditorGlobalSavingState,
+    IEditorDateContextState,
+    IEditorAssetsState,
+    IInsertionMenuState,
+    IFieldEditorState,
+    IEditorDocumentState,
+    ICustomerEditorState,
+    IEditorDocumentThemeState,
+    IRowEditorState {
+  basepath: string;
+  organization: {
+    name: string;
+    id: number;
+  };
+  project: {
+    name: string;
+    id: number;
+  };
+  document_id: string;
+  document_title: string;
+  doctype: GDocumentType;
 }
 
 interface IFieldEditorState {

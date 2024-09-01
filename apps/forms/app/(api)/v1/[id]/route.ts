@@ -38,7 +38,7 @@ import type {
   FormMethod,
   FormDocument,
   Option,
-  FormsPageLanguage,
+  LanguageCode,
 } from "@/types";
 import { Features } from "@/lib/features/scheduling";
 import { requesterurl, resolverurl } from "@/services/form/session-storage";
@@ -201,7 +201,7 @@ export async function GET(
     store_connection,
   } = data;
 
-  const lang: FormsPageLanguage =
+  const lang: LanguageCode =
     (default_page as unknown as FormDocument | null)?.lang ?? "en";
   const is_powered_by_branding_enabled =
     (default_page as unknown as FormDocument | null)

@@ -8,7 +8,7 @@ import resources from "@/i18n";
 import { nanoid } from "nanoid";
 import { ExclamationTriangleIcon } from "@radix-ui/react-icons";
 import useVariablesCSS from "../use-variables-css";
-import { FormsPageLanguage } from "@/types";
+import { LanguageCode } from "@/types";
 import { useTheme } from "next-themes";
 import type {
   FormEventMessage,
@@ -170,7 +170,7 @@ export function PlaygroundPreviewSlave() {
   }, []);
 
   const [renderer, invalid] = useRenderer(schema);
-  const lang: FormsPageLanguage = (renderer?.lang ?? "en") as FormsPageLanguage;
+  const lang: LanguageCode = (renderer?.lang ?? "en") as LanguageCode;
 
   return (
     <>

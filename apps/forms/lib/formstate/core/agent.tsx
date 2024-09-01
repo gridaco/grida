@@ -9,10 +9,9 @@ export function FormAgentProvider({
 }: React.PropsWithChildren<{ initial: FormAgentState }>) {
   const [state, dispatch] = React.useReducer(reducer, initial);
 
-  // console.log("FormAgentProvider", state.tree, initial.tree);
-
   useEffect(() => {
     dispatch({ type: "refresh", state: initial });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initial.tree]);
 
   return (

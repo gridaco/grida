@@ -9,7 +9,7 @@ import type {
   FormResponse,
   FormResponseWithFields,
   FormStyleSheetV1Schema,
-  FormsPageLanguage,
+  LanguageCode,
   GridaXSupabase,
 } from "@/types";
 import type {
@@ -336,7 +336,7 @@ export interface FeedXSupabaseMainTableRowsAction {
 
 export interface EditorThemeLangAction {
   type: "editor/theme/lang";
-  lang: FormsPageLanguage;
+  lang: LanguageCode;
 }
 
 export interface EditorThemePoweredByBrandingAction {
