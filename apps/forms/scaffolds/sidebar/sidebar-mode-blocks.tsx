@@ -10,6 +10,7 @@ import {
   SidebarMenuItemAction,
   SidebarSectionHeaderItem,
   SidebarSectionHeaderLabel,
+  SidebarMenuItemLabel,
 } from "@/components/sidebar";
 import { EditorFlatFormBlock, MenuItem } from "../editor/state";
 import { FormBlockType, FormFieldDefinition, FormInputType } from "@/types";
@@ -20,7 +21,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { DotsHorizontalIcon } from "@radix-ui/react-icons";
+import { DotsHorizontalIcon, GlobeIcon } from "@radix-ui/react-icons";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -57,7 +58,44 @@ export function ModeDesign() {
           <HierarchyView />
         </>
       )}
+
+      {/* WIP */}
+      {process.env.NODE_ENV === "development" && <LocalizationView />}
     </>
+  );
+}
+
+function LocalizationView() {
+  return (
+    <SidebarSection>
+      {/* <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>Localization</SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem> */}
+      <SidebarMenuList>
+        <SidebarMenuItem muted className="cursor-default">
+          <SidebarMenuItemLabel>
+            <GlobeIcon className="w-4 h-4 me-2 inline-flex" />
+            Translations
+          </SidebarMenuItemLabel>
+        </SidebarMenuItem>
+        <SidebarMenuItem muted className="cursor-default" level={1}>
+          <SidebarMenuItemLabel>
+            <span className="inline-flex w-4 h-4 me-2 items-center justify-center">
+              🇺🇸
+            </span>
+            en
+          </SidebarMenuItemLabel>
+        </SidebarMenuItem>
+        <SidebarMenuItem muted className="cursor-default" level={1}>
+          <SidebarMenuItemLabel>
+            <span className="inline-flex w-4 h-4 me-2 items-center justify-center">
+              🇰🇷
+            </span>
+            ko
+          </SidebarMenuItemLabel>
+        </SidebarMenuItem>
+      </SidebarMenuList>
+    </SidebarSection>
   );
 }
 
