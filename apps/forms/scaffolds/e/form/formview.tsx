@@ -396,13 +396,16 @@ function BlockRenderer({
   block,
   stylesheet,
   getDefaultValue,
-  context,
+  // this is the default config because if the form does not have a section, it is considered as a single root section.
+  // if there is a section, the section renderer will create a new context.
+  context = { is_root: true, is_in_current_section: false },
 }: {
   block: ClientRenderBlock;
   stylesheet?: any;
   // e.g. (key) => defaultValues?.[key]
   getDefaultValue?: (key: string) => string | undefined;
   context?: {
+    is_root: boolean;
     is_in_current_section: boolean;
   };
 }) {
@@ -462,6 +465,7 @@ function BlockRenderer({
                 stylesheet={stylesheet}
                 getDefaultValue={getDefaultValue}
                 context={{
+                  is_root: false, // always false
                   is_in_current_section: is_current_section,
                 }}
               />
@@ -474,7 +478,9 @@ function BlockRenderer({
       const { field } = block;
       const { type } = field;
 
-      const is_not_in_current_section = !context?.is_in_current_section;
+      const is_not_in_current_section_nor_root =
+        !context.is_in_current_section && !context.is_root;
+
       const defaultValue = getDefaultValue?.(field.name);
 
       switch (type) {
@@ -520,8 +526,8 @@ function BlockRenderer({
                   autoComplete={field.autocomplete}
                   accept={field.accept}
                   multiple={field.multiple}
-                  novalidate={is_not_in_current_section || hidden}
-                  locked={is_not_in_current_section || hidden}
+                  novalidate={is_not_in_current_section_nor_root || hidden}
+                  locked={is_not_in_current_section_nor_root || hidden}
                   v_value={field.v_value}
                   fileupload={
                     FieldSupports.file_upload(type)
