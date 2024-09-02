@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useCallback } from "react";
 import { useEditorState, useFormFields } from "../editor";
 import {
   SidebarMenuItem,
@@ -13,7 +13,12 @@ import {
   SidebarMenuItemLabel,
 } from "@/components/sidebar";
 import { EditorFlatFormBlock, MenuItem } from "../editor/state";
-import { FormBlockType, FormFieldDefinition, FormInputType } from "@/types";
+import {
+  FormBlockType,
+  FormFieldDefinition,
+  FormInputType,
+  LanguageCode,
+} from "@/types";
 import { BlockTypeIcon } from "@/components/form-blcok-type-icon";
 import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
 import {
@@ -21,14 +26,34 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { DotsHorizontalIcon, GlobeIcon } from "@radix-ui/react-icons";
+import {
+  DotsHorizontalIcon,
+  GlobeIcon,
+  TrashIcon,
+} from "@radix-ui/react-icons";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { FormFieldBlockMenuItems } from "../blocks-editor/blocks/field-block";
 import { renderMenuItems } from "./render";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useDialogState } from "@/components/hooks/use-dialog-state";
+import {
+  LanguageSelect,
+  LanguageSelectOptionMap,
+} from "@/components/language-select";
+import { Button } from "@/components/ui/button";
+import { AddNewLanguageDialog } from "../dialogs/langs-add-dialog";
 
 export function ModeDesign() {
   const [state, dispatch] = useEditorState();
@@ -37,7 +62,7 @@ export function ModeDesign() {
     document: { pages },
   } = state;
 
-  const show_hierarchy =
+  const show_tools =
     state.document.selected_page_id &&
     ["form", "collection"].includes(state.document.selected_page_id);
 
@@ -52,50 +77,112 @@ export function ModeDesign() {
         },
       })}
 
-      {show_hierarchy && (
+      {/* WIP */}
+      {process.env.NODE_ENV === "development" && show_tools && (
+        <LocalizationView />
+      )}
+
+      {show_tools && (
         <>
           <hr />
           <HierarchyView />
         </>
       )}
-
-      {/* WIP */}
-      {process.env.NODE_ENV === "development" && <LocalizationView />}
     </>
   );
 }
 
 function LocalizationView() {
+  const [state, dispatch] = useEditorState();
+  const addnewlangDialog = useDialogState("addnewlang", { refreshkey: true });
+
+  const { lang, lang_default, langs } = state.document;
+
+  const switchLang = useCallback(
+    (lang: LanguageCode) => {
+      dispatch({
+        type: "editor/document/lang",
+        lang: lang,
+      });
+    },
+    [dispatch]
+  );
+
   return (
-    <SidebarSection>
-      {/* <SidebarSectionHeaderItem>
+    <>
+      <AddNewLanguageDialog
+        {...addnewlangDialog}
+        key={addnewlangDialog.refreshkey}
+      />
+      <SidebarSection>
+        {/* <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Localization</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem> */}
-      <SidebarMenuList>
-        <SidebarMenuItem muted className="cursor-default">
-          <SidebarMenuItemLabel>
-            <GlobeIcon className="w-4 h-4 me-2 inline-flex" />
-            Translations
-          </SidebarMenuItemLabel>
-        </SidebarMenuItem>
-        <SidebarMenuItem muted className="cursor-default" level={1}>
-          <SidebarMenuItemLabel>
-            <span className="inline-flex w-4 h-4 me-2 items-center justify-center">
-              🇺🇸
-            </span>
-            en
-          </SidebarMenuItemLabel>
-        </SidebarMenuItem>
-        <SidebarMenuItem muted className="cursor-default" level={1}>
-          <SidebarMenuItemLabel>
-            <span className="inline-flex w-4 h-4 me-2 items-center justify-center">
-              🇰🇷
-            </span>
-            ko
-          </SidebarMenuItemLabel>
-        </SidebarMenuItem>
-      </SidebarMenuList>
-    </SidebarSection>
+        <SidebarMenuList>
+          <SidebarMenuItem muted className="cursor-default">
+            <SidebarMenuItemLabel>
+              <GlobeIcon className="w-4 h-4 me-2 inline-flex" />
+              Languages
+              <SidebarMenuItemActions>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <SidebarMenuItemAction>
+                      <DotsHorizontalIcon />
+                    </SidebarMenuItemAction>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onSelect={addnewlangDialog.openDialog}>
+                      <GlobeIcon className="inline-flex w-4 h-4 me-2 align-middle" />
+                      Add Language
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </SidebarMenuItemActions>
+            </SidebarMenuItemLabel>
+          </SidebarMenuItem>
+          {langs.map((l) => {
+            const isdefault = l === lang_default;
+            const isselected = l === lang;
+            return (
+              <SidebarMenuItem
+                key={l}
+                muted
+                className="cursor-default"
+                level={1}
+                selected={isselected}
+                onSelect={() => switchLang(l)}
+              >
+                <SidebarMenuItemLabel>
+                  {/* <span className="inline-flex w-4 h-4 me-2 items-center justify-center">
+                🇺🇸
+              </span> */}
+                  {l}
+                  <SidebarMenuItemActions>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <SidebarMenuItemAction>
+                          <DotsHorizontalIcon />
+                        </SidebarMenuItemAction>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem disabled={isdefault}>
+                          <TrashIcon className="inline-flex w-4 h-4 me-2 align-middle" />
+                          Delete
+                        </DropdownMenuItem>
+                        <DropdownMenuItem disabled={isdefault}>
+                          <GlobeIcon className="inline-flex w-4 h-4 me-2 align-middle" />
+                          Set as Default
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </SidebarMenuItemActions>
+                </SidebarMenuItemLabel>
+              </SidebarMenuItem>
+            );
+          })}
+        </SidebarMenuList>
+      </SidebarSection>
+    </>
   );
 }
 

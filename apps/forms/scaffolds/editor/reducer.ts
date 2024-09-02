@@ -52,6 +52,9 @@ import type {
   DataTableRefreshAction,
   DataTableLoadingAction,
   EditorDocumentLangAction,
+  EditorDocumentLangSetDefaultAction,
+  EditorDocumentLangAddAction,
+  EditorDocumentLangDeleteAction,
   EditorThemePaletteAction,
   EditorThemeFontFamilyAction,
   EditorThemeBackgroundAction,
@@ -99,6 +102,7 @@ import {
   table_to_sidebar_table_menu,
 } from "./init";
 import assert from "assert";
+import toast from "react-hot-toast";
 
 export function reducer(
   state: EditorState,
@@ -1062,6 +1066,43 @@ export function reducer(
         draft.document.lang = lang;
       });
     }
+    case "editor/document/langs/set-default": {
+      const { lang } = <EditorDocumentLangSetDefaultAction>action;
+      return produce(state, (draft) => {
+        if (draft.document.langs.length === 1) {
+          draft.document.langs = [lang];
+          draft.document.lang_default = lang;
+          draft.document.lang = lang;
+        } else {
+          assert(draft.document.langs.includes(lang), "Language not found");
+          draft.document.lang_default = lang;
+          draft.document.lang = lang;
+        }
+      });
+    }
+    case "editor/document/langs/add": {
+      const { lang } = <EditorDocumentLangAddAction>action;
+      return produce(state, (draft) => {
+        const langs = new Set(draft.document.langs);
+        langs.add(lang);
+        draft.document.langs = Array.from(langs);
+        draft.document.lang = lang;
+      });
+    }
+    case "editor/document/langs/delete": {
+      const { lang } = <EditorDocumentLangDeleteAction>action;
+      return produce(state, (draft) => {
+        if (draft.document.langs.length === 1) {
+          toast.error("At least one language is required");
+          return;
+        }
+        const langs = new Set(draft.document.langs);
+        langs.delete(lang);
+        draft.document.langs = Array.from(langs);
+        draft.document.lang = draft.document.langs[0];
+      });
+    }
+    //
     case "editor/document/select-page": {
       const { page_id } = <DocumentSelectPageAction>action;
 

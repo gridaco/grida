@@ -38,6 +38,7 @@ import {
   MoonIcon,
   OpenInNewWindowIcon,
   Pencil2Icon,
+  PlusIcon,
   SunIcon,
 } from "@radix-ui/react-icons";
 import {
@@ -74,6 +75,9 @@ import { PropertyLine, PropertyLineControlRoot, PropertyLineLabel } from "./ui";
 import { inputVariants } from "./controls/utils/input-variants";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { defineStepper } from "@stepperize/react";
+import { LanguageSelect } from "@/components/language-select";
+import { Badge } from "@/components/ui/badge";
+import { AddNewLanguageDialog } from "../dialogs/langs-add-dialog";
 
 const { default: all, ...variants } = _variants;
 
@@ -145,8 +149,9 @@ function Language() {
   const localizationSetupDialog = useDialogState("localization-setup", {
     refreshkey: true,
   });
+  const addnewlangDialog = useDialogState("addnewlang", { refreshkey: true });
   const {
-    document: { lang },
+    document: { lang, langs, lang_default },
   } = state;
 
   const onLangChange = useCallback(
@@ -159,6 +164,50 @@ function Language() {
     [dispatch]
   );
 
+  const ismultilangs = langs.length > 1;
+
+  if (ismultilangs) {
+    return (
+      <>
+        <AddNewLanguageDialog
+          {...addnewlangDialog}
+          key={addnewlangDialog.refreshkey}
+        />
+        <PropertyLine>
+          <div className="flex flex-wrap gap-2">
+            {langs.map((l) => {
+              const isdefault = l === lang_default;
+              const iscurrent = l === lang;
+              return (
+                <Badge
+                  onClick={() => onLangChange(l)}
+                  variant={iscurrent ? "default" : "outline"}
+                  key={l}
+                  className="cursor-pointer"
+                >
+                  {l}{" "}
+                  {isdefault && (
+                    <span className="text-[10px] font-normal ms-1 text-muted-foreground">
+                      (default)
+                    </span>
+                  )}
+                </Badge>
+              );
+            })}
+            <Badge
+              onClick={addnewlangDialog.openDialog}
+              variant={"outline"}
+              className="cursor-pointer"
+            >
+              <PlusIcon className="inline-flex w-3 h-3 me-1 align-middle" />
+              New
+            </Badge>
+          </div>
+        </PropertyLine>
+      </>
+    );
+  }
+
   return (
     <>
       <EnableMultiLanguageDialog
@@ -167,7 +216,11 @@ function Language() {
       />
       <PropertyLine>
         <PropertyLineLabel>Default</PropertyLineLabel>
-        <LanguageSelect value={lang} onValueChange={onLangChange} />
+        <LanguageSelect
+          value={lang}
+          onValueChange={onLangChange}
+          className={inputVariants({ size: "sm" })}
+        />
       </PropertyLine>
       <PropertyLine>
         <PropertyLineLabel>Multiple</PropertyLineLabel>
@@ -186,50 +239,6 @@ function Language() {
   );
 }
 
-function LanguageSelect({
-  name,
-  required,
-  value,
-  defaultValue,
-  onValueChange,
-  options = supported_form_page_languages,
-}: {
-  name?: string;
-  required?: boolean;
-  value?: LanguageCode;
-  defaultValue?: LanguageCode;
-  onValueChange?: (value: LanguageCode) => void;
-  options?: LanguageCode[];
-}) {
-  return (
-    <Select
-      name={name}
-      value={value}
-      required={required}
-      defaultValue={defaultValue}
-      onValueChange={(value) => {
-        onValueChange?.(value as LanguageCode);
-      }}
-    >
-      <SelectTrigger
-        className={cn(
-          inputVariants({ size: "sm" }),
-          "overflow-hidden text-ellipsis"
-        )}
-      >
-        <SelectValue placeholder="None" />
-      </SelectTrigger>
-      <SelectContent>
-        {options.map((lang) => (
-          <SelectItem key={lang} value={lang}>
-            {language_label_map[lang]}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-}
-
 const { useStepper } = defineStepper(
   { id: "fallbacklang" },
   { id: "firstlang" }
@@ -238,9 +247,24 @@ const { useStepper } = defineStepper(
 function EnableMultiLanguageDialog({
   ...props
 }: React.ComponentProps<typeof Dialog>) {
+  const [state, dispatch] = useEditorState();
   const stepper = useStepper();
 
-  const [fallbackLang, setFallbackLang] = useState<LanguageCode>("en");
+  const [fallbackLang, setFallbackLang] = useState<LanguageCode>(
+    state.document.lang_default
+  );
+
+  const [firstLang, setFirstLang] = useState<LanguageCode>();
+
+  const addLang = useCallback(
+    (lang: LanguageCode) => {
+      dispatch({
+        type: "editor/document/langs/add",
+        lang,
+      });
+    },
+    [dispatch]
+  );
 
   return (
     <Dialog {...props}>
@@ -256,8 +280,8 @@ function EnableMultiLanguageDialog({
           onSubmit={(e) => {
             e.preventDefault();
             if (stepper.isLast) {
-              // do something
-              alert("done");
+              addLang(firstLang!);
+              props?.onOpenChange?.(false);
             } else {
               stepper.next();
             }
@@ -269,7 +293,6 @@ function EnableMultiLanguageDialog({
               <LanguageSelect
                 name="default_language"
                 required
-                defaultValue="en"
                 value={fallbackLang}
                 onValueChange={setFallbackLang}
               />
@@ -290,6 +313,8 @@ function EnableMultiLanguageDialog({
               <LanguageSelect
                 name="target_language"
                 required
+                value={firstLang}
+                onValueChange={setFirstLang}
                 options={supported_form_page_languages.filter(
                   (l) => l !== fallbackLang
                 )}

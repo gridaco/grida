@@ -66,6 +66,9 @@ export type BlocksEditorAction =
   | DataGridCellChangeAction
   | FeedXSupabaseMainTableRowsAction
   | EditorDocumentLangAction
+  | EditorDocumentLangSetDefaultAction
+  | EditorDocumentLangAddAction
+  | EditorDocumentLangDeleteAction
   | EditorThemePoweredByBrandingAction
   | EditorThemePaletteAction
   | EditorThemeAppearanceAction
@@ -389,6 +392,20 @@ export interface FormEndingPreferencesAction
 }
 export interface EditorDocumentLangAction {
   type: "editor/document/lang";
+  lang: LanguageCode;
+}
+
+export interface EditorDocumentLangSetDefaultAction {
+  type: "editor/document/langs/set-default";
+  lang: LanguageCode;
+}
+
+export interface EditorDocumentLangAddAction {
+  type: "editor/document/langs/add";
+  lang: LanguageCode;
+}
+export interface EditorDocumentLangDeleteAction {
+  type: "editor/document/langs/delete";
   lang: LanguageCode;
 }
 
