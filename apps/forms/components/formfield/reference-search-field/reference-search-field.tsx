@@ -94,7 +94,11 @@ export function ReferenceSearch({
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger>
-        <SearchInput value={value} {...props} />
+        <SearchInput
+          {...props}
+          // make sure to pass the value (after ...props)
+          value={value}
+        />
       </SheetTrigger>
       <SheetContent className="flex flex-col p-0 py-6 xl:w-[800px] xl:max-w-none sm:w-[500px] sm:max-w-none w-screen max-w-none">
         <SheetHeader className="px-6">
