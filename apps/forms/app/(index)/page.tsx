@@ -37,12 +37,10 @@ const components = {
 export default function Home() {
   return (
     <main>
-      {/* <Background /> */}
+      <Background />
       <Header />
       <div className="mt-80 mb-20 container mx-auto text-center flex items-center justify-center">
-        <h1 className="text-6xl font-black max-w-xl">
-          No-Code Techs for Developers
-        </h1>
+        <h1 className="text-6xl font-black max-w-xl">Imagine.</h1>
       </div>
       <div className="w-full flex items-center justify-center">
         <div className="w-full">
@@ -73,6 +71,14 @@ export default function Home() {
       </div>
       <Footer />
     </main>
+  );
+}
+function Background() {
+  return (
+    <iframe
+      src="https://bg.grida.co/embed/dots"
+      className="fixed inset-0 w-full h-full -z-10 pointer-events-none"
+    />
   );
 }
 
