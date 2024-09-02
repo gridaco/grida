@@ -278,9 +278,9 @@ function EnableMultiLanguageDialog({
                   Your current contents will be used as the default language.
                 </i>
                 <br />
-                Choose a default language that will be used when a user's
-                preferred language isn't available. This ensures your content is
-                always accessible and understandable.
+                Choose a default language that will be used when a user&apos;s
+                preferred language isn&apos;t available. This ensures your
+                content is always accessible and understandable.
               </p>
             </div>
           ))}
@@ -296,7 +296,8 @@ function EnableMultiLanguageDialog({
               />
               <p className="text-xs text-muted-foreground">
                 Select the first language for localization. You can add or
-                delete languages later, so don't worry if you're unsure.
+                delete languages later, so don&apos;t worry if you&apos;re
+                unsure.
               </p>
             </div>
           ))}
