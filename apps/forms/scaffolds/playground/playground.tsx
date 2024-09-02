@@ -182,7 +182,7 @@ export function Playground({
           </div>
         )} */}
         <div className="flex-1  flex gap-1 items-center">
-          <Link href="/ai">
+          <Link href="/forms/ai">
             <button className="text-md font-black text-start flex items-center gap-2">
               <GridaLogo />
               <span className="flex flex-col">

@@ -10,9 +10,8 @@ import "../globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Grida Forms",
-  description:
-    "Grida Forms is a headless & api-first form builder for developers",
+  title: "Grida",
+  description: "Grida - Free and Open Canvas for Humans and Machines",
 };
 
 export default async function RootLayout({

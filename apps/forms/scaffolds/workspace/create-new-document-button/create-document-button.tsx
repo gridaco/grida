@@ -194,7 +194,7 @@ export function CreateNewDocumentButton({
               />
               Blank Headless Form
             </DropdownMenuItem>
-            <Link href="/ai">
+            <Link href="/forms/ai">
               <DropdownMenuItem>
                 <ResourceTypeIcon
                   type="ai"

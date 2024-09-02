@@ -23,7 +23,7 @@ export default function Header() {
             <GitHubLogoIcon className="fill-black" width={24} height={24} />
           </Button>
         </Link>
-        <Link href="/ai" className="hidden md:block">
+        <Link href="/forms/ai" className="hidden md:block">
           <Button variant="link">AI</Button>
         </Link>
         <Link href="/playground" className="hidden md:block">
