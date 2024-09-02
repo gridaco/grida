@@ -35,6 +35,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { FormFieldBlockMenuItems } from "../blocks-editor/blocks/field-block";
@@ -46,6 +47,7 @@ import {
   DeleteConfirmationAlertDialog,
   useDeleteConfirmationAlertDialogState,
 } from "@/components/delete-confirmation-dialog";
+import { LanguagesIcon } from "lucide-react";
 
 export function ModeDesign() {
   const [state, dispatch] = useEditorState();
@@ -94,10 +96,22 @@ function LocalizationView() {
 
   const { lang, lang_default, langs } = state.document;
 
+  const ismultilang = langs.length > 1;
+
   const switchLang = useCallback(
     (lang: LanguageCode) => {
       dispatch({
         type: "editor/document/lang",
+        lang: lang,
+      });
+    },
+    [dispatch]
+  );
+
+  const switchDefaultLang = useCallback(
+    (lang: LanguageCode) => {
+      dispatch({
+        type: "editor/document/langs/set-default",
         lang: lang,
       });
     },
@@ -113,6 +127,10 @@ function LocalizationView() {
     },
     [dispatch]
   );
+
+  if (!ismultilang) {
+    return <></>;
+  }
 
   return (
     <>
@@ -188,6 +206,24 @@ function LocalizationView() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent>
                         <DropdownMenuItem
+                          onSelect={() => {
+                            // TODO:
+                            alert("open in translate");
+                          }}
+                        >
+                          <LanguagesIcon className="inline-flex w-4 h-4 me-2 align-middle" />
+                          Open in Translate
+                        </DropdownMenuItem>
+
+                        <DropdownMenuItem
+                          disabled={isdefault}
+                          onSelect={() => switchDefaultLang(l)}
+                        >
+                          <GlobeIcon className="inline-flex w-4 h-4 me-2 align-middle" />
+                          Set as Default
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
                           disabled={isdefault}
                           onSelect={() =>
                             deleteConfirmationDialog.openDialog({
@@ -200,10 +236,6 @@ function LocalizationView() {
                         >
                           <TrashIcon className="inline-flex w-4 h-4 me-2 align-middle" />
                           Delete
-                        </DropdownMenuItem>
-                        <DropdownMenuItem disabled={isdefault}>
-                          <GlobeIcon className="inline-flex w-4 h-4 me-2 align-middle" />
-                          Set as Default
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>

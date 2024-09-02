@@ -1077,6 +1077,11 @@ export function reducer(
           assert(draft.document.langs.includes(lang), "Language not found");
           draft.document.lang_default = lang;
           draft.document.lang = lang;
+          draft.document.langs = draft.document.langs.slice().sort((a, b) => {
+            if (a === lang) return -1;
+            if (b === lang) return 1;
+            return 0;
+          });
         }
       });
     }
