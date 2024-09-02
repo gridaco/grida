@@ -52,6 +52,9 @@ export interface BaseDocumentEditorInit {
   };
   document_id: string;
   document_title: string;
+  document: {
+    lang: LanguageCode;
+  };
   doctype: GDocumentType;
   theme: EditorState["theme"];
 }
@@ -319,6 +322,19 @@ interface IInsertionMenuState {
 
 interface IEditorDocumentState {
   document: {
+    /**
+     * view document in...
+     */
+    lang: LanguageCode;
+    /**
+     * default language
+     */
+    lang_default: LanguageCode;
+    /**
+     * available languages provided by user
+     */
+    langs: LanguageCode[];
+
     pages: MenuItem<string>[];
     selected_page_id?: string;
     nodes: any[];
@@ -348,7 +364,6 @@ interface IEditorDocumentState {
 interface IEditorDocumentThemeState {
   theme: {
     is_powered_by_branding_enabled: boolean;
-    lang: LanguageCode;
     appearance: Appearance;
     palette?: FormStyleSheetV1Schema["palette"];
     fontFamily: FontFamily;

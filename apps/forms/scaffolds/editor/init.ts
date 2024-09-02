@@ -163,6 +163,9 @@ function initialDatabaseEditorState(
     supabase_project: init.supabase_project,
     connections: {},
     document: {
+      lang: init.document.lang,
+      lang_default: init.document.lang,
+      langs: [init.document.lang],
       pages: [],
       nodes: [],
       templatedata: {},
@@ -239,6 +242,9 @@ function initialSiteEditorState(init: SiteDocumentEditorInit): EditorState {
   return {
     ...base,
     document: {
+      lang: init.document.lang,
+      lang_default: init.document.lang,
+      langs: [init.document.lang],
       pages: sitedocumentpagesinit({
         basepath: base.basepath,
         document_id: init.document_id,
@@ -443,6 +449,9 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
 
     blocks: blockstreeflat(init.blocks),
     document: {
+      lang: init.document.lang,
+      lang_default: init.document.lang,
+      langs: [init.document.lang],
       pages: formdocumentpagesinit({
         basepath: base.basepath,
         document_id: init.document_id,

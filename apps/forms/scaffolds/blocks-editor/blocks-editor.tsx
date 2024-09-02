@@ -227,7 +227,7 @@ function OptimisticBlocksSyncProvider({
 
 function AgentThemeSyncProvider({ children }: React.PropsWithChildren<{}>) {
   const [state] = useEditorState();
-  const { document_id, theme } = state;
+  const { document_id, document, theme } = state;
   const prev = usePrevious(state.theme);
   const supabase = createClientFormsClient();
 
@@ -242,7 +242,7 @@ function AgentThemeSyncProvider({ children }: React.PropsWithChildren<{}>) {
       supabase
         .from("form_document")
         .update({
-          lang: theme.lang,
+          lang: document.lang,
           is_powered_by_branding_enabled: theme.is_powered_by_branding_enabled,
           stylesheet: {
             appearance: theme.appearance,
@@ -266,8 +266,8 @@ function AgentThemeSyncProvider({ children }: React.PropsWithChildren<{}>) {
     prev,
     supabase,
     document_id,
+    document.lang,
     theme.is_powered_by_branding_enabled,
-    theme.lang,
     theme.appearance,
     theme.customCSS,
     theme.fontFamily,
@@ -325,7 +325,8 @@ function FooterPreview() {
   const [state] = useEditorState();
 
   const {
-    theme: { is_powered_by_branding_enabled, lang },
+    theme: { is_powered_by_branding_enabled },
+    document: { lang },
   } = state;
 
   return (

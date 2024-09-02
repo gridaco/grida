@@ -51,7 +51,7 @@ export function EndingPagePreferences() {
 
   const {
     form,
-    theme: { lang },
+    document: { lang },
     form: { ending },
   } = state;
 

@@ -24,6 +24,7 @@ import { ZodObject } from "zod";
 
 export type BlocksEditorAction =
   | GlobalSavingAction
+  | GlobalWorkbenchPathAction
   | EditorSidebarModeAction
   | CreateNewPendingBlockAction
   | ResolvePendingBlockAction
@@ -64,7 +65,7 @@ export type BlocksEditorAction =
   | DataTableLoadingAction
   | DataGridCellChangeAction
   | FeedXSupabaseMainTableRowsAction
-  | EditorThemeLangAction
+  | EditorDocumentLangAction
   | EditorThemePoweredByBrandingAction
   | EditorThemePaletteAction
   | EditorThemeAppearanceAction
@@ -88,6 +89,14 @@ export type BlocksEditorAction =
 export type GlobalSavingAction = {
   type: "saving";
   saving: boolean;
+};
+
+/**
+ * /[org]/[proj]/[docid]/[...workbenchpath]
+ */
+export type GlobalWorkbenchPathAction = {
+  type: "workbench/path";
+  path: string;
 };
 
 export interface EditorSidebarModeAction {
@@ -334,11 +343,6 @@ export interface FeedXSupabaseMainTableRowsAction {
   data: GridaXSupabase.XDataRow[];
 }
 
-export interface EditorThemeLangAction {
-  type: "editor/theme/lang";
-  lang: LanguageCode;
-}
-
 export interface EditorThemePoweredByBrandingAction {
   type: "editor/theme/powered_by_branding";
   enabled: boolean;
@@ -382,6 +386,10 @@ export interface FormCampaignPreferencesAction
 export interface FormEndingPreferencesAction
   extends Partial<EditorState["form"]["ending"]> {
   type: "editor/form/ending/preferences";
+}
+export interface EditorDocumentLangAction {
+  type: "editor/document/lang";
+  lang: LanguageCode;
 }
 
 export interface DocumentSelectPageAction {

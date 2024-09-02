@@ -14,6 +14,7 @@ import type {
 } from "./state";
 import type {
   GlobalSavingAction,
+  GlobalWorkbenchPathAction,
   EditorSidebarModeAction,
   BlockDescriptionAction,
   BlockTitleAction,
@@ -50,7 +51,7 @@ import type {
   FeedXSupabaseMainTableRowsAction,
   DataTableRefreshAction,
   DataTableLoadingAction,
-  EditorThemeLangAction,
+  EditorDocumentLangAction,
   EditorThemePaletteAction,
   EditorThemeFontFamilyAction,
   EditorThemeBackgroundAction,
@@ -108,6 +109,17 @@ export function reducer(
       const { saving } = <GlobalSavingAction>action;
       return produce(state, (draft) => {
         draft.saving = saving;
+      });
+    }
+    case "workbench/path": {
+      // TODO: experiemntal
+      const { path } = <GlobalWorkbenchPathAction>action;
+      return produce(state, (draft) => {
+        if (path === "form/edit") {
+          draft.document.selected_page_id = "form";
+        } else {
+          draft.document.selected_page_id = "";
+        }
       });
     }
     case "editor/sidebar/mode": {
@@ -983,12 +995,6 @@ export function reducer(
       });
       //
     }
-    case "editor/theme/lang": {
-      const { lang } = <EditorThemeLangAction>action;
-      return produce(state, (draft) => {
-        draft.theme.lang = lang;
-      });
-    }
     case "editor/theme/powered_by_branding": {
       const { enabled } = <EditorThemePoweredByBrandingAction>action;
       return produce(state, (draft) => {
@@ -1050,6 +1056,12 @@ export function reducer(
       });
     }
     //
+    case "editor/document/lang": {
+      const { lang } = <EditorDocumentLangAction>action;
+      return produce(state, (draft) => {
+        draft.document.lang = lang;
+      });
+    }
     case "editor/document/select-page": {
       const { page_id } = <DocumentSelectPageAction>action;
 

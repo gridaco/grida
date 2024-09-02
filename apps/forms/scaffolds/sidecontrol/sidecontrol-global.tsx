@@ -146,13 +146,13 @@ function Language() {
     refreshkey: true,
   });
   const {
-    theme: { lang },
+    document: { lang },
   } = state;
 
   const onLangChange = useCallback(
     (lang: LanguageCode) => {
       dispatch({
-        type: "editor/theme/lang",
+        type: "editor/document/lang",
         lang,
       });
     },

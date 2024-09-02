@@ -39,6 +39,7 @@ import React from "react";
 import { PlayActions } from "@/scaffolds/workbench/play-actions";
 import { DontCastJsonProperties } from "@/types/supabase-ext";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
+import EditorRouterProvider from "./router";
 
 export const revalidate = 0;
 
@@ -174,7 +175,6 @@ export default async function Layout({
                   supabase: supabase_connection_state || undefined,
                 },
                 theme: {
-                  lang: data.lang,
                   is_powered_by_branding_enabled:
                     data.is_powered_by_branding_enabled,
                   appearance: appearance,
@@ -193,6 +193,9 @@ export default async function Layout({
                 form_id: form.id,
                 // TODO:
                 form_title: form.title,
+                document: {
+                  lang: data.lang,
+                },
                 campaign: {
                   is_scheduling_enabled: form.is_scheduling_enabled,
                   is_force_closed: form.is_force_closed,
@@ -258,8 +261,10 @@ export default async function Layout({
               theme: {
                 appearance: "system",
                 fontFamily: "inter",
-                lang: "en",
                 is_powered_by_branding_enabled: true,
+              },
+              document: {
+                lang: "en",
               },
             }}
           >
@@ -385,8 +390,10 @@ export default async function Layout({
               theme: {
                 appearance: "system",
                 fontFamily: "inter",
-                lang: "en",
                 is_powered_by_branding_enabled: true,
+              },
+              document: {
+                lang: "en",
               },
             }}
           >
@@ -464,6 +471,7 @@ function BaseLayout({
             <div className="w-full h-full overflow-x-hidden">{children}</div>
           </div>
         </div>
+        <EditorRouterProvider />
         <EditorHelpFab />
         <ToasterWithMax position="bottom-center" max={5} />
       </ThemeProvider>
