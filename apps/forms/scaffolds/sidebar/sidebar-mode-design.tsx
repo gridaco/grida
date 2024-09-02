@@ -39,21 +39,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { FormFieldBlockMenuItems } from "../blocks-editor/blocks/field-block";
 import { renderMenuItems } from "./render";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
-import {
-  LanguageSelect,
-  LanguageSelectOptionMap,
-} from "@/components/language-select";
-import { Button } from "@/components/ui/button";
 import { AddNewLanguageDialog } from "../dialogs/langs-add-dialog";
+import { Badge } from "@/components/ui/badge";
+import {
+  DeleteConfirmationAlertDialog,
+  useDeleteConfirmationAlertDialogState,
+} from "@/components/delete-confirmation-dialog";
 
 export function ModeDesign() {
   const [state, dispatch] = useEditorState();
@@ -95,6 +87,10 @@ export function ModeDesign() {
 function LocalizationView() {
   const [state, dispatch] = useEditorState();
   const addnewlangDialog = useDialogState("addnewlang", { refreshkey: true });
+  const deleteConfirmationDialog =
+    useDeleteConfirmationAlertDialogState<LanguageCode>("deleteconfirmation", {
+      refreshkey: true,
+    });
 
   const { lang, lang_default, langs } = state.document;
 
@@ -108,11 +104,29 @@ function LocalizationView() {
     [dispatch]
   );
 
+  const deleteLang = useCallback(
+    (lang: LanguageCode) => {
+      dispatch({
+        type: "editor/document/langs/delete",
+        lang,
+      });
+    },
+    [dispatch]
+  );
+
   return (
     <>
       <AddNewLanguageDialog
         {...addnewlangDialog}
         key={addnewlangDialog.refreshkey}
+      />
+      <DeleteConfirmationAlertDialog<LanguageCode>
+        {...deleteConfirmationDialog}
+        key={deleteConfirmationDialog.refreshkey}
+        onDelete={async ({ id }) => {
+          deleteLang(id);
+          return true;
+        }}
       />
       <SidebarSection>
         {/* <SidebarSectionHeaderItem>
@@ -156,7 +170,15 @@ function LocalizationView() {
                   {/* <span className="inline-flex w-4 h-4 me-2 items-center justify-center">
                 🇺🇸
               </span> */}
-                  {l}
+                  {l}{" "}
+                  {isdefault && (
+                    <Badge
+                      variant="outline"
+                      className="ms-2 font-normal text-muted-foreground"
+                    >
+                      default
+                    </Badge>
+                  )}
                   <SidebarMenuItemActions>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -165,7 +187,17 @@ function LocalizationView() {
                         </SidebarMenuItemAction>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent>
-                        <DropdownMenuItem disabled={isdefault}>
+                        <DropdownMenuItem
+                          disabled={isdefault}
+                          onSelect={() =>
+                            deleteConfirmationDialog.openDialog({
+                              id: l,
+                              title: "DELETE " + l,
+                              description: `Are you sure you want to delete the language "${l}"? This action cannot be undone.`,
+                              match: "DELETE " + l,
+                            })
+                          }
+                        >
                           <TrashIcon className="inline-flex w-4 h-4 me-2 align-middle" />
                           Delete
                         </DropdownMenuItem>

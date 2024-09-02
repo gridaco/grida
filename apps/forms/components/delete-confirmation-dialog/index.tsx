@@ -11,8 +11,42 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "../spinner";
+import { useDialogState } from "../hooks/use-dialog-state";
 
-export function DeleteConfirmationAlertDialog({
+type UseDeleteConfirmationAlertDialogStateProps<ID> = {
+  id: ID;
+  match: string;
+  title: string;
+  description?: string;
+};
+
+export function useDeleteConfirmationAlertDialogState<
+  ID extends string = string,
+>(name = "alertdialog", config?: { refreshkey?: boolean }) {
+  const { open, setOpen, openDialog, closeDialog, data, setData, refreshkey } =
+    useDialogState<UseDeleteConfirmationAlertDialogStateProps<ID>>(
+      name,
+      config
+    );
+
+  return {
+    refreshkey,
+    open,
+    setOpen,
+    onOpenChange: setOpen,
+    openDialog,
+    closeDialog,
+    data: {
+      id: data?.id as ID,
+    },
+    setData,
+    title: data?.title,
+    description: data?.description,
+    match: data?.match,
+  };
+}
+
+export function DeleteConfirmationAlertDialog<ID extends string = string>({
   title,
   description,
   placeholder,
@@ -26,7 +60,7 @@ export function DeleteConfirmationAlertDialog({
   placeholder?: string;
   match?: string;
   data?: {
-    id: string;
+    id: ID;
   };
   /**
    * trigger when the delete button is clicked
@@ -34,7 +68,7 @@ export function DeleteConfirmationAlertDialog({
    * if the promise resolves to true, the dialog will be closed
    */
   onDelete?: (
-    data: { id: string },
+    data: { id: ID },
     user_confirmation_txt: string
   ) => Promise<boolean>;
 }) {
@@ -71,7 +105,7 @@ export function DeleteConfirmationAlertDialog({
             spellCheck="false"
             type="text"
             name="comfirmation"
-            placeholder={placeholder}
+            placeholder={placeholder ?? match}
             value={confirmation}
             onChange={(e) => {
               setConfirmation(e.target.value);
