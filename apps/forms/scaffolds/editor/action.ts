@@ -393,7 +393,8 @@ export type NSEditorDocumentLangAction =
   | EditorDocumentLangSetCurrentAction
   | EditorDocumentLangSetDefaultAction
   | EditorDocumentLangAddAction
-  | EditorDocumentLangDeleteAction;
+  | EditorDocumentLangDeleteAction
+  | EditorDocumentLangMessageAction;
 
 export interface EditorDocumentLangSetCurrentAction {
   type: "editor/document/langs/set-current";
@@ -412,6 +413,13 @@ export interface EditorDocumentLangAddAction {
 export interface EditorDocumentLangDeleteAction {
   type: "editor/document/langs/delete";
   lang: LanguageCode;
+}
+
+export interface EditorDocumentLangMessageAction {
+  type: "editor/document/langs/messages/update";
+  lang: LanguageCode;
+  key: string;
+  message: string | undefined;
 }
 // #endregion lang
 

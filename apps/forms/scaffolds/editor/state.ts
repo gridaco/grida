@@ -334,7 +334,7 @@ export interface IDocumentLangState {
    */
   langs: LanguageCode[];
 
-  messages: Partial<Record<LanguageCode, Record<string, string>>>;
+  messages: Partial<Record<LanguageCode, Record<string, string | undefined>>>;
 }
 
 interface IDocumentState extends IDocumentLangState {

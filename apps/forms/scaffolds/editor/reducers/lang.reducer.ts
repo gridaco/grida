@@ -6,6 +6,7 @@ import type {
   EditorDocumentLangAddAction,
   EditorDocumentLangDeleteAction,
   NSEditorDocumentLangAction,
+  EditorDocumentLangMessageAction,
 } from "../action";
 import assert from "assert";
 import toast from "react-hot-toast";
@@ -47,6 +48,7 @@ export default function langReducer(
         langs.add(lang);
         draft.document.langs = Array.from(langs);
         draft.document.lang = lang;
+        draft.document.messages[lang] = {};
       });
     }
     case "editor/document/langs/delete": {
@@ -60,6 +62,15 @@ export default function langReducer(
         langs.delete(lang);
         draft.document.langs = Array.from(langs);
         draft.document.lang = draft.document.langs[0];
+        delete draft.document.messages[lang];
+      });
+    }
+    case "editor/document/langs/messages/update": {
+      const { lang, key, message } = <EditorDocumentLangMessageAction>action;
+
+      return produce(state, (draft) => {
+        assert(draft.document.messages[lang], "Language not found");
+        draft.document.messages[lang][key] = message;
       });
     }
   }
