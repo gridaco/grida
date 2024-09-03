@@ -15,10 +15,11 @@ import type {
   TableXSBMainTableConnection,
   GDocSchemaTable,
   TableMenuItem,
+  IDocumentLangState,
 } from "./state";
 import { blockstreeflat } from "@/lib/forms/tree";
 import { SYM_LOCALTZ, EditorSymbols } from "./symbols";
-import { FormFieldDefinition, GridaXSupabase } from "@/types";
+import { FormFieldDefinition, GridaXSupabase, LanguageCode } from "@/types";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 
 export function initialEditorState(init: EditorInit): EditorState {
@@ -163,9 +164,7 @@ function initialDatabaseEditorState(
     supabase_project: init.supabase_project,
     connections: {},
     document: {
-      lang: init.document.lang,
-      lang_default: init.document.lang,
-      langs: [init.document.lang],
+      ...langinit(init.document.lang),
       pages: [],
       nodes: [],
       templatedata: {},
@@ -242,9 +241,7 @@ function initialSiteEditorState(init: SiteDocumentEditorInit): EditorState {
   return {
     ...base,
     document: {
-      lang: init.document.lang,
-      lang_default: init.document.lang,
-      langs: [init.document.lang],
+      ...langinit(init.document.lang),
       pages: sitedocumentpagesinit({
         basepath: base.basepath,
         document_id: init.document_id,
@@ -449,9 +446,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
 
     blocks: blockstreeflat(init.blocks),
     document: {
-      lang: init.document.lang,
-      lang_default: init.document.lang,
-      langs: [init.document.lang],
+      ...langinit(init.document.lang),
       pages: formdocumentpagesinit({
         basepath: base.basepath,
         document_id: init.document_id,
@@ -522,6 +517,17 @@ function sitedocumentpagesinit({
       data: {},
     },
   ];
+}
+
+function langinit(lang: LanguageCode): IDocumentLangState {
+  return {
+    lang: lang,
+    lang_default: lang,
+    langs: [lang],
+    messages: {
+      [lang]: {},
+    },
+  };
 }
 
 function formdocumentpagesinit({

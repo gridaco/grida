@@ -320,45 +320,47 @@ interface IInsertionMenuState {
   insertmenu: TGlobalEditorDialogState;
 }
 
-interface IEditorDocumentState {
-  document: {
-    /**
-     * view document in...
-     */
-    lang: LanguageCode;
-    /**
-     * default language
-     */
-    lang_default: LanguageCode;
-    /**
-     * available languages provided by user
-     */
-    langs: LanguageCode[];
+export interface IDocumentLangState {
+  /**
+   * view document in...
+   */
+  lang: LanguageCode;
+  /**
+   * default language
+   */
+  lang_default: LanguageCode;
+  /**
+   * available languages provided by user
+   */
+  langs: LanguageCode[];
 
-    pages: MenuItem<string>[];
-    selected_page_id?: string;
-    nodes: any[];
-    templatesample?: string;
-    templatedata: {
-      [key: string]: {
-        text?: Tokens.StringValueExpression;
-        template_id: string;
-        attributes?: Omit<
-          React.HtmlHTMLAttributes<HTMLDivElement>,
-          "style" | "className"
-        >;
-        properties?: { [key: string]: Tokens.StringValueExpression };
-        style?: React.CSSProperties;
-      };
+  messages: Partial<Record<LanguageCode, Record<string, string>>>;
+}
+
+interface IDocumentState extends IDocumentLangState {
+  pages: MenuItem<string>[];
+  selected_page_id?: string;
+  nodes: any[];
+  templatesample?: string;
+  templatedata: {
+    [key: string]: {
+      text?: Tokens.StringValueExpression;
+      template_id: string;
+      attributes?: Omit<
+        React.HtmlHTMLAttributes<HTMLDivElement>,
+        "style" | "className"
+      >;
+      properties?: { [key: string]: Tokens.StringValueExpression };
+      style?: React.CSSProperties;
     };
-    selected_node_id?: string;
-    selected_node_type?: string;
-    selected_node_schema?: ZodObject<any> | null;
-    selected_node_default_properties?: Record<string, any>;
-    selected_node_default_style?: React.CSSProperties;
-    selected_node_default_text?: Tokens.StringValueExpression;
-    selected_node_context?: Record<string, any>;
   };
+  selected_node_id?: string;
+  selected_node_type?: string;
+  selected_node_schema?: ZodObject<any> | null;
+  selected_node_default_properties?: Record<string, any>;
+  selected_node_default_style?: React.CSSProperties;
+  selected_node_default_text?: Tokens.StringValueExpression;
+  selected_node_context?: Record<string, any>;
 }
 
 interface IEditorDocumentThemeState {
@@ -379,7 +381,6 @@ export interface BaseDocumentEditorState
     IEditorAssetsState,
     IInsertionMenuState,
     IFieldEditorState,
-    IEditorDocumentState,
     ICustomerEditorState,
     IEditorDocumentThemeState,
     IRowEditorState {
@@ -395,6 +396,7 @@ export interface BaseDocumentEditorState
   document_id: string;
   document_title: string;
   doctype: GDocumentType;
+  document: IDocumentState;
 }
 
 interface IFieldEditorState {

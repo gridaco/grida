@@ -22,7 +22,7 @@ import type { Tokens } from "@/ast";
 import { SYM_LOCALTZ } from "./symbols";
 import { ZodObject } from "zod";
 
-export type BlocksEditorAction =
+export type EditorAction =
   | GlobalSavingAction
   | GlobalWorkbenchPathAction
   | EditorSidebarModeAction

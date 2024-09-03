@@ -19,7 +19,7 @@ import type {
   BlockDescriptionAction,
   BlockTitleAction,
   BlockVHiddenAction,
-  BlocksEditorAction,
+  EditorAction,
   ChangeBlockFieldAction,
   CreateFielFromBlockdAction,
   CreateNewPendingBlockAction,
@@ -51,10 +51,6 @@ import type {
   FeedXSupabaseMainTableRowsAction,
   DataTableRefreshAction,
   DataTableLoadingAction,
-  EditorDocumentLangAction,
-  EditorDocumentLangSetDefaultAction,
-  EditorDocumentLangAddAction,
-  EditorDocumentLangDeleteAction,
   EditorThemePaletteAction,
   EditorThemeFontFamilyAction,
   EditorThemeBackgroundAction,
@@ -102,12 +98,9 @@ import {
   table_to_sidebar_table_menu,
 } from "./init";
 import assert from "assert";
-import toast from "react-hot-toast";
+import langReducer from "./reducers/lang.reducer";
 
-export function reducer(
-  state: EditorState,
-  action: BlocksEditorAction
-): EditorState {
+export function reducer(state: EditorState, action: EditorAction): EditorState {
   switch (action.type) {
     case "saving": {
       const { saving } = <GlobalSavingAction>action;
@@ -1059,55 +1052,14 @@ export function reducer(
         draft.theme.customCSS = custom;
       });
     }
-    //
-    case "editor/document/lang": {
-      const { lang } = <EditorDocumentLangAction>action;
-      return produce(state, (draft) => {
-        draft.document.lang = lang;
-      });
-    }
-    case "editor/document/langs/set-default": {
-      const { lang } = <EditorDocumentLangSetDefaultAction>action;
-      return produce(state, (draft) => {
-        if (draft.document.langs.length === 1) {
-          draft.document.langs = [lang];
-          draft.document.lang_default = lang;
-          draft.document.lang = lang;
-        } else {
-          assert(draft.document.langs.includes(lang), "Language not found");
-          draft.document.lang_default = lang;
-          draft.document.lang = lang;
-          draft.document.langs = draft.document.langs.slice().sort((a, b) => {
-            if (a === lang) return -1;
-            if (b === lang) return 1;
-            return 0;
-          });
-        }
-      });
-    }
-    case "editor/document/langs/add": {
-      const { lang } = <EditorDocumentLangAddAction>action;
-      return produce(state, (draft) => {
-        const langs = new Set(draft.document.langs);
-        langs.add(lang);
-        draft.document.langs = Array.from(langs);
-        draft.document.lang = lang;
-      });
-    }
+    // #region lang
+    case "editor/document/lang":
+    case "editor/document/langs/set-default":
+    case "editor/document/langs/add":
     case "editor/document/langs/delete": {
-      const { lang } = <EditorDocumentLangDeleteAction>action;
-      return produce(state, (draft) => {
-        if (draft.document.langs.length === 1) {
-          toast.error("At least one language is required");
-          return;
-        }
-        const langs = new Set(draft.document.langs);
-        langs.delete(lang);
-        draft.document.langs = Array.from(langs);
-        draft.document.lang = draft.document.langs[0];
-      });
+      return langReducer(state, action);
     }
-    //
+    // #endregion lang
     case "editor/document/select-page": {
       const { page_id } = <DocumentSelectPageAction>action;
 
