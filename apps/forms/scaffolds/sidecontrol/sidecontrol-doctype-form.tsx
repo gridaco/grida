@@ -23,6 +23,7 @@ import { PopoverClose } from "@radix-ui/react-popover";
 import { PlainTextControl } from "./controls/plaintext";
 import { FieldSupports } from "@/k/supported_field_types";
 import toast from "react-hot-toast";
+import { Badge } from "@/components/ui/badge";
 
 export function SideControlDoctypeForm() {
   const [state, dispatch] = useEditorState();
@@ -214,22 +215,78 @@ function BlockTypeField() {
   );
 }
 
+/**
+ * @example
+ * ```ts
+ * const t = useDocumentTranslations()
+ * ```
+ */
+function useDocumentTranslations() {
+  const [state, dispatch] = useEditorState();
+  const { lang, lang_default, messages } = state.document;
+  //
+
+  return useCallback(
+    (key: string) => {
+      return messages[lang]?.[key];
+    },
+    [lang]
+  );
+}
+
 function BlockTypeHeader() {
+  const [state, dispatch] = useEditorState();
   const [block] = useFocusedFormBlock();
+  const t = useDocumentTranslations();
+  const { lang, lang_default } = state.document;
+  const istranslationmode = lang !== lang_default;
+
+  const updateMessage = useCallback(
+    (key: string, message: string | undefined) => {
+      dispatch({
+        type: "editor/document/langs/messages/update",
+        lang: lang,
+        key,
+        message,
+      });
+    },
+    [dispatch, lang]
+  );
 
   return (
     <SidebarSection className="border-b pb-4">
       <SidebarSectionHeaderItem>
-        <SidebarSectionHeaderLabel>Customize</SidebarSectionHeaderLabel>
+        <SidebarSectionHeaderLabel>
+          {istranslationmode ? (
+            <>
+              Translate <Badge variant="outline">{lang}</Badge>
+            </>
+          ) : (
+            <>Customize</>
+          )}
+        </SidebarSectionHeaderLabel>
       </SidebarSectionHeaderItem>
       <SidebarMenuSectionContent className="space-y-2">
         <PropertyLine>
           <PropertyLineLabel>Title</PropertyLineLabel>
-          <PlainTextControl value={block.title_html ?? ""} />
+          <PlainTextControl
+            onValueChange={(value) => {
+              updateMessage(block.id + "/title_html", value);
+            }}
+            placeholder={block.title_html ?? ""}
+            value={
+              istranslationmode
+                ? t(block.id + "/title_html")
+                : block.title_html ?? ""
+            }
+          />
         </PropertyLine>
         <PropertyLine>
           <PropertyLineLabel>Description</PropertyLineLabel>
-          <PlainTextControl value={block.description_html ?? ""} />
+          <PlainTextControl
+            placeholder={block.description_html ?? ""}
+            value={istranslationmode ? "" : block.description_html ?? ""}
+          />
         </PropertyLine>
       </SidebarMenuSectionContent>
     </SidebarSection>
