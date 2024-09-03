@@ -33,6 +33,11 @@ const nextConfig = withMDX()({
         destination: "/",
         permanent: true,
       },
+      {
+        source: "/issues/new",
+        destination: "https://github.com/gridaco/grida/issues/new/choose",
+        permanent: true,
+      },
       // DO NOT ADD BELOW. this will match all paths with 3 segments.
       // {
       //   source: "/:org/:proj/:id",
