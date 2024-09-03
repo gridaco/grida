@@ -157,7 +157,7 @@ function Language() {
   const onLangChange = useCallback(
     (lang: LanguageCode) => {
       dispatch({
-        type: "editor/document/lang",
+        type: "editor/document/langs/set-current",
         lang,
       });
     },

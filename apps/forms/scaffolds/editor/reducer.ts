@@ -1053,7 +1053,7 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
       });
     }
     // #region lang
-    case "editor/document/lang":
+    case "editor/document/langs/set-current":
     case "editor/document/langs/set-default":
     case "editor/document/langs/add":
     case "editor/document/langs/delete": {

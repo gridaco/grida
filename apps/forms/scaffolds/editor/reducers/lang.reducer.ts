@@ -1,22 +1,22 @@
 import { produce, type Draft } from "immer";
 import type { EditorState } from "../state";
 import type {
-  EditorAction,
-  EditorDocumentLangAction,
+  EditorDocumentLangSetCurrentAction,
   EditorDocumentLangSetDefaultAction,
   EditorDocumentLangAddAction,
   EditorDocumentLangDeleteAction,
+  NSEditorDocumentLangAction,
 } from "../action";
 import assert from "assert";
 import toast from "react-hot-toast";
 
 export default function langReducer(
   state: EditorState,
-  action: EditorAction
+  action: NSEditorDocumentLangAction
 ): EditorState {
   switch (action.type) {
-    case "editor/document/lang": {
-      const { lang } = <EditorDocumentLangAction>action;
+    case "editor/document/langs/set-current": {
+      const { lang } = <EditorDocumentLangSetCurrentAction>action;
       return produce(state, (draft) => {
         draft.document.lang = lang;
       });

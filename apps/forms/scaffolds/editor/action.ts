@@ -65,10 +65,7 @@ export type EditorAction =
   | DataTableLoadingAction
   | DataGridCellChangeAction
   | FeedXSupabaseMainTableRowsAction
-  | EditorDocumentLangAction
-  | EditorDocumentLangSetDefaultAction
-  | EditorDocumentLangAddAction
-  | EditorDocumentLangDeleteAction
+  | NSEditorDocumentLangAction
   | EditorThemePoweredByBrandingAction
   | EditorThemePaletteAction
   | EditorThemeAppearanceAction
@@ -390,8 +387,16 @@ export interface FormEndingPreferencesAction
   extends Partial<EditorState["form"]["ending"]> {
   type: "editor/form/ending/preferences";
 }
-export interface EditorDocumentLangAction {
-  type: "editor/document/lang";
+
+// #region lang
+export type NSEditorDocumentLangAction =
+  | EditorDocumentLangSetCurrentAction
+  | EditorDocumentLangSetDefaultAction
+  | EditorDocumentLangAddAction
+  | EditorDocumentLangDeleteAction;
+
+export interface EditorDocumentLangSetCurrentAction {
+  type: "editor/document/langs/set-current";
   lang: LanguageCode;
 }
 
@@ -408,6 +413,7 @@ export interface EditorDocumentLangDeleteAction {
   type: "editor/document/langs/delete";
   lang: LanguageCode;
 }
+// #endregion lang
 
 export interface DocumentSelectPageAction {
   type: "editor/document/select-page";
