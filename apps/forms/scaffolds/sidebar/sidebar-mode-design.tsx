@@ -48,6 +48,8 @@ import {
   useDeleteConfirmationAlertDialogState,
 } from "@/components/delete-confirmation-dialog";
 import { LanguagesIcon } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { editorlink } from "@/lib/forms/url";
 
 export function ModeDesign() {
   const [state, dispatch] = useEditorState();
@@ -87,6 +89,7 @@ export function ModeDesign() {
 }
 
 function LocalizationView() {
+  const router = useRouter();
   const [state, dispatch] = useEditorState();
   const addnewlangDialog = useDialogState("addnewlang", { refreshkey: true });
   const deleteConfirmationDialog =
@@ -207,8 +210,12 @@ function LocalizationView() {
                       <DropdownMenuContent>
                         <DropdownMenuItem
                           onSelect={() => {
-                            // TODO:
-                            alert("open in translate");
+                            router.push(
+                              editorlink("form/i18n", {
+                                basepath: state.basepath,
+                                document_id: state.document_id,
+                              })
+                            );
                           }}
                         >
                           <LanguagesIcon className="inline-flex w-4 h-4 me-2 align-middle" />
