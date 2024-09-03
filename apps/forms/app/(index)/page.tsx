@@ -62,7 +62,7 @@ export default function Home() {
                 <CarouselItem key={index}>
                   <div className="p-10">
                     <Card className="max-w-screen-2xl mx-auto p-0 bg-transparent overflow-hidden rounded-3xl">
-                      <div className="flex aspect-video p-0">
+                      <div className="flex aspect-square md:aspect-video p-0">
                         {React.createElement(components[name])}
                       </div>
                     </Card>
