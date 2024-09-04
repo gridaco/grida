@@ -83,6 +83,7 @@ Since 2020, I’ve dedicated myself full-time to building Grida, often facing ch
 - [grida.studio](https://grida.studio) - Our Creative Studio
 - [code.grida.co](https://code.grida.co) - A Figma2Code project
 - [cors.sh](https://cors.sh) - A simple CORS proxy service
+- We're ~~hiring!~~ - But I am actively looking for co-founder who excels in engineering and market reach / sales.
 
 ---
 
