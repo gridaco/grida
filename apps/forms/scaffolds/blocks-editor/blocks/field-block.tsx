@@ -76,15 +76,15 @@ export function FieldBlock({
   const can_advanced_mode = fields.length > 0;
 
   const label = useG11nResource(
-    g11nkey("field", { id: form_field_id!, property: "label" })
+    g11nkey("block", { id: id, property: "label" })
   );
 
   const placeholder = useG11nResource(
-    g11nkey("field", { id: form_field_id!, property: "placeholder" })
+    g11nkey("block", { id: id, property: "placeholder" })
   );
 
   const helptext = useG11nResource(
-    g11nkey("field", { id: form_field_id!, property: "help_text" })
+    g11nkey("block", { id: id, property: "help_text" })
   );
 
   const onFieldChange = useCallback(

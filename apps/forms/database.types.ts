@@ -1813,6 +1813,167 @@ export type Database = {
       [_ in never]: never
     }
   }
+  grida_g11n: {
+    Tables: {
+      key: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: number
+          keypath: string[]
+          manifest_id: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: number
+          keypath: string[]
+          manifest_id: number
+          updated_at: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: number
+          keypath?: string[]
+          manifest_id?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "key_manifest_id_fkey"
+            columns: ["manifest_id"]
+            isOneToOne: false
+            referencedRelation: "manifest"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      locale: {
+        Row: {
+          code: string
+          created_at: string
+          id: number
+          manifest_id: number
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: number
+          manifest_id: number
+          updated_at: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: number
+          manifest_id?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "locale_manifest_id_fkey"
+            columns: ["manifest_id"]
+            isOneToOne: false
+            referencedRelation: "manifest"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      manifest: {
+        Row: {
+          created_at: string
+          id: number
+          project_id: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          project_id: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          project_id?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "manifest_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      value: {
+        Row: {
+          created_at: string
+          id: number
+          key_id: number
+          locale_id: number
+          manifest_id: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          key_id: number
+          locale_id: number
+          manifest_id: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          key_id?: number
+          locale_id?: number
+          manifest_id?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "value_key_id_fkey"
+            columns: ["key_id"]
+            isOneToOne: false
+            referencedRelation: "key"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "value_locale_id_fkey"
+            columns: ["locale_id"]
+            isOneToOne: false
+            referencedRelation: "locale"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "value_manifest_id_fkey"
+            columns: ["manifest_id"]
+            isOneToOne: false
+            referencedRelation: "manifest"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   grida_sites: {
     Tables: {
       site_document: {

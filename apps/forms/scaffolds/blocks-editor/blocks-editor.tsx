@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useId, useRef } from "react";
+import React, { useCallback, useEffect, useId, useMemo, useRef } from "react";
 import { type EditorFlatFormBlock, DRAFT_ID_START_WITH } from "../editor/state";
 import { useEditorState } from "../editor";
 import {
@@ -225,11 +225,39 @@ function OptimisticBlocksSyncProvider({
   return <>{children}</>;
 }
 
+function LangSyncProvider({ children }: React.PropsWithChildren<{}>) {
+  const [state] = useEditorState();
+  const { document_id } = state;
+  const prev = usePrevious(state.document.g11n);
+  const supabase = useMemo(() => createClientFormsClient(), []);
+
+  useEffect(() => {
+    if (!prev) {
+      return;
+    }
+
+    // sync lang to server
+    if (!equal(prev, state.document.g11n)) {
+      // update lang
+      supabase
+        .from("form_document")
+        .update({
+          lang: state.document.g11n.lang,
+        })
+        .eq("id", document_id!)
+        .then(({ error }) => {
+          if (error) console.error(error);
+        });
+    }
+  }, [prev, document_id, state.document.g11n]);
+  return <>{children}</>;
+}
+
 function AgentThemeSyncProvider({ children }: React.PropsWithChildren<{}>) {
   const [state] = useEditorState();
   const { document_id, document, theme } = state;
   const prev = usePrevious(state.theme);
-  const supabase = createClientFormsClient();
+  const supabase = useMemo(() => createClientFormsClient(), []);
 
   useEffect(() => {
     if (!prev) {
@@ -242,7 +270,6 @@ function AgentThemeSyncProvider({ children }: React.PropsWithChildren<{}>) {
       supabase
         .from("form_document")
         .update({
-          lang: document.g11n.lang,
           is_powered_by_branding_enabled: theme.is_powered_by_branding_enabled,
           stylesheet: {
             appearance: theme.appearance,
@@ -266,7 +293,6 @@ function AgentThemeSyncProvider({ children }: React.PropsWithChildren<{}>) {
     prev,
     supabase,
     document_id,
-    document.g11n.lang,
     theme.is_powered_by_branding_enabled,
     theme.appearance,
     theme.customCSS,
@@ -299,6 +325,7 @@ function BlocksEditor() {
         <PendingBlocksResolver />
         <OptimisticBlocksSyncProvider />
         <AgentThemeSyncProvider />
+        <LangSyncProvider />
         <BlocksCanvas id="root" className="mt-10">
           <SortableContext
             items={state.blocks.map((b) => b.id)}

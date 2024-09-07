@@ -27,8 +27,6 @@ import type {
   LanguageCode,
 } from "@/types";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
-import { g11nkey } from "../g11n";
-import { FieldSupports } from "@/k/supported_field_types";
 import { FormDocumentG11nKVInit } from "./g11n.init";
 
 export function initialEditorState(init: EditorInit): EditorState {

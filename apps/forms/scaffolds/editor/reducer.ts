@@ -317,10 +317,11 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
     }
     case "blocks/delete": {
       const { block_id } = <DeleteBlockAction>action;
-      console.log("delete block", block_id);
       return produce(state, (draft) => {
         // remove the field id from available_field_ids
         draft.blocks = draft.blocks.filter((block) => block.id !== block_id);
+
+        draft.focus_block_id = null;
 
         // find the field_id of the deleted block
         const field_id = state.blocks.find(

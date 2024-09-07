@@ -139,17 +139,15 @@ export function useG11nResource(key: string) {
   // );
 
   const [state, dispatch] = useEditorState();
-  const { lang, lang_default, resources: messages } = state.document.g11n;
-
-  //
+  const { lang, lang_default, resources } = state.document.g11n;
 
   const fallback = useMemo(() => {
-    return messages[lang_default]?.[key];
-  }, [lang_default, messages, key]);
+    return resources[lang_default]?.[key];
+  }, [lang_default, resources, key]);
 
   const value = useMemo(() => {
-    return messages[lang]?.[key];
-  }, [lang, messages, key]);
+    return resources[lang]?.[key];
+  }, [lang, resources, key]);
 
   const change = useCallback(
     (message?: string) => {

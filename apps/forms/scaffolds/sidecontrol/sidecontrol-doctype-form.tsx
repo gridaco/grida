@@ -199,15 +199,17 @@ function BlockTypeField() {
   const istranslationmode = lang !== lang_default;
 
   const label = useG11nResource(
-    g11nkey("field", { id: block.form_field_id!, property: "label" })
+    g11nkey("block", { id: block.id, property: "label" })
   );
 
+  console.log("label", label);
+
   const placeholder = useG11nResource(
-    g11nkey("field", { id: block.form_field_id!, property: "placeholder" })
+    g11nkey("block", { id: block.id, property: "placeholder" })
   );
 
   const helptext = useG11nResource(
-    g11nkey("field", { id: block.form_field_id!, property: "help_text" })
+    g11nkey("block", { id: block.id, property: "help_text" })
   );
 
   if (is_hidden_field) return <></>;

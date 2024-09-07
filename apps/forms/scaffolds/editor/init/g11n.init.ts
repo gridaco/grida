@@ -44,12 +44,12 @@ export class FormDocumentG11nKVInit extends G11nKVInit {
           return;
         }
 
-        const labelkey = g11nkey("field", { id: b.id, property: "label" });
-        const placeholderkey = g11nkey("field", {
+        const labelkey = g11nkey("block", { id: b.id, property: "label" });
+        const placeholderkey = g11nkey("block", {
           id: b.id,
           property: "placeholder",
         });
-        const helptextkey = g11nkey("field", {
+        const helptextkey = g11nkey("block", {
           id: b.id,
           property: "help_text",
         });

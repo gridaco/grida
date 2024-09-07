@@ -27,9 +27,14 @@ export default function langReducer(
       const { lang } = <EditorDocumentLangSetDefaultAction>action;
       return produce(state, (draft) => {
         if (draft.document.g11n.langs.length === 1) {
+          const prevlang = draft.document.g11n.lang;
           draft.document.g11n.langs = [lang];
           draft.document.g11n.lang_default = lang;
           draft.document.g11n.lang = lang;
+          // swap the resources lang key
+          draft.document.g11n.resources = {
+            [lang]: draft.document.g11n.resources[prevlang],
+          };
         } else {
           assert(
             draft.document.g11n.langs.includes(lang),
