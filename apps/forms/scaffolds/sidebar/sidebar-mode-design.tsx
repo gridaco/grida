@@ -11,6 +11,7 @@ import {
   SidebarSectionHeaderItem,
   SidebarSectionHeaderLabel,
   SidebarMenuItemLabel,
+  SidebarMenuLink,
 } from "@/components/sidebar";
 import { EditorFlatFormBlock, MenuItem } from "../editor/state";
 import {
@@ -78,9 +79,7 @@ export function ModeDesign() {
       })}
 
       {/* WIP */}
-      {process.env.NODE_ENV === "development" && show_tools && (
-        <LocalizationView />
-      )}
+      {process.env.NODE_ENV === "development" && <LocalizationView />}
 
       {show_tools && (
         <>
@@ -158,27 +157,34 @@ function LocalizationView() {
           <SidebarSectionHeaderLabel>Localization</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem> */}
         <SidebarMenuList>
-          <SidebarMenuItem muted className="cursor-default">
-            <SidebarMenuItemLabel>
-              <GlobeIcon className="w-4 h-4 me-2 inline-flex" />
-              Languages
-              <SidebarMenuItemActions>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <SidebarMenuItemAction>
-                      <DotsHorizontalIcon />
-                    </SidebarMenuItemAction>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    <DropdownMenuItem onSelect={addnewlangDialog.openDialog}>
-                      <GlobeIcon className="inline-flex w-4 h-4 me-2 align-middle" />
-                      Add Language
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </SidebarMenuItemActions>
-            </SidebarMenuItemLabel>
-          </SidebarMenuItem>
+          <SidebarMenuLink
+            href={editorlink("form/g11n", {
+              basepath: state.basepath,
+              document_id: state.document_id,
+            })}
+          >
+            <SidebarMenuItem muted className="cursor-default">
+              <SidebarMenuItemLabel>
+                <GlobeIcon className="w-4 h-4 me-2 inline-flex" />
+                Languages
+                <SidebarMenuItemActions>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <SidebarMenuItemAction>
+                        <DotsHorizontalIcon />
+                      </SidebarMenuItemAction>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      <DropdownMenuItem onSelect={addnewlangDialog.openDialog}>
+                        <GlobeIcon className="inline-flex w-4 h-4 me-2 align-middle" />
+                        Add Language
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </SidebarMenuItemActions>
+              </SidebarMenuItemLabel>
+            </SidebarMenuItem>
+          </SidebarMenuLink>
           {langs.map((l) => {
             const isdefault = l === lang_default;
             const isselected = l === lang;
@@ -212,7 +218,7 @@ function LocalizationView() {
                         <DropdownMenuItem
                           onSelect={() => {
                             router.push(
-                              editorlink("form/i18n", {
+                              editorlink("form/g11n", {
                                 basepath: state.basepath,
                                 document_id: state.document_id,
                               })

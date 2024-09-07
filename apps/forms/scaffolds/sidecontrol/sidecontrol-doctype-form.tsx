@@ -24,8 +24,9 @@ import { InputControl } from "./controls/input";
 import { FieldSupports } from "@/k/supported_field_types";
 import toast from "react-hot-toast";
 import { Badge } from "@/components/ui/badge";
-import { g11nkey, useG11nResource } from "../editor/use";
+import { useG11nResource } from "../editor/use";
 import { language_label_map } from "@/k/supported_languages";
+import { g11nkey } from "../editor/g11n";
 
 export function SideControlDoctypeForm() {
   const [state, dispatch] = useEditorState();

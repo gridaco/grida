@@ -76,7 +76,7 @@ export default function langReducer(
 
       return produce(state, (draft) => {
         assert(draft.document.g11n.resources[lang], "Language not found");
-        draft.document.g11n.resources[lang][key] = message;
+        draft.document.g11n.resources[lang]![key] = message;
       });
     }
   }

@@ -24,7 +24,8 @@ import {
 import { useEditorState } from "@/scaffolds/editor";
 import dynamic from "next/dynamic";
 import { Input } from "@/components/ui/input";
-import { g11nkey, useG11nResource } from "@/scaffolds/editor/use";
+import { useG11nResource } from "@/scaffolds/editor/use";
+import { g11nkey } from "@/scaffolds/editor/g11n";
 
 const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false });
 

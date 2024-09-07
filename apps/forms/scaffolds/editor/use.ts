@@ -5,7 +5,6 @@ import type { EditorState, GDocTable, GDocTableID } from "./state";
 import { useDispatch, type FlatDispatcher } from "./dispatch";
 
 import { Context } from "./provider";
-import { IFormBlock, IFormField } from "@/types";
 
 export const useEditorState = (): [EditorState, FlatDispatcher] => {
   const state = useContext(Context);
@@ -114,32 +113,6 @@ export function useDocumentTranslations() {
     },
     [lang, messages]
   );
-}
-
-type G11nFormBlockResourceQuery = [
-  type: "block",
-  {
-    id: string;
-    property: keyof Pick<
-      IFormBlock,
-      "title_html" | "description_html" | "body_html" | "src"
-    >;
-  },
-];
-
-type G11nFormFieldResourceQuery = [
-  type: "field",
-  {
-    id: string;
-    property: keyof Pick<IFormField, "label" | "placeholder" | "help_text">;
-  },
-];
-
-type ResourceKeyQuery = G11nFormBlockResourceQuery | G11nFormFieldResourceQuery;
-
-export function g11nkey(...q: ResourceKeyQuery) {
-  const [type, { id, property }] = q;
-  return [type, id, property].join(".");
 }
 
 export function useG11nResource(key: string) {

@@ -47,7 +47,8 @@ import clsx from "clsx";
 import { editorlink } from "@/lib/forms/url";
 import { SYSTEM_GF_KEY_STARTS_WITH } from "@/k/system";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
-import { g11nkey, useG11nResource } from "@/scaffolds/editor/use";
+import { useG11nResource } from "@/scaffolds/editor/use";
+import { g11nkey } from "@/scaffolds/editor/g11n";
 
 export function FieldBlock({
   id,

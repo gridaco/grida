@@ -334,9 +334,7 @@ export interface IG11nState {
      * available languages provided by user
      */
     langs: LanguageCode[];
-    /**
-     * @deprecated - not supported
-     */
+
     keys: Array<string>;
 
     resources: Partial<

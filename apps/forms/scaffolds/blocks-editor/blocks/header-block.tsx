@@ -19,7 +19,8 @@ import {
 } from "./base-block";
 import TextareaAutosize from "react-textarea-autosize";
 import { Button } from "@/components/ui/button";
-import { g11nkey, useG11nResource } from "@/scaffolds/editor/use";
+import { useG11nResource } from "@/scaffolds/editor/use";
+import { g11nkey } from "@/scaffolds/editor/g11n";
 
 export function HeaderBlock({ id }: { id: string }) {
   const deleteBlock = useDeleteBlock();
