@@ -166,7 +166,7 @@ function LocalizationView() {
             <SidebarMenuItem muted className="cursor-default">
               <SidebarMenuItemLabel>
                 <GlobeIcon className="w-4 h-4 me-2 inline-flex" />
-                Languages
+                Translations
                 <SidebarMenuItemActions>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>

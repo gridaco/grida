@@ -15,14 +15,27 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { language_label_map } from "@/k/supported_languages";
+import { useG11nResource } from "../editor/use";
+import { Badge } from "@/components/ui/badge";
 
 export function I18nEditor() {
   const [state] = useEditorState();
-  const { lang, lang_default, langs, keys, resources } = state.document.g11n;
+  const { lang, lang_default, keys } = state.document.g11n;
 
   return (
     <GridLayout.Root>
-      <GridLayout.Header>Header</GridLayout.Header>
+      <GridLayout.Header>
+        <div className="w-full flex justify-between">
+          <Label className="flex-1">
+            {language_label_map[lang_default].flag}{" "}
+            {language_label_map[lang_default].label}
+          </Label>
+          <Label className="flex-1 ps-4">
+            {language_label_map[lang].flag} {language_label_map[lang].label}
+          </Label>
+        </div>
+      </GridLayout.Header>
       <GridLayout.Content className="overflow-y-scroll">
         <div className="w-full divide-y">
           <GroupHeaderRow />
@@ -47,43 +60,66 @@ export function I18nEditor() {
 
 function DuoRow({ keyname }: { keyname: string }) {
   const [state] = useEditorState();
-  const { lang, lang_default, langs, keys, resources } = state.document.g11n;
-  const fallback = resources[lang_default]?.[keyname];
+  const { lang, lang_default, langs, keys } = state.document.g11n;
+
+  const resource = useG11nResource(keyname);
+
+  const badge: "done" | "todo" = resource.value ? "done" : "todo";
+
   return (
-    <div className="group h-14 flex items-center px-4">
+    <div className="relative group h-14 flex items-center px-4">
       <div className="flex-1 grow w-full h-full flex">
         <AnchorLangCell
           htmlFor={keyname}
           className="relative flex-1 w-full flex items-center"
         >
-          {fallback || <span className="text-muted-foreground">(Empty)</span>}
+          {resource.fallback || (
+            <span className="text-muted-foreground">(Empty)</span>
+          )}
           <br />
           <span className="absolute bottom-2 text-[8px] font-light text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
             {keyname}
           </span>
         </AnchorLangCell>
       </div>
-      <div className="flex-1 grow w-full flex">
+      <div className="flex-1 grow w-full h-full flex">
         <TargetLangCell
+          key={lang + keyname}
           id={keyname}
-          placeholder={fallback || "(Empty)"}
-          className="flex-1 w-full"
+          placeholder={resource.fallback || "(Empty)"}
+          value={resource.value ?? ""}
+          onChange={(e) => {
+            resource.change(e.target.value || undefined);
+          }}
+          className="flex-1 w-full flex items-center h-full"
         />
       </div>
-      <div className="flex items-center gap-2 invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-opacity">
-        <Button variant="outline" size="icon" className="w-8 h-8">
-          <SparkleIcon className="w-3 h-3" />
-        </Button>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="icon" className="w-8 h-8">
-              <DotsHorizontalIcon className="w-3 h-3" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem>Copy Translation Key</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+      <div className="absolute right-4 flex items-center gap-2 transition-opacity invisible opacity-0 group-hover:visible group-hover:opacity-100">
+        <div className="flex items-center gap-2  ">
+          <Button variant="outline" size="icon" className="w-8 h-8">
+            <SparkleIcon className="w-3 h-3" />
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon" className="w-8 h-8">
+                <DotsHorizontalIcon className="w-3 h-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem>Copy Translation Key</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+      <div className="absolute right-4 flex items-center gap-2 transition-opacity visible group-hover:invisible">
+        <div className="">
+          <Badge
+            variant={badge === "todo" ? "default" : "secondary"}
+            className="capitalize"
+          >
+            {badge}
+          </Badge>
+        </div>
       </div>
     </div>
   );

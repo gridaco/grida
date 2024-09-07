@@ -256,11 +256,17 @@ function EnableMultiLanguageDialog({
   const [state, dispatch] = useEditorState();
   const stepper = useStepper();
 
-  const [fallbackLang, setFallbackLang] = useState<LanguageCode>(
-    state.document.g11n.lang_default
-  );
-
   const [firstLang, setFirstLang] = useState<LanguageCode>();
+
+  const changeDefaultLang = useCallback(
+    (lang: LanguageCode) => {
+      dispatch({
+        type: "editor/document/langs/set-default",
+        lang,
+      });
+    },
+    [dispatch]
+  );
 
   const addLang = useCallback(
     (lang: LanguageCode) => {
@@ -299,8 +305,8 @@ function EnableMultiLanguageDialog({
               <LanguageSelect
                 name="default_language"
                 required
-                value={fallbackLang}
-                onValueChange={setFallbackLang}
+                value={state.document.g11n.lang_default}
+                onValueChange={changeDefaultLang}
               />
               <p className="text-xs text-muted-foreground">
                 <i>
@@ -322,7 +328,7 @@ function EnableMultiLanguageDialog({
                 value={firstLang}
                 onValueChange={setFirstLang}
                 options={supported_form_page_languages.filter(
-                  (l) => l !== fallbackLang
+                  (l) => l !== state.document.g11n.lang_default
                 )}
               />
               <p className="text-xs text-muted-foreground">
