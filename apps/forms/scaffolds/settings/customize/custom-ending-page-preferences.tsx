@@ -51,7 +51,7 @@ export function EndingPagePreferences() {
 
   const {
     form,
-    document: { lang },
+    document: { g11n },
     form: { ending },
   } = state;
 
@@ -158,12 +158,12 @@ export function EndingPagePreferences() {
             Enabling ending page will disable redirection
           </PreferenceDescription>
         </form>
-        <I18nProvider lng={lang}>
+        <I18nProvider lng={g11n.lang}>
           {template && (
             <div className="flex justify-center items-center min-h-96">
               <Preview
                 title={form.form_title}
-                lang={lang}
+                lang={g11n.lang}
                 template={template}
                 overrides={overrides}
               />
@@ -175,7 +175,7 @@ export function EndingPagePreferences() {
         key={template}
         form_id={form.form_id}
         title={form.form_title}
-        lang={lang}
+        lang={g11n.lang}
         init={{
           template_id: template ?? "default",
           i18n_overrides: overrides,

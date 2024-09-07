@@ -23,6 +23,8 @@ import {
 } from "./base-block";
 import { useEditorState } from "@/scaffolds/editor";
 import dynamic from "next/dynamic";
+import { Input } from "@/components/ui/input";
+import { g11nkey, useG11nResource } from "@/scaffolds/editor/use";
 
 const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false });
 
@@ -30,12 +32,14 @@ export function VideoBlock({
   id,
   type,
   form_field_id,
-  src,
+  // src,
   data,
 }: EditorFlatFormBlock) {
   const [state, dispatch] = useEditorState();
   const [focused, setFocus] = useBlockFocus(id);
   const deleteBlock = useDeleteBlock();
+
+  const src = useG11nResource(g11nkey("block", { id: id, property: "src" }));
 
   return (
     <FlatBlockBase focused={focused} onPointerDown={setFocus} invalid={!src}>
@@ -77,22 +81,18 @@ export function VideoBlock({
       </BlockHeader>
       <div>
         <div className="py-4">
-          <input
-            type="text"
-            value={src ?? ""}
+          <Input
+            name="src"
+            type="url"
+            value={src.value ?? ""}
             onChange={(e) => {
-              dispatch({
-                type: "blocks/video/src",
-                block_id: id,
-                src: e.target.value,
-              });
+              src.change(e.target.value || undefined);
             }}
-            className="bg-neutral-50 border border-neutral-300 text-neutral-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-neutral-700 dark:border-neutral-600 dark:placeholder-neutral-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
             placeholder="Video URL"
           />
         </div>
         <div className="bg-card rounded overflow-hidden border aspect-video">
-          <ReactPlayer width={"100%"} height={"100%"} url={src ?? ""} />
+          <ReactPlayer width={"100%"} height={"100%"} url={src.value ?? ""} />
         </div>
       </div>
     </FlatBlockBase>

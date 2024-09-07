@@ -1,6 +1,5 @@
 "use client";
 
-import { useCallback } from "react";
 import {
   DotsHorizontalIcon,
   HeadingIcon,
@@ -12,8 +11,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { EditorFlatFormBlock } from "@/scaffolds/editor/state";
-import { useEditorState } from "@/scaffolds/editor";
 import {
   BlockHeader,
   FlatBlockBase,
@@ -22,36 +19,18 @@ import {
 } from "./base-block";
 import TextareaAutosize from "react-textarea-autosize";
 import { Button } from "@/components/ui/button";
+import { g11nkey, useG11nResource } from "@/scaffolds/editor/use";
 
-export function HeaderBlock({
-  id,
-  title_html,
-  description_html,
-}: EditorFlatFormBlock) {
-  const [state, dispatch] = useEditorState();
+export function HeaderBlock({ id }: { id: string }) {
   const deleteBlock = useDeleteBlock();
   const [focused, setFocus] = useBlockFocus(id);
 
-  const onEditTitle = useCallback(
-    (title: string) => {
-      dispatch({
-        type: "blocks/title",
-        block_id: id,
-        title_html: title,
-      });
-    },
-    [dispatch, id]
+  const title = useG11nResource(
+    g11nkey("block", { id: id, property: "title_html" })
   );
 
-  const onEditDescription = useCallback(
-    (description: string) => {
-      dispatch({
-        type: "blocks/description",
-        block_id: id,
-        description_html: description,
-      });
-    },
-    [dispatch, id]
+  const description = useG11nResource(
+    g11nkey("block", { id: id, property: "description_html" })
   );
 
   return (
@@ -87,15 +66,15 @@ export function HeaderBlock({
             type="text"
             className="bg-background w-full p-4 text-2xl font-bold outline-none"
             placeholder="Heading"
-            value={title_html ?? ""}
-            onChange={(e) => onEditTitle(e.target.value)}
+            value={title.value}
+            onChange={(e) => title.change(e.target.value)}
           />
           <TextareaAutosize
             minRows={1}
             className="bg-background w-full p-4 text-lg outline-none"
             placeholder="Description"
-            value={description_html ?? ""}
-            onChange={(e) => onEditDescription(e.target.value)}
+            value={description.value}
+            onChange={(e) => description.change(e.target.value)}
           />
         </div>
       </div>

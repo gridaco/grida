@@ -5,18 +5,21 @@ export const supported_form_page_languages: LanguageCode[] = Object.keys(
   resources
 ) as LanguageCode[];
 
-export const language_label_map: Record<LanguageCode, string> = {
-  en: "🇺🇸 English",
-  es: "🇪🇸 Spanish / Español",
-  de: "🇩🇪 German / Deutsch",
-  ja: "🇯🇵 Japanese / 日本語",
-  fr: "🇫🇷 French / Français",
-  pt: "🇵🇹 Portuguese / Português",
-  it: "🇮🇹 Italian / Italiano",
-  ko: "🇰🇷 Korean / 한국어",
-  ru: "🇷🇺 Russian / Русский",
-  zh: "🇨🇳 Chinese / 中文",
-  ar: "🇸🇦 Arabic / العربية",
-  hi: "🇮🇳 Hindi / हिन्दी",
-  nl: "🇳🇱 Dutch / Nederlands",
+export const language_label_map: Record<
+  LanguageCode,
+  { flag: string; label: string }
+> = {
+  en: { flag: "🇺🇸", label: "English" },
+  es: { flag: "🇪🇸", label: "Spanish / Español" },
+  de: { flag: "🇩🇪", label: "German / Deutsch" },
+  ja: { flag: "🇯🇵", label: "Japanese / 日本語" },
+  fr: { flag: "🇫🇷", label: "French / Français" },
+  pt: { flag: "🇵🇹", label: "Portuguese / Português" },
+  it: { flag: "🇮🇹", label: "Italian / Italiano" },
+  ko: { flag: "🇰🇷", label: "Korean / 한국어" },
+  ru: { flag: "🇷🇺", label: "Russian / Русский" },
+  zh: { flag: "🇨🇳", label: "Chinese / 中文" },
+  ar: { flag: "🇸🇦", label: "Arabic / العربية" },
+  hi: { flag: "🇮🇳", label: "Hindi / हिन्दी" },
+  nl: { flag: "🇳🇱", label: "Dutch / Nederlands" },
 };

@@ -15,7 +15,7 @@ import type {
   TableXSBMainTableConnection,
   GDocSchemaTable,
   TableMenuItem,
-  IDocumentLangState,
+  IG11nState,
 } from "./state";
 import { blockstreeflat } from "@/lib/forms/tree";
 import { SYM_LOCALTZ, EditorSymbols } from "./symbols";
@@ -519,13 +519,16 @@ function sitedocumentpagesinit({
   ];
 }
 
-function langinit(lang: LanguageCode): IDocumentLangState {
+function langinit(lang: LanguageCode): IG11nState {
   return {
-    lang: lang,
-    lang_default: lang,
-    langs: [lang],
-    messages: {
-      [lang]: {},
+    g11n: {
+      lang: lang,
+      lang_default: lang,
+      langs: [lang],
+      keys: [],
+      resources: {
+        [lang]: {},
+      },
     },
   };
 }

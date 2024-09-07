@@ -63,12 +63,8 @@ import {
   PreferenceBody,
   PreferenceBox,
   PreferenceBoxHeader,
-  PreferenceDescription,
 } from "@/components/preferences";
-import {
-  language_label_map,
-  supported_form_page_languages,
-} from "@/k/supported_languages";
+import { supported_form_page_languages } from "@/k/supported_languages";
 import { Switch } from "@/components/ui/switch";
 import { PoweredByGridaWaterMark } from "@/components/powered-by-branding";
 import { PropertyLine, PropertyLineControlRoot, PropertyLineLabel } from "./ui";
@@ -151,7 +147,7 @@ function Language() {
   });
   const addnewlangDialog = useDialogState("addnewlang", { refreshkey: true });
   const {
-    document: { lang, langs, lang_default },
+    document: { g11n },
   } = state;
 
   const onLangChange = useCallback(
@@ -164,7 +160,17 @@ function Language() {
     [dispatch]
   );
 
-  const ismultilangs = langs.length > 1;
+  const onDefaultLangChange = useCallback(
+    (lang: LanguageCode) => {
+      dispatch({
+        type: "editor/document/langs/set-default",
+        lang,
+      });
+    },
+    [dispatch]
+  );
+
+  const ismultilangs = g11n.langs.length > 1;
 
   if (ismultilangs) {
     return (
@@ -175,9 +181,9 @@ function Language() {
         />
         <PropertyLine>
           <div className="flex flex-wrap gap-2">
-            {langs.map((l) => {
-              const isdefault = l === lang_default;
-              const iscurrent = l === lang;
+            {g11n.langs.map((l) => {
+              const isdefault = l === g11n.lang_default;
+              const iscurrent = l === g11n.lang;
               return (
                 <Badge
                   onClick={() => onLangChange(l)}
@@ -217,8 +223,8 @@ function Language() {
       <PropertyLine>
         <PropertyLineLabel>Default</PropertyLineLabel>
         <LanguageSelect
-          value={lang}
-          onValueChange={onLangChange}
+          value={g11n.lang_default}
+          onValueChange={onDefaultLangChange}
           className={inputVariants({ size: "sm" })}
         />
       </PropertyLine>
@@ -251,7 +257,7 @@ function EnableMultiLanguageDialog({
   const stepper = useStepper();
 
   const [fallbackLang, setFallbackLang] = useState<LanguageCode>(
-    state.document.lang_default
+    state.document.g11n.lang_default
   );
 
   const [firstLang, setFirstLang] = useState<LanguageCode>();

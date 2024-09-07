@@ -1057,7 +1057,7 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
     case "editor/document/langs/set-default":
     case "editor/document/langs/add":
     case "editor/document/langs/delete":
-    case "editor/document/langs/messages/update": {
+    case "editor/document/langs/messages/change": {
       return langReducer(state, action);
     }
     // #endregion lang

@@ -6,7 +6,7 @@ import { I18nEditor } from "@/scaffolds/i18n-editor";
 
 export default function FormI18nPage() {
   const [state] = useEditorState();
-  const { lang, lang_default, langs, messages } = state.document;
+  const { lang, lang_default, langs } = state.document.g11n;
 
   if (langs.length <= 1) {
     return <Invalid />;

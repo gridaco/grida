@@ -320,24 +320,32 @@ interface IInsertionMenuState {
   insertmenu: TGlobalEditorDialogState;
 }
 
-export interface IDocumentLangState {
-  /**
-   * view document in...
-   */
-  lang: LanguageCode;
-  /**
-   * default language
-   */
-  lang_default: LanguageCode;
-  /**
-   * available languages provided by user
-   */
-  langs: LanguageCode[];
+export interface IG11nState {
+  g11n: {
+    /**
+     * view document in...
+     */
+    lang: LanguageCode;
+    /**
+     * default language
+     */
+    lang_default: LanguageCode;
+    /**
+     * available languages provided by user
+     */
+    langs: LanguageCode[];
+    /**
+     * @deprecated - not supported
+     */
+    keys: Array<string>;
 
-  messages: Partial<Record<LanguageCode, Record<string, string | undefined>>>;
+    resources: Partial<
+      Record<LanguageCode, Record<string, string | undefined>>
+    >;
+  };
 }
 
-interface IDocumentState extends IDocumentLangState {
+interface IDocumentState extends IG11nState {
   pages: MenuItem<string>[];
   selected_page_id?: string;
   nodes: any[];

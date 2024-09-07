@@ -67,7 +67,7 @@ export function LanguageSelect({
           const disabled = optionsmap?.[lang]?.disabled;
           return (
             <SelectItem key={lang} value={lang} disabled={disabled}>
-              {language_label_map[lang]}
+              {language_label_map[lang].flag} {language_label_map[lang].label}
             </SelectItem>
           );
         })}

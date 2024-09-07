@@ -12,7 +12,7 @@ import * as GridLayout from "@/scaffolds/grid-editor/components/layout";
 
 export function I18nEditor() {
   const [state] = useEditorState();
-  const { lang, lang_default, langs, messages } = state.document;
+  const { lang, lang_default, langs } = state.document.g11n;
 
   const keys = [
     "1",

@@ -50,6 +50,10 @@ import {
 import { LanguagesIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { editorlink } from "@/lib/forms/url";
+import {
+  language_label_map,
+  supported_form_page_languages,
+} from "@/k/supported_languages";
 
 export function ModeDesign() {
   const [state, dispatch] = useEditorState();
@@ -97,7 +101,7 @@ function LocalizationView() {
       refreshkey: true,
     });
 
-  const { lang, lang_default, langs } = state.document;
+  const { lang, lang_default, langs } = state.document.g11n;
 
   const ismultilang = langs.length > 1;
 
@@ -188,10 +192,7 @@ function LocalizationView() {
                 onSelect={() => switchLang(l)}
               >
                 <SidebarMenuItemLabel>
-                  {/* <span className="inline-flex w-4 h-4 me-2 items-center justify-center">
-                🇺🇸
-              </span> */}
-                  {l}{" "}
+                  {language_label_map[l].flag} {l}{" "}
                   {isdefault && (
                     <Badge
                       variant="outline"

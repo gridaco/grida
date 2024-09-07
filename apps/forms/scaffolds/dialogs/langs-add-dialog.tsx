@@ -22,7 +22,7 @@ export function AddNewLanguageDialog({
 }: React.ComponentProps<typeof Dialog>) {
   const [state, dispatch] = useEditorState();
 
-  const { langs } = state.document;
+  const { langs } = state.document.g11n;
 
   const [newlang, setNewLang] = React.useState<LanguageCode>();
 

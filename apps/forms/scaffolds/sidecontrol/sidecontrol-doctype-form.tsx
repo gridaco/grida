@@ -20,10 +20,12 @@ import { FormExpression } from "@/lib/forms/expression";
 import { PropertyLine, PropertyLineLabel } from "./ui";
 import { EditBinaryExpression } from "../panels/extensions/v-edit";
 import { PopoverClose } from "@radix-ui/react-popover";
-import { PlainTextControl } from "./controls/plaintext";
+import { InputControl } from "./controls/input";
 import { FieldSupports } from "@/k/supported_field_types";
 import toast from "react-hot-toast";
 import { Badge } from "@/components/ui/badge";
+import { g11nkey, useG11nResource } from "../editor/use";
+import { language_label_map } from "@/k/supported_languages";
 
 export function SideControlDoctypeForm() {
   const [state, dispatch] = useEditorState();
@@ -88,6 +90,10 @@ function SelectedFormBlockProperties() {
       </SidebarSection>
       {block.type === "field" && <BlockTypeField />}
       {block.type === "header" && <BlockTypeHeader />}
+      {block.type === "video" && <BlockTypeVideo />}
+      {/* NOT SUPPORTED */}
+      {/* {block.type === "image" && <BlockTypeImage />} */}
+      {/* {block.type === "html" && <BlockTypeHtml />} */}
     </div>
   );
 }
@@ -184,73 +190,87 @@ function PropertyV_Hidden() {
 }
 
 function BlockTypeField() {
+  const [state, dispatch] = useEditorState();
   const [block] = useFocusedFormBlock();
   const field = useFormField(block.form_field_id!)!;
   const is_hidden_field = field.type === "hidden";
+  const { lang, lang_default } = state.document.g11n;
+  const istranslationmode = lang !== lang_default;
+
+  const label = useG11nResource(
+    g11nkey("field", { id: block.form_field_id!, property: "label" })
+  );
+
+  const placeholder = useG11nResource(
+    g11nkey("field", { id: block.form_field_id!, property: "placeholder" })
+  );
+
+  const helptext = useG11nResource(
+    g11nkey("field", { id: block.form_field_id!, property: "help_text" })
+  );
 
   if (is_hidden_field) return <></>;
 
   return (
     <SidebarSection className="border-b pb-4">
       <SidebarSectionHeaderItem>
-        <SidebarSectionHeaderLabel>Customize</SidebarSectionHeaderLabel>
+        <SidebarSectionHeaderLabel>
+          {istranslationmode ? (
+            <>
+              Field{" "}
+              <Badge variant="outline">
+                {language_label_map[lang].flag} {lang}
+              </Badge>
+            </>
+          ) : (
+            <>Field</>
+          )}
+        </SidebarSectionHeaderLabel>
       </SidebarSectionHeaderItem>
       <SidebarMenuSectionContent className="space-y-2">
         <PropertyLine>
           <PropertyLineLabel>Label</PropertyLineLabel>
-          <PlainTextControl value={field.label ?? ""} />
+          <InputControl
+            placeholder={label.fallback}
+            value={label.value ?? ""}
+            onValueChange={label.change}
+          />
         </PropertyLine>
         {FieldSupports.placeholder(field.type) && (
           <PropertyLine>
             <PropertyLineLabel>Placeholder</PropertyLineLabel>
-            <PlainTextControl value={field.placeholder ?? ""} />
+            <InputControl
+              placeholder={placeholder.fallback}
+              value={placeholder.value ?? ""}
+              onValueChange={placeholder.change}
+            />
           </PropertyLine>
         )}
         <PropertyLine>
           <PropertyLineLabel>Help Text</PropertyLineLabel>
-          <PlainTextControl value={field.help_text ?? ""} />
+          <InputControl
+            placeholder={helptext.fallback}
+            value={helptext.value ?? ""}
+            onValueChange={helptext.change}
+          />
         </PropertyLine>
       </SidebarMenuSectionContent>
     </SidebarSection>
   );
 }
 
-/**
- * @example
- * ```ts
- * const t = useDocumentTranslations()
- * ```
- */
-function useDocumentTranslations() {
-  const [state, dispatch] = useEditorState();
-  const { lang, lang_default, messages } = state.document;
-  //
-
-  return useCallback(
-    (key: string) => {
-      return messages[lang]?.[key];
-    },
-    [lang]
-  );
-}
-
 function BlockTypeHeader() {
   const [state, dispatch] = useEditorState();
   const [block] = useFocusedFormBlock();
-  const t = useDocumentTranslations();
-  const { lang, lang_default } = state.document;
+  const { lang, lang_default } = state.document.g11n;
   const istranslationmode = lang !== lang_default;
 
-  const updateMessage = useCallback(
-    (key: string, message: string | undefined) => {
-      dispatch({
-        type: "editor/document/langs/messages/update",
-        lang: lang,
-        key,
-        message,
-      });
-    },
-    [dispatch, lang]
+  const title = useG11nResource(
+    g11nkey("block", { id: block.id, property: "title_html" })
+  );
+
+  const description = useG11nResource(
+    g11nkey("block", { id: block.id, property: "description_html" })
   );
 
   return (
@@ -259,33 +279,123 @@ function BlockTypeHeader() {
         <SidebarSectionHeaderLabel>
           {istranslationmode ? (
             <>
-              Translate <Badge variant="outline">{lang}</Badge>
+              Header{" "}
+              <Badge variant="outline">
+                {language_label_map[lang].flag} {lang}
+              </Badge>
             </>
           ) : (
-            <>Customize</>
+            <>Header</>
           )}
         </SidebarSectionHeaderLabel>
       </SidebarSectionHeaderItem>
       <SidebarMenuSectionContent className="space-y-2">
         <PropertyLine>
           <PropertyLineLabel>Title</PropertyLineLabel>
-          <PlainTextControl
-            onValueChange={(value) => {
-              updateMessage(block.id + "/title_html", value);
-            }}
-            placeholder={block.title_html ?? ""}
+          <InputControl
+            onValueChange={title.change}
+            placeholder={title.fallback}
+            //  block.title_html ?? ""
             value={
-              istranslationmode
-                ? t(block.id + "/title_html")
-                : block.title_html ?? ""
+              title.value
+              // istranslationmode
+              //   ? t(block.id + "/title_html")
+              //   : block.title_html ?? ""
             }
           />
         </PropertyLine>
         <PropertyLine>
           <PropertyLineLabel>Description</PropertyLineLabel>
-          <PlainTextControl
-            placeholder={block.description_html ?? ""}
-            value={istranslationmode ? "" : block.description_html ?? ""}
+          <InputControl
+            // placeholder={block.description_html ?? ""}
+            // value={istranslationmode ? "" : block.description_html ?? ""}
+            placeholder={description.fallback}
+            value={description.value}
+            onValueChange={description.change}
+          />
+        </PropertyLine>
+      </SidebarMenuSectionContent>
+    </SidebarSection>
+  );
+}
+
+function BlockTypeVideo() {
+  const [state, dispatch] = useEditorState();
+  const [block] = useFocusedFormBlock();
+  const { lang, lang_default } = state.document.g11n;
+  const istranslationmode = lang !== lang_default;
+
+  const src = useG11nResource(
+    g11nkey("block", { id: block.id, property: "src" })
+  );
+
+  return (
+    <SidebarSection className="border-b pb-4">
+      <SidebarSectionHeaderItem>
+        <SidebarSectionHeaderLabel>
+          {istranslationmode ? (
+            <>
+              Video{" "}
+              <Badge variant="outline">
+                {language_label_map[lang].flag} {lang}
+              </Badge>
+            </>
+          ) : (
+            <>Video</>
+          )}
+        </SidebarSectionHeaderLabel>
+      </SidebarSectionHeaderItem>
+      <SidebarMenuSectionContent className="space-y-2">
+        <PropertyLine>
+          <PropertyLineLabel htmlFor="src">URL</PropertyLineLabel>
+          <InputControl
+            id="src"
+            name="src"
+            type="url"
+            value={src.value}
+            onValueChange={src.change}
+          />
+        </PropertyLine>
+      </SidebarMenuSectionContent>
+    </SidebarSection>
+  );
+}
+
+function BlockTypeImage() {
+  const [state, dispatch] = useEditorState();
+  const [block] = useFocusedFormBlock();
+  const { lang, lang_default } = state.document.g11n;
+  const istranslationmode = lang !== lang_default;
+
+  const src = useG11nResource(
+    g11nkey("block", { id: block.id, property: "src" })
+  );
+
+  return (
+    <SidebarSection className="border-b pb-4">
+      <SidebarSectionHeaderItem>
+        <SidebarSectionHeaderLabel>
+          {istranslationmode ? (
+            <>
+              Image{" "}
+              <Badge variant="outline">
+                {language_label_map[lang].flag} {lang}
+              </Badge>
+            </>
+          ) : (
+            <>Image</>
+          )}
+        </SidebarSectionHeaderLabel>
+      </SidebarSectionHeaderItem>
+      <SidebarMenuSectionContent className="space-y-2">
+        <PropertyLine>
+          <PropertyLineLabel htmlFor="src">URL</PropertyLineLabel>
+          <InputControl
+            id="src"
+            name="src"
+            type="url"
+            value={src.value}
+            onValueChange={src.change}
           />
         </PropertyLine>
       </SidebarMenuSectionContent>

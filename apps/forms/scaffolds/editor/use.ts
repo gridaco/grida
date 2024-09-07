@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useContext } from "react";
+import { useMemo, useContext, useCallback } from "react";
 import type { EditorState, GDocTable, GDocTableID } from "./state";
 import { useDispatch, type FlatDispatcher } from "./dispatch";
 
 import { Context } from "./provider";
+import { IFormBlock, IFormField } from "@/types";
 
 export const useEditorState = (): [EditorState, FlatDispatcher] => {
   const state = useContext(Context);
@@ -94,4 +95,107 @@ export function useDatabaseTableId(): string | null {
       : (state.datagrid_table_id as string);
 
   return table_id;
+}
+
+/**
+ * @example
+ * ```ts
+ * const t = useDocumentTranslations()
+ * ```
+ */
+export function useDocumentTranslations() {
+  const [state, dispatch] = useEditorState();
+  const { lang, lang_default, resources: messages } = state.document.g11n;
+  //
+
+  return useCallback(
+    (key: string) => {
+      return messages[lang]?.[key];
+    },
+    [lang, messages]
+  );
+}
+
+type G11nFormBlockResourceQuery = [
+  type: "block",
+  {
+    id: string;
+    property: keyof Pick<
+      IFormBlock,
+      "title_html" | "description_html" | "body_html" | "src"
+    >;
+  },
+];
+
+type G11nFormFieldResourceQuery = [
+  type: "field",
+  {
+    id: string;
+    property: keyof Pick<IFormField, "label" | "placeholder" | "help_text">;
+  },
+];
+
+type ResourceKeyQuery = G11nFormBlockResourceQuery | G11nFormFieldResourceQuery;
+
+export function g11nkey(...q: ResourceKeyQuery) {
+  const [type, { id, property }] = q;
+  return [type, id, property].join(".");
+}
+
+export function useG11nResource(key: string) {
+  // const onEditTitle = useCallback(
+  //   (title: string) => {
+  //     dispatch({
+  //       type: "blocks/title",
+  //       block_id: id,
+  //       title_html: title,
+  //     });
+  //   },
+  //   [dispatch, id]
+  // );
+
+  // const onEditDescription = useCallback(
+  //   (description: string) => {
+  //     dispatch({
+  //       type: "blocks/description",
+  //       block_id: id,
+  //       description_html: description,
+  //     });
+  //   },
+  //   [dispatch, id]
+  // );
+
+  const [state, dispatch] = useEditorState();
+  const { lang, lang_default, resources: messages } = state.document.g11n;
+
+  //
+
+  const fallback = useMemo(() => {
+    return messages[lang_default]?.[key];
+  }, [lang_default, messages, key]);
+
+  const value = useMemo(() => {
+    return messages[lang]?.[key];
+  }, [lang, messages, key]);
+
+  const change = useCallback(
+    (message?: string) => {
+      dispatch({
+        type: "editor/document/langs/messages/change",
+        key: key,
+        message: message,
+        lang: lang,
+      });
+    },
+    [key, lang, dispatch]
+  );
+
+  return {
+    fallback,
+    value,
+    change,
+    lang,
+    lang_default,
+    isTranslationMode: lang !== lang_default,
+  };
 }

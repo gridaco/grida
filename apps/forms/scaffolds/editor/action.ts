@@ -151,30 +151,45 @@ export interface BlockVHiddenAction {
   v_hidden: Tokens.ShorthandBooleanBinaryExpression;
 }
 
+/**
+ * @deprecated - remove me - use translation module
+ */
 export interface HtmlBlockBodyAction {
   type: "blocks/html/body";
   block_id: string;
   html: string;
 }
 
+/**
+ * @deprecated - remove me - use translation module
+ */
 export interface ImageBlockSrcAction {
   type: "blocks/image/src";
   block_id: string;
   src: string;
 }
 
+/**
+ * @deprecated - remove me - use translation module
+ */
 export interface VideoBlockSrcAction {
   type: "blocks/video/src";
   block_id: string;
   src: string;
 }
 
+/**
+ * @deprecated - remove me - use translation module
+ */
 export interface BlockTitleAction {
   type: "blocks/title";
   block_id: string;
   title_html: string;
 }
 
+/**
+ * @deprecated - remove me - use translation module
+ */
 export interface BlockDescriptionAction {
   type: "blocks/description";
   block_id: string;
@@ -416,7 +431,7 @@ export interface EditorDocumentLangDeleteAction {
 }
 
 export interface EditorDocumentLangMessageAction {
-  type: "editor/document/langs/messages/update";
+  type: "editor/document/langs/messages/change";
   lang: LanguageCode;
   key: string;
   message: string | undefined;

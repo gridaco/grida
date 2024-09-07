@@ -42,6 +42,8 @@ If you wish to contribute or run this project locally, see [CONTRIBUTING.md](./C
 - [ ] Localization
 - [ ] Joins & Relational Queries
 - [ ] Gallary & List View
+- [ ] Charts & Analytics
+- [ ] Actions & Workflows
 
 # Grida Localization (Comming this Fall)
 

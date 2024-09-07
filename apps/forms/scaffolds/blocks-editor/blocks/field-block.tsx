@@ -47,6 +47,7 @@ import clsx from "clsx";
 import { editorlink } from "@/lib/forms/url";
 import { SYSTEM_GF_KEY_STARTS_WITH } from "@/k/system";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
+import { g11nkey, useG11nResource } from "@/scaffolds/editor/use";
 
 export function FieldBlock({
   id,
@@ -57,6 +58,12 @@ export function FieldBlock({
   const [state, dispatch] = useEditorState();
   const [focused, setFocus] = useBlockFocus(id);
 
+  const {
+    form: { available_field_ids },
+  } = state;
+
+  const advancedModeDialog = useDialogState();
+
   const fields = useFormFields();
 
   const form_field: FormFieldDefinition | undefined = fields.find(
@@ -65,12 +72,19 @@ export function FieldBlock({
 
   const is_hidden_field = form_field?.type === "hidden";
 
-  const {
-    form: { available_field_ids },
-  } = state;
-  const advancedModeDialog = useDialogState();
-
   const can_advanced_mode = fields.length > 0;
+
+  const label = useG11nResource(
+    g11nkey("field", { id: form_field_id!, property: "label" })
+  );
+
+  const placeholder = useG11nResource(
+    g11nkey("field", { id: form_field_id!, property: "placeholder" })
+  );
+
+  const helptext = useG11nResource(
+    g11nkey("field", { id: form_field_id!, property: "help_text" })
+  );
 
   const onFieldChange = useCallback(
     (field_id: string) => {
@@ -192,7 +206,14 @@ export function FieldBlock({
               preview
               disabled={!!!form_field}
               name={form_field?.name ?? ""}
-              label={form_field?.label ?? ""}
+              //
+              // label={form_field?.label ?? ""}
+              // helpText={form_field?.help_text ?? ""}
+              // placeholder={form_field?.placeholder ?? ""}
+              label={label.value}
+              helpText={helptext.value}
+              placeholder={placeholder.value}
+              //
               type={form_field?.type ?? "text"}
               required={form_field?.required ?? false}
               requiredAsterisk
@@ -200,8 +221,6 @@ export function FieldBlock({
               step={form_field?.step ?? undefined}
               min={form_field?.min ?? undefined}
               max={form_field?.max ?? undefined}
-              helpText={form_field?.help_text ?? ""}
-              placeholder={form_field?.placeholder ?? ""}
               options={form_field?.options}
               optgroups={form_field?.optgroups}
               multiple={form_field?.multiple ?? false}

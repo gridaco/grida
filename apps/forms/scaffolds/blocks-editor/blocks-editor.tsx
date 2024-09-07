@@ -242,7 +242,7 @@ function AgentThemeSyncProvider({ children }: React.PropsWithChildren<{}>) {
       supabase
         .from("form_document")
         .update({
-          lang: document.lang,
+          lang: document.g11n.lang,
           is_powered_by_branding_enabled: theme.is_powered_by_branding_enabled,
           stylesheet: {
             appearance: theme.appearance,
@@ -266,7 +266,7 @@ function AgentThemeSyncProvider({ children }: React.PropsWithChildren<{}>) {
     prev,
     supabase,
     document_id,
-    document.lang,
+    document.g11n.lang,
     theme.is_powered_by_branding_enabled,
     theme.appearance,
     theme.customCSS,
@@ -326,7 +326,7 @@ function FooterPreview() {
 
   const {
     theme: { is_powered_by_branding_enabled },
-    document: { lang },
+    document: { g11n },
   } = state;
 
   return (
@@ -341,7 +341,7 @@ function FooterPreview() {
           "w-full md:w-auto"
         )}
       >
-        <Button type="button">{common[lang].submit}</Button>
+        <Button type="button">{common[g11n.lang].submit}</Button>
       </footer>
       {is_powered_by_branding_enabled && (
         <div className="hidden md:block">
