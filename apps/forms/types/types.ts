@@ -2,7 +2,8 @@ import { IpInfo } from "@/clients/ipinfo";
 import palettes from "@/theme/palettes";
 import type { Tokens } from "@/ast";
 
-type UUID = string;
+export type PGUUID = string;
+export type PGINT8ID = number;
 
 export type JSONValue =
   | string
@@ -218,7 +219,7 @@ export interface IFormField {
 }
 
 export interface FormFieldDefinition extends IFormField {
-  id: UUID;
+  id: PGUUID;
   local_index: number;
 }
 

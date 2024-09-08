@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import {
   createRouteHandlerXSBClient,
   createServerComponentFormsClient,
+  createServerComponentG11nClient,
   createServerComponentWorkspaceClient,
   grida_xsupabase_service_client,
 } from "@/supabase/server";
@@ -76,8 +77,10 @@ export default async function Layout({
   params: GDocEditorRouteParams;
 }>) {
   const cookieStore = cookies();
-  const supabase = createServerComponentFormsClient(cookieStore);
+  const formsclient = createServerComponentFormsClient(cookieStore);
   const wsclient = createServerComponentWorkspaceClient(cookieStore);
+  const g11nclient = createServerComponentG11nClient(cookieStore);
+
   const { id, org, proj } = params;
 
   const { data: project_ref, error: project_ref_err } = await wsclient
@@ -115,7 +118,7 @@ export default async function Layout({
 
   switch (masterdoc_ref.doctype) {
     case "v0_form": {
-      const { data, error } = await supabase
+      const { data, error } = await formsclient
         .from("form_document")
         .select(
           `
@@ -145,7 +148,7 @@ export default async function Layout({
       const appearance =
         (data.stylesheet as FormStyleSheetV1Schema)?.appearance ?? "system";
 
-      const client = new GridaXSupabaseService();
+      const xsbservice = new GridaXSupabaseService();
 
       const { form: _form } = data;
       assert(_form);
@@ -156,8 +159,32 @@ export default async function Layout({
       };
 
       const supabase_connection_state = form.supabase_connection
-        ? await client.getXSBMainTableConnectionState(form.supabase_connection)
+        ? await xsbservice.getXSBMainTableConnectionState(
+            form.supabase_connection
+          )
         : null;
+
+      if (data.g11n_manifest_id) {
+        const { data: g11n, error: g11n_err } = await g11nclient
+          .from("manifest")
+          .select(
+            `
+              *,
+              locales:locale!manifest_id(*),
+              default_locale:locale(*),
+              keys:key(*)
+            `
+          )
+          .eq("id", data.g11n_manifest_id)
+          .single();
+
+        // g11n.
+
+        if (g11n_err) {
+          // report and ignore
+          console.error("g11n_err", g11n_err);
+        }
+      }
 
       return (
         <Html>
@@ -285,7 +312,7 @@ export default async function Layout({
       );
     }
     case "v0_schema": {
-      const { data, error } = await supabase
+      const { data, error } = await formsclient
         .from("schema_document")
         .select(
           `

@@ -20,6 +20,7 @@ import type {
   GDocumentType,
   GridaXSupabase,
   OrderBy,
+  PGINT8ID,
 } from "@/types";
 import { SYM_LOCALTZ, EditorSymbols } from "./symbols";
 import { ZodObject } from "zod";
@@ -323,13 +324,20 @@ interface IInsertionMenuState {
 export interface IG11nState {
   g11n: {
     /**
+     * grida_g11n.manifest.id
+     */
+    manifest_id: PGINT8ID;
+
+    /**
      * view document in...
      */
     lang: LanguageCode;
+
     /**
      * default language
      */
     lang_default: LanguageCode;
+
     /**
      * available languages provided by user
      */

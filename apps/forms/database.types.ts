@@ -1918,7 +1918,7 @@ export type Database = {
           {
             foreignKeyName: "manifest_default_locale_id_fkey"
             columns: ["default_locale_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "locale"
             referencedColumns: ["id"]
           },

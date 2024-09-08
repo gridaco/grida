@@ -229,7 +229,7 @@ function Language() {
         />
       </PropertyLine>
       <PropertyLine>
-        <PropertyLineLabel>Multiple</PropertyLineLabel>
+        <PropertyLineLabel>Localize</PropertyLineLabel>
         <PropertyLineControlRoot>
           <Switch
             checked={localizationSetupDialog.open}
@@ -292,6 +292,7 @@ function EnableMultiLanguageDialog({
           onSubmit={(e) => {
             e.preventDefault();
             if (stepper.isLast) {
+              //
               addLang(firstLang!);
               props?.onOpenChange?.(false);
             } else {

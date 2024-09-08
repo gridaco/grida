@@ -90,6 +90,20 @@ export const createServerComponentWorkspaceClient = (
     }
   );
 
+export const createServerComponentG11nClient = (
+  cookieStore: ReadonlyRequestCookies
+) =>
+  _createServerComponentClient<Database, "grida_g11n">(
+    {
+      cookies: () => cookieStore,
+    },
+    {
+      options: {
+        db: { schema: "grida_g11n" },
+      },
+    }
+  );
+
 export const createRouteHandlerFormsClient = (
   cookieStore: ReadonlyRequestCookies
 ) =>
