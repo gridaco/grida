@@ -1,5 +1,6 @@
 "use client";
 
+import React, { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,8 +17,36 @@ import {
 } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import { SlackIcon } from "lucide-react";
-import { useState } from "react";
+import { sendGAEvent } from "@next/third-parties/google";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { useWorkspace } from "../workspace";
 import Head from "next/head";
+
+function useGAAuthenticatedUserIDTelemetry() {
+  const { state } = useWorkspace();
+  const [uid, setUid] = useState<string>();
+
+  const supabase = useMemo(
+    () => createClientComponentClient({ isSingleton: false }),
+    []
+  );
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setUid(data.user?.id);
+    });
+  }, [supabase]);
+
+  useEffect(() => {
+    if (!uid) return;
+    if (process.env.NEXT_PUBLIC_GAID) {
+      window.dataLayer?.push({ user_id: uid });
+      sendGAEvent("event", "workspace", {
+        org: state.organization.name,
+      });
+    }
+  }, [uid, state.organization.name]);
+}
 
 function AnimatedAvatar() {
   const [isHovered, setIsHovered] = useState(false);
@@ -54,6 +83,9 @@ function AnimatedAvatar() {
 }
 
 export function EditorHelpFab() {
+  // this is a good place to track authenticated user id - as its global by workspace and unique.
+  useGAAuthenticatedUserIDTelemetry();
+
   return (
     <div className="fixed right-4 bottom-4">
       <DropdownMenu>

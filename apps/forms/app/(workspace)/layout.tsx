@@ -2,7 +2,6 @@ import { Inter } from "next/font/google";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ToasterWithMax } from "@/components/toaster";
-import { EditorHelpFab } from "@/scaffolds/help/editor-help-fab";
 import clsx from "clsx";
 import "../editor.css";
 
@@ -37,7 +36,6 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             {children}
-            <EditorHelpFab />
             <ToasterWithMax position="bottom-center" max={5} />
           </ThemeProvider>
         </div>
