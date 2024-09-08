@@ -4,10 +4,7 @@ import {
   SYSTEM_GF_CUSTOMER_UUID_KEY,
 } from "@/k/system";
 // TODO: need RLS?
-import {
-  grida_forms_client,
-  grida_commerce_client,
-} from "@/lib/supabase/server";
+import { grida_forms_client, grida_commerce_client } from "@/supabase/server";
 import { upsert_customer_with } from "@/services/customer";
 import {
   validate_max_access_by_customer,

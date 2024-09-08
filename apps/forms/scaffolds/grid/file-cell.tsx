@@ -44,7 +44,7 @@ import { FileTypeIcon } from "@/components/form-field-type-icon";
 import toast from "react-hot-toast";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { SignedUploadUrlData } from "@/types/private/api";
-import { SupabaseStorageExtensions } from "@/lib/supabase/storage-ext";
+import { SupabaseStorageExtensions } from "@/supabase/storage-ext";
 import { Spinner } from "@/components/spinner";
 
 export function FileEditCell({

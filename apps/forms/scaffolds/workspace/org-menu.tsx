@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { createClientWorkspaceClient } from "@/lib/supabase/client";
+import { createClientWorkspaceClient } from "@/supabase/client";
 import { CheckIcon, PlusIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
 import React, { useMemo } from "react";

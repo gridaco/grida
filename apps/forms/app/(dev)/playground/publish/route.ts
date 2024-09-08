@@ -1,9 +1,6 @@
 import { Env } from "@/env";
 import { editorlink, formlink } from "@/lib/forms/url";
-import {
-  createRouteHandlerClient,
-  workspaceclient,
-} from "@/lib/supabase/server";
+import { createRouteHandlerClient, workspaceclient } from "@/supabase/server";
 import { JSONFrom2DB } from "@/services/new/json2db";
 import { JSONFormParser } from "@/types";
 import assert from "assert";

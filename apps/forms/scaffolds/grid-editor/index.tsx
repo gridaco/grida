@@ -2,7 +2,7 @@
 
 import React, { useCallback, useMemo } from "react";
 import { ResponseGrid } from "../grid";
-import { createClientFormsClient } from "@/lib/supabase/client";
+import { createClientFormsClient } from "@/supabase/client";
 import {
   AlertDialog,
   AlertDialogContent,

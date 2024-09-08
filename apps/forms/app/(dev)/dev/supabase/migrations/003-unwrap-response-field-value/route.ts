@@ -1,5 +1,5 @@
 import { unwrapFeildValue } from "@/lib/forms/unwrap";
-import { grida_forms_client } from "@/lib/supabase/server";
+import { grida_forms_client } from "@/supabase/server";
 import { NextResponse } from "next/server";
 
 export async function POST() {

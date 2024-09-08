@@ -106,7 +106,13 @@ function DuoRow({ keyname }: { keyname: string }) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              <DropdownMenuItem>Copy Translation Key</DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => {
+                  alert("Not implemented yet - contact support");
+                }}
+              >
+                Copy Translation Key
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

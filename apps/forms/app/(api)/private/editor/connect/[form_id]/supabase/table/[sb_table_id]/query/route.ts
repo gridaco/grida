@@ -6,7 +6,7 @@ import {
   XSupabaseQuery,
   XSupabaseQueryBuilder,
 } from "@/lib/supabase-postgrest/builder";
-import { createRouteHandlerClient } from "@/lib/supabase/server";
+import { createRouteHandlerClient } from "@/supabase/server";
 import {
   GridaXSupabaseService,
   createXSupabaseClient,

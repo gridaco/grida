@@ -1,4 +1,4 @@
-import { grida_forms_client, workspaceclient } from "@/lib/supabase/server";
+import { grida_forms_client, workspaceclient } from "@/supabase/server";
 import type {
   FormResponseUnknownFieldHandlingStrategyType,
   GDocumentType,

@@ -1,4 +1,4 @@
-import { createRouteHandlerXSBClient } from "@/lib/supabase/server";
+import { createRouteHandlerXSBClient } from "@/supabase/server";
 import { createXSupabaseClient } from "@/services/x-supabase";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";

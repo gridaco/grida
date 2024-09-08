@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { stringify } from "csv-stringify/sync";
 import { unwrapFeildValue } from "@/lib/forms/unwrap";
 import { fmt_local_index } from "@/utils/fmt";
-import { createRouteHandlerClient } from "@/lib/supabase/server";
+import { createRouteHandlerClient } from "@/supabase/server";
 
 export const revalidate = 0;
 

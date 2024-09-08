@@ -1,5 +1,5 @@
 import resources from "./resources";
-import { grida_forms_client } from "@/lib/supabase/server";
+import { grida_forms_client } from "@/supabase/server";
 import i18next from "i18next";
 
 type InitWith = { form_id: string } | { lng: string };

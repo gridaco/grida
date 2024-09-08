@@ -1,7 +1,7 @@
 import { GRIDA_FORMS_RESPONSE_BUCKET } from "@/k/env";
-import { grida_forms_client } from "@/lib/supabase/server";
+import { grida_forms_client } from "@/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
-import { SupabaseStorageExtensions } from "@/lib/supabase/storage-ext";
+import { SupabaseStorageExtensions } from "@/supabase/storage-ext";
 import assert from "assert";
 
 // [PROTECTED] this route is protected for only dev environment via middleware

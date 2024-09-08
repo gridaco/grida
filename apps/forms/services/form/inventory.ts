@@ -1,4 +1,4 @@
-import { grida_commerce_client } from "@/lib/supabase/server";
+import { grida_commerce_client } from "@/supabase/server";
 import { GridaCommerceClient } from "../commerce";
 import assert from "assert";
 import { Option } from "@/types";

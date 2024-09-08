@@ -1,7 +1,7 @@
 import {
   createServerComponentClient,
   createServerComponentWorkspaceClient,
-} from "@/lib/supabase/server";
+} from "@/supabase/server";
 import { Workspace } from "@/scaffolds/workspace";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";

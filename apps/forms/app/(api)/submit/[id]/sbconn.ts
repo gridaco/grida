@@ -1,6 +1,6 @@
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";
-import { grida_xsupabase_client } from "@/lib/supabase/server";
+import { grida_xsupabase_client } from "@/supabase/server";
 import { createXSupabaseClient } from "@/services/x-supabase";
 import type {
   SchemaTableConnectionXSupabaseMainTableJoint,

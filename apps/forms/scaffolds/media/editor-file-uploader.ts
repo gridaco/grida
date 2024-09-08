@@ -1,4 +1,4 @@
-import { createClientFormsClient } from "@/lib/supabase/client";
+import { createClientFormsClient } from "@/supabase/client";
 import { useEditorState } from "../editor";
 import { nanoid } from "nanoid";
 import { useCallback } from "react";

@@ -11,7 +11,7 @@ import toast from "react-hot-toast";
 import {
   createClientFormsClient,
   createClientWorkspaceClient,
-} from "@/lib/supabase/client";
+} from "@/supabase/client";
 import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import useSWR from "swr";
 import type { EditorApiResponse } from "@/types/private/api";

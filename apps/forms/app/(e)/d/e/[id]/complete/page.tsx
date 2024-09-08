@@ -1,5 +1,5 @@
 import React from "react";
-import { grida_forms_client } from "@/lib/supabase/server";
+import { grida_forms_client } from "@/supabase/server";
 import { notFound } from "next/navigation";
 import { EndingPageWithContext } from "@/theme/templates/formcomplete";
 import { ssr_page_init_i18n } from "@/i18n/ssr";

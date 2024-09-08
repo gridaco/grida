@@ -4,7 +4,7 @@ import {
   grida_forms_client,
   createServerComponentClient,
   workspaceclient,
-} from "@/lib/supabase/server";
+} from "@/supabase/server";
 import { Metadata } from "next";
 import { Inconsolata, Inter, Lora } from "next/font/google";
 import { FormDocument } from "@/types";

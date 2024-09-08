@@ -4,7 +4,7 @@ import { streamObject } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { createStreamableValue } from "ai/rsc";
 import { GENzJSONForm } from "@/types/zod";
-import { grida_forms_client } from "@/lib/supabase/server";
+import { grida_forms_client } from "@/supabase/server";
 
 export async function generate(input: string, gist?: string) {
   const stream = createStreamableValue({});

@@ -1,4 +1,4 @@
-import { grida_forms_client, workspaceclient } from "@/lib/supabase/server";
+import { grida_forms_client, workspaceclient } from "@/supabase/server";
 import { process_response_provisional_info } from "@/services/customer/utils";
 import { NextResponse } from "next/server";
 

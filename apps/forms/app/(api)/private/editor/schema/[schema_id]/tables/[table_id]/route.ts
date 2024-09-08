@@ -1,4 +1,4 @@
-import { createRouteHandlerClient } from "@/lib/supabase/server";
+import { createRouteHandlerClient } from "@/supabase/server";
 import { EditorApiResponseOk } from "@/types/private/api";
 import assert from "assert";
 import { cookies } from "next/headers";

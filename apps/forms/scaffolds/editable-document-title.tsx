@@ -1,7 +1,7 @@
 "use client";
 
 import { Input } from "@/components/ui/input";
-import { createClientWorkspaceClient } from "@/lib/supabase/client";
+import { createClientWorkspaceClient } from "@/supabase/client";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import toast from "react-hot-toast";
 import { useEditorState } from "./editor";

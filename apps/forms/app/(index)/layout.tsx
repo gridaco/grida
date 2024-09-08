@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import { createServerComponentClient } from "@/lib/supabase/server";
+import { createServerComponentClient } from "@/supabase/server";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { GoogleAnalytics } from "@next/third-parties/google";

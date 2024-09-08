@@ -1,5 +1,5 @@
-import { grida_xsupabase_client } from "@/lib/supabase/server";
-import { secureformsclient } from "@/lib/supabase/vault";
+import { grida_xsupabase_client } from "@/supabase/server";
+import { secureformsclient } from "@/supabase/vault";
 import {
   SchemaTableConnectionXSupabaseMainTableJoint,
   GridaXSupabase,
@@ -9,7 +9,7 @@ import {
   SupabaseClientOptions,
   createClient,
 } from "@supabase/supabase-js";
-import { SupabaseStorageExtensions } from "@/lib/supabase/storage-ext";
+import { SupabaseStorageExtensions } from "@/supabase/storage-ext";
 import { render } from "@/lib/templating/template";
 import type { XSupabaseStorageSchema } from "@/types";
 import type { TemplateVariables } from "@/lib/templating";

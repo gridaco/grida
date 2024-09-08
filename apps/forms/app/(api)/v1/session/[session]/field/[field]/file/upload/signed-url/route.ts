@@ -1,4 +1,4 @@
-import { grida_forms_client } from "@/lib/supabase/server";
+import { grida_forms_client } from "@/supabase/server";
 import { SessionStorageServices } from "@/services/form/storage";
 import type {
   CreateSessionSignedUploadUrlRequest,

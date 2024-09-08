@@ -5,7 +5,7 @@ import {
   SERVICE_ERROR,
 } from "@/k/error";
 // TODO: need RLS?
-import { grida_forms_client } from "@/lib/supabase/server";
+import { grida_forms_client } from "@/supabase/server";
 
 export async function validate_max_access_by_form({
   form_id,

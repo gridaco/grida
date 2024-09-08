@@ -1,4 +1,4 @@
-import { createServerComponentClient } from "@/lib/supabase/server";
+import { createServerComponentClient } from "@/supabase/server";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import assert from "assert";
-import { grida_forms_client } from "@/lib/supabase/server";
+import { grida_forms_client } from "@/supabase/server";
 import { notFound } from "next/navigation";
 import { RawdataProcessing } from "@/lib/forms/rawdata";
 

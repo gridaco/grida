@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { XSupabasePrivateApiTypes } from "@/types/private/api";
 import { cookies } from "next/headers";
-import { createRouteHandlerXSBClient } from "@/lib/supabase/server";
+import { createRouteHandlerXSBClient } from "@/supabase/server";
 import assert from "assert";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 

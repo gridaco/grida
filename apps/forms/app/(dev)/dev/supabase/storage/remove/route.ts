@@ -2,7 +2,7 @@ import {
   GRIDA_FORMS_RESPONSE_BUCKET,
   GRIDA_FORMS_RESPONSE_BUCKET_TMP_FOLDER,
 } from "@/k/env";
-import { grida_forms_client } from "@/lib/supabase/server";
+import { grida_forms_client } from "@/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
 // [PROTECTED] this route is protected for only dev environment via middleware

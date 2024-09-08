@@ -3,7 +3,7 @@ import {
   grida_commerce_client,
   createRouteHandlerClient,
   createRouteHandlerWorkspaceClient,
-} from "@/lib/supabase/server";
+} from "@/supabase/server";
 import { GridaCommerceClient } from "@/services/commerce";
 import { GridaFormsClient } from "@/services/form";
 import { generated_form_store_name } from "@/services/utils/generated-form-store-name";

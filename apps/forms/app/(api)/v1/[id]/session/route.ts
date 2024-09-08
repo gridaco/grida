@@ -1,5 +1,5 @@
 import { parseGFKeys } from "@/lib/forms/gfkeys";
-import { grida_forms_client } from "@/lib/supabase/server";
+import { grida_forms_client } from "@/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
 // the phylosophy behind response session is, always create, do not validate.

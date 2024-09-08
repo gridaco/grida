@@ -1,4 +1,4 @@
-import { grida_forms_client as grida_forms_client } from "@/lib/supabase/server";
+import { grida_forms_client as grida_forms_client } from "@/supabase/server";
 import assert from "assert";
 import {
   GRIDA_FORMS_RESPONSE_BUCKET,

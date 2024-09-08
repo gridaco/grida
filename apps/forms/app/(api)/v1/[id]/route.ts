@@ -18,7 +18,7 @@ import {
   SYSTEM_GF_FINGERPRINT_VISITORID_KEY,
 } from "@/k/system";
 import { FormBlockTree } from "@/lib/forms/types";
-import { grida_forms_client } from "@/lib/supabase/server";
+import { grida_forms_client } from "@/supabase/server";
 import { upsert_customer_with } from "@/services/customer";
 import {
   FormFieldOptionsInventoryMap,
