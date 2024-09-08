@@ -1,4 +1,4 @@
-import { workspaceclient } from "@/supabase/server";
+import { workspace_service_client } from "@/supabase/server";
 import {
   isValidUsername,
   username_validation_messages,
@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   const { value } = await req.json();
-  const { data, error } = await workspaceclient
+  const { data, error } = await workspace_service_client
     .from("organization")
     .select("name")
     .ilike("name", value)

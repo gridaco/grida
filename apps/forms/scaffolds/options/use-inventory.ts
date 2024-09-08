@@ -3,13 +3,13 @@ import { InventoryStock } from "@/types/inventory";
 import { INITIAL_INVENTORY_STOCK } from "@/k/inventory_defaults";
 import { GridaCommerceClient } from "@/services/commerce";
 import { useEditorState } from "../editor";
-import { createClientCommerceClient } from "@/supabase/client";
+import { createClientComponentCommerceClient } from "@/supabase/client";
 import type { Option } from "@/types";
 
 function useCommerceClient() {
   const [state] = useEditorState();
 
-  const supabase = useMemo(() => createClientCommerceClient(), []);
+  const supabase = useMemo(() => createClientComponentCommerceClient(), []);
 
   const commerce = useMemo(
     () =>

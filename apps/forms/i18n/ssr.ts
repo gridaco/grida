@@ -1,5 +1,5 @@
 import resources from "./resources";
-import { grida_forms_client } from "@/supabase/server";
+import { grida_forms_service_client } from "@/supabase/server";
 import i18next from "i18next";
 
 type InitWith = { form_id: string } | { lng: string };
@@ -11,7 +11,7 @@ export async function ssr_page_init_i18n(init: InitWith) {
     lng = init.lng;
   } else {
     const { form_id } = init;
-    const { data, error } = await grida_forms_client
+    const { data, error } = await grida_forms_service_client
       .from("form_document")
       .select(
         `

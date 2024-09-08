@@ -1,4 +1,4 @@
-import { createRouteHandlerClient } from "@/supabase/server";
+import { createRouteHandlerFormsClient } from "@/supabase/server";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
 
   assert(form_id, "form_id is required");
 
-  const supabase = createRouteHandlerClient(cookieStore);
+  const supabase = createRouteHandlerFormsClient(cookieStore);
 
   const { error } = await supabase
     .from("form")

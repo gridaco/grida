@@ -1,7 +1,7 @@
 import type { Database } from "@/database.types";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 
-export const createClientFormsClient = () =>
+export const createClientComponentFormsClient = () =>
   createClientComponentClient<Database, "grida_forms">({
     options: {
       db: {
@@ -10,7 +10,7 @@ export const createClientFormsClient = () =>
     },
   });
 
-export const createClientCommerceClient = () =>
+export const createClientComponentCommerceClient = () =>
   createClientComponentClient<Database, "grida_commerce">({
     options: {
       db: {
@@ -20,7 +20,16 @@ export const createClientCommerceClient = () =>
     isSingleton: false,
   });
 
-export const createClientWorkspaceClient = () =>
+export const createClientComponentG11nClient = () =>
+  createClientComponentClient<Database, "grida_g11n">({
+    options: {
+      db: {
+        schema: "grida_g11n",
+      },
+    },
+  });
+
+export const createClientComponentWorkspaceClient = () =>
   createClientComponentClient<Database, "public">({
     options: {
       db: {

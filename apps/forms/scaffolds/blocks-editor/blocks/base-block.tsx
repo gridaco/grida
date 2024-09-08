@@ -1,6 +1,6 @@
 "use client";
 
-import { createClientFormsClient } from "@/supabase/client";
+import { createClientComponentFormsClient } from "@/supabase/client";
 import { useEditorState } from "@/scaffolds/editor";
 import { useCallback } from "react";
 import toast from "react-hot-toast";
@@ -8,7 +8,7 @@ import clsx from "clsx";
 
 export function useDeleteBlock() {
   const [state, dispatch] = useEditorState();
-  const supabase = createClientFormsClient();
+  const supabase = createClientComponentFormsClient();
 
   const deleteBlock = useCallback(
     async (id: string) => {

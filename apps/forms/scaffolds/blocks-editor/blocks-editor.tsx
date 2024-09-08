@@ -16,7 +16,7 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { createClientFormsClient } from "@/supabase/client";
+import { createClientComponentFormsClient } from "@/supabase/client";
 import toast from "react-hot-toast";
 import { InsertMenuTrigger } from "./insert-menu-trigger";
 import { SectionStyle } from "../agent/theme";
@@ -90,7 +90,7 @@ function DndContextProvider({ children }: React.PropsWithChildren<{}>) {
 function PendingBlocksResolver() {
   const [state, dispatch] = useEditorState();
 
-  const supabase = createClientFormsClient();
+  const supabase = createClientComponentFormsClient();
 
   const insertBlock = useCallback(
     async (block: EditorFlatFormBlock) => {
@@ -154,7 +154,7 @@ function PendingBlocksResolver() {
 function useSyncBlocks(blocks: EditorFlatFormBlock[]) {
   // TODO: add debounce
 
-  const supabase = createClientFormsClient();
+  const supabase = createClientComponentFormsClient();
   const prevBlocksRef = useRef(blocks);
 
   useEffect(() => {
@@ -229,7 +229,7 @@ function LangSyncProvider({ children }: React.PropsWithChildren<{}>) {
   const [state] = useEditorState();
   const { document_id } = state;
   const prev = usePrevious(state.document.g11n);
-  const supabase = useMemo(() => createClientFormsClient(), []);
+  const supabase = useMemo(() => createClientComponentFormsClient(), []);
 
   useEffect(() => {
     if (!prev) {
@@ -257,7 +257,7 @@ function AgentThemeSyncProvider({ children }: React.PropsWithChildren<{}>) {
   const [state] = useEditorState();
   const { document_id, document, theme } = state;
   const prev = usePrevious(state.theme);
-  const supabase = useMemo(() => createClientFormsClient(), []);
+  const supabase = useMemo(() => createClientComponentFormsClient(), []);
 
   useEffect(() => {
     if (!prev) {

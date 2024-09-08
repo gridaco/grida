@@ -1,7 +1,7 @@
 import { GRIDA_FORMS_RESPONSE_BUCKET } from "@/k/env";
 import { UniqueFileNameGenerator } from "@/lib/forms/storage";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
-import { grida_forms_client } from "@/supabase/server";
+import { grida_forms_service_client } from "@/supabase/server";
 import { TemplateVariables } from "@/lib/templating";
 import {
   FileStorage,
@@ -75,7 +75,7 @@ export class FieldStorageService {
     }
 
     this._m_fileStorage = new FileStorage(
-      grida_forms_client,
+      grida_forms_service_client,
       GRIDA_FORMS_RESPONSE_BUCKET
     );
     return this._m_fileStorage;
@@ -222,7 +222,7 @@ export namespace SessionStorageServices {
       }
     } else {
       const storage = new SessionStagedFileStorage(
-        grida_forms_client,
+        grida_forms_service_client,
         GRIDA_FORMS_RESPONSE_BUCKET
       );
 
@@ -278,7 +278,7 @@ export namespace SessionStorageServices {
       }
     } else {
       const storage = new FileStorage(
-        grida_forms_client,
+        grida_forms_service_client,
         GRIDA_FORMS_RESPONSE_BUCKET
       );
 

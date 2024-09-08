@@ -24,7 +24,7 @@ import { MixIcon } from "@radix-ui/react-icons";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { I18nProvider } from "@/i18n/csr";
 import { useTranslation } from "react-i18next";
-import { createClientFormsClient } from "@/supabase/client";
+import { createClientComponentFormsClient } from "@/supabase/client";
 import toast from "react-hot-toast";
 import type {
   EndingPageI18nOverrides,
@@ -56,7 +56,7 @@ export function EndingPagePreferences() {
   } = state;
 
   const [customizeOpen, setCustomizeOpen] = useState(false);
-  const supabase = createClientFormsClient();
+  const supabase = createClientComponentFormsClient();
 
   const {
     handleSubmit,

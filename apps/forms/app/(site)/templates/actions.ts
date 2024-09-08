@@ -1,11 +1,11 @@
 "use server";
 
-import { createRouteHandlerClient } from "@/supabase/server";
+import { createRouteHandlerFormsClient } from "@/supabase/server";
 import { cookies } from "next/headers";
 
 export async function fetchTemplates() {
   const cookieStore = cookies();
-  const supabase = createRouteHandlerClient(cookieStore);
+  const supabase = createRouteHandlerFormsClient(cookieStore);
 
   const { data } = await supabase.from("form_template").select();
 

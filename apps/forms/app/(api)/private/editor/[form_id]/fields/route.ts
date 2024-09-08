@@ -1,7 +1,7 @@
 import { FieldSupports } from "@/k/supported_field_types";
 import {
-  grida_commerce_client,
-  createRouteHandlerClient,
+  grida_commerce_service_client,
+  createRouteHandlerFormsClient,
 } from "@/supabase/server";
 import { GridaCommerceClient } from "@/services/commerce";
 import assert from "assert";
@@ -27,7 +27,7 @@ export async function POST(
 ) {
   const { form_id } = context.params;
   const cookieStore = cookies();
-  const supabase = createRouteHandlerClient(cookieStore);
+  const supabase = createRouteHandlerFormsClient(cookieStore);
   const init = (await req.json()) as FormFieldUpsert;
   const operation = init.id ? "update" : "create";
 
@@ -245,7 +245,7 @@ export async function POST(
     assert(form_reference.store_connection, "store_connection is required");
 
     const commerce = new GridaCommerceClient(
-      grida_commerce_client,
+      grida_commerce_service_client,
       form_reference.project_id,
       form_reference.store_connection.store_id
     );

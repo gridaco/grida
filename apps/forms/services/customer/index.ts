@@ -1,4 +1,4 @@
-import { workspaceclient } from "@/supabase/server";
+import { workspace_service_client } from "@/supabase/server";
 import { is_uuid_v4 } from "@/utils/is";
 
 export async function upsert_customer_with({
@@ -32,7 +32,7 @@ export async function upsert_customer_with({
       // if uuid is provided, we don't need to store fingerprint (vulnerable)
       delete pl._fp_fingerprintjs_visitorid;
 
-      const { data: customer, error } = await workspaceclient
+      const { data: customer, error } = await workspace_service_client
         .from("customer")
         .upsert(pl, {
           onConflict: "project_id, uuid",
@@ -46,7 +46,7 @@ export async function upsert_customer_with({
       }
       return customer;
     } else {
-      const { data: customer, error } = await workspaceclient
+      const { data: customer, error } = await workspace_service_client
         .from("customer")
         .upsert(pl, {
           onConflict: "project_id, _fp_fingerprintjs_visitorid",

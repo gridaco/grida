@@ -2,7 +2,7 @@
 
 import React, { useCallback, useMemo } from "react";
 import { ResponseGrid } from "../grid";
-import { createClientFormsClient } from "@/supabase/client";
+import { createClientComponentFormsClient } from "@/supabase/client";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -73,7 +73,7 @@ export function GridEditor({
   selection: "on" | "off";
   deletion: "on" | "off";
 }) {
-  const supabase = useMemo(() => createClientFormsClient(), []);
+  const supabase = useMemo(() => createClientComponentFormsClient(), []);
   const [state, dispatch] = useEditorState();
   const { datagrid_isloading, datagrid_selected_rows } = state;
 
@@ -481,7 +481,7 @@ function TableMod() {
 
 function useDeleteSelectedSchemaTableRows() {
   const [state, dispatch] = useEditorState();
-  const supabase = createClientFormsClient();
+  const supabase = createClientComponentFormsClient();
   const { datagrid_selected_rows } = state;
   return useCallback(() => {
     const deleting = supabase

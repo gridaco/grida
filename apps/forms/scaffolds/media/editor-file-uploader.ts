@@ -1,11 +1,11 @@
-import { createClientFormsClient } from "@/supabase/client";
+import { createClientComponentFormsClient } from "@/supabase/client";
 import { useEditorState } from "../editor";
 import { nanoid } from "nanoid";
 import { useCallback } from "react";
 
 export function useUploadFile() {
   const [state] = useEditorState();
-  const supabase = createClientFormsClient();
+  const supabase = createClientComponentFormsClient();
 
   return useCallback(
     async (file: Blob | File) => {

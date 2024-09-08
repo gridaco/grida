@@ -1,6 +1,6 @@
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import {
-  createRouteHandlerClient,
+  createRouteHandlerFormsClient,
   createRouteHandlerXSBClient,
 } from "@/supabase/server";
 import { GridaXSupabase } from "@/types";
@@ -22,7 +22,7 @@ type Context = {
 export async function POST(req: NextRequest, context: Context) {
   const cookieStore = cookies();
   const schema_id = context.params.schema_id;
-  const supabase = createRouteHandlerClient(cookieStore);
+  const supabase = createRouteHandlerFormsClient(cookieStore);
   const grida_x_sb_client = createRouteHandlerXSBClient(cookieStore);
 
   const data: CreateNewSchemaTableWithXSBTableConnectionRequest =

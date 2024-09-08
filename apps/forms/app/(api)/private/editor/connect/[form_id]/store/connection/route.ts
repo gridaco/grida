@@ -1,7 +1,7 @@
 import { resolve_next } from "@/lib/forms/url";
 import {
-  grida_commerce_client,
-  createRouteHandlerClient,
+  grida_commerce_service_client,
+  createRouteHandlerFormsClient,
   createRouteHandlerWorkspaceClient,
 } from "@/supabase/server";
 import { GridaCommerceClient } from "@/services/commerce";
@@ -25,7 +25,7 @@ export async function POST(
   const cookieStore = cookies();
   const { form_id } = context.params;
   const next = req.nextUrl.searchParams.get("next");
-  const supabase = createRouteHandlerClient(cookieStore);
+  const supabase = createRouteHandlerFormsClient(cookieStore);
   const wsclient = createRouteHandlerWorkspaceClient(cookieStore);
 
   const { data: form_reference, error: form_ref_err } = await supabase
@@ -65,7 +65,7 @@ export async function POST(
   }
 
   const commerce = new GridaCommerceClient(
-    grida_commerce_client, // TODO: use non admin client
+    grida_commerce_service_client, // TODO: use non admin client
     form_reference.project_id
   );
 

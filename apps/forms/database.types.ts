@@ -966,6 +966,7 @@ export type Database = {
           ending_page_i18n_overrides: Json | null
           ending_page_template_id: string | null
           form_id: string
+          g11n_manifest_id: number | null
           id: string
           is_ending_page_enabled: boolean
           is_powered_by_branding_enabled: boolean
@@ -983,6 +984,7 @@ export type Database = {
           ending_page_i18n_overrides?: Json | null
           ending_page_template_id?: string | null
           form_id: string
+          g11n_manifest_id?: number | null
           id: string
           is_ending_page_enabled?: boolean
           is_powered_by_branding_enabled?: boolean
@@ -1000,6 +1002,7 @@ export type Database = {
           ending_page_i18n_overrides?: Json | null
           ending_page_template_id?: string | null
           form_id?: string
+          g11n_manifest_id?: number | null
           id?: string
           is_ending_page_enabled?: boolean
           is_powered_by_branding_enabled?: boolean
@@ -1011,6 +1014,13 @@ export type Database = {
           stylesheet?: Json | null
         }
         Relationships: [
+          {
+            foreignKeyName: "form_document_g11n_manifest_id_fkey"
+            columns: ["g11n_manifest_id"]
+            isOneToOne: false
+            referencedRelation: "manifest"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "form_document_id_fkey"
             columns: ["id"]
@@ -1885,23 +1895,33 @@ export type Database = {
       manifest: {
         Row: {
           created_at: string
+          default_locale_id: number | null
           id: number
           project_id: number
           updated_at: string
         }
         Insert: {
           created_at?: string
+          default_locale_id?: number | null
           id?: number
           project_id: number
           updated_at?: string
         }
         Update: {
           created_at?: string
+          default_locale_id?: number | null
           id?: number
           project_id?: number
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "manifest_default_locale_id_fkey"
+            columns: ["default_locale_id"]
+            isOneToOne: false
+            referencedRelation: "locale"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "manifest_project_id_fkey"
             columns: ["project_id"]
@@ -1911,7 +1931,7 @@ export type Database = {
           },
         ]
       }
-      value: {
+      resource: {
         Row: {
           created_at: string
           id: number
@@ -1919,6 +1939,7 @@ export type Database = {
           locale_id: number
           manifest_id: number
           updated_at: string
+          value: Json
         }
         Insert: {
           created_at?: string
@@ -1927,6 +1948,7 @@ export type Database = {
           locale_id: number
           manifest_id: number
           updated_at?: string
+          value: Json
         }
         Update: {
           created_at?: string
@@ -1935,6 +1957,7 @@ export type Database = {
           locale_id?: number
           manifest_id?: number
           updated_at?: string
+          value?: Json
         }
         Relationships: [
           {
@@ -2548,6 +2571,12 @@ export type Database = {
           user_id: string
         }
         Returns: number[]
+      }
+      rls_manifest: {
+        Args: {
+          p_manifest_id: number
+        }
+        Returns: boolean
       }
       rls_organization: {
         Args: {

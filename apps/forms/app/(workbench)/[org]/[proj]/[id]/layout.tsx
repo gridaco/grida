@@ -4,9 +4,9 @@ import { notFound, redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import {
   createRouteHandlerXSBClient,
-  createServerComponentClient,
+  createServerComponentFormsClient,
   createServerComponentWorkspaceClient,
-  grida_xsupabase_client,
+  grida_xsupabase_service_client,
 } from "@/supabase/server";
 import { GridaLogo } from "@/components/grida-logo";
 import { SlashIcon } from "@radix-ui/react-icons";
@@ -76,7 +76,7 @@ export default async function Layout({
   params: GDocEditorRouteParams;
 }>) {
   const cookieStore = cookies();
-  const supabase = createServerComponentClient(cookieStore);
+  const supabase = createServerComponentFormsClient(cookieStore);
   const wsclient = createServerComponentWorkspaceClient(cookieStore);
   const { id, org, proj } = params;
 
@@ -307,7 +307,7 @@ export default async function Layout({
         .single();
 
       // get project supabase project
-      const { data: supabase_project } = await grida_xsupabase_client
+      const { data: supabase_project } = await grida_xsupabase_service_client
         .from("supabase_project")
         .select("*")
         .eq("project_id", project_ref.id)

@@ -5,14 +5,14 @@ import {
   SERVICE_ERROR,
 } from "@/k/error";
 // TODO: need RLS?
-import { grida_forms_client } from "@/supabase/server";
+import { grida_forms_service_client } from "@/supabase/server";
 
 export async function validate_max_access_by_form({
   form_id,
 }: {
   form_id: string;
 }) {
-  const { error: max_response_error } = await grida_forms_client.rpc(
+  const { error: max_response_error } = await grida_forms_service_client.rpc(
     "rpc_check_max_responses",
     { form_id }
   );
@@ -52,7 +52,7 @@ export async function validate_max_access_by_customer({
   if (customer_id) {
     //
     // TODO: migrate with counter rpc, since it can raise 502 on high load
-    const { count, data, error } = await grida_forms_client
+    const { count, data, error } = await grida_forms_service_client
       .from("response")
       .select("id", { count: "exact" })
       .eq("form_id", form_id)

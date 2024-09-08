@@ -1,5 +1,5 @@
 import {
-  createServerComponentClient,
+  createServerComponentFormsClient,
   createServerComponentWorkspaceClient,
 } from "@/supabase/server";
 import { Workspace } from "@/scaffolds/workspace";
@@ -14,7 +14,7 @@ export default async function Layout({
   params: { org: string };
 }>) {
   const cookieStore = cookies();
-  const supabase = createServerComponentClient(cookieStore);
+  const supabase = createServerComponentFormsClient(cookieStore);
   const wsclient = createServerComponentWorkspaceClient(cookieStore);
 
   const { data: auth } = await supabase.auth.getUser();

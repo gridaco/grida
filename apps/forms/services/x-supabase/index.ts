@@ -1,4 +1,4 @@
-import { grida_xsupabase_client } from "@/supabase/server";
+import { grida_xsupabase_service_client } from "@/supabase/server";
 import { secureformsclient } from "@/supabase/vault";
 import {
   SchemaTableConnectionXSupabaseMainTableJoint,
@@ -23,7 +23,7 @@ export async function createXSupabaseClient(
 ): Promise<SupabaseClient<any, any>> {
   // fetch connection table
   const { data: supabase_project, error: supabase_project_err } =
-    await grida_xsupabase_client
+    await grida_xsupabase_service_client
       .from("supabase_project")
       .select("*, tables:supabase_table(*)")
       .eq("id", supabase_project_id)
@@ -91,7 +91,7 @@ export class GridaXSupabaseService {
     const { supabase_project_id, main_supabase_table_id } = conn;
 
     const { data: supabase_project, error: supabase_project_err } =
-      await grida_xsupabase_client
+      await grida_xsupabase_service_client
         .from("supabase_project")
         .select(`*, tables:supabase_table(*)`)
         .eq("id", supabase_project_id)
