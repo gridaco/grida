@@ -65,7 +65,7 @@ export function SupabaseStorageSettings({
     if (!state.connections.supabase) return;
     if (enabled) {
       PrivateEditorApi.XSupabase.listXSBBucket(
-        state.connections.supabase.id
+        state.connections.supabase.supabase_project_id
       ).then((res) => {
         res.data.data && setBuckets(res.data.data);
       });
