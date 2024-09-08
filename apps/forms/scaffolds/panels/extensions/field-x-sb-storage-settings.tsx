@@ -29,6 +29,7 @@ export function SupabaseStorageSettings({
   enabled,
   onEnabledChange,
   rules,
+  xsb,
 }: {
   value?: Partial<FormFieldStorageSchema> | null | undefined;
   onValueChange?: (value: Partial<FormFieldStorageSchema>) => void;
@@ -39,6 +40,9 @@ export function SupabaseStorageSettings({
       | "x-supabase-storage-compile-time-renderable-single-file-path-template"
       | undefined;
     bucketpolicy: "public" | "private" | "any";
+  };
+  xsb: {
+    supabase_project_id: number;
   };
 }) {
   const [state] = useEditorState();
@@ -62,15 +66,14 @@ export function SupabaseStorageSettings({
 
   // list buckets
   useEffect(() => {
-    if (!state.connections.supabase) return;
     if (enabled) {
-      PrivateEditorApi.XSupabase.listXSBBucket(
-        state.connections.supabase.supabase_project_id
-      ).then((res) => {
-        res.data.data && setBuckets(res.data.data);
-      });
+      PrivateEditorApi.XSupabase.listXSBBucket(xsb.supabase_project_id).then(
+        (res) => {
+          res.data.data && setBuckets(res.data.data);
+        }
+      );
     }
-  }, [enabled, state.connections.supabase]);
+  }, [enabled, xsb.supabase_project_id]);
 
   useEffect(() => {
     setBucket(value?.bucket);

@@ -205,7 +205,7 @@ class GridaXSupabaseStorageTaskPooler {
     );
 
     for (const row of rows) {
-      // TODO: get pk based on table schema (alternatively, we can use index as well - doesnt have to be a data from a fetched row)
+      // FIXME: get pk based on table schema (alternatively, we can use index as well - doesnt have to be a data from a fetched row)
       const pk = row.id;
       const task = this.storage.createSignedUrls(
         row,

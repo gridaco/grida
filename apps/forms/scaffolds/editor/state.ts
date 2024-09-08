@@ -384,6 +384,9 @@ interface IConnectionsState {
   supabase_project: GridaXSupabase.SupabaseProject | null;
   connections: {
     store_id?: number | null;
+    /**
+     * @deprecated drop me
+     */
     supabase?: GridaXSupabase.XSupabaseMainTableConnectionState;
   };
 }
