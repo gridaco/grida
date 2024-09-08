@@ -326,7 +326,7 @@ export interface IG11nState {
     /**
      * grida_g11n.manifest.id
      */
-    manifest_id: PGINT8ID;
+    manifest_id: PGINT8ID | null;
 
     /**
      * view document in...

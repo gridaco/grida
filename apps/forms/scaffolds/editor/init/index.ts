@@ -545,6 +545,7 @@ function initialize_g11n_state_without_keys_from_lang(
     lang: lang,
     lang_default: lang,
     langs: [lang],
+    manifest_id: null,
     resources: {
       [lang]: {},
     },
