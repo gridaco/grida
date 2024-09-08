@@ -53,7 +53,7 @@ import {
 import { OptionsStockEdit } from "../options/options-sku";
 import { Switch } from "@/components/ui/switch";
 import { FormFieldUpsert } from "@/types/private/api";
-import { useEditorState } from "@/scaffolds/editor";
+import { useDatagridTable, useEditorState } from "@/scaffolds/editor";
 import { useRouter } from "next/navigation";
 import { editorlink } from "@/lib/forms/url";
 import { useInventory, useInventoryState } from "../options/use-inventory";
@@ -170,6 +170,13 @@ export function FieldEditPanel({
 }) {
   const is_edit_mode = !!init?.id;
   const [state] = useEditorState();
+  const tb = useDatagridTable();
+  const x_sb_main_table_connection = tb
+    ? "x_sb_main_table_connection" in tb
+      ? tb.x_sb_main_table_connection
+      : null
+    : null;
+
   const { basepath, document_id } = state;
   const router = useRouter();
   const [effect_cause, set_effect_cause] = useState<"ai" | "human" | "system">(
@@ -907,10 +914,13 @@ export function FieldEditPanel({
               onChange={set_v_value}
             />
           )}
-          {FieldSupports.file_upload(type) && state.connections.supabase && (
+          {FieldSupports.file_upload(type) && x_sb_main_table_connection && (
             <>
               <hr />
               <SupabaseStorageSettings
+                xsb={{
+                  supabase_project_id: state.supabase_project!.id,
+                }}
                 value={storage}
                 onValueChange={setStorage}
                 enabled={storage_enabled}
@@ -933,13 +943,13 @@ export function FieldEditPanel({
               />
             </>
           )}
-          {FieldSupports.fk(type) && state.connections.supabase && !!name && (
+          {FieldSupports.fk(type) && x_sb_main_table_connection && !!name && (
             <>
               <hr />
               <SupabaseFKReferenceSettings
                 format={
-                  state.connections.supabase.main_supabase_table
-                    ?.sb_table_schema?.properties?.[name]?.format
+                  x_sb_main_table_connection.sb_table_schema.properties[name]
+                    ?.format
                 }
                 value={reference}
                 onValueChange={setReference}

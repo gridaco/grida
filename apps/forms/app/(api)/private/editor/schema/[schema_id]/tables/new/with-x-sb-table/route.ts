@@ -135,12 +135,13 @@ export async function POST(req: NextRequest, context: Context) {
     return NextResponse.error();
   }
 
-  // check if connection already exists for other table
+  // check if connection already exists for other table within the same schema_document
   const { count: conn_ref_count, error: conn_ref_error } = await supabase
     .from("connection_supabase")
-    .select("id", { count: "exact" })
+    .select("id, schema:form!inner(schema_id)", { count: "exact" })
     .eq("main_supabase_table_id", upserted_supabase_table.id)
-    .eq("supabase_project_id", xsb_project_ref.id);
+    .eq("supabase_project_id", xsb_project_ref.id)
+    .eq("schema.schema_id", schema_id);
 
   if (conn_ref_error) {
     console.error("ERR: while validatting existing connection", conn_ref_error);
