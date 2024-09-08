@@ -5,6 +5,7 @@ import {
 import { Workspace } from "@/scaffolds/workspace";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
+import { EditorHelpFab } from "@/scaffolds/help/editor-help-fab";
 
 export default async function Layout({
   params,
@@ -34,5 +35,10 @@ export default async function Layout({
     return notFound();
   }
 
-  return <Workspace organization={organization}>{children}</Workspace>;
+  return (
+    <Workspace organization={organization}>
+      <EditorHelpFab />
+      {children}
+    </Workspace>
+  );
 }
