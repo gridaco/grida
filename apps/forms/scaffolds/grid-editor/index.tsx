@@ -57,6 +57,7 @@ import { saveAs } from "file-saver";
 import Papa from "papaparse";
 import { TVirtualRow } from "../editor/state";
 import { FormResponseField } from "@/types";
+import { Gallery } from "../table-view-gallery/gallery";
 
 export function GridEditor({
   systemcolumns,
@@ -81,6 +82,7 @@ export function GridEditor({
 
   const tb = useDatagridTable();
   const table_id = useDatabaseTableId();
+  const view = tb?.views.find((v) => v.id === tb.view_id);
   const row_keyword = tb?.row_keyword ?? "row";
   const has_selected_rows = datagrid_selected_rows.size > 0;
   const selectionDisabled = selection !== "on";
@@ -218,31 +220,38 @@ export function GridEditor({
           {!tb?.readonly && <TableMod />}
         </GridLayout.HeaderMenus>
       </GridLayout.Header>
-      <GridLayout.Content>
-        <ResponseGrid
-          className="bg-transparent"
-          systemcolumns={systemcolumns}
-          columns={columns}
-          rows={rows ?? []}
-          readonly={readonly}
-          loading={datagrid_isloading}
-          selectionDisabled={selectionDisabled}
-          onAddNewFieldClick={openNewFieldPanel}
-          onEditFieldClick={openEditFieldPanel}
-          onDeleteFieldClick={(field_id) => {
-            deleteFieldConfirmDialog.openDialog({ field_id });
-          }}
-          onCellChange={(row, column, data) => {
-            dispatch({
-              type: "editor/data-grid/cell/change",
-              table_id: table_id!,
-              row: row.__gf_id,
-              column: column,
-              data: data,
-            });
-          }}
-        />
-      </GridLayout.Content>
+      {view?.type === "gallery" && (
+        <GridLayout.Content>
+          <Gallery />
+        </GridLayout.Content>
+      )}
+      {!view && (
+        <GridLayout.Content>
+          <ResponseGrid
+            className="bg-transparent"
+            systemcolumns={systemcolumns}
+            columns={columns}
+            rows={rows ?? []}
+            readonly={readonly}
+            loading={datagrid_isloading}
+            selectionDisabled={selectionDisabled}
+            onAddNewFieldClick={openNewFieldPanel}
+            onEditFieldClick={openEditFieldPanel}
+            onDeleteFieldClick={(field_id) => {
+              deleteFieldConfirmDialog.openDialog({ field_id });
+            }}
+            onCellChange={(row, column, data) => {
+              dispatch({
+                type: "editor/data-grid/cell/change",
+                table_id: table_id!,
+                row: row.__gf_id,
+                column: column,
+                data: data,
+              });
+            }}
+          />
+        </GridLayout.Content>
+      )}
       <GridLayout.Footer>
         <div className="flex gap-4 items-center">
           <GridLimit />

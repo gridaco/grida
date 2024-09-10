@@ -152,6 +152,7 @@ function initialDatabaseEditorState(
     rules: {
       delete_restricted: true,
     },
+    views: [],
   } satisfies GDocTable;
 
   const should_add_sb_auth_users =
@@ -288,6 +289,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
           rules: {
             delete_restricted: true,
           },
+          views: [],
         } satisfies GDocTable,
       }
     : {
@@ -303,6 +305,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
           rules: {
             delete_restricted: true,
           },
+          views: [],
         } satisfies GDocTable,
         [EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID]: {
           id: EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID,
@@ -316,6 +319,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
           rules: {
             delete_restricted: true,
           },
+          views: [],
         } satisfies GDocTable,
         [EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID]: {
           id: EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID,
@@ -329,6 +333,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
           rules: {
             delete_restricted: true,
           },
+          views: [],
         } satisfies GDocTable,
       };
 
@@ -598,6 +603,7 @@ export function schematableinit(table: {
       rules: {
         delete_restricted: false,
       },
+      views: [],
     } satisfies GDocSchemaTable;
   } else {
     return {
@@ -613,6 +619,14 @@ export function schematableinit(table: {
       rules: {
         delete_restricted: false,
       },
+      views: [
+        // DEV TODO: remove me
+        {
+          id: "gallery",
+          type: "gallery",
+          label: "Gallery",
+        },
+      ],
     } satisfies GDocSchemaTable;
   }
 }

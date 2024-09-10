@@ -32,7 +32,9 @@ export type ResourceTypeIconName =
   | "project"
   | "form"
   | "view-gallery"
+  | "gallery"
   | "view-list"
+  | "list"
   | "chart"
   | "commerce"
   | "user"
@@ -90,8 +92,10 @@ export function ResourceTypeIcon({
     case "i18n":
       return <LanguagesIcon {...props} />;
     case "view-gallery":
+    case "gallery":
       return <GridIcon {...props} />;
     case "view-list":
+    case "list":
       return <ListBulletIcon {...props} />;
     default:
       return null;

@@ -51,6 +51,7 @@ export type BlocksEditorAction =
   | DataGridRowsAction
   | FeedResponseSessionsAction
   | DataGridTableAction
+  | DataGridTableViewAction
   | FeedCustomerAction
   | OpenCustomerEditAction
   | OpenInsertMenuPanelAction
@@ -283,6 +284,13 @@ export type DataGridTableAction = {
       name: string;
     }
 );
+
+export type DataGridTableViewAction = {
+  type: "editor/data-grid/table/view";
+} & {
+  table_id: GDocTableID;
+  view_id: string;
+};
 
 export interface DataGridRowsAction {
   type: "editor/data-grid/rows";

@@ -31,13 +31,14 @@ export function TableViews() {
   return (
     <div className="flex items-center gap-2">
       <Tabs
-        value={tb?.name}
-        // onValueChange={(value) => {
-        //   dispatch({
-        //     type: "editor/data-grid/table",
-        //     name: value,
-        //   });
-        // }}
+        value={tb.view_id ?? tb.name}
+        onValueChange={(value) => {
+          dispatch({
+            type: "editor/data-grid/table/view",
+            table_id: tb.id,
+            view_id: value,
+          });
+        }}
       >
         <TabsList>
           <TabsTrigger key={tb.id.toString()} value={tb.name}>
@@ -52,20 +53,18 @@ export function TableViews() {
             )}
             {tb.label}
           </TabsTrigger>
-        </TabsList>
-        {/* <TabsList>
-          {table?.views.map((table) => {
+          {tb?.views.map((view) => {
             return (
-              <TabsTrigger key={table.id.toString()} value={table.name}>
+              <TabsTrigger key={view.id} value={view.id}>
                 <ResourceTypeIcon
-                  type={table.icon}
+                  type={view.type}
                   className="inline align-middle w-4 h-4 me-2"
                 />
-                {table.label}
+                {view.label}
               </TabsTrigger>
             );
           })}
-        </TabsList> */}
+        </TabsList>
       </Tabs>
       <DropdownMenu>
         <DropdownMenuTrigger>

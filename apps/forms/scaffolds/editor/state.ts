@@ -114,7 +114,15 @@ type GDocTableBase = {
     delete_restricted: boolean;
   };
   label: string;
+  views: Array<TableView>;
+  view_id?: string;
 };
+
+interface TableView {
+  id: string;
+  type: "table" | "list" | "chart" | "gallery";
+  label: string;
+}
 
 export type GDocTable = GDocTableBase &
   (

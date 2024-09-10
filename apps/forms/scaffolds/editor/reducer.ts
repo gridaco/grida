@@ -74,6 +74,7 @@ import type {
   EditorThemeAppearanceAction,
   SchemaTableAddAction,
   SchemaTableDeleteAction,
+  DataGridTableViewAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { blockstreeflat } from "@/lib/forms/tree";
@@ -711,6 +712,14 @@ export function reducer(
             draft.tablespace[tableid].realtime = true;
           }
         }
+      });
+    }
+    case "editor/data-grid/table/view": {
+      const { table_id, view_id } = <DataGridTableViewAction>action;
+      return produce(state, (draft) => {
+        const tb = draft.tables.find((t) => t.id == table_id);
+        if (!tb) return;
+        tb.view_id = view_id;
       });
     }
     case "editor/data-grid/delete/selected": {
