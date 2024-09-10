@@ -246,10 +246,10 @@ function Responses({ data }: { data: { count: number; date: Date }[] }) {
           </span>
         </div>
       </CardHeader>
-      <CardContent className="p-0 h-40 w-full">
+      <CardContent>
         <TimeSeriesChart
           data={data}
-          chartType="bar"
+          type="step"
           datefmt={(date) => format(date, "HH:mm:ss.SSS")}
         />
       </CardContent>
@@ -273,10 +273,10 @@ function Sessions({ data }: { data: { count: number; date: Date }[] }) {
           </span>
         </div>
       </CardHeader>
-      <CardContent className="p-0 h-40 w-full">
+      <CardContent>
         <TimeSeriesChart
           data={data}
-          chartType="bar"
+          type="step"
           datefmt={(date) => format(date, "HH:mm:ss.SSS")}
         />
       </CardContent>
