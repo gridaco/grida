@@ -1,4 +1,10 @@
-import { AvatarIcon, FileIcon, HomeIcon } from "@radix-ui/react-icons";
+import {
+  AvatarIcon,
+  FileIcon,
+  GridIcon,
+  ListBulletIcon,
+  HomeIcon,
+} from "@radix-ui/react-icons";
 import {
   FolderDotIcon,
   PanelsTopLeftIcon,
@@ -25,6 +31,8 @@ export type ResourceTypeIconName =
   | "table"
   | "project"
   | "form"
+  | "view-gallery"
+  | "view-list"
   | "chart"
   | "commerce"
   | "user"
@@ -81,6 +89,10 @@ export function ResourceTypeIcon({
       return <AvatarIcon {...props} />;
     case "i18n":
       return <LanguagesIcon {...props} />;
+    case "view-gallery":
+      return <GridIcon {...props} />;
+    case "view-list":
+      return <ListBulletIcon {...props} />;
     default:
       return null;
   }
