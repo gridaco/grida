@@ -2,6 +2,7 @@ import { Inter } from "next/font/google";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ToasterWithMax } from "@/components/toaster";
+import { Analytics } from "@vercel/analytics/react";
 import clsx from "clsx";
 import "../editor.css";
 
@@ -28,6 +29,7 @@ export default function RootLayout({
         {process.env.NEXT_PUBLIC_GAID && (
           <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GAID} />
         )}
+        <Analytics />
         <div className="h-screen flex flex-col">
           <ThemeProvider
             attribute="class"
