@@ -46,6 +46,7 @@ import { MediaLoadPluginProvider } from "./mediaload";
 import { FormAgentMessagingInterfaceProvider } from "./interface";
 import { FormAgentMessagingInterface } from "./emit";
 import { useValue } from "@/lib/spock";
+import { Spinner } from "@/components/spinner";
 
 const html_form_id = "form";
 
@@ -382,11 +383,17 @@ function FormSubmit({
       form={html_form_id}
       type="submit"
       className={clsx(
+        "min-w-10",
         "data-[submit-hidden='true']:hidden",
         "disabled:opacity-50 disabled:cursor-not-allowed",
         className
       )}
     >
+      {is_submitting && (
+        <div className="flex items-center justify-center">
+          <Spinner className="me-2 fill-accent" />
+        </div>
+      )}
       {children}
     </Button>
   );
