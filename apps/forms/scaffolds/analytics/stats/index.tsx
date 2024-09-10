@@ -9,7 +9,7 @@ import {
 import TimeSeriesChart from "../charts/timeseries";
 import { GraphSkeleton, NumberSkeleton } from "../charts/skeleton";
 import { SupabaseClient } from "@supabase/supabase-js";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
   SelectValue,
@@ -101,7 +101,7 @@ export function ProjectStats({ project_ids }: { project_ids: number[] }) {
           />
         </div>
       </header>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mt-4">
         <Customers project_ids={project_ids} from={from} to={to} />
         <Responses project_ids={project_ids} from={from} to={to} />
         <Sessions project_ids={project_ids} from={from} to={to} />
@@ -222,7 +222,7 @@ export function Sessions({
   return (
     <Card className="overflow-hidden">
       <CardHeader>
-        <h1 className="text-lg font-semibold">Sessions</h1>
+        <CardTitle>Sessions</CardTitle>
         {loading ? (
           <NumberSkeleton />
         ) : (
@@ -233,13 +233,13 @@ export function Sessions({
           </div>
         )}
       </CardHeader>
-      <CardContent className="p-0 h-40 w-full">
+      <CardContent>
         {loading ? (
-          <div className="p-6">
+          <div className="h-20">
             <GraphSkeleton />
           </div>
         ) : (
-          <TimeSeriesChart data={data} chartType="line" />
+          <TimeSeriesChart data={data} type="bump" />
         )}
       </CardContent>
     </Card>
@@ -294,7 +294,7 @@ export function Customers({
   return (
     <Card className="overflow-hidden">
       <CardHeader>
-        <h1 className="text-lg font-semibold">New Customers</h1>
+        <CardTitle>Customers</CardTitle>
         {loading ? (
           <NumberSkeleton />
         ) : (
@@ -305,13 +305,13 @@ export function Customers({
           </div>
         )}
       </CardHeader>
-      <CardContent className="p-0 h-40 w-full">
+      <CardContent>
         {loading ? (
-          <div className="p-6">
+          <div className="h-20">
             <GraphSkeleton />
           </div>
         ) : (
-          <TimeSeriesChart data={data} chartType="line" />
+          <TimeSeriesChart data={data} type="bump" />
         )}
       </CardContent>
     </Card>
@@ -366,7 +366,7 @@ export function Responses({
   return (
     <Card className="overflow-hidden">
       <CardHeader>
-        <h1 className="text-lg font-semibold">New Entries</h1>
+        <CardTitle>New Entries</CardTitle>
         {loading ? (
           <NumberSkeleton />
         ) : (
@@ -377,13 +377,13 @@ export function Responses({
           </div>
         )}
       </CardHeader>
-      <CardContent className="p-0 h-40 w-full">
+      <CardContent>
         {loading ? (
-          <div className="p-6">
+          <div className="h-20">
             <GraphSkeleton />
           </div>
         ) : (
-          <TimeSeriesChart data={data} chartType="line" />
+          <TimeSeriesChart data={data} type="bump" />
         )}
       </CardContent>
     </Card>

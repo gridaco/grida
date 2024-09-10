@@ -1,16 +1,14 @@
 "use client";
 
 import React from "react";
-import { ParentSize } from "@visx/responsive";
+import { CartesianGrid, XAxis, Area, AreaChart } from "recharts";
 import {
-  XYChart,
-  AnimatedAxis,
-  AnimatedLineSeries,
-  AnimatedBarSeries,
-  Tooltip,
-  DataProvider,
-} from "@visx/xychart";
-import { useDarkMode } from "usehooks-ts";
+  ChartConfig,
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
+import type { CurveType } from "recharts/types/shape/Curve";
 
 interface TimeSeriesChartData {
   date: Date;
@@ -19,115 +17,64 @@ interface TimeSeriesChartData {
 
 interface TimeSeriesChartProps {
   data: TimeSeriesChartData[];
-  chartType: "line" | "bar";
-  height?: number;
+  type?: CurveType;
   margin?: { top: number; right: number; bottom: number; left: number };
   datefmt?: (date: Date) => string;
 }
 
+const chartConfig = {
+  data: {
+    label: "Count",
+    color: "hsl(var(--chart-1))",
+  },
+} satisfies ChartConfig;
+
 const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
   data,
-  chartType,
-  datefmt = (date) => date.toLocaleDateString(),
-  margin = { top: 16, right: 16, bottom: 40, left: 40 },
+  type: curveType = "step",
+  datefmt = (date) =>
+    date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    }),
+  margin = { top: 12, right: 12, bottom: 0, left: 12 },
 }) => {
-  const { isDarkMode } = useDarkMode();
-
-  if (data.length === 0) return null;
-
-  const accessors = {
-    xAccessor: (d: TimeSeriesChartData) => d.date,
-    yAccessor: (d: TimeSeriesChartData) => d.count,
-  };
+  if (data.length === 0) return <></>;
 
   return (
-    <ParentSize>
-      {({ width, height }) => (
-        <DataProvider xScale={{ type: "time" }} yScale={{ type: "linear" }}>
-          <XYChart height={height} width={width} margin={margin}>
-            {chartType === "line" ? (
-              <AnimatedLineSeries
-                dataKey="LineChart"
-                data={data}
-                {...accessors}
-                strokeWidth={2.5}
-                className="stroke-primary"
-              />
-            ) : (
-              <AnimatedBarSeries
-                dataKey="BarChart"
-                colorAccessor={() => (isDarkMode ? "white" : "black")}
-                data={data}
-                {...accessors}
-              />
-            )}
-            <AnimatedAxis
-              orientation="bottom"
-              hideTicks
-              axisLineClassName="stroke-muted-foreground opacity-50"
-              tickLabelProps={(value, index, ticks) => ({
-                className: "fill-muted-foreground",
-                textAnchor:
-                  index === 0
-                    ? "start"
-                    : index === ticks.length - 1
-                      ? "end"
-                      : "middle",
-                display:
-                  index === 0 || index === ticks.length - 1 ? "block" : "none",
-              })}
+    <ChartContainer config={chartConfig}>
+      <AreaChart accessibilityLayer data={data} margin={margin}>
+        <CartesianGrid vertical={false} horizontal={false} />
+        <XAxis
+          dataKey="date"
+          tickLine={false}
+          axisLine={false}
+          interval="preserveStartEnd"
+          tickMargin={8}
+          minTickGap={24}
+          tickFormatter={datefmt}
+        />
+        <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
+        <defs>
+          <linearGradient id="data" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%" stopColor="var(--color-data)" stopOpacity={0.8} />
+            <stop
+              offset="95%"
+              stopColor="var(--color-data)"
+              stopOpacity={0.1}
             />
-            <AnimatedAxis
-              orientation="left"
-              hideTicks
-              hideAxisLine
-              tickLabelProps={(value, index, ticks) => ({
-                className: "fill-muted-foreground",
-                fontSize: 12,
-                textAnchor: "end",
-                display:
-                  index === 0 || index === ticks.length - 1 ? "block" : "none",
-              })}
-            />
-            <Tooltip
-              zIndex={10}
-              showVerticalCrosshair
-              verticalCrosshairStyle={{
-                strokeDasharray: "2 2",
-              }}
-              showDatumGlyph
-              snapTooltipToDatumX
-              snapTooltipToDatumY
-              renderGlyph={() => (
-                <circle
-                  r={4}
-                  className="fill-accent-foreground stroke-accent"
-                  strokeWidth={1}
-                />
-              )}
-              renderTooltip={({ tooltipData }) => (
-                <div>
-                  <span>
-                    <small>
-                      {datefmt(
-                        accessors.xAccessor(
-                          tooltipData?.nearestDatum?.datum as any
-                        )
-                      )}
-                    </small>{" "}
-                    <strong>
-                      {accessors.yAccessor(
-                        tooltipData?.nearestDatum?.datum as any
-                      )}
-                    </strong>
-                  </span>
-                </div>
-              )}
-            />
-          </XYChart>
-        </DataProvider>
-      )}
-    </ParentSize>
+          </linearGradient>
+        </defs>
+        <Area
+          dataKey="count"
+          type={curveType}
+          fill="url(#data)"
+          fillOpacity={0.4}
+          stroke="var(--color-data)"
+          stackId="a"
+        />
+      </AreaChart>
+    </ChartContainer>
   );
 };
 
