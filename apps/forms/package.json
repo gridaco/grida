@@ -122,6 +122,7 @@
     "react-player": "^2.14.1",
     "react-textarea-autosize": "^8.5.3",
     "react-timer-hook": "^3.0.7",
+    "recharts": "^2.12.7",
     "resend": "^3.2.0",
     "signature_pad": "^4.2.0",
     "stylis": "^4.3.2",
