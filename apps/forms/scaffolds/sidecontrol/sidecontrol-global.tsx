@@ -228,19 +228,22 @@ function Language() {
           className={inputVariants({ size: "sm" })}
         />
       </PropertyLine>
-      <PropertyLine>
-        <PropertyLineLabel>Localize</PropertyLineLabel>
-        <PropertyLineControlRoot>
-          <Switch
-            checked={localizationSetupDialog.open}
-            onCheckedChange={(checked) => {
-              if (checked) {
-                localizationSetupDialog.openDialog();
-              }
-            }}
-          />
-        </PropertyLineControlRoot>
-      </PropertyLine>
+      {/* WIP - this is a entry point to enabling localization, disabling this will prevent users from setting up localization, we're good to go. */}
+      {process.env.NODE_ENV !== "production" && (
+        <PropertyLine>
+          <PropertyLineLabel>Localize</PropertyLineLabel>
+          <PropertyLineControlRoot>
+            <Switch
+              checked={localizationSetupDialog.open}
+              onCheckedChange={(checked) => {
+                if (checked) {
+                  localizationSetupDialog.openDialog();
+                }
+              }}
+            />
+          </PropertyLineControlRoot>
+        </PropertyLine>
+      )}
     </>
   );
 }

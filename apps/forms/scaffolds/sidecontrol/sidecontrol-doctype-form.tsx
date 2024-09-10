@@ -27,6 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import { useG11nResource } from "../editor/use";
 import { language_label_map } from "@/k/supported_languages";
 import { g11nkey } from "../editor/g11n";
+import { FormFieldDefinition } from "@/types";
 
 export function SideControlDoctypeForm() {
   const [state, dispatch] = useEditorState();
@@ -68,9 +69,12 @@ function useFocusedFormBlock() {
   return [block, { set_v_hidden }] as const;
 }
 
-function useFormField(id: string) {
+function useFormField(id?: string | null): FormFieldDefinition | undefined {
   const fields = useFormFields();
-  return useMemo(() => fields.find((f) => f.id === id), [fields, id]);
+  return useMemo(
+    () => (!id ? undefined : fields.find((f) => f.id === id)),
+    [fields, id]
+  );
 }
 
 function SelectedFormBlockProperties() {
@@ -193,16 +197,14 @@ function PropertyV_Hidden() {
 function BlockTypeField() {
   const [state, dispatch] = useEditorState();
   const [block] = useFocusedFormBlock();
-  const field = useFormField(block.form_field_id!)!;
-  const is_hidden_field = field.type === "hidden";
+  const field = useFormField(block.form_field_id);
+  const is_hidden_field = field?.type === "hidden";
   const { lang, lang_default } = state.document.g11n;
   const istranslationmode = lang !== lang_default;
 
   const label = useG11nResource(
     g11nkey("block", { id: block.id, property: "label" })
   );
-
-  console.log("label", label);
 
   const placeholder = useG11nResource(
     g11nkey("block", { id: block.id, property: "placeholder" })
@@ -212,7 +214,7 @@ function BlockTypeField() {
     g11nkey("block", { id: block.id, property: "help_text" })
   );
 
-  if (is_hidden_field) return <></>;
+  if (!field || is_hidden_field) return <></>;
 
   return (
     <SidebarSection className="border-b pb-4">
