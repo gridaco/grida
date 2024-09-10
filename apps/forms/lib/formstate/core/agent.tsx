@@ -13,6 +13,7 @@ export function FormAgentProvider({
 
   useEffect(() => {
     dispatch({ type: "refresh", state: initial });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initial.tree]);
 
   return (

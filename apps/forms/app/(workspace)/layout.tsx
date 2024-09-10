@@ -3,6 +3,7 @@ import { GoogleAnalytics } from "@next/third-parties/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ToasterWithMax } from "@/components/toaster";
 import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import clsx from "clsx";
 import "../editor.css";
 
@@ -30,6 +31,7 @@ export default function RootLayout({
           <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GAID} />
         )}
         <Analytics />
+        <SpeedInsights />
         <div className="h-screen flex flex-col">
           <ThemeProvider
             attribute="class"

@@ -425,6 +425,9 @@ importers:
       '@vercel/functions':
         specifier: ^1.4.1
         version: 1.4.1
+      '@vercel/speed-insights':
+        specifier: ^1.0.12
+        version: 1.0.12(next@14.2.5)(react@18.3.1)(svelte@4.2.17)(vue@3.4.27)
       '@visx/responsive':
         specifier: ^3.10.2
         version: 3.10.2(react@18.3.1)
@@ -22600,6 +22603,36 @@ packages:
     peerDependenciesMeta:
       '@aws-sdk/credential-provider-web-identity':
         optional: true
+    dev: false
+
+  /@vercel/speed-insights@1.0.12(next@14.2.5)(react@18.3.1)(svelte@4.2.17)(vue@3.4.27):
+    resolution: {integrity: sha512-ZGQ+a7bcfWJD2VYEp2R1LHvRAMyyaFBYytZXsfnbOMkeOvzGNVxUL7aVUvisIrTZjXTSsxG45DKX7yiw6nq2Jw==}
+    requiresBuild: true
+    peerDependencies:
+      '@sveltejs/kit': ^1 || ^2
+      next: '>= 13'
+      react: ^18.2.0
+      svelte: ^4
+      vue: ^3
+      vue-router: ^4
+    peerDependenciesMeta:
+      '@sveltejs/kit':
+        optional: true
+      next:
+        optional: true
+      react:
+        optional: true
+      svelte:
+        optional: true
+      vue:
+        optional: true
+      vue-router:
+        optional: true
+    dependencies:
+      next: 14.2.5(@babel/core@7.24.6)(react-dom@18.3.1)(react@18.3.1)
+      react: 18.3.1
+      svelte: 4.2.17
+      vue: 3.4.27(typescript@5.4.5)
     dev: false
 
   /@visx/annotation@3.3.0(react-dom@18.3.1)(react@18.3.1):
