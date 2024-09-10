@@ -221,7 +221,7 @@ export function GridEditor({
         </GridLayout.HeaderMenus>
       </GridLayout.Header>
       {view?.type === "gallery" && (
-        <GridLayout.Content>
+        <GridLayout.Content className="overflow-y-scroll">
           <Gallery />
         </GridLayout.Content>
       )}
