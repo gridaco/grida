@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createRouteHandlerXSBClient } from "@/lib/supabase/server";
+import { createRouteHandlerXSBClient } from "@/supabase/server";
 import { cookies } from "next/headers";
 import {
   secureCreateServiceKey,

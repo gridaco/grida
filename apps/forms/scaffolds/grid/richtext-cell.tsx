@@ -14,7 +14,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { BlockNoteSchema, defaultBlockSpecs } from "@blocknote/core";
 import { useCreateBlockNote } from "@blocknote/react";
 import { useDatabaseTableId } from "@/scaffolds/editor";
-import { SupabaseStorageExtensions } from "@/lib/supabase/storage-ext";
+import { SupabaseStorageExtensions } from "@/supabase/storage-ext";
 import { PrivateEditorApi } from "@/lib/private";
 import { filemeta } from "@/utils/file";
 import { useCallback } from "react";

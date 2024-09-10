@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useId, useRef } from "react";
+import React, { useCallback, useEffect, useId, useMemo, useRef } from "react";
 import { type EditorFlatFormBlock, DRAFT_ID_START_WITH } from "../editor/state";
 import { useEditorState } from "../editor";
 import {
@@ -16,7 +16,7 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { createClientFormsClient } from "@/lib/supabase/client";
+import { createClientComponentFormsClient } from "@/supabase/client";
 import toast from "react-hot-toast";
 import { InsertMenuTrigger } from "./insert-menu-trigger";
 import { SectionStyle } from "../agent/theme";
@@ -24,6 +24,10 @@ import { usePrevious } from "@uidotdev/usehooks";
 import equal from "deep-equal";
 import { FormPageBackgroundSchema, FormStyleSheetV1Schema } from "@/types";
 import { FormAgentProvider, initdummy } from "@/lib/formstate";
+import { Button } from "@/components/ui/button";
+import { PoweredByGridaFooter } from "@/scaffolds/e/form/powered-by-brand-footer";
+import clsx from "clsx";
+import common from "@/i18n/resources.common";
 
 export default function BlocksEditorRoot() {
   return (
@@ -86,7 +90,7 @@ function DndContextProvider({ children }: React.PropsWithChildren<{}>) {
 function PendingBlocksResolver() {
   const [state, dispatch] = useEditorState();
 
-  const supabase = createClientFormsClient();
+  const supabase = createClientComponentFormsClient();
 
   const insertBlock = useCallback(
     async (block: EditorFlatFormBlock) => {
@@ -150,7 +154,7 @@ function PendingBlocksResolver() {
 function useSyncBlocks(blocks: EditorFlatFormBlock[]) {
   // TODO: add debounce
 
-  const supabase = createClientFormsClient();
+  const supabase = createClientComponentFormsClient();
   const prevBlocksRef = useRef(blocks);
 
   useEffect(() => {
@@ -221,11 +225,39 @@ function OptimisticBlocksSyncProvider({
   return <>{children}</>;
 }
 
+function LangSyncProvider({ children }: React.PropsWithChildren<{}>) {
+  const [state] = useEditorState();
+  const { document_id } = state;
+  const prev = usePrevious(state.document.g11n);
+  const supabase = useMemo(() => createClientComponentFormsClient(), []);
+
+  useEffect(() => {
+    if (!prev) {
+      return;
+    }
+
+    // sync lang to server
+    if (!equal(prev, state.document.g11n)) {
+      // update lang
+      supabase
+        .from("form_document")
+        .update({
+          lang: state.document.g11n.lang,
+        })
+        .eq("id", document_id!)
+        .then(({ error }) => {
+          if (error) console.error(error);
+        });
+    }
+  }, [prev, document_id, state.document.g11n]);
+  return <>{children}</>;
+}
+
 function AgentThemeSyncProvider({ children }: React.PropsWithChildren<{}>) {
   const [state] = useEditorState();
-  const { document_id, theme } = state;
+  const { document_id, document, theme } = state;
   const prev = usePrevious(state.theme);
-  const supabase = createClientFormsClient();
+  const supabase = useMemo(() => createClientComponentFormsClient(), []);
 
   useEffect(() => {
     if (!prev) {
@@ -238,7 +270,6 @@ function AgentThemeSyncProvider({ children }: React.PropsWithChildren<{}>) {
       supabase
         .from("form_document")
         .update({
-          lang: theme.lang,
           is_powered_by_branding_enabled: theme.is_powered_by_branding_enabled,
           stylesheet: {
             appearance: theme.appearance,
@@ -263,7 +294,6 @@ function AgentThemeSyncProvider({ children }: React.PropsWithChildren<{}>) {
     supabase,
     document_id,
     theme.is_powered_by_branding_enabled,
-    theme.lang,
     theme.appearance,
     theme.customCSS,
     theme.fontFamily,
@@ -295,6 +325,7 @@ function BlocksEditor() {
         <PendingBlocksResolver />
         <OptimisticBlocksSyncProvider />
         <AgentThemeSyncProvider />
+        <LangSyncProvider />
         <BlocksCanvas id="root" className="mt-10">
           <SortableContext
             items={state.blocks.map((b) => b.id)}
@@ -311,8 +342,40 @@ function BlocksEditor() {
             </SectionStyle>
           </SortableContext>
         </BlocksCanvas>
+        <FooterPreview />
       </div>
     </div>
+  );
+}
+
+function FooterPreview() {
+  const [state] = useEditorState();
+
+  const {
+    theme: { is_powered_by_branding_enabled },
+    document: { g11n },
+  } = state;
+
+  return (
+    <>
+      <footer
+        className={clsx(
+          "mt-4",
+          "sticky bottom-0",
+          "flex gap-2 p-4 pt-4 border-t",
+          "justify-end bg-background",
+          "md:static md:justify-start md:bg-transparent md:dark:bg-transparent",
+          "w-full md:w-auto"
+        )}
+      >
+        <Button type="button">{common[g11n.lang].submit}</Button>
+      </footer>
+      {is_powered_by_branding_enabled && (
+        <div className="hidden md:block">
+          <PoweredByGridaFooter />
+        </div>
+      )}
+    </>
   );
 }
 

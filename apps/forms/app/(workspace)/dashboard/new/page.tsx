@@ -1,4 +1,4 @@
-import { createServerComponentClient } from "@/lib/supabase/server";
+import { createServerComponentFormsClient } from "@/supabase/server";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -29,7 +29,7 @@ export default async function OnboardWithNewFormPage({
   const { plan, period } = searchParams || {};
   const price = prices[plan || "free"][period || "monthly"];
 
-  const supabase = createServerComponentClient(cookieStore);
+  const supabase = createServerComponentFormsClient(cookieStore);
 
   const { data } = await supabase.auth.getSession();
   // if no auth, sign in, redirect back here

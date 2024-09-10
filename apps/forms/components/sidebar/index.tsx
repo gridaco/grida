@@ -104,7 +104,10 @@ export function SidebarMenuLink({
   return (
     <Link href={href}>
       {/* override selected prop */}
-      {React.cloneElement(children as any, { selected })}
+      {React.cloneElement(children as any, {
+        selected,
+        className: "cursor-pointer",
+      })}
     </Link>
   );
 }
@@ -149,7 +152,7 @@ export const SidebarMenuItem = React.forwardRef(function SidebarMenuItem(
         "relative group",
         "w-full px-2 py-1 rounded text-sm font-medium text-foreground",
         "text-ellipsis whitespace-nowrap overflow-hidden",
-        "hover:bg-accent hover:text-accent-foreground",
+        "hover:bg-accent hover:text-accent-foreground cursor-default",
         "data-[muted='true']:text-muted-foreground",
         "data-[disabled='true']:cursor-not-allowed data-[disabled='true']:opacity-40 data-[disabled='true']:bg-background",
         "data-[selected='true']:bg-accent data-[selected='true']:text-accent-foreground",

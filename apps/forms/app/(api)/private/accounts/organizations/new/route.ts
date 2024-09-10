@@ -1,7 +1,7 @@
 import {
   createRouteHandlerWorkspaceClient,
-  workspaceclient,
-} from "@/lib/supabase/server";
+  workspace_service_client,
+} from "@/supabase/server";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const { data, error } = await workspaceclient
+  const { data, error } = await workspace_service_client
     .from("organization")
     .insert({
       name: String(name),

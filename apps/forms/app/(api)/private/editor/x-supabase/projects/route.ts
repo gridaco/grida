@@ -1,6 +1,6 @@
 import { PrivateEditorApi } from "@/lib/private";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
-import { createRouteHandlerXSBClient } from "@/lib/supabase/server";
+import { createRouteHandlerXSBClient } from "@/supabase/server";
 import { GridaXSupabase } from "@/types";
 import type {
   EditorApiResponse,

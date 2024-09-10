@@ -4,10 +4,11 @@ import { notFound, redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import {
   createRouteHandlerXSBClient,
-  createServerComponentClient,
+  createServerComponentFormsClient,
+  createServerComponentG11nClient,
   createServerComponentWorkspaceClient,
-  grida_xsupabase_client,
-} from "@/lib/supabase/server";
+  grida_xsupabase_service_client,
+} from "@/supabase/server";
 import { GridaLogo } from "@/components/grida-logo";
 import { SlashIcon } from "@radix-ui/react-icons";
 import { Sidebar } from "@/scaffolds/sidebar/sidebar";
@@ -39,6 +40,7 @@ import React from "react";
 import { PlayActions } from "@/scaffolds/workbench/play-actions";
 import { DontCastJsonProperties } from "@/types/supabase-ext";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
+import EditorRouterProvider from "./router";
 
 export const revalidate = 0;
 
@@ -75,8 +77,10 @@ export default async function Layout({
   params: GDocEditorRouteParams;
 }>) {
   const cookieStore = cookies();
-  const supabase = createServerComponentClient(cookieStore);
+  const formsclient = createServerComponentFormsClient(cookieStore);
   const wsclient = createServerComponentWorkspaceClient(cookieStore);
+  const g11nclient = createServerComponentG11nClient(cookieStore);
+
   const { id, org, proj } = params;
 
   const { data: project_ref, error: project_ref_err } = await wsclient
@@ -114,7 +118,7 @@ export default async function Layout({
 
   switch (masterdoc_ref.doctype) {
     case "v0_form": {
-      const { data, error } = await supabase
+      const { data, error } = await formsclient
         .from("form_document")
         .select(
           `
@@ -144,7 +148,7 @@ export default async function Layout({
       const appearance =
         (data.stylesheet as FormStyleSheetV1Schema)?.appearance ?? "system";
 
-      const client = new GridaXSupabaseService();
+      const xsbservice = new GridaXSupabaseService();
 
       const { form: _form } = data;
       assert(_form);
@@ -155,8 +159,32 @@ export default async function Layout({
       };
 
       const supabase_connection_state = form.supabase_connection
-        ? await client.getXSBMainTableConnectionState(form.supabase_connection)
+        ? await xsbservice.getXSBMainTableConnectionState(
+            form.supabase_connection
+          )
         : null;
+
+      if (data.g11n_manifest_id) {
+        const { data: g11n, error: g11n_err } = await g11nclient
+          .from("manifest")
+          .select(
+            `
+              *,
+              locales:locale!manifest_id(*),
+              default_locale:locale(*),
+              keys:key(*)
+            `
+          )
+          .eq("id", data.g11n_manifest_id)
+          .single();
+
+        // g11n.
+
+        if (g11n_err) {
+          // report and ignore
+          console.error("g11n_err", g11n_err);
+        }
+      }
 
       return (
         <Html>
@@ -174,7 +202,6 @@ export default async function Layout({
                   supabase: supabase_connection_state || undefined,
                 },
                 theme: {
-                  lang: data.lang,
                   is_powered_by_branding_enabled:
                     data.is_powered_by_branding_enabled,
                   appearance: appearance,
@@ -193,6 +220,9 @@ export default async function Layout({
                 form_id: form.id,
                 // TODO:
                 form_title: form.title,
+                document: {
+                  lang: data.lang,
+                },
                 campaign: {
                   is_scheduling_enabled: form.is_scheduling_enabled,
                   is_force_closed: form.is_force_closed,
@@ -258,8 +288,10 @@ export default async function Layout({
               theme: {
                 appearance: "system",
                 fontFamily: "inter",
-                lang: "en",
                 is_powered_by_branding_enabled: true,
+              },
+              document: {
+                lang: "en",
               },
             }}
           >
@@ -280,7 +312,7 @@ export default async function Layout({
       );
     }
     case "v0_schema": {
-      const { data, error } = await supabase
+      const { data, error } = await formsclient
         .from("schema_document")
         .select(
           `
@@ -302,7 +334,7 @@ export default async function Layout({
         .single();
 
       // get project supabase project
-      const { data: supabase_project } = await grida_xsupabase_client
+      const { data: supabase_project } = await grida_xsupabase_service_client
         .from("supabase_project")
         .select("*")
         .eq("project_id", project_ref.id)
@@ -385,8 +417,10 @@ export default async function Layout({
               theme: {
                 appearance: "system",
                 fontFamily: "inter",
-                lang: "en",
                 is_powered_by_branding_enabled: true,
+              },
+              document: {
+                lang: "en",
               },
             }}
           >
@@ -464,6 +498,7 @@ function BaseLayout({
             <div className="w-full h-full overflow-x-hidden">{children}</div>
           </div>
         </div>
+        <EditorRouterProvider />
         <EditorHelpFab />
         <ToasterWithMax position="bottom-center" max={5} />
       </ThemeProvider>

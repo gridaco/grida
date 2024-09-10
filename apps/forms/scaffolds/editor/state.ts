@@ -16,10 +16,11 @@ import type {
   FormResponseSession,
   FormResponseUnknownFieldHandlingStrategyType,
   FormStyleSheetV1Schema,
-  FormsPageLanguage,
+  LanguageCode,
   GDocumentType,
   GridaXSupabase,
   OrderBy,
+  PGINT8ID,
 } from "@/types";
 import { SYM_LOCALTZ, EditorSymbols } from "./symbols";
 import { ZodObject } from "zod";
@@ -52,6 +53,9 @@ export interface BaseDocumentEditorInit {
   };
   document_id: string;
   document_title: string;
+  document: {
+    lang: LanguageCode;
+  };
   doctype: GDocumentType;
   theme: EditorState["theme"];
 }
@@ -317,6 +321,74 @@ interface IInsertionMenuState {
   insertmenu: TGlobalEditorDialogState;
 }
 
+export interface IG11nState {
+  g11n: {
+    /**
+     * grida_g11n.manifest.id
+     */
+    manifest_id: PGINT8ID | null;
+
+    /**
+     * view document in...
+     */
+    lang: LanguageCode;
+
+    /**
+     * default language
+     */
+    lang_default: LanguageCode;
+
+    /**
+     * available languages provided by user
+     */
+    langs: LanguageCode[];
+
+    keys: Array<string>;
+
+    resources: Partial<
+      Record<LanguageCode, Record<string, string | undefined>>
+    >;
+  };
+}
+
+interface IDocumentState extends IG11nState {
+  pages: MenuItem<string>[];
+  selected_page_id?: string;
+  nodes: any[];
+  templatesample?: string;
+  templatedata: {
+    [key: string]: {
+      text?: Tokens.StringValueExpression;
+      template_id: string;
+      attributes?: Omit<
+        React.HtmlHTMLAttributes<HTMLDivElement>,
+        "style" | "className"
+      >;
+      properties?: { [key: string]: Tokens.StringValueExpression };
+      style?: React.CSSProperties;
+    };
+  };
+  selected_node_id?: string;
+  selected_node_type?: string;
+  selected_node_schema?: ZodObject<any> | null;
+  selected_node_default_properties?: Record<string, any>;
+  selected_node_default_style?: React.CSSProperties;
+  selected_node_default_text?: Tokens.StringValueExpression;
+  selected_node_context?: Record<string, any>;
+}
+
+interface IEditorDocumentThemeState {
+  theme: {
+    is_powered_by_branding_enabled: boolean;
+    appearance: Appearance;
+    palette?: FormStyleSheetV1Schema["palette"];
+    fontFamily: FontFamily;
+    customCSS?: FormStyleSheetV1Schema["custom"];
+    section?: FormStyleSheetV1Schema["section"];
+    background?: FormPageBackgroundSchema;
+  };
+}
+
 export interface BaseDocumentEditorState
   extends IEditorGlobalSavingState,
     IEditorDateContextState,
@@ -324,6 +396,7 @@ export interface BaseDocumentEditorState
     IInsertionMenuState,
     IFieldEditorState,
     ICustomerEditorState,
+    IEditorDocumentThemeState,
     IRowEditorState {
   basepath: string;
   organization: {
@@ -337,41 +410,7 @@ export interface BaseDocumentEditorState
   document_id: string;
   document_title: string;
   doctype: GDocumentType;
-  document: {
-    pages: MenuItem<string>[];
-    selected_page_id?: string;
-    nodes: any[];
-    templatesample?: string;
-    templatedata: {
-      [key: string]: {
-        text?: Tokens.StringValueExpression;
-        template_id: string;
-        attributes?: Omit<
-          React.HtmlHTMLAttributes<HTMLDivElement>,
-          "style" | "className"
-        >;
-        properties?: { [key: string]: Tokens.StringValueExpression };
-        style?: React.CSSProperties;
-      };
-    };
-    selected_node_id?: string;
-    selected_node_type?: string;
-    selected_node_schema?: ZodObject<any> | null;
-    selected_node_default_properties?: Record<string, any>;
-    selected_node_default_style?: React.CSSProperties;
-    selected_node_default_text?: Tokens.StringValueExpression;
-    selected_node_context?: Record<string, any>;
-  };
-  theme: {
-    is_powered_by_branding_enabled: boolean;
-    lang: FormsPageLanguage;
-    appearance: Appearance;
-    palette?: FormStyleSheetV1Schema["palette"];
-    fontFamily: FontFamily;
-    customCSS?: FormStyleSheetV1Schema["custom"];
-    section?: FormStyleSheetV1Schema["section"];
-    background?: FormPageBackgroundSchema;
-  };
+  document: IDocumentState;
 }
 
 interface IFieldEditorState {

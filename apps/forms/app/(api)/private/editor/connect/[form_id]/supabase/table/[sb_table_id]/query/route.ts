@@ -6,7 +6,7 @@ import {
   XSupabaseQuery,
   XSupabaseQueryBuilder,
 } from "@/lib/supabase-postgrest/builder";
-import { createRouteHandlerClient } from "@/lib/supabase/server";
+import { createRouteHandlerFormsClient } from "@/supabase/server";
 import {
   GridaXSupabaseService,
   createXSupabaseClient,
@@ -138,7 +138,7 @@ async function get_forms_x_supabase_table_connector({
   sb_table_id: number;
 }) {
   const cookieStore = cookies();
-  const grida_forms_client = createRouteHandlerClient(cookieStore);
+  const grida_forms_client = createRouteHandlerFormsClient(cookieStore);
 
   const { data: form, error } = await grida_forms_client
     .from("form")

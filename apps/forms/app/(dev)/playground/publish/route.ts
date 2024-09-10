@@ -1,9 +1,9 @@
 import { Env } from "@/env";
 import { editorlink, formlink } from "@/lib/forms/url";
 import {
-  createRouteHandlerClient,
-  workspaceclient,
-} from "@/lib/supabase/server";
+  createRouteHandlerFormsClient,
+  workspace_service_client,
+} from "@/supabase/server";
 import { JSONFrom2DB } from "@/services/new/json2db";
 import { JSONFormParser } from "@/types";
 import assert from "assert";
@@ -21,7 +21,7 @@ const nanoid = customAlphabet(alphabet, 39);
 export async function POST(req: NextRequest) {
   const form = await req.formData();
   const cookieStore = cookies();
-  const supabase = createRouteHandlerClient(cookieStore);
+  const supabase = createRouteHandlerFormsClient(cookieStore);
 
   const gist = form.get("gist");
   const src = form.get("src");
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
   // check if user has a project as a owner
   // get the user owned organization
   // TODO: WROKSPACE MANAGEMENT
-  const { data: org, error } = await workspaceclient
+  const { data: org, error } = await workspace_service_client
     .from("organization")
     .select(`*, projects:project(*)`)
     .eq("owner_id", auth.user.id)
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
 
   if (!org) {
     // 1. create org if not exists
-    const { data: neworg, error } = await workspaceclient
+    const { data: neworg, error } = await workspace_service_client
       .from("organization")
       .insert({
         owner_id: auth.user.id,
@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
 
   if (!PROJECT) {
     // 2. create project if not exists  - TODO: also bad
-    const { data: project, error } = await workspaceclient
+    const { data: project, error } = await workspace_service_client
       .from("project")
       .insert({
         organization_id: ORG.id,

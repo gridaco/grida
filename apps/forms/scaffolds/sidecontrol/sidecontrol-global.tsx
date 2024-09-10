@@ -26,7 +26,7 @@ import {
   Appearance,
   FontFamily,
   FormStyleSheetV1Schema,
-  FormsPageLanguage,
+  LanguageCode,
 } from "@/types";
 import * as _variants from "@/theme/palettes";
 import { PaletteColorChip } from "@/components/design/palette-color-chip";
@@ -38,6 +38,7 @@ import {
   MoonIcon,
   OpenInNewWindowIcon,
   Pencil2Icon,
+  PlusIcon,
   SunIcon,
 } from "@radix-ui/react-icons";
 import {
@@ -62,14 +63,17 @@ import {
   PreferenceBody,
   PreferenceBox,
   PreferenceBoxHeader,
-  PreferenceDescription,
 } from "@/components/preferences";
-import {
-  language_label_map,
-  supported_form_page_languages,
-} from "@/k/supported_languages";
+import { supported_form_page_languages } from "@/k/supported_languages";
 import { Switch } from "@/components/ui/switch";
 import { PoweredByGridaWaterMark } from "@/components/powered-by-branding";
+import { PropertyLine, PropertyLineControlRoot, PropertyLineLabel } from "./ui";
+import { inputVariants } from "./controls/utils/input-variants";
+import { useDialogState } from "@/components/hooks/use-dialog-state";
+import { defineStepper } from "@stepperize/react";
+import { LanguageSelect } from "@/components/language-select";
+import { Badge } from "@/components/ui/badge";
+import { AddNewLanguageDialog } from "../dialogs/langs-add-dialog";
 
 const { default: all, ...variants } = _variants;
 
@@ -110,6 +114,14 @@ export function SideControlGlobal() {
       </SidebarSection>
       <SidebarSection className="border-b pb-4">
         <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>Language</SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuSectionContent>
+          <Language />
+        </SidebarMenuSectionContent>
+      </SidebarSection>
+      <SidebarSection className="border-b pb-4">
+        <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Custom CSS</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuSectionContent>
@@ -125,6 +137,223 @@ export function SideControlGlobal() {
         </SidebarMenuSectionContent>
       </SidebarSection>
     </>
+  );
+}
+
+function Language() {
+  const [state, dispatch] = useEditorState();
+  const localizationSetupDialog = useDialogState("localization-setup", {
+    refreshkey: true,
+  });
+  const addnewlangDialog = useDialogState("addnewlang", { refreshkey: true });
+  const {
+    document: { g11n },
+  } = state;
+
+  const onLangChange = useCallback(
+    (lang: LanguageCode) => {
+      dispatch({
+        type: "editor/document/langs/set-current",
+        lang,
+      });
+    },
+    [dispatch]
+  );
+
+  const onDefaultLangChange = useCallback(
+    (lang: LanguageCode) => {
+      dispatch({
+        type: "editor/document/langs/set-default",
+        lang,
+      });
+    },
+    [dispatch]
+  );
+
+  const ismultilangs = g11n.langs.length > 1;
+
+  if (ismultilangs) {
+    return (
+      <>
+        <AddNewLanguageDialog
+          {...addnewlangDialog}
+          key={addnewlangDialog.refreshkey}
+        />
+        <PropertyLine>
+          <div className="flex flex-wrap gap-2">
+            {g11n.langs.map((l) => {
+              const isdefault = l === g11n.lang_default;
+              const iscurrent = l === g11n.lang;
+              return (
+                <Badge
+                  onClick={() => onLangChange(l)}
+                  variant={iscurrent ? "default" : "outline"}
+                  key={l}
+                  className="cursor-pointer"
+                >
+                  {l}{" "}
+                  {isdefault && (
+                    <span className="text-[10px] font-normal ms-1 text-muted-foreground">
+                      (default)
+                    </span>
+                  )}
+                </Badge>
+              );
+            })}
+            <Badge
+              onClick={addnewlangDialog.openDialog}
+              variant={"outline"}
+              className="cursor-pointer"
+            >
+              <PlusIcon className="inline-flex w-3 h-3 me-1 align-middle" />
+              New
+            </Badge>
+          </div>
+        </PropertyLine>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <EnableMultiLanguageDialog
+        {...localizationSetupDialog}
+        key={localizationSetupDialog.refreshkey}
+      />
+      <PropertyLine>
+        <PropertyLineLabel>Default</PropertyLineLabel>
+        <LanguageSelect
+          value={g11n.lang_default}
+          onValueChange={onDefaultLangChange}
+          className={inputVariants({ size: "sm" })}
+        />
+      </PropertyLine>
+      {/* WIP - this is a entry point to enabling localization, disabling this will prevent users from setting up localization, we're good to go. */}
+      {process.env.NODE_ENV !== "production" && (
+        <PropertyLine>
+          <PropertyLineLabel>Localize</PropertyLineLabel>
+          <PropertyLineControlRoot>
+            <Switch
+              checked={localizationSetupDialog.open}
+              onCheckedChange={(checked) => {
+                if (checked) {
+                  localizationSetupDialog.openDialog();
+                }
+              }}
+            />
+          </PropertyLineControlRoot>
+        </PropertyLine>
+      )}
+    </>
+  );
+}
+
+const { useStepper } = defineStepper(
+  { id: "fallbacklang" },
+  { id: "firstlang" }
+);
+
+function EnableMultiLanguageDialog({
+  ...props
+}: React.ComponentProps<typeof Dialog>) {
+  const [state, dispatch] = useEditorState();
+  const stepper = useStepper();
+
+  const [firstLang, setFirstLang] = useState<LanguageCode>();
+
+  const changeDefaultLang = useCallback(
+    (lang: LanguageCode) => {
+      dispatch({
+        type: "editor/document/langs/set-default",
+        lang,
+      });
+    },
+    [dispatch]
+  );
+
+  const addLang = useCallback(
+    (lang: LanguageCode) => {
+      dispatch({
+        type: "editor/document/langs/add",
+        lang,
+      });
+    },
+    [dispatch]
+  );
+
+  return (
+    <Dialog {...props}>
+      <DialogContent>
+        <DialogTitle>Setup Localization</DialogTitle>
+        <DialogDescription>
+          Ensure your content feels local everywhere, making every user feel
+          right at home.
+        </DialogDescription>
+        <hr />
+        <form
+          id="localization-setup-dialog"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (stepper.isLast) {
+              //
+              addLang(firstLang!);
+              props?.onOpenChange?.(false);
+            } else {
+              stepper.next();
+            }
+          }}
+        >
+          {stepper.when("fallbacklang", () => (
+            <div className="grid gap-2">
+              <Label>Default Language</Label>
+              <LanguageSelect
+                name="default_language"
+                required
+                value={state.document.g11n.lang_default}
+                onValueChange={changeDefaultLang}
+              />
+              <p className="text-xs text-muted-foreground">
+                <i>
+                  Your current contents will be used as the default language.
+                </i>
+                <br />
+                Choose a default language that will be used when a user&apos;s
+                preferred language isn&apos;t available. This ensures your
+                content is always accessible and understandable.
+              </p>
+            </div>
+          ))}
+          {stepper.when("firstlang", () => (
+            <div className="grid gap-2">
+              <Label>First Language to Get Started</Label>
+              <LanguageSelect
+                name="target_language"
+                required
+                value={firstLang}
+                onValueChange={setFirstLang}
+                options={supported_form_page_languages.filter(
+                  (l) => l !== state.document.g11n.lang_default
+                )}
+              />
+              <p className="text-xs text-muted-foreground">
+                Select the first language for localization. You can add or
+                delete languages later, so don&apos;t worry if you&apos;re
+                unsure.
+              </p>
+            </div>
+          ))}
+        </form>
+        <hr />
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="outline">Cancel</Button>
+          </DialogClose>
+          <Button form="localization-setup-dialog" type="submit">
+            {stepper.isLast ? "Done" : "Continue"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -512,18 +741,8 @@ function CustomCSS() {
 function Settings() {
   const [state, dispatch] = useEditorState();
   const {
-    theme: { lang, is_powered_by_branding_enabled },
+    theme: { is_powered_by_branding_enabled },
   } = state;
-
-  const onLangChange = useCallback(
-    (lang: FormsPageLanguage) => {
-      dispatch({
-        type: "editor/theme/lang",
-        lang,
-      });
-    },
-    [dispatch]
-  );
 
   const onPoweredByBrandingEnabledChange = useCallback(
     (enabled: boolean) => {
@@ -550,51 +769,8 @@ function Settings() {
         <div>
           <Tabs>
             <TabsList>
-              <TabsTrigger value="lang">Language</TabsTrigger>
               <TabsTrigger value="branding">Branding</TabsTrigger>
             </TabsList>
-            <TabsContent value="lang">
-              <PreferenceBox>
-                <PreferenceBoxHeader
-                  heading={<>Page Language</>}
-                  description={
-                    <>Choose the language that your customers will be seeing.</>
-                  }
-                />
-                <PreferenceBody>
-                  <div className="flex flex-col gap-8">
-                    <section>
-                      <div className="mt-4 flex flex-col gap-1">
-                        <Select
-                          name="lang"
-                          value={lang}
-                          onValueChange={(value) => {
-                            onLangChange(value as any);
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="None" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {supported_form_page_languages.map((lang) => (
-                              <SelectItem key={lang} value={lang}>
-                                {language_label_map[lang]}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <PreferenceDescription>
-                          The form page will be displayed in{" "}
-                          <span className="font-bold font-mono">
-                            {language_label_map[lang]}
-                          </span>
-                        </PreferenceDescription>
-                      </div>
-                    </section>
-                  </div>
-                </PreferenceBody>
-              </PreferenceBox>
-            </TabsContent>
             <TabsContent value="branding">
               <PreferenceBox>
                 <PreferenceBoxHeader

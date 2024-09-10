@@ -2,7 +2,7 @@ import { SYSTEM_X_GF_SIMULATOR_FLAG_KEY } from "@/k/system";
 import { nanoid } from "nanoid";
 import { v4 } from "uuid";
 import { FormRenderTree } from "../forms";
-import { createClientFormsClient } from "../supabase/client";
+import { createClientComponentFormsClient } from "../../supabase/client";
 import assert from "assert";
 import { FormDocument } from "@/types";
 import { FormSubmitErrorCode } from "@/types/private/api";
@@ -62,7 +62,7 @@ export class Simulator {
   }
 
   private async _fetch_form_schema() {
-    const { data } = await createClientFormsClient()
+    const { data } = await createClientComponentFormsClient()
       .from("form")
       .select(
         `

@@ -1,10 +1,13 @@
-import { grida_forms_client, workspaceclient } from "@/lib/supabase/server";
+import {
+  grida_forms_service_client,
+  workspace_service_client,
+} from "@/supabase/server";
 import { process_response_provisional_info } from "@/services/customer/utils";
 import { NextResponse } from "next/server";
 
 export async function POST() {
   // list all customer, except dev account
-  const { data: customers, error } = await workspaceclient
+  const { data: customers, error } = await workspace_service_client
     .from("customer")
     .select()
     .neq("project_id", 2);
@@ -14,7 +17,7 @@ export async function POST() {
   let i = 0;
   for (const customer of customers!) {
     try {
-      const { data: responses } = await grida_forms_client
+      const { data: responses } = await grida_forms_service_client
         .from("response")
         .select(
           `*, response_fields:response_field(*, form_field:form_field(type, name))`
@@ -26,7 +29,7 @@ export async function POST() {
         process_response_provisional_info(responses as any);
 
       // update customer
-      await workspaceclient
+      await workspace_service_client
         .from("customer")
         .update({
           email_provisional: unique(

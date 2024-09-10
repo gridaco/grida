@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { createClientWorkspaceClient } from "@/lib/supabase/client";
+import { createClientComponentWorkspaceClient } from "@/supabase/client";
 import { CheckIcon, PlusIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
 import React, { useMemo } from "react";
@@ -22,7 +22,7 @@ export function WorkspaceMenu({
   current?: number;
 }>) {
   const { state } = useWorkspace();
-  const supabase = useMemo(() => createClientWorkspaceClient(), []);
+  const supabase = useMemo(() => createClientComponentWorkspaceClient(), []);
 
   const { organizations } = state;
 

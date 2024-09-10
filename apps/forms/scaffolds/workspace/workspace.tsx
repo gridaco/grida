@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useReducer, useEffect } from "react";
 import produce from "immer";
 import type { GDocument, Organization, Project } from "@/types";
-import { createClientWorkspaceClient } from "@/lib/supabase/client";
+import { createClientComponentWorkspaceClient } from "@/supabase/client";
 import { PublicUrls } from "@/services/public-urls";
 import useSWR from "swr";
 import { EditorApiResponse } from "@/types/private/api";
@@ -66,7 +66,7 @@ export function Workspace({
 }: React.PropsWithChildren<{
   organization: Organization;
 }>) {
-  const supabase = createClientWorkspaceClient();
+  const supabase = createClientComponentWorkspaceClient();
 
   const initial = {
     loading: true,

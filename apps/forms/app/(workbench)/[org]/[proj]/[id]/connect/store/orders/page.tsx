@@ -72,7 +72,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cookies } from "next/headers";
-import { createServerComponentClient } from "@/lib/supabase/server";
+import { createServerComponentFormsClient } from "@/supabase/server";
 import { redirect } from "next/navigation";
 
 export default function Dashboard({

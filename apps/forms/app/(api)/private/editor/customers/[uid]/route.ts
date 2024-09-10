@@ -1,7 +1,7 @@
 import {
-  createRouteHandlerClient,
+  createRouteHandlerFormsClient,
   createRouteHandlerWorkspaceClient,
-} from "@/lib/supabase/server";
+} from "@/supabase/server";
 import { Customer, Form, FormResponse } from "@/types";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
@@ -21,7 +21,7 @@ export async function GET(
 ) {
   const { uid } = context.params;
   const cookieStore = cookies();
-  const client = createRouteHandlerClient(cookieStore);
+  const client = createRouteHandlerFormsClient(cookieStore);
   const wsclient = createRouteHandlerWorkspaceClient(cookieStore);
 
   const { data: customer } = await wsclient

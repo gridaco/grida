@@ -1,5 +1,5 @@
 import { editorlink } from "@/lib/forms/url";
-import { createRouteHandlerWorkspaceClient } from "@/lib/supabase/server";
+import { createRouteHandlerWorkspaceClient } from "@/supabase/server";
 import {
   SchemaDocumentSetupAssistantService,
   FormDocumentSetupAssistantService,

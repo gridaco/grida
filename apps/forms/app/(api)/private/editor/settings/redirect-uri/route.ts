@@ -1,4 +1,4 @@
-import { createRouteHandlerClient } from "@/lib/supabase/server";
+import { createRouteHandlerFormsClient } from "@/supabase/server";
 import type {
   EditorApiResponseOk,
   UpdateFormRedirectAfterSubmissionRequest,
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
 
   assert(form_id, "form_id is required");
 
-  const supabase = createRouteHandlerClient(cookieStore);
+  const supabase = createRouteHandlerFormsClient(cookieStore);
 
   const { error } = await supabase
     .from("form_document")

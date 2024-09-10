@@ -1,5 +1,5 @@
 import { parseGFKeys } from "@/lib/forms/gfkeys";
-import { grida_forms_client } from "@/lib/supabase/server";
+import { grida_forms_service_client } from "@/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
 // the phylosophy behind response session is, always create, do not validate.
@@ -15,13 +15,14 @@ export async function GET(
     req.nextUrl.searchParams
   );
 
-  const { data: session, error: session_error } = await grida_forms_client
-    .from("response_session")
-    .insert({
-      form_id: form_id,
-    })
-    .select()
-    .single();
+  const { data: session, error: session_error } =
+    await grida_forms_service_client
+      .from("response_session")
+      .insert({
+        form_id: form_id,
+      })
+      .select()
+      .single();
 
   if (!session || session_error) {
     console.error("Error creating session", session_error);

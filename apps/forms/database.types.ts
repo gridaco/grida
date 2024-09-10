@@ -799,6 +799,7 @@ export type Database = {
           is_scheduling_enabled: boolean
           max_form_responses_by_customer: number | null
           max_form_responses_in_total: number | null
+          name: string
           project_id: number
           scheduling_close_at: string | null
           scheduling_open_at: string | null
@@ -819,6 +820,7 @@ export type Database = {
           is_scheduling_enabled?: boolean
           max_form_responses_by_customer?: number | null
           max_form_responses_in_total?: number | null
+          name?: string
           project_id: number
           scheduling_close_at?: string | null
           scheduling_open_at?: string | null
@@ -839,6 +841,7 @@ export type Database = {
           is_scheduling_enabled?: boolean
           max_form_responses_by_customer?: number | null
           max_form_responses_in_total?: number | null
+          name?: string
           project_id?: number
           scheduling_close_at?: string | null
           scheduling_open_at?: string | null
@@ -957,57 +960,67 @@ export type Database = {
       }
       form_document: {
         Row: {
+          __name: string
           background: Json | null
           created_at: string
           ending_page_i18n_overrides: Json | null
           ending_page_template_id: string | null
           form_id: string
+          g11n_manifest_id: number | null
           id: string
           is_ending_page_enabled: boolean
           is_powered_by_branding_enabled: boolean
           is_redirect_after_response_uri_enabled: boolean
-          lang: Database["grida_forms"]["Enums"]["form_page_language"]
+          lang: Database["public"]["Enums"]["language_code"]
           method: Database["grida_forms"]["Enums"]["form_method"]
-          name: string
           project_id: number
           redirect_after_response_uri: string | null
           stylesheet: Json | null
         }
         Insert: {
+          __name?: string
           background?: Json | null
           created_at?: string
           ending_page_i18n_overrides?: Json | null
           ending_page_template_id?: string | null
           form_id: string
+          g11n_manifest_id?: number | null
           id: string
           is_ending_page_enabled?: boolean
           is_powered_by_branding_enabled?: boolean
           is_redirect_after_response_uri_enabled?: boolean
-          lang?: Database["grida_forms"]["Enums"]["form_page_language"]
+          lang?: Database["public"]["Enums"]["language_code"]
           method?: Database["grida_forms"]["Enums"]["form_method"]
-          name?: string
           project_id: number
           redirect_after_response_uri?: string | null
           stylesheet?: Json | null
         }
         Update: {
+          __name?: string
           background?: Json | null
           created_at?: string
           ending_page_i18n_overrides?: Json | null
           ending_page_template_id?: string | null
           form_id?: string
+          g11n_manifest_id?: number | null
           id?: string
           is_ending_page_enabled?: boolean
           is_powered_by_branding_enabled?: boolean
           is_redirect_after_response_uri_enabled?: boolean
-          lang?: Database["grida_forms"]["Enums"]["form_page_language"]
+          lang?: Database["public"]["Enums"]["language_code"]
           method?: Database["grida_forms"]["Enums"]["form_method"]
-          name?: string
           project_id?: number
           redirect_after_response_uri?: string | null
           stylesheet?: Json | null
         }
         Relationships: [
+          {
+            foreignKeyName: "form_document_g11n_manifest_id_fkey"
+            columns: ["g11n_manifest_id"]
+            isOneToOne: false
+            referencedRelation: "manifest"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "form_document_id_fkey"
             columns: ["id"]
@@ -1767,20 +1780,6 @@ export type Database = {
         | "video"
         | "json"
       form_method: "post" | "get" | "dialog"
-      form_page_language:
-        | "en"
-        | "ko"
-        | "es"
-        | "de"
-        | "ja"
-        | "fr"
-        | "pt"
-        | "it"
-        | "ru"
-        | "zh"
-        | "ar"
-        | "hi"
-        | "nl"
       form_response_unknown_field_handling_strategy_type:
         | "ignore"
         | "accept"
@@ -1816,6 +1815,180 @@ export type Database = {
         }
         Returns: string
       }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+  grida_g11n: {
+    Tables: {
+      key: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: number
+          keypath: string[]
+          manifest_id: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: number
+          keypath: string[]
+          manifest_id: number
+          updated_at: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: number
+          keypath?: string[]
+          manifest_id?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "key_manifest_id_fkey"
+            columns: ["manifest_id"]
+            isOneToOne: false
+            referencedRelation: "manifest"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      locale: {
+        Row: {
+          code: string
+          created_at: string
+          id: number
+          manifest_id: number
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: number
+          manifest_id: number
+          updated_at: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: number
+          manifest_id?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "locale_manifest_id_fkey"
+            columns: ["manifest_id"]
+            isOneToOne: false
+            referencedRelation: "manifest"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      manifest: {
+        Row: {
+          created_at: string
+          default_locale_id: number | null
+          id: number
+          project_id: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          default_locale_id?: number | null
+          id?: number
+          project_id: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          default_locale_id?: number | null
+          id?: number
+          project_id?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "manifest_default_locale_id_fkey"
+            columns: ["default_locale_id"]
+            isOneToOne: true
+            referencedRelation: "locale"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manifest_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      resource: {
+        Row: {
+          created_at: string
+          id: number
+          key_id: number
+          locale_id: number
+          manifest_id: number
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          key_id: number
+          locale_id: number
+          manifest_id: number
+          updated_at?: string
+          value: Json
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          key_id?: number
+          locale_id?: number
+          manifest_id?: number
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "value_key_id_fkey"
+            columns: ["key_id"]
+            isOneToOne: false
+            referencedRelation: "key"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "value_locale_id_fkey"
+            columns: ["locale_id"]
+            isOneToOne: false
+            referencedRelation: "locale"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "value_manifest_id_fkey"
+            columns: ["manifest_id"]
+            isOneToOne: false
+            referencedRelation: "manifest"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
     }
     Enums: {
       [_ in never]: never
@@ -2399,6 +2572,12 @@ export type Database = {
         }
         Returns: number[]
       }
+      rls_manifest: {
+        Args: {
+          p_manifest_id: number
+        }
+        Returns: boolean
+      }
       rls_organization: {
         Args: {
           p_organization_id: number
@@ -2432,6 +2611,20 @@ export type Database = {
     }
     Enums: {
       doctype: "v0_form" | "v0_site" | "v0_schema"
+      language_code:
+        | "en"
+        | "ko"
+        | "es"
+        | "de"
+        | "ja"
+        | "fr"
+        | "pt"
+        | "it"
+        | "ru"
+        | "zh"
+        | "ar"
+        | "hi"
+        | "nl"
     }
     CompositeTypes: {
       [_ in never]: never

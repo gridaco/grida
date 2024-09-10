@@ -1,10 +1,10 @@
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import {
-  grida_forms_client,
-  createServerComponentClient,
-  workspaceclient,
-} from "@/lib/supabase/server";
+  grida_forms_service_client,
+  createServerComponentFormsClient,
+  workspace_service_client,
+} from "@/supabase/server";
 import { Metadata } from "next";
 import { Inconsolata, Inter, Lora } from "next/font/google";
 import { FormDocument } from "@/types";
@@ -36,7 +36,7 @@ export async function generateMetadata({
   // room for improvement - query optimization via rpc or meta from client side
   const id = params.id;
 
-  const { data: formdoc, error: formdoc_err } = await grida_forms_client
+  const { data: formdoc, error: formdoc_err } = await grida_forms_service_client
     .from("form_document")
     .select(
       `
@@ -53,7 +53,7 @@ export async function generateMetadata({
     return notFound();
   }
 
-  const { data: doc } = await workspaceclient
+  const { data: doc } = await workspace_service_client
     .from("document")
     .select("*")
     .eq("id", formdoc.id)
@@ -80,9 +80,9 @@ export default async function Layout({
 }>) {
   const { id } = params;
   const cookieStore = cookies();
-  const supabase = createServerComponentClient(cookieStore);
+  const supabase = createServerComponentFormsClient(cookieStore);
 
-  const { data, error } = await grida_forms_client
+  const { data, error } = await grida_forms_service_client
     .from("form_document")
     .select(
       `

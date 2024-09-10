@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { CreateSignedUploadUrlRequest } from "@/types/private/api";
 import { cookies } from "next/headers";
-import { createRouteHandlerClient } from "@/lib/supabase/server";
+import { createRouteHandlerFormsClient } from "@/supabase/server";
 import { notFound } from "next/navigation";
 import { FieldStorageService } from "@/services/form/storage";
 import type { FormFieldStorageSchema } from "@/types";
@@ -39,7 +39,7 @@ async function handler(
   const { form_id, row_id, field_id } = context.params;
 
   const cookieStore = cookies();
-  const supabase = createRouteHandlerClient(cookieStore);
+  const supabase = createRouteHandlerFormsClient(cookieStore);
 
   const { data: form, error: formerr } = await supabase
     .from("form")

@@ -14,11 +14,12 @@ import type {
 } from "./state";
 import type {
   GlobalSavingAction,
+  GlobalWorkbenchPathAction,
   EditorSidebarModeAction,
   BlockDescriptionAction,
   BlockTitleAction,
   BlockVHiddenAction,
-  BlocksEditorAction,
+  EditorAction,
   ChangeBlockFieldAction,
   CreateFielFromBlockdAction,
   CreateNewPendingBlockAction,
@@ -50,7 +51,6 @@ import type {
   FeedXSupabaseMainTableRowsAction,
   DataTableRefreshAction,
   DataTableLoadingAction,
-  EditorThemeLangAction,
   EditorThemePaletteAction,
   EditorThemeFontFamilyAction,
   EditorThemeBackgroundAction,
@@ -98,16 +98,25 @@ import {
   table_to_sidebar_table_menu,
 } from "./init";
 import assert from "assert";
+import langReducer from "./reducers/lang.reducer";
 
-export function reducer(
-  state: EditorState,
-  action: BlocksEditorAction
-): EditorState {
+export function reducer(state: EditorState, action: EditorAction): EditorState {
   switch (action.type) {
     case "saving": {
       const { saving } = <GlobalSavingAction>action;
       return produce(state, (draft) => {
         draft.saving = saving;
+      });
+    }
+    case "workbench/path": {
+      // TODO: experiemntal
+      const { path } = <GlobalWorkbenchPathAction>action;
+      return produce(state, (draft) => {
+        if (path === "form/edit") {
+          draft.document.selected_page_id = "form";
+        } else {
+          draft.document.selected_page_id = "";
+        }
       });
     }
     case "editor/sidebar/mode": {
@@ -308,10 +317,11 @@ export function reducer(
     }
     case "blocks/delete": {
       const { block_id } = <DeleteBlockAction>action;
-      console.log("delete block", block_id);
       return produce(state, (draft) => {
         // remove the field id from available_field_ids
         draft.blocks = draft.blocks.filter((block) => block.id !== block_id);
+
+        draft.focus_block_id = null;
 
         // find the field_id of the deleted block
         const field_id = state.blocks.find(
@@ -983,12 +993,6 @@ export function reducer(
       });
       //
     }
-    case "editor/theme/lang": {
-      const { lang } = <EditorThemeLangAction>action;
-      return produce(state, (draft) => {
-        draft.theme.lang = lang;
-      });
-    }
     case "editor/theme/powered_by_branding": {
       const { enabled } = <EditorThemePoweredByBrandingAction>action;
       return produce(state, (draft) => {
@@ -1049,7 +1053,15 @@ export function reducer(
         draft.theme.customCSS = custom;
       });
     }
-    //
+    // #region lang
+    case "editor/document/langs/set-current":
+    case "editor/document/langs/set-default":
+    case "editor/document/langs/add":
+    case "editor/document/langs/delete":
+    case "editor/document/langs/messages/change": {
+      return langReducer(state, action);
+    }
+    // #endregion lang
     case "editor/document/select-page": {
       const { page_id } = <DocumentSelectPageAction>action;
 

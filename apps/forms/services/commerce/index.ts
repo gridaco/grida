@@ -1,14 +1,13 @@
-import type { Database } from "@/database.types";
-import { SupabaseClient } from "@supabase/supabase-js";
+import type { TGridaCommerceSupabaseClient } from "@/supabase/types";
 import assert from "assert";
 
 export class GridaCommerceClient {
-  public readonly client: SupabaseClient<Database, "grida_commerce">;
+  public readonly client: TGridaCommerceSupabaseClient;
   public readonly project_id: number;
   public readonly store_id?: number | null;
 
   constructor(
-    client: SupabaseClient<Database, "grida_commerce">,
+    client: TGridaCommerceSupabaseClient,
     project_id: number,
     store_id?: number | null
   ) {

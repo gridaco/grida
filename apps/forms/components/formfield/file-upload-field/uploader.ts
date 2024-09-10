@@ -1,4 +1,4 @@
-import { createClientFormsClient } from "@/lib/supabase/client";
+import { createClientComponentFormsClient } from "@/supabase/client";
 import {
   GRIDA_FORMS_RESPONSE_BUCKET,
   GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT,
@@ -15,7 +15,7 @@ import type {
   StoragePublicUrlData,
   SessionSignedUploadUrlData,
 } from "@/types/private/api";
-import { SupabaseStorageExtensions } from "@/lib/supabase/storage-ext";
+import { SupabaseStorageExtensions } from "@/supabase/storage-ext";
 
 export type FileUploaderFn = (
   file: File
@@ -54,7 +54,7 @@ async function makeSignedUrlUploader({
 }: {
   signed_urls: { path: string; token: string }[];
 }) {
-  const supabase = createClientFormsClient();
+  const supabase = createClientComponentFormsClient();
 
   return async (file: File, i: number) => {
     const { path, token } = signed_urls[i];
@@ -70,7 +70,7 @@ async function makeSignedUrlUploader({
 }
 
 function makeRequestUrlUploader({ request_url }: { request_url: string }) {
-  const supabase = createClientFormsClient();
+  const supabase = createClientComponentFormsClient();
 
   return async (file: File) => {
     const res = await fetch(request_url, {

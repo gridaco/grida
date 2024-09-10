@@ -9,7 +9,7 @@ import type {
   FormResponse,
   FormResponseWithFields,
   FormStyleSheetV1Schema,
-  FormsPageLanguage,
+  LanguageCode,
   GridaXSupabase,
 } from "@/types";
 import type {
@@ -22,8 +22,9 @@ import type { Tokens } from "@/ast";
 import { SYM_LOCALTZ } from "./symbols";
 import { ZodObject } from "zod";
 
-export type BlocksEditorAction =
+export type EditorAction =
   | GlobalSavingAction
+  | GlobalWorkbenchPathAction
   | EditorSidebarModeAction
   | CreateNewPendingBlockAction
   | ResolvePendingBlockAction
@@ -64,7 +65,7 @@ export type BlocksEditorAction =
   | DataTableLoadingAction
   | DataGridCellChangeAction
   | FeedXSupabaseMainTableRowsAction
-  | EditorThemeLangAction
+  | NSEditorDocumentLangAction
   | EditorThemePoweredByBrandingAction
   | EditorThemePaletteAction
   | EditorThemeAppearanceAction
@@ -88,6 +89,14 @@ export type BlocksEditorAction =
 export type GlobalSavingAction = {
   type: "saving";
   saving: boolean;
+};
+
+/**
+ * /[org]/[proj]/[docid]/[...workbenchpath]
+ */
+export type GlobalWorkbenchPathAction = {
+  type: "workbench/path";
+  path: string;
 };
 
 export interface EditorSidebarModeAction {
@@ -142,30 +151,45 @@ export interface BlockVHiddenAction {
   v_hidden: Tokens.ShorthandBooleanBinaryExpression;
 }
 
+/**
+ * @deprecated - remove me - use translation module
+ */
 export interface HtmlBlockBodyAction {
   type: "blocks/html/body";
   block_id: string;
   html: string;
 }
 
+/**
+ * @deprecated - remove me - use translation module
+ */
 export interface ImageBlockSrcAction {
   type: "blocks/image/src";
   block_id: string;
   src: string;
 }
 
+/**
+ * @deprecated - remove me - use translation module
+ */
 export interface VideoBlockSrcAction {
   type: "blocks/video/src";
   block_id: string;
   src: string;
 }
 
+/**
+ * @deprecated - remove me - use translation module
+ */
 export interface BlockTitleAction {
   type: "blocks/title";
   block_id: string;
   title_html: string;
 }
 
+/**
+ * @deprecated - remove me - use translation module
+ */
 export interface BlockDescriptionAction {
   type: "blocks/description";
   block_id: string;
@@ -334,11 +358,6 @@ export interface FeedXSupabaseMainTableRowsAction {
   data: GridaXSupabase.XDataRow[];
 }
 
-export interface EditorThemeLangAction {
-  type: "editor/theme/lang";
-  lang: FormsPageLanguage;
-}
-
 export interface EditorThemePoweredByBrandingAction {
   type: "editor/theme/powered_by_branding";
   enabled: boolean;
@@ -383,6 +402,41 @@ export interface FormEndingPreferencesAction
   extends Partial<EditorState["form"]["ending"]> {
   type: "editor/form/ending/preferences";
 }
+
+// #region lang
+export type NSEditorDocumentLangAction =
+  | EditorDocumentLangSetCurrentAction
+  | EditorDocumentLangSetDefaultAction
+  | EditorDocumentLangAddAction
+  | EditorDocumentLangDeleteAction
+  | EditorDocumentLangMessageAction;
+
+export interface EditorDocumentLangSetCurrentAction {
+  type: "editor/document/langs/set-current";
+  lang: LanguageCode;
+}
+
+export interface EditorDocumentLangSetDefaultAction {
+  type: "editor/document/langs/set-default";
+  lang: LanguageCode;
+}
+
+export interface EditorDocumentLangAddAction {
+  type: "editor/document/langs/add";
+  lang: LanguageCode;
+}
+export interface EditorDocumentLangDeleteAction {
+  type: "editor/document/langs/delete";
+  lang: LanguageCode;
+}
+
+export interface EditorDocumentLangMessageAction {
+  type: "editor/document/langs/messages/change";
+  lang: LanguageCode;
+  key: string;
+  message: string | undefined;
+}
+// #endregion lang
 
 export interface DocumentSelectPageAction {
   type: "editor/document/select-page";

@@ -21,6 +21,7 @@ import {
 } from "./base-block";
 import { useEditorState } from "@/scaffolds/editor";
 import { PDFViewer } from "@/components/pdf-viewer";
+import { Input } from "@/components/ui/input";
 
 export function PdfBlock({
   id,
@@ -64,17 +65,17 @@ export function PdfBlock({
       </BlockHeader>
       <div>
         <div className="py-4">
-          <input
+          <Input
             type="text"
             value={src ?? ""}
             onChange={(e) => {
+              // TODO:
               dispatch({
                 type: "blocks/video/src",
                 block_id: id,
                 src: e.target.value,
               });
             }}
-            className="bg-neutral-50 border border-neutral-300 text-neutral-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-neutral-700 dark:border-neutral-600 dark:placeholder-neutral-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
             placeholder="Video URL"
           />
         </div>

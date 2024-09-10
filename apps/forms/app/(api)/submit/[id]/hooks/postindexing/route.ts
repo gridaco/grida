@@ -1,4 +1,7 @@
-import { grida_forms_client, workspaceclient } from "@/lib/supabase/server";
+import {
+  grida_forms_service_client,
+  workspace_service_client,
+} from "@/supabase/server";
 import { process_response_provisional_info } from "@/services/customer/utils";
 import { unique } from "@/utils/unique";
 import assert from "assert";
@@ -17,14 +20,15 @@ export async function POST(
 
   assert(response_id, "response_id is required");
 
-  const { data: response, error: response_err } = await grida_forms_client
-    .from("response")
-    .select(
-      `*, response_fields:response_field(*, form_field:form_field(type, name))`
-    )
-    .eq("id", response_id)
-    .eq("form_id", form_id)
-    .single();
+  const { data: response, error: response_err } =
+    await grida_forms_service_client
+      .from("response")
+      .select(
+        `*, response_fields:response_field(*, form_field:form_field(type, name))`
+      )
+      .eq("id", response_id)
+      .eq("form_id", form_id)
+      .single();
 
   if (response_err) console.error("postindexing/err", response_err);
   if (!response) {
@@ -78,7 +82,7 @@ export async function POST(
   // update customer
 
   const { data: customer_prev, error: customer_prev_err } =
-    await workspaceclient
+    await workspace_service_client
       .from("customer")
       .select("email_provisional, phone_provisional")
       .eq("uid", response.customer_id)
@@ -92,7 +96,7 @@ export async function POST(
   const { email_provisional, phone_provisional } =
     process_response_provisional_info([response as any]);
 
-  const { error } = await workspaceclient
+  const { error } = await workspace_service_client
     .from("customer")
     .update({
       email_provisional: unique(

@@ -3,9 +3,9 @@
 import type { Database } from "@/database.types";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  createClientFormsClient,
-  createClientWorkspaceClient,
-} from "@/lib/supabase/client";
+  createClientComponentFormsClient,
+  createClientComponentWorkspaceClient,
+} from "@/supabase/client";
 import TimeSeriesChart from "../charts/timeseries";
 import { GraphSkeleton, NumberSkeleton } from "../charts/skeleton";
 import { SupabaseClient } from "@supabase/supabase-js";
@@ -183,7 +183,7 @@ export function Sessions({
   from: Date;
   to: Date;
 }) {
-  const supabase = useMemo(() => createClientFormsClient(), []);
+  const supabase = useMemo(() => createClientComponentFormsClient(), []);
 
   const [data, setData] = useState<LineChartData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -255,7 +255,7 @@ export function Customers({
   from: Date;
   to: Date;
 }) {
-  const supabase = useMemo(() => createClientWorkspaceClient(), []);
+  const supabase = useMemo(() => createClientComponentWorkspaceClient(), []);
 
   const [data, setData] = useState<LineChartData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -327,7 +327,7 @@ export function Responses({
   from: Date;
   to: Date;
 }) {
-  const supabase = useMemo(() => createClientFormsClient(), []);
+  const supabase = useMemo(() => createClientComponentFormsClient(), []);
 
   const [data, setData] = useState<LineChartData[]>([]);
   const [loading, setLoading] = useState(true);

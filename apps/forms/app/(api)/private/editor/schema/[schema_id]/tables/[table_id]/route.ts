@@ -1,4 +1,4 @@
-import { createRouteHandlerClient } from "@/lib/supabase/server";
+import { createRouteHandlerFormsClient } from "@/supabase/server";
 import { EditorApiResponseOk } from "@/types/private/api";
 import assert from "assert";
 import { cookies } from "next/headers";
@@ -16,7 +16,7 @@ export async function DELETE(req: NextRequest, context: Context) {
   const { schema_id, table_id } = context.params;
 
   const cookieStore = cookies();
-  const supabase = createRouteHandlerClient(cookieStore);
+  const supabase = createRouteHandlerFormsClient(cookieStore);
 
   const { user_confirmation_txt } = await req.json();
 

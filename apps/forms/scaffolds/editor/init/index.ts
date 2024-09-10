@@ -15,11 +15,19 @@ import type {
   TableXSBMainTableConnection,
   GDocSchemaTable,
   TableMenuItem,
-} from "./state";
+  IG11nState,
+} from "../state";
 import { blockstreeflat } from "@/lib/forms/tree";
-import { SYM_LOCALTZ, EditorSymbols } from "./symbols";
-import { FormFieldDefinition, GridaXSupabase } from "@/types";
+import { SYM_LOCALTZ, EditorSymbols } from "../symbols";
+import type {
+  FormBlock,
+  FormFieldDefinition,
+  GridaXSupabase,
+  IFormField,
+  LanguageCode,
+} from "@/types";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
+import { FormDocumentG11nKVInit } from "./g11n.init";
 
 export function initialEditorState(init: EditorInit): EditorState {
   switch (init.doctype) {
@@ -163,6 +171,10 @@ function initialDatabaseEditorState(
     supabase_project: init.supabase_project,
     connections: {},
     document: {
+      g11n: {
+        ...initialize_g11n_state_without_keys_from_lang(init.document.lang),
+        keys: [],
+      },
       pages: [],
       nodes: [],
       templatedata: {},
@@ -239,6 +251,10 @@ function initialSiteEditorState(init: SiteDocumentEditorInit): EditorState {
   return {
     ...base,
     document: {
+      g11n: {
+        ...initialize_g11n_state_without_keys_from_lang(init.document.lang),
+        keys: [],
+      },
       pages: sitedocumentpagesinit({
         basepath: base.basepath,
         document_id: init.document_id,
@@ -415,6 +431,8 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
   const tableids = Object.getOwnPropertySymbols(tables);
   const values = tableids.map((id) => (tables as any)[id]);
 
+  const g11ninit = new FormDocumentG11nKVInit(init.blocks, init.fields);
+
   return {
     ...base,
     supabase_project: init.connections?.supabase?.supabase_project ?? null,
@@ -443,6 +461,11 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
 
     blocks: blockstreeflat(init.blocks),
     document: {
+      g11n: {
+        ...initialize_g11n_state_without_keys_from_lang(init.document.lang),
+        resources: { [init.document.lang]: g11ninit.resources },
+        keys: g11ninit.keys,
+      },
       pages: formdocumentpagesinit({
         basepath: base.basepath,
         document_id: init.document_id,
@@ -513,6 +536,20 @@ function sitedocumentpagesinit({
       data: {},
     },
   ];
+}
+
+function initialize_g11n_state_without_keys_from_lang(
+  lang: LanguageCode
+): Omit<IG11nState["g11n"], "keys"> {
+  return {
+    lang: lang,
+    lang_default: lang,
+    langs: [lang],
+    manifest_id: null,
+    resources: {
+      [lang]: {},
+    },
+  };
 }
 
 function formdocumentpagesinit({

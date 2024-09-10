@@ -16,7 +16,7 @@ import {
   SidebarSectionHeaderItem,
   SidebarSectionHeaderLabel,
 } from "@/components/sidebar";
-import { ModeDesign } from "./sidebar-mode-blocks";
+import { ModeDesign } from "./sidebar-mode-design";
 import { editorlink } from "@/lib/forms/url";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useWorkspace } from "../workspace";

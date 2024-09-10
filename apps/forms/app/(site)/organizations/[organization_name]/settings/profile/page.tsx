@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { createRouteHandlerWorkspaceClient } from "@/lib/supabase/server";
+import { createRouteHandlerWorkspaceClient } from "@/supabase/server";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";

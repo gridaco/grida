@@ -2,7 +2,8 @@ import { IpInfo } from "@/clients/ipinfo";
 import palettes from "@/theme/palettes";
 import type { Tokens } from "@/ast";
 
-type UUID = string;
+export type PGUUID = string;
+export type PGINT8ID = number;
 
 export type JSONValue =
   | string
@@ -46,9 +47,9 @@ export interface Customer {
 }
 
 /**
- * user facing page language
+ * Grida supported languages
  */
-export type FormsPageLanguage =
+export type LanguageCode =
   | "en"
   | "es"
   | "de"
@@ -218,7 +219,7 @@ export interface IFormField {
 }
 
 export interface FormFieldDefinition extends IFormField {
-  id: UUID;
+  id: PGUUID;
   local_index: number;
 }
 
@@ -233,7 +234,7 @@ export interface FormDocument {
   stylesheet?: FormStyleSheetV1Schema;
   is_redirect_after_response_uri_enabled: boolean;
   redirect_after_response_uri: string | null;
-  lang: FormsPageLanguage;
+  lang: LanguageCode;
   is_powered_by_branding_enabled: boolean;
   is_ending_page_enabled: boolean;
   ending_page_template_id: string | null;

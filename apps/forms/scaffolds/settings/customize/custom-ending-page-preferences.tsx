@@ -24,12 +24,12 @@ import { MixIcon } from "@radix-ui/react-icons";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { I18nProvider } from "@/i18n/csr";
 import { useTranslation } from "react-i18next";
-import { createClientFormsClient } from "@/lib/supabase/client";
+import { createClientComponentFormsClient } from "@/supabase/client";
 import toast from "react-hot-toast";
 import type {
   EndingPageI18nOverrides,
   EndingPageTemplateID,
-  FormsPageLanguage,
+  LanguageCode,
 } from "@/types";
 import {
   render,
@@ -51,12 +51,12 @@ export function EndingPagePreferences() {
 
   const {
     form,
-    theme: { lang },
+    document: { g11n },
     form: { ending },
   } = state;
 
   const [customizeOpen, setCustomizeOpen] = useState(false);
-  const supabase = createClientFormsClient();
+  const supabase = createClientComponentFormsClient();
 
   const {
     handleSubmit,
@@ -158,12 +158,12 @@ export function EndingPagePreferences() {
             Enabling ending page will disable redirection
           </PreferenceDescription>
         </form>
-        <I18nProvider lng={lang}>
+        <I18nProvider lng={g11n.lang}>
           {template && (
             <div className="flex justify-center items-center min-h-96">
               <Preview
                 title={form.form_title}
-                lang={lang}
+                lang={g11n.lang}
                 template={template}
                 overrides={overrides}
               />
@@ -175,7 +175,7 @@ export function EndingPagePreferences() {
         key={template}
         form_id={form.form_id}
         title={form.form_title}
-        lang={lang}
+        lang={g11n.lang}
         init={{
           template_id: template ?? "default",
           i18n_overrides: overrides,
@@ -220,7 +220,7 @@ function Preview({
 }: {
   template: EndingPageTemplateID;
   title: string;
-  lang: FormsPageLanguage;
+  lang: LanguageCode;
   overrides?: Record<string, string>;
 }) {
   const { t } = useTranslation();
@@ -288,7 +288,7 @@ function CustomizeTemplate({
     template_id?: EndingPageTemplateID;
     i18n_overrides?: Record<string, string>;
   };
-  lang: FormsPageLanguage;
+  lang: LanguageCode;
   title: string;
   form_id: string;
   onSave?: (template_id: string, data: Record<string, string>) => void;

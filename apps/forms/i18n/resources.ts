@@ -1,6 +1,7 @@
 import { TemplateVariables } from "@/lib/templating";
 import type { ObjectPath } from "@/lib/templating/@types";
-import type { FormsPageLanguage } from "@/types";
+import type { LanguageCode } from "@/types";
+import common from "./resources.common";
 
 type T = ObjectPath<
   TemplateVariables.FormResponseContext & {
@@ -79,18 +80,14 @@ export interface Translation {
 }
 
 const resources: Record<
-  FormsPageLanguage,
+  LanguageCode,
   {
     translation: Translation;
   }
 > = {
   en: {
     translation: {
-      next: "Next",
-      back: "Previous",
-      submit: "Submit",
-      pay: "Pay",
-      home: "Home",
+      ...common.en,
       left_in_stock: `${use("available")} left`,
       sold_out: "Sold Out",
       support_metadata: `Support Metadata`,
@@ -152,11 +149,7 @@ const resources: Record<
   },
   es: {
     translation: {
-      next: "Siguiente",
-      back: "Anterior",
-      submit: "Enviar",
-      pay: "Pagar",
-      home: "Inicio",
+      ...common.es,
       left_in_stock: `${use("available")} restantes`,
       sold_out: "Agotado",
       support_metadata: `Metadatos de soporte`,
@@ -218,11 +211,7 @@ const resources: Record<
   },
   ko: {
     translation: {
-      next: "다음",
-      back: "이전",
-      submit: "제출",
-      pay: "결제",
-      home: "홈",
+      ...common.ko,
       left_in_stock: `${use("available")}개 남음`,
       sold_out: "매진됨",
       support_metadata: `서포트 메타데이터`,
@@ -283,11 +272,7 @@ const resources: Record<
   },
   ja: {
     translation: {
-      next: "次へ",
-      back: "戻る",
-      submit: "提出する",
-      pay: "支払う",
-      home: "ホーム",
+      ...common.ja,
       left_in_stock: `残り${use("available")}個`,
       sold_out: "完売",
       support_metadata: `サポートメタデータ`,
@@ -348,11 +333,7 @@ const resources: Record<
   },
   zh: {
     translation: {
-      next: "下一步",
-      back: "上一步",
-      submit: "提交",
-      pay: "支付",
-      home: "首页",
+      ...common.zh,
       left_in_stock: `剩余${use("available")}件`,
       sold_out: "售罄",
       support_metadata: `支持元数据`,
@@ -410,11 +391,7 @@ const resources: Record<
   },
   fr: {
     translation: {
-      next: "Suivant",
-      back: "Précédent",
-      submit: "Soumettre",
-      pay: "Payer",
-      home: "Accueil",
+      ...common.fr,
       left_in_stock: `${use("available")} restants`,
       sold_out: "Épuisé",
       support_metadata: `Métadonnées de support`,
@@ -476,11 +453,7 @@ const resources: Record<
   },
   pt: {
     translation: {
-      next: "Próximo",
-      back: "Anterior",
-      submit: "Enviar",
-      pay: "Pagar",
-      home: "Início",
+      ...common.pt,
       left_in_stock: `${use("available")} restantes`,
       sold_out: "Esgotado",
       support_metadata: `Metadados de suporte`,
@@ -542,11 +515,7 @@ const resources: Record<
   },
   it: {
     translation: {
-      next: "Avanti",
-      back: "Indietro",
-      submit: "Invia",
-      pay: "Paga",
-      home: "Home",
+      ...common.it,
       left_in_stock: `${use("available")} rimasti`,
       sold_out: "Esaurito",
       support_metadata: `Metadati di supporto`,
@@ -608,11 +577,7 @@ const resources: Record<
   },
   de: {
     translation: {
-      next: "Weiter",
-      back: "Zurück",
-      submit: "Einreichen",
-      pay: "Bezahlen",
-      home: "Startseite",
+      ...common.de,
       left_in_stock: `${use("available")} übrig`,
       sold_out: "Ausverkauft",
       support_metadata: `Support-Metadaten`,
@@ -674,11 +639,7 @@ const resources: Record<
   },
   ru: {
     translation: {
-      next: "Далее",
-      back: "Назад",
-      submit: "Отправить",
-      pay: "Оплатить",
-      home: "Главная",
+      ...common.ru,
       left_in_stock: `Осталось ${use("available")} шт.`,
       sold_out: "Распродано",
       support_metadata: `Метаданные поддержки`,
@@ -738,11 +699,7 @@ const resources: Record<
   },
   ar: {
     translation: {
-      next: "التالي",
-      back: "السابق",
-      submit: "إرسال",
-      pay: "دفع",
-      home: "الرئيسية",
+      ...common.ar,
       left_in_stock: `${use("available")} متبقية`,
       sold_out: "نفذت الكمية",
       support_metadata: `بيانات الدعم الوصفية`,
@@ -802,11 +759,7 @@ const resources: Record<
   },
   hi: {
     translation: {
-      next: "अगला",
-      back: "पिछला",
-      submit: "जमा करें",
-      pay: "भुगतान करें",
-      home: "होम",
+      ...common.hi,
       left_in_stock: `${use("available")} बचे हैं`,
       sold_out: "बिक गया",
       support_metadata: `सहायता मेटाडाटा`,
@@ -867,11 +820,7 @@ const resources: Record<
   },
   nl: {
     translation: {
-      next: "Volgende",
-      back: "Vorige",
-      submit: "Indienen",
-      pay: "Betalen",
-      home: "Home",
+      ...common.nl,
       left_in_stock: `Nog ${use("available")} beschikbaar`,
       sold_out: "Uitverkocht",
       support_metadata: `Ondersteuningsmetadata`,

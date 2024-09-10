@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { stringify } from "csv-stringify/sync";
 import { unwrapFeildValue } from "@/lib/forms/unwrap";
 import { fmt_local_index } from "@/utils/fmt";
-import { createRouteHandlerClient } from "@/lib/supabase/server";
+import { createRouteHandlerFormsClient } from "@/supabase/server";
 
 export const revalidate = 0;
 
@@ -14,7 +14,7 @@ export async function GET(
 ) {
   const id = context.params.id;
   const cookieStore = cookies();
-  const supabase = createRouteHandlerClient(cookieStore);
+  const supabase = createRouteHandlerFormsClient(cookieStore);
   //
   const { data } = await supabase
     .from("form")

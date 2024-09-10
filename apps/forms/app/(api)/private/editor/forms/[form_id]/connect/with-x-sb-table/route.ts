@@ -1,8 +1,8 @@
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import {
-  createRouteHandlerClient,
-  grida_xsupabase_client,
-} from "@/lib/supabase/server";
+  createRouteHandlerFormsClient,
+  grida_xsupabase_service_client,
+} from "@/supabase/server";
 import { GridaXSupabase } from "@/types";
 import { XSupabasePrivateApiTypes } from "@/types/private/api";
 import assert from "assert";
@@ -60,7 +60,7 @@ export async function GET(req: NextRequest, context: Context) {
 export async function PUT(req: NextRequest, context: Context) {
   const form_id = context.params.form_id;
   const cookieStore = cookies();
-  const supabase = createRouteHandlerClient(cookieStore);
+  const supabase = createRouteHandlerFormsClient(cookieStore);
 
   const {
     schema_name,
@@ -81,7 +81,7 @@ export async function PUT(req: NextRequest, context: Context) {
 
   if (!conn_ref) return notFound();
 
-  const { data: supabase_project } = await grida_xsupabase_client
+  const { data: supabase_project } = await grida_xsupabase_service_client
     .from("supabase_project")
     .select(
       "sb_schema_definitions, sb_schema_openapi_docs, tables:supabase_table(*)"
@@ -107,22 +107,23 @@ export async function PUT(req: NextRequest, context: Context) {
       table_name
     );
 
-  const { data: upserted_supabase_table, error } = await grida_xsupabase_client
-    .from("supabase_table")
-    .upsert(
-      {
-        supabase_project_id: conn_ref!.supabase_project_id,
-        sb_table_name: table_name,
-        sb_schema_name: schema_name,
-        sb_table_schema: table_schema,
-        sb_postgrest_methods,
-      },
-      {
-        onConflict: "supabase_project_id, sb_table_name, sb_schema_name",
-      }
-    )
-    .select()
-    .single();
+  const { data: upserted_supabase_table, error } =
+    await grida_xsupabase_service_client
+      .from("supabase_table")
+      .upsert(
+        {
+          supabase_project_id: conn_ref!.supabase_project_id,
+          sb_table_name: table_name,
+          sb_schema_name: schema_name,
+          sb_table_schema: table_schema,
+          sb_postgrest_methods,
+        },
+        {
+          onConflict: "supabase_project_id, sb_table_name, sb_schema_name",
+        }
+      )
+      .select()
+      .single();
 
   if (error) {
     console.error(error);

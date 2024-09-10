@@ -1,4 +1,4 @@
-import { createRouteHandlerClient } from "@/lib/supabase/server";
+import { createRouteHandlerFormsClient } from "@/supabase/server";
 import { FormInputType } from "@/types";
 import {
   CreateNewSchemaTableRequest,
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest, context: Context) {
   const schema_id = context.params.schema_id;
   assert(data.table_name, "table_name is required");
 
-  const supabase = createRouteHandlerClient(cookieStore);
+  const supabase = createRouteHandlerFormsClient(cookieStore);
 
   const { data: schema_ref, error: schema_ref_err } = await supabase
     .from("schema_document")

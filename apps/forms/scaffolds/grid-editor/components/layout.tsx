@@ -8,7 +8,7 @@ export function Root({ children }: React.PropsWithChildren<{}>) {
 
 export function Header({ children }: React.PropsWithChildren<{}>) {
   return (
-    <header className="bg-background min-h-12 h-12 w-full flex items-center justify-between gap-4 px-4">
+    <header className="bg-background min-h-12 h-12 w-full flex items-center justify-between gap-4 px-4 border-b">
       {children}
     </header>
   );

@@ -9,9 +9,9 @@ import {
 } from "./use";
 import toast from "react-hot-toast";
 import {
-  createClientFormsClient,
-  createClientWorkspaceClient,
-} from "@/lib/supabase/client";
+  createClientComponentFormsClient,
+  createClientComponentWorkspaceClient,
+} from "@/supabase/client";
 import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import useSWR from "swr";
 import type { EditorApiResponse } from "@/types/private/api";
@@ -51,7 +51,7 @@ const useSubscription = ({
   onDelete?: (data: RealtimeTableChangeData | {}) => void;
   enabled: boolean;
 }) => {
-  const supabase = useMemo(() => createClientFormsClient(), []);
+  const supabase = useMemo(() => createClientComponentFormsClient(), []);
 
   useEffect(() => {
     if (!form_id) return;
@@ -94,7 +94,7 @@ const useSubscription = ({
 };
 
 function useFetchSchemaTableRows(table_id: string) {
-  const supabase = useMemo(() => createClientFormsClient(), []);
+  const supabase = useMemo(() => createClientComponentFormsClient(), []);
 
   return useCallback(
     async (limit: number = 100) => {
@@ -122,7 +122,7 @@ function useFetchSchemaTableRows(table_id: string) {
 }
 
 function useFetchSchemaTableRow() {
-  const supabase = useMemo(() => createClientFormsClient(), []);
+  const supabase = useMemo(() => createClientComponentFormsClient(), []);
 
   return useCallback(
     async (id: string) => {
@@ -148,7 +148,7 @@ function useFetchSchemaTableRow() {
 }
 
 function useFetchResponseSessions(form_id: string) {
-  const supabase = useMemo(() => createClientFormsClient(), []);
+  const supabase = useMemo(() => createClientComponentFormsClient(), []);
 
   return useCallback(
     async (limit: number = 100) => {
@@ -185,7 +185,7 @@ function useChangeDatagridLoading() {
 }
 
 function useSyncCell() {
-  const supabase = useMemo(() => createClientFormsClient(), []);
+  const supabase = useMemo(() => createClientComponentFormsClient(), []);
 
   return useCallback(
     async (id: string, payload: { value: any; option_id?: string | null }) => {
@@ -625,7 +625,7 @@ export function CustomerFeedProvider({
     datagrid_table_refresh_key,
   } = state;
 
-  const client = useMemo(() => createClientWorkspaceClient(), []);
+  const client = useMemo(() => createClientComponentWorkspaceClient(), []);
 
   const setLoading = useChangeDatagridLoading();
 
