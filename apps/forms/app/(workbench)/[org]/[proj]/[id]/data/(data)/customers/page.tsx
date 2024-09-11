@@ -29,7 +29,7 @@ export default function Customers() {
 
   const rows = useMemo(() => {
     const { filtered } = GridData.rows({
-      filter: state.datagrid_filter,
+      filter: state.datagrid_local_filter,
       table: EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID,
       data: {
         rows: stream || [],
@@ -50,7 +50,7 @@ export default function Customers() {
       })) || [];
 
     return rows;
-  }, [stream, state.datagrid_filter]);
+  }, [stream, state.datagrid_local_filter]);
 
   return (
     <CurrentTable table={EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID}>
@@ -69,11 +69,11 @@ export default function Customers() {
           <CustomerGrid
             loading={datagrid_isloading}
             tokens={
-              state.datagrid_filter.localsearch
-                ? [state.datagrid_filter.localsearch]
+              state.datagrid_local_filter.localsearch
+                ? [state.datagrid_local_filter.localsearch]
                 : []
             }
-            masked={state.datagrid_filter.masking_enabled}
+            masked={state.datagrid_local_filter.masking_enabled}
             rows={rows}
           />
         </GridLayout.Content>

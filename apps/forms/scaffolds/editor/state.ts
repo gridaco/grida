@@ -19,7 +19,8 @@ import type {
   FormsPageLanguage,
   GDocumentType,
   GridaXSupabase,
-  OrderBy,
+  SQLOrderBy,
+  SQLPredicate,
 } from "@/types";
 import { SYM_LOCALTZ, EditorSymbols } from "./symbols";
 import { ZodObject } from "zod";
@@ -94,7 +95,7 @@ export interface FormDocumentEditorInit extends BaseDocumentEditorInit {
   fields: FormFieldDefinition[];
 }
 
-export interface DataGridFilterSettings {
+export interface DataGridLocalFilter {
   localsearch?: string; // local search uses fuse.js to available data
   masking_enabled: boolean;
   empty_data_hidden: boolean;
@@ -202,8 +203,9 @@ export interface IDataGridState {
   datagrid_table_id: GDocTableID | null;
   datagrid_table_refresh_key: number;
   datagrid_isloading: boolean;
-  datagrid_filter: DataGridFilterSettings;
-  datagrid_orderby: { [key: string]: OrderBy };
+  datagrid_local_filter: DataGridLocalFilter;
+  datagrid_predicates: Array<SQLPredicate>;
+  datagrid_orderby: { [key: string]: SQLOrderBy };
   datagrid_selected_rows: Set<string>;
 }
 

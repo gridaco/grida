@@ -38,7 +38,7 @@ export default function FormResponsesPage() {
 
 function FormResponseSessionGridEditor() {
   const [state, dispatch] = useEditorState();
-  const { form, tablespace, datagrid_filter } = state;
+  const { form, tablespace, datagrid_local_filter: datagrid_filter } = state;
 
   const tb = useDatagridTable<GDocTable>();
 

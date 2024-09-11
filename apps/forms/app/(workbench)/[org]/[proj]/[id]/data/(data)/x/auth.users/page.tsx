@@ -88,13 +88,13 @@ export default function XTablePage() {
 
   const { filtered, inputlength } = useMemo(() => {
     return GridData.rows({
-      filter: state.datagrid_filter,
+      filter: state.datagrid_local_filter,
       table: EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID,
       data: {
         rows: data?.data?.users ?? [],
       },
     });
-  }, [data, state.datagrid_filter]);
+  }, [data, state.datagrid_local_filter]);
 
   return (
     <CurrentTable
@@ -112,10 +112,10 @@ export default function XTablePage() {
         </GridLayout.Header>
         <GridLayout.Content>
           <ReferenceTableGrid
-            masked={state.datagrid_filter.masking_enabled}
+            masked={state.datagrid_local_filter.masking_enabled}
             tokens={
-              state.datagrid_filter.localsearch
-                ? [state.datagrid_filter.localsearch]
+              state.datagrid_local_filter.localsearch
+                ? [state.datagrid_local_filter.localsearch]
                 : []
             }
             columns={columns}

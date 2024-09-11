@@ -55,11 +55,12 @@ function useMasking() {
   const [state] = useEditorState();
   return useCallback(
     (txt: string): string => {
-      return state.datagrid_filter.masking_enabled && typeof txt === "string"
+      return state.datagrid_local_filter.masking_enabled &&
+        typeof txt === "string"
         ? mask(txt)
         : txt.toString();
     },
-    [state.datagrid_filter.masking_enabled]
+    [state.datagrid_local_filter.masking_enabled]
   );
 }
 
@@ -400,7 +401,7 @@ function FKButton({ onClick }: { onClick?: () => void }) {
 function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
   const [state] = useEditorState();
 
-  const { datagrid_filter } = state;
+  const { datagrid_local_filter: datagrid_filter } = state;
 
   const data = row.fields[column.key];
 

@@ -70,7 +70,12 @@ function SwitchGridEditor() {
 
 function FormResponseGridEditor() {
   const [state, dispatch] = useEditorState();
-  const { form, tablespace, datagrid_filter, datagrid_table_id } = state;
+  const {
+    form,
+    tablespace,
+    datagrid_local_filter: datagrid_filter,
+    datagrid_table_id,
+  } = state;
 
   const tb = useDatagridTable<GDocTable>();
 
@@ -123,7 +128,12 @@ function FormResponseGridEditor() {
 function ModeXSBMainTable() {
   const [state, dispatch] = useEditorState();
 
-  const { form, tablespace, datagrid_filter, datagrid_table_id } = state;
+  const {
+    form,
+    tablespace,
+    datagrid_local_filter: datagrid_filter,
+    datagrid_table_id,
+  } = state;
 
   const tb = useDatagridTable<GDocFormsXSBTable>();
 

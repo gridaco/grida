@@ -1,7 +1,7 @@
-import type { OrderBy } from "@/types";
+import type { SQLOrderBy } from "@/types";
 
 export namespace PostgrestQuery {
-  export type ParsedOrderBy = { [col: string]: OrderBy };
+  export type ParsedOrderBy = { [col: string]: SQLOrderBy };
 
   export function parseOrderByQueryString(orderQuery: string): ParsedOrderBy {
     const parsedOrderBy: ParsedOrderBy = {};
@@ -13,7 +13,7 @@ export namespace PostgrestQuery {
       const column = parts[0];
       if (!column) return; // Skip empty column names
 
-      const orderBy: OrderBy = { column };
+      const orderBy: SQLOrderBy = { column };
 
       // Default order is ascending
       orderBy.ascending = parts.includes("asc");

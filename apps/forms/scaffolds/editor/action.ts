@@ -11,6 +11,7 @@ import type {
   FormStyleSheetV1Schema,
   FormsPageLanguage,
   GridaXSupabase,
+  SQLPredicate,
 } from "@/types";
 import type {
   EditorFlatFormBlock,
@@ -57,9 +58,7 @@ export type BlocksEditorAction =
   | DataGridReorderColumnAction
   | DataGridDateFormatAction
   | DataGridDateTZAction
-  | DataGridFilterAction
-  | DataGridOrderByAction
-  | DataGridOrderByResetAction
+  | DataGridQueryAction
   | DataTableRefreshAction
   | DataTableLoadingAction
   | DataGridCellChangeAction
@@ -293,8 +292,17 @@ export interface DataGridDeleteSelectedRows {
   type: "editor/data-grid/delete/selected";
 }
 
-export interface DataGridFilterAction
-  extends Partial<EditorState["datagrid_filter"]> {
+type DataGridQueryAction =
+  | DataGridLocalFilterAction
+  | DataGridOrderByAction
+  | DataGridOrderByClearAction
+  | DataGridPredicatesAddAction
+  | DataGridPredicatesUpdateAction
+  | DataGridPredicatesRemoveAction
+  | DataGridPredicatesClearAction;
+
+export interface DataGridLocalFilterAction
+  extends Partial<EditorState["datagrid_local_filter"]> {
   type: "editor/data-grid/filter";
 }
 
@@ -307,8 +315,28 @@ export interface DataGridOrderByAction {
   } | null;
 }
 
-export interface DataGridOrderByResetAction {
-  type: "editor/data-grid/orderby/reset";
+export interface DataGridOrderByClearAction {
+  type: "editor/data-grid/orderby/clear";
+}
+
+export interface DataGridPredicatesAddAction {
+  type: "editor/data-grid/predicates/add";
+  predicate: SQLPredicate;
+}
+
+export interface DataGridPredicatesUpdateAction {
+  type: "editor/data-grid/predicates/update";
+  index: number;
+  predicate: Partial<SQLPredicate>;
+}
+
+export interface DataGridPredicatesRemoveAction {
+  type: "editor/data-grid/predicates/remove";
+  index: number;
+}
+
+export interface DataGridPredicatesClearAction {
+  type: "editor/data-grid/predicates/clear";
 }
 
 export interface DataTableRefreshAction {

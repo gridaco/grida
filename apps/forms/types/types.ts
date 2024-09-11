@@ -462,8 +462,38 @@ export interface GDocument {
   max_responses: number | null;
 }
 
-export interface OrderBy {
+export interface SQLOrderBy {
   column: string;
   ascending?: boolean;
   nullsFirst?: boolean;
+}
+
+export type SQLFilterOperator =
+  | "eq"
+  | "neq"
+  | "gt"
+  | "gte"
+  | "lt"
+  | "lte"
+  | "like"
+  | "ilike"
+  | "is"
+  | "in"
+  | "cs"
+  | "cd"
+  | "sl"
+  | "sr"
+  | "nxl"
+  | "nxr"
+  | "adj"
+  | "ov"
+  | "fts"
+  | "plfts"
+  | "phfts"
+  | "wfts";
+
+export interface SQLPredicate {
+  column: string;
+  op: SQLFilterOperator; // `${"" | "not."}${SQLFilterOperator}`;
+  value: unknown;
 }

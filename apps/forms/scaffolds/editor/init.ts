@@ -86,11 +86,12 @@ export function initialDatagridState(): Omit<
     datagrid_rows_per_page: 100,
     datagrid_table_refresh_key: 0,
     datagrid_isloading: false,
-    datagrid_filter: {
+    datagrid_local_filter: {
       masking_enabled: false,
       empty_data_hidden: true,
     },
     datagrid_orderby: {},
+    datagrid_predicates: [],
   };
 }
 

@@ -1,4 +1,4 @@
-import type { DataGridFilterSettings } from "@/scaffolds/editor/state";
+import type { DataGridLocalFilter } from "@/scaffolds/editor/state";
 import Fuse from "fuse.js";
 
 type DataGetter<T> = ((row: T) => any) | keyof T;
@@ -14,7 +14,7 @@ function getRpwData<T>(row: T, datakey?: DataGetter<T>): any {
 export namespace GridFilter {
   export function filter<T extends { [key: string]: any }>(
     rows: Array<T>,
-    filter: DataGridFilterSettings,
+    filter: DataGridLocalFilter,
     datakey?: DataGetter<T>,
     datasearchkeys?: string[]
   ): Array<T> {

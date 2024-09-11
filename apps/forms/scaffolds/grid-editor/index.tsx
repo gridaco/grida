@@ -55,8 +55,7 @@ import {
 } from "@/scaffolds/editor/use";
 import { saveAs } from "file-saver";
 import Papa from "papaparse";
-import { TVirtualRow } from "../editor/state";
-import { FormResponseField } from "@/types";
+import { XSupaDataGridFilter } from "./components/filter";
 
 export function GridEditor({
   systemcolumns,
@@ -412,7 +411,12 @@ function TableQuery() {
   return (
     <div className="flex items-center gap-1">
       <GridLocalSearch />
-      {"x_sb_main_table_connection" in tb && <XSupaDataGridSort />}
+      {"x_sb_main_table_connection" in tb && (
+        <>
+          <XSupaDataGridFilter />
+          <XSupaDataGridSort />
+        </>
+      )}
     </div>
   );
 }

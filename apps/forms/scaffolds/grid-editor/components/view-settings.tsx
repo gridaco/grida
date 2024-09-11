@@ -29,8 +29,13 @@ import {
 export function GridViewSettings() {
   const [state, dispatch] = useEditorState();
 
-  const { doctype, datetz, dateformat, datagrid_filter, datagrid_table_id } =
-    state;
+  const {
+    doctype,
+    datetz,
+    dateformat,
+    datagrid_local_filter: datagrid_filter,
+    datagrid_table_id,
+  } = state;
 
   // dummy example date - happy star wars day!
   const starwarsday = useMemo(

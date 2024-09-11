@@ -45,7 +45,7 @@ import type {
   FeedResponseSessionsAction,
   DataGridDateFormatAction,
   DataGridDateTZAction,
-  DataGridFilterAction,
+  DataGridLocalFilterAction,
   DataGridCellChangeAction,
   FeedXSupabaseMainTableRowsAction,
   DataTableRefreshAction,
@@ -65,7 +65,11 @@ import type {
   DocumentNodeChangeTextAction,
   DocumentTemplateSampleDataAction,
   DataGridOrderByAction,
-  DataGridOrderByResetAction,
+  DataGridOrderByClearAction,
+  DataGridPredicatesAddAction,
+  DataGridPredicatesUpdateAction,
+  DataGridPredicatesClearAction,
+  DataGridPredicatesRemoveAction,
   InitAssetAction,
   FeedCustomerAction,
   EditorThemePoweredByBrandingAction,
@@ -702,7 +706,7 @@ export function reducer(
         // clear datagrid state
         const datagridreset = initialDatagridState();
         draft.datagrid_selected_rows = datagridreset.datagrid_selected_rows;
-        draft.datagrid_filter = datagridreset.datagrid_filter;
+        draft.datagrid_local_filter = datagridreset.datagrid_local_filter;
         draft.datagrid_orderby = datagridreset.datagrid_orderby;
 
         if (draft.doctype === "v0_form") {
@@ -822,12 +826,13 @@ export function reducer(
         draft.datetz = tz;
       });
     }
+    // #region datagrid query
     case "editor/data-grid/filter": {
-      const { type, ...pref } = <DataGridFilterAction>action;
+      const { type, ...pref } = <DataGridLocalFilterAction>action;
 
       return produce(state, (draft) => {
-        draft.datagrid_filter = {
-          ...draft.datagrid_filter,
+        draft.datagrid_local_filter = {
+          ...draft.datagrid_local_filter,
           ...pref,
         };
       });
@@ -846,12 +851,41 @@ export function reducer(
         };
       });
     }
-    case "editor/data-grid/orderby/reset": {
-      const {} = <DataGridOrderByResetAction>action;
+    case "editor/data-grid/orderby/clear": {
+      const {} = <DataGridOrderByClearAction>action;
       return produce(state, (draft) => {
         draft.datagrid_orderby = {};
       });
     }
+    case "editor/data-grid/predicates/add": {
+      const { predicate } = <DataGridPredicatesAddAction>action;
+      return produce(state, (draft) => {
+        draft.datagrid_predicates.push(predicate);
+      });
+    }
+    case "editor/data-grid/predicates/update": {
+      const { index, predicate } = <DataGridPredicatesUpdateAction>action;
+      return produce(state, (draft) => {
+        const prev = draft.datagrid_predicates[index];
+        draft.datagrid_predicates[index] = {
+          ...prev,
+          ...predicate,
+        };
+      });
+    }
+    case "editor/data-grid/predicates/remove": {
+      const { index } = <DataGridPredicatesRemoveAction>action;
+      return produce(state, (draft) => {
+        draft.datagrid_predicates.splice(index, 1);
+      });
+    }
+    case "editor/data-grid/predicates/clear": {
+      const {} = <DataGridPredicatesClearAction>action;
+      return produce(state, (draft) => {
+        draft.datagrid_predicates = [];
+      });
+    }
+    // #endregion datagrid query
     case "editor/data-grid/refresh": {
       const {} = <DataTableRefreshAction>action;
 

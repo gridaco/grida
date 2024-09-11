@@ -94,7 +94,7 @@ function SwitchGridEditor() {
 
 function ModeProviderGrida() {
   const [state] = useEditorState();
-  const { tablespace, datagrid_filter } = state;
+  const { tablespace, datagrid_local_filter: datagrid_filter } = state;
 
   const tb = useDatagridTable<GDocSchemaTableProviderGrida>();
 
@@ -133,7 +133,7 @@ function ModeProviderGrida() {
 
 function ModeProviderXSB() {
   const [state] = useEditorState();
-  const { tablespace, datagrid_filter } = state;
+  const { tablespace, datagrid_local_filter: datagrid_filter } = state;
 
   const tb = useDatagridTable<GDocSchemaTableProviderXSupabase>();
 
