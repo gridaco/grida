@@ -115,7 +115,10 @@ export function XSupaDataGridSort() {
                 isset && " text-accent-foreground"
               )}
             >
-              <ArrowDownUpIcon className="w-4 h-4 text-muted-foreground" />
+              <ArrowDownUpIcon
+                data-state={isset ? "on" : "off"}
+                className="w-4 h-4 text-muted-foreground data-[state='on']:text-workbench-accent-1"
+              />
               {isset && <IconButtonDotBadge />}
             </Button>
           </TooltipTrigger>

@@ -1,4 +1,5 @@
 const { fontFamily } = require("tailwindcss/defaultTheme");
+const colors = require("tailwindcss/colors");
 
 /** @type {import('tailwindcss').Config} */
 module.exports = {
@@ -50,6 +51,12 @@ module.exports = {
         // custom extended
         "workbench-panel": {
           DEFAULT: "hsl(var(--secondary) / 10%)",
+        },
+        "workbench-accent-1": {
+          DEFAULT: colors.sky[500],
+        },
+        "workbench-accent-2": {
+          DEFAULT: colors.orange[400],
         },
       },
       borderRadius: {
