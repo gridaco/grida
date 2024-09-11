@@ -1,5 +1,5 @@
 import { Input } from "@/components/ui/input";
-import { inputVariants } from "./utils/input-variants";
+import { WorkbenchUI } from "@/components/workbench";
 import { BoltIcon } from "lucide-react";
 import {
   DropdownMenu,
@@ -199,7 +199,7 @@ function StringLiteralControl({
       value={(value as string) || ""}
       placeholder={placeholder}
       onChange={(e) => onValueChange?.(e.target.value)}
-      className={inputVariants({ size: "sm" })}
+      className={WorkbenchUI.inputVariants({ size: "sm" })}
     />
   );
 }

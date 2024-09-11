@@ -1,5 +1,5 @@
 import { Input } from "@/components/ui/input";
-import { inputVariants } from "./utils/input-variants";
+import { WorkbenchUI } from "@/components/workbench";
 import { Select } from "@radix-ui/react-select";
 import {
   SelectContent,
@@ -22,7 +22,7 @@ export function FontSizeControl({
       placeholder="inherit"
       min={1}
       step={1}
-      className={inputVariants({ size: "sm" })}
+      className={WorkbenchUI.inputVariants({ size: "sm" })}
       onChange={(e) => {
         onValueChange?.(parseInt(e.target.value) || undefined);
       }}

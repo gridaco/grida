@@ -186,7 +186,7 @@ export function XSupaDataGridSort() {
         </section>
         <section className="flex flex-col">
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+            <DropdownMenuTrigger asChild className="min-w-40">
               <Button variant="ghost" size="sm" className="flex justify-start">
                 <PlusIcon className="w-4 h-4 me-2 align-middle" /> Pick a column
                 to sort by

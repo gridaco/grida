@@ -1,5 +1,5 @@
-import { inputVariants } from "./utils/input-variants";
+import { WorkbenchUI } from "@/components/workbench";
 
 export function BackgroundControl() {
-  return <div className={inputVariants({ size: "sm" })}></div>;
+  return <div className={WorkbenchUI.inputVariants({ size: "sm" })}></div>;
 }

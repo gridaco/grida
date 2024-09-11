@@ -247,7 +247,7 @@ export function XSupaDataGridFilter() {
           </section>
           <section>
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
+              <DropdownMenuTrigger asChild className="min-w-40">
                 <Button
                   variant="ghost"
                   size="sm"

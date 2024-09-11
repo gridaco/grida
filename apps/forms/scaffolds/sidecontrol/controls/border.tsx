@@ -1,5 +1,5 @@
 import { Input } from "@/components/ui/input";
-import { inputVariants } from "./utils/input-variants";
+import { WorkbenchUI } from "@/components/workbench";
 
 type Border = {
   borderWidth?: number;
@@ -22,7 +22,7 @@ export function BorderControl({
   return (
     <Input
       type="number"
-      className={inputVariants({ size: "sm" })}
+      className={WorkbenchUI.inputVariants({ size: "sm" })}
       value={value?.borderWidth}
       onChange={onChange}
     />

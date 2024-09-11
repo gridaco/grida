@@ -1,6 +1,6 @@
 import { Input } from "@/components/ui/input";
 import React from "react";
-import { inputVariants } from "./utils/input-variants";
+import { WorkbenchUI } from "@/components/workbench";
 
 export function HrefControl({
   value,
@@ -14,7 +14,7 @@ export function HrefControl({
       value={value}
       onChange={(e) => onValueChange?.(e.target.value)}
       placeholder="https://example.com"
-      className={inputVariants({ size: "sm" })}
+      className={WorkbenchUI.inputVariants({ size: "sm" })}
     />
   );
 }

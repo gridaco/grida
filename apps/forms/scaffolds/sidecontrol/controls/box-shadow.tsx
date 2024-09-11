@@ -5,7 +5,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { inputVariants } from "./utils/input-variants";
+import { WorkbenchUI } from "@/components/workbench";
 
 type BoxShadow = {
   boxShadow?: string;
@@ -27,7 +27,7 @@ export function BoxShadowControl({
 
   return (
     <Select value={value?.boxShadow} onValueChange={onChange}>
-      <SelectTrigger className={inputVariants({ size: "sm" })}>
+      <SelectTrigger className={WorkbenchUI.inputVariants({ size: "sm" })}>
         <SelectValue placeholder="Select..." />
       </SelectTrigger>
       <SelectContent>

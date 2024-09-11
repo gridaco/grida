@@ -1,5 +1,5 @@
 import { Input } from "@/components/ui/input";
-import { inputVariants } from "./utils/input-variants";
+import { WorkbenchUI } from "@/components/workbench";
 
 export function BorderRadiusControl({
   value,
@@ -15,7 +15,7 @@ export function BorderRadiusControl({
       placeholder="inherit"
       min={0}
       step={1}
-      className={inputVariants({ size: "sm" })}
+      className={WorkbenchUI.inputVariants({ size: "sm" })}
       onChange={(e) => {
         onValueChange?.(parseInt(e.target.value));
       }}

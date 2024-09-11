@@ -1,5 +1,5 @@
 import { Input } from "@/components/ui/input";
-import { inputVariants } from "./utils/input-variants";
+import { WorkbenchUI } from "@/components/workbench";
 
 export function AspectRatioControl({
   value,
@@ -12,7 +12,7 @@ export function AspectRatioControl({
     <Input
       value={value}
       onChange={(e) => onValueChange?.(parseFloat(e.target.value) || undefined)}
-      className={inputVariants({ size: "sm" })}
+      className={WorkbenchUI.inputVariants({ size: "sm" })}
     />
   );
 }
