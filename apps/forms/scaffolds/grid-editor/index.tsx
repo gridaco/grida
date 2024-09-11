@@ -533,7 +533,7 @@ function DeleteSelectedRowsButton({
       return;
     }
 
-    const res = PrivateEditorApi.SupabaseQuery.qdelete({
+    const res = PrivateEditorApi.SupabaseQuery.delete_request({
       form_id: db_table_id,
       main_table_id: tb.x_sb_main_table_connection.sb_table_id,
       filters: [

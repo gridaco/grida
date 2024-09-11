@@ -20,8 +20,7 @@ import {
   XSupabasePrivateApiTypes,
 } from "@/types/private/api";
 import Axios from "axios";
-import { PostgrestQuery } from "@/lib/supabase-postgrest/postgrest-query";
-import { XSupabaseQuery } from "@/lib/supabase-postgrest/builder";
+import { XPostgrestQuery } from "@/lib/supabase-postgrest/builder";
 import { PostgrestSingleResponse } from "@supabase/postgrest-js";
 
 export namespace PrivateEditorApi {
@@ -325,41 +324,23 @@ export namespace PrivateEditorApi {
   }
 
   export namespace SupabaseQuery {
-    export function makeQueryParams({
-      limit,
-      order,
-      refreshKey,
-    }: {
-      limit?: number;
-      order?: PostgrestQuery.ParsedOrderBy;
-      refreshKey?: number | number;
-    }) {
-      //
-      const params = new URLSearchParams();
-
-      if (limit) params.append("limit", limit.toString());
-
-      if (order)
-        params.append("order", PostgrestQuery.createOrderByQueryString(order));
-
-      if (refreshKey) params.append("r", refreshKey.toString());
-
-      return params;
-    }
-
-    export async function qdelete({
+    /**
+     * performs proxy delete request with filters
+     * @returns
+     */
+    export async function delete_request({
       form_id,
       main_table_id,
       filters,
     }: {
       form_id: string;
       main_table_id: number;
-      filters: ReadonlyArray<XSupabaseQuery.Filter>;
+      filters: ReadonlyArray<XPostgrestQuery.NamedPredicate>;
     }) {
       return Axios.request<PostgrestSingleResponse<any>>({
         method: "DELETE",
         url: `/private/editor/connect/${form_id}/supabase/table/${main_table_id}/query`,
-        data: { filters } satisfies XSupabaseQuery.Body,
+        data: { filters } satisfies XPostgrestQuery.Body,
       });
     }
   }

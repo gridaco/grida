@@ -17,7 +17,7 @@ import useSWR from "swr";
 import type { EditorApiResponse } from "@/types/private/api";
 import type { FormResponse, FormResponseField, GridaXSupabase } from "@/types";
 import { usePrevious } from "@uidotdev/usehooks";
-import { XSupabaseQuery } from "@/lib/supabase-postgrest/builder";
+import { XPostgrestQuery } from "@/lib/supabase-postgrest/builder";
 import equal from "deep-equal";
 import { PrivateEditorApi } from "@/lib/private";
 import { EditorSymbols } from "./symbols";
@@ -271,15 +271,24 @@ function useXSBTableFeed(
     datagrid_rows_per_page,
     datagrid_table_refresh_key,
     datagrid_orderby,
+    datagrid_predicates,
   } = state;
 
   const serachParams = useMemo(() => {
-    return PrivateEditorApi.SupabaseQuery.makeQueryParams({
+    const search = XPostgrestQuery.QS.select({
       limit: datagrid_rows_per_page,
       order: datagrid_orderby,
-      refreshKey: datagrid_table_refresh_key,
+      // only pass predicates with value set
+      filters: datagrid_predicates.filter((p) => p.value ?? false),
     });
-  }, [datagrid_rows_per_page, datagrid_orderby, datagrid_table_refresh_key]);
+    search.set("r", datagrid_table_refresh_key.toString());
+    return search;
+  }, [
+    datagrid_rows_per_page,
+    datagrid_orderby,
+    datagrid_predicates,
+    datagrid_table_refresh_key,
+  ]);
 
   const request = sb_table_id
     ? PrivateEditorApi.XSupabase.url_table_x_query(
@@ -357,7 +366,7 @@ function useXSBSyncCell({
                 value: key,
               },
             ],
-          } satisfies XSupabaseQuery.Body),
+          } satisfies XPostgrestQuery.Body),
         }
       );
 

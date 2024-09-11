@@ -2,12 +2,8 @@
 
 import React, { useCallback } from "react";
 import { useDatagridTable, useEditorState } from "@/scaffolds/editor";
-import {
-  Cross2Icon,
-  DotIcon,
-  PlusIcon,
-  TrashIcon,
-} from "@radix-ui/react-icons";
+import { Cross2Icon, PlusIcon, TrashIcon } from "@radix-ui/react-icons";
+import { ListFilterIcon } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -27,7 +23,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { FilterIcon } from "lucide-react";
 import { cn } from "@/utils";
 import { PopoverClose } from "@radix-ui/react-popover";
 import {
@@ -70,18 +65,19 @@ const operator_labels: Record<
   ilike: { symbol: "~~*", label: "[~~*] ilike operator" },
   is: { symbol: "is", label: "[is] is (null, not null, true, false)" },
   in: { symbol: "in", label: "[in] one of the values" },
-  cs: { symbol: "", label: "" },
-  cd: { symbol: "", label: "" },
-  sl: { symbol: "", label: "" },
-  sr: { symbol: "", label: "" },
-  nxl: { symbol: "", label: "" },
-  nxr: { symbol: "", label: "" },
-  adj: { symbol: "", label: "" },
-  ov: { symbol: "", label: "" },
-  fts: { symbol: "", label: "" },
-  plfts: { symbol: "", label: "" },
-  phfts: { symbol: "", label: "" },
-  wfts: { symbol: "", label: "" },
+  //
+  cs: { symbol: "@>", label: "[@>] contains" }, // Contains operator
+  cd: { symbol: "<@", label: "[<@] contained by" }, // Contained by operator
+  sl: { symbol: "<<", label: "[<<] strictly left of" }, // Range strictly left
+  sr: { symbol: ">>", label: "[>>] strictly right of" }, // Range strictly right
+  nxl: { symbol: "&<", label: "[&<] does not extend to the left of" }, // No extend left
+  nxr: { symbol: "&>", label: "[&>] does not extend to the right of" }, // No extend right
+  adj: { symbol: "-|-", label: "[-|-] adjacent" }, // Adjacent operator
+  ov: { symbol: "&&", label: "[&&] overlaps" }, // Overlaps operator
+  fts: { symbol: "@@", label: "[@@] full-text search" }, // Full-text search
+  plfts: { symbol: "@@@", label: "[@@@] plain full-text search" }, // Plain full-text search
+  phfts: { symbol: "@@@@", label: "[@@@@] phrase full-text search" }, // Phrase full-text search
+  wfts: { symbol: "@@@@", label: "[@@@@] web search" }, // Web search
 };
 
 function useDataGridPredicates() {
@@ -167,7 +163,10 @@ export function XSupaDataGridFilter() {
                   isset && " text-accent-foreground"
                 )}
               >
-                <FilterIcon className="w-4 h-4 text-muted-foreground" />
+                <ListFilterIcon
+                  data-state={isset ? "on" : "off"}
+                  className="w-4 h-4 text-muted-foreground data-[state='on']:text-workbench-accent-1"
+                />
                 {isset && <IconButtonDotBadge />}
               </Button>
             </TooltipTrigger>
@@ -230,6 +229,7 @@ export function XSupaDataGridFilter() {
                         <Input
                           placeholder="Enter a value"
                           value={q.value as string | undefined}
+                          onChange={(e) => onchange({ value: e.target.value })}
                         />
                       </div>
                     </div>
@@ -261,9 +261,7 @@ export function XSupaDataGridFilter() {
                 {columnkeys.map((key) => (
                   <DropdownMenuItem
                     key={key}
-                    onSelect={() =>
-                      add({ column: key, op: "eq", value: undefined })
-                    }
+                    onSelect={() => add({ column: key, op: "eq", value: "" })}
                   >
                     {key}{" "}
                     <span className="ms-2 text-xs text-muted-foreground">

@@ -3,8 +3,8 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { FieldSupports } from "@/k/supported_field_types";
 import {
-  XSupabaseQuery,
-  XSupabaseQueryBuilder,
+  XPostgrestQuery,
+  XSupabaseClientQueryBuilder,
 } from "@/lib/supabase-postgrest/builder";
 import { createRouteHandlerClient } from "@/lib/supabase/server";
 import {
@@ -18,7 +18,6 @@ import type {
   XSupabaseStorageSchema,
 } from "@/types";
 import assert from "assert";
-import { PostgrestQuery } from "@/lib/supabase-postgrest/postgrest-query";
 
 type Context = {
   params: {
@@ -28,11 +27,7 @@ type Context = {
 };
 
 export async function GET(req: NextRequest, context: Context) {
-  const _q_limit = req.nextUrl.searchParams.get("limit");
-  const limit = _q_limit ? parseInt(_q_limit) : undefined;
-  const _q_order = req.nextUrl.searchParams.get("order");
-  const order = PostgrestQuery.parseOrderByQueryString(_q_order || "");
-
+  const searchParams = req.nextUrl.searchParams;
   const { form_id, sb_table_id: _sb_table_id } = context.params;
   const sb_table_id = parseInt(_sb_table_id);
 
@@ -44,21 +39,25 @@ export async function GET(req: NextRequest, context: Context) {
 
   const { fields } = form;
 
-  const query = new XSupabaseQueryBuilder(x_client);
+  // get and clear route specific query params
+  const __refreshkey = searchParams.get("r"); // not used, only for swr key
+  searchParams.delete("r");
+  //
+
+  const query = new XSupabaseClientQueryBuilder(x_client);
 
   query.from(main_supabase_table.sb_table_name);
   query.select("*");
-  query.limit(limit);
-
-  Object.keys(order).forEach((col) => {
-    const o = order[col];
-    query.order(o.column, {
-      ascending: o.ascending,
-      nullsFirst: o.nullsFirst,
-    });
-  });
+  query.fromSearchParams(searchParams);
 
   const { data, error } = await query.done();
+
+  if (error) {
+    console.error("query ERR", error);
+    console.error("likely due to malformed query params", {
+      searchParams: searchParams.toString(),
+    });
+  }
 
   const pooler = new GridaXSupabaseStorageTaskPooler(x_storage_client);
   pooler.queue(data, fields);
@@ -91,9 +90,9 @@ export async function PATCH(req: NextRequest, context: Context) {
       sb_table_id: sb_table_id,
     });
 
-  const body: XSupabaseQuery.Body = await req.json();
+  const body: XPostgrestQuery.Body = await req.json();
 
-  const query = new XSupabaseQueryBuilder(x_client);
+  const query = new XSupabaseClientQueryBuilder(x_client);
 
   // console.log("PATCH", body.values, body.filters);
   // return NextResponse.json({ ok: true });
@@ -117,9 +116,9 @@ export async function DELETE(req: NextRequest, context: Context) {
       sb_table_id: sb_table_id,
     });
 
-  const body: XSupabaseQuery.Body = await req.json();
+  const body: XPostgrestQuery.Body = await req.json();
 
-  const query = new XSupabaseQueryBuilder(x_client);
+  const query = new XSupabaseClientQueryBuilder(x_client);
 
   const res = await query
     .from(main_supabase_table.sb_table_name)

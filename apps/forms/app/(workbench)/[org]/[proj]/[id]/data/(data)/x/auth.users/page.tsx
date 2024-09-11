@@ -19,6 +19,7 @@ import { useEffect, useMemo } from "react";
 import { CurrentTable } from "@/scaffolds/editor/utils/switch-table";
 import { GridData } from "@/scaffolds/grid-editor/grid-data";
 import { EditorSymbols } from "@/scaffolds/editor/symbols";
+import { XPostgrestQuery } from "@/lib/supabase-postgrest/builder";
 import useSWR from "swr";
 
 export default function XTablePage() {
@@ -33,11 +34,14 @@ export default function XTablePage() {
   } = state;
 
   const serachParams = useMemo(() => {
-    return PrivateEditorApi.SupabaseQuery.makeQueryParams({
+    const search = XPostgrestQuery.QS.select({
       limit: datagrid_rows_per_page,
       order: datagrid_orderby,
-      refreshKey: datagrid_table_refresh_key,
+      // cannot apply filter to auth.users
+      filters: undefined,
     });
+    search.set("r", datagrid_table_refresh_key.toString());
+    return search;
   }, [datagrid_rows_per_page, datagrid_orderby, datagrid_table_refresh_key]);
 
   const request = supabase_project
