@@ -5,8 +5,10 @@ import DataGrid, {
   Column,
   CopyEvent,
   RenderCellProps,
+  RenderCheckboxProps,
   RenderEditCellProps,
   RenderHeaderCellProps,
+  // SelectColumn,
 } from "react-data-grid";
 import {
   PlusIcon,
@@ -50,6 +52,7 @@ import { EmptyRowsRenderer } from "./empty";
 import { ColumnHeaderCell } from "./column-header-cell";
 import "./grid.css";
 import { cn } from "@/utils";
+import { Checkbox } from "@/components/ui/checkbox";
 
 function useMasking() {
   const [state] = useEditorState();
@@ -108,8 +111,6 @@ export function ResponseGrid({
   };
 
   const onColumnsReorder = (sourceKey: string, targetKey: string) => {
-    console.log("reorder", sourceKey, targetKey);
-    // FIXME: the reorder won't work. we are using custom header cell, which needs a custom dnd handling.
     dispatch({
       type: "editor/data-grid/column/reorder",
       a: sourceKey,
@@ -184,7 +185,7 @@ export function ResponseGrid({
             resizable: true,
             editable: true,
             sortable: true,
-            draggable: false,
+            draggable: true,
             minWidth: 160,
             maxWidth: columns.length <= 1 ? undefined : 640,
             width: undefined,
@@ -213,7 +214,7 @@ export function ResponseGrid({
   }
 
   const onCopy = (e: CopyEvent<GFResponseRow>) => {
-    console.log(e);
+    // console.log(e);
     let val: string | undefined;
     if (e.sourceColumnKey.startsWith("__gf_")) {
       // copy value as is
@@ -269,8 +270,17 @@ export function ResponseGrid({
       onSelectedRowsChange={
         selectionDisabled ? undefined : onSelectedRowsChange
       }
-      renderers={{ noRowsFallback: <EmptyRowsRenderer loading={loading} /> }}
+      renderers={{
+        noRowsFallback: <EmptyRowsRenderer loading={loading} />,
+        renderCheckbox,
+      }}
     />
+  );
+}
+
+function renderCheckbox({ onChange, ...props }: RenderCheckboxProps) {
+  return (
+    <Checkbox {...props} onCheckedChange={(v) => onChange(v === true, false)} />
   );
 }
 

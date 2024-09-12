@@ -848,10 +848,11 @@ export function reducer(
         // update field local_index
         const index_a = draft.form.fields.findIndex((f) => f.id === a);
         const index_b = draft.form.fields.findIndex((f) => f.id === b);
-        // TODO:
-        draft.form.fields = arrayMove(draft.form.fields, index_a, index_b);
 
-        console.error("reorder:: Not implemented yet");
+        draft.form.fields = arrayMove(draft.form.fields, index_a, index_b);
+        draft.form.fields.forEach((f, index) => {
+          f.local_index = index;
+        });
       });
     }
     case "editor/data-grid/dateformat": {
