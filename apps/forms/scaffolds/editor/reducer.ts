@@ -658,7 +658,7 @@ export function reducer(
       });
     }
     case "editor/data/sessions/feed": {
-      const { data, reset } = <FeedResponseSessionsAction>action;
+      const { data } = <FeedResponseSessionsAction>action;
       return produce(state, (draft) => {
         // Initialize session stream if it's not already an array
         const session_space =
@@ -670,7 +670,10 @@ export function reducer(
           session_space.stream = [];
         }
 
-        if (reset) {
+        if (action.reset) {
+          // update the query count
+          draft.datagrid_query_estimated_count = action.count;
+          // reset the stream
           session_space.stream = data;
           return;
         }
@@ -685,6 +688,8 @@ export function reducer(
           {}
         );
 
+        let cnt_added = 0;
+
         data.forEach((newSession) => {
           if (existingSessionsById.hasOwnProperty(newSession.id)) {
             // Update existing response
@@ -695,8 +700,14 @@ export function reducer(
           } else {
             // Add new response if id does not exist
             session_space.stream?.push(newSession);
+
+            cnt_added++;
           }
         });
+
+        // adjust the query count
+        draft.datagrid_query_estimated_count =
+          (draft.datagrid_query_estimated_count || 0) + cnt_added;
       });
     }
     case "editor/data-grid/table": {

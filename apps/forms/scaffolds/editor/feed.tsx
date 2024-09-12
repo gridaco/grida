@@ -150,20 +150,20 @@ function useFetchResponseSessions(form_id: string) {
   const supabase = useMemo(() => createClientFormsClient(), []);
 
   return useCallback(
-    async (limit: number = 100) => {
+    async ({ range }: { range: { from: number; to: number } }) => {
       // fetch the responses
-      const { data, error } = await supabase
+      const { data, count, error } = await supabase
         .from("response_session")
-        .select()
+        .select("*", { count: "estimated" })
         .eq("form_id", form_id)
         .order("created_at")
-        .limit(limit);
+        .range(range.from, range.to);
 
       if (error) {
         throw new Error();
       }
 
-      return data;
+      return { data, count };
     },
     [supabase, form_id]
   );
@@ -564,7 +564,8 @@ export function FormResponseSessionFeedProvider({
   const {
     form,
     datagrid_table_id,
-    datagrid_page_limit: datagrid_rows_per_page,
+    datagrid_page_limit,
+    datagrid_page_index,
     datagrid_table_refresh_key,
     tablespace,
   } = state;
@@ -588,11 +589,17 @@ export function FormResponseSessionFeedProvider({
 
     setLoading(true);
 
-    const feed = fetchResponseSessions(datagrid_rows_per_page).then((data) => {
+    const feed = fetchResponseSessions({
+      range: {
+        from: datagrid_page_index * datagrid_page_limit,
+        to: (datagrid_page_index + 1) * datagrid_page_limit - 1,
+      },
+    }).then(({ data, count }) => {
       dispatch({
         type: "editor/data/sessions/feed",
         data: data as any,
         reset: true,
+        count: count!,
       });
     });
 
@@ -610,7 +617,8 @@ export function FormResponseSessionFeedProvider({
     fetchResponseSessions,
     setLoading,
     datagrid_table_id,
-    datagrid_rows_per_page,
+    datagrid_page_limit,
+    datagrid_page_index,
     datagrid_table_refresh_key,
   ]);
 

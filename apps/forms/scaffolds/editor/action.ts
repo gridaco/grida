@@ -227,11 +227,10 @@ export interface DeleteResponseAction {
   id: string;
 }
 
-export interface FeedResponseSessionsAction {
+export type FeedResponseSessionsAction = {
   type: "editor/data/sessions/feed";
   data: FormResponse[];
-  reset?: boolean;
-}
+} & ({ reset?: false } | { reset: true; count: number });
 
 export interface OpenResponseEditAction {
   type: "editor/responses/edit";
