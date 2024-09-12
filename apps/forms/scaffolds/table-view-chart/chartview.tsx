@@ -10,6 +10,7 @@ import {
   PieChart,
   CartesianGrid,
   XAxis,
+  YAxis,
 } from "recharts";
 
 import {
@@ -30,7 +31,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useCallback, useReducer, useState } from "react";
 import produce from "immer";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
-import { CHART_PALETTES, DataChartPalette } from "./colors";
+import { CHART_PALETTES, DataChartPalette, STANDARD_PALETTES } from "./colors";
 
 /// TODO:
 // type switch
@@ -41,7 +42,7 @@ import { CHART_PALETTES, DataChartPalette } from "./colors";
 // y plot
 // y group
 
-type DataChartRendererType = "bar" | "area" | "pie";
+type DataChartRendererType = "bar" | "bar-vertical" | "area" | "pie";
 
 interface ChartViewState {
   renderer: DataChartRendererType;
@@ -71,25 +72,14 @@ function reducer(state: ChartViewState, action: ChartViewAction) {
   return state;
 }
 
-const chartData = [
-  { month: "January", desktop: 186, mobile: 80 },
-  { month: "February", desktop: 305, mobile: 200 },
-  { month: "March", desktop: 237, mobile: 120 },
-  { month: "April", desktop: 73, mobile: 190 },
-  { month: "May", desktop: 209, mobile: 130 },
-  { month: "June", desktop: 214, mobile: 140 },
+const data = [
+  { month: "January", a: 186, b: 80, c: 100 },
+  { month: "February", a: 305, b: 200, c: 150 },
+  { month: "March", a: 237, b: 120, c: 200 },
+  { month: "April", a: 73, b: 190, c: 250 },
+  { month: "May", a: 209, b: 130, c: 300 },
+  { month: "June", a: 214, b: 140, c: 350 },
 ];
-
-const chartConfig = {
-  desktop: {
-    label: "Desktop",
-    color: "hsl(var(--chart-1))",
-  },
-  mobile: {
-    label: "Mobile",
-    color: "hsl(var(--chart-2))",
-  },
-} satisfies ChartConfig;
 
 export function Chartview() {
   const [state, dispatch] = useReducer(reducer, {
@@ -119,14 +109,19 @@ export function Chartview() {
         <div className="w-full">
           <DataChart
             type={renderer}
+            data={data}
             defs={{
-              mobile: {
-                label: "Mobile",
-                color: CHART_PALETTES[palette].colors[500],
+              a: {
+                label: "A",
+                color: CHART_PALETTES[palette].colors[1],
               },
-              desktop: {
-                label: "Desktop",
-                color: CHART_PALETTES[palette].colors[500],
+              b: {
+                label: "B",
+                color: CHART_PALETTES[palette].colors[2],
+              },
+              c: {
+                label: "C",
+                color: CHART_PALETTES[palette].colors[3],
               },
             }}
           />
@@ -158,15 +153,15 @@ function ChartTypeToggleGroup({
     >
       <ToggleGroupItem value="bar">
         <ResourceTypeIcon type="chart-bar" className="w-4 h-4" />
-        Bar
+      </ToggleGroupItem>
+      <ToggleGroupItem value="bar-vertical">
+        <ResourceTypeIcon type="chart-bar-vertical" className="w-4 h-4" />
       </ToggleGroupItem>
       <ToggleGroupItem value="area">
         <ResourceTypeIcon type="chart-line" className="w-4 h-4" />
-        Area
       </ToggleGroupItem>
       <ToggleGroupItem value="pie">
         <ResourceTypeIcon type="chart-pie" className="w-4 h-4" />
-        Pie
       </ToggleGroupItem>
     </ToggleGroup>
   );
@@ -183,25 +178,31 @@ function PaletteToggleGroup({
     <ToggleGroup
       type="single"
       value={value}
-      onValueChange={onValueChange}
+      onValueChange={(p) => {
+        if (!p) return;
+        onValueChange?.(p as DataChartPalette);
+      }}
       className="flex-col"
     >
-      {Object.entries(CHART_PALETTES).map(([key, { label, colors }]) => (
-        <ToggleGroupItem key={key} value={key as DataChartPalette}>
-          <span className="me-2">{label}</span>
-          <div className="flex gap-1">
-            {Object.entries(colors).map(([k, color]) => (
-              <div
-                key={k}
-                className="w-4 h-4 rounded-sm"
-                style={{
-                  backgroundColor: color,
-                }}
-              />
-            ))}
-          </div>
-        </ToggleGroupItem>
-      ))}
+      {STANDARD_PALETTES.map((key) => {
+        const { label, colors } = CHART_PALETTES[key];
+        return (
+          <ToggleGroupItem key={key} value={key as DataChartPalette}>
+            <span className="me-2">{label}</span>
+            <div className="flex gap-1">
+              {Object.entries(colors).map(([k, color]) => (
+                <div
+                  key={k}
+                  className="w-4 h-4 rounded-sm"
+                  style={{
+                    backgroundColor: color,
+                  }}
+                />
+              ))}
+            </div>
+          </ToggleGroupItem>
+        );
+      })}
     </ToggleGroup>
   );
 }
@@ -209,8 +210,10 @@ function PaletteToggleGroup({
 function DataChart({
   type,
   defs,
+  data,
 }: {
   type: DataChartRendererType;
+  data: Array<any>;
   defs: {
     [key: string]: {
       label: string;
@@ -227,8 +230,8 @@ function DataChart({
       <CardContent>
         <>
           {type === "bar" && (
-            <ChartContainer config={chartConfig}>
-              <BarChart accessibilityLayer data={chartData}>
+            <ChartContainer config={defs}>
+              <BarChart accessibilityLayer data={data}>
                 <CartesianGrid vertical={false} />
                 <XAxis
                   dataKey="month"
@@ -241,16 +244,40 @@ function DataChart({
                   cursor={false}
                   content={<ChartTooltipContent indicator="dashed" />}
                 />
-                <Bar dataKey="desktop" fill="var(--color-desktop)" radius={4} />
-                <Bar dataKey="mobile" fill="var(--color-mobile)" radius={4} />
+                {Object.entries(defs).map(([key]) => {
+                  return (
+                    <Bar
+                      key={key}
+                      dataKey={key}
+                      fill={`var(--color-${key})`}
+                      radius={4}
+                    />
+                  );
+                })}
+              </BarChart>
+            </ChartContainer>
+          )}
+          {type === "bar-vertical" && (
+            <ChartContainer config={defs}>
+              <BarChart layout="vertical" data={data}>
+                <CartesianGrid horizontal={false} />
+                <XAxis type="number" />
+                <YAxis type="category" dataKey="month" />
+                <ChartTooltip
+                  cursor={false}
+                  content={<ChartTooltipContent />}
+                />
+                {Object.entries(defs).map(([key]) => (
+                  <Bar key={key} dataKey={key} fill={`var(--color-${key})`} />
+                ))}
               </BarChart>
             </ChartContainer>
           )}
           {type === "area" && (
-            <ChartContainer config={chartConfig}>
+            <ChartContainer config={defs}>
               <AreaChart
                 accessibilityLayer
-                data={chartData}
+                data={data}
                 margin={{
                   left: 12,
                   right: 12,
@@ -269,53 +296,48 @@ function DataChart({
                   content={<ChartTooltipContent />}
                 />
                 <defs>
-                  <linearGradient id="fillDesktop" x1="0" y1="0" x2="0" y2="1">
-                    <stop
-                      offset="5%"
-                      stopColor="var(--color-desktop)"
-                      stopOpacity={0.8}
-                    />
-                    <stop
-                      offset="95%"
-                      stopColor="var(--color-desktop)"
-                      stopOpacity={0.1}
-                    />
-                  </linearGradient>
-                  <linearGradient id="fillMobile" x1="0" y1="0" x2="0" y2="1">
-                    <stop
-                      offset="5%"
-                      stopColor="var(--color-mobile)"
-                      stopOpacity={0.8}
-                    />
-                    <stop
-                      offset="95%"
-                      stopColor="var(--color-mobile)"
-                      stopOpacity={0.1}
-                    />
-                  </linearGradient>
+                  {Object.entries(defs).map(([key]) => {
+                    return (
+                      <linearGradient
+                        id={`fill-${key}`}
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="5%"
+                          stopColor={`var(--color-${key})`}
+                          stopOpacity={0.8}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor={`var(--color-${key})`}
+                          stopOpacity={0.1}
+                        />
+                      </linearGradient>
+                    );
+                  })}
                 </defs>
-                <Area
-                  dataKey="mobile"
-                  type="natural"
-                  fill="url(#fillMobile)"
-                  fillOpacity={0.4}
-                  stroke="var(--color-mobile)"
-                  stackId="a"
-                />
-                <Area
-                  dataKey="desktop"
-                  type="natural"
-                  fill="url(#fillDesktop)"
-                  fillOpacity={0.4}
-                  stroke="var(--color-desktop)"
-                  stackId="a"
-                />
+                {Object.entries(defs).map(([key]) => {
+                  return (
+                    <Area
+                      key={key}
+                      dataKey={key}
+                      type="natural"
+                      fill={`url(#fill-${key})`}
+                      fillOpacity={0.4}
+                      stroke={`var(--color-${key})`}
+                      stackId={key}
+                    />
+                  );
+                })}
               </AreaChart>
             </ChartContainer>
           )}
           {type === "pie" && (
             <ChartContainer
-              config={chartConfig}
+              config={defs}
               className="mx-auto aspect-square max-h-[250px]"
             >
               <PieChart>
@@ -324,9 +346,9 @@ function DataChart({
                   content={<ChartTooltipContent hideLabel />}
                 />
                 <Pie
-                  data={chartData}
-                  dataKey="visitors"
-                  nameKey="browser"
+                  data={data}
+                  dataKey="key"
+                  nameKey="type"
                   innerRadius={60}
                 />
               </PieChart>

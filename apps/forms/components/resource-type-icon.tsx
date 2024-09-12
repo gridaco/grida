@@ -18,7 +18,8 @@ import {
   AppWindowIcon,
   LanguagesIcon,
   LineChartIcon,
-  BarChartIcon,
+  BarChart3Icon,
+  BarChartHorizontalIcon,
 } from "lucide-react";
 import { SupabaseLogo } from "./logos";
 
@@ -39,6 +40,7 @@ export type ResourceTypeIconName =
   | "list"
   | "chart"
   | "chart-bar"
+  | "chart-bar-vertical"
   | "chart-line"
   | "chart-pie"
   | "commerce"
@@ -84,7 +86,9 @@ export function ResourceTypeIcon({
     case "chart":
       return <PieChartIcon {...props} />;
     case "chart-bar":
-      return <BarChartIcon {...props} />;
+      return <BarChart3Icon {...props} />;
+    case "chart-bar-vertical":
+      return <BarChartHorizontalIcon {...props} />;
     case "chart-line":
       return <LineChartIcon {...props} />;
     case "chart-pie":
