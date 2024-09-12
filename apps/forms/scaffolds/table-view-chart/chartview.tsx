@@ -56,14 +56,29 @@ import { CHART_PALETTES, DataChartPalette, STANDARD_PALETTES } from "./colors";
 
 type DataChartRendererType = "bar" | "bar-vertical" | "area" | "pie";
 
+type DataChartCurveType = "bump" | "linear" | "natural" | "step";
+
+type DataChartAreaFillType = "solid" | "gradient" | "transparent";
+
+type DataChartCartesianGridState = {
+  // rename to main and cross ?
+  vertical: boolean;
+  horizontal: boolean;
+};
+
 interface ChartViewState {
   renderer: DataChartRendererType;
   palette: DataChartPalette;
+  curve: DataChartCurveType;
+  areaFill: DataChartAreaFillType;
+  grid: DataChartCartesianGridState;
 }
 
 type ChartViewAction =
   | { type: "type"; renderer: DataChartRendererType }
-  | { type: "palette"; palette: DataChartPalette };
+  | { type: "palette"; palette: DataChartPalette }
+  | { type: "curve"; curve: DataChartCurveType }
+  | { type: "area-fill"; areaFill: DataChartAreaFillType };
 
 function reducer(state: ChartViewState, action: ChartViewAction) {
   switch (action.type) {
@@ -77,6 +92,18 @@ function reducer(state: ChartViewState, action: ChartViewAction) {
       const { palette } = action;
       return produce(state, (draft) => {
         draft.palette = palette;
+      });
+    }
+    case "curve": {
+      const { curve } = action;
+      return produce(state, (draft) => {
+        draft.curve = curve;
+      });
+    }
+    case "area-fill": {
+      const { areaFill } = action;
+      return produce(state, (draft) => {
+        draft.areaFill = areaFill;
       });
     }
   }
@@ -97,9 +124,15 @@ export function Chartview() {
   const [state, dispatch] = useReducer(reducer, {
     renderer: "bar",
     palette: "slate",
+    curve: "natural",
+    areaFill: "gradient",
+    grid: {
+      vertical: true,
+      horizontal: false,
+    },
   });
 
-  const { renderer, palette } = state;
+  const { renderer, curve, areaFill, palette } = state;
 
   const changeType = useCallback(
     (type: DataChartRendererType) => {
@@ -115,6 +148,19 @@ export function Chartview() {
     [dispatch]
   );
 
+  const changeCurve = useCallback(
+    (curve: DataChartCurveType) => {
+      dispatch({ type: "curve", curve: curve });
+    },
+    [dispatch]
+  );
+  const changeAreaFill = useCallback(
+    (areaFill: DataChartAreaFillType) => {
+      dispatch({ type: "area-fill", areaFill: areaFill });
+    },
+    [dispatch]
+  );
+
   return (
     <div className="w-full h-full p-4">
       <div className="flex justify-between gap-4 h-full w-full">
@@ -122,7 +168,9 @@ export function Chartview() {
           <div className="w-full aspect-video">
             <DataChart
               type={renderer}
+              curve={curve}
               data={data}
+              areaFill={areaFill}
               defs={{
                 a: {
                   label: "A",
@@ -142,10 +190,57 @@ export function Chartview() {
         </div>
         <aside className="flex flex-col gap-4">
           <ChartTypeToggleGroup value={renderer} onValueChange={changeType} />
+          <CurveTypeControl value={curve} onValueChange={changeCurve} />
+          <AreaFillTypeControl
+            value={areaFill}
+            onValueChange={changeAreaFill}
+          />
           <PaletteToggleGroup value={palette} onValueChange={changePalette} />
         </aside>
       </div>
     </div>
+  );
+}
+
+function CurveTypeControl({
+  value,
+  onValueChange,
+}: {
+  value: DataChartCurveType;
+  onValueChange?: (value: DataChartCurveType) => void;
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onValueChange?.(e.target.value as any)}
+    >
+      {["bump", "linear", "natural", "step"].map((curve) => (
+        <option key={curve} value={curve}>
+          {curve}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function AreaFillTypeControl({
+  value,
+  onValueChange,
+}: {
+  value: DataChartAreaFillType;
+  onValueChange?: (value: DataChartAreaFillType) => void;
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onValueChange?.(e.target.value as any)}
+    >
+      {["gradient", "solid", "transparent"].map((curve) => (
+        <option key={curve} value={curve}>
+          {curve}
+        </option>
+      ))}
+    </select>
   );
 }
 
@@ -236,10 +331,14 @@ function DataChart({
   type,
   defs,
   data,
+  curve,
+  areaFill,
 }: {
   type: DataChartRendererType;
   data: Array<any>;
   defs: DataGroupDef;
+  curve?: DataChartCurveType;
+  areaFill?: DataChartAreaFillType;
 }) {
   return (
     <>
@@ -322,25 +421,26 @@ function DataChart({
                     <stop
                       offset="5%"
                       stopColor={`var(--color-${key})`}
-                      stopOpacity={0.8}
+                      stopOpacity={areaFill === "gradient" ? 0.8 : 1}
                     />
                     <stop
                       offset="95%"
                       stopColor={`var(--color-${key})`}
-                      stopOpacity={0.1}
+                      stopOpacity={areaFill === "gradient" ? 0.1 : 1}
                     />
                   </linearGradient>
                 );
               })}
             </defs>
+
             {Object.entries(defs).map(([key]) => {
               return (
                 <Area
                   key={key}
                   dataKey={key}
-                  type="natural"
+                  type={curve}
                   fill={`url(#fill-${key})`}
-                  fillOpacity={0.4}
+                  fillOpacity={areaFill === "transparent" ? 0 : 0.4}
                   stroke={`var(--color-${key})`}
                   stackId={key}
                 />
