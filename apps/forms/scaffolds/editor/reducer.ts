@@ -755,6 +755,11 @@ export function reducer(
     case "editor/data-grid/delete/selected": {
       const {} = <DataGridDeleteSelectedRows>action;
       return produce(state, (draft) => {
+        // adjust the query count
+        draft.datagrid_query_estimated_count =
+          (draft.datagrid_query_estimated_count || 0) -
+          state.datagrid_selected_rows.size;
+
         switch (draft.datagrid_table_id) {
           case EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID: {
             const ids = Array.from(state.datagrid_selected_rows);
