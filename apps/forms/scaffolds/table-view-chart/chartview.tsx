@@ -253,7 +253,7 @@ function DataChart({
               tickMargin={10}
               axisLine={false}
             />
-            <YAxis type="number" />
+            <YAxis type="number" tickLine={false} axisLine={false} />
             <ChartTooltip
               cursor={false}
               content={<ChartTooltipContent indicator="dashed" />}
@@ -275,8 +275,14 @@ function DataChart({
         <ChartContainer config={defs}>
           <BarChart layout="vertical" data={data}>
             <CartesianGrid horizontal={false} />
-            <XAxis type="number" />
-            <YAxis type="category" dataKey="month" />
+            <XAxis type="number" tickLine={false} axisLine={false} />
+            <YAxis
+              type="category"
+              dataKey="month"
+              tickLine={false}
+              tickMargin={10}
+              axisLine={false}
+            />
             <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
             {Object.entries(defs).map(([key]) => (
               <Bar key={key} dataKey={key} fill={`var(--color-${key})`} />
@@ -298,10 +304,10 @@ function DataChart({
             <XAxis
               dataKey="month"
               tickLine={false}
-              axisLine={false}
               tickMargin={8}
+              axisLine={false}
             />
-            <YAxis type="number" />
+            <YAxis type="number" tickLine={false} axisLine={false} />
             <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
             <defs>
               {Object.entries(defs).map(([key]) => {
