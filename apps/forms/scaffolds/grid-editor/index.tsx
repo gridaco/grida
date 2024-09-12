@@ -523,11 +523,8 @@ function DeleteSelectedRowsButton({
 
   const delete_selected_rows = useDeleteSelectedSchemaTableRows();
 
-  const delete_selected_x_supabase_main_table_rows = useCallback(() => {
-    if (
-      !db_table_id ||
-      tb?.id !== EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID
-    ) {
+  const delete_selected_x_supabase_table_rows = useCallback(() => {
+    if (!db_table_id || tb?.provider !== "x-supabase") {
       toast.error("Something went wrong. Please refresh the page.");
       return;
     }
@@ -564,6 +561,18 @@ function DeleteSelectedRowsButton({
     });
   }, [tb, db_table_id, datagrid_selected_rows, dispatch]);
 
+  const delete_selected_x_supabase_main_table_rows = useCallback(() => {
+    if (
+      !db_table_id ||
+      tb?.id !== EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID
+    ) {
+      toast.error("Something went wrong. Please refresh the page.");
+      return;
+    }
+
+    return delete_selected_x_supabase_table_rows();
+  }, [tb?.id, db_table_id, delete_selected_x_supabase_table_rows]);
+
   const onDeleteSelection = useCallback(() => {
     switch (datagrid_table_id) {
       case EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID:
@@ -576,12 +585,24 @@ function DeleteSelectedRowsButton({
         delete_selected_x_supabase_main_table_rows();
         break;
       default:
-        delete_selected_rows();
+        switch (tb?.provider) {
+          case "x-supabase":
+            delete_selected_x_supabase_table_rows();
+            break;
+          case "grida":
+            delete_selected_rows();
+            break;
+          default:
+            toast.error("Something went wrong. Please refresh the page.");
+            break;
+        }
         break;
     }
   }, [
+    tb?.provider,
     datagrid_table_id,
     delete_selected_rows,
+    delete_selected_x_supabase_table_rows,
     delete_selected_x_supabase_main_table_rows,
   ]);
 

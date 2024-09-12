@@ -144,7 +144,7 @@ function initialDatabaseEditorState(
   const tables: GDocTable[] = [...init.tables.map(schematableinit)];
 
   const sb_auth_users = {
-    provider: "x-supabase",
+    provider: "x-supabase-auth",
     id: EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID,
     row_keyword: "user",
     icon: "supabase",

@@ -120,41 +120,41 @@ type GDocTableBase = {
 export type GDocTable = GDocTableBase &
   (
     | {
-        provider: "grida";
         id: typeof EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID;
+        provider: "grida";
       }
     | {
-        provider: "custom";
         id: typeof EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID;
+        provider: "custom";
       }
     | {
-        provider: "custom";
         id: typeof EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID;
+        provider: "custom";
       }
     | GDocFormsXSBTable
     | {
-        provider: "x-supabase";
         id: typeof EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID;
+        provider: "x-supabase-auth";
       }
     | GDocSchemaTable
   );
 
 export type GDocFormsXSBTable = {
-  provider: "x-supabase";
   id: typeof EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID;
+  provider: "x-supabase";
   x_sb_main_table_connection: TableXSBMainTableConnection;
 } & GDocTableBase;
 
 export type GDocSchemaTableProviderGrida = {
-  provider: "grida";
   id: string;
+  provider: "grida";
   attributes: Array<AttributeDefinition>;
   readonly: false;
 } & GDocTableBase;
 
 export type GDocSchemaTableProviderXSupabase = {
-  provider: "x-supabase";
   id: string;
+  provider: "x-supabase";
   attributes: Array<AttributeDefinition>;
   x_sb_main_table_connection: TableXSBMainTableConnection;
 } & GDocTableBase;
