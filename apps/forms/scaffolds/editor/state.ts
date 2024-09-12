@@ -201,7 +201,7 @@ export interface IDataGridState {
    *
    * a.k.a limit
    */
-  datagrid_rows_per_page: number;
+  datagrid_page_limit: number;
   /**
    * @global current page index - shall be display with +1
    *

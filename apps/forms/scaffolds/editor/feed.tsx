@@ -271,7 +271,8 @@ function useXSBTableFeed(
   const enabled = !!sb_table_id;
 
   const {
-    datagrid_rows_per_page,
+    datagrid_page_limit,
+    datagrid_page_index,
     datagrid_table_refresh_key,
     datagrid_orderby,
     datagrid_predicates,
@@ -279,15 +280,20 @@ function useXSBTableFeed(
 
   const serachParams = useMemo(() => {
     const search = XPostgrestQuery.QS.select({
-      limit: datagrid_rows_per_page,
+      limit: datagrid_page_limit,
       order: datagrid_orderby,
+      range: {
+        from: datagrid_page_index * datagrid_page_limit,
+        to: (datagrid_page_index + 1) * datagrid_page_limit - 1,
+      },
       // only pass predicates with value set
       filters: datagrid_predicates.filter((p) => p.value ?? false),
     });
     search.set("r", datagrid_table_refresh_key.toString());
     return search;
   }, [
-    datagrid_rows_per_page,
+    datagrid_page_limit,
+    datagrid_page_index,
     datagrid_orderby,
     datagrid_predicates,
     datagrid_table_refresh_key,
@@ -442,7 +448,7 @@ export function FormResponseFeedProvider({
   const {
     form,
     datagrid_table_id,
-    datagrid_rows_per_page,
+    datagrid_page_limit: datagrid_rows_per_page,
     datagrid_table_refresh_key,
     tablespace,
   } = state;
@@ -552,7 +558,7 @@ export function FormResponseSessionFeedProvider({
   const {
     form,
     datagrid_table_id,
-    datagrid_rows_per_page,
+    datagrid_page_limit: datagrid_rows_per_page,
     datagrid_table_refresh_key,
     tablespace,
   } = state;
@@ -633,7 +639,7 @@ export function CustomerFeedProvider({
   const {
     project: { id: project_id },
     datagrid_table_id,
-    datagrid_rows_per_page,
+    datagrid_page_limit: datagrid_rows_per_page,
     datagrid_table_refresh_key,
   } = state;
 
@@ -759,8 +765,11 @@ export function GridaSchemaTableFeedProvider({
 }>) {
   const [state, dispatch] = useEditorState();
 
-  const { datagrid_rows_per_page, datagrid_table_refresh_key, tablespace } =
-    state;
+  const {
+    datagrid_page_limit: datagrid_rows_per_page,
+    datagrid_table_refresh_key,
+    tablespace,
+  } = state;
 
   const { realtime: _realtime_responses_enabled } = tablespace[table_id];
 

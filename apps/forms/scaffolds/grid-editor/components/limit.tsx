@@ -13,7 +13,7 @@ export function GridLimit() {
   return (
     <div>
       <Select
-        value={state.datagrid_rows_per_page + ""}
+        value={state.datagrid_page_limit + ""}
         onValueChange={(value) => {
           dispatch({
             type: "editor/data-grid/rows-per-page",

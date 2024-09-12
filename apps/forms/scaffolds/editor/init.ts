@@ -83,7 +83,7 @@ export function initialDatagridState(): Omit<
 > {
   return {
     datagrid_selected_rows: new Set(),
-    datagrid_rows_per_page: 100,
+    datagrid_page_limit: 100,
     datagrid_query_estimated_count: null,
     datagrid_page_index: 0,
     datagrid_table_refresh_key: 0,

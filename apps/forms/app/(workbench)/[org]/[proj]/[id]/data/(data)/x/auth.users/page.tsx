@@ -27,7 +27,7 @@ export default function XTablePage() {
 
   const {
     supabase_project,
-    datagrid_rows_per_page,
+    datagrid_page_limit,
     datagrid_orderby,
     datagrid_table_refresh_key,
     datagrid_isloading,
@@ -35,14 +35,14 @@ export default function XTablePage() {
 
   const serachParams = useMemo(() => {
     const search = XPostgrestQuery.QS.select({
-      limit: datagrid_rows_per_page,
+      limit: datagrid_page_limit,
       order: datagrid_orderby,
       // cannot apply filter to auth.users
       filters: undefined,
     });
     search.set("r", datagrid_table_refresh_key.toString());
     return search;
-  }, [datagrid_rows_per_page, datagrid_orderby, datagrid_table_refresh_key]);
+  }, [datagrid_page_limit, datagrid_orderby, datagrid_table_refresh_key]);
 
   const request = supabase_project
     ? PrivateEditorApi.XSupabase.url_x_auth_users_get(

@@ -573,7 +573,7 @@ export function reducer(
     case "editor/data-grid/rows-per-page": {
       const { limit: max } = <DataGridRowsPerPageAction>action;
       return produce(state, (draft) => {
-        draft.datagrid_rows_per_page = max;
+        draft.datagrid_page_limit = max;
       });
     }
     case "editor/data-grid/page": {

@@ -10,13 +10,13 @@ function useDatagridPagination() {
   const [state, dispatch] = useEditorState();
   const {
     datagrid_page_index,
-    datagrid_rows_per_page,
+    datagrid_page_limit,
     datagrid_query_estimated_count,
   } = state;
 
   const min = 0;
   const max = Math.ceil(
-    (datagrid_query_estimated_count ?? 0) / datagrid_rows_per_page
+    (datagrid_query_estimated_count ?? 0) / datagrid_page_limit
   );
 
   const hasprev = datagrid_page_index > min;
