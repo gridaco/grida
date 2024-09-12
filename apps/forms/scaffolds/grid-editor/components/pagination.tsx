@@ -71,7 +71,7 @@ export function GridPagination() {
         <Input
           type="number"
           min={min + 1}
-          max={max + 1}
+          max={max}
           value={page + 1}
           onChange={(e) => {
             const i = parseInt(e.target.value) - 1;
@@ -81,7 +81,7 @@ export function GridPagination() {
           }}
           className={WorkbenchUI.inputVariants()}
         />
-        <p className="text-muted-foreground whitespace-nowrap">of {max + 1}</p>
+        <p className="text-muted-foreground whitespace-nowrap">of {max}</p>
       </div>
       <Button
         disabled={!hasnext}
