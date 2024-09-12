@@ -93,12 +93,13 @@ export function CustomerGrid({
 
   return (
     <DataGrid
-      className="flex-grow select-none"
+      className="flex-grow select-none text-xs text-foreground/80"
       columns={columns}
       rows={rows}
       renderers={{ noRowsFallback: <EmptyRowsRenderer loading={loading} /> }}
       rowKeyGetter={rowKey ? (row) => (row as any)[rowKey] : undefined}
-      rowHeight={44}
+      rowHeight={32}
+      headerRowHeight={36}
     />
   );
 }

@@ -405,13 +405,13 @@ function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
 
   const data = row.fields[column.key];
 
+  const masker = useMasking();
+
   if (!data) {
     return <></>;
   }
 
   const { type, value, options, multiple, files } = data;
-
-  const masker = useMasking();
 
   // FIXME: we need to use other parser for db-oriented data.
   // at the moment, we are using type check on value to use the value as is or not.
