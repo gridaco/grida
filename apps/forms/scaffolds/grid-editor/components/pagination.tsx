@@ -15,9 +15,8 @@ function useDatagridPagination() {
   } = state;
 
   const min = 0;
-  const max = Math.ceil(
-    (datagrid_query_estimated_count ?? 0) / datagrid_page_limit
-  );
+  const max =
+    Math.ceil((datagrid_query_estimated_count ?? 0) / datagrid_page_limit) - 1;
 
   const hasprev = datagrid_page_index > min;
   const hasnext = datagrid_page_index < max;
@@ -35,7 +34,7 @@ function useDatagridPagination() {
 
   const next = useCallback(() => {
     paginate(datagrid_page_index + 1);
-  }, [datagrid_page_index, dispatch]);
+  }, [datagrid_page_index, paginate]);
 
   return {
     page: datagrid_page_index,
@@ -81,7 +80,7 @@ export function GridPagination() {
           }}
           className={WorkbenchUI.inputVariants()}
         />
-        <p className="text-muted-foreground whitespace-nowrap">of {max}</p>
+        <p className="text-muted-foreground whitespace-nowrap">of {max + 1}</p>
       </div>
       <Button
         disabled={!hasnext}

@@ -571,9 +571,12 @@ export function reducer(
       });
     }
     case "editor/data-grid/rows-per-page": {
-      const { limit: max } = <DataGridRowsPerPageAction>action;
+      const { limit } = <DataGridRowsPerPageAction>action;
       return produce(state, (draft) => {
-        draft.datagrid_page_limit = max;
+        draft.datagrid_page_limit = limit;
+
+        // reset the pagination
+        draft.datagrid_page_index = 0;
       });
     }
     case "editor/data-grid/page": {
@@ -583,7 +586,7 @@ export function reducer(
       });
     }
     case "editor/table/space/feed": {
-      const { table_id, data, reset } = <TablespaceFeedAction>action;
+      const { table_id, data } = <TablespaceFeedAction>action;
 
       const virtualized: Array<TVirtualRow<FormResponseField, FormResponse>> =
         data.map((vrow) => {
@@ -608,7 +611,11 @@ export function reducer(
         assert(space, "Table space not found");
         assert(space.provider === "grida", "Table space provider is not grida");
 
-        if (reset) {
+        if (action.reset) {
+          // update the query count
+          draft.datagrid_query_estimated_count = action.count;
+
+          // reset the stream
           space.stream = virtualized;
           return;
         }
@@ -621,6 +628,8 @@ export function reducer(
           return acc;
         }, {});
 
+        let cnt_added = 0;
+
         virtualized.forEach((newRow) => {
           if (existing_rows_id_map.hasOwnProperty(newRow.id)) {
             // Update existing response
@@ -628,8 +637,13 @@ export function reducer(
           } else {
             // Add new response if id does not exist
             space.stream?.push(newRow);
+            cnt_added++;
           }
         });
+
+        // adjust the query count
+        draft.datagrid_query_estimated_count =
+          (draft.datagrid_query_estimated_count || 0) + cnt_added;
       });
     }
     case "editor/responses/edit": {

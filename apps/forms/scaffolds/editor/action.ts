@@ -205,12 +205,17 @@ export interface TableAttributeDeleteAction {
   field_id: string;
 }
 
-export interface TablespaceFeedAction {
+export type TablespaceFeedAction = {
   type: "editor/table/space/feed";
   table_id: GDocTableID;
   data: FormResponseWithFields[];
-  reset?: boolean;
-}
+} & (
+  | {
+      count: number;
+      reset: true;
+    }
+  | { reset?: false }
+);
 
 export interface SelectResponse {
   type: "editor/response/select";

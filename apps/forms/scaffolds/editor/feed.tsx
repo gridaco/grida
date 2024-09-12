@@ -1,12 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo } from "react";
-import {
-  useDatabaseTableId,
-  useDatagridTable,
-  useEditorState,
-  useFormFields,
-} from "./use";
+import { useDatagridTable, useEditorState, useFormFields } from "./use";
 import toast from "react-hot-toast";
 import {
   createClientFormsClient,
@@ -17,7 +12,6 @@ import {
   RealtimePostgresChangesPayload,
 } from "@supabase/supabase-js";
 import useSWR from "swr";
-import type { EditorApiResponse } from "@/types/private/api";
 import type { FormResponse, FormResponseField, GridaXSupabase } from "@/types";
 import { usePrevious } from "@uidotdev/usehooks";
 import { XPostgrestQuery } from "@/lib/supabase-postgrest/builder";
@@ -25,7 +19,6 @@ import equal from "deep-equal";
 import { PrivateEditorApi } from "@/lib/private";
 import { EditorSymbols } from "./symbols";
 import {
-  GDocSchemaTableProviderXSupabase,
   type GDocFormsXSBTable,
   type GDocSchemaTableProviderGrida,
   type TablespaceSchemaTableStreamType,
@@ -100,25 +93,28 @@ function useFetchSchemaTableRows(table_id: string) {
   const supabase = useMemo(() => createClientFormsClient(), []);
 
   return useCallback(
-    async (limit: number = 100) => {
+    async ({ range }: { range: { from: number; to: number } }) => {
       // fetch the responses
-      const { data, error } = await supabase
+      const { data, count, error } = await supabase
         .from("response")
         .select(
           `
             *,
             fields:response_field(*)
-          `
+          `,
+          {
+            count: "estimated",
+          }
         )
         .eq("form_id", table_id)
         .order("local_index")
-        .limit(limit);
+        .range(range.from, range.to);
 
       if (error) {
         throw new Error();
       }
 
-      return data;
+      return { data, error, count };
     },
     [supabase, table_id]
   );
@@ -335,6 +331,7 @@ function useXSBTableFeed(
     dispatch({
       type: "editor/data-grid/refresh",
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatch, enabled, ...stableDeps]);
 
   useEffect(() => {
@@ -342,6 +339,7 @@ function useXSBTableFeed(
       const rows = res.data.data;
       onFeed?.(rows, res.data.count!);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [res.data]);
 }
 
@@ -448,7 +446,8 @@ export function FormResponseFeedProvider({
   const {
     form,
     datagrid_table_id,
-    datagrid_page_limit: datagrid_rows_per_page,
+    datagrid_page_limit,
+    datagrid_page_index,
     datagrid_table_refresh_key,
     tablespace,
   } = state;
@@ -471,10 +470,16 @@ export function FormResponseFeedProvider({
     }
 
     setLoading(true);
-    const feed = fetchResponses(datagrid_rows_per_page).then((data) => {
+    const feed = fetchResponses({
+      range: {
+        from: datagrid_page_index * datagrid_page_limit,
+        to: (datagrid_page_index + 1) * datagrid_page_limit - 1,
+      },
+    }).then(({ data, count }) => {
       dispatch({
         table_id: EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID,
         type: "editor/table/space/feed",
+        count: count ?? 0,
         data: data as any,
         reset: true,
       });
@@ -493,7 +498,8 @@ export function FormResponseFeedProvider({
     dispatch,
     fetchResponses,
     setLoading,
-    datagrid_rows_per_page,
+    datagrid_page_limit,
+    datagrid_page_index,
     datagrid_table_id,
     datagrid_table_refresh_key,
   ]);
@@ -766,7 +772,8 @@ export function GridaSchemaTableFeedProvider({
   const [state, dispatch] = useEditorState();
 
   const {
-    datagrid_page_limit: datagrid_rows_per_page,
+    datagrid_page_limit,
+    datagrid_page_index,
     datagrid_table_refresh_key,
     tablespace,
   } = state;
@@ -782,12 +789,18 @@ export function GridaSchemaTableFeedProvider({
   useEffect(() => {
     if (typeof table_id !== "string") return;
     setLoading(true);
-    const feed = fetchTableRows(datagrid_rows_per_page).then((data) => {
+    const feed = fetchTableRows({
+      range: {
+        from: datagrid_page_index * datagrid_page_limit,
+        to: (datagrid_page_index + 1) * datagrid_page_limit - 1,
+      },
+    }).then(({ data, count }) => {
       dispatch({
         type: "editor/table/space/feed",
         table_id: table_id,
         data: data as any,
         reset: true,
+        count: count!,
       });
     });
 
@@ -805,7 +818,8 @@ export function GridaSchemaTableFeedProvider({
     fetchTableRows,
     setLoading,
     table_id,
-    datagrid_rows_per_page,
+    datagrid_page_limit,
+    datagrid_page_index,
     datagrid_table_refresh_key,
   ]);
 
