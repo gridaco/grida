@@ -58,6 +58,7 @@ import Papa from "papaparse";
 import { Gallery } from "../table-view-gallery/gallery";
 import { XSupaDataGridFilter } from "./components/filter";
 import { GridPagination } from "./components/pagination";
+import { Chartview } from "../table-view-chart/chartview";
 
 export function GridEditor({
   systemcolumns,
@@ -224,6 +225,11 @@ export function GridEditor({
       {view?.type === "gallery" && (
         <GridLayout.Content className="overflow-y-scroll">
           <Gallery />
+        </GridLayout.Content>
+      )}
+      {view?.type === "chart" && (
+        <GridLayout.Content className="overflow-y-scroll">
+          <Chartview />
         </GridLayout.Content>
       )}
       {!view && (
