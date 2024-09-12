@@ -36,7 +36,8 @@ import type {
   OpenEditFieldAction,
   OpenResponseEditAction,
   ResolvePendingBlockAction,
-  DataGridRowsAction,
+  DataGridRowsPerPageAction,
+  DataGridPageAction,
   TableAttributeChangeAction,
   SelectResponse,
   DataGridTableAction,
@@ -45,7 +46,7 @@ import type {
   FeedResponseSessionsAction,
   DataGridDateFormatAction,
   DataGridDateTZAction,
-  DataGridFilterAction,
+  DataGridLocalFilterAction,
   DataGridCellChangeAction,
   FeedXSupabaseMainTableRowsAction,
   DataTableRefreshAction,
@@ -65,7 +66,11 @@ import type {
   DocumentNodeChangeTextAction,
   DocumentTemplateSampleDataAction,
   DataGridOrderByAction,
-  DataGridOrderByResetAction,
+  DataGridOrderByClearAction,
+  DataGridPredicatesAddAction,
+  DataGridPredicatesUpdateAction,
+  DataGridPredicatesClearAction,
+  DataGridPredicatesRemoveAction,
   InitAssetAction,
   FeedCustomerAction,
   EditorThemePoweredByBrandingAction,
@@ -565,14 +570,23 @@ export function reducer(
         draft.datagrid_selected_rows = new_selected_responses;
       });
     }
-    case "editor/data-grid/rows": {
-      const { rows: max } = <DataGridRowsAction>action;
+    case "editor/data-grid/rows-per-page": {
+      const { limit } = <DataGridRowsPerPageAction>action;
       return produce(state, (draft) => {
-        draft.datagrid_rows_per_page = max;
+        draft.datagrid_page_limit = limit;
+
+        // reset the pagination
+        draft.datagrid_page_index = 0;
+      });
+    }
+    case "editor/data-grid/page": {
+      const { index } = <DataGridPageAction>action;
+      return produce(state, (draft) => {
+        draft.datagrid_page_index = index;
       });
     }
     case "editor/table/space/feed": {
-      const { table_id, data, reset } = <TablespaceFeedAction>action;
+      const { table_id, data } = <TablespaceFeedAction>action;
 
       const virtualized: Array<TVirtualRow<FormResponseField, FormResponse>> =
         data.map((vrow) => {
@@ -597,7 +611,11 @@ export function reducer(
         assert(space, "Table space not found");
         assert(space.provider === "grida", "Table space provider is not grida");
 
-        if (reset) {
+        if (action.reset) {
+          // update the query count
+          draft.datagrid_query_estimated_count = action.count;
+
+          // reset the stream
           space.stream = virtualized;
           return;
         }
@@ -610,6 +628,8 @@ export function reducer(
           return acc;
         }, {});
 
+        let cnt_added = 0;
+
         virtualized.forEach((newRow) => {
           if (existing_rows_id_map.hasOwnProperty(newRow.id)) {
             // Update existing response
@@ -617,8 +637,13 @@ export function reducer(
           } else {
             // Add new response if id does not exist
             space.stream?.push(newRow);
+            cnt_added++;
           }
         });
+
+        // adjust the query count
+        draft.datagrid_query_estimated_count =
+          (draft.datagrid_query_estimated_count || 0) + cnt_added;
       });
     }
     case "editor/responses/edit": {
@@ -633,7 +658,7 @@ export function reducer(
       });
     }
     case "editor/data/sessions/feed": {
-      const { data, reset } = <FeedResponseSessionsAction>action;
+      const { data } = <FeedResponseSessionsAction>action;
       return produce(state, (draft) => {
         // Initialize session stream if it's not already an array
         const session_space =
@@ -645,7 +670,10 @@ export function reducer(
           session_space.stream = [];
         }
 
-        if (reset) {
+        if (action.reset) {
+          // update the query count
+          draft.datagrid_query_estimated_count = action.count;
+          // reset the stream
           session_space.stream = data;
           return;
         }
@@ -660,6 +688,8 @@ export function reducer(
           {}
         );
 
+        let cnt_added = 0;
+
         data.forEach((newSession) => {
           if (existingSessionsById.hasOwnProperty(newSession.id)) {
             // Update existing response
@@ -670,8 +700,14 @@ export function reducer(
           } else {
             // Add new response if id does not exist
             session_space.stream?.push(newSession);
+
+            cnt_added++;
           }
         });
+
+        // adjust the query count
+        draft.datagrid_query_estimated_count =
+          (draft.datagrid_query_estimated_count || 0) + cnt_added;
       });
     }
     case "editor/data-grid/table": {
@@ -701,8 +737,11 @@ export function reducer(
 
         // clear datagrid state
         const datagridreset = initialDatagridState();
+        draft.datagrid_query_estimated_count =
+          datagridreset.datagrid_query_estimated_count;
+        draft.datagrid_page_index = datagridreset.datagrid_page_index;
         draft.datagrid_selected_rows = datagridreset.datagrid_selected_rows;
-        draft.datagrid_filter = datagridreset.datagrid_filter;
+        draft.datagrid_local_filter = datagridreset.datagrid_local_filter;
         draft.datagrid_orderby = datagridreset.datagrid_orderby;
 
         if (draft.doctype === "v0_form") {
@@ -716,6 +755,11 @@ export function reducer(
     case "editor/data-grid/delete/selected": {
       const {} = <DataGridDeleteSelectedRows>action;
       return produce(state, (draft) => {
+        // adjust the query count
+        draft.datagrid_query_estimated_count =
+          (draft.datagrid_query_estimated_count || 0) -
+          state.datagrid_selected_rows.size;
+
         switch (draft.datagrid_table_id) {
           case EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID: {
             const ids = Array.from(state.datagrid_selected_rows);
@@ -822,12 +866,13 @@ export function reducer(
         draft.datetz = tz;
       });
     }
+    // #region datagrid query
     case "editor/data-grid/filter": {
-      const { type, ...pref } = <DataGridFilterAction>action;
+      const { type, ...pref } = <DataGridLocalFilterAction>action;
 
       return produce(state, (draft) => {
-        draft.datagrid_filter = {
-          ...draft.datagrid_filter,
+        draft.datagrid_local_filter = {
+          ...draft.datagrid_local_filter,
           ...pref,
         };
       });
@@ -846,12 +891,41 @@ export function reducer(
         };
       });
     }
-    case "editor/data-grid/orderby/reset": {
-      const {} = <DataGridOrderByResetAction>action;
+    case "editor/data-grid/orderby/clear": {
+      const {} = <DataGridOrderByClearAction>action;
       return produce(state, (draft) => {
         draft.datagrid_orderby = {};
       });
     }
+    case "editor/data-grid/predicates/add": {
+      const { predicate } = <DataGridPredicatesAddAction>action;
+      return produce(state, (draft) => {
+        draft.datagrid_predicates.push(predicate);
+      });
+    }
+    case "editor/data-grid/predicates/update": {
+      const { index, predicate } = <DataGridPredicatesUpdateAction>action;
+      return produce(state, (draft) => {
+        const prev = draft.datagrid_predicates[index];
+        draft.datagrid_predicates[index] = {
+          ...prev,
+          ...predicate,
+        };
+      });
+    }
+    case "editor/data-grid/predicates/remove": {
+      const { index } = <DataGridPredicatesRemoveAction>action;
+      return produce(state, (draft) => {
+        draft.datagrid_predicates.splice(index, 1);
+      });
+    }
+    case "editor/data-grid/predicates/clear": {
+      const {} = <DataGridPredicatesClearAction>action;
+      return produce(state, (draft) => {
+        draft.datagrid_predicates = [];
+      });
+    }
+    // #endregion datagrid query
     case "editor/data-grid/refresh": {
       const {} = <DataTableRefreshAction>action;
 
@@ -975,11 +1049,13 @@ export function reducer(
       });
     }
     case "editor/table/space/feed/x-supabase": {
-      const { data, table_id } = <FeedXSupabaseMainTableRowsAction>action;
+      const { data, count, table_id } = <FeedXSupabaseMainTableRowsAction>(
+        action
+      );
 
       return produce(state, (draft) => {
         draft.tablespace[table_id].stream = data;
-        return;
+        draft.datagrid_query_estimated_count = count;
       });
       //
     }

@@ -27,6 +27,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { ArrowDownUpIcon } from "lucide-react";
 import { cn } from "@/utils";
 import { PopoverClose } from "@radix-ui/react-popover";
@@ -34,6 +39,8 @@ import {
   GDocFormsXSBTable,
   GDocSchemaTableProviderXSupabase,
 } from "@/scaffolds/editor/state";
+import { IconButtonDotBadge } from "./dotbadge";
+import { WorkbenchUI } from "@/components/workbench";
 
 /**
  * this can also be used for form query, but at this moment, form does not have a db level field sorting query.
@@ -58,8 +65,8 @@ export function XSupaDataGridSort() {
   const usedkeys = Object.keys(datagrid_orderby);
   const unusedkeys = keys.filter((key) => !usedkeys.includes(key));
 
-  const onReset = useCallback(() => {
-    dispatch({ type: "editor/data-grid/orderby/reset" });
+  const onClear = useCallback(() => {
+    dispatch({ type: "editor/data-grid/orderby/clear" });
   }, [dispatch]);
 
   const onAdd = useCallback(
@@ -97,21 +104,27 @@ export function XSupaDataGridSort() {
 
   return (
     <Popover modal>
-      <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className={cn(
-            "relative",
-            "text-muted-foreground",
-            isset && " text-accent-foreground"
-          )}
-        >
-          <ArrowDownUpIcon className="w-4 h-4 text-muted-foreground" />
-          {isset && (
-            <DotIcon className="absolute top-0.5 right-0.5 text-blue-500" />
-          )}
-        </Button>
+      <PopoverTrigger>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn(
+                "relative",
+                "text-muted-foreground",
+                isset && " text-accent-foreground"
+              )}
+            >
+              <ArrowDownUpIcon
+                data-state={isset ? "on" : "off"}
+                className="w-4 h-4 text-muted-foreground data-[state='on']:text-workbench-accent-1"
+              />
+              {isset && <IconButtonDotBadge />}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Sort</TooltipContent>
+        </Tooltip>
       </PopoverTrigger>
       <PopoverContent className="p-2 w-full">
         <section className="py-2" hidden={!isset}>
@@ -129,7 +142,12 @@ export function XSupaDataGridSort() {
                           onUpdate(value, orderby);
                         }}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger
+                          className={WorkbenchUI.selectVariants({
+                            variant: "trigger",
+                            size: "sm",
+                          })}
+                        >
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -150,7 +168,12 @@ export function XSupaDataGridSort() {
                           });
                         }}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger
+                          className={WorkbenchUI.selectVariants({
+                            variant: "trigger",
+                            size: "sm",
+                          })}
+                        >
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -174,7 +197,7 @@ export function XSupaDataGridSort() {
         </section>
         <section className="flex flex-col">
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+            <DropdownMenuTrigger asChild className="min-w-40">
               <Button variant="ghost" size="sm" className="flex justify-start">
                 <PlusIcon className="w-4 h-4 me-2 align-middle" /> Pick a column
                 to sort by
@@ -197,7 +220,7 @@ export function XSupaDataGridSort() {
                 variant="ghost"
                 size="sm"
                 className="flex justify-start"
-                onClick={onReset}
+                onClick={onClear}
               >
                 <TrashIcon className="w-4 h-4 me-2 align-middle" /> Delete sort
               </Button>

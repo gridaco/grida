@@ -19,7 +19,8 @@ import type {
   FormsPageLanguage,
   GDocumentType,
   GridaXSupabase,
-  OrderBy,
+  SQLOrderBy,
+  SQLPredicate,
 } from "@/types";
 import { SYM_LOCALTZ, EditorSymbols } from "./symbols";
 import { ZodObject } from "zod";
@@ -94,7 +95,7 @@ export interface FormDocumentEditorInit extends BaseDocumentEditorInit {
   fields: FormFieldDefinition[];
 }
 
-export interface DataGridFilterSettings {
+export interface DataGridLocalFilter {
   localsearch?: string; // local search uses fuse.js to available data
   masking_enabled: boolean;
   empty_data_hidden: boolean;
@@ -119,41 +120,41 @@ type GDocTableBase = {
 export type GDocTable = GDocTableBase &
   (
     | {
-        provider: "grida";
         id: typeof EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID;
+        provider: "grida";
       }
     | {
-        provider: "custom";
         id: typeof EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID;
+        provider: "custom";
       }
     | {
-        provider: "custom";
         id: typeof EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID;
+        provider: "custom";
       }
     | GDocFormsXSBTable
     | {
-        provider: "x-supabase";
         id: typeof EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID;
+        provider: "x-supabase-auth";
       }
     | GDocSchemaTable
   );
 
 export type GDocFormsXSBTable = {
-  provider: "x-supabase";
   id: typeof EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID;
+  provider: "x-supabase";
   x_sb_main_table_connection: TableXSBMainTableConnection;
 } & GDocTableBase;
 
 export type GDocSchemaTableProviderGrida = {
-  provider: "grida";
   id: string;
+  provider: "grida";
   attributes: Array<AttributeDefinition>;
   readonly: false;
 } & GDocTableBase;
 
 export type GDocSchemaTableProviderXSupabase = {
-  provider: "x-supabase";
   id: string;
+  provider: "x-supabase";
   attributes: Array<AttributeDefinition>;
   x_sb_main_table_connection: TableXSBMainTableConnection;
 } & GDocTableBase;
@@ -197,13 +198,26 @@ export type TableType =
 export interface IDataGridState {
   /**
    * @global rows per page is not saved per table
+   *
+   * a.k.a limit
    */
-  datagrid_rows_per_page: number;
+  datagrid_page_limit: number;
+  /**
+   * @global current page index - shall be display with +1
+   *
+   * @default 0
+   */
+  datagrid_page_index: number;
+  /**
+   * @global total rows count, also used for pagination (uses 'estimated' for counting - for performance reasons)
+   */
+  datagrid_query_estimated_count: number | null;
   datagrid_table_id: GDocTableID | null;
   datagrid_table_refresh_key: number;
   datagrid_isloading: boolean;
-  datagrid_filter: DataGridFilterSettings;
-  datagrid_orderby: { [key: string]: OrderBy };
+  datagrid_local_filter: DataGridLocalFilter;
+  datagrid_predicates: Array<SQLPredicate>;
+  datagrid_orderby: { [key: string]: SQLOrderBy };
   datagrid_selected_rows: Set<string>;
 }
 

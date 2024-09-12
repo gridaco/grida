@@ -13,7 +13,7 @@ export function GridCount({
       {count === undefined ? (
         <Spinner />
       ) : (
-        <span className="text-sm font-medium text-muted-foreground">
+        <span className="text-xs font-normal text-muted-foreground">
           {txt_n_plural(count, keyword)}
         </span>
       )}

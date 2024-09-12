@@ -5,7 +5,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { inputVariants } from "./utils/input-variants";
+import { WorkbenchUI } from "@/components/workbench";
 
 type JustifyContent =
   | "start"
@@ -26,7 +26,7 @@ export function JustifyContentControl({
       value={value}
       onValueChange={(v) => onValueChange?.(v as JustifyContent)}
     >
-      <SelectTrigger className={inputVariants({ size: "sm" })}>
+      <SelectTrigger className={WorkbenchUI.inputVariants({ size: "sm" })}>
         <SelectValue placeholder="Select..." />
       </SelectTrigger>
       <SelectContent>

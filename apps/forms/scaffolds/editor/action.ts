@@ -11,6 +11,7 @@ import type {
   FormStyleSheetV1Schema,
   FormsPageLanguage,
   GridaXSupabase,
+  SQLPredicate,
 } from "@/types";
 import type {
   EditorFlatFormBlock,
@@ -48,7 +49,7 @@ export type BlocksEditorAction =
   | TableAttributeDeleteAction
   | TablespaceFeedAction
   | OpenResponseEditAction
-  | DataGridRowsAction
+  | DataGridPaginationAction
   | FeedResponseSessionsAction
   | DataGridTableAction
   | FeedCustomerAction
@@ -57,9 +58,7 @@ export type BlocksEditorAction =
   | DataGridReorderColumnAction
   | DataGridDateFormatAction
   | DataGridDateTZAction
-  | DataGridFilterAction
-  | DataGridOrderByAction
-  | DataGridOrderByResetAction
+  | DataGridQueryAction
   | DataTableRefreshAction
   | DataTableLoadingAction
   | DataGridCellChangeAction
@@ -206,12 +205,17 @@ export interface TableAttributeDeleteAction {
   field_id: string;
 }
 
-export interface TablespaceFeedAction {
+export type TablespaceFeedAction = {
   type: "editor/table/space/feed";
   table_id: GDocTableID;
   data: FormResponseWithFields[];
-  reset?: boolean;
-}
+} & (
+  | {
+      count: number;
+      reset: true;
+    }
+  | { reset?: false }
+);
 
 export interface SelectResponse {
   type: "editor/response/select";
@@ -223,11 +227,10 @@ export interface DeleteResponseAction {
   id: string;
 }
 
-export interface FeedResponseSessionsAction {
+export type FeedResponseSessionsAction = {
   type: "editor/data/sessions/feed";
   data: FormResponse[];
-  reset?: boolean;
-}
+} & ({ reset?: false } | { reset: true; count: number });
 
 export interface OpenResponseEditAction {
   type: "editor/responses/edit";
@@ -284,17 +287,33 @@ export type DataGridTableAction = {
     }
 );
 
-export interface DataGridRowsAction {
-  type: "editor/data-grid/rows";
-  rows: number;
+type DataGridPaginationAction = DataGridRowsPerPageAction | DataGridPageAction;
+
+export interface DataGridRowsPerPageAction {
+  type: "editor/data-grid/rows-per-page";
+  limit: number;
+}
+
+export interface DataGridPageAction {
+  type: "editor/data-grid/page";
+  index: number;
 }
 
 export interface DataGridDeleteSelectedRows {
   type: "editor/data-grid/delete/selected";
 }
 
-export interface DataGridFilterAction
-  extends Partial<EditorState["datagrid_filter"]> {
+type DataGridQueryAction =
+  | DataGridLocalFilterAction
+  | DataGridOrderByAction
+  | DataGridOrderByClearAction
+  | DataGridPredicatesAddAction
+  | DataGridPredicatesUpdateAction
+  | DataGridPredicatesRemoveAction
+  | DataGridPredicatesClearAction;
+
+export interface DataGridLocalFilterAction
+  extends Partial<EditorState["datagrid_local_filter"]> {
   type: "editor/data-grid/filter";
 }
 
@@ -307,8 +326,28 @@ export interface DataGridOrderByAction {
   } | null;
 }
 
-export interface DataGridOrderByResetAction {
-  type: "editor/data-grid/orderby/reset";
+export interface DataGridOrderByClearAction {
+  type: "editor/data-grid/orderby/clear";
+}
+
+export interface DataGridPredicatesAddAction {
+  type: "editor/data-grid/predicates/add";
+  predicate: SQLPredicate;
+}
+
+export interface DataGridPredicatesUpdateAction {
+  type: "editor/data-grid/predicates/update";
+  index: number;
+  predicate: Partial<SQLPredicate>;
+}
+
+export interface DataGridPredicatesRemoveAction {
+  type: "editor/data-grid/predicates/remove";
+  index: number;
+}
+
+export interface DataGridPredicatesClearAction {
+  type: "editor/data-grid/predicates/clear";
 }
 
 export interface DataTableRefreshAction {
@@ -332,6 +371,7 @@ export interface FeedXSupabaseMainTableRowsAction {
   type: "editor/table/space/feed/x-supabase";
   table_id: GDocTableID;
   data: GridaXSupabase.XDataRow[];
+  count: number;
 }
 
 export interface EditorThemeLangAction {

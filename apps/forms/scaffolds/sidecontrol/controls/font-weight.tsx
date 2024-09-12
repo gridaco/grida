@@ -6,7 +6,7 @@ import {
   SelectItem,
   SelectValue,
 } from "@/components/ui/select";
-import { inputVariants } from "./utils/input-variants";
+import { WorkbenchUI } from "@/components/workbench";
 
 type FontWeight = 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900;
 
@@ -24,7 +24,7 @@ export function FontWeightControl({
         onValueChange?.(parseInt(v) as FontWeight);
       }}
     >
-      <SelectTrigger className={inputVariants({ size: "sm" })}>
+      <SelectTrigger className={WorkbenchUI.inputVariants({ size: "sm" })}>
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

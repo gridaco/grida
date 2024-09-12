@@ -5,6 +5,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { WorkbenchUI } from "@/components/workbench";
 import { useEditorState } from "@/scaffolds/editor";
 
 export function GridLimit() {
@@ -13,15 +14,20 @@ export function GridLimit() {
   return (
     <div>
       <Select
-        value={state.datagrid_rows_per_page + ""}
+        value={state.datagrid_page_limit + ""}
         onValueChange={(value) => {
           dispatch({
-            type: "editor/data-grid/rows",
-            rows: parseInt(value),
+            type: "editor/data-grid/rows-per-page",
+            limit: parseInt(value),
           });
         }}
       >
-        <SelectTrigger>
+        <SelectTrigger
+          className={WorkbenchUI.selectVariants({
+            variant: "trigger",
+            size: "sm",
+          })}
+        >
           <SelectValue placeholder="rows" />
         </SelectTrigger>
         <SelectContent>
