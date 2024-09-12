@@ -5,6 +5,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { WorkbenchUI } from "@/components/workbench";
 import { useEditorState } from "@/scaffolds/editor";
 
 export function GridLimit() {
@@ -21,7 +22,12 @@ export function GridLimit() {
           });
         }}
       >
-        <SelectTrigger>
+        <SelectTrigger
+          className={WorkbenchUI.selectVariants({
+            variant: "trigger",
+            size: "sm",
+          })}
+        >
           <SelectValue placeholder="rows" />
         </SelectTrigger>
         <SelectContent>

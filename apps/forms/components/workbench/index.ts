@@ -18,19 +18,21 @@ export namespace WorkbenchUI {
     },
   });
 
-  export const selectVariants = cva(
-    "flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
-    {
-      variants: {
-        size: {
-          sm: "text-xs h-8 px-2 min-w-none",
-        },
+  export const selectVariants = cva("", {
+    variants: {
+      variant: {
+        trigger:
+          "flex h-8 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
       },
-      defaultVariants: {
-        size: "sm",
+      size: {
+        sm: "h-8 text-xs",
       },
-    }
-  );
+    },
+    defaultVariants: {
+      variant: "trigger",
+      size: "sm",
+    },
+  });
 
   export const buttonVariants = cva(
     "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
