@@ -40,9 +40,11 @@ export namespace XPostgrestQuery {
       limit,
       order,
       filters,
+      range,
     }: {
       columns?: string;
       limit?: number;
+      range?: { from: number; to: number };
       order?: { [col: string]: SQLOrderBy };
       filters?: ReadonlyArray<SQLPredicate>;
     }) {
@@ -55,6 +57,8 @@ export namespace XPostgrestQuery {
 
       // limit
       if (limit) f = f.limit(limit);
+
+      if (range) f = f.range(range.from, range.to);
 
       // order
       if (order) {
@@ -147,8 +151,20 @@ export class XSupabaseClientQueryBuilder {
     return this;
   }
 
-  select(columns: string) {
-    this.builder = this.builder!.select(columns);
+  select(
+    columns: string,
+    {
+      head = false,
+      count,
+    }: {
+      head?: boolean;
+      count?: "exact" | "planned" | "estimated";
+    } = {}
+  ) {
+    this.builder = this.builder!.select(columns, {
+      head,
+      count,
+    });
     return this;
   }
 

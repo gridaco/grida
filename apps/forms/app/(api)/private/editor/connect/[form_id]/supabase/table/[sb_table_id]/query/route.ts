@@ -47,10 +47,13 @@ export async function GET(req: NextRequest, context: Context) {
   const query = new XSupabaseClientQueryBuilder(x_client);
 
   query.from(main_supabase_table.sb_table_name);
-  query.select("*");
+  query.select("*", {
+    // use estimated count for performance
+    count: "estimated",
+  });
   query.fromSearchParams(searchParams);
 
-  const { data, error } = await query.done();
+  const { data, count, error } = await query.done();
 
   if (error) {
     console.error("query ERR", error);
@@ -75,6 +78,7 @@ export async function GET(req: NextRequest, context: Context) {
   });
 
   return NextResponse.json({
+    count,
     data: datawithstorage,
     error,
   });

@@ -56,6 +56,7 @@ import {
 import { saveAs } from "file-saver";
 import Papa from "papaparse";
 import { XSupaDataGridFilter } from "./components/filter";
+import { GridPagination } from "./components/pagination";
 
 export function GridEditor({
   systemcolumns,
@@ -83,6 +84,7 @@ export function GridEditor({
   const row_keyword = tb?.row_keyword ?? "row";
   const has_selected_rows = datagrid_selected_rows.size > 0;
   const selectionDisabled = selection !== "on";
+  const count = state.datagrid_query_estimated_count;
 
   const onClearSelection = useCallback(() => {
     dispatch({
@@ -244,9 +246,11 @@ export function GridEditor({
       </GridLayout.Content>
       <GridLayout.Footer>
         <div className="flex gap-4 items-center">
+          <GridPagination />
           <GridLimit />
-          <GridCount count={rows?.length} keyword={row_keyword} />
         </div>
+        <GridLayout.FooterSeparator />
+        <GridCount count={count ?? rows?.length} keyword="record" />
         <GridLayout.FooterSeparator />
         <GridRefresh />
         {state.doctype === "v0_form" && tb?.provider === "grida" && (

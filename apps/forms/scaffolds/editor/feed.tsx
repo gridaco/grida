@@ -12,7 +12,10 @@ import {
   createClientFormsClient,
   createClientWorkspaceClient,
 } from "@/lib/supabase/client";
-import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
+import {
+  PostgrestSingleResponse,
+  RealtimePostgresChangesPayload,
+} from "@supabase/supabase-js";
 import useSWR from "swr";
 import type { EditorApiResponse } from "@/types/private/api";
 import type { FormResponse, FormResponseField, GridaXSupabase } from "@/types";
@@ -260,7 +263,7 @@ function useXSBTableFeed(
   }: {
     table_id: string;
     sb_table_id?: number | null;
-    onFeed?: (data: GridaXSupabase.XDataRow[]) => void;
+    onFeed?: (data: GridaXSupabase.XDataRow[], count: number) => void;
   },
   dpes?: React.DependencyList
 ) {
@@ -298,7 +301,7 @@ function useXSBTableFeed(
       )
     : null;
 
-  const res = useSWR<EditorApiResponse<GridaXSupabase.XDataRow[], any>>(
+  const res = useSWR<PostgrestSingleResponse<GridaXSupabase.XDataRow[]>>(
     request,
     async (url: string) => {
       const res = await fetch(url);
@@ -331,7 +334,7 @@ function useXSBTableFeed(
   useEffect(() => {
     if (res.data?.data) {
       const rows = res.data.data;
-      onFeed?.(rows);
+      onFeed?.(rows, res.data.count!);
     }
   }, [res.data]);
 }
@@ -707,12 +710,13 @@ export function FormXSupabaseMainTableFeedProvider({
     {
       table_id: state.form.form_id,
       sb_table_id: state.connections.supabase?.main_supabase_table_id,
-      onFeed: (rows) => {
+      onFeed: (rows, count) => {
         dispatch({
           type: "editor/table/space/feed/x-supabase",
           table_id:
             EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID,
           data: rows,
+          count,
         });
       },
     },
@@ -884,11 +888,12 @@ export function GridaSchemaXSBTableFeedProvider({
   useXSBTableFeed({
     table_id: table_id,
     sb_table_id: sb_table_id,
-    onFeed: (rows) => {
+    onFeed: (rows, count) => {
       dispatch({
         type: "editor/table/space/feed/x-supabase",
         table_id: table_id,
         data: rows,
+        count,
       });
     },
   });

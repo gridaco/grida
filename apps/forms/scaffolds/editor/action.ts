@@ -49,7 +49,7 @@ export type BlocksEditorAction =
   | TableAttributeDeleteAction
   | TablespaceFeedAction
   | OpenResponseEditAction
-  | DataGridRowsAction
+  | DataGridPaginationAction
   | FeedResponseSessionsAction
   | DataGridTableAction
   | FeedCustomerAction
@@ -283,9 +283,16 @@ export type DataGridTableAction = {
     }
 );
 
-export interface DataGridRowsAction {
-  type: "editor/data-grid/rows";
-  rows: number;
+type DataGridPaginationAction = DataGridRowsPerPageAction | DataGridPageAction;
+
+export interface DataGridRowsPerPageAction {
+  type: "editor/data-grid/rows-per-page";
+  limit: number;
+}
+
+export interface DataGridPageAction {
+  type: "editor/data-grid/page";
+  index: number;
 }
 
 export interface DataGridDeleteSelectedRows {
@@ -360,6 +367,7 @@ export interface FeedXSupabaseMainTableRowsAction {
   type: "editor/table/space/feed/x-supabase";
   table_id: GDocTableID;
   data: GridaXSupabase.XDataRow[];
+  count: number;
 }
 
 export interface EditorThemeLangAction {

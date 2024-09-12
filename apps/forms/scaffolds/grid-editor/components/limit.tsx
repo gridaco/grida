@@ -16,8 +16,8 @@ export function GridLimit() {
         value={state.datagrid_rows_per_page + ""}
         onValueChange={(value) => {
           dispatch({
-            type: "editor/data-grid/rows",
-            rows: parseInt(value),
+            type: "editor/data-grid/rows-per-page",
+            limit: parseInt(value),
           });
         }}
       >

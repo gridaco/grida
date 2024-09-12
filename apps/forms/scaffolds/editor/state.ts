@@ -198,8 +198,20 @@ export type TableType =
 export interface IDataGridState {
   /**
    * @global rows per page is not saved per table
+   *
+   * a.k.a limit
    */
   datagrid_rows_per_page: number;
+  /**
+   * @global current page index - shall be display with +1
+   *
+   * @default 0
+   */
+  datagrid_page_index: number;
+  /**
+   * @global total rows count, also used for pagination (uses 'estimated' for counting - for performance reasons)
+   */
+  datagrid_query_estimated_count: number | null;
   datagrid_table_id: GDocTableID | null;
   datagrid_table_refresh_key: number;
   datagrid_isloading: boolean;

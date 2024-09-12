@@ -36,7 +36,8 @@ import type {
   OpenEditFieldAction,
   OpenResponseEditAction,
   ResolvePendingBlockAction,
-  DataGridRowsAction,
+  DataGridRowsPerPageAction,
+  DataGridPageAction,
   TableAttributeChangeAction,
   SelectResponse,
   DataGridTableAction,
@@ -569,10 +570,16 @@ export function reducer(
         draft.datagrid_selected_rows = new_selected_responses;
       });
     }
-    case "editor/data-grid/rows": {
-      const { rows: max } = <DataGridRowsAction>action;
+    case "editor/data-grid/rows-per-page": {
+      const { limit: max } = <DataGridRowsPerPageAction>action;
       return produce(state, (draft) => {
         draft.datagrid_rows_per_page = max;
+      });
+    }
+    case "editor/data-grid/page": {
+      const { index } = <DataGridPageAction>action;
+      return produce(state, (draft) => {
+        draft.datagrid_page_index = index;
       });
     }
     case "editor/table/space/feed": {
@@ -705,6 +712,9 @@ export function reducer(
 
         // clear datagrid state
         const datagridreset = initialDatagridState();
+        draft.datagrid_query_estimated_count =
+          datagridreset.datagrid_query_estimated_count;
+        draft.datagrid_page_index = datagridreset.datagrid_page_index;
         draft.datagrid_selected_rows = datagridreset.datagrid_selected_rows;
         draft.datagrid_local_filter = datagridreset.datagrid_local_filter;
         draft.datagrid_orderby = datagridreset.datagrid_orderby;
@@ -1009,11 +1019,13 @@ export function reducer(
       });
     }
     case "editor/table/space/feed/x-supabase": {
-      const { data, table_id } = <FeedXSupabaseMainTableRowsAction>action;
+      const { data, count, table_id } = <FeedXSupabaseMainTableRowsAction>(
+        action
+      );
 
       return produce(state, (draft) => {
         draft.tablespace[table_id].stream = data;
-        return;
+        draft.datagrid_query_estimated_count = count;
       });
       //
     }
