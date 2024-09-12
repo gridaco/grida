@@ -19,6 +19,7 @@ import { useEffect, useMemo } from "react";
 import { CurrentTable } from "@/scaffolds/editor/utils/switch-table";
 import { GridData } from "@/scaffolds/grid-editor/grid-data";
 import { EditorSymbols } from "@/scaffolds/editor/symbols";
+import { XPostgrestQuery } from "@/lib/supabase-postgrest/builder";
 import useSWR from "swr";
 
 export default function XTablePage() {
@@ -26,19 +27,22 @@ export default function XTablePage() {
 
   const {
     supabase_project,
-    datagrid_rows_per_page,
+    datagrid_page_limit,
     datagrid_orderby,
     datagrid_table_refresh_key,
     datagrid_isloading,
   } = state;
 
   const serachParams = useMemo(() => {
-    return PrivateEditorApi.SupabaseQuery.makeQueryParams({
-      limit: datagrid_rows_per_page,
+    const search = XPostgrestQuery.QS.select({
+      limit: datagrid_page_limit,
       order: datagrid_orderby,
-      refreshKey: datagrid_table_refresh_key,
+      // cannot apply filter to auth.users
+      filters: undefined,
     });
-  }, [datagrid_rows_per_page, datagrid_orderby, datagrid_table_refresh_key]);
+    search.set("r", datagrid_table_refresh_key.toString());
+    return search;
+  }, [datagrid_page_limit, datagrid_orderby, datagrid_table_refresh_key]);
 
   const request = supabase_project
     ? PrivateEditorApi.XSupabase.url_x_auth_users_get(
@@ -88,13 +92,13 @@ export default function XTablePage() {
 
   const { filtered, inputlength } = useMemo(() => {
     return GridData.rows({
-      filter: state.datagrid_filter,
+      filter: state.datagrid_local_filter,
       table: EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID,
       data: {
         rows: data?.data?.users ?? [],
       },
     });
-  }, [data, state.datagrid_filter]);
+  }, [data, state.datagrid_local_filter]);
 
   return (
     <CurrentTable
@@ -112,10 +116,10 @@ export default function XTablePage() {
         </GridLayout.Header>
         <GridLayout.Content>
           <ReferenceTableGrid
-            masked={state.datagrid_filter.masking_enabled}
+            masked={state.datagrid_local_filter.masking_enabled}
             tokens={
-              state.datagrid_filter.localsearch
-                ? [state.datagrid_filter.localsearch]
+              state.datagrid_local_filter.localsearch
+                ? [state.datagrid_local_filter.localsearch]
                 : []
             }
             columns={columns}

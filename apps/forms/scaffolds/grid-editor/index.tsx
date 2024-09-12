@@ -55,9 +55,9 @@ import {
 } from "@/scaffolds/editor/use";
 import { saveAs } from "file-saver";
 import Papa from "papaparse";
-import { TVirtualRow } from "../editor/state";
-import { FormResponseField } from "@/types";
 import { Gallery } from "../table-view-gallery/gallery";
+import { XSupaDataGridFilter } from "./components/filter";
+import { GridPagination } from "./components/pagination";
 
 export function GridEditor({
   systemcolumns,
@@ -86,6 +86,7 @@ export function GridEditor({
   const row_keyword = tb?.row_keyword ?? "row";
   const has_selected_rows = datagrid_selected_rows.size > 0;
   const selectionDisabled = selection !== "on";
+  const count = state.datagrid_query_estimated_count;
 
   const onClearSelection = useCallback(() => {
     dispatch({
@@ -254,9 +255,11 @@ export function GridEditor({
       )}
       <GridLayout.Footer>
         <div className="flex gap-4 items-center">
+          <GridPagination />
           <GridLimit />
-          <GridCount count={rows?.length} keyword={row_keyword} />
         </div>
+        <GridLayout.FooterSeparator />
+        <GridCount count={count ?? rows?.length} keyword="record" />
         <GridLayout.FooterSeparator />
         <GridRefresh />
         {state.doctype === "v0_form" && tb?.provider === "grida" && (
@@ -421,7 +424,12 @@ function TableQuery() {
   return (
     <div className="flex items-center gap-1">
       <GridLocalSearch />
-      {"x_sb_main_table_connection" in tb && <XSupaDataGridSort />}
+      {"x_sb_main_table_connection" in tb && (
+        <>
+          <XSupaDataGridFilter />
+          <XSupaDataGridSort />
+        </>
+      )}
     </div>
   );
 }
@@ -524,11 +532,8 @@ function DeleteSelectedRowsButton({
 
   const delete_selected_rows = useDeleteSelectedSchemaTableRows();
 
-  const delete_selected_x_supabase_main_table_rows = useCallback(() => {
-    if (
-      !db_table_id ||
-      tb?.id !== EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID
-    ) {
+  const delete_selected_x_supabase_table_rows = useCallback(() => {
+    if (!db_table_id || tb?.provider !== "x-supabase") {
       toast.error("Something went wrong. Please refresh the page.");
       return;
     }
@@ -538,7 +543,7 @@ function DeleteSelectedRowsButton({
       return;
     }
 
-    const res = PrivateEditorApi.SupabaseQuery.qdelete({
+    const res = PrivateEditorApi.SupabaseQuery.delete_request({
       form_id: db_table_id,
       main_table_id: tb.x_sb_main_table_connection.sb_table_id,
       filters: [
@@ -565,6 +570,18 @@ function DeleteSelectedRowsButton({
     });
   }, [tb, db_table_id, datagrid_selected_rows, dispatch]);
 
+  const delete_selected_x_supabase_main_table_rows = useCallback(() => {
+    if (
+      !db_table_id ||
+      tb?.id !== EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID
+    ) {
+      toast.error("Something went wrong. Please refresh the page.");
+      return;
+    }
+
+    return delete_selected_x_supabase_table_rows();
+  }, [tb?.id, db_table_id, delete_selected_x_supabase_table_rows]);
+
   const onDeleteSelection = useCallback(() => {
     switch (datagrid_table_id) {
       case EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID:
@@ -577,12 +594,24 @@ function DeleteSelectedRowsButton({
         delete_selected_x_supabase_main_table_rows();
         break;
       default:
-        delete_selected_rows();
+        switch (tb?.provider) {
+          case "x-supabase":
+            delete_selected_x_supabase_table_rows();
+            break;
+          case "grida":
+            delete_selected_rows();
+            break;
+          default:
+            toast.error("Something went wrong. Please refresh the page.");
+            break;
+        }
         break;
     }
   }, [
+    tb?.provider,
     datagrid_table_id,
     delete_selected_rows,
+    delete_selected_x_supabase_table_rows,
     delete_selected_x_supabase_main_table_rows,
   ]);
 

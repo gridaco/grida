@@ -1,5 +1,5 @@
 import { Input } from "@/components/ui/input";
-import { inputVariants } from "./utils/input-variants";
+import { WorkbenchUI } from "@/components/workbench";
 
 export function MarginControl({
   value = 0,
@@ -14,7 +14,7 @@ export function MarginControl({
       value={value}
       placeholder="inherit"
       step={1}
-      className={inputVariants({ size: "sm" })}
+      className={WorkbenchUI.inputVariants({ size: "sm" })}
       onChange={(e) => {
         onValueChange?.(parseInt(e.target.value));
       }}

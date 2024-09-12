@@ -83,14 +83,17 @@ export function initialDatagridState(): Omit<
 > {
   return {
     datagrid_selected_rows: new Set(),
-    datagrid_rows_per_page: 100,
+    datagrid_page_limit: 100,
+    datagrid_query_estimated_count: null,
+    datagrid_page_index: 0,
     datagrid_table_refresh_key: 0,
     datagrid_isloading: false,
-    datagrid_filter: {
+    datagrid_local_filter: {
       masking_enabled: false,
       empty_data_hidden: true,
     },
     datagrid_orderby: {},
+    datagrid_predicates: [],
   };
 }
 
@@ -141,7 +144,7 @@ function initialDatabaseEditorState(
   const tables: GDocTable[] = [...init.tables.map(schematableinit)];
 
   const sb_auth_users = {
-    provider: "x-supabase",
+    provider: "x-supabase-auth",
     id: EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID,
     row_keyword: "user",
     icon: "supabase",
