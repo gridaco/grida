@@ -629,6 +629,11 @@ export function schematableinit(table: {
           type: "gallery",
           label: "Gallery",
         },
+        {
+          id: "chart",
+          type: "chart",
+          label: "Chart",
+        },
       ],
     } satisfies GDocSchemaTable;
   }

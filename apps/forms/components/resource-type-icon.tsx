@@ -17,6 +17,8 @@ import {
   Code2Icon,
   AppWindowIcon,
   LanguagesIcon,
+  LineChartIcon,
+  BarChartIcon,
 } from "lucide-react";
 import { SupabaseLogo } from "./logos";
 
@@ -36,6 +38,9 @@ export type ResourceTypeIconName =
   | "view-list"
   | "list"
   | "chart"
+  | "chart-bar"
+  | "chart-line"
+  | "chart-pie"
   | "commerce"
   | "user"
   | "i18n"
@@ -77,6 +82,12 @@ export function ResourceTypeIcon({
     case "form":
       return <FileBarChart2 {...props} />;
     case "chart":
+      return <PieChartIcon {...props} />;
+    case "chart-bar":
+      return <BarChartIcon {...props} />;
+    case "chart-line":
+      return <LineChartIcon {...props} />;
+    case "chart-pie":
       return <PieChartIcon {...props} />;
     case "v0_site":
       return <AppWindowIcon {...props} />;
