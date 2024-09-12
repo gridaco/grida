@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/tooltip";
 import { SQLFilterOperator, SQLPredicate } from "@/types";
 import { Input } from "@/components/ui/input";
+import { WorkbenchUI } from "@/components/workbench";
 
 const supported_operators: SQLFilterOperator[] = [
   "eq",
@@ -188,12 +189,17 @@ export function XSupaDataGridFilter() {
                           value={q.column}
                           onValueChange={(v) => onchange({ column: v })}
                         >
-                          <SelectTrigger>
+                          <SelectTrigger
+                            className={WorkbenchUI.selectVariants({
+                              variant: "trigger",
+                              size: "sm",
+                            })}
+                          >
                             <SelectValue>{q.column}</SelectValue>
                           </SelectTrigger>
                           <SelectContent>
                             {columnkeys.map((key) => (
-                              <SelectItem value={key}>
+                              <SelectItem value={key} key={key}>
                                 {key}{" "}
                                 <span className="ms-2 text-xs text-muted-foreground">
                                   {properties[key].format}
@@ -208,14 +214,19 @@ export function XSupaDataGridFilter() {
                           value={q.op}
                           onValueChange={(v) => onchange({ op: v as any })}
                         >
-                          <SelectTrigger>
+                          <SelectTrigger
+                            className={WorkbenchUI.selectVariants({
+                              variant: "trigger",
+                              size: "sm",
+                            })}
+                          >
                             <SelectValue>
                               {operator_labels[q.op].symbol}
                             </SelectValue>
                           </SelectTrigger>
                           <SelectContent>
                             {supported_operators.map((key) => (
-                              <SelectItem value={key}>
+                              <SelectItem value={key} key={key}>
                                 {key}
                                 <small className="ms-1 text-muted-foreground">
                                   {operator_labels[key].label}
@@ -230,6 +241,10 @@ export function XSupaDataGridFilter() {
                           placeholder="Enter a value"
                           value={q.value as string | undefined}
                           onChange={(e) => onchange({ value: e.target.value })}
+                          className={WorkbenchUI.inputVariants({
+                            variant: "input",
+                            size: "sm",
+                          })}
                         />
                       </div>
                     </div>
@@ -237,6 +252,10 @@ export function XSupaDataGridFilter() {
                       size="icon"
                       variant="outline"
                       onClick={() => remove(i)}
+                      className={WorkbenchUI.buttonVariants({
+                        variant: "outline",
+                        size: "icon",
+                      })}
                     >
                       <Cross2Icon />
                     </Button>

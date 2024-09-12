@@ -40,6 +40,7 @@ import {
   GDocSchemaTableProviderXSupabase,
 } from "@/scaffolds/editor/state";
 import { IconButtonDotBadge } from "./dotbadge";
+import { WorkbenchUI } from "@/components/workbench";
 
 /**
  * this can also be used for form query, but at this moment, form does not have a db level field sorting query.
@@ -141,7 +142,12 @@ export function XSupaDataGridSort() {
                           onUpdate(value, orderby);
                         }}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger
+                          className={WorkbenchUI.selectVariants({
+                            variant: "trigger",
+                            size: "sm",
+                          })}
+                        >
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -162,7 +168,12 @@ export function XSupaDataGridSort() {
                           });
                         }}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger
+                          className={WorkbenchUI.selectVariants({
+                            variant: "trigger",
+                            size: "sm",
+                          })}
+                        >
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
