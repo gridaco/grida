@@ -56,6 +56,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Chart } from "@/lib/chart";
+import { ChartPartialDataAlert } from "./warn-partial-data";
 
 /// TODO:
 // type switch
@@ -237,7 +238,7 @@ export function Chartview() {
   return (
     <div className="w-full h-full p-4">
       <div className="flex justify-between gap-4 h-full w-full">
-        <div className="flex-1 mx-auto w-full h-full max-w-xl flex items-center justify-center">
+        <div className="flex-1 flex-col gap-20 mx-auto w-full h-full max-w-xl flex items-center justify-center">
           <div className="w-full aspect-video">
             <DataChart
               type={renderer}
@@ -263,6 +264,7 @@ export function Chartview() {
               }}
             />
           </div>
+          <ChartPartialDataAlert />
         </div>
         <aside className="flex flex-col gap-4 max-w-xs">
           <ChartTypeToggleGroup value={renderer} onValueChange={changeType} />
@@ -420,7 +422,7 @@ function MainAxisQueryControl({
   attributes: { name: string; type: FormInputType }[];
 }) {
   const onKeyChange = (key: string) => {
-    onValueChange?.({ ...value, key });
+    onValueChange?.({ ...value, aggregate: "none", key });
   };
 
   return (
