@@ -606,7 +606,19 @@ export function schematableinit(table: {
       rules: {
         delete_restricted: false,
       },
-      views: [],
+      views: [
+        // DEV TODO: remove me
+        {
+          id: "gallery",
+          type: "gallery",
+          label: "Gallery",
+        },
+        {
+          id: "chart",
+          type: "chart",
+          label: "Chart",
+        },
+      ],
     } satisfies GDocSchemaTable;
   } else {
     return {
@@ -622,19 +634,7 @@ export function schematableinit(table: {
       rules: {
         delete_restricted: false,
       },
-      views: [
-        // DEV TODO: remove me
-        {
-          id: "gallery",
-          type: "gallery",
-          label: "Gallery",
-        },
-        {
-          id: "chart",
-          type: "chart",
-          label: "Chart",
-        },
-      ],
+      views: [],
     } satisfies GDocSchemaTable;
   }
 }

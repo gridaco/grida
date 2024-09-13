@@ -479,6 +479,12 @@ importers:
       csv-stringify:
         specifier: ^6.4.6
         version: 6.4.6
+      d3-array:
+        specifier: ^3.2.4
+        version: 3.2.4
+      d3-time:
+        specifier: ^3.1.0
+        version: 3.1.0
       date-fns:
         specifier: ^3.6.0
         version: 3.6.0
@@ -660,6 +666,12 @@ importers:
       '@types/css-tree':
         specifier: ^2.3.1
         version: 2.3.7
+      '@types/d3-array':
+        specifier: ^3.2.1
+        version: 3.2.1
+      '@types/d3-time':
+        specifier: ^3.0.3
+        version: 3.0.3
       '@types/deep-equal':
         specifier: ^1.0.4
         version: 1.0.4
@@ -21556,6 +21568,9 @@ packages:
     resolution: {integrity: sha512-Reoy+pKnvsksN0lQUlcH6dOGjRZ/3WRwXR//m+/8lt1BXeI4xyaUZoqULNjyXXRuh0Mj4LNpkCvhUpQlY3X5xQ==}
     dev: false
 
+  /@types/d3-array@3.2.1:
+    resolution: {integrity: sha512-Y2Jn2idRrLzUfAKV2LyRImR+y4oa2AntrgID95SHJxuMUrkNXmanDSed71sRNZysveJVt1hLLemQZIady0FpEg==}
+
   /@types/d3-cloud@1.2.5:
     resolution: {integrity: sha512-vEIER9DsEBUOdpRiwCh3n1qE+cV6h4e1LhxhY2sLt+m8LPNAIkOOhTlqk0JDiBwD+ZPM8ynFAOU3AuPuVYBFBA==}
     dependencies:
@@ -21627,7 +21642,7 @@ packages:
   /@types/d3-scale@4.0.2:
     resolution: {integrity: sha512-Yk4htunhPAwN0XGlIwArRomOjdoBFXC3+kCxK2Ubg7I9shQlVSJy/pG/Ht5ASN+gdMIalpk8TJ5xV74jFsetLA==}
     dependencies:
-      '@types/d3-time': 3.0.0
+      '@types/d3-time': 3.0.3
     dev: false
 
   /@types/d3-selection@3.0.10:
@@ -21657,6 +21672,9 @@ packages:
   /@types/d3-time@3.0.0:
     resolution: {integrity: sha512-sZLCdHvBUcNby1cB6Fd3ZBrABbjz3v1Vm90nysCQ6Vt7vd6e/h9Lt7SiJUoEX0l4Dzc7P5llKyhqSi1ycSf1Hg==}
     dev: false
+
+  /@types/d3-time@3.0.3:
+    resolution: {integrity: sha512-2p6olUZ4w3s+07q3Tm2dbiMZy5pCDfYwtLXXHUnVzXgQlZ/OyPtUz6OL382BkOuGlLXqfT+wqv8Fw2v8/0geBw==}
 
   /@types/d3-timer@3.0.2:
     resolution: {integrity: sha512-Ps3T8E8dZDam6fUyNiMkekK3XUsaUEik+idO9/YjPtfj2qruF8tFBXS7XhtE4iIXBLxhmLjP3SXpLhVf21I9Lw==}
@@ -45818,12 +45836,12 @@ packages:
   /victory-vendor@36.9.2:
     resolution: {integrity: sha512-PnpQQMuxlwYdocC8fIJqVXvkeViHYzotI+NJrCuav0ZYFoq912ZHBk3mCeuj+5/VpodOjPe1z0Fk2ihgzlXqjQ==}
     dependencies:
-      '@types/d3-array': 3.0.3
+      '@types/d3-array': 3.2.1
       '@types/d3-ease': 3.0.2
       '@types/d3-interpolate': 3.0.1
       '@types/d3-scale': 4.0.2
       '@types/d3-shape': 3.1.6
-      '@types/d3-time': 3.0.0
+      '@types/d3-time': 3.0.3
       '@types/d3-timer': 3.0.2
       d3-array: 3.2.4
       d3-ease: 3.0.1

@@ -33,6 +33,29 @@ import { useCallback, useReducer, useState } from "react";
 import produce from "immer";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
 import { CHART_PALETTES, DataChartPalette, STANDARD_PALETTES } from "./colors";
+import { useDatagridTable, useDatagridTableSpace } from "../editor";
+import assert from "assert";
+import { FormInputType, GridaXSupabase } from "@/types";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Chart } from "@/lib/chart";
 
 /// TODO:
 // type switch
@@ -66,19 +89,26 @@ type DataChartCartesianGridState = {
   horizontal: boolean;
 };
 
+interface CrossAxisDataQuery {
+  fn: "count";
+}
+
 interface ChartViewState {
   renderer: DataChartRendererType;
   palette: DataChartPalette;
   curve: DataChartCurveType;
   areaFill: DataChartAreaFillType;
   grid: DataChartCartesianGridState;
+  mainAxis: Chart.MainAxisDataQuery;
+  crossAxis: CrossAxisDataQuery;
 }
 
 type ChartViewAction =
   | { type: "type"; renderer: DataChartRendererType }
   | { type: "palette"; palette: DataChartPalette }
   | { type: "curve"; curve: DataChartCurveType }
-  | { type: "area-fill"; areaFill: DataChartAreaFillType };
+  | { type: "area-fill"; areaFill: DataChartAreaFillType }
+  | { type: "main-axis"; query: Chart.MainAxisDataQuery };
 
 function reducer(state: ChartViewState, action: ChartViewAction) {
   switch (action.type) {
@@ -106,13 +136,19 @@ function reducer(state: ChartViewState, action: ChartViewAction) {
         draft.areaFill = areaFill;
       });
     }
+    case "main-axis": {
+      const { query } = action;
+      return produce(state, (draft) => {
+        draft.mainAxis = query;
+      });
+    }
   }
 
   return state;
 }
 
-const data = [
-  { month: "January", a: 186, b: 80, c: 100 },
+const dummy_pretty_data = [
+  { month: "January", a: 214, b: 80, c: 100 },
   { month: "February", a: 305, b: 200, c: 150 },
   { month: "March", a: 237, b: 120, c: 200 },
   { month: "April", a: 73, b: 190, c: 250 },
@@ -120,7 +156,32 @@ const data = [
   { month: "June", a: 214, b: 140, c: 350 },
 ];
 
+function useDataFrame() {
+  const tb = useDatagridTable();
+  const space = useDatagridTableSpace()!;
+  assert(tb?.provider === "x-supabase", "other than xsb is not supported yet");
+  assert(typeof tb.id === "string");
+
+  const attributes = tb.attributes;
+  const data: Array<GridaXSupabase.XDataRow> =
+    space.stream as Array<GridaXSupabase.XDataRow>;
+
+  // attributes[0].type;
+  // attributes[0].name;
+  // //
+
+  // const cell = data[0]["key"];
+
+  return {
+    attributes: attributes,
+    data: data,
+  };
+  //
+}
+
 export function Chartview() {
+  const df = useDataFrame();
+
   const [state, dispatch] = useReducer(reducer, {
     renderer: "bar",
     palette: "slate",
@@ -130,9 +191,11 @@ export function Chartview() {
       vertical: true,
       horizontal: false,
     },
+    mainAxis: { key: "", sort: "none", aggregate: "datetime-week" },
+    crossAxis: { fn: "count" },
   });
 
-  const { renderer, curve, areaFill, palette } = state;
+  const { mainAxis, renderer, curve, areaFill, palette } = state;
 
   const changeType = useCallback(
     (type: DataChartRendererType) => {
@@ -161,6 +224,16 @@ export function Chartview() {
     [dispatch]
   );
 
+  const changeMainAxis = useCallback(
+    (query: Chart.MainAxisDataQuery) => {
+      dispatch({ type: "main-axis", query: query });
+    },
+    [dispatch]
+  );
+
+  const data = Chart.chart(df.data, mainAxis);
+  console.log("data", data);
+
   return (
     <div className="w-full h-full p-4">
       <div className="flex justify-between gap-4 h-full w-full">
@@ -170,26 +243,39 @@ export function Chartview() {
               type={renderer}
               curve={curve}
               data={data}
+              // data={df.data}
+              // data={dummy_pretty_data}
+              dataKey={"key"}
               areaFill={areaFill}
               defs={{
-                a: {
-                  label: "A",
+                count: {
+                  label: "Count",
                   color: CHART_PALETTES[palette].colors[1],
                 },
-                b: {
-                  label: "B",
-                  color: CHART_PALETTES[palette].colors[2],
-                },
-                c: {
-                  label: "C",
-                  color: CHART_PALETTES[palette].colors[3],
-                },
+                // b: {
+                //   label: "B",
+                //   color: CHART_PALETTES[palette].colors[2],
+                // },
+                // c: {
+                //   label: "C",
+                //   color: CHART_PALETTES[palette].colors[3],
+                // },
               }}
             />
           </div>
         </div>
-        <aside className="flex flex-col gap-4">
+        <aside className="flex flex-col gap-4 max-w-xs">
           <ChartTypeToggleGroup value={renderer} onValueChange={changeType} />
+          <hr />
+          <label>Main Axis</label>
+          <MainAxisQueryControl
+            value={mainAxis}
+            onValueChange={changeMainAxis}
+            attributes={df.attributes}
+          />
+          <hr />
+          <hr />
+          <label>Styles</label>
           <CurveTypeControl value={curve} onValueChange={changeCurve} />
           <AreaFillTypeControl
             value={areaFill}
@@ -210,16 +296,18 @@ function CurveTypeControl({
   onValueChange?: (value: DataChartCurveType) => void;
 }) {
   return (
-    <select
-      value={value}
-      onChange={(e) => onValueChange?.(e.target.value as any)}
-    >
-      {["bump", "linear", "natural", "step"].map((curve) => (
-        <option key={curve} value={curve}>
-          {curve}
-        </option>
-      ))}
-    </select>
+    <Select value={value} onValueChange={onValueChange}>
+      <SelectTrigger>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {["bump", "linear", "natural", "step"].map((curve) => (
+          <SelectItem key={curve} value={curve}>
+            {curve}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
@@ -231,16 +319,18 @@ function AreaFillTypeControl({
   onValueChange?: (value: DataChartAreaFillType) => void;
 }) {
   return (
-    <select
-      value={value}
-      onChange={(e) => onValueChange?.(e.target.value as any)}
-    >
-      {["gradient", "solid", "transparent"].map((curve) => (
-        <option key={curve} value={curve}>
-          {curve}
-        </option>
-      ))}
-    </select>
+    <Select value={value} onValueChange={onValueChange}>
+      <SelectTrigger>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {["gradient", "solid", "transparent"].map((curve) => (
+          <SelectItem key={curve} value={curve}>
+            {curve}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
@@ -320,6 +410,92 @@ function PaletteToggleGroup({
   );
 }
 
+function MainAxisQueryControl({
+  value,
+  onValueChange,
+  attributes,
+}: {
+  value: Chart.MainAxisDataQuery;
+  onValueChange?: (value: Chart.MainAxisDataQuery) => void;
+  attributes: { name: string; type: FormInputType }[];
+}) {
+  const onKeyChange = (key: string) => {
+    onValueChange?.({ ...value, key });
+  };
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger>What to show {value.key}</DropdownMenuTrigger>
+      <DropdownMenuContent>
+        <DropdownMenuRadioGroup onValueChange={onKeyChange}>
+          {attributes.map(({ name, type }) => {
+            const onAggregateChange = (aggregate: Chart.MainAxisAggregate) => {
+              onValueChange?.({ ...value, key: name, aggregate });
+            };
+
+            switch (type) {
+              case "date":
+              case "datetime-local":
+              case "month":
+              case "week":
+              case "time":
+                return (
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>{name}</DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent>
+                      <DropdownMenuRadioGroup
+                        value={value.aggregate}
+                        onValueChange={(v) =>
+                          onAggregateChange(v as Chart.MainAxisAggregate)
+                        }
+                      >
+                        <DropdownMenuRadioItem
+                          value={"none" satisfies Chart.MainAxisAggregate}
+                        >
+                          None
+                        </DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem
+                          value={
+                            "datetime-day" satisfies Chart.MainAxisAggregate
+                          }
+                        >
+                          Day
+                        </DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem
+                          value={
+                            "datetime-week" satisfies Chart.MainAxisAggregate
+                          }
+                        >
+                          Week
+                        </DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem
+                          value={
+                            "datetime-year" satisfies Chart.MainAxisAggregate
+                          }
+                        >
+                          Year
+                        </DropdownMenuRadioItem>
+                      </DropdownMenuRadioGroup>
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                );
+            }
+            return (
+              <DropdownMenuRadioItem value={name}>
+                <FormFieldTypeIcon
+                  type={type}
+                  className="inline-block me-2 align-middle w-4 h-4"
+                />
+                {name}
+              </DropdownMenuRadioItem>
+            );
+          })}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 type DataGroupDef = {
   [key: string]: {
     label: string;
@@ -331,11 +507,13 @@ function DataChart({
   type,
   defs,
   data,
+  dataKey,
   curve,
   areaFill,
 }: {
   type: DataChartRendererType;
   data: Array<any>;
+  dataKey: string;
   defs: DataGroupDef;
   curve?: DataChartCurveType;
   areaFill?: DataChartAreaFillType;
@@ -347,7 +525,7 @@ function DataChart({
           <BarChart accessibilityLayer data={data}>
             <CartesianGrid vertical={false} />
             <XAxis
-              dataKey="month"
+              dataKey={dataKey}
               tickLine={false}
               tickMargin={10}
               axisLine={false}
@@ -377,7 +555,7 @@ function DataChart({
             <XAxis type="number" tickLine={false} axisLine={false} />
             <YAxis
               type="category"
-              dataKey="month"
+              dataKey={dataKey}
               tickLine={false}
               tickMargin={10}
               axisLine={false}
@@ -401,7 +579,7 @@ function DataChart({
           >
             <CartesianGrid vertical={false} />
             <XAxis
-              dataKey="month"
+              dataKey={dataKey}
               tickLine={false}
               tickMargin={8}
               axisLine={false}
