@@ -7,13 +7,17 @@ import {
   CardHeader,
   CardTitle,
 } from "./ui/card";
-import { InstagramLogoIcon, TwitterLogoIcon } from "@radix-ui/react-icons";
+import {
+  GitHubLogoIcon,
+  InstagramLogoIcon,
+  TwitterLogoIcon,
+} from "@radix-ui/react-icons";
 import { Button } from "./ui/button";
 import { SlackIcon } from "lucide-react";
 
 export default function Maintenance() {
   return (
-    <main className="flex flex-col items-center justify-center min-h-screen">
+    <main className="flex flex-col items-center justify-center min-h-screen px-4">
       <Card className="max-w-md">
         <CardContent>
           <CardHeader className="text-center">
@@ -48,7 +52,7 @@ export default function Maintenance() {
           </footer>
         </CardContent>
       </Card>
-      <hr className="my-10 w-full" />
+      <hr className="my-10 w-full max-w-sm" />
       <footer className="flex flex-wrap max-w-sm gap-4">
         <Link href="https://x.com/grida_co" target="_blank">
           <TwitterLogoIcon className="h-4 w-4" />
@@ -58,6 +62,9 @@ export default function Maintenance() {
         </Link>
         <Link href="https://grida.co/join-slack" target="_blank">
           <SlackIcon className="h-4 w-4" />
+        </Link>
+        <Link href="https://github.com/gridaco" target="_blank">
+          <GitHubLogoIcon className="h-4 w-4" />
         </Link>
       </footer>
     </main>
