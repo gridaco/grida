@@ -43,13 +43,6 @@ export default function Maintenance() {
               for more information.
             </p>
           </div>
-          <footer>
-            <Link href="/">
-              <Button className="w-full" variant="outline">
-                Home
-              </Button>
-            </Link>
-          </footer>
         </CardContent>
       </Card>
       <hr className="my-10 w-full max-w-sm" />
