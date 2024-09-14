@@ -23,46 +23,33 @@ import type { Tokens } from "@/ast";
 import { SYM_LOCALTZ } from "./symbols";
 import { ZodObject } from "zod";
 
-export type BlocksEditorAction =
+export type EditorAction =
+  //
+  | DatabaseAction
+  //
+  | FormsBlockAction
+  //
+  | InitAssetAction
+  //
   | GlobalSavingAction
   | EditorSidebarModeAction
-  | CreateNewPendingBlockAction
-  | ResolvePendingBlockAction
-  | DeleteBlockAction
-  | OpenEditFieldAction
-  | SortBlockAction
-  | FocusBlockAction
-  | BlurBlockAction
-  | InitAssetAction
-  | ChangeBlockFieldAction
-  | CreateFielFromBlockdAction
-  | BlockVHiddenAction
-  | HtmlBlockBodyAction
-  | ImageBlockSrcAction
-  | VideoBlockSrcAction
-  | BlockTitleAction
-  | BlockDescriptionAction
-  | SelectResponse
-  | DataGridDeleteSelectedRows
-  | DeleteResponseAction
+  | OpenFieldEditPanelAction
+  | OpenRecordEditPanelAction
+  | OpenCustomerDetailsPanelAction
+  | OpenInsertMenuPanelAction
+  //
+  | FeedCustomerAction
+  //
   | TableAttributeChangeAction
   | TableAttributeDeleteAction
-  | TablespaceFeedAction
-  | OpenResponseEditAction
   | DataGridPaginationAction
-  | FeedResponseSessionsAction
   | DataGridTableAction
-  | FeedCustomerAction
-  | OpenCustomerEditAction
-  | OpenInsertMenuPanelAction
   | DataGridReorderColumnAction
   | DataGridDateFormatAction
   | DataGridDateTZAction
   | DataGridQueryAction
   | DataTableRefreshAction
   | DataTableLoadingAction
-  | DataGridCellChangeAction
-  | FeedXSupabaseMainTableRowsAction
   | EditorThemeLangAction
   | EditorThemePoweredByBrandingAction
   | EditorThemePaletteAction
@@ -84,17 +71,29 @@ export type BlocksEditorAction =
   | SchemaTableAddAction
   | SchemaTableDeleteAction;
 
-export type GlobalSavingAction = {
-  type: "saving";
-  saving: boolean;
-};
-
-export interface EditorSidebarModeAction {
-  type: "editor/sidebar/mode";
-  mode: "project" | "build" | "data" | "connect";
+export interface InitAssetAction extends Partial<EditorState["assets"]> {
+  type: "editor/assets/init";
 }
 
-export type CreateNewPendingBlockAction =
+// #region block
+
+export type FormsBlockAction =
+  | FormsBlockCreateNewPendingBlockAction
+  | FormsBlockResolvePendingBlockAction
+  | FormsBlockDeleteBlockAction
+  | FormsBlockSortBlockAction
+  | FormsBlockChangeBlockFieldAction
+  | FormsBlockCreateFielFromBlockdAction
+  | FormsBlockBlockVHiddenAction
+  | FormsBlockHtmlBlockBodyAction
+  | FormsBlockImageBlockSrcAction
+  | FormsBlockVideoBlockSrcAction
+  | FormsBlockBlockTitleAction
+  | FormsBlockBlockDescriptionAction
+  | FormsBlockFocusBlockAction
+  | FormsBlockBlurBlockAction;
+
+export type FormsBlockCreateNewPendingBlockAction =
   | {
       type: "blocks/new";
       block: FormBlockType;
@@ -107,90 +106,122 @@ export type CreateNewPendingBlockAction =
       };
     };
 
-export interface ResolvePendingBlockAction {
+export interface FormsBlockResolvePendingBlockAction {
   type: "blocks/resolve";
   block_id: string;
   block: EditorFlatFormBlock;
 }
 
-export interface DeleteBlockAction {
+export interface FormsBlockDeleteBlockAction {
   type: "blocks/delete";
   block_id: string;
 }
 
-export interface SortBlockAction {
+export interface FormsBlockSortBlockAction {
   type: "blocks/sort";
   block_id: string;
   over_id: string;
 }
 
-export interface ChangeBlockFieldAction {
+export interface FormsBlockChangeBlockFieldAction {
   type: "blocks/field/change";
   block_id: string;
   field_id: string | null;
 }
 
-export interface CreateFielFromBlockdAction {
+export interface FormsBlockCreateFielFromBlockdAction {
   type: "blocks/field/new";
   block_id: string;
 }
 
-export interface BlockVHiddenAction {
+export interface FormsBlockBlockVHiddenAction {
   type: "blocks/hidden";
   block_id: string;
   v_hidden: Tokens.ShorthandBooleanBinaryExpression;
 }
 
-export interface HtmlBlockBodyAction {
+export interface FormsBlockHtmlBlockBodyAction {
   type: "blocks/html/body";
   block_id: string;
   html: string;
 }
 
-export interface ImageBlockSrcAction {
+export interface FormsBlockImageBlockSrcAction {
   type: "blocks/image/src";
   block_id: string;
   src: string;
 }
 
-export interface VideoBlockSrcAction {
+export interface FormsBlockVideoBlockSrcAction {
   type: "blocks/video/src";
   block_id: string;
   src: string;
 }
 
-export interface BlockTitleAction {
+export interface FormsBlockBlockTitleAction {
   type: "blocks/title";
   block_id: string;
   title_html: string;
 }
 
-export interface BlockDescriptionAction {
+export interface FormsBlockBlockDescriptionAction {
   type: "blocks/description";
   block_id: string;
   description_html: string;
 }
 
-export interface FocusBlockAction {
+export interface FormsBlockFocusBlockAction {
   type: "blocks/focus";
   block_id: string;
 }
 
-export interface BlurBlockAction {
+export interface FormsBlockBlurBlockAction {
   type: "blocks/blur";
 }
 
-export interface InitAssetAction extends Partial<EditorState["assets"]> {
-  type: "editor/assets/init";
-}
+// #endregion block
 
-export interface OpenEditFieldAction {
-  type: "editor/field/edit";
+// #region global ui
+
+export type GlobalSavingAction = {
+  type: "saving";
+  saving: boolean;
+};
+
+export interface EditorSidebarModeAction {
+  type: "editor/sidebar/mode";
+  mode: "project" | "build" | "data" | "connect";
+}
+export interface OpenFieldEditPanelAction {
+  type: "editor/panels/field-edit";
   field_id?: string;
   // true by default
   open?: boolean;
   refresh?: boolean;
 }
+
+export interface OpenCustomerDetailsPanelAction {
+  type: "editor/panels/customer-details";
+  customer_id?: string;
+  // true by default
+  open?: boolean;
+}
+
+export interface OpenInsertMenuPanelAction {
+  type: "editor/panels/insert-menu";
+  // true by default
+  open?: boolean;
+}
+
+export interface OpenRecordEditPanelAction {
+  type: "editor/panels/record-edit";
+  response_id?: string;
+  // true by default
+  open?: boolean;
+  refresh?: boolean;
+}
+
+// #endregion global ui
 
 export interface TableAttributeChangeAction {
   type: "editor/table/attribute/change";
@@ -205,57 +236,9 @@ export interface TableAttributeDeleteAction {
   field_id: string;
 }
 
-export type TablespaceFeedAction = {
-  type: "editor/table/space/feed";
-  table_id: GDocTableID;
-  data: FormResponseWithFields[];
-} & (
-  | {
-      count: number;
-      reset: true;
-    }
-  | { reset?: false }
-);
-
-export interface SelectResponse {
-  type: "editor/response/select";
-  selection: ReadonlySet<string>;
-}
-
-export interface DeleteResponseAction {
-  type: "editor/response/delete";
-  id: string;
-}
-
-export type FeedResponseSessionsAction = {
-  type: "editor/data/sessions/feed";
-  data: FormResponse[];
-} & ({ reset?: false } | { reset: true; count: number });
-
-export interface OpenResponseEditAction {
-  type: "editor/responses/edit";
-  response_id?: string;
-  // true by default
-  open?: boolean;
-  refresh?: boolean;
-}
-
 export interface FeedCustomerAction {
   type: "editor/customers/feed";
   data: Customer[];
-}
-
-export interface OpenCustomerEditAction {
-  type: "editor/customers/edit";
-  customer_id?: string;
-  // true by default
-  open?: boolean;
-}
-
-export interface OpenInsertMenuPanelAction {
-  type: "editor/panels/insert-menu";
-  // true by default
-  open?: boolean;
 }
 
 export interface DataGridReorderColumnAction {
@@ -287,6 +270,7 @@ export type DataGridTableAction = {
     }
 );
 
+// #region pagination
 type DataGridPaginationAction = DataGridRowsPerPageAction | DataGridPageAction;
 
 export interface DataGridRowsPerPageAction {
@@ -298,11 +282,9 @@ export interface DataGridPageAction {
   type: "editor/data-grid/page";
   index: number;
 }
+// #endregion pagination
 
-export interface DataGridDeleteSelectedRows {
-  type: "editor/data-grid/delete/selected";
-}
-
+// #region query
 type DataGridQueryAction =
   | DataGridLocalFilterAction
   | DataGridOrderByAction
@@ -314,7 +296,7 @@ type DataGridQueryAction =
 
 export interface DataGridLocalFilterAction
   extends Partial<EditorState["datagrid_local_filter"]> {
-  type: "editor/data-grid/filter";
+  type: "editor/data-grid/local-filter";
 }
 
 export interface DataGridOrderByAction {
@@ -350,6 +332,8 @@ export interface DataGridPredicatesClearAction {
   type: "editor/data-grid/predicates/clear";
 }
 
+// #endregion query
+
 export interface DataTableRefreshAction {
   type: "editor/data-grid/refresh";
 }
@@ -359,20 +343,63 @@ export interface DataTableLoadingAction {
   isloading: boolean;
 }
 
-export interface DataGridCellChangeAction {
-  type: "editor/data-grid/cell/change";
+// #region database
+export type DatabaseAction =
+  | DatabaseTableSpaceSelectRowsAction
+  | DatabaseTableSpaceCellChangeAction
+  | DatabaseTableSpaceDeleteSelectedRowsAction
+  | DatabaseTableSpaceDeleteRowAction
+  | DatabaseTableSpaceFeedProviderXSupabaseAction
+  | DatabaseTableSpaceFeedAction
+  | DatabaseTableSpaceFeedResponseSessionsAction;
+
+export interface DatabaseTableSpaceSelectRowsAction {
+  type: "editor/table/space/rows/select";
+  selection: ReadonlySet<string>;
+}
+
+export interface DatabaseTableSpaceCellChangeAction {
+  type: "editor/table/space/cell/change";
   table_id: string;
   row: string;
   column: string;
   data: { value: any; option_id?: string | null };
 }
 
-export interface FeedXSupabaseMainTableRowsAction {
+export interface DatabaseTableSpaceDeleteSelectedRowsAction {
+  type: "editor/table/space/rows/delete/selected";
+}
+
+export interface DatabaseTableSpaceDeleteRowAction {
+  type: "editor/table/space/rows/delete";
+  id: string;
+}
+
+export interface DatabaseTableSpaceFeedProviderXSupabaseAction {
   type: "editor/table/space/feed/x-supabase";
   table_id: GDocTableID;
   data: GridaXSupabase.XDataRow[];
   count: number;
 }
+
+export type DatabaseTableSpaceFeedAction = {
+  type: "editor/table/space/feed";
+  table_id: GDocTableID;
+  data: FormResponseWithFields[];
+} & (
+  | {
+      count: number;
+      reset: true;
+    }
+  | { reset?: false }
+);
+
+export type DatabaseTableSpaceFeedResponseSessionsAction = {
+  type: "editor/table/space/feed/sessions";
+  data: FormResponse[];
+} & ({ reset?: false } | { reset: true; count: number });
+
+// #endregion database
 
 export interface EditorThemeLangAction {
   type: "editor/theme/lang";

@@ -129,7 +129,7 @@ function SelectCellFormatter({
 
   const onEnterFullScreenClick = useCallback(() => {
     dispatch({
-      type: "editor/responses/edit",
+      type: "editor/panels/record-edit",
       response_id: id,
       refresh: true,
     });

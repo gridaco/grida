@@ -343,6 +343,10 @@ function useXSBTableFeed(
   }, [res.data]);
 }
 
+/**
+ * @deprecated dangerous
+ * @returns
+ */
 function useXSBSyncCell({
   table_id,
   sb_table_id,
@@ -542,7 +546,7 @@ export function FormResponseFeedProvider({
     onDelete: (data) => {
       if ("id" in data) {
         dispatch({
-          type: "editor/response/delete",
+          type: "editor/table/space/rows/delete",
           id: data.id,
         });
       }
@@ -596,7 +600,7 @@ export function FormResponseSessionFeedProvider({
       },
     }).then(({ data, count }) => {
       dispatch({
-        type: "editor/data/sessions/feed",
+        type: "editor/table/space/feed/sessions",
         data: data as any,
         reset: true,
         count: count!,
@@ -627,13 +631,13 @@ export function FormResponseSessionFeedProvider({
     form_id: form.form_id,
     onInsert: (data) => {
       dispatch({
-        type: "editor/data/sessions/feed",
+        type: "editor/table/space/feed/sessions",
         data: [data as any],
       });
     },
     onUpdate: (data) => {
       dispatch({
-        type: "editor/data/sessions/feed",
+        type: "editor/table/space/feed/sessions",
         data: [data as any],
       });
     },
@@ -869,7 +873,7 @@ export function GridaSchemaTableFeedProvider({
     onDelete: (data) => {
       if ("id" in data) {
         dispatch({
-          type: "editor/response/delete",
+          type: "editor/table/space/rows/delete",
           id: data.id,
         });
       }
