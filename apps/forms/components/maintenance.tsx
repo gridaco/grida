@@ -24,10 +24,10 @@ export default function Maintenance() {
             <div className="flex items-center justify-center my-4">
               <GridaLogo className="h-6 w-6 text-primary" />
             </div>
-            <CardTitle>We'll be back soon!</CardTitle>
+            <CardTitle>We&apos;ll be back soon!</CardTitle>
             <CardDescription>
-              We're currently performing some maintenance on our site. We'll be
-              back shortly!
+              We&apos;re currently performing some maintenance on our site.
+              We&apos;ll be back shortly!
             </CardDescription>
           </CardHeader>
           <hr />
