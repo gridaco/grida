@@ -27,6 +27,7 @@ import { AssetsBackgroundsResolver } from "./resolver/assets-backgrounds-resolve
 import toast from "react-hot-toast";
 import { EditorSymbols } from "./symbols";
 import { fmt_local_index } from "@/utils/fmt";
+import { MultiplayerLayer } from "./multiplayer/multiplayer";
 
 export function EditorProvider({
   initial,
@@ -67,6 +68,7 @@ export function DatabaseDocumentEditorProvider({
   return (
     <StateProvider state={state} dispatch={dispatch}>
       <TooltipProvider>
+        <MultiplayerLayer />
         <AssetsBackgroundsResolver />
         <MediaViewerProvider>
           {/*  */}
@@ -90,6 +92,7 @@ export function SiteDocumentEditorProvider({
   return (
     <StateProvider state={state} dispatch={dispatch}>
       <TooltipProvider>
+        <MultiplayerLayer />
         <AssetsBackgroundsResolver />
         <MediaViewerProvider>
           {/*  */}
@@ -112,6 +115,7 @@ export function FormDocumentEditorProvider({
   return (
     <StateProvider state={state} dispatch={dispatch}>
       <TooltipProvider>
+        <MultiplayerLayer />
         <AssetsBackgroundsResolver />
         <MediaViewerProvider>
           <FormFieldEditPanelProvider />

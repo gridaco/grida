@@ -55,6 +55,10 @@ function initialBaseDocumentEditorState(
     document_title: init.document_title,
     organization: init.organization,
     project: init.project,
+    multiplayer: {
+      room_id: init.document_id,
+      users: [],
+    },
     saving: false,
     theme: init.theme,
     assets: {

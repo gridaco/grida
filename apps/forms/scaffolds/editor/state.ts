@@ -349,6 +349,30 @@ interface IInsertionMenuState {
   insertmenu: TGlobalEditorDialogState;
 }
 
+export type IMultiplayerUserCursor = {
+  cursor_id: string;
+  // user_id: string;
+  // username: string;
+  message?: string;
+  // avatar: string;
+  // color: string;
+  // location: string;
+  // canvas: "canvas" | "table";
+  node_type?: "cell";
+  node_id?: string;
+  // anchor: "screen" | "node" | "canvas";
+  // origin: "center" | "top-left";
+  x?: number;
+  y?: number;
+};
+
+interface IEditorMultiplayerState {
+  multiplayer: {
+    room_id: string;
+    users: Array<IMultiplayerUserCursor>;
+  };
+}
+
 export interface BaseDocumentEditorState
   extends IEditorGlobalSavingState,
     IEditorDateContextState,
@@ -356,7 +380,8 @@ export interface BaseDocumentEditorState
     IInsertionMenuState,
     IFieldEditorState,
     ICustomerEditorState,
-    IRowEditorState {
+    IRowEditorState,
+    IEditorMultiplayerState {
   basepath: string;
   organization: {
     name: string;
