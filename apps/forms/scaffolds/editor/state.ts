@@ -250,13 +250,13 @@ export type ITablespace<T> = {
 
 export type TablespaceTransaction = {
   digest: string;
-  timestamp: string;
+  timestamp: number;
   user: "system" | "user";
   operation: "update";
   table_id: string;
   row: string;
   column: string;
-  data: { value: unknown; enumid?: string | null };
+  data: { value: unknown; option_id?: string | null };
 };
 
 export type TTablespace =
@@ -269,7 +269,10 @@ type TCustomDataTablespace<T> = {
   realtime: boolean;
   stream?: Array<T>;
 } & (
-  | { readonly: false; transactions: Array<TablespaceTransaction> }
+  | {
+      readonly: false;
+      // transactions: Array<TablespaceTransaction>
+    }
   | { readonly: true }
 );
 
@@ -286,7 +289,7 @@ export type TGridaDataTablespace = {
   readonly: boolean;
   realtime: boolean;
   stream?: Array<GridaSchemaTableVirtualRow>;
-  transactions: Array<TablespaceTransaction>;
+  // transactions: Array<TablespaceTransaction>;
 };
 
 export type GridaSchemaTableVirtualRow = TVirtualRow<

@@ -237,6 +237,7 @@ export function GridEditor({
             dispatch({
               type: "editor/table/space/cell/change",
               table_id: table_id!,
+              gdoc_table_id: tb!.id,
               row: row.__gf_id,
               column: column,
               data: data,

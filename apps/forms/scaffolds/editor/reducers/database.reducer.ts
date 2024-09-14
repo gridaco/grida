@@ -35,6 +35,7 @@ import assert from "assert";
 import { EditorSymbols } from "../symbols";
 import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";
 import { schematableinit, table_to_sidebar_table_menu } from "../init";
+import { v4 } from "uuid";
 
 export default function databaseRecucer(
   state: EditorState,
@@ -96,7 +97,7 @@ export default function databaseRecucer(
           default:
             if (draft.doctype === "v0_schema") {
               //
-              const space = get_tablespace_feed(draft);
+              const space = get_current_tablespace_feed(draft);
 
               const ids = Array.from(state.datagrid_selected_rows);
 
@@ -119,7 +120,7 @@ export default function databaseRecucer(
     case "editor/table/space/rows/delete": {
       const { id } = <DatabaseTableSpaceDeleteRowAction>action;
       return produce(state, (draft) => {
-        const space = get_tablespace_feed(draft);
+        const space = get_current_tablespace_feed(draft);
         if (!space) {
           console.error("Table space not found");
           return;
@@ -260,110 +261,64 @@ export default function databaseRecucer(
       });
     }
     case "editor/table/space/cell/change": {
-      return produce(state, (draft) => {
-        switch (draft.datagrid_table_id) {
-          case EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID: {
-            const {
-              row: row_id,
-              column: attribute_id,
-              data,
-            } = <DatabaseTableSpaceCellChangeAction>action;
-            const { value, option_id } = data;
+      const {
+        gdoc_table_id,
+        table_id,
+        row: row_id,
+        column: attribute_id,
+        data,
+      } = <DatabaseTableSpaceCellChangeAction>action;
 
-            const response_space =
-              draft.tablespace[
-                EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID
-              ];
-            const cell = response_space.stream?.find(
-              (row) => row.id === row_id
-            )!.data[attribute_id];
+      return produce(state, (draft) => {
+        const tb = get_table(draft, gdoc_table_id);
+        assert(tb, "Table not found");
+
+        const space = get_tablespace(draft, gdoc_table_id);
+        assert(space, "Table space not found");
+
+        switch (tb.provider) {
+          case "x-supabase-auth":
+          case "custom":
+            throw new Error("Unsupported table provider: " + tb.provider);
+          case "grida": {
+            // TODO: provider:grida also needs to be migrated with transaction methhod of syncing data.
+            // @see feed.tsx - no changes required here.
+
+            assert(space.provider === "grida");
+
+            const { value, option_id } = data;
+            const cell = space.stream?.find((row) => row.id === row_id)!.data[
+              attribute_id
+            ];
 
             if (!cell) return;
 
             cell.value = value;
             cell.form_field_option_id = option_id ?? null;
-
             break;
           }
-          case EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID: {
-            const space =
-              draft.tablespace[
-                EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID
-              ];
+          case "x-supabase": {
+            assert(space.provider === "x-supabase");
 
-            const tb = get_table<GDocFormsXSBTable>(
-              draft,
-              EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID
-            );
-            if (!tb) return;
             const pk = tb.x_sb_main_table_connection.pk!;
 
             update_xsbtablespace(pk, space, draft, action);
+
+            // add to transactions
+            space.transactions.push({
+              digest: v4(),
+              timestamp: Date.now(),
+              user: "user",
+              operation: "update",
+              table_id: table_id,
+              column: attribute_id,
+              row: row_id,
+              data: data,
+            });
             break;
           }
-          case EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID: {
-            throw new Error(
-              "Unsupported table type: " + state.datagrid_table_id?.toString()
-            );
-          }
-          default: {
-            if (draft.doctype === "v0_schema") {
-              const {
-                row: row_id,
-                column: attribute_id,
-                data,
-              } = <DatabaseTableSpaceCellChangeAction>action;
-              const { value, option_id } = data;
-
-              const space = get_tablespace_feed(draft);
-              assert(space, "Table space not found");
-
-              switch (space?.provider) {
-                case "grida": {
-                  const cell = space.stream?.find((row) => row.id === row_id)!
-                    .data[attribute_id];
-
-                  if (!cell) return;
-
-                  cell.value = value;
-                  cell.form_field_option_id = option_id ?? null;
-                  break;
-                }
-                case "x-supabase": {
-                  const space = draft.tablespace[action.table_id];
-                  assert(space.provider === "x-supabase");
-
-                  const tb = get_table<GDocSchemaTableProviderXSupabase>(
-                    draft,
-                    action.table_id
-                  );
-
-                  if (!tb) return;
-
-                  const pk = tb.x_sb_main_table_connection.pk!;
-
-                  update_xsbtablespace(
-                    pk,
-                    space as TXSupabaseDataTablespace,
-                    draft,
-                    action
-                  );
-                  break;
-                }
-                case "custom":
-                default:
-                  throw new Error(
-                    "Unsupported table provider: " + space?.provider
-                  );
-              }
-
-              break;
-            } else {
-              throw new Error(
-                "Unsupported table type: " + state.datagrid_table_id?.toString()
-              );
-            }
-          }
+          default:
+            throw new Error("Unsupported table provider");
         }
       });
     }
@@ -452,7 +407,7 @@ export default function databaseRecucer(
             readonly: false,
             stream: [],
             realtime: true,
-            transactions: [],
+            // transactions: [],
           };
         }
 
@@ -477,10 +432,6 @@ export default function databaseRecucer(
   return state;
 }
 
-function get_tablespace(draft: Draft<EditorState>, table_id: GDocTableID) {
-  return draft.tablespace[table_id];
-}
-
 function get_table<T extends GDocTable>(
   draft: Draft<EditorState>,
   table_id: GDocTableID
@@ -490,21 +441,26 @@ function get_table<T extends GDocTable>(
   >;
 }
 
+function get_tablespace(draft: Draft<EditorState>, table_id: GDocTableID) {
+  return draft.tablespace[table_id];
+}
+
 /**
  * @deprecated
  * @returns
  */
-function get_tablespace_feed(
+function get_current_tablespace_feed(
   draft: Draft<EditorState>
 ): Draft<TTablespace> | null {
   switch (draft.doctype) {
     case "v0_form":
-      return draft.tablespace[
+      return get_tablespace(
+        draft,
         EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID
-      ];
+      );
     case "v0_schema":
       if (typeof draft.datagrid_table_id === "string")
-        return draft.tablespace[draft.datagrid_table_id] as TTablespace;
+        return get_tablespace(draft, draft.datagrid_table_id) as TTablespace;
     default:
       return null;
   }

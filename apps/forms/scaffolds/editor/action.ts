@@ -341,6 +341,7 @@ export interface DatabaseTableSpaceSelectRowsAction {
 
 export interface DatabaseTableSpaceCellChangeAction {
   type: "editor/table/space/cell/change";
+  gdoc_table_id: GDocTableID;
   table_id: string;
   row: string;
   column: string;

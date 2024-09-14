@@ -469,7 +469,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
         readonly: false,
         realtime: true,
         stream: [],
-        transactions: [],
+        // transactions: [],
       },
       [EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID]: {
         provider: "custom",

@@ -22,6 +22,7 @@ import {
   type GDocFormsXSBTable,
   type GDocSchemaTableProviderGrida,
   type TablespaceSchemaTableStreamType,
+  type TablespaceTransaction,
   type TVirtualRow,
   TXSupabaseDataTablespace,
 } from "./state";
@@ -30,6 +31,16 @@ import assert from "assert";
 type RealtimeTableChangeData = {
   id: string;
   [key: string]: any;
+};
+
+const useRefresh = () => {
+  const [state, dispatch] = useEditorState();
+
+  return useCallback(() => {
+    dispatch({
+      type: "editor/data-grid/refresh",
+    });
+  }, [dispatch]);
 };
 
 const useSubscription = ({
@@ -183,7 +194,7 @@ function useChangeDatagridLoading() {
   );
 }
 
-function useSyncCell() {
+function useUpdateCell() {
   const supabase = useMemo(() => createClientFormsClient(), []);
 
   return useCallback(
@@ -214,7 +225,7 @@ function useSyncCellChangesEffect(
   prev: Array<TVirtualRow<FormResponseField, FormResponse>> | undefined,
   current: Array<TVirtualRow<FormResponseField, FormResponse>> | undefined
 ) {
-  const sync = useSyncCell();
+  const sync = useUpdateCell();
 
   useEffect(() => {
     current?.forEach((r) => {
@@ -342,12 +353,7 @@ function useXSBTableFeed(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [res.data]);
 }
-
-/**
- * @deprecated dangerous
- * @returns
- */
-function useXSBSyncCell({
+function useXSBUpdateRow({
   table_id,
   sb_table_id,
   pk,
@@ -395,37 +401,24 @@ function useXSBSyncCell({
   );
 }
 
-function useXSBSyncCellChangesEffect(
-  prev: Array<GridaXSupabase.XDataRow> | undefined,
-  current: Array<GridaXSupabase.XDataRow> | undefined,
-  queryprops: {
-    table_id: string;
-    sb_table_id?: number | null;
-    pk: string | undefined;
+function useResolveTransactions(
+  transactions: Array<TablespaceTransaction>,
+  operators: {
+    update: (key: string, data: Record<string, any>) => void;
+    after?: () => void;
   }
 ) {
-  const pk = queryprops.pk;
-
-  const update = useXSBSyncCell(queryprops);
-
   useEffect(() => {
-    if (!current) return;
-    if (!prev) return;
-    if (!pk) return;
+    if (!transactions || transactions.length === 0) return;
+    const tasks = Promise.all(
+      transactions.map(async (transaction) => {
+        const { row, data } = transaction;
+        operators.update(row, data);
+      })
+    );
 
-    // check if rows are updated
-    for (const row of current) {
-      const prevRow = prev.find((r) => r.id === row.id);
-
-      if (prevRow) {
-        // get changed fields
-        const diff = rowdiff(prevRow, row, (key) => key.startsWith("__gf_"));
-        if (Object.keys(diff).length > 0) {
-          update(row[pk], diff);
-        }
-      }
-    }
-  }, [pk, prev, update, current]);
+    tasks.finally(operators.after);
+  }, [transactions, operators]);
 }
 
 export function FormResponseSyncProvider({
@@ -707,18 +700,23 @@ export function FormXSupabaseMainTableSyncProvider({
 
   const { tablespace } = state;
 
-  const current =
+  const transactions =
     tablespace[EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID]
-      .stream;
-
-  const prev = usePrevious(current);
+      .transactions;
 
   const pk = tb?.x_sb_main_table_connection.pk;
 
-  useXSBSyncCellChangesEffect(prev, current, {
-    table_id: state.form.form_id,
+  const refresh = useRefresh();
+
+  const update = useXSBUpdateRow({
     pk: pk,
+    table_id: state.form.form_id,
     sb_table_id: state.connections.supabase?.main_supabase_table_id,
+  });
+
+  useResolveTransactions(transactions, {
+    update: update,
+    after: refresh,
   });
 
   return <>{children}</>;
@@ -898,14 +896,20 @@ export function GridaSchemaXSBTableSyncProvider({
 
   const { tablespace } = state;
 
-  const current = (tablespace[table_id] as TXSupabaseDataTablespace).stream;
+  const transactions = (tablespace[table_id] as TXSupabaseDataTablespace)
+    .transactions;
 
-  const prev = usePrevious(current);
+  const refresh = useRefresh();
 
-  useXSBSyncCellChangesEffect(prev, current, {
-    table_id: table_id,
+  const update = useXSBUpdateRow({
     pk: pk,
+    table_id: table_id,
     sb_table_id: sb_table_id,
+  });
+
+  useResolveTransactions(transactions, {
+    update: update,
+    after: refresh,
   });
 
   return <>{children}</>;
