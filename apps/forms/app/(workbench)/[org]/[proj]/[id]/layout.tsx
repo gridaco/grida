@@ -87,7 +87,7 @@ export default async function Layout({
     .single();
 
   if (project_ref_err) {
-    console.error("project_ref err", project_ref_err);
+    console.error("project_ref err", project_ref_err, { org, proj });
     return notFound();
   }
 
