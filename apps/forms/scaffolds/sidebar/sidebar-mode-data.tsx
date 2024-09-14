@@ -233,7 +233,7 @@ export function ModeData() {
             });
 
             dispatch({
-              type: "editor/schema/table/delete",
+              type: "editor/table/schema/delete",
               table_id: id,
             });
 
@@ -371,7 +371,7 @@ function CreateNewSchemaTableDialog({
       promise.then(({ data: { data } }) => {
         if (!data) return;
         dispatch({
-          type: "editor/schema/table/add",
+          type: "editor/table/schema/add",
           table: data,
         });
 
@@ -523,7 +523,7 @@ function ConnectNewSupabaseTableDialog({
         );
 
       dispatch({
-        type: "editor/schema/table/add",
+        type: "editor/table/schema/add",
         table: {
           ...data.table,
           x_sb_main_table_connection: {

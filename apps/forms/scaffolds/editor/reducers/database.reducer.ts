@@ -8,6 +8,8 @@ import type {
   DatabaseTableSpaceDeleteSelectedRowsAction,
   DatabaseTableSpaceDeleteRowAction,
   DatabaseTableSpaceFeedResponseSessionsAction,
+  DatabaseTableSchemaAddAction,
+  DatabaseTableSchemaDeleteAction,
 } from "../action";
 import type {
   EditorState,
@@ -25,6 +27,7 @@ import { FormResponse, FormResponseField, GridaXSupabase } from "@/types";
 import assert from "assert";
 import { EditorSymbols } from "../symbols";
 import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";
+import { schematableinit, table_to_sidebar_table_menu } from "../init";
 
 export default function databaseRecucer(
   state: EditorState,
@@ -354,6 +357,51 @@ export default function databaseRecucer(
               );
             }
           }
+        }
+      });
+    }
+    case "editor/table/schema/add": {
+      const { table } = <DatabaseTableSchemaAddAction>action;
+      return produce(state, (draft) => {
+        const tb = schematableinit(table);
+        draft.tables.push(tb as Draft<GDocTable>);
+        draft.sidebar.mode_data.tables.push(
+          table_to_sidebar_table_menu(tb, {
+            basepath: draft.basepath,
+            document_id: draft.document_id,
+          })
+        );
+
+        if (table.x_sb_main_table_connection) {
+          draft.tablespace[tb.id] = {
+            provider: "x-supabase",
+            readonly: false,
+            stream: [],
+            realtime: false,
+          };
+        } else {
+          draft.tablespace[tb.id] = {
+            provider: "grida",
+            readonly: false,
+            stream: [],
+            realtime: true,
+          };
+        }
+
+        // TODO: setting the id won't change the route. need to update the route. (where?)
+        draft.datagrid_table_id = table.id;
+      });
+    }
+    case "editor/table/schema/delete": {
+      const { table_id } = <DatabaseTableSchemaDeleteAction>action;
+      return produce(state, (draft) => {
+        const table = draft.tables.find((t) => t.id === table_id);
+        if (table) {
+          draft.tables = draft.tables.filter((t) => t.id !== table_id);
+          draft.sidebar.mode_data.tables =
+            draft.sidebar.mode_data.tables.filter((t) => t.id !== table_id);
+          delete draft.tablespace[table_id];
+          draft.datagrid_table_id = null;
         }
       });
     }

@@ -1,5 +1,5 @@
 import { produce, type Draft } from "immer";
-import type { EditorState, GDocTable, GDocTableID } from "./state";
+import type { EditorState, GDocTableID } from "./state";
 import type {
   GlobalSavingAction,
   EditorSidebarModeAction,
@@ -45,17 +45,11 @@ import type {
   FormCampaignPreferencesAction,
   FormEndingPreferencesAction,
   EditorThemeAppearanceAction,
-  SchemaTableAddAction,
-  SchemaTableDeleteAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import type { AttributeDefinition } from "@/types";
 import { EditorSymbols } from "./symbols";
-import {
-  initialDatagridState,
-  schematableinit,
-  table_to_sidebar_table_menu,
-} from "./init";
+import { initialDatagridState } from "./init";
 import databaseRecucer, { get_attributes } from "./reducers/database.reducer";
 import blockReducer from "./reducers/block.reducer";
 
@@ -68,6 +62,8 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
     case "editor/table/space/rows/select":
     case "editor/table/space/rows/delete/selected":
     case "editor/table/space/feed/sessions":
+    case "editor/table/schema/add":
+    case "editor/table/schema/delete":
       return databaseRecucer(state, action);
 
     case "blocks/new":
@@ -517,51 +513,6 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
             ...data,
           },
         };
-      });
-    }
-    case "editor/schema/table/add": {
-      const { table } = <SchemaTableAddAction>action;
-      return produce(state, (draft) => {
-        const tb = schematableinit(table);
-        draft.tables.push(tb as Draft<GDocTable>);
-        draft.sidebar.mode_data.tables.push(
-          table_to_sidebar_table_menu(tb, {
-            basepath: draft.basepath,
-            document_id: draft.document_id,
-          })
-        );
-
-        if (table.x_sb_main_table_connection) {
-          draft.tablespace[tb.id] = {
-            provider: "x-supabase",
-            readonly: false,
-            stream: [],
-            realtime: false,
-          };
-        } else {
-          draft.tablespace[tb.id] = {
-            provider: "grida",
-            readonly: false,
-            stream: [],
-            realtime: true,
-          };
-        }
-
-        // TODO: setting the id won't change the route. need to update the route. (where?)
-        draft.datagrid_table_id = table.id;
-      });
-    }
-    case "editor/schema/table/delete": {
-      const { table_id } = <SchemaTableDeleteAction>action;
-      return produce(state, (draft) => {
-        const table = draft.tables.find((t) => t.id === table_id);
-        if (table) {
-          draft.tables = draft.tables.filter((t) => t.id !== table_id);
-          draft.sidebar.mode_data.tables =
-            draft.sidebar.mode_data.tables.filter((t) => t.id !== table_id);
-          delete draft.tablespace[table_id];
-          draft.datagrid_table_id = null;
-        }
       });
     }
     default:

@@ -67,9 +67,7 @@ export type EditorAction =
   | DocumentNodeChangeTextAction
   | DocumentNodeUpdateStyleAction
   | DocumentNodeUpdateAttributeAction
-  | DocumentNodeUpdatePropertyAction
-  | SchemaTableAddAction
-  | SchemaTableDeleteAction;
+  | DocumentNodeUpdatePropertyAction;
 
 export interface InitAssetAction extends Partial<EditorState["assets"]> {
   type: "editor/assets/init";
@@ -351,7 +349,9 @@ export type DatabaseAction =
   | DatabaseTableSpaceDeleteRowAction
   | DatabaseTableSpaceFeedProviderXSupabaseAction
   | DatabaseTableSpaceFeedAction
-  | DatabaseTableSpaceFeedResponseSessionsAction;
+  | DatabaseTableSpaceFeedResponseSessionsAction
+  | DatabaseTableSchemaAddAction
+  | DatabaseTableSchemaDeleteAction;
 
 export interface DatabaseTableSpaceSelectRowsAction {
   type: "editor/table/space/rows/select";
@@ -363,7 +363,7 @@ export interface DatabaseTableSpaceCellChangeAction {
   table_id: string;
   row: string;
   column: string;
-  data: { value: any; option_id?: string | null };
+  data: { value: unknown; option_id?: string | null };
 }
 
 export interface DatabaseTableSpaceDeleteSelectedRowsAction {
@@ -398,6 +398,22 @@ export type DatabaseTableSpaceFeedResponseSessionsAction = {
   type: "editor/table/space/feed/sessions";
   data: FormResponse[];
 } & ({ reset?: false } | { reset: true; count: number });
+
+export interface DatabaseTableSchemaAddAction {
+  type: "editor/table/schema/add";
+  table: {
+    id: string;
+    name: string;
+    description?: string | null;
+    attributes: FormFieldDefinition[];
+    x_sb_main_table_connection?: TableXSBMainTableConnection;
+  };
+}
+
+export interface DatabaseTableSchemaDeleteAction {
+  type: "editor/table/schema/delete";
+  table_id: string;
+}
 
 // #endregion database
 
@@ -501,20 +517,4 @@ export interface DocumentNodeUpdatePropertyAction {
   type: "editor/document/node/property";
   node_id: string;
   data: { [key: string]: any };
-}
-
-export interface SchemaTableAddAction {
-  type: "editor/schema/table/add";
-  table: {
-    id: string;
-    name: string;
-    description?: string | null;
-    attributes: FormFieldDefinition[];
-    x_sb_main_table_connection?: TableXSBMainTableConnection;
-  };
-}
-
-export interface SchemaTableDeleteAction {
-  type: "editor/schema/table/delete";
-  table_id: string;
 }
