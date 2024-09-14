@@ -308,6 +308,7 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
         draft.datagrid_isloading = isloading;
       });
     }
+    //
     case "editor/theme/lang": {
       const { lang } = <EditorThemeLangAction>action;
       return produce(state, (draft) => {

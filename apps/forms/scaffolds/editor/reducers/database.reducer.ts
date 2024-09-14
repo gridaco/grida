@@ -444,6 +444,7 @@ export default function databaseRecucer(
             readonly: false,
             stream: [],
             realtime: false,
+            transactions: [],
           };
         } else {
           draft.tablespace[tb.id] = {
@@ -451,6 +452,7 @@ export default function databaseRecucer(
             readonly: false,
             stream: [],
             realtime: true,
+            transactions: [],
           };
         }
 

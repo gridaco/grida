@@ -469,6 +469,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
         readonly: false,
         realtime: true,
         stream: [],
+        transactions: [],
       },
       [EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID]: {
         provider: "custom",
@@ -487,6 +488,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
         readonly: true,
         stream: [],
         realtime: false,
+        transactions: [],
       },
       // noop
       [EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID]:

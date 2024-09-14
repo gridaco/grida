@@ -248,6 +248,17 @@ export type ITablespace<T> = {
   stream?: Array<T>;
 };
 
+export type TablespaceTransaction = {
+  digest: string;
+  timestamp: string;
+  user: "system" | "user";
+  operation: "update";
+  table_id: string;
+  row: string;
+  column: string;
+  data: { value: unknown; enumid?: string | null };
+};
+
 export type TTablespace =
   | TCustomDataTablespace<any>
   | TXSupabaseDataTablespace
@@ -255,16 +266,19 @@ export type TTablespace =
 
 type TCustomDataTablespace<T> = {
   provider: "custom";
-  readonly: boolean;
   realtime: boolean;
   stream?: Array<T>;
-};
+} & (
+  | { readonly: false; transactions: Array<TablespaceTransaction> }
+  | { readonly: true }
+);
 
 export type TXSupabaseDataTablespace = {
   provider: "x-supabase";
   readonly: boolean;
   realtime: false;
   stream?: Array<GridaXSupabase.XDataRow>;
+  transactions: Array<TablespaceTransaction>;
 };
 
 export type TGridaDataTablespace = {
@@ -272,6 +286,7 @@ export type TGridaDataTablespace = {
   readonly: boolean;
   realtime: boolean;
   stream?: Array<GridaSchemaTableVirtualRow>;
+  transactions: Array<TablespaceTransaction>;
 };
 
 export type GridaSchemaTableVirtualRow = TVirtualRow<
