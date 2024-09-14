@@ -31,6 +31,8 @@ export type EditorAction =
   //
   | InitAssetAction
   //
+  | DocumentAction
+  //
   | GlobalSavingAction
   | EditorSidebarModeAction
   | OpenFieldEditPanelAction
@@ -40,8 +42,6 @@ export type EditorAction =
   //
   | FeedCustomerAction
   //
-  | TableAttributeChangeAction
-  | TableAttributeDeleteAction
   | DataGridPaginationAction
   | DataGridTableAction
   | DataGridReorderColumnAction
@@ -59,15 +59,7 @@ export type EditorAction =
   | EditorThemeCustomCSSAction
   | EditorThemeBackgroundAction
   | FormCampaignPreferencesAction
-  | FormEndingPreferencesAction
-  | DocumentSelectPageAction
-  | DocumentTemplateSampleDataAction
-  | DocumentSelectNodeAction
-  | DocumentNodeChangeTemplateAction
-  | DocumentNodeChangeTextAction
-  | DocumentNodeUpdateStyleAction
-  | DocumentNodeUpdateAttributeAction
-  | DocumentNodeUpdatePropertyAction;
+  | FormEndingPreferencesAction;
 
 export interface InitAssetAction extends Partial<EditorState["assets"]> {
   type: "editor/assets/init";
@@ -221,19 +213,6 @@ export interface OpenRecordEditPanelAction {
 
 // #endregion global ui
 
-export interface TableAttributeChangeAction {
-  type: "editor/table/attribute/change";
-  table_id: string;
-  field_id: string;
-  data: FormFieldDefinition;
-}
-
-export interface TableAttributeDeleteAction {
-  type: "editor/table/attribute/delete";
-  table_id: string;
-  field_id: string;
-}
-
 export interface FeedCustomerAction {
   type: "editor/customers/feed";
   data: Customer[];
@@ -350,6 +329,8 @@ export type DatabaseAction =
   | DatabaseTableSpaceFeedProviderXSupabaseAction
   | DatabaseTableSpaceFeedAction
   | DatabaseTableSpaceFeedResponseSessionsAction
+  | DatabaseTableAttributeChangeAction
+  | DatabaseTableAttributeDeleteAction
   | DatabaseTableSchemaAddAction
   | DatabaseTableSchemaDeleteAction;
 
@@ -398,6 +379,19 @@ export type DatabaseTableSpaceFeedResponseSessionsAction = {
   type: "editor/table/space/feed/sessions";
   data: FormResponse[];
 } & ({ reset?: false } | { reset: true; count: number });
+
+export interface DatabaseTableAttributeChangeAction {
+  type: "editor/table/attribute/change";
+  table_id: string;
+  field_id: string;
+  data: FormFieldDefinition;
+}
+
+export interface DatabaseTableAttributeDeleteAction {
+  type: "editor/table/attribute/delete";
+  table_id: string;
+  field_id: string;
+}
 
 export interface DatabaseTableSchemaAddAction {
   type: "editor/table/schema/add";
@@ -466,6 +460,16 @@ export interface FormEndingPreferencesAction
   extends Partial<EditorState["form"]["ending"]> {
   type: "editor/form/ending/preferences";
 }
+
+export type DocumentAction =
+  | DocumentSelectPageAction
+  | DocumentTemplateSampleDataAction
+  | DocumentSelectNodeAction
+  | DocumentNodeChangeTemplateAction
+  | DocumentNodeChangeTextAction
+  | DocumentNodeUpdateStyleAction
+  | DocumentNodeUpdateAttributeAction
+  | DocumentNodeUpdatePropertyAction;
 
 export interface DocumentSelectPageAction {
   type: "editor/document/select-page";

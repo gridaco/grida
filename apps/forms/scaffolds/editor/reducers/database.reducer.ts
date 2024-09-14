@@ -10,6 +10,8 @@ import type {
   DatabaseTableSpaceFeedResponseSessionsAction,
   DatabaseTableSchemaAddAction,
   DatabaseTableSchemaDeleteAction,
+  DatabaseTableAttributeChangeAction,
+  DatabaseTableAttributeDeleteAction,
 } from "../action";
 import type {
   EditorState,
@@ -23,7 +25,12 @@ import type {
   TVirtualRowData,
   TXSupabaseDataTablespace,
 } from "../state";
-import { FormResponse, FormResponseField, GridaXSupabase } from "@/types";
+import {
+  AttributeDefinition,
+  FormResponse,
+  FormResponseField,
+  GridaXSupabase,
+} from "@/types";
 import assert from "assert";
 import { EditorSymbols } from "../symbols";
 import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";
@@ -360,6 +367,65 @@ export default function databaseRecucer(
         }
       });
     }
+    case "editor/table/attribute/change": {
+      const { table_id, field_id, data } = <DatabaseTableAttributeChangeAction>(
+        action
+      );
+
+      return produce(state, (draft) => {
+        // clear init
+        draft.field_editor.data = { draft: null };
+
+        // update (create) the changed attribute
+        const attributes = get_attributes(draft, table_id);
+        const { isnew } = push_or_update_attribute(attributes, data);
+
+        if (draft.doctype === "v0_form") {
+          if (isnew) {
+            // assign the field_id to the block if required
+            let unused_field_id: string | null = field_id;
+            const waiting_block = has_waiting_block_for_new_field(draft);
+
+            if (waiting_block) {
+              waiting_block.form_field_id = unused_field_id;
+              unused_field_id = null;
+            } else {
+              // add the field_id to available_field_ids
+              draft.form.available_field_ids.push(unused_field_id);
+            }
+          }
+        }
+        //
+      });
+    }
+    case "editor/table/attribute/delete": {
+      const { table_id, field_id } = <DatabaseTableAttributeDeleteAction>action;
+      return produce(state, (draft) => {
+        const attributes = get_attributes(draft, table_id);
+
+        // [EXECUTION ORDER MATTERS] remove from attributes (using below syntax since attribute is a const - still a draft proxy)
+        const new_attributes = attributes.filter(
+          (attr) => attr.id !== field_id
+        );
+        attributes.length = 0;
+        attributes.push(...new_attributes);
+        //
+
+        if (draft.doctype === "v0_form") {
+          // remove from available_field_ids
+          draft.form.available_field_ids =
+            draft.form.available_field_ids.filter((id) => id !== field_id);
+
+          // set empty to referenced blocks
+          draft.blocks = draft.blocks.map((block) => {
+            if (block.form_field_id === field_id) {
+              block.form_field_id = null;
+            }
+            return block;
+          });
+        }
+      });
+    }
     case "editor/table/schema/add": {
       const { table } = <DatabaseTableSchemaAddAction>action;
       return produce(state, (draft) => {
@@ -506,5 +572,43 @@ export function get_attributes(
     }
     default:
       throw new Error("cannot get attributes - unsupported doctype");
+  }
+}
+
+function push_or_update_attribute(
+  attributes: Draft<Array<AttributeDefinition>>,
+  data: AttributeDefinition
+) {
+  const attribute = attributes.find((f) => f.id === data.id);
+  if (attribute) {
+    Object.assign(attribute, { ...data });
+    return {
+      isnew: false,
+      attribute,
+    };
+  } else {
+    attributes.push(data);
+    return {
+      isnew: true,
+      attribute: attributes.find((f) => f.id === data.id),
+    };
+  }
+}
+
+/**
+ * check if there is a waiting block for new field.
+ * when creating a new field on certain ux, we create the block first then open a new field panel, once saved, we may use this for finding the block.
+ * @param draft
+ * @returns
+ */
+function has_waiting_block_for_new_field(draft: Draft<EditorState>) {
+  if (draft.focus_block_id) {
+    const block = draft.blocks.find((d) => d.id == draft.focus_block_id);
+
+    if (block && block.type === "field" && !block.form_field_id) {
+      return block;
+    }
+
+    return false;
   }
 }
