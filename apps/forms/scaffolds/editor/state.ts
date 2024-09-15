@@ -27,6 +27,7 @@ import { ZodObject } from "zod";
 import { Tokens } from "@/ast";
 import React from "react";
 import { ResourceTypeIconName } from "@/components/resource-type-icon";
+import colors from "@/k/tailwindcolors";
 
 export type GDocEditorRouteParams = {
   org: string;
@@ -356,7 +357,7 @@ export type IMultiplayerCursor = {
 
   message?: string;
   // avatar: string;
-  color: string;
+  color: keyof typeof colors;
   // location: string;
   // canvas: "canvas" | "table";
   node_type?: "cell";
