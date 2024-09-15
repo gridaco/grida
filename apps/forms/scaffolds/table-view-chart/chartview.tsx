@@ -2,7 +2,7 @@
 
 import { TrendingUp } from "lucide-react";
 import {
-  Label,
+  Label as ChartLabel,
   Area,
   AreaChart,
   Bar,
@@ -57,6 +57,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Chart } from "@/lib/chart";
 import { ChartPartialDataAlert } from "./warn-partial-data";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 
 /// TODO:
 // type switch
@@ -102,6 +104,7 @@ interface ChartViewState {
   grid: DataChartCartesianGridState;
   mainAxis: Chart.MainAxisDataQuery;
   crossAxis: CrossAxisDataQuery;
+  semantic: "continuous" | "discrete" | "unknwon";
 }
 
 type ChartViewAction =
@@ -194,6 +197,7 @@ export function Chartview() {
     },
     mainAxis: { key: "", sort: "none", aggregate: "datetime-week" },
     crossAxis: { fn: "count" },
+    semantic: "unknwon",
   });
 
   const { mainAxis, renderer, curve, areaFill, palette } = state;
@@ -269,15 +273,14 @@ export function Chartview() {
         <aside className="flex flex-col gap-4 max-w-xs">
           <ChartTypeToggleGroup value={renderer} onValueChange={changeType} />
           <hr />
-          <label>Main Axis</label>
+          <Label className="text-muted-foreground">Main Axis</Label>
           <MainAxisQueryControl
             value={mainAxis}
             onValueChange={changeMainAxis}
             attributes={df.attributes}
           />
           <hr />
-          <hr />
-          <label>Styles</label>
+          <Label className="text-muted-foreground">Styles</Label>
           <CurveTypeControl value={curve} onValueChange={changeCurve} />
           <AreaFillTypeControl
             value={areaFill}
@@ -427,7 +430,11 @@ function MainAxisQueryControl({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger>What to show {value.key}</DropdownMenuTrigger>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm">
+          {value.key ? value.key : "What to show"}
+        </Button>
+      </DropdownMenuTrigger>
       <DropdownMenuContent>
         <DropdownMenuRadioGroup onValueChange={onKeyChange}>
           {attributes.map(({ name, type }) => {
@@ -483,7 +490,7 @@ function MainAxisQueryControl({
                 );
             }
             return (
-              <DropdownMenuRadioItem value={name}>
+              <DropdownMenuRadioItem key={name} value={name}>
                 <FormFieldTypeIcon
                   type={type}
                   className="inline-block me-2 align-middle w-4 h-4"
@@ -592,6 +599,7 @@ function DataChart({
               {Object.entries(defs).map(([key]) => {
                 return (
                   <linearGradient
+                    key={key}
                     id={`fill-${key}`}
                     x1="0"
                     y1="0"
@@ -647,7 +655,7 @@ function DataChart({
               dataKey={"value"}
               innerRadius={60}
             >
-              <Label
+              <ChartLabel
                 content={({ viewBox }) => {
                   if (viewBox && "cx" in viewBox && "cy" in viewBox) {
                     return (
