@@ -349,13 +349,13 @@ interface IInsertionMenuState {
   insertmenu: TGlobalEditorDialogState;
 }
 
-export type IMultiplayerUserCursor = {
+export type IMultiplayerCursor = {
   cursor_id: string;
   // user_id: string;
   // username: string;
   message?: string;
   // avatar: string;
-  // color: string;
+  color: string;
   // location: string;
   // canvas: "canvas" | "table";
   node_type?: "cell";
@@ -369,7 +369,8 @@ export type IMultiplayerUserCursor = {
 interface IEditorMultiplayerState {
   multiplayer: {
     room_id: string;
-    users: Array<IMultiplayerUserCursor>;
+    cursor_id: string;
+    cursors: Array<IMultiplayerCursor>;
   };
 }
 

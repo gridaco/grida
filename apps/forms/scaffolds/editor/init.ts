@@ -20,6 +20,7 @@ import { blockstreeflat } from "@/lib/forms/tree";
 import { SYM_LOCALTZ, EditorSymbols } from "./symbols";
 import { FormFieldDefinition, GridaXSupabase } from "@/types";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
+import { nanoid } from "nanoid";
 
 export function initialEditorState(init: EditorInit): EditorState {
   switch (init.doctype) {
@@ -57,7 +58,8 @@ function initialBaseDocumentEditorState(
     project: init.project,
     multiplayer: {
       room_id: init.document_id,
-      users: [],
+      cursor_id: nanoid(),
+      cursors: [],
     },
     saving: false,
     theme: init.theme,

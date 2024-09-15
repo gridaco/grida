@@ -1,7 +1,7 @@
 import { createClientWorkspaceClient } from "@/lib/supabase/client";
 import { useEffect, useId, useMemo, useState } from "react";
 import { useEditorState } from "../use";
-import type { IMultiplayerUserCursor } from "../state";
+import type { IMultiplayerCursor } from "../state";
 import { useDebounce, useThrottle } from "@uidotdev/usehooks";
 
 export interface Payload<T> {
@@ -16,15 +16,29 @@ interface ICursorPos {
   y: number;
 }
 
-function useMultiplayerRoom(room_id: string) {
-  const cursor_id = useId();
+function initcursor(seed: Partial<IMultiplayerCursor>): IMultiplayerCursor {
+  // const color = colors
+
+  return {
+    color: "",
+    ...seed,
+  } as IMultiplayerCursor;
+}
+
+function useMultiplayerRoom({
+  room_id,
+  cursor_id,
+}: {
+  room_id: string;
+  cursor_id: string;
+}) {
   const client = useMemo(() => createClientWorkspaceClient(), []);
 
   const [pos, setPos] = useState<[number, number]>();
 
   const debouncedPos = useThrottle(pos, 10);
 
-  const [users, setUsers] = useState<IMultiplayerUserCursor[]>([]);
+  const [cursors, setCursors] = useState<IMultiplayerCursor[]>([]);
 
   const [send, setSend] = useState<
     ((payload: Payload<any>) => void) | undefined
@@ -57,7 +71,7 @@ function useMultiplayerRoom(room_id: string) {
 
     ch.on("broadcast", { event: "POS" }, (payload: Payload<ICursorPos>) => {
       if (!payload.payload) return;
-      setUsers((users) => {
+      setCursors((users) => {
         const user = users.find(
           (u) => u.cursor_id === payload.payload!.cursor_id
         );
@@ -134,17 +148,18 @@ function useMultiplayerRoom(room_id: string) {
     });
   }, [send, debouncedPos?.[0], debouncedPos?.[1]]);
 
-  return users;
+  return cursors;
 }
 
 export function MultiplayerLayer() {
   const [state] = useEditorState();
+  const { room_id, cursor_id } = state.multiplayer;
 
-  const users = useMultiplayerRoom(state.multiplayer.room_id);
+  const players = useMultiplayerRoom({ room_id, cursor_id });
 
   return (
     <>
-      {users.map((u) =>
+      {players.map((u) =>
         u.x && u.y ? (
           <Cursor
             key={u.cursor_id}
