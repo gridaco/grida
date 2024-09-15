@@ -28,28 +28,42 @@ export function Breadcrumbs() {
 
   return (
     <Breadcrumb>
-      <BreadcrumbList>
+      <BreadcrumbList className="flex-nowrap">
+        <div className="hidden md:block">
+          <BreadcrumbItem>
+            <BreadcrumbLink
+              href={`/${org}/${proj}`}
+              className="text-ellipsis overflow-hidden whitespace-nowrap w-full"
+            >
+              {proj}
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+        </div>
+        <div className="hidden md:block">
+          <BreadcrumbSeparator />
+        </div>
         <BreadcrumbItem>
-          <BreadcrumbLink href={`/${org}/${proj}`}>{proj}</BreadcrumbLink>
-        </BreadcrumbItem>
-        <BreadcrumbSeparator />
-        <BreadcrumbItem>
-          <BreadcrumbPage>
+          <BreadcrumbPage className="max-w-[160px] text-ellipsis overflow-hidden whitespace-nowrap w-full">
             <ResourceTypeIcon
               type={doctype}
               className="inline w-4 h-4 me-2 align-middle"
             />
-            {document_title}
+            <span className="text-ellipsis overflow-hidden">
+              {document_title}
+            </span>
           </BreadcrumbPage>
         </BreadcrumbItem>
-        {paths.map((path, i) => (
-          <React.Fragment key={i}>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>{path}</BreadcrumbPage>
-            </BreadcrumbItem>
-          </React.Fragment>
-        ))}
+
+        <BreadcrumbList className="hidden lg:flex">
+          {paths.map((path, i) => (
+            <React.Fragment key={i}>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage>{path}</BreadcrumbPage>
+              </BreadcrumbItem>
+            </React.Fragment>
+          ))}
+        </BreadcrumbList>
       </BreadcrumbList>
     </Breadcrumb>
   );
