@@ -503,8 +503,35 @@ function Header({
           <Breadcrumbs />
           <SavingIndicator />
         </div>
-        <PlayActions />
+        <div className="flex gap-1 items-center">
+          <Players />
+          <PlayActions />
+        </div>
       </div>
     </header>
+  );
+}
+
+function Players() {
+  const count = 3;
+  const max = 5;
+  return (
+    <div className="flex -space-x-2 -mx-2">
+      {[1, 2, 3].map((i) => (
+        <PlayerAvatar key={i} zIndex={count - i} />
+      ))}
+    </div>
+  );
+}
+
+function PlayerAvatar({ focus, zIndex }: { focus?: boolean; zIndex: number }) {
+  return (
+    <button
+      data-focus={focus}
+      className="w-7 h-7 rounded-full bg-muted border-2 border-background hover:border-ring hover:!z-10 transition focus:border-accent"
+      style={{
+        zIndex: zIndex,
+      }}
+    />
   );
 }

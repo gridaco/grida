@@ -16,11 +16,22 @@ interface ICursorPos {
   y: number;
 }
 
+const colors = [
+  "#FF0000",
+  "#FF7F00",
+  "#FFFF00",
+  "#00FF00",
+  "#0000FF",
+  "#4B0082",
+  "#9400D3",
+];
+
 function initcursor(seed: Partial<IMultiplayerCursor>): IMultiplayerCursor {
-  // const color = colors
+  const color = colors[Math.floor(Math.random() * colors.length)];
 
   return {
-    color: "",
+    color: color,
+    typing: false,
     ...seed,
   } as IMultiplayerCursor;
 }
@@ -36,7 +47,7 @@ function useMultiplayerRoom({
 
   const [pos, setPos] = useState<[number, number]>();
 
-  const debouncedPos = useThrottle(pos, 10);
+  const debouncedPos = useThrottle(pos, 50);
 
   const [cursors, setCursors] = useState<IMultiplayerCursor[]>([]);
 
@@ -79,9 +90,11 @@ function useMultiplayerRoom({
           return [
             ...users,
             {
-              cursor_id: payload.payload!.cursor_id,
-              x: payload.payload?.x,
-              y: payload.payload?.y,
+              ...initcursor({
+                cursor_id: payload.payload!.cursor_id,
+                x: payload.payload?.x,
+                y: payload.payload?.y,
+              }),
             },
           ];
         }
@@ -162,8 +175,9 @@ export function MultiplayerLayer() {
       {players.map((u) =>
         u.x && u.y ? (
           <Cursor
+            local={cursor_id === u.cursor_id}
             key={u.cursor_id}
-            color={"black"}
+            color={u.color}
             hue={"black"}
             x={u.x}
             y={u.y}
@@ -177,11 +191,13 @@ export function MultiplayerLayer() {
 }
 
 function Cursor({
+  local,
   color,
   hue,
   x,
   y,
 }: {
+  local: boolean;
   color: string;
   hue: string;
   x: number;
@@ -189,27 +205,61 @@ function Cursor({
 }) {
   return (
     <>
-      <svg
-        width="18"
-        height="24"
-        viewBox="0 0 18 24"
-        fill="none"
-        className="absolute top-0 left-0 transform transition pointer-events-none"
-        style={{ color, transform: `translateX(${x}px) translateY(${y}px)` }}
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <path
-          d="M2.717 2.22918L15.9831 15.8743C16.5994 16.5083 16.1503 17.5714 15.2661 17.5714H9.35976C8.59988 17.5714 7.86831 17.8598 7.3128 18.3783L2.68232 22.7C2.0431 23.2966 1 22.8434 1 21.969V2.92626C1 2.02855 2.09122 1.58553 2.717 2.22918Z"
-          fill={color}
-          stroke={hue}
-          strokeWidth="2"
-        />
-      </svg>
-      <CursorMessageBubble />
+      {!local && (
+        <svg
+          width="18"
+          height="24"
+          viewBox="0 0 18 24"
+          fill="none"
+          className="absolute top-0 left-0 transform transition-transform duration-75 pointer-events-none"
+          style={{
+            color,
+            transform: `translateX(${x}px) translateY(${y}px)`,
+            zIndex: 999,
+          }}
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M2.717 2.22918L15.9831 15.8743C16.5994 16.5083 16.1503 17.5714 15.2661 17.5714H9.35976C8.59988 17.5714 7.86831 17.8598 7.3128 18.3783L2.68232 22.7C2.0431 23.2966 1 22.8434 1 21.969V2.92626C1 2.02855 2.09122 1.58553 2.717 2.22918Z"
+            fill={color}
+            stroke={hue}
+            strokeWidth="2"
+          />
+        </svg>
+      )}
+      <CursorMessageBubble color={color} hue={hue} x={x + 16} y={y + 16} />
     </>
   );
 }
 
-function CursorMessageBubble() {
-  return <></>;
+function CursorMessageBubble({
+  x,
+  y,
+  color,
+  hue,
+}: {
+  color: string;
+  hue: string;
+  x: number;
+  y: number;
+}) {
+  return (
+    <div
+      className="absolute top-0 left-0 transform transition-transform duration-75 pointer-events-none"
+      style={{
+        transform: `translateX(${x}px) translateY(${y}px)`,
+        zIndex: 999 - 1,
+      }}
+    >
+      <div
+        className="max-w-xs rounded-full h-10 w-40 overflow-hidden border-2"
+        style={{ backgroundColor: color, borderColor: hue }}
+      >
+        <input
+          className="px-4 w-full h-full bg-transparent text-white placeholder:text-white/50"
+          placeholder="Say something"
+        />
+      </div>
+    </div>
+  );
 }

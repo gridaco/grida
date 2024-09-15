@@ -353,6 +353,7 @@ export type IMultiplayerCursor = {
   cursor_id: string;
   // user_id: string;
   // username: string;
+  typing: boolean;
   message?: string;
   // avatar: string;
   color: string;
