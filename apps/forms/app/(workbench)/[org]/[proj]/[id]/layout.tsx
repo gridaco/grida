@@ -524,11 +524,17 @@ function Players() {
   );
 }
 
-function PlayerAvatar({ focus, zIndex }: { focus?: boolean; zIndex: number }) {
+function PlayerAvatar({
+  selected,
+  zIndex,
+}: {
+  selected?: boolean;
+  zIndex: number;
+}) {
   return (
     <button
-      data-focus={focus}
-      className="w-7 h-7 rounded-full bg-muted border-2 border-background hover:border-ring hover:!z-10 transition focus:border-accent"
+      data-selected={selected}
+      className="w-7 h-7 rounded-full bg-muted border-2 border-background focus:border-ring hover:border-ring hover:!z-10 transition data-[selected='true']:border-foreground data-[selected='true']:!z-10"
       style={{
         zIndex: zIndex,
       }}

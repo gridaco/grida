@@ -59,6 +59,7 @@ function initialBaseDocumentEditorState(
     multiplayer: {
       room_id: init.document_id,
       cursor_id: nanoid(),
+      typing: false,
       cursors: [],
     },
     saving: false,

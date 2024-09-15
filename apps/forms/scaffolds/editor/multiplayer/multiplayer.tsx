@@ -1,8 +1,8 @@
 import { createClientWorkspaceClient } from "@/lib/supabase/client";
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useEditorState } from "../use";
 import type { IMultiplayerCursor } from "../state";
-import { useDebounce, useThrottle } from "@uidotdev/usehooks";
+import { useThrottle } from "@uidotdev/usehooks";
 
 export interface Payload<T> {
   type: "broadcast";
@@ -31,7 +31,6 @@ function initcursor(seed: Partial<IMultiplayerCursor>): IMultiplayerCursor {
 
   return {
     color: color,
-    typing: false,
     ...seed,
   } as IMultiplayerCursor;
 }

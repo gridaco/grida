@@ -353,7 +353,7 @@ export type IMultiplayerCursor = {
   cursor_id: string;
   // user_id: string;
   // username: string;
-  typing: boolean;
+
   message?: string;
   // avatar: string;
   color: string;
@@ -371,6 +371,7 @@ interface IEditorMultiplayerState {
   multiplayer: {
     room_id: string;
     cursor_id: string;
+    typing: boolean;
     cursors: Array<IMultiplayerCursor>;
   };
 }
