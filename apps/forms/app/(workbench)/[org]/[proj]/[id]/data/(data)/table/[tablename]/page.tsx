@@ -6,7 +6,7 @@ import {
   GridaSchemaTableFeedProvider,
   GridaSchemaTableSyncProvider,
   GridaSchemaXSBTableFeedProvider,
-  GridaSchemaXSBTableSyncProvider,
+  XSBTableTransactionsQueueProvider,
 } from "@/scaffolds/editor/feed";
 import {
   GDocSchemaTable,
@@ -76,9 +76,9 @@ function SwitchGridEditor() {
       return (
         <>
           {!tb.readonly && (
-            <GridaSchemaXSBTableSyncProvider
+            <XSBTableTransactionsQueueProvider
               pk={tb.x_sb_main_table_connection.pk!}
-              table_id={tb.id}
+              schema_table_id={tb.id}
               sb_table_id={tb.x_sb_main_table_connection.sb_table_id}
             />
           )}

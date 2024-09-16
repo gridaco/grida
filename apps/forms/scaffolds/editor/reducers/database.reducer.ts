@@ -12,13 +12,14 @@ import type {
   DatabaseTableSchemaDeleteAction,
   DatabaseTableAttributeChangeAction,
   DatabaseTableAttributeDeleteAction,
+  DatabaseTableSpaceTransactionStatusAction,
 } from "../action";
 import type {
   EditorState,
   GDocFormsXSBTable,
-  GDocSchemaTableProviderXSupabase,
   GDocTable,
   GDocTableID,
+  TablespaceTransaction,
   TGridaDataTablespace,
   TTablespace,
   TVirtualRow,
@@ -35,7 +36,8 @@ import assert from "assert";
 import { EditorSymbols } from "../symbols";
 import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";
 import { schematableinit, table_to_sidebar_table_menu } from "../init";
-import { v4 } from "uuid";
+import { nanoid } from "nanoid";
+import equal from "deep-equal";
 
 export default function databaseRecucer(
   state: EditorState,
@@ -304,21 +306,28 @@ export default function databaseRecucer(
 
             update_xsbtablespace(pk, space, draft, action);
 
-            // add to transactions
-            space.transactions.push({
-              digest: v4(),
-              timestamp: Date.now(),
-              user: "user",
-              operation: "update",
-              table_id: table_id,
-              column: attribute_id,
-              row: row_id,
-              data: data,
-            });
             break;
           }
           default:
             throw new Error("Unsupported table provider");
+        }
+      });
+    }
+    case "editor/table/space/transactions/status": {
+      const { digest, status } = <DatabaseTableSpaceTransactionStatusAction>(
+        action
+      );
+
+      return produce(state, (draft) => {
+        switch (status) {
+          case "queued":
+            updateTransaction(draft.transactions, digest, "queued");
+            break;
+          case "resolved":
+            resolveTransaction(draft.transactions, digest);
+            break;
+          default:
+            throw new Error("Unsupported status: " + status);
         }
       });
     }
@@ -399,7 +408,6 @@ export default function databaseRecucer(
             readonly: false,
             stream: [],
             realtime: false,
-            transactions: [],
           };
         } else {
           draft.tablespace[tb.id] = {
@@ -407,7 +415,6 @@ export default function databaseRecucer(
             readonly: false,
             stream: [],
             realtime: true,
-            // transactions: [],
           };
         }
 
@@ -430,6 +437,43 @@ export default function databaseRecucer(
     }
   }
   return state;
+}
+
+function updateTransaction(
+  transactions: Draft<TablespaceTransaction[]>,
+  digest: string,
+  status: "queued"
+) {
+  const transaction = transactions.find((t) => t.digest === digest);
+  assert(transaction, "Transaction not found");
+
+  transaction.status = status;
+}
+
+function resolveTransaction(
+  transactions: Draft<TablespaceTransaction[]>,
+  digest: string
+) {
+  // remove the transaction
+  const idx = transactions.findIndex((t) => t.digest === digest);
+  assert(idx !== -1, "Transaction not found");
+  transactions.splice(idx, 1);
+}
+
+function pushTransaction(
+  transactions: Draft<TablespaceTransaction[]>,
+  digest: string,
+  transaction: Omit<TablespaceTransaction, "digest" | "status">
+) {
+  // assert if the digest already exists
+  const existing = transactions.find((t) => t.digest === digest);
+  assert(!existing, "Transaction digest already exists");
+
+  transactions.push({
+    digest,
+    status: "pending",
+    ...transaction,
+  });
 }
 
 function get_table<T extends GDocTable>(
@@ -480,12 +524,13 @@ function update_xsbtablespace(
   const attribute = attributes.find((f) => f.id === column);
   if (!attribute) return;
 
+  const row = space.stream!.find((r) => r[pk] === row_pk);
+  const row_prev = { ...row };
+  assert(row, "Row not found");
+
   // handle jsonpaths - partial object update
   if (FlatPostgREST.testPath(attribute.name)) {
     const { column } = FlatPostgREST.decodePath(attribute.name);
-    const row = space.stream!.find((r) => r[pk] === row_pk);
-
-    if (!row) return;
 
     const newrow = FlatPostgREST.update(
       row,
@@ -499,19 +544,44 @@ function update_xsbtablespace(
       }
       return r;
     });
-
-    return;
+  } else {
+    space.stream = space.stream!.map((r) => {
+      if (r[pk] === row_pk) {
+        return {
+          ...r,
+          [attribute!.name]: value,
+        };
+      }
+      return r;
+    });
   }
 
-  space.stream = space.stream!.map((r) => {
-    if (r[pk] === row_pk) {
-      return {
-        ...r,
-        [attribute!.name]: value,
-      };
-    }
-    return r;
-  });
+  // #region create transaction based on diff
+
+  // get the diff of current row.
+  // push to transactions based on diff
+  // we do this for 2 reasons:
+  // 1. since the tablespace does not 1:1 match with the remote database.
+  // 2. to cater flattened json fields (requires reconstruction)
+  const new_row = space.stream!.find((r) => r[pk] === row_pk);
+  const diff = rowdiff(row_prev, new_row!, (key) => key.startsWith("__gf_"));
+  // console.log("diff", diff);
+
+  if (Object.keys(diff).length > 0) {
+    // add to transactions
+    const digest = nanoid();
+    pushTransaction(draft.transactions, digest, {
+      timestamp: Date.now(),
+      user: "user",
+      operation: "update",
+      schema_table_id: table_id,
+      column: column,
+      row: row_pk,
+      data: diff,
+    });
+  }
+
+  // #endregion
 }
 
 export function get_attributes(
@@ -569,4 +639,21 @@ function has_waiting_block_for_new_field(draft: Draft<EditorState>) {
 
     return false;
   }
+}
+
+function rowdiff(
+  prevRow: Record<string, any>,
+  newRow: Record<string, any>,
+  ignoreKey?: (key: string) => boolean
+) {
+  const changedFields: Record<string, any> = {};
+  for (const key in newRow) {
+    if (ignoreKey && ignoreKey(key)) {
+      continue;
+    }
+    if (!equal(newRow[key], prevRow[key])) {
+      changedFields[key] = newRow[key];
+    }
+  }
+  return changedFields;
 }
