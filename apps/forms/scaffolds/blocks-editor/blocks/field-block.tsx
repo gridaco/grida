@@ -98,7 +98,7 @@ export function FieldBlock({
 
   const onFieldEditClick = useCallback(() => {
     dispatch({
-      type: "editor/field/edit",
+      type: "editor/panels/field-edit",
       field_id: form_field_id!,
     });
   }, [dispatch, form_field_id]);
@@ -314,7 +314,7 @@ export function FormFieldBlockMenuItems({
 
   const onFieldEditClick = useCallback(() => {
     dispatch({
-      type: "editor/field/edit",
+      type: "editor/panels/field-edit",
       field_id: form_field_id!,
     });
   }, [dispatch, form_field_id]);

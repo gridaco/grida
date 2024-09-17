@@ -19,17 +19,27 @@ import equal from "deep-equal";
 import { PrivateEditorApi } from "@/lib/private";
 import { EditorSymbols } from "./symbols";
 import {
-  type GDocFormsXSBTable,
   type GDocSchemaTableProviderGrida,
   type TablespaceSchemaTableStreamType,
+  type TablespaceTransaction,
   type TVirtualRow,
-  TXSupabaseDataTablespace,
 } from "./state";
+import PQueue from "p-queue";
 import assert from "assert";
 
 type RealtimeTableChangeData = {
   id: string;
   [key: string]: any;
+};
+
+const useRefresh = () => {
+  const [state, dispatch] = useEditorState();
+
+  return useCallback(() => {
+    dispatch({
+      type: "editor/data-grid/refresh",
+    });
+  }, [dispatch]);
 };
 
 const useSubscription = ({
@@ -183,7 +193,7 @@ function useChangeDatagridLoading() {
   );
 }
 
-function useSyncCell() {
+function useUpdateCell() {
   const supabase = useMemo(() => createClientFormsClient(), []);
 
   return useCallback(
@@ -214,7 +224,7 @@ function useSyncCellChangesEffect(
   prev: Array<TVirtualRow<FormResponseField, FormResponse>> | undefined,
   current: Array<TVirtualRow<FormResponseField, FormResponse>> | undefined
 ) {
-  const sync = useSyncCell();
+  const sync = useUpdateCell();
 
   useEffect(() => {
     current?.forEach((r) => {
@@ -343,22 +353,25 @@ function useXSBTableFeed(
   }, [res.data]);
 }
 
-function useXSBSyncCell({
-  table_id,
+function useXSBUpdateRow({
+  schema_table_id,
   sb_table_id,
   pk,
 }: {
-  table_id: string;
+  schema_table_id: string;
   sb_table_id?: number | null;
   pk: string | undefined;
 }) {
   return useCallback(
-    (key: number | string, value: Record<string, any>) => {
+    async (key: number | string, value: Record<string, any>) => {
       if (!sb_table_id) return;
       if (!pk) return;
 
-      const task = fetch(
-        PrivateEditorApi.XSupabase.url_table_x_query(table_id, sb_table_id),
+      const res = await fetch(
+        PrivateEditorApi.XSupabase.url_table_x_query(
+          schema_table_id,
+          sb_table_id
+        ),
         {
           method: "PATCH",
           headers: {
@@ -375,53 +388,56 @@ function useXSBSyncCell({
             ],
           } satisfies XPostgrestQuery.Body),
         }
-      );
+      ).then((res) => res.json());
 
-      toast
-        .promise(task, {
-          loading: "Updating...",
-          success: "Updated",
-          error: "Failed",
-        })
-        .then((data) => {
-          // NOTE: Do not dispatch data based on this result. this does not contain extended data
+      const { data, error } = res;
+      if (error) {
+        console.error(error, {
+          key,
+          payload: value,
         });
+        throw new Error();
+      }
+
+      return res;
     },
-    [pk, table_id, sb_table_id]
+    [pk, schema_table_id, sb_table_id]
   );
 }
 
-function useXSBSyncCellChangesEffect(
-  prev: Array<GridaXSupabase.XDataRow> | undefined,
-  current: Array<GridaXSupabase.XDataRow> | undefined,
-  queryprops: {
-    table_id: string;
-    sb_table_id?: number | null;
-    pk: string | undefined;
+const DB_TRANSACTIONS_RESOLVER_QUEUE = new PQueue({ concurrency: 1 });
+
+function useResolveTransactions(
+  transactions: Array<TablespaceTransaction>,
+  {
+    operators,
+    onTransactionFinally,
+    onTransactionQueued,
+  }: {
+    operators: {
+      update: (key: string, data: Record<string, any>) => Promise<any>;
+    };
+    onTransactionFinally?: (digest: string) => void;
+    onTransactionQueued?: (digest: string) => void;
   }
 ) {
-  const pk = queryprops.pk;
-
-  const update = useXSBSyncCell(queryprops);
-
   useEffect(() => {
-    if (!current) return;
-    if (!prev) return;
-    if (!pk) return;
+    if (!transactions) return;
+    const tobequeued = transactions.filter((t) => t.status === "pending");
+    if (tobequeued.length === 0) return;
 
-    // check if rows are updated
-    for (const row of current) {
-      const prevRow = prev.find((r) => r.id === row.id);
-
-      if (prevRow) {
-        // get changed fields
-        const diff = rowdiff(prevRow, row, (key) => key.startsWith("__gf_"));
-        if (Object.keys(diff).length > 0) {
-          update(row[pk], diff);
-        }
-      }
+    for (const q of tobequeued) {
+      const { row, column, data } = q;
+      const fn = async () => {
+        operators.update(row, data).finally(() => {
+          onTransactionFinally?.(q.digest);
+        });
+      };
+      DB_TRANSACTIONS_RESOLVER_QUEUE.add(fn);
+      // mark as processing
+      onTransactionQueued?.(q.digest);
     }
-  }, [pk, prev, update, current]);
+  }, [transactions, operators, onTransactionFinally, onTransactionQueued]);
 }
 
 export function FormResponseSyncProvider({
@@ -542,7 +558,7 @@ export function FormResponseFeedProvider({
     onDelete: (data) => {
       if ("id" in data) {
         dispatch({
-          type: "editor/response/delete",
+          type: "editor/table/space/rows/delete",
           id: data.id,
         });
       }
@@ -596,7 +612,7 @@ export function FormResponseSessionFeedProvider({
       },
     }).then(({ data, count }) => {
       dispatch({
-        type: "editor/data/sessions/feed",
+        type: "editor/table/space/feed/sessions",
         data: data as any,
         reset: true,
         count: count!,
@@ -627,13 +643,13 @@ export function FormResponseSessionFeedProvider({
     form_id: form.form_id,
     onInsert: (data) => {
       dispatch({
-        type: "editor/data/sessions/feed",
+        type: "editor/table/space/feed/sessions",
         data: [data as any],
       });
     },
     onUpdate: (data) => {
       dispatch({
-        type: "editor/data/sessions/feed",
+        type: "editor/table/space/feed/sessions",
         data: [data as any],
       });
     },
@@ -694,27 +710,63 @@ export function CustomerFeedProvider({
   return <>{children}</>;
 }
 
-export function FormXSupabaseMainTableSyncProvider({
+export function XSBTableTransactionsQueueProvider({
+  pk,
+  schema_table_id,
+  sb_table_id,
   children,
-}: React.PropsWithChildren<{}>) {
-  const [state] = useEditorState();
+}: React.PropsWithChildren<{
+  schema_table_id: string;
+  sb_table_id: number;
+  pk: string;
+}>) {
+  const [state, dispatch] = useEditorState();
 
-  const tb = useDatagridTable<GDocFormsXSBTable>();
+  const { transactions: _transactions } = state;
 
-  const { tablespace } = state;
+  const target_transactions = useMemo(() => {
+    return _transactions.filter((t) => t.schema_table_id === schema_table_id);
+  }, [_transactions, schema_table_id]);
 
-  const current =
-    tablespace[EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID]
-      .stream;
+  const refresh = useRefresh();
 
-  const prev = usePrevious(current);
-
-  const pk = tb?.x_sb_main_table_connection.pk;
-
-  useXSBSyncCellChangesEffect(prev, current, {
-    table_id: state.form.form_id,
+  const update = useXSBUpdateRow({
     pk: pk,
-    sb_table_id: state.connections.supabase?.main_supabase_table_id,
+    schema_table_id: schema_table_id,
+    sb_table_id: sb_table_id,
+  });
+
+  const updateTransactionStatus = useCallback(
+    (digest: string, status: "queued" | "resolved") => {
+      dispatch({
+        type: "editor/table/space/transactions/status",
+        digest: digest,
+        status: status,
+      });
+    },
+    [dispatch]
+  );
+
+  useResolveTransactions(target_transactions, {
+    operators: {
+      update: (...args) => {
+        const task = update(...args);
+        toast.promise(task, {
+          loading: "Updating...",
+          success: "Updated",
+          error: "Failed",
+        });
+
+        return task;
+      },
+    },
+    onTransactionFinally: (digest: string) => {
+      updateTransactionStatus(digest, "resolved");
+      refresh();
+    },
+    onTransactionQueued: (digest: string) => {
+      updateTransactionStatus(digest, "queued");
+    },
   });
 
   return <>{children}</>;
@@ -869,39 +921,12 @@ export function GridaSchemaTableFeedProvider({
     onDelete: (data) => {
       if ("id" in data) {
         dispatch({
-          type: "editor/response/delete",
+          type: "editor/table/space/rows/delete",
           id: data.id,
         });
       }
     },
     enabled: _realtime_responses_enabled,
-  });
-
-  return <>{children}</>;
-}
-
-export function GridaSchemaXSBTableSyncProvider({
-  pk,
-  table_id,
-  sb_table_id,
-  children,
-}: React.PropsWithChildren<{
-  table_id: string;
-  sb_table_id: number;
-  pk: string;
-}>) {
-  const [state] = useEditorState();
-
-  const { tablespace } = state;
-
-  const current = (tablespace[table_id] as TXSupabaseDataTablespace).stream;
-
-  const prev = usePrevious(current);
-
-  useXSBSyncCellChangesEffect(prev, current, {
-    table_id: table_id,
-    pk: pk,
-    sb_table_id: sb_table_id,
   });
 
   return <>{children}</>;
@@ -930,21 +955,4 @@ export function GridaSchemaXSBTableFeedProvider({
   });
 
   return <></>;
-}
-
-function rowdiff(
-  prevRow: Record<string, any>,
-  newRow: Record<string, any>,
-  ignoreKey?: (key: string) => boolean
-) {
-  const changedFields: Record<string, any> = {};
-  for (const key in newRow) {
-    if (ignoreKey && ignoreKey(key)) {
-      continue;
-    }
-    if (!equal(newRow[key], prevRow[key])) {
-      changedFields[key] = newRow[key];
-    }
-  }
-  return changedFields;
 }

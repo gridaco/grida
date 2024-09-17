@@ -293,7 +293,7 @@ function SectionResponseCustomerDetails({
   const onViewCustomerDetailsClick = useCallback(
     (customer_id: string) => {
       dispatch({
-        type: "editor/customers/edit",
+        type: "editor/panels/customer-details",
         customer_id: customer_id,
       });
     },

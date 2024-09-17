@@ -15,7 +15,7 @@ export function GridLocalSearch() {
 
   const onSearchChange = useDebounceCallback((txt: string) => {
     dispatch({
-      type: "editor/data-grid/filter",
+      type: "editor/data-grid/local-filter",
       localsearch: txt,
     });
   }, 250);

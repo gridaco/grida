@@ -13,6 +13,11 @@ export default async function Layout({
   children: React.ReactNode;
   params: { org: string };
 }>) {
+  const org = params.org;
+
+  // in local dev, the vercel insights script is not loaded, will hit this route
+  if (org === "_vercel") return notFound();
+
   const cookieStore = cookies();
   const supabase = createServerComponentClient(cookieStore);
   const wsclient = createServerComponentWorkspaceClient(cookieStore);
@@ -26,10 +31,10 @@ export default async function Layout({
   const { data: organization, error: err } = await wsclient
     .from("organization")
     .select(`*`)
-    .eq("name", params.org)
+    .eq("name", org)
     .single();
 
-  if (err) console.error(err);
+  if (err) console.error("org err", err);
   if (!organization) {
     return notFound();
   }

@@ -551,6 +551,9 @@ importers:
       openai:
         specifier: ^4.29.1
         version: 4.45.0
+      p-queue:
+        specifier: ^7.2.0
+        version: 7.4.1
       papaparse:
         specifier: ^5.4.1
         version: 5.4.1

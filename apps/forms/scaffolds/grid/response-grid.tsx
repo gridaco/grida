@@ -102,7 +102,7 @@ export function ResponseGrid({
 
   const onSelectedRowsChange = (selectedRows: ReadonlySet<string>) => {
     dispatch({
-      type: "editor/response/select",
+      type: "editor/table/space/rows/select",
       selection: selectedRows,
     });
   };
@@ -375,7 +375,7 @@ function DefaultPropertyCustomerCell({
       <FKButton
         onClick={() => {
           dispatch({
-            type: "editor/customers/edit",
+            type: "editor/panels/customer-details",
             open: true,
             customer_id: data,
           });
