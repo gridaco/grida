@@ -565,7 +565,6 @@ function update_xsbtablespace(
   // 2. to cater flattened json fields (requires reconstruction)
   const new_row = space.stream!.find((r) => r[pk] === row_pk);
   const diff = rowdiff(row_prev, new_row!, (key) => key.startsWith("__gf_"));
-  // console.log("diff", diff);
 
   if (Object.keys(diff).length > 0) {
     // add to transactions

@@ -747,8 +747,6 @@ export function XSBTableTransactionsQueueProvider({
     [dispatch]
   );
 
-  // console.log(target_transactions);
-
   useResolveTransactions(target_transactions, {
     operators: {
       update: (...args) => {
