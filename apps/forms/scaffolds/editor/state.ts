@@ -254,10 +254,11 @@ export type TablespaceTransaction = {
   timestamp: number;
   user: "system" | "user";
   operation: "update";
-  table_id: string;
+  schema_table_id: string;
   row: string;
   column: string;
-  data: { value: unknown; option_id?: string | null };
+  data: Record<string, unknown>;
+  status: "pending" | "queued";
 };
 
 export type TTablespace =
@@ -272,7 +273,6 @@ type TCustomDataTablespace<T> = {
 } & (
   | {
       readonly: false;
-      // transactions: Array<TablespaceTransaction>
     }
   | { readonly: true }
 );
@@ -282,7 +282,6 @@ export type TXSupabaseDataTablespace = {
   readonly: boolean;
   realtime: false;
   stream?: Array<GridaXSupabase.XDataRow>;
-  transactions: Array<TablespaceTransaction>;
 };
 
 export type TGridaDataTablespace = {
@@ -290,7 +289,6 @@ export type TGridaDataTablespace = {
   readonly: boolean;
   realtime: boolean;
   stream?: Array<GridaSchemaTableVirtualRow>;
-  // transactions: Array<TablespaceTransaction>;
 };
 
 export type GridaSchemaTableVirtualRow = TVirtualRow<
@@ -508,6 +506,8 @@ interface ITablespaceEditorState {
     //   TablespaceSchemaTableStreamType<T>
     // >;
   };
+
+  transactions: Array<TablespaceTransaction>;
 }
 
 export interface FormEditorState

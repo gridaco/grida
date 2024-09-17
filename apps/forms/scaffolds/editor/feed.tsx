@@ -19,13 +19,12 @@ import equal from "deep-equal";
 import { PrivateEditorApi } from "@/lib/private";
 import { EditorSymbols } from "./symbols";
 import {
-  type GDocFormsXSBTable,
   type GDocSchemaTableProviderGrida,
   type TablespaceSchemaTableStreamType,
   type TablespaceTransaction,
   type TVirtualRow,
-  TXSupabaseDataTablespace,
 } from "./state";
+import PQueue from "p-queue";
 import assert from "assert";
 
 type RealtimeTableChangeData = {
@@ -353,22 +352,26 @@ function useXSBTableFeed(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [res.data]);
 }
+
 function useXSBUpdateRow({
-  table_id,
+  schema_table_id,
   sb_table_id,
   pk,
 }: {
-  table_id: string;
+  schema_table_id: string;
   sb_table_id?: number | null;
   pk: string | undefined;
 }) {
   return useCallback(
-    (key: number | string, value: Record<string, any>) => {
+    async (key: number | string, value: Record<string, any>) => {
       if (!sb_table_id) return;
       if (!pk) return;
 
-      const task = fetch(
-        PrivateEditorApi.XSupabase.url_table_x_query(table_id, sb_table_id),
+      const res = await fetch(
+        PrivateEditorApi.XSupabase.url_table_x_query(
+          schema_table_id,
+          sb_table_id
+        ),
         {
           method: "PATCH",
           headers: {
@@ -385,40 +388,56 @@ function useXSBUpdateRow({
             ],
           } satisfies XPostgrestQuery.Body),
         }
-      );
+      ).then((res) => res.json());
 
-      toast
-        .promise(task, {
-          loading: "Updating...",
-          success: "Updated",
-          error: "Failed",
-        })
-        .then((data) => {
-          // NOTE: Do not dispatch data based on this result. this does not contain extended data
+      const { data, error } = res;
+      if (error) {
+        console.error(error, {
+          key,
+          payload: value,
         });
+        throw new Error();
+      }
+
+      return res;
     },
-    [pk, table_id, sb_table_id]
+    [pk, schema_table_id, sb_table_id]
   );
 }
 
+const DB_TRANSACTIONS_RESOLVER_QUEUE = new PQueue({ concurrency: 1 });
+
 function useResolveTransactions(
   transactions: Array<TablespaceTransaction>,
-  operators: {
-    update: (key: string, data: Record<string, any>) => void;
-    after?: () => void;
+  {
+    operators,
+    onTransactionFinally,
+    onTransactionQueued,
+  }: {
+    operators: {
+      update: (key: string, data: Record<string, any>) => Promise<any>;
+    };
+    onTransactionFinally?: (digest: string) => void;
+    onTransactionQueued?: (digest: string) => void;
   }
 ) {
   useEffect(() => {
-    if (!transactions || transactions.length === 0) return;
-    const tasks = Promise.all(
-      transactions.map(async (transaction) => {
-        const { row, data } = transaction;
-        operators.update(row, data);
-      })
-    );
+    if (!transactions) return;
+    const tobequeued = transactions.filter((t) => t.status === "pending");
+    if (tobequeued.length === 0) return;
 
-    tasks.finally(operators.after);
-  }, [transactions, operators]);
+    for (const q of tobequeued) {
+      const { row, column, data } = q;
+      const fn = async () => {
+        operators.update(row, data).finally(() => {
+          onTransactionFinally?.(q.digest);
+        });
+      };
+      DB_TRANSACTIONS_RESOLVER_QUEUE.add(fn);
+      // mark as processing
+      onTransactionQueued?.(q.digest);
+    }
+  }, [transactions, operators, onTransactionFinally, onTransactionQueued]);
 }
 
 export function FormResponseSyncProvider({
@@ -691,32 +710,63 @@ export function CustomerFeedProvider({
   return <>{children}</>;
 }
 
-export function FormXSupabaseMainTableSyncProvider({
+export function XSBTableTransactionsQueueProvider({
+  pk,
+  schema_table_id,
+  sb_table_id,
   children,
-}: React.PropsWithChildren<{}>) {
-  const [state] = useEditorState();
+}: React.PropsWithChildren<{
+  schema_table_id: string;
+  sb_table_id: number;
+  pk: string;
+}>) {
+  const [state, dispatch] = useEditorState();
 
-  const tb = useDatagridTable<GDocFormsXSBTable>();
+  const { transactions: _transactions } = state;
 
-  const { tablespace } = state;
-
-  const transactions =
-    tablespace[EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID]
-      .transactions;
-
-  const pk = tb?.x_sb_main_table_connection.pk;
+  const target_transactions = useMemo(() => {
+    return _transactions.filter((t) => t.schema_table_id === schema_table_id);
+  }, [_transactions, schema_table_id]);
 
   const refresh = useRefresh();
 
   const update = useXSBUpdateRow({
     pk: pk,
-    table_id: state.form.form_id,
-    sb_table_id: state.connections.supabase?.main_supabase_table_id,
+    schema_table_id: schema_table_id,
+    sb_table_id: sb_table_id,
   });
 
-  useResolveTransactions(transactions, {
-    update: update,
-    after: refresh,
+  const updateTransactionStatus = useCallback(
+    (digest: string, status: "queued" | "resolved") => {
+      dispatch({
+        type: "editor/table/space/transactions/status",
+        digest: digest,
+        status: status,
+      });
+    },
+    [dispatch]
+  );
+
+  useResolveTransactions(target_transactions, {
+    operators: {
+      update: (...args) => {
+        const task = update(...args);
+        toast.promise(task, {
+          loading: "Updating...",
+          success: "Updated",
+          error: "Failed",
+        });
+
+        return task;
+      },
+    },
+    onTransactionFinally: (digest: string) => {
+      updateTransactionStatus(digest, "resolved");
+      refresh();
+    },
+    onTransactionQueued: (digest: string) => {
+      updateTransactionStatus(digest, "queued");
+    },
   });
 
   return <>{children}</>;
@@ -882,39 +932,6 @@ export function GridaSchemaTableFeedProvider({
   return <>{children}</>;
 }
 
-export function GridaSchemaXSBTableSyncProvider({
-  pk,
-  table_id,
-  sb_table_id,
-  children,
-}: React.PropsWithChildren<{
-  table_id: string;
-  sb_table_id: number;
-  pk: string;
-}>) {
-  const [state] = useEditorState();
-
-  const { tablespace } = state;
-
-  const transactions = (tablespace[table_id] as TXSupabaseDataTablespace)
-    .transactions;
-
-  const refresh = useRefresh();
-
-  const update = useXSBUpdateRow({
-    pk: pk,
-    table_id: table_id,
-    sb_table_id: sb_table_id,
-  });
-
-  useResolveTransactions(transactions, {
-    update: update,
-    after: refresh,
-  });
-
-  return <>{children}</>;
-}
-
 export function GridaSchemaXSBTableFeedProvider({
   table_id,
   sb_table_id,
@@ -938,21 +955,4 @@ export function GridaSchemaXSBTableFeedProvider({
   });
 
   return <></>;
-}
-
-function rowdiff(
-  prevRow: Record<string, any>,
-  newRow: Record<string, any>,
-  ignoreKey?: (key: string) => boolean
-) {
-  const changedFields: Record<string, any> = {};
-  for (const key in newRow) {
-    if (ignoreKey && ignoreKey(key)) {
-      continue;
-    }
-    if (!equal(newRow[key], prevRow[key])) {
-      changedFields[key] = newRow[key];
-    }
-  }
-  return changedFields;
 }

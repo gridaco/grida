@@ -324,6 +324,7 @@ export interface DataTableLoadingAction {
 export type DatabaseAction =
   | DatabaseTableSpaceSelectRowsAction
   | DatabaseTableSpaceCellChangeAction
+  | DatabaseTableSpaceTransactionStatusAction
   | DatabaseTableSpaceDeleteSelectedRowsAction
   | DatabaseTableSpaceDeleteRowAction
   | DatabaseTableSpaceFeedProviderXSupabaseAction
@@ -346,6 +347,12 @@ export interface DatabaseTableSpaceCellChangeAction {
   row: string;
   column: string;
   data: { value: unknown; option_id?: string | null };
+}
+
+export interface DatabaseTableSpaceTransactionStatusAction {
+  type: "editor/table/space/transactions/status";
+  digest: string;
+  status: "queued" | "resolved";
 }
 
 export interface DatabaseTableSpaceDeleteSelectedRowsAction {

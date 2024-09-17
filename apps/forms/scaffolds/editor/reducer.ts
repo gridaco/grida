@@ -49,6 +49,7 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
     case "editor/table/space/feed/x-supabase":
     case "editor/table/space/rows/delete":
     case "editor/table/space/cell/change":
+    case "editor/table/space/transactions/status":
     case "editor/table/space/rows/select":
     case "editor/table/space/rows/delete/selected":
     case "editor/table/space/feed/sessions":

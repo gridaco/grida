@@ -167,7 +167,6 @@ function initialDatabaseEditorState(
   const should_add_sb_auth_users =
     init.supabase_project && tables.some((t) => t.provider === "x-supabase");
 
-  // @ts-ignore
   return {
     ...base,
     supabase_project: init.supabase_project,
@@ -217,23 +216,24 @@ function initialDatabaseEditorState(
     ...initialDatagridState(),
     datagrid_table_id: init.tables.length > 0 ? init.tables[0].id : null,
     tables: tables.concat(should_add_sb_auth_users ? [sb_auth_users] : []),
-    // @ts-expect-error
+    // @ts-expect-error TODO: clear
     tablespace: {
-      // @ts-expect-error
+      // @ts-expect-error TODO: clear
       ...init.tables.reduce((acc: Record<GDocTableID, TTablespace>, t) => {
-        // @ts-expect-error
+        // @ts-expect-error TODO: clear
         acc[t.id] = {
           provider: t.x_sb_main_table_connection ? "x-supabase" : "grida",
           readonly: false,
           realtime: true,
           stream: [],
-          // @ts-expect-error
+          // @ts-expect-error TODO: clear
         } satisfies TTablespace;
         return acc;
       }, {}),
       [EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID]:
         "noop" as never,
     },
+    transactions: [],
   };
 }
 
@@ -476,7 +476,6 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
         readonly: false,
         realtime: true,
         stream: [],
-        // transactions: [],
       },
       [EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID]: {
         provider: "custom",
@@ -495,12 +494,12 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
         readonly: true,
         stream: [],
         realtime: false,
-        transactions: [],
       },
       // noop
       [EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID]:
         "noop" as never,
     },
+    transactions: [],
     ...initialDatagridState(),
     datagrid_table_id: is_main_table_supabase
       ? EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID
