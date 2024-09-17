@@ -248,6 +248,18 @@ export type ITablespace<T> = {
   stream?: Array<T>;
 };
 
+export type TablespaceTransaction = {
+  digest: string;
+  timestamp: number;
+  user: "system" | "user";
+  operation: "update";
+  schema_table_id: string;
+  row: string;
+  column: string;
+  data: Record<string, unknown>;
+  status: "pending" | "queued";
+};
+
 export type TTablespace =
   | TCustomDataTablespace<any>
   | TXSupabaseDataTablespace
@@ -255,10 +267,14 @@ export type TTablespace =
 
 type TCustomDataTablespace<T> = {
   provider: "custom";
-  readonly: boolean;
   realtime: boolean;
   stream?: Array<T>;
-};
+} & (
+  | {
+      readonly: false;
+    }
+  | { readonly: true }
+);
 
 export type TXSupabaseDataTablespace = {
   provider: "x-supabase";
@@ -461,6 +477,8 @@ interface ITablespaceEditorState {
     //   TablespaceSchemaTableStreamType<T>
     // >;
   };
+
+  transactions: Array<TablespaceTransaction>;
 }
 
 export interface FormEditorState

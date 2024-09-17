@@ -88,14 +88,14 @@ export function GridEditor({
 
   const onClearSelection = useCallback(() => {
     dispatch({
-      type: "editor/response/select",
+      type: "editor/table/space/rows/select",
       selection: new Set(),
     });
   }, [dispatch]);
 
   const openNewFieldPanel = useCallback(() => {
     dispatch({
-      type: "editor/field/edit",
+      type: "editor/panels/field-edit",
       open: true,
       refresh: true,
     });
@@ -104,7 +104,7 @@ export function GridEditor({
   const openEditFieldPanel = useCallback(
     (field_id?: string) => {
       dispatch({
-        type: "editor/field/edit",
+        type: "editor/panels/field-edit",
         field_id: field_id,
         open: true,
         refresh: true,
@@ -235,8 +235,9 @@ export function GridEditor({
           }}
           onCellChange={(row, column, data) => {
             dispatch({
-              type: "editor/data-grid/cell/change",
+              type: "editor/table/space/cell/change",
               table_id: table_id!,
+              gdoc_table_id: tb!.id,
               row: row.__gf_id,
               column: column,
               data: data,
@@ -430,7 +431,7 @@ function TableMod() {
 
   const openNewTuplePanel = useCallback(() => {
     dispatch({
-      type: "editor/responses/edit",
+      type: "editor/panels/record-edit",
       open: true,
       response_id: undefined,
       refresh: true,
@@ -439,7 +440,7 @@ function TableMod() {
 
   const openNewAttributePanel = useCallback(() => {
     dispatch({
-      type: "editor/field/edit",
+      type: "editor/panels/field-edit",
       open: true,
       refresh: true,
     });
@@ -498,7 +499,7 @@ function useDeleteSelectedSchemaTableRows() {
       .in("id", Array.from(datagrid_selected_rows))
       .then(() => {
         dispatch({
-          type: "editor/data-grid/delete/selected",
+          type: "editor/table/space/rows/delete/selected",
         });
       });
 
@@ -550,7 +551,7 @@ function DeleteSelectedRowsButton({
         throw error;
       }
       dispatch({
-        type: "editor/data-grid/delete/selected",
+        type: "editor/table/space/rows/delete/selected",
       });
     });
 

@@ -74,10 +74,14 @@ export default async function Layout({
   children: React.ReactNode;
   params: GDocEditorRouteParams;
 }>) {
+  const { id, org, proj } = params;
+
+  // in local dev, the vercel insights script is not loaded, will hit this route
+  if (org === "_vercel") return notFound();
+
   const cookieStore = cookies();
   const supabase = createServerComponentClient(cookieStore);
   const wsclient = createServerComponentWorkspaceClient(cookieStore);
-  const { id, org, proj } = params;
 
   const { data: project_ref, error: project_ref_err } = await wsclient
     .from("project")
@@ -87,7 +91,7 @@ export default async function Layout({
     .single();
 
   if (project_ref_err) {
-    console.error("project_ref err", project_ref_err, { org, proj });
+    console.error("project_ref err", project_ref_err, { id, org, proj });
     return notFound();
   }
 

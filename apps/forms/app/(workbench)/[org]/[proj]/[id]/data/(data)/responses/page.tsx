@@ -10,7 +10,7 @@ import {
   FormResponseFeedProvider,
   FormResponseSyncProvider,
   FormXSupabaseMainTableFeedProvider,
-  FormXSupabaseMainTableSyncProvider,
+  XSBTableTransactionsQueueProvider,
 } from "@/scaffolds/editor/feed";
 import {
   GDocFormsXSBTable,
@@ -22,6 +22,7 @@ import { CurrentTable } from "@/scaffolds/editor/utils/switch-table";
 import { GridEditor } from "@/scaffolds/grid-editor";
 import { GridData } from "@/scaffolds/grid-editor/grid-data";
 import { GFResponseRow } from "@/scaffolds/grid/types";
+import assert from "assert";
 import { useMemo } from "react";
 
 export default function FormResponsesPage() {
@@ -45,7 +46,9 @@ export default function FormResponsesPage() {
 function SwitchGridEditor() {
   const [state] = useEditorState();
   const { datagrid_table_id } = state;
+  const tb = useDatagridTable();
 
+  if (!tb) return <Invalid />;
   switch (datagrid_table_id) {
     case EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID:
       return (
@@ -56,10 +59,15 @@ function SwitchGridEditor() {
         </>
       );
     case EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID:
+      assert(tb.provider === "x-supabase");
       return (
         <>
           <FormXSupabaseMainTableFeedProvider />
-          <FormXSupabaseMainTableSyncProvider />
+          <XSBTableTransactionsQueueProvider
+            pk={tb.x_sb_main_table_connection.pk!}
+            schema_table_id={state.form.form_id}
+            sb_table_id={tb.x_sb_main_table_connection.sb_table_id}
+          />
           <ModeXSBMainTable />
         </>
       );

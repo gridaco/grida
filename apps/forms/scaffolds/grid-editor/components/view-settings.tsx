@@ -70,7 +70,7 @@ export function GridViewSettings() {
           checked={datagrid_filter.empty_data_hidden}
           onCheckedChange={(checked) => {
             dispatch({
-              type: "editor/data-grid/filter",
+              type: "editor/data-grid/local-filter",
               empty_data_hidden: checked,
             });
           }}
@@ -81,7 +81,7 @@ export function GridViewSettings() {
           checked={datagrid_filter.masking_enabled}
           onCheckedChange={(checked) => {
             dispatch({
-              type: "editor/data-grid/filter",
+              type: "editor/data-grid/local-filter",
               masking_enabled: checked,
             });
           }}

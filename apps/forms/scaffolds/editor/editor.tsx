@@ -158,7 +158,7 @@ function FormFieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
   const closeFieldPanel = useCallback(
     (options: { refresh: boolean }) => {
       dispatch({
-        type: "editor/field/edit",
+        type: "editor/panels/field-edit",
         open: false,
         refresh: options.refresh,
       });
@@ -268,7 +268,7 @@ function FormFieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
             : undefined
         }
         onOpenChange={(open) => {
-          dispatch({ type: "editor/field/edit", open });
+          dispatch({ type: "editor/panels/field-edit", open });
         }}
         onSave={onSaveField}
       />
@@ -349,7 +349,7 @@ function RowEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
           row: row,
         }}
         onOpenChange={(open) => {
-          dispatch({ type: "editor/responses/edit", open });
+          dispatch({ type: "editor/panels/record-edit", open });
         }}
       />
       {children}
@@ -367,7 +367,7 @@ function CustomerPanelProvider({ children }: React.PropsWithChildren<{}>) {
         customer_id={state.customer_editor.id}
         open={state.customer_editor.open}
         onOpenChange={(open) => {
-          dispatch({ type: "editor/customers/edit", open });
+          dispatch({ type: "editor/panels/customer-details", open });
         }}
       />
       {children}

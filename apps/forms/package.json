@@ -106,6 +106,7 @@
     "next": "14.2.5",
     "next-themes": "^0.3.0",
     "openai": "^4.29.1",
+    "p-queue": "^7.2.0",
     "papaparse": "^5.4.1",
     "prism-react-renderer": "^2.3.1",
     "react": "^18.3.1",
