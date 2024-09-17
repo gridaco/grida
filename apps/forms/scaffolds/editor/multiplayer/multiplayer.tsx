@@ -1,9 +1,11 @@
 import { createClientWorkspaceClient } from "@/lib/supabase/client";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useEditorState } from "../use";
 import type { IMultiplayerCursor } from "../state";
 import { useThrottle } from "@uidotdev/usehooks";
 import colors from "@/k/tailwindcolors";
+import { usePathname, useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 
 const RT_THROTTLE_MS = 50;
 
@@ -17,6 +19,11 @@ interface ICursorPos {
   cursor_id: string;
   x: number;
   y: number;
+}
+
+interface ILocation {
+  cursor_id: string;
+  location: string;
 }
 
 type ColorName = keyof typeof colors;
@@ -44,15 +51,41 @@ function useMultiplayerRoom({
 }) {
   const client = useMemo(() => createClientWorkspaceClient(), []);
 
-  const [pos, setPos] = useState<[number, number]>();
-
-  const debouncedPos = useThrottle(pos, RT_THROTTLE_MS);
-
   const [cursors, setCursors] = useState<IMultiplayerCursor[]>([]);
 
   const [send, setSend] = useState<
-    ((payload: Payload<any>) => void) | undefined
+    ((event: "LOCATION" | "POS" | "MESSAGE", payload: any) => void) | undefined
   >();
+
+  const syncstate = useCallback(
+    (cursor_id: string, payload: Partial<IMultiplayerCursor>) => {
+      setCursors((cursors) => {
+        const cursor = cursors.find((u) => u.cursor_id === cursor_id);
+        if (!cursor) {
+          return [
+            ...cursors,
+            {
+              ...initcursor({
+                cursor_id: cursor_id,
+                ...payload,
+              }),
+            },
+          ];
+        }
+
+        return cursors.map((u) => {
+          if (u.cursor_id === cursor_id) {
+            return {
+              ...u,
+              ...payload,
+            };
+          }
+          return u;
+        });
+      });
+    },
+    []
+  );
 
   useEffect(() => {
     const room = client.channel("rooms", {
@@ -81,46 +114,31 @@ function useMultiplayerRoom({
 
     ch.on("broadcast", { event: "POS" }, (payload: Payload<ICursorPos>) => {
       if (!payload.payload) return;
-      setCursors((cursors) => {
-        const cursor = cursors.find(
-          (u) => u.cursor_id === payload.payload!.cursor_id
-        );
-        if (!cursor) {
-          return [
-            ...cursors,
-            {
-              ...initcursor({
-                cursor_id: payload.payload!.cursor_id,
-                x: payload.payload?.x,
-                y: payload.payload?.y,
-              }),
-            },
-          ];
-        }
-
-        return cursors.map((u) => {
-          if (u.cursor_id === payload.payload?.cursor_id) {
-            if (u.cursor_id === cursor_id) return u; // skip local cursor
-            return {
-              ...u,
-              x: payload.payload?.x,
-              y: payload.payload?.y,
-            };
-          }
-          return u;
-        });
+      syncstate(payload.payload.cursor_id, {
+        x: payload.payload.x,
+        y: payload.payload.y,
+      });
+    });
+    ch.on("broadcast", { event: "LOCATION" }, (payload: Payload<ILocation>) => {
+      if (!payload.payload) return;
+      syncstate(payload.payload.cursor_id, {
+        location: payload.payload.location,
+      });
+    });
+    ch.on("broadcast", { event: "MESSAGE" }, (payload: Payload<any>) => {
+      if (!payload.payload) return;
+      syncstate(payload.payload.cursor_id, {
+        message: payload.payload.message,
       });
     });
     ch.on("broadcast", { event: "NODE" }, (payload: Payload<any>) => {});
-    ch.on("broadcast", { event: "LOCATION" }, (payload: Payload<any>) => {});
-    ch.on("broadcast", { event: "MESSAGE" }, (payload: Payload<any>) => {});
     ch.subscribe((status) => {
       if (status === "SUBSCRIBED") {
-        setSend(() => (payload: Payload<any>) => {
+        setSend(() => (event: string, payload: any) => {
           ch.send({
-            type: payload.type,
-            event: payload.event,
-            payload: payload.payload,
+            type: "broadcast",
+            event: event,
+            payload: payload,
           });
         });
       }
@@ -130,12 +148,59 @@ function useMultiplayerRoom({
       room.unsubscribe();
       client.removeChannel(room);
     };
-  }, [client, cursor_id, room_id]);
+  }, [client, cursor_id, room_id, syncstate]);
+
+  return { cursors, send, syncstate };
+}
+
+export function MultiplayerLayer() {
+  const [state, dispatch] = useEditorState();
+  const { room_id, cursor_id } = state.multiplayer;
+  const location = usePathname();
+
+  const { cursors, send, syncstate } = useMultiplayerRoom({
+    room_id,
+    cursor_id,
+  });
+
+  const [typing, setTyping] = useState(false);
+
+  const [message, setMessage] = useState<string>();
+
+  const [pos, setPos] = useState<{
+    x: number;
+    y: number;
+  }>();
+
+  const debouncedPos = useThrottle(pos, RT_THROTTLE_MS);
+
+  useEffect(() => {
+    const onkeydown = (e: KeyboardEvent) => {
+      if (e.shiftKey) return;
+      if (e.metaKey) return;
+      if (e.key === "/") {
+        setTyping(true);
+        return;
+      }
+
+      if (e.key === "Escape") {
+        setTyping(false);
+        setMessage("");
+        return;
+      }
+    };
+
+    window.addEventListener("keydown", onkeydown);
+
+    return () => {
+      window.removeEventListener("keydown", onkeydown);
+    };
+  }, []);
 
   // POS hook
   useEffect(() => {
     const onmousemove = (e: MouseEvent) => {
-      setPos([e.clientX, e.clientY]);
+      setPos({ x: e.clientX, y: e.clientY });
     };
 
     window.addEventListener("mousemove", onmousemove);
@@ -147,73 +212,70 @@ function useMultiplayerRoom({
 
   useEffect(() => {
     if (!send) return;
+    send("LOCATION", { cursor_id: cursor_id, location: location });
+  }, [location, send, cursor_id]);
+
+  useEffect(() => {
+    if (!send) return;
     if (
       !debouncedPos ||
-      debouncedPos[0] === undefined ||
-      debouncedPos[1] === undefined
+      debouncedPos.x === undefined ||
+      debouncedPos.y === undefined
     )
       return;
 
-    send({
-      type: "broadcast",
-      event: "POS",
-      payload: { cursor_id: cursor_id, x: debouncedPos[0], y: debouncedPos[1] },
-    });
+    send("POS", { cursor_id: cursor_id, x: debouncedPos.x, y: debouncedPos.y });
   }, [cursor_id, debouncedPos, send]);
+
+  useEffect(() => {
+    if (!send) return;
+    send("MESSAGE", { cursor_id: cursor_id, message: message });
+  }, [cursor_id, message, send, typing]);
 
   // local cursor update (without throttle)
   useEffect(() => {
-    if (!pos || pos[0] === undefined || pos[1] === undefined) return;
-    setCursors((cursors) => {
-      const me = cursors.find((u) => u.cursor_id === cursor_id);
-      if (!me) {
-        return cursors;
-      }
+    if (!pos || pos.x === undefined || pos.y === undefined) return;
+    syncstate(cursor_id, { x: pos.x, y: pos.y });
+  }, [cursor_id, pos, syncstate]);
 
-      return cursors.map((u) => {
-        if (u.cursor_id === cursor_id) {
-          return {
-            ...u,
-            x: pos[0],
-            y: pos[1],
-          };
-        }
-        return u;
-      });
-    });
-  }, [cursor_id, pos]);
+  const current_location_other_cursors = useMemo(() => {
+    return cursors.filter(
+      (u) => u.location === location && u.cursor_id !== cursor_id
+    );
+  }, [cursors, location, cursor_id]);
 
-  return cursors;
-}
+  const mycursor = cursors.find((u) => u.cursor_id === cursor_id);
 
-export function MultiplayerLayer() {
-  const [state] = useEditorState();
-  const { room_id, cursor_id } = state.multiplayer;
+  // console.log("players", {
+  //   cursors,
+  //   current_location_players: current_location_other_cursors,
+  //   mycursor,
+  // });
 
-  useEffect(() => {
-    const onkeydown = (e: KeyboardEvent) => {
-      if (e.shiftKey) return;
-      if (e.metaKey) return;
-      if (e.key === "/") {
-        console.log("enter");
-      }
-    };
-
-    window.addEventListener("keydown", onkeydown);
-
-    return () => {
-      window.removeEventListener("keydown", onkeydown);
-    };
-  }, []);
-
-  const players = useMultiplayerRoom({ room_id, cursor_id });
+  console.log("mycursor", mycursor);
 
   return (
-    <>
-      {players.map((u) =>
+    <div className="absolute inset-0 pointer-events-none overflow-hidden">
+      {mycursor && (
+        <Cursor
+          local
+          message={message}
+          onMessageChange={setMessage}
+          typing={typing}
+          x={pos?.x ?? 0}
+          y={pos?.y ?? 0}
+          color={mycursor.color}
+          onMessageBlur={() => {
+            setTyping(false);
+            setMessage("");
+          }}
+        />
+      )}
+      {current_location_other_cursors.map((u) =>
         u.x && u.y ? (
           <Cursor
-            local={cursor_id === u.cursor_id}
+            local={false}
+            message={u.message}
             key={u.cursor_id}
             color={u.color}
             x={u.x}
@@ -223,7 +285,7 @@ export function MultiplayerLayer() {
           <></>
         )
       )}
-    </>
+    </div>
   );
 }
 
@@ -235,6 +297,7 @@ function Cursor({
   y,
   message,
   onMessageChange,
+  onMessageBlur,
 }: {
   local: boolean;
   typing?: boolean;
@@ -243,6 +306,7 @@ function Cursor({
   y: number;
   message?: string;
   onMessageChange?: (message: string) => void;
+  onMessageBlur?: () => void;
 }) {
   const fill = colors[color][600];
   const hue = colors[color][400];
@@ -271,8 +335,9 @@ function Cursor({
           />
         </svg>
       )}
-      {typing && (
+      {(message || typing) && (
         <CursorMessageBubble
+          key={typing ? "typing" : "message"}
           local={local}
           color={fill}
           hue={hue}
@@ -280,10 +345,29 @@ function Cursor({
           y={y + 16}
           message={message}
           onMessageChange={onMessageChange}
+          onMessageBlur={onMessageBlur}
         />
       )}
     </>
   );
+}
+
+function useBubbleVisibility(message: string, delay: number) {
+  const [isVisible, setIsVisible] = useState(true);
+
+  useEffect(() => {
+    if (message) {
+      setIsVisible(true);
+
+      const handler = setTimeout(() => {
+        setIsVisible(false);
+      }, delay);
+
+      return () => clearTimeout(handler);
+    }
+  }, [message, delay]);
+
+  return isVisible;
 }
 
 function CursorMessageBubble({
@@ -294,6 +378,7 @@ function CursorMessageBubble({
   hue,
   message,
   onMessageChange,
+  onMessageBlur,
 }: {
   local: boolean;
   color: string;
@@ -302,10 +387,22 @@ function CursorMessageBubble({
   y: number;
   message?: string;
   onMessageChange?: (message: string) => void;
+  onMessageBlur?: () => void;
 }) {
+  const isVisible = useBubbleVisibility(message ?? "", 3000);
+
   return (
-    <div
+    <motion.div
       data-local={local}
+      initial={{ opacity: 1 }}
+      animate={{ opacity: isVisible ? 1 : 0 }}
+      transition={{ opacity: { duration: isVisible ? 0 : 1.5 } }}
+      onAnimationComplete={() => {
+        if (!isVisible) {
+          onMessageBlur?.();
+          onMessageChange?.("");
+        }
+      }}
       className="absolute top-0 left-0 transform transition-transform duration-75 pointer-events-none data-[local='true']:duration-0"
       style={{
         transform: `translateX(${x}px) translateY(${y}px)`,
@@ -313,17 +410,33 @@ function CursorMessageBubble({
       }}
     >
       <div
-        className="max-w-xs rounded-full h-10 w-40 overflow-hidden border-2"
+        className="rounded-full h-10 min-w-48 w-full overflow-hidden border-2"
         style={{ backgroundColor: color, borderColor: hue }}
       >
         <input
           readOnly={!local}
           value={message}
-          onChange={(e) => onMessageChange?.(e.target.value)}
-          className="px-4 w-full h-full bg-transparent text-white placeholder:text-white/50"
+          autoFocus
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              onMessageBlur?.();
+              return;
+            }
+            if (e.key === "Escape") {
+              onMessageBlur?.();
+              onMessageChange?.("");
+              return;
+            }
+          }}
+          onChange={(e) => {
+            onMessageChange?.(e.target.value);
+          }}
+          onBlur={onMessageBlur}
+          maxLength={100}
+          className="px-4 w-full h-full bg-transparent outline-none border-none text-white placeholder:text-white/50"
           placeholder="Say something"
         />
       </div>
-    </div>
+    </motion.div>
   );
 }

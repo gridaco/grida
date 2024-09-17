@@ -83,6 +83,14 @@ export default async function Layout({
   const supabase = createServerComponentClient(cookieStore);
   const wsclient = createServerComponentWorkspaceClient(cookieStore);
 
+  const {
+    data: { user },
+  } = await wsclient.auth.getUser();
+
+  if (!user) {
+    return redirect("/sign-in");
+  }
+
   const { data: project_ref, error: project_ref_err } = await wsclient
     .from("project")
     .select("id, name, organization!inner(id, name)")
@@ -177,6 +185,7 @@ export default async function Layout({
                   store_id: form.store_connection?.store_id,
                   supabase: supabase_connection_state || undefined,
                 },
+                user_id: user.id,
                 theme: {
                   lang: data.lang,
                   is_powered_by_branding_enabled:
@@ -257,6 +266,7 @@ export default async function Layout({
                 id: project_ref.organization!.id,
                 name: project_ref.organization!.name,
               },
+              user_id: user.id,
               document_id: masterdoc_ref.id,
               document_title: masterdoc_ref.title,
               theme: {
@@ -373,6 +383,7 @@ export default async function Layout({
                 id: project_ref.organization!.id,
                 name: project_ref.organization!.name,
               },
+              user_id: user.id,
               tables: data.tables.map((ft) => ({
                 id: ft.id,
                 // TODO: this should be migrated from database

@@ -56,10 +56,11 @@ function initialBaseDocumentEditorState(
     document_title: init.document_title,
     organization: init.organization,
     project: init.project,
+    user_id: init.user_id,
     multiplayer: {
       room_id: init.document_id,
       cursor_id: nanoid(),
-      typing: false,
+      // typing: false,
       cursors: [],
     },
     saving: false,

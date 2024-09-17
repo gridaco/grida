@@ -56,6 +56,7 @@ export interface BaseDocumentEditorInit {
   document_title: string;
   doctype: GDocumentType;
   theme: EditorState["theme"];
+  user_id: string;
 }
 
 export type EditorInit =
@@ -356,7 +357,7 @@ export type IMultiplayerCursor = {
   message?: string;
   // avatar: string;
   color: keyof typeof colors;
-  // location: string;
+  location: string;
   // canvas: "canvas" | "table";
   node_type?: "cell";
   node_id?: string;
@@ -367,10 +368,11 @@ export type IMultiplayerCursor = {
 };
 
 interface IEditorMultiplayerState {
+  user_id: string;
   multiplayer: {
     room_id: string;
     cursor_id: string;
-    typing: boolean;
+    // typing: boolean;
     cursors: Array<IMultiplayerCursor>;
   };
 }
