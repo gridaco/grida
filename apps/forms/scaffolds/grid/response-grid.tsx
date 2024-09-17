@@ -247,9 +247,13 @@ export function ResponseGrid({
       rows={rows}
       rowHeight={32}
       headerRowHeight={36}
-      onCellDoubleClick={() => {
+      onCellDoubleClick={({ column, row }) => {
         if (readonly) {
           toast("This table is readonly", { icon: "🔒" });
+        }
+        const cellreadonly = row.fields[column.key].readonly;
+        if (cellreadonly) {
+          toast("This cell is readonly", { icon: "🔒" });
         }
       }}
       onColumnsReorder={onColumnsReorder}

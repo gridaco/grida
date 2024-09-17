@@ -908,7 +908,7 @@ export function FieldEditPanel({
               </PanelPropertyField>
             </PanelPropertyFields>
           </PanelPropertySection>
-          {supports_computedvalue && (
+          {supports_computedvalue && state.doctype === "v0_form" && (
             <FieldValueExpression
               expression={v_value ?? undefined}
               onChange={set_v_value}

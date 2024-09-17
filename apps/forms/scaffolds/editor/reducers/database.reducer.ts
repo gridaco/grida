@@ -278,6 +278,11 @@ export default function databaseRecucer(
         const space = get_tablespace(draft, gdoc_table_id);
         assert(space, "Table space not found");
 
+        const attributes = get_attributes(draft, gdoc_table_id);
+        const attribute = attributes.find((f) => f.id === attribute_id);
+        assert(attribute, "Attribute not found");
+        assert(attribute.readonly === false, "Attribute is readonly");
+
         switch (tb.provider) {
           case "x-supabase-auth":
           case "custom":
