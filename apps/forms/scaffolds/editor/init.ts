@@ -102,6 +102,7 @@ export function initialDatagridState(): Omit<
     },
     datagrid_orderby: {},
     datagrid_predicates: [],
+    datagrid_selected_cell: null,
   };
 }
 

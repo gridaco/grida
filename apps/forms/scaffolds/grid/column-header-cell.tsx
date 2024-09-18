@@ -12,7 +12,7 @@ import {
 import { FormInputType } from "@/types";
 import { ChevronDownIcon, Pencil1Icon, TrashIcon } from "@radix-ui/react-icons";
 import { RenderHeaderCellProps } from "react-data-grid";
-
+import { CellRoot } from "./cell";
 export const ColumnHeaderCell = React.forwardRef(function ColumnHeaderCell(
   {
     column,
@@ -29,7 +29,7 @@ export const ColumnHeaderCell = React.forwardRef(function ColumnHeaderCell(
   const { name } = column;
 
   return (
-    <div ref={ref} className="flex items-center justify-between">
+    <CellRoot ref={ref} className="flex items-center justify-between">
       <span className="flex items-center gap-2">
         <FormFieldTypeIcon type={type} className="w-4 h-4" />
         <span className="font-normal">{name}</span>
@@ -53,6 +53,6 @@ export const ColumnHeaderCell = React.forwardRef(function ColumnHeaderCell(
           </DropdownMenuContent>
         </DropdownMenuPortal>
       </DropdownMenu>
-    </div>
+    </CellRoot>
   );
 });

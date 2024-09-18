@@ -197,6 +197,11 @@ export type TableType =
   | "schema"
   | "x-supabase-auth.users";
 
+export type DataGridCellPositionQuery = {
+  pk: string | -1;
+  column: string;
+};
+
 export interface IDataGridState {
   /**
    * @global rows per page is not saved per table
@@ -221,6 +226,7 @@ export interface IDataGridState {
   datagrid_predicates: Array<SQLPredicate>;
   datagrid_orderby: { [key: string]: SQLOrderBy };
   datagrid_selected_rows: Set<string>;
+  datagrid_selected_cell: DataGridCellPositionQuery | null;
 }
 
 /**
@@ -349,6 +355,8 @@ interface IInsertionMenuState {
   insertmenu: TGlobalEditorDialogState;
 }
 
+type NodePos = { type: "cell"; pos: DataGridCellPositionQuery };
+
 export type IMultiplayerCursor = {
   cursor_id: string;
   // user_id: string;
@@ -359,8 +367,7 @@ export type IMultiplayerCursor = {
   color: keyof typeof colors;
   location: string;
   // canvas: "canvas" | "table";
-  node_type?: "cell";
-  node_id?: string;
+  node?: NodePos;
   // anchor: "screen" | "node" | "canvas";
   // origin: "center" | "top-left";
   x?: number;

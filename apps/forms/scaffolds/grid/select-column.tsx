@@ -21,6 +21,7 @@ import { EnterFullScreenIcon } from "@radix-ui/react-icons";
 import { useEditorState } from "../editor";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CheckedState } from "@radix-ui/react-checkbox";
+import { CellRoot } from "./cell";
 
 function stopPropagation(event: SyntheticEvent) {
   event.stopPropagation();
@@ -136,7 +137,7 @@ function SelectCellFormatter({
   }, [dispatch, id]);
 
   return (
-    <div className="group">
+    <CellRoot className="group">
       <Checkbox
         aria-label={ariaLabel}
         aria-labelledby={ariaLabelledBy}
@@ -174,7 +175,7 @@ function SelectCellFormatter({
           </Tooltip.Portal>
         </Tooltip.Root>
       )}
-    </div>
+    </CellRoot>
   );
 }
 
@@ -196,7 +197,7 @@ function SelectCellHeader({
   }
 
   return (
-    <div className="sb-grid-select-cell__header">
+    <CellRoot>
       <Checkbox
         aria-label={ariaLabel}
         aria-labelledby={ariaLabelledBy}
@@ -207,6 +208,6 @@ function SelectCellHeader({
         onCheckedChange={handleChange}
         onClick={stopPropagation}
       />
-    </div>
+    </CellRoot>
   );
 }

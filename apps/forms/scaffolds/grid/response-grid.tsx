@@ -48,8 +48,9 @@ import { FieldSupports } from "@/k/supported_field_types";
 import { format } from "date-fns";
 import { EmptyRowsRenderer } from "./empty";
 import { ColumnHeaderCell } from "./column-header-cell";
-import "./grid.css";
+import { CellRoot } from "./cell";
 import { cn } from "@/utils";
+import "./grid.css";
 
 function useMasking() {
   const [state] = useEditorState();
@@ -64,14 +65,72 @@ function useMasking() {
   );
 }
 
+function multiplayer_rows(
+  rows: GFResponseRow[],
+  selectedCells?: Array<DataGridCellSelectionCursor>,
+  local_cursor_id?: string
+): RenderingRow[] {
+  if (!selectedCells) return rows.map((row) => ({ ...row, selections: [] }));
+
+  return rows.map((row) => {
+    const selections = selectedCells
+      .filter((cell) => cell.pk === row.__gf_id)
+      .map((cell) => ({
+        column: cell.column,
+        cursor_id: cell.cursor_id,
+        color: cell.color,
+        is_local_cursor: cell.cursor_id === local_cursor_id,
+      }));
+
+    return {
+      ...row,
+      selections,
+    };
+  });
+}
+
+function getCellSelection(
+  selections: CellSelection[],
+  column: string
+): CellSelection | undefined {
+  const thiscolumnselections = selections
+    .filter((s) => s.column === column)
+    .sort((a, b) => {
+      if (a.is_local_cursor) return -1;
+      if (b.is_local_cursor) return 1;
+      return 0;
+    });
+
+  return thiscolumnselections[0];
+}
+
 function rowKeyGetter(row: GFResponseRow) {
   return row.__gf_id;
 }
 
+interface DataGridCellSelectionCursor {
+  pk: string | -1;
+  column: string;
+  cursor_id: string;
+  color: string;
+}
+
+type CellSelection = {
+  column: string;
+  cursor_id: string;
+  color: string;
+  is_local_cursor: boolean;
+};
+
+type RenderingRow = GFResponseRow & {
+  selections: CellSelection[];
+};
+
 export function ResponseGrid({
+  local_cursor_id,
   systemcolumns: _systemcolumns,
   columns,
-  rows,
+  rows: _rows,
   selectionDisabled,
   readonly,
   loading,
@@ -79,8 +138,11 @@ export function ResponseGrid({
   onEditFieldClick,
   onDeleteFieldClick,
   onCellChange,
+  onSelectedCellChange,
+  selectedCells,
   className,
 }: {
+  local_cursor_id: string;
   systemcolumns: GFSystemColumn[];
   columns: GFColumn[];
   rows: GFResponseRow[];
@@ -95,6 +157,8 @@ export function ResponseGrid({
     column: string,
     data: GFResponseFieldData
   ) => void;
+  onSelectedCellChange?: (cell: { pk: string | -1; column: string }) => void;
+  selectedCells?: Array<DataGridCellSelectionCursor>;
   className?: string;
 }) {
   const [state, dispatch] = useEditorState();
@@ -124,14 +188,15 @@ export function ResponseGrid({
     sortable: false,
     width: 100,
   };
-  const __id_column: Column<GFResponseRow> = {
+  const __id_column: Column<RenderingRow> = {
     ...sys_col_props,
     key: "__gf_display_id",
     name: "id",
     renderHeaderCell: GFSystemPropertyHeaderCell,
+    renderCell: DefaultPropertyIdentifierCell,
   };
 
-  const __created_at_column: Column<GFResponseRow> = {
+  const __created_at_column: Column<RenderingRow> = {
     ...sys_col_props,
     key: "__gf_created_at",
     name: "time",
@@ -139,7 +204,7 @@ export function ResponseGrid({
     renderCell: DefaultPropertyDateCell,
   };
 
-  const __customer_uuid_column: Column<GFResponseRow> = {
+  const __customer_uuid_column: Column<RenderingRow> = {
     ...sys_col_props,
     key: "__gf_customer_id",
     name: "customer",
@@ -147,7 +212,7 @@ export function ResponseGrid({
     renderCell: DefaultPropertyCustomerCell,
   };
 
-  const __new_column: Column<GFResponseRow> = {
+  const __new_column: Column<RenderingRow> = {
     key: "__gf_new",
     name: "+",
     resizable: false,
@@ -212,7 +277,7 @@ export function ResponseGrid({
     allcolumns.unshift(SelectColumn);
   }
 
-  const onCopy = (e: CopyEvent<GFResponseRow>) => {
+  const onCopy = (e: CopyEvent<RenderingRow>) => {
     console.log(e);
     let val: string | undefined;
     if (e.sourceColumnKey.startsWith("__gf_")) {
@@ -236,6 +301,10 @@ export function ResponseGrid({
     }
   };
 
+  const final_rows = useMemo(() => {
+    return multiplayer_rows(_rows, selectedCells, local_cursor_id);
+  }, [_rows, selectedCells, local_cursor_id]);
+
   return (
     <DataGrid
       className={cn(
@@ -244,7 +313,7 @@ export function ResponseGrid({
       )}
       rowKeyGetter={rowKeyGetter}
       columns={allcolumns}
-      rows={rows}
+      rows={final_rows}
       rowHeight={32}
       headerRowHeight={36}
       onCellDoubleClick={() => {
@@ -255,6 +324,22 @@ export function ResponseGrid({
       onColumnsReorder={onColumnsReorder}
       selectedRows={selectionDisabled ? undefined : selected_responses}
       onCopy={onCopy}
+      onSelectedCellChange={(cell) => {
+        if (cell.rowIdx === -1) {
+          const column = cell.column.key;
+          onSelectedCellChange?.({
+            pk: -1,
+            column,
+          });
+        } else {
+          const pk = cell.row.__gf_id;
+          const column = cell.column.key;
+          onSelectedCellChange?.({
+            pk,
+            column,
+          });
+        }
+      }}
       onRowsChange={(rows, data) => {
         const key = data.column.key;
         const indexes = data.indexes;
@@ -277,11 +362,18 @@ export function ResponseGrid({
 function GFSystemPropertyHeaderCell({ column }: RenderHeaderCellProps<any>) {
   const { name, key } = column;
 
+  const selection = useMemo(() => getCellSelection([], key), [key]);
+
+  const rootprops = {
+    selected: selection !== undefined,
+    is_local_cursor: selection?.is_local_cursor,
+  };
+
   return (
-    <div className="flex items-center gap-2">
+    <CellRoot {...rootprops} className="flex items-center gap-2">
       <DefaultPropertyIcon __key={key as GFSystemColumnTypes} />
       <span className="font-normal">{name}</span>
-    </div>
+    </CellRoot>
   );
 }
 
@@ -311,21 +403,54 @@ function NewFieldHeaderCell({
   );
 }
 
+function DefaultPropertyIdentifierCell({
+  column,
+  row,
+}: RenderCellProps<RenderingRow>) {
+  const identifier = row.__gf_id;
+
+  const selection = useMemo(
+    () => getCellSelection(row.selections, column.key),
+    [column.key, row.selections]
+  );
+
+  const rootprops = {
+    selected: selection !== undefined,
+    is_local_cursor: selection?.is_local_cursor,
+  };
+
+  return <CellRoot {...rootprops}>{identifier}</CellRoot>;
+}
+
 function DefaultPropertyDateCell({
   column,
   row,
-}: RenderCellProps<GFResponseRow>) {
+}: RenderCellProps<RenderingRow>) {
   const [state] = useEditorState();
 
   const date = row.__gf_created_at;
 
   const { dateformat, datetz } = state;
 
+  const selection = useMemo(
+    () => getCellSelection(row.selections, column.key),
+    [column.key, row.selections]
+  );
+
+  const rootprops = {
+    selected: selection !== undefined,
+    is_local_cursor: selection?.is_local_cursor,
+  };
+
   if (!date) {
     return <></>;
   }
 
-  return <>{fmtdate(date, dateformat, tztostr(datetz))}</>;
+  return (
+    <CellRoot {...rootprops}>
+      {fmtdate(date, dateformat, tztostr(datetz))}
+    </CellRoot>
+  );
 }
 
 function fmtdatetimelocal(date: Date | string) {
@@ -358,17 +483,30 @@ function fmtdate(
 function DefaultPropertyCustomerCell({
   column,
   row,
-}: RenderCellProps<GFResponseRow>) {
+}: RenderCellProps<RenderingRow>) {
   const [state, dispatch] = useEditorState();
 
   const data = row.__gf_customer_id;
+
+  const selection = useMemo(
+    () => getCellSelection(row.selections, column.key),
+    [column.key, row.selections]
+  );
+
+  const rootprops = {
+    selected: selection !== undefined,
+    is_local_cursor: selection?.is_local_cursor,
+  };
 
   if (!data) {
     return <></>;
   }
 
   return (
-    <div className="w-full flex justify-between items-center">
+    <CellRoot
+      {...rootprops}
+      className="w-full flex justify-between items-center"
+    >
       <span className="font-mono text-ellipsis flex-1 overflow-hidden">
         {data}
       </span>
@@ -381,7 +519,7 @@ function DefaultPropertyCustomerCell({
           });
         }}
       />
-    </div>
+    </CellRoot>
   );
 }
 
@@ -398,17 +536,27 @@ function FKButton({ onClick }: { onClick?: () => void }) {
   );
 }
 
-function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
+function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
   const [state] = useEditorState();
 
   const { datagrid_local_filter: datagrid_filter } = state;
 
   const data = row.fields[column.key];
 
+  const selection = useMemo(
+    () => getCellSelection(row.selections, column.key),
+    [column.key, row.selections]
+  );
+
+  const rootprops = {
+    selected: selection !== undefined,
+    is_local_cursor: selection?.is_local_cursor,
+  };
+
   const masker = useMasking();
 
   if (!data) {
-    return <></>;
+    return <CellRoot></CellRoot>;
   }
 
   const { type, value, options, multiple, files } = data;
@@ -436,20 +584,27 @@ function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
     (unwrapped === null || unwrapped === "" || unwrapped === undefined)
   ) {
     return (
-      <span className="text-muted-foreground/50">
+      <CellRoot {...rootprops} className="text-muted-foreground/50">
         <Empty value={unwrapped} />
-      </span>
+      </CellRoot>
     );
   }
 
   switch (type as FormInputType) {
     case "switch":
     case "checkbox": {
-      return <input type="checkbox" checked={unwrapped as boolean} disabled />;
+      return (
+        <CellRoot {...rootprops}>
+          <input type="checkbox" checked={unwrapped as boolean} disabled />
+        </CellRoot>
+      );
     }
     case "color": {
       return (
-        <div className="w-full h-full p-2 flex gap-2 items-center">
+        <CellRoot
+          {...rootprops}
+          className="w-full h-full p-2 flex gap-2 items-center"
+        >
           <div
             className="aspect-square min-w-4 rounded bg-neutral-500 border border-ring"
             style={{ backgroundColor: unwrapped as string }}
@@ -461,14 +616,14 @@ function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
               className="bg-foreground text-background"
             />
           </span>
-        </div>
+        </CellRoot>
       );
     }
     case "video":
     case "audio":
     case "file": {
       return (
-        <div className="w-full h-full flex gap-2">
+        <CellRoot {...rootprops} className="w-full h-full flex gap-2">
           {files?.map((f, i) => (
             <span key={i}>
               <FileTypeIcon
@@ -484,12 +639,12 @@ function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
               </span>
             </span>
           ))}
-        </div>
+        </CellRoot>
       );
     }
     case "image": {
       return (
-        <div className="w-full h-full flex gap-2">
+        <CellRoot {...rootprops} className="w-full h-full flex gap-2">
           {files?.map((file, i) => (
             <figure className="py-1 flex items-center gap-2" key={i}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -502,57 +657,71 @@ function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
               {/* <figcaption>{file.name}</figcaption> */}
             </figure>
           ))}
-        </div>
+        </CellRoot>
       );
     }
     case "richtext": {
       if (unwrapped === null || unwrapped === "" || unwrapped === undefined) {
         return (
-          <span className="text-muted-foreground/50">
+          <CellRoot {...rootprops} className="text-muted-foreground/50">
             <Empty value={unwrapped} />
-          </span>
+          </CellRoot>
         );
       }
 
       return (
-        <div>
+        <CellRoot {...rootprops}>
           <FileTypeIcon
             type="richtext"
             className="inline w-4 h-4 align-middle me-2"
           />{" "}
           DOCUMENT
-        </div>
+        </CellRoot>
       );
     }
     case "datetime-local": {
       return (
-        <div>
+        <CellRoot {...rootprops}>
           {fmtdate(unwrapped as string, "datetime", tztostr(state.datetz))}
-        </div>
+        </CellRoot>
       );
     }
     case "json": {
-      return <code>{masker(JSON.stringify(unwrapped))}</code>;
+      return (
+        <CellRoot {...rootprops}>
+          <code>{masker(JSON.stringify(unwrapped))}</code>
+        </CellRoot>
+      );
     }
     default:
       const display = masker(unwrapped?.toString() ?? "");
       return (
-        <div>
+        <CellRoot {...rootprops}>
           <Highlight
             text={display}
             tokens={datagrid_filter.localsearch}
             className="bg-foreground text-background"
           />
-        </div>
+        </CellRoot>
       );
   }
 }
 
-function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
+function FieldEditCell(props: RenderEditCellProps<RenderingRow>) {
   const { column, row } = props;
   const data = row.fields[column.key];
   const ref = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
   const wasEscPressed = useRef(false);
+
+  const selection = useMemo(
+    () => getCellSelection(row.selections, column.key),
+    [column.key, row.selections]
+  );
+
+  const rootprops = {
+    selected: selection !== undefined,
+    is_local_cursor: selection?.is_local_cursor,
+  };
 
   useEffect(() => {
     if (ref.current) {
@@ -636,7 +805,11 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
     const unwrapped = unwrapFeildValue(value, type);
 
     if (!FieldSupports.file_alias(type) && unwrapped === undefined) {
-      return <NotSupportedEditCell />;
+      return (
+        <CellRoot {...rootprops}>
+          <NotSupportedEditCell />
+        </CellRoot>
+      );
     }
 
     switch (type as FormInputType) {
@@ -647,52 +820,60 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
       case "text":
       case "hidden": {
         return (
-          <input
-            ref={ref as React.RefObject<HTMLInputElement>}
-            type={type === "hidden" ? "text" : type}
-            className="w-full px-2 appearance-none outline-none border-none"
-            defaultValue={unwrapped as string}
-            onKeyDown={onKeydown}
-            onBlur={onBlur}
-          />
+          <CellRoot {...rootprops}>
+            <input
+              ref={ref as React.RefObject<HTMLInputElement>}
+              type={type === "hidden" ? "text" : type}
+              className="w-full appearance-none outline-none border-none bg-transparent"
+              defaultValue={unwrapped as string}
+              onKeyDown={onKeydown}
+              onBlur={onBlur}
+            />
+          </CellRoot>
         );
       }
       case "textarea": {
         return (
-          <textarea
-            ref={ref as React.RefObject<HTMLTextAreaElement>}
-            className="w-full px-2 appearance-none outline-none border-none"
-            defaultValue={unwrapped as string}
-            onKeyDown={onKeydown}
-            onBlur={onBlur}
-          />
+          <CellRoot {...rootprops}>
+            <textarea
+              ref={ref as React.RefObject<HTMLTextAreaElement>}
+              className="w-full appearance-none outline-none border-none bg-transparent"
+              defaultValue={unwrapped as string}
+              onKeyDown={onKeydown}
+              onBlur={onBlur}
+            />
+          </CellRoot>
         );
       }
       case "range":
       case "number": {
         return (
-          <input
-            ref={ref as React.RefObject<HTMLInputElement>}
-            className="w-full px-2 appearance-none outline-none border-none"
-            type="number"
-            defaultValue={unwrapped as string | number}
-            onKeyDown={onKeydown}
-            onBlur={onBlur}
-          />
+          <CellRoot {...rootprops}>
+            <input
+              ref={ref as React.RefObject<HTMLInputElement>}
+              className="w-full appearance-none outline-none border-none bg-transparent"
+              type="number"
+              defaultValue={unwrapped as string | number}
+              onKeyDown={onKeydown}
+              onBlur={onBlur}
+            />
+          </CellRoot>
         );
       }
       case "datetime-local": {
         return (
-          <input
-            ref={ref as React.RefObject<HTMLInputElement>}
-            type={type}
-            className="w-full px-2 appearance-none outline-none border-none"
-            defaultValue={
-              unwrapped ? fmtdatetimelocal(unwrapped as string) : undefined
-            }
-            onKeyDown={onKeydown}
-            onBlur={onBlur}
-          />
+          <CellRoot {...rootprops}>
+            <input
+              ref={ref as React.RefObject<HTMLInputElement>}
+              type={type}
+              className="w-full appearance-none outline-none border-none bg-transparent"
+              defaultValue={
+                unwrapped ? fmtdatetimelocal(unwrapped as string) : undefined
+              }
+              onKeyDown={onKeydown}
+              onBlur={onBlur}
+            />
+          </CellRoot>
         );
       }
       case "date":
@@ -700,55 +881,66 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
       case "month":
       case "week": {
         return (
-          <input
-            ref={ref as React.RefObject<HTMLInputElement>}
-            type={type}
-            className="w-full px-2 appearance-none outline-none border-none"
-            defaultValue={unwrapped as string}
-            onKeyDown={onKeydown}
-            onBlur={onBlur}
-          />
+          <CellRoot {...rootprops}>
+            <input
+              ref={ref as React.RefObject<HTMLInputElement>}
+              type={type}
+              className="w-full appearance-none outline-none border-none bg-transparent"
+              defaultValue={unwrapped as string}
+              onKeyDown={onKeydown}
+              onBlur={onBlur}
+            />
+          </CellRoot>
         );
       }
       case "color":
         return (
-          <input
-            ref={ref as React.RefObject<HTMLInputElement>}
-            type="color"
-            className="w-full px-2 appearance-none outline-none border-none"
-            defaultValue={unwrapped as string}
-            onKeyDown={onKeydown}
-            onBlur={onBlur}
-          />
+          <CellRoot {...rootprops}>
+            <input
+              ref={ref as React.RefObject<HTMLInputElement>}
+              type="color"
+              className="w-full appearance-none outline-none border-none bg-transparent"
+              defaultValue={unwrapped as string}
+              onKeyDown={onKeydown}
+              onBlur={onBlur}
+            />
+          </CellRoot>
         );
       case "file":
       case "audio":
       case "video":
       case "image": {
         return (
-          <FileEditCell
-            type={type as "file" | "image" | "audio" | "video"}
-            multiple={multiple}
-            files={files || []}
-          />
+          <CellRoot {...rootprops}>
+            <FileEditCell
+              type={type as "file" | "image" | "audio" | "video"}
+              multiple={multiple}
+              files={files || []}
+            />
+          </CellRoot>
         );
       }
       case "richtext": {
         return (
-          <RichTextEditCell
-            row_id={row.__gf_id}
-            field_id={column.key}
-            defaultValue={unwrapped}
-            onValueCommit={(v) => {
-              commit({ value: v });
-            }}
-          />
+          <CellRoot {...rootprops}>
+            <RichTextEditCell
+              row_id={row.__gf_id}
+              field_id={column.key}
+              defaultValue={unwrapped}
+              onValueCommit={(v) => {
+                commit({ value: v });
+              }}
+            />
+          </CellRoot>
         );
       }
       case "switch":
       case "checkbox": {
         return (
-          <div className="px-2 w-full h-full flex justify-between items-center">
+          <CellRoot
+            {...rootprops}
+            className="px-2 w-full h-full flex justify-between items-center"
+          >
             <input
               ref={ref as React.RefObject<HTMLInputElement>}
               type="checkbox"
@@ -756,62 +948,75 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
               onKeyDown={onKeydown}
               onBlur={onBlur}
             />
-          </div>
+          </CellRoot>
         );
       }
       case "radio":
       case "select":
         return (
-          <Select
-            defaultValue={option_id ?? undefined}
-            onValueChange={(v) => {
-              commit({ value: options?.[v]?.value, option_id: v });
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue className="w-full h-full m-0" placeholder="Select" />
-            </SelectTrigger>
-            <SelectContent>
-              {options &&
-                Object.keys(options)?.map((key, i) => {
-                  const opt = options[key];
-                  return (
-                    <SelectItem key={key} value={key}>
-                      {opt.value}{" "}
-                      <small className="text-muted-foreground">
-                        {opt.label || opt.value}
-                      </small>
-                    </SelectItem>
-                  );
-                })}
-            </SelectContent>
-          </Select>
+          <CellRoot {...rootprops}>
+            <Select
+              defaultValue={option_id ?? undefined}
+              onValueChange={(v) => {
+                commit({ value: options?.[v]?.value, option_id: v });
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue
+                  className="w-full h-full m-0"
+                  placeholder="Select"
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {options &&
+                  Object.keys(options)?.map((key, i) => {
+                    const opt = options[key];
+                    return (
+                      <SelectItem key={key} value={key}>
+                        {opt.value}{" "}
+                        <small className="text-muted-foreground">
+                          {opt.label || opt.value}
+                        </small>
+                      </SelectItem>
+                    );
+                  })}
+              </SelectContent>
+            </Select>
+          </CellRoot>
         );
       case "json":
         return (
-          <JsonPopupEditorCell
-            value={unwrapped ?? null}
-            onCommitValue={(v) => {
-              commit({ value: v });
-            }}
-          />
+          <CellRoot {...rootprops}>
+            <JsonPopupEditorCell
+              value={unwrapped ?? null}
+              onCommitValue={(v) => {
+                commit({ value: v });
+              }}
+            />
+          </CellRoot>
         );
       // not supported
       case "checkboxes":
       case "signature":
       case "payment":
       default:
-        return <NotSupportedEditCell />;
+        return (
+          <CellRoot {...rootprops}>
+            <NotSupportedEditCell />
+          </CellRoot>
+        );
     }
   } catch (e) {
     console.error(e);
     return (
-      <JsonPopupEditorCell
-        value={value}
-        onCommitValue={(v) => {
-          commit({ value: v });
-        }}
-      />
+      <CellRoot {...rootprops}>
+        <JsonPopupEditorCell
+          value={value}
+          onCommitValue={(v) => {
+            commit({ value: v });
+          }}
+        />
+      </CellRoot>
     );
   }
 }

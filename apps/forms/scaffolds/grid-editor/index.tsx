@@ -222,6 +222,7 @@ export function GridEditor({
       <GridLayout.Content>
         <ResponseGrid
           className="bg-transparent"
+          local_cursor_id={state.multiplayer.cursor_id}
           systemcolumns={systemcolumns}
           columns={columns}
           rows={rows ?? []}
@@ -243,6 +244,24 @@ export function GridEditor({
               data: data,
             });
           }}
+          onSelectedCellChange={({ pk, column }) => {
+            dispatch({
+              type: "editor/data-grid/cell/select",
+              pk: pk,
+              column,
+            });
+          }}
+          selectedCells={
+            state.datagrid_selected_cell
+              ? [
+                  {
+                    ...state.datagrid_selected_cell,
+                    color: "",
+                    cursor_id: state.multiplayer.cursor_id,
+                  },
+                ]
+              : []
+          }
         />
       </GridLayout.Content>
       <GridLayout.Footer>
