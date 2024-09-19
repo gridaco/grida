@@ -37,6 +37,7 @@ import { Inter } from "next/font/google";
 import { cn } from "@/utils";
 import React from "react";
 import { PlayActions } from "@/scaffolds/workbench/play-actions";
+import Players from "@/scaffolds/workbench/players";
 import { DontCastJsonProperties } from "@/types/supabase-ext";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 
@@ -520,35 +521,5 @@ function Header({
         </div>
       </div>
     </header>
-  );
-}
-
-function Players() {
-  const count = 3;
-  const max = 5;
-  return (
-    <div className="flex -space-x-2 -mx-2">
-      {[1, 2, 3].map((i) => (
-        <PlayerAvatar key={i} zIndex={count - i} />
-      ))}
-    </div>
-  );
-}
-
-function PlayerAvatar({
-  selected,
-  zIndex,
-}: {
-  selected?: boolean;
-  zIndex: number;
-}) {
-  return (
-    <button
-      data-selected={selected}
-      className="w-7 h-7 rounded-full bg-muted border-2 border-background focus:border-ring hover:border-ring hover:!z-10 transition data-[selected='true']:border-foreground data-[selected='true']:!z-10"
-      style={{
-        zIndex: zIndex,
-      }}
-    />
   );
 }

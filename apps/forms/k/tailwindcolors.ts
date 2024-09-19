@@ -292,3 +292,10 @@ const colors = {
 } as const;
 
 export default colors;
+
+export type ColorName = keyof typeof colors;
+
+export function randomcolorname(): ColorName {
+  const keys = Object.keys(colors);
+  return keys[Math.floor(Math.random() * keys.length)] as ColorName;
+}

@@ -57,12 +57,14 @@ import { saveAs } from "file-saver";
 import Papa from "papaparse";
 import { XSupaDataGridFilter } from "./components/filter";
 import { GridPagination } from "./components/pagination";
+import { useMultiplayer } from "@/scaffolds/editor/multiplayer";
 
 function useSelectedCells(): DataGridCellSelectionCursor[] {
   const [state] = useEditorState();
+  const [multplayer] = useMultiplayer();
 
   return useMemo(() => {
-    const cellcursors: DataGridCellSelectionCursor[] = state.multiplayer.cursors
+    const cellcursors: DataGridCellSelectionCursor[] = multplayer.cursors
       .filter((c) => c.node?.type === "cell")
       .map((cursor) => {
         return {
@@ -77,16 +79,12 @@ function useSelectedCells(): DataGridCellSelectionCursor[] {
       cellcursors.push({
         ...state.datagrid_selected_cell,
         color: "current", // in datagrid we don't use cursor color for local cursor
-        cursor_id: state.multiplayer.cursor_id,
+        cursor_id: multplayer.player.cursor_id,
       });
     }
 
     return cellcursors;
-  }, [
-    state.multiplayer.cursors,
-    state.multiplayer.cursor_id,
-    state.datagrid_selected_cell,
-  ]);
+  }, [multplayer.cursors, multplayer.player, state.datagrid_selected_cell]);
 }
 
 export function GridEditor({
@@ -255,7 +253,7 @@ export function GridEditor({
       <GridLayout.Content>
         <ResponseGrid
           className="bg-transparent"
-          local_cursor_id={state.multiplayer.cursor_id}
+          local_cursor_id={state.cursor_id}
           systemcolumns={systemcolumns}
           columns={columns}
           rows={rows ?? []}

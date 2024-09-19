@@ -355,34 +355,7 @@ interface IInsertionMenuState {
   insertmenu: TGlobalEditorDialogState;
 }
 
-type NodePos = { type: "cell"; pos: DataGridCellPositionQuery };
-
-export type IMultiplayerCursor = {
-  cursor_id: string;
-  // user_id: string;
-  // username: string;
-
-  message?: string;
-  // avatar: string;
-  color: keyof typeof colors;
-  location: string;
-  // canvas: "canvas" | "table";
-  node?: NodePos;
-  // anchor: "screen" | "node" | "canvas";
-  // origin: "center" | "top-left";
-  x?: number;
-  y?: number;
-};
-
-interface IEditorMultiplayerState {
-  user_id: string;
-  multiplayer: {
-    room_id: string;
-    cursor_id: string;
-    // typing: boolean;
-    cursors: Array<IMultiplayerCursor>;
-  };
-}
+export type NodePos = { type: "cell"; pos: DataGridCellPositionQuery };
 
 export interface BaseDocumentEditorState
   extends IEditorGlobalSavingState,
@@ -391,8 +364,9 @@ export interface BaseDocumentEditorState
     IInsertionMenuState,
     IFieldEditorState,
     ICustomerEditorState,
-    IRowEditorState,
-    IEditorMultiplayerState {
+    IRowEditorState {
+  user_id: string;
+  cursor_id: string;
   basepath: string;
   organization: {
     name: string;
