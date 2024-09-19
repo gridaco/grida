@@ -68,7 +68,7 @@ function useSelectedCells(): DataGridCellSelectionCursor[] {
       .filter((c) => c.node?.type === "cell")
       .map((cursor) => {
         return {
-          color: cursor.color,
+          color: cursor.palette[400],
           cursor_id: cursor.cursor_id,
           pk: cursor.node!.pos?.pk,
           column: cursor.node!.pos.column,

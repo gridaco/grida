@@ -1,7 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import colors, { ColorName } from "@/k/tailwindcolors";
 
 export function PointerCursor({
   local,
@@ -15,15 +14,18 @@ export function PointerCursor({
 }: {
   local: boolean;
   typing?: boolean;
-  color: ColorName;
+  color: {
+    hue: string;
+    fill: string;
+  };
+
   x: number;
   y: number;
   message?: string;
   onMessageChange?: (message: string) => void;
   onMessageBlur?: () => void;
 }) {
-  const fill = colors[color][600];
-  const hue = colors[color][400];
+  const { fill, hue } = color;
 
   return (
     <>

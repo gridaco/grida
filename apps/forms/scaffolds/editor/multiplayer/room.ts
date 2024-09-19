@@ -1,7 +1,6 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createClientWorkspaceClient } from "@/lib/supabase/client";
-import type { IMultiplayerCursor } from "./provider";
 import type {
   ICursorId,
   ICursorPos,
@@ -9,21 +8,11 @@ import type {
   ICursorMessage,
   ICursorNode,
 } from "./types";
-import { randomcolorname } from "@/k/tailwindcolors";
 
 interface BroadcastPayload<T> {
   type: "broadcast";
   event: string;
   payload?: T;
-}
-
-function initcursor(seed: Partial<IMultiplayerCursor>): IMultiplayerCursor {
-  const color = randomcolorname();
-
-  return {
-    color: color,
-    ...seed,
-  } as IMultiplayerCursor;
 }
 
 export function useMultiplayerRoom({

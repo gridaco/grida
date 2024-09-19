@@ -172,7 +172,10 @@ function MultiplayerLayer() {
         typing={player.typing}
         x={player.pos?.x ?? 0}
         y={player.pos?.y ?? 0}
-        color={player.color}
+        color={{
+          fill: player.palette[600],
+          hue: player.palette[400],
+        }}
         onMessageBlur={() => {
           onPlayerTyping(false);
           onPlayerMessage("");
@@ -184,7 +187,10 @@ function MultiplayerLayer() {
             local={false}
             message={c.message}
             key={c.cursor_id}
-            color={c.color}
+            color={{
+              fill: c.palette[600],
+              hue: c.palette[400],
+            }}
             x={c.pos.x}
             y={c.pos.y}
           />

@@ -14,7 +14,7 @@ import type {
 } from "./types";
 import type { NodePos } from "../state";
 import produce from "immer";
-import colors, { randomcolorname } from "@/k/tailwindcolors";
+import colors, { randomcolorname, type ColorPalette } from "@/k/tailwindcolors";
 
 export type IMultiplayerCursor = {
   cursor_id: string;
@@ -23,7 +23,7 @@ export type IMultiplayerCursor = {
 
   message?: string;
   // avatar: string;
-  color: keyof typeof colors;
+  palette: ColorPalette;
   location: string | undefined;
   // canvas: "canvas" | "table";
   node?: NodePos;
@@ -226,7 +226,7 @@ function multiplayerReducer(
         new_cursor_ids.forEach((cursor_id) => {
           draft.cursors.push({
             cursor_id,
-            color: randomcolorname(),
+            palette: colors[randomcolorname()],
             location: undefined,
             message: undefined,
             node: undefined,
@@ -287,7 +287,7 @@ function initial_multiplayer_state(seed: {
 }): IMultiplayerState {
   const local_color_name = randomcolorname();
   const local_player_cursor = {
-    color: local_color_name,
+    palette: colors[local_color_name],
     cursor_id: seed.cursor_id,
     location: undefined,
     message: undefined,
