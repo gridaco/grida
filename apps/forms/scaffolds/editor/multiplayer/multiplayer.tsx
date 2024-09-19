@@ -5,6 +5,8 @@ import { PointerCursor } from "./pointer";
 import { useMouse, useThrottle } from "@uidotdev/usehooks";
 import { usePathname } from "next/navigation";
 import {
+  IMultiplayerCursor,
+  IMultiplayerCursorSync,
   MultiplayerStateProvider,
   useLocalPlayer,
   useMultiplayer,
@@ -41,8 +43,9 @@ function MultiplayerLayer() {
     onPlayerMessage,
     onPlayerTyping,
     onPlayerLocation,
+    onPlayerNode,
   } = useLocalPlayer();
-  const { room_id, player, cursors } = state;
+  const { room_id, player, cursors, presence_notify_key } = state;
 
   const [mouse] = useMouse();
 
@@ -83,6 +86,25 @@ function MultiplayerLayer() {
     [dispatch]
   );
 
+  const onJoin = useCallback(
+    (cursors: string[]) => {
+      console.log("join", cursors);
+      dispatch({ type: "multiplayer/presence/join", cursors });
+    },
+    [dispatch]
+  );
+  const onLeave = useCallback(() => {}, []);
+
+  const onNotify = useCallback(
+    (cursor_id: string, payload: Omit<IMultiplayerCursorSync, "cursor_id">) => {
+      dispatch({
+        type: "multiplayer/presence/notify",
+        cursor: { cursor_id, ...payload },
+      });
+    },
+    [dispatch]
+  );
+
   const { broadcast } = useMultiplayerRoom({
     room_id: room_id,
     cursor_id: player.cursor_id,
@@ -91,6 +113,9 @@ function MultiplayerLayer() {
     onNode: onNode,
     onPos: onPos,
     onPresenceSync: onPresenceSync,
+    onJoin,
+    onLeave,
+    onNotify,
   });
 
   useEffect(() => {
@@ -122,10 +147,26 @@ function MultiplayerLayer() {
 
   useEffect(() => {
     onPlayerLocation(location);
+  }, [location, onPlayerLocation]);
 
+  useEffect(() => {
     if (!broadcast) return;
-    broadcast("LOCATION", { location: location });
-  }, [location, broadcast, onPlayerLocation]);
+    broadcast("LOCATION", { location: player.location });
+  }, [broadcast, player.location]);
+
+  useEffect(() => {
+    if (presence_notify_key === 0) return;
+    if (!broadcast) return;
+    const pl = {
+      location: player.location,
+      message: player.message,
+      node: player.node,
+      pos: player.pos,
+    } satisfies Omit<IMultiplayerCursorSync, "cursor_id">;
+    broadcast("NOTIFY", pl);
+    console.log("broadcast", presence_notify_key, pl);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [presence_notify_key, broadcast]);
 
   useEffect(() => {
     if (!broadcast) return;
@@ -140,13 +181,19 @@ function MultiplayerLayer() {
   }, [debouncedPos, broadcast]);
 
   useEffect(() => {
+    if (editor.datagrid_selected_cell) {
+      onPlayerNode({
+        type: "cell",
+        pos: editor.datagrid_selected_cell,
+      });
+    }
+  }, [editor.datagrid_selected_cell]);
+
+  useEffect(() => {
     if (!broadcast) return;
 
-    broadcast("NODE", {
-      type: "cell",
-      pos: editor.datagrid_selected_cell,
-    });
-  }, [editor.datagrid_selected_cell, broadcast]);
+    broadcast("NODE", player.node);
+  }, [player.node, broadcast]);
 
   useEffect(() => {
     if (!broadcast) return;
@@ -154,33 +201,44 @@ function MultiplayerLayer() {
   }, [player.message, broadcast, player.typing]);
 
   const current_location_cursors = useMemo(() => {
-    return cursors.filter((u) => u.location === location);
-  }, [cursors, location]);
+    // TODO: inspect me!
+    // return cursors;
+    return cursors.filter((u) => u.location === player.location);
+  }, [cursors, player.location]);
 
   // console.log("players", {
-  //   // cursors,
-  //   current_location_players: current_location_other_cursors,
-  //   // mycursor,
+  //   cursors,
+  //   current_location_cursors,
+  //   player,
   // });
 
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden">
-      <PointerCursor
-        local
-        message={player.message}
-        onMessageChange={onPlayerMessage}
-        typing={player.typing}
-        x={player.pos?.x ?? 0}
-        y={player.pos?.y ?? 0}
-        color={{
-          fill: player.palette[600],
-          hue: player.palette[400],
-        }}
-        onMessageBlur={() => {
-          onPlayerTyping(false);
-          onPlayerMessage("");
-        }}
-      />
+      {process.env.NODE_ENV === "development" && (
+        <div className="absolute z-50 left-0 top-0 p-2 bg-black bg-opacity-50 text-white text-xs w-40 overflow-scroll">
+          <pre>
+            {JSON.stringify({ ...player, plalette: undefined }, null, 2)}
+          </pre>
+        </div>
+      )}
+      {player.pos && (
+        <PointerCursor
+          local
+          message={player.message}
+          onMessageChange={onPlayerMessage}
+          typing={player.typing}
+          x={player.pos?.x ?? 0}
+          y={player.pos?.y ?? 0}
+          color={{
+            fill: player.palette[600],
+            hue: player.palette[400],
+          }}
+          onMessageBlur={() => {
+            onPlayerTyping(false);
+            onPlayerMessage("");
+          }}
+        />
+      )}
       {current_location_cursors.map((c) =>
         c.pos ? (
           <PointerCursor

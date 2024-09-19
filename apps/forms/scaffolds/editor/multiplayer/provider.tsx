@@ -14,19 +14,31 @@ import type {
 } from "./types";
 import type { NodePos } from "../state";
 import produce from "immer";
-import colors, { randomcolorname, type ColorPalette } from "@/k/tailwindcolors";
+import colors, {
+  neutral_colors,
+  randomcolorname,
+  type ColorPalette,
+} from "@/k/tailwindcolors";
+
+export type IMultiplayerCursorSync = {
+  cursor_id: string;
+  message: string | undefined;
+  location: string | undefined;
+  node: NodePos | undefined;
+  pos: ICursorPos | undefined;
+};
 
 export type IMultiplayerCursor = {
   cursor_id: string;
   // user_id: string;
   // username: string;
 
-  message?: string;
+  message: string | undefined;
   // avatar: string;
   palette: ColorPalette;
   location: string | undefined;
   // canvas: "canvas" | "table";
-  node?: NodePos;
+  node: NodePos | undefined;
   // anchor: "screen" | "node" | "canvas";
   // origin: "center" | "top-left";
   pos: ICursorPos | undefined;
@@ -34,8 +46,9 @@ export type IMultiplayerCursor = {
 
 export interface IMultiplayerState {
   room_id: string;
+  presence_notify_key: number;
   cursors: Array<IMultiplayerCursor>;
-  player: Omit<IMultiplayerCursor, "is_local"> & {
+  player: IMultiplayerCursor & {
     typing: boolean;
   };
 }
@@ -43,6 +56,9 @@ export interface IMultiplayerState {
 type MultiplayerAction =
   | MultiplayerLocalPlayerAction
   | MultiplayerPresenceSyncAction
+  | MultiplayerPresenceNotifyAction
+  | MultiplayerPresenceJoinAction
+  | MultiplayerPresenceLeaveAction
   | MultiplayerCursorPosAction
   | MultiplayerCursorLocationAction
   | MultiplayerCursorMessageAction
@@ -55,6 +71,27 @@ type MultiplayerLocalPlayerAction = {
 
 type MultiplayerPresenceSyncAction = {
   type: "multiplayer/presence/sync";
+  cursors: string[];
+};
+
+type MultiplayerPresenceNotifyAction = {
+  type: "multiplayer/presence/notify";
+  cursor: IMultiplayerCursorSync;
+};
+
+type MultiplayerPresenceJoinAction = {
+  type: "multiplayer/presence/join";
+  /**
+   * newly joined cursor ids
+   */
+  cursors: string[];
+};
+
+type MultiplayerPresenceLeaveAction = {
+  type: "multiplayer/presence/leave";
+  /**
+   * left cursor ids
+   */
   cursors: string[];
 };
 
@@ -175,6 +212,16 @@ export function useLocalPlayer() {
     [dispatch]
   );
 
+  const onPlayerNode = useCallback(
+    (node: ICursorNode | undefined) => {
+      dispatch({
+        type: "multiplayer/player/local",
+        update: { node },
+      });
+    },
+    [dispatch]
+  );
+
   return useMemo(
     () => ({
       ...state.player,
@@ -182,6 +229,7 @@ export function useLocalPlayer() {
       onPlayerMessage,
       onPlayerTyping,
       onPlayerLocation,
+      onPlayerNode,
     }),
     [
       state.player,
@@ -189,6 +237,7 @@ export function useLocalPlayer() {
       onPlayerMessage,
       onPlayerTyping,
       onPlayerLocation,
+      onPlayerNode,
     ]
   );
 }
@@ -226,7 +275,7 @@ function multiplayerReducer(
         new_cursor_ids.forEach((cursor_id) => {
           draft.cursors.push({
             cursor_id,
-            palette: colors[randomcolorname()],
+            palette: colors[randomcolorname({ exclude: neutral_colors })],
             location: undefined,
             message: undefined,
             node: undefined,
@@ -241,6 +290,45 @@ function multiplayerReducer(
           draft.cursors.splice(index, 1);
         });
       });
+    }
+    case "multiplayer/presence/notify": {
+      const { cursor } = action satisfies MultiplayerPresenceNotifyAction;
+      return produce(state, (draft) => {
+        if (cursor.cursor_id === state.player.cursor_id) return;
+        const existing_cursor = draft.cursors.find(
+          (c) => c.cursor_id === cursor.cursor_id
+        );
+        if (existing_cursor) {
+          console.log("replace", cursor);
+          existing_cursor.location = cursor.location;
+          existing_cursor.message = cursor.message;
+          existing_cursor.node = cursor.node;
+          existing_cursor.pos = cursor.pos;
+        } else {
+          console.error("cursor not found", cursor.cursor_id);
+        }
+      });
+    }
+    case "multiplayer/presence/join": {
+      // when new cursor joins, notify player state
+      const { cursors: __new_cursor_ids } =
+        action satisfies MultiplayerPresenceJoinAction;
+
+      if (state.cursors.length === 0) return state;
+
+      const new_cursor_ids = __new_cursor_ids.filter(
+        (id) => id !== state.player.cursor_id
+      );
+
+      if (new_cursor_ids.length === 0) return state;
+
+      return produce(state, (draft) => {
+        draft.presence_notify_key++;
+      });
+    }
+    case "multiplayer/presence/leave": {
+      // do nothing - this is also handled in sync
+      break;
     }
     case "multiplayer/cursor/pos": {
       const { cursor_id, pos } = action satisfies MultiplayerCursorPosAction;
@@ -285,7 +373,7 @@ function initial_multiplayer_state(seed: {
   cursor_id: string;
   document_id: string;
 }): IMultiplayerState {
-  const local_color_name = randomcolorname();
+  const local_color_name = randomcolorname({ exclude: neutral_colors });
   const local_player_cursor = {
     palette: colors[local_color_name],
     cursor_id: seed.cursor_id,
@@ -297,6 +385,7 @@ function initial_multiplayer_state(seed: {
 
   return {
     room_id: seed.document_id,
+    presence_notify_key: 0,
     player: { ...local_player_cursor, typing: false },
     cursors: [],
   };

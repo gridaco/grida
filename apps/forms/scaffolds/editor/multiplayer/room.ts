@@ -8,6 +8,7 @@ import type {
   ICursorMessage,
   ICursorNode,
 } from "./types";
+import { IMultiplayerCursor, IMultiplayerCursorSync } from "./provider";
 
 interface BroadcastPayload<T> {
   type: "broadcast";
@@ -23,6 +24,9 @@ export function useMultiplayerRoom({
   onNode,
   onPos,
   onPresenceSync,
+  onJoin,
+  onLeave,
+  onNotify,
 }: {
   room_id: string;
   cursor_id: string;
@@ -31,11 +35,20 @@ export function useMultiplayerRoom({
   onNode: (cursor_id: string, node: ICursorNode | undefined) => void;
   onPos: (cursor_id: string, pos: ICursorPos) => void;
   onPresenceSync: (cursors: string[]) => void;
+  onJoin: (cursors: string[]) => void;
+  onLeave: (cursors: string[]) => void;
+  onNotify: (
+    cursor_id: string,
+    payload: Omit<IMultiplayerCursorSync, "cursor_id">
+  ) => void;
 }) {
   const client = useMemo(() => createClientWorkspaceClient(), []);
 
   const [broadcast, setBroadcast] = useState<
-    | ((event: "LOCATION" | "POS" | "MESSAGE" | "NODE", payload: any) => void)
+    | ((
+        event: "LOCATION" | "POS" | "MESSAGE" | "NODE" | "NOTIFY",
+        payload: any
+      ) => void)
     | undefined
   >();
 
@@ -55,10 +68,12 @@ export function useMultiplayerRoom({
         const presence_cursor_ids = cursors.map((u) => u.cursor_id);
         onPresenceSync(presence_cursor_ids);
       })
-      // .on("presence", { event: "join" }, ({ key, newPresences }) => {
-      // })
-      // .on("presence", { event: "leave" }, ({ key, leftPresences }) => {
-      // })
+      .on("presence", { event: "join" }, ({ key, newPresences }) => {
+        onJoin(newPresences.map((p) => p.cursor_id));
+      })
+      .on("presence", { event: "leave" }, ({ key, leftPresences }) => {
+        onLeave(leftPresences.map((p) => p.cursor_id));
+      })
       .subscribe(async (status) => {
         console.log("room status", status);
         if (status === "SUBSCRIBED") {
@@ -114,6 +129,15 @@ export function useMultiplayerRoom({
               }
             : undefined
         );
+      }
+    );
+    ch.on(
+      "broadcast",
+      { event: "NOTIFY" },
+      (payload: BroadcastPayload<IMultiplayerCursor>) => {
+        console.log("event:notify", payload);
+        if (!payload.payload) return;
+        onNotify(payload.payload.cursor_id, payload.payload);
       }
     );
     ch.subscribe((status) => {
