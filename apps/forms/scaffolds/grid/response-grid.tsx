@@ -108,7 +108,7 @@ function rowKeyGetter(row: GFResponseRow) {
   return row.__gf_id;
 }
 
-interface DataGridCellSelectionCursor {
+export interface DataGridCellSelectionCursor {
   pk: string | -1;
   column: string;
   cursor_id: string;
@@ -367,6 +367,7 @@ function GFSystemPropertyHeaderCell({ column }: RenderHeaderCellProps<any>) {
   const rootprops = {
     selected: selection !== undefined,
     is_local_cursor: selection?.is_local_cursor,
+    color: selection?.color,
   };
 
   return (
@@ -417,6 +418,7 @@ function DefaultPropertyIdentifierCell({
   const rootprops = {
     selected: selection !== undefined,
     is_local_cursor: selection?.is_local_cursor,
+    color: selection?.color,
   };
 
   return <CellRoot {...rootprops}>{identifier}</CellRoot>;
@@ -440,6 +442,7 @@ function DefaultPropertyDateCell({
   const rootprops = {
     selected: selection !== undefined,
     is_local_cursor: selection?.is_local_cursor,
+    color: selection?.color,
   };
 
   if (!date) {
@@ -496,6 +499,7 @@ function DefaultPropertyCustomerCell({
   const rootprops = {
     selected: selection !== undefined,
     is_local_cursor: selection?.is_local_cursor,
+    color: selection?.color,
   };
 
   if (!data) {
@@ -551,12 +555,13 @@ function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
   const rootprops = {
     selected: selection !== undefined,
     is_local_cursor: selection?.is_local_cursor,
+    color: selection?.color,
   };
 
   const masker = useMasking();
 
   if (!data) {
-    return <CellRoot></CellRoot>;
+    return <CellRoot {...rootprops}></CellRoot>;
   }
 
   const { type, value, options, multiple, files } = data;
@@ -721,6 +726,7 @@ function FieldEditCell(props: RenderEditCellProps<RenderingRow>) {
   const rootprops = {
     selected: selection !== undefined,
     is_local_cursor: selection?.is_local_cursor,
+    color: selection?.color,
   };
 
   useEffect(() => {

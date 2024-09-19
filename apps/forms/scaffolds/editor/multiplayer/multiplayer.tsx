@@ -1,7 +1,7 @@
 import { createClientWorkspaceClient } from "@/lib/supabase/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useEditorState } from "../use";
-import type { IMultiplayerCursor } from "../state";
+import type { DataGridCellPositionQuery, IMultiplayerCursor } from "../state";
 import { useThrottle } from "@uidotdev/usehooks";
 import colors from "@/k/tailwindcolors";
 import { usePathname, useRouter } from "next/navigation";
@@ -15,15 +15,22 @@ export interface Payload<T> {
   payload?: T;
 }
 
-interface ICursorPos {
+interface ICursorId {
   cursor_id: string;
+}
+
+interface ICursorPos extends ICursorId {
   x: number;
   y: number;
 }
 
-interface ILocation {
-  cursor_id: string;
+interface ILocation extends ICursorId {
   location: string;
+}
+
+interface INode extends ICursorId {
+  type: "cell";
+  pos: DataGridCellPositionQuery;
 }
 
 type ColorName = keyof typeof colors;
@@ -53,8 +60,9 @@ function useMultiplayerRoom({
 
   const [cursors, setCursors] = useState<IMultiplayerCursor[]>([]);
 
-  const [send, setSend] = useState<
-    ((event: "LOCATION" | "POS" | "MESSAGE", payload: any) => void) | undefined
+  const [broadcast, setBroadcast] = useState<
+    | ((event: "LOCATION" | "POS" | "MESSAGE" | "NODE", payload: any) => void)
+    | undefined
   >();
 
   const syncstate = useCallback(
@@ -131,14 +139,27 @@ function useMultiplayerRoom({
         message: payload.payload.message,
       });
     });
-    ch.on("broadcast", { event: "NODE" }, (payload: Payload<any>) => {});
+    ch.on("broadcast", { event: "NODE" }, (payload: Payload<INode>) => {
+      if (!payload.payload) return;
+      syncstate(payload.payload.cursor_id, {
+        node: payload.payload?.pos
+          ? {
+              type: payload.payload.type,
+              pos: payload.payload.pos,
+            }
+          : undefined,
+      });
+    });
     ch.subscribe((status) => {
       if (status === "SUBSCRIBED") {
-        setSend(() => (event: string, payload: any) => {
+        setBroadcast(() => (event: string, payload: any) => {
           ch.send({
             type: "broadcast",
             event: event,
-            payload: payload,
+            payload: {
+              cursor_id: cursor_id,
+              ...payload,
+            },
           });
         });
       }
@@ -150,7 +171,7 @@ function useMultiplayerRoom({
     };
   }, [client, cursor_id, room_id, syncstate]);
 
-  return { cursors, send, syncstate };
+  return { cursors, broadcast, syncstate };
 }
 
 export function MultiplayerLayer() {
@@ -158,7 +179,7 @@ export function MultiplayerLayer() {
   const { room_id, cursor_id } = state.multiplayer;
   const location = usePathname();
 
-  const { cursors, send, syncstate } = useMultiplayerRoom({
+  const { cursors, broadcast, syncstate } = useMultiplayerRoom({
     room_id,
     cursor_id,
   });
@@ -211,12 +232,12 @@ export function MultiplayerLayer() {
   }, []);
 
   useEffect(() => {
-    if (!send) return;
-    send("LOCATION", { cursor_id: cursor_id, location: location });
-  }, [location, send, cursor_id]);
+    if (!broadcast) return;
+    broadcast("LOCATION", { location: location });
+  }, [location, broadcast]);
 
   useEffect(() => {
-    if (!send) return;
+    if (!broadcast) return;
     if (
       !debouncedPos ||
       debouncedPos.x === undefined ||
@@ -224,19 +245,35 @@ export function MultiplayerLayer() {
     )
       return;
 
-    send("POS", { cursor_id: cursor_id, x: debouncedPos.x, y: debouncedPos.y });
-  }, [cursor_id, debouncedPos, send]);
+    broadcast("POS", { x: debouncedPos.x, y: debouncedPos.y });
+  }, [debouncedPos, broadcast]);
 
   useEffect(() => {
-    if (!send) return;
-    send("MESSAGE", { cursor_id: cursor_id, message: message });
-  }, [cursor_id, message, send, typing]);
+    if (!broadcast) return;
+
+    broadcast("NODE", {
+      type: "cell",
+      pos: state.datagrid_selected_cell,
+    });
+  }, [state.datagrid_selected_cell, broadcast]);
+
+  useEffect(() => {
+    if (!broadcast) return;
+    broadcast("MESSAGE", { message: message });
+  }, [message, broadcast, typing]);
 
   // local cursor update (without throttle)
   useEffect(() => {
     if (!pos || pos.x === undefined || pos.y === undefined) return;
     syncstate(cursor_id, { x: pos.x, y: pos.y });
   }, [cursor_id, pos, syncstate]);
+
+  useEffect(() => {
+    dispatch({
+      type: "editor/multiplayer/sync",
+      cursors,
+    });
+  }, [cursors, dispatch]);
 
   const current_location_other_cursors = useMemo(() => {
     return cursors.filter(
@@ -247,12 +284,12 @@ export function MultiplayerLayer() {
   const mycursor = cursors.find((u) => u.cursor_id === cursor_id);
 
   // console.log("players", {
-  //   cursors,
+  //   // cursors,
   //   current_location_players: current_location_other_cursors,
-  //   mycursor,
+  //   // mycursor,
   // });
 
-  console.log("mycursor", mycursor);
+  // console.log("mycursor", mycursor);
 
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden">

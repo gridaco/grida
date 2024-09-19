@@ -17,6 +17,7 @@ import type {
   EditorFlatFormBlock,
   EditorState,
   GDocTableID,
+  IMultiplayerCursor,
   TableXSBMainTableConnection,
 } from "./state";
 import type { Tokens } from "@/ast";
@@ -30,6 +31,8 @@ export type EditorAction =
   | FormsBlockAction
   //
   | InitAssetAction
+  //
+  | MultiplayerSyncAction
   //
   | DocumentAction
   //
@@ -65,6 +68,11 @@ export type EditorAction =
 export interface InitAssetAction extends Partial<EditorState["assets"]> {
   type: "editor/assets/init";
 }
+
+export type MultiplayerSyncAction = {
+  type: "editor/multiplayer/sync";
+  cursors: IMultiplayerCursor[];
+};
 
 // #region block
 

@@ -8,10 +8,12 @@ export const CellRoot = React.forwardRef(function CellRoot(
     children,
     className,
     is_local_cursor,
+    color,
     ...props
   }: React.HtmlHTMLAttributes<HTMLDivElement> & {
     selected?: boolean;
     is_local_cursor?: boolean;
+    color?: string;
   },
   ref: React.Ref<HTMLDivElement>
 ) {
@@ -26,8 +28,9 @@ export const CellRoot = React.forwardRef(function CellRoot(
     >
       <div
         data-selected={selected}
-        data-cursor-type={is_local_cursor ? "local" : "foreign"}
+        data-cursor-type={is_local_cursor && "local"}
         className="absolute inset-0 pointer-events-none select-none border border-border/25 data-[selected='true']:border-2 data-[cursor-type='local']:border-ring"
+        style={color ? { borderColor: color } : undefined}
       />
       {children}
     </div>

@@ -36,6 +36,7 @@ import type {
   FormEndingPreferencesAction,
   EditorThemeAppearanceAction,
   DataGridSelectCellAction,
+  MultiplayerSyncAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { EditorSymbols } from "./symbols";
@@ -108,6 +109,14 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
         };
       });
     }
+
+    case "editor/multiplayer/sync": {
+      const { cursors } = <MultiplayerSyncAction>action;
+      return produce(state, (draft) => {
+        draft.multiplayer.cursors = cursors;
+      });
+    }
+
     // #region editor/panels
     case "editor/panels/field-edit": {
       const { field_id, open, refresh } = <OpenFieldEditPanelAction>action;

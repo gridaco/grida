@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useMemo } from "react";
-import { ResponseGrid } from "../grid";
+import { DataGridCellSelectionCursor, ResponseGrid } from "../grid";
 import { createClientFormsClient } from "@/lib/supabase/client";
 import {
   AlertDialog,
@@ -57,6 +57,37 @@ import { saveAs } from "file-saver";
 import Papa from "papaparse";
 import { XSupaDataGridFilter } from "./components/filter";
 import { GridPagination } from "./components/pagination";
+
+function useSelectedCells(): DataGridCellSelectionCursor[] {
+  const [state] = useEditorState();
+
+  return useMemo(() => {
+    const cellcursors: DataGridCellSelectionCursor[] = state.multiplayer.cursors
+      .filter((c) => c.node?.type === "cell")
+      .map((cursor) => {
+        return {
+          color: cursor.color,
+          cursor_id: cursor.cursor_id,
+          pk: cursor.node!.pos?.pk,
+          column: cursor.node!.pos.column,
+        };
+      });
+
+    if (state.datagrid_selected_cell) {
+      cellcursors.push({
+        ...state.datagrid_selected_cell,
+        color: "current", // in datagrid we don't use cursor color for local cursor
+        cursor_id: state.multiplayer.cursor_id,
+      });
+    }
+
+    return cellcursors;
+  }, [
+    state.multiplayer.cursors,
+    state.multiplayer.cursor_id,
+    state.datagrid_selected_cell,
+  ]);
+}
 
 export function GridEditor({
   systemcolumns,
@@ -141,6 +172,8 @@ export function GridEditor({
     },
     [table_id, supabase, dispatch]
   );
+
+  const selectedCells = useSelectedCells();
 
   return (
     <GridLayout.Root>
@@ -251,17 +284,7 @@ export function GridEditor({
               column,
             });
           }}
-          selectedCells={
-            state.datagrid_selected_cell
-              ? [
-                  {
-                    ...state.datagrid_selected_cell,
-                    color: "",
-                    cursor_id: state.multiplayer.cursor_id,
-                  },
-                ]
-              : []
-          }
+          selectedCells={selectedCells}
         />
       </GridLayout.Content>
       <GridLayout.Footer>
