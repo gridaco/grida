@@ -37,6 +37,7 @@ import { Inter } from "next/font/google";
 import { cn } from "@/utils";
 import React from "react";
 import { PlayActions } from "@/scaffolds/workbench/play-actions";
+import Players from "@/scaffolds/workbench/players";
 import { DontCastJsonProperties } from "@/types/supabase-ext";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 
@@ -82,6 +83,14 @@ export default async function Layout({
   const cookieStore = cookies();
   const supabase = createServerComponentClient(cookieStore);
   const wsclient = createServerComponentWorkspaceClient(cookieStore);
+
+  const {
+    data: { user },
+  } = await wsclient.auth.getUser();
+
+  if (!user) {
+    return redirect("/sign-in");
+  }
 
   const { data: project_ref, error: project_ref_err } = await wsclient
     .from("project")
@@ -177,6 +186,7 @@ export default async function Layout({
                   store_id: form.store_connection?.store_id,
                   supabase: supabase_connection_state || undefined,
                 },
+                user_id: user.id,
                 theme: {
                   lang: data.lang,
                   is_powered_by_branding_enabled:
@@ -257,6 +267,7 @@ export default async function Layout({
                 id: project_ref.organization!.id,
                 name: project_ref.organization!.name,
               },
+              user_id: user.id,
               document_id: masterdoc_ref.id,
               document_title: masterdoc_ref.title,
               theme: {
@@ -373,6 +384,7 @@ export default async function Layout({
                 id: project_ref.organization!.id,
                 name: project_ref.organization!.name,
               },
+              user_id: user.id,
               tables: data.tables.map((ft) => ({
                 id: ft.id,
                 // TODO: this should be migrated from database
@@ -503,7 +515,10 @@ function Header({
           <Breadcrumbs />
           <SavingIndicator />
         </div>
-        <PlayActions />
+        <div className="flex gap-1 items-center">
+          <Players />
+          <PlayActions />
+        </div>
       </div>
     </header>
   );

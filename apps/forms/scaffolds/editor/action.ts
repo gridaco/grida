@@ -45,6 +45,7 @@ export type EditorAction =
   | DataGridPaginationAction
   | DataGridTableAction
   | DataGridTableViewAction
+  | DataGridSelectCellAction
   | DataGridReorderColumnAction
   | DataGridDateFormatAction
   | DataGridDateTZAction
@@ -217,6 +218,12 @@ export interface OpenRecordEditPanelAction {
 export interface FeedCustomerAction {
   type: "editor/customers/feed";
   data: Customer[];
+}
+
+export interface DataGridSelectCellAction {
+  type: "editor/data-grid/cell/select";
+  pk: string | -1; // pk value
+  column: string; // column key
 }
 
 export interface DataGridReorderColumnAction {

@@ -36,6 +36,7 @@ import type {
   FormEndingPreferencesAction,
   EditorThemeAppearanceAction,
   DataGridTableViewAction,
+  DataGridSelectCellAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { EditorSymbols } from "./symbols";
@@ -203,6 +204,7 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
         draft.datagrid_selected_rows = datagridreset.datagrid_selected_rows;
         draft.datagrid_local_filter = datagridreset.datagrid_local_filter;
         draft.datagrid_orderby = datagridreset.datagrid_orderby;
+        draft.datagrid_selected_cell = datagridreset.datagrid_selected_cell;
 
         if (draft.doctype === "v0_form") {
           // TODO: not a best way. but for now.
@@ -218,6 +220,15 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
         const tb = draft.tables.find((t) => t.id == table_id);
         if (!tb) return;
         tb.view_id = view_id;
+      });
+    }
+    case "editor/data-grid/cell/select": {
+      const { pk, column } = <DataGridSelectCellAction>action;
+      return produce(state, (draft) => {
+        draft.datagrid_selected_cell = {
+          pk,
+          column,
+        };
       });
     }
     case "editor/data-grid/column/reorder": {

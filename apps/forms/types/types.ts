@@ -34,6 +34,12 @@ export interface Form {
   scheduling_tz: string | null;
 }
 
+export type UserProfile = {
+  uid: string;
+  display_name: string;
+  avatar_path: string | null;
+};
+
 export interface Customer {
   uid: string;
   created_at: string;
