@@ -25,7 +25,7 @@ export type IMultiplayerCursorPresence = {
   user_id: string;
 };
 
-export type IMultiplayerCursorSync = {
+export type IMultiplayerCursorNotify = {
   cursor_id: string;
   message: string | undefined;
   location: string | undefined;
@@ -45,7 +45,6 @@ export type IMultiplayerCursor = {
   node: NodePos | undefined;
   // anchor: "screen" | "node" | "canvas";
   // origin: "center" | "top-left";
-  pos: ICursorPos | undefined;
 };
 
 export type MultiplayerUserProfile = {
@@ -58,15 +57,18 @@ export interface IMultiplayerState {
   room_id: string;
   presence_notify_key: number;
   cursors: Array<IMultiplayerCursor>;
+  cursors_pos: Record<string, ICursorPos | undefined>;
   player: IMultiplayerCursor & {
     typing: boolean;
   };
-  profiles: Record<string, MultiplayerUserProfile>;
+  player_pos: ICursorPos | undefined;
+  profiles: Record<string, MultiplayerUserProfile | undefined>;
 }
 
 type MultiplayerAction =
   | MultiplayerResolveProfileAction
   | MultiplayerLocalPlayerAction
+  | MultiplayerLocalPlayerPosAction
   | MultiplayerPresenceSyncAction
   | MultiplayerPresenceNotifyAction
   | MultiplayerPresenceJoinAction
@@ -86,6 +88,11 @@ type MultiplayerLocalPlayerAction = {
   update: Partial<IMultiplayerState["player"]>;
 };
 
+type MultiplayerLocalPlayerPosAction = {
+  type: "multiplayer/player/local/pos";
+  pos: ICursorPos | undefined;
+};
+
 type MultiplayerPresenceSyncAction = {
   type: "multiplayer/presence/sync";
   cursors: IMultiplayerCursorPresence[];
@@ -93,7 +100,7 @@ type MultiplayerPresenceSyncAction = {
 
 type MultiplayerPresenceNotifyAction = {
   type: "multiplayer/presence/notify";
-  cursor: IMultiplayerCursorSync;
+  cursor: IMultiplayerCursorNotify;
 };
 
 type MultiplayerPresenceJoinAction = {
@@ -141,6 +148,7 @@ function multiplayerReducer(
       const { profile } = action satisfies MultiplayerResolveProfileAction;
       return produce(state, (draft) => {
         draft.profiles[action.profile.uid] = {
+          uid: profile.uid,
           avatar: profile.avatar,
           display_name: profile.display_name,
         };
@@ -150,6 +158,12 @@ function multiplayerReducer(
       const { update } = action satisfies MultiplayerLocalPlayerAction;
       return produce(state, (draft) => {
         draft.player = { ...draft.player, ...update };
+      });
+    }
+    case "multiplayer/player/local/pos": {
+      const { pos } = action satisfies MultiplayerLocalPlayerPosAction;
+      return produce(state, (draft) => {
+        draft.player_pos = pos;
       });
     }
     case "multiplayer/presence/sync": {
@@ -180,7 +194,6 @@ function multiplayerReducer(
             location: undefined,
             message: undefined,
             node: undefined,
-            pos: undefined,
           });
         });
 
@@ -200,11 +213,11 @@ function multiplayerReducer(
           (c) => c.cursor_id === cursor.cursor_id
         );
         if (existing_cursor) {
-          console.log("replace", cursor);
+          // console.log("replace", cursor);
           existing_cursor.location = cursor.location;
           existing_cursor.message = cursor.message;
           existing_cursor.node = cursor.node;
-          existing_cursor.pos = cursor.pos;
+          draft.cursors_pos[cursor.cursor_id] = cursor.pos;
         } else {
           console.error("cursor not found", cursor.cursor_id);
         }
@@ -234,9 +247,7 @@ function multiplayerReducer(
     case "multiplayer/cursor/pos": {
       const { cursor_id, pos } = action satisfies MultiplayerCursorPosAction;
       return produce(state, (draft) => {
-        const cursor = draft.cursors.find((c) => c.cursor_id === cursor_id);
-        if (!cursor) return;
-        cursor.pos = pos;
+        draft.cursors_pos[cursor_id] = pos;
       });
     }
     case "multiplayer/cursor/location": {
@@ -327,10 +338,10 @@ export function useLocalPlayer() {
   const [state, dispatch] = useMultiplayer();
 
   const onPlayerPosition = useCallback(
-    (pos: ICursorPos) => {
+    (pos: ICursorPos | undefined) => {
       dispatch({
-        type: "multiplayer/player/local",
-        update: { pos },
+        type: "multiplayer/player/local/pos",
+        pos,
       });
     },
     [dispatch]
@@ -409,14 +420,15 @@ function initial_multiplayer_state(seed: {
     location: undefined,
     message: undefined,
     node: undefined,
-    pos: undefined,
   } satisfies IMultiplayerCursor;
 
   return {
     room_id: seed.document_id,
     presence_notify_key: 0,
     player: { ...local_player_cursor, typing: false },
+    player_pos: undefined,
     cursors: [],
+    cursors_pos: {},
     profiles: {},
   };
 }

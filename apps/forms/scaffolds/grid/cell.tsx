@@ -2,6 +2,12 @@
 import React from "react";
 import { cn } from "@/utils/cn";
 
+export interface DataGridCellRootProps {
+  selected?: boolean;
+  is_local_cursor?: boolean;
+  color?: string;
+}
+
 export const CellRoot = React.forwardRef(function CellRoot(
   {
     selected,
@@ -10,11 +16,7 @@ export const CellRoot = React.forwardRef(function CellRoot(
     is_local_cursor,
     color,
     ...props
-  }: React.HtmlHTMLAttributes<HTMLDivElement> & {
-    selected?: boolean;
-    is_local_cursor?: boolean;
-    color?: string;
-  },
+  }: React.HtmlHTMLAttributes<HTMLDivElement> & DataGridCellRootProps,
   ref: React.Ref<HTMLDivElement>
 ) {
   return (

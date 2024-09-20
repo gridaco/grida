@@ -13,6 +13,7 @@ import { FormInputType } from "@/types";
 import { ChevronDownIcon, Pencil1Icon, TrashIcon } from "@radix-ui/react-icons";
 import { RenderHeaderCellProps } from "react-data-grid";
 import { CellRoot } from "./cell";
+import { useCellRootProps } from "./hooks";
 export const ColumnHeaderCell = React.forwardRef(function ColumnHeaderCell(
   {
     column,
@@ -26,10 +27,16 @@ export const ColumnHeaderCell = React.forwardRef(function ColumnHeaderCell(
   },
   ref: React.Ref<HTMLDivElement>
 ) {
-  const { name } = column;
+  const { name, key } = column;
+
+  const rootprops = useCellRootProps(-1, key);
 
   return (
-    <CellRoot ref={ref} className="flex items-center justify-between">
+    <CellRoot
+      ref={ref}
+      {...rootprops}
+      className="flex items-center justify-between"
+    >
       <span className="flex items-center gap-2">
         <FormFieldTypeIcon type={type} className="w-4 h-4" />
         <span className="font-normal">{name}</span>

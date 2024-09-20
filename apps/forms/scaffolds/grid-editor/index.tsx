@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useMemo } from "react";
-import { DataGridCellSelectionCursor, ResponseGrid } from "../grid";
+import { ResponseGrid, type DataGridCellSelectionCursor } from "../grid";
 import { createClientFormsClient } from "@/lib/supabase/client";
 import {
   AlertDialog,
@@ -84,7 +84,12 @@ function useSelectedCells(): DataGridCellSelectionCursor[] {
     }
 
     return cellcursors;
-  }, [multplayer.cursors, multplayer.player, state.datagrid_selected_cell]);
+  }, [
+    multplayer.cursors,
+    multplayer.player.node,
+    multplayer.player.cursor_id,
+    state.datagrid_selected_cell,
+  ]);
 }
 
 export function GridEditor({

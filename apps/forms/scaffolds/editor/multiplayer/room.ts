@@ -11,7 +11,7 @@ import type {
 import {
   IMultiplayerCursor,
   IMultiplayerCursorPresence,
-  IMultiplayerCursorSync,
+  IMultiplayerCursorNotify,
 } from "./provider";
 
 interface BroadcastPayload<T> {
@@ -45,7 +45,7 @@ export function useMultiplayerRoom({
   onLeave: (cursors: string[]) => void;
   onNotify: (
     cursor_id: string,
-    payload: Omit<IMultiplayerCursorSync, "cursor_id">
+    payload: Omit<IMultiplayerCursorNotify, "cursor_id">
   ) => void;
 }) {
   const client = useMemo(() => createClientWorkspaceClient(), []);
@@ -145,7 +145,7 @@ export function useMultiplayerRoom({
     ch.on(
       "broadcast",
       { event: "NOTIFY" },
-      (payload: BroadcastPayload<IMultiplayerCursor>) => {
+      (payload: BroadcastPayload<IMultiplayerCursorNotify>) => {
         // console.log("event:notify", payload);
         if (!payload.payload) return;
         onNotify(payload.payload.cursor_id, payload.payload);

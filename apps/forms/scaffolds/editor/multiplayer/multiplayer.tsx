@@ -7,7 +7,7 @@ import { usePathname } from "next/navigation";
 import {
   IMultiplayerCursor,
   IMultiplayerCursorPresence,
-  IMultiplayerCursorSync,
+  IMultiplayerCursorNotify,
   MultiplayerStateProvider,
   MultiplayerUserProfile,
   useLocalPlayer,
@@ -122,11 +122,18 @@ function MultiplayerLayer() {
     onPlayerLocation,
     onPlayerNode,
   } = useLocalPlayer();
-  const { room_id, player, cursors, presence_notify_key } = state;
+  const {
+    room_id,
+    player,
+    player_pos,
+    cursors,
+    cursors_pos,
+    presence_notify_key,
+  } = state;
 
   const [mouse] = useMouse();
 
-  const debouncedPos = useThrottle(player.pos, RT_THROTTLE_MS);
+  const debouncedPos = useThrottle(player_pos, RT_THROTTLE_MS);
 
   const onLocation = useCallback(
     (cursor_id: string, location: string) => {
@@ -173,7 +180,10 @@ function MultiplayerLayer() {
   const onLeave = useCallback(() => {}, []);
 
   const onNotify = useCallback(
-    (cursor_id: string, payload: Omit<IMultiplayerCursorSync, "cursor_id">) => {
+    (
+      cursor_id: string,
+      payload: Omit<IMultiplayerCursorNotify, "cursor_id">
+    ) => {
       dispatch({
         type: "multiplayer/presence/notify",
         cursor: { cursor_id, ...payload },
@@ -240,8 +250,8 @@ function MultiplayerLayer() {
       location: player.location,
       message: player.message,
       node: player.node,
-      pos: player.pos,
-    } satisfies Omit<IMultiplayerCursorSync, "cursor_id">;
+      pos: player_pos,
+    } satisfies Omit<IMultiplayerCursorNotify, "cursor_id">;
     broadcast("NOTIFY", pl);
     // console.log("broadcast", presence_notify_key, pl);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -300,21 +310,21 @@ function MultiplayerLayer() {
 
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden">
-      {process.env.NODE_ENV === "development" && (
+      {/* {process.env.NODE_ENV === "development" && (
         <div className="absolute z-50 left-0 top-0 p-2 bg-black bg-opacity-50 text-white text-xs w-40 overflow-scroll">
           <pre>
             {JSON.stringify({ ...player, plalette: undefined }, null, 2)}
           </pre>
         </div>
-      )}
-      {player.pos && (
+      )} */}
+      {player_pos && (
         <PointerCursor
           local
           message={player.message}
           onMessageChange={onPlayerMessage}
           typing={player.typing}
-          x={player.pos?.x ?? 0}
-          y={player.pos?.y ?? 0}
+          x={player_pos.x}
+          y={player_pos.y}
           color={{
             fill: player.palette[600],
             hue: player.palette[400],
@@ -325,8 +335,10 @@ function MultiplayerLayer() {
           }}
         />
       )}
-      {current_location_cursors.map((c) =>
-        c.pos ? (
+      {current_location_cursors.map((c) => {
+        const pos = cursors_pos[c.cursor_id];
+        if (!pos) return <></>;
+        return (
           <PointerCursor
             local={false}
             message={c.message}
@@ -335,13 +347,11 @@ function MultiplayerLayer() {
               fill: c.palette[600],
               hue: c.palette[400],
             }}
-            x={c.pos.x}
-            y={c.pos.y}
+            x={pos.x}
+            y={pos.y}
           />
-        ) : (
-          <></>
-        )
-      )}
+        );
+      })}
     </div>
   );
 }

@@ -1,5 +1,12 @@
 import type { FormInputType, GridaXSupabase } from "@/types";
 
+export interface DataGridCellSelectionCursor {
+  pk: string | -1;
+  column: string;
+  cursor_id: string;
+  color: string;
+}
+
 export type GFSystemColumnTypes =
   | "__gf_display_id"
   | "__gf_created_at"

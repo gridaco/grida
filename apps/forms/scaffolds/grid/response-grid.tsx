@@ -19,6 +19,7 @@ import { FormInputType } from "@/types";
 import { JsonPopupEditorCell } from "./json-cell";
 import { useEditorState } from "../editor";
 import type {
+  DataGridCellSelectionCursor,
   GFColumn,
   GFResponseFieldData,
   GFResponseRow,
@@ -31,7 +32,6 @@ import { Button } from "@/components/ui/button";
 import { FileTypeIcon } from "@/components/form-field-type-icon";
 import { toZonedTime } from "date-fns-tz";
 import { tztostr } from "../editor/symbols";
-import { mask } from "./mask";
 import toast from "react-hot-toast";
 import { FormValue } from "@/services/form";
 import {
@@ -48,89 +48,24 @@ import { FieldSupports } from "@/k/supported_field_types";
 import { format } from "date-fns";
 import { EmptyRowsRenderer } from "./empty";
 import { ColumnHeaderCell } from "./column-header-cell";
-import { CellRoot } from "./cell";
+import { CellRoot, DataGridCellRootProps } from "./cell";
 import { cn } from "@/utils";
 import "./grid.css";
+import { GridMultiplayerProvider, useCellSelection } from "./multiplayer";
+import { useCellRootProps, useMasking } from "./hooks";
 
-function useMasking() {
-  const [state] = useEditorState();
-  return useCallback(
-    (txt: string): string => {
-      return state.datagrid_local_filter.masking_enabled &&
-        typeof txt === "string"
-        ? mask(txt)
-        : txt.toString();
-    },
-    [state.datagrid_local_filter.masking_enabled]
-  );
-}
-
-function multiplayer_rows(
-  rows: GFResponseRow[],
-  selectedCells?: Array<DataGridCellSelectionCursor>,
-  local_cursor_id?: string
-): RenderingRow[] {
-  if (!selectedCells) return rows.map((row) => ({ ...row, selections: [] }));
-
-  return rows.map((row) => {
-    const selections = selectedCells
-      .filter((cell) => cell.pk === row.__gf_id)
-      .map((cell) => ({
-        column: cell.column,
-        cursor_id: cell.cursor_id,
-        color: cell.color,
-        is_local_cursor: cell.cursor_id === local_cursor_id,
-      }));
-
-    return {
-      ...row,
-      selections,
-    };
-  });
-}
-
-function getCellSelection(
-  selections: CellSelection[],
-  column: string
-): CellSelection | undefined {
-  const thiscolumnselections = selections
-    .filter((s) => s.column === column)
-    .sort((a, b) => {
-      if (a.is_local_cursor) return -1;
-      if (b.is_local_cursor) return 1;
-      return 0;
-    });
-
-  return thiscolumnselections[0];
-}
 
 function rowKeyGetter(row: GFResponseRow) {
   return row.__gf_id;
 }
 
-export interface DataGridCellSelectionCursor {
-  pk: string | -1;
-  column: string;
-  cursor_id: string;
-  color: string;
-}
-
-type CellSelection = {
-  column: string;
-  cursor_id: string;
-  color: string;
-  is_local_cursor: boolean;
-};
-
-type RenderingRow = GFResponseRow & {
-  selections: CellSelection[];
-};
+type RenderingRow = GFResponseRow;
 
 export function ResponseGrid({
   local_cursor_id,
   systemcolumns: _systemcolumns,
   columns,
-  rows: _rows,
+  rows: rows,
   selectionDisabled,
   readonly,
   loading,
@@ -301,74 +236,69 @@ export function ResponseGrid({
     }
   };
 
-  const final_rows = useMemo(() => {
-    return multiplayer_rows(_rows, selectedCells, local_cursor_id);
-  }, [_rows, selectedCells, local_cursor_id]);
-
   return (
-    <DataGrid
-      className={cn(
-        "flex-grow select-none text-xs text-foreground/80",
-        className
-      )}
-      rowKeyGetter={rowKeyGetter}
-      columns={allcolumns}
-      rows={final_rows}
-      rowHeight={32}
-      headerRowHeight={36}
-      onCellDoubleClick={() => {
-        if (readonly) {
-          toast("This table is readonly", { icon: "🔒" });
-        }
-      }}
-      onColumnsReorder={onColumnsReorder}
-      selectedRows={selectionDisabled ? undefined : selected_responses}
-      onCopy={onCopy}
-      onSelectedCellChange={(cell) => {
-        if (cell.rowIdx === -1) {
-          const column = cell.column.key;
-          onSelectedCellChange?.({
-            pk: -1,
-            column,
-          });
-        } else {
-          const pk = cell.row.__gf_id;
-          const column = cell.column.key;
-          onSelectedCellChange?.({
-            pk,
-            column,
-          });
-        }
-      }}
-      onRowsChange={(rows, data) => {
-        const key = data.column.key;
-        const indexes = data.indexes;
+    <GridMultiplayerProvider
+      local_cursor_id={local_cursor_id}
+      selections={selectedCells ?? []}
+    >
+      <DataGrid
+        className={cn(
+          "flex-grow select-none text-xs text-foreground/80",
+          className
+        )}
+        rowKeyGetter={rowKeyGetter}
+        columns={allcolumns}
+        rows={rows}
+        rowHeight={32}
+        headerRowHeight={36}
+        onCellDoubleClick={() => {
+          if (readonly) {
+            toast("This table is readonly", { icon: "🔒" });
+          }
+        }}
+        onColumnsReorder={onColumnsReorder}
+        selectedRows={selectionDisabled ? undefined : selected_responses}
+        onCopy={onCopy}
+        onSelectedCellChange={(cell) => {
+          if (cell.rowIdx === -1) {
+            const column = cell.column.key;
+            onSelectedCellChange?.({
+              pk: -1,
+              column,
+            });
+          } else {
+            const pk = cell.row.__gf_id;
+            const column = cell.column.key;
+            onSelectedCellChange?.({
+              pk,
+              column,
+            });
+          }
+        }}
+        onRowsChange={(rows, data) => {
+          const key = data.column.key;
+          const indexes = data.indexes;
 
-        for (const i of indexes) {
-          const row = rows[i];
-          const field = row.fields[key];
+          for (const i of indexes) {
+            const row = rows[i];
+            const field = row.fields[key];
 
-          onCellChange?.(row, key, field);
+            onCellChange?.(row, key, field);
+          }
+        }}
+        onSelectedRowsChange={
+          selectionDisabled ? undefined : onSelectedRowsChange
         }
-      }}
-      onSelectedRowsChange={
-        selectionDisabled ? undefined : onSelectedRowsChange
-      }
-      renderers={{ noRowsFallback: <EmptyRowsRenderer loading={loading} /> }}
-    />
+        renderers={{ noRowsFallback: <EmptyRowsRenderer loading={loading} /> }}
+      />
+    </GridMultiplayerProvider>
   );
 }
 
 function GFSystemPropertyHeaderCell({ column }: RenderHeaderCellProps<any>) {
   const { name, key } = column;
 
-  const selection = useMemo(() => getCellSelection([], key), [key]);
-
-  const rootprops = {
-    selected: selection !== undefined,
-    is_local_cursor: selection?.is_local_cursor,
-    color: selection?.color,
-  };
+  const rootprops = useCellRootProps(-1, key);
 
   return (
     <CellRoot {...rootprops} className="flex items-center gap-2">
@@ -410,16 +340,7 @@ function DefaultPropertyIdentifierCell({
 }: RenderCellProps<RenderingRow>) {
   const identifier = row.__gf_id;
 
-  const selection = useMemo(
-    () => getCellSelection(row.selections, column.key),
-    [column.key, row.selections]
-  );
-
-  const rootprops = {
-    selected: selection !== undefined,
-    is_local_cursor: selection?.is_local_cursor,
-    color: selection?.color,
-  };
+  const rootprops = useCellRootProps(row.__gf_id, column.key);
 
   return <CellRoot {...rootprops}>{identifier}</CellRoot>;
 }
@@ -434,16 +355,7 @@ function DefaultPropertyDateCell({
 
   const { dateformat, datetz } = state;
 
-  const selection = useMemo(
-    () => getCellSelection(row.selections, column.key),
-    [column.key, row.selections]
-  );
-
-  const rootprops = {
-    selected: selection !== undefined,
-    is_local_cursor: selection?.is_local_cursor,
-    color: selection?.color,
-  };
+  const rootprops = useCellRootProps(row.__gf_id, column.key);
 
   if (!date) {
     return <></>;
@@ -491,16 +403,7 @@ function DefaultPropertyCustomerCell({
 
   const data = row.__gf_customer_id;
 
-  const selection = useMemo(
-    () => getCellSelection(row.selections, column.key),
-    [column.key, row.selections]
-  );
-
-  const rootprops = {
-    selected: selection !== undefined,
-    is_local_cursor: selection?.is_local_cursor,
-    color: selection?.color,
-  };
+  const rootprops = useCellRootProps(row.__gf_id, column.key);
 
   if (!data) {
     return <></>;
@@ -547,16 +450,7 @@ function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
 
   const data = row.fields[column.key];
 
-  const selection = useMemo(
-    () => getCellSelection(row.selections, column.key),
-    [column.key, row.selections]
-  );
-
-  const rootprops = {
-    selected: selection !== undefined,
-    is_local_cursor: selection?.is_local_cursor,
-    color: selection?.color,
-  };
+  const rootprops = useCellRootProps(row.__gf_id, column.key);
 
   const masker = useMasking();
 
@@ -718,16 +612,7 @@ function FieldEditCell(props: RenderEditCellProps<RenderingRow>) {
   const ref = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
   const wasEscPressed = useRef(false);
 
-  const selection = useMemo(
-    () => getCellSelection(row.selections, column.key),
-    [column.key, row.selections]
-  );
-
-  const rootprops = {
-    selected: selection !== undefined,
-    is_local_cursor: selection?.is_local_cursor,
-    color: selection?.color,
-  };
+  const rootprops = useCellRootProps(row.__gf_id, column.key);
 
   useEffect(() => {
     if (ref.current) {
