@@ -265,7 +265,7 @@ function multiplayerReducer(
       return produce(state, (draft) => {
         const cursor = draft.cursors.find((c) => c.cursor_id === cursor_id);
         if (!cursor) return;
-        cursor.message;
+        cursor.message = message;
       });
     }
     case "multiplayer/cursor/node": {

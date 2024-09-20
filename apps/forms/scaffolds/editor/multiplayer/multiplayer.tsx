@@ -107,6 +107,48 @@ function useProfilesResolver() {
   }, [unresolved_user_ids, onResolve]);
 }
 
+function useMessageBubbleTrigger({
+  onFocus,
+  onBlur,
+}: {
+  onFocus: () => void;
+  onBlur: () => void;
+}) {
+  useEffect(() => {
+    const isInputElement = (element: EventTarget | null): boolean => {
+      if (!(element instanceof HTMLElement)) return false;
+      const tagName = element.tagName.toLowerCase();
+      return (
+        tagName === "input" ||
+        tagName === "textarea" ||
+        element.isContentEditable
+      );
+    };
+
+    const onkeydown = (e: KeyboardEvent) => {
+      if (isInputElement(e.target)) return;
+
+      if (e.shiftKey || e.metaKey) return;
+
+      if (e.key === "/") {
+        onFocus();
+        return;
+      }
+
+      if (e.key === "Escape") {
+        onBlur();
+        return;
+      }
+    };
+
+    window.addEventListener("keydown", onkeydown);
+
+    return () => {
+      window.removeEventListener("keydown", onkeydown);
+    };
+  }, [onFocus, onBlur]);
+}
+
 function MultiplayerLayer() {
   useProfilesResolver();
 
@@ -206,28 +248,15 @@ function MultiplayerLayer() {
     onNotify,
   });
 
-  useEffect(() => {
-    const onkeydown = (e: KeyboardEvent) => {
-      if (e.shiftKey) return;
-      if (e.metaKey) return;
-      if (e.key === "/") {
-        onPlayerTyping(true);
-        return;
-      }
-
-      if (e.key === "Escape") {
-        onPlayerTyping(false);
-        onPlayerMessage("");
-        return;
-      }
-    };
-
-    window.addEventListener("keydown", onkeydown);
-
-    return () => {
-      window.removeEventListener("keydown", onkeydown);
-    };
-  }, [onPlayerMessage, onPlayerTyping]);
+  useMessageBubbleTrigger({
+    onFocus: () => {
+      onPlayerTyping(true);
+    },
+    onBlur: () => {
+      onPlayerTyping(false);
+      onPlayerMessage("");
+    },
+  });
 
   useEffect(() => {
     onPlayerPosition({ x: mouse.x, y: mouse.y });
@@ -287,24 +316,26 @@ function MultiplayerLayer() {
   useEffect(() => {
     if (!broadcast) return;
     broadcast("MESSAGE", { message: player.message });
-  }, [player.message, broadcast, player.typing]);
+  }, [broadcast, player.typing, player.message]);
 
-  const current_location_cursors = useMemo(() => {
-    // TODO: inspect me!
-    // return cursors;
-    return cursors
-      .filter((c) => c.location === player.location)
-      .filter((c) => {
-        if (c.node) {
-          return c.node.type !== "cell";
-        }
-        return true;
-      });
+  const current_visible_cursors = useMemo(() => {
+    return (
+      cursors
+        // TODO: inspect me! - location state is buggy.
+        .filter((c) => c.location === player.location)
+        .filter((c) => {
+          if (c.message) return true;
+          if (c.node) {
+            return c.node.type !== "cell";
+          }
+          return true;
+        })
+    );
   }, [cursors, player.location]);
 
   // console.log("players", {
   //   cursors,
-  //   current_location_cursors,
+  //   current_visible_cursors,
   //   player,
   // });
 
@@ -335,9 +366,9 @@ function MultiplayerLayer() {
           }}
         />
       )}
-      {current_location_cursors.map((c) => {
+      {current_visible_cursors.map((c) => {
         const pos = cursors_pos[c.cursor_id];
-        if (!pos) return <></>;
+        if (!pos || (pos.x === 0 && pos.y === 0)) return <></>;
         return (
           <PointerCursor
             local={false}
