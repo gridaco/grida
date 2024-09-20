@@ -2447,19 +2447,19 @@ export type Database = {
         Row: {
           avatar_path: string | null
           created_at: string
-          display_name: string | null
+          display_name: string
           uid: string
         }
         Insert: {
           avatar_path?: string | null
           created_at?: string
-          display_name?: string | null
+          display_name: string
           uid?: string
         }
         Update: {
           avatar_path?: string | null
           created_at?: string
-          display_name?: string | null
+          display_name?: string
           uid?: string
         }
         Relationships: [

@@ -8,7 +8,11 @@ import type {
   ICursorMessage,
   ICursorNode,
 } from "./types";
-import { IMultiplayerCursor, IMultiplayerCursorSync } from "./provider";
+import {
+  IMultiplayerCursor,
+  IMultiplayerCursorPresence,
+  IMultiplayerCursorSync,
+} from "./provider";
 
 interface BroadcastPayload<T> {
   type: "broadcast";
@@ -18,6 +22,7 @@ interface BroadcastPayload<T> {
 
 export function useMultiplayerRoom({
   room_id,
+  user_id,
   cursor_id,
   onLocation,
   onMessage,
@@ -29,12 +34,13 @@ export function useMultiplayerRoom({
   onNotify,
 }: {
   room_id: string;
+  user_id: string;
   cursor_id: string;
   onMessage: (cursor_id: string, message: string) => void;
   onLocation: (cursor_id: string, location: string) => void;
   onNode: (cursor_id: string, node: ICursorNode | undefined) => void;
   onPos: (cursor_id: string, pos: ICursorPos) => void;
-  onPresenceSync: (cursors: string[]) => void;
+  onPresenceSync: (cursors: IMultiplayerCursorPresence[]) => void;
   onJoin: (cursors: string[]) => void;
   onLeave: (cursors: string[]) => void;
   onNotify: (
@@ -61,12 +67,14 @@ export function useMultiplayerRoom({
 
     room
       .on("presence", { event: "sync" }, () => {
-        const state = room.presenceState<{ cursor_id: string }>();
+        const state = room.presenceState<{
+          cursor_id: string;
+          user_id: string;
+        }>();
         const cursors = state[room_id];
         if (!cursors) return;
 
-        const presence_cursor_ids = cursors.map((u) => u.cursor_id);
-        onPresenceSync(presence_cursor_ids);
+        onPresenceSync(cursors);
       })
       .on("presence", { event: "join" }, ({ key, newPresences }) => {
         onJoin(newPresences.map((p) => p.cursor_id));
@@ -75,9 +83,12 @@ export function useMultiplayerRoom({
         onLeave(leftPresences.map((p) => p.cursor_id));
       })
       .subscribe(async (status) => {
-        console.log("room status", status);
+        // console.log("room status", status);
         if (status === "SUBSCRIBED") {
-          const resp = await room.track({ cursor_id: cursor_id });
+          const resp = await room.track({
+            cursor_id: cursor_id,
+            user_id: user_id,
+          });
           if (resp === "ok") {
           } else {
             console.error("Failed to track cursor");
@@ -135,7 +146,7 @@ export function useMultiplayerRoom({
       "broadcast",
       { event: "NOTIFY" },
       (payload: BroadcastPayload<IMultiplayerCursor>) => {
-        console.log("event:notify", payload);
+        // console.log("event:notify", payload);
         if (!payload.payload) return;
         onNotify(payload.payload.cursor_id, payload.payload);
       }

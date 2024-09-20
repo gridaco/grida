@@ -20,6 +20,11 @@ import colors, {
   type ColorPalette,
 } from "@/k/tailwindcolors";
 
+export type IMultiplayerCursorPresence = {
+  cursor_id: string;
+  user_id: string;
+};
+
 export type IMultiplayerCursorSync = {
   cursor_id: string;
   message: string | undefined;
@@ -30,8 +35,7 @@ export type IMultiplayerCursorSync = {
 
 export type IMultiplayerCursor = {
   cursor_id: string;
-  // user_id: string;
-  // username: string;
+  user_id: string;
 
   message: string | undefined;
   // avatar: string;
@@ -44,6 +48,12 @@ export type IMultiplayerCursor = {
   pos: ICursorPos | undefined;
 };
 
+export type MultiplayerUserProfile = {
+  uid: string;
+  display_name: string;
+  avatar: string | undefined;
+};
+
 export interface IMultiplayerState {
   room_id: string;
   presence_notify_key: number;
@@ -51,9 +61,11 @@ export interface IMultiplayerState {
   player: IMultiplayerCursor & {
     typing: boolean;
   };
+  profiles: Record<string, MultiplayerUserProfile>;
 }
 
 type MultiplayerAction =
+  | MultiplayerResolveProfileAction
   | MultiplayerLocalPlayerAction
   | MultiplayerPresenceSyncAction
   | MultiplayerPresenceNotifyAction
@@ -64,6 +76,11 @@ type MultiplayerAction =
   | MultiplayerCursorMessageAction
   | MultiplayerCursorNodeAction;
 
+type MultiplayerResolveProfileAction = {
+  type: "multiplayer/profile/resolve";
+  profile: MultiplayerUserProfile;
+};
+
 type MultiplayerLocalPlayerAction = {
   type: "multiplayer/player/local";
   update: Partial<IMultiplayerState["player"]>;
@@ -71,7 +88,7 @@ type MultiplayerLocalPlayerAction = {
 
 type MultiplayerPresenceSyncAction = {
   type: "multiplayer/presence/sync";
-  cursors: string[];
+  cursors: IMultiplayerCursorPresence[];
 };
 
 type MultiplayerPresenceNotifyAction = {
@@ -114,6 +131,143 @@ type MultiplayerCursorNodeAction = {
   type: "multiplayer/cursor/node";
   node: ICursorNode | undefined;
 } & ICursorId;
+
+function multiplayerReducer(
+  state: IMultiplayerState,
+  action: MultiplayerAction
+): IMultiplayerState {
+  switch (action.type) {
+    case "multiplayer/profile/resolve": {
+      const { profile } = action satisfies MultiplayerResolveProfileAction;
+      return produce(state, (draft) => {
+        draft.profiles[action.profile.uid] = {
+          avatar: profile.avatar,
+          display_name: profile.display_name,
+        };
+      });
+    }
+    case "multiplayer/player/local": {
+      const { update } = action satisfies MultiplayerLocalPlayerAction;
+      return produce(state, (draft) => {
+        draft.player = { ...draft.player, ...update };
+      });
+    }
+    case "multiplayer/presence/sync": {
+      const { cursors: presence_cursors } =
+        action satisfies MultiplayerPresenceSyncAction;
+      return produce(state, (draft) => {
+        const other_cursor_ids = presence_cursors
+          .map((c) => c.cursor_id)
+          .filter((id) => id !== state.player.cursor_id);
+
+        // if new, initialize and add
+        // if removed, remove
+
+        const new_cursor_ids = other_cursor_ids.filter(
+          (id) => !draft.cursors.some((c) => c.cursor_id === id)
+        );
+
+        const removed_cursor_ids = draft.cursors
+          .map((c) => c.cursor_id)
+          .filter((id) => !other_cursor_ids.includes(id));
+
+        new_cursor_ids.forEach((cursor_id) => {
+          draft.cursors.push({
+            cursor_id,
+            user_id: presence_cursors.find((c) => c.cursor_id === cursor_id)!
+              .user_id,
+            palette: colors[randomcolorname({ exclude: neutral_colors })],
+            location: undefined,
+            message: undefined,
+            node: undefined,
+            pos: undefined,
+          });
+        });
+
+        removed_cursor_ids.forEach((cursor_id) => {
+          const index = draft.cursors.findIndex(
+            (c) => c.cursor_id === cursor_id
+          );
+          draft.cursors.splice(index, 1);
+        });
+      });
+    }
+    case "multiplayer/presence/notify": {
+      const { cursor } = action satisfies MultiplayerPresenceNotifyAction;
+      return produce(state, (draft) => {
+        if (cursor.cursor_id === state.player.cursor_id) return;
+        const existing_cursor = draft.cursors.find(
+          (c) => c.cursor_id === cursor.cursor_id
+        );
+        if (existing_cursor) {
+          console.log("replace", cursor);
+          existing_cursor.location = cursor.location;
+          existing_cursor.message = cursor.message;
+          existing_cursor.node = cursor.node;
+          existing_cursor.pos = cursor.pos;
+        } else {
+          console.error("cursor not found", cursor.cursor_id);
+        }
+      });
+    }
+    case "multiplayer/presence/join": {
+      // when new cursor joins, notify player state
+      const { cursors: __new_cursor_ids } =
+        action satisfies MultiplayerPresenceJoinAction;
+
+      if (state.cursors.length === 0) return state;
+
+      const new_cursor_ids = __new_cursor_ids.filter(
+        (id) => id !== state.player.cursor_id
+      );
+
+      if (new_cursor_ids.length === 0) return state;
+
+      return produce(state, (draft) => {
+        draft.presence_notify_key++;
+      });
+    }
+    case "multiplayer/presence/leave": {
+      // do nothing - this is also handled in sync
+      break;
+    }
+    case "multiplayer/cursor/pos": {
+      const { cursor_id, pos } = action satisfies MultiplayerCursorPosAction;
+      return produce(state, (draft) => {
+        const cursor = draft.cursors.find((c) => c.cursor_id === cursor_id);
+        if (!cursor) return;
+        cursor.pos = pos;
+      });
+    }
+    case "multiplayer/cursor/location": {
+      const { cursor_id, location } =
+        action satisfies MultiplayerCursorLocationAction;
+      return produce(state, (draft) => {
+        const cursor = draft.cursors.find((c) => c.cursor_id === cursor_id);
+        if (!cursor) return;
+        cursor.location = location;
+      });
+    }
+    case "multiplayer/cursor/message": {
+      const { cursor_id, message } =
+        action satisfies MultiplayerCursorMessageAction;
+      return produce(state, (draft) => {
+        const cursor = draft.cursors.find((c) => c.cursor_id === cursor_id);
+        if (!cursor) return;
+        cursor.message;
+      });
+    }
+    case "multiplayer/cursor/node": {
+      const { cursor_id, node } = action satisfies MultiplayerCursorNodeAction;
+      return produce(state, (draft) => {
+        const cursor = draft.cursors.find((c) => c.cursor_id === cursor_id);
+        if (!cursor) return;
+        cursor.node = node;
+      });
+    }
+  }
+  return state;
+}
 
 const Context = createContext<IMultiplayerState | null>(null);
 
@@ -242,132 +396,6 @@ export function useLocalPlayer() {
   );
 }
 
-function multiplayerReducer(
-  state: IMultiplayerState,
-  action: MultiplayerAction
-): IMultiplayerState {
-  switch (action.type) {
-    case "multiplayer/player/local": {
-      const { update } = action satisfies MultiplayerLocalPlayerAction;
-      return produce(state, (draft) => {
-        draft.player = { ...draft.player, ...update };
-      });
-    }
-    case "multiplayer/presence/sync": {
-      const { cursors: presence_cursor_ids } =
-        action satisfies MultiplayerPresenceSyncAction;
-      return produce(state, (draft) => {
-        const other_cursor_ids = presence_cursor_ids.filter(
-          (id) => id !== state.player.cursor_id
-        );
-
-        // if new, initialize and add
-        // if removed, remove
-
-        const new_cursor_ids = other_cursor_ids.filter(
-          (id) => !draft.cursors.some((c) => c.cursor_id === id)
-        );
-
-        const removed_cursor_ids = draft.cursors
-          .map((c) => c.cursor_id)
-          .filter((id) => !other_cursor_ids.includes(id));
-
-        new_cursor_ids.forEach((cursor_id) => {
-          draft.cursors.push({
-            cursor_id,
-            palette: colors[randomcolorname({ exclude: neutral_colors })],
-            location: undefined,
-            message: undefined,
-            node: undefined,
-            pos: undefined,
-          });
-        });
-
-        removed_cursor_ids.forEach((cursor_id) => {
-          const index = draft.cursors.findIndex(
-            (c) => c.cursor_id === cursor_id
-          );
-          draft.cursors.splice(index, 1);
-        });
-      });
-    }
-    case "multiplayer/presence/notify": {
-      const { cursor } = action satisfies MultiplayerPresenceNotifyAction;
-      return produce(state, (draft) => {
-        if (cursor.cursor_id === state.player.cursor_id) return;
-        const existing_cursor = draft.cursors.find(
-          (c) => c.cursor_id === cursor.cursor_id
-        );
-        if (existing_cursor) {
-          console.log("replace", cursor);
-          existing_cursor.location = cursor.location;
-          existing_cursor.message = cursor.message;
-          existing_cursor.node = cursor.node;
-          existing_cursor.pos = cursor.pos;
-        } else {
-          console.error("cursor not found", cursor.cursor_id);
-        }
-      });
-    }
-    case "multiplayer/presence/join": {
-      // when new cursor joins, notify player state
-      const { cursors: __new_cursor_ids } =
-        action satisfies MultiplayerPresenceJoinAction;
-
-      if (state.cursors.length === 0) return state;
-
-      const new_cursor_ids = __new_cursor_ids.filter(
-        (id) => id !== state.player.cursor_id
-      );
-
-      if (new_cursor_ids.length === 0) return state;
-
-      return produce(state, (draft) => {
-        draft.presence_notify_key++;
-      });
-    }
-    case "multiplayer/presence/leave": {
-      // do nothing - this is also handled in sync
-      break;
-    }
-    case "multiplayer/cursor/pos": {
-      const { cursor_id, pos } = action satisfies MultiplayerCursorPosAction;
-      return produce(state, (draft) => {
-        const cursor = draft.cursors.find((c) => c.cursor_id === cursor_id);
-        if (!cursor) return;
-        cursor.pos = pos;
-      });
-    }
-    case "multiplayer/cursor/location": {
-      const { cursor_id, location } =
-        action satisfies MultiplayerCursorLocationAction;
-      return produce(state, (draft) => {
-        const cursor = draft.cursors.find((c) => c.cursor_id === cursor_id);
-        if (!cursor) return;
-        cursor.location = location;
-      });
-    }
-    case "multiplayer/cursor/message": {
-      const { cursor_id, message } =
-        action satisfies MultiplayerCursorMessageAction;
-      return produce(state, (draft) => {
-        const cursor = draft.cursors.find((c) => c.cursor_id === cursor_id);
-        if (!cursor) return;
-        cursor.message;
-      });
-    }
-    case "multiplayer/cursor/node": {
-      const { cursor_id, node } = action satisfies MultiplayerCursorNodeAction;
-      return produce(state, (draft) => {
-        const cursor = draft.cursors.find((c) => c.cursor_id === cursor_id);
-        if (!cursor) return;
-        cursor.node = node;
-      });
-    }
-  }
-  return state;
-}
-
 function initial_multiplayer_state(seed: {
   user_id: string;
   cursor_id: string;
@@ -377,6 +405,7 @@ function initial_multiplayer_state(seed: {
   const local_player_cursor = {
     palette: colors[local_color_name],
     cursor_id: seed.cursor_id,
+    user_id: seed.user_id,
     location: undefined,
     message: undefined,
     node: undefined,
@@ -388,5 +417,6 @@ function initial_multiplayer_state(seed: {
     presence_notify_key: 0,
     player: { ...local_player_cursor, typing: false },
     cursors: [],
+    profiles: {},
   };
 }

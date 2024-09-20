@@ -6,13 +6,16 @@ import { useMouse, useThrottle } from "@uidotdev/usehooks";
 import { usePathname } from "next/navigation";
 import {
   IMultiplayerCursor,
+  IMultiplayerCursorPresence,
   IMultiplayerCursorSync,
   MultiplayerStateProvider,
+  MultiplayerUserProfile,
   useLocalPlayer,
   useMultiplayer,
 } from "./provider";
 import { useMultiplayerRoom } from "./room";
 import { ICursorPos, ICursorNode } from "./types";
+import { createClientWorkspaceClient } from "@/lib/supabase/client";
 
 const RT_THROTTLE_MS = 50;
 
@@ -32,7 +35,81 @@ export default function Multiplayer({ children }: React.PropsWithChildren<{}>) {
   );
 }
 
+function useFetchUserProfile() {
+  const supabase = useMemo(() => createClientWorkspaceClient(), []);
+
+  return useCallback(
+    async (uid: string) => {
+      const { error, data } = await supabase
+        .from("user_profile")
+        .select("*")
+        .eq("uid", uid)
+        .single();
+
+      if (data) {
+        return {
+          error,
+          data: {
+            uid: data.uid,
+            display_name: data.display_name,
+            avatar: data.avatar_path
+              ? supabase.storage.from("avatars").getPublicUrl(data.avatar_path)
+                  .data.publicUrl
+              : undefined,
+          },
+        };
+      }
+
+      return {
+        error,
+        data,
+      };
+    },
+    [supabase]
+  );
+}
+
+function useProfilesResolver() {
+  const [state, dispatch] = useMultiplayer();
+
+  const onResolve = useCallback(
+    (profile: MultiplayerUserProfile) => {
+      dispatch({ type: "multiplayer/profile/resolve", profile });
+    },
+    [dispatch]
+  );
+
+  const fetch = useFetchUserProfile();
+
+  const user_ids = [state.player.user_id].concat(
+    state.cursors.map((c) => c.user_id)
+  );
+
+  const resolved_user_ids = Object.keys(state.profiles);
+
+  const unresolved_user_ids = user_ids.filter(
+    (uid) => !resolved_user_ids.includes(uid)
+  );
+
+  useEffect(() => {
+    unresolved_user_ids.forEach((uid) => {
+      fetch(uid).then(({ data }) => {
+        if (data) {
+          const profile: MultiplayerUserProfile = {
+            uid: data.uid,
+            display_name: data.display_name,
+            avatar: data.avatar,
+          };
+          onResolve(profile);
+        }
+      });
+    });
+  }, [unresolved_user_ids, onResolve]);
+}
+
 function MultiplayerLayer() {
+  useProfilesResolver();
+
   const [editor] = useEditorState();
   const location = usePathname();
 
@@ -80,7 +157,7 @@ function MultiplayerLayer() {
   );
 
   const onPresenceSync = useCallback(
-    (cursors: string[]) => {
+    (cursors: IMultiplayerCursorPresence[]) => {
       dispatch({ type: "multiplayer/presence/sync", cursors });
     },
     [dispatch]
@@ -88,7 +165,7 @@ function MultiplayerLayer() {
 
   const onJoin = useCallback(
     (cursors: string[]) => {
-      console.log("join", cursors);
+      // console.log("join", cursors);
       dispatch({ type: "multiplayer/presence/join", cursors });
     },
     [dispatch]
@@ -108,6 +185,7 @@ function MultiplayerLayer() {
   const { broadcast } = useMultiplayerRoom({
     room_id: room_id,
     cursor_id: player.cursor_id,
+    user_id: player.user_id,
     onLocation: onLocation,
     onMessage: onMessage,
     onNode: onNode,
@@ -147,6 +225,7 @@ function MultiplayerLayer() {
 
   useEffect(() => {
     onPlayerLocation(location);
+    onPlayerNode(undefined);
   }, [location, onPlayerLocation]);
 
   useEffect(() => {
@@ -164,7 +243,7 @@ function MultiplayerLayer() {
       pos: player.pos,
     } satisfies Omit<IMultiplayerCursorSync, "cursor_id">;
     broadcast("NOTIFY", pl);
-    console.log("broadcast", presence_notify_key, pl);
+    // console.log("broadcast", presence_notify_key, pl);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [presence_notify_key, broadcast]);
 
@@ -203,7 +282,14 @@ function MultiplayerLayer() {
   const current_location_cursors = useMemo(() => {
     // TODO: inspect me!
     // return cursors;
-    return cursors.filter((u) => u.location === player.location);
+    return cursors
+      .filter((c) => c.location === player.location)
+      .filter((c) => {
+        if (c.node) {
+          return c.node.type !== "cell";
+        }
+        return true;
+      });
   }, [cursors, player.location]);
 
   // console.log("players", {
