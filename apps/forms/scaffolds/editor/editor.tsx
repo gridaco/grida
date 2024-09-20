@@ -27,6 +27,7 @@ import { AssetsBackgroundsResolver } from "./resolver/assets-backgrounds-resolve
 import toast from "react-hot-toast";
 import { EditorSymbols } from "./symbols";
 import { fmt_local_index } from "@/utils/fmt";
+import Multiplayer from "./multiplayer";
 
 export function EditorProvider({
   initial,
@@ -66,15 +67,17 @@ export function DatabaseDocumentEditorProvider({
   );
   return (
     <StateProvider state={state} dispatch={dispatch}>
-      <TooltipProvider>
-        <AssetsBackgroundsResolver />
-        <MediaViewerProvider>
-          {/*  */}
-          <FormFieldEditPanelProvider />
-          <RowEditPanelProvider />
-          {children}
-        </MediaViewerProvider>
-      </TooltipProvider>
+      <Multiplayer>
+        <TooltipProvider>
+          <AssetsBackgroundsResolver />
+          <MediaViewerProvider>
+            {/*  */}
+            <FormFieldEditPanelProvider />
+            <RowEditPanelProvider />
+            {children}
+          </MediaViewerProvider>
+        </TooltipProvider>
+      </Multiplayer>
     </StateProvider>
   );
 }
@@ -89,13 +92,15 @@ export function SiteDocumentEditorProvider({
   );
   return (
     <StateProvider state={state} dispatch={dispatch}>
-      <TooltipProvider>
-        <AssetsBackgroundsResolver />
-        <MediaViewerProvider>
-          {/*  */}
-          {children}
-        </MediaViewerProvider>
-      </TooltipProvider>
+      <Multiplayer>
+        <TooltipProvider>
+          <AssetsBackgroundsResolver />
+          <MediaViewerProvider>
+            {/*  */}
+            {children}
+          </MediaViewerProvider>
+        </TooltipProvider>
+      </Multiplayer>
     </StateProvider>
   );
 }
@@ -111,15 +116,17 @@ export function FormDocumentEditorProvider({
 
   return (
     <StateProvider state={state} dispatch={dispatch}>
-      <TooltipProvider>
-        <AssetsBackgroundsResolver />
-        <MediaViewerProvider>
-          <FormFieldEditPanelProvider />
-          <RowEditPanelProvider />
-          <CustomerPanelProvider />
-          {children}
-        </MediaViewerProvider>
-      </TooltipProvider>
+      <Multiplayer>
+        <TooltipProvider>
+          <AssetsBackgroundsResolver />
+          <MediaViewerProvider>
+            <FormFieldEditPanelProvider />
+            <RowEditPanelProvider />
+            <CustomerPanelProvider />
+            {children}
+          </MediaViewerProvider>
+        </TooltipProvider>
+      </Multiplayer>
     </StateProvider>
   );
 }

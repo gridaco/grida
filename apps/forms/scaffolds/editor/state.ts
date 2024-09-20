@@ -27,6 +27,7 @@ import { ZodObject } from "zod";
 import { Tokens } from "@/ast";
 import React from "react";
 import { ResourceTypeIconName } from "@/components/resource-type-icon";
+import colors from "@/k/tailwindcolors";
 
 export type GDocEditorRouteParams = {
   org: string;
@@ -55,6 +56,7 @@ export interface BaseDocumentEditorInit {
   document_title: string;
   doctype: GDocumentType;
   theme: EditorState["theme"];
+  user_id: string;
 }
 
 export type EditorInit =
@@ -195,6 +197,11 @@ export type TableType =
   | "schema"
   | "x-supabase-auth.users";
 
+export type DataGridCellPositionQuery = {
+  pk: string | -1;
+  column: string;
+};
+
 export interface IDataGridState {
   /**
    * @global rows per page is not saved per table
@@ -219,6 +226,7 @@ export interface IDataGridState {
   datagrid_predicates: Array<SQLPredicate>;
   datagrid_orderby: { [key: string]: SQLOrderBy };
   datagrid_selected_rows: Set<string>;
+  datagrid_selected_cell: DataGridCellPositionQuery | null;
 }
 
 /**
@@ -347,6 +355,8 @@ interface IInsertionMenuState {
   insertmenu: TGlobalEditorDialogState;
 }
 
+export type NodePos = { type: "cell"; pos: DataGridCellPositionQuery };
+
 export interface BaseDocumentEditorState
   extends IEditorGlobalSavingState,
     IEditorDateContextState,
@@ -355,6 +365,8 @@ export interface BaseDocumentEditorState
     IFieldEditorState,
     ICustomerEditorState,
     IRowEditorState {
+  user_id: string;
+  cursor_id: string;
   basepath: string;
   organization: {
     name: string;

@@ -21,6 +21,8 @@ import { EnterFullScreenIcon } from "@radix-ui/react-icons";
 import { useEditorState } from "../editor";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CheckedState } from "@radix-ui/react-checkbox";
+import { CellRoot } from "./cell";
+import { useCellRootProps } from "./hooks";
 
 function stopPropagation(event: SyntheticEvent) {
   event.stopPropagation();
@@ -36,64 +38,50 @@ export const SelectColumn: CalculatedColumn<any, any> = {
   sortable: false,
   frozen: true,
   renderHeaderCell: (props: RenderHeaderCellProps<unknown>) => {
+    const { column } = props;
     // eslint-disable-next-line react-hooks/rules-of-hooks
     const [isRowSelected, onRowSelectionChange] = useRowSelection();
+    const rootprops = useCellRootProps(-1, column.key);
 
     return (
-      <SelectCellHeader
-        aria-label="Select All"
-        tabIndex={props.tabIndex}
-        value={isRowSelected}
-        onChange={(checked) =>
-          onRowSelectionChange({ type: "HEADER", checked })
-        }
-      />
+      <CellRoot {...rootprops}>
+        <SelectCellHeader
+          aria-label="Select All"
+          tabIndex={props.tabIndex}
+          value={isRowSelected}
+          onChange={(checked) =>
+            onRowSelectionChange({ type: "HEADER", checked })
+          }
+        />
+      </CellRoot>
     );
   },
   renderCell: (props: RenderCellProps<GFResponseRow>) => {
+    const { column, row } = props;
     // eslint-disable-next-line react-hooks/rules-of-hooks
     const [isRowSelected, onRowSelectionChange] = useRowSelection();
+    const rootprops = useCellRootProps(row.__gf_id, column.key);
     return (
-      <SelectCellFormatter
-        aria-label="Select"
-        tabIndex={props.tabIndex}
-        value={isRowSelected}
-        row={props.row}
-        onChange={(checked, isShiftClick) => {
-          onRowSelectionChange({
-            type: "ROW",
-            row: props.row,
-            checked,
-            isShiftClick,
-          });
-        }}
-        // Stop propagation to prevent row selection
-        onClick={stopPropagation}
-      />
+      <CellRoot {...rootprops} className="group">
+        <SelectCellFormatter
+          aria-label="Select"
+          tabIndex={props.tabIndex}
+          value={isRowSelected}
+          row={props.row}
+          onChange={(checked, isShiftClick) => {
+            onRowSelectionChange({
+              type: "ROW",
+              row: props.row,
+              checked,
+              isShiftClick,
+            });
+          }}
+          // Stop propagation to prevent row selection
+          onClick={stopPropagation}
+        />
+      </CellRoot>
     );
   },
-  renderGroupCell: (props: RenderGroupCellProps<GFResponseRow>) => {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    const [isRowSelected, onRowSelectionChange] = useRowSelection();
-    return (
-      <SelectCellFormatter
-        aria-label="Select Group"
-        tabIndex={props.tabIndex}
-        value={isRowSelected}
-        onChange={(checked) => {
-          onRowSelectionChange({
-            type: "ROW",
-            row: props.row,
-            checked,
-            isShiftClick: false,
-          });
-        }}
-        // Stop propagation to prevent row selection
-        onClick={stopPropagation}
-      />
-    );
-  },
-
   parent: undefined,
   level: 0,
   minWidth: 0,
@@ -136,7 +124,7 @@ function SelectCellFormatter({
   }, [dispatch, id]);
 
   return (
-    <div className="group">
+    <>
       <Checkbox
         aria-label={ariaLabel}
         aria-labelledby={ariaLabelledBy}
@@ -174,7 +162,7 @@ function SelectCellFormatter({
           </Tooltip.Portal>
         </Tooltip.Root>
       )}
-    </div>
+    </>
   );
 }
 
@@ -196,17 +184,15 @@ function SelectCellHeader({
   }
 
   return (
-    <div className="sb-grid-select-cell__header">
-      <Checkbox
-        aria-label={ariaLabel}
-        aria-labelledby={ariaLabelledBy}
-        tabIndex={tabIndex}
-        className="rdg-row__select-column__select-action"
-        disabled={disabled}
-        checked={value}
-        onCheckedChange={handleChange}
-        onClick={stopPropagation}
-      />
-    </div>
+    <Checkbox
+      aria-label={ariaLabel}
+      aria-labelledby={ariaLabelledBy}
+      tabIndex={tabIndex}
+      className="rdg-row__select-column__select-action"
+      disabled={disabled}
+      checked={value}
+      onCheckedChange={handleChange}
+      onClick={stopPropagation}
+    />
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useMemo } from "react";
-import { ResponseGrid } from "../grid";
+import { ResponseGrid, type DataGridCellSelectionCursor } from "../grid";
 import { createClientFormsClient } from "@/lib/supabase/client";
 import {
   AlertDialog,
@@ -57,6 +57,40 @@ import { saveAs } from "file-saver";
 import Papa from "papaparse";
 import { XSupaDataGridFilter } from "./components/filter";
 import { GridPagination } from "./components/pagination";
+import { useMultiplayer } from "@/scaffolds/editor/multiplayer";
+
+function useSelectedCells(): DataGridCellSelectionCursor[] {
+  const [state] = useEditorState();
+  const [multplayer] = useMultiplayer();
+
+  return useMemo(() => {
+    const cellcursors: DataGridCellSelectionCursor[] = multplayer.cursors
+      .filter((c) => c.node?.type === "cell")
+      .map((cursor) => {
+        return {
+          color: cursor.palette[400],
+          cursor_id: cursor.cursor_id,
+          pk: cursor.node!.pos?.pk,
+          column: cursor.node!.pos.column,
+        };
+      });
+
+    if (state.datagrid_selected_cell) {
+      cellcursors.push({
+        ...state.datagrid_selected_cell,
+        color: "current", // in datagrid we don't use cursor color for local cursor
+        cursor_id: multplayer.player.cursor_id,
+      });
+    }
+
+    return cellcursors;
+  }, [
+    multplayer.cursors,
+    multplayer.player.node,
+    multplayer.player.cursor_id,
+    state.datagrid_selected_cell,
+  ]);
+}
 
 export function GridEditor({
   systemcolumns,
@@ -142,6 +176,8 @@ export function GridEditor({
     [table_id, supabase, dispatch]
   );
 
+  const selectedCells = useSelectedCells();
+
   return (
     <GridLayout.Root>
       <DeleteFieldConfirmDialog
@@ -222,6 +258,7 @@ export function GridEditor({
       <GridLayout.Content>
         <ResponseGrid
           className="bg-transparent"
+          local_cursor_id={state.cursor_id}
           systemcolumns={systemcolumns}
           columns={columns}
           rows={rows ?? []}
@@ -243,6 +280,14 @@ export function GridEditor({
               data: data,
             });
           }}
+          onSelectedCellChange={({ pk, column }) => {
+            dispatch({
+              type: "editor/data-grid/cell/select",
+              pk: pk,
+              column,
+            });
+          }}
+          selectedCells={selectedCells}
         />
       </GridLayout.Content>
       <GridLayout.Footer>

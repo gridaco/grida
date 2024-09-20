@@ -292,3 +292,46 @@ const colors = {
 } as const;
 
 export default colors;
+
+export type ColorName = keyof typeof colors;
+
+export type ColorPalette = {
+  "50": string;
+  "100": string;
+  "200": string;
+  "300": string;
+  "400": string;
+  "500": string;
+  "600": string;
+  "700": string;
+  "800": string;
+  "900": string;
+  "950": string;
+};
+
+export function randomcolorname(options?: {
+  exclude?: ColorName[];
+}): ColorName {
+  const keys = Object.keys(colors) as ColorName[];
+
+  // Filter out the keys that are in the exclude array
+  const availableKeys = options?.exclude
+    ? keys.filter((key) => !options.exclude?.includes(key))
+    : keys;
+
+  // If all colors are excluded, return a default or handle appropriately
+  if (availableKeys.length === 0) {
+    throw new Error("No available colors to choose from.");
+  }
+
+  // Return a random color from the available keys
+  return availableKeys[Math.floor(Math.random() * availableKeys.length)];
+}
+
+export const neutral_colors: ColorName[] = [
+  "neutral",
+  "zinc",
+  "stone",
+  "slate",
+  "gray",
+] as const;

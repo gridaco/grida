@@ -20,6 +20,7 @@ import { blockstreeflat } from "@/lib/forms/tree";
 import { SYM_LOCALTZ, EditorSymbols } from "./symbols";
 import { FormFieldDefinition, GridaXSupabase } from "@/types";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
+import { nanoid } from "nanoid";
 
 export function initialEditorState(init: EditorInit): EditorState {
   switch (init.doctype) {
@@ -55,6 +56,8 @@ function initialBaseDocumentEditorState(
     document_title: init.document_title,
     organization: init.organization,
     project: init.project,
+    user_id: init.user_id,
+    cursor_id: nanoid(),
     saving: false,
     theme: init.theme,
     assets: {
@@ -94,6 +97,7 @@ export function initialDatagridState(): Omit<
     },
     datagrid_orderby: {},
     datagrid_predicates: [],
+    datagrid_selected_cell: null,
   };
 }
 
