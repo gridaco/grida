@@ -10,7 +10,7 @@ type ID = string;
 type FormFieldInsertion =
   Database["grida_forms"]["Tables"]["form_field"]["Insert"];
 type FormFieldOptionInsertion =
-  Database["grida_forms"]["Tables"]["form_field_option"]["Insert"];
+  Database["grida_forms"]["Tables"]["option"]["Insert"];
 type FormBlockInsertion =
   Database["grida_forms"]["Tables"]["form_block"]["Insert"];
 
@@ -22,7 +22,7 @@ type FormBlockInsertion =
  * - 1. create a new form (grida_forms.form)
  * - 2. create a new form document (grida_forms.form_document)
  * - 3. create fields (grida_forms.form_field)
- * - 4. create options (grida_forms.form_field_option)
+ * - 4. create options (grida_forms.option)
  * // TODO:
  * - 5. create blocks (grida_forms.form_block)
  */
@@ -203,7 +203,7 @@ export class JSONFrom2DB {
       };
     });
 
-    return this.client.from("form_field_option").insert(rows);
+    return this.client.from("option").insert(rows);
   }
 
   private async insert_blocks() {

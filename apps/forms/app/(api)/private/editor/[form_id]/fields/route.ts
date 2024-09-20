@@ -83,7 +83,7 @@ export async function POST(
     .select(
       `
         *,
-        existing_options:form_field_option(*),
+        existing_options:option(*),
         existing_optgroups:optgroup(*)
       `
     )
@@ -178,7 +178,7 @@ export async function POST(
 
   if (options) {
     const { data: options_upsert, error } = await supabase
-      .from("form_field_option")
+      .from("option")
       .upsert(
         options.map((option) => ({
           // use the id if this is old, otherwise it will be generated
@@ -228,10 +228,7 @@ export async function POST(
   // delete removed options
   if (deleting_option_ids?.length) {
     console.log("removing_option_ids", deleting_option_ids);
-    await supabase
-      .from("form_field_option")
-      .delete()
-      .in("id", deleting_option_ids);
+    await supabase.from("option").delete().in("id", deleting_option_ids);
   }
 
   // #endregion

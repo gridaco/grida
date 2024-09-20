@@ -1044,52 +1044,6 @@ export type Database = {
           },
         ]
       }
-      form_editor_metadata: {
-        Row: {
-          form_id: string | null
-          id: number
-          project_id: number | null
-          updated_at: string
-          user_id: string | null
-        }
-        Insert: {
-          form_id?: string | null
-          id?: number
-          project_id?: number | null
-          updated_at?: string
-          user_id?: string | null
-        }
-        Update: {
-          form_id?: string | null
-          id?: number
-          project_id?: number | null
-          updated_at?: string
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "grida_forms_editor_metadata_last_active_form_form_id_fkey"
-            columns: ["form_id"]
-            isOneToOne: false
-            referencedRelation: "form"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "grida_forms_editor_metadata_last_active_form_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "project"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "grida_forms_editor_metadata_last_active_form_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       form_field: {
         Row: {
           accept: string | null
@@ -1190,67 +1144,6 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "grida_forms_form_field_form_id_fkey"
-            columns: ["form_id"]
-            isOneToOne: false
-            referencedRelation: "form"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      form_field_option: {
-        Row: {
-          created_at: string
-          disabled: boolean | null
-          form_field_id: string
-          form_id: string
-          id: string
-          index: number
-          label: string
-          optgroup_id: string | null
-          src: string | null
-          value: string
-        }
-        Insert: {
-          created_at?: string
-          disabled?: boolean | null
-          form_field_id: string
-          form_id: string
-          id?: string
-          index?: number
-          label?: string
-          optgroup_id?: string | null
-          src?: string | null
-          value: string
-        }
-        Update: {
-          created_at?: string
-          disabled?: boolean | null
-          form_field_id?: string
-          form_id?: string
-          id?: string
-          index?: number
-          label?: string
-          optgroup_id?: string | null
-          src?: string | null
-          value?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "form_field_option_optgroup_id_fkey"
-            columns: ["optgroup_id"]
-            isOneToOne: false
-            referencedRelation: "optgroup"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "grida_forms_form_field_option_form_field_id_fkey"
-            columns: ["form_field_id"]
-            isOneToOne: false
-            referencedRelation: "form_field"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "grida_forms_form_field_option_form_id_fkey"
             columns: ["form_id"]
             isOneToOne: false
             referencedRelation: "form"
@@ -1375,6 +1268,67 @@ export type Database = {
           },
           {
             foreignKeyName: "optgroup_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "form"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      option: {
+        Row: {
+          created_at: string
+          disabled: boolean | null
+          form_field_id: string
+          form_id: string
+          id: string
+          index: number
+          label: string
+          optgroup_id: string | null
+          src: string | null
+          value: string
+        }
+        Insert: {
+          created_at?: string
+          disabled?: boolean | null
+          form_field_id: string
+          form_id: string
+          id?: string
+          index?: number
+          label?: string
+          optgroup_id?: string | null
+          src?: string | null
+          value: string
+        }
+        Update: {
+          created_at?: string
+          disabled?: boolean | null
+          form_field_id?: string
+          form_id?: string
+          id?: string
+          index?: number
+          label?: string
+          optgroup_id?: string | null
+          src?: string | null
+          value?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_field_option_optgroup_id_fkey"
+            columns: ["optgroup_id"]
+            isOneToOne: false
+            referencedRelation: "optgroup"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grida_forms_form_field_option_form_field_id_fkey"
+            columns: ["form_field_id"]
+            isOneToOne: false
+            referencedRelation: "form_field"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grida_forms_form_field_option_form_id_fkey"
             columns: ["form_id"]
             isOneToOne: false
             referencedRelation: "form"
@@ -1519,7 +1473,7 @@ export type Database = {
             foreignKeyName: "grida_forms_response_field_form_field_option_id_fkey"
             columns: ["form_field_option_id"]
             isOneToOne: false
-            referencedRelation: "form_field_option"
+            referencedRelation: "option"
             referencedColumns: ["id"]
           },
           {
