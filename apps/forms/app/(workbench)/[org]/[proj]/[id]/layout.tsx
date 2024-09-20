@@ -137,7 +137,7 @@ export default async function Layout({
           *,
           fields:form_field(
             *,
-            options:form_field_option(*),
+            options:option(*),
             optgroups:optgroup(*)
           ),
           store_connection:connection_commerce_store(*),
@@ -304,7 +304,7 @@ export default async function Layout({
               *,
               fields:form_field(
                 *,
-                options:form_field_option(*),
+                options:option(*),
                 optgroups:optgroup(*)
               ),
               store_connection:connection_commerce_store(*),

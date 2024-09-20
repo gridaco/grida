@@ -160,7 +160,7 @@ export async function GET(
         *,
         fields:form_field(
           *,
-          options:form_field_option(*),
+          options:option(*),
           optgroups:optgroup(*)
         ),
         default_page:form_document!default_form_page_id(

@@ -69,7 +69,7 @@ export class Simulator {
           *,
           fields:form_field(
             *,
-            options:form_field_option(*)
+            options:option(*)
           ),
           default_page:form_document!default_form_page_id(
             *,
