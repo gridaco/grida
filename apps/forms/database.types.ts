@@ -1044,52 +1044,6 @@ export type Database = {
           },
         ]
       }
-      form_editor_metadata: {
-        Row: {
-          form_id: string | null
-          id: number
-          project_id: number | null
-          updated_at: string
-          user_id: string | null
-        }
-        Insert: {
-          form_id?: string | null
-          id?: number
-          project_id?: number | null
-          updated_at?: string
-          user_id?: string | null
-        }
-        Update: {
-          form_id?: string | null
-          id?: number
-          project_id?: number | null
-          updated_at?: string
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "grida_forms_editor_metadata_last_active_form_form_id_fkey"
-            columns: ["form_id"]
-            isOneToOne: false
-            referencedRelation: "form"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "grida_forms_editor_metadata_last_active_form_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "project"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "grida_forms_editor_metadata_last_active_form_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       form_field: {
         Row: {
           accept: string | null
