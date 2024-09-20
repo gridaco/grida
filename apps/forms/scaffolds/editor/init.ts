@@ -57,7 +57,7 @@ function initialBaseDocumentEditorState(
     organization: init.organization,
     project: init.project,
     user_id: init.user_id,
-    cursor_id: nanoid(),
+    cursor_id: nanoid(4), // 4 is enough for multiplayer
     saving: false,
     theme: init.theme,
     assets: {
