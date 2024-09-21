@@ -54,7 +54,6 @@ import "./grid.css";
 import { GridMultiplayerProvider, useCellSelection } from "./multiplayer";
 import { useCellRootProps, useMasking } from "./hooks";
 
-
 function rowKeyGetter(row: GFResponseRow) {
   return row.__gf_id;
 }
@@ -338,7 +337,7 @@ function DefaultPropertyIdentifierCell({
   column,
   row,
 }: RenderCellProps<RenderingRow>) {
-  const identifier = row.__gf_id;
+  const identifier = row.__gf_display_id;
 
   const rootprops = useCellRootProps(row.__gf_id, column.key);
 

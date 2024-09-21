@@ -21,7 +21,7 @@ export async function GET(
     .select(
       `
         *,
-        fields:form_field(*),
+        fields:attribute(*),
         responses: response(*, fields:response_field(*))
       `
     )

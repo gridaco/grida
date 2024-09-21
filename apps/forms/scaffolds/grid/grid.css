@@ -37,8 +37,8 @@
 }
 
 .rdg-header-row > .rdg-cell[aria-selected="true"] {
-  box-shadow: inset 0 0 0 1px var(--rdg-selection-color);
-  outline: 2px solid var(--rdg-selection-color);
+  outline: none;
+  box-shadow: none;
 }
 
 .rdg-cell {

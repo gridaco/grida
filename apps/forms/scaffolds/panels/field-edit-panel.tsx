@@ -704,33 +704,7 @@ export function FieldEditPanel({
                   <Switch checked={multiple} onCheckedChange={setMultiple} />
                 </PanelPropertyField>
               )}
-              {FieldSupports.readonly(type) && (
-                <PanelPropertyField
-                  label={"Readonly"}
-                  help={
-                    <>
-                      Because a read-only field cannot have its value changed by
-                      a user interaction,{" "}
-                      <Link
-                        href="https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/readonly"
-                        target="_blank"
-                      >
-                        required
-                      </Link>{" "}
-                      does not have any effect on inputs with the readonly
-                      attribute also specified.{" "}
-                      <Link
-                        href="https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/readonly#attribute_interactions"
-                        target="_blank"
-                      >
-                        (MDN)
-                      </Link>
-                    </>
-                  }
-                >
-                  <Switch checked={readonly} onCheckedChange={setReadonly} />
-                </PanelPropertyField>
-              )}
+
               {!FieldSupports.checkbox_alias(type) && type !== "range" && (
                 <PanelPropertyField
                   label={"Required"}
@@ -908,12 +882,45 @@ export function FieldEditPanel({
               </PanelPropertyField>
             </PanelPropertyFields>
           </PanelPropertySection>
-          {supports_computedvalue && (
-            <FieldValueExpression
-              expression={v_value ?? undefined}
-              onChange={set_v_value}
-            />
+          {FieldSupports.readonly(type) && (
+            <PanelPropertySection>
+              <PanelPropertySectionTitle>Computed</PanelPropertySectionTitle>
+              <PanelPropertyFields>
+                <PanelPropertyField
+                  label={"Readonly"}
+                  help={
+                    <>
+                      Because a read-only field cannot have its value changed by
+                      a user interaction,{" "}
+                      <Link
+                        href="https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/readonly"
+                        target="_blank"
+                      >
+                        required
+                      </Link>{" "}
+                      does not have any effect on inputs with the readonly
+                      attribute also specified.{" "}
+                      <Link
+                        href="https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/readonly#attribute_interactions"
+                        target="_blank"
+                      >
+                        (MDN)
+                      </Link>
+                    </>
+                  }
+                >
+                  <Switch checked={readonly} onCheckedChange={setReadonly} />
+                </PanelPropertyField>
+                {supports_computedvalue && (
+                  <FieldValueExpression
+                    expression={v_value ?? undefined}
+                    onChange={set_v_value}
+                  />
+                )}
+              </PanelPropertyFields>
+            </PanelPropertySection>
           )}
+
           {FieldSupports.file_upload(type) && x_sb_main_table_connection && (
             <>
               <hr />

@@ -1,12 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useReducer, useState } from "react";
-import {
-  PanelPropertyField,
-  PanelPropertyFields,
-  PanelPropertySection,
-  PanelPropertySectionTitle,
-} from "@/components/panels/side-panel";
+import { PanelPropertyField } from "@/components/panels/side-panel";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { LockClosedIcon, MixIcon, ReloadIcon } from "@radix-ui/react-icons";
 import { Button } from "@/components/ui/button";
@@ -72,33 +67,31 @@ export function FieldValueExpression({
   };
 
   return (
-    <PanelPropertySection>
-      <PanelPropertySectionTitle>Computed Value</PanelPropertySectionTitle>
-      <PanelPropertyFields>
-        <PanelPropertyField
-          label={"Value"}
-          description={
-            <>
-              The value of the input will be computed based on the provided
-              formula.
-            </>
-          }
+    <>
+      <PanelPropertyField
+        label={"Value"}
+        description={
+          <>
+            The value of the input will be computed based on the provided
+            formula.
+          </>
+        }
+      >
+        <PropertyAccessDropdownMenu
+          onSelect={onPropertySelect}
+          schema={schema}
+          asChild
         >
-          <PropertyAccessDropdownMenu
-            onSelect={onPropertySelect}
-            schema={schema}
-            asChild
-          >
-            <Button variant="outline" type="button">
-              <MixIcon className="me-2" />
-              {expression ? (
-                <>Update Value Expression</>
-              ) : (
-                <>Set Value Expression</>
-              )}
-            </Button>
-          </PropertyAccessDropdownMenu>
-          {/* <Dialog>
+          <Button variant="outline" type="button">
+            <MixIcon className="me-2" />
+            {expression ? (
+              <>Update Value Expression</>
+            ) : (
+              <>Set Value Expression</>
+            )}
+          </Button>
+        </PropertyAccessDropdownMenu>
+        {/* <Dialog>
             <DialogTrigger>
               <div>
                 <Button variant="outline" type="button">
@@ -111,13 +104,12 @@ export function FieldValueExpression({
               <EditValueExpression />
             </DialogContent>
           </Dialog> */}
+      </PanelPropertyField>
+      {expression && (
+        <PanelPropertyField label="Expression">
+          <code>{JSON.stringify(expression, null, 2)}</code>
         </PanelPropertyField>
-        {expression && (
-          <PanelPropertyField label="Expression">
-            <code>{JSON.stringify(expression, null, 2)}</code>
-          </PanelPropertyField>
-        )}
-      </PanelPropertyFields>
-    </PanelPropertySection>
+      )}
+    </>
   );
 }

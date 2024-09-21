@@ -137,11 +137,11 @@ async function submit({
     .select(
       `
         *,
-        fields:form_field(
+        fields:attribute(
           *,
-          options:form_field_option(*)
+          options:option(*)
         ),
-        options:form_field_option(*),
+        options:option(*),
         default_page:form_document!default_form_page_id(
           *
         ),
@@ -524,7 +524,7 @@ async function submit({
   if (needs_to_be_created) {
     // create new fields
     const { data: new_fields } = await grida_forms_client
-      .from("form_field")
+      .from("attribute")
       .insert(
         needs_to_be_created.map((key) => ({
           form_id: form_id,

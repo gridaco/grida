@@ -408,7 +408,7 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
  */
 function nextrefreshkey(curr: number | undefined, refresh: boolean = true) {
   if (refresh) {
-    return curr ? curr + 1 : 0;
+    return (curr ?? 0) + 1;
   }
   return curr;
 }

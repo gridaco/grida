@@ -40,7 +40,7 @@ export function useInventory(options: Option[]) {
       return;
     }
 
-    console.log("fetching inventory");
+    // console.log("fetching inventory");
     commerce
       .fetchInventoryItemsRPC()
       .then(({ data, error }) => {

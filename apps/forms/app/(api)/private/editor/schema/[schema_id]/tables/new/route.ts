@@ -126,7 +126,7 @@ export async function POST(req: NextRequest, context: Context) {
         ];
         break;
     }
-    await supabase.from("form_field").insert(
+    await supabase.from("attribute").insert(
       fields.map((field) => ({
         form_id: new_table_ref.id,
         type: field.type,
@@ -138,7 +138,7 @@ export async function POST(req: NextRequest, context: Context) {
 
   const { data: new_table_detail, error: new_table_detail_err } = await supabase
     .from("form")
-    .select(`*, attributes:form_field(*)`)
+    .select(`*, attributes:attribute(*)`)
     .eq("id", new_table_ref.id)
     .single();
 

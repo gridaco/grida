@@ -5,7 +5,7 @@ import type { NextRequest } from "next/server";
 
 export async function middleware(req: NextRequest) {
   // #region maintenance mode
-  if (process.env.EDGE_CONFIG) {
+  if (process.env.NODE_ENV === "production") {
     try {
       // Check whether the maintenance page should be shown
       const isInMaintenanceMode = await get<boolean>("IS_IN_MAINTENANCE_MODE");

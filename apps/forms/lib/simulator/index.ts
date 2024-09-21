@@ -67,9 +67,9 @@ export class Simulator {
       .select(
         `
           *,
-          fields:form_field(
+          fields:attribute(
             *,
-            options:form_field_option(*)
+            options:option(*)
           ),
           default_page:form_document!default_form_page_id(
             *,

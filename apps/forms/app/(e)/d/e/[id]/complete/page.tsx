@@ -23,8 +23,8 @@ export default async function SubmitCompletePage({
     .select(
       `
         *,
-        fields:form_field(*),
-        options:form_field_option(*),
+        fields:attribute(*),
+        options:option(*),
         default_page:form_document!default_form_page_id(
           *
         )

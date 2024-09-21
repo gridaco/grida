@@ -37,7 +37,7 @@ export async function GET(
   const { data, error } = await grida_forms_client
     .from("response_session")
     .select(
-      `id, form:form( fields:form_field( id, reference ), supabase_connection:connection_supabase(*) )`
+      `id, form:form( fields:attribute( id, reference ), supabase_connection:connection_supabase(*) )`
     )
     .eq("id", session_id)
     .single();

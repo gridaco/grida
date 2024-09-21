@@ -17,7 +17,7 @@ export async function POST() {
       const { data: responses } = await grida_forms_client
         .from("response")
         .select(
-          `*, response_fields:response_field(*, form_field:form_field(type, name))`
+          `*, response_fields:response_field(*, form_field:attribute(type, name))`
         )
         // where email_provisional length is 0
         .eq("customer_id", customer.uid);

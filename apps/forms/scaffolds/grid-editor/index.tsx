@@ -154,7 +154,7 @@ export function GridEditor({
     (field_id: string) => {
       if (!table_id) return;
       const deleting = supabase
-        .from("form_field")
+        .from("attribute")
         .delete({
           count: "exact",
         })
@@ -739,6 +739,7 @@ function DeleteFieldConfirmDialog({
           <AlertDialogAction
             disabled={!field_id}
             onClick={() => onDeleteConfirm(field_id!)}
+            className={buttonVariants({ variant: "destructive" })}
           >
             Delete
           </AlertDialogAction>

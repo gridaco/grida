@@ -132,7 +132,7 @@ function PointerCursorMessageBubble({
         <input
           readOnly={!local}
           value={message}
-          autoFocus
+          autoFocus={local}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               onMessageBlur?.();

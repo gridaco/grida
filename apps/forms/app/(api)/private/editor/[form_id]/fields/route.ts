@@ -53,7 +53,7 @@ export async function POST(
   }
 
   const { data: upserted, error } = await supabase
-    .from("form_field")
+    .from("attribute")
     .upsert({
       id: init.id,
       form_id: form_id,
@@ -83,16 +83,16 @@ export async function POST(
     .select(
       `
         *,
-        existing_options:form_field_option(*),
+        existing_options:option(*),
         existing_optgroups:optgroup(*)
       `
     )
     .single();
 
-  // console.log("upserted", upserted, init.data);
+  // console.log("upserted", upserted, init);
 
   if (error) {
-    console.error("ERR: while upserting field", error);
+    // console.error("ERR: while upserting field", error, upserted);
     return NextResponse.json(
       {
         message: `Failed to ${operation} field`,
@@ -178,7 +178,7 @@ export async function POST(
 
   if (options) {
     const { data: options_upsert, error } = await supabase
-      .from("form_field_option")
+      .from("option")
       .upsert(
         options.map((option) => ({
           // use the id if this is old, otherwise it will be generated
@@ -207,7 +207,7 @@ export async function POST(
       console.info("failed options payload", init.options);
       if (operation === "create") {
         // revert field if options failed
-        await supabase.from("form_field").delete().eq("id", upserted.id);
+        await supabase.from("attribute").delete().eq("id", upserted.id);
       } else {
         // just let only the options fail, keep the updated field
       }
@@ -228,10 +228,7 @@ export async function POST(
   // delete removed options
   if (deleting_option_ids?.length) {
     console.log("removing_option_ids", deleting_option_ids);
-    await supabase
-      .from("form_field_option")
-      .delete()
-      .in("id", deleting_option_ids);
+    await supabase.from("option").delete().in("id", deleting_option_ids);
   }
 
   // #endregion
