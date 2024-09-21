@@ -299,11 +299,13 @@ export function FieldEditPanel({
   const supports_pattern = FieldSupports.pattern(type);
   const supports_numeric = FieldSupports.numeric(type);
   const supports_accept = FieldSupports.accept(type);
-  const supports_computedvalue = FieldSupports.computedvalue({
-    type,
-    readonly,
-    required,
-  });
+  const supports_computedvalue =
+    state.doctype === "v0_form" &&
+    FieldSupports.computedvalue({
+      type,
+      readonly,
+      required,
+    });
 
   const preview_placeholder =
     placeholder ||
