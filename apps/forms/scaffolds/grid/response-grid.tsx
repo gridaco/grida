@@ -300,7 +300,7 @@ function GFSystemPropertyHeaderCell({ column }: RenderHeaderCellProps<any>) {
   const rootprops = useCellRootProps(-1, key);
 
   return (
-    <CellRoot {...rootprops} className="flex items-center gap-2">
+    <CellRoot {...rootprops} className="flex items-center gap-2 border-t-0">
       <DefaultPropertyIcon __key={key as GFSystemColumnTypes} />
       <span className="font-normal">{name}</span>
     </CellRoot>
@@ -324,12 +324,14 @@ function NewFieldHeaderCell({
   onClick?: () => void;
 }) {
   return (
-    <button
-      onClick={onClick}
-      className="w-full h-full flex items-center justify-center"
-    >
-      <PlusIcon />
-    </button>
+    <CellRoot className="border-t-0">
+      <button
+        onClick={onClick}
+        className="w-full h-full flex items-center justify-center"
+      >
+        <PlusIcon />
+      </button>
+    </CellRoot>
   );
 }
 

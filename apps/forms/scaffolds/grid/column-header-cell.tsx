@@ -35,7 +35,7 @@ export const ColumnHeaderCell = React.forwardRef(function ColumnHeaderCell(
     <CellRoot
       ref={ref}
       {...rootprops}
-      className="flex items-center justify-between"
+      className="flex items-center justify-between border-t-0"
     >
       <span className="flex items-center gap-2">
         <FormFieldTypeIcon type={type} className="w-4 h-4" />

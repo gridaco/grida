@@ -23,7 +23,7 @@ export const CellRoot = React.forwardRef(function CellRoot(
     <div
       ref={ref}
       className={cn(
-        "relative h-full w-full px-2 overflow-hidden text-ellipsis",
+        "relative h-full w-full px-2 overflow-hidden text-ellipsis border border-border/25",
         className
       )}
       {...props}
@@ -31,7 +31,7 @@ export const CellRoot = React.forwardRef(function CellRoot(
       <div
         data-selected={selected}
         data-cursor-type={is_local_cursor && "local"}
-        className="absolute inset-0 pointer-events-none select-none border border-border/25 data-[selected='true']:border-2 data-[cursor-type='local']:border-ring"
+        className="absolute inset-0 pointer-events-none select-none border-0 data-[selected='true']:border-2 data-[cursor-type='local']:border-ring"
         style={color ? { borderColor: color } : undefined}
       />
       {children}

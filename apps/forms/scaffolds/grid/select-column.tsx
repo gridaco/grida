@@ -44,7 +44,7 @@ export const SelectColumn: CalculatedColumn<any, any> = {
     const rootprops = useCellRootProps(-1, column.key);
 
     return (
-      <CellRoot {...rootprops}>
+      <CellRoot {...rootprops} className="border-t-0">
         <SelectCellHeader
           aria-label="Select All"
           tabIndex={props.tabIndex}
