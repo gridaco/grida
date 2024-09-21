@@ -724,6 +724,7 @@ function DeleteFieldConfirmDialog({
           <AlertDialogAction
             disabled={!field_id}
             onClick={() => onDeleteConfirm(field_id!)}
+            className={buttonVariants({ variant: "destructive" })}
           >
             Delete
           </AlertDialogAction>
