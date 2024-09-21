@@ -1,13 +1,7 @@
 "use client";
 
-import React, { useCallback } from "react";
-import { useDatagridTable, useEditorState } from "@/scaffolds/editor";
-import {
-  Cross2Icon,
-  DotIcon,
-  PlusIcon,
-  TrashIcon,
-} from "@radix-ui/react-icons";
+import React from "react";
+import { Cross2Icon, PlusIcon, TrashIcon } from "@radix-ui/react-icons";
 import {
   Select,
   SelectContent,
@@ -35,12 +29,9 @@ import {
 import { ArrowDownUpIcon } from "lucide-react";
 import { cn } from "@/utils";
 import { PopoverClose } from "@radix-ui/react-popover";
-import {
-  GDocFormsXSBTable,
-  GDocSchemaTableProviderXSupabase,
-} from "@/scaffolds/editor/state";
 import { IconButtonDotBadge } from "./dotbadge";
 import { WorkbenchUI } from "@/components/workbench";
+import { useDataGridOrderby } from "./query/hooks";
 
 /**
  * this can also be used for form query, but at this moment, form does not have a db level field sorting query.
@@ -48,59 +39,17 @@ import { WorkbenchUI } from "@/components/workbench";
  * when it updates to id, the x-supabase query route will also have to change.
  */
 export function XSupaDataGridSort() {
-  const [state, dispatch] = useEditorState();
-
-  const { datagrid_orderby } = state;
-
-  const tb = useDatagridTable<
-    GDocFormsXSBTable | GDocSchemaTableProviderXSupabase
-  >();
-
-  const properties =
-    tb?.x_sb_main_table_connection.sb_table_schema.properties ?? {};
-
-  const isset = Object.keys(datagrid_orderby).length > 0;
-
-  const keys = Object.keys(properties);
-  const usedkeys = Object.keys(datagrid_orderby);
-  const unusedkeys = keys.filter((key) => !usedkeys.includes(key));
-
-  const onClear = useCallback(() => {
-    dispatch({ type: "editor/data-grid/orderby/clear" });
-  }, [dispatch]);
-
-  const onAdd = useCallback(
-    (column_id: string) => {
-      dispatch({
-        type: "editor/data-grid/orderby",
-        column_id: column_id,
-        data: {},
-      });
-    },
-    [dispatch]
-  );
-
-  const onUpdate = useCallback(
-    (column_id: string, data: { ascending?: boolean }) => {
-      dispatch({
-        type: "editor/data-grid/orderby",
-        column_id: column_id,
-        data: data,
-      });
-    },
-    [dispatch]
-  );
-
-  const onRemove = useCallback(
-    (column_id: string) => {
-      dispatch({
-        type: "editor/data-grid/orderby",
-        column_id: column_id,
-        data: null,
-      });
-    },
-    [dispatch]
-  );
+  const {
+    orderby,
+    isset,
+    properties,
+    usedkeys,
+    unusedkeys,
+    onClear,
+    onAdd,
+    onUpdate,
+    onRemove,
+  } = useDataGridOrderby();
 
   return (
     <Popover modal>
@@ -130,16 +79,16 @@ export function XSupaDataGridSort() {
         <section className="py-2" hidden={!isset}>
           <div className="flex flex-col space-y-2 w-full">
             {usedkeys.map((col) => {
-              const orderby = datagrid_orderby[col];
+              const ob = orderby[col];
               return (
                 <div key={col} className="flex gap-2 px-2 w-full">
                   <div className="flex items-center gap-2 flex-1">
                     <div className="flex-1">
                       <Select
                         disabled
-                        value={orderby.column}
+                        value={ob.column}
                         onValueChange={(value) => {
-                          onUpdate(value, orderby);
+                          onUpdate(value, ob);
                         }}
                       >
                         <SelectTrigger
@@ -161,9 +110,9 @@ export function XSupaDataGridSort() {
                     </div>
                     <div>
                       <Select
-                        value={orderby.ascending ? "ASC" : "DESC"}
+                        value={ob.ascending ? "ASC" : "DESC"}
                         onValueChange={(value) => {
-                          onUpdate(orderby.column, {
+                          onUpdate(ob.column, {
                             ascending: value === "ASC",
                           });
                         }}

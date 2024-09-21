@@ -242,7 +242,7 @@ export function Chartview() {
   const stat = useChartDataStat();
 
   return (
-    <div className="w-full h-full p-4 overflow-hidden">
+    <div className="w-full h-full p-4">
       <div className="w-full h-full flex justify-between gap-4">
         <div className="flex-1 relative w-full h-full flex items-center justify-center">
           <div className="w-full h-[400px]">
