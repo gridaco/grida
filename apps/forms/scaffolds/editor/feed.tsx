@@ -348,6 +348,8 @@ function useXSBTableFeed(
     if (res.data?.data) {
       const rows = res.data.data;
       onFeed?.(rows, res.data.count!);
+    } else {
+      onFeed?.([], 0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [res.data]);
