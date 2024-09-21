@@ -178,7 +178,7 @@ export async function POST(req: NextRequest, context: Context) {
     })
   );
 
-  const { error: fields_init_err } = await supabase.from("form_field").insert(
+  const { error: fields_init_err } = await supabase.from("attribute").insert(
     fields_init.map((field) => ({
       form_id: new_table_ref.id,
       type: field.type ?? "text",
@@ -218,7 +218,7 @@ export async function POST(req: NextRequest, context: Context) {
   // get final
   const { data: new_table_detail, error: new_table_detail_err } = await supabase
     .from("form")
-    .select(`*, attributes:form_field(*)`)
+    .select(`*, attributes:attribute(*)`)
     .eq("id", new_table_ref.id)
     .single();
 

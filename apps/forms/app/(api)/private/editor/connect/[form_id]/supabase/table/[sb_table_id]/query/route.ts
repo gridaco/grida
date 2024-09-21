@@ -149,7 +149,7 @@ async function get_forms_x_supabase_table_connector({
       `
         id,
         supabase_connection:connection_supabase(*),
-        fields:form_field(*)
+        fields:attribute(*)
       `
     )
     .eq("id", form_id)

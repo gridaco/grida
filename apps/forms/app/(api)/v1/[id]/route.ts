@@ -158,7 +158,7 @@ export async function GET(
     .select(
       `
         *,
-        fields:form_field(
+        fields:attribute(
           *,
           options:option(*),
           optgroups:optgroup(*)

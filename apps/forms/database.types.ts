@@ -695,6 +695,110 @@ export type Database = {
   }
   grida_forms: {
     Tables: {
+      attribute: {
+        Row: {
+          accept: string | null
+          autocomplete:
+            | Database["grida_forms"]["Enums"]["form_field_autocomplete_type"][]
+            | null
+          created_at: string
+          data: Json | null
+          description: string | null
+          form_id: string
+          help_text: string | null
+          id: string
+          is_array: boolean
+          label: string | null
+          local_index: number
+          max: number | null
+          maxlength: number | null
+          min: number | null
+          minlength: number | null
+          multiple: boolean | null
+          name: string
+          pattern: Json | null
+          placeholder: string | null
+          readonly: boolean
+          reference: Json | null
+          required: boolean
+          step: number | null
+          storage: Json | null
+          type: Database["grida_forms"]["Enums"]["form_field_type"]
+          updated_at: string
+          v_value: Json | null
+        }
+        Insert: {
+          accept?: string | null
+          autocomplete?:
+            | Database["grida_forms"]["Enums"]["form_field_autocomplete_type"][]
+            | null
+          created_at?: string
+          data?: Json | null
+          description?: string | null
+          form_id: string
+          help_text?: string | null
+          id?: string
+          is_array?: boolean
+          label?: string | null
+          local_index?: number
+          max?: number | null
+          maxlength?: number | null
+          min?: number | null
+          minlength?: number | null
+          multiple?: boolean | null
+          name: string
+          pattern?: Json | null
+          placeholder?: string | null
+          readonly?: boolean
+          reference?: Json | null
+          required?: boolean
+          step?: number | null
+          storage?: Json | null
+          type?: Database["grida_forms"]["Enums"]["form_field_type"]
+          updated_at?: string
+          v_value?: Json | null
+        }
+        Update: {
+          accept?: string | null
+          autocomplete?:
+            | Database["grida_forms"]["Enums"]["form_field_autocomplete_type"][]
+            | null
+          created_at?: string
+          data?: Json | null
+          description?: string | null
+          form_id?: string
+          help_text?: string | null
+          id?: string
+          is_array?: boolean
+          label?: string | null
+          local_index?: number
+          max?: number | null
+          maxlength?: number | null
+          min?: number | null
+          minlength?: number | null
+          multiple?: boolean | null
+          name?: string
+          pattern?: Json | null
+          placeholder?: string | null
+          readonly?: boolean
+          reference?: Json | null
+          required?: boolean
+          step?: number | null
+          storage?: Json | null
+          type?: Database["grida_forms"]["Enums"]["form_field_type"]
+          updated_at?: string
+          v_value?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grida_forms_form_field_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "form"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       connection_commerce_store: {
         Row: {
           created_at: string
@@ -939,7 +1043,7 @@ export type Database = {
             foreignKeyName: "grida_forms_form_block_form_field_id_fkey"
             columns: ["form_field_id"]
             isOneToOne: false
-            referencedRelation: "form_field"
+            referencedRelation: "attribute"
             referencedColumns: ["id"]
           },
           {
@@ -1039,113 +1143,6 @@ export type Database = {
             foreignKeyName: "grida_forms_form_page_form_id_fkey"
             columns: ["form_id"]
             isOneToOne: true
-            referencedRelation: "form"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      form_field: {
-        Row: {
-          accept: string | null
-          alt: string | null
-          autocomplete:
-            | Database["grida_forms"]["Enums"]["form_field_autocomplete_type"][]
-            | null
-          created_at: string
-          data: Json | null
-          description: string | null
-          form_id: string
-          help_text: string | null
-          id: string
-          is_array: boolean
-          label: string | null
-          local_index: number
-          max: number | null
-          maxlength: number | null
-          min: number | null
-          minlength: number | null
-          multiple: boolean | null
-          name: string
-          pattern: Json | null
-          placeholder: string | null
-          readonly: boolean
-          reference: Json | null
-          required: boolean
-          step: number | null
-          storage: Json | null
-          type: Database["grida_forms"]["Enums"]["form_field_type"]
-          updated_at: string
-          v_value: Json | null
-        }
-        Insert: {
-          accept?: string | null
-          alt?: string | null
-          autocomplete?:
-            | Database["grida_forms"]["Enums"]["form_field_autocomplete_type"][]
-            | null
-          created_at?: string
-          data?: Json | null
-          description?: string | null
-          form_id: string
-          help_text?: string | null
-          id?: string
-          is_array?: boolean
-          label?: string | null
-          local_index?: number
-          max?: number | null
-          maxlength?: number | null
-          min?: number | null
-          minlength?: number | null
-          multiple?: boolean | null
-          name: string
-          pattern?: Json | null
-          placeholder?: string | null
-          readonly?: boolean
-          reference?: Json | null
-          required?: boolean
-          step?: number | null
-          storage?: Json | null
-          type?: Database["grida_forms"]["Enums"]["form_field_type"]
-          updated_at?: string
-          v_value?: Json | null
-        }
-        Update: {
-          accept?: string | null
-          alt?: string | null
-          autocomplete?:
-            | Database["grida_forms"]["Enums"]["form_field_autocomplete_type"][]
-            | null
-          created_at?: string
-          data?: Json | null
-          description?: string | null
-          form_id?: string
-          help_text?: string | null
-          id?: string
-          is_array?: boolean
-          label?: string | null
-          local_index?: number
-          max?: number | null
-          maxlength?: number | null
-          min?: number | null
-          minlength?: number | null
-          multiple?: boolean | null
-          name?: string
-          pattern?: Json | null
-          placeholder?: string | null
-          readonly?: boolean
-          reference?: Json | null
-          required?: boolean
-          step?: number | null
-          storage?: Json | null
-          type?: Database["grida_forms"]["Enums"]["form_field_type"]
-          updated_at?: string
-          v_value?: Json | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "grida_forms_form_field_form_id_fkey"
-            columns: ["form_id"]
-            isOneToOne: false
             referencedRelation: "form"
             referencedColumns: ["id"]
           },
@@ -1263,7 +1260,7 @@ export type Database = {
             foreignKeyName: "optgroup_form_field_id_fkey"
             columns: ["form_field_id"]
             isOneToOne: false
-            referencedRelation: "form_field"
+            referencedRelation: "attribute"
             referencedColumns: ["id"]
           },
           {
@@ -1324,7 +1321,7 @@ export type Database = {
             foreignKeyName: "grida_forms_form_field_option_form_field_id_fkey"
             columns: ["form_field_id"]
             isOneToOne: false
-            referencedRelation: "form_field"
+            referencedRelation: "attribute"
             referencedColumns: ["id"]
           },
           {
@@ -1466,7 +1463,7 @@ export type Database = {
             foreignKeyName: "grida_forms_response_field_form_field_id_fkey"
             columns: ["form_field_id"]
             isOneToOne: false
-            referencedRelation: "form_field"
+            referencedRelation: "attribute"
             referencedColumns: ["id"]
           },
           {

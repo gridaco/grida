@@ -34,7 +34,7 @@ export async function GET(
     .from("form")
     .select(
       `
-        fields:form_field( id, storage ),
+        fields:attribute( id, storage ),
         supabase_connection:connection_supabase(
           *
         )

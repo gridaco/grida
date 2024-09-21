@@ -20,7 +20,7 @@ export async function POST(
   const { data: response, error: response_err } = await grida_forms_client
     .from("response")
     .select(
-      `*, response_fields:response_field(*, form_field:form_field(type, name))`
+      `*, response_fields:response_field(*, form_field:attribute(type, name))`
     )
     .eq("id", response_id)
     .eq("form_id", form_id)

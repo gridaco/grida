@@ -43,7 +43,7 @@ export async function PUT(req: NextRequest, context: Context) {
     .select(
       `
         *,
-        fields:form_field( id, storage ),
+        fields:attribute( id, storage ),
         supabase_connection:connection_supabase(*)
       `
     )
