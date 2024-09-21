@@ -135,7 +135,7 @@ export default async function Layout({
         blocks:form_block(*),
         form!form_id(
           *,
-          fields:form_field(
+          fields:attribute(
             *,
             options:option(*),
             optgroups:optgroup(*)
@@ -302,7 +302,7 @@ export default async function Layout({
             *,
             tables:form(
               *,
-              fields:form_field(
+              fields:attribute(
                 *,
                 options:option(*),
                 optgroups:optgroup(*)

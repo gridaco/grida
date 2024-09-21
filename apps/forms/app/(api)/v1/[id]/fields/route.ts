@@ -22,7 +22,7 @@ export async function POST(
   );
 
   const { data: inserted, error } = await grida_forms_client
-    .from("form_field")
+    .from("attribute")
     .insert({
       name: data.name,
       form_id: form_id,

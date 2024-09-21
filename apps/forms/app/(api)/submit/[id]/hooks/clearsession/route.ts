@@ -18,7 +18,7 @@ export async function POST(
 
   const { data: form_ref, error: form_ref_err } = await grida_forms_client
     .from("form")
-    .select("id, fields:form_field(*)")
+    .select("id, fields:attribute(*)")
     .eq("id", form_id)
     .single();
 

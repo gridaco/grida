@@ -67,7 +67,7 @@ export class Simulator {
       .select(
         `
           *,
-          fields:form_field(
+          fields:attribute(
             *,
             options:option(*)
           ),
