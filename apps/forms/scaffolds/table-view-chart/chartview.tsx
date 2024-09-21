@@ -56,7 +56,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Chart } from "@/lib/chart";
-import { ChartPartialDataAlert } from "./warn-partial-data";
+import { ChartPartialDataAlert, useChartDataStat } from "./warn-partial-data";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 
@@ -239,11 +239,13 @@ export function Chartview() {
   const data = Chart.chart(df.data, mainAxis);
   console.log("data", data);
 
+  const stat = useChartDataStat();
+
   return (
-    <div className="w-full h-full p-4">
-      <div className="flex justify-between gap-4 h-full w-full">
-        <div className="flex-1 flex-col gap-20 mx-auto w-full h-full max-w-xl flex items-center justify-center">
-          <div className="w-full aspect-video">
+    <div className="w-full h-full p-4 overflow-hidden">
+      <div className="w-full h-full flex justify-between gap-4">
+        <div className="flex-1 relative w-full h-full flex items-center justify-center">
+          <div className="w-full h-[400px]">
             <DataChart
               type={renderer}
               curve={curve}
@@ -266,11 +268,19 @@ export function Chartview() {
                 //   color: CHART_PALETTES[palette].colors[3],
                 // },
               }}
+              className="h-full aspect-auto"
             />
           </div>
-          <ChartPartialDataAlert />
+          {stat?.is_data_not_fully_loaded && (
+            <div className="absolute top-0 right-0 z-10">
+              <ChartPartialDataAlert
+                count={stat.count}
+                estimated_count={stat.estimated_count}
+              />
+            </div>
+          )}
         </div>
-        <aside className="flex flex-col gap-4 max-w-xs">
+        <aside className="flex-shrink-0 flex flex-col gap-4 w-60 max-w-xs pl-4 border-l">
           <ChartTypeToggleGroup value={renderer} onValueChange={changeType} />
           <hr />
           <Label className="text-muted-foreground">Main Axis</Label>
@@ -519,6 +529,7 @@ function DataChart({
   dataKey,
   curve,
   areaFill,
+  className,
 }: {
   type: DataChartRendererType;
   data: Array<any>;
@@ -526,11 +537,12 @@ function DataChart({
   defs: DataGroupDef;
   curve?: DataChartCurveType;
   areaFill?: DataChartAreaFillType;
+  className?: string;
 }) {
   return (
     <>
       {type === "bar" && (
-        <ChartContainer config={defs}>
+        <ChartContainer config={defs} className={className}>
           <BarChart accessibilityLayer data={data}>
             <CartesianGrid vertical={false} />
             <XAxis
@@ -558,7 +570,7 @@ function DataChart({
         </ChartContainer>
       )}
       {type === "bar-vertical" && (
-        <ChartContainer config={defs}>
+        <ChartContainer config={defs} className={className}>
           <BarChart layout="vertical" data={data}>
             <CartesianGrid horizontal={false} />
             <XAxis type="number" tickLine={false} axisLine={false} />
@@ -577,7 +589,7 @@ function DataChart({
         </ChartContainer>
       )}
       {type === "area" && (
-        <ChartContainer config={defs}>
+        <ChartContainer config={defs} className={className}>
           <AreaChart
             accessibilityLayer
             data={data}
@@ -638,10 +650,7 @@ function DataChart({
         </ChartContainer>
       )}
       {type === "pie" && (
-        <ChartContainer
-          config={defs}
-          className="mx-auto aspect-square max-h-[250px]"
-        >
+        <ChartContainer config={defs} className={className}>
           <PieChart>
             <ChartTooltip
               cursor={false}
