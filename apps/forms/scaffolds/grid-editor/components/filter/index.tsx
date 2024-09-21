@@ -29,7 +29,7 @@ import {
   GDocFormsXSBTable,
   GDocSchemaTableProviderXSupabase,
 } from "@/scaffolds/editor/state";
-import { IconButtonDotBadge } from "./dotbadge";
+import { IconButtonDotBadge } from "../dotbadge";
 import {
   Tooltip,
   TooltipContent,
