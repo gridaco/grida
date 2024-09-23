@@ -44,6 +44,7 @@ import { initialDatagridState } from "./init";
 import databaseRecucer from "./reducers/database.reducer";
 import blockReducer from "./reducers/block.reducer";
 import documentReducer from "./reducers/document.reducer";
+import { DataGridLocalPreferencesStorage } from "./storage/datagrid.storage";
 
 export function reducer(state: EditorState, action: EditorAction): EditorState {
   switch (action.type) {
@@ -194,10 +195,12 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
           return;
         }
 
+        // [ORDER MATTERS] 1. update the table id
         draft.datagrid_table_id = tableid;
 
+        // [ORDER MATTERS] 2. get view id via table id
         // clear datagrid state
-        const datagridreset = initialDatagridState();
+        const datagridreset = initialDatagridState(tmp_view_id(draft));
         draft.datagrid_query_estimated_count =
           datagridreset.datagrid_query_estimated_count;
         draft.datagrid_page_index = datagridreset.datagrid_page_index;
@@ -279,18 +282,21 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
           column: column_id,
           ...data,
         };
+        on_datagrid_query_change(draft, { view_id: tmp_view_id(draft) });
       });
     }
     case "editor/data-grid/orderby/clear": {
       const {} = <DataGridOrderByClearAction>action;
       return produce(state, (draft) => {
         draft.datagrid_orderby = {};
+        on_datagrid_query_change(draft, { view_id: tmp_view_id(draft) });
       });
     }
     case "editor/data-grid/predicates/add": {
       const { predicate } = <DataGridPredicatesAddAction>action;
       return produce(state, (draft) => {
         draft.datagrid_predicates.push(predicate);
+        on_datagrid_query_change(draft, { view_id: tmp_view_id(draft) });
       });
     }
     case "editor/data-grid/predicates/update": {
@@ -301,18 +307,21 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
           ...prev,
           ...predicate,
         };
+        on_datagrid_query_change(draft, { view_id: tmp_view_id(draft) });
       });
     }
     case "editor/data-grid/predicates/remove": {
       const { index } = <DataGridPredicatesRemoveAction>action;
       return produce(state, (draft) => {
         draft.datagrid_predicates.splice(index, 1);
+        on_datagrid_query_change(draft, { view_id: tmp_view_id(draft) });
       });
     }
     case "editor/data-grid/predicates/clear": {
       const {} = <DataGridPredicatesClearAction>action;
       return produce(state, (draft) => {
         draft.datagrid_predicates = [];
+        on_datagrid_query_change(draft, { view_id: tmp_view_id(draft) });
       });
     }
     // #endregion datagrid query
@@ -412,4 +421,31 @@ function nextrefreshkey(curr: number | undefined, refresh: boolean = true) {
     return (curr ?? 0) + 1;
   }
   return curr;
+}
+
+/**
+ * TODO: this should be removed after we support database views in service layer
+ * get a view id of current datagrid
+ *
+ * @deprecated
+ */
+function tmp_view_id(draft: Draft<EditorState>) {
+  return draft.document_id + "/" + draft.datagrid_table_id?.toString();
+  //
+}
+
+/**
+ * TODO: it is a good practive to do this in a hook.
+ * I'm too lazy to do it now.
+ *
+ * @deprecated
+ */
+function on_datagrid_query_change(
+  draft: Draft<EditorState>,
+  { view_id }: { view_id: string }
+) {
+  DataGridLocalPreferencesStorage.set(view_id, {
+    orderby: draft.datagrid_orderby,
+    predicates: draft.datagrid_predicates,
+  });
 }

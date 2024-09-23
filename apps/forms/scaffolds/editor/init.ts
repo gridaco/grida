@@ -21,6 +21,7 @@ import { SYM_LOCALTZ, EditorSymbols } from "./symbols";
 import { FormFieldDefinition, GridaXSupabase } from "@/types";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { nanoid } from "nanoid";
+import { DataGridLocalPreferencesStorage } from "./storage/datagrid.storage";
 
 export function initialEditorState(init: EditorInit): EditorState {
   switch (init.doctype) {
@@ -80,11 +81,10 @@ function initialBaseDocumentEditorState(
   };
 }
 
-export function initialDatagridState(): Omit<
-  IDataGridState,
-  "datagrid_table_id"
-> {
-  return {
+export function initialDatagridState(
+  view_id?: string
+): Omit<IDataGridState, "datagrid_table_id"> {
+  const cleared: Omit<IDataGridState, "datagrid_table_id"> = {
     datagrid_selected_rows: new Set(),
     datagrid_page_limit: 100,
     datagrid_query_estimated_count: null,
@@ -99,6 +99,21 @@ export function initialDatagridState(): Omit<
     datagrid_predicates: [],
     datagrid_selected_cell: null,
   };
+
+  if (view_id) {
+    // used by reducer
+    // TODO: it is a good practive to do this in a hook.
+    // I'm too lazy to do it now.
+    const pref = DataGridLocalPreferencesStorage.get(view_id);
+    if (pref) {
+      return {
+        ...cleared,
+        datagrid_predicates: pref.predicates || [],
+        datagrid_orderby: pref.orderby || {},
+      };
+    }
+  }
+  return cleared;
 }
 
 export function table_to_sidebar_table_menu(
