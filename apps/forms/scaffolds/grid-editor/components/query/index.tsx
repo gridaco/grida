@@ -150,7 +150,7 @@ export function XSupaDataGridFilter({ children }: React.PropsWithChildren<{}>) {
                         <Input
                           type={
                             q.op !== "is"
-                              ? GridaXSupabaseTypeMap.getInputType({
+                              ? GridaXSupabaseTypeMap.getLiteralInputType({
                                   format,
                                 }) ?? "search"
                               : "search"

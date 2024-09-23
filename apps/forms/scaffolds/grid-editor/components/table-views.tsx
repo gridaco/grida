@@ -53,7 +53,7 @@ export function TableViews() {
             )}
             {tb.label}
           </TabsTrigger>
-          {tb?.views.map((view) => {
+          {/* {tb?.views.map((view) => {
             return (
               <TabsTrigger key={view.id} value={view.id}>
                 <ResourceTypeIcon
@@ -63,40 +63,46 @@ export function TableViews() {
                 {view.label}
               </TabsTrigger>
             );
-          })}
+          })} */}
         </TabsList>
       </Tabs>
-      <DropdownMenu>
-        <DropdownMenuTrigger>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <PlusIcon />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Add new view</TooltipContent>
-          </Tooltip>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent className="min-w-40">
-          <DropdownMenuLabel>New View</DropdownMenuLabel>
-          <DropdownMenuItem>
-            <ResourceTypeIcon type="table" className="me-2 w-4 h-4" />
-            Table
-          </DropdownMenuItem>
-          <DropdownMenuItem>
-            <ResourceTypeIcon type="chart" className="me-2 w-4 h-4" />
-            Chart
-          </DropdownMenuItem>
-          <DropdownMenuItem>
-            <ResourceTypeIcon type="view-list" className="me-2 w-4 h-4" />
-            List
-          </DropdownMenuItem>
-          <DropdownMenuItem>
-            <ResourceTypeIcon type="view-gallery" className="me-2 w-4 h-4" />
-            Gallery
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {/* <AddViewButton/> */}
     </div>
+  );
+}
+
+function AddViewButton() {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon">
+              <PlusIcon />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Add new view</TooltipContent>
+        </Tooltip>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="min-w-40">
+        <DropdownMenuLabel>New View</DropdownMenuLabel>
+        <DropdownMenuItem>
+          <ResourceTypeIcon type="table" className="me-2 w-4 h-4" />
+          Table
+        </DropdownMenuItem>
+        <DropdownMenuItem>
+          <ResourceTypeIcon type="chart" className="me-2 w-4 h-4" />
+          Chart
+        </DropdownMenuItem>
+        <DropdownMenuItem>
+          <ResourceTypeIcon type="view-list" className="me-2 w-4 h-4" />
+          List
+        </DropdownMenuItem>
+        <DropdownMenuItem>
+          <ResourceTypeIcon type="view-gallery" className="me-2 w-4 h-4" />
+          Gallery
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

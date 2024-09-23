@@ -84,12 +84,12 @@ export function XSupaDataGridSortMenu({
     <Popover modal>
       <PopoverTrigger>{children}</PopoverTrigger>
       <PopoverContent className="p-2 w-full">
-        <section className="py-2" hidden={!isset}>
+        <section className="pb-2" hidden={!isset}>
           <div className="flex flex-col space-y-2 w-full">
             {usedkeys.map((col) => {
               const ob = orderby[col];
               return (
-                <div key={col} className="flex gap-2 px-2 w-full">
+                <div key={col} className="flex gap-2 w-full items-center">
                   <div className="flex items-center gap-2 flex-1">
                     <div className="flex-1">
                       <Select
@@ -142,10 +142,11 @@ export function XSupaDataGridSortMenu({
                   </div>
                   <Button
                     size="icon"
-                    variant="outline"
+                    variant="ghost"
+                    className="w-6 h-6"
                     onClick={() => onRemove(col)}
                   >
-                    <Cross2Icon />
+                    <TrashIcon className="w-3 h-3" />
                   </Button>
                 </div>
               );

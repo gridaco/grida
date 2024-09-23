@@ -1,6 +1,6 @@
-import type { SQLFilterOperator } from "@/types";
+import type { SQLPredicateOperator } from "@/types";
 
-export const supported_operators: SQLFilterOperator[] = [
+export const supported_operators: SQLPredicateOperator[] = [
   "eq",
   "neq",
   "gt",
@@ -14,7 +14,7 @@ export const supported_operators: SQLFilterOperator[] = [
 ];
 
 export const operator_labels: Record<
-  SQLFilterOperator,
+  SQLPredicateOperator,
   { symbol: string; label: string }
 > = {
   eq: { symbol: "=", label: "[=] equals" },

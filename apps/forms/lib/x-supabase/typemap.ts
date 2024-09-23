@@ -1,4 +1,4 @@
-import type { FormInputType } from "@/types";
+import type { FormInputType, SQLPredicateOperator } from "@/types";
 import type { PGSupportedColumnType } from "../supabase-postgrest/@types/pg";
 
 export namespace GridaXSupabaseTypeMap {
@@ -95,11 +95,155 @@ export namespace GridaXSupabaseTypeMap {
     return undefined;
   }
 
-  export function getInputType({
+  export function getPredicateOperators({
+    format,
+  }: {
+    format: PGSupportedColumnType | `${PGSupportedColumnType}[]`;
+  }): SQLPredicateOperator[] {
+    const _get_for_non_array = (
+      format: PGSupportedColumnType
+    ): SQLPredicateOperator[] => {
+      switch (format) {
+        case "int":
+        case "int2":
+        case "int4":
+        case "int8":
+        case "smallint":
+        case "integer":
+        case "bigint":
+        case "decimal":
+        case "numeric":
+        case "real":
+        case "float":
+        case "float4":
+        case "float8":
+        case "double precision":
+        case "money":
+          return ["eq", "neq", "gt", "gte", "lt", "lte", "is", "in"];
+
+        case "character varying":
+        case "varchar":
+        case "character":
+        case "char":
+        case "text":
+        case "citext":
+          return [
+            "eq",
+            "neq",
+            "like",
+            "ilike",
+            "is",
+            "in",
+            "fts",
+            "plfts",
+            "phfts",
+            "wfts",
+          ];
+
+        case "bool":
+        case "boolean":
+          return ["eq", "neq", "is"];
+
+        case "json":
+        case "jsonb":
+        case "hstore":
+          return ["eq", "neq", "is", "cs", "cd", "ov"];
+
+        case "tsvector":
+        case "tsquery":
+          return ["eq", "neq", "fts", "plfts", "phfts", "wfts"];
+
+        case "uuid":
+        case "xml":
+        case "inet":
+        case "cidr":
+        case "macaddr":
+          return ["eq", "neq", "is", "in"];
+
+        case "date":
+        case "timestamp":
+        case "timestamptz":
+        case "timestamp without time zone":
+        case "timestamp with time zone":
+        case "time":
+        case "time without time zone":
+        case "time with time zone":
+        case "timetz":
+        case "interval":
+          return ["eq", "neq", "gt", "gte", "lt", "lte", "is", "in"];
+
+        case "point":
+        case "line":
+        case "lseg":
+        case "box":
+        case "path":
+        case "polygon":
+        case "circle":
+          return ["eq", "neq", "is", "sl", "sr", "nxl", "nxr", "adj", "ov"];
+
+        case "int4range":
+        case "int8range":
+        case "numrange":
+        case "tsrange":
+        case "tstzrange":
+        case "daterange":
+        case "int4multirange":
+        case "int8multirange":
+        case "nummultirange":
+        case "tsmultirange":
+        case "tstzmultirange":
+        case "datemultirange":
+          return [
+            "eq",
+            "neq",
+            "is",
+            "sl",
+            "sr",
+            "nxl",
+            "nxr",
+            "adj",
+            "ov",
+            "cs",
+            "cd",
+          ];
+
+        default:
+          return ["eq", "neq", "is"];
+      }
+    };
+
+    if (format.includes("[]")) {
+      const baseFormat = format.replace("[]", "") as PGSupportedColumnType;
+      // For array types, the operators "cs" (contains) and "cd" (contained by) are typically used
+      return [..._get_for_non_array(baseFormat), "cs", "cd"];
+    } else {
+      return _get_for_non_array(format as PGSupportedColumnType);
+    }
+  }
+
+  export type SQLLiteralInputType =
+    | { type: "text" }
+    | { type: "boolean" }
+    | { type: "json" }
+    | { type: "xml" }
+    | { type: "number" }
+    | { type: "is"; accepts_boolean: boolean }
+    | { type: "time" }
+    | { type: "datetime-local" }
+    | { type: "date" };
+  // | {
+  //     type: "search";
+  //     relation?: {
+  //       table: string;
+  //       column: string;
+  //     };
+  //   };
+
+  export function getLiteralInputType({
     format,
   }: {
     format?: PGSupportedColumnType | `${PGSupportedColumnType}[]`;
-  }) {
+  }): SQLLiteralInputType["type"] | undefined {
     if (format?.includes("[]")) {
       return "text";
     }
@@ -125,7 +269,7 @@ export namespace GridaXSupabaseTypeMap {
       // Boolean Types
       case "bool":
       case "boolean":
-        return "checkbox";
+        return "boolean";
 
       // Date/Time Types
       case "date":
@@ -162,7 +306,7 @@ export namespace GridaXSupabaseTypeMap {
 
       // XML
       case "xml":
-        return "textarea"; // For multiline XML input
+        return "xml"; // For multiline XML input
 
       // Enum (may require additional processing for options)
       case "enum":

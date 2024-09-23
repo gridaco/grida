@@ -474,7 +474,7 @@ export interface SQLOrderBy {
   nullsFirst?: boolean;
 }
 
-export type SQLFilterOperator =
+export type SQLPredicateOperator =
   | "eq"
   | "neq"
   | "gt"
@@ -500,6 +500,6 @@ export type SQLFilterOperator =
 
 export interface SQLPredicate {
   column: string;
-  op: SQLFilterOperator; // `${"" | "not."}${SQLFilterOperator}`;
+  op: SQLPredicateOperator; // `${"" | "not."}${SQLFilterOperator}`;
   value: unknown;
 }

@@ -38,7 +38,7 @@ export function OrderbyChip() {
     <XSupaDataGridSortMenu>
       <QueryChip active={isset}>
         <SortIcon type={icon} className="w-3 h-3 me-1" />
-        {multiple ? <>{length + "sorts"}</> : <>{first.column}</>}
+        {multiple ? <>{length} sorts</> : <>{first.column}</>}
       </QueryChip>
     </XSupaDataGridSortMenu>
   );
