@@ -30,10 +30,11 @@ import {
   GridLimit,
   GridViewSettings,
   GridRefresh,
-  XSupaDataGridSort,
+  XSupaDataGridSortMenu,
   GridLocalSearch,
   GridCount,
   TableViews,
+  XSupaDataGridSortTrigger,
 } from "./components";
 import * as GridLayout from "./components/layout";
 import { txt_n_plural } from "@/utils/plural";
@@ -48,7 +49,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Columns3Icon, Rows3Icon } from "lucide-react";
+import { ArrowDownUpIcon, Columns3Icon, Rows3Icon } from "lucide-react";
 import {
   useDatabaseTableId,
   useDatagridTableAttributes,
@@ -57,12 +58,17 @@ import {
 import { saveAs } from "file-saver";
 import Papa from "papaparse";
 import { Gallery } from "../table-view-gallery/gallery";
-import { XSupaDataGridFilter } from "./components/query";
+import {
+  XSupaDataGridFilter,
+  XSupaDataGridFilterTrigger,
+} from "./components/query";
 import { GridPagination } from "./components/pagination";
 import { Chartview } from "../table-view-chart/chartview";
 import { useMultiplayer } from "@/scaffolds/editor/multiplayer";
 import { PredicateChip, AddPrediateMenu } from "./components/query/predicate";
 import { useDataGridQuery } from "./components/query/hooks";
+import { OrderbyChip } from "./components/query/orderby";
+import { Tooltip, TooltipTrigger } from "@/components/ui/tooltip";
 
 function useSelectedCells(): DataGridCellSelectionCursor[] {
   const [state] = useEditorState();
@@ -488,8 +494,12 @@ function TableQueryToggles() {
       <GridLocalSearch />
       {"x_sb_main_table_connection" in tb && (
         <>
-          <XSupaDataGridFilter />
-          <XSupaDataGridSort />
+          <XSupaDataGridFilter>
+            <XSupaDataGridFilterTrigger />
+          </XSupaDataGridFilter>
+          <XSupaDataGridSortMenu>
+            <XSupaDataGridSortTrigger />
+          </XSupaDataGridSortMenu>
         </>
       )}
     </div>
@@ -498,10 +508,16 @@ function TableQueryToggles() {
 
 function TableQueryChips() {
   const [state] = useEditorState();
-  const { predicates, orderby } = useDataGridQuery();
+  const { predicates, orderby, is_orderby_set } = useDataGridQuery();
 
   return (
     <div className="flex gap-2">
+      {is_orderby_set && (
+        <>
+          <OrderbyChip />
+          <GridLayout.HeaderSeparator />
+        </>
+      )}
       {predicates.map((predicate, i) => (
         <PredicateChip key={i} index={i} />
       ))}

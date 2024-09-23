@@ -345,6 +345,12 @@ function useXSBTableFeed(
   }, [dispatch, enabled, ...stableDeps]);
 
   useEffect(() => {
+    if (!res.data) return;
+    if (res.data.error) {
+      toast.error("Failed to fetch data - see console for more details");
+      console.error(res.data.error);
+      return;
+    }
     if (res.data?.data) {
       const rows = res.data.data;
       onFeed?.(rows, res.data.count!);

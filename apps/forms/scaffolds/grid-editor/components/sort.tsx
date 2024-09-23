@@ -33,12 +33,41 @@ import { IconButtonDotBadge } from "./dotbadge";
 import { WorkbenchUI } from "@/components/workbench";
 import { useDataGridOrderby } from "./query/hooks";
 
+export function XSupaDataGridSortTrigger() {
+  const { isset } = useDataGridOrderby();
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={cn(
+            "relative",
+            "text-muted-foreground",
+            isset && " text-accent-foreground"
+          )}
+        >
+          <ArrowDownUpIcon
+            data-state={isset ? "on" : "off"}
+            className="w-4 h-4 text-muted-foreground data-[state='on']:text-workbench-accent-1"
+          />
+          {isset && <IconButtonDotBadge />}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>Sort</TooltipContent>
+    </Tooltip>
+  );
+}
+
 /**
  * this can also be used for form query, but at this moment, form does not have a db level field sorting query.
  * plus, this uses the column name, which in the future, it should be using field id for more universal handling.
  * when it updates to id, the x-supabase query route will also have to change.
  */
-export function XSupaDataGridSort() {
+export function XSupaDataGridSortMenu({
+  children,
+}: React.PropsWithChildren<{}>) {
   const {
     orderby,
     isset,
@@ -53,28 +82,7 @@ export function XSupaDataGridSort() {
 
   return (
     <Popover modal>
-      <PopoverTrigger>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn(
-                "relative",
-                "text-muted-foreground",
-                isset && " text-accent-foreground"
-              )}
-            >
-              <ArrowDownUpIcon
-                data-state={isset ? "on" : "off"}
-                className="w-4 h-4 text-muted-foreground data-[state='on']:text-workbench-accent-1"
-              />
-              {isset && <IconButtonDotBadge />}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Sort</TooltipContent>
-        </Tooltip>
-      </PopoverTrigger>
+      <PopoverTrigger>{children}</PopoverTrigger>
       <PopoverContent className="p-2 w-full">
         <section className="py-2" hidden={!isset}>
           <div className="flex flex-col space-y-2 w-full">

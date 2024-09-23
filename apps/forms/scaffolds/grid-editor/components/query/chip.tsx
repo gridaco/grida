@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { IconButtonDotBadge } from "../dotbadge";
 import { cn } from "@/utils";
+import { CaretDownIcon } from "@radix-ui/react-icons";
 
 export function QueryChip({
   active,
@@ -29,6 +30,7 @@ export function QueryChip({
         )}
       >
         {children}
+        <CaretDownIcon className="w-3 h-3 ms-2" />
       </Badge>
     </div>
   );

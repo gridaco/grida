@@ -204,6 +204,7 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
         draft.datagrid_selected_rows = datagridreset.datagrid_selected_rows;
         draft.datagrid_local_filter = datagridreset.datagrid_local_filter;
         draft.datagrid_orderby = datagridreset.datagrid_orderby;
+        draft.datagrid_predicates = datagridreset.datagrid_predicates;
         draft.datagrid_selected_cell = datagridreset.datagrid_selected_cell;
 
         if (draft.doctype === "v0_form") {

@@ -27,6 +27,8 @@ import * as SelectPrimitive from "@radix-ui/react-select";
 import { operator_labels, supported_operators } from "./data";
 import { useDebounce } from "@uidotdev/usehooks";
 import { QueryChip } from "./chip";
+import type { PGSupportedColumnType } from "@/lib/supabase-postgrest/@types/pg";
+import { GridaXSupabaseTypeMap } from "@/lib/x-supabase/typemap";
 
 export function AddPrediateMenu({ children }: React.PropsWithChildren<{}>) {
   const { attributes, properties, add } = useDataGridPredicates();
@@ -52,9 +54,15 @@ export function AddPrediateMenu({ children }: React.PropsWithChildren<{}>) {
 }
 
 export function PredicateChip({ index }: { index: number }) {
-  const { predicates, add, remove, update } = useDataGridPredicates();
+  const { properties, predicates, add, remove, update } =
+    useDataGridPredicates();
 
   const predicate = predicates[index];
+
+  const format =
+    predicate.column in properties
+      ? properties[predicate.column].format
+      : "text";
 
   const [search, setSearch] = React.useState(predicate.value as string);
 
@@ -81,7 +89,6 @@ export function PredicateChip({ index }: { index: number }) {
         <QueryChip badge={!!!predicate.value} active={!!predicate.value}>
           {predicate.column} {predicate.op}{" "}
           {!!predicate.value ? ": " + String(predicate.value) : ""}
-          <CaretDownIcon className="w-3 h-3 ms-2" />
         </QueryChip>
       </PopoverTrigger>
       <PopoverContent className="flex flex-col gap-2 w-[200px] p-2">
@@ -126,7 +133,11 @@ export function PredicateChip({ index }: { index: number }) {
           </Button>
         </div>
         <Input
-          type="search"
+          type={
+            predicate.op !== "is"
+              ? GridaXSupabaseTypeMap.getInputType({ format }) ?? "search"
+              : "search"
+          }
           autoFocus
           value={search as string}
           onChange={(e) => setSearch(e.target.value)}

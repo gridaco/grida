@@ -148,6 +148,8 @@ export function useDataGridQuery() {
   const { predicates, isset: is_predicates_set } = useDataGridPredicates();
   return {
     isset: is_orderby_set || is_predicates_set,
+    is_orderby_set,
+    is_predicates_set,
     orderby,
     predicates,
   };
