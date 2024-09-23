@@ -13,15 +13,6 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import {
   ChartConfig,
   ChartContainer,
@@ -29,7 +20,7 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { useCallback, useReducer, useState } from "react";
+import { useCallback, useMemo, useReducer, useState } from "react";
 import produce from "immer";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
 import { CHART_PALETTES, DataChartPalette, STANDARD_PALETTES } from "./colors";
@@ -59,6 +50,8 @@ import { Chart } from "@/lib/chart";
 import { ChartPartialDataAlert, useChartDataStat } from "./warn-partial-data";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Card } from "@/components/ui/card";
 
 /// TODO:
 // type switch
@@ -244,35 +237,41 @@ export function Chartview() {
   return (
     <div className="w-full h-full p-4">
       <div className="w-full h-full flex justify-between gap-4">
-        <div className="flex-1 relative w-full h-full flex items-center justify-center">
-          <div className="w-full h-[400px]">
-            <DataChart
-              type={renderer}
-              curve={curve}
-              data={data}
-              // data={df.data}
-              // data={dummy_pretty_data}
-              dataKey={"key"}
-              areaFill={areaFill}
-              defs={{
-                count: {
-                  label: "Count",
-                  color: CHART_PALETTES[palette].colors[1],
-                },
-                // b: {
-                //   label: "B",
-                //   color: CHART_PALETTES[palette].colors[2],
-                // },
-                // c: {
-                //   label: "C",
-                //   color: CHART_PALETTES[palette].colors[3],
-                // },
-              }}
-              className="h-full aspect-auto"
-            />
-          </div>
+        <div className="flex-1 relative w-full h-full">
+          <Card className="w-full h-full flex items-center justify-center">
+            <div className="w-full h-[400px]">
+              {stat ? (
+                <DataChart
+                  type={renderer}
+                  curve={curve}
+                  data={data}
+                  // data={df.data}
+                  // data={dummy_pretty_data}
+                  dataKey={"key"}
+                  areaFill={areaFill}
+                  defs={{
+                    count: {
+                      label: "Count",
+                      color: CHART_PALETTES[palette].colors[1],
+                    },
+                    // b: {
+                    //   label: "B",
+                    //   color: CHART_PALETTES[palette].colors[2],
+                    // },
+                    // c: {
+                    //   label: "C",
+                    //   color: CHART_PALETTES[palette].colors[3],
+                    // },
+                  }}
+                  className="h-full aspect-auto"
+                />
+              ) : (
+                <DataChartSkeleton />
+              )}
+            </div>
+          </Card>
           {stat?.is_data_not_fully_loaded && (
-            <div className="absolute top-0 right-0 z-10">
+            <div className="absolute top-4 right-4 z-10">
               <ChartPartialDataAlert
                 count={stat.count}
                 estimated_count={stat.estimated_count}
@@ -512,6 +511,31 @@ function MainAxisQueryControl({
         </DropdownMenuRadioGroup>
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+function DataChartSkeleton({ count = 20 }: { count?: number }) {
+  const randbars = useMemo(
+    () =>
+      Array.from({ length: count }, (_, i) => {
+        return Math.floor(Math.random() * 100);
+      }),
+    [count]
+  );
+  return (
+    <div className="aspect-video h-full mx-auto px-10">
+      <div className="w-full h-full flex items-end justify-end gap-4">
+        {randbars.map((height, i) => (
+          <Skeleton
+            key={i}
+            className="w-full"
+            style={{
+              height: `${height}%`,
+            }}
+          />
+        ))}
+      </div>
+    </div>
   );
 }
 
