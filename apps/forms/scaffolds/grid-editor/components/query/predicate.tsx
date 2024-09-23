@@ -105,9 +105,9 @@ export function PredicateChip({ index }: { index: number }) {
         </QueryChip>
       </PopoverTrigger>
       <PopoverContent className="flex flex-col gap-2 w-[200px] p-2">
-        <div className="flex justify-between">
-          <div className="flex gap-2 items-center">
-            <span className="text-xs text-muted-foreground">
+        <div className="flex justify-between w-full">
+          <div className="flex gap-2 items-center w-full overflow-hidden">
+            <span className="text-xs text-muted-foreground  overflow-hidden overflow-ellipsis">
               {predicate.column}
             </span>
             <Select
@@ -117,7 +117,7 @@ export function PredicateChip({ index }: { index: number }) {
               <SelectPrimitive.Trigger>
                 <Badge
                   variant="outline"
-                  className="text-xs text-muted-foreground"
+                  className="w-full overflow-ellipsis text-xs text-muted-foreground"
                 >
                   <SelectValue>
                     {operator_labels[predicate.op].symbol}
@@ -144,7 +144,7 @@ export function PredicateChip({ index }: { index: number }) {
             variant="ghost"
             size="icon"
             onClick={onRemove}
-            className="w-6 h-6"
+            className="w-6 h-6 min-w-6 min-h-6"
           >
             <TrashIcon className="w-3 h-3" />
           </Button>

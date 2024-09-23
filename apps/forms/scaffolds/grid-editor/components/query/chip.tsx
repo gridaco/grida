@@ -24,7 +24,7 @@ export function QueryChip({
       <Badge
         variant="outline"
         className={cn(
-          "text-xs font-normal text-muted-foreground rounded-full ps-2 pe-1",
+          "text-xs font-normal text-muted-foreground rounded-full ps-2 pe-1 whitespace-nowrap",
           active &&
             "border-workbench-accent-1 text-workbench-accent-1 bg-workbench-accent-1/10"
         )}

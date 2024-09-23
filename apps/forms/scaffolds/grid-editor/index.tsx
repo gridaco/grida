@@ -68,7 +68,7 @@ import { Chartview } from "../table-view-chart/chartview";
 import { useMultiplayer } from "@/scaffolds/editor/multiplayer";
 import { PredicateChip, AddPrediateMenu } from "./components/query/predicate";
 import { OrderbyChip } from "./components/query/orderby";
-import { Tooltip, TooltipTrigger } from "@/components/ui/tooltip";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 function useSelectedCells(): DataGridCellSelectionCursor[] {
   const [state] = useEditorState();
@@ -271,8 +271,13 @@ export function GridEditor({
           </GridLayout.HeaderMenus>
         </GridLayout.HeaderLine>
         {is_query_set && (
-          <GridLayout.HeaderLine className="border-b-0">
-            <TableQueryChips />
+          <GridLayout.HeaderLine className="border-b-0 px-0">
+            <ScrollArea>
+              <ScrollBar orientation="horizontal" className="invisible" />
+              <div className="px-2">
+                <TableQueryChips />
+              </div>
+            </ScrollArea>
           </GridLayout.HeaderLine>
         )}
       </GridLayout.Header>
