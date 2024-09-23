@@ -1,4 +1,5 @@
 import type { FormInputType } from "@/types";
+import type { PGSupportedColumnType } from "../supabase-postgrest/@types/pg";
 
 export namespace GridaXSupabaseTypeMap {
   /**
@@ -92,5 +93,134 @@ export namespace GridaXSupabaseTypeMap {
     }
 
     return undefined;
+  }
+
+  export function getInputType({
+    format,
+  }: {
+    format?: PGSupportedColumnType | `${PGSupportedColumnType}[]`;
+  }) {
+    if (format?.includes("[]")) {
+      return "text";
+    }
+    switch (format as PGSupportedColumnType) {
+      // Number Types
+      case "bigint":
+      case "integer":
+      case "int":
+      case "int2":
+      case "int4":
+      case "int8":
+      case "smallint":
+      case "decimal":
+      case "numeric":
+      case "real":
+      case "float":
+      case "float4":
+      case "float8":
+      case "double precision":
+      case "money":
+        return "number";
+
+      // Boolean Types
+      case "bool":
+      case "boolean":
+        return "checkbox";
+
+      // Date/Time Types
+      case "date":
+        return "date";
+      case "timestamp":
+      case "timestamp without time zone":
+      case "timestamp with time zone":
+      case "timestamptz":
+        return "datetime-local";
+      case "time":
+      case "time without time zone":
+      case "time with time zone":
+      case "timetz":
+        return "time";
+
+      // Text Types
+      case "character varying":
+      case "varchar":
+      case "character":
+      case "char":
+      case "text":
+      case "citext":
+        return "text";
+
+      // JSON Types
+      case "json":
+      case "jsonb":
+        return "text";
+      // TODO:
+
+      // UUID
+      case "uuid":
+        return "text"; // Can use specialized UUID input or regex validation
+
+      // XML
+      case "xml":
+        return "textarea"; // For multiline XML input
+
+      // Enum (may require additional processing for options)
+      case "enum":
+        return "text";
+      // TODO:
+      // return "select"; // Enum options could be handled as select inputs
+
+      // Network Address Types
+      case "cidr":
+      case "inet":
+      case "macaddr":
+        return "text"; // Custom validation can be added
+
+      // Geometric Types (Custom or unsupported)
+      case "point":
+      case "line":
+      case "lseg":
+      case "box":
+      case "path":
+      case "polygon":
+      case "circle":
+        return undefined; // Geometric data requires custom handling
+
+      // Range Types (Unsupported)
+      case "int4range":
+      case "int8range":
+      case "numrange":
+      case "tsrange":
+      case "tstzrange":
+      case "daterange":
+      case "int4multirange":
+      case "int8multirange":
+      case "nummultirange":
+      case "tsmultirange":
+      case "tstzmultirange":
+      case "datemultirange":
+        return undefined; // Ranges require custom components
+
+      // Full Text Search Types
+      case "tsvector":
+      case "tsquery":
+        return "text"; // Can use text input for now
+
+      // Spatial Types (PostGIS or custom handling)
+      case "geometry":
+      case "geography":
+        return undefined; // Requires specialized handling
+
+      // Unsupported or Specific Use Cases
+      case "hstore":
+      case "ltree":
+      case "cube":
+        return undefined; // Requires custom handling for key-value data or hierarchical data
+
+      case "bytea":
+        return undefined;
+      default:
+        return undefined; // Not supported or requires custom handling
+    }
   }
 }

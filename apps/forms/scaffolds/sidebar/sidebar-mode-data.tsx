@@ -474,7 +474,7 @@ function ConnectNewSupabaseTableDialog({
           type: property.type,
           format: property.format,
           enum: property.enum,
-          is_array: property.is_array,
+          is_array: property.type === "array",
         });
 
         return [

@@ -1,27 +1,44 @@
+import type { JSONSchemaType, JSONType } from "ajv";
 import type { OpenAPI } from "openapi-types";
 import type { GridaXSupabase } from "@/types";
 import type { ColumnType } from "./@types/column-types";
 import { XMLParser } from "fast-xml-parser";
-import { PGSupportedColumnTypeWithoutArray } from "./@types/pg";
+import type {
+  PGSupportedColumnType,
+  PGSupportedColumnTypeWithoutArray,
+} from "./@types/pg";
 import assert from "assert";
-
 export namespace SupabasePostgRESTOpenApi {
+  export type SupabaseOpenAPIDefinitionJSONSchema = JSONSchemaType<
+    Record<string, any>
+  > & {
+    properties: {
+      [key: string]: {
+        default?: string;
+        /**
+         * description provided by system (and user)
+         * when the column is a pk or a fk, it comes with a message formated as:
+         *
+         * @example
+         * - "ID\n\nNote:\nThis is a Primary Key.<pk/>"
+         * - "Note:\nThis is a Foreign Key to `organization.id`.<fk table='organization' column='id'/>"
+         */
+        description?: string;
+        format: PGSupportedColumnType | `${PGSupportedColumnType}[]`;
+        type?: JSONType;
+        enum?: string[];
+        items: JSONSchemaType<any>;
+      };
+    };
+    type: JSONType;
+    required: string[];
+  };
+
   export type SupabaseOpenAPIDocument = OpenAPI.Document & {
     basePath: string;
     consumes: string[];
     definitions: {
-      [key: string]: {
-        properties: {
-          [key: string]: {
-            default?: any;
-            description?: string;
-            type: string;
-            format: string;
-          };
-        };
-        type: string;
-        required: string[];
-      };
+      [key: string]: SupabaseOpenAPIDefinitionJSONSchema;
     };
     host: string;
     parameters: any;
@@ -165,13 +182,13 @@ export namespace SupabasePostgRESTOpenApi {
 
   export type PostgRESTColumnMeta = {
     name: string;
-    type: string;
+    type?: JSONType;
     format: string;
     pk: boolean;
     fk: FKMeta | null;
     description?: string;
     required: boolean;
-    default: string;
+    default?: string;
   };
 
   export function parse_supabase_postgrest_schema_definition(
