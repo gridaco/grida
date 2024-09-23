@@ -34,9 +34,9 @@ import type { SQLPredicate } from "@/types";
 import { Input } from "@/components/ui/input";
 import { WorkbenchUI } from "@/components/workbench";
 import { operator_labels, supported_operators } from "./data";
-import { useDataGridPredicates } from "./hooks";
 import { AddPrediateMenu } from "./predicate";
 import { GridaXSupabaseTypeMap } from "@/lib/x-supabase/typemap";
+import { useDataGridPredicates } from "@/scaffolds/editor/use";
 
 export function XSupaDataGridFilterTrigger() {
   const { isset } = useDataGridPredicates();

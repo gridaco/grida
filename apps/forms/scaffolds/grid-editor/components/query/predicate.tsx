@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import type { SQLPredicate } from "@/types";
-import { CaretDownIcon, TrashIcon } from "@radix-ui/react-icons";
+import { TrashIcon } from "@radix-ui/react-icons";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,7 +13,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { useDataGridPredicates } from "./hooks";
 import { Input } from "@/components/ui/input";
 import { WorkbenchUI } from "@/components/workbench";
 import { Button } from "@/components/ui/button";
@@ -27,8 +26,8 @@ import * as SelectPrimitive from "@radix-ui/react-select";
 import { operator_labels, supported_operators } from "./data";
 import { useDebounce } from "@uidotdev/usehooks";
 import { QueryChip } from "./chip";
-import type { PGSupportedColumnType } from "@/lib/supabase-postgrest/@types/pg";
 import { GridaXSupabaseTypeMap } from "@/lib/x-supabase/typemap";
+import { useDataGridPredicates } from "@/scaffolds/editor/use";
 
 export function AddPrediateMenu({ children }: React.PropsWithChildren<{}>) {
   const { attributes, properties, add } = useDataGridPredicates();

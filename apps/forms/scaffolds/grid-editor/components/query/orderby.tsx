@@ -1,12 +1,7 @@
 import { ArrowDownIcon, ArrowDownUpIcon, ArrowUpIcon } from "lucide-react";
-import { QueryChip } from "./chip";
-import { useDataGridOrderby } from "./hooks";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { useDataGridOrderby } from "@/scaffolds/editor/use";
 import { XSupaDataGridSortMenu } from "../sort";
+import { QueryChip } from "./chip";
 
 type SortIconType = "up" | "down" | "mixed";
 function SortIcon({

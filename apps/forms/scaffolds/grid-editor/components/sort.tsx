@@ -31,7 +31,7 @@ import { cn } from "@/utils";
 import { PopoverClose } from "@radix-ui/react-popover";
 import { IconButtonDotBadge } from "./dotbadge";
 import { WorkbenchUI } from "@/components/workbench";
-import { useDataGridOrderby } from "./query/hooks";
+import { useDataGridOrderby } from "@/scaffolds/editor/use";
 
 export function XSupaDataGridSortTrigger() {
   const { isset } = useDataGridOrderby();

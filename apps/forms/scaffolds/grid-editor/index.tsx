@@ -52,6 +52,7 @@ import {
 import { ArrowDownUpIcon, Columns3Icon, Rows3Icon } from "lucide-react";
 import {
   useDatabaseTableId,
+  useDataGridQuery,
   useDatagridTableAttributes,
   useDatagridTableSpace,
 } from "@/scaffolds/editor/use";
@@ -66,7 +67,6 @@ import { GridPagination } from "./components/pagination";
 import { Chartview } from "../table-view-chart/chartview";
 import { useMultiplayer } from "@/scaffolds/editor/multiplayer";
 import { PredicateChip, AddPrediateMenu } from "./components/query/predicate";
-import { useDataGridQuery } from "./components/query/hooks";
 import { OrderbyChip } from "./components/query/orderby";
 import { Tooltip, TooltipTrigger } from "@/components/ui/tooltip";
 
