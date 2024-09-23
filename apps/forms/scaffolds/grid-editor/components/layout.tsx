@@ -17,7 +17,7 @@ export function HeaderLine({
   return (
     <div
       className={cn(
-        "px-4 min-h-12 h-12 flex items-center justify-between gap-4 border-b",
+        "px-2 min-h-12 h-12 flex items-center justify-between gap-4 border-b",
         className
       )}
     >

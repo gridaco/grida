@@ -515,7 +515,7 @@ function Header({
           <Breadcrumbs />
           <SavingIndicator />
         </div>
-        <div className="flex gap-1 items-center">
+        <div className="flex gap-4 items-center">
           <Players />
           <PlayActions />
         </div>
