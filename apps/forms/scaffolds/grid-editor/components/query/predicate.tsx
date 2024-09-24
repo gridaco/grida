@@ -1,13 +1,7 @@
 import React, { useCallback, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import type { SQLPredicate } from "@/types";
-import {
-  BoxIcon,
-  CheckboxIcon,
-  TrashIcon,
-  ValueIcon,
-  ValueNoneIcon,
-} from "@radix-ui/react-icons";
+import { Link2Icon, TrashIcon } from "@radix-ui/react-icons";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,14 +13,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Input } from "@/components/ui/input";
-import { WorkbenchUI } from "@/components/workbench";
 import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
   SelectItem,
-  SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 import * as SelectPrimitive from "@radix-ui/react-select";
@@ -35,11 +26,10 @@ import { useDebounce } from "@uidotdev/usehooks";
 import { QueryChip } from "./chip";
 import { GridaXSupabaseTypeMap } from "@/lib/x-supabase/typemap";
 import { useDataGridPredicates } from "@/scaffolds/editor/use";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { CheckedState } from "@radix-ui/react-checkbox";
-import { intersect } from "@/utils/intersect";
+import { ReferenceSearch } from "@/components/formfield/reference-search-field";
+import { SQLLiteralInput } from "./sql-literal-input";
+import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
+import { KeyIcon } from "lucide-react";
 
 export function AddPrediateMenu({ children }: React.PropsWithChildren<{}>) {
   const { attributes, properties, add } = useDataGridPredicates();
@@ -48,17 +38,30 @@ export function AddPrediateMenu({ children }: React.PropsWithChildren<{}>) {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
       <DropdownMenuContent align="start">
-        {attributes.map((key) => (
-          <DropdownMenuItem
-            key={key}
-            onSelect={() => add({ column: key, op: "eq", value: "" })}
-          >
-            {key}{" "}
-            <span className="ms-2 text-xs text-muted-foreground">
-              {properties[key].format}
-            </span>
-          </DropdownMenuItem>
-        ))}
+        {attributes.map((key) => {
+          const property =
+            SupabasePostgRESTOpenApi.parse_postgrest_property_meta(
+              key,
+              properties[key],
+              null
+            );
+
+          return (
+            <DropdownMenuItem
+              key={key}
+              onSelect={() => add({ column: key, op: "eq", value: "" })}
+            >
+              <div className="w-4 h-4 flex items-center justify-center gap-2">
+                {property.pk && <KeyIcon className="w-3 h-3" />}
+                {property.fk && <Link2Icon className="w-3 h-3" />}
+              </div>
+              <span className="ms-2">{key}</span>
+              <span className="ms-2 text-xs text-muted-foreground">
+                {property.format}
+              </span>
+            </DropdownMenuItem>
+          );
+        })}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -150,18 +153,19 @@ export function PredicateChip({ index }: { index: number }) {
           </Button>
         </div>
         <SQLLiteralInput
-          literal={
+          config={
             predicate.op === "is"
               ? {
                   type: "is",
                   accepts_boolean: format === "bool" || format === "boolean",
                 }
-              : {
-                  type:
-                    (GridaXSupabaseTypeMap.getLiteralInputType({
-                      format,
-                    }) as "text") ?? "text",
-                }
+              : GridaXSupabaseTypeMap.getSQLLiteralInputConfig(
+                  SupabasePostgRESTOpenApi.parse_postgrest_property_meta(
+                    predicate.column,
+                    properties[predicate.column],
+                    null
+                  )
+                )
           }
           value={search as string}
           onValueChange={(v) => setSearch(v)}
@@ -170,106 +174,4 @@ export function PredicateChip({ index }: { index: number }) {
     </Popover>
   );
   //
-}
-
-function SQLLiteralInput({
-  value,
-  onValueChange,
-  literal,
-  autoFocus,
-}: {
-  value?: string;
-  onValueChange?: (value: string) => void;
-  literal: GridaXSupabaseTypeMap.SQLLiteralInputType;
-  autoFocus?: boolean;
-}) {
-  switch (literal.type) {
-    case "text":
-    case "datetime-local":
-    case "date":
-    case "number":
-    case "time":
-      return (
-        <Input
-          type={literal.type}
-          autoFocus={autoFocus}
-          autoComplete="off"
-          placeholder="Type a value..."
-          value={value}
-          onChange={(e) => onValueChange?.(e.target.value)}
-          className={WorkbenchUI.inputVariants({
-            variant: "input",
-            size: "sm",
-          })}
-        />
-      );
-    case "boolean":
-      return (
-        <Select value={value || undefined} onValueChange={onValueChange}>
-          <SelectTrigger autoFocus={autoFocus}>
-            <SelectValue placeholder={"Select a value..."} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="true">
-              <CheckboxIcon className="inline-flex align-middle w-4 h-4 me-1" />
-              true
-            </SelectItem>
-            <SelectItem value="false">
-              <BoxIcon className="inline-flex align-middle w-4 h-4 me-1" />
-              false
-            </SelectItem>
-          </SelectContent>
-        </Select>
-      );
-    case "is":
-      return (
-        <Select value={value || undefined} onValueChange={onValueChange}>
-          <SelectTrigger autoFocus={autoFocus}>
-            <SelectValue placeholder={"Select a value..."} />
-          </SelectTrigger>
-          <SelectContent>
-            {literal.accepts_boolean && (
-              <>
-                <SelectItem value="true">
-                  <CheckboxIcon className="inline-flex align-middle w-4 h-4 me-1" />
-                  true
-                </SelectItem>
-                <SelectItem value="false">
-                  <BoxIcon className="inline-flex align-middle w-4 h-4 me-1" />
-                  false
-                </SelectItem>
-              </>
-            )}
-            <SelectItem value="null">
-              <ValueNoneIcon className="inline-flex align-middle w-4 h-4 me-1" />
-              null
-            </SelectItem>
-            <SelectItem value="not null">
-              <ValueIcon className="inline-flex align-middle w-4 h-4 me-1" />
-              not null
-            </SelectItem>
-          </SelectContent>
-        </Select>
-      );
-    // TODO:
-    case "json":
-    case "xml":
-      // case "search":
-      return (
-        <Input
-          type="search"
-          autoFocus={autoFocus}
-          autoComplete="off"
-          placeholder="Type a value..."
-          value={value}
-          onChange={(e) => onValueChange?.(e.target.value)}
-          className={WorkbenchUI.inputVariants({
-            variant: "input",
-            size: "sm",
-          })}
-        />
-      );
-    default:
-      break;
-  }
 }

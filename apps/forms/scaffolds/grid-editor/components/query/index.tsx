@@ -148,13 +148,14 @@ export function XSupaDataGridFilter({ children }: React.PropsWithChildren<{}>) {
                       </div>
                       <div className="flex-1">
                         <Input
-                          type={
-                            q.op !== "is"
-                              ? GridaXSupabaseTypeMap.getLiteralInputType({
-                                  format,
-                                }) ?? "search"
-                              : "search"
-                          }
+                          // TODO: QUERY
+                          // type={
+                          //   q.op !== "is"
+                          //     ? GridaXSupabaseTypeMap.getSQLLiteralInputConfig({
+                          //         format,
+                          //       }) ?? "search"
+                          //     : "search"
+                          // }
                           placeholder="Enter a value"
                           value={q.value as string | undefined}
                           onChange={(e) => onchange({ value: e.target.value })}

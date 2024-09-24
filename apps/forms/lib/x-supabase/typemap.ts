@@ -1,5 +1,6 @@
 import type { FormInputType, SQLPredicateOperator } from "@/types";
 import type { PGSupportedColumnType } from "../supabase-postgrest/@types/pg";
+import { SupabasePostgRESTOpenApi } from "../supabase-postgrest";
 
 export namespace GridaXSupabaseTypeMap {
   /**
@@ -221,150 +222,196 @@ export namespace GridaXSupabaseTypeMap {
     }
   }
 
-  export type SQLLiteralInputType =
+  export type SQLLiteralInputConfig =
     | { type: "text" }
     | { type: "boolean" }
     | { type: "json" }
     | { type: "xml" }
-    | { type: "number" }
+    | { type: "select"; options: string[] }
+    | { type: "number"; min?: number; max?: number; step?: number }
     | { type: "is"; accepts_boolean: boolean }
-    | { type: "time" }
-    | { type: "datetime-local" }
-    | { type: "date" };
-  // | {
-  //     type: "search";
-  //     relation?: {
-  //       table: string;
-  //       column: string;
-  //     };
-  //   };
+    | { type: "time"; with_time_zone: boolean }
+    | { type: "datetime-local"; with_time_zone: boolean }
+    | { type: "date"; with_time_zone: boolean }
+    | {
+        type: "search";
+        relation: {
+          referenced_table: string;
+          referenced_column: string;
+        };
+      };
 
-  export function getLiteralInputType({
+  export type SQLLiteralInputType = SQLLiteralInputConfig["type"];
+
+  export function getSQLLiteralInputConfig({
+    fk,
+    is_enum,
+    enums,
     format,
-  }: {
-    format?: PGSupportedColumnType | `${PGSupportedColumnType}[]`;
-  }): SQLLiteralInputType["type"] | undefined {
+  }: SupabasePostgRESTOpenApi.PostgRESTColumnMeta):
+    | Exclude<SQLLiteralInputConfig, { type: "is" }>
+    | undefined {
     if (format?.includes("[]")) {
-      return "text";
+      return { type: "text" };
     }
-    switch (format as PGSupportedColumnType) {
-      // Number Types
-      case "bigint":
-      case "integer":
-      case "int":
-      case "int2":
-      case "int4":
-      case "int8":
-      case "smallint":
-      case "decimal":
-      case "numeric":
-      case "real":
-      case "float":
-      case "float4":
-      case "float8":
-      case "double precision":
-      case "money":
-        return "number";
 
-      // Boolean Types
-      case "bool":
-      case "boolean":
-        return "boolean";
+    // for fk relation
+    if (fk) {
+      return {
+        type: "search",
+        relation: {
+          referenced_column: fk.referenced_column,
+          referenced_table: fk.referenced_table,
+        },
+      };
+    }
 
-      // Date/Time Types
-      case "date":
-        return "date";
-      case "timestamp":
-      case "timestamp without time zone":
-      case "timestamp with time zone":
-      case "timestamptz":
-        return "datetime-local";
-      case "time":
-      case "time without time zone":
-      case "time with time zone":
-      case "timetz":
-        return "time";
+    // for enum type
+    if (is_enum) {
+      return {
+        type: "select",
+        options: enums ?? [],
+      };
+    }
 
-      // Text Types
-      case "character varying":
-      case "varchar":
-      case "character":
-      case "char":
-      case "text":
-      case "citext":
-        return "text";
+    // others
+    const input_type =
+      postgrest_column_type_to_literal_input_type[
+        format as PGSupportedColumnType
+      ];
 
-      // JSON Types
+    switch (input_type) {
+      case "search":
+      case "select":
+        break;
       case "json":
-      case "jsonb":
-        return "text";
-      // TODO:
-
-      // UUID
-      case "uuid":
-        return "text"; // Can use specialized UUID input or regex validation
-
-      // XML
+      case "text":
       case "xml":
-        return "xml"; // For multiline XML input
-
-      // Enum (may require additional processing for options)
-      case "enum":
-        return "text";
-      // TODO:
-      // return "select"; // Enum options could be handled as select inputs
-
-      // Network Address Types
-      case "cidr":
-      case "inet":
-      case "macaddr":
-        return "text"; // Custom validation can be added
-
-      // Geometric Types (Custom or unsupported)
-      case "point":
-      case "line":
-      case "lseg":
-      case "box":
-      case "path":
-      case "polygon":
-      case "circle":
-        return undefined; // Geometric data requires custom handling
-
-      // Range Types (Unsupported)
-      case "int4range":
-      case "int8range":
-      case "numrange":
-      case "tsrange":
-      case "tstzrange":
-      case "daterange":
-      case "int4multirange":
-      case "int8multirange":
-      case "nummultirange":
-      case "tsmultirange":
-      case "tstzmultirange":
-      case "datemultirange":
-        return undefined; // Ranges require custom components
-
-      // Full Text Search Types
-      case "tsvector":
-      case "tsquery":
-        return "text"; // Can use text input for now
-
-      // Spatial Types (PostGIS or custom handling)
-      case "geometry":
-      case "geography":
-        return undefined; // Requires specialized handling
-
-      // Unsupported or Specific Use Cases
-      case "hstore":
-      case "ltree":
-      case "cube":
-        return undefined; // Requires custom handling for key-value data or hierarchical data
-
-      case "bytea":
-        return undefined;
-      default:
-        return undefined; // Not supported or requires custom handling
+      case "boolean":
+        return {
+          type: input_type,
+        };
+      case "number":
+        return {
+          type: "number",
+          // TODO:
+          // min:
+          // max:
+          // step:
+        };
+      case "date":
+      case "datetime-local":
+      case "time":
+        return {
+          type: input_type,
+          with_time_zone:
+            (format?.endsWith("with time zone") || format?.endsWith("tz")) ??
+            false,
+        };
     }
   }
+
+  const postgrest_column_type_to_literal_input_type: Record<
+    PGSupportedColumnType,
+    Exclude<SQLLiteralInputType, "is"> | undefined
+  > = {
+    // Number Types
+    bigint: "number",
+    integer: "number",
+    int: "number",
+    int2: "number",
+    int4: "number",
+    int8: "number",
+    smallint: "number",
+    decimal: "number",
+    numeric: "number",
+    real: "number",
+    float: "number",
+    float4: "number",
+    float8: "number",
+    "double precision": "number",
+    money: "number",
+
+    // Boolean Types
+    bool: "boolean",
+    boolean: "boolean",
+
+    // Date/Time Types
+    date: "date",
+    timestamp: "datetime-local",
+    "timestamp without time zone": "datetime-local",
+    "timestamp with time zone": "datetime-local",
+    timestamptz: "datetime-local",
+    time: "time",
+    "time without time zone": "time",
+    "time with time zone": "time",
+    timetz: "time",
+
+    // Text Types
+    "character varying": "text",
+    varchar: "text",
+    character: "text",
+    char: "text",
+    text: "text",
+    citext: "text",
+
+    // JSON Types
+    json: "text",
+    jsonb: "text",
+
+    // UUID
+    uuid: "text",
+
+    // XML
+    xml: "xml",
+
+    // Enum
+    enum: "text",
+
+    // Network Address Types
+    cidr: "text",
+    inet: "text",
+    macaddr: "text",
+
+    // Geometric Types
+    point: undefined,
+    line: undefined,
+    lseg: undefined,
+    box: undefined,
+    path: undefined,
+    polygon: undefined,
+    circle: undefined,
+
+    // Range Types
+    int4range: undefined,
+    int8range: undefined,
+    numrange: undefined,
+    tsrange: undefined,
+    tstzrange: undefined,
+    daterange: undefined,
+    int4multirange: undefined,
+    int8multirange: undefined,
+    nummultirange: undefined,
+    tsmultirange: undefined,
+    tstzmultirange: undefined,
+    datemultirange: undefined,
+
+    // Full Text Search Types
+    tsvector: "text",
+    tsquery: "text",
+
+    // Spatial Types
+    geometry: undefined,
+    geography: undefined,
+
+    // Unsupported or Specific Use Cases
+    hstore: undefined,
+    ltree: undefined,
+    cube: undefined,
+    bytea: undefined,
+    bit: undefined,
+    varbit: undefined,
+    "bit varying": undefined,
+    interval: undefined,
+  };
 }
