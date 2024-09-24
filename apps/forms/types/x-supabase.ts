@@ -10,7 +10,7 @@ export namespace GridaXSupabase {
   type XSBSearchMeta<X = {}> = {
     schema_name: string;
     table_name: string;
-    table_schema: GridaXSupabase.SupabaseTable["sb_table_schema"];
+    table_schema: GridaXSupabase.SupabaseTable["sb_table_schema"] | null;
   } & X;
 
   export type XSBSearchResult<

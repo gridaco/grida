@@ -1,22 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
-import {
-  XPostgrestQuery,
-  XSupabaseClientQueryBuilder,
-} from "@/lib/supabase-postgrest/builder";
-import { createRouteHandlerClient } from "@/lib/supabase/server";
-import {
-  GridaXSupabaseService,
-  createXSupabaseClient,
-} from "@/services/x-supabase";
-
-import assert from "assert";
+import { XSupabaseClientQueryBuilder } from "@/lib/supabase-postgrest/builder";
+import { createRouteHandlerXSBClient } from "@/lib/supabase/server";
+import { createXSupabaseClient } from "@/services/x-supabase";
 import { omit } from "@/utils/qs";
+import type { GridaXSupabase } from "@/types";
+import type { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 
 type Context = {
   params: {
-    form_id: string;
+    supabase_project_id: number;
     supabase_table_name: string;
   };
 };
@@ -24,20 +18,16 @@ type Context = {
 export async function GET(req: NextRequest, context: Context) {
   const searchParams = omit(req.nextUrl.searchParams, "r"); // not used, only for swr key
   const supabase_schema_name = req.headers.get("Accept-Profile") || "public";
-  const { form_id, supabase_table_name } = context.params;
+  const { supabase_project_id, supabase_table_name } = context.params;
 
   const cookieStore = cookies();
-  const client = createRouteHandlerClient(cookieStore);
+  const client = createRouteHandlerXSBClient(cookieStore);
 
   // fetch connection
   const { data: connection_ref, error: connection_ref_err } = await client
-    .from("connection_supabase")
-    .select(
-      `
-        *
-      `
-    )
-    .eq("form_id", form_id)
+    .from("supabase_project")
+    .select("id, sb_schema_definitions")
+    .eq("id", supabase_project_id)
     .single();
 
   if (!connection_ref) {
@@ -46,19 +36,12 @@ export async function GET(req: NextRequest, context: Context) {
   }
   //
 
-  const x = new GridaXSupabaseService();
-  const conn = await x.getXSBMainTableConnectionState(connection_ref);
-  assert(conn, "connection fetch failed");
-
-  const x_client = await createXSupabaseClient(
-    connection_ref.supabase_project_id,
-    {
-      db: {
-        schema: supabase_schema_name,
-      },
-      service_role: true,
-    }
-  );
+  const x_client = await createXSupabaseClient(connection_ref.id, {
+    db: {
+      schema: supabase_schema_name,
+    },
+    service_role: true,
+  });
 
   const query = new XSupabaseClientQueryBuilder(x_client);
 
@@ -69,11 +52,20 @@ export async function GET(req: NextRequest, context: Context) {
   });
   query.fromSearchParams(searchParams);
 
-  const { data, count, error } = await query.done();
+  const res = await query.done();
 
   return NextResponse.json({
-    data,
-    error,
-    count,
-  });
+    ...res,
+    meta: {
+      schema_name: supabase_schema_name,
+      table_name: supabase_table_name,
+      table_schema:
+        (
+          connection_ref.sb_schema_definitions as Record<
+            string,
+            SupabasePostgRESTOpenApi.SupabaseOpenAPIDefinitionJSONSchema
+          >
+        )?.[supabase_schema_name]?.[supabase_table_name] || null,
+    },
+  } satisfies GridaXSupabase.XSBSearchResult);
 }
