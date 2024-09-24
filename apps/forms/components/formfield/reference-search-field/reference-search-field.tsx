@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Sheet,
   SheetClose,
@@ -33,14 +32,6 @@ export function ReferenceSearchPreview(
   return <SearchInput {...props} />;
 }
 
-type SearchRes = {
-  schema_name: string;
-  table_name: string;
-  table_schema: GridaXSupabase.SupabaseTable["sb_table_schema"];
-  column: string;
-  rows: Record<string, any>[];
-};
-
 export function ReferenceSearch({
   field_id,
   ...props
@@ -53,9 +44,14 @@ export function ReferenceSearch({
   const [localSearch, setLocalSearch] = useState<string>("");
   const [perpage, setPerPage] = useState<number>(50);
 
-  const res = useSWR<{
-    data: SearchRes;
-  }>(
+  const res = useSWR<
+    GridaXSupabase.XSBSearchResult<
+      any,
+      {
+        column: string;
+      }
+    >
+  >(
     `/v1/session/${state.session_id}/field/${field_id}/search?per_page=${perpage}`,
     async (url: string) => {
       const res = await fetch(url);
@@ -63,13 +59,14 @@ export function ReferenceSearch({
     }
   );
 
+  const { meta, data: _rows } = res.data ?? {};
+
   const {
     schema_name: schema,
     table_name: table,
     column: rowKey,
-    rows: _rows,
     table_schema,
-  } = res.data?.data ?? {};
+  } = meta ?? {};
 
   const fulltable = [schema, table].filter(Boolean).join(".");
 

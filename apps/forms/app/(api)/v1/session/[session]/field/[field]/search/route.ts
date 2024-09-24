@@ -8,14 +8,6 @@ import assert from "assert";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
-type SearchRes = {
-  schema_name: string;
-  table_name: string;
-  table_schema: GridaXSupabase.SupabaseTable["sb_table_schema"];
-  column: string;
-  rows: Record<string, any>[];
-};
-
 //
 // TODO: consider dropping the `reference` field from the field schema - on x-sb, it's not needed
 //
@@ -73,7 +65,7 @@ export async function GET(
           supabase_project: { sb_schema_definitions },
         } = conn;
 
-        const client = await createXSupabaseClient(
+        const x_client = await createXSupabaseClient(
           supabase_connection?.supabase_project_id,
           {
             service_role: true,
@@ -89,7 +81,7 @@ export async function GET(
               table === "users",
               `Unsupported table "${table}" on schena "${schema}"`
             );
-            const { data, error } = await client.auth.admin.listUsers({
+            const { data, error } = await x_client.auth.admin.listUsers({
               page: page,
               perPage: per_page,
             });
@@ -100,39 +92,46 @@ export async function GET(
             }
 
             return NextResponse.json({
-              data: {
+              meta: {
                 schema_name: schema as string,
                 table_name: table,
                 table_schema: GridaXSupabase.SupabaseUserJsonSchema as any,
                 column: column,
-                rows: data.users,
-              } satisfies SearchRes,
-            });
+              },
+              data: data.users,
+              count: data.total,
+              // always ok - for xsb auth
+              error: null,
+              status: 200,
+              statusText: "OK",
+            } satisfies GridaXSupabase.XSBSearchResult<
+              any,
+              {
+                column: string;
+              }
+            >);
           }
           case "public":
           default: {
             const r1 = (page - 1) * per_page;
             const r2 = r1 + per_page;
 
-            const { data, error } = await client
-              .from(table)
-              .select()
-              .range(r1, r2);
-
-            if (error || !data) {
-              console.error("search/err::table", error);
-              return NextResponse.error();
-            }
+            const res = await x_client.from(table).select().range(r1, r2);
 
             return NextResponse.json({
-              data: {
+              ...res,
+              meta: {
                 schema_name: schema,
                 table_name: table,
                 column: column,
                 table_schema: sb_schema_definitions[schema][table],
-                rows: data,
-              } satisfies SearchRes,
-            });
+              },
+            } satisfies GridaXSupabase.XSBSearchResult<
+              any,
+              {
+                column: string;
+              }
+            >);
 
             break;
           }

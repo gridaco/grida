@@ -1,21 +1,36 @@
 import type { SchemaTableConnectionXSupabaseMainTableJoint } from "./types";
-import type { User } from "@supabase/supabase-js";
+import type { PostgrestSingleResponse, User } from "@supabase/supabase-js";
 import type { Bucket } from "@supabase/storage-js";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 
 export namespace GridaXSupabase {
+  export type XSBQueryResult<T extends Record<string, any> = any> =
+    PostgrestSingleResponse<GridaXSupabase.XDataRow<T>[]>;
+
+  type XSBSearchMeta<X = {}> = {
+    schema_name: string;
+    table_name: string;
+    table_schema: GridaXSupabase.SupabaseTable["sb_table_schema"];
+  } & X;
+
+  export type XSBSearchResult<
+    T extends Record<string, any> = any,
+    X = {},
+  > = XSBQueryResult<T> & { meta: XSBSearchMeta<X> | null };
+
   export type XSBPostgrestMethod = "get" | "post" | "delete" | "patch";
 
-  export type XDataRow = Record<string, any> & {
-    __gf_storage_fields: Record<
-      string,
-      | {
-          signedUrl: string;
-          path: string;
-        }[]
-      | null
-    >;
-  };
+  export type XDataRow<T extends Record<string, any> = Record<string, any>> =
+    T & {
+      __gf_storage_fields: Record<
+        string,
+        | {
+            signedUrl: string;
+            path: string;
+          }[]
+        | null
+      >;
+    };
 
   export type JSONSChema =
     SupabasePostgRESTOpenApi.SupabaseOpenAPIDefinitionJSONSchema;
