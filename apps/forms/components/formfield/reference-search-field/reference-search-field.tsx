@@ -165,19 +165,3 @@ export function ReferenceSearch({
     </Sheet>
   );
 }
-
-const _auth_user_columns = Object.keys(
-  GridaXSupabase.SupabaseUserJsonSchema.properties
-).map((key) => {
-  const _ =
-    GridaXSupabase.SupabaseUserJsonSchema.properties[
-      key as GridaXSupabase.SupabaseUserColumn
-    ];
-
-  return {
-    key: key,
-    name: key,
-    type: _.type,
-    format: _.format,
-  };
-});

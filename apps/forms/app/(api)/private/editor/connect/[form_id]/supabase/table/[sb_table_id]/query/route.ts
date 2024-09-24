@@ -18,6 +18,7 @@ import type {
   XSupabaseStorageSchema,
 } from "@/types";
 import assert from "assert";
+import { omit } from "@/utils/qs";
 
 type Context = {
   params: {
@@ -27,7 +28,7 @@ type Context = {
 };
 
 export async function GET(req: NextRequest, context: Context) {
-  const searchParams = req.nextUrl.searchParams;
+  const searchParams = omit(req.nextUrl.searchParams, "r"); // not used, only for swr key
   const { form_id, sb_table_id: _sb_table_id } = context.params;
   const sb_table_id = parseInt(_sb_table_id);
 
@@ -38,11 +39,6 @@ export async function GET(req: NextRequest, context: Context) {
     });
 
   const { fields } = form;
-
-  // get and clear route specific query params
-  const __refreshkey = searchParams.get("r"); // not used, only for swr key
-  searchParams.delete("r");
-  //
 
   const query = new XSupabaseClientQueryBuilder(x_client);
 
@@ -133,6 +129,14 @@ export async function DELETE(req: NextRequest, context: Context) {
   return NextResponse.json(res);
 }
 
+/**
+ *
+ * [SECURE]
+ *
+ * RLS Protected
+ *
+ * @returns
+ */
 async function get_forms_x_supabase_table_connector({
   form_id,
   sb_table_id,
@@ -156,6 +160,7 @@ async function get_forms_x_supabase_table_connector({
     .single();
 
   if (!form) {
+    console.error("failed to fetch connection", error);
     return notFound();
   }
 

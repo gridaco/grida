@@ -16,6 +16,9 @@ type SearchRes = {
   rows: Record<string, any>[];
 };
 
+//
+// TODO: consider dropping the `reference` field from the field schema - on x-sb, it's not needed
+//
 export async function GET(
   req: NextRequest,
   context: {
