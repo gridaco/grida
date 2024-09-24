@@ -674,6 +674,7 @@ function xsbmtinit(
     : undefined;
 
   return {
+    supabase_project_id: conn.supabase_project_id,
     sb_table_id: conn.main_supabase_table.id,
     sb_schema_name: conn.main_supabase_table.sb_schema_name as string,
     sb_table_name: conn.main_supabase_table.sb_table_name as string,

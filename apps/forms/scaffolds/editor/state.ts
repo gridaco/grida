@@ -179,6 +179,7 @@ export type GDocTableID = GDocTable["id"];
  * this connection indicates the grida table is connected to a x-supabase table
  */
 export type TableXSBMainTableConnection = {
+  supabase_project_id: number;
   sb_schema_name: string;
   sb_table_name: string;
   sb_table_id: number;

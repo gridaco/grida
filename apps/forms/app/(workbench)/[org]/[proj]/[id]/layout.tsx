@@ -358,6 +358,7 @@ export default async function Layout({
         return {
           pks: pks,
           pk: pks[0],
+          supabase_project_id: t.supabase_project_id,
           sb_table_id: sb_table_id,
           sb_schema_name: t.sb_schema_name,
           sb_table_name: t.sb_table_name,

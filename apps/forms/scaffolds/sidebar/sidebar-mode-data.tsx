@@ -527,6 +527,7 @@ function ConnectNewSupabaseTableDialog({
         table: {
           ...data.table,
           x_sb_main_table_connection: {
+            supabase_project_id: data.connection.supabase_project_id,
             sb_table_id: data.connection.sb_table_id,
             sb_schema_name: data.connection.sb_schema_name,
             sb_table_name: data.connection.sb_table_name,
