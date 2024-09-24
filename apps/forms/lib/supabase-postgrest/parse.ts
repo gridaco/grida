@@ -174,18 +174,28 @@ export namespace SupabasePostgRESTOpenApi {
     return methods.length === 1 && methods[0] === "get";
   }
 
-  export type FKMeta = {
-    column: string;
-    table: string;
-    foreignColumn: string;
+  /**
+   * PostgREST Column Relationship
+   *
+   * postgrest does not emmit metadata on description for composite foreign keys
+   * only one column per foreign key is supported
+   */
+  export type PostgRESTColumnRelationship = {
+    referencing_column: string;
+    referenced_table: string;
+    referenced_column: string;
+    //
+    // column: string;
+    // table: string;
+    // foreignColumn: string;
   };
 
   export type PostgRESTColumnMeta = {
     name: string;
     type?: JSONType;
-    format: string;
+    format?: PGSupportedColumnType | `${PGSupportedColumnType}[]` | string;
     pk: boolean;
-    fk: FKMeta | null;
+    fk: PostgRESTColumnRelationship | null;
     description?: string;
     required: boolean;
     default?: string;
@@ -196,7 +206,7 @@ export namespace SupabasePostgRESTOpenApi {
   ) {
     const parsed: {
       pks: string[];
-      fks: FKMeta[];
+      fks: PostgRESTColumnRelationship[];
       properties: { [key: string]: PostgRESTColumnMeta };
     } = {
       pks: [],
@@ -217,7 +227,8 @@ export namespace SupabasePostgRESTOpenApi {
           default: defaultValue,
         } = columnDetails;
         const pk = pks.includes(columnName);
-        const fk = fks.find((fk) => fk.column === columnName) || null;
+        const fk =
+          fks.find((fk) => fk.referencing_column === columnName) || null;
 
         return {
           name: columnName,
@@ -250,7 +261,7 @@ export namespace SupabasePostgRESTOpenApi {
    * @returns An object containing arrays of primary keys and foreign keys.
    *
    * @example
-   * const schema: GridaSupabase.JSONSChema = {
+   * const schema: SupabaseOpenAPIDefinitionJSONSchema = {
    *   properties: {
    *     id: {
    *       description: "Note:\nThis is a Primary Key.<pk/>",
@@ -284,58 +295,118 @@ export namespace SupabasePostgRESTOpenApi {
    * //   primaryKeys: ["id"],
    * //   foreignKeys: [
    * //     {
-   * //       column: "organization_id",
-   * //       table: "organization",
-   * //       foreignColumn: "id"
+   * //       referencing_column: "organization_id",
+   * //       referenced_table: "organization",
+   * //       referenced_column: "id"
    * //     }
    * //   ]
    * // }
    */
   function parse_supabase_postgrest_schema_properties_description(
-    schema: GridaXSupabase.JSONSChema
+    schema: SupabaseOpenAPIDefinitionJSONSchema
   ) {
     const result = {
       pks: [] as string[],
-      fks: [] as FKMeta[],
+      fks: [] as PostgRESTColumnRelationship[],
     };
 
-    const options = {
-      ignoreAttributes: false,
-      attributeNamePrefix: "",
-    };
-
-    const parser = new XMLParser(options);
-
+    // schema.properties
     for (const [columnName, columnDetails] of Object.entries(
       schema.properties
     )) {
       if (columnDetails.description) {
+        const { pk, fk } = parse_supabase_postgrest_property_description(
+          columnName,
+          columnDetails.description
+        );
         const description = columnDetails.description;
 
-        // Parse description with fast-xml-parser
-        const parsedDescription = parser.parse(description);
-
-        // Check for Primary Key
-        if (parsedDescription.pk !== undefined) {
+        if (pk) {
           result.pks.push(columnName);
         }
 
-        // Check for Foreign Key
-        if (parsedDescription.fk) {
-          const table = parsedDescription.fk["@_table"];
-          const column = parsedDescription.fk["@_column"];
-          if (table && column) {
-            result.fks.push({
-              column: columnName,
-              table: table,
-              foreignColumn: column,
-            });
-          }
+        if (fk) {
+          result.fks.push(fk);
         }
       }
     }
 
     return result;
+  }
+
+  /**
+   * Parses the description of a property from a Supabase Postgrest schema to determine
+   * if it contains information about primary keys or foreign keys.
+   *
+   * @param key - The name of the property being described.
+   * @param description - The description string that may contain metadata about primary or foreign keys.
+   * @returns An object containing two properties:
+   * - `pk`: A boolean indicating whether the property is a primary key.
+   * - `fk`: An object representing the foreign key relationship if present, or `null` if not present.
+   *
+   * @example
+   * const description = "Note:\nThis is a Foreign Key to `organization.id`.<fk table='organization' column='id'/>";
+   * const result = parse_supabase_postgrest_property_description("organization_id", description);
+   * console.log(result);
+   * // Output:
+   * // {
+   * //   pk: false,
+   * //   fk: {
+   * //     referencing_column: "organization_id",
+   * //     referenced_table: "organization",
+   * //     referenced_column: "id"
+   * //   }
+   * // }
+   *
+   * @example
+   * const description = "Note:\nThis is a Primary Key.<pk/>";
+   * const result = parse_supabase_postgrest_property_description("id", description);
+   * console.log(result);
+   * // Output:
+   * // {
+   * //   pk: true,
+   * //   fk: null
+   * // }
+   */
+  export function parse_supabase_postgrest_property_description(
+    key: string,
+    description: string
+  ): {
+    pk: boolean;
+    fk: PostgRESTColumnRelationship | null;
+  } {
+    const res: { pk: boolean; fk: PostgRESTColumnRelationship | null } = {
+      pk: false,
+      fk: null,
+    };
+
+    const parser = new XMLParser({
+      ignoreAttributes: false,
+      attributeNamePrefix: "",
+    });
+
+    // Parse description with fast-xml-parser
+    const parsedDescription = parser.parse(description);
+
+    // Check for Primary Key
+    if (parsedDescription.pk !== undefined) {
+      res.pk = true;
+    }
+
+    // Check for Foreign Key
+    if (parsedDescription.fk) {
+      const table: string = parsedDescription.fk["table"];
+      const column: string = parsedDescription.fk["column"];
+      if (table && column) {
+        res.fk = {
+          referencing_column: key,
+          referenced_table: table,
+          referenced_column: column,
+        };
+      }
+    }
+
+    return res;
   }
 
   type Format =
