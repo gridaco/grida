@@ -23,4 +23,32 @@ describe("parse fk", () => {
       );
     expect(_.fks).toEqual([]);
   });
+
+  it("should return empty array fks when no fks", () => {
+    const _ = SupabasePostgRESTOpenApi.parse_postgrest_property_meta(
+      "t1",
+      example["definitions"]["t2"]["properties"]["t1"],
+      example["definitions"]["t2"]["required"]
+    );
+
+    expect(_).toEqual({
+      name: "t1",
+      type: "integer",
+      format: "bigint",
+      scalar_format: "bigint",
+      is_array: false,
+      is_enum: false,
+      enums: undefined,
+      description:
+        "Note:\nThis is a Foreign Key to `t1.id`.<fk table='t1' column='id'/>",
+      pk: false,
+      fk: {
+        referencing_column: "t1",
+        referenced_table: "t1",
+        referenced_column: "id",
+      },
+      default: undefined,
+      required: false,
+    } satisfies SupabasePostgRESTOpenApi.PostgRESTColumnMeta);
+  });
 });

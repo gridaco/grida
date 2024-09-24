@@ -9,29 +9,42 @@ import type {
 } from "./@types/pg";
 import assert from "assert";
 export namespace SupabasePostgRESTOpenApi {
+  /**
+   * @example
+   *
+   * ```
+   * {
+   *   "description": "Note:\nThis is a Foreign Key to `t1.id`.<fk table='t1' column='id'/>",
+   *   "format": "bigint",
+   *   "type": "integer"
+   * }
+   * ```
+   */
+  export type SupabaseOpenAPIDefinitionProperty = {
+    default?: string;
+    /**
+     * description provided by system (and user)
+     * when the column is a pk or a fk, it comes with a message formated as:
+     *
+     * @example
+     * - "ID\n\nNote:\nThis is a Primary Key.<pk/>"
+     * - "Note:\nThis is a Foreign Key to `organization.id`.<fk table='organization' column='id'/>"
+     */
+    description?: string;
+    format: PGSupportedColumnType | `${PGSupportedColumnType}[]`;
+    type?: JSONType;
+    enum?: string[];
+    items: JSONSchemaType<any>;
+  };
+
   export type SupabaseOpenAPIDefinitionJSONSchema = JSONSchemaType<
     Record<string, any>
   > & {
     properties: {
-      [key: string]: {
-        default?: string;
-        /**
-         * description provided by system (and user)
-         * when the column is a pk or a fk, it comes with a message formated as:
-         *
-         * @example
-         * - "ID\n\nNote:\nThis is a Primary Key.<pk/>"
-         * - "Note:\nThis is a Foreign Key to `organization.id`.<fk table='organization' column='id'/>"
-         */
-        description?: string;
-        format: PGSupportedColumnType | `${PGSupportedColumnType}[]`;
-        type?: JSONType;
-        enum?: string[];
-        items: JSONSchemaType<any>;
-      };
+      [key: string]: SupabaseOpenAPIDefinitionProperty;
     };
     type: JSONType;
-    required: string[];
+    required: string[] | null;
   };
 
   export type SupabaseOpenAPIDocument = OpenAPI.Document & {
@@ -184,22 +197,64 @@ export namespace SupabasePostgRESTOpenApi {
     referencing_column: string;
     referenced_table: string;
     referenced_column: string;
-    //
-    // column: string;
-    // table: string;
-    // foreignColumn: string;
   };
 
   export type PostgRESTColumnMeta = {
     name: string;
     type?: JSONType;
     format?: PGSupportedColumnType | `${PGSupportedColumnType}[]` | string;
+    //
+    scalar_format: PGSupportedColumnType;
+    is_enum: boolean;
+    enums?: string[];
+    is_array: boolean;
+    //
     pk: boolean;
     fk: PostgRESTColumnRelationship | null;
     description?: string;
-    required: boolean;
+    required?: boolean;
     default?: string;
   };
+
+  export function parse_postgrest_property_meta(
+    key: string,
+    property: SupabaseOpenAPIDefinitionProperty,
+    required: string[] | null
+  ): PostgRESTColumnMeta {
+    const { type, format, description, default: defaultValue } = property;
+
+    const is_array = property.format.includes("[]");
+    const scalar = is_array
+      ? (property.format.replace("[]", "") as PGSupportedColumnType)
+      : (property.format as PGSupportedColumnType);
+
+    const is_enum = !!property.enum;
+
+    let pk: boolean = false;
+    let fk: PostgRESTColumnRelationship | null = null;
+
+    if (description) {
+      const { fk: _fk, pk: _pk } =
+        parse_supabase_postgrest_property_description(key, description);
+      pk = _pk;
+      fk = _fk;
+    }
+
+    return {
+      name: key,
+      type,
+      format,
+      scalar_format: scalar,
+      is_array,
+      is_enum,
+      enums: property.enum,
+      description,
+      pk,
+      fk,
+      default: defaultValue,
+      required: required?.includes(key),
+    } satisfies PostgRESTColumnMeta;
+  }
 
   export function parse_supabase_postgrest_schema_definition(
     schema: GridaXSupabase.JSONSChema
@@ -214,34 +269,14 @@ export namespace SupabasePostgRESTOpenApi {
       properties: {},
     };
 
-    // for (const table in definitions) {
-    const { pks, fks } =
-      parse_supabase_postgrest_schema_properties_description(schema);
-
     Object.entries(schema.properties)
       .map(([columnName, columnDetails]) => {
-        const {
-          type,
-          format,
-          description,
-          default: defaultValue,
-        } = columnDetails;
-        const pk = pks.includes(columnName);
-        const fk =
-          fks.find((fk) => fk.referencing_column === columnName) || null;
-
         return {
-          name: columnName,
-          type,
-          // https://github.com/supabase/postgrest-js/issues/544
-          // need a better way for parsing format
-          format,
-          description,
-          // required can be null when postgrest view
-          required: schema.required?.includes(columnName),
-          pk,
-          fk,
-          default: defaultValue,
+          ...parse_postgrest_property_meta(
+            columnName,
+            columnDetails,
+            schema.required
+          ),
         };
       })
       .reduce((acc, columnMeta) => {
@@ -407,40 +442,5 @@ export namespace SupabasePostgRESTOpenApi {
     }
 
     return res;
-  }
-
-  type Format =
-    | ColumnType
-    | `${ColumnType}[]`
-    // else
-    | (string & {});
-
-  export function analyze_format(property: {
-    type: string;
-    format: Format;
-    enum?: string[];
-  }): {
-    is_enum: boolean;
-    is_array: boolean;
-    format: ColumnType;
-    type: PGSupportedColumnTypeWithoutArray;
-  } {
-    const is_array = property.format.includes("[]");
-    const scalar = is_array
-      ? (property.format.replace("[]", "") as ColumnType)
-      : (property.format as ColumnType);
-
-    // switch (scalar) {
-    //   case ''
-    // }
-
-    const is_enum = !!property.enum;
-
-    return {
-      is_enum,
-      is_array,
-      format: scalar,
-      type: property.type as PGSupportedColumnTypeWithoutArray,
-    };
   }
 }
