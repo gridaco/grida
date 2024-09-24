@@ -1,14 +1,26 @@
 import type { JSONSchemaType, JSONType } from "ajv";
 import type { OpenAPI } from "openapi-types";
 import type { GridaXSupabase } from "@/types";
-import type { ColumnType } from "./@types/column-types";
 import { XMLParser } from "fast-xml-parser";
-import type {
-  PGSupportedColumnType,
-  PGSupportedColumnTypeWithoutArray,
-} from "./@types/pg";
+import type { PGSupportedColumnType } from "./@types/pg";
 import assert from "assert";
+
 export namespace SupabasePostgRESTOpenApi {
+  /**
+   * @example
+   *
+   * ```
+   * {
+   *   "format": "bigint",
+   *   "format": "custom_schema.custom_type",
+   * }
+   * ```
+   */
+  export type PostgRESTOpenAPIDefinitionPropertyFormatType =
+    | PGSupportedColumnType
+    | `${PGSupportedColumnType}[]`
+    | string;
+
   /**
    * @example
    *
@@ -31,7 +43,7 @@ export namespace SupabasePostgRESTOpenApi {
      * - "Note:\nThis is a Foreign Key to `organization.id`.<fk table='organization' column='id'/>"
      */
     description?: string;
-    format: PGSupportedColumnType | `${PGSupportedColumnType}[]`;
+    format: PostgRESTOpenAPIDefinitionPropertyFormatType;
     type?: JSONType;
     enum?: string[];
     items: JSONSchemaType<any>;
@@ -202,7 +214,7 @@ export namespace SupabasePostgRESTOpenApi {
   export type PostgRESTColumnMeta = {
     name: string;
     type?: JSONType;
-    format?: PGSupportedColumnType | `${PGSupportedColumnType}[]` | string;
+    format: PostgRESTOpenAPIDefinitionPropertyFormatType;
     //
     scalar_format: PGSupportedColumnType;
     is_enum: boolean;

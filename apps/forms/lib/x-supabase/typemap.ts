@@ -99,7 +99,7 @@ export namespace GridaXSupabaseTypeMap {
   export function getPredicateOperators({
     format,
   }: {
-    format: PGSupportedColumnType | `${PGSupportedColumnType}[]`;
+    format: SupabasePostgRESTOpenApi.PostgRESTOpenAPIDefinitionPropertyFormatType;
   }): SQLPredicateOperator[] {
     const _get_for_non_array = (
       format: PGSupportedColumnType

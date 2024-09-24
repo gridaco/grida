@@ -7,8 +7,11 @@ import { EmptyRowsRenderer } from "./empty";
 import Highlight from "@/components/highlight";
 import "./grid.css";
 import { mask } from "./mask";
+import { CellRoot } from "./cell";
+import type { JSONType } from "ajv";
+import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 
-export function ReferenceTableGrid({
+export function XSBReferenceTableGrid({
   columns: _columns,
   rows: _rows,
   rowKey,
@@ -20,7 +23,9 @@ export function ReferenceTableGrid({
   columns: {
     key: string;
     name: string;
-    type?: string;
+    type?: JSONType;
+    format?: SupabasePostgRESTOpenApi.PostgRESTOpenAPIDefinitionPropertyFormatType;
+    pk: boolean;
   }[];
   rows: XSupabaseReferenceTableRow[];
   rowKey?: string;
@@ -39,6 +44,20 @@ export function ReferenceTableGrid({
         editable: false,
         // frozen: col.key === rowKey,
         width: undefined,
+        renderHeaderCell: ({ column }) => {
+          return (
+            <CellRoot className="flex items-center gap-1.5">
+              <span>{column.name}</span>
+              <span>
+                {col.format && (
+                  <span className="text-xs font-normal text-foreground/60">
+                    {col.format}
+                  </span>
+                )}
+              </span>
+            </CellRoot>
+          );
+        },
         renderCell: ({ row, column }: RenderCellProps<any>) => {
           const val = row[col.key as keyof XSupabaseReferenceTableRow];
           const display = masked
@@ -48,11 +67,13 @@ export function ReferenceTableGrid({
             : val?.toString();
 
           return (
-            <Highlight
-              text={display}
-              tokens={tokens}
-              className="bg-foreground text-background"
-            />
+            <CellRoot>
+              <Highlight
+                text={display}
+                tokens={tokens}
+                className="bg-foreground text-background"
+              />
+            </CellRoot>
           );
         },
         maxWidth: 300,

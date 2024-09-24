@@ -25,9 +25,11 @@ import { operator_labels, supported_operators } from "./data";
 import { useDebounce } from "@uidotdev/usehooks";
 import { QueryChip } from "./chip";
 import { GridaXSupabaseTypeMap } from "@/lib/x-supabase/typemap";
-import { useDataGridPredicates } from "@/scaffolds/editor/use";
-import { ReferenceSearch } from "@/components/formfield/reference-search-field";
-import { SQLLiteralInput } from "./sql-literal-input";
+import { useDataGridPredicates, useEditorState } from "@/scaffolds/editor/use";
+import {
+  SQLLiteralInputValue,
+  XSBSQLLiteralInput,
+} from "./xsb-sql-literal-input";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { KeyIcon } from "lucide-react";
 
@@ -68,7 +70,10 @@ export function AddPrediateMenu({ children }: React.PropsWithChildren<{}>) {
 }
 
 export function PredicateChip({ index }: { index: number }) {
-  const { properties, predicates, add, remove, update } =
+  const [state] = useEditorState();
+  const { supabase_project } = state;
+
+  const { table, properties, predicates, add, remove, update } =
     useDataGridPredicates();
 
   const predicate = predicates[index];
@@ -78,7 +83,9 @@ export function PredicateChip({ index }: { index: number }) {
       ? properties[predicate.column].format
       : "text";
 
-  const [search, setSearch] = React.useState(predicate.value as string);
+  const [search, setSearch] = React.useState<SQLLiteralInputValue>(
+    predicate.value as SQLLiteralInputValue
+  );
 
   const debouncedSearch = useDebounce(search, 500);
 
@@ -152,24 +159,34 @@ export function PredicateChip({ index }: { index: number }) {
             <TrashIcon className="w-3 h-3" />
           </Button>
         </div>
-        <SQLLiteralInput
-          config={
-            predicate.op === "is"
-              ? {
-                  type: "is",
-                  accepts_boolean: format === "bool" || format === "boolean",
-                }
-              : GridaXSupabaseTypeMap.getSQLLiteralInputConfig(
-                  SupabasePostgRESTOpenApi.parse_postgrest_property_meta(
-                    predicate.column,
-                    properties[predicate.column],
-                    null
+        {table?.x_sb_main_table_connection ? (
+          <XSBSQLLiteralInput
+            supabase={{
+              supabase_project_id:
+                table?.x_sb_main_table_connection.supabase_project_id,
+              supabase_schema_name:
+                table?.x_sb_main_table_connection.sb_schema_name,
+            }}
+            config={
+              predicate.op === "is"
+                ? {
+                    type: "is",
+                    accepts_boolean: format === "bool" || format === "boolean",
+                  }
+                : GridaXSupabaseTypeMap.getSQLLiteralInputConfig(
+                    SupabasePostgRESTOpenApi.parse_postgrest_property_meta(
+                      predicate.column,
+                      properties[predicate.column],
+                      null
+                    )
                   )
-                )
-          }
-          value={search as string}
-          onValueChange={(v) => setSearch(v)}
-        />
+            }
+            value={search as string}
+            onValueChange={(v) => setSearch(v)}
+          />
+        ) : (
+          <>N/A</>
+        )}
       </PopoverContent>
     </Popover>
   );

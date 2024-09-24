@@ -188,17 +188,7 @@ export namespace GridaXSupabase {
       "created_at",
       "updated_at",
     ],
-  };
-
-  /**
-   * general & common priorities for columns order (only for auth.users table)
-   */
-  export const unknown_table_column_priorities = [
-    "id",
-    "email",
-    "name",
-    "username",
-  ];
+  } as unknown as SupabasePostgRESTOpenApi.SupabaseOpenAPIDefinitionJSONSchema; // TODO: this works for now, but lets remove the `as unknown as` when theres a time.
 
   export type SupabaseUserColumn =
     keyof (typeof SupabaseUserJsonSchema)["properties"];

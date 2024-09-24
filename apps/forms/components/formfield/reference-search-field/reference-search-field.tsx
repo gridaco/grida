@@ -10,7 +10,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useFormAgentState } from "@/lib/formstate";
-import { ReferenceTableGrid } from "@/scaffolds/grid/reference-grid";
+import { XSBReferenceTableGrid } from "@/scaffolds/grid/reference-grid";
 import { GridaXSupabase } from "@/types";
 import useSWR from "swr";
 import { useMemo, useState } from "react";
@@ -24,7 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { priority_sorter } from "@/utils/sort";
+import { GridDataXSBUnknown } from "@/scaffolds/grid-editor/grid-data-xsb-unknow";
 
 export function ReferenceSearchPreview(
   props: React.ComponentProps<typeof SearchInput>
@@ -84,10 +84,6 @@ export function ReferenceSearch({
     return fuse.search(localSearch).map((r) => r.item);
   }, [fuse, localSearch, _rows]);
 
-  const sort_by_priorities = priority_sorter(
-    GridaXSupabase.unknown_table_column_priorities
-  );
-
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger>
@@ -113,7 +109,7 @@ export function ReferenceSearch({
         </div>
         <div className="flex-1">
           <div className="flex flex-col w-full h-full">
-            <ReferenceTableGrid
+            <XSBReferenceTableGrid
               loading={!rows}
               tokens={localSearch ? [localSearch] : undefined}
               onSelected={(key, row) => {
@@ -121,17 +117,9 @@ export function ReferenceSearch({
                 setOpen(false);
               }}
               rowKey={rowKey}
-              columns={Object.keys(table_schema?.properties ?? {})
-                .sort(sort_by_priorities)
-                .map((key) => {
-                  const _ = (table_schema?.properties as any)[key];
-                  return {
-                    key: key,
-                    name: key,
-                    type: _.type,
-                    format: _.format,
-                  };
-                })}
+              columns={GridDataXSBUnknown.columns(table_schema, {
+                sort: "unknown_table_column_priorities",
+              })}
               rows={rows ?? []}
             />
             <footer className="w-full px-2 py-1 border-y">

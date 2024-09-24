@@ -3,15 +3,12 @@
 import React, { useCallback, useEffect, useMemo } from "react";
 import { useDatagridTable, useEditorState, useFormFields } from "./use";
 import toast from "react-hot-toast";
+import useSWR from "swr";
 import {
   createClientFormsClient,
   createClientWorkspaceClient,
 } from "@/lib/supabase/client";
-import {
-  PostgrestSingleResponse,
-  RealtimePostgresChangesPayload,
-} from "@supabase/supabase-js";
-import useSWR from "swr";
+import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import type { FormResponse, FormResponseField, GridaXSupabase } from "@/types";
 import { usePrevious } from "@uidotdev/usehooks";
 import { XPostgrestQuery } from "@/lib/supabase-postgrest/builder";
@@ -313,7 +310,7 @@ function useXSBTableFeed(
       )
     : null;
 
-  const res = useSWR<PostgrestSingleResponse<GridaXSupabase.XDataRow[]>>(
+  const res = useSWR<GridaXSupabase.XSBQueryResult>(
     request,
     async (url: string) => {
       const res = await fetch(url);

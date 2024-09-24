@@ -1,33 +1,51 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { PrivateEditorApi } from "@/lib/private";
+import { XSBReferenceTableGrid } from "@/scaffolds/grid/reference-grid";
+import { GridaXSupabase } from "@/types";
 import { Link2Icon } from "@radix-ui/react-icons";
 import React from "react";
-import useSWR from "swr";
+import useSWR, { BareFetcher } from "swr";
+import { GridDataXSBUnknown } from "../../grid-data-xsb-unknow";
 
 interface ISQLForeignKeyRelation {
   referenced_column: string;
   referenced_table: string;
 }
 
+type SQLForeignKeyValue = string | number | undefined;
+
 export function XSBSQLForeignKeySearchInput({
+  value,
+  onValueChange,
   relation,
   supabase_project_id,
   supabase_schema_name,
-  onValueChange,
   ...props
 }: Omit<React.ComponentProps<typeof Input>, "onChange"> & {
   relation: ISQLForeignKeyRelation;
   supabase_project_id: number;
   supabase_schema_name: string;
-  onValueChange?: (value: string) => void;
+  value: SQLForeignKeyValue;
+  onValueChange?: (value: SQLForeignKeyValue) => void;
 }) {
   const [open, setOpen] = React.useState(false);
 
   return (
     <>
       <XSBSearchTableSheet
+        value={value}
+        onValueChange={onValueChange}
         open={open}
         onOpenChange={setOpen}
         relation={relation}
@@ -58,12 +76,16 @@ export function XSBSQLForeignKeySearchInput({
 }
 
 function XSBSearchTableSheet({
+  value,
+  onValueChange,
   relation,
   supabase_project_id,
   supabase_schema_name,
   children,
   ...props
 }: React.ComponentProps<typeof Sheet> & {
+  value?: SQLForeignKeyValue;
+  onValueChange?: (value: SQLForeignKeyValue) => void;
   relation: ISQLForeignKeyRelation;
   supabase_project_id: number;
   supabase_schema_name: string;
@@ -71,15 +93,23 @@ function XSBSearchTableSheet({
   return (
     <Sheet {...props}>
       <SheetTrigger asChild>{children}</SheetTrigger>
-      <SheetContent>
-        Hi
-        {relation.referenced_table}
-        {relation.referenced_column}
-        <XSBSearchTableDataGrid
-          supabase_project_id={supabase_project_id}
-          supabase_schema_name={supabase_schema_name}
-          supabase_table_name={relation.referenced_table}
-        />
+      <SheetContent className="flex flex-col p-0 py-6 xl:w-[800px] xl:max-w-none sm:w-[500px] sm:max-w-none w-screen max-w-none">
+        <SheetHeader className="px-6">
+          <SheetTitle>Search Reference</SheetTitle>
+          <SheetDescription>
+            Select a record to reference from{" "}
+            <code>
+              {supabase_schema_name}.{relation.referenced_table}
+            </code>
+          </SheetDescription>
+        </SheetHeader>
+        <div className="flex-1">
+          <XSBSearchTableDataGrid
+            supabase_project_id={supabase_project_id}
+            supabase_schema_name={supabase_schema_name}
+            supabase_table_name={relation.referenced_table}
+          />
+        </div>
       </SheetContent>
     </Sheet>
   );
@@ -89,13 +119,16 @@ function XSBSearchTableSheet({
  * swr fetcher for x-sb search integration, which passes schema name to Accept-Profile header
  * @returns
  */
-const x_table_search_swr_fetcher = (arg: [string, string]) => {
+const x_table_search_swr_fetcher = async (
+  arg: [string, string]
+): Promise<GridaXSupabase.XSBSearchResult> => {
   const [url, schema_name] = arg;
-  return fetch(url, {
+  const res = await fetch(url, {
     headers: {
       "Accept-Profile": schema_name,
     },
-  }).then((r) => r.json());
+  });
+  return res.json();
 };
 
 function useXSupabaseTableSearch({
@@ -109,7 +142,7 @@ function useXSupabaseTableSearch({
   supabase_schema_name: string;
   search?: URLSearchParams | string;
 }) {
-  return useSWR(
+  return useSWR<GridaXSupabase.XSBSearchResult>(
     [
       PrivateEditorApi.XSupabase.url_x_table_search(
         supabase_project_id,
@@ -120,7 +153,8 @@ function useXSupabaseTableSearch({
       ),
       supabase_schema_name,
     ],
-    x_table_search_swr_fetcher
+    // @see https://github.com/vercel/swr/discussions/545#discussioncomment-10740463
+    x_table_search_swr_fetcher as BareFetcher<any>
   );
 }
 
@@ -139,8 +173,16 @@ function XSBSearchTableDataGrid({
     supabase_schema_name,
   });
   return (
-    <>
-      <pre>{JSON.stringify(data, null, 2)}</pre>
-    </>
+    <div className="flex flex-col w-full h-full">
+      <XSBReferenceTableGrid
+        loading={!data?.data}
+        onSelected={(key, row) => {
+          //
+        }}
+        // rowKey={rowKey}
+        columns={GridDataXSBUnknown.columns(data?.meta?.table_schema)}
+        rows={data?.data ?? []}
+      />
+    </div>
   );
 }

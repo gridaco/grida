@@ -17,17 +17,31 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { GridaXSupabaseTypeMap } from "@/lib/x-supabase/typemap";
-import { XSBSQLForeignKeySearchInput } from "./sql-fk-search-input";
+import { XSBSQLForeignKeySearchInput } from "./xsb-sql-fk-search-input";
 
-export function SQLLiteralInput({
+export type SQLLiteralInputValue =
+  | string
+  | number
+  | "true"
+  | "false"
+  | "null"
+  | "not null"
+  | undefined;
+
+export function XSBSQLLiteralInput({
   value,
   onValueChange,
   config = { type: "text" },
+  supabase,
   autoFocus,
 }: {
-  value?: string;
-  onValueChange?: (value: string) => void;
+  value?: SQLLiteralInputValue;
+  onValueChange?: (value: SQLLiteralInputValue) => void;
   config?: GridaXSupabaseTypeMap.SQLLiteralInputConfig;
+  supabase: {
+    supabase_project_id: number;
+    supabase_schema_name: string;
+  };
   autoFocus?: boolean;
 }) {
   switch (config?.type) {
@@ -52,7 +66,10 @@ export function SQLLiteralInput({
       );
     case "boolean":
       return (
-        <Select value={value || undefined} onValueChange={onValueChange}>
+        <Select
+          value={(value as string) || undefined}
+          onValueChange={onValueChange}
+        >
           <SelectTrigger autoFocus={autoFocus}>
             <SelectValue placeholder={"Select a value..."} />
           </SelectTrigger>
@@ -70,7 +87,10 @@ export function SQLLiteralInput({
       );
     case "is":
       return (
-        <Select value={value || undefined} onValueChange={onValueChange}>
+        <Select
+          value={(value as string) || undefined}
+          onValueChange={onValueChange}
+        >
           <SelectTrigger autoFocus={autoFocus}>
             <SelectValue placeholder={"Select a value..."} />
           </SelectTrigger>
@@ -102,13 +122,10 @@ export function SQLLiteralInput({
       return (
         <XSBSQLForeignKeySearchInput
           value={value}
-          onValueChange={onValueChange}
+          onValueChange={(value) => onValueChange?.(value)}
           relation={config.relation}
-          // TODO:
-          // xsb project id
-          supabase_project_id={0}
-          // same schema
-          supabase_schema_name={""}
+          supabase_project_id={supabase.supabase_project_id}
+          supabase_schema_name={supabase.supabase_schema_name}
         />
       );
     case "json":

@@ -11,16 +11,16 @@ import {
   TableViews,
 } from "@/scaffolds/grid-editor/components";
 import * as GridLayout from "@/scaffolds/grid-editor/components/layout";
-import { ReferenceTableGrid } from "@/scaffolds/grid/reference-grid";
+import { XSBReferenceTableGrid } from "@/scaffolds/grid/reference-grid";
 import { GridaXSupabase } from "@/types";
 import { EditorApiResponse } from "@/types/private/api";
-import { priority_sorter } from "@/utils/sort";
 import { useEffect, useMemo } from "react";
 import { CurrentTable } from "@/scaffolds/editor/utils/switch-table";
 import { GridData } from "@/scaffolds/grid-editor/grid-data";
 import { EditorSymbols } from "@/scaffolds/editor/symbols";
 import { XPostgrestQuery } from "@/lib/supabase-postgrest/builder";
 import useSWR from "swr";
+import { GridDataXSBUnknown } from "@/scaffolds/grid-editor/grid-data-xsb-unknow";
 
 export default function XTablePage() {
   const [state, dispatch] = useEditorState();
@@ -72,20 +72,11 @@ export default function XTablePage() {
     });
   }, [dispatch, isLoading, isValidating]);
 
-  const sort_by_priorities = priority_sorter(
-    GridaXSupabase.unknown_table_column_priorities
-  );
-
   const columns = useMemo(
     () =>
-      Object.keys(GridaXSupabase.SupabaseUserJsonSchema.properties)
-        .sort(sort_by_priorities)
-        .map((key) => {
-          return {
-            key: key,
-            name: key,
-          };
-        }),
+      GridDataXSBUnknown.columns(GridaXSupabase.SupabaseUserJsonSchema, {
+        sort: "unknown_table_column_priorities",
+      }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   );
@@ -115,7 +106,7 @@ export default function XTablePage() {
           </GridLayout.HeaderMenus>
         </GridLayout.Header>
         <GridLayout.Content>
-          <ReferenceTableGrid
+          <XSBReferenceTableGrid
             masked={state.datagrid_local_filter.masking_enabled}
             tokens={
               state.datagrid_local_filter.localsearch
