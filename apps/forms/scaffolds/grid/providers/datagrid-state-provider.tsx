@@ -9,7 +9,7 @@ type State = {
 
 const Context = React.createContext<State | null>(null);
 
-export function DataGridMultiplayerProvider({
+export function DataGridStateProvider({
   children,
   local_cursor_id,
   selections,
@@ -17,11 +17,6 @@ export function DataGridMultiplayerProvider({
   local_cursor_id: string;
   selections: Array<DataGridCellSelectionCursor>;
 }>) {
-  // const contextValue = useMemo(
-  //   () => (),
-  //   [local_cursor_id, selections]
-  // );
-
   return (
     <Context.Provider
       value={{

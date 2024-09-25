@@ -273,34 +273,23 @@ function useXSBTableFeed(
   const [state, dispatch] = useEditorState();
   const enabled = !!sb_table_id;
 
-  const {
-    datagrid_page_limit,
-    datagrid_page_index,
-    datagrid_table_refresh_key,
-    datagrid_orderby,
-    datagrid_predicates,
-  } = state;
+  const { datagrid_query } = state;
 
   const serachParams = useMemo(() => {
+    if (!datagrid_query) return;
     const search = XPostgrestQuery.QS.select({
-      limit: datagrid_page_limit,
-      order: datagrid_orderby,
+      limit: datagrid_query.q_page_limit,
+      order: datagrid_query.q_orderby,
       range: {
-        from: datagrid_page_index * datagrid_page_limit,
-        to: (datagrid_page_index + 1) * datagrid_page_limit - 1,
+        from: datagrid_query.q_page_index * datagrid_query.q_page_limit,
+        to: (datagrid_query.q_page_index + 1) * datagrid_query.q_page_limit - 1,
       },
       // only pass predicates with value set
-      filters: datagrid_predicates.filter((p) => p.value ?? false),
+      filters: datagrid_query.q_predicates.filter((p) => p.value ?? false),
     });
-    search.set("r", datagrid_table_refresh_key.toString());
+    search.set("r", datagrid_query.q_refresh_key.toString());
     return search;
-  }, [
-    datagrid_page_limit,
-    datagrid_page_index,
-    datagrid_orderby,
-    datagrid_predicates,
-    datagrid_table_refresh_key,
-  ]);
+  }, [datagrid_query]);
 
   const request = sb_table_id
     ? PrivateEditorApi.XSupabase.url_table_x_query(
@@ -464,14 +453,7 @@ export function FormResponseFeedProvider({
 }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
 
-  const {
-    form,
-    datagrid_table_id,
-    datagrid_page_limit,
-    datagrid_page_index,
-    datagrid_table_refresh_key,
-    tablespace,
-  } = state;
+  const { form, datagrid_table_id, datagrid_query, tablespace } = state;
 
   const { realtime: _realtime_responses_enabled } =
     tablespace[EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID];
@@ -490,11 +472,13 @@ export function FormResponseFeedProvider({
       return;
     }
 
+    if (!datagrid_query) return;
+
     setLoading(true);
     const feed = fetchResponses({
       range: {
-        from: datagrid_page_index * datagrid_page_limit,
-        to: (datagrid_page_index + 1) * datagrid_page_limit - 1,
+        from: datagrid_query.q_page_index * datagrid_query.q_page_limit,
+        to: (datagrid_query.q_page_index + 1) * datagrid_query.q_page_limit - 1,
       },
     }).then(({ data, count }) => {
       dispatch({
@@ -515,15 +499,7 @@ export function FormResponseFeedProvider({
       .finally(() => {
         setLoading(false);
       });
-  }, [
-    dispatch,
-    fetchResponses,
-    setLoading,
-    datagrid_page_limit,
-    datagrid_page_index,
-    datagrid_table_id,
-    datagrid_table_refresh_key,
-  ]);
+  }, [dispatch, fetchResponses, setLoading, datagrid_query, datagrid_table_id]);
 
   useSubscription({
     table: "response",
@@ -582,14 +558,7 @@ export function FormResponseSessionFeedProvider({
 }>) {
   const [state, dispatch] = useEditorState();
 
-  const {
-    form,
-    datagrid_table_id,
-    datagrid_page_limit,
-    datagrid_page_index,
-    datagrid_table_refresh_key,
-    tablespace,
-  } = state;
+  const { form, datagrid_table_id, datagrid_query, tablespace } = state;
 
   const { realtime: _realtime_sessions_enabled } =
     tablespace[EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID];
@@ -608,12 +577,14 @@ export function FormResponseSessionFeedProvider({
       return;
     }
 
+    if (!datagrid_query) return;
+
     setLoading(true);
 
     const feed = fetchResponseSessions({
       range: {
-        from: datagrid_page_index * datagrid_page_limit,
-        to: (datagrid_page_index + 1) * datagrid_page_limit - 1,
+        from: datagrid_query.q_page_index * datagrid_query.q_page_limit,
+        to: (datagrid_query.q_page_index + 1) * datagrid_query.q_page_limit - 1,
       },
     }).then(({ data, count }) => {
       dispatch({
@@ -638,9 +609,7 @@ export function FormResponseSessionFeedProvider({
     fetchResponseSessions,
     setLoading,
     datagrid_table_id,
-    datagrid_page_limit,
-    datagrid_page_index,
-    datagrid_table_refresh_key,
+    datagrid_query,
   ]);
 
   useSubscription({
@@ -674,8 +643,7 @@ export function CustomerFeedProvider({
   const {
     project: { id: project_id },
     datagrid_table_id,
-    datagrid_page_limit: datagrid_rows_per_page,
-    datagrid_table_refresh_key,
+    datagrid_query,
   } = state;
 
   const client = useMemo(() => createClientWorkspaceClient(), []);
@@ -686,12 +654,14 @@ export function CustomerFeedProvider({
     if (datagrid_table_id !== EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID)
       return;
 
+    if (!datagrid_query) return;
+
     setLoading(true);
     client
       .from("customer")
       .select()
       .order("last_seen_at", { ascending: false })
-      .limit(datagrid_rows_per_page)
+      .limit(datagrid_query?.q_page_limit)
       .eq("project_id", project_id)
       .then(({ data, error }) => {
         setLoading(false);
@@ -706,9 +676,8 @@ export function CustomerFeedProvider({
     dispatch,
     setLoading,
     datagrid_table_id,
-    datagrid_rows_per_page,
+    datagrid_query,
     project_id,
-    datagrid_table_refresh_key,
     client,
   ]);
 
@@ -836,12 +805,7 @@ export function GridaSchemaTableFeedProvider({
 }>) {
   const [state, dispatch] = useEditorState();
 
-  const {
-    datagrid_page_limit,
-    datagrid_page_index,
-    datagrid_table_refresh_key,
-    tablespace,
-  } = state;
+  const { datagrid_query, tablespace } = state;
 
   const { realtime: _realtime_responses_enabled } = tablespace[table_id];
 
@@ -853,11 +817,13 @@ export function GridaSchemaTableFeedProvider({
 
   useEffect(() => {
     if (typeof table_id !== "string") return;
+    if (!datagrid_query) return;
+
     setLoading(true);
     const feed = fetchTableRows({
       range: {
-        from: datagrid_page_index * datagrid_page_limit,
-        to: (datagrid_page_index + 1) * datagrid_page_limit - 1,
+        from: datagrid_query.q_page_index * datagrid_query.q_page_limit,
+        to: (datagrid_query.q_page_index + 1) * datagrid_query.q_page_limit - 1,
       },
     }).then(({ data, count }) => {
       dispatch({
@@ -878,15 +844,7 @@ export function GridaSchemaTableFeedProvider({
       .finally(() => {
         setLoading(false);
       });
-  }, [
-    dispatch,
-    fetchTableRows,
-    setLoading,
-    table_id,
-    datagrid_page_limit,
-    datagrid_page_index,
-    datagrid_table_refresh_key,
-  ]);
+  }, [dispatch, fetchTableRows, setLoading, table_id, datagrid_query]);
 
   useSubscription({
     table: "response",

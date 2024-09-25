@@ -25,24 +25,19 @@ import { GridDataXSBUnknown } from "@/scaffolds/grid-editor/grid-data-xsb-unknow
 export default function XTablePage() {
   const [state, dispatch] = useEditorState();
 
-  const {
-    supabase_project,
-    datagrid_page_limit,
-    datagrid_orderby,
-    datagrid_table_refresh_key,
-    datagrid_isloading,
-  } = state;
+  const { supabase_project, datagrid_isloading, datagrid_query } = state;
 
   const serachParams = useMemo(() => {
+    if (!datagrid_query) return;
     const search = XPostgrestQuery.QS.select({
-      limit: datagrid_page_limit,
-      order: datagrid_orderby,
+      limit: datagrid_query?.q_page_limit,
+      order: datagrid_query?.q_orderby,
       // cannot apply filter to auth.users
       filters: undefined,
     });
-    search.set("r", datagrid_table_refresh_key.toString());
+    search.set("r", datagrid_query?.q_refresh_key?.toString());
     return search;
-  }, [datagrid_page_limit, datagrid_orderby, datagrid_table_refresh_key]);
+  }, [datagrid_query]);
 
   const request = supabase_project
     ? PrivateEditorApi.XSupabase.url_x_auth_users_get(

@@ -86,17 +86,19 @@ export function initialDatagridState(
 ): Omit<IDataGridState, "datagrid_table_id"> {
   const cleared: Omit<IDataGridState, "datagrid_table_id"> = {
     datagrid_selected_rows: new Set(),
-    datagrid_page_limit: 100,
+    datagrid_query: {
+      q_page_limit: 100,
+      q_page_index: 0,
+      q_refresh_key: 0,
+      q_orderby: {},
+      q_predicates: [],
+    },
     datagrid_query_estimated_count: null,
-    datagrid_page_index: 0,
-    datagrid_table_refresh_key: 0,
     datagrid_isloading: false,
     datagrid_local_filter: {
       masking_enabled: false,
       empty_data_hidden: true,
     },
-    datagrid_orderby: {},
-    datagrid_predicates: [],
     datagrid_selected_cell: null,
   };
 
@@ -108,8 +110,11 @@ export function initialDatagridState(
     if (pref) {
       return {
         ...cleared,
-        datagrid_predicates: pref.predicates || [],
-        datagrid_orderby: pref.orderby || {},
+        datagrid_query: {
+          ...cleared.datagrid_query!,
+          q_predicates: pref.predicates || [],
+          q_orderby: pref.orderby || {},
+        },
       };
     }
   }

@@ -3,23 +3,22 @@ import { Input } from "@/components/ui/input";
 import { WorkbenchUI } from "@/components/workbench";
 import { useEditorState } from "@/scaffolds/editor";
 import { ArrowLeftIcon, ArrowRightIcon } from "@radix-ui/react-icons";
+import assert from "assert";
 import { useCallback } from "react";
 
 function useDatagridPagination() {
-  //
   const [state, dispatch] = useEditorState();
-  const {
-    datagrid_page_index,
-    datagrid_page_limit,
-    datagrid_query_estimated_count,
-  } = state;
+  const { datagrid_query, datagrid_query_estimated_count } = state;
+
+  assert(datagrid_query);
+  const { q_page_index, q_page_limit } = datagrid_query;
 
   const min = 0;
   const max =
-    Math.ceil((datagrid_query_estimated_count ?? 0) / datagrid_page_limit) - 1;
+    Math.ceil((datagrid_query_estimated_count ?? 0) / q_page_limit) - 1;
 
-  const hasprev = datagrid_page_index > min;
-  const hasnext = datagrid_page_index < max;
+  const hasprev = q_page_index > min;
+  const hasnext = q_page_index < max;
 
   const paginate = useCallback(
     (index: number) => {
@@ -29,15 +28,15 @@ function useDatagridPagination() {
   );
 
   const prev = useCallback(() => {
-    paginate(datagrid_page_index - 1);
-  }, [datagrid_page_index, paginate]);
+    paginate(q_page_index - 1);
+  }, [q_page_index, paginate]);
 
   const next = useCallback(() => {
-    paginate(datagrid_page_index + 1);
-  }, [datagrid_page_index, paginate]);
+    paginate(q_page_index + 1);
+  }, [q_page_index, paginate]);
 
   return {
-    page: datagrid_page_index,
+    page: q_page_index,
     min,
     max,
     hasprev,

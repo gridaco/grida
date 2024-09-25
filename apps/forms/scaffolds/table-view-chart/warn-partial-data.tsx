@@ -48,7 +48,7 @@ export function ChartPartialDataAlert({
       <AlertDescription className="text-muted-foreground text-xs">
         This chart shows a subset of data. You can load up to 1000 rows per
         page. For better accuracy, apply filters to refine the chart.
-        {state.datagrid_page_limit < 1000 && (
+        {(state.datagrid_query?.q_page_limit ?? 0) < 1000 && (
           <div className="pt-4">
             <Button variant="outline" size="xs" onClick={onLoadMax}>
               Load 1,000

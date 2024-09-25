@@ -9,6 +9,7 @@ import type {
   GDocSchemaTableProviderXSupabase,
 } from "@/scaffolds/editor/state";
 import type { SQLPredicate } from "@/types";
+import assert from "assert";
 
 export function useDatagridTable<T extends GDocTable>():
   | Extract<GDocTable, T>
@@ -35,7 +36,10 @@ export function useDatagridTableSpace() {
 export function useDataGridOrderby() {
   const [state, dispatch] = useEditorState();
 
-  const { datagrid_orderby } = state;
+  const { datagrid_query } = state;
+  assert(datagrid_query);
+
+  const { q_orderby } = datagrid_query;
 
   const table = useDatagridTable<
     GDocFormsXSBTable | GDocSchemaTableProviderXSupabase
@@ -44,10 +48,10 @@ export function useDataGridOrderby() {
   const properties =
     table?.x_sb_main_table_connection.sb_table_schema.properties ?? {};
 
-  const isset = Object.keys(datagrid_orderby).length > 0;
+  const isset = Object.keys(q_orderby).length > 0;
 
   const keys = Object.keys(properties);
-  const usedkeys = Object.keys(datagrid_orderby);
+  const usedkeys = Object.keys(q_orderby);
   const unusedkeys = keys.filter((key) => !usedkeys.includes(key));
 
   const onClear = useCallback(() => {
@@ -89,7 +93,7 @@ export function useDataGridOrderby() {
 
   return {
     table,
-    orderby: datagrid_orderby,
+    orderby: q_orderby,
     isset,
     properties,
     usedkeys,
@@ -113,9 +117,12 @@ export function useDataGridPredicates() {
 
   const attributes = Object.keys(properties);
 
-  const { datagrid_predicates: predicates } = state;
+  const { datagrid_query } = state;
+  assert(datagrid_query);
 
-  const isset = predicates.length > 0;
+  const { q_predicates } = datagrid_query;
+
+  const isset = q_predicates.length > 0;
 
   const add = useCallback(
     (predicate: SQLPredicate) => {
@@ -159,7 +166,7 @@ export function useDataGridPredicates() {
     isset,
     properties,
     attributes,
-    predicates,
+    predicates: q_predicates,
     add,
     update,
     remove,

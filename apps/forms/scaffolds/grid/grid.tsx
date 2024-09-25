@@ -59,7 +59,7 @@ import { EmptyRowsRenderer } from "./grid-empty-state";
 import { cn } from "@/utils";
 import "./grid.css";
 import {
-  DataGridMultiplayerProvider,
+  DataGridStateProvider,
   useCellRootProps,
   useMasking,
 } from "./providers";
@@ -234,7 +234,7 @@ export function DataGrid({
   };
 
   return (
-    <DataGridMultiplayerProvider
+    <DataGridStateProvider
       local_cursor_id={local_cursor_id}
       selections={selectedCells ?? []}
     >
@@ -292,7 +292,7 @@ export function DataGrid({
           }}
         />
       </CreateNewAttributeProvider>
-    </DataGridMultiplayerProvider>
+    </DataGridStateProvider>
   );
 }
 
