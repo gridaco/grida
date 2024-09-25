@@ -26,13 +26,17 @@ import {
   GridQueryPaginationControl,
   DataQueryOrderByMenu,
   DataQueryOrderbyMenuTriggerButton,
+  DataQueryPredicatesMenu,
+  DataQueryPredicatesMenuTriggerButton,
 } from "@/scaffolds/grid-editor/components";
 import { WorkbenchUI } from "@/components/workbench";
 import {
+  SchemaNameProvider,
   StandaloneDataQueryProvider,
   useStandaloneSchemaDataQuery,
 } from "@/scaffolds/data-query";
 import { Data } from "@/lib/data";
+import toast from "react-hot-toast";
 
 interface ISQLForeignKeyRelation {
   referenced_column: string;
@@ -121,19 +125,22 @@ function XSBSearchTableSheet({
             </code>
           </SheetDescription>
         </SheetHeader>
-        <StandaloneDataQueryProvider
-          initial={Data.Relation.INITIAL_QUERY_STATE}
-        >
-          <XSBSearchTableDataGrid
-            supabase_project_id={supabase_project_id}
-            supabase_schema_name={supabase_schema_name}
-            supabase_table_name={relation.referenced_table}
-            onRowDoubleClick={(row) => {
-              onValueChange?.(row[relation.referenced_column]);
-              props.onOpenChange?.(false);
-            }}
-          />
-        </StandaloneDataQueryProvider>
+        <hr />
+        <SchemaNameProvider schema={supabase_schema_name}>
+          <StandaloneDataQueryProvider
+            initial={Data.Relation.INITIAL_QUERY_STATE}
+          >
+            <XSBSearchTableDataGrid
+              supabase_project_id={supabase_project_id}
+              supabase_schema_name={supabase_schema_name}
+              supabase_table_name={relation.referenced_table}
+              onRowDoubleClick={(row) => {
+                onValueChange?.(row[relation.referenced_column]);
+                props.onOpenChange?.(false);
+              }}
+            />
+          </StandaloneDataQueryProvider>
+        </SchemaNameProvider>
       </SheetContent>
     </Sheet>
   );
@@ -207,12 +214,24 @@ function XSBSearchTableDataGrid({
     if (data?.meta?.table_schema) setSchema(data?.meta?.table_schema);
   }, [data?.meta?.table_schema]);
 
+  useEffect(() => {
+    if (data?.error) {
+      console.error(data.error.message);
+      toast.error(data.error.message);
+    }
+  }, [data?.error]);
+
   return (
     <GridLayout.Root>
       <GridLayout.Header>
         <GridLayout.HeaderLine>
           <GridLayout.HeaderMenus>
             <GridLayout.HeaderMenuItems>
+              <DataQueryPredicatesMenu {...query}>
+                <DataQueryPredicatesMenuTriggerButton
+                  active={query.isPredicatesSet}
+                />
+              </DataQueryPredicatesMenu>
               <DataQueryOrderByMenu {...query}>
                 <DataQueryOrderbyMenuTriggerButton
                   active={query.isOrderbySet}

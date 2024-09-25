@@ -25,7 +25,7 @@ import { operator_labels, supported_operators } from "../../k";
 import { useDebounce } from "@uidotdev/usehooks";
 import { QueryChip } from "../ui/chip";
 import { GridaXSupabaseTypeMap } from "@/lib/x-supabase/typemap";
-import { useDataGridQuery, useEditorState } from "@/scaffolds/editor/use";
+import { useEditorState } from "@/scaffolds/editor/use";
 import {
   SQLLiteralInputValue,
   XSBSQLLiteralInput,
@@ -40,12 +40,23 @@ import {
 } from "@radix-ui/react-icons";
 import { PopoverClose } from "@radix-ui/react-popover";
 import { WorkbenchUI } from "@/components/workbench";
+import { Data } from "@/lib/data";
+import {
+  useSchemaName,
+  type IDataQueryPredicatesConsumer,
+} from "@/scaffolds/data-query";
+
+type IDataQueryPredicatesConsumerWithProperties =
+  IDataQueryPredicatesConsumer & {
+    keys: string[];
+    properties: Data.Relation.Schema["properties"];
+  };
 
 export function DataQueryPredicatesMenu({
   children,
-}: React.PropsWithChildren<{}>) {
+  ...props
+}: React.PropsWithChildren<IDataQueryPredicatesConsumerWithProperties>) {
   const {
-    table,
     isPredicatesSet: isset,
     keys: attributes,
     properties,
@@ -53,10 +64,17 @@ export function DataQueryPredicatesMenu({
     onPredicatesRemove: onRemove,
     onPredicatesUpdate: onUpdate,
     onPredicatesClear: onClear,
-  } = useDataGridQuery();
+  } = props;
+
+  const schema_name = useSchemaName();
+
+  const [state] = useEditorState();
+  const { supabase_project } = state;
 
   if (!isset) {
-    return <DataQueryPrediateAddMenu>{children}</DataQueryPrediateAddMenu>;
+    return (
+      <DataQueryPrediateAddMenu {...props}>{children}</DataQueryPrediateAddMenu>
+    );
   }
 
   return (
@@ -128,15 +146,11 @@ export function DataQueryPredicatesMenu({
                         </Select>
                       </div>
                       <div className="flex-1">
-                        {table?.x_sb_main_table_connection ? (
+                        {supabase_project ? (
                           <XSBSQLLiteralInput
                             supabase={{
-                              supabase_project_id:
-                                table?.x_sb_main_table_connection
-                                  .supabase_project_id,
-                              supabase_schema_name:
-                                table?.x_sb_main_table_connection
-                                  .sb_schema_name,
+                              supabase_project_id: supabase_project.id,
+                              supabase_schema_name: schema_name,
                             }}
                             config={
                               q.op === "is"
@@ -179,7 +193,7 @@ export function DataQueryPredicatesMenu({
             </div>
           </section>
           <section>
-            <DataQueryPrediateAddMenu asChild>
+            <DataQueryPrediateAddMenu asChild {...props}>
               <Button
                 variant="ghost"
                 size="sm"
@@ -212,12 +226,11 @@ export function DataQueryPredicatesMenu({
 export function DataQueryPrediateAddMenu({
   asChild,
   children,
-}: React.PropsWithChildren<{ asChild?: boolean }>) {
-  const {
-    keys: attributes,
-    properties,
-    onPredicatesAdd: onAdd,
-  } = useDataGridQuery();
+  ...props
+}: React.PropsWithChildren<
+  IDataQueryPredicatesConsumerWithProperties & { asChild?: boolean }
+>) {
+  const { keys: attributes, properties, onPredicatesAdd: onAdd } = props;
 
   return (
     <DropdownMenu>
@@ -252,14 +265,17 @@ export function DataQueryPrediateAddMenu({
   );
 }
 
-export function DataQueryPredicateChip({ index }: { index: number }) {
-  const {
-    table,
-    properties,
-    predicates,
-    onPredicatesRemove,
-    onPredicatesUpdate,
-  } = useDataGridQuery();
+export function DataQueryPredicateChip({
+  index,
+  ...props
+}: IDataQueryPredicatesConsumerWithProperties & { index: number }) {
+  const { properties, predicates, onPredicatesRemove, onPredicatesUpdate } =
+    props;
+
+  const schema_name = useSchemaName();
+
+  const [state] = useEditorState();
+  const { supabase_project } = state;
 
   const predicate = predicates[index];
 
@@ -344,13 +360,11 @@ export function DataQueryPredicateChip({ index }: { index: number }) {
             <TrashIcon className="w-3 h-3" />
           </Button>
         </div>
-        {table?.x_sb_main_table_connection ? (
+        {supabase_project ? (
           <XSBSQLLiteralInput
             supabase={{
-              supabase_project_id:
-                table?.x_sb_main_table_connection.supabase_project_id,
-              supabase_schema_name:
-                table?.x_sb_main_table_connection.sb_schema_name,
+              supabase_project_id: supabase_project.id,
+              supabase_schema_name: schema_name,
             }}
             config={
               predicate.op === "is"

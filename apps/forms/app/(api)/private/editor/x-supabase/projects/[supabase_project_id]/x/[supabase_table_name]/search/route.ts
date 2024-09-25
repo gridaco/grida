@@ -54,6 +54,10 @@ export async function GET(req: NextRequest, context: Context) {
 
   const res = await query.done();
 
+  if (res.error) {
+    console.error("failed to fetch data", res.error);
+  }
+
   return NextResponse.json({
     ...res,
     meta: {
