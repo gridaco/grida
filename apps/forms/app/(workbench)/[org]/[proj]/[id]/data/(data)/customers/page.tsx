@@ -1,6 +1,6 @@
 "use client";
 
-import { CustomerGrid } from "@/scaffolds/grid/customer-grid";
+import { CustomerGrid } from "@/scaffolds/grid/wellknown/customer-grid";
 import { provisional } from "@/services/customer/utils";
 import {
   GridLimit,
