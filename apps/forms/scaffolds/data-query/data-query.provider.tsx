@@ -13,11 +13,15 @@ import type {
   DataQueryOrderbyRemoveAllDispatcher,
   DataQueryOrderbyRemoveDispatcher,
   DataQueryOrderbyUpdateDispatcher,
+  DataQueryPaginationIndexDispatcher,
   DataQueryPaginationLimitDispatcher,
   DataQueryPredicateAddDispatcher,
   DataQueryPredicateRemoveAllDispatcher,
   DataQueryPredicateRemoveDispatcher,
   DataQueryPredicateUpdateDispatcher,
+  IDataQueryOrderbyConsumer,
+  IDataQueryPaginationConsumer,
+  IDataQueryPredicatesConsumer,
 } from "./data-query.type";
 import reducer from "./data-query.reducer";
 
@@ -78,21 +82,28 @@ export function useStandaloneDataQuery() {
 
 export function useStandaloneSchemaDataQuery(
   schema: Data.Relation.Schema | null
-) {
+): SchemaDataQueryConsumerReturnType {
   const standalone = useStandaloneDataQuery();
   return useStandaloneSchemaDataQueryConsumer(standalone, schema);
 }
 
+type SchemaDataQueryConsumerReturnType = DataQueryState &
+  IDataQueryOrderbyConsumer &
+  IDataQueryPredicatesConsumer &
+  IDataQueryPaginationConsumer & {
+    keys: string[];
+    properties: Data.Relation.Schema["properties"];
+  };
+
 export function useStandaloneSchemaDataQueryConsumer(
   [state, dispatch]: readonly [DataQueryState, Dispatcher],
   schema: Data.Relation.Schema | null
-) {
-  // const orderby = useDataQueryOrderbyConsumer(standalone, schema);
-  // const predicates = useDataQueryPredicatesConsumer(standalone, schema);
+): SchemaDataQueryConsumerReturnType {
+  const { q_orderby, q_predicates } = state;
   const properties = schema?.properties || {};
-
   const keys = Object.keys(properties);
 
+  // #region pagination
   const onLimit: DataQueryPaginationLimitDispatcher = useCallback(
     (limit: number) => {
       dispatch({ type: "data/query/page-limit", limit });
@@ -100,7 +111,13 @@ export function useStandaloneSchemaDataQueryConsumer(
     [dispatch]
   );
 
-  const { q_orderby, q_predicates } = state;
+  const onPaginate: DataQueryPaginationIndexDispatcher = useCallback(
+    (index: number) => {
+      dispatch({ type: "data/query/page-index", index });
+    },
+    [dispatch]
+  );
+  // #region pagination
 
   // #region orderby
   const isOrderbySet = Object.keys(q_orderby).length > 0;
@@ -197,7 +214,9 @@ export function useStandaloneSchemaDataQueryConsumer(
       ...state,
       properties,
       keys,
+      //
       onLimit,
+      onPaginate,
       //
       orderby: q_orderby,
       isOrderbySet,
@@ -222,6 +241,7 @@ export function useStandaloneSchemaDataQueryConsumer(
       keys,
       //
       onLimit,
+      onPaginate,
       //
       q_orderby,
       isOrderbySet,

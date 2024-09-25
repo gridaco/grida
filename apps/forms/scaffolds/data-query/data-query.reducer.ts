@@ -43,7 +43,8 @@ export default function reducer(
 
         draft.q_orderby[column_id] = {
           column: column_id,
-          ...data,
+          ascending: data.ascending ?? true,
+          nullsFirst: data.nullsFirst,
         };
       });
     }

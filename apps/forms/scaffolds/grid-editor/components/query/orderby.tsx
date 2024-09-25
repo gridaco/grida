@@ -24,6 +24,12 @@ import { WorkbenchUI } from "@/components/workbench";
 import { ArrowDownIcon, ArrowDownUpIcon, ArrowUpIcon } from "lucide-react";
 import { useDataGridQuery } from "@/scaffolds/editor/use";
 import { QueryChip } from "../ui/chip";
+import type { IDataQueryOrderbyConsumer } from "@/scaffolds/data-query";
+import { Data } from "@/lib/data";
+
+type IDataQueryOrderbyConsumerWithProperties = IDataQueryOrderbyConsumer & {
+  properties: Data.Relation.Schema["properties"];
+};
 
 type SortIconType = "up" | "down" | "mixed";
 function SortIcon({
@@ -50,19 +56,23 @@ function SortIcon({
  */
 export function DataQueryOrderByMenu({
   children,
-}: React.PropsWithChildren<{}>) {
+  ...props
+}: React.PropsWithChildren<IDataQueryOrderbyConsumerWithProperties>) {
   const {
     orderby,
     isOrderbySet: isset,
-    properties,
     orderbyUsedKeys: usedkeys,
     onOrderbyClear: onClear,
     onOrderbyUpdate: onUpdate,
     onOrderbyRemove: onRemove,
-  } = useDataGridQuery();
+    //
+    properties,
+  } = props;
 
   if (!isset) {
-    return <DataQueryAddOrderbyMenu>{children}</DataQueryAddOrderbyMenu>;
+    return (
+      <DataQueryAddOrderbyMenu {...props}>{children}</DataQueryAddOrderbyMenu>
+    );
   }
 
   return (
@@ -129,7 +139,9 @@ export function DataQueryOrderByMenu({
                     size="icon"
                     variant="ghost"
                     className="w-6 h-6"
-                    onClick={() => onRemove(col)}
+                    onClick={() => {
+                      onRemove(col);
+                    }}
                   >
                     <TrashIcon className="w-3 h-3" />
                   </Button>
@@ -139,7 +151,7 @@ export function DataQueryOrderByMenu({
           </div>
         </section>
         <section className="flex flex-col">
-          <DataQueryAddOrderbyMenu asChild>
+          <DataQueryAddOrderbyMenu asChild {...props}>
             <Button variant="ghost" size="sm" className="flex justify-start">
               <PlusIcon className="w-4 h-4 me-2 align-middle" /> Pick a column
               to sort by
@@ -166,7 +178,9 @@ export function DataQueryOrderByMenu({
 function DataQueryAddOrderbyMenu({
   asChild,
   children,
-}: React.PropsWithChildren<{ asChild?: boolean }>) {
+}: React.PropsWithChildren<
+  IDataQueryOrderbyConsumerWithProperties & { asChild?: boolean }
+>) {
   const {
     properties,
     orderbyUnusedKeys: unusedkeys,
@@ -190,8 +204,10 @@ function DataQueryAddOrderbyMenu({
   );
 }
 
-export function DataQueryOrderbyChip() {
-  const { orderby, isOrderbySet: isset } = useDataGridQuery();
+export function DataQueryOrderbyChip(
+  props: IDataQueryOrderbyConsumerWithProperties
+) {
+  const { orderby, isOrderbySet: isset } = props;
 
   const length = Object.keys(orderby).length;
   const multiple = length > 1;
@@ -204,7 +220,7 @@ export function DataQueryOrderbyChip() {
       : "down";
 
   return (
-    <DataQueryOrderByMenu>
+    <DataQueryOrderByMenu {...props}>
       <QueryChip active={isset}>
         <SortIcon type={icon} className="w-3 h-3 me-1" />
         {multiple ? <>{length} sorts</> : <>{first.column}</>}

@@ -504,8 +504,8 @@ function GridaFormsResponsesExportCSV() {
 
 function TableQueryToggles() {
   const tb = useDatagridTable();
-  const { predicates, orderby, isPredicatesSet, isOrderbySet } =
-    useDataGridQuery();
+  const query = useDataGridQuery();
+  const { isPredicatesSet, isOrderbySet } = query;
   if (!tb) return <></>;
 
   return (
@@ -516,7 +516,7 @@ function TableQueryToggles() {
           <DataQueryPredicatesMenu>
             <DataGridPredicatesMenuTriggerButton active={isPredicatesSet} />
           </DataQueryPredicatesMenu>
-          <DataQueryOrderByMenu>
+          <DataQueryOrderByMenu {...query}>
             <DataGridQueryOrderbyMenuTriggerButton active={isOrderbySet} />
           </DataQueryOrderByMenu>
         </>
@@ -527,13 +527,14 @@ function TableQueryToggles() {
 
 function TableQueryChips() {
   const [state] = useEditorState();
-  const { predicates, orderby, isOrderbySet } = useDataGridQuery();
+  const query = useDataGridQuery();
+  const { predicates, orderby, isOrderbySet } = query;
 
   return (
     <div className="flex gap-2">
       {isOrderbySet && (
         <>
-          <DataQueryOrderbyChip />
+          <DataQueryOrderbyChip {...query} />
           <GridLayout.HeaderSeparator />
         </>
       )}
