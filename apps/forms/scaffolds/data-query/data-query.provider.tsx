@@ -44,7 +44,10 @@ const useDispatch = (): Dispatcher => {
 export function StandaloneDataQueryProvider({
   initial,
   children,
-}: React.PropsWithChildren<{ initial: DataQueryState }>) {
+}: React.PropsWithChildren<{
+  initial: DataQueryState;
+  onChange?: (query: DataQueryState) => void;
+}>) {
   const [state, dispatch] = useReducer(reducer, initial);
 
   return (
@@ -120,11 +123,11 @@ export function useDataQueryOrderbyConsumer(
   }, [dispatch]);
 
   const onAdd: DataQueryOrderbyAddDispatcher = useCallback(
-    (column_id: string) => {
+    (column_id: string, initial?: Partial<Omit<SQLOrderBy, "column">>) => {
       dispatch({
         type: "data/query/orderby",
         column_id: column_id,
-        data: {},
+        data: initial ?? {},
       });
     },
     [dispatch]
@@ -144,9 +147,8 @@ export function useDataQueryOrderbyConsumer(
   const onRemove: DataQueryOrderbyRemoveDispatcher = useCallback(
     (column_id: string) => {
       dispatch({
-        type: "data/query/orderby",
+        type: "data/query/orderby/remove",
         column_id: column_id,
-        data: null,
       });
     },
     [dispatch]

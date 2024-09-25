@@ -4,12 +4,13 @@ import type {
   DataQueryAction,
   DataQueryPageLimitAction,
   DataQueryPaginateAction,
-  DataQueryOrderByAction,
+  DataQueryOrderByUpsertAction,
   DataQueryOrderByClearAction,
   DataQueryPredicatesAddAction,
   DataQueryPredicatesUpdateAction,
   DataQueryPredicatesClearAction,
   DataQueryPredicatesRemoveAction,
+  DataQueryOrderByRemoveAction,
 } from "./data-query.action";
 
 export default function reducer(
@@ -33,7 +34,7 @@ export default function reducer(
       });
     }
     case "data/query/orderby": {
-      const { column_id, data } = <DataQueryOrderByAction>action;
+      const { column_id, data } = <DataQueryOrderByUpsertAction>action;
       return produce(state, (draft) => {
         if (data === null) {
           delete draft.q_orderby[column_id];
@@ -44,6 +45,13 @@ export default function reducer(
           column: column_id,
           ...data,
         };
+      });
+    }
+    case "data/query/orderby/remove": {
+      const { column_id } = <DataQueryOrderByRemoveAction>action;
+      return produce(state, (draft) => {
+        delete draft.q_orderby[column_id];
+        return;
       });
     }
     case "data/query/orderby/clear": {

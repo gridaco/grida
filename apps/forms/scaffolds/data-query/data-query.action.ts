@@ -3,7 +3,8 @@ import type { SQLOrderBy, SQLPredicate } from "@/types";
 export type DataQueryAction =
   | DataQueryPageLimitAction
   | DataQueryPaginateAction
-  | DataQueryOrderByAction
+  | DataQueryOrderByUpsertAction
+  | DataQueryOrderByRemoveAction
   | DataQueryOrderByClearAction
   | DataQueryPredicatesAddAction
   | DataQueryPredicatesUpdateAction
@@ -22,10 +23,15 @@ export interface DataQueryPaginateAction {
 }
 // #endregion pagination
 
-export interface DataQueryOrderByAction {
+export interface DataQueryOrderByUpsertAction {
   type: "data/query/orderby";
   column_id: string;
-  data: Omit<SQLOrderBy, "column"> | null;
+  data: Omit<SQLOrderBy, "column">;
+}
+
+export interface DataQueryOrderByRemoveAction {
+  type: "data/query/orderby/remove";
+  column_id: string;
 }
 
 export interface DataQueryOrderByClearAction {

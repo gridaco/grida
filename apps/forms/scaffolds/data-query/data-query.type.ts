@@ -14,7 +14,7 @@ export type DataQueryPaginationNextDispatcher = () => void;
 //
 export type DataQueryOrderbyAddDispatcher = (
   column: string,
-  initial?: Partial<Omit<SQLOrderBy, "column"> | null>
+  initial?: Partial<Omit<SQLOrderBy, "column">>
 ) => void;
 export type DataQueryOrderbyUpdateDispatcher = (
   column: string,
