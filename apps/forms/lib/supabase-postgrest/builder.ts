@@ -6,6 +6,7 @@ import {
   type PostgrestTransformBuilder,
 } from "@supabase/postgrest-js";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { Data } from "../data";
 
 export namespace XPostgrestQuery {
   export interface Body {
@@ -85,6 +86,21 @@ export namespace XPostgrestQuery {
       }
 
       return params;
+    }
+
+    export function fromQueryState(query: Data.Relation.QueryState) {
+      const search = XPostgrestQuery.QS.select({
+        limit: query.q_page_limit,
+        order: query.q_orderby,
+        range: {
+          from: query.q_page_index * query.q_page_limit,
+          to: (query.q_page_index + 1) * query.q_page_limit - 1,
+        },
+        // only pass predicates with value set
+        filters: query.q_predicates.filter((p) => p.value ?? false),
+      });
+      search.set("r", query.q_refresh_key.toString());
+      return search;
     }
 
     export function parseOrderby(orderQuery: string): OrderBy {

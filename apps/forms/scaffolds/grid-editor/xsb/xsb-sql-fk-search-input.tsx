@@ -14,7 +14,7 @@ import { PrivateEditorApi } from "@/lib/private";
 import { XSBReferenceTableGrid } from "@/scaffolds/grid/xsb-reference-grid";
 import { GridaXSupabase } from "@/types";
 import { Link2Icon } from "@radix-ui/react-icons";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import useSWR, { BareFetcher } from "swr";
 import { GridDataXSBUnknown } from "../grid-data-xsb-unknow";
 import { cn } from "@/utils";
@@ -37,6 +37,7 @@ import {
 } from "@/scaffolds/data-query";
 import { Data } from "@/lib/data";
 import toast from "react-hot-toast";
+import { XPostgrestQuery } from "@/lib/supabase-postgrest/builder";
 
 interface ISQLForeignKeyRelation {
   referenced_column: string;
@@ -204,10 +205,16 @@ function XSBSearchTableDataGrid({
 
   const query = useStandaloneSchemaDataQuery(schema);
 
+  const searchParams = useMemo(
+    () => XPostgrestQuery.QS.fromQueryState(query),
+    [query]
+  );
+
   const { data, error } = useXSupabaseTableSearch({
     supabase_project_id,
     supabase_table_name,
     supabase_schema_name,
+    search: searchParams,
   });
 
   useEffect(() => {

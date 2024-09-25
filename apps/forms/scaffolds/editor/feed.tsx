@@ -275,27 +275,16 @@ function useXSBTableFeed(
 
   const { datagrid_query } = state;
 
-  const serachParams = useMemo(() => {
+  const searchParams = useMemo(() => {
     if (!datagrid_query) return;
-    const search = XPostgrestQuery.QS.select({
-      limit: datagrid_query.q_page_limit,
-      order: datagrid_query.q_orderby,
-      range: {
-        from: datagrid_query.q_page_index * datagrid_query.q_page_limit,
-        to: (datagrid_query.q_page_index + 1) * datagrid_query.q_page_limit - 1,
-      },
-      // only pass predicates with value set
-      filters: datagrid_query.q_predicates.filter((p) => p.value ?? false),
-    });
-    search.set("r", datagrid_query.q_refresh_key.toString());
-    return search;
+    return XPostgrestQuery.QS.fromQueryState(datagrid_query);
   }, [datagrid_query]);
 
   const request = sb_table_id
     ? PrivateEditorApi.XSupabase.url_table_x_query(
         table_id,
         sb_table_id,
-        serachParams
+        searchParams
       )
     : null;
 
