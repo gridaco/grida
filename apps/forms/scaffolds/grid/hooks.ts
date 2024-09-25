@@ -1,8 +1,8 @@
 import { useCallback } from "react";
 import { useEditorState } from "../editor";
-import { DataGridCellRootProps } from "./cells/cell";
 import { useCellSelection } from "./multiplayer";
 import { mask } from "./mask";
+import type { DataGridCellRootProps } from "./cells";
 
 export function useCellRootProps(
   pk: string | -1,

@@ -13,6 +13,30 @@ import { CalendarIcon, EnvelopeClosedIcon } from "@radix-ui/react-icons";
 import { PhoneIcon } from "lucide-react";
 import { mask } from "./mask";
 import Highlight from "@/components/highlight";
+import { CellRoot } from "./cells";
+
+const customer_columns = [
+  {
+    key: "uid",
+    name: "ID",
+  },
+  {
+    key: "email",
+    name: "Email",
+  },
+  {
+    key: "phone",
+    name: "Phone",
+  },
+  {
+    key: "created_at",
+    name: "Created At",
+  },
+  {
+    key: "last_seen_at",
+    name: "Last Seen At",
+  },
+];
 
 export function CustomerGrid({
   rows: _rows,
@@ -29,28 +53,7 @@ export function CustomerGrid({
   loading?: boolean;
   onSelected?: (key: string, row: GRCustomerRow) => void;
 }) {
-  const columns = [
-    {
-      key: "uid",
-      name: "ID",
-    },
-    {
-      key: "email",
-      name: "Email",
-    },
-    {
-      key: "phone",
-      name: "Phone",
-    },
-    {
-      key: "created_at",
-      name: "Created At",
-    },
-    {
-      key: "last_seen_at",
-      name: "Last Seen At",
-    },
-  ].map(
+  const columns = customer_columns.map(
     (col) =>
       ({
         key: col.key,
@@ -70,11 +73,13 @@ export function CustomerGrid({
             : val?.toString();
 
           return (
-            <Highlight
-              text={display}
-              tokens={tokens}
-              className="bg-foreground text-background"
-            />
+            <CellRoot>
+              <Highlight
+                text={display}
+                tokens={tokens}
+                className="bg-foreground text-background"
+              />
+            </CellRoot>
           );
         },
       }) as Column<any>
