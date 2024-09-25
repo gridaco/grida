@@ -9,20 +9,12 @@ import type {
   OpenCustomerDetailsPanelAction,
   OpenFieldEditPanelAction,
   OpenRecordEditPanelAction,
-  DataGridQueryRowsPerPageAction,
-  DataGridQueryPageAction,
   DataGridTableAction,
   DataGridDateFormatAction,
   DataGridDateTZAction,
   DataGridLocalFilterAction,
   DataTableRefreshAction,
   DataTableLoadingAction,
-  DataGridQueryOrderByAction,
-  DataGridQueryOrderByClearAction,
-  DataGridQueryPredicatesAddAction,
-  DataGridQueryPredicatesUpdateAction,
-  DataGridQueryPredicatesClearAction,
-  DataGridQueryPredicatesRemoveAction,
   EditorThemeLangAction,
   EditorThemePaletteAction,
   EditorThemeFontFamilyAction,
@@ -41,10 +33,11 @@ import type {
 import { arrayMove } from "@dnd-kit/sortable";
 import { EditorSymbols } from "./symbols";
 import { initialDatagridState } from "./init";
+import { DataGridLocalPreferencesStorage } from "./storage/datagrid.storage";
 import databaseRecucer from "./reducers/database.reducer";
 import blockReducer from "./reducers/block.reducer";
 import documentReducer from "./reducers/document.reducer";
-import { DataGridLocalPreferencesStorage } from "./storage/datagrid.storage";
+import datagridQueryReducer from "../data-query/data-query.reducer";
 
 export function reducer(state: EditorState, action: EditorAction): EditorState {
   switch (action.type) {
@@ -61,6 +54,28 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
     case "editor/table/schema/add":
     case "editor/table/schema/delete":
       return databaseRecucer(state, action);
+
+    // #region datagrid query
+    case "data/query/page-limit":
+    case "data/query/page-index":
+    case "data/query/orderby":
+    case "data/query/orderby/clear":
+    case "data/query/predicates/add":
+    case "data/query/predicates/clear":
+    case "data/query/predicates/remove":
+    case "data/query/predicates/update": {
+      return produce(state, (draft) => {
+        draft.datagrid_query = datagridQueryReducer(
+          draft.datagrid_query!,
+          action
+        );
+
+        on_datagrid_query_change(draft.datagrid_query, {
+          view_id: tmp_view_id(draft),
+        });
+      });
+    }
+    // #endregion datagrid query
 
     case "blocks/new":
     case "blocks/field/new":
@@ -157,21 +172,6 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
       });
     }
 
-    case "editor/data-grid/query/rows-per-page": {
-      const { limit } = <DataGridQueryRowsPerPageAction>action;
-      return produce(state, (draft) => {
-        draft.datagrid_query!.q_page_limit = limit;
-
-        // reset the pagination
-        draft.datagrid_query!.q_page_index = 0;
-      });
-    }
-    case "editor/data-grid/query/page": {
-      const { index } = <DataGridQueryPageAction>action;
-      return produce(state, (draft) => {
-        draft.datagrid_query!.q_page_index = index;
-      });
-    }
     case "editor/data-grid/table": {
       const { ...opt } = <DataGridTableAction>action;
       return produce(state, (draft) => {
@@ -257,7 +257,6 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
         draft.datetz = tz;
       });
     }
-    // #region datagrid query
     case "editor/data-grid/local-filter": {
       const { type, ...pref } = <DataGridLocalFilterAction>action;
 
@@ -268,61 +267,6 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
         };
       });
     }
-    case "editor/data-grid/query/orderby": {
-      const { column_id, data } = <DataGridQueryOrderByAction>action;
-      return produce(state, (draft) => {
-        if (data === null) {
-          delete draft.datagrid_query!.q_orderby[column_id];
-          return;
-        }
-
-        draft.datagrid_query!.q_orderby[column_id] = {
-          column: column_id,
-          ...data,
-        };
-        on_datagrid_query_change(draft, { view_id: tmp_view_id(draft) });
-      });
-    }
-    case "editor/data-grid/query/orderby/clear": {
-      const {} = <DataGridQueryOrderByClearAction>action;
-      return produce(state, (draft) => {
-        draft.datagrid_query!.q_orderby = {};
-        on_datagrid_query_change(draft, { view_id: tmp_view_id(draft) });
-      });
-    }
-    case "editor/data-grid/query/predicates/add": {
-      const { predicate } = <DataGridQueryPredicatesAddAction>action;
-      return produce(state, (draft) => {
-        draft.datagrid_query!.q_predicates.push(predicate);
-        on_datagrid_query_change(draft, { view_id: tmp_view_id(draft) });
-      });
-    }
-    case "editor/data-grid/query/predicates/update": {
-      const { index, predicate } = <DataGridQueryPredicatesUpdateAction>action;
-      return produce(state, (draft) => {
-        const prev = draft.datagrid_query!.q_predicates[index];
-        draft.datagrid_query!.q_predicates[index] = {
-          ...prev,
-          ...predicate,
-        };
-        on_datagrid_query_change(draft, { view_id: tmp_view_id(draft) });
-      });
-    }
-    case "editor/data-grid/query/predicates/remove": {
-      const { index } = <DataGridQueryPredicatesRemoveAction>action;
-      return produce(state, (draft) => {
-        draft.datagrid_query!.q_predicates.splice(index, 1);
-        on_datagrid_query_change(draft, { view_id: tmp_view_id(draft) });
-      });
-    }
-    case "editor/data-grid/query/predicates/clear": {
-      const {} = <DataGridQueryPredicatesClearAction>action;
-      return produce(state, (draft) => {
-        draft.datagrid_query!.q_predicates = [];
-        on_datagrid_query_change(draft, { view_id: tmp_view_id(draft) });
-      });
-    }
-    // #endregion datagrid query
     case "editor/data-grid/refresh": {
       const {} = <DataTableRefreshAction>action;
 
@@ -440,11 +384,11 @@ function tmp_view_id(draft: Draft<EditorState>) {
  * @deprecated
  */
 function on_datagrid_query_change(
-  draft: Draft<EditorState>,
+  query: Draft<EditorState["datagrid_query"]>,
   { view_id }: { view_id: string }
 ) {
   DataGridLocalPreferencesStorage.set(view_id, {
-    orderby: draft.datagrid_query?.q_orderby,
-    predicates: draft.datagrid_query?.q_predicates,
+    orderby: query?.q_orderby,
+    predicates: query?.q_predicates,
   });
 }

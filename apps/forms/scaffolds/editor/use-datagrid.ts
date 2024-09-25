@@ -55,13 +55,13 @@ export function useDataGridOrderby() {
   const unusedkeys = keys.filter((key) => !usedkeys.includes(key));
 
   const onClear = useCallback(() => {
-    dispatch({ type: "editor/data-grid/query/orderby/clear" });
+    dispatch({ type: "data/query/orderby/clear" });
   }, [dispatch]);
 
   const onAdd = useCallback(
     (column_id: string) => {
       dispatch({
-        type: "editor/data-grid/query/orderby",
+        type: "data/query/orderby",
         column_id: column_id,
         data: {},
       });
@@ -72,7 +72,7 @@ export function useDataGridOrderby() {
   const onUpdate = useCallback(
     (column_id: string, data: { ascending?: boolean }) => {
       dispatch({
-        type: "editor/data-grid/query/orderby",
+        type: "data/query/orderby",
         column_id: column_id,
         data: data,
       });
@@ -83,7 +83,7 @@ export function useDataGridOrderby() {
   const onRemove = useCallback(
     (column_id: string) => {
       dispatch({
-        type: "editor/data-grid/query/orderby",
+        type: "data/query/orderby",
         column_id: column_id,
         data: null,
       });
@@ -127,7 +127,7 @@ export function useDataGridPredicates() {
   const add = useCallback(
     (predicate: SQLPredicate) => {
       dispatch({
-        type: "editor/data-grid/query/predicates/add",
+        type: "data/query/predicates/add",
         predicate: predicate,
       });
     },
@@ -137,7 +137,7 @@ export function useDataGridPredicates() {
   const update = useCallback(
     (index: number, predicate: Partial<SQLPredicate>) => {
       dispatch({
-        type: "editor/data-grid/query/predicates/update",
+        type: "data/query/predicates/update",
         index: index,
         predicate: predicate,
       });
@@ -148,7 +148,7 @@ export function useDataGridPredicates() {
   const remove = useCallback(
     (index: number) => {
       dispatch({
-        type: "editor/data-grid/query/predicates/remove",
+        type: "data/query/predicates/remove",
         index: index,
       });
     },
@@ -157,7 +157,7 @@ export function useDataGridPredicates() {
 
   const clear = useCallback(() => {
     dispatch({
-      type: "editor/data-grid/query/predicates/clear",
+      type: "data/query/predicates/clear",
     });
   }, [dispatch]);
 

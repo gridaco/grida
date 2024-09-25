@@ -22,6 +22,7 @@ import type {
 import type { Tokens } from "@/ast";
 import { SYM_LOCALTZ } from "./symbols";
 import { ZodObject } from "zod";
+import { DataQueryAction } from "../data-query";
 
 export type EditorAction =
   //
@@ -42,14 +43,13 @@ export type EditorAction =
   //
   | FeedCustomerAction
   //
-  | DataGridQueryPaginationAction
   | DataGridTableAction
   | DataGridTableViewAction
   | DataGridSelectCellAction
   | DataGridReorderColumnAction
   | DataGridDateFormatAction
   | DataGridDateTZAction
-  | DataGridQueryAction
+  | DataQueryAction
   | DataGridLocalFilterAction
   | DataTableRefreshAction
   | DataTableLoadingAction
@@ -267,66 +267,6 @@ export interface DataGridLocalFilterAction
   extends Partial<EditorState["datagrid_local_filter"]> {
   type: "editor/data-grid/local-filter";
 }
-
-// #region pagination
-type DataGridQueryPaginationAction =
-  | DataGridQueryRowsPerPageAction
-  | DataGridQueryPageAction;
-
-export interface DataGridQueryRowsPerPageAction {
-  type: "editor/data-grid/query/rows-per-page";
-  limit: number;
-}
-
-export interface DataGridQueryPageAction {
-  type: "editor/data-grid/query/page";
-  index: number;
-}
-// #endregion pagination
-
-// #region query
-type DataGridQueryAction =
-  | DataGridQueryOrderByAction
-  | DataGridQueryOrderByClearAction
-  | DataGridQueryPredicatesAddAction
-  | DataGridQueryPredicatesUpdateAction
-  | DataGridQueryPredicatesRemoveAction
-  | DataGridQueryPredicatesClearAction;
-
-export interface DataGridQueryOrderByAction {
-  type: "editor/data-grid/query/orderby";
-  column_id: string;
-  data: {
-    ascending?: boolean;
-    nullsFirst?: boolean;
-  } | null;
-}
-
-export interface DataGridQueryOrderByClearAction {
-  type: "editor/data-grid/query/orderby/clear";
-}
-
-export interface DataGridQueryPredicatesAddAction {
-  type: "editor/data-grid/query/predicates/add";
-  predicate: SQLPredicate;
-}
-
-export interface DataGridQueryPredicatesUpdateAction {
-  type: "editor/data-grid/query/predicates/update";
-  index: number;
-  predicate: Partial<SQLPredicate>;
-}
-
-export interface DataGridQueryPredicatesRemoveAction {
-  type: "editor/data-grid/query/predicates/remove";
-  index: number;
-}
-
-export interface DataGridQueryPredicatesClearAction {
-  type: "editor/data-grid/query/predicates/clear";
-}
-
-// #endregion query
 
 export interface DataTableRefreshAction {
   type: "editor/data-grid/refresh";
