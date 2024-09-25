@@ -61,7 +61,7 @@ export namespace GridData {
         filter: DataGridLocalFilter;
         table: typeof EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID;
         data: {
-          rows: any[];
+          rows: GridaXSupabase.SupabaseUser[];
         };
       }
     | (
@@ -211,8 +211,7 @@ export namespace GridData {
     | {
         type: "x-supabase-auth.users";
         inputlength: number;
-        // FIXME: add type
-        filtered: any[];
+        filtered: GridaXSupabase.SupabaseUser[];
       };
 
   export function rows(input: DataGridInput): TProcessedGridRows {

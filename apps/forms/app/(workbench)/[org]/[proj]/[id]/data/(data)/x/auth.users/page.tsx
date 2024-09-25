@@ -114,7 +114,7 @@ export default function XTablePage() {
                 : []
             }
             columns={columns}
-            rows={filtered}
+            rows={filtered as GridaXSupabase.SupabaseUser[]}
             loading={datagrid_isloading}
           />
         </GridLayout.Content>

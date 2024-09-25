@@ -9,7 +9,9 @@ import { CellRoot } from "./cell";
 import { GridDataXSBUnknown } from "../grid-editor/grid-data-xsb-unknow";
 import "./grid.css";
 
-export function XSBReferenceTableGrid({
+export function XSBReferenceTableGrid<
+  R extends Record<string, any> = GridDataXSBUnknown.DataGridRow,
+>({
   columns: _columns,
   rows: _rows,
   rowKey,
@@ -19,12 +21,12 @@ export function XSBReferenceTableGrid({
   onRowDoubleClick,
 }: {
   columns: GridDataXSBUnknown.DataGridColumn[];
-  rows: GridDataXSBUnknown.DataGridRow[];
+  rows: R[];
   rowKey?: string;
   tokens?: string[];
   masked?: boolean;
   loading?: boolean;
-  onRowDoubleClick?: (row: GridDataXSBUnknown.DataGridRow) => void;
+  onRowDoubleClick?: (row: R) => void;
 }) {
   const columns = _columns.map(
     (col) =>
@@ -72,19 +74,19 @@ export function XSBReferenceTableGrid({
       }) as Column<any>
   );
 
-  const rows = _rows.map((row) => {
+  const rows: R[] = _rows.map((row) => {
     return Object.keys(row).reduce((acc, k) => {
-      const val = row[k as keyof GridDataXSBUnknown.DataGridRow];
+      const val = row[k as keyof R];
       if (typeof val === "object") {
         return { ...acc, [k]: JSON.stringify(val) };
       }
 
       return { ...acc, [k]: val };
     }, {});
-  });
+  }) as R[];
 
   return (
-    <DataGrid
+    <DataGrid<R>
       className="flex-grow select-none text-xs text-foreground/80"
       columns={columns}
       rows={rows}
