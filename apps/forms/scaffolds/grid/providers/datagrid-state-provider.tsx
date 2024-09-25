@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
-import type { DataGridCellSelectionCursor } from "./types";
+import type { DataGridCellSelectionCursor } from "../types";
+import type { DataGridCellRootProps } from "../cells";
 
 type State = {
   local_cursor_id: string;
@@ -8,7 +9,7 @@ type State = {
 
 const Context = React.createContext<State | null>(null);
 
-export function GridMultiplayerProvider({
+export function DataGridMultiplayerProvider({
   children,
   local_cursor_id,
   selections,
@@ -33,7 +34,7 @@ export function GridMultiplayerProvider({
   );
 }
 
-export function useGridMultiplayer() {
+function useDataGridMultiplayer() {
   const context = React.useContext(Context);
   if (!context) {
     throw new Error(
@@ -82,7 +83,7 @@ function getCellSelection({
 }
 
 export function useCellSelection(pk: string | -1, column: string) {
-  const { selections, local_cursor_id } = useGridMultiplayer();
+  const { selections, local_cursor_id } = useDataGridMultiplayer();
 
   return useMemo(
     () =>
@@ -94,4 +95,17 @@ export function useCellSelection(pk: string | -1, column: string) {
       }),
     [local_cursor_id, selections, pk, column]
   );
+}
+
+export function useCellRootProps(
+  pk: string | -1,
+  column: string
+): DataGridCellRootProps {
+  const selection = useCellSelection(pk, column);
+
+  return {
+    selected: selection !== undefined,
+    is_local_cursor: selection?.is_local_cursor,
+    color: selection?.color,
+  };
 }

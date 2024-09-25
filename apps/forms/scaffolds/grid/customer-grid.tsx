@@ -41,7 +41,6 @@ const customer_columns = [
 export function CustomerGrid({
   rows: _rows,
   rowKey,
-  onSelected,
   tokens,
   masked,
   loading,
@@ -51,7 +50,6 @@ export function CustomerGrid({
   tokens?: string[];
   masked?: boolean;
   loading?: boolean;
-  onSelected?: (key: string, row: GRCustomerRow) => void;
 }) {
   const columns = customer_columns.map(
     (col) =>
@@ -113,10 +111,10 @@ function HeaderCell({ column }: RenderHeaderCellProps<any>) {
   const { name, key } = column;
 
   return (
-    <div className="flex items-center gap-2">
+    <CellRoot className="flex items-center gap-1.5">
       <CustomerPropertyIcon property={key as any} className="w-4 h-4" />
       <span className="font-normal">{name}</span>
-    </div>
+    </CellRoot>
   );
 }
 

@@ -15,14 +15,14 @@ import {
   SyntheticEvent,
   useCallback,
 } from "react";
-import { GFResponseRow } from "./types";
+import { GFResponseRow } from "../types";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import { EnterFullScreenIcon } from "@radix-ui/react-icons";
-import { useEditorState } from "../editor";
+import { useEditorState } from "../../editor";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CheckedState } from "@radix-ui/react-checkbox";
-import { CellRoot } from "./cells";
-import { useCellRootProps } from "./hooks";
+import { CellRoot } from "../cells";
+import { useCellRootProps } from "../providers";
 
 function stopPropagation(event: SyntheticEvent) {
   event.stopPropagation();

@@ -32,7 +32,11 @@ import type {
   GFSystemColumn,
   GFSystemColumnTypes,
 } from "./types";
-import { SelectColumn } from "./select-column";
+import {
+  SelectColumn,
+  CreateNewAttributeColumn,
+  CreateNewAttributeProvider,
+} from "./columns";
 import { unwrapFeildValue } from "@/lib/forms/unwrap";
 import { Button } from "@/components/ui/button";
 import { FileTypeIcon } from "@/components/form-field-type-icon";
@@ -54,8 +58,11 @@ import { EmptyRowsRenderer } from "./empty";
 
 import { cn } from "@/utils";
 import "./grid.css";
-import { GridMultiplayerProvider, useCellSelection } from "./multiplayer";
-import { useCellRootProps, useMasking } from "./hooks";
+import {
+  DataGridMultiplayerProvider,
+  useCellRootProps,
+  useMasking,
+} from "./providers";
 
 function rowKeyGetter(row: GFResponseRow) {
   return row.__gf_id;
@@ -149,18 +156,6 @@ export function ResponseGrid({
     renderCell: DefaultPropertyCustomerCell,
   };
 
-  const __new_column: Column<RenderingRow> = {
-    key: "__gf_new",
-    name: "+",
-    resizable: false,
-    draggable: false,
-    sortable: false,
-    width: 100,
-    renderHeaderCell: (props) => (
-      <NewFieldHeaderCell {...props} onClick={onAddNewFieldClick} />
-    ),
-  };
-
   const systemcolumns = _systemcolumns.map((c) => {
     switch (c.key) {
       case "__gf_display_id":
@@ -208,7 +203,7 @@ export function ResponseGrid({
           }) as Column<any>
       )
     )
-    .concat(__new_column);
+    .concat(CreateNewAttributeColumn);
 
   if (!selectionDisabled) {
     allcolumns.unshift(SelectColumn);
@@ -239,61 +234,65 @@ export function ResponseGrid({
   };
 
   return (
-    <GridMultiplayerProvider
+    <DataGridMultiplayerProvider
       local_cursor_id={local_cursor_id}
       selections={selectedCells ?? []}
     >
-      <DataGrid
-        className={cn(
-          "flex-grow select-none text-xs text-foreground/80",
-          className
-        )}
-        rowKeyGetter={rowKeyGetter}
-        columns={allcolumns}
-        rows={rows}
-        rowHeight={32}
-        headerRowHeight={36}
-        onCellDoubleClick={() => {
-          if (readonly) {
-            toast("This table is readonly", { icon: "🔒" });
-          }
-        }}
-        onColumnsReorder={onColumnsReorder}
-        selectedRows={selectionDisabled ? undefined : selected_responses}
-        onCopy={onCopy}
-        onSelectedCellChange={(cell) => {
-          if (cell.rowIdx === -1) {
-            const column = cell.column.key;
-            onSelectedCellChange?.({
-              pk: -1,
-              column,
-            });
-          } else {
-            const pk = cell.row.__gf_id;
-            const column = cell.column.key;
-            onSelectedCellChange?.({
-              pk,
-              column,
-            });
-          }
-        }}
-        onRowsChange={(rows, data) => {
-          const key = data.column.key;
-          const indexes = data.indexes;
+      <CreateNewAttributeProvider onAddNewFieldClick={onAddNewFieldClick}>
+        <DataGrid
+          className={cn(
+            "flex-grow select-none text-xs text-foreground/80",
+            className
+          )}
+          rowKeyGetter={rowKeyGetter}
+          columns={allcolumns}
+          rows={rows}
+          rowHeight={32}
+          headerRowHeight={36}
+          onCellDoubleClick={() => {
+            if (readonly) {
+              toast("This table is readonly", { icon: "🔒" });
+            }
+          }}
+          onColumnsReorder={onColumnsReorder}
+          selectedRows={selectionDisabled ? undefined : selected_responses}
+          onCopy={onCopy}
+          onSelectedCellChange={(cell) => {
+            if (cell.rowIdx === -1) {
+              const column = cell.column.key;
+              onSelectedCellChange?.({
+                pk: -1,
+                column,
+              });
+            } else {
+              const pk = cell.row.__gf_id;
+              const column = cell.column.key;
+              onSelectedCellChange?.({
+                pk,
+                column,
+              });
+            }
+          }}
+          onRowsChange={(rows, data) => {
+            const key = data.column.key;
+            const indexes = data.indexes;
 
-          for (const i of indexes) {
-            const row = rows[i];
-            const field = row.fields[key];
+            for (const i of indexes) {
+              const row = rows[i];
+              const field = row.fields[key];
 
-            onCellChange?.(row, key, field);
+              onCellChange?.(row, key, field);
+            }
+          }}
+          onSelectedRowsChange={
+            selectionDisabled ? undefined : onSelectedRowsChange
           }
-        }}
-        onSelectedRowsChange={
-          selectionDisabled ? undefined : onSelectedRowsChange
-        }
-        renderers={{ noRowsFallback: <EmptyRowsRenderer loading={loading} /> }}
-      />
-    </GridMultiplayerProvider>
+          renderers={{
+            noRowsFallback: <EmptyRowsRenderer loading={loading} />,
+          }}
+        />
+      </CreateNewAttributeProvider>
+    </DataGridMultiplayerProvider>
   );
 }
 
@@ -319,23 +318,6 @@ function DefaultPropertyIcon({ __key: key }: { __key: GFSystemColumnTypes }) {
     case "__gf_customer_id":
       return <AvatarIcon className="min-w-4" />;
   }
-}
-
-function NewFieldHeaderCell({
-  onClick,
-}: RenderHeaderCellProps<any> & {
-  onClick?: () => void;
-}) {
-  return (
-    <CellRoot className="border-t-0">
-      <button
-        onClick={onClick}
-        className="w-full h-full flex items-center justify-center"
-      >
-        <PlusIcon />
-      </button>
-    </CellRoot>
-  );
 }
 
 function DefaultPropertyIdentifierCell({
