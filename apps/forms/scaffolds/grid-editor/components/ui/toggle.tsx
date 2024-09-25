@@ -35,7 +35,7 @@ export function QueryToggle({
   );
 }
 
-export function DataGridPredicatesMenuTriggerButton({
+export function DataQueryPredicatesMenuTriggerButton({
   active,
 }: {
   active?: boolean;
@@ -50,7 +50,7 @@ export function DataGridPredicatesMenuTriggerButton({
   );
 }
 
-export function DataGridQueryOrderbyMenuTriggerButton({
+export function DataQueryOrderbyMenuTriggerButton({
   active,
 }: {
   active?: boolean;

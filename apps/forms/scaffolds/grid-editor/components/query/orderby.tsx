@@ -62,9 +62,9 @@ export function DataQueryOrderByMenu({
     orderby,
     isOrderbySet: isset,
     orderbyUsedKeys: usedkeys,
-    onOrderbyClear: onClear,
-    onOrderbyUpdate: onUpdate,
-    onOrderbyRemove: onRemove,
+    onOrderbyClear,
+    onOrderbyUpdate,
+    onOrderbyRemove,
     //
     properties,
   } = props;
@@ -91,7 +91,7 @@ export function DataQueryOrderByMenu({
                         disabled
                         value={ob.column}
                         onValueChange={(value) => {
-                          onUpdate(value, ob);
+                          onOrderbyUpdate(value, ob);
                         }}
                       >
                         <SelectTrigger
@@ -115,7 +115,7 @@ export function DataQueryOrderByMenu({
                       <Select
                         value={ob.ascending ? "ASC" : "DESC"}
                         onValueChange={(value) => {
-                          onUpdate(ob.column, {
+                          onOrderbyUpdate(ob.column, {
                             ascending: value === "ASC",
                           });
                         }}
@@ -140,7 +140,7 @@ export function DataQueryOrderByMenu({
                     variant="ghost"
                     className="w-6 h-6"
                     onClick={() => {
-                      onRemove(col);
+                      onOrderbyRemove(col);
                     }}
                   >
                     <TrashIcon className="w-3 h-3" />
@@ -163,7 +163,7 @@ export function DataQueryOrderByMenu({
                 variant="ghost"
                 size="sm"
                 className="flex justify-start"
-                onClick={onClear}
+                onClick={onOrderbyClear}
               >
                 <TrashIcon className="w-4 h-4 me-2 align-middle" /> Delete sort
               </Button>

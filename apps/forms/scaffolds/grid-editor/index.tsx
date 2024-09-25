@@ -68,8 +68,8 @@ import {
   DataQueryOrderbyChip,
 } from "./components/query";
 import {
-  DataGridPredicatesMenuTriggerButton,
-  DataGridQueryOrderbyMenuTriggerButton,
+  DataQueryPredicatesMenuTriggerButton,
+  DataQueryOrderbyMenuTriggerButton,
 } from "./components/ui/toggle";
 import { Chartview } from "../table-view-chart/chartview";
 import { useMultiplayer } from "@/scaffolds/editor/multiplayer";
@@ -514,10 +514,10 @@ function TableQueryToggles() {
       {"x_sb_main_table_connection" in tb && (
         <>
           <DataQueryPredicatesMenu>
-            <DataGridPredicatesMenuTriggerButton active={isPredicatesSet} />
+            <DataQueryPredicatesMenuTriggerButton active={isPredicatesSet} />
           </DataQueryPredicatesMenu>
           <DataQueryOrderByMenu {...query}>
-            <DataGridQueryOrderbyMenuTriggerButton active={isOrderbySet} />
+            <DataQueryOrderbyMenuTriggerButton active={isOrderbySet} />
           </DataQueryOrderByMenu>
         </>
       )}

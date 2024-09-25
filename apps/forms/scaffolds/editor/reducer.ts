@@ -59,6 +59,7 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
     case "data/query/page-limit":
     case "data/query/page-index":
     case "data/query/orderby":
+    case "data/query/orderby/remove":
     case "data/query/orderby/clear":
     case "data/query/predicates/add":
     case "data/query/predicates/clear":
@@ -352,6 +353,7 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
     //
 
     default:
+      console.error("unhandled action by main editor reducer", action);
       return state;
   }
 }

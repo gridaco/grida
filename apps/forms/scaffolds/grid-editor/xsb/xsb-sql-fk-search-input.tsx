@@ -24,6 +24,8 @@ import {
   GridQueryLimitSelect,
   GridRefreshButton,
   GridQueryPaginationControl,
+  DataQueryOrderByMenu,
+  DataQueryOrderbyMenuTriggerButton,
 } from "@/scaffolds/grid-editor/components";
 import { WorkbenchUI } from "@/components/workbench";
 import {
@@ -205,9 +207,11 @@ function XSBSearchTableDataGrid({
         <GridLayout.HeaderLine>
           <GridLayout.HeaderMenus>
             <GridLayout.HeaderMenuItems>
-              {/* 
-              <TableQueryToggles />
-           */}
+              <DataQueryOrderByMenu {...query}>
+                <DataQueryOrderbyMenuTriggerButton
+                  active={query.isOrderbySet}
+                />
+              </DataQueryOrderByMenu>
             </GridLayout.HeaderMenuItems>
           </GridLayout.HeaderMenus>
         </GridLayout.HeaderLine>
