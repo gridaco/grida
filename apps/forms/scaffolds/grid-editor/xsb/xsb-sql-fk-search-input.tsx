@@ -13,7 +13,7 @@ import {
 import { PrivateEditorApi } from "@/lib/private";
 import { XSBReferenceTableGrid } from "@/scaffolds/grid/xsb-reference-grid";
 import { GridaXSupabase } from "@/types";
-import { Link2Icon } from "@radix-ui/react-icons";
+import { Link2Icon, PlusIcon } from "@radix-ui/react-icons";
 import React, { useEffect, useMemo, useState } from "react";
 import useSWR, { BareFetcher } from "swr";
 import { GridDataXSBUnknown } from "../grid-data-xsb-unknow";
@@ -28,6 +28,9 @@ import {
   DataQueryOrderbyMenuTriggerButton,
   DataQueryPredicatesMenu,
   DataQueryPredicatesMenuTriggerButton,
+  DataQueryOrderbyChip,
+  DataQueryPredicateChip,
+  DataQueryPrediateAddMenu,
 } from "@/scaffolds/grid-editor/components";
 import { WorkbenchUI } from "@/components/workbench";
 import {
@@ -38,6 +41,7 @@ import {
 import { Data } from "@/lib/data";
 import toast from "react-hot-toast";
 import { XPostgrestQuery } from "@/lib/supabase-postgrest/builder";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 interface ISQLForeignKeyRelation {
   referenced_column: string;
@@ -203,11 +207,13 @@ function XSBSearchTableDataGrid({
 }) {
   const [schema, setSchema] = useState<GridaXSupabase.JSONSChema | null>(null);
   const [count, setCount] = useState<number | null>(null);
-
   const query = useStandaloneSchemaDataQuery({
     schema,
     estimated_count: count,
   });
+
+  const { predicates, isPredicatesSet, isOrderbySet } = query;
+  const is_query_orderby_or_predicates_set = isPredicatesSet || isOrderbySet;
 
   const searchParams = useMemo(
     () => XPostgrestQuery.QS.fromQueryState(query),
@@ -255,6 +261,36 @@ function XSBSearchTableDataGrid({
             </GridLayout.HeaderMenuItems>
           </GridLayout.HeaderMenus>
         </GridLayout.HeaderLine>
+        {is_query_orderby_or_predicates_set && (
+          <GridLayout.HeaderLine className="border-b-0 px-0">
+            <ScrollArea>
+              <ScrollBar orientation="horizontal" className="invisible" />
+              <div className="px-2">
+                <div className="flex gap-2">
+                  {isOrderbySet && (
+                    <>
+                      <DataQueryOrderbyChip {...query} />
+                      <GridLayout.HeaderSeparator />
+                    </>
+                  )}
+                  {predicates.map((predicate, i) => (
+                    <DataQueryPredicateChip key={i} index={i} {...query} />
+                  ))}
+                  <DataQueryPrediateAddMenu {...query}>
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      className="text-muted-foreground"
+                    >
+                      <PlusIcon className="w-3 h-3 me-2" />
+                      Add filter
+                    </Button>
+                  </DataQueryPrediateAddMenu>
+                </div>
+              </div>
+            </ScrollArea>
+          </GridLayout.HeaderLine>
+        )}
       </GridLayout.Header>
       <GridLayout.Content>
         <XSBReferenceTableGrid
