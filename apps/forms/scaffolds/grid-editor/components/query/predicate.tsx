@@ -163,23 +163,38 @@ export function PredicatesMenu({ children }: React.PropsWithChildren<{}>) {
                         </Select>
                       </div>
                       <div className="flex-1">
-                        <Input
-                          // TODO: QUERY
-                          // type={
-                          //   q.op !== "is"
-                          //     ? GridaXSupabaseTypeMap.getSQLLiteralInputConfig({
-                          //         format,
-                          //       }) ?? "search"
-                          //     : "search"
-                          // }
-                          placeholder="Enter a value"
-                          value={q.value as string | undefined}
-                          onChange={(e) => onchange({ value: e.target.value })}
-                          className={WorkbenchUI.inputVariants({
-                            variant: "input",
-                            size: "sm",
-                          })}
-                        />
+                        {table?.x_sb_main_table_connection ? (
+                          <XSBSQLLiteralInput
+                            supabase={{
+                              supabase_project_id:
+                                table?.x_sb_main_table_connection
+                                  .supabase_project_id,
+                              supabase_schema_name:
+                                table?.x_sb_main_table_connection
+                                  .sb_schema_name,
+                            }}
+                            config={
+                              q.op === "is"
+                                ? {
+                                    type: "is",
+                                    accepts_boolean:
+                                      format === "bool" || format === "boolean",
+                                  }
+                                : GridaXSupabaseTypeMap.getSQLLiteralInputConfig(
+                                    SupabasePostgRESTOpenApi.parse_postgrest_property_meta(
+                                      q.column,
+                                      properties[q.column],
+                                      null
+                                    )
+                                  )
+                            }
+                            value={q.value as string}
+                            // TODO: have a debounce here
+                            onValueChange={(v) => onchange({ value: v })}
+                          />
+                        ) : (
+                          <>N/A</>
+                        )}
                       </div>
                     </div>
                     <Button
