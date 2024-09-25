@@ -25,7 +25,7 @@ import { operator_labels, supported_operators } from "../../k";
 import { useDebounce } from "@uidotdev/usehooks";
 import { QueryChip } from "../ui/chip";
 import { GridaXSupabaseTypeMap } from "@/lib/x-supabase/typemap";
-import { useDataGridPredicates, useEditorState } from "@/scaffolds/editor/use";
+import { useDataGridQuery, useEditorState } from "@/scaffolds/editor/use";
 import {
   SQLLiteralInputValue,
   XSBSQLLiteralInput,
@@ -46,15 +46,14 @@ export function DataQueryPredicatesMenu({
 }: React.PropsWithChildren<{}>) {
   const {
     table,
-    isset,
-    attributes,
+    isPredicatesSet: isset,
+    keys: attributes,
     properties,
     predicates,
-    onAdd,
-    onRemove,
-    onUpdate,
-    onClear,
-  } = useDataGridPredicates();
+    onPredicatesRemove: onRemove,
+    onPredicatesUpdate: onUpdate,
+    onPredicatesClear: onClear,
+  } = useDataGridQuery();
 
   if (!isset) {
     return <DataQueryPrediateAddMenu>{children}</DataQueryPrediateAddMenu>;
@@ -214,7 +213,11 @@ export function DataQueryPrediateAddMenu({
   asChild,
   children,
 }: React.PropsWithChildren<{ asChild?: boolean }>) {
-  const { attributes, properties, onAdd } = useDataGridPredicates();
+  const {
+    keys: attributes,
+    properties,
+    onPredicatesAdd: onAdd,
+  } = useDataGridQuery();
 
   return (
     <DropdownMenu>
@@ -250,17 +253,13 @@ export function DataQueryPrediateAddMenu({
 }
 
 export function DataQueryPredicateChip({ index }: { index: number }) {
-  const [state] = useEditorState();
-  const { supabase_project } = state;
-
   const {
     table,
     properties,
     predicates,
-    onAdd,
-    onRemove: _onRemove,
-    onUpdate,
-  } = useDataGridPredicates();
+    onPredicatesRemove,
+    onPredicatesUpdate,
+  } = useDataGridQuery();
 
   const predicate = predicates[index];
 
@@ -276,14 +275,14 @@ export function DataQueryPredicateChip({ index }: { index: number }) {
   const debouncedSearch = useDebounce(search, 500);
 
   const onRemove = useCallback(() => {
-    _onRemove(index);
-  }, [_onRemove, index]);
+    onPredicatesRemove(index);
+  }, [onPredicatesRemove, index]);
 
   const onChange = useCallback(
     (predicate: Partial<SQLPredicate>) => {
-      onUpdate(index, predicate);
+      onPredicatesUpdate(index, predicate);
     },
-    [onUpdate, index]
+    [onPredicatesUpdate, index]
   );
 
   useEffect(() => {

@@ -22,7 +22,7 @@ import {
 import { PopoverClose } from "@radix-ui/react-popover";
 import { WorkbenchUI } from "@/components/workbench";
 import { ArrowDownIcon, ArrowDownUpIcon, ArrowUpIcon } from "lucide-react";
-import { useDataGridOrderby } from "@/scaffolds/editor/use";
+import { useDataGridQuery } from "@/scaffolds/editor/use";
 import { QueryChip } from "../ui/chip";
 
 type SortIconType = "up" | "down" | "mixed";
@@ -53,15 +53,13 @@ export function DataQueryOrderByMenu({
 }: React.PropsWithChildren<{}>) {
   const {
     orderby,
-    isset,
+    isOrderbySet: isset,
     properties,
-    usedkeys,
-    unusedkeys,
-    onClear,
-    onAdd,
-    onUpdate,
-    onRemove,
-  } = useDataGridOrderby();
+    orderbyUsedKeys: usedkeys,
+    onOrderbyClear: onClear,
+    onOrderbyUpdate: onUpdate,
+    onOrderbyRemove: onRemove,
+  } = useDataGridQuery();
 
   if (!isset) {
     return <DataQueryAddOrderbyMenu>{children}</DataQueryAddOrderbyMenu>;
@@ -169,7 +167,11 @@ function DataQueryAddOrderbyMenu({
   asChild,
   children,
 }: React.PropsWithChildren<{ asChild?: boolean }>) {
-  const { properties, unusedkeys, onAdd } = useDataGridOrderby();
+  const {
+    properties,
+    orderbyUnusedKeys: unusedkeys,
+    onOrderbyAdd: onAdd,
+  } = useDataGridQuery();
 
   return (
     <DropdownMenu>
@@ -189,7 +191,7 @@ function DataQueryAddOrderbyMenu({
 }
 
 export function DataQueryOrderbyChip() {
-  const { orderby, isset } = useDataGridOrderby();
+  const { orderby, isOrderbySet: isset } = useDataGridQuery();
 
   const length = Object.keys(orderby).length;
   const multiple = length > 1;

@@ -42,10 +42,10 @@ const useDispatch = (): Dispatcher => {
 };
 
 export function StandaloneDataQueryProvider({
-  initial,
+  initial = Data.Relation.INITIAL_QUERY_STATE,
   children,
 }: React.PropsWithChildren<{
-  initial: DataQueryState;
+  initial?: DataQueryState;
   onChange?: (query: DataQueryState) => void;
 }>) {
   const [state, dispatch] = useReducer(reducer, initial);
@@ -80,9 +80,18 @@ export function useStandaloneSchemaDataQuery(
   schema: Data.Relation.Schema | null
 ) {
   const standalone = useStandaloneDataQuery();
-  const [state, dispatch] = standalone;
-  const orderby = useDataQueryOrderbyConsumer(standalone, schema);
-  const predicates = useDataQueryPredicatesConsumer(standalone, schema);
+  return useStandaloneSchemaDataQueryConsumer(standalone, schema);
+}
+
+export function useStandaloneSchemaDataQueryConsumer(
+  [state, dispatch]: readonly [DataQueryState, Dispatcher],
+  schema: Data.Relation.Schema | null
+) {
+  // const orderby = useDataQueryOrderbyConsumer(standalone, schema);
+  // const predicates = useDataQueryPredicatesConsumer(standalone, schema);
+  const properties = schema?.properties || {};
+
+  const keys = Object.keys(properties);
 
   const onLimit: DataQueryPaginationLimitDispatcher = useCallback(
     (limit: number) => {
@@ -91,38 +100,17 @@ export function useStandaloneSchemaDataQuery(
     [dispatch]
   );
 
-  return useMemo(
-    () => ({
-      ...state,
-      onLimit,
-      isset: orderby.isset || predicates.isset,
-      orderby,
-      predicates,
-    }),
-    [onLimit, orderby, predicates, state]
+  const { q_orderby, q_predicates } = state;
+
+  // #region orderby
+  const isOrderbySet = Object.keys(q_orderby).length > 0;
+  const orderbyUsedKeys = Object.keys(q_orderby);
+
+  const orderbyUnusedKeys = keys.filter(
+    (key) => !orderbyUsedKeys.includes(key)
   );
-  //
-}
 
-export function useDataQueryOrderbyConsumer(
-  [state, dispatch]: readonly [DataQueryState, Dispatcher],
-  schema: Data.Relation.Schema | null
-) {
-  const { q_orderby } = state;
-
-  const properties = schema?.properties || {};
-
-  const isset = Object.keys(q_orderby).length > 0;
-
-  const keys = Object.keys(properties);
-  const usedkeys = Object.keys(q_orderby);
-  const unusedkeys = keys.filter((key) => !usedkeys.includes(key));
-
-  const onClear: DataQueryOrderbyRemoveAllDispatcher = useCallback(() => {
-    dispatch({ type: "data/query/orderby/clear" });
-  }, [dispatch]);
-
-  const onAdd: DataQueryOrderbyAddDispatcher = useCallback(
+  const onOrderbyAdd: DataQueryOrderbyAddDispatcher = useCallback(
     (column_id: string, initial?: Partial<Omit<SQLOrderBy, "column">>) => {
       dispatch({
         type: "data/query/orderby",
@@ -133,7 +121,7 @@ export function useDataQueryOrderbyConsumer(
     [dispatch]
   );
 
-  const onUpdate: DataQueryOrderbyUpdateDispatcher = useCallback(
+  const onOrderbyUpdate: DataQueryOrderbyUpdateDispatcher = useCallback(
     (column_id: string, data: Partial<Omit<SQLOrderBy, "column">>) => {
       dispatch({
         type: "data/query/orderby",
@@ -144,7 +132,7 @@ export function useDataQueryOrderbyConsumer(
     [dispatch]
   );
 
-  const onRemove: DataQueryOrderbyRemoveDispatcher = useCallback(
+  const onOrderbyRemove: DataQueryOrderbyRemoveDispatcher = useCallback(
     (column_id: string) => {
       dispatch({
         type: "data/query/orderby/remove",
@@ -154,32 +142,18 @@ export function useDataQueryOrderbyConsumer(
     [dispatch]
   );
 
-  return {
-    orderby: q_orderby,
-    isset,
-    properties,
-    usedkeys,
-    unusedkeys,
-    onClear,
-    onAdd,
-    onUpdate,
-    onRemove,
-  };
-}
+  const onOrderbyClear: DataQueryOrderbyRemoveAllDispatcher =
+    useCallback(() => {
+      dispatch({ type: "data/query/orderby/clear" });
+    }, [dispatch]);
 
-export function useDataQueryPredicatesConsumer(
-  [state, dispatch]: readonly [DataQueryState, Dispatcher],
-  schema: Data.Relation.Schema | null
-) {
-  const { q_predicates } = state;
+  // #endregion orderby
 
-  const properties = schema?.properties || {};
+  // #region predicates
 
-  const attributes = Object.keys(properties);
+  const isPredicatesSet = q_predicates.length > 0;
 
-  const isset = q_predicates.length > 0;
-
-  const onAdd: DataQueryPredicateAddDispatcher = useCallback(
+  const onPredicatesAdd: DataQueryPredicateAddDispatcher = useCallback(
     (predicate: SQLPredicate) => {
       dispatch({
         type: "data/query/predicates/add",
@@ -189,7 +163,7 @@ export function useDataQueryPredicatesConsumer(
     [dispatch]
   );
 
-  const onUpdate: DataQueryPredicateUpdateDispatcher = useCallback(
+  const onPredicatesUpdate: DataQueryPredicateUpdateDispatcher = useCallback(
     (index: number, predicate: Partial<SQLPredicate>) => {
       dispatch({
         type: "data/query/predicates/update",
@@ -200,7 +174,7 @@ export function useDataQueryPredicatesConsumer(
     [dispatch]
   );
 
-  const onRemove: DataQueryPredicateRemoveDispatcher = useCallback(
+  const onPredicatesRemove: DataQueryPredicateRemoveDispatcher = useCallback(
     (index: number) => {
       dispatch({
         type: "data/query/predicates/remove",
@@ -210,21 +184,64 @@ export function useDataQueryPredicatesConsumer(
     [dispatch]
   );
 
-  const onClear: DataQueryPredicateRemoveAllDispatcher = useCallback(() => {
-    dispatch({
-      type: "data/query/predicates/clear",
-    });
-  }, [dispatch]);
+  const onPredicatesClear: DataQueryPredicateRemoveAllDispatcher =
+    useCallback(() => {
+      dispatch({
+        type: "data/query/predicates/clear",
+      });
+    }, [dispatch]);
+  // #endregion
 
-  return {
-    isset,
-    properties,
-    attributes,
-    predicates: q_predicates,
-    onAdd: onAdd,
-    onUpdate: onUpdate,
-    onRemove: onRemove,
-    onClear: onClear,
-  };
+  return useMemo(
+    () => ({
+      ...state,
+      properties,
+      keys,
+      onLimit,
+      //
+      orderby: q_orderby,
+      isOrderbySet,
+      onOrderbyAdd,
+      onOrderbyUpdate,
+      onOrderbyRemove,
+      onOrderbyClear,
+      orderbyUnusedKeys,
+      orderbyUsedKeys,
+      //
+      predicates: q_predicates,
+      isPredicatesSet,
+      onPredicatesAdd,
+      onPredicatesUpdate,
+      onPredicatesRemove,
+      onPredicatesClear,
+      //
+    }),
+    [
+      state,
+      properties,
+      keys,
+      //
+      onLimit,
+      //
+      q_orderby,
+      isOrderbySet,
+      onOrderbyAdd,
+      onOrderbyUpdate,
+      onOrderbyRemove,
+      onOrderbyClear,
+      orderbyUnusedKeys,
+      orderbyUsedKeys,
+      //
+      q_predicates,
+      isPredicatesSet,
+      onPredicatesAdd,
+      onPredicatesUpdate,
+      onPredicatesRemove,
+      onPredicatesClear,
+      //
+    ]
+  );
+  //
 }
+
 // #endregion with schema

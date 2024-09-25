@@ -125,7 +125,8 @@ export function GridEditor({
   const supabase = useMemo(() => createClientFormsClient(), []);
   const [state, dispatch] = useEditorState();
 
-  const { isset: is_query_set } = useDataGridQuery();
+  const { isPredicatesSet, isOrderbySet } = useDataGridQuery();
+  const is_query_orderby_or_predicates_set = isPredicatesSet || isOrderbySet;
   const { datagrid_isloading, datagrid_selected_rows } = state;
 
   const deleteFieldConfirmDialog = useDialogState<{ field_id: string }>();
@@ -276,7 +277,7 @@ export function GridEditor({
             {!tb?.readonly && <TableMod />}
           </GridLayout.HeaderMenus>
         </GridLayout.HeaderLine>
-        {is_query_set && (
+        {is_query_orderby_or_predicates_set && (
           <GridLayout.HeaderLine className="border-b-0 px-0">
             <ScrollArea>
               <ScrollBar orientation="horizontal" className="invisible" />
@@ -503,7 +504,7 @@ function GridaFormsResponsesExportCSV() {
 
 function TableQueryToggles() {
   const tb = useDatagridTable();
-  const { predicates, orderby, is_predicates_set, is_orderby_set } =
+  const { predicates, orderby, isPredicatesSet, isOrderbySet } =
     useDataGridQuery();
   if (!tb) return <></>;
 
@@ -513,10 +514,10 @@ function TableQueryToggles() {
       {"x_sb_main_table_connection" in tb && (
         <>
           <DataQueryPredicatesMenu>
-            <DataGridPredicatesMenuTriggerButton active={is_predicates_set} />
+            <DataGridPredicatesMenuTriggerButton active={isPredicatesSet} />
           </DataQueryPredicatesMenu>
           <DataQueryOrderByMenu>
-            <DataGridQueryOrderbyMenuTriggerButton active={is_orderby_set} />
+            <DataGridQueryOrderbyMenuTriggerButton active={isOrderbySet} />
           </DataQueryOrderByMenu>
         </>
       )}
@@ -526,11 +527,11 @@ function TableQueryToggles() {
 
 function TableQueryChips() {
   const [state] = useEditorState();
-  const { predicates, orderby, is_orderby_set } = useDataGridQuery();
+  const { predicates, orderby, isOrderbySet } = useDataGridQuery();
 
   return (
     <div className="flex gap-2">
-      {is_orderby_set && (
+      {isOrderbySet && (
         <>
           <DataQueryOrderbyChip />
           <GridLayout.HeaderSeparator />

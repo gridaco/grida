@@ -10,8 +10,7 @@ import type {
 } from "@/scaffolds/editor/state";
 import assert from "assert";
 import {
-  useDataQueryOrderbyConsumer,
-  useDataQueryPredicatesConsumer,
+  useStandaloneSchemaDataQueryConsumer,
   type DataQueryPaginationIndexDispatcher,
   type DataQueryPaginationLimitDispatcher,
   type DataQueryPaginationNextDispatcher,
@@ -104,51 +103,20 @@ export function useDatagridPagination() {
 // #region query ========================================================================
 //
 
-export function useDataGridOrderby() {
-  const [state, dispatch] = useEditorState();
-
-  const table = useDatagridTable<
-    GDocFormsXSBTable | GDocSchemaTableProviderXSupabase
-  >();
-
-  const consumer = useDataQueryOrderbyConsumer(
-    [state.datagrid_query!, dispatch],
-    table?.x_sb_main_table_connection.sb_table_schema ?? null
-  );
-
-  return {
-    table,
-    ...consumer,
-  };
-}
-
-export function useDataGridPredicates() {
-  const [state, dispatch] = useEditorState();
-
-  const table = useDatagridTable<
-    GDocFormsXSBTable | GDocSchemaTableProviderXSupabase
-  >();
-
-  const consumer = useDataQueryPredicatesConsumer(
-    [state.datagrid_query!, dispatch],
-    table?.x_sb_main_table_connection.sb_table_schema ?? null
-  );
-
-  return {
-    table,
-    ...consumer,
-  };
-}
-
 export function useDataGridQuery() {
-  const { orderby, isset: is_orderby_set } = useDataGridOrderby();
-  const { predicates, isset: is_predicates_set } = useDataGridPredicates();
+  const [state, dispatch] = useEditorState();
+  const table = useDatagridTable<
+    GDocFormsXSBTable | GDocSchemaTableProviderXSupabase
+  >();
+
+  const query = useStandaloneSchemaDataQueryConsumer(
+    [state.datagrid_query!, dispatch],
+    table?.x_sb_main_table_connection.sb_table_schema ?? null
+  );
+
   return {
-    isset: is_orderby_set || is_predicates_set,
-    is_orderby_set,
-    is_predicates_set,
-    orderby,
-    predicates,
+    table,
+    ...query,
   };
 }
 // #endregion query ========================================================================
