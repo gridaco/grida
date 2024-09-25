@@ -6,20 +6,22 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { WorkbenchUI } from "@/components/workbench";
-import { useEditorState } from "@/scaffolds/editor";
 
-export function GridLimit() {
-  const [state, dispatch] = useEditorState();
+const default_limit_options = [10, 100, 500, 1000] as const;
 
+export function GridQueryLimitSelect({
+  value,
+  onValueChange,
+}: {
+  value?: number;
+  onValueChange?: (value: number) => void;
+}) {
   return (
     <div>
       <Select
-        value={state.datagrid_query?.q_page_limit + ""}
+        value={value + ""}
         onValueChange={(value) => {
-          dispatch({
-            type: "data/query/page-limit",
-            limit: parseInt(value),
-          });
+          onValueChange?.(parseInt(value));
         }}
       >
         <SelectTrigger
@@ -31,10 +33,11 @@ export function GridLimit() {
           <SelectValue placeholder="rows" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value={10 + ""}>10 rows</SelectItem>
-          <SelectItem value={100 + ""}>100 rows</SelectItem>
-          <SelectItem value={500 + ""}>500 rows</SelectItem>
-          <SelectItem value={1000 + ""}>1000 rows</SelectItem>
+          {default_limit_options.map((n) => (
+            <SelectItem key={n} value={n + ""}>
+              {n} rows
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
     </div>

@@ -7,7 +7,18 @@ import React, {
 } from "react";
 import { Data } from "@/lib/data";
 import type { DataQueryAction } from "./data-query.action";
-import type { SQLPredicate } from "@/types";
+import type { SQLOrderBy, SQLPredicate } from "@/types";
+import type {
+  DataQueryOrderbyAddDispatcher,
+  DataQueryOrderbyRemoveAllDispatcher,
+  DataQueryOrderbyRemoveDispatcher,
+  DataQueryOrderbyUpdateDispatcher,
+  DataQueryPaginationLimitDispatcher,
+  DataQueryPredicateAddDispatcher,
+  DataQueryPredicateRemoveAllDispatcher,
+  DataQueryPredicateRemoveDispatcher,
+  DataQueryPredicateUpdateDispatcher,
+} from "./data-query.type";
 import reducer from "./data-query.reducer";
 
 export type DataQueryState = Data.Relation.QueryState;
@@ -63,22 +74,36 @@ export function useStandaloneDataQuery() {
 //
 
 export function useStandaloneSchemaDataQuery(
-  schema: Data.Relation.PostgRESTRelationJSONSchema | null
+  schema: Data.Relation.Schema | null
 ) {
   const standalone = useStandaloneDataQuery();
+  const [state, dispatch] = standalone;
   const orderby = useDataQueryOrderbyConsumer(standalone, schema);
   const predicates = useDataQueryPredicatesConsumer(standalone, schema);
-  return {
-    isset: orderby.isset || predicates.isset,
-    orderby,
-    predicates,
-  };
+
+  const onLimit: DataQueryPaginationLimitDispatcher = useCallback(
+    (limit: number) => {
+      dispatch({ type: "data/query/page-limit", limit });
+    },
+    [dispatch]
+  );
+
+  return useMemo(
+    () => ({
+      ...state,
+      onLimit,
+      isset: orderby.isset || predicates.isset,
+      orderby,
+      predicates,
+    }),
+    [onLimit, orderby, predicates, state]
+  );
   //
 }
 
 export function useDataQueryOrderbyConsumer(
   [state, dispatch]: readonly [DataQueryState, Dispatcher],
-  schema: Data.Relation.PostgRESTRelationJSONSchema | null
+  schema: Data.Relation.Schema | null
 ) {
   const { q_orderby } = state;
 
@@ -90,11 +115,11 @@ export function useDataQueryOrderbyConsumer(
   const usedkeys = Object.keys(q_orderby);
   const unusedkeys = keys.filter((key) => !usedkeys.includes(key));
 
-  const onClear = useCallback(() => {
+  const onClear: DataQueryOrderbyRemoveAllDispatcher = useCallback(() => {
     dispatch({ type: "data/query/orderby/clear" });
   }, [dispatch]);
 
-  const onAdd = useCallback(
+  const onAdd: DataQueryOrderbyAddDispatcher = useCallback(
     (column_id: string) => {
       dispatch({
         type: "data/query/orderby",
@@ -105,8 +130,8 @@ export function useDataQueryOrderbyConsumer(
     [dispatch]
   );
 
-  const onUpdate = useCallback(
-    (column_id: string, data: { ascending?: boolean }) => {
+  const onUpdate: DataQueryOrderbyUpdateDispatcher = useCallback(
+    (column_id: string, data: Partial<Omit<SQLOrderBy, "column">>) => {
       dispatch({
         type: "data/query/orderby",
         column_id: column_id,
@@ -116,7 +141,7 @@ export function useDataQueryOrderbyConsumer(
     [dispatch]
   );
 
-  const onRemove = useCallback(
+  const onRemove: DataQueryOrderbyRemoveDispatcher = useCallback(
     (column_id: string) => {
       dispatch({
         type: "data/query/orderby",
@@ -142,7 +167,7 @@ export function useDataQueryOrderbyConsumer(
 
 export function useDataQueryPredicatesConsumer(
   [state, dispatch]: readonly [DataQueryState, Dispatcher],
-  schema: Data.Relation.PostgRESTRelationJSONSchema | null
+  schema: Data.Relation.Schema | null
 ) {
   const { q_predicates } = state;
 
@@ -152,7 +177,7 @@ export function useDataQueryPredicatesConsumer(
 
   const isset = q_predicates.length > 0;
 
-  const add = useCallback(
+  const onAdd: DataQueryPredicateAddDispatcher = useCallback(
     (predicate: SQLPredicate) => {
       dispatch({
         type: "data/query/predicates/add",
@@ -162,7 +187,7 @@ export function useDataQueryPredicatesConsumer(
     [dispatch]
   );
 
-  const update = useCallback(
+  const onUpdate: DataQueryPredicateUpdateDispatcher = useCallback(
     (index: number, predicate: Partial<SQLPredicate>) => {
       dispatch({
         type: "data/query/predicates/update",
@@ -173,7 +198,7 @@ export function useDataQueryPredicatesConsumer(
     [dispatch]
   );
 
-  const remove = useCallback(
+  const onRemove: DataQueryPredicateRemoveDispatcher = useCallback(
     (index: number) => {
       dispatch({
         type: "data/query/predicates/remove",
@@ -183,7 +208,7 @@ export function useDataQueryPredicatesConsumer(
     [dispatch]
   );
 
-  const clear = useCallback(() => {
+  const onClear: DataQueryPredicateRemoveAllDispatcher = useCallback(() => {
     dispatch({
       type: "data/query/predicates/clear",
     });
@@ -194,10 +219,10 @@ export function useDataQueryPredicatesConsumer(
     properties,
     attributes,
     predicates: q_predicates,
-    add,
-    update,
-    remove,
-    clear,
+    onAdd: onAdd,
+    onUpdate: onUpdate,
+    onRemove: onRemove,
+    onClear: onClear,
   };
 }
 // #endregion with schema

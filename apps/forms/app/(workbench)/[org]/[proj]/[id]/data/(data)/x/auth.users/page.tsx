@@ -3,11 +3,11 @@
 import { PrivateEditorApi } from "@/lib/private";
 import { useEditorState } from "@/scaffolds/editor";
 import {
-  GridLimit,
+  GridQueryLimitSelect,
   GridViewSettings,
-  GridRefresh,
+  GridRefreshButton,
   GridLocalSearch,
-  GridCount,
+  GridQueryCount,
   TableViews,
 } from "@/scaffolds/grid-editor/components";
 import * as GridLayout from "@/scaffolds/grid-editor/components/layout";
@@ -21,11 +21,18 @@ import { EditorSymbols } from "@/scaffolds/editor/symbols";
 import { XPostgrestQuery } from "@/lib/supabase-postgrest/builder";
 import useSWR from "swr";
 import { GridDataXSBUnknown } from "@/scaffolds/grid-editor/grid-data-xsb-unknow";
+import {
+  useDatagridPagination,
+  useDataGridRefresh,
+} from "@/scaffolds/editor/use";
 
 export default function XTablePage() {
   const [state, dispatch] = useEditorState();
 
   const { supabase_project, datagrid_isloading, datagrid_query } = state;
+
+  const refresh = useDataGridRefresh();
+  const pagination = useDatagridPagination();
 
   const serachParams = useMemo(() => {
     if (!datagrid_query) return;
@@ -114,9 +121,15 @@ export default function XTablePage() {
           />
         </GridLayout.Content>
         <GridLayout.Footer>
-          <GridLimit />
-          <GridCount count={filtered.length} keyword="user" />
-          <GridRefresh />
+          <GridQueryLimitSelect
+            value={pagination.limit}
+            onValueChange={pagination.onLimit}
+          />
+          <GridQueryCount count={filtered.length} keyword="user" />
+          <GridRefreshButton
+            refreshing={refresh.refreshing}
+            onRefreshClick={refresh.refresh}
+          />
         </GridLayout.Footer>
       </GridLayout.Root>
     </CurrentTable>

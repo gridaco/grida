@@ -16,9 +16,15 @@ import { GridaXSupabase } from "@/types";
 import { Link2Icon } from "@radix-ui/react-icons";
 import React from "react";
 import useSWR, { BareFetcher } from "swr";
-import { GridDataXSBUnknown } from "../../grid-data-xsb-unknow";
+import { GridDataXSBUnknown } from "../grid-data-xsb-unknow";
 import { cn } from "@/utils";
 import * as GridLayout from "@/scaffolds/grid-editor/components/layout";
+import {
+  GridQueryCount,
+  GridQueryLimitSelect,
+  GridRefreshButton,
+  GridQueryPaginationControl,
+} from "@/scaffolds/grid-editor/components";
 import { WorkbenchUI } from "@/components/workbench";
 import {
   StandaloneDataQueryProvider,
@@ -185,13 +191,14 @@ function XSBSearchTableDataGrid({
   supabase_schema_name: string;
   onRowDoubleClick?: (value: GridaXSupabase.XDataRow) => void;
 }) {
-  const { orderby, predicates } = useStandaloneSchemaDataQuery(null);
+  const query = useStandaloneSchemaDataQuery(null);
 
   const { data, error } = useXSupabaseTableSearch({
     supabase_project_id,
     supabase_table_name,
     supabase_schema_name,
   });
+
   return (
     <GridLayout.Root>
       <GridLayout.Header>
@@ -216,15 +223,17 @@ function XSBSearchTableDataGrid({
         />
       </GridLayout.Content>
       <GridLayout.Footer>
-        {/* <div className="flex gap-4 items-center">
-          <GridPagination />
-          <GridLimit />
+        <div className="flex gap-4 items-center">
+          {/* <GridQueryPaginationControl /> */}
+          <GridQueryLimitSelect
+            value={query.q_page_limit}
+            onValueChange={query.onLimit}
+          />
         </div>
         <GridLayout.FooterSeparator />
-        <GridCount count={count ?? rows?.length} keyword="record" />
+        <GridQueryCount count={data?.count} keyword="record" />
         <GridLayout.FooterSeparator />
-        <GridRefresh />
-         */}
+        <GridRefreshButton />
       </GridLayout.Footer>
     </GridLayout.Root>
   );

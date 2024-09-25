@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import * as SelectPrimitive from "@radix-ui/react-select";
-import { operator_labels, supported_operators } from "./data";
+import { operator_labels, supported_operators } from "../../k";
 import { useDebounce } from "@uidotdev/usehooks";
 import { QueryChip } from "../ui/chip";
 import { GridaXSupabaseTypeMap } from "@/lib/x-supabase/typemap";
@@ -29,7 +29,7 @@ import { useDataGridPredicates, useEditorState } from "@/scaffolds/editor/use";
 import {
   SQLLiteralInputValue,
   XSBSQLLiteralInput,
-} from "./xsb-sql-literal-input";
+} from "../../xsb/xsb-sql-literal-input";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { KeyIcon } from "lucide-react";
 import {
@@ -38,26 +38,26 @@ import {
   PlusIcon,
   TrashIcon,
 } from "@radix-ui/react-icons";
-import { ListFilterIcon } from "lucide-react";
 import { PopoverClose } from "@radix-ui/react-popover";
 import { WorkbenchUI } from "@/components/workbench";
-import { QueryToggle } from "../ui/toggle";
 
-export function PredicatesMenu({ children }: React.PropsWithChildren<{}>) {
+export function DataQueryPredicatesMenu({
+  children,
+}: React.PropsWithChildren<{}>) {
   const {
     table,
     isset,
     attributes,
     properties,
     predicates,
-    add,
-    remove,
-    update,
-    clear,
+    onAdd,
+    onRemove,
+    onUpdate,
+    onClear,
   } = useDataGridPredicates();
 
   if (!isset) {
-    return <AddPrediateMenu>{children}</AddPrediateMenu>;
+    return <DataQueryPrediateAddMenu>{children}</DataQueryPrediateAddMenu>;
   }
 
   return (
@@ -71,7 +71,7 @@ export function PredicatesMenu({ children }: React.PropsWithChildren<{}>) {
                 const format = properties[q.column].format;
 
                 const onchange = (predicate: Partial<SQLPredicate>) => {
-                  update(i, predicate);
+                  onUpdate(i, predicate);
                 };
                 return (
                   <div key={i} className="flex gap-2 px-2 w-full">
@@ -166,7 +166,7 @@ export function PredicatesMenu({ children }: React.PropsWithChildren<{}>) {
                     <Button
                       size="icon"
                       variant="outline"
-                      onClick={() => remove(i)}
+                      onClick={() => onRemove(i)}
                       className={WorkbenchUI.buttonVariants({
                         variant: "outline",
                         size: "icon",
@@ -180,7 +180,7 @@ export function PredicatesMenu({ children }: React.PropsWithChildren<{}>) {
             </div>
           </section>
           <section>
-            <AddPrediateMenu asChild>
+            <DataQueryPrediateAddMenu asChild>
               <Button
                 variant="ghost"
                 size="sm"
@@ -189,14 +189,14 @@ export function PredicatesMenu({ children }: React.PropsWithChildren<{}>) {
                 <PlusIcon className="w-4 h-4 me-2 align-middle" />
                 Add Filter
               </Button>
-            </AddPrediateMenu>
+            </DataQueryPrediateAddMenu>
             {isset && (
               <PopoverClose asChild>
                 <Button
                   variant="ghost"
                   size="sm"
                   className="w-full flex justify-start"
-                  onClick={clear}
+                  onClick={onClear}
                 >
                   <TrashIcon className="w-4 h-4 me-2 align-middle" /> Delete
                   filter
@@ -210,11 +210,11 @@ export function PredicatesMenu({ children }: React.PropsWithChildren<{}>) {
   );
 }
 
-export function AddPrediateMenu({
+export function DataQueryPrediateAddMenu({
   asChild,
   children,
 }: React.PropsWithChildren<{ asChild?: boolean }>) {
-  const { attributes, properties, add } = useDataGridPredicates();
+  const { attributes, properties, onAdd } = useDataGridPredicates();
 
   return (
     <DropdownMenu>
@@ -231,7 +231,7 @@ export function AddPrediateMenu({
           return (
             <DropdownMenuItem
               key={key}
-              onSelect={() => add({ column: key, op: "eq", value: "" })}
+              onSelect={() => onAdd({ column: key, op: "eq", value: "" })}
             >
               <div className="w-4 h-4 flex items-center justify-center gap-2">
                 {property.pk && <KeyIcon className="w-3 h-3" />}
@@ -249,12 +249,18 @@ export function AddPrediateMenu({
   );
 }
 
-export function PredicateChip({ index }: { index: number }) {
+export function DataQueryPredicateChip({ index }: { index: number }) {
   const [state] = useEditorState();
   const { supabase_project } = state;
 
-  const { table, properties, predicates, add, remove, update } =
-    useDataGridPredicates();
+  const {
+    table,
+    properties,
+    predicates,
+    onAdd,
+    onRemove: _onRemove,
+    onUpdate,
+  } = useDataGridPredicates();
 
   const predicate = predicates[index];
 
@@ -270,14 +276,14 @@ export function PredicateChip({ index }: { index: number }) {
   const debouncedSearch = useDebounce(search, 500);
 
   const onRemove = useCallback(() => {
-    remove(index);
-  }, [remove, index]);
+    _onRemove(index);
+  }, [_onRemove, index]);
 
   const onChange = useCallback(
     (predicate: Partial<SQLPredicate>) => {
-      update(index, predicate);
+      onUpdate(index, predicate);
     },
-    [update, index]
+    [onUpdate, index]
   );
 
   useEffect(() => {

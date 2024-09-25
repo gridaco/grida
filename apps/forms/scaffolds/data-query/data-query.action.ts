@@ -1,4 +1,4 @@
-import type { SQLPredicate } from "@/types";
+import type { SQLOrderBy, SQLPredicate } from "@/types";
 
 export type DataQueryAction =
   | DataQueryPageLimitAction
@@ -25,10 +25,7 @@ export interface DataQueryPaginateAction {
 export interface DataQueryOrderByAction {
   type: "data/query/orderby";
   column_id: string;
-  data: {
-    ascending?: boolean;
-    nullsFirst?: boolean;
-  } | null;
+  data: Omit<SQLOrderBy, "column"> | null;
 }
 
 export interface DataQueryOrderByClearAction {

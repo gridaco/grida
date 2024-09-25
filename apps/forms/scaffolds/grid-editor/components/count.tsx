@@ -1,16 +1,16 @@
 import { Spinner } from "@/components/spinner";
 import { txt_n_plural } from "@/utils/plural";
 
-export function GridCount({
+export function GridQueryCount({
   count,
   keyword,
 }: {
-  count?: number;
+  count?: number | undefined | null;
   keyword: string;
 }) {
   return (
     <div>
-      {count === undefined ? (
+      {count === undefined || count === null ? (
         <Spinner />
       ) : (
         <span className="text-xs font-normal text-muted-foreground">

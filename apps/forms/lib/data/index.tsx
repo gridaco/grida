@@ -1,5 +1,5 @@
 import type { SQLOrderBy, SQLPredicate } from "@/types";
-import { SupabasePostgRESTOpenApi } from "../supabase-postgrest";
+import type { SupabasePostgRESTOpenApi } from "../supabase-postgrest";
 
 /**
  * Grida Data Module
@@ -17,6 +17,13 @@ export namespace Data {
      */
     export type PostgRESTRelationJSONSchema =
       SupabasePostgRESTOpenApi.SupabaseOpenAPIDefinitionJSONSchema;
+
+    export type Schema = PostgRESTRelationJSONSchema;
+
+    // export interface QueryViewState {
+    //   schema: Schema;
+    //   query: QueryState;
+    // }
 
     export const INITIAL_QUERY_STATE: QueryState = {
       q_page_limit: 100,

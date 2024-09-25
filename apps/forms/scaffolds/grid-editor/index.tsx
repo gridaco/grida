@@ -27,13 +27,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import clsx from "clsx";
 import {
-  GridLimit,
-  GridViewSettings,
-  GridRefresh,
-  XSupaDataGridSortMenu,
-  GridLocalSearch,
-  GridCount,
   TableViews,
+  GridQueryLimitSelect,
+  GridViewSettings,
+  GridRefreshButton,
+  GridLocalSearch,
+  GridQueryCount,
+  GridQueryPaginationControl,
 } from "./components";
 import * as GridLayout from "./components/layout";
 import { txt_n_plural } from "@/utils/plural";
@@ -48,27 +48,32 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ArrowDownUpIcon, Columns3Icon, Rows3Icon } from "lucide-react";
+import { Columns3Icon, Rows3Icon } from "lucide-react";
 import {
   useDatabaseTableId,
+  useDatagridPagination,
   useDataGridQuery,
+  useDataGridRefresh,
   useDatagridTableAttributes,
   useDatagridTableSpace,
 } from "@/scaffolds/editor/use";
 import { saveAs } from "file-saver";
 import Papa from "papaparse";
 import { Gallery } from "../table-view-gallery/gallery";
-import { PredicatesMenu } from "./components/query";
-import { GridPagination } from "./components/pagination";
-import { Chartview } from "../table-view-chart/chartview";
-import { useMultiplayer } from "@/scaffolds/editor/multiplayer";
-import { PredicateChip, AddPrediateMenu } from "./components/query/predicate";
-import { OrderbyChip } from "./components/query/orderby";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import {
+  DataQueryPredicatesMenu,
+  DataQueryPredicateChip,
+  DataQueryPrediateAddMenu,
+  DataQueryOrderByMenu,
+  DataQueryOrderbyChip,
+} from "./components/query";
 import {
   DataGridPredicatesMenuTriggerButton,
   DataGridQueryOrderbyMenuTriggerButton,
 } from "./components/ui/toggle";
+import { Chartview } from "../table-view-chart/chartview";
+import { useMultiplayer } from "@/scaffolds/editor/multiplayer";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 function useSelectedCells(): DataGridCellSelectionCursor[] {
   const [state] = useEditorState();
@@ -127,6 +132,8 @@ export function GridEditor({
 
   const tb = useDatagridTable();
   const table_id = useDatabaseTableId();
+  const refresh = useDataGridRefresh();
+  const pagination = useDatagridPagination();
   const view = tb?.views.find((v) => v.id === tb.view_id);
   const row_keyword = tb?.row_keyword ?? "row";
   const has_selected_rows = datagrid_selected_rows.size > 0;
@@ -329,13 +336,19 @@ export function GridEditor({
       )}
       <GridLayout.Footer>
         <div className="flex gap-4 items-center">
-          <GridPagination />
-          <GridLimit />
+          <GridQueryPaginationControl {...pagination} />
+          <GridQueryLimitSelect
+            value={pagination.limit}
+            onValueChange={pagination.onLimit}
+          />
         </div>
         <GridLayout.FooterSeparator />
-        <GridCount count={count ?? rows?.length} keyword="record" />
+        <GridQueryCount count={count ?? rows?.length} keyword="record" />
         <GridLayout.FooterSeparator />
-        <GridRefresh />
+        <GridRefreshButton
+          refreshing={refresh.refreshing}
+          onRefreshClick={refresh.refresh}
+        />
         {state.doctype === "v0_form" && tb?.provider === "grida" && (
           <>
             <GridLayout.FooterSeparator />
@@ -499,12 +512,12 @@ function TableQueryToggles() {
       <GridLocalSearch />
       {"x_sb_main_table_connection" in tb && (
         <>
-          <PredicatesMenu>
+          <DataQueryPredicatesMenu>
             <DataGridPredicatesMenuTriggerButton active={is_predicates_set} />
-          </PredicatesMenu>
-          <XSupaDataGridSortMenu>
+          </DataQueryPredicatesMenu>
+          <DataQueryOrderByMenu>
             <DataGridQueryOrderbyMenuTriggerButton active={is_orderby_set} />
-          </XSupaDataGridSortMenu>
+          </DataQueryOrderByMenu>
         </>
       )}
     </GridLayout.HeaderMenuItems>
@@ -519,19 +532,19 @@ function TableQueryChips() {
     <div className="flex gap-2">
       {is_orderby_set && (
         <>
-          <OrderbyChip />
+          <DataQueryOrderbyChip />
           <GridLayout.HeaderSeparator />
         </>
       )}
       {predicates.map((predicate, i) => (
-        <PredicateChip key={i} index={i} />
+        <DataQueryPredicateChip key={i} index={i} />
       ))}
-      <AddPrediateMenu>
+      <DataQueryPrediateAddMenu>
         <Button variant="ghost" size="xs" className="text-muted-foreground">
           <PlusIcon className="w-3 h-3 me-2" />
           Add filter
         </Button>
-      </AddPrediateMenu>
+      </DataQueryPrediateAddMenu>
     </div>
   );
 }
