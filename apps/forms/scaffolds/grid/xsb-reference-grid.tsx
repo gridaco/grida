@@ -2,9 +2,9 @@
 
 import React from "react";
 import DataGrid, { Column, RenderCellProps } from "react-data-grid";
-import { EmptyRowsRenderer } from "./empty";
+import { EmptyRowsRenderer } from "./grid-empty-state";
 import Highlight from "@/components/highlight";
-import { mask } from "./mask";
+import { mask } from "./grid-text-mask";
 import { CellRoot } from "./cells";
 import { GridDataXSBUnknown } from "../grid-editor/grid-data-xsb-unknow";
 import "./grid.css";

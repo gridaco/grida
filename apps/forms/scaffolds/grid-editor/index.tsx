@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useMemo } from "react";
-import { ResponseGrid, type DataGridCellSelectionCursor } from "../grid";
+import { DataGrid, type DataGridCellSelectionCursor } from "../grid";
 import { createClientFormsClient } from "@/lib/supabase/client";
 import {
   AlertDialog,
@@ -293,7 +293,7 @@ export function GridEditor({
       )}
       {!view && (
         <GridLayout.Content>
-          <ResponseGrid
+          <DataGrid
             className="bg-transparent"
             local_cursor_id={state.cursor_id}
             systemcolumns={systemcolumns}

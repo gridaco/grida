@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
-import DataGrid, {
+import RDG, {
   Column,
   CopyEvent,
   RenderCellProps,
@@ -54,7 +54,7 @@ import {
 import Highlight from "@/components/highlight";
 import { FieldSupports } from "@/k/supported_field_types";
 import { format } from "date-fns";
-import { EmptyRowsRenderer } from "./empty";
+import { EmptyRowsRenderer } from "./grid-empty-state";
 
 import { cn } from "@/utils";
 import "./grid.css";
@@ -70,7 +70,7 @@ function rowKeyGetter(row: GFResponseRow) {
 
 type RenderingRow = GFResponseRow;
 
-export function ResponseGrid({
+export function DataGrid({
   local_cursor_id,
   systemcolumns: _systemcolumns,
   columns,
@@ -239,7 +239,7 @@ export function ResponseGrid({
       selections={selectedCells ?? []}
     >
       <CreateNewAttributeProvider onAddNewFieldClick={onAddNewFieldClick}>
-        <DataGrid
+        <RDG
           className={cn(
             "flex-grow select-none text-xs text-foreground/80",
             className

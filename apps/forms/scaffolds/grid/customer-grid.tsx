@@ -7,11 +7,11 @@ import DataGrid, {
   RenderHeaderCellProps,
 } from "react-data-grid";
 import { GRCustomerRow } from "./types";
-import { EmptyRowsRenderer } from "./empty";
+import { EmptyRowsRenderer } from "./grid-empty-state";
 import "./grid.css";
 import { CalendarIcon, EnvelopeClosedIcon } from "@radix-ui/react-icons";
 import { PhoneIcon } from "lucide-react";
-import { mask } from "./mask";
+import { mask } from "./grid-text-mask";
 import Highlight from "@/components/highlight";
 import { CellRoot } from "./cells";
 

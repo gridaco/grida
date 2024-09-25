@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useEditorState } from "@/scaffolds/editor";
-import { mask } from "../mask";
+import { mask } from "../grid-text-mask";
 
 export function useMasking() {
   const [state] = useEditorState();
