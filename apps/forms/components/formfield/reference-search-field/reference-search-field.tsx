@@ -25,6 +25,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { GridDataXSBUnknown } from "@/scaffolds/grid-editor/grid-data-xsb-unknow";
+import * as GridLayout from "@/scaffolds/grid-editor/components/layout";
+import { WorkbenchUI } from "@/components/workbench";
 import toast from "react-hot-toast";
 
 export function ReferenceSearchPreview(
@@ -101,15 +103,19 @@ export function ReferenceSearch({
             Select a record to reference from <code>{fulltable}</code>
           </SheetDescription>
         </SheetHeader>
-        <div className="px-6">
-          <SearchInput
-            value={localSearch}
-            onChange={(e) => setLocalSearch(e.target.value)}
-            placeholder={`Search in ${rows?.length ?? 0} records`}
-          />
-        </div>
-        <div className="flex-1">
-          <div className="flex flex-col w-full h-full">
+        <GridLayout.Root>
+          <GridLayout.Header>
+            <GridLayout.HeaderLine>
+              <div>
+                <SearchInput
+                  value={localSearch}
+                  onChange={(e) => setLocalSearch(e.target.value)}
+                  placeholder={`Search in ${rows?.length ?? 0} records`}
+                />
+              </div>
+            </GridLayout.HeaderLine>
+          </GridLayout.Header>
+          <GridLayout.Content>
             <XSBReferenceTableGrid
               loading={!rows}
               tokens={localSearch ? [localSearch] : undefined}
@@ -130,25 +136,32 @@ export function ReferenceSearch({
               })}
               rows={rows ?? []}
             />
-            <footer className="w-full px-2 py-1 border-y">
-              <div className="flex">
-                <Select
-                  value={perpage.toString()}
-                  onValueChange={(v) => setPerPage(parseInt(v))}
+          </GridLayout.Content>
+          <GridLayout.Footer>
+            <div>
+              <Select
+                value={perpage.toString()}
+                onValueChange={(v) => setPerPage(parseInt(v))}
+              >
+                <SelectTrigger
+                  className={WorkbenchUI.selectVariants({
+                    variant: "trigger",
+                    size: "sm",
+                  })}
                 >
-                  <SelectTrigger className="w-auto">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="50">50</SelectItem>
-                    <SelectItem value="100">100</SelectItem>
-                    <SelectItem value="1000">1000</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </footer>
-          </div>
-        </div>
+                  <SelectValue placeholder="rows" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={10 + ""}>10 rows</SelectItem>
+                  <SelectItem value={100 + ""}>100 rows</SelectItem>
+                  <SelectItem value={500 + ""}>500 rows</SelectItem>
+                  <SelectItem value={1000 + ""}>1000 rows</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </GridLayout.Footer>
+        </GridLayout.Root>
+        <hr />
         <SheetFooter className="px-6">
           <SheetClose>
             <Button variant="outline">Cancel</Button>

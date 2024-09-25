@@ -29,11 +29,11 @@ export function DataGridStateProvider({
   );
 }
 
-function useDataGridMultiplayer() {
+function useDataGridState() {
   const context = React.useContext(Context);
   if (!context) {
     throw new Error(
-      "useGridMultiplayer must be used within a GridMultiplayerProvider"
+      "useDataGridState must be used within a DataGridStateProvider"
     );
   }
 
@@ -78,7 +78,7 @@ function getCellSelection({
 }
 
 export function useCellSelection(pk: string | -1, column: string) {
-  const { selections, local_cursor_id } = useDataGridMultiplayer();
+  const { selections, local_cursor_id } = useDataGridState();
 
   return useMemo(
     () =>

@@ -18,6 +18,8 @@ import React from "react";
 import useSWR, { BareFetcher } from "swr";
 import { GridDataXSBUnknown } from "../../grid-data-xsb-unknow";
 import { cn } from "@/utils";
+import * as GridLayout from "@/scaffolds/grid-editor/components/layout";
+import { WorkbenchUI } from "@/components/workbench";
 
 interface ISQLForeignKeyRelation {
   referenced_column: string;
@@ -106,17 +108,15 @@ function XSBSearchTableSheet({
             </code>
           </SheetDescription>
         </SheetHeader>
-        <div className="flex-1">
-          <XSBSearchTableDataGrid
-            supabase_project_id={supabase_project_id}
-            supabase_schema_name={supabase_schema_name}
-            supabase_table_name={relation.referenced_table}
-            onRowDoubleClick={(row) => {
-              onValueChange?.(row[relation.referenced_column]);
-              props.onOpenChange?.(false);
-            }}
-          />
-        </div>
+        <XSBSearchTableDataGrid
+          supabase_project_id={supabase_project_id}
+          supabase_schema_name={supabase_schema_name}
+          supabase_table_name={relation.referenced_table}
+          onRowDoubleClick={(row) => {
+            onValueChange?.(row[relation.referenced_column]);
+            props.onOpenChange?.(false);
+          }}
+        />
       </SheetContent>
     </Sheet>
   );
@@ -182,15 +182,21 @@ function XSBSearchTableDataGrid({
     supabase_schema_name,
   });
   return (
-    <div className="flex flex-col w-full h-full">
-      <XSBReferenceTableGrid
-        loading={!data?.data}
-        onRowDoubleClick={onRowDoubleClick}
-        columns={GridDataXSBUnknown.columns(data?.meta?.table_schema, {
-          sort: "unknown_table_column_priorities",
-        })}
-        rows={data?.data ?? []}
-      />
-    </div>
+    <GridLayout.Root>
+      <GridLayout.Header>
+        <GridLayout.HeaderLine>{/*  */}</GridLayout.HeaderLine>
+      </GridLayout.Header>
+      <GridLayout.Content>
+        <XSBReferenceTableGrid
+          loading={!data?.data}
+          onRowDoubleClick={onRowDoubleClick}
+          columns={GridDataXSBUnknown.columns(data?.meta?.table_schema, {
+            sort: "unknown_table_column_priorities",
+          })}
+          rows={data?.data ?? []}
+        />
+      </GridLayout.Content>
+      <GridLayout.Footer>{/*  */}</GridLayout.Footer>
+    </GridLayout.Root>
   );
 }
