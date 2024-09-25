@@ -202,8 +202,12 @@ function XSBSearchTableDataGrid({
   onRowDoubleClick?: (value: GridaXSupabase.XDataRow) => void;
 }) {
   const [schema, setSchema] = useState<GridaXSupabase.JSONSChema | null>(null);
+  const [count, setCount] = useState<number | null>(null);
 
-  const query = useStandaloneSchemaDataQuery(schema);
+  const query = useStandaloneSchemaDataQuery({
+    schema,
+    estimated_count: count,
+  });
 
   const searchParams = useMemo(
     () => XPostgrestQuery.QS.fromQueryState(query),
@@ -220,6 +224,10 @@ function XSBSearchTableDataGrid({
   useEffect(() => {
     if (data?.meta?.table_schema) setSchema(data?.meta?.table_schema);
   }, [data?.meta?.table_schema]);
+
+  useEffect(() => {
+    if (data?.count) setCount(data.count);
+  }, [data?.count]);
 
   useEffect(() => {
     if (data?.error) {
@@ -260,7 +268,7 @@ function XSBSearchTableDataGrid({
       </GridLayout.Content>
       <GridLayout.Footer>
         <div className="flex gap-4 items-center">
-          {/* <GridQueryPaginationControl /> */}
+          <GridQueryPaginationControl {...query} />
           <GridQueryLimitSelect
             value={query.q_page_limit}
             onValueChange={query.onLimit}

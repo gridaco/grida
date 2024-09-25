@@ -61,7 +61,15 @@ export interface IDataQueryPredicatesConsumer {
 }
 
 export interface IDataQueryPaginationConsumer {
+  limit: number;
+  page: number;
+  minPage: number;
+  maxPage: number;
+  hasPrevPage: boolean;
+  hasNextPage: boolean;
   onLimit: DataQueryPaginationLimitDispatcher;
   onPaginate: DataQueryPaginationIndexDispatcher;
+  onNextPage: DataQueryPaginationNextDispatcher;
+  onPrevPage: DataQueryPaginationPrevDispatcher;
 }
 // #endregion hook interface

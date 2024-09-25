@@ -21,10 +21,7 @@ import { EditorSymbols } from "@/scaffolds/editor/symbols";
 import { XPostgrestQuery } from "@/lib/supabase-postgrest/builder";
 import useSWR from "swr";
 import { GridDataXSBUnknown } from "@/scaffolds/grid-editor/grid-data-xsb-unknow";
-import {
-  useDatagridPagination,
-  useDataGridRefresh,
-} from "@/scaffolds/editor/use";
+import { useDataGridQuery, useDataGridRefresh } from "@/scaffolds/editor/use";
 
 export default function XTablePage() {
   const [state, dispatch] = useEditorState();
@@ -32,7 +29,7 @@ export default function XTablePage() {
   const { supabase_project, datagrid_isloading, datagrid_query } = state;
 
   const refresh = useDataGridRefresh();
-  const pagination = useDatagridPagination();
+  const query = useDataGridQuery();
 
   const serachParams = useMemo(() => {
     if (!datagrid_query) return;
@@ -122,8 +119,8 @@ export default function XTablePage() {
         </GridLayout.Content>
         <GridLayout.Footer>
           <GridQueryLimitSelect
-            value={pagination.limit}
-            onValueChange={pagination.onLimit}
+            value={query.limit}
+            onValueChange={query.onLimit}
           />
           <GridQueryCount count={filtered.length} keyword="user" />
           <GridRefreshButton

@@ -18,10 +18,7 @@ import { useMemo } from "react";
 import { GridData } from "@/scaffolds/grid-editor/grid-data";
 import { Customer } from "@/types";
 import { EditorSymbols } from "@/scaffolds/editor/symbols";
-import {
-  useDatagridPagination,
-  useDataGridRefresh,
-} from "@/scaffolds/editor/use";
+import { useDataGridQuery, useDataGridRefresh } from "@/scaffolds/editor/use";
 
 export default function Customers() {
   const [state] = useEditorState();
@@ -32,7 +29,7 @@ export default function Customers() {
     tablespace[EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID].stream;
 
   const refresh = useDataGridRefresh();
-  const pagination = useDatagridPagination();
+  const query = useDataGridQuery();
 
   const rows = useMemo(() => {
     const { filtered } = GridData.rows({
@@ -86,8 +83,8 @@ export default function Customers() {
         </GridLayout.Content>
         <GridLayout.Footer>
           <GridQueryLimitSelect
-            value={pagination.limit}
-            onValueChange={pagination.onLimit}
+            value={query.limit}
+            onValueChange={query.onLimit}
           />
           <GridQueryCount count={rows.length} keyword="customer" />
           <GridRefreshButton

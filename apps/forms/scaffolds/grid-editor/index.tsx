@@ -51,7 +51,6 @@ import {
 import { Columns3Icon, Rows3Icon } from "lucide-react";
 import {
   useDatabaseTableId,
-  useDatagridPagination,
   useDataGridQuery,
   useDataGridRefresh,
   useDatagridTableAttributes,
@@ -126,7 +125,8 @@ export function GridEditor({
   const supabase = useMemo(() => createClientFormsClient(), []);
   const [state, dispatch] = useEditorState();
 
-  const { isPredicatesSet, isOrderbySet } = useDataGridQuery();
+  const query = useDataGridQuery();
+  const { isPredicatesSet, isOrderbySet } = query;
   const is_query_orderby_or_predicates_set = isPredicatesSet || isOrderbySet;
   const { datagrid_isloading, datagrid_selected_rows } = state;
 
@@ -135,7 +135,6 @@ export function GridEditor({
   const tb = useDatagridTable();
   const table_id = useDatabaseTableId();
   const refresh = useDataGridRefresh();
-  const pagination = useDatagridPagination();
   const view = tb?.views.find((v) => v.id === tb.view_id);
   const row_keyword = tb?.row_keyword ?? "row";
   const has_selected_rows = datagrid_selected_rows.size > 0;
@@ -347,10 +346,10 @@ export function GridEditor({
         )}
         <GridLayout.Footer>
           <div className="flex gap-4 items-center">
-            <GridQueryPaginationControl {...pagination} />
+            <GridQueryPaginationControl {...query} />
             <GridQueryLimitSelect
-              value={pagination.limit}
-              onValueChange={pagination.onLimit}
+              value={query.limit}
+              onValueChange={query.onLimit}
             />
           </div>
           <GridLayout.FooterSeparator />

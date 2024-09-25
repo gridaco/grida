@@ -15,6 +15,8 @@ import type {
   DataQueryOrderbyUpdateDispatcher,
   DataQueryPaginationIndexDispatcher,
   DataQueryPaginationLimitDispatcher,
+  DataQueryPaginationNextDispatcher,
+  DataQueryPaginationPrevDispatcher,
   DataQueryPredicateAddDispatcher,
   DataQueryPredicateRemoveAllDispatcher,
   DataQueryPredicateRemoveDispatcher,
@@ -80,11 +82,18 @@ export function useStandaloneDataQuery() {
 // #region with schema
 //
 
-export function useStandaloneSchemaDataQuery(
-  schema: Data.Relation.Schema | null
-): SchemaDataQueryConsumerReturnType {
+export function useStandaloneSchemaDataQuery({
+  schema,
+  estimated_count,
+}: {
+  schema: Data.Relation.Schema | null;
+  estimated_count: number | null;
+}): SchemaDataQueryConsumerReturnType {
   const standalone = useStandaloneDataQuery();
-  return useStandaloneSchemaDataQueryConsumer(standalone, schema);
+  return useStandaloneSchemaDataQueryConsumer(standalone, {
+    schema,
+    estimated_count,
+  });
 }
 
 type SchemaDataQueryConsumerReturnType = DataQueryState &
@@ -97,13 +106,26 @@ type SchemaDataQueryConsumerReturnType = DataQueryState &
 
 export function useStandaloneSchemaDataQueryConsumer(
   [state, dispatch]: readonly [DataQueryState, Dispatcher],
-  schema: Data.Relation.Schema | null
+  {
+    schema,
+    estimated_count,
+  }: {
+    schema: Data.Relation.Schema | null;
+    estimated_count: number | null;
+  }
 ): SchemaDataQueryConsumerReturnType {
-  const { q_orderby, q_predicates } = state;
+  const { q_page_index, q_page_limit, q_orderby, q_predicates } = state;
   const properties = schema?.properties || {};
   const keys = Object.keys(properties);
 
   // #region pagination
+
+  const minPage = 0;
+  const maxPage = Math.ceil((estimated_count ?? 0) / q_page_limit) - 1;
+
+  const hasPrevPage = q_page_index > minPage;
+  const hasNextPage = q_page_index < maxPage;
+
   const onLimit: DataQueryPaginationLimitDispatcher = useCallback(
     (limit: number) => {
       dispatch({ type: "data/query/page-limit", limit });
@@ -117,6 +139,15 @@ export function useStandaloneSchemaDataQueryConsumer(
     },
     [dispatch]
   );
+
+  const onPrevPage: DataQueryPaginationPrevDispatcher = useCallback(() => {
+    onPaginate(q_page_index - 1);
+  }, [q_page_index, onPaginate]);
+
+  const onNextPage: DataQueryPaginationNextDispatcher = useCallback(() => {
+    onPaginate(q_page_index + 1);
+  }, [q_page_index, onPaginate]);
+
   // #region pagination
 
   // #region orderby
@@ -215,8 +246,16 @@ export function useStandaloneSchemaDataQueryConsumer(
       properties,
       keys,
       //
-      onLimit,
+      limit: q_page_limit,
+      page: q_page_index,
+      minPage,
+      maxPage,
+      hasPrevPage,
+      hasNextPage,
       onPaginate,
+      onPrevPage,
+      onNextPage,
+      onLimit,
       //
       orderby: q_orderby,
       isOrderbySet,
@@ -240,8 +279,16 @@ export function useStandaloneSchemaDataQueryConsumer(
       properties,
       keys,
       //
-      onLimit,
+      q_page_limit,
+      q_page_index,
+      minPage,
+      maxPage,
+      hasPrevPage,
+      hasNextPage,
       onPaginate,
+      onPrevPage,
+      onNextPage,
+      onLimit,
       //
       q_orderby,
       isOrderbySet,

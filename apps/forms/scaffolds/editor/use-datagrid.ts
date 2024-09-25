@@ -15,6 +15,7 @@ import {
   type DataQueryPaginationLimitDispatcher,
   type DataQueryPaginationNextDispatcher,
   type DataQueryPaginationPrevDispatcher,
+  type IDataQueryPaginationConsumer,
 } from "../data-query";
 
 export function useDatagridTable<T extends GDocTable>():
@@ -49,56 +50,6 @@ export function useDataGridRefresh() {
   };
 }
 
-export function useDatagridPagination() {
-  const [state, dispatch] = useEditorState();
-  const { datagrid_query, datagrid_query_estimated_count } = state;
-
-  assert(datagrid_query);
-  const { q_page_index, q_page_limit } = datagrid_query;
-
-  const min = 0;
-  const max =
-    Math.ceil((datagrid_query_estimated_count ?? 0) / q_page_limit) - 1;
-
-  const hasPrev = q_page_index > min;
-  const hasNext = q_page_index < max;
-
-  const onLimit: DataQueryPaginationLimitDispatcher = useCallback(
-    (limit: number) => {
-      dispatch({ type: "data/query/page-limit", limit });
-    },
-    [dispatch]
-  );
-
-  const onPaginate: DataQueryPaginationIndexDispatcher = useCallback(
-    (index: number) => {
-      dispatch({ type: "data/query/page-index", index });
-    },
-    [dispatch]
-  );
-
-  const onPrev: DataQueryPaginationPrevDispatcher = useCallback(() => {
-    onPaginate(q_page_index - 1);
-  }, [q_page_index, onPaginate]);
-
-  const onNext: DataQueryPaginationNextDispatcher = useCallback(() => {
-    onPaginate(q_page_index + 1);
-  }, [q_page_index, onPaginate]);
-
-  return {
-    limit: q_page_limit,
-    page: q_page_index,
-    min,
-    max,
-    hasPrev,
-    hasNext,
-    onPaginate,
-    onPrev,
-    onNext,
-    onLimit,
-  };
-}
-
 //
 // #region query ========================================================================
 //
@@ -111,7 +62,10 @@ export function useDataGridQuery() {
 
   const query = useStandaloneSchemaDataQueryConsumer(
     [state.datagrid_query!, dispatch],
-    table?.x_sb_main_table_connection.sb_table_schema ?? null
+    {
+      schema: table?.x_sb_main_table_connection.sb_table_schema ?? null,
+      estimated_count: state.datagrid_query_estimated_count,
+    }
   );
 
   return {

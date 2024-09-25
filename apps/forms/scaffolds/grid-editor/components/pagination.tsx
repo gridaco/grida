@@ -3,27 +3,19 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { WorkbenchUI } from "@/components/workbench";
+import { IDataQueryPaginationConsumer } from "@/scaffolds/data-query";
 import { ArrowLeftIcon, ArrowRightIcon } from "@radix-ui/react-icons";
 
 export function GridQueryPaginationControl({
   page,
-  min,
-  max,
-  hasNext,
-  hasPrev,
-  onNext,
+  minPage: min,
+  maxPage: max,
+  hasNextPage: hasNext,
+  hasPrevPage: hasPrev,
+  onNextPage: onNext,
   onPaginate,
-  onPrev,
-}: {
-  page: number;
-  min: number;
-  max: number;
-  hasPrev: boolean;
-  hasNext: boolean;
-  onPaginate: (index: number) => void;
-  onPrev: () => void;
-  onNext: () => void;
-}) {
+  onPrevPage: onPrev,
+}: IDataQueryPaginationConsumer) {
   return (
     <div className="flex items-center gap-2">
       <Button
