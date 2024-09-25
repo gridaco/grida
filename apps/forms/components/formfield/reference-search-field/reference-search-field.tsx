@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { GridDataXSBUnknown } from "@/scaffolds/grid-editor/grid-data-xsb-unknow";
+import toast from "react-hot-toast";
 
 export function ReferenceSearchPreview(
   props: React.ComponentProps<typeof SearchInput>
@@ -112,9 +113,16 @@ export function ReferenceSearch({
             <XSBReferenceTableGrid
               loading={!rows}
               tokens={localSearch ? [localSearch] : undefined}
-              onSelected={(key, row) => {
-                setValue(key);
-                setOpen(false);
+              onRowDoubleClick={(row) => {
+                if (rowKey) {
+                  const key = row[rowKey];
+                  setValue(key);
+                  setOpen(false);
+                } else {
+                  toast.error(
+                    "No row key found. This is a application error. Please contact support."
+                  );
+                }
               }}
               rowKey={rowKey}
               columns={GridDataXSBUnknown.columns(table_schema, {

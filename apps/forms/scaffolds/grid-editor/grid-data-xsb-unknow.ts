@@ -2,12 +2,13 @@
 /// Grid data manipulation for XSB dynamic postgrest json schema (unknown by grida schema)
 ///
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
+import { GridaXSupabase } from "@/types";
 import { priority_sorter } from "@/utils/sort";
 import type { JSONType } from "ajv";
 
 export namespace GridDataXSBUnknown {
   /**
-   * general & common priorities for columns order
+   * General & common priorities for column order
    */
   export const unknown_table_column_priorities = [
     "id",
@@ -17,15 +18,45 @@ export namespace GridDataXSBUnknown {
     "display_name",
     "title",
     "slug",
+    "status",
+    "role",
+    "type",
+    "category",
+    "tags",
+    "description",
+    // created time
+    "created_at",
+    "phone",
+    "address",
+    "city",
+    "state",
+    "country",
+    "postal_code",
+    "url",
+    "birth_date",
+    "gender",
+    "age",
+    "company",
+    "position",
+    "department",
+    "location",
+    // other time related
+    "updated_at",
+    "deleted_at",
+    "created_by",
+    "updated_by",
+    "deleted_by",
   ];
 
-  type DataGridColumn = {
+  export type DataGridColumn = {
     key: string;
     name: string;
     type?: JSONType;
     format?: SupabasePostgRESTOpenApi.PostgRESTOpenAPIDefinitionPropertyFormatType;
     pk: boolean;
   };
+
+  export type DataGridRow = GridaXSupabase.XDataRow;
 
   const short_unknow_table_properties_by_priorities = priority_sorter(
     unknown_table_column_priorities

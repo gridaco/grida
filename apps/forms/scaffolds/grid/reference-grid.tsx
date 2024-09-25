@@ -2,14 +2,12 @@
 
 import React from "react";
 import DataGrid, { Column, RenderCellProps } from "react-data-grid";
-import { XSupabaseReferenceTableRow } from "./types";
 import { EmptyRowsRenderer } from "./empty";
 import Highlight from "@/components/highlight";
-import "./grid.css";
 import { mask } from "./mask";
 import { CellRoot } from "./cell";
-import type { JSONType } from "ajv";
-import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
+import { GridDataXSBUnknown } from "../grid-editor/grid-data-xsb-unknow";
+import "./grid.css";
 
 export function XSBReferenceTableGrid({
   columns: _columns,
@@ -18,21 +16,15 @@ export function XSBReferenceTableGrid({
   tokens,
   masked,
   loading,
-  onSelected,
+  onRowDoubleClick,
 }: {
-  columns: {
-    key: string;
-    name: string;
-    type?: JSONType;
-    format?: SupabasePostgRESTOpenApi.PostgRESTOpenAPIDefinitionPropertyFormatType;
-    pk: boolean;
-  }[];
-  rows: XSupabaseReferenceTableRow[];
+  columns: GridDataXSBUnknown.DataGridColumn[];
+  rows: GridDataXSBUnknown.DataGridRow[];
   rowKey?: string;
   tokens?: string[];
   masked?: boolean;
   loading?: boolean;
-  onSelected?: (key: string, row: XSupabaseReferenceTableRow) => void;
+  onRowDoubleClick?: (row: GridDataXSBUnknown.DataGridRow) => void;
 }) {
   const columns = _columns.map(
     (col) =>
@@ -42,7 +34,7 @@ export function XSBReferenceTableGrid({
         resizable: true,
         draggable: true,
         editable: false,
-        // frozen: col.key === rowKey,
+        frozen: col.pk,
         width: undefined,
         renderHeaderCell: ({ column }) => {
           return (
@@ -59,7 +51,7 @@ export function XSBReferenceTableGrid({
           );
         },
         renderCell: ({ row, column }: RenderCellProps<any>) => {
-          const val = row[col.key as keyof XSupabaseReferenceTableRow];
+          const val = row[col.key as keyof GridDataXSBUnknown.DataGridRow];
           const display = masked
             ? val
               ? mask(val.toString())
@@ -82,7 +74,7 @@ export function XSBReferenceTableGrid({
 
   const rows = _rows.map((row) => {
     return Object.keys(row).reduce((acc, k) => {
-      const val = row[k as keyof XSupabaseReferenceTableRow];
+      const val = row[k as keyof GridDataXSBUnknown.DataGridRow];
       if (typeof val === "object") {
         return { ...acc, [k]: JSON.stringify(val) };
       }
@@ -96,9 +88,8 @@ export function XSBReferenceTableGrid({
       className="flex-grow select-none text-xs text-foreground/80"
       columns={columns}
       rows={rows}
-      onCellDoubleClick={(args) => {
-        const k = rowKey ? (args.row as any)[rowKey] : undefined;
-        onSelected?.(k, args.row);
+      onCellDoubleClick={({ row }) => {
+        onRowDoubleClick?.(row);
       }}
       renderers={{ noRowsFallback: <EmptyRowsRenderer loading={loading} /> }}
       rowKeyGetter={rowKey ? (row) => (row as any)[rowKey] : undefined}

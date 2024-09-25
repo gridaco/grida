@@ -87,7 +87,7 @@ export function EditorHelpFab() {
   useGAAuthenticatedUserIDTelemetry();
 
   return (
-    <div className="fixed right-4 bottom-4 z-50">
+    <div className="fixed right-4 bottom-4 z-30">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button className="rounded-full" size="icon">

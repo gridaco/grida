@@ -57,6 +57,7 @@ export function XSBSQLForeignKeySearchInput({
           type="search"
           placeholder="Search for reference..."
           {...props}
+          value={value}
           onChange={(e) => onValueChange?.(e.target.value)}
           className="group-hover:pr-8"
         />
@@ -108,6 +109,10 @@ function XSBSearchTableSheet({
             supabase_project_id={supabase_project_id}
             supabase_schema_name={supabase_schema_name}
             supabase_table_name={relation.referenced_table}
+            onRowDoubleClick={(row) => {
+              onValueChange?.(row[relation.referenced_column]);
+              props.onOpenChange?.(false);
+            }}
           />
         </div>
       </SheetContent>
@@ -162,10 +167,12 @@ function XSBSearchTableDataGrid({
   supabase_project_id,
   supabase_table_name,
   supabase_schema_name,
+  onRowDoubleClick,
 }: {
   supabase_project_id: number;
   supabase_table_name: string;
   supabase_schema_name: string;
+  onRowDoubleClick?: (value: GridaXSupabase.XDataRow) => void;
 }) {
   const { data, error } = useXSupabaseTableSearch({
     supabase_project_id,
@@ -176,11 +183,10 @@ function XSBSearchTableDataGrid({
     <div className="flex flex-col w-full h-full">
       <XSBReferenceTableGrid
         loading={!data?.data}
-        onSelected={(key, row) => {
-          //
-        }}
-        // rowKey={rowKey}
-        columns={GridDataXSBUnknown.columns(data?.meta?.table_schema)}
+        onRowDoubleClick={onRowDoubleClick}
+        columns={GridDataXSBUnknown.columns(data?.meta?.table_schema, {
+          sort: "unknown_table_column_priorities",
+        })}
         rows={data?.data ?? []}
       />
     </div>
