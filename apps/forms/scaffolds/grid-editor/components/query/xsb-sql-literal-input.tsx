@@ -95,18 +95,14 @@ export function XSBSQLLiteralInput({
             <SelectValue placeholder={"Select a value..."} />
           </SelectTrigger>
           <SelectContent>
-            {config.accepts_boolean && (
-              <>
-                <SelectItem value="true">
-                  <CheckboxIcon className="inline-flex align-middle w-4 h-4 me-1" />
-                  true
-                </SelectItem>
-                <SelectItem value="false">
-                  <BoxIcon className="inline-flex align-middle w-4 h-4 me-1" />
-                  false
-                </SelectItem>
-              </>
-            )}
+            <SelectItem value="true" disabled={!config.accepts_boolean}>
+              <CheckboxIcon className="inline-flex align-middle w-4 h-4 me-1" />
+              true
+            </SelectItem>
+            <SelectItem value="false" disabled={!config.accepts_boolean}>
+              <BoxIcon className="inline-flex align-middle w-4 h-4 me-1" />
+              false
+            </SelectItem>
             <SelectItem value="null">
               <ValueNoneIcon className="inline-flex align-middle w-4 h-4 me-1" />
               null
@@ -115,6 +111,25 @@ export function XSBSQLLiteralInput({
               <ValueIcon className="inline-flex align-middle w-4 h-4 me-1" />
               not null
             </SelectItem>
+          </SelectContent>
+        </Select>
+      );
+    case "select":
+      const { options } = config;
+      return (
+        <Select
+          value={(value as string) || undefined}
+          onValueChange={onValueChange}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Select a enum..." />
+          </SelectTrigger>
+          <SelectContent>
+            {options.map((option) => (
+              <SelectItem key={option} value={option}>
+                {option}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       );

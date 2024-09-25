@@ -37,7 +37,7 @@ export function XSBReferenceTableGrid<
         draggable: true,
         editable: false,
         frozen: col.pk,
-        width: undefined,
+        width: col.pk ? 100 : undefined,
         renderHeaderCell: ({ column }) => {
           return (
             <CellRoot className="flex items-center gap-1.5">
