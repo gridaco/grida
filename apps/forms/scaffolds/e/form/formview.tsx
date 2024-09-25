@@ -21,7 +21,7 @@ import {
   TossPaymentsPayButton,
 } from "@/components/tosspayments";
 import { StripePaymentFormFieldPreview } from "@/components/formfield/form-field-preview-payment-stripe";
-import { useFingerprint } from "@/scaffolds/fingerprint";
+import { useFingerprint } from "@/components/fingerprint";
 import {
   SYSTEM_GF_FINGERPRINT_VISITORID_KEY,
   SYSTEM_GF_SESSION_KEY,
