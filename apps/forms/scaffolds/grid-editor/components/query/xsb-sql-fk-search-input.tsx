@@ -17,6 +17,7 @@ import { Link2Icon } from "@radix-ui/react-icons";
 import React from "react";
 import useSWR, { BareFetcher } from "swr";
 import { GridDataXSBUnknown } from "../../grid-data-xsb-unknow";
+import { cn } from "@/utils";
 
 interface ISQLForeignKeyRelation {
   referenced_column: string;
@@ -31,6 +32,7 @@ export function XSBSQLForeignKeySearchInput({
   relation,
   supabase_project_id,
   supabase_schema_name,
+  className,
   ...props
 }: Omit<React.ComponentProps<typeof Input>, "onChange"> & {
   relation: ISQLForeignKeyRelation;
@@ -59,7 +61,7 @@ export function XSBSQLForeignKeySearchInput({
           {...props}
           value={value}
           onChange={(e) => onValueChange?.(e.target.value)}
-          className="group-hover:pr-8"
+          className={cn("group-hover:pr-8", className)}
         />
         <div className="absolute hidden group-hover:flex items-center justify-end right-2 top-2 bottom-2">
           <Button

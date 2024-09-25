@@ -70,7 +70,13 @@ export function XSBSQLLiteralInput({
           value={(value as string) || undefined}
           onValueChange={onValueChange}
         >
-          <SelectTrigger autoFocus={autoFocus}>
+          <SelectTrigger
+            autoFocus={autoFocus}
+            className={WorkbenchUI.selectVariants({
+              variant: "trigger",
+              size: "sm",
+            })}
+          >
             <SelectValue placeholder={"Select a value..."} />
           </SelectTrigger>
           <SelectContent>
@@ -91,7 +97,13 @@ export function XSBSQLLiteralInput({
           value={(value as string) || undefined}
           onValueChange={onValueChange}
         >
-          <SelectTrigger autoFocus={autoFocus}>
+          <SelectTrigger
+            autoFocus={autoFocus}
+            className={WorkbenchUI.selectVariants({
+              variant: "trigger",
+              size: "sm",
+            })}
+          >
             <SelectValue placeholder={"Select a value..."} />
           </SelectTrigger>
           <SelectContent>
@@ -121,7 +133,12 @@ export function XSBSQLLiteralInput({
           value={(value as string) || undefined}
           onValueChange={onValueChange}
         >
-          <SelectTrigger>
+          <SelectTrigger
+            className={WorkbenchUI.selectVariants({
+              variant: "trigger",
+              size: "sm",
+            })}
+          >
             <SelectValue placeholder="Select a enum..." />
           </SelectTrigger>
           <SelectContent>
@@ -141,6 +158,10 @@ export function XSBSQLLiteralInput({
           relation={config.relation}
           supabase_project_id={supabase.supabase_project_id}
           supabase_schema_name={supabase.supabase_schema_name}
+          className={WorkbenchUI.inputVariants({
+            variant: "input",
+            size: "sm",
+          })}
         />
       );
     case "json":

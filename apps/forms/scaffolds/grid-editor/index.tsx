@@ -60,8 +60,8 @@ import { saveAs } from "file-saver";
 import Papa from "papaparse";
 import { Gallery } from "../table-view-gallery/gallery";
 import {
-  XSupaDataGridFilter,
-  XSupaDataGridFilterTrigger,
+  PredicatesMenu,
+  PredicatesMenuTriggerButton,
 } from "./components/query";
 import { GridPagination } from "./components/pagination";
 import { Chartview } from "../table-view-chart/chartview";
@@ -499,9 +499,9 @@ function TableQueryToggles() {
       <GridLocalSearch />
       {"x_sb_main_table_connection" in tb && (
         <>
-          <XSupaDataGridFilter>
-            <XSupaDataGridFilterTrigger />
-          </XSupaDataGridFilter>
+          <PredicatesMenu>
+            <PredicatesMenuTriggerButton />
+          </PredicatesMenu>
           <XSupaDataGridSortMenu>
             <XSupaDataGridSortTrigger />
           </XSupaDataGridSortMenu>
