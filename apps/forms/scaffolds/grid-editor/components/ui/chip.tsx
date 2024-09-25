@@ -1,5 +1,5 @@
 import { Badge } from "@/components/ui/badge";
-import { IconButtonDotBadge } from "../dotbadge";
+import { IconButtonDotBadge } from "./dotbadge";
 import { cn } from "@/utils";
 import { CaretDownIcon } from "@radix-ui/react-icons";
 

@@ -23,7 +23,7 @@ import {
 import * as SelectPrimitive from "@radix-ui/react-select";
 import { operator_labels, supported_operators } from "./data";
 import { useDebounce } from "@uidotdev/usehooks";
-import { QueryChip } from "./chip";
+import { QueryChip } from "../ui/chip";
 import { GridaXSupabaseTypeMap } from "@/lib/x-supabase/typemap";
 import { useDataGridPredicates, useEditorState } from "@/scaffolds/editor/use";
 import {
@@ -39,43 +39,9 @@ import {
   TrashIcon,
 } from "@radix-ui/react-icons";
 import { ListFilterIcon } from "lucide-react";
-import { cn } from "@/utils";
 import { PopoverClose } from "@radix-ui/react-popover";
-import { IconButtonDotBadge } from "../dotbadge";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { Input } from "@/components/ui/input";
 import { WorkbenchUI } from "@/components/workbench";
-
-export function PredicatesMenuTriggerButton() {
-  const { isset } = useDataGridPredicates();
-
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className={cn(
-            "relative",
-            "text-muted-foreground",
-            isset && " text-accent-foreground"
-          )}
-        >
-          <ListFilterIcon
-            data-state={isset ? "on" : "off"}
-            className="w-4 h-4 text-muted-foreground data-[state='on']:text-workbench-accent-1"
-          />
-          {isset && <IconButtonDotBadge />}
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>Filter</TooltipContent>
-    </Tooltip>
-  );
-}
+import { QueryToggle } from "../ui/toggle";
 
 export function PredicatesMenu({ children }: React.PropsWithChildren<{}>) {
   const {

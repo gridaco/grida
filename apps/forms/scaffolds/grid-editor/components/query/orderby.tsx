@@ -1,7 +1,7 @@
 import { ArrowDownIcon, ArrowDownUpIcon, ArrowUpIcon } from "lucide-react";
 import { useDataGridOrderby } from "@/scaffolds/editor/use";
 import { XSupaDataGridSortMenu } from "../sort";
-import { QueryChip } from "./chip";
+import { QueryChip } from "../ui/chip";
 
 type SortIconType = "up" | "down" | "mixed";
 function SortIcon({

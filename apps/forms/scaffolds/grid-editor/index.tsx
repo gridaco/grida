@@ -34,7 +34,6 @@ import {
   GridLocalSearch,
   GridCount,
   TableViews,
-  XSupaDataGridSortTrigger,
 } from "./components";
 import * as GridLayout from "./components/layout";
 import { txt_n_plural } from "@/utils/plural";
@@ -59,16 +58,17 @@ import {
 import { saveAs } from "file-saver";
 import Papa from "papaparse";
 import { Gallery } from "../table-view-gallery/gallery";
-import {
-  PredicatesMenu,
-  PredicatesMenuTriggerButton,
-} from "./components/query";
+import { PredicatesMenu } from "./components/query";
 import { GridPagination } from "./components/pagination";
 import { Chartview } from "../table-view-chart/chartview";
 import { useMultiplayer } from "@/scaffolds/editor/multiplayer";
 import { PredicateChip, AddPrediateMenu } from "./components/query/predicate";
 import { OrderbyChip } from "./components/query/orderby";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import {
+  DataGridPredicatesMenuTriggerButton,
+  DataGridQueryOrderbyMenuTriggerButton,
+} from "./components/ui/toggle";
 
 function useSelectedCells(): DataGridCellSelectionCursor[] {
   const [state] = useEditorState();
@@ -97,7 +97,6 @@ function useSelectedCells(): DataGridCellSelectionCursor[] {
     return cellcursors;
   }, [
     multplayer.cursors,
-    multplayer.player.node,
     multplayer.player.cursor_id,
     state.datagrid_selected_cell,
   ]);
@@ -491,23 +490,24 @@ function GridaFormsResponsesExportCSV() {
 
 function TableQueryToggles() {
   const tb = useDatagridTable();
-
+  const { predicates, orderby, is_predicates_set, is_orderby_set } =
+    useDataGridQuery();
   if (!tb) return <></>;
 
   return (
-    <div className="flex items-center gap-1">
+    <GridLayout.HeaderMenuItems>
       <GridLocalSearch />
       {"x_sb_main_table_connection" in tb && (
         <>
           <PredicatesMenu>
-            <PredicatesMenuTriggerButton />
+            <DataGridPredicatesMenuTriggerButton active={is_predicates_set} />
           </PredicatesMenu>
           <XSupaDataGridSortMenu>
-            <XSupaDataGridSortTrigger />
+            <DataGridQueryOrderbyMenuTriggerButton active={is_orderby_set} />
           </XSupaDataGridSortMenu>
         </>
       )}
-    </div>
+    </GridLayout.HeaderMenuItems>
   );
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Cross2Icon, PlusIcon, TrashIcon } from "@radix-ui/react-icons";
+import { PlusIcon, TrashIcon } from "@radix-ui/react-icons";
 import {
   Select,
   SelectContent,
@@ -21,44 +21,9 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { ArrowDownUpIcon } from "lucide-react";
-import { cn } from "@/utils";
 import { PopoverClose } from "@radix-ui/react-popover";
-import { IconButtonDotBadge } from "./dotbadge";
 import { WorkbenchUI } from "@/components/workbench";
 import { useDataGridOrderby } from "@/scaffolds/editor/use";
-
-export function XSupaDataGridSortTrigger() {
-  const { isset } = useDataGridOrderby();
-
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className={cn(
-            "relative",
-            "text-muted-foreground",
-            isset && " text-accent-foreground"
-          )}
-        >
-          <ArrowDownUpIcon
-            data-state={isset ? "on" : "off"}
-            className="w-4 h-4 text-muted-foreground data-[state='on']:text-workbench-accent-1"
-          />
-          {isset && <IconButtonDotBadge />}
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>Sort</TooltipContent>
-    </Tooltip>
-  );
-}
 
 /**
  * this can also be used for form query, but at this moment, form does not have a db level field sorting query.

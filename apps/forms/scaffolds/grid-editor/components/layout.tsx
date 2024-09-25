@@ -30,6 +30,10 @@ export function HeaderMenus({ children }: React.PropsWithChildren<{}>) {
   return <div className="flex gap-2 items-center">{children}</div>;
 }
 
+export function HeaderMenuItems({ children }: React.PropsWithChildren<{}>) {
+  return <div className="flex gap-1 items-center">{children}</div>;
+}
+
 export function HeaderSeparator() {
   return <div className="border-r h-6" />;
 }
