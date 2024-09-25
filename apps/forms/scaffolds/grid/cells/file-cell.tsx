@@ -30,8 +30,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import type { GFFile } from "./types";
-import { useMediaViewer } from "../mediaviewer";
+import type { GFFile } from "../types";
+import { useMediaViewer } from "../../mediaviewer";
 import {
   Tooltip,
   TooltipContent,
@@ -39,7 +39,7 @@ import {
 } from "@/components/ui/tooltip";
 import React, { useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { MediaPicker } from "../mediapicker";
+import { MediaPicker } from "../../mediapicker";
 import { FileTypeIcon } from "@/components/form-field-type-icon";
 import toast from "react-hot-toast";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";

@@ -21,7 +21,7 @@ import { EnterFullScreenIcon } from "@radix-ui/react-icons";
 import { useEditorState } from "../editor";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CheckedState } from "@radix-ui/react-checkbox";
-import { CellRoot } from "./cell";
+import { CellRoot } from "./cells/cell";
 import { useCellRootProps } from "./hooks";
 
 function stopPropagation(event: SyntheticEvent) {

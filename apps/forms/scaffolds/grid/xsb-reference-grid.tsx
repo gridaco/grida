@@ -5,7 +5,7 @@ import DataGrid, { Column, RenderCellProps } from "react-data-grid";
 import { EmptyRowsRenderer } from "./empty";
 import Highlight from "@/components/highlight";
 import { mask } from "./mask";
-import { CellRoot } from "./cell";
+import { CellRoot } from "./cells/cell";
 import { GridDataXSBUnknown } from "../grid-editor/grid-data-xsb-unknow";
 import "./grid.css";
 

@@ -10,7 +10,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useFormAgentState } from "@/lib/formstate";
-import { XSBReferenceTableGrid } from "@/scaffolds/grid/reference-grid";
+import { XSBReferenceTableGrid } from "@/scaffolds/grid/xsb-reference-grid";
 import { GridaXSupabase } from "@/types";
 import useSWR from "swr";
 import { useMemo, useState } from "react";

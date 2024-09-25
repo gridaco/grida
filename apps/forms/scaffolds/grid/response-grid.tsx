@@ -16,7 +16,7 @@ import {
   ArrowRightIcon,
 } from "@radix-ui/react-icons";
 import { FormInputType } from "@/types";
-import { JsonPopupEditorCell } from "./json-cell";
+import { JsonPopupEditorCell } from "./cells/json-cell";
 import { useEditorState } from "../editor";
 import type {
   DataGridCellSelectionCursor,
@@ -41,14 +41,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FileEditCell } from "./file-cell";
-import { RichTextEditCell } from "./richtext-cell";
+import { FileEditCell } from "./cells/file-cell";
+import { RichTextEditCell } from "./cells/richtext-cell";
 import Highlight from "@/components/highlight";
 import { FieldSupports } from "@/k/supported_field_types";
 import { format } from "date-fns";
 import { EmptyRowsRenderer } from "./empty";
-import { ColumnHeaderCell } from "./column-header-cell";
-import { CellRoot, DataGridCellRootProps } from "./cell";
+import { ColumnHeaderCell } from "./cells/column-header-cell";
+import { CellRoot, DataGridCellRootProps } from "./cells/cell";
 import { cn } from "@/utils";
 import "./grid.css";
 import { GridMultiplayerProvider, useCellSelection } from "./multiplayer";

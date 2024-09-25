@@ -13,7 +13,7 @@ import { FormInputType } from "@/types";
 import { ChevronDownIcon, Pencil1Icon, TrashIcon } from "@radix-ui/react-icons";
 import { RenderHeaderCellProps } from "react-data-grid";
 import { CellRoot } from "./cell";
-import { useCellRootProps } from "./hooks";
+import { useCellRootProps } from "../hooks";
 export const ColumnHeaderCell = React.forwardRef(function ColumnHeaderCell(
   {
     column,

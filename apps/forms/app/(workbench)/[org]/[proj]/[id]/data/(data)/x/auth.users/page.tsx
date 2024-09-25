@@ -11,7 +11,7 @@ import {
   TableViews,
 } from "@/scaffolds/grid-editor/components";
 import * as GridLayout from "@/scaffolds/grid-editor/components/layout";
-import { XSBReferenceTableGrid } from "@/scaffolds/grid/reference-grid";
+import { XSBReferenceTableGrid } from "@/scaffolds/grid/xsb-reference-grid";
 import { GridaXSupabase } from "@/types";
 import { EditorApiResponse } from "@/types/private/api";
 import { useEffect, useMemo } from "react";

@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useEditorState } from "../editor";
-import { DataGridCellRootProps } from "./cell";
+import { DataGridCellRootProps } from "./cells/cell";
 import { useCellSelection } from "./multiplayer";
 import { mask } from "./mask";
 
