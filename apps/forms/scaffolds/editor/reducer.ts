@@ -9,20 +9,20 @@ import type {
   OpenCustomerDetailsPanelAction,
   OpenFieldEditPanelAction,
   OpenRecordEditPanelAction,
-  DataGridRowsPerPageAction,
-  DataGridPageAction,
+  DataGridQueryRowsPerPageAction,
+  DataGridQueryPageAction,
   DataGridTableAction,
   DataGridDateFormatAction,
   DataGridDateTZAction,
   DataGridLocalFilterAction,
   DataTableRefreshAction,
   DataTableLoadingAction,
-  DataGridOrderByAction,
-  DataGridOrderByClearAction,
-  DataGridPredicatesAddAction,
-  DataGridPredicatesUpdateAction,
-  DataGridPredicatesClearAction,
-  DataGridPredicatesRemoveAction,
+  DataGridQueryOrderByAction,
+  DataGridQueryOrderByClearAction,
+  DataGridQueryPredicatesAddAction,
+  DataGridQueryPredicatesUpdateAction,
+  DataGridQueryPredicatesClearAction,
+  DataGridQueryPredicatesRemoveAction,
   EditorThemeLangAction,
   EditorThemePaletteAction,
   EditorThemeFontFamilyAction,
@@ -157,8 +157,8 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
       });
     }
 
-    case "editor/data-grid/rows-per-page": {
-      const { limit } = <DataGridRowsPerPageAction>action;
+    case "editor/data-grid/query/rows-per-page": {
+      const { limit } = <DataGridQueryRowsPerPageAction>action;
       return produce(state, (draft) => {
         draft.datagrid_query!.q_page_limit = limit;
 
@@ -166,8 +166,8 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
         draft.datagrid_query!.q_page_index = 0;
       });
     }
-    case "editor/data-grid/page": {
-      const { index } = <DataGridPageAction>action;
+    case "editor/data-grid/query/page": {
+      const { index } = <DataGridQueryPageAction>action;
       return produce(state, (draft) => {
         draft.datagrid_query!.q_page_index = index;
       });
@@ -268,8 +268,8 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
         };
       });
     }
-    case "editor/data-grid/orderby": {
-      const { column_id, data } = <DataGridOrderByAction>action;
+    case "editor/data-grid/query/orderby": {
+      const { column_id, data } = <DataGridQueryOrderByAction>action;
       return produce(state, (draft) => {
         if (data === null) {
           delete draft.datagrid_query!.q_orderby[column_id];
@@ -283,22 +283,22 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
         on_datagrid_query_change(draft, { view_id: tmp_view_id(draft) });
       });
     }
-    case "editor/data-grid/orderby/clear": {
-      const {} = <DataGridOrderByClearAction>action;
+    case "editor/data-grid/query/orderby/clear": {
+      const {} = <DataGridQueryOrderByClearAction>action;
       return produce(state, (draft) => {
         draft.datagrid_query!.q_orderby = {};
         on_datagrid_query_change(draft, { view_id: tmp_view_id(draft) });
       });
     }
-    case "editor/data-grid/predicates/add": {
-      const { predicate } = <DataGridPredicatesAddAction>action;
+    case "editor/data-grid/query/predicates/add": {
+      const { predicate } = <DataGridQueryPredicatesAddAction>action;
       return produce(state, (draft) => {
         draft.datagrid_query!.q_predicates.push(predicate);
         on_datagrid_query_change(draft, { view_id: tmp_view_id(draft) });
       });
     }
-    case "editor/data-grid/predicates/update": {
-      const { index, predicate } = <DataGridPredicatesUpdateAction>action;
+    case "editor/data-grid/query/predicates/update": {
+      const { index, predicate } = <DataGridQueryPredicatesUpdateAction>action;
       return produce(state, (draft) => {
         const prev = draft.datagrid_query!.q_predicates[index];
         draft.datagrid_query!.q_predicates[index] = {
@@ -308,15 +308,15 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
         on_datagrid_query_change(draft, { view_id: tmp_view_id(draft) });
       });
     }
-    case "editor/data-grid/predicates/remove": {
-      const { index } = <DataGridPredicatesRemoveAction>action;
+    case "editor/data-grid/query/predicates/remove": {
+      const { index } = <DataGridQueryPredicatesRemoveAction>action;
       return produce(state, (draft) => {
         draft.datagrid_query!.q_predicates.splice(index, 1);
         on_datagrid_query_change(draft, { view_id: tmp_view_id(draft) });
       });
     }
-    case "editor/data-grid/predicates/clear": {
-      const {} = <DataGridPredicatesClearAction>action;
+    case "editor/data-grid/query/predicates/clear": {
+      const {} = <DataGridQueryPredicatesClearAction>action;
       return produce(state, (draft) => {
         draft.datagrid_query!.q_predicates = [];
         on_datagrid_query_change(draft, { view_id: tmp_view_id(draft) });

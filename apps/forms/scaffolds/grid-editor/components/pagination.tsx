@@ -22,7 +22,7 @@ function useDatagridPagination() {
 
   const paginate = useCallback(
     (index: number) => {
-      dispatch({ type: "editor/data-grid/page", index });
+      dispatch({ type: "editor/data-grid/query/page", index });
     },
     [dispatch]
   );

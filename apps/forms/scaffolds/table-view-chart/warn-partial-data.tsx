@@ -34,7 +34,7 @@ export function ChartPartialDataAlert({
 
   const onLoadMax = useCallback(() => {
     dispatch({
-      type: "editor/data-grid/rows-per-page",
+      type: "editor/data-grid/query/rows-per-page",
       limit: 1000,
     });
   }, [dispatch]);

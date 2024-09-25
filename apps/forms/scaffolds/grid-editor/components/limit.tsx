@@ -17,7 +17,7 @@ export function GridLimit() {
         value={state.datagrid_query?.q_page_limit + ""}
         onValueChange={(value) => {
           dispatch({
-            type: "editor/data-grid/rows-per-page",
+            type: "editor/data-grid/query/rows-per-page",
             limit: parseInt(value),
           });
         }}
@@ -31,7 +31,6 @@ export function GridLimit() {
           <SelectValue placeholder="rows" />
         </SelectTrigger>
         <SelectContent>
-          <></>
           <SelectItem value={10 + ""}>10 rows</SelectItem>
           <SelectItem value={100 + ""}>100 rows</SelectItem>
           <SelectItem value={500 + ""}>500 rows</SelectItem>

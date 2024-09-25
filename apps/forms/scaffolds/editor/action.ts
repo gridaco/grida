@@ -42,7 +42,7 @@ export type EditorAction =
   //
   | FeedCustomerAction
   //
-  | DataGridPaginationAction
+  | DataGridQueryPaginationAction
   | DataGridTableAction
   | DataGridTableViewAction
   | DataGridSelectCellAction
@@ -50,6 +50,7 @@ export type EditorAction =
   | DataGridDateFormatAction
   | DataGridDateTZAction
   | DataGridQueryAction
+  | DataGridLocalFilterAction
   | DataTableRefreshAction
   | DataTableLoadingAction
   | EditorThemeLangAction
@@ -262,37 +263,38 @@ export type DataGridTableViewAction = {
   view_id: string;
 };
 
-// #region pagination
-type DataGridPaginationAction = DataGridRowsPerPageAction | DataGridPageAction;
+export interface DataGridLocalFilterAction
+  extends Partial<EditorState["datagrid_local_filter"]> {
+  type: "editor/data-grid/local-filter";
+}
 
-export interface DataGridRowsPerPageAction {
-  type: "editor/data-grid/rows-per-page";
+// #region pagination
+type DataGridQueryPaginationAction =
+  | DataGridQueryRowsPerPageAction
+  | DataGridQueryPageAction;
+
+export interface DataGridQueryRowsPerPageAction {
+  type: "editor/data-grid/query/rows-per-page";
   limit: number;
 }
 
-export interface DataGridPageAction {
-  type: "editor/data-grid/page";
+export interface DataGridQueryPageAction {
+  type: "editor/data-grid/query/page";
   index: number;
 }
 // #endregion pagination
 
 // #region query
 type DataGridQueryAction =
-  | DataGridLocalFilterAction
-  | DataGridOrderByAction
-  | DataGridOrderByClearAction
-  | DataGridPredicatesAddAction
-  | DataGridPredicatesUpdateAction
-  | DataGridPredicatesRemoveAction
-  | DataGridPredicatesClearAction;
+  | DataGridQueryOrderByAction
+  | DataGridQueryOrderByClearAction
+  | DataGridQueryPredicatesAddAction
+  | DataGridQueryPredicatesUpdateAction
+  | DataGridQueryPredicatesRemoveAction
+  | DataGridQueryPredicatesClearAction;
 
-export interface DataGridLocalFilterAction
-  extends Partial<EditorState["datagrid_local_filter"]> {
-  type: "editor/data-grid/local-filter";
-}
-
-export interface DataGridOrderByAction {
-  type: "editor/data-grid/orderby";
+export interface DataGridQueryOrderByAction {
+  type: "editor/data-grid/query/orderby";
   column_id: string;
   data: {
     ascending?: boolean;
@@ -300,28 +302,28 @@ export interface DataGridOrderByAction {
   } | null;
 }
 
-export interface DataGridOrderByClearAction {
-  type: "editor/data-grid/orderby/clear";
+export interface DataGridQueryOrderByClearAction {
+  type: "editor/data-grid/query/orderby/clear";
 }
 
-export interface DataGridPredicatesAddAction {
-  type: "editor/data-grid/predicates/add";
+export interface DataGridQueryPredicatesAddAction {
+  type: "editor/data-grid/query/predicates/add";
   predicate: SQLPredicate;
 }
 
-export interface DataGridPredicatesUpdateAction {
-  type: "editor/data-grid/predicates/update";
+export interface DataGridQueryPredicatesUpdateAction {
+  type: "editor/data-grid/query/predicates/update";
   index: number;
   predicate: Partial<SQLPredicate>;
 }
 
-export interface DataGridPredicatesRemoveAction {
-  type: "editor/data-grid/predicates/remove";
+export interface DataGridQueryPredicatesRemoveAction {
+  type: "editor/data-grid/query/predicates/remove";
   index: number;
 }
 
-export interface DataGridPredicatesClearAction {
-  type: "editor/data-grid/predicates/clear";
+export interface DataGridQueryPredicatesClearAction {
+  type: "editor/data-grid/query/predicates/clear";
 }
 
 // #endregion query
