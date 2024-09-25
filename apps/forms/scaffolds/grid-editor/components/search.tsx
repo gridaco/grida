@@ -1,31 +1,24 @@
 "use client";
 
-import React, { useCallback, useMemo, useState } from "react";
-import { useEditorState } from "../../editor";
+import React from "react";
 import { SearchInput } from "@/components/extension/search-input";
-import { useDebounceCallback } from "usehooks-ts";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-export function GridLocalSearch() {
-  const [state, dispatch] = useEditorState();
-
-  const onSearchChange = useDebounceCallback((txt: string) => {
-    dispatch({
-      type: "editor/data-grid/local-filter",
-      localsearch: txt,
-    });
-  }, 250);
-
+export function GridLocalSearch({
+  onValueChange,
+}: {
+  onValueChange?: (txt: string) => void;
+}) {
   return (
     <Tooltip>
       <TooltipTrigger>
         <SearchInput
           placeholder="Search locally"
-          onChange={(e) => onSearchChange(e.target.value)}
+          onChange={(e) => onValueChange?.(e.target.value)}
           className="max-w-sm"
           variant="icon"
         />

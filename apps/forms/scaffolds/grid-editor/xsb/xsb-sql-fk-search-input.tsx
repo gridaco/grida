@@ -31,6 +31,7 @@ import {
   DataQueryOrderbyChip,
   DataQueryPredicateChip,
   DataQueryPrediateAddMenu,
+  GridLocalSearch,
 } from "@/scaffolds/grid-editor/components";
 import { WorkbenchUI } from "@/components/workbench";
 import {
@@ -42,6 +43,8 @@ import { Data } from "@/lib/data";
 import toast from "react-hot-toast";
 import { XPostgrestQuery } from "@/lib/supabase-postgrest/builder";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { useLocalFuzzySearch } from "@/hooks/use-fuzzy-search";
+import { SearchInput } from "@/components/extension/search-input";
 
 interface ISQLForeignKeyRelation {
   referenced_column: string;
@@ -205,6 +208,7 @@ function XSBSearchTableDataGrid({
   supabase_schema_name: string;
   onRowDoubleClick?: (value: GridaXSupabase.XDataRow) => void;
 }) {
+  const [localSearch, setLocalSearch] = useState<string>("");
   const [schema, setSchema] = useState<GridaXSupabase.JSONSChema | null>(null);
   const [count, setCount] = useState<number | null>(null);
   const query = useStandaloneSchemaDataQuery({
@@ -242,6 +246,13 @@ function XSBSearchTableDataGrid({
     }
   }, [data?.error]);
 
+  const result = useLocalFuzzySearch(localSearch, {
+    data: data?.data ?? [],
+    keys: Object.keys(schema?.properties ?? {}),
+  });
+
+  const rows = result.map((r) => r.item);
+
   return (
     <GridLayout.Root>
       <GridLayout.Header>
@@ -258,6 +269,7 @@ function XSBSearchTableDataGrid({
                   active={query.isOrderbySet}
                 />
               </DataQueryOrderByMenu>
+              <GridLocalSearch onValueChange={setLocalSearch} />
             </GridLayout.HeaderMenuItems>
           </GridLayout.HeaderMenus>
         </GridLayout.HeaderLine>
@@ -295,11 +307,12 @@ function XSBSearchTableDataGrid({
       <GridLayout.Content>
         <XSBReferenceTableGrid
           loading={!data?.data}
+          tokens={localSearch ? [localSearch] : undefined}
           onRowDoubleClick={onRowDoubleClick}
           columns={GridDataXSBUnknown.columns(data?.meta?.table_schema, {
             sort: "unknown_table_column_priorities",
           })}
-          rows={data?.data ?? []}
+          rows={rows ?? []}
         />
       </GridLayout.Content>
       <GridLayout.Footer>
@@ -311,7 +324,7 @@ function XSBSearchTableDataGrid({
           />
         </div>
         <GridLayout.FooterSeparator />
-        <GridQueryCount count={data?.count} keyword="record" />
+        <GridQueryCount count={count} keyword="record" />
         <GridLayout.FooterSeparator />
         <GridRefreshButton />
       </GridLayout.Footer>

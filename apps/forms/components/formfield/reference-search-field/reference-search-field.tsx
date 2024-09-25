@@ -13,8 +13,7 @@ import { useFormAgentState } from "@/lib/formstate";
 import { XSBReferenceTableGrid } from "@/scaffolds/grid/xsb-reference-grid";
 import { GridaXSupabase } from "@/types";
 import useSWR from "swr";
-import { useMemo, useState } from "react";
-import Fuse from "fuse.js";
+import { useState } from "react";
 import { SearchInput } from "@/components/extension/search-input";
 import "react-data-grid/lib/styles.css";
 import {
@@ -28,6 +27,7 @@ import { GridDataXSBUnknown } from "@/scaffolds/grid-editor/grid-data-xsb-unknow
 import * as GridLayout from "@/scaffolds/grid-editor/components/layout";
 import { WorkbenchUI } from "@/components/workbench";
 import toast from "react-hot-toast";
+import { useLocalFuzzySearch } from "@/hooks/use-fuzzy-search";
 
 export function ReferenceSearchPreview(
   props: React.ComponentProps<typeof SearchInput>
@@ -73,19 +73,12 @@ export function ReferenceSearch({
 
   const fulltable = [schema, table].filter(Boolean).join(".");
 
-  const fuse = useMemo(() => {
-    return new Fuse(_rows ?? [], {
-      keys: Object.keys(table_schema?.properties ?? {}),
-    });
-  }, [_rows, table_schema]);
+  const result = useLocalFuzzySearch(localSearch, {
+    data: _rows ?? [],
+    keys: Object.keys(table_schema?.properties ?? {}),
+  });
 
-  const rows = useMemo(() => {
-    if (!localSearch) {
-      return _rows;
-    }
-
-    return fuse.search(localSearch).map((r) => r.item);
-  }, [fuse, localSearch, _rows]);
+  const rows = result.map((r) => r.item);
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>

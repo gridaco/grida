@@ -18,7 +18,11 @@ import { useMemo } from "react";
 import { GridData } from "@/scaffolds/grid-editor/grid-data";
 import { Customer } from "@/types";
 import { EditorSymbols } from "@/scaffolds/editor/symbols";
-import { useDataGridQuery, useDataGridRefresh } from "@/scaffolds/editor/use";
+import {
+  useDataGridLocalSearch,
+  useDataGridQuery,
+  useDataGridRefresh,
+} from "@/scaffolds/editor/use";
 
 export default function Customers() {
   const [state] = useEditorState();
@@ -30,6 +34,7 @@ export default function Customers() {
 
   const refresh = useDataGridRefresh();
   const query = useDataGridQuery();
+  const search = useDataGridLocalSearch();
 
   const rows = useMemo(() => {
     const { filtered } = GridData.rows({
@@ -63,7 +68,7 @@ export default function Customers() {
         <GridLayout.Header>
           <GridLayout.HeaderMenus>
             <TableViews />
-            <GridLocalSearch />
+            <GridLocalSearch onValueChange={search} />
           </GridLayout.HeaderMenus>
           <GridLayout.HeaderMenus>
             <GridViewSettings />

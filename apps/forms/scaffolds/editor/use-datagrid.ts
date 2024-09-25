@@ -8,15 +8,8 @@ import type {
   GDocFormsXSBTable,
   GDocSchemaTableProviderXSupabase,
 } from "@/scaffolds/editor/state";
-import assert from "assert";
-import {
-  useStandaloneSchemaDataQueryConsumer,
-  type DataQueryPaginationIndexDispatcher,
-  type DataQueryPaginationLimitDispatcher,
-  type DataQueryPaginationNextDispatcher,
-  type DataQueryPaginationPrevDispatcher,
-  type IDataQueryPaginationConsumer,
-} from "../data-query";
+import { useStandaloneSchemaDataQueryConsumer } from "../data-query";
+import { useDebounceCallback } from "usehooks-ts";
 
 export function useDatagridTable<T extends GDocTable>():
   | Extract<GDocTable, T>
@@ -48,6 +41,17 @@ export function useDataGridRefresh() {
     refreshing: datagrid_isloading,
     refresh: refresh,
   };
+}
+
+export function useDataGridLocalSearch(delay: number = 250) {
+  const [state, dispatch] = useEditorState();
+
+  return useDebounceCallback((txt: string) => {
+    dispatch({
+      type: "editor/data-grid/local-filter",
+      localsearch: txt,
+    });
+  }, delay);
 }
 
 //

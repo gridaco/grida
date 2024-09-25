@@ -21,7 +21,11 @@ import { EditorSymbols } from "@/scaffolds/editor/symbols";
 import { XPostgrestQuery } from "@/lib/supabase-postgrest/builder";
 import useSWR from "swr";
 import { GridDataXSBUnknown } from "@/scaffolds/grid-editor/grid-data-xsb-unknow";
-import { useDataGridQuery, useDataGridRefresh } from "@/scaffolds/editor/use";
+import {
+  useDataGridLocalSearch,
+  useDataGridQuery,
+  useDataGridRefresh,
+} from "@/scaffolds/editor/use";
 
 export default function XTablePage() {
   const [state, dispatch] = useEditorState();
@@ -30,6 +34,7 @@ export default function XTablePage() {
 
   const refresh = useDataGridRefresh();
   const query = useDataGridQuery();
+  const search = useDataGridLocalSearch();
 
   const serachParams = useMemo(() => {
     if (!datagrid_query) return;
@@ -98,7 +103,7 @@ export default function XTablePage() {
         <GridLayout.Header>
           <GridLayout.HeaderMenus>
             <TableViews />
-            <GridLocalSearch />
+            <GridLocalSearch onValueChange={search} />
           </GridLayout.HeaderMenus>
           <GridLayout.HeaderMenus>
             <GridViewSettings />

@@ -51,6 +51,7 @@ import {
 import { Columns3Icon, Rows3Icon } from "lucide-react";
 import {
   useDatabaseTableId,
+  useDataGridLocalSearch,
   useDataGridQuery,
   useDataGridRefresh,
   useDatagridTableAttributes,
@@ -515,12 +516,14 @@ function GridaFormsResponsesExportCSV() {
 function TableQueryToggles() {
   const tb = useDatagridTable();
   const query = useDataGridQuery();
+  const search = useDataGridLocalSearch();
+
   const { isPredicatesSet, isOrderbySet } = query;
   if (!tb) return <></>;
 
   return (
     <GridLayout.HeaderMenuItems>
-      <GridLocalSearch />
+      <GridLocalSearch onValueChange={search} />
       {"x_sb_main_table_connection" in tb && (
         <>
           <DataQueryPredicatesMenu {...query}>
