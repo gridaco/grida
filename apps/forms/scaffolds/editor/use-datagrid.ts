@@ -10,6 +10,10 @@ import type {
 } from "@/scaffolds/editor/state";
 import type { SQLPredicate } from "@/types";
 import assert from "assert";
+import {
+  useDataQueryOrderbyConsumer,
+  useDataQueryPredicatesConsumer,
+} from "../data-query";
 
 export function useDatagridTable<T extends GDocTable>():
   | Extract<GDocTable, T>
@@ -36,72 +40,18 @@ export function useDatagridTableSpace() {
 export function useDataGridOrderby() {
   const [state, dispatch] = useEditorState();
 
-  const { datagrid_query } = state;
-  assert(datagrid_query);
-
-  const { q_orderby } = datagrid_query;
-
   const table = useDatagridTable<
     GDocFormsXSBTable | GDocSchemaTableProviderXSupabase
   >();
 
-  const properties =
-    table?.x_sb_main_table_connection.sb_table_schema.properties ?? {};
-
-  const isset = Object.keys(q_orderby).length > 0;
-
-  const keys = Object.keys(properties);
-  const usedkeys = Object.keys(q_orderby);
-  const unusedkeys = keys.filter((key) => !usedkeys.includes(key));
-
-  const onClear = useCallback(() => {
-    dispatch({ type: "data/query/orderby/clear" });
-  }, [dispatch]);
-
-  const onAdd = useCallback(
-    (column_id: string) => {
-      dispatch({
-        type: "data/query/orderby",
-        column_id: column_id,
-        data: {},
-      });
-    },
-    [dispatch]
-  );
-
-  const onUpdate = useCallback(
-    (column_id: string, data: { ascending?: boolean }) => {
-      dispatch({
-        type: "data/query/orderby",
-        column_id: column_id,
-        data: data,
-      });
-    },
-    [dispatch]
-  );
-
-  const onRemove = useCallback(
-    (column_id: string) => {
-      dispatch({
-        type: "data/query/orderby",
-        column_id: column_id,
-        data: null,
-      });
-    },
-    [dispatch]
+  const consumer = useDataQueryOrderbyConsumer(
+    [state.datagrid_query!, dispatch],
+    table?.x_sb_main_table_connection.sb_table_schema ?? null
   );
 
   return {
     table,
-    orderby: q_orderby,
-    isset,
-    properties,
-    usedkeys,
-    unusedkeys,
-    onClear,
-    onAdd,
-    onUpdate,
-    onRemove,
+    ...consumer,
   };
 }
 
@@ -112,65 +62,14 @@ export function useDataGridPredicates() {
     GDocFormsXSBTable | GDocSchemaTableProviderXSupabase
   >();
 
-  const properties =
-    table?.x_sb_main_table_connection.sb_table_schema.properties ?? {};
-
-  const attributes = Object.keys(properties);
-
-  const { datagrid_query } = state;
-  assert(datagrid_query);
-
-  const { q_predicates } = datagrid_query;
-
-  const isset = q_predicates.length > 0;
-
-  const add = useCallback(
-    (predicate: SQLPredicate) => {
-      dispatch({
-        type: "data/query/predicates/add",
-        predicate: predicate,
-      });
-    },
-    [dispatch]
+  const consumer = useDataQueryPredicatesConsumer(
+    [state.datagrid_query!, dispatch],
+    table?.x_sb_main_table_connection.sb_table_schema ?? null
   );
-
-  const update = useCallback(
-    (index: number, predicate: Partial<SQLPredicate>) => {
-      dispatch({
-        type: "data/query/predicates/update",
-        index: index,
-        predicate: predicate,
-      });
-    },
-    [dispatch]
-  );
-
-  const remove = useCallback(
-    (index: number) => {
-      dispatch({
-        type: "data/query/predicates/remove",
-        index: index,
-      });
-    },
-    [dispatch]
-  );
-
-  const clear = useCallback(() => {
-    dispatch({
-      type: "data/query/predicates/clear",
-    });
-  }, [dispatch]);
 
   return {
     table,
-    isset,
-    properties,
-    attributes,
-    predicates: q_predicates,
-    add,
-    update,
-    remove,
-    clear,
+    ...consumer,
   };
 }
 

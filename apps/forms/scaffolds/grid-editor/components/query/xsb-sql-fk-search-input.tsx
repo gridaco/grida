@@ -20,6 +20,11 @@ import { GridDataXSBUnknown } from "../../grid-data-xsb-unknow";
 import { cn } from "@/utils";
 import * as GridLayout from "@/scaffolds/grid-editor/components/layout";
 import { WorkbenchUI } from "@/components/workbench";
+import {
+  StandaloneDataQueryProvider,
+  useStandaloneSchemaDataQuery,
+} from "@/scaffolds/data-query";
+import { Data } from "@/lib/data";
 
 interface ISQLForeignKeyRelation {
   referenced_column: string;
@@ -108,15 +113,19 @@ function XSBSearchTableSheet({
             </code>
           </SheetDescription>
         </SheetHeader>
-        <XSBSearchTableDataGrid
-          supabase_project_id={supabase_project_id}
-          supabase_schema_name={supabase_schema_name}
-          supabase_table_name={relation.referenced_table}
-          onRowDoubleClick={(row) => {
-            onValueChange?.(row[relation.referenced_column]);
-            props.onOpenChange?.(false);
-          }}
-        />
+        <StandaloneDataQueryProvider
+          initial={Data.Relation.INITIAL_QUERY_STATE}
+        >
+          <XSBSearchTableDataGrid
+            supabase_project_id={supabase_project_id}
+            supabase_schema_name={supabase_schema_name}
+            supabase_table_name={relation.referenced_table}
+            onRowDoubleClick={(row) => {
+              onValueChange?.(row[relation.referenced_column]);
+              props.onOpenChange?.(false);
+            }}
+          />
+        </StandaloneDataQueryProvider>
       </SheetContent>
     </Sheet>
   );
@@ -176,6 +185,8 @@ function XSBSearchTableDataGrid({
   supabase_schema_name: string;
   onRowDoubleClick?: (value: GridaXSupabase.XDataRow) => void;
 }) {
+  const { orderby, predicates } = useStandaloneSchemaDataQuery(null);
+
   const { data, error } = useXSupabaseTableSearch({
     supabase_project_id,
     supabase_table_name,
@@ -184,7 +195,15 @@ function XSBSearchTableDataGrid({
   return (
     <GridLayout.Root>
       <GridLayout.Header>
-        <GridLayout.HeaderLine>{/*  */}</GridLayout.HeaderLine>
+        <GridLayout.HeaderLine>
+          <GridLayout.HeaderMenus>
+            <GridLayout.HeaderMenuItems>
+              {/* 
+              <TableQueryToggles />
+           */}
+            </GridLayout.HeaderMenuItems>
+          </GridLayout.HeaderMenus>
+        </GridLayout.HeaderLine>
       </GridLayout.Header>
       <GridLayout.Content>
         <XSBReferenceTableGrid
@@ -196,7 +215,17 @@ function XSBSearchTableDataGrid({
           rows={data?.data ?? []}
         />
       </GridLayout.Content>
-      <GridLayout.Footer>{/*  */}</GridLayout.Footer>
+      <GridLayout.Footer>
+        {/* <div className="flex gap-4 items-center">
+          <GridPagination />
+          <GridLimit />
+        </div>
+        <GridLayout.FooterSeparator />
+        <GridCount count={count ?? rows?.length} keyword="record" />
+        <GridLayout.FooterSeparator />
+        <GridRefresh />
+         */}
+      </GridLayout.Footer>
     </GridLayout.Root>
   );
 }

@@ -22,6 +22,7 @@ import { FormFieldDefinition, GridaXSupabase } from "@/types";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { nanoid } from "nanoid";
 import { DataGridLocalPreferencesStorage } from "./storage/datagrid.storage";
+import { Data } from "@/lib/data";
 
 export function initialEditorState(init: EditorInit): EditorState {
   switch (init.doctype) {
@@ -86,13 +87,7 @@ export function initialDatagridState(
 ): Omit<IDataGridState, "datagrid_table_id"> {
   const cleared: Omit<IDataGridState, "datagrid_table_id"> = {
     datagrid_selected_rows: new Set(),
-    datagrid_query: {
-      q_page_limit: 100,
-      q_page_index: 0,
-      q_refresh_key: 0,
-      q_orderby: {},
-      q_predicates: [],
-    },
+    datagrid_query: Data.Relation.INITIAL_QUERY_STATE,
     datagrid_query_estimated_count: null,
     datagrid_isloading: false,
     datagrid_local_filter: {

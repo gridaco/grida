@@ -1,5 +1,5 @@
 import produce from "immer";
-import type { DataGridQueryState } from "./data-query.provider";
+import type { DataQueryState } from "./data-query.provider";
 import type {
   DataQueryAction,
   DataQueryPageLimitAction,
@@ -13,9 +13,9 @@ import type {
 } from "./data-query.action";
 
 export default function reducer(
-  state: DataGridQueryState,
+  state: DataQueryState,
   action: DataQueryAction
-): DataGridQueryState {
+): DataQueryState {
   switch (action.type) {
     case "data/query/page-limit": {
       const { limit } = <DataQueryPageLimitAction>action;
