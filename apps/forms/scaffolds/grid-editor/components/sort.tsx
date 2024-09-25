@@ -80,6 +80,10 @@ export function XSupaDataGridSortMenu({
     onRemove,
   } = useDataGridOrderby();
 
+  if (!isset) {
+    return <AddOrderbyMenu>{children}</AddOrderbyMenu>;
+  }
+
   return (
     <Popover modal>
       <PopoverTrigger>{children}</PopoverTrigger>
@@ -154,24 +158,12 @@ export function XSupaDataGridSortMenu({
           </div>
         </section>
         <section className="flex flex-col">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild className="min-w-40">
-              <Button variant="ghost" size="sm" className="flex justify-start">
-                <PlusIcon className="w-4 h-4 me-2 align-middle" /> Pick a column
-                to sort by
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              {unusedkeys.map((key) => (
-                <DropdownMenuItem key={key} onSelect={() => onAdd(key)}>
-                  {key}{" "}
-                  <span className="ms-2 text-xs text-muted-foreground">
-                    {properties[key].format}
-                  </span>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <AddOrderbyMenu asChild>
+            <Button variant="ghost" size="sm" className="flex justify-start">
+              <PlusIcon className="w-4 h-4 me-2 align-middle" /> Pick a column
+              to sort by
+            </Button>
+          </AddOrderbyMenu>
           {isset && (
             <PopoverClose asChild>
               <Button
@@ -187,5 +179,28 @@ export function XSupaDataGridSortMenu({
         </section>
       </PopoverContent>
     </Popover>
+  );
+}
+
+function AddOrderbyMenu({
+  asChild,
+  children,
+}: React.PropsWithChildren<{ asChild?: boolean }>) {
+  const { properties, unusedkeys, onAdd } = useDataGridOrderby();
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild={asChild}>{children}</DropdownMenuTrigger>
+      <DropdownMenuContent align="start">
+        {unusedkeys.map((key) => (
+          <DropdownMenuItem key={key} onSelect={() => onAdd(key)}>
+            {key}{" "}
+            <span className="ms-2 text-xs text-muted-foreground">
+              {properties[key].format}
+            </span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

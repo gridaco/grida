@@ -33,12 +33,15 @@ import {
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { KeyIcon } from "lucide-react";
 
-export function AddPrediateMenu({ children }: React.PropsWithChildren<{}>) {
+export function AddPrediateMenu({
+  asChild,
+  children,
+}: React.PropsWithChildren<{ asChild?: boolean }>) {
   const { attributes, properties, add } = useDataGridPredicates();
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
+      <DropdownMenuTrigger asChild={asChild}>{children}</DropdownMenuTrigger>
       <DropdownMenuContent align="start">
         {attributes.map((key) => {
           const property =

@@ -78,6 +78,10 @@ export function XSupaDataGridFilter({ children }: React.PropsWithChildren<{}>) {
     clear,
   } = useDataGridPredicates();
 
+  if (!isset) {
+    return <AddPrediateMenu>{children}</AddPrediateMenu>;
+  }
+
   return (
     <>
       <Popover modal>
@@ -183,7 +187,7 @@ export function XSupaDataGridFilter({ children }: React.PropsWithChildren<{}>) {
             </div>
           </section>
           <section>
-            <AddPrediateMenu>
+            <AddPrediateMenu asChild>
               <Button
                 variant="ghost"
                 size="sm"
