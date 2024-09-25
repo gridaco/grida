@@ -22,10 +22,9 @@ import {
 import { PopoverClose } from "@radix-ui/react-popover";
 import { WorkbenchUI } from "@/components/workbench";
 import { ArrowDownIcon, ArrowDownUpIcon, ArrowUpIcon } from "lucide-react";
-import { useDataGridQuery } from "@/scaffolds/editor/use";
 import { QueryChip } from "../ui/chip";
-import type { IDataQueryOrderbyConsumer } from "@/scaffolds/data-query";
 import { Data } from "@/lib/data";
+import type { IDataQueryOrderbyConsumer } from "@/scaffolds/data-query";
 
 type IDataQueryOrderbyConsumerWithProperties = IDataQueryOrderbyConsumer & {
   properties: Data.Relation.Schema["properties"];
@@ -178,6 +177,7 @@ export function DataQueryOrderByMenu({
 function DataQueryAddOrderbyMenu({
   asChild,
   children,
+  ...props
 }: React.PropsWithChildren<
   IDataQueryOrderbyConsumerWithProperties & { asChild?: boolean }
 >) {
@@ -185,7 +185,7 @@ function DataQueryAddOrderbyMenu({
     properties,
     orderbyUnusedKeys: unusedkeys,
     onOrderbyAdd: onAdd,
-  } = useDataGridQuery();
+  } = props;
 
   return (
     <DropdownMenu>

@@ -14,7 +14,7 @@ import { PrivateEditorApi } from "@/lib/private";
 import { XSBReferenceTableGrid } from "@/scaffolds/grid/xsb-reference-grid";
 import { GridaXSupabase } from "@/types";
 import { Link2Icon } from "@radix-ui/react-icons";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import useSWR, { BareFetcher } from "swr";
 import { GridDataXSBUnknown } from "../grid-data-xsb-unknow";
 import { cn } from "@/utils";
@@ -193,13 +193,19 @@ function XSBSearchTableDataGrid({
   supabase_schema_name: string;
   onRowDoubleClick?: (value: GridaXSupabase.XDataRow) => void;
 }) {
-  const query = useStandaloneSchemaDataQuery(null);
+  const [schema, setSchema] = useState<GridaXSupabase.JSONSChema | null>(null);
+
+  const query = useStandaloneSchemaDataQuery(schema);
 
   const { data, error } = useXSupabaseTableSearch({
     supabase_project_id,
     supabase_table_name,
     supabase_schema_name,
   });
+
+  useEffect(() => {
+    if (data?.meta?.table_schema) setSchema(data?.meta?.table_schema);
+  }, [data?.meta?.table_schema]);
 
   return (
     <GridLayout.Root>
