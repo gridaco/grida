@@ -30,7 +30,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import type { GFFile } from "../types";
+import type { DataGridFileRef } from "../types";
 import { useMediaViewer } from "../../mediaviewer";
 import {
   Tooltip,
@@ -65,13 +65,13 @@ export function FileEditCell({
   type: "image" | "file" | "audio" | "video";
   accept?: string;
   multiple?: boolean;
-  files: GFFile[];
+  files: DataGridFileRef[];
 }) {
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
   const [replaceFileDialogOpen, setReplaceFileDialogOpen] = useState(false);
   const { open: openMediaViewer } = useMediaViewer();
 
-  const onEnterFullScreen = (f: GFFile) => {
+  const onEnterFullScreen = (f: DataGridFileRef) => {
     switch (type) {
       case "audio":
         openMediaViewer(f, "audio/*");
@@ -322,7 +322,7 @@ function ReplaceFileDialog({
   accept,
   ...props
 }: React.ComponentProps<typeof Dialog> & {
-  f: GFFile;
+  f: DataGridFileRef;
   accept?: string;
 }) {
   const [file, setFile] = useState<File | undefined>();

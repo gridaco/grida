@@ -75,7 +75,7 @@ import { Chartview } from "../table-view-chart/chartview";
 import { useMultiplayer } from "@/scaffolds/editor/multiplayer";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { SchemaNameProvider } from "../data-query";
-import { GridFileStorageQueueProvider } from "./grid-storage-queue";
+import { GridFileStorageQueueProvider } from "./grid-file-storage-queue";
 
 function useSelectedCells(): DataGridCellSelectionCursor[] {
   const [state] = useEditorState();

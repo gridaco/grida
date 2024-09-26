@@ -9,7 +9,7 @@ import {
 import { fmt_local_index } from "@/utils/fmt";
 import type {
   GFColumn,
-  GFFile,
+  DataGridFileRef,
   GFResponseRow,
   GFSystemColumn,
 } from "../grid/types";
@@ -118,12 +118,16 @@ export namespace GridData {
   } {
     const fieldcolumns = Array.from(params.fields)
       .sort((a, b) => a.local_index - b.local_index)
-      .map((field) => ({
-        key: field.id,
-        name: field.name,
-        readonly: field.readonly || false,
-        type: field.type,
-      }));
+      .map(
+        (field) =>
+          ({
+            key: field.id,
+            name: field.name,
+            readonly: field.readonly || false,
+            type: field.type,
+            storage: field.storage || null,
+          }) satisfies GFColumn
+      );
 
     switch (params.table_id) {
       case EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID:
@@ -395,7 +399,7 @@ export namespace GridData {
     form_id: string;
     field_id: string;
     filepath: string;
-  }): GFFile {
+  }): DataGridFileRef {
     const base = PrivateEditorApi.FormFieldFile.file_preview_url({
       params: params,
     });
@@ -513,9 +517,9 @@ export namespace GridData {
               name: path,
               download: signedUrl,
               upsert: upsert,
-            } satisfies GFFile;
+            } satisfies DataGridFileRef;
           })
-          .filter((f) => f) as GFFile[] | [];
+          .filter((f) => f) as DataGridFileRef[] | [];
       }
     };
 

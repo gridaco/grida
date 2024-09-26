@@ -31,9 +31,7 @@ import BatchQueue from "./batch";
 const __P_QUEUE_FALLBACK = new PQueue();
 
 // #region generic types
-interface TID {
-  tid: string;
-}
+interface TID {}
 
 type PQResolverResult<T, E = any> = {
   data: T | null;
@@ -135,11 +133,11 @@ function reducer(
       break;
     }
     case "result": {
-      const { tid, result } = action;
+      const { result } = action;
       const { error } = result;
       return {
         ...state,
-        store: [...state.store, { ...result, tid, ok: error ? true : false }],
+        store: [...state.store, { ...result, ok: error ? true : false }],
       };
     }
     case "clear":
@@ -202,7 +200,6 @@ function QueueProvider<T, P extends TID | any>({
           const task = tasks[index];
           dispatch({
             type: "result",
-            tid: task.tid,
             result: { data: result, error: results.error },
           });
         });
@@ -248,10 +245,7 @@ function __useResolver() {
   return [context.resolver, context.queue, { batch: context.batch }] as const;
 }
 
-type PQAddDispatcher<T, P> = (
-  tid: string,
-  task: P
-) => Promise<PQResolverResult<T> | void>;
+type PQAddDispatcher<T, P> = (task: P) => Promise<PQResolverResult<T> | void>;
 type PQClearDispatcher = () => void;
 
 type UseQueueReturnType<T, P> = {
@@ -271,17 +265,17 @@ function useQueue<T, P>(): UseQueueReturnType<T, P> {
   const { batch } = config;
 
   const onAdd: PQAddDispatcher<T, P> = useCallback(
-    async (tid: string, task: P) => {
+    async (task: P) => {
       if (batch) {
         // If batch mode is enabled, add tasks to the BatchQueue
-        batch.addTask({ ...task, tid });
+        batch.addTask({ ...task });
         return;
       } else {
         // If batch mode is not enabled, use p-queue
         try {
           const res = await queue.add(() => resolver(task));
           assert(res);
-          dispatch({ type: "result", result: res, tid: tid });
+          dispatch({ type: "result", result: res });
           return res;
         } catch (e) {
           return {

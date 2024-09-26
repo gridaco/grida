@@ -1,4 +1,4 @@
-import type { FormInputType, GridaXSupabase } from "@/types";
+import type { FormFieldStorageSchema, FormInputType } from "@/types";
 
 export interface DataGridCellSelectionCursor {
   pk: string | -1;
@@ -22,6 +22,7 @@ export type GFColumn = {
   name: string;
   readonly: boolean;
   type?: FormInputType;
+  storage?: FormFieldStorageSchema | {} | null;
 };
 
 export type GFResponseFieldData = {
@@ -33,10 +34,10 @@ export type GFResponseFieldData = {
   options?: {
     [key: string]: { value: string; label?: string };
   };
-  files?: GFFile[] | "loading";
+  files?: DataGridFileRef[] | "loading";
 };
 
-export type GFFile = {
+export type DataGridFileRef = {
   src: string;
   srcset: {
     thumbnail: string;

@@ -27,6 +27,7 @@ import {
 import { useEditorState } from "../editor";
 import type {
   DataGridCellSelectionCursor,
+  DataGridFileRef,
   GFColumn,
   GFResponseFieldData,
   GFResponseRow,
@@ -510,51 +511,17 @@ function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
     case "file": {
       return (
         <CellRoot {...rootprops} className="w-full h-full flex gap-2">
-          {files === "loading" ? (
-            <FileLoadingCell />
-          ) : (
-            <>
-              {files?.map((f, i) => (
-                <span key={i}>
-                  <FileTypeIcon
-                    type={type as "file" | "image" | "audio" | "video"}
-                    className="inline w-4 h-4 align-middle me-2"
-                  />
-                  <span>
-                    <Highlight
-                      text={f.name}
-                      tokens={datagrid_filter.localsearch}
-                      className="bg-foreground text-background"
-                    />
-                  </span>
-                </span>
-              ))}
-            </>
-          )}
+          <FileCellContent
+            files={files}
+            type={type as "file" | "image" | "audio" | "video"}
+          />
         </CellRoot>
       );
     }
     case "image": {
       return (
         <CellRoot {...rootprops} className="w-full h-full flex gap-2">
-          {files === "loading" ? (
-            <FileLoadingCell />
-          ) : (
-            <>
-              {files?.map((file, i) => (
-                <figure className="py-1 flex items-center gap-2" key={i}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={file.src}
-                    alt={file.name}
-                    className="h-full min-w-8 aspect-square rounded overflow-hidden object-cover bg-neutral-500"
-                    loading="lazy"
-                  />
-                  {/* <figcaption>{file.name}</figcaption> */}
-                </figure>
-              ))}
-            </>
-          )}
+          <ImageCellContent files={files} />
         </CellRoot>
       );
     }
@@ -603,6 +570,63 @@ function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
         </CellRoot>
       );
   }
+}
+
+function FileCellContent({
+  type,
+  files,
+}: {
+  files?: DataGridFileRef[] | "loading";
+  type: "file" | "image" | "audio" | "video";
+}) {
+  return (
+    <>
+      {files === "loading" ? (
+        <FileLoadingCell />
+      ) : (
+        <>
+          {files?.map((f, i) => (
+            <span key={i}>
+              <FileTypeIcon
+                type={type}
+                className="inline w-4 h-4 align-middle me-2"
+              />
+              <span>{f.name}</span>
+            </span>
+          ))}
+        </>
+      )}
+    </>
+  );
+}
+
+function ImageCellContent({
+  files,
+}: {
+  files?: DataGridFileRef[] | "loading";
+}) {
+  return (
+    <>
+      {files === "loading" ? (
+        <FileLoadingCell />
+      ) : (
+        <>
+          {files?.map((file, i) => (
+            <figure className="py-1 flex items-center gap-2" key={i}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={file.src}
+                alt={file.name}
+                className="h-full min-w-8 aspect-square rounded overflow-hidden object-cover bg-neutral-500"
+                loading="lazy"
+              />
+              {/* <figcaption>{file.name}</figcaption> */}
+            </figure>
+          ))}
+        </>
+      )}
+    </>
+  );
 }
 
 function FieldEditCell(props: RenderEditCellProps<RenderingRow>) {

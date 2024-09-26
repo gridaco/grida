@@ -2,12 +2,30 @@ import type { Database } from "@/database.types";
 
 const schema = "grida_forms" as const;
 
-export type Row<T extends keyof Database[typeof schema]["Tables"]> =
-  Database[typeof schema]["Tables"][T]["Row"];
-export type InsertDto<T extends keyof Database[typeof schema]["Tables"]> =
-  Database[typeof schema]["Tables"][T]["Insert"];
-export type UpdateDto<T extends keyof Database[typeof schema]["Tables"]> =
-  Database[typeof schema]["Tables"][T]["Update"];
+type SchemaKey = keyof Database;
+
+export type Row<S extends SchemaKey, T extends keyof Database[S]["Tables"]> =
+  // @ts-expect-error
+  Database[S]["Tables"][T]["Row"];
+
+export type InsertDto<
+  S extends SchemaKey,
+  T extends keyof Database[S]["Tables"],
+> =
+  // @ts-expect-error
+  Database[S]["Tables"][T]["Insert"];
+
+export type UpdateDto<
+  S extends SchemaKey,
+  T extends keyof Database[S]["Tables"],
+> =
+  // @ts-expect-error
+  Database[S]["Tables"][T]["Update"];
+
+export type UpsertDto<
+  S extends SchemaKey,
+  T extends keyof Database[S]["Tables"],
+> = InsertDto<S, T>;
 
 export type DontCastJsonProperties<T, K extends keyof T> = Omit<T, K> & {
   [P in K]: any;
