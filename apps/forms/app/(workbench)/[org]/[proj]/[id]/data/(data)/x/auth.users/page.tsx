@@ -101,13 +101,15 @@ export default function XTablePage() {
     >
       <GridLayout.Root>
         <GridLayout.Header>
-          <GridLayout.HeaderMenus>
-            <TableViews />
-            <GridLocalSearch onValueChange={search} />
-          </GridLayout.HeaderMenus>
-          <GridLayout.HeaderMenus>
-            <GridViewSettings />
-          </GridLayout.HeaderMenus>
+          <GridLayout.HeaderLine>
+            <GridLayout.HeaderMenus>
+              <TableViews />
+              <GridLocalSearch onValueChange={search} />
+            </GridLayout.HeaderMenus>
+            <GridLayout.HeaderMenus>
+              <GridViewSettings />
+            </GridLayout.HeaderMenus>
+          </GridLayout.HeaderLine>
         </GridLayout.Header>
         <GridLayout.Content>
           <XSBReferenceTableGrid
