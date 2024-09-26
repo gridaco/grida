@@ -1,6 +1,7 @@
-import type { FormInputType, SQLPredicateOperator } from "@/types";
+import type { FormInputType } from "@/types";
 import type { PGSupportedColumnType } from "../supabase-postgrest/@types/pg";
-import { SupabasePostgRESTOpenApi } from "../supabase-postgrest";
+import type { SupabasePostgRESTOpenApi } from "../supabase-postgrest";
+import type { XPostgrestQuery } from "../supabase-postgrest/builder";
 
 export namespace GridaXSupabaseTypeMap {
   /**
@@ -100,10 +101,10 @@ export namespace GridaXSupabaseTypeMap {
     format,
   }: {
     format: SupabasePostgRESTOpenApi.PostgRESTOpenAPIDefinitionPropertyFormatType;
-  }): SQLPredicateOperator[] {
+  }): XPostgrestQuery.PredicateOperator.SQLPredicateOperatorKeyword[] {
     const _get_for_non_array = (
       format: PGSupportedColumnType
-    ): SQLPredicateOperator[] => {
+    ): XPostgrestQuery.PredicateOperator.SQLPredicateOperatorKeyword[] => {
       switch (format) {
         case "int":
         case "int2":

@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import * as SelectPrimitive from "@radix-ui/react-select";
-import { operator_labels, supported_operators } from "../../k";
+import { Data } from "@/lib/data";
 import { useDebounce } from "@uidotdev/usehooks";
 import { QueryChip } from "../ui/chip";
 import { GridaXSupabaseTypeMap } from "@/lib/x-supabase/typemap";
@@ -29,7 +29,7 @@ import { useEditorState } from "@/scaffolds/editor/use";
 import {
   SQLLiteralInputValue,
   XSBSQLLiteralInput,
-} from "../../xsb/xsb-sql-literal-input";
+} from "./xsb/xsb-sql-literal-input";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { KeyIcon } from "lucide-react";
 import {
@@ -40,11 +40,14 @@ import {
 } from "@radix-ui/react-icons";
 import { PopoverClose } from "@radix-ui/react-popover";
 import { WorkbenchUI } from "@/components/workbench";
-import { Data } from "@/lib/data";
 import {
   useSchemaName,
   type IDataQueryPredicatesConsumer,
 } from "@/scaffolds/data-query";
+
+const {
+  Query: { Predicate },
+} = Data;
 
 type IDataQueryPredicatesConsumerWithProperties =
   IDataQueryPredicatesConsumer & {
@@ -130,15 +133,15 @@ export function DataQueryPredicatesMenu({
                             })}
                           >
                             <SelectValue>
-                              {operator_labels[q.op].symbol}
+                              {Predicate.K.operator_labels[q.op].symbol}
                             </SelectValue>
                           </SelectTrigger>
                           <SelectContent>
-                            {supported_operators.map((key) => (
+                            {Predicate.K.supported_operators.map((key) => (
                               <SelectItem value={key} key={key}>
                                 {key}
                                 <small className="ms-1 text-muted-foreground">
-                                  {operator_labels[key].label}
+                                  {Predicate.K.operator_labels[key].label}
                                 </small>
                               </SelectItem>
                             ))}
@@ -311,7 +314,7 @@ export function DataQueryPredicateChip({
     <Popover modal>
       <PopoverTrigger>
         <QueryChip badge={!!!predicate.value} active={!!predicate.value}>
-          {predicate.column} {operator_labels[predicate.op].symbol}{" "}
+          {predicate.column} {Predicate.K.operator_labels[predicate.op].symbol}{" "}
           {!!predicate.value ? String(predicate.value) : "..."}
         </QueryChip>
       </PopoverTrigger>
@@ -331,12 +334,12 @@ export function DataQueryPredicateChip({
                   className="w-full overflow-ellipsis text-xs text-muted-foreground"
                 >
                   <SelectValue>
-                    {operator_labels[predicate.op].symbol}
+                    {Predicate.K.operator_labels[predicate.op].symbol}
                   </SelectValue>
                 </Badge>
               </SelectPrimitive.Trigger>
               <SelectContent>
-                {supported_operators.map((key) => (
+                {Predicate.K.supported_operators.map((key) => (
                   <SelectItem
                     value={key}
                     key={key}
@@ -344,7 +347,7 @@ export function DataQueryPredicateChip({
                   >
                     {key}
                     <small className="ms-1 text-muted-foreground">
-                      {operator_labels[key].label}
+                      {Predicate.K.operator_labels[key].label}
                     </small>
                   </SelectItem>
                 ))}

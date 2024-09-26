@@ -1,6 +1,7 @@
 import { IpInfo } from "@/clients/ipinfo";
 import palettes from "@/theme/palettes";
 import type { Tokens } from "@/ast";
+import type { XPostgrestQuery } from "@/lib/supabase-postgrest/builder";
 
 type UUID = string;
 
@@ -474,32 +475,8 @@ export interface SQLOrderBy {
   nullsFirst?: boolean;
 }
 
-export type SQLPredicateOperator =
-  | "eq"
-  | "neq"
-  | "gt"
-  | "gte"
-  | "lt"
-  | "lte"
-  | "like"
-  | "ilike"
-  | "is"
-  | "in"
-  | "cs"
-  | "cd"
-  | "sl"
-  | "sr"
-  | "nxl"
-  | "nxr"
-  | "adj"
-  | "ov"
-  | "fts"
-  | "plfts"
-  | "phfts"
-  | "wfts";
-
 export interface SQLPredicate {
   column: string;
-  op: SQLPredicateOperator; // `${"" | "not."}${SQLFilterOperator}`;
+  op: XPostgrestQuery.PredicateOperator.SQLPredicateOperatorKeyword;
   value: unknown;
 }

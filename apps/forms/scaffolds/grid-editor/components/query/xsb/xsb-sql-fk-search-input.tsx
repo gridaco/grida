@@ -2,10 +2,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Sheet,
-  SheetClose,
   SheetContent,
   SheetDescription,
-  SheetFooter,
   SheetHeader,
   SheetTitle,
   SheetTrigger,
@@ -16,8 +14,7 @@ import { GridaXSupabase } from "@/types";
 import { Link2Icon, PlusIcon } from "@radix-ui/react-icons";
 import React, { useEffect, useMemo, useState } from "react";
 import useSWR, { BareFetcher } from "swr";
-import { GridDataXSBUnknown } from "../grid-data-xsb-unknow";
-import { cn } from "@/utils";
+import { GridDataXSBUnknown } from "@/scaffolds/grid-editor/grid-data-xsb-unknow";
 import * as GridLayout from "@/scaffolds/grid-editor/components/layout";
 import {
   GridQueryCount,
@@ -33,7 +30,6 @@ import {
   DataQueryPrediateAddMenu,
   GridLocalSearch,
 } from "@/scaffolds/grid-editor/components";
-import { WorkbenchUI } from "@/components/workbench";
 import {
   SchemaNameProvider,
   StandaloneDataQueryProvider,
@@ -44,7 +40,7 @@ import toast from "react-hot-toast";
 import { XPostgrestQuery } from "@/lib/supabase-postgrest/builder";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useLocalFuzzySearch } from "@/hooks/use-fuzzy-search";
-import { SearchInput } from "@/components/extension/search-input";
+import { cn } from "@/utils";
 
 interface ISQLForeignKeyRelation {
   referenced_column: string;
