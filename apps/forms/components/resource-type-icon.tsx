@@ -1,4 +1,10 @@
-import { AvatarIcon, FileIcon, HomeIcon } from "@radix-ui/react-icons";
+import {
+  AvatarIcon,
+  FileIcon,
+  GridIcon,
+  ListBulletIcon,
+  HomeIcon,
+} from "@radix-ui/react-icons";
 import {
   FolderDotIcon,
   PanelsTopLeftIcon,
@@ -11,6 +17,9 @@ import {
   Code2Icon,
   AppWindowIcon,
   LanguagesIcon,
+  LineChartIcon,
+  BarChart3Icon,
+  BarChartHorizontalIcon,
 } from "lucide-react";
 import { SupabaseLogo } from "./logos";
 
@@ -25,7 +34,15 @@ export type ResourceTypeIconName =
   | "table"
   | "project"
   | "form"
+  | "view-gallery"
+  | "gallery"
+  | "view-list"
+  | "list"
   | "chart"
+  | "chart-bar"
+  | "chart-bar-vertical"
+  | "chart-line"
+  | "chart-pie"
   | "commerce"
   | "user"
   | "i18n"
@@ -68,6 +85,14 @@ export function ResourceTypeIcon({
       return <FileBarChart2 {...props} />;
     case "chart":
       return <PieChartIcon {...props} />;
+    case "chart-bar":
+      return <BarChart3Icon {...props} />;
+    case "chart-bar-vertical":
+      return <BarChartHorizontalIcon {...props} />;
+    case "chart-line":
+      return <LineChartIcon {...props} />;
+    case "chart-pie":
+      return <PieChartIcon {...props} />;
     case "v0_site":
       return <AppWindowIcon {...props} />;
     case "form-x-supabase":
@@ -81,6 +106,12 @@ export function ResourceTypeIcon({
       return <AvatarIcon {...props} />;
     case "i18n":
       return <LanguagesIcon {...props} />;
+    case "view-gallery":
+    case "gallery":
+      return <GridIcon {...props} />;
+    case "view-list":
+    case "list":
+      return <ListBulletIcon {...props} />;
     default:
       return null;
   }

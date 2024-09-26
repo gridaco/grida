@@ -144,6 +144,7 @@ export interface CreateNewSchemaTableWithXSBTableConnectionResponse {
     attributes: FormFieldDefinition[];
   };
   connection: {
+    supabase_project_id: number;
     sb_schema_name: string;
     sb_table_name: string;
     sb_table_id: number;

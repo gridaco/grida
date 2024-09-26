@@ -21,6 +21,8 @@ import { SYM_LOCALTZ, EditorSymbols } from "./symbols";
 import { FormFieldDefinition, GridaXSupabase } from "@/types";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { nanoid } from "nanoid";
+import { DataGridLocalPreferencesStorage } from "./storage/datagrid.storage";
+import { Data } from "@/lib/data";
 
 export function initialEditorState(init: EditorInit): EditorState {
   switch (init.doctype) {
@@ -80,25 +82,38 @@ function initialBaseDocumentEditorState(
   };
 }
 
-export function initialDatagridState(): Omit<
-  IDataGridState,
-  "datagrid_table_id"
-> {
-  return {
+export function initialDatagridState(
+  view_id?: string
+): Omit<IDataGridState, "datagrid_table_id"> {
+  const cleared: Omit<IDataGridState, "datagrid_table_id"> = {
     datagrid_selected_rows: new Set(),
-    datagrid_page_limit: 100,
+    datagrid_query: Data.Relation.INITIAL_QUERY_STATE,
     datagrid_query_estimated_count: null,
-    datagrid_page_index: 0,
-    datagrid_table_refresh_key: 0,
     datagrid_isloading: false,
     datagrid_local_filter: {
       masking_enabled: false,
       empty_data_hidden: true,
     },
-    datagrid_orderby: {},
-    datagrid_predicates: [],
     datagrid_selected_cell: null,
   };
+
+  if (view_id) {
+    // used by reducer
+    // TODO: it is a good practive to do this in a hook.
+    // I'm too lazy to do it now.
+    const pref = DataGridLocalPreferencesStorage.get(view_id);
+    if (pref) {
+      return {
+        ...cleared,
+        datagrid_query: {
+          ...cleared.datagrid_query!,
+          q_predicates: pref.predicates || [],
+          q_orderby: pref.orderby || {},
+        },
+      };
+    }
+  }
+  return cleared;
 }
 
 export function table_to_sidebar_table_menu(
@@ -159,6 +174,7 @@ function initialDatabaseEditorState(
     rules: {
       delete_restricted: true,
     },
+    views: [],
   } satisfies GDocTable;
 
   const should_add_sb_auth_users =
@@ -295,6 +311,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
           rules: {
             delete_restricted: true,
           },
+          views: [],
         } satisfies GDocTable,
       }
     : {
@@ -310,6 +327,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
           rules: {
             delete_restricted: true,
           },
+          views: [],
         } satisfies GDocTable,
         [EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID]: {
           id: EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID,
@@ -323,6 +341,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
           rules: {
             delete_restricted: true,
           },
+          views: [],
         } satisfies GDocTable,
         [EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID]: {
           id: EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID,
@@ -336,6 +355,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
           rules: {
             delete_restricted: true,
           },
+          views: [],
         } satisfies GDocTable,
       };
 
@@ -606,6 +626,19 @@ export function schematableinit(table: {
       rules: {
         delete_restricted: false,
       },
+      views: [
+        // DEV TODO: remove me
+        {
+          id: "gallery",
+          type: "gallery",
+          label: "Gallery",
+        },
+        {
+          id: "chart",
+          type: "chart",
+          label: "Chart",
+        },
+      ],
     } satisfies GDocSchemaTable;
   } else {
     return {
@@ -621,6 +654,7 @@ export function schematableinit(table: {
       rules: {
         delete_restricted: false,
       },
+      views: [],
     } satisfies GDocSchemaTable;
   }
 }
@@ -640,6 +674,7 @@ function xsbmtinit(
     : undefined;
 
   return {
+    supabase_project_id: conn.supabase_project_id,
     sb_table_id: conn.main_supabase_table.id,
     sb_schema_name: conn.main_supabase_table.sb_schema_name as string,
     sb_table_name: conn.main_supabase_table.sb_table_name as string,

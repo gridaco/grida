@@ -1,2 +1,2 @@
-export * from "./response-grid";
+export * from "./grid";
 export * from "./types";

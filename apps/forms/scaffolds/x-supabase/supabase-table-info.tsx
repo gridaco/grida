@@ -19,6 +19,11 @@ import { Button } from "@/components/ui/button";
 import { GridaXSupabase } from "@/types";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { CodeIcon } from "@radix-ui/react-icons";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export function SupabaseTableInfo({
   table,
@@ -55,7 +60,16 @@ export function SupabaseTableInfo({
                       <KeyIcon className="me-1 inline align-middle w-4 h-4" />
                     )}
                     {fk && (
-                      <LinkIcon className="me-1 inline align-middle w-4 h-4" />
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <LinkIcon className="me-1 inline align-middle w-4 h-4" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <div className="max-w-40 overflow-scroll">
+                            <pre>{JSON.stringify(fk, null, 2)}</pre>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
                     )}
                   </TableCell>
                   <TableCell>

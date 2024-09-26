@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useMemo } from "react";
-import { ResponseGrid, type DataGridCellSelectionCursor } from "../grid";
+import { DataGrid, type DataGridCellSelectionCursor } from "../grid";
 import { createClientFormsClient } from "@/lib/supabase/client";
 import {
   AlertDialog,
@@ -20,19 +20,20 @@ import {
   Cross2Icon,
   DownloadIcon,
   PieChartIcon,
+  PlusIcon,
   TrashIcon,
 } from "@radix-ui/react-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import clsx from "clsx";
 import {
-  GridLimit,
-  GridViewSettings,
-  GridRefresh,
-  XSupaDataGridSort,
-  GridLocalSearch,
-  GridCount,
   TableViews,
+  GridQueryLimitSelect,
+  GridViewSettings,
+  GridRefreshButton,
+  GridLocalSearch,
+  GridQueryCount,
+  GridQueryPaginationControl,
 } from "./components";
 import * as GridLayout from "./components/layout";
 import { txt_n_plural } from "@/utils/plural";
@@ -50,14 +51,30 @@ import {
 import { Columns3Icon, Rows3Icon } from "lucide-react";
 import {
   useDatabaseTableId,
+  useDataGridLocalSearch,
+  useDataGridQuery,
+  useDataGridRefresh,
   useDatagridTableAttributes,
   useDatagridTableSpace,
 } from "@/scaffolds/editor/use";
 import { saveAs } from "file-saver";
 import Papa from "papaparse";
-import { XSupaDataGridFilter } from "./components/filter";
-import { GridPagination } from "./components/pagination";
+import { Gallery } from "../table-view-gallery/gallery";
+import {
+  DataQueryPredicatesMenu,
+  DataQueryPredicateChip,
+  DataQueryPrediateAddMenu,
+  DataQueryOrderByMenu,
+  DataQueryOrderbyChip,
+} from "./components/query";
+import {
+  DataQueryPredicatesMenuTriggerButton,
+  DataQueryOrderbyMenuTriggerButton,
+} from "./components/ui/toggle";
+import { Chartview } from "../table-view-chart/chartview";
 import { useMultiplayer } from "@/scaffolds/editor/multiplayer";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { SchemaNameProvider } from "../data-query";
 
 function useSelectedCells(): DataGridCellSelectionCursor[] {
   const [state] = useEditorState();
@@ -86,7 +103,6 @@ function useSelectedCells(): DataGridCellSelectionCursor[] {
     return cellcursors;
   }, [
     multplayer.cursors,
-    multplayer.player.node,
     multplayer.player.cursor_id,
     state.datagrid_selected_cell,
   ]);
@@ -109,12 +125,18 @@ export function GridEditor({
 }) {
   const supabase = useMemo(() => createClientFormsClient(), []);
   const [state, dispatch] = useEditorState();
+
+  const query = useDataGridQuery();
+  const { isPredicatesSet, isOrderbySet } = query;
+  const is_query_orderby_or_predicates_set = isPredicatesSet || isOrderbySet;
   const { datagrid_isloading, datagrid_selected_rows } = state;
 
   const deleteFieldConfirmDialog = useDialogState<{ field_id: string }>();
 
   const tb = useDatagridTable();
   const table_id = useDatabaseTableId();
+  const refresh = useDataGridRefresh();
+  const view = tb?.views.find((v) => v.id === tb.view_id);
   const row_keyword = tb?.row_keyword ?? "row";
   const has_selected_rows = datagrid_selected_rows.size > 0;
   const selectionDisabled = selection !== "on";
@@ -179,134 +201,174 @@ export function GridEditor({
   const selectedCells = useSelectedCells();
 
   return (
-    <GridLayout.Root>
-      <DeleteFieldConfirmDialog
-        open={deleteFieldConfirmDialog.open}
-        onOpenChange={deleteFieldConfirmDialog.onOpenChange}
-        onCancel={deleteFieldConfirmDialog.closeDialog}
-        field_id={deleteFieldConfirmDialog.data?.field_id}
-        onDeleteConfirm={(field_id) => onDeleteField(field_id)}
-      />
-      <GridLayout.Header>
-        <GridLayout.HeaderMenus>
-          {has_selected_rows ? (
-            <div
-              className={clsx(
-                "flex items-center",
-                !has_selected_rows || selectionDisabled ? "hidden" : ""
-              )}
-            >
-              <div className="flex gap-2 items-center">
-                <div className="flex items-center gap-1.5">
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    className="w-7 h-7"
-                    onClick={onClearSelection}
-                  >
-                    <Cross2Icon />
-                  </Button>
-                  <span
-                    className="text-sm font-norma text-muted-foreground"
-                    aria-label="selected responses"
-                  >
-                    {txt_n_plural(datagrid_selected_rows.size, row_keyword)}{" "}
-                    selected
-                  </span>
-                </div>
-                <GridLayout.HeaderSeparator />
-                <SelectionExport />
-                {deletion === "on" && (
-                  <>
+    <SchemaNameProvider
+      schema={
+        tb
+          ? "x_sb_main_table_connection" in tb
+            ? tb.x_sb_main_table_connection.sb_schema_name
+            : undefined
+          : undefined
+      }
+    >
+      <GridLayout.Root>
+        <DeleteFieldConfirmDialog
+          open={deleteFieldConfirmDialog.open}
+          onOpenChange={deleteFieldConfirmDialog.onOpenChange}
+          onCancel={deleteFieldConfirmDialog.closeDialog}
+          field_id={deleteFieldConfirmDialog.data?.field_id}
+          onDeleteConfirm={(field_id) => onDeleteField(field_id)}
+        />
+        <GridLayout.Header>
+          <GridLayout.HeaderLine>
+            <GridLayout.HeaderMenus>
+              {has_selected_rows ? (
+                <div
+                  className={clsx(
+                    "flex items-center",
+                    !has_selected_rows || selectionDisabled ? "hidden" : ""
+                  )}
+                >
+                  <div className="flex gap-2 items-center">
+                    <div className="flex items-center gap-1.5">
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        className="w-7 h-7"
+                        onClick={onClearSelection}
+                      >
+                        <Cross2Icon />
+                      </Button>
+                      <span
+                        className="text-sm font-norma text-muted-foreground"
+                        aria-label="selected responses"
+                      >
+                        {txt_n_plural(datagrid_selected_rows.size, row_keyword)}{" "}
+                        selected
+                      </span>
+                    </div>
                     <GridLayout.HeaderSeparator />
-                    <DeleteSelectedRowsButton
-                      disabled={readonly}
-                      className={readonly ? "cursor-not-allowed" : ""}
-                    />
-                  </>
-                )}
-              </div>
-            </div>
-          ) : (
+                    <SelectionExport />
+                    {deletion === "on" && (
+                      <>
+                        <GridLayout.HeaderSeparator />
+                        <DeleteSelectedRowsButton
+                          disabled={readonly}
+                          className={readonly ? "cursor-not-allowed" : ""}
+                        />
+                      </>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="flex justify-center items-center divide-x *:px-2 first:*:pl-0 last:*:pr-0">
+                    <TableViews />
+                    <TableQueryToggles />
+                  </div>
+                </>
+              )}
+            </GridLayout.HeaderMenus>
+            <GridLayout.HeaderMenus>
+              {state.doctype === "v0_form" && (
+                <Link
+                  href={editorlink("data/analytics", {
+                    basepath: state.basepath,
+                    document_id: state.document_id,
+                  })}
+                  className="flex"
+                >
+                  <Badge variant={"outline"} className="cursor-pointer">
+                    <PieChartIcon className="align-middle me-2" />
+                    Realtime
+                  </Badge>
+                </Link>
+              )}
+              <GridViewSettings />
+              {!tb?.readonly && <TableMod />}
+            </GridLayout.HeaderMenus>
+          </GridLayout.HeaderLine>
+          {is_query_orderby_or_predicates_set && (
+            <GridLayout.HeaderLine className="border-b-0 px-0">
+              <ScrollArea>
+                <ScrollBar orientation="horizontal" className="invisible" />
+                <div className="px-2">
+                  <TableQueryChips />
+                </div>
+              </ScrollArea>
+            </GridLayout.HeaderLine>
+          )}
+        </GridLayout.Header>
+        {view?.type === "gallery" && (
+          <GridLayout.Content className="overflow-y-scroll">
+            <Gallery />
+          </GridLayout.Content>
+        )}
+        {view?.type === "chart" && (
+          <GridLayout.Content className="overflow-y-scroll">
+            <Chartview />
+          </GridLayout.Content>
+        )}
+        {!view && (
+          <GridLayout.Content>
+            <DataGrid
+              className="bg-transparent"
+              local_cursor_id={state.cursor_id}
+              systemcolumns={systemcolumns}
+              columns={columns}
+              rows={rows ?? []}
+              readonly={readonly}
+              loading={datagrid_isloading}
+              selectionDisabled={selectionDisabled}
+              onAddNewFieldClick={openNewFieldPanel}
+              onEditFieldClick={openEditFieldPanel}
+              onDeleteFieldClick={(field_id) => {
+                deleteFieldConfirmDialog.openDialog({ field_id });
+              }}
+              onCellChange={(row, column, data) => {
+                dispatch({
+                  type: "editor/table/space/cell/change",
+                  table_id: table_id!,
+                  gdoc_table_id: tb!.id,
+                  row: row.__gf_id,
+                  column: column,
+                  data: data,
+                });
+              }}
+              onSelectedCellChange={({ pk, column }) => {
+                dispatch({
+                  type: "editor/data-grid/cell/select",
+                  pk: pk,
+                  column,
+                });
+              }}
+              selectedCells={selectedCells}
+            />
+          </GridLayout.Content>
+        )}
+        <GridLayout.Footer>
+          <div className="flex gap-4 items-center">
+            <GridQueryPaginationControl {...query} />
+            <GridQueryLimitSelect
+              value={query.limit}
+              onValueChange={query.onLimit}
+            />
+          </div>
+          <GridLayout.FooterSeparator />
+          <GridQueryCount count={count ?? rows?.length} keyword="record" />
+          <GridLayout.FooterSeparator />
+          <GridRefreshButton
+            refreshing={refresh.refreshing}
+            onRefreshClick={refresh.refresh}
+          />
+          {state.doctype === "v0_form" && tb?.provider === "grida" && (
             <>
-              <div className="flex justify-center items-center divide-x *:px-2 first:*:pl-0 last:*:pr-0">
-                <TableViews />
-                <TableQuery />
-              </div>
+              <GridLayout.FooterSeparator />
+              <GridaFormsResponsesExportCSV />
             </>
           )}
-        </GridLayout.HeaderMenus>
-        <GridLayout.HeaderMenus>
-          {state.doctype === "v0_form" && (
-            <Link
-              href={editorlink("data/analytics", {
-                basepath: state.basepath,
-                document_id: state.document_id,
-              })}
-              className="flex"
-            >
-              <Badge variant={"outline"} className="cursor-pointer">
-                <PieChartIcon className="align-middle me-2" />
-                Realtime
-              </Badge>
-            </Link>
-          )}
-          <GridViewSettings />
-          {!tb?.readonly && <TableMod />}
-        </GridLayout.HeaderMenus>
-      </GridLayout.Header>
-      <GridLayout.Content>
-        <ResponseGrid
-          className="bg-transparent"
-          local_cursor_id={state.cursor_id}
-          systemcolumns={systemcolumns}
-          columns={columns}
-          rows={rows ?? []}
-          readonly={readonly}
-          loading={datagrid_isloading}
-          selectionDisabled={selectionDisabled}
-          onAddNewFieldClick={openNewFieldPanel}
-          onEditFieldClick={openEditFieldPanel}
-          onDeleteFieldClick={(field_id) => {
-            deleteFieldConfirmDialog.openDialog({ field_id });
-          }}
-          onCellChange={(row, column, data) => {
-            dispatch({
-              type: "editor/table/space/cell/change",
-              table_id: table_id!,
-              gdoc_table_id: tb!.id,
-              row: row.__gf_id,
-              column: column,
-              data: data,
-            });
-          }}
-          onSelectedCellChange={({ pk, column }) => {
-            dispatch({
-              type: "editor/data-grid/cell/select",
-              pk: pk,
-              column,
-            });
-          }}
-          selectedCells={selectedCells}
-        />
-      </GridLayout.Content>
-      <GridLayout.Footer>
-        <div className="flex gap-4 items-center">
-          <GridPagination />
-          <GridLimit />
-        </div>
-        <GridLayout.FooterSeparator />
-        <GridCount count={count ?? rows?.length} keyword="record" />
-        <GridLayout.FooterSeparator />
-        <GridRefresh />
-        {state.doctype === "v0_form" && tb?.provider === "grida" && (
-          <>
-            <GridLayout.FooterSeparator />
-            <GridaFormsResponsesExportCSV />
-          </>
-        )}
-      </GridLayout.Footer>
-    </GridLayout.Root>
+        </GridLayout.Footer>
+      </GridLayout.Root>
+    </SchemaNameProvider>
   );
 }
 
@@ -451,22 +513,53 @@ function GridaFormsResponsesExportCSV() {
   );
 }
 
-function TableQuery() {
-  const [state] = useEditorState();
-  // const { datagrid_table_id } = state;
+function TableQueryToggles() {
   const tb = useDatagridTable();
+  const query = useDataGridQuery();
+  const search = useDataGridLocalSearch();
 
+  const { isPredicatesSet, isOrderbySet } = query;
   if (!tb) return <></>;
 
   return (
-    <div className="flex items-center gap-1">
-      <GridLocalSearch />
+    <GridLayout.HeaderMenuItems>
+      <GridLocalSearch onValueChange={search} />
       {"x_sb_main_table_connection" in tb && (
         <>
-          <XSupaDataGridFilter />
-          <XSupaDataGridSort />
+          <DataQueryPredicatesMenu {...query}>
+            <DataQueryPredicatesMenuTriggerButton active={isPredicatesSet} />
+          </DataQueryPredicatesMenu>
+          <DataQueryOrderByMenu {...query}>
+            <DataQueryOrderbyMenuTriggerButton active={isOrderbySet} />
+          </DataQueryOrderByMenu>
         </>
       )}
+    </GridLayout.HeaderMenuItems>
+  );
+}
+
+function TableQueryChips() {
+  const [state] = useEditorState();
+  const query = useDataGridQuery();
+  const { predicates, orderby, isOrderbySet } = query;
+
+  return (
+    <div className="flex gap-2">
+      {isOrderbySet && (
+        <>
+          <DataQueryOrderbyChip {...query} />
+          <GridLayout.HeaderSeparator />
+        </>
+      )}
+      {predicates.map((predicate, i) => (
+        <DataQueryPredicateChip key={i} index={i} {...query} />
+      ))}
+      <DataQueryPrediateAddMenu {...query}>
+        <Button variant="ghost" size="xs" className="text-muted-foreground">
+          <PlusIcon className="w-3 h-3 me-2" />
+          Add filter
+        </Button>
+      </DataQueryPrediateAddMenu>
     </div>
   );
 }

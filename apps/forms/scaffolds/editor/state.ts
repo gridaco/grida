@@ -19,15 +19,12 @@ import type {
   FormsPageLanguage,
   GDocumentType,
   GridaXSupabase,
-  SQLOrderBy,
-  SQLPredicate,
 } from "@/types";
 import { SYM_LOCALTZ, EditorSymbols } from "./symbols";
 import { ZodObject } from "zod";
 import { Tokens } from "@/ast";
-import React from "react";
 import { ResourceTypeIconName } from "@/components/resource-type-icon";
-import colors from "@/k/tailwindcolors";
+import type { Data } from "@/lib/data";
 
 export type GDocEditorRouteParams = {
   org: string;
@@ -117,7 +114,15 @@ type GDocTableBase = {
     delete_restricted: boolean;
   };
   label: string;
+  views: Array<TableView>;
+  view_id?: string;
 };
+
+interface TableView {
+  id: string;
+  type: "table" | "list" | "chart" | "gallery";
+  label: string;
+}
 
 export type GDocTable = GDocTableBase &
   (
@@ -171,6 +176,7 @@ export type GDocTableID = GDocTable["id"];
  * this connection indicates the grida table is connected to a x-supabase table
  */
 export type TableXSBMainTableConnection = {
+  supabase_project_id: number;
   sb_schema_name: string;
   sb_table_name: string;
   sb_table_id: number;
@@ -201,30 +207,19 @@ export type DataGridCellPositionQuery = {
   pk: string | -1;
   column: string;
 };
-
 export interface IDataGridState {
   /**
-   * @global rows per page is not saved per table
-   *
-   * a.k.a limit
+   * @global current data grid query state
    */
-  datagrid_page_limit: number;
-  /**
-   * @global current page index - shall be display with +1
-   *
-   * @default 0
-   */
-  datagrid_page_index: number;
+  datagrid_query: Data.Relation.QueryState | null;
+
   /**
    * @global total rows count, also used for pagination (uses 'estimated' for counting - for performance reasons)
    */
   datagrid_query_estimated_count: number | null;
   datagrid_table_id: GDocTableID | null;
-  datagrid_table_refresh_key: number;
   datagrid_isloading: boolean;
   datagrid_local_filter: DataGridLocalFilter;
-  datagrid_predicates: Array<SQLPredicate>;
-  datagrid_orderby: { [key: string]: SQLOrderBy };
   datagrid_selected_rows: Set<string>;
   datagrid_selected_cell: DataGridCellPositionQuery | null;
 }
@@ -427,7 +422,7 @@ interface IConnectionsState {
   connections: {
     store_id?: number | null;
     /**
-     * @deprecated drop me
+     * @deprecated drop me use supabase_project instead
      */
     supabase?: GridaXSupabase.XSupabaseMainTableConnectionState;
   };

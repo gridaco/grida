@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Sheet,
   SheetClose,
@@ -11,11 +10,10 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useFormAgentState } from "@/lib/formstate";
-import { ReferenceTableGrid } from "@/scaffolds/grid/reference-grid";
+import { XSBReferenceTableGrid } from "@/scaffolds/grid/xsb-reference-grid";
 import { GridaXSupabase } from "@/types";
 import useSWR from "swr";
-import { useMemo, useState } from "react";
-import Fuse from "fuse.js";
+import { useState } from "react";
 import { SearchInput } from "@/components/extension/search-input";
 import "react-data-grid/lib/styles.css";
 import {
@@ -25,21 +23,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { priority_sorter } from "@/utils/sort";
+import { GridDataXSBUnknown } from "@/scaffolds/grid-editor/grid-data-xsb-unknow";
+import * as GridLayout from "@/scaffolds/grid-editor/components/layout";
+import { WorkbenchUI } from "@/components/workbench";
+import toast from "react-hot-toast";
+import { useLocalFuzzySearch } from "@/hooks/use-fuzzy-search";
 
 export function ReferenceSearchPreview(
   props: React.ComponentProps<typeof SearchInput>
 ) {
   return <SearchInput {...props} />;
 }
-
-type SearchRes = {
-  schema_name: string;
-  table_name: string;
-  table_schema: GridaXSupabase.SupabaseTable["sb_table_schema"];
-  column: string;
-  rows: Record<string, any>[];
-};
 
 export function ReferenceSearch({
   field_id,
@@ -53,9 +47,14 @@ export function ReferenceSearch({
   const [localSearch, setLocalSearch] = useState<string>("");
   const [perpage, setPerPage] = useState<number>(50);
 
-  const res = useSWR<{
-    data: SearchRes;
-  }>(
+  const res = useSWR<
+    GridaXSupabase.XSBSearchResult<
+      any,
+      {
+        column: string;
+      }
+    >
+  >(
     `/v1/session/${state.session_id}/field/${field_id}/search?per_page=${perpage}`,
     async (url: string) => {
       const res = await fetch(url);
@@ -63,33 +62,23 @@ export function ReferenceSearch({
     }
   );
 
+  const { meta, data: _rows } = res.data ?? {};
+
   const {
     schema_name: schema,
     table_name: table,
     column: rowKey,
-    rows: _rows,
     table_schema,
-  } = res.data?.data ?? {};
+  } = meta ?? {};
 
   const fulltable = [schema, table].filter(Boolean).join(".");
 
-  const fuse = useMemo(() => {
-    return new Fuse(_rows ?? [], {
-      keys: Object.keys(table_schema?.properties ?? {}),
-    });
-  }, [_rows, table_schema]);
+  const result = useLocalFuzzySearch(localSearch, {
+    data: _rows ?? [],
+    keys: Object.keys(table_schema?.properties ?? {}),
+  });
 
-  const rows = useMemo(() => {
-    if (!localSearch) {
-      return _rows;
-    }
-
-    return fuse.search(localSearch).map((r) => r.item);
-  }, [fuse, localSearch, _rows]);
-
-  const sort_by_priorities = priority_sorter(
-    GridaXSupabase.unknown_table_column_priorities
-  );
+  const rows = result.map((r) => r.item);
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -107,55 +96,65 @@ export function ReferenceSearch({
             Select a record to reference from <code>{fulltable}</code>
           </SheetDescription>
         </SheetHeader>
-        <div className="px-6">
-          <SearchInput
-            value={localSearch}
-            onChange={(e) => setLocalSearch(e.target.value)}
-            placeholder={`Search in ${rows?.length ?? 0} records`}
-          />
-        </div>
-        <div className="flex-1">
-          <div className="flex flex-col w-full h-full">
-            <ReferenceTableGrid
+        <GridLayout.Root>
+          <GridLayout.Header>
+            <GridLayout.HeaderLine>
+              <div>
+                <SearchInput
+                  value={localSearch}
+                  onChange={(e) => setLocalSearch(e.target.value)}
+                  placeholder={`Search in ${rows?.length ?? 0} records`}
+                />
+              </div>
+            </GridLayout.HeaderLine>
+          </GridLayout.Header>
+          <GridLayout.Content>
+            <XSBReferenceTableGrid
               loading={!rows}
               tokens={localSearch ? [localSearch] : undefined}
-              onSelected={(key, row) => {
-                setValue(key);
-                setOpen(false);
+              onRowDoubleClick={(row) => {
+                if (rowKey) {
+                  const key = row[rowKey];
+                  setValue(key);
+                  setOpen(false);
+                } else {
+                  toast.error(
+                    "No row key found. This is a application error. Please contact support."
+                  );
+                }
               }}
               rowKey={rowKey}
-              columns={Object.keys(table_schema?.properties ?? {})
-                .sort(sort_by_priorities)
-                .map((key) => {
-                  const _ = (table_schema?.properties as any)[key];
-                  return {
-                    key: key,
-                    name: key,
-                    type: _.type,
-                    format: _.format,
-                  };
-                })}
+              columns={GridDataXSBUnknown.columns(table_schema, {
+                sort: "unknown_table_column_priorities",
+              })}
               rows={rows ?? []}
             />
-            <footer className="w-full px-2 py-1 border-y">
-              <div className="flex">
-                <Select
-                  value={perpage.toString()}
-                  onValueChange={(v) => setPerPage(parseInt(v))}
+          </GridLayout.Content>
+          <GridLayout.Footer>
+            <div>
+              <Select
+                value={perpage.toString()}
+                onValueChange={(v) => setPerPage(parseInt(v))}
+              >
+                <SelectTrigger
+                  className={WorkbenchUI.selectVariants({
+                    variant: "trigger",
+                    size: "sm",
+                  })}
                 >
-                  <SelectTrigger className="w-auto">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="50">50</SelectItem>
-                    <SelectItem value="100">100</SelectItem>
-                    <SelectItem value="1000">1000</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </footer>
-          </div>
-        </div>
+                  <SelectValue placeholder="rows" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={10 + ""}>10 rows</SelectItem>
+                  <SelectItem value={100 + ""}>100 rows</SelectItem>
+                  <SelectItem value={500 + ""}>500 rows</SelectItem>
+                  <SelectItem value={1000 + ""}>1000 rows</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </GridLayout.Footer>
+        </GridLayout.Root>
+        <hr />
         <SheetFooter className="px-6">
           <SheetClose>
             <Button variant="outline">Cancel</Button>
@@ -165,19 +164,3 @@ export function ReferenceSearch({
     </Sheet>
   );
 }
-
-const _auth_user_columns = Object.keys(
-  GridaXSupabase.SupabaseUserJsonSchema.properties
-).map((key) => {
-  const _ =
-    GridaXSupabase.SupabaseUserJsonSchema.properties[
-      key as GridaXSupabase.SupabaseUserColumn
-    ];
-
-  return {
-    key: key,
-    name: key,
-    type: _.type,
-    format: _.format,
-  };
-});

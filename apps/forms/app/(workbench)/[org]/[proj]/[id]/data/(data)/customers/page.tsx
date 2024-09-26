@@ -1,13 +1,13 @@
 "use client";
 
-import { CustomerGrid } from "@/scaffolds/grid/customer-grid";
+import { CustomerGrid } from "@/scaffolds/grid/wellknown/customer-grid";
 import { provisional } from "@/services/customer/utils";
 import {
-  GridLimit,
+  GridQueryLimitSelect,
   GridViewSettings,
-  GridRefresh,
+  GridRefreshButton,
   GridLocalSearch,
-  GridCount,
+  GridQueryCount,
   TableViews,
 } from "@/scaffolds/grid-editor/components";
 import * as GridLayout from "@/scaffolds/grid-editor/components/layout";
@@ -18,6 +18,11 @@ import { useMemo } from "react";
 import { GridData } from "@/scaffolds/grid-editor/grid-data";
 import { Customer } from "@/types";
 import { EditorSymbols } from "@/scaffolds/editor/symbols";
+import {
+  useDataGridLocalSearch,
+  useDataGridQuery,
+  useDataGridRefresh,
+} from "@/scaffolds/editor/use";
 
 export default function Customers() {
   const [state] = useEditorState();
@@ -26,6 +31,10 @@ export default function Customers() {
 
   const stream =
     tablespace[EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID].stream;
+
+  const refresh = useDataGridRefresh();
+  const query = useDataGridQuery();
+  const search = useDataGridLocalSearch();
 
   const rows = useMemo(() => {
     const { filtered } = GridData.rows({
@@ -57,13 +66,15 @@ export default function Customers() {
       <CustomerFeedProvider />
       <GridLayout.Root>
         <GridLayout.Header>
-          <GridLayout.HeaderMenus>
-            <TableViews />
-            <GridLocalSearch />
-          </GridLayout.HeaderMenus>
-          <GridLayout.HeaderMenus>
-            <GridViewSettings />
-          </GridLayout.HeaderMenus>
+          <GridLayout.HeaderLine>
+            <GridLayout.HeaderMenus>
+              <TableViews />
+              <GridLocalSearch onValueChange={search} />
+            </GridLayout.HeaderMenus>
+            <GridLayout.HeaderMenus>
+              <GridViewSettings />
+            </GridLayout.HeaderMenus>
+          </GridLayout.HeaderLine>
         </GridLayout.Header>
         <GridLayout.Content>
           <CustomerGrid
@@ -78,9 +89,15 @@ export default function Customers() {
           />
         </GridLayout.Content>
         <GridLayout.Footer>
-          <GridLimit />
-          <GridCount count={rows.length} keyword="customer" />
-          <GridRefresh />
+          <GridQueryLimitSelect
+            value={query.limit}
+            onValueChange={query.onLimit}
+          />
+          <GridQueryCount count={rows.length} keyword="customer" />
+          <GridRefreshButton
+            refreshing={refresh.refreshing}
+            onRefreshClick={refresh.refresh}
+          />
         </GridLayout.Footer>
       </GridLayout.Root>
     </CurrentTable>

@@ -7,15 +7,31 @@ export function Root({ children }: React.PropsWithChildren<{}>) {
 }
 
 export function Header({ children }: React.PropsWithChildren<{}>) {
+  return <header className="bg-background w-full">{children}</header>;
+}
+
+export function HeaderLine({
+  className,
+  children,
+}: React.PropsWithChildren<{ className?: string }>) {
   return (
-    <header className="bg-background min-h-12 h-12 w-full flex items-center justify-between gap-4 px-4">
+    <div
+      className={cn(
+        "px-2 min-h-12 h-12 flex items-center justify-between gap-4 border-b",
+        className
+      )}
+    >
       {children}
-    </header>
+    </div>
   );
 }
 
 export function HeaderMenus({ children }: React.PropsWithChildren<{}>) {
   return <div className="flex gap-2 items-center">{children}</div>;
+}
+
+export function HeaderMenuItems({ children }: React.PropsWithChildren<{}>) {
+  return <div className="flex gap-1 items-center">{children}</div>;
 }
 
 export function HeaderSeparator() {

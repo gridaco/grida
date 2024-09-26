@@ -11,6 +11,7 @@ export function PaletteColorChip({
   background,
   onSelect,
   className,
+  orientation = "horizontal",
 }: {
   primary: HSL;
   secondary?: HSL;
@@ -18,6 +19,7 @@ export function PaletteColorChip({
   selected?: boolean;
   onSelect?: () => void;
   className?: string;
+  orientation?: "vertical" | "horizontal";
 }) {
   return (
     <div
@@ -29,7 +31,12 @@ export function PaletteColorChip({
         className
       )}
     >
-      <div className="flex w-full h-full">
+      <div
+        className="flex w-full h-full"
+        style={{
+          flexDirection: orientation === "vertical" ? "column" : "row",
+        }}
+      >
         {background && (
           <div
             className="flex-1"

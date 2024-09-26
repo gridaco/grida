@@ -1,4 +1,7 @@
-export function mask(value: string, mask = "*") {
+/**
+ * Data masking without additional information, solely based on the shape of the string.
+ */
+export function mask(value: string, mask = "*"): string {
   // split tokens
   const tokens = [" ", "@", "-", ".", "_"];
 

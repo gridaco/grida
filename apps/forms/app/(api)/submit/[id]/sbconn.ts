@@ -114,7 +114,7 @@ function asTableRowData(
   {
     schema,
   }: {
-    schema: JSONSchemaType<Record<string, any>>;
+    schema: GridaXSupabase.JSONSChema;
   }
 ) {
   //
@@ -125,11 +125,14 @@ function asTableRowData(
   Object.keys(schema.properties).forEach((key) => {
     let parsedvalue: any;
 
-    const { type, format, is_array } = SupabasePostgRESTOpenApi.analyze_format(
-      schema.properties[key]
-    );
+    const { scalar_format: format, is_array } =
+      SupabasePostgRESTOpenApi.parse_postgrest_property_meta(
+        key,
+        schema.properties[key],
+        schema.required
+      );
 
-    switch (type) {
+    switch (format) {
       case "int":
       case "int2":
       case "int4":

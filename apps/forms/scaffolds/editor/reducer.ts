@@ -9,20 +9,12 @@ import type {
   OpenCustomerDetailsPanelAction,
   OpenFieldEditPanelAction,
   OpenRecordEditPanelAction,
-  DataGridRowsPerPageAction,
-  DataGridPageAction,
   DataGridTableAction,
   DataGridDateFormatAction,
   DataGridDateTZAction,
   DataGridLocalFilterAction,
   DataTableRefreshAction,
   DataTableLoadingAction,
-  DataGridOrderByAction,
-  DataGridOrderByClearAction,
-  DataGridPredicatesAddAction,
-  DataGridPredicatesUpdateAction,
-  DataGridPredicatesClearAction,
-  DataGridPredicatesRemoveAction,
   EditorThemeLangAction,
   EditorThemePaletteAction,
   EditorThemeFontFamilyAction,
@@ -35,14 +27,17 @@ import type {
   FormCampaignPreferencesAction,
   FormEndingPreferencesAction,
   EditorThemeAppearanceAction,
+  DataGridTableViewAction,
   DataGridSelectCellAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { EditorSymbols } from "./symbols";
 import { initialDatagridState } from "./init";
+import { DataGridLocalPreferencesStorage } from "./storage/datagrid.storage";
 import databaseRecucer from "./reducers/database.reducer";
 import blockReducer from "./reducers/block.reducer";
 import documentReducer from "./reducers/document.reducer";
+import datagridQueryReducer from "../data-query/data-query.reducer";
 
 export function reducer(state: EditorState, action: EditorAction): EditorState {
   switch (action.type) {
@@ -59,6 +54,29 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
     case "editor/table/schema/add":
     case "editor/table/schema/delete":
       return databaseRecucer(state, action);
+
+    // #region datagrid query
+    case "data/query/page-limit":
+    case "data/query/page-index":
+    case "data/query/orderby":
+    case "data/query/orderby/remove":
+    case "data/query/orderby/clear":
+    case "data/query/predicates/add":
+    case "data/query/predicates/clear":
+    case "data/query/predicates/remove":
+    case "data/query/predicates/update": {
+      return produce(state, (draft) => {
+        draft.datagrid_query = datagridQueryReducer(
+          draft.datagrid_query!,
+          action
+        );
+
+        on_datagrid_query_change(draft.datagrid_query, {
+          view_id: tmp_view_id(draft),
+        });
+      });
+    }
+    // #endregion datagrid query
 
     case "blocks/new":
     case "blocks/field/new":
@@ -155,21 +173,6 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
       });
     }
 
-    case "editor/data-grid/rows-per-page": {
-      const { limit } = <DataGridRowsPerPageAction>action;
-      return produce(state, (draft) => {
-        draft.datagrid_page_limit = limit;
-
-        // reset the pagination
-        draft.datagrid_page_index = 0;
-      });
-    }
-    case "editor/data-grid/page": {
-      const { index } = <DataGridPageAction>action;
-      return produce(state, (draft) => {
-        draft.datagrid_page_index = index;
-      });
-    }
     case "editor/data-grid/table": {
       const { ...opt } = <DataGridTableAction>action;
       return produce(state, (draft) => {
@@ -193,16 +196,17 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
           return;
         }
 
+        // [ORDER MATTERS] 1. update the table id
         draft.datagrid_table_id = tableid;
 
+        // [ORDER MATTERS] 2. get view id via table id
         // clear datagrid state
-        const datagridreset = initialDatagridState();
+        const datagridreset = initialDatagridState(tmp_view_id(draft));
         draft.datagrid_query_estimated_count =
           datagridreset.datagrid_query_estimated_count;
-        draft.datagrid_page_index = datagridreset.datagrid_page_index;
+        draft.datagrid_query = datagridreset.datagrid_query;
         draft.datagrid_selected_rows = datagridreset.datagrid_selected_rows;
         draft.datagrid_local_filter = datagridreset.datagrid_local_filter;
-        draft.datagrid_orderby = datagridreset.datagrid_orderby;
         draft.datagrid_selected_cell = datagridreset.datagrid_selected_cell;
 
         if (draft.doctype === "v0_form") {
@@ -211,6 +215,14 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
             draft.tablespace[tableid].realtime = true;
           }
         }
+      });
+    }
+    case "editor/data-grid/table/view": {
+      const { table_id, view_id } = <DataGridTableViewAction>action;
+      return produce(state, (draft) => {
+        const tb = draft.tables.find((t) => t.id == table_id);
+        if (!tb) return;
+        tb.view_id = view_id;
       });
     }
     case "editor/data-grid/cell/select": {
@@ -246,7 +258,6 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
         draft.datetz = tz;
       });
     }
-    // #region datagrid query
     case "editor/data-grid/local-filter": {
       const { type, ...pref } = <DataGridLocalFilterAction>action;
 
@@ -257,60 +268,12 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
         };
       });
     }
-    case "editor/data-grid/orderby": {
-      const { column_id, data } = <DataGridOrderByAction>action;
-      return produce(state, (draft) => {
-        if (data === null) {
-          delete draft.datagrid_orderby[column_id];
-          return;
-        }
-
-        draft.datagrid_orderby[column_id] = {
-          column: column_id,
-          ...data,
-        };
-      });
-    }
-    case "editor/data-grid/orderby/clear": {
-      const {} = <DataGridOrderByClearAction>action;
-      return produce(state, (draft) => {
-        draft.datagrid_orderby = {};
-      });
-    }
-    case "editor/data-grid/predicates/add": {
-      const { predicate } = <DataGridPredicatesAddAction>action;
-      return produce(state, (draft) => {
-        draft.datagrid_predicates.push(predicate);
-      });
-    }
-    case "editor/data-grid/predicates/update": {
-      const { index, predicate } = <DataGridPredicatesUpdateAction>action;
-      return produce(state, (draft) => {
-        const prev = draft.datagrid_predicates[index];
-        draft.datagrid_predicates[index] = {
-          ...prev,
-          ...predicate,
-        };
-      });
-    }
-    case "editor/data-grid/predicates/remove": {
-      const { index } = <DataGridPredicatesRemoveAction>action;
-      return produce(state, (draft) => {
-        draft.datagrid_predicates.splice(index, 1);
-      });
-    }
-    case "editor/data-grid/predicates/clear": {
-      const {} = <DataGridPredicatesClearAction>action;
-      return produce(state, (draft) => {
-        draft.datagrid_predicates = [];
-      });
-    }
-    // #endregion datagrid query
     case "editor/data-grid/refresh": {
       const {} = <DataTableRefreshAction>action;
 
       return produce(state, (draft) => {
-        draft.datagrid_table_refresh_key = draft.datagrid_table_refresh_key + 1;
+        draft.datagrid_query!.q_refresh_key =
+          nextrefreshkey(draft.datagrid_query!.q_refresh_key) ?? 0;
       });
     }
     case "editor/data-grid/loading": {
@@ -390,6 +353,7 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
     //
 
     default:
+      console.error("unhandled action by main editor reducer", action);
       return state;
   }
 }
@@ -402,4 +366,31 @@ function nextrefreshkey(curr: number | undefined, refresh: boolean = true) {
     return (curr ?? 0) + 1;
   }
   return curr;
+}
+
+/**
+ * TODO: this should be removed after we support database views in service layer
+ * get a view id of current datagrid
+ *
+ * @deprecated
+ */
+function tmp_view_id(draft: Draft<EditorState>) {
+  return draft.document_id + "/" + draft.datagrid_table_id?.toString();
+  //
+}
+
+/**
+ * TODO: it is a good practive to do this in a hook.
+ * I'm too lazy to do it now.
+ *
+ * @deprecated
+ */
+function on_datagrid_query_change(
+  query: Draft<EditorState["datagrid_query"]>,
+  { view_id }: { view_id: string }
+) {
+  DataGridLocalPreferencesStorage.set(view_id, {
+    orderby: query?.q_orderby,
+    predicates: query?.q_predicates,
+  });
 }

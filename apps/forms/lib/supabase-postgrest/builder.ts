@@ -6,8 +6,92 @@ import {
   type PostgrestTransformBuilder,
 } from "@supabase/postgrest-js";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { Data } from "../data";
 
 export namespace XPostgrestQuery {
+  export namespace PredicateOperator {
+    export type SQLPredicateOperatorKeyword =
+      | "eq" // Equals
+      | "neq" // Not Equals
+      | "gt" // Greater Than
+      | "gte" // Greater Than or Equal
+      | "lt" // Less Than
+      | "lte" // Less Than or Equal
+      | "like" // Case-Sensitive Pattern Match
+      | "ilike" // Case-Insensitive Pattern Match
+      | "is" // Is (NULL check, etc.)
+      | "in" // In (list of values)
+      | "cs" // Contains (JSON/Array containment)
+      | "cd" // Contained By (JSON/Array containment)
+      | "sl" // Strictly Left of (range operation)
+      | "sr" // Strictly Right of (range operation)
+      | "nxl" // Not Extends to the Left of (range operation)
+      | "nxr" // Not Extends to the Right of (range operation)
+      | "adj" // Adjacent to (range operation)
+      | "ov" // Overlaps (range operation)
+      | "fts" // Full-Text Search
+      | "plfts" // Phrase Full-Text Search
+      | "phfts" // Plain Full-Text Search
+      | "wfts"; // Web Full-Text Search
+
+    export type PostgRESTSQLPredicateNegateOperatorKeyword =
+      `not.${SQLPredicateOperatorKeyword}`;
+
+    export type PostgRESTSQLPredicateOperators =
+      | SQLPredicateOperatorKeyword
+      | PostgRESTSQLPredicateNegateOperatorKeyword;
+
+    /**
+     * Checks if the given SQL predicate operator is a negated operator.
+     *
+     * @param operator - The SQL predicate operator to check.
+     *
+     * @returns A boolean indicating whether the operator is a negated operator (i.e., it starts with "not.").
+     *
+     * @example
+     * ```typescript
+     * isNegateOperator("not.eq"); // true
+     * isNegateOperator("eq"); // false
+     * ```
+     */
+    export function isNegateOperator(
+      operator: PostgRESTSQLPredicateOperators
+    ): operator is PostgRESTSQLPredicateNegateOperatorKeyword {
+      return operator.startsWith("not.");
+    }
+
+    /**
+     * Analyzes the given SQL predicate operator and extracts its base operator and negation status.
+     *
+     * @param operator - The SQL predicate operator to analyze.
+     *
+     * @returns An object containing:
+     *  - `op`: The base SQL predicate operator (without negation).
+     *  - `negate`: A boolean indicating whether the operator is negated.
+     *
+     * @example
+     * ```typescript
+     * analyzeOperator("not.eq"); // { keyword: "eq", negate: true }
+     * analyzeOperator("eq"); // { keyword: "eq", negate: false }
+     * ```
+     */
+    export function analyzeOperator(operator: PostgRESTSQLPredicateOperators): {
+      keyword: SQLPredicateOperatorKeyword;
+      negate: boolean;
+    } {
+      if (operator.startsWith("not.")) {
+        return {
+          keyword: operator.replace("not.", "") as SQLPredicateOperatorKeyword,
+          negate: true,
+        };
+      }
+      return {
+        keyword: operator as SQLPredicateOperatorKeyword,
+        negate: false,
+      };
+    }
+  }
+
   export interface Body {
     values?: any;
     filters?: ReadonlyArray<NamedPredicate>;
@@ -85,6 +169,21 @@ export namespace XPostgrestQuery {
       }
 
       return params;
+    }
+
+    export function fromQueryState(query: Data.Relation.QueryState) {
+      const search = XPostgrestQuery.QS.select({
+        limit: query.q_page_limit,
+        order: query.q_orderby,
+        range: {
+          from: query.q_page_index * query.q_page_limit,
+          to: (query.q_page_index + 1) * query.q_page_limit - 1,
+        },
+        // only pass predicates with value set
+        filters: query.q_predicates.filter((p) => p.value ?? false),
+      });
+      search.set("r", query.q_refresh_key.toString());
+      return search;
     }
 
     export function parseOrderby(orderQuery: string): OrderBy {

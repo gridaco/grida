@@ -64,5 +64,3 @@ export type GRCustomerRow = {
   created_at: string;
   last_seen_at: string;
 };
-
-export type XSupabaseReferenceTableRow = GridaXSupabase.SupabaseUser | any;

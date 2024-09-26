@@ -237,6 +237,7 @@ export async function POST(req: NextRequest, context: Context) {
         attributes: new_table_detail.attributes,
       },
       connection: {
+        supabase_project_id: xsb_project_ref.id,
         sb_schema_name: upserted_supabase_table.sb_schema_name,
         sb_table_name: upserted_supabase_table.sb_table_name,
         sb_table_id: upserted_supabase_table.id,

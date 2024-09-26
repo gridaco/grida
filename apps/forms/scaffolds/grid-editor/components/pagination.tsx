@@ -1,67 +1,31 @@
+"use client";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { WorkbenchUI } from "@/components/workbench";
-import { useEditorState } from "@/scaffolds/editor";
+import { IDataQueryPaginationConsumer } from "@/scaffolds/data-query";
 import { ArrowLeftIcon, ArrowRightIcon } from "@radix-ui/react-icons";
-import { useCallback } from "react";
 
-function useDatagridPagination() {
-  //
-  const [state, dispatch] = useEditorState();
-  const {
-    datagrid_page_index,
-    datagrid_page_limit,
-    datagrid_query_estimated_count,
-  } = state;
-
-  const min = 0;
-  const max =
-    Math.ceil((datagrid_query_estimated_count ?? 0) / datagrid_page_limit) - 1;
-
-  const hasprev = datagrid_page_index > min;
-  const hasnext = datagrid_page_index < max;
-
-  const paginate = useCallback(
-    (index: number) => {
-      dispatch({ type: "editor/data-grid/page", index });
-    },
-    [dispatch]
-  );
-
-  const prev = useCallback(() => {
-    paginate(datagrid_page_index - 1);
-  }, [datagrid_page_index, paginate]);
-
-  const next = useCallback(() => {
-    paginate(datagrid_page_index + 1);
-  }, [datagrid_page_index, paginate]);
-
-  return {
-    page: datagrid_page_index,
-    min,
-    max,
-    hasprev,
-    hasnext,
-    paginate,
-    prev,
-    next,
-  };
-}
-
-export function GridPagination() {
-  const { min, max, hasprev, hasnext, page, paginate, prev, next } =
-    useDatagridPagination();
-
+export function GridQueryPaginationControl({
+  page,
+  minPage: min,
+  maxPage: max,
+  hasNextPage: hasNext,
+  hasPrevPage: hasPrev,
+  onNextPage: onNext,
+  onPaginate,
+  onPrevPage: onPrev,
+}: IDataQueryPaginationConsumer) {
   return (
     <div className="flex items-center gap-2">
       <Button
-        disabled={!hasprev}
+        disabled={!hasPrev}
         variant="outline"
         className={WorkbenchUI.buttonVariants({
           variant: "outline",
           size: "icon",
         })}
-        onClick={prev}
+        onClick={onPrev}
       >
         <ArrowLeftIcon className="w-3.5 h-3.5" />
       </Button>
@@ -75,7 +39,7 @@ export function GridPagination() {
           onChange={(e) => {
             const i = parseInt(e.target.value) - 1;
             if (i >= min && i <= max) {
-              paginate(i);
+              onPaginate(i);
             }
           }}
           className={WorkbenchUI.inputVariants()}
@@ -83,13 +47,13 @@ export function GridPagination() {
         <p className="text-muted-foreground whitespace-nowrap">of {max + 1}</p>
       </div>
       <Button
-        disabled={!hasnext}
+        disabled={!hasNext}
         variant="outline"
         className={WorkbenchUI.buttonVariants({
           variant: "outline",
           size: "icon",
         })}
-        onClick={next}
+        onClick={onNext}
       >
         <ArrowRightIcon className="w-3.5 h-3.5" />
       </Button>

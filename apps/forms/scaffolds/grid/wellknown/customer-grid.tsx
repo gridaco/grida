@@ -6,18 +6,41 @@ import DataGrid, {
   RenderCellProps,
   RenderHeaderCellProps,
 } from "react-data-grid";
-import { GRCustomerRow } from "./types";
-import { EmptyRowsRenderer } from "./empty";
-import "./grid.css";
+import { GRCustomerRow } from "../types";
+import { EmptyRowsRenderer } from "../grid-empty-state";
 import { CalendarIcon, EnvelopeClosedIcon } from "@radix-ui/react-icons";
 import { PhoneIcon } from "lucide-react";
-import { mask } from "./mask";
+import { mask } from "../grid-text-mask";
 import Highlight from "@/components/highlight";
+import { CellRoot } from "../cells";
+import "../grid.css";
+
+const customer_columns = [
+  {
+    key: "uid",
+    name: "ID",
+  },
+  {
+    key: "email",
+    name: "Email",
+  },
+  {
+    key: "phone",
+    name: "Phone",
+  },
+  {
+    key: "created_at",
+    name: "Created At",
+  },
+  {
+    key: "last_seen_at",
+    name: "Last Seen At",
+  },
+];
 
 export function CustomerGrid({
   rows: _rows,
   rowKey,
-  onSelected,
   tokens,
   masked,
   loading,
@@ -27,30 +50,8 @@ export function CustomerGrid({
   tokens?: string[];
   masked?: boolean;
   loading?: boolean;
-  onSelected?: (key: string, row: GRCustomerRow) => void;
 }) {
-  const columns = [
-    {
-      key: "uid",
-      name: "ID",
-    },
-    {
-      key: "email",
-      name: "Email",
-    },
-    {
-      key: "phone",
-      name: "Phone",
-    },
-    {
-      key: "created_at",
-      name: "Created At",
-    },
-    {
-      key: "last_seen_at",
-      name: "Last Seen At",
-    },
-  ].map(
+  const columns = customer_columns.map(
     (col) =>
       ({
         key: col.key,
@@ -70,11 +71,13 @@ export function CustomerGrid({
             : val?.toString();
 
           return (
-            <Highlight
-              text={display}
-              tokens={tokens}
-              className="bg-foreground text-background"
-            />
+            <CellRoot>
+              <Highlight
+                text={display}
+                tokens={tokens}
+                className="bg-foreground text-background"
+              />
+            </CellRoot>
           );
         },
       }) as Column<any>
@@ -108,10 +111,10 @@ function HeaderCell({ column }: RenderHeaderCellProps<any>) {
   const { name, key } = column;
 
   return (
-    <div className="flex items-center gap-2">
+    <CellRoot className="flex items-center gap-1.5">
       <CustomerPropertyIcon property={key as any} className="w-4 h-4" />
       <span className="font-normal">{name}</span>
-    </div>
+    </CellRoot>
   );
 }
 

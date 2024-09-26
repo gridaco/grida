@@ -281,9 +281,19 @@ export namespace PrivateEditorApi {
 
     export const url_x_auth_users_get = (
       supabase_project_id: number,
-      serachParams: URLSearchParams | string
+      serachParams?: URLSearchParams | string
     ) =>
-      `/private/editor/x-supabase/projects/${supabase_project_id}/x/auth.users/query?${serachParams}`;
+      `/private/editor/x-supabase/projects/${supabase_project_id}/x/auth.users/query${serachParams ? `?${serachParams}` : ""}`;
+
+    /**
+     * Note: this route accepts schema as Accept-Profile via headers like postgrest does. you will need to set the header with non-'public' schema
+     */
+    export const url_x_table_search = (
+      supabase_project_id: number,
+      supabase_table_name: string,
+      { serachParams }: { serachParams?: URLSearchParams | string }
+    ) =>
+      `/private/editor/x-supabase/projects/${supabase_project_id}/x/${supabase_table_name}/search${serachParams ? `?${serachParams}` : ""}`;
 
     // #endregion supabase project
 

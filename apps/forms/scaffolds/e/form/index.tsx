@@ -4,7 +4,7 @@ import React from "react";
 import { notFound, redirect } from "next/navigation";
 import { FormPageDeveloperErrorDialog } from "@/scaffolds/e/form/error";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useFingerprint } from "@/scaffolds/fingerprint";
+import { useFingerprint } from "@/components/fingerprint";
 import { formlink } from "@/lib/forms/url";
 import { GridaFormsFormView, type FormViewTranslation } from "./formview";
 import type { FormPageBackgroundSchema } from "@/types";

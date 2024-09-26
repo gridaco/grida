@@ -3,46 +3,50 @@
 import { PrivateEditorApi } from "@/lib/private";
 import { useEditorState } from "@/scaffolds/editor";
 import {
-  GridLimit,
+  GridQueryLimitSelect,
   GridViewSettings,
-  GridRefresh,
+  GridRefreshButton,
   GridLocalSearch,
-  GridCount,
+  GridQueryCount,
   TableViews,
 } from "@/scaffolds/grid-editor/components";
 import * as GridLayout from "@/scaffolds/grid-editor/components/layout";
-import { ReferenceTableGrid } from "@/scaffolds/grid/reference-grid";
+import { XSBReferenceTableGrid } from "@/scaffolds/grid/xsb-reference-grid";
 import { GridaXSupabase } from "@/types";
 import { EditorApiResponse } from "@/types/private/api";
-import { priority_sorter } from "@/utils/sort";
 import { useEffect, useMemo } from "react";
 import { CurrentTable } from "@/scaffolds/editor/utils/switch-table";
 import { GridData } from "@/scaffolds/grid-editor/grid-data";
 import { EditorSymbols } from "@/scaffolds/editor/symbols";
 import { XPostgrestQuery } from "@/lib/supabase-postgrest/builder";
 import useSWR from "swr";
+import { GridDataXSBUnknown } from "@/scaffolds/grid-editor/grid-data-xsb-unknow";
+import {
+  useDataGridLocalSearch,
+  useDataGridQuery,
+  useDataGridRefresh,
+} from "@/scaffolds/editor/use";
 
 export default function XTablePage() {
   const [state, dispatch] = useEditorState();
 
-  const {
-    supabase_project,
-    datagrid_page_limit,
-    datagrid_orderby,
-    datagrid_table_refresh_key,
-    datagrid_isloading,
-  } = state;
+  const { supabase_project, datagrid_isloading, datagrid_query } = state;
+
+  const refresh = useDataGridRefresh();
+  const query = useDataGridQuery();
+  const search = useDataGridLocalSearch();
 
   const serachParams = useMemo(() => {
+    if (!datagrid_query) return;
     const search = XPostgrestQuery.QS.select({
-      limit: datagrid_page_limit,
-      order: datagrid_orderby,
+      limit: datagrid_query?.q_page_limit,
+      order: datagrid_query?.q_orderby,
       // cannot apply filter to auth.users
       filters: undefined,
     });
-    search.set("r", datagrid_table_refresh_key.toString());
+    search.set("r", datagrid_query?.q_refresh_key?.toString());
     return search;
-  }, [datagrid_page_limit, datagrid_orderby, datagrid_table_refresh_key]);
+  }, [datagrid_query]);
 
   const request = supabase_project
     ? PrivateEditorApi.XSupabase.url_x_auth_users_get(
@@ -72,20 +76,11 @@ export default function XTablePage() {
     });
   }, [dispatch, isLoading, isValidating]);
 
-  const sort_by_priorities = priority_sorter(
-    GridaXSupabase.unknown_table_column_priorities
-  );
-
   const columns = useMemo(
     () =>
-      Object.keys(GridaXSupabase.SupabaseUserJsonSchema.properties)
-        .sort(sort_by_priorities)
-        .map((key) => {
-          return {
-            key: key,
-            name: key,
-          };
-        }),
+      GridDataXSBUnknown.columns(GridaXSupabase.SupabaseUserJsonSchema, {
+        sort: "unknown_table_column_priorities",
+      }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   );
@@ -106,16 +101,18 @@ export default function XTablePage() {
     >
       <GridLayout.Root>
         <GridLayout.Header>
-          <GridLayout.HeaderMenus>
-            <TableViews />
-            <GridLocalSearch />
-          </GridLayout.HeaderMenus>
-          <GridLayout.HeaderMenus>
-            <GridViewSettings />
-          </GridLayout.HeaderMenus>
+          <GridLayout.HeaderLine>
+            <GridLayout.HeaderMenus>
+              <TableViews />
+              <GridLocalSearch onValueChange={search} />
+            </GridLayout.HeaderMenus>
+            <GridLayout.HeaderMenus>
+              <GridViewSettings />
+            </GridLayout.HeaderMenus>
+          </GridLayout.HeaderLine>
         </GridLayout.Header>
         <GridLayout.Content>
-          <ReferenceTableGrid
+          <XSBReferenceTableGrid
             masked={state.datagrid_local_filter.masking_enabled}
             tokens={
               state.datagrid_local_filter.localsearch
@@ -123,14 +120,20 @@ export default function XTablePage() {
                 : []
             }
             columns={columns}
-            rows={filtered}
+            rows={filtered as GridaXSupabase.SupabaseUser[]}
             loading={datagrid_isloading}
           />
         </GridLayout.Content>
         <GridLayout.Footer>
-          <GridLimit />
-          <GridCount count={filtered.length} keyword="user" />
-          <GridRefresh />
+          <GridQueryLimitSelect
+            value={query.limit}
+            onValueChange={query.onLimit}
+          />
+          <GridQueryCount count={filtered.length} keyword="user" />
+          <GridRefreshButton
+            refreshing={refresh.refreshing}
+            onRefreshClick={refresh.refresh}
+          />
         </GridLayout.Footer>
       </GridLayout.Root>
     </CurrentTable>
