@@ -22,6 +22,7 @@ import {
   RichTextEditCell,
   FileEditCell,
   JsonPopupEditorCell,
+  FileLoadingCell,
 } from "./cells";
 import { useEditorState } from "../editor";
 import type {
@@ -509,39 +510,51 @@ function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
     case "file": {
       return (
         <CellRoot {...rootprops} className="w-full h-full flex gap-2">
-          {files?.map((f, i) => (
-            <span key={i}>
-              <FileTypeIcon
-                type={type as "file"}
-                className="inline w-4 h-4 align-middle me-2"
-              />
-              <span>
-                <Highlight
-                  text={f.name}
-                  tokens={datagrid_filter.localsearch}
-                  className="bg-foreground text-background"
-                />
-              </span>
-            </span>
-          ))}
+          {files === "loading" ? (
+            <FileLoadingCell />
+          ) : (
+            <>
+              {files?.map((f, i) => (
+                <span key={i}>
+                  <FileTypeIcon
+                    type={type as "file" | "image" | "audio" | "video"}
+                    className="inline w-4 h-4 align-middle me-2"
+                  />
+                  <span>
+                    <Highlight
+                      text={f.name}
+                      tokens={datagrid_filter.localsearch}
+                      className="bg-foreground text-background"
+                    />
+                  </span>
+                </span>
+              ))}
+            </>
+          )}
         </CellRoot>
       );
     }
     case "image": {
       return (
         <CellRoot {...rootprops} className="w-full h-full flex gap-2">
-          {files?.map((file, i) => (
-            <figure className="py-1 flex items-center gap-2" key={i}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={file.src}
-                alt={file.name}
-                className="h-full min-w-8 aspect-square rounded overflow-hidden object-cover bg-neutral-500"
-                loading="lazy"
-              />
-              {/* <figcaption>{file.name}</figcaption> */}
-            </figure>
-          ))}
+          {files === "loading" ? (
+            <FileLoadingCell />
+          ) : (
+            <>
+              {files?.map((file, i) => (
+                <figure className="py-1 flex items-center gap-2" key={i}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={file.src}
+                    alt={file.name}
+                    className="h-full min-w-8 aspect-square rounded overflow-hidden object-cover bg-neutral-500"
+                    loading="lazy"
+                  />
+                  {/* <figcaption>{file.name}</figcaption> */}
+                </figure>
+              ))}
+            </>
+          )}
         </CellRoot>
       );
     }
@@ -789,11 +802,15 @@ function FieldEditCell(props: RenderEditCellProps<RenderingRow>) {
       case "image": {
         return (
           <CellRoot {...rootprops}>
-            <FileEditCell
-              type={type as "file" | "image" | "audio" | "video"}
-              multiple={multiple}
-              files={files || []}
-            />
+            {files === "loading" ? (
+              <FileLoadingCell />
+            ) : (
+              <FileEditCell
+                type={type as "file" | "image" | "audio" | "video"}
+                multiple={multiple}
+                files={files || []}
+              />
+            )}
           </CellRoot>
         );
       }

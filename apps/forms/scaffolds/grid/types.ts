@@ -33,7 +33,7 @@ export type GFResponseFieldData = {
   options?: {
     [key: string]: { value: string; label?: string };
   };
-  files?: GFFile[];
+  files?: GFFile[] | "loading";
 };
 
 export type GFFile = {

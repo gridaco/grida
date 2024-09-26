@@ -75,6 +75,7 @@ import { Chartview } from "../table-view-chart/chartview";
 import { useMultiplayer } from "@/scaffolds/editor/multiplayer";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { SchemaNameProvider } from "../data-query";
+import { GridFileStorageQueueProvider } from "./grid-storage-queue";
 
 function useSelectedCells(): DataGridCellSelectionCursor[] {
   const [state] = useEditorState();
@@ -298,53 +299,55 @@ export function GridEditor({
             </GridLayout.HeaderLine>
           )}
         </GridLayout.Header>
-        {view?.type === "gallery" && (
-          <GridLayout.Content className="overflow-y-scroll">
-            <Gallery />
-          </GridLayout.Content>
-        )}
-        {view?.type === "chart" && (
-          <GridLayout.Content className="overflow-y-scroll">
-            <Chartview />
-          </GridLayout.Content>
-        )}
-        {!view && (
-          <GridLayout.Content>
-            <DataGrid
-              className="bg-transparent"
-              local_cursor_id={state.cursor_id}
-              systemcolumns={systemcolumns}
-              columns={columns}
-              rows={rows ?? []}
-              readonly={readonly}
-              loading={datagrid_isloading}
-              selectionDisabled={selectionDisabled}
-              onAddNewFieldClick={openNewFieldPanel}
-              onEditFieldClick={openEditFieldPanel}
-              onDeleteFieldClick={(field_id) => {
-                deleteFieldConfirmDialog.openDialog({ field_id });
-              }}
-              onCellChange={(row, column, data) => {
-                dispatch({
-                  type: "editor/table/space/cell/change",
-                  table_id: table_id!,
-                  gdoc_table_id: tb!.id,
-                  row: row.__gf_id,
-                  column: column,
-                  data: data,
-                });
-              }}
-              onSelectedCellChange={({ pk, column }) => {
-                dispatch({
-                  type: "editor/data-grid/cell/select",
-                  pk: pk,
-                  column,
-                });
-              }}
-              selectedCells={selectedCells}
-            />
-          </GridLayout.Content>
-        )}
+        <GridFileStorageQueueProvider>
+          {view?.type === "gallery" && (
+            <GridLayout.Content className="overflow-y-scroll">
+              <Gallery />
+            </GridLayout.Content>
+          )}
+          {view?.type === "chart" && (
+            <GridLayout.Content className="overflow-y-scroll">
+              <Chartview />
+            </GridLayout.Content>
+          )}
+          {!view && (
+            <GridLayout.Content>
+              <DataGrid
+                className="bg-transparent"
+                local_cursor_id={state.cursor_id}
+                systemcolumns={systemcolumns}
+                columns={columns}
+                rows={rows ?? []}
+                readonly={readonly}
+                loading={datagrid_isloading}
+                selectionDisabled={selectionDisabled}
+                onAddNewFieldClick={openNewFieldPanel}
+                onEditFieldClick={openEditFieldPanel}
+                onDeleteFieldClick={(field_id) => {
+                  deleteFieldConfirmDialog.openDialog({ field_id });
+                }}
+                onCellChange={(row, column, data) => {
+                  dispatch({
+                    type: "editor/table/space/cell/change",
+                    table_id: table_id!,
+                    gdoc_table_id: tb!.id,
+                    row: row.__gf_id,
+                    column: column,
+                    data: data,
+                  });
+                }}
+                onSelectedCellChange={({ pk, column }) => {
+                  dispatch({
+                    type: "editor/data-grid/cell/select",
+                    pk: pk,
+                    column,
+                  });
+                }}
+                selectedCells={selectedCells}
+              />
+            </GridLayout.Content>
+          )}
+        </GridFileStorageQueueProvider>
         <GridLayout.Footer>
           <div className="flex gap-4 items-center">
             <GridQueryPaginationControl {...query} />

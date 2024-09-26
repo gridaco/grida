@@ -46,6 +46,15 @@ import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { SignedUploadUrlData } from "@/types/private/api";
 import { SupabaseStorageExtensions } from "@/lib/supabase/storage-ext";
 import { Spinner } from "@/components/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
+
+export function FileLoadingCell() {
+  return (
+    <div className="min-w-8 aspect-square py-1">
+      <Skeleton className=" w-full h-full" />
+    </div>
+  );
+}
 
 export function FileEditCell({
   type,

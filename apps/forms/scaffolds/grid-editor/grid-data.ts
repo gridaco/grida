@@ -477,7 +477,7 @@ export namespace GridData {
       // file field
       if (
         FieldSupports.file_alias(field.type) &&
-        row.__gf_storage_fields[field.id]
+        row.__gf_storage_fields?.[field.id]
       ) {
         const objects = row.__gf_storage_fields[field.id];
         return objects
@@ -543,7 +543,7 @@ export namespace GridData {
             },
             {}
           ),
-          files: filesfn(row, field),
+          files: filesfn(row, field) ?? "loading",
         };
       });
       acc.push(gfRow);
