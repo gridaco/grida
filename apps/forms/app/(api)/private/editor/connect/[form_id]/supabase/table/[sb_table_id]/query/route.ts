@@ -18,7 +18,7 @@ import type {
   XSupabaseStorageSchema,
 } from "@/types";
 import assert from "assert";
-import { omit } from "@/utils/qs";
+import { omit, qboolean } from "@/utils/qs";
 
 type Context = {
   params: {
@@ -27,8 +27,19 @@ type Context = {
   };
 };
 
+const XSB_STORAGE_CONFIG_KEY = "__xsb_storage";
+
 export async function GET(req: NextRequest, context: Context) {
-  const searchParams = omit(req.nextUrl.searchParams, "r"); // not used, only for swr key
+  const __q__xsb_storage = req.nextUrl.searchParams.get(XSB_STORAGE_CONFIG_KEY);
+  const __xsb_storage = qboolean(__q__xsb_storage);
+
+  const searchParams = omit(
+    req.nextUrl.searchParams,
+    // not used, only for swr key
+    "r",
+    // storage config
+    XSB_STORAGE_CONFIG_KEY
+  );
   const { form_id, sb_table_id: _sb_table_id } = context.params;
   const sb_table_id = parseInt(_sb_table_id);
 
@@ -58,9 +69,12 @@ export async function GET(req: NextRequest, context: Context) {
     });
   }
 
-  const pooler = new GridaXSupabaseStorageTaskPooler(x_storage_client);
-  pooler.queue(data, fields);
-  const files = await pooler.resolve();
+  let __xsb_storage_files: StorageTaskPoolerResult | null = null;
+  if (__xsb_storage) {
+    const pooler = new GridaXSupabaseStorageTaskPooler(x_storage_client);
+    pooler.queue(data, fields);
+    __xsb_storage_files = await pooler.resolve();
+  }
 
   // console.log("files", files);
 
@@ -69,7 +83,7 @@ export async function GET(req: NextRequest, context: Context) {
     const pk = row.id;
     return {
       ...row,
-      __gf_storage_fields: (files as any)[pk],
+      __gf_storage_fields: __xsb_storage_files ? __xsb_storage_files[pk] : null,
     } satisfies GridaXSupabase.XDataRow;
   });
 
@@ -194,6 +208,18 @@ async function get_forms_x_supabase_table_connector({
   return { form, main_supabase_table, x_client, x_storage_client };
 }
 
+type StorageTaskPoolerResult = Record<
+  string,
+  Record<
+    string,
+    | {
+        signedUrl: string;
+        path: string;
+      }[]
+    | null
+  >
+>;
+
 class GridaXSupabaseStorageTaskPooler {
   private tasks: Record<
     string,
@@ -228,20 +254,7 @@ class GridaXSupabaseStorageTaskPooler {
 
     return this.tasks;
   }
-
-  async resolve(): Promise<
-    Record<
-      string,
-      Record<
-        string,
-        | {
-            signedUrl: string;
-            path: string;
-          }[]
-        | null
-      >
-    >
-  > {
+  async resolve(): Promise<StorageTaskPoolerResult> {
     const resolvedEntries = await Promise.all(
       Object.entries(this.tasks).map(async ([rowId, task]) => {
         const result = await task;

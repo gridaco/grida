@@ -29,7 +29,7 @@ export namespace GridaXSupabase {
             path: string;
           }[]
         | null
-      >;
+      > | null;
     };
 
   export type JSONSChema =
