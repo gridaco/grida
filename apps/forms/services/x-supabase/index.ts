@@ -15,6 +15,7 @@ import type { XSupabaseStorageSchema } from "@/types";
 import type { TemplateVariables } from "@/lib/templating";
 import type { StorageError } from "@supabase/storage-js";
 import assert from "assert";
+import type { Database } from "@/database.types";
 import "core-js/features/map/group-by";
 
 export async function createXSupabaseClient(
@@ -80,6 +81,62 @@ export async function secureCreateServiceKey(
       p_secret: service_key,
     }
   );
+}
+
+export async function get_grida_table_x_supabase_table_connector({
+  form_id,
+  sb_table_id,
+  client,
+}: {
+  form_id: string;
+  sb_table_id: number;
+  client: SupabaseClient<Database, "grida_forms">;
+}) {
+  const { data: form, error } = await client
+    .from("form")
+    .select(
+      `
+        id,
+        supabase_connection:connection_supabase(*),
+        fields:attribute(*)
+      `
+    )
+    .eq("id", form_id)
+    .single();
+
+  if (!form) {
+    console.error("failed to fetch connection", error);
+    throw error;
+  }
+
+  const { supabase_connection } = form;
+  assert(supabase_connection, "supabase_connection is required");
+
+  const x = new GridaXSupabaseService();
+  const conn = await x.getXSBMainTableConnectionState(supabase_connection);
+  assert(conn, "connection fetch failed");
+  const { main_supabase_table } = conn;
+
+  assert(
+    main_supabase_table?.id === sb_table_id,
+    "only supports main table atm"
+  );
+
+  const x_client = await createXSupabaseClient(
+    supabase_connection.supabase_project_id,
+    {
+      db: {
+        schema: main_supabase_table?.sb_schema_name,
+      },
+      service_role: true,
+    }
+  );
+
+  const x_storage_client = new XSupabase.Storage.ConnectedClient(
+    x_client.storage
+  );
+
+  return { grida_table: form, main_supabase_table, x_client, x_storage_client };
 }
 
 export class GridaXSupabaseService {

@@ -6,17 +6,12 @@ import {
   XSupabaseClientQueryBuilder,
 } from "@/lib/supabase-postgrest/builder";
 import { createRouteHandlerClient } from "@/lib/supabase/server";
-import {
-  GridaXSupabaseService,
-  createXSupabaseClient,
-} from "@/services/x-supabase";
-import { XSupabase } from "@/services/x-supabase";
+import { get_grida_table_x_supabase_table_connector } from "@/services/x-supabase";
 import type { GridaXSupabase } from "@/types";
-import assert from "assert";
 import { omit, qboolean } from "@/utils/qs";
 import {
-  GridaXSupabaseStorageTaskPooler,
-  GridaXSupabaseStorageTaskPoolerResult,
+  XSupabaseStorageCrossBucketTaskPooler,
+  XSupabaseStorageTaskPoolerResult,
 } from "@/services/x-supabase/xsb-storage-pooler";
 
 type Context = {
@@ -29,6 +24,11 @@ type Context = {
 const XSB_STORAGE_CONFIG_KEY = "__xsb_storage";
 
 export async function GET(req: NextRequest, context: Context) {
+  const cookieStore = cookies();
+  const grida_forms_client = createRouteHandlerClient(cookieStore);
+
+  const { form_id, sb_table_id: _sb_table_id } = context.params;
+  const sb_table_id = parseInt(_sb_table_id);
   const __q__xsb_storage = req.nextUrl.searchParams.get(XSB_STORAGE_CONFIG_KEY);
   const __xsb_storage = qboolean(__q__xsb_storage);
 
@@ -39,16 +39,15 @@ export async function GET(req: NextRequest, context: Context) {
     // storage config
     XSB_STORAGE_CONFIG_KEY
   );
-  const { form_id, sb_table_id: _sb_table_id } = context.params;
-  const sb_table_id = parseInt(_sb_table_id);
 
-  const { form, main_supabase_table, x_client, x_storage_client } =
-    await get_forms_x_supabase_table_connector({
+  const { grida_table, main_supabase_table, x_client, x_storage_client } =
+    await get_grida_table_x_supabase_table_connector({
       form_id,
       sb_table_id: sb_table_id,
+      client: grida_forms_client,
     });
 
-  const { fields } = form;
+  const { fields } = grida_table;
 
   const query = new XSupabaseClientQueryBuilder(x_client);
 
@@ -68,10 +67,15 @@ export async function GET(req: NextRequest, context: Context) {
     });
   }
 
-  let __xsb_storage_files: GridaXSupabaseStorageTaskPoolerResult | null = null;
+  let __xsb_storage_files: XSupabaseStorageTaskPoolerResult | null = null;
   if (__xsb_storage) {
-    const pooler = new GridaXSupabaseStorageTaskPooler(x_storage_client);
-    pooler.queue(fields, data);
+    const pooler = new XSupabaseStorageCrossBucketTaskPooler(x_storage_client);
+    pooler.queue(
+      fields,
+      data,
+      // FIXME: get pk based on table schema (alternatively, we can use index as well - doesnt have to be a data from a fetched row)
+      "id"
+    );
     __xsb_storage_files = await pooler.resolve();
   }
 
@@ -94,13 +98,17 @@ export async function GET(req: NextRequest, context: Context) {
 }
 
 export async function PATCH(req: NextRequest, context: Context) {
+  const cookieStore = cookies();
+  const grida_forms_client = createRouteHandlerClient(cookieStore);
+
   const { form_id, sb_table_id: _sb_table_id } = context.params;
   const sb_table_id = parseInt(_sb_table_id);
 
   const { main_supabase_table, x_client } =
-    await get_forms_x_supabase_table_connector({
+    await get_grida_table_x_supabase_table_connector({
       form_id,
       sb_table_id: sb_table_id,
+      client: grida_forms_client,
     });
 
   const body: XPostgrestQuery.Body = await req.json();
@@ -120,13 +128,17 @@ export async function PATCH(req: NextRequest, context: Context) {
 }
 
 export async function DELETE(req: NextRequest, context: Context) {
+  const cookieStore = cookies();
+  const grida_forms_client = createRouteHandlerClient(cookieStore);
+
   const { form_id, sb_table_id: _sb_table_id } = context.params;
   const sb_table_id = parseInt(_sb_table_id);
 
   const { main_supabase_table, x_client } =
-    await get_forms_x_supabase_table_connector({
+    await get_grida_table_x_supabase_table_connector({
       form_id,
       sb_table_id: sb_table_id,
+      client: grida_forms_client,
     });
 
   const body: XPostgrestQuery.Body = await req.json();
@@ -140,69 +152,4 @@ export async function DELETE(req: NextRequest, context: Context) {
     .done();
 
   return NextResponse.json(res);
-}
-
-/**
- *
- * [SECURE]
- *
- * RLS Protected
- *
- * @returns
- */
-async function get_forms_x_supabase_table_connector({
-  form_id,
-  sb_table_id,
-}: {
-  form_id: string;
-  sb_table_id: number;
-}) {
-  const cookieStore = cookies();
-  const grida_forms_client = createRouteHandlerClient(cookieStore);
-
-  const { data: form, error } = await grida_forms_client
-    .from("form")
-    .select(
-      `
-        id,
-        supabase_connection:connection_supabase(*),
-        fields:attribute(*)
-      `
-    )
-    .eq("id", form_id)
-    .single();
-
-  if (!form) {
-    console.error("failed to fetch connection", error);
-    return notFound();
-  }
-
-  const { supabase_connection } = form;
-  assert(supabase_connection, "supabase_connection is required");
-
-  const x = new GridaXSupabaseService();
-  const conn = await x.getXSBMainTableConnectionState(supabase_connection);
-  assert(conn, "connection fetch failed");
-  const { main_supabase_table } = conn;
-
-  assert(
-    main_supabase_table?.id === sb_table_id,
-    "only supports main table atm"
-  );
-
-  const x_client = await createXSupabaseClient(
-    supabase_connection.supabase_project_id,
-    {
-      db: {
-        schema: main_supabase_table?.sb_schema_name,
-      },
-      service_role: true,
-    }
-  );
-
-  const x_storage_client = new XSupabase.Storage.ConnectedClient(
-    x_client.storage
-  );
-
-  return { form, main_supabase_table, x_client, x_storage_client };
 }

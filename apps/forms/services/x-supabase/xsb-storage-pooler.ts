@@ -3,7 +3,7 @@ import type { FormFieldDefinition, XSupabaseStorageSchema } from "@/types";
 import assert from "assert";
 import type { XSupabase } from ".";
 
-export type GridaXSupabaseStorageTaskPoolerResult = Record<
+export type XSupabaseStorageTaskPoolerResult = Record<
   string,
   Record<
     string,
@@ -15,7 +15,7 @@ export type GridaXSupabaseStorageTaskPoolerResult = Record<
   >
 >;
 
-export class GridaXSupabaseStorageTaskPooler {
+export class XSupabaseStorageCrossBucketTaskPooler {
   private tasks: Record<
     string,
     Promise<Record<string, XSupabase.Storage.CreateSignedUrlsResult["data"]>>
@@ -25,7 +25,8 @@ export class GridaXSupabaseStorageTaskPooler {
 
   queue(
     fields: Pick<FormFieldDefinition, "id" | "storage" | "type">[],
-    rows: ReadonlyArray<Record<string, any>>
+    rows: ReadonlyArray<Record<string, any>>,
+    pkcol: string
   ) {
     const x_supabase_storage_file_fields = fields.filter(
       (f) =>
@@ -34,8 +35,7 @@ export class GridaXSupabaseStorageTaskPooler {
     );
 
     for (const row of rows) {
-      // FIXME: get pk based on table schema (alternatively, we can use index as well - doesnt have to be a data from a fetched row)
-      const pk = row.id;
+      const pk = row[pkcol];
       const task = this.storage.createSignedUrls(
         row,
         x_supabase_storage_file_fields.map((ff) => ({
@@ -49,7 +49,7 @@ export class GridaXSupabaseStorageTaskPooler {
 
     return this.tasks;
   }
-  async resolve(): Promise<GridaXSupabaseStorageTaskPoolerResult> {
+  async resolve(): Promise<XSupabaseStorageTaskPoolerResult> {
     const resolvedEntries = await Promise.all(
       Object.entries(this.tasks).map(async ([rowId, task]) => {
         const result = await task;
