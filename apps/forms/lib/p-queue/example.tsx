@@ -9,6 +9,7 @@ const queue = new PQueue({ concurrency: 1 });
 function App() {
   return (
     <QueueProvider<ImageResult, ImageQuery>
+      identifier="src"
       config={{
         max_store_size: null,
       }}
@@ -35,7 +36,7 @@ function App() {
 }
 
 function Consumer() {
-  const { store, add, clear } = useQueue();
-  add("", {});
+  const { add, clear } = useQueue();
+  add({});
   return <></>;
 }

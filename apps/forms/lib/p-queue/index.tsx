@@ -31,25 +31,26 @@ import BatchQueue from "./batch";
 const __P_QUEUE_FALLBACK = new PQueue();
 
 // #region generic types
-interface TID {}
+interface Identifiable {
+  [key: string]: any;
+}
 
 type PQResolverResult<T, E = any> = {
   data: T | null;
   error?: E | null;
 };
 
-type PQResult<T, E> = PQResolverResult<T, E> &
-  TID & {
-    ok: boolean;
-  };
+type PQResult<T, E> = PQResolverResult<T, E> & {
+  ok: boolean;
+};
 
-type TaskPayload<P extends TID> = P;
+type TaskPayload<P> = P;
 
-type PQSingleResolver<T, P extends TID> = (
+type PQSingleResolver<T, P> = (
   task: TaskPayload<P>
 ) => Promise<PQResolverResult<T>>;
 
-type PQBatchResolver<T, P extends TID> = (
+type PQBatchResolver<T, P> = (
   ...task: TaskPayload<P>[]
 ) => Promise<PQResolverResult<T[]>>;
 
@@ -64,8 +65,8 @@ type PQConfig = {
 
 // #region state context
 
-interface PQResolverState<T, P extends TID> {
-  batch: BatchQueue<P> | null;
+interface PQResolverState<T extends Identifiable, P extends Identifiable> {
+  batch: BatchQueue<P, T, any> | null;
   resolver: PQBatchResolver<T, P> | PQSingleResolver<T, P>;
   queue: PQueue;
 }
@@ -76,7 +77,7 @@ const PQueueResolverContext = createContext<PQResolverState<any, any> | null>(
 
 type PQError = any;
 
-interface PQState<T, P extends TID, E> {
+interface PQState<T, P, E> {
   config: PQConfig;
   store: PQResult<T, E | PQError>[];
   tasks: TaskPayload<P>[];
@@ -109,7 +110,7 @@ type PQueueTaskStartAction = {
   type: "start";
   task: any;
 };
-type PQueueTaskResultAction = TID & {
+type PQueueTaskResultAction = {
   type: "result";
   result: PQResolverResult<any, any>;
 };
@@ -150,11 +151,12 @@ function reducer(
   return state;
 }
 
-type TResolverByBatch<B, T, P extends TID> = B extends true
+type TResolverByBatch<B, T, P> = B extends true
   ? PQBatchResolver<T, P>
   : PQSingleResolver<T, P>;
 
-type QueueProviderProps<T, P extends TID> = {
+type QueueProviderProps<T, P> = {
+  identifier: keyof T;
   config: PQConfig;
   queue?: PQueue;
 } & (
@@ -176,21 +178,23 @@ type QueueProviderProps<T, P extends TID> = {
     }
 );
 
-function QueueProvider<T, P extends TID | any>({
+function QueueProvider<T extends Identifiable, P extends Identifiable>({
   config,
   resolver,
   batch,
   throttle,
   queue,
+  identifier,
   children,
-}: React.PropsWithChildren<QueueProviderProps<T, P & TID>>) {
+}: React.PropsWithChildren<QueueProviderProps<T, P>>) {
   const [state, dispatch] = useReducer(reducer, initstate(config));
 
   const batchqueue = useMemo(() => {
     if (!batch) return null;
-    return new BatchQueue<P & TID>({
+    return new BatchQueue<P, T, any>({
       batchSize: batch,
       throttleTime: throttle,
+      identifier: identifier,
       resolver: async (tasks) => {
         // This is how you process the batched tasks using the provided resolver
         const results = await resolver(...tasks);
@@ -203,6 +207,12 @@ function QueueProvider<T, P extends TID | any>({
             result: { data: result, error: results.error },
           });
         });
+
+        if (!results.data) {
+          throw results.error;
+        }
+
+        return results.data;
       },
     });
   }, [batch, resolver, throttle]);
@@ -245,15 +255,21 @@ function __useResolver() {
   return [context.resolver, context.queue, { batch: context.batch }] as const;
 }
 
-type PQAddDispatcher<T, P> = (task: P) => Promise<PQResolverResult<T> | void>;
+type PQAddDispatcher<T, P> = (task: P) => Promise<PQResolverResult<T>>;
 type PQClearDispatcher = () => void;
 
 type UseQueueReturnType<T, P> = {
-  store: PQResolverResult<T, any>[];
   add: PQAddDispatcher<T, P>;
   clear: PQClearDispatcher;
 };
 // #endregion hook
+
+function useQueueStore<T, P>(): PQResolverResult<T, any>[] {
+  const state = useContext(PQueueContext);
+  if (!state) throw new Error("QueueProvider not provided");
+  const { store } = state;
+  return store;
+}
 
 function useQueue<T, P>(): UseQueueReturnType<T, P> {
   const dispatch = __useDispatch();
@@ -261,15 +277,13 @@ function useQueue<T, P>(): UseQueueReturnType<T, P> {
   const state = useContext(PQueueContext);
   if (!state) throw new Error("QueueProvider not provided");
 
-  const { store } = state;
   const { batch } = config;
 
   const onAdd: PQAddDispatcher<T, P> = useCallback(
     async (task: P) => {
       if (batch) {
         // If batch mode is enabled, add tasks to the BatchQueue
-        batch.addTask({ ...task });
-        return;
+        return batch.addTask(task);
       } else {
         // If batch mode is not enabled, use p-queue
         try {
@@ -295,13 +309,12 @@ function useQueue<T, P>(): UseQueueReturnType<T, P> {
 
   return useMemo(
     () => ({
-      store,
       add: onAdd,
       clear: onClear,
     }),
-    [store, onAdd, onClear]
+    [onAdd, onClear]
   );
 }
 
 export default QueueProvider;
-export { useQueue };
+export { useQueue, useQueueStore };
