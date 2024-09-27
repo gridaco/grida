@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
-import { FieldSupports } from "@/k/supported_field_types";
 import {
   XPostgrestQuery,
   XSupabaseClientQueryBuilder,
@@ -12,13 +11,13 @@ import {
   createXSupabaseClient,
 } from "@/services/x-supabase";
 import { XSupabase } from "@/services/x-supabase";
-import type {
-  FormFieldDefinition,
-  GridaXSupabase,
-  XSupabaseStorageSchema,
-} from "@/types";
+import type { GridaXSupabase } from "@/types";
 import assert from "assert";
 import { omit, qboolean } from "@/utils/qs";
+import {
+  GridaXSupabaseStorageTaskPooler,
+  GridaXSupabaseStorageTaskPoolerResult,
+} from "@/services/x-supabase/xsb-storage-pooler";
 
 type Context = {
   params: {
@@ -69,10 +68,10 @@ export async function GET(req: NextRequest, context: Context) {
     });
   }
 
-  let __xsb_storage_files: StorageTaskPoolerResult | null = null;
+  let __xsb_storage_files: GridaXSupabaseStorageTaskPoolerResult | null = null;
   if (__xsb_storage) {
     const pooler = new GridaXSupabaseStorageTaskPooler(x_storage_client);
-    pooler.queue(data, fields);
+    pooler.queue(fields, data);
     __xsb_storage_files = await pooler.resolve();
   }
 
@@ -206,74 +205,4 @@ async function get_forms_x_supabase_table_connector({
   );
 
   return { form, main_supabase_table, x_client, x_storage_client };
-}
-
-type StorageTaskPoolerResult = Record<
-  string,
-  Record<
-    string,
-    | {
-        signedUrl: string;
-        path: string;
-      }[]
-    | null
-  >
->;
-
-class GridaXSupabaseStorageTaskPooler {
-  private tasks: Record<
-    string,
-    Promise<Record<string, XSupabase.Storage.CreateSignedUrlsResult["data"]>>
-  > = {};
-
-  constructor(private readonly storage: XSupabase.Storage.ConnectedClient) {}
-
-  queue(
-    rows: ReadonlyArray<Record<string, any>>,
-    fields: Pick<FormFieldDefinition, "id" | "storage" | "type">[]
-  ) {
-    const x_supabase_storage_file_fields = fields.filter(
-      (f) =>
-        FieldSupports.file_alias(f.type) &&
-        (f.storage as XSupabaseStorageSchema)?.type === "x-supabase"
-    );
-
-    for (const row of rows) {
-      // FIXME: get pk based on table schema (alternatively, we can use index as well - doesnt have to be a data from a fetched row)
-      const pk = row.id;
-      const task = this.storage.createSignedUrls(
-        row,
-        x_supabase_storage_file_fields.map((ff) => ({
-          ...(ff.storage as XSupabaseStorageSchema),
-          id: ff.id,
-        }))
-      );
-
-      this.tasks[pk] = task;
-    }
-
-    return this.tasks;
-  }
-  async resolve(): Promise<StorageTaskPoolerResult> {
-    const resolvedEntries = await Promise.all(
-      Object.entries(this.tasks).map(async ([rowId, task]) => {
-        const result = await task;
-
-        const success = Object.entries(result).reduce((acc, [fieldId, r]) => {
-          if (r) {
-            return {
-              ...acc,
-              [fieldId]: r.filter((r) => r.signedUrl),
-            };
-          }
-
-          return acc;
-        }, {});
-
-        return [rowId, success];
-      })
-    );
-
-    return Object.fromEntries(resolvedEntries);
-  }
 }
