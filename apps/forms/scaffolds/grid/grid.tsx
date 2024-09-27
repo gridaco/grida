@@ -23,9 +23,12 @@ import {
   FileEditCell,
   JsonPopupEditorCell,
   FileLoadingCell,
+  FileRefsStateRenderer,
 } from "./cells";
 import { useEditorState } from "../editor";
 import type {
+  CellIdentifier,
+  DataGridCellFileRefsResolver,
   DataGridCellSelectionCursor,
   DataGridFileRef,
   GFColumn,
@@ -63,6 +66,7 @@ import "./grid.css";
 import {
   DataGridStateProvider,
   useCellRootProps,
+  useFileRefs,
   useMasking,
 } from "./providers";
 
@@ -442,6 +446,11 @@ function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
 
   const masker = useMasking();
 
+  const identifier: CellIdentifier = {
+    attribute: column.key,
+    key: row.__gf_id,
+  };
+
   if (!data) {
     return <CellRoot {...rootprops}></CellRoot>;
   }
@@ -509,19 +518,27 @@ function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
     case "video":
     case "audio":
     case "file": {
+      const rowdata = rowrawdata(row);
       return (
         <CellRoot {...rootprops} className="w-full h-full flex gap-2">
           <FileCellContent
-            files={files}
+            identifier={identifier}
+            rowdata={rowdata}
+            resolver={files}
             type={type as "file" | "image" | "audio" | "video"}
           />
         </CellRoot>
       );
     }
     case "image": {
+      const rowdata = rowrawdata(row);
       return (
         <CellRoot {...rootprops} className="w-full h-full flex gap-2">
-          <ImageCellContent files={files} />
+          <ImageCellContent
+            identifier={identifier}
+            rowdata={rowdata}
+            resolver={files}
+          />
         </CellRoot>
       );
     }
@@ -572,59 +589,83 @@ function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
   }
 }
 
+function rowrawdata(row: GFResponseRow): Record<string, any> {
+  return Object.keys(row.fields).reduce((acc: Record<string, any>, key) => {
+    const v = row.fields[key].value;
+    acc[key] = v;
+    return acc;
+  }, {});
+}
+
 function FileCellContent({
+  identifier,
+  rowdata,
   type,
-  files,
+  resolver,
 }: {
-  files?: DataGridFileRef[] | "loading";
+  identifier: CellIdentifier;
+  rowdata: Record<string, any>;
+  resolver?: DataGridCellFileRefsResolver;
   type: "file" | "image" | "audio" | "video";
 }) {
+  const refs = useFileRefs(identifier, rowdata, resolver);
   return (
     <>
-      {files === "loading" ? (
-        <FileLoadingCell />
-      ) : (
-        <>
-          {files?.map((f, i) => (
-            <span key={i}>
-              <FileTypeIcon
-                type={type}
-                className="inline w-4 h-4 align-middle me-2"
-              />
-              <span>{f.name}</span>
-            </span>
-          ))}
-        </>
-      )}
+      <FileRefsStateRenderer
+        refs={refs}
+        renderers={{
+          loading: <FileLoadingCell />,
+          error: "ERR",
+          files: (f, i) => {
+            return (
+              <span key={i}>
+                <FileTypeIcon
+                  type={type}
+                  className="inline w-4 h-4 align-middle me-2"
+                />
+                <span>{f.name}</span>
+              </span>
+            );
+          },
+        }}
+      />
     </>
   );
 }
 
 function ImageCellContent({
-  files,
+  identifier,
+  rowdata,
+  resolver,
 }: {
-  files?: DataGridFileRef[] | "loading";
+  identifier: CellIdentifier;
+  rowdata: Record<string, any>;
+  resolver?: DataGridCellFileRefsResolver;
 }) {
+  const refs = useFileRefs(identifier, rowdata, resolver);
+
   return (
     <>
-      {files === "loading" ? (
-        <FileLoadingCell />
-      ) : (
-        <>
-          {files?.map((file, i) => (
-            <figure className="py-1 flex items-center gap-2" key={i}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={file.src}
-                alt={file.name}
-                className="h-full min-w-8 aspect-square rounded overflow-hidden object-cover bg-neutral-500"
-                loading="lazy"
-              />
-              {/* <figcaption>{file.name}</figcaption> */}
-            </figure>
-          ))}
-        </>
-      )}
+      <FileRefsStateRenderer
+        refs={refs}
+        renderers={{
+          loading: <FileLoadingCell />,
+          error: "ERR",
+          files: (f, i) => {
+            return (
+              <figure key={i} className="flex items-center gap-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={f.src}
+                  alt={f.name}
+                  className="h-full min-w-8 aspect-square rounded overflow-hidden object-cover bg-neutral-500"
+                  loading="lazy"
+                />
+              </figure>
+            );
+          },
+        }}
+      />
     </>
   );
 }
@@ -646,6 +687,11 @@ function FieldEditCell(props: RenderEditCellProps<RenderingRow>) {
   }, [ref]);
 
   const { type, value, option_id, multiple, options, files } = data ?? {};
+
+  const identifier: CellIdentifier = {
+    attribute: column.key,
+    key: row.__gf_id,
+  };
 
   const onKeydown = (
     e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -824,17 +870,16 @@ function FieldEditCell(props: RenderEditCellProps<RenderingRow>) {
       case "audio":
       case "video":
       case "image": {
+        const rowdata = rowrawdata(row);
         return (
           <CellRoot {...rootprops}>
-            {files === "loading" ? (
-              <FileLoadingCell />
-            ) : (
-              <FileEditCell
-                type={type as "file" | "image" | "audio" | "video"}
-                multiple={multiple}
-                files={files || []}
-              />
-            )}
+            <FileEditCell
+              identifier={identifier}
+              rowdata={rowdata}
+              type={type as "file" | "image" | "audio" | "video"}
+              multiple={multiple}
+              resolver={files}
+            />
           </CellRoot>
         );
       }

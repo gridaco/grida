@@ -36,6 +36,7 @@ export class XSupabaseStorageCrossBucketTaskPooler {
 
     for (const row of rows) {
       const pk = row[pkcol];
+      assert(pk, `pk "${pkcol}" not found in row ${JSON.stringify(row)}`);
       const task = this.storage.createSignedUrls(
         row,
         x_supabase_storage_file_fields.map((ff) => ({

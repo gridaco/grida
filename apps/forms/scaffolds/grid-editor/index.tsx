@@ -75,7 +75,7 @@ import { Chartview } from "../table-view-chart/chartview";
 import { useMultiplayer } from "@/scaffolds/editor/multiplayer";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { SchemaNameProvider } from "../data-query";
-import { GridFileStorageQueueProvider } from "./grid-file-storage-queue";
+import { GridFileStorageQueueProvider } from "../grid/providers";
 
 function useSelectedCells(): DataGridCellSelectionCursor[] {
   const [state] = useEditorState();
@@ -299,7 +299,14 @@ export function GridEditor({
             </GridLayout.HeaderLine>
           )}
         </GridLayout.Header>
-        <GridFileStorageQueueProvider>
+        <GridFileStorageQueueProvider
+          table_id={table_id!}
+          supabase_table_id={
+            "x_sb_main_table_connection" in tb!
+              ? tb.x_sb_main_table_connection.sb_table_id
+              : null
+          }
+        >
           {view?.type === "gallery" && (
             <GridLayout.Content className="overflow-y-scroll">
               <Gallery />

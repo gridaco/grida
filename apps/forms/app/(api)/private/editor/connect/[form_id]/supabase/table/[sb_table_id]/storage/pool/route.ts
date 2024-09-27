@@ -1,3 +1,4 @@
+import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { createRouteHandlerClient } from "@/lib/supabase/server";
 import { get_grida_table_x_supabase_table_connector } from "@/services/x-supabase";
 import {
@@ -15,7 +16,6 @@ type Context = {
 };
 
 interface XSBStorageBulkResolverRequest {
-  pkcol: string;
   rows: Record<string, any>[];
 }
 
@@ -27,20 +27,48 @@ export async function POST(req: NextRequest, context: Context) {
 
   const body: XSBStorageBulkResolverRequest = await req.json();
 
-  const { grida_table, main_supabase_table, x_client, x_storage_client } =
-    await get_grida_table_x_supabase_table_connector({
-      form_id,
-      sb_table_id: sb_table_id,
-      client: grida_forms_client,
-    });
+  try {
+    const { grida_table, main_supabase_table, x_client, x_storage_client } =
+      await get_grida_table_x_supabase_table_connector({
+        form_id,
+        sb_table_id: sb_table_id,
+        client: grida_forms_client,
+      });
 
-  const { fields } = grida_table;
+    const { fields } = grida_table;
 
-  const pooler = new XSupabaseStorageCrossBucketTaskPooler(x_storage_client);
-  pooler.queue(fields, body.rows, body.pkcol);
+    const { pk_col, pk_first_col } = SupabasePostgRESTOpenApi.parse_pks(
+      main_supabase_table.sb_table_schema
+    );
 
-  const xsb_storage_files: XSupabaseStorageTaskPoolerResult | null =
-    await pooler.resolve();
+    // map the rows with real name
+    const realdbrows: Record<string, any>[] = body.rows.map((row) =>
+      Object.keys(row).reduce(
+        (acc, key) => {
+          const field = fields.find((f) => f.id === key);
+          if (field) {
+            acc[field.name] = row[key];
+          }
+          return acc;
+        },
+        {} as Record<string, any>
+      )
+    );
 
-  return NextResponse.json({ data: xsb_storage_files });
+    const pooler = new XSupabaseStorageCrossBucketTaskPooler(x_storage_client);
+    pooler.queue(fields, realdbrows, (pk_col || pk_first_col)!);
+
+    try {
+      const xsb_storage_files: XSupabaseStorageTaskPoolerResult | null =
+        await pooler.resolve();
+
+      return NextResponse.json({ data: xsb_storage_files });
+    } catch (e) {
+      console.error("ERR 400 storage/pooler", e);
+      return NextResponse.json({ error: true }, { status: 400 });
+    }
+  } catch (e) {
+    console.error("ERR 500 storage/pooler", e);
+    return NextResponse.json({ error: true }, { status: 500 });
+  }
 }

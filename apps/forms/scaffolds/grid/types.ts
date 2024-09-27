@@ -7,6 +7,50 @@ export interface DataGridCellSelectionCursor {
   color: string;
 }
 
+export interface CellIdentifier {
+  /**
+   * the column key
+   */
+  attribute: string;
+  /**
+   * the primary key value (row id)
+   */
+  key: string;
+}
+
+export type StandaloneFileRefsResolverFn = () => Promise<DataGridFileRef[]>;
+export type StandaloneFileRefsResolver = {
+  type: "data-grid-file-storage-file-refs-resolver-fn";
+  fn: StandaloneFileRefsResolverFn;
+};
+
+export type DataGridFileRefsResolverQueryTask = {
+  type: "data-grid-file-storage-file-refs-query-task";
+  identifier: CellIdentifier;
+};
+
+export type DataGridCellFileRefsResolver =
+  | StandaloneFileRefsResolver
+  | DataGridFileRefsResolverQueryTask
+  | DataGridFileRef[]
+  | null;
+
+type FileUpsertionUrlResolver =
+  // TODO:
+  // | ((identifier: CellIdentifier) => Promise<string>)
+  string | null;
+
+export type DataGridFileRef = {
+  src: string;
+  srcset: {
+    thumbnail: string;
+    original: string;
+  };
+  download: string;
+  upsert?: FileUpsertionUrlResolver;
+  name: string;
+};
+
 export type GFSystemColumnTypes =
   | "__gf_display_id"
   | "__gf_created_at"
@@ -34,18 +78,7 @@ export type GFResponseFieldData = {
   options?: {
     [key: string]: { value: string; label?: string };
   };
-  files?: DataGridFileRef[] | "loading";
-};
-
-export type DataGridFileRef = {
-  src: string;
-  srcset: {
-    thumbnail: string;
-    original: string;
-  };
-  download: string;
-  upsert?: string;
-  name: string;
+  files?: DataGridCellFileRefsResolver;
 };
 
 export type GFResponseRow = {

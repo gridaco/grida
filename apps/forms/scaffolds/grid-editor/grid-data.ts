@@ -12,6 +12,8 @@ import type {
   DataGridFileRef,
   GFResponseRow,
   GFSystemColumn,
+  DataGridCellFileRefsResolver,
+  DataGridFileRefsResolverQueryTask,
 } from "../grid/types";
 import type {
   DataGridLocalFilter,
@@ -260,7 +262,7 @@ export namespace GridData {
           filtered: rows_from_x_supabase_main_table({
             form_id: input.form_id,
             // TODO: support multiple PKs
-            pk: input.data.pks.length > 0 ? input.data.pks[0] : null,
+            pkcol: input.data.pks.length > 0 ? input.data.pks[0] : null,
             fields: input.fields,
             rows: GridFilter.filter(
               input.data.rows,
@@ -328,7 +330,7 @@ export namespace GridData {
               filtered: rows_from_x_supabase_main_table({
                 form_id: input.table_id,
                 // TODO: support multiple PKs
-                pk: input.pks.length > 0 ? input.pks[0] : null,
+                pkcol: input.pks.length > 0 ? input.pks[0] : null,
                 fields: input.attributes,
                 rows: GridFilter.filter(
                   input.rows,
@@ -455,12 +457,12 @@ export namespace GridData {
   }
 
   function rows_from_x_supabase_main_table({
-    pk,
+    pkcol,
     form_id,
     fields,
     rows,
   }: {
-    pk: string | null;
+    pkcol: string | null;
     form_id: string;
     fields: FormFieldDefinition[];
     rows: any[];
@@ -474,59 +476,10 @@ export namespace GridData {
       return row[field.name];
     };
 
-    const filesfn = (
-      row: GridaXSupabase.XDataRow,
-      field: FormFieldDefinition
-    ) => {
-      // file field
-      if (
-        FieldSupports.file_alias(field.type) &&
-        row.__gf_storage_fields?.[field.id]
-      ) {
-        const objects = row.__gf_storage_fields[field.id];
-        return objects
-          ?.map((obj) => {
-            const { path, signedUrl } = obj;
-
-            const thumbnail = PrivateEditorApi.FormFieldFile.file_preview_url({
-              params: {
-                form_id: form_id,
-                field_id: field.id,
-                filepath: path,
-              },
-              options: {
-                width: 200,
-              },
-            });
-
-            const upsert =
-              PrivateEditorApi.FormFieldFile.file_request_upsert_url({
-                form_id: form_id,
-                field_id: field.id,
-                filepath: path,
-              });
-
-            return {
-              // use thumbnail as src
-              src: thumbnail,
-              srcset: {
-                thumbnail: thumbnail,
-                original: signedUrl,
-              },
-              // use path as name for x-supabase
-              name: path,
-              download: signedUrl,
-              upsert: upsert,
-            } satisfies DataGridFileRef;
-          })
-          .filter((f) => f) as DataGridFileRef[] | [];
-      }
-    };
-
     return rows.reduce((acc, row, index) => {
       const gfRow: GFResponseRow = {
-        __gf_id: pk ? row[pk] : "",
-        __gf_display_id: pk ? row[pk] : "",
+        __gf_id: pkcol ? row[pkcol] : "",
+        __gf_display_id: pkcol ? row[pkcol] : "",
         fields: {},
       };
       fields.forEach((field) => {
@@ -547,11 +500,83 @@ export namespace GridData {
             },
             {}
           ),
-          files: filesfn(row, field) ?? "loading",
+          files: xsb_storage_files({ row, field, form_id, pkcol }),
         };
       });
       acc.push(gfRow);
       return acc;
     }, []);
   }
+}
+
+export function xsb_file_refs_mapper(
+  table_id: string,
+  field_id: string,
+  signatures: { signedUrl: string; path: string }[]
+) {
+  return signatures
+    ?.map((obj) => {
+      const { path, signedUrl } = obj;
+
+      const thumbnail = PrivateEditorApi.FormFieldFile.file_preview_url({
+        params: {
+          form_id: table_id,
+          field_id: field_id,
+          filepath: path,
+        },
+        options: {
+          width: 200,
+        },
+      });
+
+      const upsert = PrivateEditorApi.FormFieldFile.file_request_upsert_url({
+        form_id: table_id,
+        field_id: field_id,
+        filepath: path,
+      });
+
+      return {
+        // use thumbnail as src
+        src: thumbnail,
+        srcset: {
+          thumbnail: thumbnail,
+          original: signedUrl,
+        },
+        // use path as name for x-supabase
+        name: path,
+        download: signedUrl,
+        upsert: upsert,
+      } satisfies DataGridFileRef;
+    })
+    .filter((f) => f) as DataGridFileRef[] | [];
+}
+
+function xsb_storage_files({
+  form_id,
+  row,
+  pkcol,
+  field,
+}: {
+  row: GridaXSupabase.XDataRow;
+  field: FormFieldDefinition;
+  pkcol: string | null;
+  form_id: string;
+}): DataGridCellFileRefsResolver {
+  if (!FieldSupports.file_alias(field.type)) return null;
+  if (row.__gf_storage_fields?.[field.id]) {
+    // file field
+    const objects = row.__gf_storage_fields[field.id];
+    return objects ? xsb_file_refs_mapper(form_id, field.id, objects) : null;
+  } else {
+    if (!pkcol) return null;
+    return {
+      type: "data-grid-file-storage-file-refs-query-task",
+      identifier: {
+        attribute: field.name,
+        key: pkcol,
+      },
+    } satisfies DataGridFileRefsResolverQueryTask;
+  }
+
+  return null;
 }
