@@ -99,12 +99,11 @@ export class FieldStorageService {
           );
 
           const { sb_table_name, sb_table_schema } = conn?.main_supabase_table!;
-          const { pks } =
-            SupabasePostgRESTOpenApi.parse_supabase_postgrest_schema_definition(
-              sb_table_schema
-            );
+          const { pk_col, pk_cols, pk_first_col } =
+            SupabasePostgRESTOpenApi.parse_pks(sb_table_schema);
 
-          const pk = pks[0];
+          const pk = pk_col || pk_first_col;
+          assert(pk, "pk not found");
           const { data: row, error } = await xclient
             .from(sb_table_name)
             .select("*")
@@ -116,7 +115,7 @@ export class FieldStorageService {
           const rowcontext = TemplateVariables.createContext(
             "x-supabase.postgrest_query_insert_select",
             {
-              TABLE: { pks },
+              TABLE: { pks: pk_cols },
               RECORD: row,
               NEW: row,
             }

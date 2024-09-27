@@ -455,4 +455,17 @@ export namespace SupabasePostgRESTOpenApi {
 
     return res;
   }
+
+  export function parse_pks(schema: SupabaseOpenAPIDefinitionJSONSchema) {
+    const parsed =
+      SupabasePostgRESTOpenApi.parse_supabase_postgrest_schema_definition(
+        schema
+      );
+
+    return {
+      pk_col: (parsed?.pks?.length || 0) === 1 ? parsed?.pks[0] : undefined,
+      pk_cols: parsed?.pks || [],
+      pk_first_col: (parsed?.pks?.length || 0) > 0 ? parsed?.pks[0] : undefined,
+    };
+  }
 }
