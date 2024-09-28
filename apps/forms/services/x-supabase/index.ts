@@ -17,6 +17,7 @@ import type { StorageError } from "@supabase/storage-js";
 import assert from "assert";
 import type { Database } from "@/database.types";
 import "core-js/features/map/group-by";
+import { unique } from "@/utils/unique";
 
 export async function createXSupabaseClient(
   supabase_project_id: number,
@@ -203,6 +204,87 @@ export namespace XSupabase {
           error: StorageError;
         };
 
+    /**
+     * A bucket info with bucket name required, but other data missing or unknwon
+     *
+     * This type is required because in Grida XSB Storage can be saved only with the name but without other metadata, e.g. `public`
+     * This is because the configuration can change and lead to unidentifiable outcomes.
+     *
+     * Fetching the bucket info is relatively fast, when other properties are required, we may fetch based on this typings.
+     *
+     * @see https://supabase.com/docs/reference/javascript/storage-getbucket
+     */
+    type BucketWithUnknownProperties = {
+      bucket: string;
+      public: boolean | "unknown";
+      file_size_limit?: number | "unknwon";
+      allowed_mime_types?: string[] | "unknown";
+    };
+
+    type BucketObjectPath = {
+      bucket: string;
+      path: string;
+    };
+
+    type SignedBucketObjectPath = BucketObjectPath & {
+      signedUrl: string;
+      error: string | null;
+    };
+
+    /**
+     * As supabase storage api works per bucket, this client is a wrapper around the supabase storage client, which seamlessly handles requests across multiple buckets.
+     */
+    export class MultiBucketClient {
+      constructor(
+        public readonly storage: SupabaseClient["storage"],
+        public readonly buckets: BucketWithUnknownProperties[]
+      ) {}
+
+      async createSignedUrls(
+        objects: Array<BucketObjectPath>,
+        expiresIn: number
+      ): Promise<Array<SignedBucketObjectPath>> {
+        // remove duplicates by (bucket + path)
+        objects = unique(objects, (o) => o.bucket + o.path);
+
+        const objects_by_bucket = Map.groupBy(objects, (o) => o.bucket);
+        const tasks_by_bucket: Promise<CreateSignedUrlsResult>[] = [];
+
+        // bulk create signed urls by bucket
+        for (const entry of Array.from(objects_by_bucket.entries())) {
+          const [bucket, bucket_objects] = entry;
+          const paths = bucket_objects.map((o) => o.path);
+          tasks_by_bucket.push(
+            this.storage.from(bucket).createSignedUrls(paths, expiresIn)
+          );
+        }
+        //
+
+        const resolved_by_bucket = await Promise.all(tasks_by_bucket);
+
+        const result: SignedBucketObjectPath[] = [];
+
+        resolved_by_bucket.forEach((curr, index) => {
+          const bucket = Array.from(objects_by_bucket.keys())[index];
+          const bucket_objects = objects_by_bucket.get(bucket)!;
+          if (!curr.error) {
+            curr.data.forEach((data, index) => {
+              const object = bucket_objects[index];
+              result.push({
+                bucket,
+                path: object.path,
+                signedUrl: data.signedUrl,
+                error: data.error,
+              } satisfies SignedBucketObjectPath);
+            });
+          }
+        });
+
+        return result;
+      }
+      //
+    }
+
     export class ConnectedClient {
       /**
        * dummy table info since this does not use a table variable
@@ -232,10 +314,10 @@ export namespace XSupabase {
 
       createSignedUrl(
         row: Record<string, any>,
-        fieldstorage: XSupabaseStorageSchema
+        storage: XSupabaseStorageSchema
       ) {
-        assert(fieldstorage.type === "x-supabase");
-        const { bucket, path: pathtemplate } = fieldstorage;
+        assert(storage.type === "x-supabase");
+        const { bucket, path: pathtemplate } = storage;
         const renderedpath = renderpath(pathtemplate, {
           TABLE: this.table_dummy,
           NEW: row,
@@ -248,50 +330,55 @@ export namespace XSupabase {
       async createSignedUrls(
         row: Record<string, any>,
         fields: (XSupabaseStorageSchema & { id: string })[]
-      ): Promise<Record<string, CreateSignedUrlsResult["data"]>> {
-        // group fields by bucket
-        const grouped_by_bucket = Map.groupBy(fields, (f) => f.bucket);
+      ): Promise<Record<string, SignedBucketObjectPath[]>> {
+        const buckets: BucketWithUnknownProperties[] = Array.from(
+          new Set(fields.map((f) => f.bucket))
+        ).map((b) => {
+          return {
+            bucket: b,
+            public: "unknown",
+          } satisfies BucketWithUnknownProperties;
+        });
 
-        const tasks_by_bucket: Promise<CreateSignedUrlsResult>[] = [];
-
-        // bulk create signed urls by bucket
-        Array.from(grouped_by_bucket.entries()).map(
-          ([bucket, fields]: [string, XSupabaseStorageSchema[]]) => {
-            const paths = fields.map((f) => {
-              const renderedpath = renderpath(f.path, {
-                TABLE: this.table_dummy,
-                NEW: row,
-                RECORD: row,
-              });
-              return renderedpath;
+        const objects: (BucketObjectPath & { field_id: string })[] = fields.map(
+          (f) => {
+            const renderedpath = renderpath(f.path, {
+              TABLE: this.table_dummy,
+              NEW: row,
+              RECORD: row,
             });
-            tasks_by_bucket.push(
-              this.storage.from(bucket).createSignedUrls(paths, 60 * 60)
-            );
+
+            return {
+              bucket: f.bucket,
+              path: renderedpath,
+              field_id: f.id,
+            };
           }
         );
 
-        const resolved_by_bucket = await Promise.all(tasks_by_bucket);
+        const mbc = new MultiBucketClient(this.storage, buckets);
+        const res = await mbc.createSignedUrls(objects, 60 * 60);
 
         const result: Record<
-          string,
-          NonNullable<CreateSignedUrlsResult["data"]>
+          string, // field id
+          SignedBucketObjectPath[]
         > = {};
 
-        resolved_by_bucket.forEach((curr, index) => {
-          const bucket = Array.from(grouped_by_bucket.keys())[index];
-          const fields = grouped_by_bucket.get(bucket)!;
-          if (!curr.error) {
-            curr.data.forEach((signedUrl, index) => {
-              const field = fields[index];
-              if (!result[field.id]) {
-                result[field.id] = [];
-              }
+        // find from result and append by field_id
+        for (const obj of objects) {
+          const { field_id, path, bucket } = obj;
+          const signed_objects = res.filter(
+            (r) => r.bucket === bucket && r.path === path
+          );
 
-              result[field.id].push(signedUrl);
-            });
+          // init
+          if (!result[field_id]) {
+            result[field_id] = [];
           }
-        });
+
+          // append
+          result[field_id].push(...signed_objects);
+        }
 
         return result;
       }
