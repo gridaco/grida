@@ -8,6 +8,10 @@ export type XSupabaseStorageTaskPoolerResult = Record<
   Record<
     string,
     | {
+        /**
+         * available if the bucket if public
+         */
+        publicUrl: string | null;
         signedUrl: string;
         path: string;
       }[]
@@ -15,6 +19,16 @@ export type XSupabaseStorageTaskPoolerResult = Record<
   >
 >;
 
+/**
+ * A task pooler for creating signed urls for x-supabase storage fields.
+ * This is used to queue multiple tasks and resolve them in bulk.
+ *
+ * Since supabase storage api can be called per bucket, this manages multiple dynamic storage tasks and resolves as whole.
+ *
+ * TODO: Improvements:
+ * - When the path is already rendered and can be trusted (non dynamic path) we may skip the existence check.
+ * - When this is used only for reading, we may check if the bucket is public and skip the signed url request.
+ */
 export class XSupabaseStorageCrossBucketTaskPooler {
   private tasks: Record<
     string,

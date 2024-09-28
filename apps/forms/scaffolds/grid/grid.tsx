@@ -656,7 +656,7 @@ function ImageCellContent({
               <figure key={i} className="flex items-center gap-2">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={f.src}
+                  src={f.srcset.thumbnail}
                   alt={f.name}
                   className="h-full min-w-8 aspect-square rounded overflow-hidden object-cover bg-neutral-500"
                   loading="lazy"

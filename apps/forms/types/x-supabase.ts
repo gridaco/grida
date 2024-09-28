@@ -25,6 +25,10 @@ export namespace GridaXSupabase {
       __gf_storage_fields: Record<
         string,
         | {
+            /**
+             * available if the bucket if public
+             */
+            publicUrl: string | null;
             signedUrl: string;
             path: string;
           }[]

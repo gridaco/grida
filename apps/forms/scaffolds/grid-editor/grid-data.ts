@@ -28,6 +28,7 @@ import { FieldSupports } from "@/k/supported_field_types";
 import { PrivateEditorApi } from "@/lib/private";
 import { GridFilter } from "../grid-filter";
 import { EditorSymbols } from "../editor/symbols";
+import { SupabaseStorageExtensions } from "@/lib/supabase/storage-ext";
 
 export namespace GridData {
   type DataGridInput =
@@ -512,22 +513,32 @@ export namespace GridData {
 export function xsb_file_refs_mapper(
   table_id: string,
   field_id: string,
-  signatures: { signedUrl: string; path: string }[]
+  signatures: {
+    publicUrl: string | null;
+    signedUrl: string;
+    path: string;
+  }[]
 ) {
   return signatures
     ?.map((obj) => {
-      const { path, signedUrl } = obj;
+      const { path, signedUrl, publicUrl } = obj;
 
-      const thumbnail = PrivateEditorApi.FormFieldFile.file_preview_url({
-        params: {
-          form_id: table_id,
-          field_id: field_id,
-          filepath: path,
-        },
-        options: {
-          width: 200,
-        },
-      });
+      const thumbnail = publicUrl
+        ? SupabaseStorageExtensions.transformPublicUrl(publicUrl, {
+            width: 200,
+            resize: "contain",
+            quality: 50,
+          })
+        : PrivateEditorApi.FormFieldFile.file_preview_url({
+            params: {
+              form_id: table_id,
+              field_id: field_id,
+              filepath: path,
+            },
+            options: {
+              width: 200,
+            },
+          });
 
       const upsert = PrivateEditorApi.FormFieldFile.file_request_upsert_url({
         form_id: table_id,
@@ -536,11 +547,11 @@ export function xsb_file_refs_mapper(
       });
 
       return {
-        // use thumbnail as src
-        src: thumbnail,
+        // always use public url if available (this is cost effective for clients (users' supabase billing))
+        src: publicUrl || thumbnail,
         srcset: {
           thumbnail: thumbnail,
-          original: signedUrl,
+          original: publicUrl || signedUrl,
         },
         // use path as name for x-supabase
         name: path,
