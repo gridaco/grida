@@ -227,6 +227,10 @@ export namespace XSupabase {
     };
 
     type SignedBucketObjectPath = BucketObjectPath & {
+      /**
+       * the public url will be null if the bucket is not public
+       */
+      publicUrl: string | null;
       signedUrl: string;
       error: string | null;
     };
@@ -237,13 +241,36 @@ export namespace XSupabase {
     export class MultiBucketClient {
       constructor(
         public readonly storage: SupabaseClient["storage"],
-        public readonly buckets: BucketWithUnknownProperties[]
+        public readonly buckets: BucketWithUnknownProperties[],
+        readonly alwaysResolveBuckets = true
       ) {}
+
+      async resolveBuckets() {
+        const tasks = this.buckets.map((b) => {
+          return this.storage.getBucket(b.bucket);
+        });
+
+        const resolved = await Promise.all(tasks);
+
+        // once resolved, we can update the buckets with the resolved data
+        resolved.forEach((res, index) => {
+          if (res.data) {
+            this.buckets[index] = {
+              ...this.buckets[index],
+              ...res.data,
+            };
+          }
+        });
+      }
 
       async createSignedUrls(
         objects: Array<BucketObjectPath>,
         expiresIn: number
       ): Promise<Array<SignedBucketObjectPath>> {
+        if (this.alwaysResolveBuckets) {
+          await this.resolveBuckets();
+        }
+
         // remove duplicates by (bucket + path)
         objects = unique(objects, (o) => o.bucket + o.path);
 
@@ -266,6 +293,9 @@ export namespace XSupabase {
 
         resolved_by_bucket.forEach((curr, index) => {
           const bucket = Array.from(objects_by_bucket.keys())[index];
+          const bucket_info = this.buckets.find((b) => b.bucket === bucket);
+          assert(bucket_info, `bucket info not found for ${bucket}`);
+
           const bucket_objects = objects_by_bucket.get(bucket)!;
           if (!curr.error) {
             curr.data.forEach((data, index) => {
@@ -275,6 +305,10 @@ export namespace XSupabase {
                 path: object.path,
                 signedUrl: data.signedUrl,
                 error: data.error,
+                publicUrl: bucket_info.public
+                  ? this.storage.from(bucket).getPublicUrl(object.path).data
+                      .publicUrl
+                  : null,
               } satisfies SignedBucketObjectPath);
             });
           }
