@@ -41,22 +41,8 @@ export async function POST(req: NextRequest, context: Context) {
       main_supabase_table.sb_table_schema
     );
 
-    // map the rows with real name
-    const realdbrows: Record<string, any>[] = body.rows.map((row) =>
-      Object.keys(row).reduce(
-        (acc, key) => {
-          const field = fields.find((f) => f.id === key);
-          if (field) {
-            acc[field.name] = row[key];
-          }
-          return acc;
-        },
-        {} as Record<string, any>
-      )
-    );
-
     const pooler = new XSupabaseStorageCrossBucketTaskPooler(x_storage_client);
-    pooler.queue(fields, realdbrows, (pk_col || pk_first_col)!);
+    pooler.queue(fields, body.rows, (pk_col || pk_first_col)!);
 
     try {
       const xsb_storage_files: XSupabaseStorageTaskPoolerResult | null =

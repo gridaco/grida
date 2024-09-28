@@ -69,7 +69,7 @@ export function FileEditCell({
   resolver,
 }: {
   identifier: CellIdentifier;
-  rowdata: Record<string, any>;
+  rowdata: Record<string, any> | null;
   type: "image" | "file" | "audio" | "video";
   accept?: string;
   multiple?: boolean;

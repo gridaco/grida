@@ -22,7 +22,7 @@ const parsetaskid = (id: string): CellIdentifier => {
 
 type FileStorageQueryTask = {
   id: string;
-  row: Record<string, any>;
+  row: Record<string, any> | null;
 };
 
 type FileStorageQueryResult = {
@@ -127,7 +127,7 @@ async function resolveFileRefs(
 
 export function useFileRefs(
   identifier: CellIdentifier,
-  rowdata: Record<string, any>,
+  rowdata: Record<string, any> | null,
   resolver?: DataGridCellFileRefsResolver
 ): DataGridFileRef[] | "loading" | null | "error" {
   const { add } = useQueue<FileStorageQueryResult, FileStorageQueryTask>();

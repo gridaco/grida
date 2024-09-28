@@ -518,12 +518,11 @@ function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
     case "video":
     case "audio":
     case "file": {
-      const rowdata = rowrawdata(row);
       return (
         <CellRoot {...rootprops} className="w-full h-full flex gap-2">
           <FileCellContent
             identifier={identifier}
-            rowdata={rowdata}
+            rowdata={row.raw}
             resolver={files}
             type={type as "file" | "image" | "audio" | "video"}
           />
@@ -531,12 +530,11 @@ function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
       );
     }
     case "image": {
-      const rowdata = rowrawdata(row);
       return (
         <CellRoot {...rootprops} className="w-full h-full flex gap-2">
           <ImageCellContent
             identifier={identifier}
-            rowdata={rowdata}
+            rowdata={row.raw}
             resolver={files}
           />
         </CellRoot>
@@ -589,14 +587,6 @@ function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
   }
 }
 
-function rowrawdata(row: GFResponseRow): Record<string, any> {
-  return Object.keys(row.fields).reduce((acc: Record<string, any>, key) => {
-    const v = row.fields[key].value;
-    acc[key] = v;
-    return acc;
-  }, {});
-}
-
 function FileCellContent({
   identifier,
   rowdata,
@@ -604,7 +594,7 @@ function FileCellContent({
   resolver,
 }: {
   identifier: CellIdentifier;
-  rowdata: Record<string, any>;
+  rowdata: Record<string, any> | null;
   resolver?: DataGridCellFileRefsResolver;
   type: "file" | "image" | "audio" | "video";
 }) {
@@ -639,7 +629,7 @@ function ImageCellContent({
   resolver,
 }: {
   identifier: CellIdentifier;
-  rowdata: Record<string, any>;
+  rowdata: Record<string, any> | null;
   resolver?: DataGridCellFileRefsResolver;
 }) {
   const refs = useFileRefs(identifier, rowdata, resolver);
@@ -870,12 +860,11 @@ function FieldEditCell(props: RenderEditCellProps<RenderingRow>) {
       case "audio":
       case "video":
       case "image": {
-        const rowdata = rowrawdata(row);
         return (
           <CellRoot {...rootprops}>
             <FileEditCell
               identifier={identifier}
-              rowdata={rowdata}
+              rowdata={row.raw}
               type={type as "file" | "image" | "audio" | "video"}
               multiple={multiple}
               resolver={files}

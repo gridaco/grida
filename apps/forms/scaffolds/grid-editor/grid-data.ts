@@ -358,7 +358,8 @@ export namespace GridData {
           __gf_display_id: fmt_local_index(response.meta.local_index),
           __gf_created_at: response.meta.created_at,
           __gf_customer_id: response.meta.customer_id,
-          fields: {},
+          raw: response.meta.raw,
+          fields: {}, // populated below
         }; // react-data-grid expects each row to have a unique 'id' property
 
         attributes.forEach((attribute) => {
@@ -442,7 +443,8 @@ export namespace GridData {
           __gf_display_id: session.id,
           __gf_created_at: session.created_at,
           __gf_customer_id: session.customer_id,
-          fields: {},
+          raw: session.raw,
+          fields: {}, // populated below
         }; // react-data-grid expects each row to have a unique 'id' property
         Object.entries(session.raw || {}).forEach(([key, value]) => {
           const field = fields.find((f) => f.id === key);
@@ -466,7 +468,7 @@ export namespace GridData {
     pkcol: string | null;
     form_id: string;
     fields: FormFieldDefinition[];
-    rows: any[];
+    rows: GridaXSupabase.XDataRow[];
   }) {
     const valuefn = (row: Record<string, any>, field: FormFieldDefinition) => {
       // jsonpath field
@@ -477,11 +479,13 @@ export namespace GridData {
       return row[field.name];
     };
 
-    return rows.reduce((acc, row, index) => {
+    return rows.reduce((acc: GFResponseRow[], row, index) => {
+      console.log("row", row);
       const gfRow: GFResponseRow = {
         __gf_id: pkcol ? row[pkcol] : "",
         __gf_display_id: pkcol ? row[pkcol] : "",
-        fields: {},
+        raw: row,
+        fields: {}, // populated below
       };
       fields.forEach((field) => {
         gfRow.fields[field.id] = {
