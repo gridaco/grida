@@ -20,21 +20,7 @@ export namespace GridaXSupabase {
 
   export type XSBPostgrestMethod = "get" | "post" | "delete" | "patch";
 
-  export type XDataRow<T extends Record<string, any> = Record<string, any>> =
-    T & {
-      __gf_storage_fields: Record<
-        string,
-        | {
-            /**
-             * available if the bucket if public
-             */
-            publicUrl: string | null;
-            signedUrl: string;
-            path: string;
-          }[]
-        | null
-      > | null;
-    };
+  export type XDataRow<T extends Record<string, any> = Record<string, any>> = T;
 
   export type JSONSChema =
     SupabasePostgRESTOpenApi.SupabaseOpenAPIDefinitionJSONSchema;

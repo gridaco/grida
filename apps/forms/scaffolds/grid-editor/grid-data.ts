@@ -505,7 +505,7 @@ export namespace GridData {
             },
             {}
           ),
-          files: xsb_storage_files({ row, field, form_id, pkcol }),
+          files: xsb_storage_files({ field, pkcol }),
         };
       });
       acc.push(gfRow);
@@ -567,31 +567,21 @@ export function xsb_file_refs_mapper(
 }
 
 function xsb_storage_files({
-  form_id,
-  row,
   pkcol,
   field,
 }: {
-  row: GridaXSupabase.XDataRow;
   field: FormFieldDefinition;
   pkcol: string | null;
-  form_id: string;
 }): DataGridCellFileRefsResolver {
   if (!FieldSupports.file_alias(field.type)) return null;
-  if (row.__gf_storage_fields?.[field.id]) {
-    // file field
-    const objects = row.__gf_storage_fields[field.id];
-    return objects ? xsb_file_refs_mapper(form_id, field.id, objects) : null;
-  } else {
-    if (!pkcol) return null;
-    return {
-      type: "data-grid-file-storage-file-refs-query-task",
-      identifier: {
-        attribute: field.name,
-        key: pkcol,
-      },
-    } satisfies DataGridFileRefsResolverQueryTask;
-  }
 
-  return null;
+  if (!pkcol) return null;
+
+  return {
+    type: "data-grid-file-storage-file-refs-query-task",
+    identifier: {
+      attribute: field.name,
+      key: pkcol,
+    },
+  } satisfies DataGridFileRefsResolverQueryTask;
 }
