@@ -185,6 +185,7 @@ function QueueProvider<T extends Identifiable, P extends Identifiable>({
   children,
 }: React.PropsWithChildren<QueueProviderProps<T, P>>) {
   const [state, dispatch] = useReducer(reducer, initstate(config));
+  const pQueue = useMemo(() => queue, [queue]);
 
   const batchqueue = useMemo(() => {
     if (!batch) return null;
@@ -212,19 +213,29 @@ function QueueProvider<T extends Identifiable, P extends Identifiable>({
         return results.data;
       },
     });
-  }, [batch, resolver, throttle]);
+  }, [batch, resolver, throttle, config.identifier, dispatch]);
 
   useEffect(() => {
-    return () => {
-      batchqueue?.flush();
+    if (!batchqueue) return;
+
+    // Wrap the batchqueue.flush() in pQueue.add() to control concurrency
+    const originalFlush = batchqueue.flush.bind(batchqueue);
+    batchqueue.flush = () => {
+      pQueue.add(async () => {
+        await originalFlush();
+      });
     };
-  }, [batchqueue]);
+
+    return () => {
+      batchqueue.flush(); // Ensure to flush the queue on unmount
+    };
+  }, [batchqueue, pQueue]);
 
   return (
     <PQueueResolverContext.Provider
       value={{
         resolver: resolver,
-        queue: queue,
+        queue: pQueue,
         batch: batchqueue,
       }}
     >

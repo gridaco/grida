@@ -28,7 +28,6 @@ class BatchQueue<
     reject: (error: any) => void;
   }[];
   private timeout: NodeJS.Timeout | null;
-  private flushing: boolean; // New flag to prevent multiple flushes
 
   /**
    * Creates an instance of BatchQueue.
@@ -56,7 +55,6 @@ class BatchQueue<
     this.identifier = identifier;
     this.buffer = [];
     this.timeout = null;
-    this.flushing = false; // Initialize the flushing flag
   }
 
   /**
@@ -84,12 +82,9 @@ class BatchQueue<
    * Flushes the current batch of tasks. This will clear the buffer and call the resolver function
    * with the current batch. If a timeout was set, it will be cleared.
    *
-   * @returns {Promise<void>} A promise that resolves once the resolver function has completed.
+   * @returns {void}
    */
-  async flush(): Promise<void> {
-    if (this.flushing) return; // Prevent concurrent flushes
-    this.flushing = true;
-
+  flush(): void {
     if (this.timeout) {
       clearTimeout(this.timeout);
       this.timeout = null;
@@ -97,24 +92,38 @@ class BatchQueue<
 
     if (this.buffer.length > 0) {
       const batch = this.buffer.splice(0, this.batchSize);
-      try {
-        const results = await this.resolver(batch.map((item) => item.task));
-        results.forEach((result) => {
-          const matchedTask = batch.find(
-            (item) =>
-              // @ts-expect-error
-              item.task[this.identifier] === result[this.identifier]
-          );
-          if (matchedTask) {
-            matchedTask.resolve(result);
-          }
-        });
-      } catch (error) {
-        batch.forEach((item) => item.reject(error));
-      }
+      this.processBatch(batch);
     }
+  }
 
-    this.flushing = false; // Reset flushing flag after completion
+  /**
+   * Processes a batch of tasks concurrently.
+   *
+   * @param {Array} batch - The batch of tasks to process.
+   * @returns {void}
+   */
+  private async processBatch(
+    batch: {
+      task: T;
+      resolve: (result: R) => void;
+      reject: (error: any) => void;
+    }[]
+  ): Promise<void> {
+    try {
+      const results = await this.resolver(batch.map((item) => item.task));
+      results.forEach((result) => {
+        const matchedTask = batch.find(
+          (item) =>
+            // @ts-expect-error
+            item.task[this.identifier] === result[this.identifier]
+        );
+        if (matchedTask) {
+          matchedTask.resolve(result);
+        }
+      });
+    } catch (error) {
+      batch.forEach((item) => item.reject(error));
+    }
   }
 }
 
