@@ -28,8 +28,6 @@ import BatchQueue from "./batch";
 ///   - when using batch mode, you need to provide a resolver that takes a T[] as input. ( and your endpoint as well if its a server request )
 ///
 
-const __P_QUEUE_FALLBACK = new PQueue();
-
 // #region generic types
 interface Identifiable {
   [key: string]: any;
@@ -54,12 +52,13 @@ type PQBatchResolver<T, P> = (
   ...task: TaskPayload<P>[]
 ) => Promise<PQResolverResult<T[]>>;
 
-type PQConfig = {
+type PQConfig<T> = {
   /**
    * The maximum size of the resolved data saved within the memory. set falsy (0 | -1 | false | null) for no limit.
    * This is to prevent memory leak when handling with huge queue that will be keep being triggered.
    */
   // max_store_size: number | null | false;
+  identifier: keyof T;
 };
 // #endregion generic types
 
@@ -78,14 +77,14 @@ const PQueueResolverContext = createContext<PQResolverState<any, any> | null>(
 type PQError = any;
 
 interface PQState<T, P, E> {
-  config: PQConfig;
+  config: PQConfig<T>;
   store: PQResult<T, E | PQError>[];
   tasks: TaskPayload<P>[];
 }
 
 const PQueueContext = createContext<PQState<any, any, any> | null>(null);
 
-function initstate(config: PQConfig): PQState<any, any, any> {
+function initstate(config: PQConfig<any>): PQState<any, any, any> {
   return {
     config,
     store: [],
@@ -156,9 +155,8 @@ type TResolverByBatch<B, T, P> = B extends true
   : PQSingleResolver<T, P>;
 
 type QueueProviderProps<T, P> = {
-  identifier: keyof T;
-  config: PQConfig;
-  queue?: PQueue;
+  config: PQConfig<T>;
+  queue: PQueue;
 } & (
   | {
       /**
@@ -184,7 +182,6 @@ function QueueProvider<T extends Identifiable, P extends Identifiable>({
   batch,
   throttle,
   queue,
-  identifier,
   children,
 }: React.PropsWithChildren<QueueProviderProps<T, P>>) {
   const [state, dispatch] = useReducer(reducer, initstate(config));
@@ -194,7 +191,7 @@ function QueueProvider<T extends Identifiable, P extends Identifiable>({
     return new BatchQueue<P, T, any>({
       batchSize: batch,
       throttleTime: throttle,
-      identifier: identifier,
+      identifier: config.identifier,
       resolver: async (tasks) => {
         // This is how you process the batched tasks using the provided resolver
         const results = await resolver(...tasks);
@@ -209,7 +206,7 @@ function QueueProvider<T extends Identifiable, P extends Identifiable>({
         });
 
         if (!results.data) {
-          throw results.error;
+          throw results.error || new Error("Resolver failed");
         }
 
         return results.data;
@@ -227,7 +224,7 @@ function QueueProvider<T extends Identifiable, P extends Identifiable>({
     <PQueueResolverContext.Provider
       value={{
         resolver: resolver,
-        queue: queue || __P_QUEUE_FALLBACK,
+        queue: queue,
         batch: batchqueue,
       }}
     >
@@ -252,7 +249,11 @@ function __useDispatch() {
 function __useResolver() {
   const context = useContext(PQueueResolverContext);
   if (!context) throw new Error("QueueProvider not provided");
-  return [context.resolver, context.queue, { batch: context.batch }] as const;
+  return {
+    batch: context.batch,
+    resolver: context.resolver,
+    queue: context.queue,
+  };
 }
 
 type PQAddDispatcher<T, P> = (task: P) => Promise<PQResolverResult<T>>;
@@ -273,17 +274,39 @@ function useQueueStore<T, P>(): PQResolverResult<T, any>[] {
 
 function useQueue<T, P>(): UseQueueReturnType<T, P> {
   const dispatch = __useDispatch();
-  const [resolver, queue, config] = __useResolver();
+  const { resolver, queue, batch } = __useResolver();
   const state = useContext(PQueueContext);
+  const store = useQueueStore<T, P>();
   if (!state) throw new Error("QueueProvider not provided");
-
-  const { batch } = config;
 
   const onAdd: PQAddDispatcher<T, P> = useCallback(
     async (task: P) => {
+      // load from store if exists
+      const existing = store.find((s) => {
+        return (
+          s.data &&
+          // @ts-ignore
+          s.data[state.config.identifier] === task[state.config.identifier]
+        );
+      });
+
+      if (existing) {
+        return existing;
+      }
+
       if (batch) {
         // If batch mode is enabled, add tasks to the BatchQueue
-        return batch.addTask(task);
+        const res = await batch.addTask(task);
+        if (res) {
+          return {
+            data: res,
+            error: null,
+          };
+        }
+        return {
+          data: null,
+          error: new Error("Resolver failed"),
+        };
       } else {
         // If batch mode is not enabled, use p-queue
         try {
