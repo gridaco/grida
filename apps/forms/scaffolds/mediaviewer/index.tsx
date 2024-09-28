@@ -18,12 +18,14 @@ import {
   Cross2Icon,
   DownloadIcon,
   ExitFullScreenIcon,
+  PlayIcon,
 } from "@radix-ui/react-icons";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/spinner";
 import { Menubar } from "@/components/ui/menubar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FileTypeIcon } from "@/components/form-field-type-icon";
+import { PictureInPicture } from "@/components/pip";
 
 type MediaViewerAcceptedMimeTypes = "image/*" | "video/*" | "audio/*" | "*/*";
 
@@ -93,6 +95,23 @@ export function MediaViewerProvider({ children }: React.PropsWithChildren<{}>) {
 
   return (
     <MediaViewerContext.Provider value={{ open, close }}>
+      <div className="fixed z-50">
+        <PictureInPicture className="relative min-h-32 aspect-video flex items-center justify-center">
+          <header className="absolute top-0 left-0 right-0 z-10">
+            <div className="p-1 flex justify-between items-center">
+              <div />
+              <div>
+                <Button variant="ghost" size="icon">
+                  <Cross2Icon />
+                </Button>
+              </div>
+            </div>
+          </header>
+          <Button variant="outline" size="icon">
+            <PlayIcon />
+          </Button>
+        </PictureInPicture>
+      </div>
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogPortal>
           <DialogOverlay className="fixed inset-0 bg-black bg-opacity-75 z-50" />
