@@ -1,4 +1,4 @@
-import QueueProvider, { useQueue } from "@/lib/p-queue";
+import QueueProvider, { useQueue, useQueueStore } from "@/lib/p-queue";
 import React, { useEffect, useState } from "react";
 import type {
   CellIdentifier,
@@ -8,6 +8,9 @@ import type {
 } from "../types";
 import type { XSupabaseStorageTaskPoolerResult } from "@/services/x-supabase/xsb-storage-pooler";
 import { xsb_file_refs_mapper } from "@/scaffolds/grid-editor/grid-data";
+import PQueue from "p-queue";
+
+const BATCH_P_QUEUE = new PQueue({ concurrency: 20 });
 
 const taskid = (identifier: CellIdentifier) =>
   `${identifier.key}/${identifier.attribute}`;
@@ -89,19 +92,17 @@ export function GridFileStorageQueueProvider({
 
   return (
     <QueueProvider<FileStorageQueryResult, FileStorageQueryTask>
-      identifier="id"
-      batch={50}
-      throttle={250}
-      config={{}}
+      batch={100}
+      throttle={500}
+      config={{
+        identifier: "id",
+      }}
+      queue={BATCH_P_QUEUE}
       resolver={resolver}
     >
       {children}
     </QueueProvider>
   );
-}
-
-export function useGridFileStorageQueue() {
-  return useQueue<FileStorageQueryResult, FileStorageQueryTask>();
 }
 
 async function resolveFileRefs(
@@ -129,7 +130,7 @@ export function useFileRefs(
   rowdata: Record<string, any>,
   resolver?: DataGridCellFileRefsResolver
 ): DataGridFileRef[] | "loading" | null | "error" {
-  const { add } = useGridFileStorageQueue();
+  const { add } = useQueue<FileStorageQueryResult, FileStorageQueryTask>();
   const [error, setError] = useState<any | null>(null);
   const [refs, setRefs] = useState<DataGridFileRef[] | "loading" | null>(
     "loading"
@@ -142,14 +143,13 @@ export function useFileRefs(
     }
 
     const id = taskid(identifier);
-    // TODO: make it dynamic
 
     resolveFileRefs(resolver, async () => {
       const res = await add({ id, row: rowdata });
-      if (res.data?.files) {
-        return res.data?.files;
+      if (res?.data?.files) {
+        return res.data.files;
       }
-      throw res.error;
+      throw res.error ?? "unknown error";
     })
       .then((res) => {
         setRefs(res);
