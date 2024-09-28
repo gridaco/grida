@@ -350,14 +350,12 @@ export default async function Layout({
         const t = xsb_tables?.find((t) => t.id === sb_table_id);
         if (!t) return undefined;
 
-        const { pks } =
-          SupabasePostgRESTOpenApi.parse_supabase_postgrest_schema_definition(
-            t.sb_table_schema as any
-          );
+        const { pk_cols, pk_col, pk_first_col } =
+          SupabasePostgRESTOpenApi.parse_pks(t.sb_table_schema as any);
 
         return {
-          pks: pks,
-          pk: pks[0],
+          pks: pk_cols,
+          pk: pk_col || pk_first_col,
           supabase_project_id: t.supabase_project_id,
           sb_table_id: sb_table_id,
           sb_schema_name: t.sb_schema_name,

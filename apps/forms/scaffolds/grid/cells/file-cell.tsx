@@ -28,9 +28,12 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import type { GFFile } from "../types";
+import type {
+  CellIdentifier,
+  DataGridCellFileRefsResolver,
+  DataGridFileRef,
+} from "../types";
 import { useMediaViewer } from "../../mediaviewer";
 import {
   Tooltip,
@@ -42,27 +45,42 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { MediaPicker } from "../../mediapicker";
 import { FileTypeIcon } from "@/components/form-field-type-icon";
 import toast from "react-hot-toast";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { SignedUploadUrlData } from "@/types/private/api";
 import { SupabaseStorageExtensions } from "@/lib/supabase/storage-ext";
 import { Spinner } from "@/components/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useFileRefs } from "../providers";
+
+export function FileLoadingCell() {
+  return (
+    <div className="min-w-8 aspect-square py-1">
+      <Skeleton className=" w-full h-full" />
+    </div>
+  );
+}
 
 export function FileEditCell({
+  identifier,
+  rowdata,
   type,
   accept,
   multiple,
-  files,
+  resolver,
 }: {
+  identifier: CellIdentifier;
+  rowdata: Record<string, any> | null;
   type: "image" | "file" | "audio" | "video";
   accept?: string;
   multiple?: boolean;
-  files: GFFile[];
+  resolver?: DataGridCellFileRefsResolver;
 }) {
+  const refs = useFileRefs(identifier, rowdata, resolver);
+
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
-  const [replaceFileDialogOpen, setReplaceFileDialogOpen] = useState(false);
   const { open: openMediaViewer } = useMediaViewer();
 
-  const onEnterFullScreen = (f: GFFile) => {
+  const onEnterFullScreen = (f: DataGridFileRef) => {
     switch (type) {
       case "audio":
         openMediaViewer(f, "audio/*");
@@ -78,7 +96,7 @@ export function FileEditCell({
     }
   };
 
-  const canAddNewFile = multiple || files?.length === 0;
+  const canAddNewFile = multiple || (Array.isArray(refs) && refs.length === 0);
 
   const uploader = async (file: File | Blob) => {
     // TODO: commit the changes
@@ -99,106 +117,25 @@ export function FileEditCell({
         <div className="">
           <ScrollArea>
             <div className="max-h-[500px] flex flex-col gap-2">
-              {files?.map((f, i) => (
-                <div
-                  //
-                  className="flex items-start hover:bg-secondary rounded"
-                  key={i}
-                >
-                  {/* TODO: dnd & sort */}
-                  {/* <Button variant="ghost" size="icon" className="cursor-move">
-                  <DragHandleDots2Icon />
-                </Button> */}
-                  <div className="w-4" />
-                  <FileCard
-                    type={type}
-                    onEnterFullScreen={() => onEnterFullScreen(f)}
-                    {...f}
-                  />
-
-                  <AlertDialog>
-                    <DropdownMenu modal={false}>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <DotsHorizontalIcon />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent className="min-w-40">
-                        <DropdownMenuItem
-                          onSelect={() => {
-                            onEnterFullScreen(f);
-                          }}
-                        >
-                          <EnterFullScreenIcon className="me-2" />
-                          Full Screen
-                        </DropdownMenuItem>
-                        <a
-                          href={f.download}
-                          target="_blank"
-                          rel="noreferrer"
-                          download
-                        >
-                          <DropdownMenuItem>
-                            <DownloadIcon className="me-2" />
-                            Download
-                          </DropdownMenuItem>
-                        </a>
-                        <a
-                          href={f.srcset.original}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          <DropdownMenuItem>
-                            <OpenInNewWindowIcon className="me-2" />
-                            View Original
-                          </DropdownMenuItem>
-                        </a>
-                        {f.upsert && (
-                          <DropdownMenuItem
-                            onClick={() => setReplaceFileDialogOpen(true)}
-                          >
-                            <ReloadIcon className="me-2" />
-                            Replace
-                          </DropdownMenuItem>
-                        )}
-                        {/* <DropdownMenuItem>
-                        <AlertDialogTrigger asChild>
-                          <button>
-                            <TrashIcon className="inline me-2" />
-                            Delete
-                          </button>
-                        </AlertDialogTrigger>
-                      </DropdownMenuItem> */}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>
-                          Are you sure you want to delete this file?
-                        </AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This action cannot be undone.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          className={buttonVariants({ variant: "destructive" })}
-                        >
-                          <TrashIcon className="inline me-2" />
-                          Delete
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                  <ReplaceFileDialog
-                    f={f}
-                    accept={accept}
-                    open={replaceFileDialogOpen}
-                    onOpenChange={setReplaceFileDialogOpen}
-                  />
-                </div>
-              ))}
+              <FileRefsStateRenderer
+                refs={refs}
+                renderers={{
+                  loading: <Spinner />,
+                  empty: <></>,
+                  error: <div>Error</div>,
+                  files: (f, i) => {
+                    return (
+                      <FileItem
+                        key={i}
+                        type={type}
+                        file={f}
+                        accept={accept || ""}
+                        onEnterFullScreen={() => onEnterFullScreen(f)}
+                      />
+                    );
+                  },
+                }}
+              />
             </div>
           </ScrollArea>
           <footer className="p-2 border-t">
@@ -238,6 +175,129 @@ export function FileEditCell({
         </div>
       </PopoverContent>
     </Popover>
+  );
+}
+
+export function FileRefsStateRenderer({
+  refs,
+  renderers,
+}: {
+  refs: DataGridFileRef[] | "loading" | null | "error";
+  renderers: {
+    loading?: React.ReactNode;
+    error?: React.ReactNode;
+    empty?: React.ReactNode;
+    files: (f: DataGridFileRef, i: number) => React.ReactNode;
+  };
+}) {
+  if (refs === "loading") {
+    return renderers.loading || <Spinner />;
+  }
+  if (refs === "error") {
+    return renderers.error || <div>Error</div>;
+  }
+  if (!refs || refs.length === 0) {
+    return renderers.empty || <div>No files</div>;
+  }
+  return refs.map(renderers.files);
+}
+
+function FileItem({
+  file,
+  type,
+  accept,
+  onEnterFullScreen,
+}: {
+  type: "image" | "file" | "audio" | "video";
+  file: DataGridFileRef;
+  accept: string;
+  onEnterFullScreen: () => void;
+}) {
+  const [replaceFileDialogOpen, setReplaceFileDialogOpen] = useState(false);
+
+  return (
+    <div
+      //
+      className="flex items-start hover:bg-secondary rounded"
+    >
+      {/* TODO: dnd & sort */}
+      {/* <Button variant="ghost" size="icon" className="cursor-move">
+                  <DragHandleDots2Icon />
+                </Button> */}
+      <div className="w-4" />
+      <FileCard type={type} onEnterFullScreen={onEnterFullScreen} {...file} />
+
+      <AlertDialog>
+        <DropdownMenu modal={false}>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon">
+              <DotsHorizontalIcon />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="min-w-40">
+            <DropdownMenuItem
+              onSelect={() => {
+                onEnterFullScreen();
+              }}
+            >
+              <EnterFullScreenIcon className="me-2" />
+              Full Screen
+            </DropdownMenuItem>
+            <a href={file.download} target="_blank" rel="noreferrer" download>
+              <DropdownMenuItem>
+                <DownloadIcon className="me-2" />
+                Download
+              </DropdownMenuItem>
+            </a>
+            <a href={file.srcset.original} target="_blank" rel="noreferrer">
+              <DropdownMenuItem>
+                <OpenInNewWindowIcon className="me-2" />
+                View Original
+              </DropdownMenuItem>
+            </a>
+            {file.upsert && (
+              <DropdownMenuItem onClick={() => setReplaceFileDialogOpen(true)}>
+                <ReloadIcon className="me-2" />
+                Replace
+              </DropdownMenuItem>
+            )}
+            {/* <DropdownMenuItem>
+                        <AlertDialogTrigger asChild>
+                          <button>
+                            <TrashIcon className="inline me-2" />
+                            Delete
+                          </button>
+                        </AlertDialogTrigger>
+                      </DropdownMenuItem> */}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Are you sure you want to delete this file?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className={buttonVariants({ variant: "destructive" })}
+            >
+              <TrashIcon className="inline me-2" />
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <ReplaceFileDialog
+        f={file}
+        accept={accept}
+        open={replaceFileDialogOpen}
+        onOpenChange={setReplaceFileDialogOpen}
+      />
+    </div>
   );
 }
 
@@ -313,7 +373,7 @@ function ReplaceFileDialog({
   accept,
   ...props
 }: React.ComponentProps<typeof Dialog> & {
-  f: GFFile;
+  f: DataGridFileRef;
   accept?: string;
 }) {
   const [file, setFile] = useState<File | undefined>();

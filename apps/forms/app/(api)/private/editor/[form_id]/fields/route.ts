@@ -14,6 +14,7 @@ import type {
   FormInputType,
   PaymentFieldData,
 } from "@/types";
+import { UpsertDto } from "@/types/supabase-ext";
 
 export const revalidate = 0;
 
@@ -75,11 +76,11 @@ export async function POST(
       }) as any,
       accept: init.accept,
       multiple: init.multiple,
-      storage: init.storage ?? null,
+      storage: (init.storage as {}) ?? null,
       reference: init.reference ?? null,
       v_value: init.v_value ?? null,
       // 'description': init.description,
-    })
+    } satisfies UpsertDto<"grida_forms", "attribute">)
     .select(
       `
         *,

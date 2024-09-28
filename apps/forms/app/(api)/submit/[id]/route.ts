@@ -684,7 +684,7 @@ async function submit({
           value: value,
           form_field_option_id: enum_id,
           form_field_option_ids: enum_ids,
-        } satisfies InsertDto<"response_field">;
+        } satisfies InsertDto<"grida_forms", "response_field">;
       })
     );
 
@@ -849,7 +849,10 @@ async function submit({
       return filename(res.data!.path);
     }) as string[];
 
-    const upsertion_base: Omit<InsertDto<"response_field">, "value"> = {
+    const upsertion_base: Omit<
+      InsertDto<"grida_forms", "response_field">,
+      "value"
+    > = {
       form_field_id: field_id,
       response_id: response_reference_obj!.id,
       form_id: form_id,
@@ -878,14 +881,14 @@ async function submit({
       return {
         ...upsertion_base,
         value: document as {},
-      } satisfies InsertDto<"response_field">;
+      } satisfies InsertDto<"grida_forms", "response_field">;
     }
 
     // return upsertion;
     return {
       ...upsertion_base,
       value: uploadedfileval,
-    } satisfies InsertDto<"response_field">;
+    } satisfies InsertDto<"grida_forms", "response_field">;
   });
 
   if (response_field_with_resolved_file_upserts.length > 0) {

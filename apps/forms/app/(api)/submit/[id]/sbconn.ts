@@ -41,8 +41,7 @@ export async function sbconn_insert({
 
   const schema = sb_table_schema as GridaXSupabase.JSONSChema;
 
-  const { pks } =
-    SupabasePostgRESTOpenApi.parse_supabase_postgrest_schema_definition(schema);
+  const { pk_cols } = SupabasePostgRESTOpenApi.parse_pks(schema);
 
   const row = asTableRowData(data, { schema });
 
@@ -58,7 +57,7 @@ export async function sbconn_insert({
 
   return {
     insertion: sbclient.from(sb_table_name).insert(row).select().single(),
-    pks,
+    pks: pk_cols,
   };
 }
 

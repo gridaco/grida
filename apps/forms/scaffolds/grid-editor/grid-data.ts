@@ -9,9 +9,11 @@ import {
 import { fmt_local_index } from "@/utils/fmt";
 import type {
   GFColumn,
-  GFFile,
+  DataGridFileRef,
   GFResponseRow,
   GFSystemColumn,
+  DataGridCellFileRefsResolver,
+  DataGridFileRefsResolverQueryTask,
 } from "../grid/types";
 import type {
   DataGridLocalFilter,
@@ -26,6 +28,7 @@ import { FieldSupports } from "@/k/supported_field_types";
 import { PrivateEditorApi } from "@/lib/private";
 import { GridFilter } from "../grid-filter";
 import { EditorSymbols } from "../editor/symbols";
+import { SupabaseStorageExtensions } from "@/lib/supabase/storage-ext";
 
 export namespace GridData {
   type DataGridInput =
@@ -118,12 +121,16 @@ export namespace GridData {
   } {
     const fieldcolumns = Array.from(params.fields)
       .sort((a, b) => a.local_index - b.local_index)
-      .map((field) => ({
-        key: field.id,
-        name: field.name,
-        readonly: field.readonly || false,
-        type: field.type,
-      }));
+      .map(
+        (field) =>
+          ({
+            key: field.id,
+            name: field.name,
+            readonly: field.readonly || false,
+            type: field.type,
+            storage: field.storage || null,
+          }) satisfies GFColumn
+      );
 
     switch (params.table_id) {
       case EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID:
@@ -256,7 +263,7 @@ export namespace GridData {
           filtered: rows_from_x_supabase_main_table({
             form_id: input.form_id,
             // TODO: support multiple PKs
-            pk: input.data.pks.length > 0 ? input.data.pks[0] : null,
+            pkcol: input.data.pks.length > 0 ? input.data.pks[0] : null,
             fields: input.fields,
             rows: GridFilter.filter(
               input.data.rows,
@@ -324,7 +331,7 @@ export namespace GridData {
               filtered: rows_from_x_supabase_main_table({
                 form_id: input.table_id,
                 // TODO: support multiple PKs
-                pk: input.pks.length > 0 ? input.pks[0] : null,
+                pkcol: input.pks.length > 0 ? input.pks[0] : null,
                 fields: input.attributes,
                 rows: GridFilter.filter(
                   input.rows,
@@ -351,7 +358,8 @@ export namespace GridData {
           __gf_display_id: fmt_local_index(response.meta.local_index),
           __gf_created_at: response.meta.created_at,
           __gf_customer_id: response.meta.customer_id,
-          fields: {},
+          raw: response.meta.raw,
+          fields: {}, // populated below
         }; // react-data-grid expects each row to have a unique 'id' property
 
         attributes.forEach((attribute) => {
@@ -395,7 +403,7 @@ export namespace GridData {
     form_id: string;
     field_id: string;
     filepath: string;
-  }): GFFile {
+  }): DataGridFileRef {
     const base = PrivateEditorApi.FormFieldFile.file_preview_url({
       params: params,
     });
@@ -435,7 +443,8 @@ export namespace GridData {
           __gf_display_id: session.id,
           __gf_created_at: session.created_at,
           __gf_customer_id: session.customer_id,
-          fields: {},
+          raw: session.raw,
+          fields: {}, // populated below
         }; // react-data-grid expects each row to have a unique 'id' property
         Object.entries(session.raw || {}).forEach(([key, value]) => {
           const field = fields.find((f) => f.id === key);
@@ -451,15 +460,15 @@ export namespace GridData {
   }
 
   function rows_from_x_supabase_main_table({
-    pk,
+    pkcol,
     form_id,
     fields,
     rows,
   }: {
-    pk: string | null;
+    pkcol: string | null;
     form_id: string;
     fields: FormFieldDefinition[];
-    rows: any[];
+    rows: GridaXSupabase.XDataRow[];
   }) {
     const valuefn = (row: Record<string, any>, field: FormFieldDefinition) => {
       // jsonpath field
@@ -470,60 +479,13 @@ export namespace GridData {
       return row[field.name];
     };
 
-    const filesfn = (
-      row: GridaXSupabase.XDataRow,
-      field: FormFieldDefinition
-    ) => {
-      // file field
-      if (
-        FieldSupports.file_alias(field.type) &&
-        row.__gf_storage_fields[field.id]
-      ) {
-        const objects = row.__gf_storage_fields[field.id];
-        return objects
-          ?.map((obj) => {
-            const { path, signedUrl } = obj;
-
-            const thumbnail = PrivateEditorApi.FormFieldFile.file_preview_url({
-              params: {
-                form_id: form_id,
-                field_id: field.id,
-                filepath: path,
-              },
-              options: {
-                width: 200,
-              },
-            });
-
-            const upsert =
-              PrivateEditorApi.FormFieldFile.file_request_upsert_url({
-                form_id: form_id,
-                field_id: field.id,
-                filepath: path,
-              });
-
-            return {
-              // use thumbnail as src
-              src: thumbnail,
-              srcset: {
-                thumbnail: thumbnail,
-                original: signedUrl,
-              },
-              // use path as name for x-supabase
-              name: path,
-              download: signedUrl,
-              upsert: upsert,
-            } satisfies GFFile;
-          })
-          .filter((f) => f) as GFFile[] | [];
-      }
-    };
-
-    return rows.reduce((acc, row, index) => {
+    return rows.reduce((acc: GFResponseRow[], row, index) => {
+      console.log("row", row);
       const gfRow: GFResponseRow = {
-        __gf_id: pk ? row[pk] : "",
-        __gf_display_id: pk ? row[pk] : "",
-        fields: {},
+        __gf_id: pkcol ? row[pkcol] : "",
+        __gf_display_id: pkcol ? row[pkcol] : "",
+        raw: row,
+        fields: {}, // populated below
       };
       fields.forEach((field) => {
         gfRow.fields[field.id] = {
@@ -543,11 +505,83 @@ export namespace GridData {
             },
             {}
           ),
-          files: filesfn(row, field),
+          files: xsb_storage_files({ field, pkcol }),
         };
       });
       acc.push(gfRow);
       return acc;
     }, []);
   }
+}
+
+export function xsb_file_refs_mapper(
+  table_id: string,
+  field_id: string,
+  signatures: {
+    publicUrl: string | null;
+    signedUrl: string;
+    path: string;
+  }[]
+) {
+  return signatures
+    ?.map((obj) => {
+      const { path, signedUrl, publicUrl } = obj;
+
+      const thumbnail = publicUrl
+        ? SupabaseStorageExtensions.transformPublicUrl(publicUrl, {
+            width: 200,
+            resize: "contain",
+            quality: 50,
+          })
+        : PrivateEditorApi.FormFieldFile.file_preview_url({
+            params: {
+              form_id: table_id,
+              field_id: field_id,
+              filepath: path,
+            },
+            options: {
+              width: 200,
+            },
+          });
+
+      const upsert = PrivateEditorApi.FormFieldFile.file_request_upsert_url({
+        form_id: table_id,
+        field_id: field_id,
+        filepath: path,
+      });
+
+      return {
+        // always use public url if available (this is cost effective for clients (users' supabase billing))
+        src: publicUrl || thumbnail,
+        srcset: {
+          thumbnail: thumbnail,
+          original: publicUrl || signedUrl,
+        },
+        // use path as name for x-supabase
+        name: path,
+        download: signedUrl,
+        upsert: upsert,
+      } satisfies DataGridFileRef;
+    })
+    .filter((f) => f) as DataGridFileRef[] | [];
+}
+
+function xsb_storage_files({
+  pkcol,
+  field,
+}: {
+  field: FormFieldDefinition;
+  pkcol: string | null;
+}): DataGridCellFileRefsResolver {
+  if (!FieldSupports.file_alias(field.type)) return null;
+
+  if (!pkcol) return null;
+
+  return {
+    type: "data-grid-file-storage-file-refs-query-task",
+    identifier: {
+      attribute: field.name,
+      key: pkcol,
+    },
+  } satisfies DataGridFileRefsResolverQueryTask;
 }

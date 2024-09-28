@@ -667,11 +667,9 @@ function xsbmtinit(
   if (!conn) return undefined;
   if (!conn.main_supabase_table) return undefined;
 
-  const parsed = conn.main_supabase_table.sb_table_schema
-    ? SupabasePostgRESTOpenApi.parse_supabase_postgrest_schema_definition(
-        conn.main_supabase_table?.sb_table_schema
-      )
-    : undefined;
+  const { pk_col, pk_cols, pk_first_col } = SupabasePostgRESTOpenApi.parse_pks(
+    conn.main_supabase_table?.sb_table_schema
+  );
 
   return {
     supabase_project_id: conn.supabase_project_id,
@@ -680,8 +678,8 @@ function xsbmtinit(
     sb_table_name: conn.main_supabase_table.sb_table_name as string,
     sb_table_schema: conn.main_supabase_table.sb_table_schema,
     sb_postgrest_methods: conn.main_supabase_table.sb_postgrest_methods,
-    pks: parsed?.pks || [],
-    pk: (parsed?.pks?.length || 0) > 0 ? parsed?.pks[0] : undefined,
+    pks: pk_cols,
+    pk: pk_col || pk_first_col,
   } satisfies TableXSBMainTableConnection;
 }
 

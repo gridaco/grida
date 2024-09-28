@@ -1,7 +1,38 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { FileObject } from "@supabase/storage-js";
+import type { FileObject, TransformOptions } from "@supabase/storage-js";
 
 export namespace SupabaseStorageExtensions {
+  /**
+   *
+   * Converts the givven public url to a transformed url.
+   *
+   * https://xxx.supabase.co/storage/v1/object/public/[bucket]/[...folder]/[file.png]
+   * https://xxx.supabase.co/storage/v1/render/image/public/[bucket]/[...folder]/[file.png]?width=900&quality=20&resize=contain
+   * @param publicUrl
+   * @param transform
+   * @returns transformed url https:.../storage/v1/render/image/public/...
+   */
+  export function transformPublicUrl(
+    publicUrl: string,
+    transform: TransformOptions
+  ): string {
+    const baseUrl = publicUrl.replace(
+      "/object/public/",
+      "/render/image/public/"
+    );
+
+    const params = new URLSearchParams();
+
+    if (transform.width) params.append("width", transform.width.toString());
+    if (transform.height) params.append("height", transform.height.toString());
+    if (transform.resize) params.append("resize", transform.resize);
+    if (transform.quality)
+      params.append("quality", transform.quality.toString());
+    if (transform.format) params.append("format", transform.format);
+
+    return `${baseUrl}?${params.toString()}`;
+  }
+
   type StorageClient = SupabaseClient["storage"];
 
   async function list(storage: StorageClient, bucket: string, path: string) {
