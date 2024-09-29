@@ -1,5 +1,16 @@
 import React, { createContext, useRef, useState, useEffect } from "react";
 import { useAudio } from "react-use";
+
+interface MediaState {
+  buffered: any[];
+  duration: number;
+  paused: boolean;
+  muted: boolean;
+  time: number;
+  volume: number;
+  playing: boolean;
+}
+
 interface MediaImage {
   sizes?: string;
   src: string;
@@ -25,11 +36,7 @@ type MediaSessionState = {
 };
 
 type MediaSessionContextType = {
-  state: {
-    time: number;
-    duration: number;
-    playing: boolean;
-  };
+  state: MediaState;
   controls: {
     play: () => void;
     pause: () => void;
@@ -73,13 +80,10 @@ function useMediaSessionContext() {
   return context;
 }
 
-type UseMediaSession = {
+type UseMediaSession = MediaState & {
   play: () => void;
   pause: () => void;
   seek: (time: number) => void;
-  currentTime: number;
-  duration: number;
-  isPlaying: boolean;
 };
 
 function useMediaSession(): UseMediaSession {
@@ -89,9 +93,7 @@ function useMediaSession(): UseMediaSession {
     play: controls.play,
     pause: controls.pause,
     seek: controls.seek,
-    currentTime: state.time,
-    duration: state.duration,
-    isPlaying: state.playing,
+    ...state,
   };
 }
 

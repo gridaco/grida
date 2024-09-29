@@ -39,7 +39,7 @@ export function ContentAudio({
             <PlayerPrevTrigger disabled>
               <ChevronFirstIcon className="w-4 h-4" />
             </PlayerPrevTrigger>
-            <PlayerPauseTrigger
+            <PlayerTrigger
               renderer={(playing) =>
                 playing ? (
                   <PauseFilled className="w-4 h-4" />
@@ -58,13 +58,13 @@ export function ContentAudio({
         </div>
         <div className="px-4 w-full flex justify-between">
           <div className="flex gap-1 items-center">
-            <span className="text-sm">{media?.title ?? "Untitled"}</span>
-            {media?.artist && (
+            <span className="text-sm">{media?.title ?? "Untitled Audio"}</span>
+            {/* {media?.artist && (
               <>
                 <DotFilledIcon className="w-2 h-2" />
                 <span className="text-sm">{media.artist}</span>
               </>
-            )}
+            )} */}
           </div>
           <div className="flex items-center gap-2">
             <PlayerCurrentTime />
@@ -91,13 +91,13 @@ function PlayerArtwork({ children }: React.PropsWithChildren<{}>) {
 }
 
 function PlayerTrack() {
-  const { currentTime, duration, seek } = useMediaSession();
+  const { time, duration, seek } = useMediaSession();
   return (
     <div className="w-full group h-4 flex items-center">
       <SliderPrimitive.Root
         min={0}
         max={duration}
-        value={[currentTime]}
+        value={[time]}
         onValueChange={([value]) => seek(value)}
         className="relative flex w-full touch-none select-none items-center"
       >
@@ -110,32 +110,32 @@ function PlayerTrack() {
   );
 }
 
-function PlayerTime({ children }: React.PropsWithChildren<{}>) {
-  return <span className="text-sm text-muted-foreground">{children}</span>;
+function TimeText({ time }: { time: number }) {
+  return <span className="text-xs text-muted-foreground">{fmtTime(time)}</span>;
 }
 
 function PlayerCurrentTime() {
-  const { currentTime } = useMediaSession();
-  return <PlayerTime>{fmtTime(currentTime)}</PlayerTime>;
+  const { time } = useMediaSession();
+  return <TimeText time={time} />;
 }
 
 function PlayerDuration() {
   const { duration } = useMediaSession();
-  return <PlayerTime>{fmtTime(duration)}</PlayerTime>;
+  return <TimeText time={duration} />;
 }
 
-function PlayerPauseTrigger({
+function PlayerTrigger({
   renderer,
 }: {
   renderer: (playing: boolean) => React.ReactNode;
 }) {
-  const { play, pause, isPlaying } = useMediaSession();
+  const { play, pause, playing } = useMediaSession();
 
-  const onClick = isPlaying ? pause : play;
+  const onClick = playing ? pause : play;
 
   return (
     <Button onClick={onClick} variant="ghost" size="icon">
-      {useMemo(() => renderer(isPlaying), [isPlaying])}
+      {useMemo(() => renderer(playing), [renderer, playing])}
     </Button>
   );
 }

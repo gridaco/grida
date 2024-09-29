@@ -11,11 +11,11 @@ export default function MediaPlayerDevPage() {
       <Card className="h-48 aspect-video shadow-2xl">
         <PipPlayerContent
           mediaSrc={{
-            artist: "Artist",
-            artwork: "https://via.placeholder.com/150",
+            // artist: "Artist",
+            // artwork: "https://via.placeholder.com/150",
             title: "Title",
-            id: "0",
-            name: "0.mp3",
+            // id: "0",
+            // name: "0.mp3",
             src: "/dummy/audio/mp3/mp3-40s-700kb.mp3",
           }}
           contentType={"audio/mp3"}

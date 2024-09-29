@@ -637,6 +637,7 @@ function MediaCellContent({
                       onClick={() => {
                         openInPictureInPicture(
                           {
+                            title: f.name,
                             src: f.srcset.original,
                           },
                           {

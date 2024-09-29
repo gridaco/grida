@@ -34,11 +34,7 @@ type MediaViewerAcceptedPlayableMimeTypes = "video/*" | "audio/*";
 type MediaViewerAcceptedMimeTypes = "image/*" | "video/*" | "audio/*" | "*/*";
 
 export type MediaObject = {
-  id: string;
-  name: string;
   title?: string;
-  artist?: string;
-  artwork?: string;
   src: string;
   download?: string;
   srcset?: {
@@ -140,27 +136,28 @@ export function MediaViewerProvider({ children }: React.PropsWithChildren<{}>) {
       value={{ open, close, openInPictureInPicture }}
     >
       {isPip && isOpen && mediaSrc && (
-        <div className="fixed z-50 top-0 left-0 w-0 h-0">
-          <PictureInPicture className="relative h-48 aspect-video shadow-2xl flex items-center justify-center">
-            <header className="absolute top-0 left-0 right-0 z-10">
-              <div className="p-1 flex justify-between items-center">
-                <div />
-                <div>
-                  <Button variant="ghost" size="icon" onClick={close}>
-                    <Cross2Icon />
-                  </Button>
-                </div>
+        <PictureInPicture
+          padding={16}
+          className="relative h-48 aspect-video shadow-2xl flex items-center justify-center"
+        >
+          <header className="absolute top-0 left-0 right-0 z-10">
+            <div className="p-1 flex justify-between items-center">
+              <div />
+              <div>
+                <Button variant="ghost" size="icon" onClick={close}>
+                  <Cross2Icon />
+                </Button>
               </div>
-            </header>
-            <PipPlayerContent
-              mediaSrc={mediaSrc}
-              contentType={contentType as any}
-            />
-            {/* <Button variant="outline" size="icon">
+            </div>
+          </header>
+          <PipPlayerContent
+            mediaSrc={mediaSrc}
+            contentType={contentType as any}
+          />
+          {/* <Button variant="outline" size="icon">
               <PlayIcon />
             </Button> */}
-          </PictureInPicture>
-        </div>
+        </PictureInPicture>
       )}
       {!isPip && (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>

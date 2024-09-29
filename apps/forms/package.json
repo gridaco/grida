@@ -116,7 +116,6 @@
     "react-data-grid": "7.0.0-beta.44",
     "react-day-picker": "^8.10.1",
     "react-dom": "^18.3.1",
-    "react-draggable": "^4.4.4",
     "react-dropzone": "^14.2.3",
     "react-hook-form": "^7.52.1",
     "react-hot-toast": "^2.4.0",
