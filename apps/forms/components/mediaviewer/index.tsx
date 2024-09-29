@@ -28,11 +28,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FileTypeIcon } from "@/components/form-field-type-icon";
 import { PictureInPicture } from "@/components/pip";
 import { AudioLinesIcon } from "lucide-react";
+import { ContentAudio } from "./pip-audio-content";
 
 type MediaViewerAcceptedPlayableMimeTypes = "video/*" | "audio/*";
 type MediaViewerAcceptedMimeTypes = "image/*" | "video/*" | "audio/*" | "*/*";
 
-type MediaObject = {
+export type MediaObject = {
+  id: string;
+  name: string;
+  title?: string;
+  artist?: string;
+  artwork?: string;
   src: string;
   download?: string;
   srcset?: {
@@ -133,9 +139,9 @@ export function MediaViewerProvider({ children }: React.PropsWithChildren<{}>) {
     <MediaViewerContext.Provider
       value={{ open, close, openInPictureInPicture }}
     >
-      {isPip && isOpen && (
+      {isPip && isOpen && mediaSrc && (
         <div className="fixed z-50 top-0 left-0 w-0 h-0">
-          <PictureInPicture className="relative h-48 aspect-video flex items-center justify-center">
+          <PictureInPicture className="relative h-48 aspect-video shadow-2xl flex items-center justify-center">
             <header className="absolute top-0 left-0 right-0 z-10">
               <div className="p-1 flex justify-between items-center">
                 <div />
@@ -205,7 +211,7 @@ function PipPlayerContent({
   mediaSrc,
   contentType,
 }: {
-  mediaSrc?: MediaObject;
+  mediaSrc: MediaObject;
   contentType: `audio/${string}` | `video/${string}` | undefined | "unknwon";
 }) {
   if (contentType === "unknwon") {
@@ -218,20 +224,7 @@ function PipPlayerContent({
 
   if (contentType?.startsWith("audio/")) {
     return (
-      <div className="p-4 flex flex-col items-center justify-center gap-4">
-        <Card className="flex w-24 h-24 aspect-square items-center justify-center">
-          <AudioLinesIcon className="w-5 h-5" />
-        </Card>
-        <audio
-          src={mediaSrc?.src}
-          controls
-          className="min-w-full"
-          autoPlay
-          playsInline
-        >
-          Your browser does not support the audio tag.
-        </audio>
-      </div>
+      <ContentAudio media={mediaSrc} contentType={contentType as "audio/*"} />
     );
   }
 
@@ -239,6 +232,8 @@ function PipPlayerContent({
     return (
       <video
         src={mediaSrc?.src}
+        autoPlay
+        playsInline
         controls
         className="max-w-full max-h-full aspect-video"
       >
