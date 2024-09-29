@@ -58,7 +58,9 @@ export function ContentAudio({
         </div>
         <div className="px-4 w-full flex justify-between">
           <div className="flex gap-1 items-center">
-            <span className="text-sm">{media?.title ?? "Untitled Audio"}</span>
+            <span className="text-sm font-semibold">
+              {media?.title ?? "Untitled Audio"}
+            </span>
             {/* {media?.artist && (
               <>
                 <DotFilledIcon className="w-2 h-2" />
