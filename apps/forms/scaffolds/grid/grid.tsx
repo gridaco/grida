@@ -70,7 +70,7 @@ import {
   useFileRefs,
   useMasking,
 } from "./providers";
-import { useMediaViewer } from "../mediaviewer";
+import { useMediaViewer } from "@/components/mediaviewer";
 
 function rowKeyGetter(row: GFResponseRow) {
   return row.__gf_id;

@@ -34,7 +34,7 @@ import type {
   DataGridCellFileRefsResolver,
   DataGridFileRef,
 } from "../types";
-import { useMediaViewer } from "../../mediaviewer";
+import { useMediaViewer } from "@/components/mediaviewer";
 import {
   Tooltip,
   TooltipContent,

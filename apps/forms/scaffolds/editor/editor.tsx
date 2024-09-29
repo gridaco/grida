@@ -22,7 +22,7 @@ import { FormFieldUpsert, EditorApiResponse } from "@/types/private/api";
 import { TooltipProvider } from "@radix-ui/react-tooltip";
 import { RowEditPanel } from "../panels/row-edit-panel";
 import { CustomerEditPanel } from "../panels/customer-panel";
-import { MediaViewerProvider } from "../mediaviewer";
+import { MediaViewerProvider } from "@/components/mediaviewer";
 import { AssetsBackgroundsResolver } from "./resolver/assets-backgrounds-resolver";
 import toast from "react-hot-toast";
 import { EditorSymbols } from "./symbols";
