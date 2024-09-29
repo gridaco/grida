@@ -480,7 +480,6 @@ export namespace GridData {
     };
 
     return rows.reduce((acc: GFResponseRow[], row, index) => {
-      console.log("row", row);
       const gfRow: GFResponseRow = {
         __gf_id: pkcol ? row[pkcol] : "",
         __gf_display_id: pkcol ? row[pkcol] : "",
