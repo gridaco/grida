@@ -134,8 +134,8 @@ export function MediaViewerProvider({ children }: React.PropsWithChildren<{}>) {
       value={{ open, close, openInPictureInPicture }}
     >
       {isPip && isOpen && (
-        <div className="fixed z-50">
-          <PictureInPicture className="relative min-h-32 aspect-video flex items-center justify-center">
+        <div className="fixed z-50 top-0 left-0 w-0 h-0">
+          <PictureInPicture className="relative h-48 aspect-video flex items-center justify-center">
             <header className="absolute top-0 left-0 right-0 z-10">
               <div className="p-1 flex justify-between items-center">
                 <div />
