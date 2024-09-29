@@ -14,6 +14,7 @@ import {
   Link2Icon,
   AvatarIcon,
   ArrowRightIcon,
+  PlayIcon,
 } from "@radix-ui/react-icons";
 import { FormInputType } from "@/types";
 import {
@@ -69,6 +70,7 @@ import {
   useFileRefs,
   useMasking,
 } from "./providers";
+import { useMediaViewer } from "../mediaviewer";
 
 function rowKeyGetter(row: GFResponseRow) {
   return row.__gf_id;
@@ -515,20 +517,6 @@ function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
         </CellRoot>
       );
     }
-    case "video":
-    case "audio":
-    case "file": {
-      return (
-        <CellRoot {...rootprops} className="w-full h-full flex gap-2">
-          <FileCellContent
-            identifier={identifier}
-            rowdata={row.raw}
-            resolver={files}
-            type={type as "file" | "image" | "audio" | "video"}
-          />
-        </CellRoot>
-      );
-    }
     case "image": {
       return (
         <CellRoot {...rootprops} className="w-full h-full flex gap-2">
@@ -540,6 +528,32 @@ function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
         </CellRoot>
       );
     }
+    case "video":
+    case "audio": {
+      return (
+        <CellRoot {...rootprops} className="w-full h-full flex gap-2">
+          <MediaCellContent
+            identifier={identifier}
+            rowdata={row.raw}
+            resolver={files}
+            type={type as "audio" | "video"}
+          />
+        </CellRoot>
+      );
+    }
+    case "file": {
+      return (
+        <CellRoot {...rootprops} className="w-full h-full flex gap-2">
+          <FileCellContent
+            identifier={identifier}
+            rowdata={row.raw}
+            resolver={files}
+            type={type as "file" | "audio" | "video"}
+          />
+        </CellRoot>
+      );
+    }
+
     case "richtext": {
       if (unwrapped === null || unwrapped === "" || unwrapped === undefined) {
         return (
@@ -587,6 +601,64 @@ function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
   }
 }
 
+function MediaCellContent({
+  identifier,
+  rowdata,
+  type,
+  resolver,
+}: {
+  identifier: CellIdentifier;
+  rowdata: Record<string, any> | null;
+  resolver?: DataGridCellFileRefsResolver;
+  type: "audio" | "video";
+}) {
+  const refs = useFileRefs(identifier, rowdata, resolver);
+  const { openInPictureInPicture } = useMediaViewer();
+
+  return (
+    <>
+      <FileRefsStateRenderer
+        refs={refs}
+        renderers={{
+          loading: <FileLoadingCell />,
+          error: "ERR",
+          files: (f, i) => {
+            return (
+              <span key={i} className="group">
+                <div className="relative inline-flex w-5 h-5 me-1 align-middle">
+                  <div className="visible group-hover:invisible">
+                    <FileTypeIcon type={type} className="w-4 h-4" />
+                  </div>
+                  <div className="absolute inset-0 rounded hidden group-hover:flex items-center">
+                    <Button
+                      variant="default"
+                      size="icon"
+                      className="w-5 h-5 p-0.5 rounded-sm"
+                      onClick={() => {
+                        openInPictureInPicture(
+                          {
+                            src: f.srcset.original,
+                          },
+                          {
+                            contentType: `${type}/*`,
+                          }
+                        );
+                      }}
+                    >
+                      <PlayIcon />
+                    </Button>
+                  </div>
+                </div>
+                <span>{f.name}</span>
+              </span>
+            );
+          },
+        }}
+      />
+    </>
+  );
+}
+
 function FileCellContent({
   identifier,
   rowdata,
@@ -596,7 +668,7 @@ function FileCellContent({
   identifier: CellIdentifier;
   rowdata: Record<string, any> | null;
   resolver?: DataGridCellFileRefsResolver;
-  type: "file" | "image" | "audio" | "video";
+  type: "file" | "audio" | "video";
 }) {
   const refs = useFileRefs(identifier, rowdata, resolver);
   return (

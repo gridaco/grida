@@ -83,13 +83,13 @@ export function FileEditCell({
   const onEnterFullScreen = (f: DataGridFileRef) => {
     switch (type) {
       case "audio":
-        openMediaViewer(f, "audio/*");
+        openMediaViewer(f, { contentType: "audio/*" });
         break;
       case "video":
-        openMediaViewer(f, "video/*");
+        openMediaViewer(f, { contentType: "video/*" });
         break;
       case "image":
-        openMediaViewer(f, "image/*");
+        openMediaViewer(f, { contentType: "image/*" });
       default:
         openMediaViewer(f);
         break;

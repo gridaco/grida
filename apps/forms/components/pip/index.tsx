@@ -3,6 +3,7 @@
 import React from "react";
 import Draggable from "react-draggable";
 import { Card } from "../ui/card";
+import { cn } from "@/utils";
 
 export function PictureInPicture({
   children,
@@ -10,7 +11,7 @@ export function PictureInPicture({
 }: React.PropsWithChildren<{ className?: string }>) {
   return (
     <Draggable
-      defaultClassName="transition-transform"
+      defaultClassName="transition-transform duration-75"
       axis="both"
       // handle=".handle"
       // defaultPosition={{ x: 0, y: 0 }}
@@ -21,7 +22,7 @@ export function PictureInPicture({
       // onDrag={this.handleDrag}
       // onStop={this.handleStop}
     >
-      <Card className={className}>{children}</Card>
+      <Card className={cn("overflow-hidden", className)}>{children}</Card>
     </Draggable>
   );
 }

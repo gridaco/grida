@@ -6,6 +6,7 @@ import React, {
   useState,
   ReactNode,
   useEffect,
+  useCallback,
 } from "react";
 import {
   Dialog,
@@ -26,10 +27,12 @@ import { Menubar } from "@/components/ui/menubar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FileTypeIcon } from "@/components/form-field-type-icon";
 import { PictureInPicture } from "@/components/pip";
+import { AudioLinesIcon } from "lucide-react";
 
+type MediaViewerAcceptedPlayableMimeTypes = "video/*" | "audio/*";
 type MediaViewerAcceptedMimeTypes = "image/*" | "video/*" | "audio/*" | "*/*";
 
-type Src = {
+type MediaObject = {
   src: string;
   download?: string;
   srcset?: {
@@ -39,7 +42,14 @@ type Src = {
 };
 
 interface MediaViewerContextType {
-  open: (src: Src, type?: MediaViewerAcceptedMimeTypes) => void;
+  open: (
+    src: MediaObject,
+    meta?: { contentType?: MediaViewerAcceptedMimeTypes }
+  ) => void;
+  openInPictureInPicture: (
+    src: MediaObject,
+    meta?: { contentType?: MediaViewerAcceptedPlayableMimeTypes }
+  ) => void;
   close: () => void;
 }
 
@@ -57,28 +67,54 @@ export function useMediaViewer() {
 
 export function MediaViewerProvider({ children }: React.PropsWithChildren<{}>) {
   const [isOpen, setIsOpen] = useState(false);
-  const [mediaSrc, setMediaSrc] = useState<Src | undefined>(undefined);
+  const [isPip, setIsPip] = useState(false);
+  const [mediaSrc, setMediaSrc] = useState<MediaObject | undefined>(undefined);
   const [mediaType, setMediaType] =
     useState<MediaViewerAcceptedMimeTypes>("*/*");
   const [contentType, setContentType] = useState<
     "unknwon" | (string & {}) | undefined
   >(undefined);
 
-  const open = (src: Src, type?: MediaViewerAcceptedMimeTypes) => {
-    setMediaSrc(src);
-    if (type && type !== "*/*") {
-      setMediaType(type);
-      setContentType(type);
-    } else {
-      setMediaType("*/*");
-      setContentType(undefined);
-    }
-    setIsOpen(true);
-  };
+  const open = useCallback(
+    (
+      src: MediaObject,
+      meta?: {
+        contentType?: MediaViewerAcceptedMimeTypes;
+      }
+    ) => {
+      setIsPip(false);
+      setMediaSrc(src);
+      if (meta) {
+        const { contentType } = meta;
+        if (contentType && contentType !== "*/*") {
+          setMediaType(contentType);
+          setContentType(contentType);
+        } else {
+          setMediaType("*/*");
+          setContentType(undefined);
+        }
+      }
+      setIsOpen(true);
+    },
+    []
+  );
 
-  const close = () => {
+  const close = useCallback(() => {
     setIsOpen(false);
-  };
+  }, []);
+
+  const openInPictureInPicture = useCallback(
+    (
+      src: MediaObject,
+      meta?: {
+        contentType?: MediaViewerAcceptedMimeTypes;
+      }
+    ) => {
+      open(src, meta);
+      setIsPip(true);
+    },
+    [open]
+  );
 
   useEffect(() => {
     // Fetch content type if not provided
@@ -94,72 +130,139 @@ export function MediaViewerProvider({ children }: React.PropsWithChildren<{}>) {
   }, [mediaSrc?.src, mediaType]);
 
   return (
-    <MediaViewerContext.Provider value={{ open, close }}>
-      <div className="fixed z-50">
-        <PictureInPicture className="relative min-h-32 aspect-video flex items-center justify-center">
-          <header className="absolute top-0 left-0 right-0 z-10">
-            <div className="p-1 flex justify-between items-center">
-              <div />
-              <div>
-                <Button variant="ghost" size="icon">
+    <MediaViewerContext.Provider
+      value={{ open, close, openInPictureInPicture }}
+    >
+      {isPip && isOpen && (
+        <div className="fixed z-50">
+          <PictureInPicture className="relative min-h-32 aspect-video flex items-center justify-center">
+            <header className="absolute top-0 left-0 right-0 z-10">
+              <div className="p-1 flex justify-between items-center">
+                <div />
+                <div>
+                  <Button variant="ghost" size="icon" onClick={close}>
+                    <Cross2Icon />
+                  </Button>
+                </div>
+              </div>
+            </header>
+            <PipPlayerContent
+              mediaSrc={mediaSrc}
+              contentType={contentType as any}
+            />
+            {/* <Button variant="outline" size="icon">
+              <PlayIcon />
+            </Button> */}
+          </PictureInPicture>
+        </div>
+      )}
+      {!isPip && (
+        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+          <DialogPortal>
+            <DialogOverlay className="fixed inset-0 bg-black bg-opacity-75 z-50" />
+            <DialogContent className="fixed inset-0 flex items-center justify-center z-50">
+              <DialogClose className="absolute top-4 right-4">
+                <Button variant="outline" size="icon">
                   <Cross2Icon />
                 </Button>
+              </DialogClose>
+              <div className="w-full h-full p-10">
+                <Content mediaSrc={mediaSrc} contentType={contentType} />
               </div>
-            </div>
-          </header>
-          <Button variant="outline" size="icon">
-            <PlayIcon />
-          </Button>
-        </PictureInPicture>
-      </div>
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogPortal>
-          <DialogOverlay className="fixed inset-0 bg-black bg-opacity-75 z-50" />
-          <DialogContent className="fixed inset-0 flex items-center justify-center z-50">
-            <DialogClose className="absolute top-4 right-4">
-              <Button variant="outline" size="icon">
-                <Cross2Icon />
-              </Button>
-            </DialogClose>
-            <div className="w-full h-full p-10">
-              <Content mediaSrc={mediaSrc} contentType={contentType} />
-            </div>
-            <footer className="absolute bottom-4 left-4 right-4 flex items-center justify-center">
-              <Menubar>
-                <Button
-                  disabled={!mediaSrc?.download}
-                  onClick={() => {
-                    if (mediaSrc?.download) {
-                      window.open(mediaSrc.download, "_blank");
-                    }
-                  }}
-                  variant="ghost"
-                  size="icon"
-                >
-                  <DownloadIcon />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setIsOpen(false)}
-                >
-                  <ExitFullScreenIcon />
-                </Button>
-              </Menubar>
-            </footer>
-          </DialogContent>
-        </DialogPortal>
-      </Dialog>
+              <footer className="absolute bottom-4 left-4 right-4 flex items-center justify-center">
+                <Menubar>
+                  <Button
+                    disabled={!mediaSrc?.download}
+                    onClick={() => {
+                      if (mediaSrc?.download) {
+                        window.open(mediaSrc.download, "_blank");
+                      }
+                    }}
+                    variant="ghost"
+                    size="icon"
+                  >
+                    <DownloadIcon />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    <ExitFullScreenIcon />
+                  </Button>
+                </Menubar>
+              </footer>
+            </DialogContent>
+          </DialogPortal>
+        </Dialog>
+      )}
       {children}
     </MediaViewerContext.Provider>
   );
+}
+
+function PipPlayerContent({
+  mediaSrc,
+  contentType,
+}: {
+  mediaSrc?: MediaObject;
+  contentType: `audio/${string}` | `video/${string}` | undefined | "unknwon";
+}) {
+  if (contentType === "unknwon") {
+    return (
+      <div className="w-full h-full flex items-center justify-center">
+        <PipPlayerErrorMessage>Unable to read the file</PipPlayerErrorMessage>
+      </div>
+    );
+  }
+
+  if (contentType?.startsWith("audio/")) {
+    return (
+      <div className="p-4 flex flex-col items-center justify-center gap-4">
+        <Card className="flex w-24 h-24 aspect-square items-center justify-center">
+          <AudioLinesIcon className="w-5 h-5" />
+        </Card>
+        <audio
+          src={mediaSrc?.src}
+          controls
+          className="min-w-full"
+          autoPlay
+          playsInline
+        >
+          Your browser does not support the audio tag.
+        </audio>
+      </div>
+    );
+  }
+
+  if (contentType?.startsWith("video/")) {
+    return (
+      <video
+        src={mediaSrc?.src}
+        controls
+        className="max-w-full max-h-full aspect-video"
+      >
+        Your browser does not support the video tag.
+      </video>
+    );
+  }
+
+  return (
+    <div className="w-full h-full flex items-center justify-center">
+      <PipPlayerErrorMessage>Unable to read the file</PipPlayerErrorMessage>
+    </div>
+  );
+}
+
+function PipPlayerErrorMessage({ children }: React.PropsWithChildren<{}>) {
+  return <span className="text-sm text-muted-foreground">{children}</span>;
 }
 
 function Content({
   mediaSrc,
   contentType,
 }: {
-  mediaSrc?: Src;
+  mediaSrc?: MediaObject;
   contentType: string | undefined | "unknwon";
 }) {
   //
@@ -280,6 +383,11 @@ const ProgressiveImage = ({
   );
 };
 
+/**
+ * head fetches the headers of a resource
+ * @param src
+ * @returns
+ */
 function head(src: string): Promise<{
   "content-type": string;
   "content-length"?: string;
