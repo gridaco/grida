@@ -63,12 +63,14 @@ export function PictureInPicture({
   };
 
   // Bind the drag gesture
-  const bind = useDrag(({ event }) => {
-    setSafePosition(
-      (event as MouseEvent).clientX,
-      (event as MouseEvent).clientY
-    );
-  });
+  const bind = useDrag(
+    ({ offset: [x, y] }) => {
+      setSafePosition(x, y);
+    },
+    {
+      from: () => [position.x, position.y],
+    }
+  );
 
   const safeposition = useMemo(() => {
     if (!size || !containersize) return { x: 0, y: 0 };

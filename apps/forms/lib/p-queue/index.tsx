@@ -333,6 +333,7 @@ function useQueue<T, P>(): UseQueueReturnType<T, P> {
         }
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [batch, dispatch, resolver, queue]
   );
 

@@ -92,12 +92,18 @@ function PlayerArtwork({ children }: React.PropsWithChildren<{}>) {
 
 function PlayerTrack() {
   const { time, duration, seek } = useMediaSession();
+
+  const handlePointerDown = (event: React.PointerEvent) => {
+    event.stopPropagation(); // Prevent event from propagating to parent
+  };
+
   return (
     <div className="w-full group h-4 flex items-center">
       <SliderPrimitive.Root
         min={0}
         max={duration}
         value={[time]}
+        onPointerDown={handlePointerDown}
         onValueChange={([value]) => seek(value)}
         className="relative flex w-full touch-none select-none items-center"
       >
