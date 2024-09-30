@@ -43,13 +43,13 @@ export function useDataGridRefresh() {
   };
 }
 
-export function useDataGridLocalSearch(delay: number = 250) {
+export function useDataGridTextSearch(delay: number = 250) {
   const [state, dispatch] = useEditorState();
 
   return useDebounceCallback((txt: string) => {
     dispatch({
-      type: "editor/data-grid/local-filter",
-      localsearch: txt,
+      type: "data/query/textsearch/query",
+      query: txt,
     });
   }, delay);
 }

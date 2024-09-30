@@ -94,7 +94,7 @@ function SwitchGridEditor() {
 
 function ModeProviderGrida() {
   const [state] = useEditorState();
-  const { tablespace, datagrid_local_filter: datagrid_filter } = state;
+  const { tablespace, datagrid_local_filter, datagrid_query } = state;
 
   const tb = useDatagridTable<GDocSchemaTableProviderGrida>();
 
@@ -112,12 +112,15 @@ function ModeProviderGrida() {
       table: "v0_schema_table",
       provider: "grida",
       attributes: tb.attributes,
-      filter: datagrid_filter,
+      filter: {
+        empty_data_hidden: datagrid_local_filter.empty_data_hidden,
+        search: datagrid_query?.q_text_search?.query,
+      },
       rows: (stream as unknown as Array<
         TablespaceSchemaTableStreamType<GDocSchemaTableProviderGrida>
       >)!,
     });
-  }, [stream, tb, datagrid_filter]);
+  }, [stream, tb, datagrid_local_filter, datagrid_query]);
 
   return (
     <GridEditor
@@ -133,7 +136,7 @@ function ModeProviderGrida() {
 
 function ModeProviderXSB() {
   const [state] = useEditorState();
-  const { tablespace, datagrid_local_filter: datagrid_filter } = state;
+  const { tablespace, datagrid_local_filter, datagrid_query } = state;
 
   const tb = useDatagridTable<GDocSchemaTableProviderXSupabase>();
 
@@ -158,13 +161,16 @@ function ModeProviderXSB() {
       table: "v0_schema_table",
       provider: "x-supabase",
       attributes: tb.attributes,
-      filter: datagrid_filter,
+      filter: {
+        empty_data_hidden: datagrid_local_filter.empty_data_hidden,
+        search: datagrid_query?.q_text_search?.query,
+      },
       pks: tb.x_sb_main_table_connection.pks,
       rows: (stream as unknown as Array<
         TablespaceSchemaTableStreamType<GDocSchemaTableProviderXSupabase>
       >)!,
     });
-  }, [stream, tb, datagrid_filter]);
+  }, [stream, tb, datagrid_local_filter, datagrid_query]);
 
   return (
     <GridEditor

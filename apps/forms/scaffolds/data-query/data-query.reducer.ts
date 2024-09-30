@@ -11,6 +11,8 @@ import type {
   DataQueryPredicatesClearAction,
   DataQueryPredicatesRemoveAction,
   DataQueryOrderByRemoveAction,
+  DataQueryTextSearchQeuryAction,
+  DataQueryTextSearchClearAction,
 } from "./data-query.action";
 
 export default function reducer(
@@ -87,6 +89,27 @@ export default function reducer(
       const {} = <DataQueryPredicatesClearAction>action;
       return produce(state, (draft) => {
         draft.q_predicates = [];
+      });
+    }
+    case "data/query/textsearch/query": {
+      const { query } = <DataQueryTextSearchQeuryAction>action;
+      return produce(state, (draft) => {
+        if (draft.q_text_search) {
+          draft.q_text_search.query = query;
+        } else {
+          // initialize with default config (this shall not happen)
+          draft.q_text_search = {
+            column: "",
+            query: query,
+            type: "plain",
+          };
+        }
+      });
+    }
+    case "data/query/textsearch/clear": {
+      const {} = <DataQueryTextSearchClearAction>action;
+      return produce(state, (draft) => {
+        draft.q_text_search = null;
       });
     }
   }

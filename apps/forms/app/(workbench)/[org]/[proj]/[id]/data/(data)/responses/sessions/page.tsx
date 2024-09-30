@@ -38,7 +38,7 @@ export default function FormResponsesPage() {
 
 function FormResponseSessionGridEditor() {
   const [state, dispatch] = useEditorState();
-  const { form, tablespace, datagrid_local_filter: datagrid_filter } = state;
+  const { form, tablespace, datagrid_local_filter, datagrid_query } = state;
 
   const tb = useDatagridTable<GDocTable>();
 
@@ -62,10 +62,19 @@ function FormResponseSessionGridEditor() {
       form_id: form.form_id,
       table: EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID,
       fields: fields,
-      filter: datagrid_filter,
+      filter: {
+        empty_data_hidden: datagrid_local_filter.empty_data_hidden,
+        search: datagrid_query?.q_text_search?.query,
+      },
       sessions: sessions_stream ?? [],
     });
-  }, [form.form_id, sessions_stream, fields, datagrid_filter]);
+  }, [
+    form.form_id,
+    sessions_stream,
+    fields,
+    datagrid_local_filter,
+    datagrid_query,
+  ]);
 
   return (
     <>

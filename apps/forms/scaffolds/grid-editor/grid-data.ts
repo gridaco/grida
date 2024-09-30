@@ -16,10 +16,8 @@ import type {
   DataGridFileRefsResolverQueryTask,
 } from "../grid/types";
 import type {
-  DataGridLocalFilter,
   GDocSchemaTableProviderGrida,
   GDocSchemaTableProviderXSupabase,
-  GDocTableID,
   TablespaceSchemaTableStreamType,
   TVirtualRow,
 } from "../editor/state";
@@ -35,7 +33,7 @@ export namespace GridData {
     | ({
         form_id: string;
         fields: FormFieldDefinition[];
-        filter: DataGridLocalFilter;
+        filter: GridFilter.LocalFilter;
       } & (
         | {
             table: typeof EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID;
@@ -54,14 +52,14 @@ export namespace GridData {
           }
       ))
     | {
-        filter: DataGridLocalFilter;
+        filter: GridFilter.LocalFilter;
         table: typeof EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID;
         data: {
           rows: Customer[];
         };
       }
     | {
-        filter: DataGridLocalFilter;
+        filter: GridFilter.LocalFilter;
         table: typeof EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID;
         data: {
           rows: GridaXSupabase.SupabaseUser[];
@@ -69,7 +67,7 @@ export namespace GridData {
       }
     | (
         | {
-            filter: DataGridLocalFilter;
+            filter: GridFilter.LocalFilter;
             table: "v0_schema_table";
             provider: "grida";
             table_id: string;
@@ -79,7 +77,7 @@ export namespace GridData {
             >;
           }
         | {
-            filter: DataGridLocalFilter;
+            filter: GridFilter.LocalFilter;
             table: "v0_schema_table";
             provider: "x-supabase";
             table_id: string;

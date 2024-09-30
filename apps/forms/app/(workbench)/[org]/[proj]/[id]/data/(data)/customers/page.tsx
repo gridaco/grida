@@ -19,7 +19,7 @@ import { GridData } from "@/scaffolds/grid-editor/grid-data";
 import { Customer } from "@/types";
 import { EditorSymbols } from "@/scaffolds/editor/symbols";
 import {
-  useDataGridLocalSearch,
+  useDataGridTextSearch,
   useDataGridQuery,
   useDataGridRefresh,
 } from "@/scaffolds/editor/use";
@@ -27,18 +27,26 @@ import {
 export default function Customers() {
   const [state] = useEditorState();
 
-  const { datagrid_isloading, tablespace } = state;
+  const {
+    datagrid_isloading,
+    tablespace,
+    datagrid_local_filter,
+    datagrid_query,
+  } = state;
 
   const stream =
     tablespace[EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID].stream;
 
   const refresh = useDataGridRefresh();
   const query = useDataGridQuery();
-  const search = useDataGridLocalSearch();
+  const search = useDataGridTextSearch();
 
   const rows = useMemo(() => {
     const { filtered } = GridData.rows({
-      filter: state.datagrid_local_filter,
+      filter: {
+        empty_data_hidden: datagrid_local_filter.empty_data_hidden,
+        search: datagrid_query?.q_text_search?.query,
+      },
       table: EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID,
       data: {
         rows: stream || [],
@@ -59,7 +67,7 @@ export default function Customers() {
       })) || [];
 
     return rows;
-  }, [stream, state.datagrid_local_filter]);
+  }, [stream, datagrid_local_filter, datagrid_query]);
 
   return (
     <CurrentTable table={EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID}>
@@ -80,8 +88,8 @@ export default function Customers() {
           <CustomerGrid
             loading={datagrid_isloading}
             tokens={
-              state.datagrid_local_filter.localsearch
-                ? [state.datagrid_local_filter.localsearch]
+              state.datagrid_query?.q_text_search?.query
+                ? [state.datagrid_query?.q_text_search.query]
                 : []
             }
             masked={state.datagrid_local_filter.masking_enabled}

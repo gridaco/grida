@@ -51,7 +51,7 @@ import {
 import { Columns3Icon, Rows3Icon } from "lucide-react";
 import {
   useDatabaseTableId,
-  useDataGridLocalSearch,
+  useDataGridTextSearch,
   useDataGridQuery,
   useDataGridRefresh,
   useDatagridTableAttributes,
@@ -350,6 +350,11 @@ export function GridEditor({
                     column,
                   });
                 }}
+                highlightTokens={
+                  state.datagrid_query?.q_text_search?.query
+                    ? [state.datagrid_query?.q_text_search.query]
+                    : []
+                }
                 selectedCells={selectedCells}
               />
             </GridLayout.Content>
@@ -526,7 +531,7 @@ function GridaFormsResponsesExportCSV() {
 function TableQueryToggles() {
   const tb = useDatagridTable();
   const query = useDataGridQuery();
-  const search = useDataGridLocalSearch();
+  const search = useDataGridTextSearch();
 
   const { isPredicatesSet, isOrderbySet } = query;
   if (!tb) return <></>;

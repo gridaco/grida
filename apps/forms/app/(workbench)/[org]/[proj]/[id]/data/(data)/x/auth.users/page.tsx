@@ -22,7 +22,7 @@ import { XPostgrestQuery } from "@/lib/supabase-postgrest/builder";
 import useSWR from "swr";
 import { GridDataXSBUnknown } from "@/scaffolds/grid-editor/grid-data-xsb-unknow";
 import {
-  useDataGridLocalSearch,
+  useDataGridTextSearch,
   useDataGridQuery,
   useDataGridRefresh,
 } from "@/scaffolds/editor/use";
@@ -34,7 +34,7 @@ export default function XTablePage() {
 
   const refresh = useDataGridRefresh();
   const query = useDataGridQuery();
-  const search = useDataGridLocalSearch();
+  const search = useDataGridTextSearch();
 
   const serachParams = useMemo(() => {
     if (!datagrid_query) return;
@@ -87,13 +87,16 @@ export default function XTablePage() {
 
   const { filtered, inputlength } = useMemo(() => {
     return GridData.rows({
-      filter: state.datagrid_local_filter,
+      filter: {
+        empty_data_hidden: state.datagrid_local_filter.empty_data_hidden,
+        search: state.datagrid_query?.q_text_search?.query,
+      },
       table: EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID,
       data: {
         rows: data?.data?.users ?? [],
       },
     });
-  }, [data, state.datagrid_local_filter]);
+  }, [data, state.datagrid_local_filter, state.datagrid_query]);
 
   return (
     <CurrentTable
@@ -115,8 +118,8 @@ export default function XTablePage() {
           <XSBReferenceTableGrid
             masked={state.datagrid_local_filter.masking_enabled}
             tokens={
-              state.datagrid_local_filter.localsearch
-                ? [state.datagrid_local_filter.localsearch]
+              state.datagrid_query?.q_text_search?.query
+                ? [state.datagrid_query?.q_text_search.query]
                 : []
             }
             columns={columns}
