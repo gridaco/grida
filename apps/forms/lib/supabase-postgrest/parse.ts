@@ -49,6 +49,9 @@ export namespace SupabasePostgRESTOpenApi {
     items: JSONSchemaType<any>;
   };
 
+  /**
+   * A.k.a Table Schema
+   */
   export type SupabaseOpenAPIDefinitionJSONSchema = JSONSchemaType<
     Record<string, any>
   > & {

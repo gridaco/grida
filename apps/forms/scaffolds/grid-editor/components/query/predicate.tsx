@@ -24,7 +24,7 @@ import * as SelectPrimitive from "@radix-ui/react-select";
 import { Data } from "@/lib/data";
 import { useDebounce } from "@uidotdev/usehooks";
 import { QueryChip } from "../ui/chip";
-import { GridaXSupabaseTypeMap } from "@/lib/x-supabase/typemap";
+import { PostgresTypeTools } from "@/lib/x-supabase/typemap";
 import { useEditorState } from "@/scaffolds/editor/use";
 import {
   SQLLiteralInputValue,
@@ -162,7 +162,7 @@ export function DataQueryPredicatesMenu({
                                     accepts_boolean:
                                       format === "bool" || format === "boolean",
                                   }
-                                : GridaXSupabaseTypeMap.getSQLLiteralInputConfig(
+                                : PostgresTypeTools.getSQLLiteralInputConfig(
                                     SupabasePostgRESTOpenApi.parse_postgrest_property_meta(
                                       q.column,
                                       properties[q.column],
@@ -308,7 +308,7 @@ export function DataQueryPredicateChip({
     onChange({ value: debouncedSearch });
   }, [onChange, debouncedSearch]);
 
-  const allowed_ops = GridaXSupabaseTypeMap.getPredicateOperators({ format });
+  const allowed_ops = PostgresTypeTools.getPredicateOperators({ format });
 
   return (
     <Popover modal>
@@ -375,7 +375,7 @@ export function DataQueryPredicateChip({
                     type: "is",
                     accepts_boolean: format === "bool" || format === "boolean",
                   }
-                : GridaXSupabaseTypeMap.getSQLLiteralInputConfig(
+                : PostgresTypeTools.getSQLLiteralInputConfig(
                     SupabasePostgRESTOpenApi.parse_postgrest_property_meta(
                       predicate.column,
                       properties[predicate.column],

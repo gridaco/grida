@@ -37,6 +37,12 @@ export type DataQueryPredicateRemoveDispatcher = (index: number) => void;
 export type DataQueryPredicateRemoveAllDispatcher = () => void;
 // #endregion predicates
 
+// #region textsearch
+export type DataQueryTextSearchColumnSetDispatcher = (column: string) => void;
+export type DataQueryTextSearchQueryDispatcher = (query: string) => void;
+export type DataQueryTextSearchClearDispatcher = () => void;
+// #endregion textsearch
+
 //
 // #region hook interface
 //
@@ -71,5 +77,11 @@ export interface IDataQueryPaginationConsumer {
   onPaginate: DataQueryPaginationIndexDispatcher;
   onNextPage: DataQueryPaginationNextDispatcher;
   onPrevPage: DataQueryPaginationPrevDispatcher;
+}
+
+export interface IDataQueryTextSearchConsumer {
+  onTextSearchColumn: DataQueryTextSearchColumnSetDispatcher;
+  onTextSearchQuery: DataQueryTextSearchQueryDispatcher;
+  onTextSearchClear: DataQueryTextSearchClearDispatcher;
 }
 // #endregion hook interface

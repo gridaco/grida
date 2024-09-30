@@ -27,7 +27,7 @@ export function QueryToggle({
           )}
         >
           {children}
-          {active && <IconButtonDotBadge />}
+          {active && <IconButtonDotBadge accent="orange" />}
         </Button>
       </TooltipTrigger>
       <TooltipContent>{tooltip}</TooltipContent>
@@ -44,7 +44,7 @@ export function DataQueryPredicatesMenuTriggerButton({
     <QueryToggle tooltip="Filter">
       <ListFilterIcon
         data-state={active ? "on" : "off"}
-        className="w-4 h-4 text-muted-foreground data-[state='on']:text-workbench-accent-1"
+        className="w-4 h-4 text-muted-foreground data-[state='on']:text-workbench-accent-sky"
       />
     </QueryToggle>
   );
@@ -59,7 +59,7 @@ export function DataQueryOrderbyMenuTriggerButton({
     <QueryToggle tooltip="Sort">
       <ArrowDownUpIcon
         data-state={active ? "on" : "off"}
-        className="w-4 h-4 text-muted-foreground data-[state='on']:text-workbench-accent-1"
+        className="w-4 h-4 text-muted-foreground data-[state='on']:text-workbench-accent-sky"
       />
     </QueryToggle>
   );

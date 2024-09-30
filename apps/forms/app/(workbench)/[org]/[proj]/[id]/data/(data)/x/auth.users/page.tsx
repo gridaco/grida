@@ -6,7 +6,7 @@ import {
   GridQueryLimitSelect,
   GridViewSettings,
   GridRefreshButton,
-  GridLocalSearch,
+  DataQueryTextSearch,
   GridQueryCount,
   TableViews,
 } from "@/scaffolds/grid-editor/components";
@@ -107,7 +107,7 @@ export default function XTablePage() {
           <GridLayout.HeaderLine>
             <GridLayout.HeaderMenus>
               <TableViews />
-              <GridLocalSearch onValueChange={search} />
+              <DataQueryTextSearch onValueChange={search} />
             </GridLayout.HeaderMenus>
             <GridLayout.HeaderMenus>
               <GridViewSettings />

@@ -171,8 +171,6 @@ export namespace XPostgrestQuery {
         });
       }
 
-      console.log("textSearch", textSearch);
-
       const params = new URLSearchParams(f["url"]["searchParams"]);
 
       if (!columns) {

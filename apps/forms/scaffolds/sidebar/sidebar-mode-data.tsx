@@ -67,7 +67,7 @@ import { editorlink } from "@/lib/forms/url";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TypeSelect } from "@/components/formfield-type-select";
-import { GridaXSupabaseTypeMap } from "@/lib/x-supabase/typemap";
+import { PostgresTypeTools } from "@/lib/x-supabase/typemap";
 import {
   DeleteConfirmationAlertDialog,
   DeleteConfirmationSnippet,
@@ -470,7 +470,7 @@ function ConnectNewSupabaseTableDialog({
     const result = Object.fromEntries(
       Object.keys(tableSchema.properties).map((key) => {
         const property = tableSchema.properties[key];
-        const suggestion = GridaXSupabaseTypeMap.getSuggestion({
+        const suggestion = PostgresTypeTools.getSuggestion({
           type: property.type,
           format: property.format,
           enum: property.enum,

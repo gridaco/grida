@@ -11,9 +11,11 @@ import type {
   DataQueryPredicatesClearAction,
   DataQueryPredicatesRemoveAction,
   DataQueryOrderByRemoveAction,
+  DataQueryTextSearchColumnAction,
   DataQueryTextSearchQeuryAction,
   DataQueryTextSearchClearAction,
 } from "./data-query.action";
+import assert from "assert";
 
 export default function reducer(
   state: DataQueryState,
@@ -91,19 +93,18 @@ export default function reducer(
         draft.q_predicates = [];
       });
     }
+    case "data/query/textsearch/column": {
+      const { column } = <DataQueryTextSearchColumnAction>action;
+      return produce(state, (draft) => {
+        assert(draft.q_text_search);
+        draft.q_text_search.column = column;
+      });
+    }
     case "data/query/textsearch/query": {
       const { query } = <DataQueryTextSearchQeuryAction>action;
       return produce(state, (draft) => {
-        if (draft.q_text_search) {
-          draft.q_text_search.query = query;
-        } else {
-          // initialize with default config (this shall not happen)
-          draft.q_text_search = {
-            column: "",
-            query: query,
-            type: "plain",
-          };
-        }
+        assert(draft.q_text_search);
+        draft.q_text_search.query = query;
       });
     }
     case "data/query/textsearch/clear": {

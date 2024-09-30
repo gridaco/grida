@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { GridaXSupabaseTypeMap } from "@/lib/x-supabase/typemap";
+import { PostgresTypeTools } from "@/lib/x-supabase/typemap";
 import { XSBSQLForeignKeySearchInput } from "./xsb-sql-fk-search-input";
 
 export type SQLLiteralInputValue =
@@ -37,7 +37,7 @@ export function XSBSQLLiteralInput({
 }: {
   value?: SQLLiteralInputValue;
   onValueChange?: (value: SQLLiteralInputValue) => void;
-  config?: GridaXSupabaseTypeMap.SQLLiteralInputConfig;
+  config?: PostgresTypeTools.SQLLiteralInputConfig;
   supabase: {
     supabase_project_id: number;
     supabase_schema_name: string;

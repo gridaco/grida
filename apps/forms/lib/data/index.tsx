@@ -84,7 +84,8 @@ export namespace Data {
         /**
          * The text or tsvector column to filter on
          */
-        column: string;
+        column: string | null;
+
         /**
          * The query text to match with
          */

@@ -2,12 +2,15 @@ import { DotIcon } from "lucide-react";
 
 export function IconButtonDotBadge({
   offset,
+  accent,
 }: {
   offset?: { top: number; right: number };
+  accent: "orange" | "sky" | "red";
 }) {
   return (
     <DotIcon
-      className="absolute w-8 h-8 -top-2 -right-2 text-workbench-accent-2 pointer-events-none select-none"
+      data-accent={accent}
+      className="absolute w-8 h-8 -top-2 -right-2 pointer-events-none select-none data-[accent='sky']:text-workbench-accent-sky data-[accent='orange']:text-workbench-accent-orange data-[accent='red']:text-workbench-accent-red"
       style={offset}
     />
   );

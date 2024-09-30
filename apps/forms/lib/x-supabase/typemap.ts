@@ -3,7 +3,7 @@ import type { PGSupportedColumnType } from "../supabase-postgrest/@types/pg";
 import type { SupabasePostgRESTOpenApi } from "../supabase-postgrest";
 import type { XPostgrestQuery } from "../supabase-postgrest/builder";
 
-export namespace GridaXSupabaseTypeMap {
+export namespace PostgresTypeTools {
   /**
    * - `default` - Default suggestion. most likely to be used.
    * - `suggested` - The field is suggested and likely to be used.
@@ -415,4 +415,28 @@ export namespace GridaXSupabaseTypeMap {
     "bit varying": undefined,
     interval: undefined,
   };
+
+  const supports_postgrest_text_search: PGSupportedColumnType[] = [
+    "text",
+    "varchar",
+    "character varying",
+    "citext",
+    "tsvector",
+  ];
+
+  export function supportsTextSearch(
+    type: SupabasePostgRESTOpenApi.PostgRESTOpenAPIDefinitionPropertyFormatType
+  ): boolean {
+    const isArray = type.endsWith("[]");
+
+    // array is not supproted for fts
+    // will get "42883 operator does not exist: text[] @@ tsquery"
+    if (isArray) {
+      return false;
+    }
+
+    return supports_postgrest_text_search.includes(
+      type as PGSupportedColumnType
+    );
+  }
 }

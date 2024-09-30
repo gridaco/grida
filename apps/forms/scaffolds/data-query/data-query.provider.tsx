@@ -24,6 +24,7 @@ import type {
   IDataQueryOrderbyConsumer,
   IDataQueryPaginationConsumer,
   IDataQueryPredicatesConsumer,
+  IDataQueryTextSearchConsumer,
 } from "./data-query.type";
 import reducer from "./data-query.reducer";
 
@@ -99,7 +100,8 @@ export function useStandaloneSchemaDataQuery({
 type SchemaDataQueryConsumerReturnType = DataQueryState &
   IDataQueryOrderbyConsumer &
   IDataQueryPredicatesConsumer &
-  IDataQueryPaginationConsumer & {
+  IDataQueryPaginationConsumer &
+  IDataQueryTextSearchConsumer & {
     keys: string[];
     properties: Data.Relation.Schema["properties"];
   };
@@ -240,6 +242,34 @@ export function useStandaloneSchemaDataQueryConsumer(
     }, [dispatch]);
   // #endregion
 
+  // #region text search
+  const onTextSearchColumn = useCallback(
+    (column: string) => {
+      dispatch({
+        type: "data/query/textsearch/column",
+        column: column,
+      });
+    },
+    [dispatch]
+  );
+  const onTextSearchQuery = useCallback(
+    (query: string) => {
+      dispatch({
+        type: "data/query/textsearch/query",
+        query: query,
+      });
+    },
+    [dispatch]
+  );
+  const onTextSearchClear = useCallback(() => {
+    dispatch({
+      type: "data/query/textsearch/clear",
+    });
+  }, [dispatch]);
+  // const
+
+  // #endregion
+
   return useMemo(
     () => ({
       ...state,
@@ -273,6 +303,9 @@ export function useStandaloneSchemaDataQueryConsumer(
       onPredicatesRemove,
       onPredicatesClear,
       //
+      onTextSearchColumn,
+      onTextSearchQuery,
+      onTextSearchClear,
     }),
     [
       state,
@@ -306,6 +339,9 @@ export function useStandaloneSchemaDataQueryConsumer(
       onPredicatesRemove,
       onPredicatesClear,
       //
+      onTextSearchColumn,
+      onTextSearchQuery,
+      onTextSearchClear,
     ]
   );
   //

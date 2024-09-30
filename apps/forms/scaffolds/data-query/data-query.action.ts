@@ -10,6 +10,7 @@ export type DataQueryAction =
   | DataQueryPredicatesUpdateAction
   | DataQueryPredicatesRemoveAction
   | DataQueryPredicatesClearAction
+  | DataQueryTextSearchColumnAction
   | DataQueryTextSearchQeuryAction
   | DataQueryTextSearchClearAction;
 
@@ -58,6 +59,11 @@ export interface DataQueryPredicatesRemoveAction {
 
 export interface DataQueryPredicatesClearAction {
   type: "data/query/predicates/clear";
+}
+
+export interface DataQueryTextSearchColumnAction {
+  type: "data/query/textsearch/column";
+  column: string;
 }
 
 export interface DataQueryTextSearchQeuryAction {

@@ -8,7 +8,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-export function GridLocalSearch({
+export function DataQueryTextSearch({
   onValueChange,
 }: {
   onValueChange?: (txt: string) => void;
