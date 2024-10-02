@@ -69,7 +69,6 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
     case "data/query/textsearch/query":
     case "data/query/textsearch/clear": {
       return produce(state, (draft) => {
-        console.log("yoyo 1");
         draft.datagrid_query = datagridQueryReducer(
           draft.datagrid_query!,
           action

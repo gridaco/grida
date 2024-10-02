@@ -83,6 +83,7 @@ export interface IDataQueryPaginationConsumer {
 
 export interface IDataQueryTextSearchConsumer {
   isTextSearchSet: boolean;
+  isTextSearchValid: boolean;
   onTextSearchColumn: DataQueryTextSearchColumnSetDispatcher;
   onTextSearchQuery: DataQueryTextSearchQueryDispatcher;
   onTextSearchClear: DataQueryTextSearchClearDispatcher;

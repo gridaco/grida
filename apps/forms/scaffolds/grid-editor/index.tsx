@@ -129,10 +129,12 @@ export function GridEditor({
   const [state, dispatch] = useEditorState();
 
   const query = useDataGridQuery();
-  const { isPredicatesSet, isOrderbySet, isTextSearchSet } = query;
+  const { isPredicatesSet, isOrderbySet, isTextSearchSet, isTextSearchValid } =
+    query;
   const is_query_orderby_or_predicates_set = isPredicatesSet || isOrderbySet;
 
-  const hasPredicates = isPredicatesSet || isTextSearchSet;
+  const hasPredicates =
+    isPredicatesSet || (isTextSearchSet && isTextSearchValid);
 
   const { datagrid_isloading, datagrid_selected_rows } = state;
 
@@ -573,9 +575,11 @@ function TableQueryToggles() {
         </>
       ) : (
         <>
+          {/* local text search - column null */}
           <DataQueryTextSearch
-            onValueChange={() => {
-              // TODO:
+            onValueChange={(v) => {
+              query.onTextSearchQuery(v);
+              query.onTextSearchColumn(null);
             }}
           />
         </>

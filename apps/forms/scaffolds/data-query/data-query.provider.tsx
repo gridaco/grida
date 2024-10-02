@@ -273,6 +273,7 @@ export function useStandaloneSchemaDataQueryConsumer(
     }, [dispatch]);
 
   const isTextSearchSet = !!state.q_text_search;
+  const isTextSearchValid = !!state.q_text_search?.query;
 
   // #endregion
 
@@ -310,6 +311,7 @@ export function useStandaloneSchemaDataQueryConsumer(
       onPredicatesClear,
       //
       isTextSearchSet,
+      isTextSearchValid,
       onTextSearchColumn,
       onTextSearchQuery,
       onTextSearchClear,
@@ -347,6 +349,7 @@ export function useStandaloneSchemaDataQueryConsumer(
       onPredicatesClear,
       //
       isTextSearchSet,
+      isTextSearchValid,
       onTextSearchColumn,
       onTextSearchQuery,
       onTextSearchClear,

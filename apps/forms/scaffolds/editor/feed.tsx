@@ -10,7 +10,7 @@ import {
 } from "@/lib/supabase/client";
 import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import type { FormResponse, FormResponseField, GridaXSupabase } from "@/types";
-import { usePrevious } from "@uidotdev/usehooks";
+import { useDebounce, usePrevious } from "@uidotdev/usehooks";
 import { XPostgrestQuery } from "@/lib/supabase-postgrest/builder";
 import equal from "deep-equal";
 import { PrivateEditorApi } from "@/lib/private";
@@ -27,6 +27,13 @@ import assert from "assert";
 type RealtimeTableChangeData = {
   id: string;
   [key: string]: any;
+};
+
+const useDebouncedDatagridQuery = () => {
+  const [state] = useEditorState();
+  const { datagrid_query } = state;
+
+  return useDebounce(datagrid_query, 500);
 };
 
 const useRefresh = () => {
@@ -273,7 +280,7 @@ function useXSBTableFeed(
   const [state, dispatch] = useEditorState();
   const enabled = !!sb_table_id;
 
-  const { datagrid_query } = state;
+  const datagrid_query = useDebouncedDatagridQuery();
 
   const searchParams = useMemo(() => {
     if (!datagrid_query) return;
@@ -442,7 +449,9 @@ export function FormResponseFeedProvider({
 }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
 
-  const { form, datagrid_table_id, datagrid_query, tablespace } = state;
+  const { form, datagrid_table_id, tablespace } = state;
+
+  const datagrid_query = useDebouncedDatagridQuery();
 
   const { realtime: _realtime_responses_enabled } =
     tablespace[EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID];
@@ -488,7 +497,14 @@ export function FormResponseFeedProvider({
       .finally(() => {
         setLoading(false);
       });
-  }, [dispatch, fetchResponses, setLoading, datagrid_query, datagrid_table_id]);
+  }, [
+    dispatch,
+    fetchResponses,
+    setLoading,
+    datagrid_query?.q_page_index,
+    datagrid_query?.q_page_limit,
+    datagrid_table_id,
+  ]);
 
   useSubscription({
     table: "response",
@@ -547,7 +563,9 @@ export function FormResponseSessionFeedProvider({
 }>) {
   const [state, dispatch] = useEditorState();
 
-  const { form, datagrid_table_id, datagrid_query, tablespace } = state;
+  const { form, datagrid_table_id, tablespace } = state;
+
+  const datagrid_query = useDebouncedDatagridQuery();
 
   const { realtime: _realtime_sessions_enabled } =
     tablespace[EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID];
@@ -632,10 +650,11 @@ export function CustomerFeedProvider({
   const {
     project: { id: project_id },
     datagrid_table_id,
-    datagrid_query,
   } = state;
 
   const client = useMemo(() => createClientWorkspaceClient(), []);
+
+  const datagrid_query = useDebouncedDatagridQuery();
 
   const setLoading = useChangeDatagridLoading();
 
@@ -794,7 +813,9 @@ export function GridaSchemaTableFeedProvider({
 }>) {
   const [state, dispatch] = useEditorState();
 
-  const { datagrid_query, tablespace } = state;
+  const { tablespace } = state;
+
+  const datagrid_query = useDebouncedDatagridQuery();
 
   const { realtime: _realtime_responses_enabled } = tablespace[table_id];
 
