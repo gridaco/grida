@@ -21,6 +21,9 @@ import type {
   DataQueryPredicateRemoveAllDispatcher,
   DataQueryPredicateRemoveDispatcher,
   DataQueryPredicateUpdateDispatcher,
+  DataQueryTextSearchClearDispatcher,
+  DataQueryTextSearchColumnSetDispatcher,
+  DataQueryTextSearchQueryDispatcher,
   IDataQueryOrderbyConsumer,
   IDataQueryPaginationConsumer,
   IDataQueryPredicatesConsumer,
@@ -243,16 +246,17 @@ export function useStandaloneSchemaDataQueryConsumer(
   // #endregion
 
   // #region text search
-  const onTextSearchColumn = useCallback(
-    (column: string) => {
-      dispatch({
-        type: "data/query/textsearch/column",
-        column: column,
-      });
-    },
-    [dispatch]
-  );
-  const onTextSearchQuery = useCallback(
+  const onTextSearchColumn: DataQueryTextSearchColumnSetDispatcher =
+    useCallback(
+      (column: string | null) => {
+        dispatch({
+          type: "data/query/textsearch/column",
+          column: column,
+        });
+      },
+      [dispatch]
+    );
+  const onTextSearchQuery: DataQueryTextSearchQueryDispatcher = useCallback(
     (query: string) => {
       dispatch({
         type: "data/query/textsearch/query",
@@ -261,12 +265,14 @@ export function useStandaloneSchemaDataQueryConsumer(
     },
     [dispatch]
   );
-  const onTextSearchClear = useCallback(() => {
-    dispatch({
-      type: "data/query/textsearch/clear",
-    });
-  }, [dispatch]);
-  // const
+  const onTextSearchClear: DataQueryTextSearchClearDispatcher =
+    useCallback(() => {
+      dispatch({
+        type: "data/query/textsearch/clear",
+      });
+    }, [dispatch]);
+
+  const isTextSearchSet = !!state.q_text_search;
 
   // #endregion
 
@@ -303,6 +309,7 @@ export function useStandaloneSchemaDataQueryConsumer(
       onPredicatesRemove,
       onPredicatesClear,
       //
+      isTextSearchSet,
       onTextSearchColumn,
       onTextSearchQuery,
       onTextSearchClear,
@@ -339,6 +346,7 @@ export function useStandaloneSchemaDataQueryConsumer(
       onPredicatesRemove,
       onPredicatesClear,
       //
+      isTextSearchSet,
       onTextSearchColumn,
       onTextSearchQuery,
       onTextSearchClear,

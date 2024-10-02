@@ -89,14 +89,14 @@ export default function XTablePage() {
     return GridData.rows({
       filter: {
         empty_data_hidden: state.datagrid_local_filter.empty_data_hidden,
-        search: state.datagrid_query?.q_text_search?.query,
+        text_search: state.datagrid_query?.q_text_search,
       },
       table: EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID,
       data: {
         rows: data?.data?.users ?? [],
       },
     });
-  }, [data, state.datagrid_local_filter, state.datagrid_query]);
+  }, [data, state.datagrid_local_filter, state.datagrid_query?.q_text_search]);
 
   return (
     <CurrentTable

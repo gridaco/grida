@@ -129,8 +129,11 @@ export function GridEditor({
   const [state, dispatch] = useEditorState();
 
   const query = useDataGridQuery();
-  const { isPredicatesSet, isOrderbySet } = query;
+  const { isPredicatesSet, isOrderbySet, isTextSearchSet } = query;
   const is_query_orderby_or_predicates_set = isPredicatesSet || isOrderbySet;
+
+  const hasPredicates = isPredicatesSet || isTextSearchSet;
+
   const { datagrid_isloading, datagrid_selected_rows } = state;
 
   const deleteFieldConfirmDialog = useDialogState<{ field_id: string }>();
@@ -340,6 +343,7 @@ export function GridEditor({
                   rows={rows ?? []}
                   readonly={readonly}
                   loading={datagrid_isloading}
+                  hasPredicates={hasPredicates}
                   selectionDisabled={selectionDisabled}
                   onAddNewFieldClick={openNewFieldPanel}
                   onEditFieldClick={openEditFieldPanel}

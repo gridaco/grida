@@ -63,7 +63,7 @@ export interface DataQueryPredicatesClearAction {
 
 export interface DataQueryTextSearchColumnAction {
   type: "data/query/textsearch/column";
-  column: string;
+  column: string | null;
 }
 
 export interface DataQueryTextSearchQeuryAction {

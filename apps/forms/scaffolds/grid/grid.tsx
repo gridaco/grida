@@ -87,6 +87,7 @@ export function DataGrid({
   selectionDisabled,
   readonly,
   loading,
+  hasPredicates,
   onAddNewFieldClick,
   onEditFieldClick,
   onDeleteFieldClick,
@@ -103,6 +104,7 @@ export function DataGrid({
   selectionDisabled?: boolean;
   readonly?: boolean;
   loading?: boolean;
+  hasPredicates?: boolean;
   onAddNewFieldClick?: () => void;
   onEditFieldClick?: (id: string) => void;
   onDeleteFieldClick?: (id: string) => void;
@@ -300,7 +302,12 @@ export function DataGrid({
             selectionDisabled ? undefined : onSelectedRowsChange
           }
           renderers={{
-            noRowsFallback: <EmptyRowsRenderer loading={loading} />,
+            noRowsFallback: (
+              <EmptyRowsRenderer
+                loading={loading}
+                hasPredicates={hasPredicates}
+              />
+            ),
           }}
         />
       </CreateNewAttributeProvider>

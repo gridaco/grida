@@ -64,7 +64,7 @@ function FormResponseSessionGridEditor() {
       fields: fields,
       filter: {
         empty_data_hidden: datagrid_local_filter.empty_data_hidden,
-        search: datagrid_query?.q_text_search?.query,
+        text_search: datagrid_query?.q_text_search,
       },
       sessions: sessions_stream ?? [],
     });
@@ -73,7 +73,7 @@ function FormResponseSessionGridEditor() {
     sessions_stream,
     fields,
     datagrid_local_filter,
-    datagrid_query,
+    datagrid_query?.q_text_search,
   ]);
 
   return (

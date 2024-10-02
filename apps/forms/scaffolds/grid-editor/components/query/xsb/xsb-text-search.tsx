@@ -25,6 +25,7 @@ import Link from "next/link";
 import { useSchemaDefinition } from "@/scaffolds/data-query";
 import assert from "assert";
 import { PostgresTypeTools } from "@/lib/x-supabase/typemap";
+import { EditorSymbols } from "@/scaffolds/editor/symbols";
 
 export function XSBTextSearchInput({
   query,
@@ -35,14 +36,24 @@ export function XSBTextSearchInput({
   query?: string;
   onQueryChange?: (query: string) => void;
   column?: string | null;
-  onColumnChange?: (column: string) => void;
+  onColumnChange?: (column: string | null) => void;
 }) {
   const def = useSchemaDefinition();
   assert(def, "Schema definition not found");
 
   const keys = Object.keys(def.properties);
 
-  const nocolumn = !!!column;
+  const nocolumn = column === undefined;
+
+  const _onColumnChange = (column: string) => {
+    if (
+      column === EditorSymbols.SystemKey.QUERY_TS_SEARCH_LOCALLY.description!
+    ) {
+      onColumnChange?.(null);
+    } else {
+      onColumnChange?.(column);
+    }
+  };
 
   return (
     <div className="flex h-9 w-full rounded-md border border-input bg-transparent ps-0 text-sm shadow-sm transition-colors overflow-hidden">
@@ -53,13 +64,15 @@ export function XSBTextSearchInput({
               <Button
                 variant="ghost"
                 data-missing={nocolumn}
-                className="flex gap-2 text-muted-foreground w-40 overflow-hidden justify-start h-full rounded-tr-none rounded-br-none data-[missing='true']:text-workbench-accent-orange outline-none border-none focus:outline-none focus:border-none"
+                className="flex gap-2 text-muted-foreground w-64 overflow-hidden justify-start h-full rounded-none data-[missing='true']:text-workbench-accent-orange outline-none border-none focus:outline-none focus:border-none"
               >
                 <div className="relative">
                   <SearchIcon className="h-4 w-4" />
                 </div>
                 <span className="text-xs font-normal w-full text-start overflow-hidden text-ellipsis">
-                  {column ? attributes_label_text([column]) : "Select"}
+                  {column === undefined
+                    ? "Select"
+                    : attributes_label_text(column)}
                 </span>
 
                 <CaretDownIcon className="w-4 h-4 min-w-4" />
@@ -73,8 +86,12 @@ export function XSBTextSearchInput({
         <DropdownMenuContent className="max-w-sm">
           <DropdownMenuLabel>Fields to Search</DropdownMenuLabel>
           <DropdownMenuRadioGroup
-            value={column || undefined}
-            onValueChange={onColumnChange}
+            value={
+              column === null
+                ? EditorSymbols.SystemKey.QUERY_TS_SEARCH_LOCALLY.description!
+                : column
+            }
+            onValueChange={_onColumnChange}
           >
             {keys.map((key) => {
               const property = def.properties[key];
@@ -91,6 +108,16 @@ export function XSBTextSearchInput({
                 </DropdownMenuRadioItem>
               );
             })}
+            <DropdownMenuRadioItem
+              value={
+                EditorSymbols.SystemKey.QUERY_TS_SEARCH_LOCALLY.description!
+              }
+            >
+              Search Locally
+              <span className="ms-2 text-xs text-muted-foreground">
+                Search within loaded data, locally
+              </span>
+            </DropdownMenuRadioItem>
           </DropdownMenuRadioGroup>
 
           <DropdownMenuSeparator />
@@ -131,12 +158,24 @@ export function XSBTextSearchInput({
   );
 }
 
-const attributes_label_text = (selectedAttributes: string[]) => {
+const attributes_label_text = (
+  selectedAttributes: string[] | string | null
+) => {
+  if (!selectedAttributes) {
+    return "Local Search";
+  }
+
+  if (typeof selectedAttributes === "string") {
+    return selectedAttributes;
+  }
+
   if (selectedAttributes.length === 0) {
     return;
   }
+
   if (selectedAttributes.length === 1) {
     return selectedAttributes[0];
   }
+
   return `${selectedAttributes[0]} and ${selectedAttributes.length - 1} more`;
 };

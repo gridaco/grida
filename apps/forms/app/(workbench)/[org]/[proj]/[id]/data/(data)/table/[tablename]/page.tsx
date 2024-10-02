@@ -114,13 +114,13 @@ function ModeProviderGrida() {
       attributes: tb.attributes,
       filter: {
         empty_data_hidden: datagrid_local_filter.empty_data_hidden,
-        search: datagrid_query?.q_text_search?.query,
+        text_search: datagrid_query?.q_text_search,
       },
       rows: (stream as unknown as Array<
         TablespaceSchemaTableStreamType<GDocSchemaTableProviderGrida>
       >)!,
     });
-  }, [stream, tb, datagrid_local_filter, datagrid_query]);
+  }, [stream, tb, datagrid_local_filter, datagrid_query?.q_text_search]);
 
   return (
     <GridEditor
@@ -163,14 +163,14 @@ function ModeProviderXSB() {
       attributes: tb.attributes,
       filter: {
         empty_data_hidden: datagrid_local_filter.empty_data_hidden,
-        search: datagrid_query?.q_text_search?.query,
+        text_search: state.datagrid_query?.q_text_search,
       },
       pks: tb.x_sb_main_table_connection.pks,
       rows: (stream as unknown as Array<
         TablespaceSchemaTableStreamType<GDocSchemaTableProviderXSupabase>
       >)!,
     });
-  }, [stream, tb, datagrid_local_filter, datagrid_query]);
+  }, [stream, tb, datagrid_local_filter, datagrid_query?.q_text_search]);
 
   return (
     <GridEditor

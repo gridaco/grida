@@ -45,7 +45,7 @@ export default function Customers() {
     const { filtered } = GridData.rows({
       filter: {
         empty_data_hidden: datagrid_local_filter.empty_data_hidden,
-        search: datagrid_query?.q_text_search?.query,
+        text_search: datagrid_query?.q_text_search,
       },
       table: EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID,
       data: {
@@ -67,7 +67,7 @@ export default function Customers() {
       })) || [];
 
     return rows;
-  }, [stream, datagrid_local_filter, datagrid_query]);
+  }, [stream, datagrid_local_filter, datagrid_query?.q_text_search]);
 
   return (
     <CurrentTable table={EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID}>

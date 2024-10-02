@@ -111,7 +111,7 @@ function FormResponseGridEditor() {
       fields: fields,
       filter: {
         empty_data_hidden: datagrid_local_filter.empty_data_hidden,
-        search: datagrid_query?.q_text_search?.query,
+        text_search: datagrid_query?.q_text_search,
       },
       responses: responses_stream ?? [],
     });
@@ -121,7 +121,7 @@ function FormResponseGridEditor() {
     fields,
     responses_stream,
     datagrid_local_filter,
-    datagrid_query,
+    datagrid_query?.q_text_search,
   ]);
 
   return (
@@ -180,14 +180,21 @@ function ModeXSBMainTable() {
       fields: fields,
       filter: {
         empty_data_hidden: datagrid_local_filter.empty_data_hidden,
-        search: datagrid_query?.q_text_search?.query,
+        text_search: datagrid_query?.q_text_search,
       },
       data: {
         pks: tb?.x_sb_main_table_connection.pks ?? [],
         rows: stream ?? [],
       },
     });
-  }, [form.form_id, fields, tb, stream, datagrid_local_filter, datagrid_query]);
+  }, [
+    form.form_id,
+    fields,
+    tb,
+    stream,
+    datagrid_local_filter,
+    datagrid_query?.q_text_search,
+  ]);
 
   if (!tb) {
     return <Invalid />;
