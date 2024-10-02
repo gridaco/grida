@@ -57,6 +57,7 @@ export function XSBTextSearchInput({
   const keys = Object.keys(def.properties);
 
   const nocolumn = column === undefined;
+  const active = !!query;
 
   const _onColumnChange = (column: string) => {
     if (
@@ -84,7 +85,9 @@ export function XSBTextSearchInput({
     >
       {!isExpanded && (
         <div
+          data-state={active ? "on" : "off"}
           className={cn(
+            "text-muted-foreground data-[state='on']:text-workbench-accent-sky",
             "absolute left-0",
             buttonVariants({
               variant: "ghost",
@@ -93,7 +96,7 @@ export function XSBTextSearchInput({
             isExpanded && "pointer-events-none"
           )}
         >
-          <SearchIcon className="h-4 w-4 text-muted-foreground" />
+          <SearchIcon className="h-4 w-4" />
         </div>
       )}
       {isExpanded && (
@@ -150,6 +153,7 @@ export function XSBTextSearchInput({
 
                   return (
                     <DropdownMenuRadioItem
+                      key={key}
                       disabled={!supported}
                       value={key}
                       id="ignore"
