@@ -118,6 +118,11 @@ const config: Config = {
             width: "80px",
           },
         },
+        progress: {
+          "0%": { transform: "translateX(0) scaleX(0)" },
+          "40%": { transform: "translateX(0) scaleX(0.4)" },
+          "100%": { transform: "translateX(100%) scaleX(0.5)" },
+        },
       },
       animation: {
         "fade-in": "fadeIn 300ms both",
@@ -159,6 +164,7 @@ const config: Config = {
         dropdownFadeIn: "dropdownFadeIn 0.1s ease-out",
         // tailwind class for this is `animate-dropdownFadeOut`
         dropdownFadeOut: "dropdownFadeOut 0.1s ease-out",
+        progress: "progress 1s infinite linear",
       },
     },
     plugins: [require("tailwindcss-animate")],
