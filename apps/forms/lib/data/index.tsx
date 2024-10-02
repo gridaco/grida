@@ -32,6 +32,7 @@ export namespace Data {
       q_refresh_key: 0,
       q_orderby: {},
       q_predicates: [],
+      q_text_search: null,
     };
 
     /**
@@ -68,11 +69,34 @@ export namespace Data {
        * orderby queries in {ATTRIBUTE:SORT} format (as sorting can be applied only once per attribute)
        */
       q_orderby: { [key: string]: SQLOrderBy };
+
+      /**
+       * Only relevant for text and tsvector columns. Match only rows where
+       * `column` matches the query string in `query`.
+       */
+      q_text_search: Query.Predicate.TextSearchQuery | null;
     }
   }
 
   export namespace Query {
     export namespace Predicate {
+      export type TextSearchQuery = {
+        /**
+         * The text or tsvector column to filter on
+         */
+        column: string | null;
+
+        /**
+         * The query text to match with
+         */
+        query: string;
+
+        /**
+         * Change how the `query` text is interpreted
+         */
+        type: "plain" | "phrase" | "websearch";
+      };
+
       export namespace K {
         export const supported_operators: XPostgrestQuery.PredicateOperator.SQLPredicateOperatorKeyword[] =
           ["eq", "neq", "gt", "gte", "lt", "lte", "like", "ilike", "is", "in"];

@@ -2,7 +2,7 @@
 import { SearchIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { buttonVariants } from "@/components/ui/button";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/utils";
 
@@ -28,40 +28,70 @@ export function SearchInput({
   );
 }
 
-function ExpandableSearchInput({
-  className,
-  ...props
-}: React.ComponentProps<typeof Input>) {
+export function useExpandableInput(ignoreIds: string[] = []) {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const ref = useRef<HTMLInputElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleIconClick = () => {
+  const onTriggerClick = () => {
     setIsExpanded(true);
     setTimeout(() => {
-      ref.current?.focus();
+      inputRef.current?.focus();
     }, 10);
   };
 
-  const handleBlur = () => {
-    if (ref.current?.value === "") {
+  const onInputBlur = (event: React.FocusEvent<HTMLInputElement>) => {
+    if (event.relatedTarget?.id && ignoreIds.includes(event.relatedTarget.id)) {
+      return;
+    }
+    if (
+      !rootRef.current?.contains(event.relatedTarget as Node) &&
+      inputRef.current?.value === ""
+    ) {
       setIsExpanded(false);
     }
   };
 
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+  const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Escape") {
-      ref.current?.blur();
+      inputRef.current?.blur();
+      setIsExpanded(false);
     }
   };
 
+  return {
+    rootRef,
+    inputRef,
+    isExpanded,
+    onTriggerClick,
+    onInputBlur,
+    onKeyDown,
+  };
+}
+
+function ExpandableSearchInput({
+  className,
+  ...props
+}: React.ComponentProps<typeof Input>) {
+  const {
+    rootRef,
+    isExpanded,
+    onTriggerClick,
+    onKeyDown,
+    inputRef,
+    onInputBlur,
+  } = useExpandableInput();
+
   return (
     <motion.div
+      ref={rootRef}
       className="relative ml-auto flex-1 md:grow-0 h-9"
       animate={{ width: isExpanded ? 200 : 36 }}
       initial={{ width: 36 }}
       transition={{ duration: 0.15 }}
-      onClick={handleIconClick}
+      onClick={onTriggerClick}
+      onKeyDown={onKeyDown}
     >
       <div
         className={cn(
@@ -77,12 +107,11 @@ function ExpandableSearchInput({
       </div>
       <Input
         type="search"
-        ref={ref}
+        ref={inputRef}
         placeholder="Search"
         className={cn("pl-8", className)}
-        onKeyDown={handleKeyDown}
         {...props}
-        onBlur={handleBlur}
+        onBlur={onInputBlur}
         style={{
           display: isExpanded ? "block" : "none",
         }}

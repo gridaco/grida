@@ -28,7 +28,7 @@ import {
   DataQueryOrderbyChip,
   DataQueryPredicateChip,
   DataQueryPrediateAddMenu,
-  GridLocalSearch,
+  DataQueryTextSearch,
 } from "@/scaffolds/grid-editor/components";
 import {
   SchemaNameProvider,
@@ -265,7 +265,7 @@ function XSBSearchTableDataGrid({
                   active={query.isOrderbySet}
                 />
               </DataQueryOrderByMenu>
-              <GridLocalSearch onValueChange={setLocalSearch} />
+              <DataQueryTextSearch onValueChange={setLocalSearch} />
             </GridLayout.HeaderMenuItems>
           </GridLayout.HeaderMenus>
         </GridLayout.HeaderLine>

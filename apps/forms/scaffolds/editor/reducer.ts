@@ -64,7 +64,10 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
     case "data/query/predicates/add":
     case "data/query/predicates/clear":
     case "data/query/predicates/remove":
-    case "data/query/predicates/update": {
+    case "data/query/predicates/update":
+    case "data/query/textsearch/column":
+    case "data/query/textsearch/query":
+    case "data/query/textsearch/clear": {
       return produce(state, (draft) => {
         draft.datagrid_query = datagridQueryReducer(
           draft.datagrid_query!,

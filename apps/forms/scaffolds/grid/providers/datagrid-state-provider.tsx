@@ -5,6 +5,7 @@ import type { DataGridCellRootProps } from "../cells";
 type State = {
   local_cursor_id: string;
   selections: Array<DataGridCellSelectionCursor>;
+  highlightTokens?: string[];
 };
 
 const Context = React.createContext<State | null>(null);
@@ -13,15 +14,18 @@ export function DataGridStateProvider({
   children,
   local_cursor_id,
   selections,
+  highlightTokens,
 }: React.PropsWithChildren<{
   local_cursor_id: string;
   selections: Array<DataGridCellSelectionCursor>;
+  highlightTokens?: string[];
 }>) {
   return (
     <Context.Provider
       value={{
         local_cursor_id,
         selections,
+        highlightTokens: highlightTokens,
       }}
     >
       {children}
@@ -29,7 +33,7 @@ export function DataGridStateProvider({
   );
 }
 
-function useDataGridState() {
+export function useDataGridState() {
   const context = React.useContext(Context);
   if (!context) {
     throw new Error(

@@ -125,12 +125,14 @@ export namespace XPostgrestQuery {
       order,
       filters,
       range,
+      textSearch,
     }: {
       columns?: string;
       limit?: number;
       range?: { from: number; to: number };
       order?: { [col: string]: SQLOrderBy };
       filters?: ReadonlyArray<SQLPredicate>;
+      textSearch?: Data.Query.Predicate.TextSearchQuery;
     }) {
       const pq = new PostgrestQueryBuilder(new URL("noop:noop"), {});
 
@@ -162,6 +164,13 @@ export namespace XPostgrestQuery {
         }
       }
 
+      // text search
+      if (textSearch && textSearch.column && textSearch.query) {
+        f = f.textSearch(textSearch.column, textSearch.query, {
+          type: textSearch.type,
+        });
+      }
+
       const params = new URLSearchParams(f["url"]["searchParams"]);
 
       if (!columns) {
@@ -181,6 +190,7 @@ export namespace XPostgrestQuery {
         },
         // only pass predicates with value set
         filters: query.q_predicates.filter((p) => p.value ?? false),
+        textSearch: query.q_text_search ?? undefined,
       });
       search.set("r", query.q_refresh_key.toString());
       return search;

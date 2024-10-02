@@ -81,7 +81,8 @@ function FormResponseGridEditor() {
   const {
     form,
     tablespace,
-    datagrid_local_filter: datagrid_filter,
+    datagrid_local_filter,
+    datagrid_query,
     datagrid_table_id,
   } = state;
 
@@ -108,7 +109,10 @@ function FormResponseGridEditor() {
       // TODO: types with symbols not working ?
       table: datagrid_table_id as any,
       fields: fields,
-      filter: datagrid_filter,
+      filter: {
+        empty_data_hidden: datagrid_local_filter.empty_data_hidden,
+        text_search: datagrid_query?.q_text_search,
+      },
       responses: responses_stream ?? [],
     });
   }, [
@@ -116,7 +120,8 @@ function FormResponseGridEditor() {
     datagrid_table_id,
     fields,
     responses_stream,
-    datagrid_filter,
+    datagrid_local_filter,
+    datagrid_query?.q_text_search,
   ]);
 
   return (
@@ -139,7 +144,8 @@ function ModeXSBMainTable() {
   const {
     form,
     tablespace,
-    datagrid_local_filter: datagrid_filter,
+    datagrid_local_filter,
+    datagrid_query,
     datagrid_table_id,
   } = state;
 
@@ -172,13 +178,23 @@ function ModeXSBMainTable() {
       form_id: form.form_id,
       table: EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID,
       fields: fields,
-      filter: datagrid_filter,
+      filter: {
+        empty_data_hidden: datagrid_local_filter.empty_data_hidden,
+        text_search: datagrid_query?.q_text_search,
+      },
       data: {
         pks: tb?.x_sb_main_table_connection.pks ?? [],
         rows: stream ?? [],
       },
     });
-  }, [form.form_id, fields, tb, stream, datagrid_filter]);
+  }, [
+    form.form_id,
+    fields,
+    tb,
+    stream,
+    datagrid_local_filter,
+    datagrid_query?.q_text_search,
+  ]);
 
   if (!tb) {
     return <Invalid />;

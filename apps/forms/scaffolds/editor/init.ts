@@ -87,7 +87,14 @@ export function initialDatagridState(
 ): Omit<IDataGridState, "datagrid_table_id"> {
   const cleared: Omit<IDataGridState, "datagrid_table_id"> = {
     datagrid_selected_rows: new Set(),
-    datagrid_query: Data.Relation.INITIAL_QUERY_STATE,
+    datagrid_query: {
+      ...Data.Relation.INITIAL_QUERY_STATE,
+      q_text_search: {
+        query: "",
+        type: "websearch",
+        column: null,
+      },
+    },
     datagrid_query_estimated_count: null,
     datagrid_isloading: false,
     datagrid_local_filter: {

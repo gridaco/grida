@@ -11,7 +11,11 @@ import type {
   DataQueryPredicatesClearAction,
   DataQueryPredicatesRemoveAction,
   DataQueryOrderByRemoveAction,
+  DataQueryTextSearchColumnAction,
+  DataQueryTextSearchQeuryAction,
+  DataQueryTextSearchClearAction,
 } from "./data-query.action";
+import assert from "assert";
 
 export default function reducer(
   state: DataQueryState,
@@ -87,6 +91,26 @@ export default function reducer(
       const {} = <DataQueryPredicatesClearAction>action;
       return produce(state, (draft) => {
         draft.q_predicates = [];
+      });
+    }
+    case "data/query/textsearch/column": {
+      const { column } = <DataQueryTextSearchColumnAction>action;
+      return produce(state, (draft) => {
+        assert(draft.q_text_search);
+        draft.q_text_search.column = column;
+      });
+    }
+    case "data/query/textsearch/query": {
+      const { query } = <DataQueryTextSearchQeuryAction>action;
+      return produce(state, (draft) => {
+        assert(draft.q_text_search);
+        draft.q_text_search.query = query;
+      });
+    }
+    case "data/query/textsearch/clear": {
+      const {} = <DataQueryTextSearchClearAction>action;
+      return produce(state, (draft) => {
+        draft.q_text_search = null;
       });
     }
   }

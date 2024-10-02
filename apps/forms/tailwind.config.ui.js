@@ -52,11 +52,14 @@ module.exports = {
         "workbench-panel": {
           DEFAULT: "hsl(var(--secondary) / 10%)",
         },
-        "workbench-accent-1": {
+        "workbench-accent-sky": {
           DEFAULT: colors.sky[500],
         },
-        "workbench-accent-2": {
+        "workbench-accent-orange": {
           DEFAULT: colors.orange[400],
+        },
+        "workbench-accent-red": {
+          DEFAULT: colors.red[500],
         },
       },
       borderRadius: {

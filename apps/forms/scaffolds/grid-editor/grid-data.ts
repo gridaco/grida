@@ -16,10 +16,8 @@ import type {
   DataGridFileRefsResolverQueryTask,
 } from "../grid/types";
 import type {
-  DataGridLocalFilter,
   GDocSchemaTableProviderGrida,
   GDocSchemaTableProviderXSupabase,
-  GDocTableID,
   TablespaceSchemaTableStreamType,
   TVirtualRow,
 } from "../editor/state";
@@ -29,13 +27,19 @@ import { PrivateEditorApi } from "@/lib/private";
 import { GridFilter } from "../grid-filter";
 import { EditorSymbols } from "../editor/symbols";
 import { SupabaseStorageExtensions } from "@/lib/supabase/storage-ext";
+import { Data } from "@/lib/data";
 
 export namespace GridData {
+  type DataGridFilterInput = {
+    text_search?: Data.Query.Predicate.TextSearchQuery | null;
+    empty_data_hidden: boolean;
+  };
+
   type DataGridInput =
     | ({
         form_id: string;
         fields: FormFieldDefinition[];
-        filter: DataGridLocalFilter;
+        filter: DataGridFilterInput;
       } & (
         | {
             table: typeof EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID;
@@ -54,14 +58,14 @@ export namespace GridData {
           }
       ))
     | {
-        filter: DataGridLocalFilter;
+        filter: DataGridFilterInput;
         table: typeof EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID;
         data: {
           rows: Customer[];
         };
       }
     | {
-        filter: DataGridLocalFilter;
+        filter: DataGridFilterInput;
         table: typeof EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID;
         data: {
           rows: GridaXSupabase.SupabaseUser[];
@@ -69,7 +73,7 @@ export namespace GridData {
       }
     | (
         | {
-            filter: DataGridLocalFilter;
+            filter: DataGridFilterInput;
             table: "v0_schema_table";
             provider: "grida";
             table_id: string;
@@ -79,7 +83,7 @@ export namespace GridData {
             >;
           }
         | {
-            filter: DataGridLocalFilter;
+            filter: DataGridFilterInput;
             table: "v0_schema_table";
             provider: "x-supabase";
             table_id: string;
@@ -221,12 +225,28 @@ export namespace GridData {
         filtered: GridaXSupabase.SupabaseUser[];
       };
 
+  function toLocalFilter(input: DataGridFilterInput): GridFilter.LocalFilter {
+    // when text search is set and column is null, it means for local search
+    // if the column is set, it should be filtered by the service layer
+    if (input.text_search && input.text_search.column === null) {
+      return {
+        search: input.text_search.query,
+        empty_data_hidden: input.empty_data_hidden,
+      };
+    } else {
+      return {
+        search: undefined,
+        empty_data_hidden: input.empty_data_hidden,
+      };
+    }
+  }
+
   export function rows(input: DataGridInput): TProcessedGridRows {
     switch (input.table) {
       case EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID: {
         const filtered = GridFilter.filter(
           input.responses,
-          input.filter,
+          toLocalFilter(input.filter),
           (row) => row.meta.raw,
           // response raw is saved with name: value
           input.fields.map((f) => f.name)
@@ -246,7 +266,7 @@ export namespace GridData {
             ? rows_from_sessions(
                 GridFilter.filter(
                   input.sessions,
-                  input.filter,
+                  toLocalFilter(input.filter),
                   "raw",
                   // session raw is saved with id: value
                   input.fields.map((f) => f.id)
@@ -267,7 +287,7 @@ export namespace GridData {
             fields: input.fields,
             rows: GridFilter.filter(
               input.data.rows,
-              input.filter,
+              toLocalFilter(input.filter),
               undefined,
               input.fields.map((f) => f.name)
             ),
@@ -280,7 +300,7 @@ export namespace GridData {
           inputlength: input.data.rows.length,
           filtered: GridFilter.filter(
             input.data.rows,
-            input.filter,
+            toLocalFilter(input.filter),
             undefined,
             Object.keys(GridaXSupabase.SupabaseUserJsonSchema.properties)
           ),
@@ -293,7 +313,7 @@ export namespace GridData {
           // @ts-ignore - FIXME:
           filtered: GridFilter.filter(
             input.data.rows,
-            input.filter,
+            toLocalFilter(input.filter),
             undefined,
             [
               "uid",
@@ -312,7 +332,7 @@ export namespace GridData {
           case "grida": {
             const filtered = GridFilter.filter(
               input.rows,
-              input.filter,
+              toLocalFilter(input.filter),
               (row) => row.meta.raw,
               // response raw is saved with name: value
               input.attributes.map((f) => f.name)
@@ -335,7 +355,7 @@ export namespace GridData {
                 fields: input.attributes,
                 rows: GridFilter.filter(
                   input.rows,
-                  input.filter,
+                  toLocalFilter(input.filter),
                   undefined,
                   input.attributes.map((f) => f.name)
                 ),

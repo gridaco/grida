@@ -18,6 +18,7 @@ export function XSBReferenceTableGrid<
   tokens,
   masked,
   loading,
+  hasPredicates,
   onRowDoubleClick,
 }: {
   columns: GridDataXSBUnknown.DataGridColumn[];
@@ -26,6 +27,7 @@ export function XSBReferenceTableGrid<
   tokens?: string[];
   masked?: boolean;
   loading?: boolean;
+  hasPredicates?: boolean;
   onRowDoubleClick?: (row: R) => void;
 }) {
   const columns = _columns.map(
@@ -93,7 +95,11 @@ export function XSBReferenceTableGrid<
       onCellDoubleClick={({ row }) => {
         onRowDoubleClick?.(row);
       }}
-      renderers={{ noRowsFallback: <EmptyRowsRenderer loading={loading} /> }}
+      renderers={{
+        noRowsFallback: (
+          <EmptyRowsRenderer loading={loading} hasPredicates={hasPredicates} />
+        ),
+      }}
       rowKeyGetter={rowKey ? (row) => (row as any)[rowKey] : undefined}
       rowHeight={32}
       headerRowHeight={36}

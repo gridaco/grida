@@ -95,7 +95,7 @@ export interface FormDocumentEditorInit extends BaseDocumentEditorInit {
 }
 
 export interface DataGridLocalFilter {
-  localsearch?: string; // local search uses fuse.js to available data
+  // localsearch?: string; // local search uses fuse.js to available data
   masking_enabled: boolean;
   empty_data_hidden: boolean;
 }

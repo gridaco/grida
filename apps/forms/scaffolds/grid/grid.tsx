@@ -67,6 +67,7 @@ import "./grid.css";
 import {
   DataGridStateProvider,
   useCellRootProps,
+  useDataGridState,
   useFileRefs,
   useMasking,
 } from "./providers";
@@ -86,11 +87,13 @@ export function DataGrid({
   selectionDisabled,
   readonly,
   loading,
+  hasPredicates,
   onAddNewFieldClick,
   onEditFieldClick,
   onDeleteFieldClick,
   onCellChange,
   onSelectedCellChange,
+  highlightTokens,
   selectedCells,
   className,
 }: {
@@ -101,6 +104,7 @@ export function DataGrid({
   selectionDisabled?: boolean;
   readonly?: boolean;
   loading?: boolean;
+  hasPredicates?: boolean;
   onAddNewFieldClick?: () => void;
   onEditFieldClick?: (id: string) => void;
   onDeleteFieldClick?: (id: string) => void;
@@ -110,6 +114,7 @@ export function DataGrid({
     data: GFResponseFieldData
   ) => void;
   onSelectedCellChange?: (cell: { pk: string | -1; column: string }) => void;
+  highlightTokens?: string[];
   selectedCells?: Array<DataGridCellSelectionCursor>;
   className?: string;
 }) {
@@ -245,6 +250,7 @@ export function DataGrid({
     <DataGridStateProvider
       local_cursor_id={local_cursor_id}
       selections={selectedCells ?? []}
+      highlightTokens={highlightTokens}
     >
       <CreateNewAttributeProvider onAddNewFieldClick={onAddNewFieldClick}>
         <RDG
@@ -296,7 +302,12 @@ export function DataGrid({
             selectionDisabled ? undefined : onSelectedRowsChange
           }
           renderers={{
-            noRowsFallback: <EmptyRowsRenderer loading={loading} />,
+            noRowsFallback: (
+              <EmptyRowsRenderer
+                loading={loading}
+                hasPredicates={hasPredicates}
+              />
+            ),
           }}
         />
       </CreateNewAttributeProvider>
@@ -448,6 +459,8 @@ function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
 
   const masker = useMasking();
 
+  const { highlightTokens } = useDataGridState();
+
   const identifier: CellIdentifier = {
     attribute: column.key,
     key: row.__gf_id,
@@ -510,7 +523,7 @@ function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
           <span>
             <Highlight
               text={unwrapped?.toString()}
-              tokens={datagrid_filter.localsearch}
+              tokens={highlightTokens}
               className="bg-foreground text-background"
             />
           </span>
@@ -593,7 +606,7 @@ function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
         <CellRoot {...rootprops}>
           <Highlight
             text={display}
-            tokens={datagrid_filter.localsearch}
+            tokens={highlightTokens}
             className="bg-foreground text-background"
           />
         </CellRoot>

@@ -9,7 +9,10 @@ export type DataQueryAction =
   | DataQueryPredicatesAddAction
   | DataQueryPredicatesUpdateAction
   | DataQueryPredicatesRemoveAction
-  | DataQueryPredicatesClearAction;
+  | DataQueryPredicatesClearAction
+  | DataQueryTextSearchColumnAction
+  | DataQueryTextSearchQeuryAction
+  | DataQueryTextSearchClearAction;
 
 // #region pagination
 export interface DataQueryPageLimitAction {
@@ -56,4 +59,18 @@ export interface DataQueryPredicatesRemoveAction {
 
 export interface DataQueryPredicatesClearAction {
   type: "data/query/predicates/clear";
+}
+
+export interface DataQueryTextSearchColumnAction {
+  type: "data/query/textsearch/column";
+  column: string | null;
+}
+
+export interface DataQueryTextSearchQeuryAction {
+  type: "data/query/textsearch/query";
+  query: string;
+}
+
+export interface DataQueryTextSearchClearAction {
+  type: "data/query/textsearch/clear";
 }

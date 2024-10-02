@@ -15,6 +15,7 @@ export function QueryChip({
     <div className="relative">
       {badge && (
         <IconButtonDotBadge
+          accent="orange"
           offset={{
             top: -12,
             right: -12,
@@ -26,7 +27,7 @@ export function QueryChip({
         className={cn(
           "text-xs font-normal text-muted-foreground rounded-full ps-2 pe-1 whitespace-nowrap",
           active &&
-            "border-workbench-accent-1 text-workbench-accent-1 bg-workbench-accent-1/10"
+            "border-workbench-accent-sky text-workbench-accent-sky bg-workbench-accent-sky/10"
         )}
       >
         {children}

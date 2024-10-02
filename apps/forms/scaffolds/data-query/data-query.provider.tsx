@@ -21,9 +21,13 @@ import type {
   DataQueryPredicateRemoveAllDispatcher,
   DataQueryPredicateRemoveDispatcher,
   DataQueryPredicateUpdateDispatcher,
+  DataQueryTextSearchClearDispatcher,
+  DataQueryTextSearchColumnSetDispatcher,
+  DataQueryTextSearchQueryDispatcher,
   IDataQueryOrderbyConsumer,
   IDataQueryPaginationConsumer,
   IDataQueryPredicatesConsumer,
+  IDataQueryTextSearchConsumer,
 } from "./data-query.type";
 import reducer from "./data-query.reducer";
 
@@ -99,7 +103,8 @@ export function useStandaloneSchemaDataQuery({
 type SchemaDataQueryConsumerReturnType = DataQueryState &
   IDataQueryOrderbyConsumer &
   IDataQueryPredicatesConsumer &
-  IDataQueryPaginationConsumer & {
+  IDataQueryPaginationConsumer &
+  IDataQueryTextSearchConsumer & {
     keys: string[];
     properties: Data.Relation.Schema["properties"];
   };
@@ -240,6 +245,38 @@ export function useStandaloneSchemaDataQueryConsumer(
     }, [dispatch]);
   // #endregion
 
+  // #region text search
+  const onTextSearchColumn: DataQueryTextSearchColumnSetDispatcher =
+    useCallback(
+      (column: string | null) => {
+        dispatch({
+          type: "data/query/textsearch/column",
+          column: column,
+        });
+      },
+      [dispatch]
+    );
+  const onTextSearchQuery: DataQueryTextSearchQueryDispatcher = useCallback(
+    (query: string) => {
+      dispatch({
+        type: "data/query/textsearch/query",
+        query: query,
+      });
+    },
+    [dispatch]
+  );
+  const onTextSearchClear: DataQueryTextSearchClearDispatcher =
+    useCallback(() => {
+      dispatch({
+        type: "data/query/textsearch/clear",
+      });
+    }, [dispatch]);
+
+  const isTextSearchSet = !!state.q_text_search;
+  const isTextSearchValid = !!state.q_text_search?.query;
+
+  // #endregion
+
   return useMemo(
     () => ({
       ...state,
@@ -273,6 +310,11 @@ export function useStandaloneSchemaDataQueryConsumer(
       onPredicatesRemove,
       onPredicatesClear,
       //
+      isTextSearchSet,
+      isTextSearchValid,
+      onTextSearchColumn,
+      onTextSearchQuery,
+      onTextSearchClear,
     }),
     [
       state,
@@ -306,6 +348,11 @@ export function useStandaloneSchemaDataQueryConsumer(
       onPredicatesRemove,
       onPredicatesClear,
       //
+      isTextSearchSet,
+      isTextSearchValid,
+      onTextSearchColumn,
+      onTextSearchQuery,
+      onTextSearchClear,
     ]
   );
   //

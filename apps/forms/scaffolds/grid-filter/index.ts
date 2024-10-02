@@ -12,22 +12,27 @@ function getRpwData<T>(row: T, datakey?: DataGetter<T>): any {
 }
 
 export namespace GridFilter {
+  export type LocalFilter = {
+    search: string | undefined; // local search uses fuse.js to available data
+    empty_data_hidden: boolean;
+  };
+
   export function filter<T extends { [key: string]: any }>(
     rows: Array<T>,
-    filter: DataGridLocalFilter,
+    filter: LocalFilter,
     datakey?: DataGetter<T>,
     datasearchkeys?: string[]
   ): Array<T> {
-    const { empty_data_hidden, localsearch } = filter;
+    const { empty_data_hidden, search } = filter;
 
     const filters = [];
     if (empty_data_hidden) {
       filters.push((rows: T[]) => filter_empty_data_hidden(rows, datakey));
     }
 
-    if (localsearch) {
+    if (search) {
       filters.push((rows: T[]) =>
-        filter_full_text_search(rows, localsearch, datakey, datasearchkeys)
+        filter_full_text_search(rows, search, datakey, datasearchkeys)
       );
     }
 

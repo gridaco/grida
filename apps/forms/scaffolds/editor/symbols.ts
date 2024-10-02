@@ -28,4 +28,15 @@ export namespace EditorSymbols {
       "grida_customers.customer"
     );
   }
+
+  export namespace SystemKey {
+    // client system keys
+
+    /**
+     * Indicates the text search is to be done locally.
+     */
+    export const QUERY_TS_SEARCH_LOCALLY = Symbol(
+      "__grida_client_sys_key__ts_search_locally"
+    );
+  }
 }

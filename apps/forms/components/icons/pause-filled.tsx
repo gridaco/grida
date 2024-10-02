@@ -1,4 +1,4 @@
-export function PauseFilled({ className }: { className?: string }) {
+export function PauseFilledIcon({ className }: { className?: string }) {
   return (
     <svg
       height={24}
