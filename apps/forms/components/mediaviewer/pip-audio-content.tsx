@@ -11,7 +11,7 @@ import {
   ChevronLastIcon,
 } from "lucide-react";
 import React, { useMemo } from "react";
-import { PauseFilled, PlayFilledIcon } from "@/components/icons";
+import { PauseFilledIcon, PlayFilledIcon } from "@/components/icons";
 import AudioMediaSessionProvider, {
   useMediaSession,
 } from "@/components/mediaplayer";
@@ -42,7 +42,7 @@ export function ContentAudio({
             <PlayerTrigger
               renderer={(playing) =>
                 playing ? (
-                  <PauseFilled className="w-4 h-4" />
+                  <PauseFilledIcon className="w-4 h-4" />
                 ) : (
                   <PlayFilledIcon className="w-4 h-4" />
                 )
@@ -112,7 +112,7 @@ function PlayerTrack() {
         <SliderPrimitive.Track className="relative h-1 group-hover:h-1.5 transition-all w-full grow overflow-hidden bg-primary/20">
           <SliderPrimitive.Range className="absolute h-full bg-primary" />
         </SliderPrimitive.Track>
-        <SliderPrimitive.Thumb className="block opacity-0 group-hover:opacity-100 w-2 aspect-square group-hover:w-2.5 rounded-full bg-primary shadow transition-colors transition-opacity focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50" />
+        <SliderPrimitive.Thumb className="block opacity-0 group-hover:opacity-100 w-2 aspect-square group-hover:w-2.5 rounded-full bg-primary shadow transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50" />
       </SliderPrimitive.Root>
     </div>
   );
