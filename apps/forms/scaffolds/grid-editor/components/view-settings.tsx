@@ -16,7 +16,7 @@ import {
 import { CommitIcon, GearIcon } from "@radix-ui/react-icons";
 import { format, startOfDay, addSeconds } from "date-fns";
 import { format as formatTZ } from "date-fns-tz";
-import { useEditorState } from "@/scaffolds/editor";
+import { useDatagridTable, useEditorState } from "@/scaffolds/editor";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { editorlink } from "@/lib/forms/url";
@@ -26,33 +26,15 @@ import {
   tztostr,
 } from "@/scaffolds/editor/symbols";
 
+// dummy example date - happy star wars day!
+const starwarsday = new Date(new Date().getFullYear(), 4, 4);
+
 export function GridViewSettings() {
-  const [state, dispatch] = useEditorState();
+  const tb = useDatagridTable();
 
-  const {
-    doctype,
-    datetz,
-    dateformat,
-    datagrid_local_filter: datagrid_filter,
-    datagrid_table_id,
-  } = state;
-
-  // dummy example date - happy star wars day!
-  const starwarsday = useMemo(
-    () => new Date(new Date().getFullYear(), 4, 4),
-    []
-  );
-
-  const tzoffset = useMemo(
-    () => s2Hmm(new Date().getTimezoneOffset() * -1 * 60),
-    []
-  );
-
-  //
   const simulator_available =
-    datagrid_table_id ===
-      EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID ||
-    datagrid_table_id === EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID;
+    tb?.id === EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID ||
+    tb?.id === EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID;
 
   return (
     <DropdownMenu>
@@ -64,106 +46,170 @@ export function GridViewSettings() {
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-56">
-        <DropdownMenuLabel>Table Settings</DropdownMenuLabel>
+        <DropdownMenuLabel>View Options</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuCheckboxItem
-          checked={datagrid_filter.empty_data_hidden}
-          onCheckedChange={(checked) => {
-            dispatch({
-              type: "editor/data-grid/local-filter",
-              empty_data_hidden: checked,
-            });
-          }}
-        >
-          Hide records with empty data
-        </DropdownMenuCheckboxItem>
-        <DropdownMenuCheckboxItem
-          checked={datagrid_filter.masking_enabled}
-          onCheckedChange={(checked) => {
-            dispatch({
-              type: "editor/data-grid/local-filter",
-              masking_enabled: checked,
-            });
-          }}
-        >
-          Mask data
-        </DropdownMenuCheckboxItem>
+        {/* empty data filter */}
+        <_EmptyDataHidden />
+
+        {/* data masking */}
+        <_MaskingEnabled />
         <DropdownMenuSeparator />
-        <DropdownMenuRadioGroup
-          value={dateformat}
-          onValueChange={(value) => {
-            dispatch({
-              type: "editor/data-grid/dateformat",
-              dateformat: value as any,
-            });
-          }}
-        >
-          <DropdownMenuRadioItem value="date">
-            Date
-            <DropdownMenuShortcut>
-              {starwarsday.toLocaleDateString()}
-            </DropdownMenuShortcut>
-          </DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="time">
-            Time
-            <DropdownMenuShortcut>
-              {starwarsday.toLocaleTimeString()}
-            </DropdownMenuShortcut>
-          </DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="datetime">
-            Date Time
-            <DropdownMenuShortcut className="ms-4">
-              {starwarsday.toLocaleString()}
-            </DropdownMenuShortcut>
-          </DropdownMenuRadioItem>
-        </DropdownMenuRadioGroup>
+        {/* date format */}
+        <_DateFormat />
         <DropdownMenuSeparator />
-        <DropdownMenuRadioGroup
-          value={tztostr(datetz, "browser")}
-          onValueChange={(tz) => {
-            switch (tz) {
-              case "browser":
-                dispatch({ type: "editor/data-grid/tz", tz: SYM_LOCALTZ });
-                return;
-              default:
-                dispatch({ type: "editor/data-grid/tz", tz: tz });
-                return;
-            }
-          }}
-        >
-          <DropdownMenuRadioItem value="browser">
-            Local Time
-            <DropdownMenuShortcut>(UTC+{tzoffset})</DropdownMenuShortcut>
-          </DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="UTC">
-            UTC Time
-            <DropdownMenuShortcut>(UTC+0)</DropdownMenuShortcut>
-          </DropdownMenuRadioItem>
-          {doctype === "v0_form" && <DoctypeFormsCampaignTZ />}
-        </DropdownMenuRadioGroup>
-        {simulator_available && (
-          <>
-            <DropdownMenuSeparator />
-            <Link
-              href={editorlink("data/simulator", {
-                basepath: state.basepath,
-                document_id: state.document_id,
-              })}
-              target="_blank"
-            >
-              <DropdownMenuItem className="cursor-pointer">
-                <CommitIcon className="inline align-middle me-2" />
-                Open Simulator
-              </DropdownMenuItem>
-            </Link>
-          </>
-        )}
+        {/* tz */}
+        <_TimeZone />
+
+        {simulator_available && <_DoctypeFormsSimulator />}
       </DropdownMenuContent>
     </DropdownMenu>
   );
 }
 
-function DoctypeFormsCampaignTZ() {
+function _EmptyDataHidden() {
+  const [state, dispatch] = useEditorState();
+
+  const { datagrid_local_filter: datagrid_filter } = state;
+
+  return (
+    <DropdownMenuCheckboxItem
+      checked={datagrid_filter.empty_data_hidden}
+      onCheckedChange={(checked) => {
+        dispatch({
+          type: "editor/data-grid/local-filter",
+          empty_data_hidden: checked,
+        });
+      }}
+    >
+      Hide records with empty data
+    </DropdownMenuCheckboxItem>
+  );
+}
+
+function _MaskingEnabled() {
+  const [state, dispatch] = useEditorState();
+
+  const { datagrid_local_filter: datagrid_filter } = state;
+
+  return (
+    <DropdownMenuCheckboxItem
+      checked={datagrid_filter.masking_enabled}
+      onCheckedChange={(checked) => {
+        dispatch({
+          type: "editor/data-grid/local-filter",
+          masking_enabled: checked,
+        });
+      }}
+    >
+      Mask data
+    </DropdownMenuCheckboxItem>
+  );
+}
+
+function _DateFormat() {
+  const [state, dispatch] = useEditorState();
+  const tb = useDatagridTable();
+
+  const {
+    doctype,
+    datetz,
+    dateformat,
+    datagrid_local_filter: datagrid_filter,
+    datagrid_table_id,
+  } = state;
+
+  return (
+    <DropdownMenuRadioGroup
+      value={dateformat}
+      onValueChange={(value) => {
+        dispatch({
+          type: "editor/data-grid/dateformat",
+          dateformat: value as any,
+        });
+      }}
+    >
+      <DropdownMenuRadioItem value="date">
+        Date
+        <DropdownMenuShortcut>
+          {starwarsday.toLocaleDateString()}
+        </DropdownMenuShortcut>
+      </DropdownMenuRadioItem>
+      <DropdownMenuRadioItem value="time">
+        Time
+        <DropdownMenuShortcut>
+          {starwarsday.toLocaleTimeString()}
+        </DropdownMenuShortcut>
+      </DropdownMenuRadioItem>
+      <DropdownMenuRadioItem value="datetime">
+        Date Time
+        <DropdownMenuShortcut className="ms-4">
+          {starwarsday.toLocaleString()}
+        </DropdownMenuShortcut>
+      </DropdownMenuRadioItem>
+    </DropdownMenuRadioGroup>
+  );
+}
+
+function _TimeZone() {
+  const [state, dispatch] = useEditorState();
+
+  const { doctype, datetz } = state;
+
+  const tzoffset = useMemo(
+    () => s2Hmm(new Date().getTimezoneOffset() * -1 * 60),
+    []
+  );
+
+  return (
+    <DropdownMenuRadioGroup
+      value={tztostr(datetz, "browser")}
+      onValueChange={(tz) => {
+        switch (tz) {
+          case "browser":
+            dispatch({ type: "editor/data-grid/tz", tz: SYM_LOCALTZ });
+            return;
+          default:
+            dispatch({ type: "editor/data-grid/tz", tz: tz });
+            return;
+        }
+      }}
+    >
+      <DropdownMenuRadioItem value="browser">
+        Local Time
+        <DropdownMenuShortcut>(UTC+{tzoffset})</DropdownMenuShortcut>
+      </DropdownMenuRadioItem>
+      <DropdownMenuRadioItem value="UTC">
+        UTC Time
+        <DropdownMenuShortcut>(UTC+0)</DropdownMenuShortcut>
+      </DropdownMenuRadioItem>
+      {doctype === "v0_form" && <_DoctypeFormsCampaignTZ />}
+    </DropdownMenuRadioGroup>
+  );
+}
+
+function _DoctypeFormsSimulator() {
+  const [state, dispatch] = useEditorState();
+
+  return (
+    <>
+      <DropdownMenuSeparator />
+      <Link
+        href={editorlink("data/simulator", {
+          basepath: state.basepath,
+          document_id: state.document_id,
+        })}
+        target="_blank"
+      >
+        <DropdownMenuItem className="cursor-pointer">
+          <CommitIcon className="inline align-middle me-2" />
+          Open Simulator
+        </DropdownMenuItem>
+      </Link>
+    </>
+  );
+}
+
+function _DoctypeFormsCampaignTZ() {
   const [state] = useEditorState();
 
   const {
