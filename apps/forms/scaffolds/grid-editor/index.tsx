@@ -59,7 +59,7 @@ import {
 } from "@/scaffolds/editor/use";
 import { saveAs } from "file-saver";
 import Papa from "papaparse";
-import { Gallery } from "../table-view-gallery/gallery";
+import { Gallery } from "../data-view-gallery/gallery";
 import {
   DataQueryPredicatesMenu,
   DataQueryPredicateChip,
@@ -71,7 +71,7 @@ import {
   DataQueryPredicatesMenuTriggerButton,
   DataQueryOrderbyMenuTriggerButton,
 } from "./components/ui/toggle";
-import { Chartview } from "../table-view-chart/chartview";
+import { Chartview } from "../data-view-chart/chartview";
 import { useMultiplayer } from "@/scaffolds/editor/multiplayer";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { SchemaNameProvider, SchemaDefinitionProvider } from "../data-query";
@@ -145,7 +145,6 @@ export function GridEditor({
   const tb = useDatagridTable();
   const table_id = useDatabaseTableId();
   const refresh = useDataGridRefresh();
-  const view = tb?.views.find((v) => v.id === tb.view_id);
   const row_keyword = tb?.row_keyword ?? "row";
   const has_selected_rows = datagrid_selected_rows.size > 0;
   const selectionDisabled = selection !== "on";
@@ -339,17 +338,22 @@ export function GridEditor({
                 : null
             }
           >
-            {view?.type === "gallery" && (
+            {tb?.view === "gallery" && (
               <GridLayout.Content className="overflow-y-scroll">
-                <Gallery />
+                <Gallery columns={columns} rows={rows ?? []} />
               </GridLayout.Content>
             )}
-            {view?.type === "chart" && (
+            {tb?.view === "chart" && (
               <GridLayout.Content className="overflow-y-scroll">
                 <Chartview />
               </GridLayout.Content>
             )}
-            {!view && (
+            {tb?.view === "list" && (
+              <GridLayout.Content className="overflow-y-scroll">
+                {/* <Chartview /> */}
+              </GridLayout.Content>
+            )}
+            {tb?.view === "table" && (
               <GridLayout.Content>
                 <DataGrid
                   className="bg-transparent"

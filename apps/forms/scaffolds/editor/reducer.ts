@@ -221,16 +221,9 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
         }
       });
     }
-    // case "editor/data-grid/view": {
-    //   const { table_id, view_id } = <DataGridViewAction>action;
-    //   return produce(state, (draft) => {
-    //     const tb = draft.tables.find((t) => t.id == table_id);
-    //     if (!tb) return;
-    //     tb.view_id = view_id;
-    //   });
-    // }
     case "editor/data-grid/table/view": {
       const { table_id, table_view_type } = <DataGridTableViewAction>action;
+      if (!table_view_type) return state;
       return produce(state, (draft) => {
         const tb = draft.tables.find((t) => t.id == table_id);
         if (!tb) return;

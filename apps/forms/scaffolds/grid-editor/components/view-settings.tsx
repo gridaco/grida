@@ -129,7 +129,7 @@ function _LayoutMenuContent() {
   const onLayoutChange = useCallback(
     (value: string) => {
       if (!tb) return;
-
+      if (!value) return;
       dispatch({
         type: "editor/data-grid/table/view",
         table_id: tb.id,
