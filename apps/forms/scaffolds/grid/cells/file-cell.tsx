@@ -194,10 +194,14 @@ export function FileRefsStateRenderer({
     return renderers.loading || <Spinner />;
   }
   if (refs === "error") {
-    return renderers.error || <div>Error</div>;
+    return (
+      renderers.error || (
+        <span className="text-workbench-accent-red text-xs">ERROR</span>
+      )
+    );
   }
   if (!refs || refs.length === 0) {
-    return renderers.empty || <div>No files</div>;
+    return renderers.empty || <></>;
   }
   return refs.map(renderers.files);
 }
