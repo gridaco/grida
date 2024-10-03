@@ -114,15 +114,26 @@ type GDocTableBase = {
     delete_restricted: boolean;
   };
   label: string;
-  views: Array<TableView>;
-  view_id?: string;
+  // views: Array<TableView>;
+  // view_id?: string;
+  view: DataViewType;
 };
 
-interface TableView {
-  id: string;
-  type: "table" | "list" | "chart" | "gallery";
-  label: string;
+export type DataViewType = "table" | "list" | "chart" | "gallery";
+
+/**
+ * Data view model
+ *
+ * Like css, this type contains all properties that can be used to style a view.
+ * This is to make saving the user preferences easier.
+ *
+ * It depends on the implementation how each property is used. Irrelevant properties shall be ignored.
+ */
+export interface IDataView {
+  type: DataViewType;
 }
+
+// export type IDataChartView = Pick<IDataView, "type">;
 
 export type GDocTable = GDocTableBase &
   (

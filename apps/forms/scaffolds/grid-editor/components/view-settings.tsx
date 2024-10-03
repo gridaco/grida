@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useCallback, useMemo } from "react";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -25,6 +25,10 @@ import {
   SYM_LOCALTZ,
   tztostr,
 } from "@/scaffolds/editor/symbols";
+import { PaletteIcon } from "lucide-react";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { ResourceTypeIcon } from "@/components/resource-type-icon";
+import { DataViewType } from "@/scaffolds/editor/state";
 
 // dummy example date - happy star wars day!
 const starwarsday = new Date(new Date().getFullYear(), 4, 4);
@@ -48,21 +52,118 @@ export function GridViewSettings() {
       <DropdownMenuContent align="end" className="min-w-56">
         <DropdownMenuLabel>View Options</DropdownMenuLabel>
         <DropdownMenuSeparator />
+        <LayoutMenu />
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel inset className="text-xs text-muted-foreground">
+          Data Consistency & Protection
+        </DropdownMenuLabel>
         {/* empty data filter */}
         <_EmptyDataHidden />
 
         {/* data masking */}
         <_MaskingEnabled />
         <DropdownMenuSeparator />
+        <DropdownMenuLabel inset className="text-xs text-muted-foreground">
+          Date Format
+        </DropdownMenuLabel>
         {/* date format */}
         <_DateFormat />
         <DropdownMenuSeparator />
+        <DropdownMenuLabel inset className="text-xs text-muted-foreground">
+          Date Timezone
+        </DropdownMenuLabel>
         {/* tz */}
         <_TimeZone />
 
         {simulator_available && <_DoctypeFormsSimulator />}
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+function LayoutMenu() {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <DropdownMenuItem className="relative pl-8">
+          <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+            <PaletteIcon className="w-4 h-4" />
+          </span>
+          Layout & Design
+        </DropdownMenuItem>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="min-w-56">
+        <_LayoutMenuContent />
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+const _view_types = [
+  {
+    type: "table",
+    label: "Table",
+    icon: "table",
+  },
+  {
+    type: "gallery",
+    label: "Gallery",
+    icon: "gallery",
+  },
+  {
+    type: "list",
+    label: "List",
+    icon: "list",
+  },
+  {
+    type: "chart",
+    label: "Chart",
+    icon: "chart",
+  },
+] as const;
+
+function _LayoutMenuContent() {
+  const [state, dispatch] = useEditorState();
+  const tb = useDatagridTable();
+
+  const onLayoutChange = useCallback(
+    (value: string) => {
+      if (!tb) return;
+
+      dispatch({
+        type: "editor/data-grid/table/view",
+        table_id: tb.id,
+        table_view_type: value as DataViewType,
+      });
+    },
+    [dispatch]
+  );
+
+  return (
+    <div>
+      <section className="px-2">
+        <ToggleGroup
+          type="single"
+          value={tb?.view}
+          onValueChange={onLayoutChange}
+          className="grid grid-cols-4 gap-1"
+        >
+          {_view_types.map((view, i) => (
+            <ToggleGroupItem
+              key={i}
+              value={view.type}
+              variant="outline"
+              className="w-16 h-16 flex-col gap-1"
+            >
+              <ResourceTypeIcon type={view.icon} className="w-6 h-6" />
+              <span className="text-muted-foreground text-xs">
+                {view.label}
+              </span>
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      </section>
+    </div>
   );
 }
 

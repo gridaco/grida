@@ -17,6 +17,7 @@ import type {
   EditorFlatFormBlock,
   EditorState,
   GDocTableID,
+  DataViewType,
   TableXSBMainTableConnection,
 } from "./state";
 import type { Tokens } from "@/ast";
@@ -44,6 +45,7 @@ export type EditorAction =
   | FeedCustomerAction
   //
   | DataGridTableAction
+  // | DataGridViewAction
   | DataGridTableViewAction
   | DataGridSelectCellAction
   | DataGridReorderColumnAction
@@ -256,11 +258,21 @@ export type DataGridTableAction = {
     }
 );
 
+// /**
+//  * @deprecated
+//  */
+// export type DataGridViewAction = {
+//   type: "editor/data-grid/view";
+// } & {
+//   table_id: GDocTableID;
+//   view_id: string;
+// };
+
 export type DataGridTableViewAction = {
   type: "editor/data-grid/table/view";
 } & {
   table_id: GDocTableID;
-  view_id: string;
+  table_view_type: DataViewType;
 };
 
 export interface DataGridLocalFilterAction

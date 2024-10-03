@@ -31,14 +31,14 @@ export function TableViews() {
   return (
     <div className="flex items-center gap-2">
       <Tabs
-        value={tb.view_id ?? tb.name}
-        onValueChange={(value) => {
-          dispatch({
-            type: "editor/data-grid/table/view",
-            table_id: tb.id,
-            view_id: value,
-          });
-        }}
+        value={tb.name}
+        // onValueChange={(value) => {
+        //   dispatch({
+        //     type: "editor/data-grid/view",
+        //     table_id: tb.id,
+        //     view_id: value,
+        //   });
+        // }}
       >
         <TabsList>
           <TabsTrigger key={tb.id.toString()} value={tb.name}>
@@ -66,7 +66,7 @@ export function TableViews() {
           })} */}
         </TabsList>
       </Tabs>
-      {/* <AddViewButton/> */}
+      {/* <AddViewButton /> */}
     </div>
   );
 }
