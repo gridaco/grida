@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -20,16 +19,15 @@ import {
 } from "@/components/ui/tooltip";
 import { CaretDownIcon, InfoCircledIcon } from "@radix-ui/react-icons";
 import { SearchIcon } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import Link from "next/link";
-import { useSchemaDefinition } from "@/scaffolds/data-query";
 import assert from "assert";
 import { PostgresTypeTools } from "@/lib/x-supabase/typemap";
 import { EditorSymbols } from "@/scaffolds/editor/symbols";
 import { useExpandableInput } from "@/components/extension/search-input";
 import { motion } from "framer-motion";
 import { cn } from "@/utils";
-import { useClickedOutside } from "@/hooks/use-clicked-outside";
+import { useTableDefinition } from "@/scaffolds/data-query";
 
 export function XSBTextSearchInput({
   query,
@@ -51,7 +49,7 @@ export function XSBTextSearchInput({
     onKeyDown,
   } = useExpandableInput(["ignore"]);
 
-  const def = useSchemaDefinition();
+  const def = useTableDefinition();
   assert(def, "Schema definition not found");
 
   const keys = Object.keys(def.properties);

@@ -74,11 +74,12 @@ import {
 import { Chartview } from "../data-view-chart/chartview";
 import { useMultiplayer } from "@/scaffolds/editor/multiplayer";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { SchemaNameProvider, SchemaDefinitionProvider } from "../data-query";
+import { SchemaNameProvider, TableDefinitionProvider } from "../data-query";
 import { GridFileStorageQueueProvider } from "../grid/providers";
 import { XSBTextSearchInput } from "./components/query/xsb/xsb-text-search";
 import { LoadingProgress } from "@/components/extension/loading-progress";
 import { motion } from "framer-motion";
+import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 
 function useSelectedCells(): DataGridCellSelectionCursor[] {
   const [state] = useEditorState();
@@ -208,6 +209,16 @@ export function GridEditor({
 
   const selectedCells = useSelectedCells();
 
+  const definition = useMemo(() => {
+    return tb
+      ? "x_sb_main_table_connection" in tb
+        ? SupabasePostgRESTOpenApi.parse_supabase_postgrest_schema_definition(
+            tb.x_sb_main_table_connection.sb_table_schema
+          )
+        : null
+      : null;
+  }, [tb]);
+
   return (
     <SchemaNameProvider
       schema={
@@ -218,15 +229,7 @@ export function GridEditor({
           : undefined
       }
     >
-      <SchemaDefinitionProvider
-        definition={
-          tb
-            ? "x_sb_main_table_connection" in tb
-              ? tb.x_sb_main_table_connection.sb_table_schema
-              : null
-            : null
-        }
-      >
+      <TableDefinitionProvider definition={definition}>
         <GridLayout.Root>
           <DeleteFieldConfirmDialog
             open={deleteFieldConfirmDialog.open}
@@ -420,7 +423,7 @@ export function GridEditor({
             )}
           </GridLayout.Footer>
         </GridLayout.Root>
-      </SchemaDefinitionProvider>
+      </TableDefinitionProvider>
     </SchemaNameProvider>
   );
 }

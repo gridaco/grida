@@ -1,6 +1,6 @@
 import { cn } from "@/utils";
 import { GalleryModelCard } from "./modelcard";
-import { useSchemaDefinition } from "../data-query";
+import { useTableDefinition } from "../data-query";
 import assert from "assert";
 import {
   CellIdentifier,
@@ -16,6 +16,7 @@ import { FormInputType } from "@/types";
 import { useFileRefs } from "../grid/providers";
 import { FileRefsStateRenderer } from "../grid/cells";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { Data } from "@/lib/data";
 
 const media_types: FormInputType[] = ["image", "video", "audio"] as const;
 
@@ -23,15 +24,12 @@ function analyze({
   definition,
   columns,
 }: {
-  definition: SupabasePostgRESTOpenApi.SupabaseOpenAPIDefinitionJSONSchema;
+  definition: Data.Relation.TableDefinition;
   columns: DGColumn[];
 }) {
   //
 
-  const analyzed =
-    SupabasePostgRESTOpenApi.parse_supabase_postgrest_schema_definition(
-      definition
-    );
+  const analyzed = definition;
 
   const keys = Object.keys(analyzed.properties);
 
@@ -92,7 +90,7 @@ export function Gallery({
   columns: DGColumn[];
   className?: string;
 }) {
-  const definition = useSchemaDefinition();
+  const definition = useTableDefinition();
 
   assert(definition);
 
