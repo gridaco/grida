@@ -32,11 +32,11 @@ import type {
   DataGridCellFileRefsResolver,
   DataGridCellSelectionCursor,
   DataGridFileRef,
-  GFColumn,
+  DGColumn,
   GFResponseFieldData,
-  GFResponseRow,
-  GFSystemColumn,
-  GFSystemColumnTypes,
+  DGResponseRow,
+  DGSystemColumn,
+  DGSystemColumnKey,
 } from "./types";
 import {
   SelectColumn,
@@ -73,11 +73,11 @@ import {
 } from "./providers";
 import { useMediaViewer } from "@/components/mediaviewer";
 
-function rowKeyGetter(row: GFResponseRow) {
+function rowKeyGetter(row: DGResponseRow) {
   return row.__gf_id;
 }
 
-type RenderingRow = GFResponseRow;
+type RenderingRow = DGResponseRow;
 
 export function DataGrid({
   local_cursor_id,
@@ -98,9 +98,9 @@ export function DataGrid({
   className,
 }: {
   local_cursor_id: string;
-  systemcolumns: GFSystemColumn[];
-  columns: GFColumn[];
-  rows: GFResponseRow[];
+  systemcolumns: DGSystemColumn[];
+  columns: DGColumn[];
+  rows: DGResponseRow[];
   selectionDisabled?: boolean;
   readonly?: boolean;
   loading?: boolean;
@@ -109,7 +109,7 @@ export function DataGrid({
   onEditFieldClick?: (id: string) => void;
   onDeleteFieldClick?: (id: string) => void;
   onCellChange?: (
-    row: GFResponseRow,
+    row: DGResponseRow,
     column: string,
     data: GFResponseFieldData
   ) => void;
@@ -322,13 +322,13 @@ function GFSystemPropertyHeaderCell({ column }: RenderHeaderCellProps<any>) {
 
   return (
     <CellRoot {...rootprops} className="flex items-center gap-2 border-t-0">
-      <DefaultPropertyIcon __key={key as GFSystemColumnTypes} />
+      <DefaultPropertyIcon __key={key as DGSystemColumnKey} />
       <span className="font-normal">{name}</span>
     </CellRoot>
   );
 }
 
-function DefaultPropertyIcon({ __key: key }: { __key: GFSystemColumnTypes }) {
+function DefaultPropertyIcon({ __key: key }: { __key: DGSystemColumnKey }) {
   switch (key) {
     case "__gf_display_id":
       return <Link2Icon className="min-w-4" />;

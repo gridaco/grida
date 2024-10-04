@@ -8,10 +8,10 @@ import {
 } from "@/types";
 import { fmt_local_index } from "@/utils/fmt";
 import type {
-  GFColumn,
+  DGColumn,
   DataGridFileRef,
-  GFResponseRow,
-  GFSystemColumn,
+  DGResponseRow,
+  DGSystemColumn,
   DataGridCellFileRefsResolver,
   DataGridFileRefsResolverQueryTask,
 } from "../grid/types";
@@ -120,8 +120,8 @@ export namespace GridData {
       };
 
   export function columns(params: ColumSbuilderParams): {
-    systemcolumns: GFSystemColumn[];
-    columns: GFColumn[];
+    systemcolumns: DGSystemColumn[];
+    columns: DGColumn[];
   } {
     const fieldcolumns = Array.from(params.fields)
       .sort((a, b) => a.local_index - b.local_index)
@@ -133,7 +133,7 @@ export namespace GridData {
             readonly: field.readonly || false,
             type: field.type,
             storage: field.storage || null,
-          }) satisfies GFColumn
+          }) satisfies DGColumn
       );
 
     switch (params.table_id) {
@@ -207,12 +207,12 @@ export namespace GridData {
     | {
         type: "response";
         inputlength: number;
-        filtered: GFResponseRow[];
+        filtered: DGResponseRow[];
       }
     | {
         type: "session";
         inputlength: number;
-        filtered: GFResponseRow[];
+        filtered: DGResponseRow[];
       }
     | {
         type: "customer";
@@ -370,10 +370,10 @@ export namespace GridData {
   function rows_from_responses(
     responses: Array<TVirtualRow<FormResponseField, FormResponse>>,
     attributes: FormFieldDefinition[]
-  ): Array<GFResponseRow> {
+  ): Array<DGResponseRow> {
     return (
       responses.map((response, index) => {
-        const row: GFResponseRow = {
+        const row: DGResponseRow = {
           __gf_id: response.id,
           __gf_display_id: fmt_local_index(response.meta.local_index),
           __gf_created_at: response.meta.created_at,
@@ -458,7 +458,7 @@ export namespace GridData {
   ) {
     return (
       sessions?.map((session, index) => {
-        const row: GFResponseRow = {
+        const row: DGResponseRow = {
           __gf_id: session.id,
           __gf_display_id: session.id,
           __gf_created_at: session.created_at,
@@ -499,8 +499,8 @@ export namespace GridData {
       return row[field.name];
     };
 
-    return rows.reduce((acc: GFResponseRow[], row, index) => {
-      const gfRow: GFResponseRow = {
+    return rows.reduce((acc: DGResponseRow[], row, index) => {
+      const gfRow: DGResponseRow = {
         __gf_id: pkcol ? row[pkcol] : "",
         __gf_display_id: pkcol ? row[pkcol] : "",
         raw: row,

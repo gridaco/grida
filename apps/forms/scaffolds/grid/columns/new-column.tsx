@@ -4,7 +4,7 @@ import React from "react";
 import { CellRoot } from "../cells";
 import { PlusIcon } from "@radix-ui/react-icons";
 import type { Column, RenderHeaderCellProps } from "react-data-grid";
-import type { GFResponseRow } from "../types";
+import type { DGResponseRow } from "../types";
 
 type CreateNewAttributeContextState = {
   onAddNewFieldClick?: () => void;
@@ -34,7 +34,7 @@ function useCreateNewAttribute() {
   return context;
 }
 
-export const CreateNewAttributeColumn: Column<GFResponseRow> = {
+export const CreateNewAttributeColumn: Column<DGResponseRow> = {
   key: "__gf_new",
   name: "+",
   resizable: false,

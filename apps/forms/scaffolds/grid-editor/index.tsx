@@ -39,7 +39,7 @@ import * as GridLayout from "./components/layout";
 import { txt_n_plural } from "@/utils/plural";
 import { editorlink } from "@/lib/forms/url";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
-import type { GFColumn, GFResponseRow, GFSystemColumn } from "../grid/types";
+import type { DGColumn, DGResponseRow, DGSystemColumn } from "../grid/types";
 import { PrivateEditorApi } from "@/lib/private";
 import { EditorSymbols } from "../editor/symbols";
 import {
@@ -120,9 +120,9 @@ export function GridEditor({
   selection,
   deletion,
 }: {
-  systemcolumns: GFSystemColumn[];
-  columns: GFColumn[];
-  rows?: GFResponseRow[];
+  systemcolumns: DGSystemColumn[];
+  columns: DGColumn[];
+  rows?: DGResponseRow[];
   readonly?: boolean;
   selection: "on" | "off";
   deletion: "on" | "off";

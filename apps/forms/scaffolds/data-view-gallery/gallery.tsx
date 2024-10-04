@@ -5,8 +5,8 @@ import assert from "assert";
 import {
   CellIdentifier,
   DataGridCellFileRefsResolver,
-  GFColumn,
-  GFResponseRow,
+  DGColumn,
+  DGResponseRow,
 } from "../grid";
 import { Label } from "@/components/ui/label";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
@@ -24,7 +24,7 @@ function analyze({
   columns,
 }: {
   definition: SupabasePostgRESTOpenApi.SupabaseOpenAPIDefinitionJSONSchema;
-  columns: GFColumn[];
+  columns: DGColumn[];
 }) {
   //
 
@@ -88,8 +88,8 @@ export function Gallery({
   rows,
   columns,
 }: {
-  rows: GFResponseRow[];
-  columns: GFColumn[];
+  rows: DGResponseRow[];
+  columns: DGColumn[];
   className?: string;
 }) {
   const definition = useSchemaDefinition();
@@ -137,10 +137,10 @@ function DynamicDataCard({
   properties,
   data,
 }: {
-  media_columns: GFColumn[];
+  media_columns: DGColumn[];
   primary_media_column_key: string | null;
   properties: { name: string; label: string; format: PGSupportedColumnType }[];
-  data: GFResponseRow;
+  data: DGResponseRow;
 }) {
   const primary_media_column = media_columns.find(
     (c) => c.key === primary_media_column_key
@@ -182,8 +182,8 @@ function CardMediaSection({
   column,
   resolver,
 }: {
-  data: GFResponseRow;
-  column: GFColumn;
+  data: DGResponseRow;
+  column: DGColumn;
   resolver?: DataGridCellFileRefsResolver;
 }) {
   const identifier: CellIdentifier = {

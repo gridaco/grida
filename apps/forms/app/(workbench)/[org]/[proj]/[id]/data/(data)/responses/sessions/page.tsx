@@ -12,7 +12,7 @@ import { EditorSymbols } from "@/scaffolds/editor/symbols";
 import { CurrentTable } from "@/scaffolds/editor/utils/switch-table";
 import { GridEditor } from "@/scaffolds/grid-editor";
 import { GridData } from "@/scaffolds/grid-editor/grid-data";
-import { GFResponseRow } from "@/scaffolds/grid/types";
+import { DGResponseRow } from "@/scaffolds/grid/types";
 import { useMemo } from "react";
 
 export default function FormResponsesPage() {
@@ -81,7 +81,7 @@ function FormResponseSessionGridEditor() {
       <GridEditor
         systemcolumns={systemcolumns}
         columns={columns}
-        rows={filtered as GFResponseRow[]}
+        rows={filtered as DGResponseRow[]}
         readonly={true}
         selection={"off"}
         deletion={"off"}

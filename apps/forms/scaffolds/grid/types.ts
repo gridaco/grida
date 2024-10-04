@@ -51,17 +51,17 @@ export type DataGridFileRef = {
   name: string;
 };
 
-export type GFSystemColumnTypes =
+export type DGSystemColumnKey =
   | "__gf_display_id"
   | "__gf_created_at"
   | "__gf_customer_id";
 
-export type GFSystemColumn = {
-  key: GFSystemColumnTypes;
+export type DGSystemColumn = {
+  key: DGSystemColumnKey;
   name?: string;
 };
 
-export type GFColumn = {
+export type DGColumn = {
   key: string;
   name: string;
   readonly: boolean;
@@ -81,7 +81,7 @@ export type GFResponseFieldData = {
   files?: DataGridCellFileRefsResolver;
 };
 
-export type GFResponseRow = {
+export type DGResponseRow = {
   __gf_id: string;
   __gf_display_id: string;
   __gf_created_at?: string;
@@ -90,7 +90,7 @@ export type GFResponseRow = {
   raw: Record<string, any> | null;
 };
 
-export type GRCustomerRow = {
+export type DGCustomerRow = {
   uid: string;
   email: string | null;
   // name: string;

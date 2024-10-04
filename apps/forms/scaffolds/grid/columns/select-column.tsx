@@ -15,7 +15,7 @@ import {
   SyntheticEvent,
   useCallback,
 } from "react";
-import { GFResponseRow } from "../types";
+import { DGResponseRow } from "../types";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import { EnterFullScreenIcon } from "@radix-ui/react-icons";
 import { useEditorState } from "../../editor";
@@ -56,7 +56,7 @@ export const SelectColumn: CalculatedColumn<any, any> = {
       </CellRoot>
     );
   },
-  renderCell: (props: RenderCellProps<GFResponseRow>) => {
+  renderCell: (props: RenderCellProps<DGResponseRow>) => {
     const { column, row } = props;
     // eslint-disable-next-line react-hooks/rules-of-hooks
     const [isRowSelected, onRowSelectionChange] = useRowSelection();
@@ -95,7 +95,7 @@ type SharedInputProps = Pick<
 
 interface SelectCellFormatterProps extends SharedInputProps {
   value: boolean;
-  row?: GFResponseRow;
+  row?: DGResponseRow;
   onChange: (value: boolean, isShiftClick: boolean) => void;
 }
 

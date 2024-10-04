@@ -21,7 +21,7 @@ import { EditorSymbols } from "@/scaffolds/editor/symbols";
 import { CurrentTable } from "@/scaffolds/editor/utils/switch-table";
 import { GridEditor } from "@/scaffolds/grid-editor";
 import { GridData } from "@/scaffolds/grid-editor/grid-data";
-import { GFResponseRow } from "@/scaffolds/grid/types";
+import { DGResponseRow } from "@/scaffolds/grid/types";
 import assert from "assert";
 import { useMemo } from "react";
 
@@ -129,7 +129,7 @@ function FormResponseGridEditor() {
       <GridEditor
         systemcolumns={systemcolumns}
         columns={columns}
-        rows={filtered as GFResponseRow[]}
+        rows={filtered as DGResponseRow[]}
         readonly={false}
         selection={"on"}
         deletion={"on"}
@@ -205,7 +205,7 @@ function ModeXSBMainTable() {
       <GridEditor
         systemcolumns={systemcolumns}
         columns={columns}
-        rows={filtered as GFResponseRow[]}
+        rows={filtered as DGResponseRow[]}
         readonly={tb.readonly}
         selection="on"
         deletion="on"
