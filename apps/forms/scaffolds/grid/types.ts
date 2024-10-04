@@ -1,3 +1,4 @@
+import type { Data } from "@/lib/data";
 import type { FormFieldStorageSchema, FormInputType } from "@/types";
 
 export interface DataGridCellSelectionCursor {
@@ -66,13 +67,7 @@ export type DGColumn = {
   name: string;
   readonly: boolean;
   type?: FormInputType;
-  fk?:
-    | {
-        referencing_column: string;
-        referenced_table: string;
-        referenced_column: string;
-      }
-    | false;
+  fk: Data.Relation.NonCompositeRelationship | false;
   storage?: FormFieldStorageSchema | {} | null;
 };
 

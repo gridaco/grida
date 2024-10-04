@@ -24,6 +24,7 @@ import assert from "assert";
 import { useMemo } from "react";
 import { Spinner } from "@/components/spinner";
 import * as GridLayout from "@/scaffolds/grid-editor/components/layout";
+import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 
 export default function SchemaTablePage({
   params,
@@ -148,10 +149,10 @@ function ModeProviderXSB() {
     return GridData.columns({
       table_id: tb.id,
       fields: tb.attributes,
-      x_table_constraints: {
-        pk: tb.x_sb_main_table_connection.pk,
-        pks: tb.x_sb_main_table_connection.pks,
-      },
+      definition:
+        SupabasePostgRESTOpenApi.parse_supabase_postgrest_schema_definition(
+          tb.x_sb_main_table_connection.sb_table_schema
+        ),
     });
   }, [tb]);
 
@@ -163,7 +164,7 @@ function ModeProviderXSB() {
       attributes: tb.attributes,
       filter: {
         empty_data_hidden: datagrid_local_filter.empty_data_hidden,
-        text_search: state.datagrid_query?.q_text_search,
+        text_search: datagrid_query?.q_text_search,
       },
       pks: tb.x_sb_main_table_connection.pks,
       rows: (stream as unknown as Array<

@@ -95,7 +95,7 @@ export namespace GridData {
           }
       );
 
-  type ColumSbuilderParams =
+  type ColumsBuilderParams =
     | {
         table_id:
           | typeof EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID
@@ -105,21 +105,15 @@ export namespace GridData {
     | {
         table_id: typeof EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID;
         fields: FormFieldDefinition[];
-        x_table_constraints: {
-          pk?: string;
-          pks: string[];
-        };
+        definition: Data.Relation.TableDefinition;
       }
     | {
         table_id: string;
         fields: FormFieldDefinition[];
-        x_table_constraints?: {
-          pk?: string;
-          pks: string[];
-        };
+        definition?: Data.Relation.TableDefinition;
       };
 
-  export function columns(params: ColumSbuilderParams): {
+  export function columns(params: ColumsBuilderParams): {
     systemcolumns: DGSystemColumn[];
     columns: DGColumn[];
   } {
@@ -133,6 +127,10 @@ export namespace GridData {
             readonly: field.readonly || false,
             type: field.type,
             storage: field.storage || null,
+            fk:
+              "definition" in params
+                ? params.definition?.properties[field.name]?.fk || false
+                : false,
           }) satisfies DGColumn
       );
 
@@ -156,34 +154,36 @@ export namespace GridData {
         break;
       }
       case EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID: {
-        const { pk, pks } = params.x_table_constraints;
-        if (pk) {
+        const { pks } = params.definition;
+        if (pks.length > 0) {
+          const pk1 = pks[0];
           return {
             systemcolumns: [
               {
                 key: "__gf_display_id",
-                name: pk,
+                // 2. allow multiple PKs
+                name: pk1,
               },
-              // 2. allow multiple PKs
             ],
-            columns: fieldcolumns.filter((f) => f.name !== pk),
+            columns: fieldcolumns.filter((f) => f.name !== pk1),
           };
         }
         break;
       }
       default:
-        if (params.x_table_constraints) {
-          const { pk, pks } = params.x_table_constraints;
-          if (pk) {
+        if (params.definition) {
+          const { pks } = params.definition;
+          if (pks.length > 0) {
+            const pk1 = pks[0];
             return {
               systemcolumns: [
                 {
                   key: "__gf_display_id",
-                  name: pk,
+                  // 2. allow multiple PKs
+                  name: pk1,
                 },
-                // 2. allow multiple PKs
               ],
-              columns: fieldcolumns.filter((f) => f.name !== pk),
+              columns: fieldcolumns.filter((f) => f.name !== pk1),
             };
           }
         }

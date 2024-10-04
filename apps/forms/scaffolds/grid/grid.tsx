@@ -202,6 +202,7 @@ export function DataGrid({
               <ColumnHeaderCell
                 {...props}
                 type={col.type as FormInputType}
+                fk={col.fk}
                 onEditClick={() => {
                   onEditFieldClick?.(col.key);
                 }}
@@ -331,11 +332,13 @@ function GFSystemPropertyHeaderCell({ column }: RenderHeaderCellProps<any>) {
 function DefaultPropertyIcon({ __key: key }: { __key: DGSystemColumnKey }) {
   switch (key) {
     case "__gf_display_id":
-      return <Link2Icon className="min-w-4" />;
+      return (
+        <Link2Icon className="min-w-4 w-4 h-4 text-workbench-accent-sky" />
+      );
     case "__gf_created_at":
-      return <CalendarIcon className="min-w-4" />;
+      return <CalendarIcon className="min-w-4 w-4 h-4" />;
     case "__gf_customer_id":
-      return <AvatarIcon className="min-w-4" />;
+      return <AvatarIcon className="min-w-4 w-4 h-4" />;
   }
 }
 
