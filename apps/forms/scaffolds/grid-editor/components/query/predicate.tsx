@@ -52,7 +52,7 @@ const {
 type IDataQueryPredicatesConsumerWithProperties =
   IDataQueryPredicatesConsumer & {
     keys: string[];
-    properties: Data.Relation.Schema["properties"];
+    properties: Data.Relation.DefinitionJSONSchema["properties"];
   };
 
 export function DataQueryPredicatesMenu({

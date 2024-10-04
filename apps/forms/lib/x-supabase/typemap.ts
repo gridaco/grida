@@ -1,5 +1,5 @@
 import type { FormInputType } from "@/types";
-import type { PGSupportedColumnType } from "../supabase-postgrest/@types/pg";
+import type { PGSupportedColumnType } from "../pg-meta/@types/pg";
 import type { SupabasePostgRESTOpenApi } from "../supabase-postgrest";
 import type { XPostgrestQuery } from "../supabase-postgrest/builder";
 
@@ -244,41 +244,36 @@ export namespace PostgresTypeTools {
 
   export type SQLLiteralInputType = SQLLiteralInputConfig["type"];
 
-  export function getSQLLiteralInputConfig({
-    fk,
-    is_enum,
-    enums,
-    format,
-  }: SupabasePostgRESTOpenApi.PostgRESTColumnMeta):
-    | Exclude<SQLLiteralInputConfig, { type: "is" }>
-    | undefined {
-    if (format?.includes("[]")) {
+  export function getSQLLiteralInputConfig(
+    meta: SupabasePostgRESTOpenApi.PostgRESTColumnMeta
+  ): Exclude<SQLLiteralInputConfig, { type: "is" }> | undefined {
+    if (meta.format?.includes("[]")) {
       return { type: "text" };
     }
 
     // for fk relation
-    if (fk) {
+    if (meta.fk) {
       return {
         type: "search",
         relation: {
-          referenced_column: fk.referenced_column,
-          referenced_table: fk.referenced_table,
+          referenced_column: meta.fk.referenced_column,
+          referenced_table: meta.fk.referenced_table,
         },
       };
     }
 
     // for enum type
-    if (is_enum) {
+    if (meta.enum) {
       return {
         type: "select",
-        options: enums ?? [],
+        options: meta.enum,
       };
     }
 
     // others
     const input_type =
       postgrest_column_type_to_literal_input_type[
-        format as PGSupportedColumnType
+        meta.format as PGSupportedColumnType
       ];
 
     switch (input_type) {
@@ -306,7 +301,8 @@ export namespace PostgresTypeTools {
         return {
           type: input_type,
           with_time_zone:
-            (format?.endsWith("with time zone") || format?.endsWith("tz")) ??
+            (meta.format?.endsWith("with time zone") ||
+              meta.format?.endsWith("tz")) ??
             false,
         };
     }

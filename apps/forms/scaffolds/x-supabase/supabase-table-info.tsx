@@ -51,41 +51,39 @@ export function SupabaseTableInfo({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {Object.entries(properties).map(
-            ([prop, { pk, fk, type, format, required, name }]) => {
-              return (
-                <TableRow key={prop}>
-                  <TableCell>
-                    {pk && (
-                      <KeyIcon className="me-1 inline align-middle w-4 h-4" />
-                    )}
-                    {fk && (
-                      <Tooltip>
-                        <TooltipTrigger>
-                          <LinkIcon className="me-1 inline align-middle w-4 h-4" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <div className="max-w-40 overflow-scroll">
-                            <pre>{JSON.stringify(fk, null, 2)}</pre>
-                          </div>
-                        </TooltipContent>
-                      </Tooltip>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {name}{" "}
-                    {required && (
-                      <span className="text-xs text-foreground-muted text-red-500">
-                        *
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell>{type}</TableCell>
-                  <TableCell>{format}</TableCell>
-                </TableRow>
-              );
-            }
-          )}
+          {Object.entries(properties).map(([prop, meta]) => {
+            return (
+              <TableRow key={prop}>
+                <TableCell>
+                  {meta.pk && (
+                    <KeyIcon className="me-1 inline align-middle w-4 h-4" />
+                  )}
+                  {meta.fk && (
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <LinkIcon className="me-1 inline align-middle w-4 h-4" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <div className="max-w-40 overflow-scroll">
+                          <pre>{JSON.stringify(meta.fk, null, 2)}</pre>
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                </TableCell>
+                <TableCell>
+                  {meta.name}{" "}
+                  {!meta.null && (
+                    <span className="text-xs text-foreground-muted text-red-500">
+                      *
+                    </span>
+                  )}
+                </TableCell>
+                <TableCell>{meta.type}</TableCell>
+                <TableCell>{meta.format}</TableCell>
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
       <Collapsible className="mt-4">

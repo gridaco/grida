@@ -124,7 +124,7 @@ function asTableRowData(
   Object.keys(schema.properties).forEach((key) => {
     let parsedvalue: any;
 
-    const { scalar_format: format, is_array } =
+    const { scalar_format: format, array } =
       SupabasePostgRESTOpenApi.parse_postgrest_property_meta(
         key,
         schema.properties[key],
@@ -197,7 +197,7 @@ function asTableRowData(
     // prettier-ignore
     // console.log("constructrow", key, parsedvalue, { type, format, is_array });
 
-    if (is_array) {
+    if (array) {
       // we wrap the value as array if the schema expects an array. this is because our form does not support array inputs
       // do not wrap if the value is undefined (undefined means no data input through the postgrest api)
       if (parsedvalue !== undefined) {

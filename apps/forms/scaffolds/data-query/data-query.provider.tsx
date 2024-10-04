@@ -90,7 +90,7 @@ export function useStandaloneSchemaDataQuery({
   schema,
   estimated_count,
 }: {
-  schema: Data.Relation.Schema | null;
+  schema: Data.Relation.DefinitionJSONSchema | null;
   estimated_count: number | null;
 }): SchemaDataQueryConsumerReturnType {
   const standalone = useStandaloneDataQuery();
@@ -106,7 +106,7 @@ type SchemaDataQueryConsumerReturnType = DataQueryState &
   IDataQueryPaginationConsumer &
   IDataQueryTextSearchConsumer & {
     keys: string[];
-    properties: Data.Relation.Schema["properties"];
+    properties: Data.Relation.DefinitionJSONSchema["properties"];
   };
 
 export function useStandaloneSchemaDataQueryConsumer(
@@ -115,7 +115,7 @@ export function useStandaloneSchemaDataQueryConsumer(
     schema,
     estimated_count,
   }: {
-    schema: Data.Relation.Schema | null;
+    schema: Data.Relation.DefinitionJSONSchema | null;
     estimated_count: number | null;
   }
 ): SchemaDataQueryConsumerReturnType {

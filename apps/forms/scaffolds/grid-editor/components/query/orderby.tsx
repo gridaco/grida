@@ -27,7 +27,7 @@ import { Data } from "@/lib/data";
 import type { IDataQueryOrderbyConsumer } from "@/scaffolds/data-query";
 
 type IDataQueryOrderbyConsumerWithProperties = IDataQueryOrderbyConsumer & {
-  properties: Data.Relation.Schema["properties"];
+  properties: Data.Relation.DefinitionJSONSchema["properties"];
 };
 
 type SortIconType = "up" | "down" | "mixed";

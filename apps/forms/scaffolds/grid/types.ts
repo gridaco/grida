@@ -66,6 +66,13 @@ export type DGColumn = {
   name: string;
   readonly: boolean;
   type?: FormInputType;
+  fk?:
+    | {
+        referencing_column: string;
+        referenced_table: string;
+        referenced_column: string;
+      }
+    | false;
   storage?: FormFieldStorageSchema | {} | null;
 };
 

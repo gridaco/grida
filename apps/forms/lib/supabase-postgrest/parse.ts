@@ -2,8 +2,9 @@ import type { JSONSchemaType, JSONType } from "ajv";
 import type { OpenAPI } from "openapi-types";
 import type { GridaXSupabase } from "@/types";
 import { XMLParser } from "fast-xml-parser";
-import type { PGSupportedColumnType } from "./@types/pg";
+import type { PGSupportedColumnType } from "../pg-meta/@types/pg";
 import assert from "assert";
+import type { Data } from "../data";
 
 export namespace SupabasePostgRESTOpenApi {
   /**
@@ -44,7 +45,14 @@ export namespace SupabasePostgRESTOpenApi {
      */
     description?: string;
     format: PostgRESTOpenAPIDefinitionPropertyFormatType;
-    type?: JSONType;
+    type:
+      | "string"
+      | "number"
+      | "integer"
+      | "boolean"
+      | "null"
+      | "array"
+      | undefined;
     enum?: string[];
     items: JSONSchemaType<any>;
   };
@@ -208,28 +216,10 @@ export namespace SupabasePostgRESTOpenApi {
    * postgrest does not emmit metadata on description for composite foreign keys
    * only one column per foreign key is supported
    */
-  export type PostgRESTColumnRelationship = {
-    referencing_column: string;
-    referenced_table: string;
-    referenced_column: string;
-  };
+  export type PostgRESTColumnRelationship =
+    Data.Relation.NonCompositeRelationship;
 
-  export type PostgRESTColumnMeta = {
-    name: string;
-    type?: JSONType;
-    format: PostgRESTOpenAPIDefinitionPropertyFormatType;
-    //
-    scalar_format: PGSupportedColumnType;
-    is_enum: boolean;
-    enums?: string[];
-    is_array: boolean;
-    //
-    pk: boolean;
-    fk: PostgRESTColumnRelationship | null;
-    description?: string;
-    required?: boolean;
-    default?: string;
-  };
+  export type PostgRESTColumnMeta = Data.Relation.Attribute;
 
   export function parse_postgrest_property_meta(
     key: string,
@@ -243,8 +233,6 @@ export namespace SupabasePostgRESTOpenApi {
       ? (property.format.replace("[]", "") as PGSupportedColumnType)
       : (property.format as PGSupportedColumnType);
 
-    const is_enum = !!property.enum;
-
     let pk: boolean = false;
     let fk: PostgRESTColumnRelationship | null = null;
 
@@ -255,19 +243,19 @@ export namespace SupabasePostgRESTOpenApi {
       fk = _fk;
     }
 
+    const _required = required?.includes(key) || false;
     return {
       name: key,
       type,
       format,
       scalar_format: scalar,
-      is_array,
-      is_enum,
-      enums: property.enum,
+      array: is_array,
+      enum: property.enum,
       description,
       pk,
-      fk,
+      fk: fk || false,
       default: defaultValue,
-      required: required?.includes(key),
+      null: !_required,
     } satisfies PostgRESTColumnMeta;
   }
 
