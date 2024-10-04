@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useRef } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import RDG, {
   Column,
   CopyEvent,
@@ -72,6 +78,9 @@ import {
   useMasking,
 } from "./providers";
 import { useMediaViewer } from "@/components/mediaviewer";
+import { useTableDefinition } from "../data-query";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 
 function rowKeyGetter(row: DGResponseRow) {
   return row.__gf_id;
@@ -357,11 +366,9 @@ function DefaultPropertyDateCell({
   column,
   row,
 }: RenderCellProps<RenderingRow>) {
-  const [state] = useEditorState();
-
   const date = row.__gf_created_at;
 
-  const { dateformat, datetz } = state;
+  const formatDate = useFormatDate();
 
   const rootprops = useCellRootProps(row.__gf_id, column.key);
 
@@ -369,10 +376,18 @@ function DefaultPropertyDateCell({
     return <></>;
   }
 
-  return (
-    <CellRoot {...rootprops}>
-      {fmtdate(date, dateformat, tztostr(datetz))}
-    </CellRoot>
+  return <CellRoot {...rootprops}>{formatDate(date)}</CellRoot>;
+}
+
+function useFormatDate() {
+  const [state] = useEditorState();
+  const { dateformat, datetz } = state;
+
+  return useCallback(
+    (date: Date | string) => {
+      return fmtdate(date, dateformat, tztostr(datetz));
+    },
+    [dateformat, datetz]
   );
 }
 
@@ -452,10 +467,6 @@ function FKButton({ onClick }: { onClick?: () => void }) {
 }
 
 function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
-  const [state] = useEditorState();
-
-  const { datagrid_local_filter: datagrid_filter } = state;
-
   const data = row.fields[column.key];
 
   const rootprops = useCellRootProps(row.__gf_id, column.key);
@@ -463,6 +474,15 @@ function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
   const masker = useMasking();
 
   const { highlightTokens } = useDataGridState();
+
+  const formatDate = useFormatDate();
+
+  const def = useTableDefinition();
+  const fk = def?.fks.find((fk) => fk.referencing_column === column.name);
+
+  const onFKClick = () => {
+    //
+  };
 
   const identifier: CellIdentifier = {
     attribute: column.key,
@@ -508,8 +528,8 @@ function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
     case "switch":
     case "checkbox": {
       return (
-        <CellRoot {...rootprops}>
-          <input type="checkbox" checked={unwrapped as boolean} disabled />
+        <CellRoot {...rootprops} className="flex items-center">
+          <Checkbox checked={unwrapped as boolean} disabled />
         </CellRoot>
       );
     }
@@ -591,9 +611,7 @@ function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
     }
     case "datetime-local": {
       return (
-        <CellRoot {...rootprops}>
-          {fmtdate(unwrapped as string, "datetime", tztostr(state.datetz))}
-        </CellRoot>
+        <CellRoot {...rootprops}>{formatDate(unwrapped as string)}</CellRoot>
       );
     }
     case "json": {
@@ -603,15 +621,44 @@ function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
         </CellRoot>
       );
     }
+    case "toggle-group": {
+      const items = unwrapped as Array<string>;
+      return (
+        <CellRoot {...rootprops} className="w-full flex items-center gap-0.5">
+          {items.map((it, i) => {
+            return (
+              <Badge
+                variant="outline"
+                key={i}
+                className="text-muted-foreground px-1.5"
+              >
+                {it}
+              </Badge>
+            );
+          })}
+        </CellRoot>
+      );
+    }
     default:
       const display = masker(unwrapped?.toString() ?? "");
       return (
-        <CellRoot {...rootprops}>
-          <Highlight
-            text={display}
-            tokens={highlightTokens}
-            className="bg-foreground text-background"
-          />
+        <CellRoot
+          {...rootprops}
+          className="w-full flex justify-between items-center"
+        >
+          <span
+            className={cn(
+              "text-ellipsis flex-1 overflow-hidden",
+              fk ? "font-mono" : "font-normal"
+            )}
+          >
+            <Highlight
+              text={display}
+              tokens={highlightTokens}
+              className="bg-foreground text-background"
+            />
+          </span>
+          {fk && <FKButton onClick={onFKClick} />}
         </CellRoot>
       );
   }
@@ -754,7 +801,6 @@ function FieldEditCell(props: RenderEditCellProps<RenderingRow>) {
   const data = row.fields[column.key];
   const ref = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
   const wasEscPressed = useRef(false);
-
   const rootprops = useCellRootProps(row.__gf_id, column.key);
 
   useEffect(() => {
