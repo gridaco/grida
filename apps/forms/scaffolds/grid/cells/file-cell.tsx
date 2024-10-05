@@ -112,7 +112,7 @@ export function FileEditCell({
         side="bottom"
         align="start"
         sideOffset={-44}
-        className="min-w-[--radix-popover-trigger-width] max-w-sm max-h-[--radix-popover-content-available-height] p-0"
+        className="min-w-48 w-[--radix-popover-trigger-width] max-w-sm max-h-[--radix-popover-content-available-height] p-0"
       >
         <div className="">
           <ScrollArea>

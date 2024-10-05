@@ -79,7 +79,8 @@ export function XSBForeignKeyPopupEditCell({
                 className="text-xs text-muted-foreground font-mono"
               >
                 <LinkIcon className="w-3 h-3 mr-1" />
-                {relation.referenced_table}.{relation.referenced_column}
+                {supabase_schema_name}.{relation.referenced_table}.
+                {relation.referenced_column}
               </Badge>
             </header>
             <div className="p-2 flex gap-2">

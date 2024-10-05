@@ -69,7 +69,7 @@ export function JsonPopupEditorCell({
         align="start"
         sideOffset={-44}
         asChild
-        className="w-[--radix-popover-trigger-width] max-h-[--radix-popover-content-available-height] p-0"
+        className="min-w-48 w-[--radix-popover-trigger-width] max-h-[--radix-popover-content-available-height] p-0"
       >
         <div className="bg-background border rounded shadow-lg overflow-hidden">
           <BlockKeys

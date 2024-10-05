@@ -664,11 +664,11 @@ function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
               className="bg-foreground text-background"
             />
           </span>
-          {fk && (
+          {/* {fk && (
             <FloatingIconButton onClick={onFKClick}>
               <ArrowRightIcon className="w-3 h-3" />
             </FloatingIconButton>
-          )}
+          )} */}
         </CellRoot>
       );
   }
