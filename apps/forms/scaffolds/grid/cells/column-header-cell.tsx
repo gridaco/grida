@@ -12,25 +12,33 @@ import {
 import { FormInputType } from "@/types";
 import {
   ChevronDownIcon,
-  Link2Icon,
+  LockClosedIcon,
   Pencil1Icon,
   TrashIcon,
 } from "@radix-ui/react-icons";
 import { RenderHeaderCellProps } from "react-data-grid";
+import { LinkIcon } from "lucide-react";
 import { CellRoot } from "./cell";
 import { useCellRootProps } from "../providers";
 import type { Data } from "@/lib/data";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export const ColumnHeaderCell = React.forwardRef(function ColumnHeaderCell(
   {
     column,
     type,
     fk,
+    readonly,
     onEditClick,
     onDeleteClick,
   }: RenderHeaderCellProps<any> & {
     type: FormInputType;
     fk: Data.Relation.NonCompositeRelationship | false;
+    readonly: boolean;
     onEditClick?: () => void;
     onDeleteClick?: () => void;
   },
@@ -48,11 +56,19 @@ export const ColumnHeaderCell = React.forwardRef(function ColumnHeaderCell(
     >
       <span className="flex items-center gap-2">
         {fk ? (
-          <Link2Icon className="min-w-4 w-4 h-4 text-workbench-accent-sky" />
+          <LinkIcon className="min-w-4 w-4 h-4 text-workbench-accent-sky" />
         ) : (
           <FormFieldTypeIcon type={type} className="w-4 h-4" />
         )}
         <span className="font-normal">{name}</span>
+        {readonly && (
+          <Tooltip>
+            <TooltipTrigger>
+              <LockClosedIcon className="w-3 h-3 text-muted-foreground" />
+            </TooltipTrigger>
+            <TooltipContent>readonly</TooltipContent>
+          </Tooltip>
+        )}
       </span>
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
