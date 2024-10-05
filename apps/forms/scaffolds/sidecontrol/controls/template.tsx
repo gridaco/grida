@@ -11,6 +11,10 @@ import {
 import React, { useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/utils";
+import {
+  DataProvider,
+  RootDataContextProvider,
+} from "@/builder/core/data-context";
 
 export function TemplateControl({
   value,
@@ -38,68 +42,75 @@ export function TemplateControl({
       >
         {value ? value : "Select a template"}
       </Button>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-screen-xl p-0">
-          <DialogHeader className="p-4">
-            <DialogTitle>Browse Templates</DialogTitle>
-          </DialogHeader>
-          <ScrollArea className="max-h-[80vh]">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10 p-4">
-              {Object.keys(TemplateComponents.components)
-                .filter((k) => k.startsWith("templates/"))
-                .map((key: string) => {
-                  return (
-                    <TemplateCard
-                      key={key}
-                      value={key}
-                      selected={selection === key}
-                      onClick={() => {
-                        setSelection(key);
-                      }}
-                      onDoubleClick={() => {
-                        onValueChange?.(key);
-                        setOpen(false);
-                      }}
-                    >
-                      {React.createElement(TemplateComponents.components[key], {
-                        // TODO: needs to be dynamic
-                        properties: {
-                          media: {
-                            $id: "media",
-                            type: "image",
-                            src: "/images/abstract-placeholder.jpg",
-                          },
-                          h1: "Title",
-                          badge: "Badge",
-                          tags: ["Tag1", "Tag2"],
-                          p: "Content",
-                          n: 100,
-                          date1: new Date().toLocaleDateString(),
-                          date2: new Date().toLocaleDateString(),
-                        },
-                      })}
-                    </TemplateCard>
-                  );
-                })}
-            </div>
-          </ScrollArea>
-          <DialogFooter className="p-4">
-            <DialogClose asChild>
-              <Button variant="secondary">Cancel</Button>
-            </DialogClose>
-            <DialogClose asChild>
-              <Button
-                disabled={!selection}
-                onClick={() => {
-                  onValueChange?.(selection!);
-                }}
-              >
-                Use
-              </Button>
-            </DialogClose>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <RootDataContextProvider>
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogContent className="max-w-screen-xl p-0">
+            <DialogHeader className="p-4">
+              <DialogTitle>Browse Templates</DialogTitle>
+            </DialogHeader>
+            <ScrollArea className="max-h-[80vh]">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10 p-4">
+                {Object.keys(TemplateComponents.components)
+                  .filter((k) => k.startsWith("templates/"))
+                  .map((key: string) => {
+                    return (
+                      <TemplateCard
+                        key={key}
+                        value={key}
+                        selected={selection === key}
+                        onClick={() => {
+                          setSelection(key);
+                        }}
+                        onDoubleClick={() => {
+                          onValueChange?.(key);
+                          setOpen(false);
+                        }}
+                      >
+                        <DataProvider namespace="dummy" initialData={{}}>
+                          {React.createElement(
+                            TemplateComponents.components[key],
+                            {
+                              // TODO: needs to be dynamic
+                              properties: {
+                                media: {
+                                  $id: "media",
+                                  type: "image",
+                                  src: "/images/abstract-placeholder.jpg",
+                                },
+                                h1: "Title",
+                                badge: "Badge",
+                                tags: ["Tag1", "Tag2"],
+                                p: "Content",
+                                n: 100,
+                                date1: new Date().toLocaleDateString(),
+                                date2: new Date().toLocaleDateString(),
+                              },
+                            }
+                          )}
+                        </DataProvider>
+                      </TemplateCard>
+                    );
+                  })}
+              </div>
+            </ScrollArea>
+            <DialogFooter className="p-4">
+              <DialogClose asChild>
+                <Button variant="secondary">Cancel</Button>
+              </DialogClose>
+              <DialogClose asChild>
+                <Button
+                  disabled={!selection}
+                  onClick={() => {
+                    onValueChange?.(selection!);
+                  }}
+                >
+                  Use
+                </Button>
+              </DialogClose>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </RootDataContextProvider>
     </>
   );
 }
