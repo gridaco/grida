@@ -21,10 +21,12 @@ export function JsonPopupEditorCell({
   value: initialValue,
   onCommitValue,
   readonly,
+  onClose,
 }: {
   value: JSONValue;
   onCommitValue?: (value: JSONValue) => void;
   readonly?: boolean;
+  onClose?: () => void;
 }) {
   const [open, setOpen] = useState(true);
   const [txt, setTxt] = useState<string>(
@@ -38,6 +40,7 @@ export function JsonPopupEditorCell({
 
   const cancelChanges = useCallback(() => {
     setOpen(false);
+    onClose?.();
   }, []);
 
   const onCommit = () => {
@@ -69,7 +72,11 @@ export function JsonPopupEditorCell({
         className="w-[--radix-popover-trigger-width] max-h-[--radix-popover-content-available-height] p-0"
       >
         <div className="bg-background border rounded shadow-lg overflow-hidden">
-          <BlockKeys value={txt} onEscape={cancelChanges} onEnter={onCommit}>
+          <BlockKeys
+            outside="escape"
+            onEscape={cancelChanges}
+            onEnter={onCommit}
+          >
             <header className="p-2 border-b">
               <Badge
                 variant="outline"

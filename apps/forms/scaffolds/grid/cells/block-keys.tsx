@@ -8,10 +8,11 @@ import {
 } from "react";
 
 interface BlockKeysProps {
-  value: string | null;
   children: ReactNode;
-  onEscape?: (value: string | null) => void;
-  onEnter?: (value: string | null) => void;
+  onEscape?: () => void;
+  onEnter?: () => void;
+  outside?: "enter" | "escape";
+  className?: string;
 }
 
 /**
@@ -20,39 +21,45 @@ interface BlockKeysProps {
  * Example: press enter to add newline on textEditor
  */
 export const BlockKeys = ({
-  value,
   children,
   onEscape,
   onEnter,
+  outside,
+  className,
 }: BlockKeysProps) => {
   const ref = useRef(null);
   const isClickedOutside = useClickedOutside(ref);
 
-  const handleKeyDown = useCallback(
-    (ev: KeyboardEvent<HTMLDivElement>) => {
-      switch (ev.key) {
-        case "Escape":
-          ev.stopPropagation();
-          if (onEscape) onEscape(value);
-          break;
-        case "Enter":
-          ev.stopPropagation();
-          if (!ev.shiftKey && onEnter) {
-            ev.preventDefault();
-            onEnter(value);
-          }
-          break;
-      }
-    },
-    [value]
-  );
+  const handleKeyDown = (ev: KeyboardEvent<HTMLDivElement>) => {
+    switch (ev.key) {
+      case "Escape":
+        ev.stopPropagation();
+        if (onEscape) onEscape();
+        break;
+      case "Enter":
+        ev.stopPropagation();
+        if (!ev.shiftKey && onEnter) {
+          ev.preventDefault();
+          onEnter();
+        }
+        break;
+    }
+  };
 
   useEffect(() => {
-    if (isClickedOutside && onEnter !== undefined) onEnter(value);
-  }, [isClickedOutside]);
+    if (!isClickedOutside) return;
+    switch (outside) {
+      case "enter":
+        onEnter?.();
+        return;
+      case "escape":
+        onEscape?.();
+        return;
+    }
+  }, [isClickedOutside, outside]);
 
   return (
-    <div ref={ref} onKeyDown={handleKeyDown}>
+    <div ref={ref} onKeyDown={handleKeyDown} className={className}>
       {children}
     </div>
   );

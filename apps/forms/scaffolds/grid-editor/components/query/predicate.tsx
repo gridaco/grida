@@ -153,7 +153,7 @@ export function DataQueryPredicatesMenu({
                           <XSBSQLLiteralInput
                             supabase={{
                               supabase_project_id: supabase_project.id,
-                              supabase_schema_name: schema_name,
+                              supabase_schema_name: schema_name!,
                             }}
                             config={
                               q.op === "is"
@@ -367,7 +367,7 @@ export function DataQueryPredicateChip({
           <XSBSQLLiteralInput
             supabase={{
               supabase_project_id: supabase_project.id,
-              supabase_schema_name: schema_name,
+              supabase_schema_name: schema_name!,
             }}
             config={
               predicate.op === "is"

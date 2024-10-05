@@ -27,7 +27,7 @@ export function SchemaNameProvider({
  */
 export function useSchemaName() {
   const context = useContext(SchemaNameContext);
-  if (!context) {
+  if (context === null) {
     throw new Error("useSchemaName must be used within a SchemaNameProvider");
   }
 

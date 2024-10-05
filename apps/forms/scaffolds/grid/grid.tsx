@@ -1,12 +1,6 @@
 "use client";
 
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useCallback, useEffect, useRef } from "react";
 import RDG, {
   Column,
   CopyEvent,
@@ -15,14 +9,13 @@ import RDG, {
   RenderHeaderCellProps,
 } from "react-data-grid";
 import {
-  PlusIcon,
   CalendarIcon,
-  Link2Icon,
   AvatarIcon,
   ArrowRightIcon,
   PlayIcon,
 } from "@radix-ui/react-icons";
-import { FormInputType } from "@/types";
+import { KeyIcon, LinkIcon } from "lucide-react";
+import type { FormInputType } from "@/types";
 import {
   CellRoot,
   ColumnHeaderCell,
@@ -31,13 +24,13 @@ import {
   JsonPopupEditorCell,
   FileLoadingCell,
   FileRefsStateRenderer,
+  XSBForeignKeyPopupEditCell,
 } from "./cells";
 import { useEditorState } from "../editor";
 import type {
   CellIdentifier,
   DataGridCellFileRefsResolver,
   DataGridCellSelectionCursor,
-  DataGridFileRef,
   DGColumn,
   GFResponseFieldData,
   DGResponseRow,
@@ -67,9 +60,7 @@ import Highlight from "@/components/highlight";
 import { FieldSupports } from "@/k/supported_field_types";
 import { format } from "date-fns";
 import { EmptyRowsRenderer } from "./grid-empty-state";
-
 import { cn } from "@/utils";
-import "./grid.css";
 import {
   DataGridStateProvider,
   useCellRootProps,
@@ -78,9 +69,11 @@ import {
   useMasking,
 } from "./providers";
 import { useMediaViewer } from "@/components/mediaviewer";
-import { useTableDefinition } from "../data-query";
+import { useSchemaName, useTableDefinition } from "../data-query";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+
+import "./grid.css";
 
 function rowKeyGetter(row: DGResponseRow) {
   return row.__gf_id;
@@ -212,6 +205,7 @@ export function DataGrid({
                 {...props}
                 type={col.type as FormInputType}
                 fk={col.fk}
+                readonly={col.readonly}
                 onEditClick={() => {
                   onEditFieldClick?.(col.key);
                 }}
@@ -273,9 +267,17 @@ export function DataGrid({
           rows={rows}
           rowHeight={32}
           headerRowHeight={36}
-          onCellDoubleClick={() => {
+          onCellDoubleClick={({ column, row }) => {
             if (readonly) {
+              //
               toast("This table is readonly", { icon: "🔒" });
+              return;
+            }
+
+            const coldata = columns.find((c) => c.key === column.key);
+            if (coldata?.readonly) {
+              toast(`'${coldata.name}' is readonly`, { icon: "🔒" });
+              return;
             }
           }}
           onColumnsReorder={onColumnsReorder}
@@ -298,6 +300,7 @@ export function DataGrid({
             }
           }}
           onRowsChange={(rows, data) => {
+            if (readonly) return;
             const key = data.column.key;
             const indexes = data.indexes;
 
@@ -341,9 +344,7 @@ function GFSystemPropertyHeaderCell({ column }: RenderHeaderCellProps<any>) {
 function DefaultPropertyIcon({ __key: key }: { __key: DGSystemColumnKey }) {
   switch (key) {
     case "__gf_display_id":
-      return (
-        <Link2Icon className="min-w-4 w-4 h-4 text-workbench-accent-sky" />
-      );
+      return <KeyIcon className="min-w-4 w-4 h-4 text-workbench-accent-sky" />;
     case "__gf_created_at":
       return <CalendarIcon className="min-w-4 w-4 h-4" />;
     case "__gf_customer_id":
@@ -440,7 +441,7 @@ function DefaultPropertyCustomerCell({
       <span className="font-mono text-ellipsis flex-1 overflow-hidden">
         {data}
       </span>
-      <FKButton
+      <FloatingIconButton
         onClick={() => {
           dispatch({
             type: "editor/panels/customer-details",
@@ -448,12 +449,17 @@ function DefaultPropertyCustomerCell({
             customer_id: data,
           });
         }}
-      />
+      >
+        <ArrowRightIcon className="w-3 h-3" />
+      </FloatingIconButton>
     </CellRoot>
   );
 }
 
-function FKButton({ onClick }: { onClick?: () => void }) {
+function FloatingIconButton({
+  onClick,
+  children,
+}: React.PropsWithChildren<{ onClick?: () => void }>) {
   return (
     <Button
       variant="outline"
@@ -461,7 +467,7 @@ function FKButton({ onClick }: { onClick?: () => void }) {
       className="p-1 w-5 h-5"
       onClick={onClick}
     >
-      <ArrowRightIcon className="w-3 h-3" />
+      {children}
     </Button>
   );
 }
@@ -658,7 +664,11 @@ function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
               className="bg-foreground text-background"
             />
           </span>
-          {fk && <FKButton onClick={onFKClick} />}
+          {fk && (
+            <FloatingIconButton onClick={onFKClick}>
+              <ArrowRightIcon className="w-3 h-3" />
+            </FloatingIconButton>
+          )}
         </CellRoot>
       );
   }
@@ -799,155 +809,168 @@ function ImageCellContent({
 function FieldEditCell(props: RenderEditCellProps<RenderingRow>) {
   const { column, row } = props;
   const data = row.fields[column.key];
-  const ref = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
-  const wasEscPressed = useRef(false);
   const rootprops = useCellRootProps(row.__gf_id, column.key);
 
-  useEffect(() => {
-    if (ref.current) {
-      // focus & select all
-      ref.current.focus();
-      ref.current.select();
-    }
-  }, [ref]);
-
   const { type, value, option_id, multiple, options, files } = data ?? {};
+
+  const [state] = useEditorState();
+  const schema_name = useSchemaName();
+  const def = useTableDefinition();
+  const fk = def?.fks.find((fk) => fk.referencing_column === column.name);
 
   const identifier: CellIdentifier = {
     attribute: column.key,
     key: row.__gf_id,
   };
 
-  const onKeydown = (
-    e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    if (e.key === "Enter") {
-      const val = ref.current?.value;
-      onCommit(e);
-    }
-    if (e.key === "Escape") {
-      wasEscPressed.current = true;
-    }
-  };
+  const Content = useCallback(() => {
+    const ref = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
+    const wasEscPressed = useRef(false);
 
-  const onBlur = (
-    e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    if (!wasEscPressed.current) {
-      onCommit(e);
-    } else {
-      wasEscPressed.current = false;
-    }
-  };
+    useEffect(() => {
+      if (ref.current) {
+        // focus & select all
+        ref.current.focus();
+        ref.current.select();
+      }
+    }, [ref]);
 
-  const commit = (change: { value: any; option_id?: string }) => {
-    props.onRowChange(
-      {
-        ...row,
-        fields: {
-          ...row.fields,
-          [column.key]: {
-            ...data,
-            value: change.value,
-            option_id: change.option_id,
+    const onInputKeydown = (
+      e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>
+    ) => {
+      if (e.key === "Enter") {
+        const val = ref.current?.value;
+        onCommit(e);
+      }
+      if (e.key === "Escape") {
+        wasEscPressed.current = true;
+      }
+    };
+
+    const onInputBlur = (
+      e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>
+    ) => {
+      if (!wasEscPressed.current) {
+        onCommit(e);
+      } else {
+        wasEscPressed.current = false;
+      }
+    };
+
+    const commit = (change: { value: any; option_id?: string }) => {
+      props.onRowChange(
+        {
+          ...row,
+          fields: {
+            ...row.fields,
+            [column.key]: {
+              ...data,
+              value: change.value,
+              option_id: change.option_id,
+            },
           },
         },
-      },
-      true
-    );
-  };
+        true
+      );
+    };
 
-  const onCommit = (
-    e:
-      | React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>
-      | React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    let val: any = ref.current?.value;
-    switch (e.currentTarget.type) {
-      case "checkbox": {
-        val = (e.currentTarget as HTMLInputElement).checked;
-        break;
-      }
-      case "number":
-        if (!val) val = null;
-        else val = parseFloat(val);
-        break;
-      case "datetime-local": {
-        try {
-          const date = new Date(val);
-          val = date.toISOString();
-        } catch (e) {
-          // when user leaves the field empty
-          return;
+    const onCommit = (
+      e:
+        | React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>
+        | React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>
+    ) => {
+      let val: any = ref.current?.value;
+      switch (e.currentTarget.type) {
+        case "checkbox": {
+          val = (e.currentTarget as HTMLInputElement).checked;
+          break;
+        }
+        case "number":
+          if (!val) val = null;
+          else val = parseFloat(val);
+          break;
+        case "datetime-local": {
+          try {
+            const date = new Date(val);
+            val = date.toISOString();
+          } catch (e) {
+            // when user leaves the field empty
+            return;
+          }
         }
       }
-    }
 
-    commit({ value: val });
-  };
+      commit({ value: val });
+    };
 
-  try {
-    const unwrapped = unwrapFeildValue(value, type);
-
-    if (!FieldSupports.file_alias(type) && unwrapped === undefined) {
+    if (fk) {
       return (
-        <CellRoot {...rootprops}>
-          <NotSupportedEditCell />
-        </CellRoot>
+        <XSBForeignKeyPopupEditCell
+          relation={fk}
+          value={value}
+          onCommitValue={(v) => {
+            commit({ value: v });
+          }}
+          supabase_project_id={state.supabase_project!.id}
+          supabase_schema_name={schema_name!}
+          onClose={props.onClose}
+        />
       );
     }
 
-    switch (type as FormInputType) {
-      case "email":
-      case "password":
-      case "tel":
-      case "url":
-      case "text":
-      case "hidden": {
-        return (
-          <CellRoot {...rootprops}>
+    //
+    try {
+      const unwrapped = unwrapFeildValue(value, type);
+
+      if (unwrapped === undefined && !FieldSupports.file_alias(type)) {
+        return <NotSupportedEditCellContent />;
+      }
+
+      switch (type as FormInputType) {
+        case "email":
+        case "password":
+        case "tel":
+        case "url":
+        case "text":
+        case "search":
+        case "hidden": {
+          return (
             <input
               ref={ref as React.RefObject<HTMLInputElement>}
               type={type === "hidden" ? "text" : type}
               className="w-full appearance-none outline-none border-none bg-transparent"
               defaultValue={unwrapped as string}
-              onKeyDown={onKeydown}
-              onBlur={onBlur}
+              onKeyDown={onInputKeydown}
+              onBlur={onInputBlur}
             />
-          </CellRoot>
-        );
-      }
-      case "textarea": {
-        return (
-          <CellRoot {...rootprops}>
+          );
+        }
+        case "textarea": {
+          return (
             <textarea
               ref={ref as React.RefObject<HTMLTextAreaElement>}
               className="w-full appearance-none outline-none border-none bg-transparent"
               defaultValue={unwrapped as string}
-              onKeyDown={onKeydown}
-              onBlur={onBlur}
+              onKeyDown={onInputKeydown}
+              onBlur={onInputBlur}
             />
-          </CellRoot>
-        );
-      }
-      case "range":
-      case "number": {
-        return (
-          <CellRoot {...rootprops}>
+          );
+        }
+        case "range":
+        case "number": {
+          return (
             <input
               ref={ref as React.RefObject<HTMLInputElement>}
               className="w-full appearance-none outline-none border-none bg-transparent"
               type="number"
               defaultValue={unwrapped as string | number}
-              onKeyDown={onKeydown}
-              onBlur={onBlur}
+              onKeyDown={onInputKeydown}
+              onBlur={onInputBlur}
             />
-          </CellRoot>
-        );
-      }
-      case "datetime-local": {
-        return (
-          <CellRoot {...rootprops}>
+          );
+        }
+        case "datetime-local": {
+          return (
             <input
               ref={ref as React.RefObject<HTMLInputElement>}
               type={type}
@@ -955,48 +978,42 @@ function FieldEditCell(props: RenderEditCellProps<RenderingRow>) {
               defaultValue={
                 unwrapped ? fmtdatetimelocal(unwrapped as string) : undefined
               }
-              onKeyDown={onKeydown}
-              onBlur={onBlur}
+              onKeyDown={onInputKeydown}
+              onBlur={onInputBlur}
             />
-          </CellRoot>
-        );
-      }
-      case "date":
-      case "time":
-      case "month":
-      case "week": {
-        return (
-          <CellRoot {...rootprops}>
+          );
+        }
+        case "date":
+        case "time":
+        case "month":
+        case "week": {
+          return (
             <input
               ref={ref as React.RefObject<HTMLInputElement>}
               type={type}
               className="w-full appearance-none outline-none border-none bg-transparent"
               defaultValue={unwrapped as string}
-              onKeyDown={onKeydown}
-              onBlur={onBlur}
+              onKeyDown={onInputKeydown}
+              onBlur={onInputBlur}
             />
-          </CellRoot>
-        );
-      }
-      case "color":
-        return (
-          <CellRoot {...rootprops}>
+          );
+        }
+        case "color":
+          return (
             <input
               ref={ref as React.RefObject<HTMLInputElement>}
               type="color"
               className="w-full appearance-none outline-none border-none bg-transparent"
               defaultValue={unwrapped as string}
-              onKeyDown={onKeydown}
-              onBlur={onBlur}
+              onKeyDown={onInputKeydown}
+              onBlur={onInputBlur}
             />
-          </CellRoot>
-        );
-      case "file":
-      case "audio":
-      case "video":
-      case "image": {
-        return (
-          <CellRoot {...rootprops}>
+          );
+        case "file":
+        case "audio":
+        case "video":
+        case "image": {
+          return (
             <FileEditCell
               identifier={identifier}
               rowdata={row.raw}
@@ -1004,12 +1021,10 @@ function FieldEditCell(props: RenderEditCellProps<RenderingRow>) {
               multiple={multiple}
               resolver={files}
             />
-          </CellRoot>
-        );
-      }
-      case "richtext": {
-        return (
-          <CellRoot {...rootprops}>
+          );
+        }
+        case "richtext": {
+          return (
             <RichTextEditCell
               row_id={row.__gf_id}
               field_id={column.key}
@@ -1018,30 +1033,25 @@ function FieldEditCell(props: RenderEditCellProps<RenderingRow>) {
                 commit({ value: v });
               }}
             />
-          </CellRoot>
-        );
-      }
-      case "switch":
-      case "checkbox": {
-        return (
-          <CellRoot
-            {...rootprops}
-            className="px-2 w-full h-full flex justify-between items-center"
-          >
-            <input
-              ref={ref as React.RefObject<HTMLInputElement>}
-              type="checkbox"
-              defaultChecked={unwrapped === true}
-              onKeyDown={onKeydown}
-              onBlur={onBlur}
-            />
-          </CellRoot>
-        );
-      }
-      case "radio":
-      case "select":
-        return (
-          <CellRoot {...rootprops}>
+          );
+        }
+        case "switch":
+        case "checkbox": {
+          return (
+            <div className="w-full h-full flex items-center">
+              <input
+                ref={ref as React.RefObject<HTMLInputElement>}
+                type="checkbox"
+                defaultChecked={unwrapped === true}
+                onKeyDown={onInputKeydown}
+                onBlur={onInputBlur}
+              />
+            </div>
+          );
+        }
+        case "radio":
+        case "select":
+          return (
             <Select
               defaultValue={option_id ?? undefined}
               onValueChange={(v) => {
@@ -1069,48 +1079,47 @@ function FieldEditCell(props: RenderEditCellProps<RenderingRow>) {
                   })}
               </SelectContent>
             </Select>
-          </CellRoot>
-        );
-      case "json":
-        return (
-          <CellRoot {...rootprops}>
+          );
+        case "json":
+          return (
             <JsonPopupEditorCell
               value={unwrapped ?? null}
               onCommitValue={(v) => {
                 commit({ value: v });
               }}
+              onClose={props.onClose}
             />
-          </CellRoot>
-        );
-      // not supported
-      case "checkboxes":
-      case "signature":
-      case "payment":
-      default:
-        return (
-          <CellRoot {...rootprops}>
-            <NotSupportedEditCell />
-          </CellRoot>
-        );
-    }
-  } catch (e) {
-    console.error(e);
-    return (
-      <CellRoot {...rootprops}>
+          );
+        // not supported
+        case "checkboxes":
+        case "signature":
+        case "payment":
+        default:
+          return <NotSupportedEditCellContent />;
+      }
+    } catch (e) {
+      console.error(e);
+      return (
         <JsonPopupEditorCell
           value={value}
           onCommitValue={(v) => {
             commit({ value: v });
           }}
         />
-      </CellRoot>
-    );
-  }
+      );
+    }
+  }, []);
+
+  return (
+    <CellRoot {...rootprops} className="flex justify-between items-center">
+      <Content />
+    </CellRoot>
+  );
 }
 
-function NotSupportedEditCell() {
+function NotSupportedEditCellContent() {
   return (
-    <div className="px-2 w-full text-muted-foreground">
+    <div className="w-full text-muted-foreground">
       This field can&apos;t be edited
     </div>
   );

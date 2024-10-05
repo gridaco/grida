@@ -2,6 +2,7 @@ import type { FormInputType } from "@/types";
 import type { PGSupportedColumnType } from "../pg-meta/@types/pg";
 import type { SupabasePostgRESTOpenApi } from "../supabase-postgrest";
 import type { XPostgrestQuery } from "../supabase-postgrest/builder";
+import type { Data } from "../data";
 
 export namespace PostgresTypeTools {
   /**
@@ -236,10 +237,7 @@ export namespace PostgresTypeTools {
     | { type: "date"; with_time_zone: boolean }
     | {
         type: "search";
-        relation: {
-          referenced_table: string;
-          referenced_column: string;
-        };
+        relation: Data.Relation.NonCompositeRelationship;
       };
 
   export type SQLLiteralInputType = SQLLiteralInputConfig["type"];
@@ -255,10 +253,7 @@ export namespace PostgresTypeTools {
     if (meta.fk) {
       return {
         type: "search",
-        relation: {
-          referenced_column: meta.fk.referenced_column,
-          referenced_table: meta.fk.referenced_table,
-        },
+        relation: meta.fk,
       };
     }
 
