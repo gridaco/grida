@@ -90,6 +90,9 @@ function LayoutMenu() {
             <PaletteIcon className="w-4 h-4" />
           </span>
           Layout & Design
+          <Badge variant="outline" className="ms-2">
+            beta
+          </Badge>
         </DropdownMenuItem>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-56">
@@ -141,7 +144,7 @@ function _LayoutMenuContent() {
 
   return (
     <div>
-      <section className="px-2">
+      <section className="p-2">
         <ToggleGroup
           type="single"
           value={tb?.view}

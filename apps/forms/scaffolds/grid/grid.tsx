@@ -74,7 +74,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 
 import "./grid.css";
-import { ReferencedRowLookupPopover } from "./widgets/fk-referenced-row-lookup-popup";
+import { ReferencedRowLookupPopover } from "./widgets/fk-referenced-row-lookup-popover";
 
 function rowKeyGetter(row: DGResponseRow) {
   return row.__gf_id;
@@ -641,7 +641,7 @@ function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
               <Badge
                 variant="outline"
                 key={i}
-                className="text-xs font-normal text-muted-foreground px-1.5"
+                className="text-xs font-normal px-1.5"
               >
                 {it}
               </Badge>

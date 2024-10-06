@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { useMemo } from "react";
 import {
   Popover,
   PopoverContent,
@@ -12,7 +12,7 @@ import { Data } from "@/lib/data";
 import { useSchemaName } from "@/scaffolds/data-query";
 import { Spinner } from "@/components/spinner";
 import { useEditorState } from "@/scaffolds/editor";
-import { ModelCard } from "@/scaffolds/data-card/modelcard";
+import { DataCard } from "@/scaffolds/data-card/card";
 import {
   Collapsible,
   CollapsibleContent,
@@ -20,6 +20,9 @@ import {
 } from "@/components/ui/collapsible";
 import { CodeIcon } from "@radix-ui/react-icons";
 import { Button } from "@/components/ui/button";
+import { analyze } from "@/scaffolds/data-card/analyze";
+import assert from "assert";
+import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 export function ReferencedRowLookupPopover({
   children,
   relation,
@@ -30,7 +33,18 @@ export function ReferencedRowLookupPopover({
 }>) {
   const [state] = useEditorState();
   const { supabase_project } = state;
-  const schemaname = useSchemaName()!;
+  const schemaname = useSchemaName();
+
+  assert(schemaname);
+  assert(supabase_project);
+
+  const definition = useMemo(() => {
+    return SupabasePostgRESTOpenApi.parse_supabase_postgrest_schema_definition(
+      supabase_project.sb_schema_definitions[schemaname][
+        relation.referenced_table
+      ]
+    );
+  }, [schemaname, relation.referenced_table]);
 
   return (
     <Popover>
@@ -38,26 +52,35 @@ export function ReferencedRowLookupPopover({
       <PopoverContent
         side="right"
         align="start"
+        avoidCollisions
         className="flex flex-col p-0 overflow-hidden min-h-40 h-full"
         onDoubleClick={(e) => e.stopPropagation()}
       >
         <XSBReferencedRowLookupProvider
           reference={{
-            supabase_project_id: supabase_project!.id,
+            supabase_project_id: supabase_project.id,
             supabase_schema_name: schemaname,
             relation: relation,
             fk_value: value,
           }}
         >
-          <Content />
+          <Content definition={definition} />
         </XSBReferencedRowLookupProvider>
       </PopoverContent>
     </Popover>
   );
 }
 
-function Content() {
+function Content({
+  definition,
+}: {
+  definition: Data.Relation.TableDefinition;
+}) {
   const { result, isLoading } = useReferenced()!;
+
+  const { normalpropertykeys } = useMemo(() => {
+    return analyze({ definition, columns: [] });
+  }, [definition]);
 
   if (isLoading) {
     return (
@@ -67,10 +90,34 @@ function Content() {
     );
   }
 
+  if ((result?.data?.length || 0) !== 1) {
+    return (
+      <>
+        This relation is not unique and cannot be displayed (
+        {result?.data?.length} rows found)
+      </>
+    );
+  }
+
+  const row = result?.data?.[0];
+
   return (
     <div className="w-full h-full">
       <section className="p-2">
-        <ModelCard />
+        <DataCard
+          media_columns={[]}
+          primary_media_column_key={null}
+          properties={normalpropertykeys.map((key) => ({
+            ...definition.properties[key],
+            name: key,
+            label: key,
+          }))}
+          data={{
+            __gf_id: "",
+            fields: {},
+            raw: row,
+          }}
+        />
       </section>
       <hr />
       <Collapsible>

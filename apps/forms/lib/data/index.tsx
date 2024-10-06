@@ -72,7 +72,10 @@ export namespace Data {
        *
        * Important: this can also be any string for user defined types (although we are not explicitly typing as so)
        */
-      format: PGSupportedColumnType | `${PGSupportedColumnType}[]` | string;
+      format:
+        | PGSupportedColumnType
+        | `${PGSupportedColumnType}[]`
+        | (string & {});
 
       /**
        * format - sql column type (scalar - non array)
