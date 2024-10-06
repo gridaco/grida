@@ -1,5 +1,5 @@
 import { cn } from "@/utils";
-import { GalleryModelCard } from "./modelcard";
+import { ModelCard } from "../data-card/modelcard";
 import { useTableDefinition } from "../data-query";
 import assert from "assert";
 import {
@@ -149,7 +149,7 @@ function DynamicDataCard({
     : null;
 
   return (
-    <GalleryModelCard
+    <ModelCard
       media={
         primary_media?.files ? (
           <CardMediaSection

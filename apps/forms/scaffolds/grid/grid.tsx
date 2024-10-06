@@ -74,6 +74,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 
 import "./grid.css";
+import { ReferencedRowLookupPopover } from "./widgets/fk-referenced-row-lookup-popup";
 
 function rowKeyGetter(row: DGResponseRow) {
   return row.__gf_id;
@@ -640,7 +641,7 @@ function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
               <Badge
                 variant="outline"
                 key={i}
-                className="text-muted-foreground px-1.5"
+                className="text-xs font-normal text-muted-foreground px-1.5"
               >
                 {it}
               </Badge>
@@ -669,9 +670,11 @@ function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
             />
           </span>
           {fk && (
-            <FloatingIconButton onClick={onFKClick}>
-              <ArrowRightIcon className="w-3 h-3" />
-            </FloatingIconButton>
+            <ReferencedRowLookupPopover relation={fk} value={value}>
+              <FloatingIconButton onClick={onFKClick}>
+                <ArrowRightIcon className="w-3 h-3" />
+              </FloatingIconButton>
+            </ReferencedRowLookupPopover>
           )}
         </CellRoot>
       );
