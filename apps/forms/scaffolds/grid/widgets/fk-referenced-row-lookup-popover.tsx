@@ -42,12 +42,17 @@ export function ReferencedRowLookupPopover({
   assert(schemaname);
   assert(supabase_project);
 
-  const table = state.tables.find(
-    (tb) =>
-      tb.provider === "x-supabase" &&
-      tb.x_sb_main_table_connection.sb_schema_name === schemaname &&
-      tb.x_sb_main_table_connection.sb_table_name === relation.referenced_table
-  ) as GDocSchemaTable | undefined;
+  const table = useMemo(
+    () =>
+      state.tables.find(
+        (tb) =>
+          tb.provider === "x-supabase" &&
+          tb.x_sb_main_table_connection.sb_schema_name === schemaname &&
+          tb.x_sb_main_table_connection.sb_table_name ===
+            relation.referenced_table
+      ) as GDocSchemaTable | undefined,
+    [schemaname, relation.referenced_table]
+  );
 
   const definition = useMemo(() => {
     return SupabasePostgRESTOpenApi.parse_supabase_postgrest_schema_definition(
@@ -99,7 +104,28 @@ function Content({
     return analyze({ definition, fields: table?.attributes ?? [] });
   }, [definition]);
 
-  if (isLoading) {
+  // convert to grid row for file storage (if table is configured)
+  const row = useMemo(() => {
+    const rowdata = result?.data?.[0];
+    if (!rowdata) return;
+
+    return table
+      ? (GridData.rows({
+          provider: "x-supabase",
+          table: "v0_schema_table",
+          table_id: table.id,
+          fields: table.attributes,
+          rows: [rowdata],
+          pks: definition.pks,
+        }).filtered[0] as DGResponseRow)
+      : {
+          __gf_id: "",
+          fields: {},
+          raw: rowdata,
+        };
+  }, [result]);
+
+  if (isLoading || !row) {
     return (
       <div className="flex-1 flex w-full h-full items-center justify-center">
         <Spinner />
@@ -115,24 +141,6 @@ function Content({
       </>
     );
   }
-
-  const rowdata = result?.data?.[0];
-
-  // convert to grid row for file storage (if table is configured)
-  const row = table
-    ? (GridData.rows({
-        provider: "x-supabase",
-        table: "v0_schema_table",
-        table_id: table.id,
-        fields: table.attributes,
-        rows: [rowdata],
-        pks: definition.pks,
-      }).filtered[0] as DGResponseRow)
-    : {
-        __gf_id: "",
-        fields: {},
-        raw: rowdata,
-      };
 
   return (
     <div className="w-full h-full">
@@ -155,7 +163,7 @@ function Content({
               name: key,
               label: key,
             }))}
-            data={row}
+            data={row!}
           />
         </GridFileStorageQueueProvider>
       </section>
