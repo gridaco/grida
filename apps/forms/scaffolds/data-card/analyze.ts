@@ -2,6 +2,7 @@ import type { DGColumn } from "../grid";
 import { FormInputType } from "@/types";
 import type { Data } from "@/lib/data";
 import { GridDataXSBUnknown } from "../grid-editor/grid-data-xsb-unknow";
+import { PGSupportedColumnType } from "@/lib/pg-meta/@types/pg";
 
 const media_types: FormInputType[] = ["image", "video", "audio"] as const;
 
@@ -22,6 +23,24 @@ const media_col_sort_fn = (a: DGColumn, b: DGColumn) => {
   return media_col_sort_priority(a) - media_col_sort_priority(b);
 };
 
+const devonly_types: PGSupportedColumnType[] = [
+  "uuid",
+  "json",
+  "jsonb",
+  "bytea",
+  "cidr",
+  "hstore",
+  "inet",
+  // ts vectors
+  "tsmultirange",
+  "tsquery",
+  "tsrange",
+  "tstzmultirange",
+  "tstzrange",
+  "tsvector",
+  "xml",
+];
+
 export function analyze({
   definition,
   columns,
@@ -33,7 +52,7 @@ export function analyze({
 
   const devpropertykeys = keys.filter(
     (key) =>
-      ["uuid"].includes(definition.properties[key].scalar_format) ||
+      devonly_types.includes(definition.properties[key].scalar_format) ||
       !!definition.properties[key].fk ||
       definition.properties[key].pk
   );
