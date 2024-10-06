@@ -180,19 +180,24 @@ export namespace XPostgrestQuery {
       return params;
     }
 
-    export function fromQueryState(query: Data.Relation.QueryState) {
+    export function fromQueryState(query: Partial<Data.Relation.QueryState>) {
       const search = XPostgrestQuery.QS.select({
         limit: query.q_page_limit,
         order: query.q_orderby,
-        range: {
-          from: query.q_page_index * query.q_page_limit,
-          to: (query.q_page_index + 1) * query.q_page_limit - 1,
-        },
+        range:
+          query.q_page_index && query.q_page_limit
+            ? {
+                from: query.q_page_index * query.q_page_limit,
+                to: (query.q_page_index + 1) * query.q_page_limit - 1,
+              }
+            : undefined,
         // only pass predicates with value set
-        filters: query.q_predicates.filter((p) => p.value ?? false),
+        filters: query.q_predicates?.filter((p) => p.value ?? false),
         textSearch: query.q_text_search ?? undefined,
       });
-      search.set("r", query.q_refresh_key.toString());
+
+      if (query.q_refresh_key) search.set("r", query.q_refresh_key.toString());
+
       return search;
     }
 

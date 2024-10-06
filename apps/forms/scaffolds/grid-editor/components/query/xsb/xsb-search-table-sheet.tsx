@@ -9,12 +9,10 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { PrivateEditorApi } from "@/lib/private";
 import { XSBReferenceTableGrid } from "@/scaffolds/grid/xsb-reference-grid";
 import { GridaXSupabase } from "@/types";
 import { PlusIcon } from "@radix-ui/react-icons";
 import React, { useEffect, useMemo, useState } from "react";
-import useSWR, { BareFetcher } from "swr";
 import { GridDataXSBUnknown } from "@/scaffolds/grid-editor/grid-data-xsb-unknow";
 import * as GridLayout from "@/scaffolds/grid-editor/components/layout";
 import {
@@ -29,7 +27,6 @@ import {
   DataQueryOrderbyChip,
   DataQueryPredicateChip,
   DataQueryPrediateAddMenu,
-  DataQueryTextSearch,
 } from "@/scaffolds/grid-editor/components";
 import {
   SchemaNameProvider,
@@ -39,11 +36,10 @@ import {
 } from "@/scaffolds/data-query";
 import { Data } from "@/lib/data";
 import toast from "react-hot-toast";
-import { XPostgrestQuery } from "@/lib/supabase-postgrest/builder";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { useLocalFuzzySearch } from "@/hooks/use-fuzzy-search";
 import { XSBTextSearchInput } from "./xsb-text-search";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
+import { useXSupabaseTableSearch } from "@/scaffolds/x-supabase/use-x-supabase-table-search";
 
 type SQLForeignKeyValue = string | number | undefined;
 
@@ -97,49 +93,6 @@ export function XSBSearchTableSheet({
   );
 }
 
-/**
- * swr fetcher for x-sb search integration, which passes schema name to Accept-Profile header
- * @returns
- */
-const x_table_search_swr_fetcher = async (
-  arg: [string, string]
-): Promise<GridaXSupabase.XSBSearchResult> => {
-  const [url, schema_name] = arg;
-  const res = await fetch(url, {
-    headers: {
-      "Accept-Profile": schema_name,
-    },
-  });
-  return res.json();
-};
-
-function useXSupabaseTableSearch({
-  supabase_project_id,
-  supabase_schema_name,
-  supabase_table_name,
-  search,
-}: {
-  supabase_project_id: number;
-  supabase_table_name: string;
-  supabase_schema_name: string;
-  search?: URLSearchParams | string;
-}) {
-  return useSWR<GridaXSupabase.XSBSearchResult>(
-    [
-      PrivateEditorApi.XSupabase.url_x_table_search(
-        supabase_project_id,
-        supabase_table_name,
-        {
-          serachParams: search,
-        }
-      ),
-      supabase_schema_name,
-    ],
-    // @see https://github.com/vercel/swr/discussions/545#discussioncomment-10740463
-    x_table_search_swr_fetcher as BareFetcher<any>
-  );
-}
-
 function XSBSearchTableDataGrid({
   supabase_project_id,
   supabase_table_name,
@@ -160,16 +113,11 @@ function XSBSearchTableDataGrid({
   const { predicates, isPredicatesSet, isOrderbySet } = query;
   const is_query_orderby_or_predicates_set = isPredicatesSet || isOrderbySet;
 
-  const searchParams = useMemo(
-    () => XPostgrestQuery.QS.fromQueryState(query),
-    [query]
-  );
-
   const { data, error, isLoading } = useXSupabaseTableSearch({
     supabase_project_id,
     supabase_table_name,
     supabase_schema_name,
-    search: searchParams,
+    q: query,
   });
 
   useEffect(() => {

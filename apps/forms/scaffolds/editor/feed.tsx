@@ -484,26 +484,20 @@ export function FormResponseFeedProvider({
     if (!datagrid_query) return;
 
     setLoading(true);
-    const feed = fetchResponses({
+    fetchResponses({
       range: {
         from: datagrid_query.q_page_index * datagrid_query.q_page_limit,
         to: (datagrid_query.q_page_index + 1) * datagrid_query.q_page_limit - 1,
       },
-    }).then(({ data, count }) => {
-      dispatch({
-        table_id: EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID,
-        type: "editor/table/space/feed",
-        count: count ?? 0,
-        data: data as any,
-        reset: true,
-      });
-    });
-
-    toast
-      .promise(feed, {
-        loading: "Fetching responses...",
-        success: "Responses fetched",
-        error: "Failed to fetch responses",
+    })
+      .then(({ data, count }) => {
+        dispatch({
+          table_id: EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID,
+          type: "editor/table/space/feed",
+          count: count ?? 0,
+          data: data as any,
+          reset: true,
+        });
       })
       .finally(() => {
         setLoading(false);
@@ -512,6 +506,7 @@ export function FormResponseFeedProvider({
     dispatch,
     fetchResponses,
     setLoading,
+    datagrid_query?.q_refresh_key,
     datagrid_query?.q_page_index,
     datagrid_query?.q_page_limit,
     datagrid_table_id,
