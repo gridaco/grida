@@ -34,7 +34,7 @@ export function useDataGridRefresh() {
   const { datagrid_isloading } = state;
 
   const refresh = useCallback(() => {
-    dispatch({ type: "editor/data-grid/refresh" });
+    dispatch({ type: "data/query/refresh" });
   }, [dispatch]);
 
   return {

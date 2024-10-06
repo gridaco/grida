@@ -53,7 +53,6 @@ export type EditorAction =
   | DataGridDateTZAction
   | DataQueryAction
   | DataGridLocalFilterAction
-  | DataTableRefreshAction
   | DataTableLoadingAction
   | EditorThemeLangAction
   | EditorThemePoweredByBrandingAction
@@ -278,10 +277,6 @@ export type DataGridTableViewAction = {
 export interface DataGridLocalFilterAction
   extends Partial<EditorState["datagrid_local_filter"]> {
   type: "editor/data-grid/local-filter";
-}
-
-export interface DataTableRefreshAction {
-  type: "editor/data-grid/refresh";
 }
 
 export interface DataTableLoadingAction {

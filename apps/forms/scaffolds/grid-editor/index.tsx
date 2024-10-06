@@ -592,6 +592,9 @@ function TableQueryToggles() {
             onQueryChange={query.onTextSearchQuery}
             column={query.q_text_search?.column}
             onColumnChange={query.onTextSearchColumn}
+            config={{
+              localsearch: "on",
+            }}
           />
         </>
       ) : (

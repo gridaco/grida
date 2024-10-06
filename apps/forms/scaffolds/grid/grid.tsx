@@ -535,7 +535,11 @@ function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
     case "checkbox": {
       return (
         <CellRoot {...rootprops} className="flex items-center">
-          <Checkbox checked={unwrapped as boolean} disabled />
+          <Checkbox
+            checked={unwrapped as boolean}
+            disabled
+            className="disabled:cursor-default"
+          />
         </CellRoot>
       );
     }
@@ -664,11 +668,11 @@ function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
               className="bg-foreground text-background"
             />
           </span>
-          {/* {fk && (
+          {fk && (
             <FloatingIconButton onClick={onFKClick}>
               <ArrowRightIcon className="w-3 h-3" />
             </FloatingIconButton>
-          )} */}
+          )}
         </CellRoot>
       );
   }

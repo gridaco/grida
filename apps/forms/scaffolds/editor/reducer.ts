@@ -13,7 +13,6 @@ import type {
   DataGridDateFormatAction,
   DataGridDateTZAction,
   DataGridLocalFilterAction,
-  DataTableRefreshAction,
   DataTableLoadingAction,
   EditorThemeLangAction,
   EditorThemePaletteAction,
@@ -57,6 +56,7 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
       return databaseRecucer(state, action);
 
     // #region datagrid query
+    case "data/query/refresh":
     case "data/query/page-limit":
     case "data/query/page-index":
     case "data/query/orderby":
@@ -271,14 +271,6 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
           ...draft.datagrid_local_filter,
           ...pref,
         };
-      });
-    }
-    case "editor/data-grid/refresh": {
-      const {} = <DataTableRefreshAction>action;
-
-      return produce(state, (draft) => {
-        draft.datagrid_query!.q_refresh_key =
-          nextrefreshkey(draft.datagrid_query!.q_refresh_key) ?? 0;
       });
     }
     case "editor/data-grid/loading": {

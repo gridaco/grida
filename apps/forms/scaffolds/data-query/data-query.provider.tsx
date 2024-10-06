@@ -24,6 +24,7 @@ import type {
   DataQueryTextSearchClearDispatcher,
   DataQueryTextSearchColumnSetDispatcher,
   DataQueryTextSearchQueryDispatcher,
+  IDataQueryGlobalConsumer,
   IDataQueryOrderbyConsumer,
   IDataQueryPaginationConsumer,
   IDataQueryPredicatesConsumer,
@@ -101,6 +102,7 @@ export function useStandaloneSchemaDataQuery({
 }
 
 type SchemaDataQueryConsumerReturnType = DataQueryState &
+  IDataQueryGlobalConsumer &
   IDataQueryOrderbyConsumer &
   IDataQueryPredicatesConsumer &
   IDataQueryPaginationConsumer &
@@ -122,6 +124,12 @@ export function useStandaloneSchemaDataQueryConsumer(
   const { q_page_index, q_page_limit, q_orderby, q_predicates } = state;
   const properties = schema?.properties || {};
   const keys = Object.keys(properties);
+
+  // #region global
+  const onRefresh = useCallback(() => {
+    dispatch({ type: "data/query/refresh" });
+  }, [dispatch]);
+  // #endregion global
 
   // #region pagination
 
@@ -283,6 +291,8 @@ export function useStandaloneSchemaDataQueryConsumer(
       properties,
       keys,
       //
+      onRefresh,
+      //
       limit: q_page_limit,
       page: q_page_index,
       minPage,
@@ -320,6 +330,8 @@ export function useStandaloneSchemaDataQueryConsumer(
       state,
       properties,
       keys,
+      //
+      onRefresh,
       //
       q_page_limit,
       q_page_index,

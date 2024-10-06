@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useDatagridTable, useEditorState, useFormFields } from "./use";
 import toast from "react-hot-toast";
 import useSWR from "swr";
@@ -31,9 +31,20 @@ type RealtimeTableChangeData = {
 
 const useDebouncedDatagridQuery = () => {
   const [state] = useEditorState();
+  const [q, setQ] = useState(state.datagrid_query);
   const { datagrid_query } = state;
 
-  return useDebounce(datagrid_query, 500);
+  const debounced = useDebounce(datagrid_query, 500);
+
+  useEffect(() => {
+    setQ(debounced);
+  }, [debounced]);
+
+  useEffect(() => {
+    setQ(datagrid_query);
+  }, [datagrid_query?.q_refresh_key]);
+
+  return q;
 };
 
 const useRefresh = () => {
@@ -41,7 +52,7 @@ const useRefresh = () => {
 
   return useCallback(() => {
     dispatch({
-      type: "editor/data-grid/refresh",
+      type: "data/query/refresh",
     });
   }, [dispatch]);
 };
@@ -321,7 +332,7 @@ function useXSBTableFeed(
     if (!enabled) return;
     // trigger data refresh
     dispatch({
-      type: "editor/data-grid/refresh",
+      type: "data/query/refresh",
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatch, enabled, ...stableDeps]);
