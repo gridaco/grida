@@ -59,7 +59,6 @@ export interface IDataQueryOrderbyConsumer {
   readonly onOrderbyUpdate: DataQueryOrderbyUpdateDispatcher;
   readonly onOrderbyRemove: DataQueryOrderbyRemoveDispatcher;
   readonly onOrderbyClear: DataQueryOrderbyRemoveAllDispatcher;
-  readonly orderbyUnusedKeys: string[];
   readonly orderbyUsedKeys: string[];
 }
 

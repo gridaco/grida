@@ -30,7 +30,6 @@ import {
   SQLLiteralInputValue,
   XSBSQLLiteralInput,
 } from "./xsb/xsb-sql-literal-input";
-import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { KeyIcon } from "lucide-react";
 import {
   Link2Icon,
@@ -42,6 +41,7 @@ import { PopoverClose } from "@radix-ui/react-popover";
 import { WorkbenchUI } from "@/components/workbench";
 import {
   useSchemaName,
+  useTableDefinition,
   type IDataQueryPredicatesConsumer,
 } from "@/scaffolds/data-query";
 
@@ -49,25 +49,21 @@ const {
   Query: { Predicate },
 } = Data;
 
-type IDataQueryPredicatesConsumerWithProperties =
-  IDataQueryPredicatesConsumer & {
-    keys: string[];
-    properties: Data.Relation.DefinitionJSONSchema["properties"];
-  };
-
 export function DataQueryPredicatesMenu({
   children,
   ...props
-}: React.PropsWithChildren<IDataQueryPredicatesConsumerWithProperties>) {
+}: React.PropsWithChildren<IDataQueryPredicatesConsumer>) {
   const {
     isPredicatesSet: isset,
-    keys: attributes,
-    properties,
     predicates,
     onPredicatesRemove: onRemove,
     onPredicatesUpdate: onUpdate,
     onPredicatesClear: onClear,
   } = props;
+
+  const def = useTableDefinition();
+  const attributes = def ? Object.keys(def.properties) : [];
+  const properties = def ? def.properties : {};
 
   const schema_name = useSchemaName();
 
@@ -163,11 +159,7 @@ export function DataQueryPredicatesMenu({
                                       format === "bool" || format === "boolean",
                                   }
                                 : PostgresTypeTools.getSQLLiteralInputConfig(
-                                    SupabasePostgRESTOpenApi.parse_postgrest_property_meta(
-                                      q.column,
-                                      properties[q.column],
-                                      null
-                                    )
+                                    properties[q.column]
                                   )
                             }
                             value={q.value as string}
@@ -231,21 +223,20 @@ export function DataQueryPrediateAddMenu({
   children,
   ...props
 }: React.PropsWithChildren<
-  IDataQueryPredicatesConsumerWithProperties & { asChild?: boolean }
+  IDataQueryPredicatesConsumer & { asChild?: boolean }
 >) {
-  const { keys: attributes, properties, onPredicatesAdd: onAdd } = props;
+  const { onPredicatesAdd: onAdd } = props;
+
+  const def = useTableDefinition();
+  const attributes = def ? Object.keys(def.properties) : [];
+  const properties = def ? def.properties : {};
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild={asChild}>{children}</DropdownMenuTrigger>
       <DropdownMenuContent align="start">
         {attributes.map((key) => {
-          const property =
-            SupabasePostgRESTOpenApi.parse_postgrest_property_meta(
-              key,
-              properties[key],
-              null
-            );
+          const property = properties[key];
 
           return (
             <DropdownMenuItem
@@ -271,9 +262,11 @@ export function DataQueryPrediateAddMenu({
 export function DataQueryPredicateChip({
   index,
   ...props
-}: IDataQueryPredicatesConsumerWithProperties & { index: number }) {
-  const { properties, predicates, onPredicatesRemove, onPredicatesUpdate } =
-    props;
+}: IDataQueryPredicatesConsumer & { index: number }) {
+  const { predicates, onPredicatesRemove, onPredicatesUpdate } = props;
+
+  const def = useTableDefinition();
+  const properties = def ? def.properties : {};
 
   const schema_name = useSchemaName();
 
@@ -376,11 +369,7 @@ export function DataQueryPredicateChip({
                     accepts_boolean: format === "bool" || format === "boolean",
                   }
                 : PostgresTypeTools.getSQLLiteralInputConfig(
-                    SupabasePostgRESTOpenApi.parse_postgrest_property_meta(
-                      predicate.column,
-                      properties[predicate.column],
-                      null
-                    )
+                    properties[predicate.column]
                   )
             }
             value={search as string}

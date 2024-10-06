@@ -154,7 +154,6 @@ function XSBSearchTableDataGrid({
   const [schema, setSchema] = useState<GridaXSupabase.JSONSChema | null>(null);
   const [count, setCount] = useState<number | null>(null);
   const query = useStandaloneSchemaDataQuery({
-    schema,
     estimated_count: count,
   });
 
