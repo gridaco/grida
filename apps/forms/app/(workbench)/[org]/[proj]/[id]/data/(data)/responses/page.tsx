@@ -130,6 +130,7 @@ function FormResponseGridEditor() {
       <GridEditor
         systemcolumns={systemcolumns}
         columns={columns}
+        fields={fields}
         rows={filtered as DGResponseRow[]}
         readonly={false}
         selection={"on"}
@@ -206,6 +207,7 @@ function ModeXSBMainTable() {
       <GridEditor
         systemcolumns={systemcolumns}
         columns={columns}
+        fields={fields}
         rows={filtered as DGResponseRow[]}
         readonly={tb.readonly}
         selection="on"

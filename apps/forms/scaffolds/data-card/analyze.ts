@@ -1,12 +1,11 @@
-import type { DGColumn } from "../grid";
-import { FormInputType } from "@/types";
+import { FormFieldDefinition, FormInputType } from "@/types";
 import type { Data } from "@/lib/data";
 import { GridDataXSBUnknown } from "../grid-editor/grid-data-xsb-unknow";
 import { PGSupportedColumnType } from "@/lib/pg-meta/@types/pg";
 
 const media_types: FormInputType[] = ["image", "video", "audio"] as const;
 
-const media_col_sort_priority = (col: DGColumn) => {
+const media_col_sort_priority = (col: FormFieldDefinition) => {
   switch (col.type) {
     case "video":
       return 2;
@@ -19,7 +18,7 @@ const media_col_sort_priority = (col: DGColumn) => {
   }
 };
 
-const media_col_sort_fn = (a: DGColumn, b: DGColumn) => {
+const media_col_sort_fn = (a: FormFieldDefinition, b: FormFieldDefinition) => {
   return media_col_sort_priority(a) - media_col_sort_priority(b);
 };
 
@@ -43,10 +42,10 @@ const devonly_types: PGSupportedColumnType[] = [
 
 export function analyze({
   definition,
-  columns,
+  fields,
 }: {
   definition: Data.Relation.TableDefinition;
-  columns: DGColumn[];
+  fields: FormFieldDefinition[];
 }) {
   const keys = Object.keys(definition.properties);
 
@@ -61,8 +60,8 @@ export function analyze({
     .filter((key) => devpropertykeys.indexOf(key) === -1)
     .sort(GridDataXSBUnknown.sort_unknow_table_properties_by_priorities);
 
-  const virtual_columns = columns.filter((col) => {
-    return !keys.includes(col.key);
+  const virtual_columns = fields.filter((col) => {
+    return !keys.includes(col.name);
   });
 
   const virtual_media_columns = virtual_columns.filter((col) => {

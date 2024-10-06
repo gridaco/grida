@@ -6,7 +6,7 @@ import {
   DGColumn,
   DGResponseRow,
 } from "../grid";
-import { PGSupportedColumnType } from "@/lib/pg-meta/@types/pg";
+import type { FormFieldDefinition } from "@/types";
 import { useFileRefs } from "../grid/providers";
 import { FileRefsStateRenderer } from "../grid/cells";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -23,22 +23,22 @@ import { Checkbox } from "@/components/ui/checkbox";
 type TRowData = Pick<DGResponseRow, "__gf_id" | "raw" | "fields">;
 
 export function DataCard({
-  media_columns,
-  primary_media_column_key,
+  media_fields,
+  primary_media_name,
   properties,
   data,
 }: {
-  media_columns?: DGColumn[];
-  primary_media_column_key: string | null;
+  media_fields?: FormFieldDefinition[];
+  primary_media_name: string | null;
   properties: (Data.Relation.Attribute & { label: string })[];
   data: TRowData;
 }) {
-  const primary_media_column = media_columns?.find(
-    (c) => c.key === primary_media_column_key
+  const primary_media_field = media_fields?.find(
+    (c) => c.name === primary_media_name
   );
 
-  const primary_media = primary_media_column
-    ? data.fields[primary_media_column.key]
+  const primary_media = primary_media_field
+    ? data.fields[primary_media_field.id]
     : null;
 
   const lines = useMemo(() => {
@@ -74,7 +74,7 @@ export function DataCard({
         primary_media?.files ? (
           <CardMediaSection
             data={data}
-            column={primary_media_column!}
+            field={primary_media_field!}
             resolver={primary_media.files}
           />
         ) : undefined
@@ -86,19 +86,19 @@ export function DataCard({
 
 function CardMediaSection({
   data,
-  column,
+  field,
   resolver,
 }: {
   data: TRowData;
-  column: DGColumn;
+  field: FormFieldDefinition;
   resolver?: DataGridCellFileRefsResolver;
 }) {
   const identifier: CellIdentifier = {
-    attribute: column.key,
+    attribute: field.id,
     key: data.__gf_id,
   };
 
-  switch (column.type) {
+  switch (field.type) {
     case "audio":
     case "video":
     case "image":
@@ -110,7 +110,7 @@ function CardMediaSection({
         />
       );
     default:
-      throw new Error(`invalid card media type "${column.type}"`);
+      throw new Error(`invalid card media type "${field.type}"`);
   }
 }
 

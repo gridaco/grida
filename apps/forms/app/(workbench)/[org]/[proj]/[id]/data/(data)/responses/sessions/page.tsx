@@ -81,6 +81,7 @@ function FormResponseSessionGridEditor() {
       <GridEditor
         systemcolumns={systemcolumns}
         columns={columns}
+        fields={fields}
         rows={filtered as DGResponseRow[]}
         readonly={true}
         selection={"off"}

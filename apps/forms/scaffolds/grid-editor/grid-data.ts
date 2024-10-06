@@ -73,21 +73,21 @@ export namespace GridData {
       }
     | (
         | {
-            filter: DataGridFilterInput;
+            filter?: DataGridFilterInput;
             table: "v0_schema_table";
             provider: "grida";
             table_id: string;
-            attributes: FormFieldDefinition[];
+            fields: FormFieldDefinition[];
             rows: Array<
               TablespaceSchemaTableStreamType<GDocSchemaTableProviderGrida>
             >;
           }
         | {
-            filter: DataGridFilterInput;
+            filter?: DataGridFilterInput;
             table: "v0_schema_table";
             provider: "x-supabase";
             table_id: string;
-            attributes: FormFieldDefinition[];
+            fields: FormFieldDefinition[];
             pks: string[];
             rows: Array<
               TablespaceSchemaTableStreamType<GDocSchemaTableProviderXSupabase>
@@ -330,18 +330,20 @@ export namespace GridData {
         //
         switch (input.provider) {
           case "grida": {
-            const filtered = GridFilter.filter(
-              input.rows,
-              toLocalFilter(input.filter),
-              (row) => row.meta.raw,
-              // response raw is saved with name: value
-              input.attributes.map((f) => f.name)
-            );
+            const filtered = input.filter
+              ? GridFilter.filter(
+                  input.rows,
+                  toLocalFilter(input.filter),
+                  (row) => row.meta.raw,
+                  // response raw is saved with name: value
+                  input.fields.map((f) => f.name)
+                )
+              : input.rows;
 
             return {
               type: "response",
               inputlength: input.rows.length || 0,
-              filtered: rows_from_responses(filtered, input.attributes),
+              filtered: rows_from_responses(filtered, input.fields),
             };
           }
           case "x-supabase": {
@@ -352,13 +354,15 @@ export namespace GridData {
                 form_id: input.table_id,
                 // TODO: support multiple PKs
                 pkcol: input.pks.length > 0 ? input.pks[0] : null,
-                fields: input.attributes,
-                rows: GridFilter.filter(
-                  input.rows,
-                  toLocalFilter(input.filter),
-                  undefined,
-                  input.attributes.map((f) => f.name)
-                ),
+                fields: input.fields,
+                rows: input.filter
+                  ? GridFilter.filter(
+                      input.rows,
+                      toLocalFilter(input.filter),
+                      undefined,
+                      input.fields.map((f) => f.name)
+                    )
+                  : input.rows,
               }),
             };
           }

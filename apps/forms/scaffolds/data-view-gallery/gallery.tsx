@@ -5,14 +5,15 @@ import type { DGColumn, DGResponseRow } from "../grid";
 import { useMemo } from "react";
 import { analyze } from "../data-card/analyze";
 import { DataCard } from "../data-card/card";
+import type { FormFieldDefinition } from "@/types";
 
 export function Gallery({
   className,
   rows,
-  columns,
+  fields,
 }: {
   rows: DGResponseRow[];
-  columns: DGColumn[];
+  fields: FormFieldDefinition[];
   className?: string;
 }) {
   const definition = useTableDefinition();
@@ -24,8 +25,8 @@ export function Gallery({
     prioritiezed_virtual_media_columns,
     primary_virtual_media_column,
   } = useMemo(() => {
-    return analyze({ definition, columns });
-  }, [definition, columns]);
+    return analyze({ definition, fields: fields });
+  }, [definition, fields]);
 
   return (
     <div
@@ -39,8 +40,8 @@ export function Gallery({
           <DataCard
             key={i}
             data={row}
-            primary_media_column_key={primary_virtual_media_column?.key || null}
-            media_columns={prioritiezed_virtual_media_columns}
+            primary_media_name={primary_virtual_media_column?.name || null}
+            media_fields={prioritiezed_virtual_media_columns}
             properties={normalpropertykeys.map((key) => ({
               ...definition.properties[key],
               name: key,

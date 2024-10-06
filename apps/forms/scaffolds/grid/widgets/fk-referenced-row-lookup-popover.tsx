@@ -23,6 +23,10 @@ import { Button } from "@/components/ui/button";
 import { analyze } from "@/scaffolds/data-card/analyze";
 import assert from "assert";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
+import { GridFileStorageQueueProvider } from "../providers";
+import { GridData } from "@/scaffolds/grid-editor/grid-data";
+import type { GDocSchemaTable } from "@/scaffolds/editor/state";
+import type { DGResponseRow } from "../types";
 export function ReferencedRowLookupPopover({
   children,
   relation,
@@ -37,6 +41,13 @@ export function ReferencedRowLookupPopover({
 
   assert(schemaname);
   assert(supabase_project);
+
+  const table = state.tables.find(
+    (tb) =>
+      tb.provider === "x-supabase" &&
+      tb.x_sb_main_table_connection.sb_schema_name === schemaname &&
+      tb.x_sb_main_table_connection.sb_table_name === relation.referenced_table
+  ) as GDocSchemaTable | undefined;
 
   const definition = useMemo(() => {
     return SupabasePostgRESTOpenApi.parse_supabase_postgrest_schema_definition(
@@ -64,7 +75,7 @@ export function ReferencedRowLookupPopover({
             fk_value: value,
           }}
         >
-          <Content definition={definition} />
+          <Content table={table} definition={definition} />
         </XSBReferencedRowLookupProvider>
       </PopoverContent>
     </Popover>
@@ -72,14 +83,20 @@ export function ReferencedRowLookupPopover({
 }
 
 function Content({
+  table,
   definition,
 }: {
+  table?: GDocSchemaTable;
   definition: Data.Relation.TableDefinition;
 }) {
   const { result, isLoading } = useReferenced()!;
 
-  const { normalpropertykeys } = useMemo(() => {
-    return analyze({ definition, columns: [] });
+  const {
+    normalpropertykeys,
+    prioritiezed_virtual_media_columns,
+    primary_virtual_media_column,
+  } = useMemo(() => {
+    return analyze({ definition, fields: table?.attributes ?? [] });
   }, [definition]);
 
   if (isLoading) {
@@ -99,25 +116,48 @@ function Content({
     );
   }
 
-  const row = result?.data?.[0];
+  const rowdata = result?.data?.[0];
+
+  // convert to grid row for file storage (if table is configured)
+  const row = table
+    ? (GridData.rows({
+        provider: "x-supabase",
+        table: "v0_schema_table",
+        table_id: table.id,
+        fields: table.attributes,
+        rows: [rowdata],
+        pks: definition.pks,
+      }).filtered[0] as DGResponseRow)
+    : {
+        __gf_id: "",
+        fields: {},
+        raw: rowdata,
+      };
 
   return (
     <div className="w-full h-full">
       <section className="p-2">
-        <DataCard
-          media_columns={[]}
-          primary_media_column_key={null}
-          properties={normalpropertykeys.map((key) => ({
-            ...definition.properties[key],
-            name: key,
-            label: key,
-          }))}
-          data={{
-            __gf_id: "",
-            fields: {},
-            raw: row,
-          }}
-        />
+        <GridFileStorageQueueProvider
+          table_id={table?.id ?? null}
+          supabase_table_id={
+            table
+              ? "x_sb_main_table_connection" in table
+                ? table.x_sb_main_table_connection.sb_table_id
+                : null
+              : null
+          }
+        >
+          <DataCard
+            media_fields={prioritiezed_virtual_media_columns}
+            primary_media_name={primary_virtual_media_column?.name || null}
+            properties={normalpropertykeys.map((key) => ({
+              ...definition.properties[key],
+              name: key,
+              label: key,
+            }))}
+            data={row}
+          />
+        </GridFileStorageQueueProvider>
       </section>
       <hr />
       <Collapsible>

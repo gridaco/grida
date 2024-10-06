@@ -112,7 +112,7 @@ function ModeProviderGrida() {
       table_id: tb.id,
       table: "v0_schema_table",
       provider: "grida",
-      attributes: tb.attributes,
+      fields: tb.attributes,
       filter: {
         empty_data_hidden: datagrid_local_filter.empty_data_hidden,
         text_search: datagrid_query?.q_text_search,
@@ -127,6 +127,7 @@ function ModeProviderGrida() {
     <GridEditor
       systemcolumns={systemcolumns}
       columns={columns}
+      fields={tb.attributes}
       rows={filtered as DGResponseRow[]}
       readonly={tb.readonly}
       selection="on"
@@ -161,7 +162,7 @@ function ModeProviderXSB() {
       table_id: tb.id,
       table: "v0_schema_table",
       provider: "x-supabase",
-      attributes: tb.attributes,
+      fields: tb.attributes,
       filter: {
         empty_data_hidden: datagrid_local_filter.empty_data_hidden,
         text_search: datagrid_query?.q_text_search,
@@ -177,6 +178,7 @@ function ModeProviderXSB() {
     <GridEditor
       systemcolumns={systemcolumns}
       columns={columns}
+      fields={tb.attributes}
       rows={filtered as DGResponseRow[]}
       readonly={tb.readonly}
       selection="on"

@@ -80,6 +80,7 @@ import { XSBTextSearchInput } from "./components/query/xsb/xsb-text-search";
 import { LoadingProgress } from "@/components/extension/loading-progress";
 import { motion } from "framer-motion";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
+import type { FormFieldDefinition } from "@/types";
 
 function useSelectedCells(): DataGridCellSelectionCursor[] {
   const [state] = useEditorState();
@@ -115,6 +116,7 @@ function useSelectedCells(): DataGridCellSelectionCursor[] {
 
 export function GridEditor({
   systemcolumns,
+  fields,
   columns,
   rows,
   readonly,
@@ -122,6 +124,7 @@ export function GridEditor({
   deletion,
 }: {
   systemcolumns: DGSystemColumn[];
+  fields: FormFieldDefinition[];
   columns: DGColumn[];
   rows?: DGResponseRow[];
   readonly?: boolean;
@@ -343,7 +346,7 @@ export function GridEditor({
           >
             {tb?.view === "gallery" && (
               <GridLayout.Content className="overflow-y-scroll">
-                <Gallery columns={columns} rows={rows ?? []} />
+                <Gallery fields={fields} rows={rows ?? []} />
               </GridLayout.Content>
             )}
             {tb?.view === "chart" && (

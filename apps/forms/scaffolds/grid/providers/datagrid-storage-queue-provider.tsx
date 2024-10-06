@@ -55,10 +55,11 @@ export function GridFileStorageQueueProvider({
   supabase_table_id,
   children,
 }: React.PropsWithChildren<{
-  table_id: string;
+  table_id: string | null;
   supabase_table_id: number | null;
 }>) {
   const resolver = async (...t: FileStorageQueryTask[]) => {
+    if (!table_id) throw new Error("Table id is required");
     // we only support x-sb storage query for task based file resolving.
     // this is fine for now, other providers are not supported or already resolved in initial api call.
     if (!supabase_table_id) throw new Error("Supabase table id is required");
