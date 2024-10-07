@@ -143,6 +143,7 @@ export function table_to_sidebar_table_menu(
     label: tb.name,
     icon: tb.x_sb_main_table_connection ? "supabase" : "table",
     href: tablehref(basepath, document_id, tb),
+    layout: true,
     data: {
       readonly: tb.x_sb_main_table_connection
         ? SupabasePostgRESTOpenApi.table_methods_is_get_only(

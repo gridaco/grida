@@ -68,7 +68,11 @@ export function renderMenuItems<ID = any, T = any>(
                 <></>
               )}
               {items?.map((item: MenuItem<ID, T>, i) => (
-                <SidebarMenuLink key={i} href={item.href ?? ""}>
+                <SidebarMenuLink
+                  key={i}
+                  href={item.href ?? ""}
+                  layout={item.layout}
+                >
                   {renderMenuItem ? (
                     renderMenuItem({ item, onSelect: () => onSelect?.(item) })
                   ) : (

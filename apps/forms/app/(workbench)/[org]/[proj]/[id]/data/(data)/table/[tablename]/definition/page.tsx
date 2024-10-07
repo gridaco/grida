@@ -10,6 +10,9 @@ import { Data } from "@/lib/data";
 import "@xyflow/react/dist/style.css";
 import { DefinitionFlow } from "@/scaffolds/data-definition/flow";
 import { ReactFlowProvider } from "@xyflow/react";
+import { Button } from "@/components/ui/button";
+import { ArrowLeftIcon } from "@radix-ui/react-icons";
+import Link from "next/link";
 
 export default function TableDefinitionPage({
   params,
@@ -54,10 +57,20 @@ export default function TableDefinitionPage({
   const def = useMemo(() => _tmp_merged_table_definition(tb), [tb]);
 
   return (
-    <main className="w-full h-full">
+    <main className="relative w-full h-full">
       {/* <article className="prose dark:prose-invert">
         <pre>{JSON.stringify(def, null, 2)}</pre>
       </article> */}
+      <header className="absolute top-0 left-0 z-10 w-full h-12 flex items-center pointer-events-none">
+        <div className="px-2 pointer-events-auto">
+          <Link href="./">
+            <Button variant="outline">
+              <ArrowLeftIcon className="w-4 h-4 me-2" />
+              {def.name}
+            </Button>
+          </Link>
+        </div>
+      </header>
       <ReactFlowProvider>
         <DefinitionFlow
           mainTableKey={def.name}

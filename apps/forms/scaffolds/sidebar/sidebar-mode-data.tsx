@@ -15,6 +15,7 @@ import {
   SidebarMenuItem,
   SidebarMenuItemAction,
   SidebarMenuItemActions,
+  SidebarMenuItemLabel,
   SidebarMenuLink,
   SidebarMenuList,
   SidebarSection,
@@ -75,6 +76,11 @@ import {
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { FormInputType } from "@/types";
 import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export function ModeData() {
   const [state, dispatch] = useEditorState();
@@ -282,9 +288,14 @@ export function ModeData() {
               type={item.icon}
               className="w-4 h-4 min-w-4 me-2 inline"
             />
-            {item.label}
+            <SidebarMenuItemLabel>{item.label}</SidebarMenuItemLabel>
             {item.data.readonly && (
-              <EyeOpenIcon className="w-4 h-4 ms-2 inline text-muted-foreground" />
+              <Tooltip>
+                <TooltipTrigger>
+                  <EyeOpenIcon className="min-w-3 w-3 h-3 ms-1 inline text-muted-foreground" />
+                </TooltipTrigger>
+                <TooltipContent>Readonly VIEW</TooltipContent>
+              </Tooltip>
             )}
             <SidebarMenuItemActions>
               <DropdownMenu>

@@ -93,13 +93,19 @@ export function SidebarMenuGridItem({
 
 export function SidebarMenuLink({
   href,
+  layout,
   children,
 }: React.PropsWithChildren<{
   href: string;
+  /**
+   * If true, the this is a layout link, and also stays selected when the path is a subpath of the href
+   */
+  layout?: boolean;
 }>) {
   const pathName = usePathname();
 
-  const selected = pathName === href;
+  const selected =
+    pathName === href || (layout && pathName.startsWith(href + "/"));
 
   return (
     <Link href={href}>
