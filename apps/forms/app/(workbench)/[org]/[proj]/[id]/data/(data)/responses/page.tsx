@@ -1,6 +1,7 @@
 "use client";
 
 import Invalid from "@/components/invalid";
+import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import {
   useDatagridTable,
   useEditorState,
@@ -21,7 +22,7 @@ import { EditorSymbols } from "@/scaffolds/editor/symbols";
 import { CurrentTable } from "@/scaffolds/editor/utils/switch-table";
 import { GridEditor } from "@/scaffolds/grid-editor";
 import { GridData } from "@/scaffolds/grid-editor/grid-data";
-import { GFResponseRow } from "@/scaffolds/grid/types";
+import { DGResponseRow } from "@/scaffolds/grid/types";
 import assert from "assert";
 import { useMemo } from "react";
 
@@ -129,7 +130,8 @@ function FormResponseGridEditor() {
       <GridEditor
         systemcolumns={systemcolumns}
         columns={columns}
-        rows={filtered as GFResponseRow[]}
+        fields={fields}
+        rows={filtered as DGResponseRow[]}
         readonly={false}
         selection={"on"}
         deletion={"on"}
@@ -164,10 +166,10 @@ function ModeXSBMainTable() {
             table_id:
               EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID,
             fields,
-            x_table_constraints: {
-              pk: tb?.x_sb_main_table_connection.pk,
-              pks: tb?.x_sb_main_table_connection.pks ?? [],
-            },
+            definition:
+              SupabasePostgRESTOpenApi.parse_supabase_postgrest_schema_definition(
+                tb!.x_sb_main_table_connection.sb_table_schema
+              ),
           })
         : { systemcolumns: [], columns: [] },
     [datagrid_table_id, fields, tb]
@@ -205,7 +207,8 @@ function ModeXSBMainTable() {
       <GridEditor
         systemcolumns={systemcolumns}
         columns={columns}
-        rows={filtered as GFResponseRow[]}
+        fields={fields}
+        rows={filtered as DGResponseRow[]}
         readonly={tb.readonly}
         selection="on"
         deletion="on"

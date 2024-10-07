@@ -13,7 +13,6 @@ import type {
   DataGridDateFormatAction,
   DataGridDateTZAction,
   DataGridLocalFilterAction,
-  DataTableRefreshAction,
   DataTableLoadingAction,
   EditorThemeLangAction,
   EditorThemePaletteAction,
@@ -27,6 +26,7 @@ import type {
   FormCampaignPreferencesAction,
   FormEndingPreferencesAction,
   EditorThemeAppearanceAction,
+  // DataGridViewAction,
   DataGridTableViewAction,
   DataGridSelectCellAction,
 } from "./action";
@@ -56,6 +56,7 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
       return databaseRecucer(state, action);
 
     // #region datagrid query
+    case "data/query/refresh":
     case "data/query/page-limit":
     case "data/query/page-index":
     case "data/query/orderby":
@@ -221,11 +222,12 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
       });
     }
     case "editor/data-grid/table/view": {
-      const { table_id, view_id } = <DataGridTableViewAction>action;
+      const { table_id, table_view_type } = <DataGridTableViewAction>action;
+      if (!table_view_type) return state;
       return produce(state, (draft) => {
         const tb = draft.tables.find((t) => t.id == table_id);
         if (!tb) return;
-        tb.view_id = view_id;
+        tb.view = table_view_type;
       });
     }
     case "editor/data-grid/cell/select": {
@@ -269,14 +271,6 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
           ...draft.datagrid_local_filter,
           ...pref,
         };
-      });
-    }
-    case "editor/data-grid/refresh": {
-      const {} = <DataTableRefreshAction>action;
-
-      return produce(state, (draft) => {
-        draft.datagrid_query!.q_refresh_key =
-          nextrefreshkey(draft.datagrid_query!.q_refresh_key) ?? 0;
       });
     }
     case "editor/data-grid/loading": {

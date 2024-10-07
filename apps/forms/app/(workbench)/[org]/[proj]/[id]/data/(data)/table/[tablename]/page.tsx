@@ -19,11 +19,12 @@ import { useDatagridTable } from "@/scaffolds/editor/use";
 import { CurrentTable } from "@/scaffolds/editor/utils/switch-table";
 import { GridEditor } from "@/scaffolds/grid-editor";
 import { GridData } from "@/scaffolds/grid-editor/grid-data";
-import { GFResponseRow } from "@/scaffolds/grid/types";
+import { DGResponseRow } from "@/scaffolds/grid/types";
 import assert from "assert";
 import { useMemo } from "react";
 import { Spinner } from "@/components/spinner";
 import * as GridLayout from "@/scaffolds/grid-editor/components/layout";
+import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 
 export default function SchemaTablePage({
   params,
@@ -111,7 +112,7 @@ function ModeProviderGrida() {
       table_id: tb.id,
       table: "v0_schema_table",
       provider: "grida",
-      attributes: tb.attributes,
+      fields: tb.attributes,
       filter: {
         empty_data_hidden: datagrid_local_filter.empty_data_hidden,
         text_search: datagrid_query?.q_text_search,
@@ -126,7 +127,8 @@ function ModeProviderGrida() {
     <GridEditor
       systemcolumns={systemcolumns}
       columns={columns}
-      rows={filtered as GFResponseRow[]}
+      fields={tb.attributes}
+      rows={filtered as DGResponseRow[]}
       readonly={tb.readonly}
       selection="on"
       deletion="on"
@@ -148,10 +150,10 @@ function ModeProviderXSB() {
     return GridData.columns({
       table_id: tb.id,
       fields: tb.attributes,
-      x_table_constraints: {
-        pk: tb.x_sb_main_table_connection.pk,
-        pks: tb.x_sb_main_table_connection.pks,
-      },
+      definition:
+        SupabasePostgRESTOpenApi.parse_supabase_postgrest_schema_definition(
+          tb.x_sb_main_table_connection.sb_table_schema
+        ),
     });
   }, [tb]);
 
@@ -160,10 +162,10 @@ function ModeProviderXSB() {
       table_id: tb.id,
       table: "v0_schema_table",
       provider: "x-supabase",
-      attributes: tb.attributes,
+      fields: tb.attributes,
       filter: {
         empty_data_hidden: datagrid_local_filter.empty_data_hidden,
-        text_search: state.datagrid_query?.q_text_search,
+        text_search: datagrid_query?.q_text_search,
       },
       pks: tb.x_sb_main_table_connection.pks,
       rows: (stream as unknown as Array<
@@ -176,7 +178,8 @@ function ModeProviderXSB() {
     <GridEditor
       systemcolumns={systemcolumns}
       columns={columns}
-      rows={filtered as GFResponseRow[]}
+      fields={tb.attributes}
+      rows={filtered as DGResponseRow[]}
       readonly={tb.readonly}
       selection="on"
       deletion="on"

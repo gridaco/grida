@@ -24,6 +24,7 @@ import type {
   DataQueryTextSearchClearDispatcher,
   DataQueryTextSearchColumnSetDispatcher,
   DataQueryTextSearchQueryDispatcher,
+  IDataQueryGlobalConsumer,
   IDataQueryOrderbyConsumer,
   IDataQueryPaginationConsumer,
   IDataQueryPredicatesConsumer,
@@ -87,41 +88,38 @@ export function useStandaloneDataQuery() {
 //
 
 export function useStandaloneSchemaDataQuery({
-  schema,
   estimated_count,
 }: {
-  schema: Data.Relation.Schema | null;
   estimated_count: number | null;
 }): SchemaDataQueryConsumerReturnType {
   const standalone = useStandaloneDataQuery();
   return useStandaloneSchemaDataQueryConsumer(standalone, {
-    schema,
     estimated_count,
   });
 }
 
 type SchemaDataQueryConsumerReturnType = DataQueryState &
+  IDataQueryGlobalConsumer &
   IDataQueryOrderbyConsumer &
   IDataQueryPredicatesConsumer &
   IDataQueryPaginationConsumer &
-  IDataQueryTextSearchConsumer & {
-    keys: string[];
-    properties: Data.Relation.Schema["properties"];
-  };
+  IDataQueryTextSearchConsumer;
 
 export function useStandaloneSchemaDataQueryConsumer(
   [state, dispatch]: readonly [DataQueryState, Dispatcher],
   {
-    schema,
     estimated_count,
   }: {
-    schema: Data.Relation.Schema | null;
     estimated_count: number | null;
   }
 ): SchemaDataQueryConsumerReturnType {
   const { q_page_index, q_page_limit, q_orderby, q_predicates } = state;
-  const properties = schema?.properties || {};
-  const keys = Object.keys(properties);
+
+  // #region global
+  const onRefresh = useCallback(() => {
+    dispatch({ type: "data/query/refresh" });
+  }, [dispatch]);
+  // #endregion global
 
   // #region pagination
 
@@ -158,10 +156,6 @@ export function useStandaloneSchemaDataQueryConsumer(
   // #region orderby
   const isOrderbySet = Object.keys(q_orderby).length > 0;
   const orderbyUsedKeys = Object.keys(q_orderby);
-
-  const orderbyUnusedKeys = keys.filter(
-    (key) => !orderbyUsedKeys.includes(key)
-  );
 
   const onOrderbyAdd: DataQueryOrderbyAddDispatcher = useCallback(
     (column_id: string, initial?: Partial<Omit<SQLOrderBy, "column">>) => {
@@ -280,8 +274,8 @@ export function useStandaloneSchemaDataQueryConsumer(
   return useMemo(
     () => ({
       ...state,
-      properties,
-      keys,
+      //
+      onRefresh,
       //
       limit: q_page_limit,
       page: q_page_index,
@@ -300,7 +294,6 @@ export function useStandaloneSchemaDataQueryConsumer(
       onOrderbyUpdate,
       onOrderbyRemove,
       onOrderbyClear,
-      orderbyUnusedKeys,
       orderbyUsedKeys,
       //
       predicates: q_predicates,
@@ -318,8 +311,8 @@ export function useStandaloneSchemaDataQueryConsumer(
     }),
     [
       state,
-      properties,
-      keys,
+      //
+      onRefresh,
       //
       q_page_limit,
       q_page_index,
@@ -338,7 +331,6 @@ export function useStandaloneSchemaDataQueryConsumer(
       onOrderbyUpdate,
       onOrderbyRemove,
       onOrderbyClear,
-      orderbyUnusedKeys,
       orderbyUsedKeys,
       //
       q_predicates,

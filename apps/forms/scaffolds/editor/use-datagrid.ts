@@ -34,7 +34,7 @@ export function useDataGridRefresh() {
   const { datagrid_isloading } = state;
 
   const refresh = useCallback(() => {
-    dispatch({ type: "editor/data-grid/refresh" });
+    dispatch({ type: "data/query/refresh" });
   }, [dispatch]);
 
   return {
@@ -67,7 +67,6 @@ export function useDataGridQuery() {
   const query = useStandaloneSchemaDataQueryConsumer(
     [state.datagrid_query!, dispatch],
     {
-      schema: table?.x_sb_main_table_connection?.sb_table_schema ?? null,
       estimated_count: state.datagrid_query_estimated_count,
     }
   );

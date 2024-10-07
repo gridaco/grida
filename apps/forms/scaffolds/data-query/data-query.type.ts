@@ -48,6 +48,10 @@ export type DataQueryTextSearchClearDispatcher = () => void;
 //
 // #region hook interface
 //
+export interface IDataQueryGlobalConsumer {
+  onRefresh: () => void;
+}
+
 export interface IDataQueryOrderbyConsumer {
   readonly orderby: Data.Relation.QueryState["q_orderby"];
   readonly isOrderbySet: boolean;
@@ -55,7 +59,6 @@ export interface IDataQueryOrderbyConsumer {
   readonly onOrderbyUpdate: DataQueryOrderbyUpdateDispatcher;
   readonly onOrderbyRemove: DataQueryOrderbyRemoveDispatcher;
   readonly onOrderbyClear: DataQueryOrderbyRemoveAllDispatcher;
-  readonly orderbyUnusedKeys: string[];
   readonly orderbyUsedKeys: string[];
 }
 

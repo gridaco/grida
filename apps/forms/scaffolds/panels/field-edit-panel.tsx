@@ -886,7 +886,7 @@ export function FieldEditPanel({
           </PanelPropertySection>
           {FieldSupports.readonly(type) && (
             <PanelPropertySection>
-              <PanelPropertySectionTitle>Computed</PanelPropertySectionTitle>
+              <PanelPropertySectionTitle>Access</PanelPropertySectionTitle>
               <PanelPropertyFields>
                 <PanelPropertyField
                   label={"Readonly"}

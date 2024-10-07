@@ -23,12 +23,10 @@ import { PopoverClose } from "@radix-ui/react-popover";
 import { WorkbenchUI } from "@/components/workbench";
 import { ArrowDownIcon, ArrowDownUpIcon, ArrowUpIcon } from "lucide-react";
 import { QueryChip } from "../ui/chip";
-import { Data } from "@/lib/data";
-import type { IDataQueryOrderbyConsumer } from "@/scaffolds/data-query";
-
-type IDataQueryOrderbyConsumerWithProperties = IDataQueryOrderbyConsumer & {
-  properties: Data.Relation.Schema["properties"];
-};
+import {
+  useTableDefinition,
+  type IDataQueryOrderbyConsumer,
+} from "@/scaffolds/data-query";
 
 type SortIconType = "up" | "down" | "mixed";
 function SortIcon({
@@ -56,7 +54,7 @@ function SortIcon({
 export function DataQueryOrderByMenu({
   children,
   ...props
-}: React.PropsWithChildren<IDataQueryOrderbyConsumerWithProperties>) {
+}: React.PropsWithChildren<IDataQueryOrderbyConsumer>) {
   const {
     orderby,
     isOrderbySet: isset,
@@ -64,9 +62,10 @@ export function DataQueryOrderByMenu({
     onOrderbyClear,
     onOrderbyUpdate,
     onOrderbyRemove,
-    //
-    properties,
   } = props;
+
+  const def = useTableDefinition();
+  const properties = def ? def.properties : {};
 
   if (!isset) {
     return (
@@ -178,14 +177,14 @@ function DataQueryAddOrderbyMenu({
   asChild,
   children,
   ...props
-}: React.PropsWithChildren<
-  IDataQueryOrderbyConsumerWithProperties & { asChild?: boolean }
->) {
-  const {
-    properties,
-    orderbyUnusedKeys: unusedkeys,
-    onOrderbyAdd: onAdd,
-  } = props;
+}: React.PropsWithChildren<IDataQueryOrderbyConsumer & { asChild?: boolean }>) {
+  const { onOrderbyAdd: onAdd } = props;
+
+  const def = useTableDefinition();
+  const attributes = def ? Object.keys(def.properties) : [];
+  const properties = def ? def.properties : {};
+
+  const unusedkeys = attributes.filter((key) => !(key in props.orderby));
 
   return (
     <DropdownMenu>
@@ -204,9 +203,7 @@ function DataQueryAddOrderbyMenu({
   );
 }
 
-export function DataQueryOrderbyChip(
-  props: IDataQueryOrderbyConsumerWithProperties
-) {
+export function DataQueryOrderbyChip(props: IDataQueryOrderbyConsumer) {
   const { orderby, isOrderbySet: isset } = props;
 
   const length = Object.keys(orderby).length;

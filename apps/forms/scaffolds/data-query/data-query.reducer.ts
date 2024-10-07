@@ -2,6 +2,7 @@ import produce from "immer";
 import type { DataQueryState } from "./data-query.provider";
 import type {
   DataQueryAction,
+  DataQueryRefreshAction,
   DataQueryPageLimitAction,
   DataQueryPaginateAction,
   DataQueryOrderByUpsertAction,
@@ -22,6 +23,11 @@ export default function reducer(
   action: DataQueryAction
 ): DataQueryState {
   switch (action.type) {
+    case "data/query/refresh": {
+      return produce(state, (draft) => {
+        draft.q_refresh_key++;
+      });
+    }
     case "data/query/page-limit": {
       const { limit } = <DataQueryPageLimitAction>action;
       return produce(state, (draft) => {

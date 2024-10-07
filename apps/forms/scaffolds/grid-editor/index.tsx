@@ -39,7 +39,7 @@ import * as GridLayout from "./components/layout";
 import { txt_n_plural } from "@/utils/plural";
 import { editorlink } from "@/lib/forms/url";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
-import type { GFColumn, GFResponseRow, GFSystemColumn } from "../grid/types";
+import type { DGColumn, DGResponseRow, DGSystemColumn } from "../grid/types";
 import { PrivateEditorApi } from "@/lib/private";
 import { EditorSymbols } from "../editor/symbols";
 import {
@@ -59,7 +59,7 @@ import {
 } from "@/scaffolds/editor/use";
 import { saveAs } from "file-saver";
 import Papa from "papaparse";
-import { Gallery } from "../table-view-gallery/gallery";
+import { Gallery } from "../data-view-gallery/gallery";
 import {
   DataQueryPredicatesMenu,
   DataQueryPredicateChip,
@@ -71,14 +71,16 @@ import {
   DataQueryPredicatesMenuTriggerButton,
   DataQueryOrderbyMenuTriggerButton,
 } from "./components/ui/toggle";
-import { Chartview } from "../table-view-chart/chartview";
+import { Chartview } from "../data-view-chart/chartview";
 import { useMultiplayer } from "@/scaffolds/editor/multiplayer";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { SchemaNameProvider, SchemaDefinitionProvider } from "../data-query";
+import { SchemaNameProvider, TableDefinitionProvider } from "../data-query";
 import { GridFileStorageQueueProvider } from "../grid/providers";
 import { XSBTextSearchInput } from "./components/query/xsb/xsb-text-search";
 import { LoadingProgress } from "@/components/extension/loading-progress";
 import { motion } from "framer-motion";
+import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
+import type { FormFieldDefinition } from "@/types";
 
 function useSelectedCells(): DataGridCellSelectionCursor[] {
   const [state] = useEditorState();
@@ -114,15 +116,17 @@ function useSelectedCells(): DataGridCellSelectionCursor[] {
 
 export function GridEditor({
   systemcolumns,
+  fields,
   columns,
   rows,
   readonly,
   selection,
   deletion,
 }: {
-  systemcolumns: GFSystemColumn[];
-  columns: GFColumn[];
-  rows?: GFResponseRow[];
+  systemcolumns: DGSystemColumn[];
+  fields: FormFieldDefinition[];
+  columns: DGColumn[];
+  rows?: DGResponseRow[];
   readonly?: boolean;
   selection: "on" | "off";
   deletion: "on" | "off";
@@ -145,7 +149,6 @@ export function GridEditor({
   const tb = useDatagridTable();
   const table_id = useDatabaseTableId();
   const refresh = useDataGridRefresh();
-  const view = tb?.views.find((v) => v.id === tb.view_id);
   const row_keyword = tb?.row_keyword ?? "row";
   const has_selected_rows = datagrid_selected_rows.size > 0;
   const selectionDisabled = selection !== "on";
@@ -209,6 +212,16 @@ export function GridEditor({
 
   const selectedCells = useSelectedCells();
 
+  const definition = useMemo(() => {
+    return tb
+      ? "x_sb_main_table_connection" in tb
+        ? SupabasePostgRESTOpenApi.parse_supabase_postgrest_schema_definition(
+            tb.x_sb_main_table_connection.sb_table_schema
+          )
+        : null
+      : null;
+  }, [tb]);
+
   return (
     <SchemaNameProvider
       schema={
@@ -219,15 +232,7 @@ export function GridEditor({
           : undefined
       }
     >
-      <SchemaDefinitionProvider
-        definition={
-          tb
-            ? "x_sb_main_table_connection" in tb
-              ? tb.x_sb_main_table_connection.sb_table_schema
-              : null
-            : null
-        }
-      >
+      <TableDefinitionProvider definition={definition}>
         <GridLayout.Root>
           <DeleteFieldConfirmDialog
             open={deleteFieldConfirmDialog.open}
@@ -339,17 +344,22 @@ export function GridEditor({
                 : null
             }
           >
-            {view?.type === "gallery" && (
+            {tb?.view === "gallery" && (
               <GridLayout.Content className="overflow-y-scroll">
-                <Gallery />
+                <Gallery fields={fields} rows={rows ?? []} />
               </GridLayout.Content>
             )}
-            {view?.type === "chart" && (
+            {tb?.view === "chart" && (
               <GridLayout.Content className="overflow-y-scroll">
                 <Chartview />
               </GridLayout.Content>
             )}
-            {!view && (
+            {tb?.view === "list" && (
+              <GridLayout.Content className="overflow-y-scroll">
+                {/* <Chartview /> */}
+              </GridLayout.Content>
+            )}
+            {tb?.view === "table" && (
               <GridLayout.Content>
                 <DataGrid
                   className="bg-transparent"
@@ -416,7 +426,7 @@ export function GridEditor({
             )}
           </GridLayout.Footer>
         </GridLayout.Root>
-      </SchemaDefinitionProvider>
+      </TableDefinitionProvider>
     </SchemaNameProvider>
   );
 }
@@ -585,6 +595,9 @@ function TableQueryToggles() {
             onQueryChange={query.onTextSearchQuery}
             column={query.q_text_search?.column}
             onColumnChange={query.onTextSearchColumn}
+            config={{
+              localsearch: "on",
+            }}
           />
         </>
       ) : (

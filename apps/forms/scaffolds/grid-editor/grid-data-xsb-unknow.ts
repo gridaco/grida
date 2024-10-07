@@ -58,7 +58,7 @@ export namespace GridDataXSBUnknown {
 
   export type DataGridRow = GridaXSupabase.XDataRow;
 
-  const short_unknow_table_properties_by_priorities = priority_sorter(
+  export const sort_unknow_table_properties_by_priorities = priority_sorter(
     unknown_table_column_priorities
   );
 
@@ -94,7 +94,7 @@ export namespace GridDataXSBUnknown {
         switch (options.sort) {
           case "unknown_table_column_priorities":
             keys.sort((a, b) => {
-              return short_unknow_table_properties_by_priorities(a, b);
+              return sort_unknow_table_properties_by_priorities(a, b);
             });
         }
       }

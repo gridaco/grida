@@ -181,7 +181,7 @@ function initialDatabaseEditorState(
     rules: {
       delete_restricted: true,
     },
-    views: [],
+    view: "table",
   } satisfies GDocTable;
 
   const should_add_sb_auth_users =
@@ -318,7 +318,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
           rules: {
             delete_restricted: true,
           },
-          views: [],
+          view: "table",
         } satisfies GDocTable,
       }
     : {
@@ -334,7 +334,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
           rules: {
             delete_restricted: true,
           },
-          views: [],
+          view: "table",
         } satisfies GDocTable,
         [EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID]: {
           id: EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID,
@@ -348,7 +348,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
           rules: {
             delete_restricted: true,
           },
-          views: [],
+          view: "table",
         } satisfies GDocTable,
         [EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID]: {
           id: EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID,
@@ -362,7 +362,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
           rules: {
             delete_restricted: true,
           },
-          views: [],
+          view: "table",
         } satisfies GDocTable,
       };
 
@@ -633,19 +633,7 @@ export function schematableinit(table: {
       rules: {
         delete_restricted: false,
       },
-      views: [
-        // DEV TODO: remove me
-        {
-          id: "gallery",
-          type: "gallery",
-          label: "Gallery",
-        },
-        {
-          id: "chart",
-          type: "chart",
-          label: "Chart",
-        },
-      ],
+      view: "table",
     } satisfies GDocSchemaTable;
   } else {
     return {
@@ -661,7 +649,7 @@ export function schematableinit(table: {
       rules: {
         delete_restricted: false,
       },
-      views: [],
+      view: "table",
     } satisfies GDocSchemaTable;
   }
 }

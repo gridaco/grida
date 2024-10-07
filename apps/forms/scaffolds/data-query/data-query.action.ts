@@ -1,6 +1,7 @@
 import type { SQLOrderBy, SQLPredicate } from "@/types";
 
 export type DataQueryAction =
+  | DataQueryRefreshAction
   | DataQueryPageLimitAction
   | DataQueryPaginateAction
   | DataQueryOrderByUpsertAction
@@ -13,6 +14,12 @@ export type DataQueryAction =
   | DataQueryTextSearchColumnAction
   | DataQueryTextSearchQeuryAction
   | DataQueryTextSearchClearAction;
+
+// #region global
+export interface DataQueryRefreshAction {
+  type: "data/query/refresh";
+}
+// #endregion global
 
 // #region pagination
 export interface DataQueryPageLimitAction {

@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -20,28 +19,36 @@ import {
 } from "@/components/ui/tooltip";
 import { CaretDownIcon, InfoCircledIcon } from "@radix-ui/react-icons";
 import { SearchIcon } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import Link from "next/link";
-import { useSchemaDefinition } from "@/scaffolds/data-query";
 import assert from "assert";
 import { PostgresTypeTools } from "@/lib/x-supabase/typemap";
 import { EditorSymbols } from "@/scaffolds/editor/symbols";
 import { useExpandableInput } from "@/components/extension/search-input";
 import { motion } from "framer-motion";
 import { cn } from "@/utils";
-import { useClickedOutside } from "@/hooks/use-clicked-outside";
+import { useTableDefinition } from "@/scaffolds/data-query";
 
 export function XSBTextSearchInput({
   query,
   onQueryChange,
   column,
   onColumnChange,
+  config,
 }: {
   query?: string;
   onQueryChange?: (query: string) => void;
   column?: string | null;
   onColumnChange?: (column: string | null) => void;
+  config?: {
+    /**
+     * if on, null column is interpreted as local search
+     */
+    localsearch: "on" | "off";
+  };
 }) {
+  const localsearch_on = config?.localsearch === "on";
+
   const {
     rootRef,
     inputRef,
@@ -51,12 +58,12 @@ export function XSBTextSearchInput({
     onKeyDown,
   } = useExpandableInput(["ignore"]);
 
-  const def = useSchemaDefinition();
+  const def = useTableDefinition();
   assert(def, "Schema definition not found");
 
   const keys = Object.keys(def.properties);
 
-  const nocolumn = column === undefined;
+  const missing = column === undefined || (column === null && !localsearch_on);
   const active = !!query;
 
   const _onColumnChange = (column: string) => {
@@ -111,7 +118,7 @@ export function XSBTextSearchInput({
                 <Tooltip>
                   <TooltipTrigger>
                     <div
-                      data-missing={nocolumn}
+                      data-missing={missing}
                       className={cn(
                         buttonVariants({ variant: "ghost" }),
                         "flex gap-2 text-muted-foreground justify-start px-2 w-36 overflow-hidden h-full rounded-none data-[missing='true']:text-workbench-accent-orange outline-none border-none focus:outline-none focus:border-none"
@@ -123,7 +130,7 @@ export function XSBTextSearchInput({
                       <span className="flex-1 text-xs font-normal w-full text-start overflow-hidden text-ellipsis">
                         {column === undefined
                           ? "Select"
-                          : attributes_label_text(column)}
+                          : attributes_label_text(column, localsearch_on)}
                       </span>
                       <CaretDownIcon className="w-4 h-4 min-w-4" />
                     </div>
@@ -138,10 +145,10 @@ export function XSBTextSearchInput({
               <DropdownMenuLabel>Fields to Search</DropdownMenuLabel>
               <DropdownMenuRadioGroup
                 value={
-                  column === null
+                  column === null && localsearch_on
                     ? EditorSymbols.SystemKey.QUERY_TS_SEARCH_LOCALLY
                         .description!
-                    : column
+                    : column ?? undefined
                 }
                 onValueChange={_onColumnChange}
               >
@@ -165,17 +172,20 @@ export function XSBTextSearchInput({
                     </DropdownMenuRadioItem>
                   );
                 })}
-                <DropdownMenuRadioItem
-                  id="ignore"
-                  value={
-                    EditorSymbols.SystemKey.QUERY_TS_SEARCH_LOCALLY.description!
-                  }
-                >
-                  Search Locally
-                  <span className="ms-2 text-xs text-muted-foreground">
-                    Search within loaded data, locally
-                  </span>
-                </DropdownMenuRadioItem>
+                {localsearch_on && (
+                  <DropdownMenuRadioItem
+                    id="ignore"
+                    value={
+                      EditorSymbols.SystemKey.QUERY_TS_SEARCH_LOCALLY
+                        .description!
+                    }
+                  >
+                    Search Locally
+                    <span className="ms-2 text-xs text-muted-foreground">
+                      Search within loaded data, locally
+                    </span>
+                  </DropdownMenuRadioItem>
+                )}
               </DropdownMenuRadioGroup>
 
               <DropdownMenuSeparator />
@@ -223,10 +233,12 @@ export function XSBTextSearchInput({
 }
 
 const attributes_label_text = (
-  selectedAttributes: string[] | string | null
+  selectedAttributes: string[] | string | null,
+  localsearch_on: boolean
 ) => {
-  if (!selectedAttributes) {
-    return "Local Search";
+  if (selectedAttributes === null) {
+    if (localsearch_on) return "Local Search";
+    return "Select";
   }
 
   if (typeof selectedAttributes === "string") {

@@ -36,9 +36,8 @@ describe("parse fk", () => {
       type: "integer",
       format: "bigint",
       scalar_format: "bigint",
-      is_array: false,
-      is_enum: false,
-      enums: undefined,
+      array: false,
+      enum: undefined,
       description:
         "Note:\nThis is a Foreign Key to `t1.id`.<fk table='t1' column='id'/>",
       pk: false,
@@ -48,7 +47,7 @@ describe("parse fk", () => {
         referenced_column: "id",
       },
       default: undefined,
-      required: false,
+      null: true,
     } satisfies SupabasePostgRESTOpenApi.PostgRESTColumnMeta);
   });
 });

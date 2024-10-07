@@ -8,10 +8,10 @@ import {
 } from "@/types";
 import { fmt_local_index } from "@/utils/fmt";
 import type {
-  GFColumn,
+  DGColumn,
   DataGridFileRef,
-  GFResponseRow,
-  GFSystemColumn,
+  DGResponseRow,
+  DGSystemColumn,
   DataGridCellFileRefsResolver,
   DataGridFileRefsResolverQueryTask,
 } from "../grid/types";
@@ -73,21 +73,21 @@ export namespace GridData {
       }
     | (
         | {
-            filter: DataGridFilterInput;
+            filter?: DataGridFilterInput;
             table: "v0_schema_table";
             provider: "grida";
             table_id: string;
-            attributes: FormFieldDefinition[];
+            fields: FormFieldDefinition[];
             rows: Array<
               TablespaceSchemaTableStreamType<GDocSchemaTableProviderGrida>
             >;
           }
         | {
-            filter: DataGridFilterInput;
+            filter?: DataGridFilterInput;
             table: "v0_schema_table";
             provider: "x-supabase";
             table_id: string;
-            attributes: FormFieldDefinition[];
+            fields: FormFieldDefinition[];
             pks: string[];
             rows: Array<
               TablespaceSchemaTableStreamType<GDocSchemaTableProviderXSupabase>
@@ -95,7 +95,7 @@ export namespace GridData {
           }
       );
 
-  type ColumSbuilderParams =
+  type ColumsBuilderParams =
     | {
         table_id:
           | typeof EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID
@@ -105,23 +105,17 @@ export namespace GridData {
     | {
         table_id: typeof EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID;
         fields: FormFieldDefinition[];
-        x_table_constraints: {
-          pk?: string;
-          pks: string[];
-        };
+        definition: Data.Relation.TableDefinition;
       }
     | {
         table_id: string;
         fields: FormFieldDefinition[];
-        x_table_constraints?: {
-          pk?: string;
-          pks: string[];
-        };
+        definition?: Data.Relation.TableDefinition;
       };
 
-  export function columns(params: ColumSbuilderParams): {
-    systemcolumns: GFSystemColumn[];
-    columns: GFColumn[];
+  export function columns(params: ColumsBuilderParams): {
+    systemcolumns: DGSystemColumn[];
+    columns: DGColumn[];
   } {
     const fieldcolumns = Array.from(params.fields)
       .sort((a, b) => a.local_index - b.local_index)
@@ -133,7 +127,11 @@ export namespace GridData {
             readonly: field.readonly || false,
             type: field.type,
             storage: field.storage || null,
-          }) satisfies GFColumn
+            fk:
+              "definition" in params
+                ? params.definition?.properties[field.name]?.fk || false
+                : false,
+          }) satisfies DGColumn
       );
 
     switch (params.table_id) {
@@ -156,34 +154,36 @@ export namespace GridData {
         break;
       }
       case EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID: {
-        const { pk, pks } = params.x_table_constraints;
-        if (pk) {
+        const { pks } = params.definition;
+        if (pks.length > 0) {
+          const pk1 = pks[0];
           return {
             systemcolumns: [
               {
                 key: "__gf_display_id",
-                name: pk,
+                // 2. allow multiple PKs
+                name: pk1,
               },
-              // 2. allow multiple PKs
             ],
-            columns: fieldcolumns.filter((f) => f.name !== pk),
+            columns: fieldcolumns.filter((f) => f.name !== pk1),
           };
         }
         break;
       }
       default:
-        if (params.x_table_constraints) {
-          const { pk, pks } = params.x_table_constraints;
-          if (pk) {
+        if (params.definition) {
+          const { pks } = params.definition;
+          if (pks.length > 0) {
+            const pk1 = pks[0];
             return {
               systemcolumns: [
                 {
                   key: "__gf_display_id",
-                  name: pk,
+                  // 2. allow multiple PKs
+                  name: pk1,
                 },
-                // 2. allow multiple PKs
               ],
-              columns: fieldcolumns.filter((f) => f.name !== pk),
+              columns: fieldcolumns.filter((f) => f.name !== pk1),
             };
           }
         }
@@ -207,12 +207,12 @@ export namespace GridData {
     | {
         type: "response";
         inputlength: number;
-        filtered: GFResponseRow[];
+        filtered: DGResponseRow[];
       }
     | {
         type: "session";
         inputlength: number;
-        filtered: GFResponseRow[];
+        filtered: DGResponseRow[];
       }
     | {
         type: "customer";
@@ -330,18 +330,20 @@ export namespace GridData {
         //
         switch (input.provider) {
           case "grida": {
-            const filtered = GridFilter.filter(
-              input.rows,
-              toLocalFilter(input.filter),
-              (row) => row.meta.raw,
-              // response raw is saved with name: value
-              input.attributes.map((f) => f.name)
-            );
+            const filtered = input.filter
+              ? GridFilter.filter(
+                  input.rows,
+                  toLocalFilter(input.filter),
+                  (row) => row.meta.raw,
+                  // response raw is saved with name: value
+                  input.fields.map((f) => f.name)
+                )
+              : input.rows;
 
             return {
               type: "response",
               inputlength: input.rows.length || 0,
-              filtered: rows_from_responses(filtered, input.attributes),
+              filtered: rows_from_responses(filtered, input.fields),
             };
           }
           case "x-supabase": {
@@ -352,13 +354,15 @@ export namespace GridData {
                 form_id: input.table_id,
                 // TODO: support multiple PKs
                 pkcol: input.pks.length > 0 ? input.pks[0] : null,
-                fields: input.attributes,
-                rows: GridFilter.filter(
-                  input.rows,
-                  toLocalFilter(input.filter),
-                  undefined,
-                  input.attributes.map((f) => f.name)
-                ),
+                fields: input.fields,
+                rows: input.filter
+                  ? GridFilter.filter(
+                      input.rows,
+                      toLocalFilter(input.filter),
+                      undefined,
+                      input.fields.map((f) => f.name)
+                    )
+                  : input.rows,
               }),
             };
           }
@@ -370,10 +374,10 @@ export namespace GridData {
   function rows_from_responses(
     responses: Array<TVirtualRow<FormResponseField, FormResponse>>,
     attributes: FormFieldDefinition[]
-  ): Array<GFResponseRow> {
+  ): Array<DGResponseRow> {
     return (
       responses.map((response, index) => {
-        const row: GFResponseRow = {
+        const row: DGResponseRow = {
           __gf_id: response.id,
           __gf_display_id: fmt_local_index(response.meta.local_index),
           __gf_created_at: response.meta.created_at,
@@ -458,7 +462,7 @@ export namespace GridData {
   ) {
     return (
       sessions?.map((session, index) => {
-        const row: GFResponseRow = {
+        const row: DGResponseRow = {
           __gf_id: session.id,
           __gf_display_id: session.id,
           __gf_created_at: session.created_at,
@@ -499,8 +503,8 @@ export namespace GridData {
       return row[field.name];
     };
 
-    return rows.reduce((acc: GFResponseRow[], row, index) => {
-      const gfRow: GFResponseRow = {
+    return rows.reduce((acc: DGResponseRow[], row, index) => {
+      const gfRow: DGResponseRow = {
         __gf_id: pkcol ? row[pkcol] : "",
         __gf_display_id: pkcol ? row[pkcol] : "",
         raw: row,

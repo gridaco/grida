@@ -112,7 +112,7 @@ export function FileEditCell({
         side="bottom"
         align="start"
         sideOffset={-44}
-        className="min-w-[--radix-popover-trigger-width] max-w-sm max-h-[--radix-popover-content-available-height] p-0"
+        className="min-w-48 w-[--radix-popover-trigger-width] max-w-sm max-h-[--radix-popover-content-available-height] p-0"
       >
         <div className="">
           <ScrollArea>
@@ -194,10 +194,14 @@ export function FileRefsStateRenderer({
     return renderers.loading || <Spinner />;
   }
   if (refs === "error") {
-    return renderers.error || <div>Error</div>;
+    return (
+      renderers.error || (
+        <span className="text-workbench-accent-red text-xs">ERROR</span>
+      )
+    );
   }
   if (!refs || refs.length === 0) {
-    return renderers.empty || <div>No files</div>;
+    return renderers.empty || <></>;
   }
   return refs.map(renderers.files);
 }

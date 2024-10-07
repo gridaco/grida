@@ -6,7 +6,7 @@ import DataGrid, {
   RenderCellProps,
   RenderHeaderCellProps,
 } from "react-data-grid";
-import { GRCustomerRow } from "../types";
+import { DGCustomerRow } from "../types";
 import { EmptyRowsRenderer } from "../grid-empty-state";
 import { CalendarIcon, EnvelopeClosedIcon } from "@radix-ui/react-icons";
 import { PhoneIcon } from "lucide-react";
@@ -45,7 +45,7 @@ export function CustomerGrid({
   masked,
   loading,
 }: {
-  rows: GRCustomerRow[];
+  rows: DGCustomerRow[];
   rowKey?: string;
   tokens?: string[];
   masked?: boolean;
@@ -63,7 +63,7 @@ export function CustomerGrid({
         width: undefined,
         renderHeaderCell: HeaderCell,
         renderCell: ({ row, column }: RenderCellProps<any>) => {
-          const val = row[col.key as keyof GRCustomerRow];
+          const val = row[col.key as keyof DGCustomerRow];
           const display = masked
             ? val
               ? mask(val.toString())
@@ -85,7 +85,7 @@ export function CustomerGrid({
 
   const rows = _rows.map((row) => {
     return Object.keys(row).reduce((acc, k) => {
-      const val = row[k as keyof GRCustomerRow];
+      const val = row[k as keyof DGCustomerRow];
       if (typeof val === "object") {
         return { ...acc, [k]: JSON.stringify(val) };
       }
