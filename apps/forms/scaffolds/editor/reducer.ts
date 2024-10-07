@@ -75,7 +75,7 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
           action
         );
 
-        on_datagrid_query_change(draft.datagrid_query, {
+        on_datagrid_pref_change(draft, {
           view_id: tmp_view_id(draft),
         });
       });
@@ -271,6 +271,9 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
           ...draft.datagrid_local_filter,
           ...pref,
         };
+        on_datagrid_pref_change(draft, {
+          view_id: tmp_view_id(draft),
+        });
       });
     }
     case "editor/data-grid/loading": {
@@ -382,12 +385,13 @@ function tmp_view_id(draft: Draft<EditorState>) {
  *
  * @deprecated
  */
-function on_datagrid_query_change(
-  query: Draft<EditorState["datagrid_query"]>,
+function on_datagrid_pref_change(
+  draft: Draft<EditorState>,
   { view_id }: { view_id: string }
 ) {
   DataGridLocalPreferencesStorage.set(view_id, {
-    orderby: query?.q_orderby,
-    predicates: query?.q_predicates,
+    orderby: draft.datagrid_query?.q_orderby,
+    predicates: draft.datagrid_query?.q_predicates,
+    masking_enabled: draft.datagrid_local_filter?.masking_enabled,
   });
 }
