@@ -105,12 +105,12 @@ export namespace GridData {
     | {
         table_id: typeof EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID;
         fields: FormFieldDefinition[];
-        definition: Data.Relation.TableDefinition;
+        definition: Omit<Data.Relation.TableDefinition, "name">;
       }
     | {
         table_id: string;
         fields: FormFieldDefinition[];
-        definition?: Data.Relation.TableDefinition;
+        definition?: Omit<Data.Relation.TableDefinition, "name">;
       };
 
   export function columns(params: ColumsBuilderParams): {

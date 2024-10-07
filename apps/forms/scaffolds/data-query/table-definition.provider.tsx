@@ -1,14 +1,16 @@
 import type { Data } from "@/lib/data";
 import React, { createContext, useContext } from "react";
 
-const TableDefinitionContext =
-  createContext<Data.Relation.TableDefinition | null>(null);
+type DefinitionWithoutName = Omit<Data.Relation.TableDefinition, "name">;
+const TableDefinitionContext = createContext<DefinitionWithoutName | null>(
+  null
+);
 
 function TableDefinitionProvider({
   definition,
   children,
 }: React.PropsWithChildren<{
-  definition: Data.Relation.TableDefinition | null;
+  definition: DefinitionWithoutName | null;
 }>) {
   return (
     <TableDefinitionContext.Provider value={definition}>

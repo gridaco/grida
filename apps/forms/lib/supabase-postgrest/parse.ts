@@ -261,7 +261,7 @@ export namespace SupabasePostgRESTOpenApi {
 
   export function parse_supabase_postgrest_schema_definition(
     schema: GridaXSupabase.JSONSChema
-  ): Data.Relation.TableDefinition {
+  ): Omit<Data.Relation.TableDefinition, "name"> {
     const parsed: {
       pks: string[];
       fks: PostgRESTColumnRelationship[];
