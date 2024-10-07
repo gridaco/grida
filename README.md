@@ -1,12 +1,28 @@
-# Grida
+<img src="./.readme/cover.png" alt="Grida" width="100%"/>
 
-Grida is a open source platform where you can manage your database, design websites, and create forms in one place.
+<br/>
+<br/>
+<br/>
 
-**Contributing**
+<div align="center">
+  <h1>Grida</h1>
+  <p>
+    <strong>Grida is a open source platform where you can manage your database, design websites, and create forms in one place. <u>Designed for Supabase</u>.</strong>
+  </p>
+  <p>
+    <a href="./CONTRIBUTING.md">Contributing</a> •
+    <a href="https://app.grida.co">Website</a> •
+    <a href="https://grida.co/join-slack">Slack Community</a>
+  </p>
+</div>
 
-If you wish to contribute or run this project locally, see [CONTRIBUTING.md](./CONTRIBUTING.md) for instructions.
+---
 
-# Grida Forms
+<br/>
+<br/>
+<br/>
+
+# Forms
 
 ![Grida Forms Editor](./.readme/example-grida-forms-editor-ss.png)
 
@@ -27,7 +43,7 @@ If you wish to contribute or run this project locally, see [CONTRIBUTING.md](./C
 - [ ] Custom Auth Gate
 - [ ] Accept Payments
 
-# Grida Database / CMS
+# Database / CMS
 
 ![Grida Database Editor](./.readme/example-grida-database-editor-ss.png)
 
@@ -43,12 +59,12 @@ If you wish to contribute or run this project locally, see [CONTRIBUTING.md](./C
 - [ ] Joins & Relational Queries
 - [ ] Gallary & List View
 
-# Grida Localization (Comming this Fall)
+# Localization (Comming this Fall)
 
 - [ ] Stand-alone i18n / ICU Message Editor
 - [ ] API Access
 
-# Grida Micro Sites (Working on it)
+# Micro Sites (Working on it)
 
 - [ ] Start from Templates
 - [ ] Connect CMS
