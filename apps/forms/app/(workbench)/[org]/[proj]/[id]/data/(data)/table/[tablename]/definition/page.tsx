@@ -41,18 +41,21 @@ export default function TableDefinitionPage({
   const schema_definitions =
     supabase_project.sb_schema_definitions[schema_name];
 
-  const schema_table_names = Object.keys(schema_definitions);
-  const schema_other_table_names = schema_table_names.filter(
-    (name) => name !== tb.name
-  );
-  const other_definitions = schema_other_table_names.map((name) => {
-    return {
-      name,
-      ...SupabasePostgRESTOpenApi.parse_supabase_postgrest_schema_definition(
-        schema_definitions[name]
-      ),
-    };
-  });
+  const other_definitions = useMemo(() => {
+    const schema_table_names = Object.keys(schema_definitions);
+    const schema_other_table_names = schema_table_names.filter(
+      (name) => name !== tb.name
+    );
+    return schema_other_table_names.map((name) => {
+      return {
+        name,
+        ...SupabasePostgRESTOpenApi.parse_supabase_postgrest_schema_definition(
+          schema_definitions[name]
+        ),
+      };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tb]);
 
   const def = useMemo(() => _tmp_merged_table_definition(tb), [tb]);
 
