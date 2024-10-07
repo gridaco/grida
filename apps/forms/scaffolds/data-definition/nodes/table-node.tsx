@@ -3,6 +3,7 @@ import { DiamondIcon, Fingerprint, Hash, Key, Table2 } from "lucide-react";
 import { Handle, Node, NodeProps } from "@xyflow/react";
 import { cn } from "@/utils/cn";
 import type { TableNodeData } from "./types";
+import { toShorter } from "@/lib/pg-meta/k/alias";
 
 // ReactFlow is scaling everything by the factor of 2
 const TABLE_NODE_WIDTH = 320;
@@ -109,7 +110,7 @@ const TableNode = ({
                   {column.name}
                 </span>
                 <span className="px-2 inline-flex justify-end font-mono text-muted-foreground text-[0.4rem]">
-                  {column.format}
+                  {toShorter(column.format)}
                 </span>
               </div>
               {targetPosition && (
