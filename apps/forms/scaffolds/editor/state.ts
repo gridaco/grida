@@ -205,6 +205,7 @@ export type MenuItem<ID, T = {}> = {
   label: string;
   icon: ResourceTypeIconName;
   href?: string;
+  layout?: boolean;
   data: T;
 };
 

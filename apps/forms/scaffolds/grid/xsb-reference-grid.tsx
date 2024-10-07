@@ -7,6 +7,7 @@ import Highlight from "@/components/highlight";
 import { mask } from "./grid-text-mask";
 import { CellRoot } from "./cells";
 import { GridDataXSBUnknown } from "../grid-editor/grid-data-xsb-unknow";
+import { toShorter } from "@/lib/pg-meta/k/alias";
 import "./grid.css";
 
 export function XSBReferenceTableGrid<
@@ -47,7 +48,7 @@ export function XSBReferenceTableGrid<
               <span>
                 {col.format && (
                   <span className="text-xs font-normal text-foreground/60">
-                    {col.format}
+                    {toShorter(col.format)}
                   </span>
                 )}
               </span>

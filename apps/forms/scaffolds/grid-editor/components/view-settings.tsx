@@ -13,7 +13,7 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { CommitIcon, GearIcon } from "@radix-ui/react-icons";
+import { CodeIcon, CommitIcon, GearIcon } from "@radix-ui/react-icons";
 import { format, startOfDay, addSeconds } from "date-fns";
 import { format as formatTZ } from "date-fns-tz";
 import { useDatagridTable, useEditorState } from "@/scaffolds/editor";
@@ -36,10 +36,6 @@ const starwarsday = new Date(new Date().getFullYear(), 4, 4);
 export function GridViewSettings() {
   const tb = useDatagridTable();
 
-  const simulator_available =
-    tb?.id === EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID ||
-    tb?.id === EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID;
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -53,8 +49,12 @@ export function GridViewSettings() {
         <DropdownMenuLabel>View Options</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <LayoutMenu />
+        <_ViewDefinition tablename={tb?.name ?? ""} />
         <DropdownMenuSeparator />
-        <DropdownMenuLabel inset className="text-xs text-muted-foreground">
+        <DropdownMenuLabel
+          inset
+          className="text-xs text-muted-foreground font-normal"
+        >
           Data Consistency & Protection
         </DropdownMenuLabel>
         {/* empty data filter */}
@@ -63,19 +63,33 @@ export function GridViewSettings() {
         {/* data masking */}
         <_MaskingEnabled />
         <DropdownMenuSeparator />
-        <DropdownMenuLabel inset className="text-xs text-muted-foreground">
+        <DropdownMenuLabel
+          inset
+          className="text-xs text-muted-foreground font-normal"
+        >
           Date Format
         </DropdownMenuLabel>
         {/* date format */}
         <_DateFormat />
         <DropdownMenuSeparator />
-        <DropdownMenuLabel inset className="text-xs text-muted-foreground">
+        <DropdownMenuLabel
+          inset
+          className="text-xs text-muted-foreground font-normal"
+        >
           Date Timezone
         </DropdownMenuLabel>
         {/* tz */}
         <_TimeZone />
 
-        {simulator_available && <_DoctypeFormsSimulator />}
+        {/* simulator */}
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel
+          inset
+          className="text-xs text-muted-foreground font-normal"
+        >
+          Testing
+        </DropdownMenuLabel>
+        <_DoctypeFormsSimulator />
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -168,6 +182,40 @@ function _LayoutMenuContent() {
       </section>
     </div>
   );
+}
+
+function _ViewDefinition({ tablename }: { tablename: string }) {
+  const [state] = useEditorState();
+
+  const supports_definition = state.doctype === "v0_schema";
+
+  const menuitem = (
+    <DropdownMenuItem className="relative pl-8" disabled={!supports_definition}>
+      <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+        <CodeIcon className="w-4 h-4" />
+      </span>
+      Definition & API
+      <Badge variant="outline" className="ms-2">
+        beta
+      </Badge>
+    </DropdownMenuItem>
+  );
+
+  if (supports_definition) {
+    return (
+      <Link
+        href={editorlink("data/table/[tablename]/definition", {
+          basepath: state.basepath,
+          document_id: state.document_id,
+          tablename: tablename,
+        })}
+      >
+        {menuitem}
+      </Link>
+    );
+  }
+
+  return menuitem;
 }
 
 function _EmptyDataHidden() {
@@ -294,9 +342,24 @@ function _TimeZone() {
 function _DoctypeFormsSimulator() {
   const [state, dispatch] = useEditorState();
 
-  return (
-    <>
-      <DropdownMenuSeparator />
+  const tb = useDatagridTable();
+
+  const simulator_available =
+    tb?.id === EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID ||
+    tb?.id === EditorSymbols.Table.SYM_GRIDA_FORMS_SESSION_TABLE_ID;
+
+  const menuitem = (
+    <DropdownMenuItem
+      className="cursor-pointer"
+      disabled={!simulator_available}
+    >
+      <CommitIcon className="inline align-middle me-2" />
+      Open Simulator
+    </DropdownMenuItem>
+  );
+
+  if (simulator_available) {
+    return (
       <Link
         href={editorlink("data/simulator", {
           basepath: state.basepath,
@@ -304,13 +367,12 @@ function _DoctypeFormsSimulator() {
         })}
         target="_blank"
       >
-        <DropdownMenuItem className="cursor-pointer">
-          <CommitIcon className="inline align-middle me-2" />
-          Open Simulator
-        </DropdownMenuItem>
+        {menuitem}
       </Link>
-    </>
-  );
+    );
+  }
+
+  return menuitem;
 }
 
 function _DoctypeFormsCampaignTZ() {

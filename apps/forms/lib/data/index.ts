@@ -1,7 +1,6 @@
 import type { SQLOrderBy, SQLPredicate } from "@/types";
 import type { SupabasePostgRESTOpenApi } from "../supabase-postgrest";
 import type { XPostgrestQuery } from "@/lib/supabase-postgrest/builder";
-import type { JSONType } from "ajv";
 import type { PGSupportedColumnType } from "../pg-meta/@types/pg";
 
 /**
@@ -121,6 +120,7 @@ export namespace Data {
     };
 
     export type TableDefinition = {
+      name: string;
       pks: string[];
       fks: NonCompositeRelationship[];
       properties: Record<string, Attribute>;

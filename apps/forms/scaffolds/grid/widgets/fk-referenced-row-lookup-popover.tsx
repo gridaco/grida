@@ -92,7 +92,7 @@ function Content({
   definition,
 }: {
   table?: GDocSchemaTable;
-  definition: Data.Relation.TableDefinition;
+  definition: Omit<Data.Relation.TableDefinition, "name">;
 }) {
   const { result, isLoading } = useReferenced()!;
 

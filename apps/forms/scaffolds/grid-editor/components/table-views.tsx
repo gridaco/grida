@@ -44,7 +44,7 @@ export function TableViews() {
           <TabsTrigger key={tb.id.toString()} value={tb.name}>
             <ResourceTypeIcon
               type={tb.icon}
-              className="inline align-middle w-4 h-4 me-2"
+              className="inline align-middle w-4 min-w-4 h-4 me-2"
             />
             {tb.readonly && (
               <span className="me-2 text-xs font-mono text-muted-foreground">

@@ -12,7 +12,6 @@ import {
   GDocSchemaTable,
   GDocSchemaTableProviderGrida,
   GDocSchemaTableProviderXSupabase,
-  GDocTable,
   TablespaceSchemaTableStreamType,
 } from "@/scaffolds/editor/state";
 import { useDatagridTable } from "@/scaffolds/editor/use";
@@ -36,13 +35,12 @@ export default function SchemaTablePage({
   const [{ tables }] = useEditorState();
   const { tablename } = params;
 
-  const tb = tables.find((table) => table.name === tablename);
+  const tb = tables.find(
+    (table) => table.name === tablename
+  ) as GDocSchemaTable;
 
-  const isvalid = valid(tb);
-
-  if (!isvalid) {
-    return <Invalid />;
-  }
+  // its already handled on layout
+  assert(tb);
 
   return (
     <CurrentTable
@@ -185,8 +183,4 @@ function ModeProviderXSB() {
       deletion="on"
     />
   );
-}
-
-function valid(tb?: GDocTable): tb is GDocSchemaTable {
-  return !!tb && typeof tb.id === "string";
 }

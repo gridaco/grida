@@ -28,6 +28,7 @@ type EditorPageParamsMap = {
   "data/analytics": {};
   "data/simulator": {};
   "data/table/[tablename]": { tablename: string }; // Requires tablename in addition to shared params
+  "data/table/[tablename]/definition": { tablename: string }; // Requires tablename in addition to shared params
   "data/table/~new": {};
   connect: {};
   "connect/share": {};
@@ -99,6 +100,11 @@ export function editorlink<P extends EditorPageType>(
     case "data/table/[tablename]":
       const { tablename } = params as unknown as { tablename: string };
       return `${origin}/${basepath}/${id}/data/table/${tablename}`;
+    case "data/table/[tablename]/definition":
+      const { tablename: tablename1 } = params as unknown as {
+        tablename: string;
+      };
+      return `${origin}/${basepath}/${id}/data/table/${tablename1}/definition`;
   }
 
   return "";

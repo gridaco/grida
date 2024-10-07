@@ -44,7 +44,7 @@ export function analyze({
   definition,
   fields,
 }: {
-  definition: Data.Relation.TableDefinition;
+  definition: Omit<Data.Relation.TableDefinition, "name">;
   fields: FormFieldDefinition[];
 }) {
   const keys = Object.keys(definition.properties);

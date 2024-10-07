@@ -112,10 +112,14 @@ export function initialDatagridState(
     if (pref) {
       return {
         ...cleared,
+        datagrid_local_filter: {
+          ...cleared.datagrid_local_filter!,
+          masking_enabled: pref.masking_enabled ?? false,
+        },
         datagrid_query: {
           ...cleared.datagrid_query!,
-          q_predicates: pref.predicates || [],
-          q_orderby: pref.orderby || {},
+          q_predicates: pref.predicates ?? [],
+          q_orderby: pref.orderby ?? {},
         },
       };
     }
@@ -143,6 +147,7 @@ export function table_to_sidebar_table_menu(
     label: tb.name,
     icon: tb.x_sb_main_table_connection ? "supabase" : "table",
     href: tablehref(basepath, document_id, tb),
+    layout: true,
     data: {
       readonly: tb.x_sb_main_table_connection
         ? SupabasePostgRESTOpenApi.table_methods_is_get_only(
