@@ -173,18 +173,21 @@ export function XSBTextSearchInput({
                   );
                 })}
                 {localsearch_on && (
-                  <DropdownMenuRadioItem
-                    id="ignore"
-                    value={
-                      EditorSymbols.SystemKey.QUERY_TS_SEARCH_LOCALLY
-                        .description!
-                    }
-                  >
-                    Search Locally
-                    <span className="ms-2 text-xs text-muted-foreground">
-                      Search within loaded data, locally
-                    </span>
-                  </DropdownMenuRadioItem>
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuRadioItem
+                      id="ignore"
+                      value={
+                        EditorSymbols.SystemKey.QUERY_TS_SEARCH_LOCALLY
+                          .description!
+                      }
+                    >
+                      Search Locally
+                      <span className="ms-2 text-xs text-muted-foreground">
+                        Search within loaded data, locally
+                      </span>
+                    </DropdownMenuRadioItem>
+                  </>
                 )}
               </DropdownMenuRadioGroup>
 
