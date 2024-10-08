@@ -50,7 +50,7 @@ export namespace GridaXSupabase {
   export interface SupabaseTable {
     id: number;
     supabase_project_id: number;
-    sb_schema_name: "public" | (string | {});
+    sb_schema_name: string;
     sb_table_name: string;
     sb_table_schema: JSONSChema;
     sb_postgrest_methods: XSBPostgrestMethod[];

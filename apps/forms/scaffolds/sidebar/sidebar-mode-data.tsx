@@ -81,6 +81,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { xsb_table_conn_init } from "../editor/init";
 
 export function ModeData() {
   const [state, dispatch] = useEditorState();
@@ -528,23 +529,11 @@ function ConnectNewSupabaseTableDialog({
     promise.then(({ data: { data } }) => {
       if (!data) return;
 
-      const { pk_col, pk_cols, pk_first_col } =
-        SupabasePostgRESTOpenApi.parse_pks(data.connection.sb_table_schema);
-
       dispatch({
         type: "editor/table/schema/add",
         table: {
           ...data.table,
-          x_sb_main_table_connection: {
-            supabase_project_id: data.connection.supabase_project_id,
-            sb_table_id: data.connection.sb_table_id,
-            sb_schema_name: data.connection.sb_schema_name,
-            sb_table_name: data.connection.sb_table_name,
-            sb_table_schema: data.connection.sb_table_schema,
-            sb_postgrest_methods: data.connection.sb_postgrest_methods,
-            pks: pk_cols,
-            pk: pk_col || pk_first_col,
-          },
+          x_sb_main_table_connection: xsb_table_conn_init(data.connection),
         },
       });
 
