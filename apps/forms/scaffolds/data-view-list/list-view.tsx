@@ -62,6 +62,7 @@ export function DataListView({
         <div style={style}>
           <ListItem
             data={row}
+            media_fields={prioritiezed_virtual_media_columns}
             properties={normalpropertykeys.map((key) => ({
               ...definition.properties[key],
               name: key,

@@ -126,11 +126,17 @@ async function resolveFileRefs(
   throw new Error("Invalid resolver");
 }
 
+export type UseFileRefsRetrunType =
+  | DataGridFileRef[]
+  | "loading"
+  | "error"
+  | null;
+
 export function useFileRefs(
   identifier: CellIdentifier,
   rowdata: Record<string, any> | null,
   resolver?: DataGridCellFileRefsResolver
-): DataGridFileRef[] | "loading" | null | "error" {
+): UseFileRefsRetrunType {
   const { add } = useQueue<FileStorageQueryResult, FileStorageQueryTask>();
   const [error, setError] = useState<any | null>(null);
   const [refs, setRefs] = useState<DataGridFileRef[] | "loading" | null>(

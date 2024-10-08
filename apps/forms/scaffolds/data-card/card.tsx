@@ -1,25 +1,16 @@
 import React, { useMemo } from "react";
 import * as CardPrimitives from "@/components/ui/card";
-import {
-  CellIdentifier,
-  DataGridCellFileRefsResolver,
-  DGColumn,
-  DGResponseRow,
-} from "../grid";
+import type { DGResponseRow } from "../grid";
 import type { FormFieldDefinition } from "@/types";
-import { useFileRefs } from "../grid/providers";
-import { FileRefsStateRenderer } from "../grid/cells";
-import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/utils";
 import { Data } from "@/lib/data";
-import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Checkbox } from "@/components/ui/checkbox";
 import { LineContent } from "./line";
+import { MediaRenderer } from "./media";
 
 type TRowData = Pick<DGResponseRow, "__gf_id" | "raw" | "fields">;
 
@@ -73,7 +64,7 @@ export function DataCard({
     <ModelCard
       media={
         primary_media?.files ? (
-          <CardMediaSection
+          <MediaRenderer
             data={data}
             field={primary_media_field!}
             resolver={primary_media.files}
@@ -82,73 +73,6 @@ export function DataCard({
       }
       lines={lines}
     />
-  );
-}
-
-function CardMediaSection({
-  data,
-  field,
-  resolver,
-}: {
-  data: TRowData;
-  field: FormFieldDefinition;
-  resolver?: DataGridCellFileRefsResolver;
-}) {
-  const identifier: CellIdentifier = {
-    attribute: field.id,
-    key: data.__gf_id,
-  };
-
-  switch (field.type) {
-    case "audio":
-    case "video":
-    case "image":
-      return (
-        <CardMediaImageContent
-          identifier={identifier}
-          rowdata={data.raw}
-          resolver={resolver}
-        />
-      );
-    default:
-      throw new Error(`invalid card media type "${field.type}"`);
-  }
-}
-
-function CardMediaImageContent({
-  identifier,
-  rowdata,
-  resolver,
-}: {
-  identifier: CellIdentifier;
-  rowdata: Record<string, any> | null;
-  resolver?: DataGridCellFileRefsResolver;
-}) {
-  const refs = useFileRefs(identifier, rowdata, resolver);
-
-  return (
-    <>
-      <FileRefsStateRenderer
-        refs={refs}
-        renderers={{
-          loading: <Skeleton className="w-full h-full" />,
-          error: "ERR",
-          files: (f, i) => {
-            return (
-              <figure key={i} className="w-full h-full">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={f.srcset.thumbnail}
-                  alt={f.name}
-                  className="w-full h-full overflow-hidden object-cover"
-                  loading="lazy"
-                />
-              </figure>
-            );
-          },
-        }}
-      />
-    </>
   );
 }
 

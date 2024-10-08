@@ -1,5 +1,4 @@
 import React, { useMemo } from "react";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Tooltip,
   TooltipContent,
@@ -9,18 +8,21 @@ import { Data } from "@/lib/data";
 import type { DGResponseRow } from "../grid";
 import { LineContent } from "../data-card/line";
 import { cn } from "@/utils";
+import type { FormFieldDefinition } from "@/types";
+import { MediaRenderer } from "../data-card/media";
 
 type TRowData = Pick<DGResponseRow, "__gf_id" | "raw" | "fields">;
 
-const ITEM_MARGIN_Y = 2;
 export const ITEM_HEIGHT = 36;
-export const ITEM_SIZE = ITEM_HEIGHT + ITEM_MARGIN_Y * 2;
+export const ITEM_SIZE = ITEM_HEIGHT;
 
 export function ListItem({
   data,
   properties,
+  media_fields,
 }: {
   data: TRowData;
+  media_fields?: FormFieldDefinition[];
   properties: (Data.Relation.Attribute & { label: string })[];
 }) {
   const filteredProperties = useMemo(() => {
@@ -64,8 +66,26 @@ export function ListItem({
           height: ITEM_HEIGHT,
         }}
       >
-        <div className="px-4 flex items-center justify-between gap-2">
-          <div className="text-lg font-semibold">{lines[0]}</div>
+        <div className="h-full px-4 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            {media_fields?.map((field) => {
+              const media = data.fields[field.id];
+
+              return (
+                <TooltipContainer
+                  className="min-w-6 w-6 h-6 rounded-sm overflow-hidden"
+                  label={field.name}
+                >
+                  <MediaRenderer
+                    data={data}
+                    field={field}
+                    resolver={media.files}
+                  />
+                </TooltipContainer>
+              );
+            })}
+            <div className="text-lg font-semibold">{lines[0]}</div>
+          </div>
           <div className="flex items-center gap-2 text-xs">
             {lines.slice(1)}
           </div>
