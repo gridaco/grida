@@ -1,24 +1,16 @@
 import React, { useMemo } from "react";
 import * as CardPrimitives from "@/components/ui/card";
-import {
-  CellIdentifier,
-  DataGridCellFileRefsResolver,
-  DGColumn,
-  DGResponseRow,
-} from "../grid";
+import type { DGResponseRow } from "../grid";
 import type { FormFieldDefinition } from "@/types";
-import { useFileRefs } from "../grid/providers";
-import { FileRefsStateRenderer } from "../grid/cells";
-import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/utils";
 import { Data } from "@/lib/data";
-import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Checkbox } from "@/components/ui/checkbox";
+import { LineContent } from "./line";
+import { MediaRenderer } from "./media";
 
 type TRowData = Pick<DGResponseRow, "__gf_id" | "raw" | "fields">;
 
@@ -58,7 +50,7 @@ export function DataCard({
         return (
           <Tooltip key={prop.name} delayDuration={100}>
             <TooltipTrigger className="w-full text-start overflow-hidden text-ellipsis">
-              <LineContent value={value} property={prop} />
+              <LineContent value={value} property={prop} wrap />
             </TooltipTrigger>
             <TooltipContent side="left" align="center">
               {prop.label}
@@ -72,7 +64,7 @@ export function DataCard({
     <ModelCard
       media={
         primary_media?.files ? (
-          <CardMediaSection
+          <MediaRenderer
             data={data}
             field={primary_media_field!}
             resolver={primary_media.files}
@@ -82,148 +74,6 @@ export function DataCard({
       lines={lines}
     />
   );
-}
-
-function CardMediaSection({
-  data,
-  field,
-  resolver,
-}: {
-  data: TRowData;
-  field: FormFieldDefinition;
-  resolver?: DataGridCellFileRefsResolver;
-}) {
-  const identifier: CellIdentifier = {
-    attribute: field.id,
-    key: data.__gf_id,
-  };
-
-  switch (field.type) {
-    case "audio":
-    case "video":
-    case "image":
-      return (
-        <CardMediaImageContent
-          identifier={identifier}
-          rowdata={data.raw}
-          resolver={resolver}
-        />
-      );
-    default:
-      throw new Error(`invalid card media type "${field.type}"`);
-  }
-}
-
-function CardMediaImageContent({
-  identifier,
-  rowdata,
-  resolver,
-}: {
-  identifier: CellIdentifier;
-  rowdata: Record<string, any> | null;
-  resolver?: DataGridCellFileRefsResolver;
-}) {
-  const refs = useFileRefs(identifier, rowdata, resolver);
-
-  return (
-    <>
-      <FileRefsStateRenderer
-        refs={refs}
-        renderers={{
-          loading: <Skeleton className="w-full h-full" />,
-          error: "ERR",
-          files: (f, i) => {
-            return (
-              <figure key={i} className="w-full h-full">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={f.srcset.thumbnail}
-                  alt={f.name}
-                  className="w-full h-full overflow-hidden object-cover"
-                  loading="lazy"
-                />
-              </figure>
-            );
-          },
-        }}
-      />
-    </>
-  );
-}
-
-function LineContent({
-  value,
-  property,
-}: {
-  value: any;
-  property: Data.Relation.Attribute;
-}) {
-  switch (property.format) {
-    case "bool":
-    case "boolean":
-      return (
-        <div className="flex gap-2 items-center">
-          <Checkbox
-            checked={value}
-            disabled
-            className="disabled:cursor-default"
-          />
-          <span className="text-xs text-muted-foreground">
-            {value ? "true" : "false"}
-          </span>
-        </div>
-      );
-  }
-
-  return (
-    <>
-      {property.array ? (
-        <div className="flex gap-0.5 flex-wrap">
-          {(value as Array<any>).map((it, i) => {
-            return (
-              <Badge
-                variant="outline"
-                key={i}
-                className="text-xs font-normal px-1.5"
-              >
-                {fmtsafely(String(it), property.scalar_format)}
-              </Badge>
-            );
-          })}
-        </div>
-      ) : (
-        <span className="text-xs w-full text-ellipsis overflow-hidden whitespace-nowrap">
-          {fmtsafely(String(value), property.format)}
-        </span>
-      )}
-    </>
-  );
-}
-
-function fmtsafely(txt: string, format: Data.Relation.Attribute["format"]) {
-  try {
-    switch (format) {
-      case "timetz":
-      case "timestamptz":
-      case "timestamp":
-      case "timestamp without time zone":
-      case "timestamp with time zone":
-      case "date":
-      case "time":
-      case "time without time zone":
-      case "time with time zone":
-        return new Date(txt).toLocaleString();
-      case "boolean":
-        return txt === "true" ? "Yes" : "No";
-      case "json":
-      case "jsonb":
-        return JSON.stringify(txt);
-    }
-
-    return txt;
-  } catch (e) {
-    return "ERR";
-  }
 }
 
 function ModelCard({

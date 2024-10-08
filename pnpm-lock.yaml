@@ -611,6 +611,9 @@ importers:
       react-use:
         specifier: ^17.5.1
         version: 17.5.1(react-dom@18.3.1)(react@18.3.1)
+      react-window:
+        specifier: ^1.8.6
+        version: 1.8.10(react-dom@18.3.1)(react@18.3.1)
       recharts:
         specifier: ^2.12.7
         version: 2.12.7(react-dom@18.3.1)(react@18.3.1)
@@ -711,6 +714,9 @@ importers:
       '@types/react-dom':
         specifier: 18.2.19
         version: 18.2.19
+      '@types/react-window':
+        specifier: ^1.8.8
+        version: 1.8.8
       '@types/stylis':
         specifier: ^4.2.6
         version: 4.2.6
@@ -12981,7 +12987,7 @@ packages:
   /@radix-ui/number@0.0.5:
     resolution: {integrity: sha512-Xt73/CMoMpjcNDhtcOw/yQEYgoFrAjFMfBSqLGVRFf7TXOzQY+YsphyxOF0mMdS6TWsqefiUtPZ9qhJmdNPPdg==}
     dependencies:
-      '@babel/runtime': 7.24.5
+      '@babel/runtime': 7.24.6
     dev: false
 
   /@radix-ui/number@0.0.6:
@@ -13346,7 +13352,7 @@ packages:
     peerDependencies:
       react: ^18.2.0
     dependencies:
-      '@babel/runtime': 7.24.5
+      '@babel/runtime': 7.24.6
       '@radix-ui/react-context': 0.0.5(react@18.3.1)
       '@radix-ui/react-use-layout-effect': 0.0.5(react@18.3.1)
       react: 18.3.1
@@ -14459,7 +14465,7 @@ packages:
     peerDependencies:
       react: ^18.2.0
     dependencies:
-      '@babel/runtime': 7.24.5
+      '@babel/runtime': 7.24.6
       react: 18.3.1
     dev: false
 
@@ -14984,7 +14990,7 @@ packages:
     peerDependencies:
       react: ^18.2.0
     dependencies:
-      '@babel/runtime': 7.24.5
+      '@babel/runtime': 7.24.6
       '@radix-ui/react-polymorphic': 0.0.10(react@18.3.1)
       react: 18.3.1
     dev: false
@@ -16003,7 +16009,7 @@ packages:
     peerDependencies:
       react: ^18.2.0
     dependencies:
-      '@babel/runtime': 7.24.5
+      '@babel/runtime': 7.24.6
       '@radix-ui/react-use-callback-ref': 0.0.5(react@18.3.1)
       react: 18.3.1
     dev: false
@@ -16288,7 +16294,7 @@ packages:
     peerDependencies:
       react: ^18.2.0
     dependencies:
-      '@babel/runtime': 7.24.5
+      '@babel/runtime': 7.24.6
       react: 18.3.1
     dev: false
 
@@ -41264,7 +41270,7 @@ packages:
       react: ^18.2.0
       react-dom: ^18.2.0
     dependencies:
-      '@babel/runtime': 7.24.5
+      '@babel/runtime': 7.24.6
       memoize-one: 5.2.1
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)

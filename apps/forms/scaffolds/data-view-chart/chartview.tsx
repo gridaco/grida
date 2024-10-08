@@ -176,7 +176,7 @@ function useDataFrame() {
   //
 }
 
-export function Chartview() {
+export function DataChartview() {
   const df = useDataFrame();
 
   const [state, dispatch] = useReducer(reducer, {

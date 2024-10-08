@@ -22,9 +22,43 @@
 <br/>
 <br/>
 
-# Forms
+![Grida Database Editor](./.readme/cover-grida-database.png)
 
-![Grida Forms Editor](./.readme/example-grida-forms-editor-ss.png)
+# Database / CMS
+
+<details>
+<summary>Demo</summary>
+
+![Grida Database Editor](./.readme/demo-grida-database.gif)
+
+</details>
+
+<br/>
+
+- [x] Connecy your Supabase Project (Talbe, Views, Storage, Auth)
+- [x] Readonly Views
+- [x] Storage Connected Rich Text Editor
+- [x] CMS Ready
+- [x] Virtual Attributes - Computed & FK References
+- [x] Export as CSV
+- [x] Filter, Sort, Search (Locally and FTS).
+- [x] Create a Form View (Admin UI)
+- [x] View in Gallery View
+- [x] View in List View
+- [x] View in Charts View (β)
+- [ ] Joins & Relational Queries (working on it)
+- [ ] API Access
+- [ ] Localization
+
+---
+
+<br/>
+<br/>
+<br/>
+
+![Grida Database Editor](./.readme/cover-grida-forms.png)
+
+# Forms
 
 - [x] 30+ Inputs (file upload, signature, richtext, sms verification, etc)
 - [x] Logic blocks & Computed Fields
@@ -43,26 +77,18 @@
 - [ ] Custom Auth Gate
 - [ ] Accept Payments
 
-# Database / CMS
-
-![Grida Database Editor](./.readme/example-grida-database-editor-ss.png)
-
-- [x] Connecy your Supabase Project (Talbe, Views, Storage, Auth)
-- [x] Readonly Views
-- [x] Virtual Attributes - Computed & FK References
-- [x] CMS Ready
-- [x] Export as CSV
-- [x] Filter, Sort, Search.
-- [x] Create a Form View (Admin UI)
-- [ ] API Access
-- [ ] Localization
-- [ ] Joins & Relational Queries
-- [ ] Gallary & List View
+<br/>
+<br/>
+<br/>
 
 # Localization (Comming this Fall)
 
 - [ ] Stand-alone i18n / ICU Message Editor
 - [ ] API Access
+
+<br/>
+<br/>
+<br/>
 
 # Micro Sites (Working on it)
 
@@ -70,6 +96,10 @@
 - [ ] Connect CMS
 - [ ] Custom Auth
 - [ ] Custom Domain
+
+<br/>
+<br/>
+<br/>
 
 # Does it replace `(X)`..?
 
