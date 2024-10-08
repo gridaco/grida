@@ -7,7 +7,7 @@ import { analyze } from "../data-card/analyze";
 import { DataCard } from "../data-card/card";
 import type { FormFieldDefinition } from "@/types";
 
-export function Gallery({
+export function DataGalleryView({
   className,
   rows,
   fields,

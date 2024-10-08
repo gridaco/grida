@@ -127,11 +127,11 @@ const _view_types = [
     label: "Gallery",
     icon: "gallery",
   },
-  // {
-  //   type: "list",
-  //   label: "List",
-  //   icon: "list",
-  // },
+  {
+    type: "list",
+    label: "List",
+    icon: "list",
+  },
   {
     type: "chart",
     label: "Chart",

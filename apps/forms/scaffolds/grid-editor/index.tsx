@@ -59,7 +59,6 @@ import {
 } from "@/scaffolds/editor/use";
 import { saveAs } from "file-saver";
 import Papa from "papaparse";
-import { Gallery } from "../data-view-gallery/gallery";
 import {
   DataQueryPredicatesMenu,
   DataQueryPredicateChip,
@@ -71,7 +70,9 @@ import {
   DataQueryPredicatesMenuTriggerButton,
   DataQueryOrderbyMenuTriggerButton,
 } from "./components/ui/toggle";
-import { Chartview } from "../data-view-chart/chartview";
+import DataGalleryView from "../data-view-gallery";
+import DataChartview from "../data-view-chart";
+import DataListView from "../data-view-list";
 import { useMultiplayer } from "@/scaffolds/editor/multiplayer";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { SchemaNameProvider, TableDefinitionProvider } from "../data-query";
@@ -346,17 +347,17 @@ export function GridEditor({
           >
             {tb?.view === "gallery" && (
               <GridLayout.Content className="overflow-y-scroll">
-                <Gallery fields={fields} rows={rows ?? []} />
+                <DataGalleryView fields={fields} rows={rows ?? []} />
               </GridLayout.Content>
             )}
             {tb?.view === "chart" && (
               <GridLayout.Content className="overflow-y-scroll">
-                <Chartview />
+                <DataChartview />
               </GridLayout.Content>
             )}
             {tb?.view === "list" && (
               <GridLayout.Content className="overflow-y-scroll">
-                {/* <Chartview /> */}
+                <DataListView fields={fields} rows={rows ?? []} />
               </GridLayout.Content>
             )}
             {tb?.view === "table" && (
