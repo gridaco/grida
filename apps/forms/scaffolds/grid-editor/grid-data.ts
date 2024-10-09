@@ -1,10 +1,11 @@
 import {
-  Customer,
-  FormFieldDefinition,
-  FormResponse,
-  FormResponseField,
-  FormResponseSession,
+  type Customer,
+  type FormFieldDefinition,
+  type FormResponse,
+  type FormResponseField,
+  type FormResponseSession,
   GridaXSupabase,
+  isReferenceSchema,
 } from "@/types";
 import { fmt_local_index } from "@/utils/fmt";
 import type {
@@ -27,7 +28,7 @@ import { PrivateEditorApi } from "@/lib/private";
 import { GridFilter } from "../grid-filter";
 import { EditorSymbols } from "../editor/symbols";
 import { SupabaseStorageExtensions } from "@/lib/supabase/storage-ext";
-import { Data } from "@/lib/data";
+import type { Data } from "@/lib/data";
 
 export namespace GridData {
   type DataGridFilterInput = {
@@ -119,20 +120,21 @@ export namespace GridData {
   } {
     const fieldcolumns = Array.from(params.fields)
       .sort((a, b) => a.local_index - b.local_index)
-      .map(
-        (field) =>
-          ({
-            key: field.id,
-            name: field.name,
-            readonly: field.readonly || false,
-            type: field.type,
-            storage: field.storage || null,
-            fk:
-              "definition" in params
-                ? params.definition?.properties[field.name]?.fk || false
-                : false,
-          }) satisfies DGColumn
-      );
+      .map((field) => {
+        const fk = xsb_fk({
+          field,
+          definition: "definition" in params ? params.definition : undefined,
+        });
+
+        return {
+          key: field.id,
+          name: field.name,
+          readonly: field.readonly || false,
+          type: field.type,
+          storage: field.storage || null,
+          fk: fk,
+        } satisfies DGColumn;
+      });
 
     switch (params.table_id) {
       case EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID:
@@ -201,6 +203,37 @@ export namespace GridData {
       ],
       columns: fieldcolumns,
     };
+  }
+
+  type XSBColumnFK =
+    | Data.Relation.NonCompositeRelationship
+    | "x-supabase.auth.users"
+    | false;
+
+  function xsb_fk({
+    field,
+    definition,
+  }: {
+    field: FormFieldDefinition;
+    definition?: Omit<Data.Relation.TableDefinition, "name">;
+  }): XSBColumnFK {
+    if (definition?.properties?.[field.name]?.fk) {
+      return definition.properties[field.name].fk;
+    }
+
+    if (field.reference) {
+      if (isReferenceSchema(field.reference)) {
+        if (
+          field.reference.type === "x-supabase" &&
+          field.reference.schema === "auth" &&
+          field.reference.table === "users"
+        ) {
+          return "x-supabase.auth.users";
+        }
+      }
+    }
+
+    return false;
   }
 
   type TProcessedGridRows =

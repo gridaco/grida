@@ -376,6 +376,12 @@ export interface FormFieldReferenceSchema {
   column: string;
 }
 
+export function isReferenceSchema(ref: any): ref is FormFieldReferenceSchema {
+  return (
+    ref && "type" in ref && "schema" in ref && "table" in ref && "column" in ref
+  );
+}
+
 export type PaymentsServiceProviders = "stripe" | "tosspayments";
 
 export interface PaymentFieldData {
