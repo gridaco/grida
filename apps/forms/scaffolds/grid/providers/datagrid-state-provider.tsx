@@ -1,10 +1,11 @@
 import React, { useMemo } from "react";
 import type { DataGridCellSelectionCursor } from "../types";
 import type { DataGridCellRootProps } from "../cells";
+import assert from "assert";
 
 type State = {
-  local_cursor_id: string;
-  selections: Array<DataGridCellSelectionCursor>;
+  local_cursor_id?: string;
+  selections?: Array<DataGridCellSelectionCursor>;
   highlightTokens?: string[];
 };
 
@@ -16,8 +17,8 @@ export function DataGridStateProvider({
   selections,
   highlightTokens,
 }: React.PropsWithChildren<{
-  local_cursor_id: string;
-  selections: Array<DataGridCellSelectionCursor>;
+  local_cursor_id?: string;
+  selections?: Array<DataGridCellSelectionCursor>;
   highlightTokens?: string[];
 }>) {
   return (
@@ -83,6 +84,9 @@ function getCellSelection({
 
 export function useCellSelection(pk: string | -1, column: string) {
   const { selections, local_cursor_id } = useDataGridState();
+
+  assert(local_cursor_id, "local_cursor_id must be defined");
+  assert(selections, "selections must be defined");
 
   return useMemo(
     () =>

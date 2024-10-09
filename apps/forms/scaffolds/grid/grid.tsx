@@ -558,7 +558,7 @@ function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
             <Highlight
               text={unwrapped?.toString()}
               tokens={highlightTokens}
-              className="bg-foreground text-background"
+              highlightClassName="bg-foreground text-background"
             />
           </span>
         </CellRoot>
@@ -666,7 +666,7 @@ function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
             <Highlight
               text={display}
               tokens={highlightTokens}
-              className="bg-foreground text-background"
+              highlightClassName="bg-foreground text-background"
             />
           </span>
           {fk && (

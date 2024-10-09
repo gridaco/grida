@@ -3,13 +3,15 @@ import React, { memo, useMemo } from "react";
 interface HighlightProps {
   text?: string;
   tokens?: string[] | string;
+  highlightClassName?: string;
   className?: string;
 }
 
 const Highlight: React.FC<HighlightProps> = ({
   text,
   tokens,
-  className: highlightClassName,
+  highlightClassName,
+  className,
 }) => {
   const regex = useMemo(() => {
     if (!tokens || tokens.length === 0) {
@@ -43,7 +45,9 @@ const Highlight: React.FC<HighlightProps> = ({
             {part}
           </span>
         ) : (
-          part
+          <span key={index} className={className}>
+            {part}
+          </span>
         )
       )}
     </span>

@@ -11,8 +11,6 @@ import {
   TableViews,
 } from "@/scaffolds/grid-editor/components";
 import * as GridLayout from "@/scaffolds/grid-editor/components/layout";
-import { XSBReferenceTableGrid } from "@/scaffolds/grid/xsb-reference-grid";
-import { GridaXSupabase } from "@/types";
 import { EditorApiResponse } from "@/types/private/api";
 import { useEffect, useMemo } from "react";
 import { CurrentTable } from "@/scaffolds/editor/utils/switch-table";
@@ -20,13 +18,13 @@ import { GridData } from "@/scaffolds/grid-editor/grid-data";
 import { EditorSymbols } from "@/scaffolds/editor/symbols";
 import { XPostgrestQuery } from "@/lib/supabase-postgrest/builder";
 import useSWR from "swr";
-import { GridDataXSBUnknown } from "@/scaffolds/grid-editor/grid-data-xsb-unknow";
 import {
   useDataGridTextSearch,
   useDataGridQuery,
   useDataGridRefresh,
 } from "@/scaffolds/editor/use";
 import { XSBAuthUsersGrid } from "@/scaffolds/grid/wellknown/xsb-auth.users-grid";
+import { XSBUserRow } from "@/scaffolds/grid";
 
 export default function XTablePage() {
   const [state, dispatch] = useEditorState();
@@ -77,15 +75,6 @@ export default function XTablePage() {
     });
   }, [dispatch, isLoading, isValidating]);
 
-  const columns = useMemo(
-    () =>
-      GridDataXSBUnknown.columns(GridaXSupabase.SupabaseUserJsonSchema, {
-        sort: "unknown_table_column_priorities",
-      }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
-  );
-
   const { filtered, inputlength } = useMemo(() => {
     return GridData.rows({
       filter: {
@@ -117,8 +106,13 @@ export default function XTablePage() {
         </GridLayout.Header>
         <GridLayout.Content>
           <XSBAuthUsersGrid
-            users={filtered as GridaXSupabase.SupabaseUser[]}
+            rows={filtered as XSBUserRow[]}
             loading={datagrid_isloading}
+            highlightTokens={
+              state.datagrid_query?.q_text_search?.query
+                ? [state.datagrid_query.q_text_search.query]
+                : []
+            }
           />
         </GridLayout.Content>
         <GridLayout.Footer>

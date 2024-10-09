@@ -19,38 +19,24 @@ import {
 import { KeyIcon, PhoneIcon } from "lucide-react";
 import Highlight from "@/components/highlight";
 import { CellRoot } from "../cells";
-import "../grid.css";
 import { GridaXSupabase } from "@/types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Apple, Google, KakaoTalkLogo } from "@/components/logos";
 import { cn } from "@/utils";
+import "../grid.css";
+import {
+  DataGridStateProvider,
+  useDataGridState,
+  useMasking,
+} from "../providers";
 
 type ColumnData = {
   key: keyof XSBUserRow;
   name: string | null;
-  format: "uuid" | "text" | "timestamp" | "avatar";
+  format: "uuid" | "text" | "timestamp" | "email";
   width?: number;
+  sensitive?: boolean;
 };
-
-function columnFromData(col: ColumnData) {
-  return {
-    key: col.key,
-    name: col.name,
-    resizable: true,
-    draggable: true,
-    editable: false,
-    frozen: false,
-    width: col.width,
-    renderHeaderCell: HeaderCell,
-    renderCell: ({ row, column }: RenderCellProps<any>) => {
-      const val = row[col.key as keyof XSBUserRow];
-
-      const txt =
-        col.format === "timestamp" ? new Date(val).toLocaleString() : val;
-      return <CellRoot>{txt}</CellRoot>;
-    },
-  } as Column<XSBUserRow>;
-}
 
 const _column_avatar = {
   key: "avatar_url",
@@ -66,7 +52,7 @@ const _column_avatar = {
 
     return (
       <CellRoot className="flex items-center justify-center">
-        <Avatar className="h-8 w-8 aspect-square">
+        <Avatar className="h-6 w-6 aspect-square">
           <AvatarImage src={val} alt="Avatar" />
           <AvatarFallback>
             <AvatarIcon className="w-8 h-8 text-muted-foreground" />
@@ -89,13 +75,20 @@ const _column_provider = {
   renderCell: ({ row, column }: RenderCellProps<XSBUserRow>) => {
     const val = row["providers"];
 
+    const { highlightTokens } = useDataGridState();
+
     return (
       <CellRoot className="flex items-center">
         <div className="flex items-center gap-2">
           {val.map((p) => (
             <div key={p} className="flex items-center gap-1 rounded-sm p-1">
               <AuthProviderIcon type={p} className="w-4 h-4 text-foreground" />
-              <span className="capitalize">{p}</span>
+              <Highlight
+                text={p}
+                tokens={highlightTokens}
+                highlightClassName="bg-foreground text-background"
+                className="capitalize"
+              />
             </div>
           ))}
         </div>
@@ -104,6 +97,43 @@ const _column_provider = {
   },
 } satisfies Column<XSBUserRow>;
 
+function columnFromData(col: ColumnData) {
+  return {
+    key: col.key,
+    name: col.name,
+    resizable: true,
+    draggable: true,
+    editable: false,
+    frozen: false,
+    width: col.width,
+    renderHeaderCell: HeaderCell,
+    renderCell: ({ row, column }: RenderCellProps<any>) => {
+      const masker = useMasking();
+
+      const val = row[col.key as keyof XSBUserRow];
+
+      const formatted =
+        col.format === "timestamp" ? new Date(val).toLocaleString() : val;
+
+      const { highlightTokens } = useDataGridState();
+
+      return (
+        <CellRoot>
+          <Highlight
+            text={
+              col.sensitive
+                ? formatted
+                : masker(formatted, { format: col.format })
+            }
+            tokens={highlightTokens}
+            highlightClassName="bg-foreground text-background"
+          />
+        </CellRoot>
+      );
+    },
+  } as Column<XSBUserRow>;
+}
+
 const columns = [
   _column_avatar,
   columnFromData({
@@ -111,24 +141,28 @@ const columns = [
     name: "UID",
     format: "uuid",
     width: 320,
+    sensitive: true,
   }),
   columnFromData({
     key: "display_name",
     name: "Display Name",
     format: "text",
     width: 200,
+    sensitive: true,
   }),
   columnFromData({
     key: "email",
     name: "Email",
-    format: "text",
+    format: "email",
     width: 200,
+    sensitive: true,
   }),
   columnFromData({
     key: "phone",
     name: "Phone",
     format: "text",
     width: 200,
+    sensitive: true,
   }),
   _column_provider,
   columnFromData({
@@ -136,55 +170,38 @@ const columns = [
     name: "Created at",
     format: "timestamp",
     width: 160,
+    sensitive: false,
   }),
   columnFromData({
     key: "last_sign_in_at",
     name: "Last sign in at",
     format: "timestamp",
     width: 160,
+    sensitive: false,
   }),
 ];
 
 export function XSBAuthUsersGrid({
-  users,
+  rows,
   loading,
+  highlightTokens,
 }: {
-  users: GridaXSupabase.SupabaseUser[];
+  rows: XSBUserRow[];
   loading?: boolean;
+  highlightTokens?: string[];
 }) {
-  const rows: XSBUserRow[] = useMemo(() => {
-    return users.map((user) => {
-      return {
-        id: user.id,
-        avatar_url: user.user_metadata.avatar_url,
-        created_at: user.created_at,
-        display_name: user.user_metadata.full_name,
-        email: user.email,
-        phone: user.phone,
-        last_sign_in_at: user.last_sign_in_at,
-        providers:
-          (user.app_metadata
-            .providers as GridaXSupabase.SupabaseAuthProvider[]) ??
-          user.app_metadata.provider
-            ? [
-                user.app_metadata
-                  .provider! as GridaXSupabase.SupabaseAuthProvider,
-              ]
-            : [],
-      } satisfies XSBUserRow;
-    });
-  }, [users]);
-
   return (
-    <DataGrid
-      className="flex-grow select-none text-xs text-foreground/80"
-      columns={columns}
-      rows={rows}
-      renderers={{ noRowsFallback: <EmptyRowsRenderer loading={loading} /> }}
-      rowKeyGetter={(row) => row.id}
-      rowHeight={44}
-      headerRowHeight={36}
-    />
+    <DataGridStateProvider highlightTokens={highlightTokens}>
+      <DataGrid
+        className="flex-grow select-none text-xs text-foreground/80"
+        columns={columns}
+        rows={rows}
+        renderers={{ noRowsFallback: <EmptyRowsRenderer loading={loading} /> }}
+        rowKeyGetter={(row) => row.id}
+        rowHeight={32}
+        headerRowHeight={36}
+      />
+    </DataGridStateProvider>
   );
 }
 
