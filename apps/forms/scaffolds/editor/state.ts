@@ -194,7 +194,11 @@ export type TableXSBMainTableConnection = {
   // we need a single pk for editor operations - this may not always be available since pg table can have no pk
   pk: string | undefined;
   pks: string[];
+  /**
+   * @deprecated use {@link TableXSBMainTableConnection.definition} instead
+   */
   sb_table_schema: GridaXSupabase.JSONSChema;
+  definition: Data.Relation.TableDefinition;
   sb_postgrest_methods: GridaXSupabase.XSBPostgrestMethod[];
 };
 

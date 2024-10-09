@@ -6,13 +6,12 @@ import { GDocSchemaTable } from "@/scaffolds/editor/state";
 import assert from "assert";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { Data } from "@/lib/data";
-
-import "@xyflow/react/dist/style.css";
 import { DefinitionFlow } from "@/scaffolds/data-definition/flow";
 import { ReactFlowProvider } from "@xyflow/react";
 import { Button } from "@/components/ui/button";
 import { ArrowLeftIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
+import "@xyflow/react/dist/style.css";
 
 export default function TableDefinitionPage({
   params,
@@ -92,15 +91,8 @@ function _tmp_merged_table_definition(
 
   const {
     attributes,
-    x_sb_main_table_connection: { sb_table_schema, sb_table_name },
+    x_sb_main_table_connection: { definition },
   } = tb;
-
-  const definition: Data.Relation.TableDefinition = {
-    name: sb_table_name,
-    ...SupabasePostgRESTOpenApi.parse_supabase_postgrest_schema_definition(
-      sb_table_schema
-    ),
-  };
 
   //
 

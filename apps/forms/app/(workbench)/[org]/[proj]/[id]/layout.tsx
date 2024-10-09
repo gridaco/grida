@@ -39,7 +39,7 @@ import React from "react";
 import { PlayActions } from "@/scaffolds/workbench/play-actions";
 import Players from "@/scaffolds/workbench/players";
 import { DontCastJsonProperties } from "@/types/supabase-ext";
-import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
+import { xsb_table_conn_init } from "@/scaffolds/editor/init";
 
 export const revalidate = 0;
 
@@ -350,19 +350,14 @@ export default async function Layout({
         const t = xsb_tables?.find((t) => t.id === sb_table_id);
         if (!t) return undefined;
 
-        const { pk_cols, pk_col, pk_first_col } =
-          SupabasePostgRESTOpenApi.parse_pks(t.sb_table_schema as any);
-
-        return {
-          pks: pk_cols,
-          pk: pk_col || pk_first_col,
+        return xsb_table_conn_init({
           supabase_project_id: t.supabase_project_id,
-          sb_table_id: sb_table_id,
+          sb_table_id,
           sb_schema_name: t.sb_schema_name,
           sb_table_name: t.sb_table_name,
           sb_table_schema: t.sb_table_schema as any,
           sb_postgrest_methods: t.sb_postgrest_methods,
-        };
+        });
       };
 
       return (

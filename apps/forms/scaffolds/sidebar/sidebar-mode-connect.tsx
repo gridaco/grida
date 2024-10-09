@@ -217,7 +217,7 @@ function SectionXDatabase() {
     <SidebarSection>
       <SidebarSectionHeaderItem>
         <SidebarSectionHeaderLabel>
-          <span>External Database</span>
+          <span>Database</span>
         </SidebarSectionHeaderLabel>
       </SidebarSectionHeaderItem>
       <SidebarMenuList>

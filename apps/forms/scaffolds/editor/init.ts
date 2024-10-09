@@ -319,7 +319,10 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
           label: init.connections.supabase.main_supabase_table.sb_table_name,
           description: null,
           readonly: false,
-          x_sb_main_table_connection: xsbmtinit(init.connections.supabase)!,
+          x_sb_main_table_connection: xsb_table_conn_init({
+            sb_table_id: init.connections.supabase.main_supabase_table.id,
+            ...init.connections.supabase.main_supabase_table,
+          })!,
           rules: {
             delete_restricted: true,
           },
@@ -659,27 +662,35 @@ export function schematableinit(table: {
   }
 }
 
-function xsbmtinit(
-  conn?: GridaXSupabase.XSupabaseMainTableConnectionState
-): TableXSBMainTableConnection | undefined {
+export function xsb_table_conn_init(conn?: {
+  supabase_project_id: number;
+  sb_schema_name: string;
+  sb_table_name: string;
+  sb_table_id: number;
+  sb_table_schema: GridaXSupabase.JSONSChema;
+  sb_postgrest_methods: GridaXSupabase.XSBPostgrestMethod[];
+}): TableXSBMainTableConnection | undefined {
   // TODO: need inspection - will supbaseconn present even when main table is not present?
   // if yes, we need to adjust the state to be nullable
   if (!conn) return undefined;
-  if (!conn.main_supabase_table) return undefined;
 
-  const { pk_col, pk_cols, pk_first_col } = SupabasePostgRESTOpenApi.parse_pks(
-    conn.main_supabase_table?.sb_table_schema
-  );
+  const def: Data.Relation.TableDefinition = {
+    name: conn.sb_table_name,
+    ...SupabasePostgRESTOpenApi.parse_supabase_postgrest_schema_definition(
+      conn.sb_table_schema
+    ),
+  };
 
   return {
     supabase_project_id: conn.supabase_project_id,
-    sb_table_id: conn.main_supabase_table.id,
-    sb_schema_name: conn.main_supabase_table.sb_schema_name as string,
-    sb_table_name: conn.main_supabase_table.sb_table_name as string,
-    sb_table_schema: conn.main_supabase_table.sb_table_schema,
-    sb_postgrest_methods: conn.main_supabase_table.sb_postgrest_methods,
-    pks: pk_cols,
-    pk: pk_col || pk_first_col,
+    sb_table_id: conn.sb_table_id,
+    sb_schema_name: conn.sb_schema_name as string,
+    sb_table_name: conn.sb_table_name as string,
+    sb_table_schema: conn.sb_table_schema,
+    sb_postgrest_methods: conn.sb_postgrest_methods,
+    pks: def.pks,
+    pk: def.pks[0],
+    definition: def,
   } satisfies TableXSBMainTableConnection;
 }
 

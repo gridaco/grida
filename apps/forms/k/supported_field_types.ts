@@ -288,7 +288,7 @@ export namespace FieldSupports {
     return file_alias(type) || richtext(type);
   }
 
-  export function fk(type: FormInputType) {
+  export function search(type: FormInputType) {
     return type === "search";
   }
 

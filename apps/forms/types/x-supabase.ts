@@ -1,5 +1,11 @@
 import type { SchemaTableConnectionXSupabaseMainTableJoint } from "./types";
-import type { PostgrestSingleResponse, User } from "@supabase/supabase-js";
+import type {
+  PostgrestSingleResponse,
+  Provider,
+  User,
+  AuthError,
+  Pagination,
+} from "@supabase/supabase-js";
 import type { Bucket } from "@supabase/storage-js";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 
@@ -50,7 +56,7 @@ export namespace GridaXSupabase {
   export interface SupabaseTable {
     id: number;
     supabase_project_id: number;
-    sb_schema_name: "public" | (string | {});
+    sb_schema_name: string;
     sb_table_name: string;
     sb_table_schema: JSONSChema;
     sb_postgrest_methods: XSBPostgrestMethod[];
@@ -64,6 +70,12 @@ export namespace GridaXSupabase {
     };
 
   export type SupabaseUser = User;
+
+  export type ListUsersResult =
+    | { data: { users: User[]; aud: string } & Pagination; error: null }
+    | { data: { users: [] }; error: AuthError };
+
+  export type SupabaseAuthProvider = Provider | "email";
 
   // TODO: typings are incomplete - type, format, etc
   export const SupabaseUserJsonSchema = {

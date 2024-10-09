@@ -1,7 +1,6 @@
 "use client";
 
 import Invalid from "@/components/invalid";
-import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import {
   useDatagridTable,
   useEditorState,
@@ -166,10 +165,7 @@ function ModeXSBMainTable() {
             table_id:
               EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID,
             fields,
-            definition:
-              SupabasePostgRESTOpenApi.parse_supabase_postgrest_schema_definition(
-                tb!.x_sb_main_table_connection.sb_table_schema
-              ),
+            definition: tb!.x_sb_main_table_connection.definition,
           })
         : { systemcolumns: [], columns: [] },
     [datagrid_table_id, fields, tb]

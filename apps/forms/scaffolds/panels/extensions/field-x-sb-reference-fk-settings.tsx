@@ -14,6 +14,7 @@ import {
   SelectGroup,
   SelectItem,
   SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -22,12 +23,17 @@ import { useEditorState } from "@/scaffolds/editor";
 import { SupabaseLogo } from "@/components/logos";
 
 export function SupabaseFKReferenceSettings({
+  readonly,
   format,
   value,
   onValueChange,
   enabled,
   onEnabledChange,
 }: {
+  /**
+   * Readonly is used when relation is set by the system and should not be changed by the user.
+   */
+  readonly?: boolean;
   format?: string;
   value?: Partial<FormFieldReferenceSchema> | null | undefined;
   onValueChange?: (value: Partial<FormFieldReferenceSchema>) => void;
@@ -66,7 +72,7 @@ export function SupabaseFKReferenceSettings({
     [onValueChange, schema, table]
   );
 
-  const fulltable = `${schema}.${table}`;
+  const fulltable = (schema && table && `${schema}.${table}`) || undefined;
 
   return (
     <PanelPropertySection>
@@ -79,7 +85,11 @@ export function SupabaseFKReferenceSettings({
           label={"Enable Foreign Key Search"}
           description="Enable Supabase Foreign Key Search to reference data from your Supabase project."
         >
-          <Switch checked={enabled} onCheckedChange={onEnabledChange} />
+          <Switch
+            disabled={readonly}
+            checked={enabled}
+            onCheckedChange={onEnabledChange}
+          />
         </PanelPropertyField>
         {enabled && (
           <>
@@ -87,12 +97,17 @@ export function SupabaseFKReferenceSettings({
               label={"Reference Table"}
               description="The table to reference data from."
             >
-              <Select value={fulltable} onValueChange={onTableChange}>
+              <Select
+                disabled={readonly}
+                value={fulltable}
+                onValueChange={onTableChange}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder={"Select Table"} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
+                    <SelectSeparator />
                     <SelectLabel>auth</SelectLabel>
                     <SelectItem value="auth.users">
                       <span>auth.users</span>
@@ -102,6 +117,7 @@ export function SupabaseFKReferenceSettings({
                     (schemaName) => {
                       return (
                         <SelectGroup key={schemaName}>
+                          <SelectSeparator />
                           <SelectLabel>{schemaName}</SelectLabel>
                           {Object.keys(
                             supabase_project!.sb_schema_definitions[schemaName]
@@ -120,72 +136,75 @@ export function SupabaseFKReferenceSettings({
                 </SelectContent>
               </Select>
             </PanelPropertyField>
-            <PanelPropertyField
-              label={"Column"}
-              description="The column to reference data from."
-            >
-              <Select
-                // setting this to undefined will throw (don't know why)
-                value={column ?? ""}
-                onValueChange={onColumnCahnge}
+            {fulltable && (
+              <PanelPropertyField
+                label={"Column"}
+                description="The column to reference data from."
               >
-                <SelectTrigger>
-                  <SelectValue placeholder={"Select Column"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {schema &&
-                    table &&
-                    (schema === "auth" && table === "users" ? (
-                      <>
-                        {Object.keys(
-                          GridaXSupabase.SupabaseUserJsonSchema.properties
-                        ).map((key) => {
-                          const property =
-                            GridaXSupabase.SupabaseUserJsonSchema.properties[
-                              key as GridaXSupabase.SupabaseUserColumn
-                            ];
-                          return (
-                            <SelectItem
-                              disabled={format !== property.format}
-                              key={key}
-                              value={key}
-                            >
-                              <span>{key}</span>{" "}
-                              <small className="ms-1 text-muted-foreground">
-                                {property.type} | {property.format}
-                              </small>
-                            </SelectItem>
-                          );
-                        })}
-                      </>
-                    ) : (
-                      <>
-                        {Object.keys(
-                          supabase_project!.sb_schema_definitions[schema][table]
-                            ?.properties ?? {}
-                        )?.map((key) => {
-                          const property =
+                <Select
+                  disabled={readonly}
+                  value={column || undefined}
+                  onValueChange={onColumnCahnge}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={"Select Column"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {schema &&
+                      table &&
+                      (schema === "auth" && table === "users" ? (
+                        <>
+                          {Object.keys(
+                            GridaXSupabase.SupabaseUserJsonSchema.properties
+                          ).map((key) => {
+                            const property =
+                              GridaXSupabase.SupabaseUserJsonSchema.properties[
+                                key as GridaXSupabase.SupabaseUserColumn
+                              ];
+                            return (
+                              <SelectItem
+                                disabled={format !== property.format}
+                                key={key}
+                                value={key}
+                              >
+                                <span>{key}</span>{" "}
+                                <small className="ms-1 text-muted-foreground">
+                                  {property.type} | {property.format}
+                                </small>
+                              </SelectItem>
+                            );
+                          })}
+                        </>
+                      ) : (
+                        <>
+                          {Object.keys(
                             supabase_project!.sb_schema_definitions[schema][
                               table
-                            ].properties?.[key];
-                          return (
-                            <SelectItem
-                              disabled={format !== property.format}
-                              key={key}
-                              value={key}
-                            >
-                              <span>{key}</span>{" "}
-                              <small className="ms-1 text-muted-foreground">
-                                {property.type} | {property.format}
-                              </small>
-                            </SelectItem>
-                          );
-                        })}
-                      </>
-                    ))}
-                </SelectContent>
-              </Select>
-            </PanelPropertyField>
+                            ]?.properties ?? {}
+                          )?.map((key) => {
+                            const property =
+                              supabase_project!.sb_schema_definitions[schema][
+                                table
+                              ].properties?.[key];
+                            return (
+                              <SelectItem
+                                disabled={format !== property.format}
+                                key={key}
+                                value={key}
+                              >
+                                <span>{key}</span>{" "}
+                                <small className="ms-1 text-muted-foreground">
+                                  {property.type} | {property.format}
+                                </small>
+                              </SelectItem>
+                            );
+                          })}
+                        </>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </PanelPropertyField>
+            )}
           </>
         )}
       </PanelPropertyFields>

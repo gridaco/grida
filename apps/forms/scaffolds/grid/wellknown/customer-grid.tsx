@@ -75,7 +75,7 @@ export function CustomerGrid({
               <Highlight
                 text={display}
                 tokens={tokens}
-                className="bg-foreground text-background"
+                highlightClassName="bg-foreground text-background"
               />
             </CellRoot>
           );

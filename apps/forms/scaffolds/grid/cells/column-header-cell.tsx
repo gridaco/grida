@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { FormInputType } from "@/types";
 import {
+  AvatarIcon,
   ChevronDownIcon,
   LockClosedIcon,
   Pencil1Icon,
@@ -37,7 +38,10 @@ export const ColumnHeaderCell = React.forwardRef(function ColumnHeaderCell(
     onDeleteClick,
   }: RenderHeaderCellProps<any> & {
     type: FormInputType;
-    fk: Data.Relation.NonCompositeRelationship | false;
+    fk:
+      | Data.Relation.NonCompositeRelationship
+      | "x-supabase.auth.users"
+      | false;
     readonly: boolean;
     onEditClick?: () => void;
     onDeleteClick?: () => void;
@@ -56,7 +60,13 @@ export const ColumnHeaderCell = React.forwardRef(function ColumnHeaderCell(
     >
       <span className="flex items-center gap-2">
         {fk ? (
-          <LinkIcon className="min-w-4 w-4 h-4 text-workbench-accent-sky" />
+          <>
+            {fk === "x-supabase.auth.users" ? (
+              <AvatarIcon className="w-4 h-4 text-workbench-accent-sky" />
+            ) : (
+              <LinkIcon className="min-w-4 w-4 h-4 text-workbench-accent-sky" />
+            )}
+          </>
         ) : (
           <FormFieldTypeIcon type={type} className="w-4 h-4" />
         )}

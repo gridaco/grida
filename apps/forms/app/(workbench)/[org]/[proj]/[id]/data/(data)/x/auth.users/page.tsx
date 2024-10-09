@@ -9,65 +9,63 @@ import {
   DataQueryTextSearch,
   GridQueryCount,
   TableViews,
+  GridQueryPaginationControl,
+  GridLoadingProgressLine,
 } from "@/scaffolds/grid-editor/components";
 import * as GridLayout from "@/scaffolds/grid-editor/components/layout";
-import { XSBReferenceTableGrid } from "@/scaffolds/grid/xsb-reference-grid";
-import { GridaXSupabase } from "@/types";
-import { EditorApiResponse } from "@/types/private/api";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CurrentTable } from "@/scaffolds/editor/utils/switch-table";
 import { GridData } from "@/scaffolds/grid-editor/grid-data";
 import { EditorSymbols } from "@/scaffolds/editor/symbols";
-import { XPostgrestQuery } from "@/lib/supabase-postgrest/builder";
 import useSWR from "swr";
-import { GridDataXSBUnknown } from "@/scaffolds/grid-editor/grid-data-xsb-unknow";
 import {
   useDataGridTextSearch,
   useDataGridQuery,
   useDataGridRefresh,
 } from "@/scaffolds/editor/use";
+import { XSBAuthUsersGrid } from "@/scaffolds/grid/wellknown/xsb-auth.users-grid";
+import { XSBUserRow } from "@/scaffolds/grid";
+import { GridaXSupabase } from "@/types";
 
 export default function XTablePage() {
   const [state, dispatch] = useEditorState();
+  const [total, setTotal] = useState<number>();
 
   const { supabase_project, datagrid_isloading, datagrid_query } = state;
 
   const refresh = useDataGridRefresh();
-  const query = useDataGridQuery();
+  const query = useDataGridQuery({ estimated_count: total });
   const search = useDataGridTextSearch();
 
-  const serachParams = useMemo(() => {
-    if (!datagrid_query) return;
-    const search = XPostgrestQuery.QS.select({
-      limit: datagrid_query?.q_page_limit,
-      order: datagrid_query?.q_orderby,
-      // cannot apply filter to auth.users
-      filters: undefined,
-    });
-    search.set("r", datagrid_query?.q_refresh_key?.toString());
-    return search;
+  const request = useMemo(() => {
+    if (!supabase_project) return null;
+    const request_url = PrivateEditorApi.XSupabase.url_x_auth_users_get(
+      supabase_project.id,
+      {
+        page: (datagrid_query?.q_page_index ?? 0) + 1,
+        perPage: datagrid_query?.q_page_limit ?? 100,
+      }
+    );
+
+    if (datagrid_query?.q_refresh_key) {
+      return request_url + "&r=" + datagrid_query.q_refresh_key;
+    }
+
+    return request_url;
   }, [datagrid_query]);
 
-  const request = supabase_project
-    ? PrivateEditorApi.XSupabase.url_x_auth_users_get(
-        supabase_project.id,
-        serachParams
-      )
-    : null;
-
-  const { data, isLoading, isValidating } = useSWR<
-    EditorApiResponse<{ users: any[] }, any>
-  >(
-    request,
-    async (url: string) => {
-      const res = await fetch(url);
-      return res.json();
-    },
-    {
-      // disable this since this feed replaces (not updates) the data, which causes the ui to refresh, causing certain ux fails (e.g. dialog on cell)
-      revalidateOnFocus: false,
-    }
-  );
+  const { data, isLoading, isValidating } =
+    useSWR<GridaXSupabase.ListUsersResult>(
+      request,
+      async (url: string) => {
+        const res = await fetch(url);
+        return res.json();
+      },
+      {
+        // disable this since this feed replaces (not updates) the data, which causes the ui to refresh, causing certain ux fails (e.g. dialog on cell)
+        revalidateOnFocus: false,
+      }
+    );
 
   useEffect(() => {
     dispatch({
@@ -75,15 +73,6 @@ export default function XTablePage() {
       isloading: isLoading || isValidating,
     });
   }, [dispatch, isLoading, isValidating]);
-
-  const columns = useMemo(
-    () =>
-      GridDataXSBUnknown.columns(GridaXSupabase.SupabaseUserJsonSchema, {
-        sort: "unknown_table_column_priorities",
-      }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
-  );
 
   const { filtered, inputlength } = useMemo(() => {
     return GridData.rows({
@@ -97,6 +86,12 @@ export default function XTablePage() {
       },
     });
   }, [data, state.datagrid_local_filter, state.datagrid_query?.q_text_search]);
+
+  useEffect(() => {
+    if (!data?.error) {
+      if (data?.data.total) setTotal(data?.data.total);
+    }
+  }, [data]);
 
   return (
     <CurrentTable
@@ -113,26 +108,29 @@ export default function XTablePage() {
               <GridViewSettings />
             </GridLayout.HeaderMenus>
           </GridLayout.HeaderLine>
+          <GridLoadingProgressLine />
         </GridLayout.Header>
         <GridLayout.Content>
-          <XSBReferenceTableGrid
-            masked={state.datagrid_local_filter.masking_enabled}
-            tokens={
+          <XSBAuthUsersGrid
+            rows={filtered as XSBUserRow[]}
+            loading={datagrid_isloading}
+            highlightTokens={
               state.datagrid_query?.q_text_search?.query
-                ? [state.datagrid_query?.q_text_search.query]
+                ? [state.datagrid_query.q_text_search.query]
                 : []
             }
-            columns={columns}
-            rows={filtered as GridaXSupabase.SupabaseUser[]}
-            loading={datagrid_isloading}
           />
         </GridLayout.Content>
         <GridLayout.Footer>
-          <GridQueryLimitSelect
-            value={query.limit}
-            onValueChange={query.onLimit}
-          />
-          <GridQueryCount count={filtered.length} keyword="user" />
+          <div className="flex gap-4 items-center">
+            <GridQueryPaginationControl {...query} />
+            <GridQueryLimitSelect
+              value={query.limit}
+              onValueChange={query.onLimit}
+            />
+          </div>
+          <GridLayout.FooterSeparator />
+          <GridQueryCount count={total} keyword="user" />
           <GridRefreshButton
             refreshing={refresh.refreshing}
             onRefreshClick={refresh.refresh}

@@ -1,10 +1,11 @@
 import {
-  Customer,
-  FormFieldDefinition,
-  FormResponse,
-  FormResponseField,
-  FormResponseSession,
+  type Customer,
+  type FormFieldDefinition,
+  type FormResponse,
+  type FormResponseField,
+  type FormResponseSession,
   GridaXSupabase,
+  isReferenceSchema,
 } from "@/types";
 import { fmt_local_index } from "@/utils/fmt";
 import type {
@@ -14,6 +15,7 @@ import type {
   DGSystemColumn,
   DataGridCellFileRefsResolver,
   DataGridFileRefsResolverQueryTask,
+  XSBUserRow,
 } from "../grid/types";
 import type {
   GDocSchemaTableProviderGrida,
@@ -27,7 +29,7 @@ import { PrivateEditorApi } from "@/lib/private";
 import { GridFilter } from "../grid-filter";
 import { EditorSymbols } from "../editor/symbols";
 import { SupabaseStorageExtensions } from "@/lib/supabase/storage-ext";
-import { Data } from "@/lib/data";
+import type { Data } from "@/lib/data";
 
 export namespace GridData {
   type DataGridFilterInput = {
@@ -119,20 +121,21 @@ export namespace GridData {
   } {
     const fieldcolumns = Array.from(params.fields)
       .sort((a, b) => a.local_index - b.local_index)
-      .map(
-        (field) =>
-          ({
-            key: field.id,
-            name: field.name,
-            readonly: field.readonly || false,
-            type: field.type,
-            storage: field.storage || null,
-            fk:
-              "definition" in params
-                ? params.definition?.properties[field.name]?.fk || false
-                : false,
-          }) satisfies DGColumn
-      );
+      .map((field) => {
+        const fk = xsb_fk({
+          field,
+          definition: "definition" in params ? params.definition : undefined,
+        });
+
+        return {
+          key: field.id,
+          name: field.name,
+          readonly: field.readonly || false,
+          type: field.type,
+          storage: field.storage || null,
+          fk: fk,
+        } satisfies DGColumn;
+      });
 
     switch (params.table_id) {
       case EditorSymbols.Table.SYM_GRIDA_FORMS_RESPONSE_TABLE_ID:
@@ -203,6 +206,37 @@ export namespace GridData {
     };
   }
 
+  type XSBColumnFK =
+    | Data.Relation.NonCompositeRelationship
+    | "x-supabase.auth.users"
+    | false;
+
+  function xsb_fk({
+    field,
+    definition,
+  }: {
+    field: FormFieldDefinition;
+    definition?: Omit<Data.Relation.TableDefinition, "name">;
+  }): XSBColumnFK {
+    if (definition?.properties?.[field.name]?.fk) {
+      return definition.properties[field.name].fk;
+    }
+
+    if (field.reference) {
+      if (isReferenceSchema(field.reference)) {
+        if (
+          field.reference.type === "x-supabase" &&
+          field.reference.schema === "auth" &&
+          field.reference.table === "users"
+        ) {
+          return "x-supabase.auth.users";
+        }
+      }
+    }
+
+    return false;
+  }
+
   type TProcessedGridRows =
     | {
         type: "response";
@@ -222,7 +256,7 @@ export namespace GridData {
     | {
         type: "x-supabase-auth.users";
         inputlength: number;
-        filtered: GridaXSupabase.SupabaseUser[];
+        filtered: XSBUserRow[];
       };
 
   function toLocalFilter(input: DataGridFilterInput): GridFilter.LocalFilter {
@@ -295,14 +329,23 @@ export namespace GridData {
         };
       }
       case EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID: {
+        const transformed = rows_from_xsb_users(input.data.rows);
         return {
           type: "x-supabase-auth.users",
           inputlength: input.data.rows.length,
           filtered: GridFilter.filter(
-            input.data.rows,
+            transformed,
             toLocalFilter(input.filter),
             undefined,
-            Object.keys(GridaXSupabase.SupabaseUserJsonSchema.properties)
+            [
+              "id",
+              "email",
+              "phone",
+              "display_name",
+              "providers",
+              "created_at",
+              "last_sign_in_at",
+            ]
           ),
         };
       }
@@ -481,6 +524,31 @@ export namespace GridData {
         return row;
       }) ?? []
     );
+  }
+
+  function rows_from_xsb_users(
+    users: GridaXSupabase.SupabaseUser[]
+  ): XSBUserRow[] {
+    return users.map((user) => {
+      return {
+        id: user.id,
+        avatar_url: user.user_metadata.avatar_url,
+        created_at: user.created_at,
+        display_name: user.user_metadata.full_name,
+        email: user.email,
+        phone: user.phone,
+        last_sign_in_at: user.last_sign_in_at,
+        providers:
+          (user.app_metadata
+            .providers as GridaXSupabase.SupabaseAuthProvider[]) ??
+          user.app_metadata.provider
+            ? [
+                user.app_metadata
+                  .provider! as GridaXSupabase.SupabaseAuthProvider,
+              ]
+            : [],
+      } satisfies XSBUserRow;
+    });
   }
 
   function rows_from_x_supabase_main_table({
