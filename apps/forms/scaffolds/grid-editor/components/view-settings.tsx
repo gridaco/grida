@@ -253,7 +253,8 @@ function _MaskingEnabled() {
         });
       }}
     >
-      Mask data
+      Mask data{" "}
+      <span className="inline ms-2 text-muted-foreground text-xs">Locally</span>
     </DropdownMenuCheckboxItem>
   );
 }

@@ -228,7 +228,6 @@ export function DataGrid({
   }
 
   const onCopy = (e: CopyEvent<RenderingRow>) => {
-    console.log(e);
     let val: string | undefined;
     if (e.sourceColumnKey.startsWith("__gf_")) {
       // copy value as is

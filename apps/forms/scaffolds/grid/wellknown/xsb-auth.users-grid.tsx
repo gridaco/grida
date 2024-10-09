@@ -28,6 +28,7 @@ import {
   useDataGridState,
   useMasking,
 } from "../providers";
+import toast from "react-hot-toast";
 import "../grid.css";
 
 type ColumnData = {
@@ -198,6 +199,15 @@ export function XSBAuthUsersGrid({
         rows={rows}
         renderers={{ noRowsFallback: <EmptyRowsRenderer loading={loading} /> }}
         rowKeyGetter={(row) => row.id}
+        onCopy={(e) => {
+          const val = e.sourceRow[e.sourceColumnKey as keyof XSBUserRow];
+          const cp = navigator.clipboard.writeText(String(val));
+          toast.promise(cp, {
+            loading: "Copying to clipboard...",
+            success: "Copied to clipboard",
+            error: "Failed to copy to clipboard",
+          });
+        }}
         rowHeight={32}
         headerRowHeight={36}
       />
