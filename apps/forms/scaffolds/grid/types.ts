@@ -1,5 +1,9 @@
 import type { Data } from "@/lib/data";
-import type { FormFieldStorageSchema, FormInputType } from "@/types";
+import type {
+  FormFieldStorageSchema,
+  FormInputType,
+  GridaXSupabase,
+} from "@/types";
 
 export interface DataGridCellSelectionCursor {
   pk: string | -1;
@@ -100,4 +104,15 @@ export type DGCustomerRow = {
   // address: string;
   created_at: string;
   last_seen_at: string;
+};
+
+export type XSBUserRow = {
+  id: string;
+  email: string | undefined;
+  phone: string | undefined;
+  display_name: string | undefined;
+  avatar_url: string | undefined;
+  providers: GridaXSupabase.SupabaseAuthProvider[];
+  created_at: string;
+  last_sign_in_at: string | undefined;
 };

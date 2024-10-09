@@ -1,5 +1,9 @@
 import type { SchemaTableConnectionXSupabaseMainTableJoint } from "./types";
-import type { PostgrestSingleResponse, User } from "@supabase/supabase-js";
+import type {
+  PostgrestSingleResponse,
+  Provider,
+  User,
+} from "@supabase/supabase-js";
 import type { Bucket } from "@supabase/storage-js";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 
@@ -64,6 +68,8 @@ export namespace GridaXSupabase {
     };
 
   export type SupabaseUser = User;
+
+  export type SupabaseAuthProvider = Provider | "email";
 
   // TODO: typings are incomplete - type, format, etc
   export const SupabaseUserJsonSchema = {

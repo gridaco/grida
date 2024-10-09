@@ -26,6 +26,7 @@ import {
   useDataGridQuery,
   useDataGridRefresh,
 } from "@/scaffolds/editor/use";
+import { XSBAuthUsersGrid } from "@/scaffolds/grid/wellknown/xsb-auth.users-grid";
 
 export default function XTablePage() {
   const [state, dispatch] = useEditorState();
@@ -115,15 +116,8 @@ export default function XTablePage() {
           </GridLayout.HeaderLine>
         </GridLayout.Header>
         <GridLayout.Content>
-          <XSBReferenceTableGrid
-            masked={state.datagrid_local_filter.masking_enabled}
-            tokens={
-              state.datagrid_query?.q_text_search?.query
-                ? [state.datagrid_query?.q_text_search.query]
-                : []
-            }
-            columns={columns}
-            rows={filtered as GridaXSupabase.SupabaseUser[]}
+          <XSBAuthUsersGrid
+            users={filtered as GridaXSupabase.SupabaseUser[]}
             loading={datagrid_isloading}
           />
         </GridLayout.Content>
