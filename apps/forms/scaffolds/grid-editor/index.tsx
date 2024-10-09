@@ -34,6 +34,7 @@ import {
   DataQueryTextSearch,
   GridQueryCount,
   GridQueryPaginationControl,
+  GridLoadingProgressLine,
 } from "./components";
 import * as GridLayout from "./components/layout";
 import { txt_n_plural } from "@/utils/plural";
@@ -78,8 +79,6 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { SchemaNameProvider, TableDefinitionProvider } from "../data-query";
 import { GridFileStorageQueueProvider } from "../grid/providers";
 import { XSBTextSearchInput } from "./components/query/xsb/xsb-text-search";
-import { LoadingProgress } from "@/components/extension/loading-progress";
-import { motion } from "framer-motion";
 import type { FormFieldDefinition } from "@/types";
 
 function useSelectedCells(): DataGridCellSelectionCursor[] {
@@ -321,18 +320,7 @@ export function GridEditor({
                 </ScrollArea>
               </GridLayout.HeaderLine>
             )}
-
-            <motion.div
-              className="relative w-full"
-              initial={{ opacity: 0 }}
-              animate={datagrid_isloading ? "visible" : "hidden"}
-              variants={{
-                hidden: { opacity: 0, transition: { duration: 0.8 } },
-                visible: { opacity: 1, transition: { duration: 0.15 } },
-              }}
-            >
-              <LoadingProgress className="absolute bottom-0 left-0 right-0 rounded-none h-0.5 w-full" />
-            </motion.div>
+            <GridLoadingProgressLine />
           </GridLayout.Header>
           <GridFileStorageQueueProvider
             table_id={table_id!}

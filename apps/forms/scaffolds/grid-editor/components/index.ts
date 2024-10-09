@@ -7,3 +7,4 @@ export * from "./view-settings";
 export * from "./pagination";
 export * from "./query";
 export * from "./ui";
+export * from "./loading-progress";

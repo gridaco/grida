@@ -10,6 +10,7 @@ import {
   GridQueryCount,
   TableViews,
   GridQueryPaginationControl,
+  GridLoadingProgressLine,
 } from "@/scaffolds/grid-editor/components";
 import * as GridLayout from "@/scaffolds/grid-editor/components/layout";
 import { useEffect, useMemo, useState } from "react";
@@ -37,12 +38,20 @@ export default function XTablePage() {
   const search = useDataGridTextSearch();
 
   const request = useMemo(() => {
-    return supabase_project
-      ? PrivateEditorApi.XSupabase.url_x_auth_users_get(supabase_project.id, {
-          page: (datagrid_query?.q_page_index ?? 0) + 1,
-          perPage: datagrid_query?.q_page_limit ?? 100,
-        })
-      : null;
+    if (!supabase_project) return null;
+    const request_url = PrivateEditorApi.XSupabase.url_x_auth_users_get(
+      supabase_project.id,
+      {
+        page: (datagrid_query?.q_page_index ?? 0) + 1,
+        perPage: datagrid_query?.q_page_limit ?? 100,
+      }
+    );
+
+    if (datagrid_query?.q_refresh_key) {
+      return request_url + "&r=" + datagrid_query.q_refresh_key;
+    }
+
+    return request_url;
   }, [datagrid_query]);
 
   const { data, isLoading, isValidating } =
@@ -99,6 +108,7 @@ export default function XTablePage() {
               <GridViewSettings />
             </GridLayout.HeaderMenus>
           </GridLayout.HeaderLine>
+          <GridLoadingProgressLine />
         </GridLayout.Header>
         <GridLayout.Content>
           <XSBAuthUsersGrid
