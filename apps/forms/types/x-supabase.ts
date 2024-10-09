@@ -3,6 +3,8 @@ import type {
   PostgrestSingleResponse,
   Provider,
   User,
+  AuthError,
+  Pagination,
 } from "@supabase/supabase-js";
 import type { Bucket } from "@supabase/storage-js";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
@@ -68,6 +70,10 @@ export namespace GridaXSupabase {
     };
 
   export type SupabaseUser = User;
+
+  export type ListUsersResult =
+    | { data: { users: User[]; aud: string } & Pagination; error: null }
+    | { data: { users: [] }; error: AuthError };
 
   export type SupabaseAuthProvider = Provider | "email";
 

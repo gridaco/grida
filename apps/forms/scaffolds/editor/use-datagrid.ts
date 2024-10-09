@@ -58,7 +58,7 @@ export function useDataGridTextSearch(delay: number = 250) {
 // #region query ========================================================================
 //
 
-export function useDataGridQuery() {
+export function useDataGridQuery(extra?: { estimated_count?: number }) {
   const [state, dispatch] = useEditorState();
   const table = useDatagridTable<
     GDocFormsXSBTable | GDocSchemaTableProviderXSupabase
@@ -67,7 +67,8 @@ export function useDataGridQuery() {
   const query = useStandaloneSchemaDataQueryConsumer(
     [state.datagrid_query!, dispatch],
     {
-      estimated_count: state.datagrid_query_estimated_count,
+      estimated_count:
+        extra?.estimated_count ?? state.datagrid_query_estimated_count,
     }
   );
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React from "react";
 import DataGrid, {
   Column,
   RenderCellProps,
@@ -23,12 +23,12 @@ import { GridaXSupabase } from "@/types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Apple, Google, KakaoTalkLogo } from "@/components/logos";
 import { cn } from "@/utils";
-import "../grid.css";
 import {
   DataGridStateProvider,
   useDataGridState,
   useMasking,
 } from "../providers";
+import "../grid.css";
 
 type ColumnData = {
   key: keyof XSBUserRow;
@@ -42,7 +42,7 @@ const _column_avatar = {
   key: "avatar_url",
   name: "",
   resizable: true,
-  draggable: true,
+  draggable: false,
   editable: false,
   frozen: true,
   width: 48,
@@ -67,7 +67,7 @@ const _column_provider = {
   key: "providers",
   name: "Providers",
   resizable: true,
-  draggable: true,
+  draggable: false,
   editable: false,
   frozen: false,
   width: 160,
@@ -102,7 +102,7 @@ function columnFromData(col: ColumnData) {
     key: col.key,
     name: col.name,
     resizable: true,
-    draggable: true,
+    draggable: false,
     editable: false,
     frozen: false,
     width: col.width,
@@ -122,8 +122,8 @@ function columnFromData(col: ColumnData) {
           <Highlight
             text={
               col.sensitive
-                ? formatted
-                : masker(formatted, { format: col.format })
+                ? masker(formatted, { format: col.format })
+                : formatted
             }
             tokens={highlightTokens}
             highlightClassName="bg-foreground text-background"

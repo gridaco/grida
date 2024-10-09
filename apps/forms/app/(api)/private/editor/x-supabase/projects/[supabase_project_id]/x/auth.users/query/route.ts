@@ -3,6 +3,7 @@ import { createXSupabaseClient } from "@/services/x-supabase";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
+import { GridaXSupabase } from "@/types";
 
 interface Context {
   params: {
@@ -18,8 +19,11 @@ export async function GET(req: NextRequest, context: Context) {
   const supabase = createRouteHandlerXSBClient(cookieStore);
   const { supabase_project_id } = context.params;
 
-  const _q_limit = req.nextUrl.searchParams.get("limit");
-  const limit = _q_limit ? parseInt(_q_limit) : undefined;
+  const _q_page = req.nextUrl.searchParams.get("page");
+  const page = _q_page ? parseInt(_q_page) : undefined;
+
+  const _q_perPage = req.nextUrl.searchParams.get("perPage");
+  const perPage = _q_perPage ? parseInt(_q_perPage) : undefined;
 
   // [REQUIRED] RLS gate
   const { data: supabase_project } = await supabase
@@ -40,9 +44,9 @@ export async function GET(req: NextRequest, context: Context) {
   });
 
   const res = await xclient.auth.admin.listUsers({
-    page: 1,
-    perPage: limit,
+    page: page,
+    perPage: perPage,
   });
 
-  return NextResponse.json(res);
+  return NextResponse.json(res satisfies GridaXSupabase.ListUsersResult);
 }

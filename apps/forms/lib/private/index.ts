@@ -281,9 +281,18 @@ export namespace PrivateEditorApi {
 
     export const url_x_auth_users_get = (
       supabase_project_id: number,
-      serachParams?: URLSearchParams | string
-    ) =>
-      `/private/editor/x-supabase/projects/${supabase_project_id}/x/auth.users/query${serachParams ? `?${serachParams}` : ""}`;
+      params?: { page: number; perPage: number }
+    ) => {
+      const path = `/private/editor/x-supabase/projects/${supabase_project_id}/x/auth.users/query`;
+      if (params) {
+        return `${path}?${new URLSearchParams({
+          page: params.page?.toString(),
+          perPage: params.perPage?.toString(),
+        }).toString()}`;
+      }
+
+      return path;
+    };
 
     /**
      * Note: this route accepts schema as Accept-Profile via headers like postgrest does. you will need to set the header with non-'public' schema
