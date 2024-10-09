@@ -68,6 +68,7 @@ import { XSupabaseFieldConnectionPolicyCheck } from "@/lib/x-supabase/check";
 import { FieldValueExpression } from "./extensions/field-value-expression";
 import { Tokens } from "@/ast";
 import { TypeSelect } from "@/components/formfield-type-select";
+import type { Data } from "@/lib/data";
 
 // @ts-ignore
 const default_field_init: {
@@ -306,6 +307,14 @@ export function FieldEditPanel({
       readonly,
       required,
     });
+
+  const supports_reference = x_sb_main_table_connection
+    ? xsb_reference_available({
+        name,
+        field: { type },
+        sb: x_sb_main_table_connection,
+      })
+    : false;
 
   const preview_placeholder =
     placeholder ||
@@ -952,16 +961,15 @@ export function FieldEditPanel({
               />
             </>
           )}
-          {FieldSupports.fk(type) && x_sb_main_table_connection && !!name && (
+          {supports_reference && (
             <>
               <hr />
               <SupabaseFKReferenceSettings
-                format={
-                  x_sb_main_table_connection.definition.properties[name]?.format
-                }
-                value={reference}
+                format={supports_reference.format}
+                readonly={supports_reference.readonly}
+                value={supports_reference.reference || reference}
                 onValueChange={setReference}
-                enabled={reference_enabled}
+                enabled={!!supports_reference.reference || reference_enabled}
                 onEnabledChange={__set_reference_enabled}
               />
             </>
@@ -978,6 +986,50 @@ export function FieldEditPanel({
       </PanelFooter>
     </SidePanel>
   );
+}
+
+function xsb_reference_available({
+  name,
+  field,
+  sb,
+}: {
+  name: string;
+  field: { type: FormInputType };
+  sb: {
+    sb_schema_name: string;
+    definition: Data.Relation.TableDefinition;
+  };
+}):
+  | {
+      readonly: boolean;
+      reference?: FormFieldReferenceSchema;
+      format: string;
+    }
+  | false {
+  if (!name) return false;
+
+  const property = sb.definition.properties[name];
+  if (property.fk) {
+    return {
+      readonly: true,
+      reference: {
+        type: "x-supabase",
+        schema: sb.sb_schema_name,
+        table: property.fk.referenced_table,
+        column: property.fk.referenced_column,
+      } satisfies FormFieldReferenceSchema,
+      format: property.format,
+    };
+  }
+  if (FieldSupports.search(field.type)) {
+    return {
+      readonly: false,
+      reference: undefined,
+      format: property.format,
+    };
+  }
+
+  return false;
 }
 
 function buildPreviewLabel({ name, label }: { name: string; label?: string }) {
