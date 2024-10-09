@@ -166,13 +166,10 @@ export function NameInput({
                     }
                   >
                     {Object.keys(
-                      x_sb_main_table_connection?.sb_table_schema?.properties ??
-                        {}
+                      x_sb_main_table_connection?.definition?.properties ?? {}
                     ).map((key) => {
                       const property =
-                        x_sb_main_table_connection?.sb_table_schema?.properties[
-                          key
-                        ];
+                        x_sb_main_table_connection?.definition?.properties[key];
 
                       const keywords = [
                         x_sb_main_table_connection?.sb_schema_name as string,

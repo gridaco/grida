@@ -957,8 +957,7 @@ export function FieldEditPanel({
               <hr />
               <SupabaseFKReferenceSettings
                 format={
-                  x_sb_main_table_connection.sb_table_schema.properties[name]
-                    ?.format
+                  x_sb_main_table_connection.definition.properties[name]?.format
                 }
                 value={reference}
                 onValueChange={setReference}

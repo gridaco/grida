@@ -80,7 +80,6 @@ import { GridFileStorageQueueProvider } from "../grid/providers";
 import { XSBTextSearchInput } from "./components/query/xsb/xsb-text-search";
 import { LoadingProgress } from "@/components/extension/loading-progress";
 import { motion } from "framer-motion";
-import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import type { FormFieldDefinition } from "@/types";
 
 function useSelectedCells(): DataGridCellSelectionCursor[] {
@@ -216,9 +215,7 @@ export function GridEditor({
   const definition = useMemo(() => {
     return tb
       ? "x_sb_main_table_connection" in tb
-        ? SupabasePostgRESTOpenApi.parse_supabase_postgrest_schema_definition(
-            tb.x_sb_main_table_connection.sb_table_schema
-          )
+        ? tb.x_sb_main_table_connection.definition
         : null
       : null;
   }, [tb]);
