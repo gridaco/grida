@@ -55,7 +55,7 @@ export function ReferenceSearch({
       }
     >
   >(
-    `/v1/session/${state.session_id}/field/${field_id}/search?per_page=${perpage}`,
+    `/v1/session/${state.session_id}/field/${field_id}/search?perPage=${perpage}`,
     async (url: string) => {
       const res = await fetch(url);
       return res.json();

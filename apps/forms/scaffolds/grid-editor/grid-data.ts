@@ -353,7 +353,6 @@ export namespace GridData {
         return {
           type: "customer",
           inputlength: input.data.rows.length,
-          // @ts-ignore - FIXME:
           filtered: GridFilter.filter(
             input.data.rows,
             toLocalFilter(input.filter),

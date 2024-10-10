@@ -24,10 +24,14 @@ export async function GET(
 
   const _q_page = req.nextUrl.searchParams.get("page");
   const page = _q_page ? parseInt(_q_page) : 1;
-  const _q_per_page = req.nextUrl.searchParams.get("per_page");
-  const per_page = _q_per_page ? parseInt(_q_per_page) : 50;
+  const _q_perPage = req.nextUrl.searchParams.get("perPage");
+  const perPage = _q_perPage ? parseInt(_q_perPage) : 50;
 
   // FIXME: Strict Authorization - this route accesses auth.users
+  // TODO: get session from cookies to strictly match the authorization
+  // 0. user must configure protection layer for their form (e.g. password protection)
+  // 1. check if session is expired
+  // 2. check if session signature matches
 
   const { data, error } = await grida_forms_client
     .from("response_session")
@@ -83,7 +87,7 @@ export async function GET(
             );
             const { data, error } = await x_client.auth.admin.listUsers({
               page: page,
-              perPage: per_page,
+              perPage: perPage,
             });
 
             if (error || !data) {
@@ -113,8 +117,8 @@ export async function GET(
           }
           case "public":
           default: {
-            const r1 = (page - 1) * per_page;
-            const r2 = r1 + per_page;
+            const r1 = (page - 1) * perPage;
+            const r2 = r1 + perPage;
 
             const res = await x_client.from(table).select().range(r1, r2);
 
