@@ -1011,24 +1011,26 @@ function xsb_reference_available({
   const property: Data.Relation.Attribute | undefined =
     sb.definition.properties[name];
 
-  if (property && property.fk) {
-    return {
-      readonly: true,
-      reference: {
-        type: "x-supabase",
-        schema: sb.sb_schema_name,
-        table: property.fk.referenced_table,
-        column: property.fk.referenced_column,
-      } satisfies FormFieldReferenceSchema,
-      format: property.format,
-    };
-  }
-  if (FieldSupports.search(field.type)) {
-    return {
-      readonly: false,
-      reference: undefined,
-      format: property.format,
-    };
+  if (property) {
+    if (property.fk) {
+      return {
+        readonly: true,
+        reference: {
+          type: "x-supabase",
+          schema: sb.sb_schema_name,
+          table: property.fk.referenced_table,
+          column: property.fk.referenced_column,
+        } satisfies FormFieldReferenceSchema,
+        format: property.format,
+      };
+    }
+    if (FieldSupports.search(field.type)) {
+      return {
+        readonly: false,
+        reference: undefined,
+        format: property.format,
+      };
+    }
   }
 
   return false;
