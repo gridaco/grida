@@ -25,7 +25,6 @@ import { Data } from "@/lib/data";
 import { useDebounce } from "@uidotdev/usehooks";
 import { QueryChip } from "../ui/chip";
 import { PostgresTypeTools } from "@/lib/x-supabase/typemap";
-import { useEditorState } from "@/scaffolds/editor/use";
 import {
   SQLLiteralInputValue,
   XSBSQLLiteralInput,
@@ -40,6 +39,7 @@ import {
 import { PopoverClose } from "@radix-ui/react-popover";
 import { WorkbenchUI } from "@/components/workbench";
 import {
+  useDataPlatform,
   useSchemaName,
   useTableDefinition,
   type IDataQueryPredicatesConsumer,
@@ -66,9 +66,7 @@ export function DataQueryPredicatesMenu({
   const properties = def ? def.properties : {};
 
   const schema_name = useSchemaName();
-
-  const [state] = useEditorState();
-  const { supabase_project } = state;
+  const platform = useDataPlatform();
 
   if (!isset) {
     return (
@@ -145,10 +143,10 @@ export function DataQueryPredicatesMenu({
                         </Select>
                       </div>
                       <div className="flex-1">
-                        {supabase_project ? (
+                        {platform.provider == "x-supabase" ? (
                           <XSBSQLLiteralInput
                             supabase={{
-                              supabase_project_id: supabase_project.id,
+                              supabase_project_id: platform.supabase_project_id,
                               supabase_schema_name: schema_name!,
                             }}
                             config={
@@ -270,8 +268,7 @@ export function DataQueryPredicateChip({
 
   const schema_name = useSchemaName();
 
-  const [state] = useEditorState();
-  const { supabase_project } = state;
+  const platform = useDataPlatform();
 
   const predicate = predicates[index];
 
@@ -356,10 +353,10 @@ export function DataQueryPredicateChip({
             <TrashIcon className="w-3 h-3" />
           </Button>
         </div>
-        {supabase_project ? (
+        {platform.provider == "x-supabase" ? (
           <XSBSQLLiteralInput
             supabase={{
-              supabase_project_id: supabase_project.id,
+              supabase_project_id: platform.supabase_project_id,
               supabase_schema_name: schema_name!,
             }}
             config={

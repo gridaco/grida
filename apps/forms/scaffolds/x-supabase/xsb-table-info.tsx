@@ -25,11 +25,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-export function SupabaseTableInfo({
-  table,
-}: {
-  table: GridaXSupabase.JSONSChema;
-}) {
+export function XSBTableInfo({ table }: { table: GridaXSupabase.JSONSChema }) {
   const { properties } = useMemo(
     () =>
       SupabasePostgRESTOpenApi.parse_supabase_postgrest_schema_definition(

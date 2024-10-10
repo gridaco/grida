@@ -71,6 +71,7 @@ export type DGColumn = {
   name: string;
   readonly: boolean;
   type?: FormInputType;
+  pk: boolean;
   fk: Data.Relation.NonCompositeRelationship | "x-supabase.auth.users" | false;
   storage?: FormFieldStorageSchema | {} | null;
 };

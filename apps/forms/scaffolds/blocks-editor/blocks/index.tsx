@@ -1,5 +1,5 @@
 import React from "react";
-import type { EditorFlatFormBlock } from "../../editor/state";
+import type { EditorFlatFormBlock } from "@/scaffolds/editor/state";
 import { DragHandleDots2Icon } from "@radix-ui/react-icons";
 import { useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";

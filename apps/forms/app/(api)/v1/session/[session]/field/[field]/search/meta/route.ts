@@ -1,16 +1,15 @@
 import { grida_forms_client } from "@/lib/supabase/server";
-import {
-  GridaXSupabaseService,
-  createXSupabaseClient,
-} from "@/services/x-supabase";
-import { FormFieldReferenceSchema, GridaXSupabase } from "@/types";
-import assert from "assert";
-import { notFound } from "next/navigation";
+import { GridaXSupabaseService } from "@/services/x-supabase";
+import { type FormFieldReferenceSchema, GridaXSupabase } from "@/types";
 import { NextRequest, NextResponse } from "next/server";
+import { notFound } from "next/navigation";
+import assert from "assert";
 
-//
-// TODO: consider dropping the `reference` field from the field schema - on x-sb, it's not needed
-//
+/**
+ * [search/meta] This endpoint serves the meta information for the search action.
+ * since we support db connection and search field on form can be a potential security risk,
+ * this endpoint only provides the meta information of the search field, and how the actual query can be made.
+ */
 export async function GET(
   req: NextRequest,
   context: {
@@ -21,13 +20,6 @@ export async function GET(
   }
 ) {
   const { session: session_id, field: field_id } = context.params;
-
-  const _q_page = req.nextUrl.searchParams.get("page");
-  const page = _q_page ? parseInt(_q_page) : 1;
-  const _q_per_page = req.nextUrl.searchParams.get("per_page");
-  const per_page = _q_per_page ? parseInt(_q_per_page) : 50;
-
-  // FIXME: Strict Authorization - this route accesses auth.users
 
   const { data, error } = await grida_forms_client
     .from("response_session")
@@ -65,75 +57,36 @@ export async function GET(
           supabase_project: { sb_schema_definitions },
         } = conn;
 
-        const x_client = await createXSupabaseClient(
-          supabase_connection?.supabase_project_id,
-          {
-            service_role: true,
-            db: {
-              schema: schema,
-            },
-          }
-        );
-
         switch (schema) {
           case "auth": {
             assert(
               table === "users",
               `Unsupported table "${table}" on schena "${schema}"`
             );
-            const { data, error } = await x_client.auth.admin.listUsers({
-              page: page,
-              perPage: per_page,
-            });
-
-            if (error || !data) {
-              console.error("search/err::user", error);
-              return NextResponse.error();
-            }
 
             return NextResponse.json({
               meta: {
-                schema_name: schema as string,
+                provider: "x-supabase",
+                supabase_project_id: supabase_connection.supabase_project_id,
+                schema_name: "auth",
                 table_name: table,
                 table_schema: GridaXSupabase.SupabaseUserJsonSchema as any,
-                column: column,
+                referenced_column: column,
               },
-              data: data.users,
-              count: data.total,
-              // always ok - for xsb auth
-              error: null,
-              status: 200,
-              statusText: "OK",
-            } satisfies GridaXSupabase.XSBSearchResult<
-              any,
-              {
-                column: string;
-              }
-            >);
+            } satisfies GridaXSupabase.Forms.XSBSearchMetaResult);
           }
           case "public":
           default: {
-            const r1 = (page - 1) * per_page;
-            const r2 = r1 + per_page;
-
-            const res = await x_client.from(table).select().range(r1, r2);
-
             return NextResponse.json({
-              ...res,
               meta: {
+                provider: "x-supabase",
+                supabase_project_id: supabase_connection.supabase_project_id,
                 schema_name: schema,
                 table_name: table,
-                column: column,
                 table_schema: sb_schema_definitions[schema][table],
+                referenced_column: column,
               },
-            } satisfies GridaXSupabase.XSBSearchResult<
-              any,
-              {
-                column: string;
-              }
-            >);
-
-            break;
+            } satisfies GridaXSupabase.Forms.XSBSearchMetaResult);
           }
         }
       }
@@ -153,6 +106,4 @@ export async function GET(
       }
     );
   }
-
-  return NextResponse.json({});
 }

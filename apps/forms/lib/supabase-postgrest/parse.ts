@@ -255,6 +255,11 @@ export namespace SupabasePostgRESTOpenApi {
       pk,
       fk: fk || false,
       default: defaultValue,
+      //
+      // Note: in postgREST, required means `not null`, but only valid for a table (not a view)
+      // when view, required[] is always undefined
+      // @see https://github.com/PostgREST/postgrest/issues/3745
+      //
       null: !_required,
     } satisfies PostgRESTColumnMeta;
   }

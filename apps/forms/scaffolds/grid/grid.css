@@ -1,3 +1,5 @@
+@import "react-data-grid/lib/styles.css";
+
 .rdg {
   --rdg-color: hsl(var(--foreground));
   --rdg-border-color: hsl(var(--border) / 0.25);

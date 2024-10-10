@@ -15,7 +15,6 @@ import type {
   DGSystemColumn,
   DataGridCellFileRefsResolver,
   DataGridFileRefsResolverQueryTask,
-  XSBUserRow,
 } from "../grid/types";
 import type {
   GDocSchemaTableProviderGrida,
@@ -66,13 +65,6 @@ export namespace GridData {
           rows: Customer[];
         };
       }
-    | {
-        filter: DataGridFilterInput;
-        table: typeof EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID;
-        data: {
-          rows: GridaXSupabase.SupabaseUser[];
-        };
-      }
     | (
         | {
             filter?: DataGridFilterInput;
@@ -119,12 +111,16 @@ export namespace GridData {
     systemcolumns: DGSystemColumn[];
     columns: DGColumn[];
   } {
+    const definition = "definition" in params ? params.definition : undefined;
+
     const fieldcolumns = Array.from(params.fields)
       .sort((a, b) => a.local_index - b.local_index)
       .map((field) => {
+        const property = definition?.properties?.[field.name];
+        const pk = property?.pk || false;
         const fk = xsb_fk({
           field,
-          definition: "definition" in params ? params.definition : undefined,
+          definition: definition,
         });
 
         return {
@@ -134,6 +130,7 @@ export namespace GridData {
           type: field.type,
           storage: field.storage || null,
           fk: fk,
+          pk,
         } satisfies DGColumn;
       });
 
@@ -158,24 +155,17 @@ export namespace GridData {
       }
       case EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID: {
         const { pks } = params.definition;
-        if (pks.length > 0) {
-          const pk1 = pks[0];
+        // check if pk is satisfied by registered fields
+        const is_pk_present = fieldcolumns.some((f) => {
+          return f.pk;
+        });
+
+        if (is_pk_present) {
           return {
-            systemcolumns: [
-              {
-                key: "__gf_display_id",
-                // 2. allow multiple PKs
-                name: pk1,
-              },
-            ],
-            columns: fieldcolumns.filter((f) => f.name !== pk1),
+            systemcolumns: [],
+            columns: fieldcolumns,
           };
-        }
-        break;
-      }
-      default:
-        if (params.definition) {
-          const { pks } = params.definition;
+        } else {
           if (pks.length > 0) {
             const pk1 = pks[0];
             return {
@@ -186,8 +176,39 @@ export namespace GridData {
                   name: pk1,
                 },
               ],
-              columns: fieldcolumns.filter((f) => f.name !== pk1),
+              columns: fieldcolumns,
             };
+          }
+        }
+        break;
+      }
+      default:
+        if (params.definition) {
+          const { pks } = params.definition;
+          // check if pk is satisfied by registered fields
+          const is_pk_present = fieldcolumns.some((f) => {
+            return f.pk;
+          });
+
+          if (is_pk_present) {
+            return {
+              systemcolumns: [],
+              columns: fieldcolumns,
+            };
+          } else {
+            if (pks.length > 0) {
+              const pk1 = pks[0];
+              return {
+                systemcolumns: [
+                  {
+                    key: "__gf_display_id",
+                    // 2. allow multiple PKs
+                    name: pk1,
+                  },
+                ],
+                columns: fieldcolumns,
+              };
+            }
           }
         }
         break;
@@ -252,11 +273,6 @@ export namespace GridData {
         type: "customer";
         inputlength: number;
         filtered: Customer[];
-      }
-    | {
-        type: "x-supabase-auth.users";
-        inputlength: number;
-        filtered: XSBUserRow[];
       };
 
   function toLocalFilter(input: DataGridFilterInput): GridFilter.LocalFilter {
@@ -328,32 +344,10 @@ export namespace GridData {
           }),
         };
       }
-      case EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID: {
-        const transformed = rows_from_xsb_users(input.data.rows);
-        return {
-          type: "x-supabase-auth.users",
-          inputlength: input.data.rows.length,
-          filtered: GridFilter.filter(
-            transformed,
-            toLocalFilter(input.filter),
-            undefined,
-            [
-              "id",
-              "email",
-              "phone",
-              "display_name",
-              "providers",
-              "created_at",
-              "last_sign_in_at",
-            ]
-          ),
-        };
-      }
       case EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID: {
         return {
           type: "customer",
           inputlength: input.data.rows.length,
-          // @ts-ignore - FIXME:
           filtered: GridFilter.filter(
             input.data.rows,
             toLocalFilter(input.filter),
@@ -524,31 +518,6 @@ export namespace GridData {
         return row;
       }) ?? []
     );
-  }
-
-  function rows_from_xsb_users(
-    users: GridaXSupabase.SupabaseUser[]
-  ): XSBUserRow[] {
-    return users.map((user) => {
-      return {
-        id: user.id,
-        avatar_url: user.user_metadata.avatar_url,
-        created_at: user.created_at,
-        display_name: user.user_metadata.full_name,
-        email: user.email,
-        phone: user.phone,
-        last_sign_in_at: user.last_sign_in_at,
-        providers:
-          (user.app_metadata
-            .providers as GridaXSupabase.SupabaseAuthProvider[]) ??
-          user.app_metadata.provider
-            ? [
-                user.app_metadata
-                  .provider! as GridaXSupabase.SupabaseAuthProvider,
-              ]
-            : [],
-      } satisfies XSBUserRow;
-    });
   }
 
   function rows_from_x_supabase_main_table({

@@ -22,6 +22,7 @@ import {
 import Axios from "axios";
 import { XPostgrestQuery } from "@/lib/supabase-postgrest/builder";
 import { PostgrestSingleResponse } from "@supabase/postgrest-js";
+import { safeSearchParams } from "@/utils/qs";
 
 export namespace PrivateEditorApi {
   export namespace Files {
@@ -281,13 +282,14 @@ export namespace PrivateEditorApi {
 
     export const url_x_auth_users_get = (
       supabase_project_id: number,
-      params?: { page: number; perPage: number }
+      params?: { page?: number; perPage?: number; r?: string | number }
     ) => {
       const path = `/private/editor/x-supabase/projects/${supabase_project_id}/x/auth.users/query`;
       if (params) {
-        return `${path}?${new URLSearchParams({
-          page: params.page?.toString(),
-          perPage: params.perPage?.toString(),
+        return `${path}?${safeSearchParams({
+          page: params.page,
+          perPage: params.perPage,
+          r: params.r,
         }).toString()}`;
       }
 

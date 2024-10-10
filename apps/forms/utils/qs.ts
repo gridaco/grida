@@ -41,3 +41,32 @@ export function omit(search: URLSearchParams, ...omit: string[]) {
   }
   return search;
 }
+
+/**
+ * Safely converts a given object of key-value pairs into URL search parameters.
+ * It filters out `null` and `undefined` values and ensures all others are
+ * converted to strings before being added to the URL parameters.
+ *
+ * @param params - An object where the keys are strings and the values can be
+ * of type string, number, boolean, null, or undefined.
+ *
+ * @returns A `URLSearchParams` object containing only the valid key-value pairs.
+ *
+ * @example
+ * ```ts
+ * const params = { name: 'John', age: 30, active: true, token: null };
+ * const searchParams = safeSearchParams(params);
+ * console.log(searchParams.toString()); // "name=John&age=30&active=true"
+ * ```
+ */
+export function safeSearchParams(
+  params: Record<string, string | number | boolean | null | undefined>
+) {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null) {
+      search.set(key, value.toString());
+    }
+  }
+  return search;
+}

@@ -1,6 +1,6 @@
 import { Data } from "@/lib/data";
 import React, { createContext, useState } from "react";
-import { useXSupabaseTableSearch } from "@/scaffolds/x-supabase/use-x-supabase-table-search";
+import { useXSBTableSearch } from "@/scaffolds/x-supabase/use-xsb-table-search";
 import { GridaXSupabase } from "@/types";
 
 interface LookupState {
@@ -30,7 +30,7 @@ function XSBReferencedRowLookupProvider({
 }>) {
   //
 
-  const { data, isLoading } = useXSupabaseTableSearch({
+  const { data, isLoading } = useXSBTableSearch({
     supabase_project_id: reference.supabase_project_id,
     supabase_schema_name: reference.supabase_schema_name,
     supabase_table_name: reference.relation.referenced_table,

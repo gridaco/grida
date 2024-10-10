@@ -27,6 +27,7 @@ import {
   DataQueryOrderbyChip,
   DataQueryPredicateChip,
   DataQueryPrediateAddMenu,
+  GridLoadingProgressLine,
 } from "@/scaffolds/grid-editor/components";
 import {
   SchemaNameProvider,
@@ -37,9 +38,10 @@ import {
 import { Data } from "@/lib/data";
 import toast from "react-hot-toast";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { XSBTextSearchInput } from "./xsb-text-search";
+import { XSBTextSearchInput } from "@/scaffolds/grid-editor/components/query/xsb/xsb-text-search";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
-import { useXSupabaseTableSearch } from "@/scaffolds/x-supabase/use-x-supabase-table-search";
+import { useXSBTableSearch } from "@/scaffolds/x-supabase";
+import { DataPlatformProvider } from "@/scaffolds/data-query";
 
 type SQLForeignKeyValue = string | number | undefined;
 
@@ -52,7 +54,7 @@ export function XSBSearchTableSheet({
   ...props
 }: React.ComponentProps<typeof Sheet> & {
   onValueChange?: (value: SQLForeignKeyValue) => void;
-  relation: Data.Relation.NonCompositeRelationship;
+  relation: Omit<Data.Relation.NonCompositeRelationship, "referencing_column">;
   supabase_project_id: number;
   supabase_schema_name: string;
 }) {
@@ -70,24 +72,28 @@ export function XSBSearchTableSheet({
           </SheetDescription>
         </SheetHeader>
         <hr />
-        <SchemaNameProvider schema={supabase_schema_name}>
-          <StandaloneDataQueryProvider
-            initial={{
-              ...Data.Relation.INITIAL_QUERY_STATE,
-              q_text_search: { query: "", column: null, type: "websearch" },
-            }}
-          >
-            <XSBSearchTableDataGrid
-              supabase_project_id={supabase_project_id}
-              supabase_schema_name={supabase_schema_name}
-              supabase_table_name={relation.referenced_table}
-              onRowDoubleClick={(row) => {
-                onValueChange?.(row[relation.referenced_column]);
-                props.onOpenChange?.(false);
+        <DataPlatformProvider
+          platform={{ provider: "x-supabase", supabase_project_id }}
+        >
+          <SchemaNameProvider schema={supabase_schema_name}>
+            <StandaloneDataQueryProvider
+              initial={{
+                ...Data.Relation.INITIAL_QUERY_STATE,
+                q_text_search: { query: "", column: null, type: "websearch" },
               }}
-            />
-          </StandaloneDataQueryProvider>
-        </SchemaNameProvider>
+            >
+              <XSBSearchTableDataGrid
+                supabase_project_id={supabase_project_id}
+                supabase_schema_name={supabase_schema_name}
+                supabase_table_name={relation.referenced_table}
+                onRowDoubleClick={(row) => {
+                  onValueChange?.(row[relation.referenced_column]);
+                  props.onOpenChange?.(false);
+                }}
+              />
+            </StandaloneDataQueryProvider>
+          </SchemaNameProvider>
+        </DataPlatformProvider>
       </SheetContent>
     </Sheet>
   );
@@ -113,7 +119,7 @@ function XSBSearchTableDataGrid({
   const { predicates, isPredicatesSet, isOrderbySet } = query;
   const is_query_orderby_or_predicates_set = isPredicatesSet || isOrderbySet;
 
-  const { data, error, isLoading } = useXSupabaseTableSearch({
+  const { data, error, isLoading } = useXSBTableSearch({
     supabase_project_id,
     supabase_table_name,
     supabase_schema_name,
@@ -203,6 +209,7 @@ function XSBSearchTableDataGrid({
               </ScrollArea>
             </GridLayout.HeaderLine>
           )}
+          <GridLoadingProgressLine loading={isLoading} />
         </GridLayout.Header>
         <GridLayout.Content>
           <XSBReferenceTableGrid

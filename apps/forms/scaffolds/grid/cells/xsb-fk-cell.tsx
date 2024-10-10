@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Data } from "@/lib/data";
 import { LinkIcon } from "lucide-react";
-import { XSBSearchTableSheet } from "@/scaffolds/grid-editor/components/query/xsb";
+import { XSBSearchTableSheet } from "@/scaffolds/x-supabase/xsb-search-table-sheet";
 import { BlockKeys } from "./block-keys";
 
 type SQLForeignKeyValue = string | number | undefined;

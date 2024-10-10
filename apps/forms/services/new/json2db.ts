@@ -210,7 +210,7 @@ export class JSONFrom2DB {
     assert(!!this.form_id, "form not inserted");
     assert(!!this.form_document_id, "page not inserted");
 
-    // FIXME: block mapping is not complete - only works for field blocks and header blocks
+    // TODO: block mapping is not complete - only works for field blocks and header blocks
 
     // @ts-ignore
     const rows: FormBlockInsertion[] = this.renderer.blocks().map((b, i) => {

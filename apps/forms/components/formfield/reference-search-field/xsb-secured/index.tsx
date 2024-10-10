@@ -10,7 +10,7 @@ import { cn } from "@/utils";
 
 type SQLForeignKeyValue = string | number | undefined;
 
-export function XSBSQLForeignKeySearchInput({
+export function FormsSecureXSBSQLForeignKeySearchInput({
   value,
   onValueChange,
   relation,
@@ -19,10 +19,10 @@ export function XSBSQLForeignKeySearchInput({
   className,
   ...props
 }: Omit<React.ComponentProps<typeof Input>, "onChange"> & {
-  relation: Data.Relation.NonCompositeRelationship;
+  relation: Omit<Data.Relation.NonCompositeRelationship, "referencing_column">;
   supabase_project_id: number;
   supabase_schema_name: string;
-  value: SQLForeignKeyValue;
+  value?: SQLForeignKeyValue;
   onValueChange?: (value: SQLForeignKeyValue) => void;
 }) {
   const [open, setOpen] = React.useState(false);

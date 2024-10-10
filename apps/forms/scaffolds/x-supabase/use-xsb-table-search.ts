@@ -21,7 +21,7 @@ const x_table_search_swr_fetcher = async (
   return res.json();
 };
 
-export function useXSupabaseTableSearch({
+export function useXSBTableSearch({
   supabase_project_id,
   supabase_schema_name,
   supabase_table_name,

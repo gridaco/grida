@@ -9,7 +9,7 @@ import { formlink } from "@/lib/forms/url";
 import { GridaFormsFormView, type FormViewTranslation } from "./formview";
 import type { FormPageBackgroundSchema } from "@/types";
 import { FormPageBackground } from "./background";
-
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { useRequestFormSession, useFormSession } from "./load";
 import { Env } from "@/env";
 
@@ -97,29 +97,31 @@ export function GridaForm({
 
   return (
     <main className="min-h-screen flex flex-col items-center pt-10 md:pt-16">
-      <GridaFormsFormView
-        method={method}
-        encType={method === "post" ? "multipart/form-data" : undefined}
-        action={submit_action}
-        form_id={form_id}
-        session_id={session}
-        fields={fields}
-        defaultValues={default_values}
-        blocks={blocks}
-        tree={tree}
-        translation={translation}
-        config={options}
-        stylesheet={stylesheet}
-        onAfterSubmit={onAfterSubmit}
-      />
-      {background && (
-        <FormPageBackground {...(background as FormPageBackgroundSchema)} />
-      )}
-      {error && (
-        <div className="absolute top-4 right-4">
-          <FormPageDeveloperErrorDialog {...error} />
-        </div>
-      )}
+      <TooltipProvider>
+        <GridaFormsFormView
+          method={method}
+          encType={method === "post" ? "multipart/form-data" : undefined}
+          action={submit_action}
+          form_id={form_id}
+          session_id={session}
+          fields={fields}
+          defaultValues={default_values}
+          blocks={blocks}
+          tree={tree}
+          translation={translation}
+          config={options}
+          stylesheet={stylesheet}
+          onAfterSubmit={onAfterSubmit}
+        />
+        {background && (
+          <FormPageBackground {...(background as FormPageBackgroundSchema)} />
+        )}
+        {error && (
+          <div className="absolute top-4 right-4">
+            <FormPageDeveloperErrorDialog {...error} />
+          </div>
+        )}
+      </TooltipProvider>
     </main>
   );
 }
