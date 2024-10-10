@@ -62,6 +62,7 @@ export function RowEditPanel({
     row: TVirtualRow<FormResponseField, FormResponse>;
   }>;
 }) {
+  const [state, dispatch] = useEditorState();
   const { row } = init ?? {};
 
   const [advanced, setAdvanced] = useState<boolean>(mode === "update");
@@ -99,6 +100,11 @@ export function RowEditPanel({
 
                   promise.then(() => {
                     props.onOpenChange?.(false);
+
+                    // refresh data once saved
+                    dispatch({
+                      type: "data/query/refresh",
+                    });
                   });
                 }}
               />
