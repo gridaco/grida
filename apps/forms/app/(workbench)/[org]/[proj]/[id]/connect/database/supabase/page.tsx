@@ -68,7 +68,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { SupabaseTableInfo } from "@/scaffolds/x-supabase/supabase-table-info";
+import { XSBTableInfo } from "@/scaffolds/x-supabase/xsb-table-info";
 import { useEditorState } from "@/scaffolds/editor";
 import { XSupabasePrivateApiTypes } from "@/types/private/api";
 import { Sector, SectorHeader, SectorHeading } from "@/components/preferences";
@@ -689,7 +689,7 @@ function ConnectSchema({
                             <TableIcon className="me-2 inline-flex" />
                             {schema}.{table}
                           </Label>
-                          <SupabaseTableInfo
+                          <XSBTableInfo
                             table={tables[table] as GridaXSupabase.JSONSChema}
                           />
                         </div>
@@ -840,7 +840,7 @@ function ConnectFormXSupabaseTable({
               </Label>
 
               {tableName && sb_schema_definitions[schemaName][tableName] && (
-                <SupabaseTableInfo
+                <XSBTableInfo
                   table={
                     sb_schema_definitions[schemaName][
                       tableName
