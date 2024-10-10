@@ -1008,8 +1008,10 @@ function xsb_reference_available({
   | false {
   if (!name) return false;
 
-  const property = sb.definition.properties[name];
-  if (property.fk) {
+  const property: Data.Relation.Attribute | undefined =
+    sb.definition.properties[name];
+
+  if (property && property.fk) {
     return {
       readonly: true,
       reference: {
