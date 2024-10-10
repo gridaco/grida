@@ -62,6 +62,9 @@ export function ReferenceSearch({
           }}
           supabase_project_id={data.meta.supabase_project_id}
           supabase_schema_name={data.meta.schema_name}
+          // [required] - for form validation
+          {...props}
+          // TODO: inspect me does the parent inteface need this?
           value={value as any}
           onValueChange={setValue}
         />
