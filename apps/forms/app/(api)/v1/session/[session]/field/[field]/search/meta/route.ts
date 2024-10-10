@@ -68,7 +68,7 @@ export async function GET(
               meta: {
                 provider: "x-supabase",
                 supabase_project_id: supabase_connection.supabase_project_id,
-                schema_name: schema as string,
+                schema_name: "auth",
                 table_name: table,
                 table_schema: GridaXSupabase.SupabaseUserJsonSchema as any,
                 referenced_column: column,

@@ -3,7 +3,7 @@ import { useFormAgentState } from "@/lib/formstate";
 import { GridaXSupabase } from "@/types";
 import { SearchInput } from "@/components/extension/search-input";
 import { InputSkeleton } from "@/components/extension/input-skeleton";
-import { FormsSecureXSBSQLForeignKeySearchInput } from "./xsb";
+import { FormsSecureXSBSQLForeignKeySearchInput } from "./xsb-secured";
 import useSWR from "swr";
 
 /**

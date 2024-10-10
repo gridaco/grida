@@ -4,6 +4,7 @@ import type { DataGridCellRootProps } from "../cells";
 import assert from "assert";
 
 type State = {
+  masking_enabled?: boolean;
   local_cursor_id?: string;
   selections?: Array<DataGridCellSelectionCursor>;
   highlightTokens?: string[];
@@ -12,11 +13,13 @@ type State = {
 const Context = React.createContext<State | null>(null);
 
 export function DataGridStateProvider({
-  children,
+  masking_enabled,
   local_cursor_id,
   selections,
   highlightTokens,
+  children,
 }: React.PropsWithChildren<{
+  masking_enabled?: boolean;
   local_cursor_id?: string;
   selections?: Array<DataGridCellSelectionCursor>;
   highlightTokens?: string[];
@@ -24,6 +27,7 @@ export function DataGridStateProvider({
   return (
     <Context.Provider
       value={{
+        masking_enabled,
         local_cursor_id,
         selections,
         highlightTokens: highlightTokens,

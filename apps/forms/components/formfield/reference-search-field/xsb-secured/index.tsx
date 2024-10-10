@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Link2Icon } from "@radix-ui/react-icons";
 import { Data } from "@/lib/data";
-import { XSBSearchTableSheet } from "@/scaffolds/x-supabase/xsb-search-table-sheet";
+import { XSBSearchTableSheet, XSBListUsersSheet } from "@/scaffolds/x-supabase";
 import { cn } from "@/utils";
 
 type SQLForeignKeyValue = string | number | undefined;
@@ -27,16 +27,30 @@ export function FormsSecureXSBSQLForeignKeySearchInput({
 }) {
   const [open, setOpen] = React.useState(false);
 
+  const is_xsb_auth_users_table =
+    supabase_schema_name === "auth" && relation.referenced_table === "users";
+
   return (
     <>
-      <XSBSearchTableSheet
-        onValueChange={onValueChange}
-        open={open}
-        onOpenChange={setOpen}
-        relation={relation}
-        supabase_project_id={supabase_project_id}
-        supabase_schema_name={supabase_schema_name}
-      />
+      {is_xsb_auth_users_table ? (
+        <XSBListUsersSheet
+          onValueChange={onValueChange}
+          open={open}
+          onOpenChange={setOpen}
+          relation={relation}
+          supabase_project_id={supabase_project_id}
+        />
+      ) : (
+        <XSBSearchTableSheet
+          onValueChange={onValueChange}
+          open={open}
+          onOpenChange={setOpen}
+          relation={relation}
+          supabase_project_id={supabase_project_id}
+          supabase_schema_name={supabase_schema_name}
+        />
+      )}
+
       <div className="relative group">
         <Input
           type="search"

@@ -72,9 +72,8 @@ import { useMediaViewer } from "@/components/mediaviewer";
 import { useSchemaName, useTableDefinition } from "../data-query";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-
-import "./grid.css";
 import { ReferencedRowLookupPopover } from "./widgets/fk-referenced-row-lookup-popover";
+import "./grid.css";
 
 function rowKeyGetter(row: DGResponseRow) {
   return row.__gf_id;
@@ -252,6 +251,7 @@ export function DataGrid({
 
   return (
     <DataGridStateProvider
+      masking_enabled={state.datagrid_local_filter.masking_enabled}
       local_cursor_id={local_cursor_id}
       selections={selectedCells ?? []}
       highlightTokens={highlightTokens}

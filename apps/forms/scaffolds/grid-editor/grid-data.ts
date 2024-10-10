@@ -15,7 +15,6 @@ import type {
   DGSystemColumn,
   DataGridCellFileRefsResolver,
   DataGridFileRefsResolverQueryTask,
-  XSBUserRow,
 } from "../grid/types";
 import type {
   GDocSchemaTableProviderGrida,
@@ -64,13 +63,6 @@ export namespace GridData {
         table: typeof EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID;
         data: {
           rows: Customer[];
-        };
-      }
-    | {
-        filter: DataGridFilterInput;
-        table: typeof EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID;
-        data: {
-          rows: GridaXSupabase.SupabaseUser[];
         };
       }
     | (
@@ -252,11 +244,6 @@ export namespace GridData {
         type: "customer";
         inputlength: number;
         filtered: Customer[];
-      }
-    | {
-        type: "x-supabase-auth.users";
-        inputlength: number;
-        filtered: XSBUserRow[];
       };
 
   function toLocalFilter(input: DataGridFilterInput): GridFilter.LocalFilter {
@@ -326,27 +313,6 @@ export namespace GridData {
               input.fields.map((f) => f.name)
             ),
           }),
-        };
-      }
-      case EditorSymbols.Table.SYM_GRIDA_X_SUPABASE_AUTH_USERS_TABLE_ID: {
-        const transformed = rows_from_xsb_users(input.data.rows);
-        return {
-          type: "x-supabase-auth.users",
-          inputlength: input.data.rows.length,
-          filtered: GridFilter.filter(
-            transformed,
-            toLocalFilter(input.filter),
-            undefined,
-            [
-              "id",
-              "email",
-              "phone",
-              "display_name",
-              "providers",
-              "created_at",
-              "last_sign_in_at",
-            ]
-          ),
         };
       }
       case EditorSymbols.Table.SYM_GRIDA_CUSTOMER_TABLE_ID: {
@@ -523,31 +489,6 @@ export namespace GridData {
         return row;
       }) ?? []
     );
-  }
-
-  function rows_from_xsb_users(
-    users: GridaXSupabase.SupabaseUser[]
-  ): XSBUserRow[] {
-    return users.map((user) => {
-      return {
-        id: user.id,
-        avatar_url: user.user_metadata.avatar_url,
-        created_at: user.created_at,
-        display_name: user.user_metadata.full_name,
-        email: user.email,
-        phone: user.phone,
-        last_sign_in_at: user.last_sign_in_at,
-        providers:
-          (user.app_metadata
-            .providers as GridaXSupabase.SupabaseAuthProvider[]) ??
-          user.app_metadata.provider
-            ? [
-                user.app_metadata
-                  .provider! as GridaXSupabase.SupabaseAuthProvider,
-              ]
-            : [],
-      } satisfies XSBUserRow;
-    });
   }
 
   function rows_from_x_supabase_main_table({

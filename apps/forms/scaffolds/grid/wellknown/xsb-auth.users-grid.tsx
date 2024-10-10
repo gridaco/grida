@@ -186,13 +186,20 @@ export function XSBAuthUsersGrid({
   rows,
   loading,
   highlightTokens,
+  onRowDoubleClick,
+  mask,
 }: {
   rows: XSBUserRow[];
   loading?: boolean;
   highlightTokens?: string[];
+  mask?: boolean;
+  onRowDoubleClick?: (row: XSBUserRow) => void;
 }) {
   return (
-    <DataGridStateProvider highlightTokens={highlightTokens}>
+    <DataGridStateProvider
+      masking_enabled={mask}
+      highlightTokens={highlightTokens}
+    >
       <DataGrid
         className="flex-grow select-none text-xs text-foreground/80"
         columns={columns}
@@ -210,6 +217,9 @@ export function XSBAuthUsersGrid({
         }}
         rowHeight={32}
         headerRowHeight={36}
+        onCellDoubleClick={({ row }) => {
+          onRowDoubleClick?.(row);
+        }}
       />
     </DataGridStateProvider>
   );

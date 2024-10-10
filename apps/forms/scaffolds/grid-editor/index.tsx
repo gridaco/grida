@@ -334,7 +334,7 @@ export function GridEditor({
                   </ScrollArea>
                 </GridLayout.HeaderLine>
               )}
-              <GridLoadingProgressLine />
+              <GridLoadingProgressLine loading={datagrid_isloading} />
             </GridLayout.Header>
             <GridFileStorageQueueProvider
               table_id={table_id!}
