@@ -48,6 +48,7 @@ export function XSBSQLForeignKeySearchInput({
         />
         <div className="absolute hidden group-hover:flex items-center justify-end right-2 top-2 bottom-2">
           <Button
+            type="button"
             variant="outline"
             size="icon"
             className="w-6 h-6"

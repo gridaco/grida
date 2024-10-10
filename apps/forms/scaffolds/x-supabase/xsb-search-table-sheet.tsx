@@ -40,6 +40,7 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { XSBTextSearchInput } from "@/scaffolds/grid-editor/components/query/xsb/xsb-text-search";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { useXSupabaseTableSearch } from "@/scaffolds/x-supabase/use-x-supabase-table-search";
+import { DataPlatformProvider } from "@/scaffolds/data-query";
 
 type SQLForeignKeyValue = string | number | undefined;
 
@@ -52,7 +53,7 @@ export function XSBSearchTableSheet({
   ...props
 }: React.ComponentProps<typeof Sheet> & {
   onValueChange?: (value: SQLForeignKeyValue) => void;
-  relation: Data.Relation.NonCompositeRelationship;
+  relation: Omit<Data.Relation.NonCompositeRelationship, "referencing_column">;
   supabase_project_id: number;
   supabase_schema_name: string;
 }) {
@@ -70,24 +71,28 @@ export function XSBSearchTableSheet({
           </SheetDescription>
         </SheetHeader>
         <hr />
-        <SchemaNameProvider schema={supabase_schema_name}>
-          <StandaloneDataQueryProvider
-            initial={{
-              ...Data.Relation.INITIAL_QUERY_STATE,
-              q_text_search: { query: "", column: null, type: "websearch" },
-            }}
-          >
-            <XSBSearchTableDataGrid
-              supabase_project_id={supabase_project_id}
-              supabase_schema_name={supabase_schema_name}
-              supabase_table_name={relation.referenced_table}
-              onRowDoubleClick={(row) => {
-                onValueChange?.(row[relation.referenced_column]);
-                props.onOpenChange?.(false);
+        <DataPlatformProvider
+          platform={{ provider: "x-supabase", supabase_project_id }}
+        >
+          <SchemaNameProvider schema={supabase_schema_name}>
+            <StandaloneDataQueryProvider
+              initial={{
+                ...Data.Relation.INITIAL_QUERY_STATE,
+                q_text_search: { query: "", column: null, type: "websearch" },
               }}
-            />
-          </StandaloneDataQueryProvider>
-        </SchemaNameProvider>
+            >
+              <XSBSearchTableDataGrid
+                supabase_project_id={supabase_project_id}
+                supabase_schema_name={supabase_schema_name}
+                supabase_table_name={relation.referenced_table}
+                onRowDoubleClick={(row) => {
+                  onValueChange?.(row[relation.referenced_column]);
+                  props.onOpenChange?.(false);
+                }}
+              />
+            </StandaloneDataQueryProvider>
+          </SchemaNameProvider>
+        </DataPlatformProvider>
       </SheetContent>
     </Sheet>
   );
