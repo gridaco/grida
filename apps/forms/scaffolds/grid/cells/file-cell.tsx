@@ -42,7 +42,7 @@ import {
 } from "@/components/ui/tooltip";
 import React, { useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { MediaPicker } from "../../mediapicker";
+import { MediaPicker } from "@/scaffolds/mediapicker";
 import { FileTypeIcon } from "@/components/form-field-type-icon";
 import toast from "react-hot-toast";
 import { Dialog, DialogContent } from "@/components/ui/dialog";

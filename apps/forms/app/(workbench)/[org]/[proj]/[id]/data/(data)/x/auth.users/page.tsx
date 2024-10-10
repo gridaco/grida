@@ -52,6 +52,7 @@ export default function XTablePage() {
     }
 
     return request_url;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [datagrid_query]);
 
   const { data, isLoading, isValidating } =
