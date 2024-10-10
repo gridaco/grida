@@ -111,12 +111,16 @@ export namespace GridData {
     systemcolumns: DGSystemColumn[];
     columns: DGColumn[];
   } {
+    const definition = "definition" in params ? params.definition : undefined;
+
     const fieldcolumns = Array.from(params.fields)
       .sort((a, b) => a.local_index - b.local_index)
       .map((field) => {
+        const property = definition?.properties?.[field.name];
+        const pk = property?.pk || false;
         const fk = xsb_fk({
           field,
-          definition: "definition" in params ? params.definition : undefined,
+          definition: definition,
         });
 
         return {
@@ -126,6 +130,7 @@ export namespace GridData {
           type: field.type,
           storage: field.storage || null,
           fk: fk,
+          pk,
         } satisfies DGColumn;
       });
 
@@ -150,24 +155,17 @@ export namespace GridData {
       }
       case EditorSymbols.Table.SYM_GRIDA_FORMS_X_SUPABASE_MAIN_TABLE_ID: {
         const { pks } = params.definition;
-        if (pks.length > 0) {
-          const pk1 = pks[0];
+        // check if pk is satisfied by registered fields
+        const is_pk_present = fieldcolumns.some((f) => {
+          return f.pk;
+        });
+
+        if (is_pk_present) {
           return {
-            systemcolumns: [
-              {
-                key: "__gf_display_id",
-                // 2. allow multiple PKs
-                name: pk1,
-              },
-            ],
-            columns: fieldcolumns.filter((f) => f.name !== pk1),
+            systemcolumns: [],
+            columns: fieldcolumns,
           };
-        }
-        break;
-      }
-      default:
-        if (params.definition) {
-          const { pks } = params.definition;
+        } else {
           if (pks.length > 0) {
             const pk1 = pks[0];
             return {
@@ -178,8 +176,39 @@ export namespace GridData {
                   name: pk1,
                 },
               ],
-              columns: fieldcolumns.filter((f) => f.name !== pk1),
+              columns: fieldcolumns,
             };
+          }
+        }
+        break;
+      }
+      default:
+        if (params.definition) {
+          const { pks } = params.definition;
+          // check if pk is satisfied by registered fields
+          const is_pk_present = fieldcolumns.some((f) => {
+            return f.pk;
+          });
+
+          if (is_pk_present) {
+            return {
+              systemcolumns: [],
+              columns: fieldcolumns,
+            };
+          } else {
+            if (pks.length > 0) {
+              const pk1 = pks[0];
+              return {
+                systemcolumns: [
+                  {
+                    key: "__gf_display_id",
+                    // 2. allow multiple PKs
+                    name: pk1,
+                  },
+                ],
+                columns: fieldcolumns,
+              };
+            }
           }
         }
         break;

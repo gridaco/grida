@@ -194,16 +194,18 @@ export function DataGrid({
             key: col.key,
             name: col.name,
             resizable: true,
-            editable: true,
-            sortable: true,
+            sortable: false,
             draggable: false,
-            minWidth: 160,
+            editable: !col.pk,
+            frozen: col.pk,
+            minWidth: col.pk ? 100 : 160,
             maxWidth: columns.length <= 1 ? undefined : 640,
             width: undefined,
             renderHeaderCell: (props) => (
               <ColumnHeaderCell
                 {...props}
                 type={col.type as FormInputType}
+                pk={col.pk}
                 fk={col.fk}
                 readonly={col.readonly}
                 onEditClick={() => {
