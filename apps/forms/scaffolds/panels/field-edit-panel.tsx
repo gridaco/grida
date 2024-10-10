@@ -1003,7 +1003,7 @@ function xsb_reference_available({
   | {
       readonly: boolean;
       reference?: FormFieldReferenceSchema;
-      format: string;
+      format?: string;
     }
   | false {
   if (!name) return false;
@@ -1024,13 +1024,13 @@ function xsb_reference_available({
         format: property.format,
       };
     }
-    if (FieldSupports.search(field.type)) {
-      return {
-        readonly: false,
-        reference: undefined,
-        format: property.format,
-      };
-    }
+  }
+  if (FieldSupports.search(field.type)) {
+    return {
+      readonly: false,
+      reference: undefined,
+      format: property?.format,
+    };
   }
 
   return false;

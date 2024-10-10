@@ -163,7 +163,9 @@ export function SupabaseFKReferenceSettings({
                               ];
                             return (
                               <SelectItem
-                                disabled={format !== property.format}
+                                disabled={
+                                  format ? format !== property.format : false
+                                }
                                 key={key}
                                 value={key}
                               >
@@ -188,7 +190,9 @@ export function SupabaseFKReferenceSettings({
                               ].properties?.[key];
                             return (
                               <SelectItem
-                                disabled={format !== property.format}
+                                disabled={
+                                  format ? format !== property.format : false
+                                }
                                 key={key}
                                 value={key}
                               >
