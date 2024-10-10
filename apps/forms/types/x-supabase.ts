@@ -19,6 +19,10 @@ export namespace GridaXSupabase {
     table_schema: GridaXSupabase.SupabaseTable["sb_table_schema"] | null;
   } & X;
 
+  export type XSBSearchMetaResult<X = {}> = {
+    meta: XSBSearchMeta<X>;
+  };
+
   export type XSBSearchResult<
     T extends Record<string, any> = any,
     X = {},
@@ -196,4 +200,16 @@ export namespace GridaXSupabase {
     keyof (typeof SupabaseUserJsonSchema)["properties"];
 
   export type SupabaseBucket = Bucket;
+
+  export namespace Forms {
+    /**
+     * Meta Type for pointing to the x-supabase search
+     * In v0_forms context, the xsb search shall happen in a secure context, this only provides the meta information for making the actual query.
+     */
+    export type XSBSearchMetaResult = GridaXSupabase.XSBSearchMetaResult<{
+      provider: "x-supabase";
+      supabase_project_id: number;
+      referenced_column: string;
+    }>;
+  }
 }

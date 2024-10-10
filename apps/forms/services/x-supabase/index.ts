@@ -19,6 +19,10 @@ import type { Database } from "@/database.types";
 import "core-js/features/map/group-by";
 import { unique } from "@/utils/unique";
 
+/**
+ * @deprecated - CAUTION: use within the secure context - marked for caution
+ * @returns
+ */
 export async function createXSupabaseClient(
   supabase_project_id: number,
   config?: SupabaseClientOptions<any> & { service_role?: boolean }
