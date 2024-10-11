@@ -40,7 +40,7 @@ export function CreateNewProjectDialog({
   const [ok, setOK] = useState(false);
   const [error, setError] = useState(false);
   const [message, setMessage] = useState(
-    `Your project url will be https://grida.co/${org}/project-name`
+    `Your project url will be https://app.grida.co/${org}/project-name`
   );
   const [pending, setPending] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -75,9 +75,11 @@ export function CreateNewProjectDialog({
         <DialogHeader>
           <DialogTitle>Create a new project</DialogTitle>
           <DialogDescription>
-            Projects are where your files and integrations will be managed
+            Create a new project to create databases, forms, workflows, and
+            integrations.
           </DialogDescription>
         </DialogHeader>
+        <hr />
         <form
           action={`/private/accounts/organizations/${org}/projects/new`}
           method="post"

@@ -7,7 +7,9 @@ import {
   DotsHorizontalIcon,
   GearIcon,
   HomeIcon,
+  Pencil1Icon,
   PlusIcon,
+  TrashIcon,
 } from "@radix-ui/react-icons";
 import { OrganizationAvatar } from "@/components/organization-avatar";
 import { WorkspaceMenu } from "./org-menu";
@@ -22,6 +24,7 @@ import {
   SidebarSection,
   SidebarMenuItemLabel,
   SidebarHeader,
+  SidebarMenuLink,
 } from "@/components/sidebar";
 import { CreateNewProjectDialog } from "./new-project-dialog";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
@@ -104,20 +107,15 @@ export function WorkspaceSidebar() {
                   );
                   return (
                     <div key={p.id}>
-                      <Link href={`/${organization.name}/${p.name}`}>
+                      <SidebarMenuLink href={`/${organization.name}/${p.name}`}>
                         <SidebarMenuItem key={p.name} muted>
                           <ResourceTypeIcon
                             type="project"
                             className="inline align-middle me-2 w-4 h-4"
                           />
                           {p.name}
-                          <SidebarMenuItemActions>
-                            <SidebarMenuItemAction>
-                              <DotsHorizontalIcon className="w-4 h-4" />
-                            </SidebarMenuItemAction>
-                          </SidebarMenuItemActions>
                         </SidebarMenuItem>
-                      </Link>
+                      </SidebarMenuLink>
 
                       {projectdocs.map((doc, i) => (
                         <Link
