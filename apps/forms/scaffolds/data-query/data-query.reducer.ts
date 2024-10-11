@@ -33,7 +33,7 @@ export default function reducer(
       return produce(state, (draft) => {
         draft.q_page_limit = limit;
 
-        // reset the pagination
+        // reset the pagination (othersize might throw range error PGRST103)
         draft.q_page_index = 0;
       });
     }
@@ -75,6 +75,9 @@ export default function reducer(
       const { predicate } = <DataQueryPredicatesAddAction>action;
       return produce(state, (draft) => {
         draft.q_predicates.push(predicate);
+
+        // reset the pagination (othersize might throw range error PGRST103)
+        draft.q_page_index = 0;
       });
     }
     case "data/query/predicates/update": {
@@ -85,18 +88,27 @@ export default function reducer(
           ...prev,
           ...predicate,
         };
+
+        // reset the pagination (othersize might throw range error PGRST103)
+        draft.q_page_index = 0;
       });
     }
     case "data/query/predicates/remove": {
       const { index } = <DataQueryPredicatesRemoveAction>action;
       return produce(state, (draft) => {
         draft.q_predicates.splice(index, 1);
+
+        // Note: pagination reset not required - result can only be smaller
+        // ~draft.q_page_index = 0;~
       });
     }
     case "data/query/predicates/clear": {
       const {} = <DataQueryPredicatesClearAction>action;
       return produce(state, (draft) => {
         draft.q_predicates = [];
+
+        // Note: pagination reset not required - result can only be smaller
+        // ~draft.q_page_index = 0;~
       });
     }
     case "data/query/textsearch/column": {
@@ -104,6 +116,9 @@ export default function reducer(
       return produce(state, (draft) => {
         assert(draft.q_text_search);
         draft.q_text_search.column = column;
+
+        // reset the pagination (othersize might throw range error PGRST103)
+        draft.q_page_index = 0;
       });
     }
     case "data/query/textsearch/query": {
@@ -111,12 +126,18 @@ export default function reducer(
       return produce(state, (draft) => {
         assert(draft.q_text_search);
         draft.q_text_search.query = query;
+
+        // reset the pagination (othersize might throw range error PGRST103)
+        draft.q_page_index = 0;
       });
     }
     case "data/query/textsearch/clear": {
       const {} = <DataQueryTextSearchClearAction>action;
       return produce(state, (draft) => {
         draft.q_text_search = null;
+
+        // Note: pagination reset not required - result can only be smaller
+        // ~draft.q_page_index = 0;~
       });
     }
   }

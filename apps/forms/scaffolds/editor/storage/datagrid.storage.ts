@@ -1,4 +1,4 @@
-import type { SQLOrderBy, SQLPredicate } from "@/types";
+import type { Data } from "@/lib/data";
 
 export namespace DataGridLocalPreferencesStorage {
   const key = (view_id: string) => `editor/data-grid/preferences/${view_id}`;
@@ -11,8 +11,8 @@ export namespace DataGridLocalPreferencesStorage {
   const version = "0";
   //
   export type DataGridLocalPreference = {
-    predicates?: Array<SQLPredicate> | null;
-    orderby?: { [key: string]: SQLOrderBy } | null;
+    predicates?: Array<Data.Query.Predicate.ExtendedPredicate> | null;
+    orderby?: { [key: string]: Data.Query.OrderBy.SQLOrderBy } | null;
     masking_enabled?: boolean | null;
   };
 

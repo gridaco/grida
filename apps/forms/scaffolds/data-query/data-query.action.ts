@@ -1,4 +1,4 @@
-import type { SQLOrderBy, SQLPredicate } from "@/types";
+import type { Data } from "@/lib/data";
 
 export type DataQueryAction =
   | DataQueryRefreshAction
@@ -36,7 +36,7 @@ export interface DataQueryPaginateAction {
 export interface DataQueryOrderByUpsertAction {
   type: "data/query/orderby";
   column_id: string;
-  data: Omit<SQLOrderBy, "column">;
+  data: Omit<Data.Query.OrderBy.SQLOrderBy, "column">;
 }
 
 export interface DataQueryOrderByRemoveAction {
@@ -50,13 +50,13 @@ export interface DataQueryOrderByClearAction {
 
 export interface DataQueryPredicatesAddAction {
   type: "data/query/predicates/add";
-  predicate: SQLPredicate;
+  predicate: Data.Query.Predicate.ExtendedPredicate;
 }
 
 export interface DataQueryPredicatesUpdateAction {
   type: "data/query/predicates/update";
   index: number;
-  predicate: Partial<SQLPredicate>;
+  predicate: Partial<Data.Query.Predicate.ExtendedPredicate>;
 }
 
 export interface DataQueryPredicatesRemoveAction {

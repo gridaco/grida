@@ -1,7 +1,6 @@
 import { IpInfo } from "@/clients/ipinfo";
 import palettes from "@/theme/palettes";
 import type { Tokens } from "@/ast";
-import type { XPostgrestQuery } from "@/lib/supabase-postgrest/builder";
 
 type UUID = string;
 
@@ -473,16 +472,4 @@ export interface GDocument {
   has_connection_supabase: boolean;
   responses: number | null;
   max_responses: number | null;
-}
-
-export interface SQLOrderBy {
-  column: string;
-  ascending?: boolean;
-  nullsFirst?: boolean;
-}
-
-export interface SQLPredicate {
-  column: string;
-  op: XPostgrestQuery.PredicateOperator.SQLPredicateOperatorKeyword;
-  value: unknown;
 }

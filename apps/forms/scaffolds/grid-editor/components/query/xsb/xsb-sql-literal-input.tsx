@@ -119,7 +119,12 @@ export function XSBSQLLiteralInput({
               <ValueNoneIcon className="inline-flex align-middle w-4 h-4 me-1" />
               null
             </SelectItem>
-            <SelectItem value="not null">
+            {/* https://github.com/PostgREST/postgrest/issues/3747 */}
+            <SelectItem
+              value="not null"
+              // TODO: should be done with negate
+              disabled
+            >
               <ValueIcon className="inline-flex align-middle w-4 h-4 me-1" />
               not null
             </SelectItem>

@@ -1,4 +1,3 @@
-import type { SQLOrderBy, SQLPredicate } from "@/types";
 import {
   PostgrestQueryBuilder,
   type PostgrestFilterBuilder,
@@ -6,39 +5,15 @@ import {
   type PostgrestTransformBuilder,
 } from "@supabase/postgrest-js";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { Data } from "../data";
+import { Data } from "@/lib/data";
 
 export namespace XPostgrestQuery {
   export namespace PredicateOperator {
-    export type SQLPredicateOperatorKeyword =
-      | "eq" // Equals
-      | "neq" // Not Equals
-      | "gt" // Greater Than
-      | "gte" // Greater Than or Equal
-      | "lt" // Less Than
-      | "lte" // Less Than or Equal
-      | "like" // Case-Sensitive Pattern Match
-      | "ilike" // Case-Insensitive Pattern Match
-      | "is" // Is (NULL check, etc.)
-      | "in" // In (list of values)
-      | "cs" // Contains (JSON/Array containment)
-      | "cd" // Contained By (JSON/Array containment)
-      | "sl" // Strictly Left of (range operation)
-      | "sr" // Strictly Right of (range operation)
-      | "nxl" // Not Extends to the Left of (range operation)
-      | "nxr" // Not Extends to the Right of (range operation)
-      | "adj" // Adjacent to (range operation)
-      | "ov" // Overlaps (range operation)
-      | "fts" // Full-Text Search
-      | "plfts" // Phrase Full-Text Search
-      | "phfts" // Plain Full-Text Search
-      | "wfts"; // Web Full-Text Search
-
     export type PostgRESTSQLPredicateNegateOperatorKeyword =
-      `not.${SQLPredicateOperatorKeyword}`;
+      `not.${Data.Query.Predicate.PredicateOperatorKeyword}`;
 
     export type PostgRESTSQLPredicateOperators =
-      | SQLPredicateOperatorKeyword
+      | Data.Query.Predicate.PredicateOperatorKeyword
       | PostgRESTSQLPredicateNegateOperatorKeyword;
 
     /**
@@ -76,17 +51,20 @@ export namespace XPostgrestQuery {
      * ```
      */
     export function analyzeOperator(operator: PostgRESTSQLPredicateOperators): {
-      keyword: SQLPredicateOperatorKeyword;
+      keyword: Data.Query.Predicate.PredicateOperatorKeyword;
       negate: boolean;
     } {
       if (operator.startsWith("not.")) {
         return {
-          keyword: operator.replace("not.", "") as SQLPredicateOperatorKeyword,
+          keyword: operator.replace(
+            "not.",
+            ""
+          ) as Data.Query.Predicate.PredicateOperatorKeyword,
           negate: true,
         };
       }
       return {
-        keyword: operator as SQLPredicateOperatorKeyword,
+        keyword: operator as Data.Query.Predicate.PredicateOperatorKeyword,
         negate: false,
       };
     }
@@ -109,7 +87,7 @@ export namespace XPostgrestQuery {
     values: ReadonlyArray<unknown>;
   }
 
-  export type OrderBy = { [col: string]: SQLOrderBy };
+  export type OrderBy = { [col: string]: Data.Query.OrderBy.SQLOrderBy };
 
   /**
    * modular, partial postgrest query string builder / parser
@@ -130,8 +108,8 @@ export namespace XPostgrestQuery {
       columns?: string;
       limit?: number;
       range?: { from: number; to: number };
-      order?: { [col: string]: SQLOrderBy };
-      filters?: ReadonlyArray<SQLPredicate>;
+      order?: { [col: string]: Data.Query.OrderBy.SQLOrderBy };
+      filters?: ReadonlyArray<Data.Query.Predicate.SQLPredicate>;
       textSearch?: Data.Query.Predicate.TextSearchQuery;
     }) {
       const pq = new PostgrestQueryBuilder(new URL("noop:noop"), {});
@@ -181,6 +159,10 @@ export namespace XPostgrestQuery {
     }
 
     export function fromQueryState(query: Partial<Data.Relation.QueryState>) {
+      const sql_predicates = query.q_predicates
+        ?.map(Data.Query.Predicate.Extension.encode)
+        ?.filter(Data.Query.Predicate.is_predicate_fulfilled);
+
       const search = XPostgrestQuery.QS.select({
         limit: query.q_page_limit,
         order: query.q_orderby,
@@ -191,8 +173,7 @@ export namespace XPostgrestQuery {
                 to: (query.q_page_index + 1) * query.q_page_limit - 1,
               }
             : undefined,
-        // only pass predicates with value set
-        filters: query.q_predicates?.filter((p) => p.value ?? false),
+        filters: sql_predicates,
         textSearch: query.q_text_search ?? undefined,
       });
 
@@ -211,7 +192,7 @@ export namespace XPostgrestQuery {
         const column = parts[0];
         if (!column) return; // Skip empty column names
 
-        const orderBy: SQLOrderBy = { column };
+        const orderBy: Data.Query.OrderBy.SQLOrderBy = { column };
 
         // Default order is ascending
         orderBy.ascending = parts.includes("asc");

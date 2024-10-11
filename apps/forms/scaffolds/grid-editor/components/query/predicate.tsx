@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
-import type { SQLPredicate } from "@/types";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,7 +15,10 @@ import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -44,6 +46,7 @@ import {
   useTableDefinition,
   type IDataQueryPredicatesConsumer,
 } from "@/scaffolds/data-query";
+import { toShorter } from "@/lib/pg-meta/k/alias";
 
 const {
   Query: { Predicate },
@@ -84,7 +87,9 @@ export function DataQueryPredicatesMenu({
               {predicates.map((q, i) => {
                 const format = properties[q.column].format;
 
-                const onchange = (predicate: Partial<SQLPredicate>) => {
+                const onchange = (
+                  predicate: Partial<Data.Query.Predicate.ExtendedPredicate>
+                ) => {
                   onUpdate(i, predicate);
                 };
                 return (
@@ -108,7 +113,7 @@ export function DataQueryPredicatesMenu({
                               <SelectItem value={key} key={key}>
                                 {key}{" "}
                                 <span className="ms-2 text-xs text-muted-foreground">
-                                  {properties[key].format}
+                                  {toShorter(properties[key].format)}
                                 </span>
                               </SelectItem>
                             ))}
@@ -127,15 +132,15 @@ export function DataQueryPredicatesMenu({
                             })}
                           >
                             <SelectValue>
-                              {Predicate.K.operator_labels[q.op].symbol}
+                              {Predicate.K.operators[q.op].symbol}
                             </SelectValue>
                           </SelectTrigger>
                           <SelectContent>
-                            {Predicate.K.supported_operators.map((key) => (
+                            {Predicate.K.ui_supported_operators.map((key) => (
                               <SelectItem value={key} key={key}>
                                 {key}
                                 <small className="ms-1 text-muted-foreground">
-                                  {Predicate.K.operator_labels[key].label}
+                                  {Predicate.K.operators[key].label}
                                 </small>
                               </SelectItem>
                             ))}
@@ -239,7 +244,7 @@ export function DataQueryPrediateAddMenu({
           return (
             <DropdownMenuItem
               key={key}
-              onSelect={() => onAdd({ column: key, op: "eq", value: "" })}
+              onSelect={() => onAdd({ column: key, op: "eq", value: null })}
             >
               <div className="w-4 h-4 flex items-center justify-center gap-2">
                 {property.pk && <KeyIcon className="w-3 h-3" />}
@@ -288,24 +293,54 @@ export function DataQueryPredicateChip({
   }, [onPredicatesRemove, index]);
 
   const onChange = useCallback(
-    (predicate: Partial<SQLPredicate>) => {
+    (predicate: Partial<Data.Query.Predicate.ExtendedPredicate>) => {
       onPredicatesUpdate(index, predicate);
     },
     [onPredicatesUpdate, index]
+  );
+
+  const onOpChange = useCallback(
+    (
+      op:
+        | Data.Query.Predicate.PredicateOperatorKeyword
+        | Data.Query.Predicate.Extension.PrediacteExtensionType
+    ) => {
+      const config = Predicate.K.operators[op];
+      if (config.required) onChange({ op });
+      else onChange({ op, value: null });
+    },
+    [onChange]
   );
 
   useEffect(() => {
     onChange({ value: debouncedSearch });
   }, [onChange, debouncedSearch]);
 
-  const allowed_ops = PostgresTypeTools.getPredicateOperators({ format });
+  const allowed_ops = Predicate.K.get_operators_by_format(format);
+
+  const requires_value = Predicate.K.operators[predicate.op].required;
+
+  const this_supported_extensions = Predicate.K.supported_extensions.filter(
+    (ext) => {
+      const op = Predicate.K.operators[ext];
+      const supported =
+        allowed_ops.includes(op.extends!) &&
+        (op.format ? op.format.includes(format as unknown as any) : true);
+
+      return supported;
+    }
+  );
+
+  const this_has_supported_extensions = this_supported_extensions.length > 0;
+
+  const fulfilled = !requires_value || !!predicate.value;
 
   return (
     <Popover modal>
       <PopoverTrigger>
-        <QueryChip badge={!!!predicate.value} active={!!predicate.value}>
-          {predicate.column} {Predicate.K.operator_labels[predicate.op].symbol}{" "}
-          {!!predicate.value ? String(predicate.value) : "..."}
+        <QueryChip badge={!fulfilled} active={fulfilled}>
+          {predicate.column} {Predicate.K.operators[predicate.op].symbol}{" "}
+          {fulfilled ? (requires_value ? String(predicate.value) : "") : "..."}
         </QueryChip>
       </PopoverTrigger>
       <PopoverContent className="flex flex-col gap-2 w-[200px] p-2">
@@ -316,31 +351,51 @@ export function DataQueryPredicateChip({
             </span>
             <Select
               value={predicate.op}
-              onValueChange={(v) => onChange({ op: v as any })}
+              onValueChange={(v) => onOpChange(v as any)}
             >
               <SelectPrimitive.Trigger>
                 <Badge
                   variant="outline"
-                  className="w-full overflow-ellipsis text-xs text-muted-foreground"
+                  className="px-1 w-full overflow-ellipsis text-xs text-muted-foreground whitespace-nowrap"
                 >
                   <SelectValue>
-                    {Predicate.K.operator_labels[predicate.op].symbol}
+                    {Predicate.K.operators[predicate.op].symbol}
                   </SelectValue>
                 </Badge>
               </SelectPrimitive.Trigger>
               <SelectContent>
-                {Predicate.K.supported_operators.map((key) => (
-                  <SelectItem
-                    value={key}
-                    key={key}
-                    disabled={!allowed_ops.includes(key)}
-                  >
-                    {key}
-                    <small className="ms-1 text-muted-foreground">
-                      {Predicate.K.operator_labels[key].label}
-                    </small>
-                  </SelectItem>
-                ))}
+                {this_has_supported_extensions && (
+                  <SelectGroup>
+                    {this_supported_extensions.map((ext) => {
+                      const op = Predicate.K.operators[ext];
+                      return (
+                        <SelectItem value={ext} key={ext}>
+                          {op.label}
+                        </SelectItem>
+                      );
+                    })}
+                    <SelectSeparator />
+                  </SelectGroup>
+                )}
+                <SelectGroup>
+                  {this_has_supported_extensions && (
+                    <SelectLabel className="text-xs text-muted-foreground uppercase">
+                      Advanced
+                    </SelectLabel>
+                  )}
+                  {Predicate.K.ui_supported_operators.map((key) => (
+                    <SelectItem
+                      value={key}
+                      key={key}
+                      disabled={!allowed_ops.includes(key as any)}
+                    >
+                      {key}
+                      <small className="ms-1 text-muted-foreground">
+                        {Predicate.K.operators[key].label}
+                      </small>
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
               </SelectContent>
             </Select>
           </div>
@@ -353,27 +408,32 @@ export function DataQueryPredicateChip({
             <TrashIcon className="w-3 h-3" />
           </Button>
         </div>
-        {platform.provider == "x-supabase" ? (
-          <XSBSQLLiteralInput
-            supabase={{
-              supabase_project_id: platform.supabase_project_id,
-              supabase_schema_name: schema_name!,
-            }}
-            config={
-              predicate.op === "is"
-                ? {
-                    type: "is",
-                    accepts_boolean: format === "bool" || format === "boolean",
-                  }
-                : PostgresTypeTools.getSQLLiteralInputConfig(
-                    properties[predicate.column]
-                  )
-            }
-            value={search as string}
-            onValueChange={(v) => setSearch(v)}
-          />
-        ) : (
-          <>N/A</>
+        {requires_value && (
+          <>
+            {platform.provider == "x-supabase" ? (
+              <XSBSQLLiteralInput
+                supabase={{
+                  supabase_project_id: platform.supabase_project_id,
+                  supabase_schema_name: schema_name!,
+                }}
+                config={
+                  predicate.op === "is"
+                    ? {
+                        type: "is",
+                        accepts_boolean:
+                          format === "bool" || format === "boolean",
+                      }
+                    : PostgresTypeTools.getSQLLiteralInputConfig(
+                        properties[predicate.column]
+                      )
+                }
+                value={search as string}
+                onValueChange={(v) => setSearch(v)}
+              />
+            ) : (
+              <>N/A</>
+            )}
+          </>
         )}
       </PopoverContent>
     </Popover>
