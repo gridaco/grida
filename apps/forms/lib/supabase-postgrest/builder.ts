@@ -161,8 +161,7 @@ export namespace XPostgrestQuery {
     export function fromQueryState(query: Partial<Data.Relation.QueryState>) {
       const sql_predicates = query.q_predicates
         ?.map(Data.Query.Predicate.Extension.encode)
-        // only pass predicates with value set
-        ?.filter((p) => p.value !== null && p.value !== undefined);
+        ?.filter(Data.Query.Predicate.is_predicate_fulfilled);
 
       const search = XPostgrestQuery.QS.select({
         limit: query.q_page_limit,

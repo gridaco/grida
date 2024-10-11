@@ -208,6 +208,8 @@ export namespace Data {
         /**
          * value must be set for this predicate to be fulfilled
          * for `null | undefined`, the predicate will be ignored
+         *
+         * @see {is_predicate_fulfilled}
          */
         value: unknown | null | undefined;
       };
@@ -397,9 +399,10 @@ export namespace Data {
 
         export const supported_extensions: Extension.PrediacteExtensionType[] =
           [
-            "EXT_CONTAINS",
-            "EXT_STARTS_WITH",
-            "EXT_ENDS_WITH",
+            "EXT_ILIKE_IS",
+            "EXT_ILIKE_CONTAINS",
+            "EXT_ILIKE_STARTS_WITH",
+            "EXT_ILIKE_ENDS_WITH",
             "EXT_IS_EMPTY",
             "EXT_IS_NOT_EMPTY",
           ];
@@ -588,21 +591,28 @@ export namespace Data {
           }, // Web search
 
           //
-          EXT_CONTAINS: {
+          EXT_ILIKE_IS: {
+            symbol: "is",
+            label: "Is",
+            required: true,
+            extends: "ilike",
+            format: null,
+          },
+          EXT_ILIKE_CONTAINS: {
             symbol: "contains",
             label: "Contains",
             required: true,
             extends: "ilike",
             format: null,
           },
-          EXT_STARTS_WITH: {
+          EXT_ILIKE_STARTS_WITH: {
             symbol: "starts with",
             label: "Starts with",
             required: true,
             extends: "ilike",
             format: null,
           },
-          EXT_ENDS_WITH: {
+          EXT_ILIKE_ENDS_WITH: {
             symbol: "ends with",
             label: "Ends with",
             required: true,
@@ -641,6 +651,18 @@ export namespace Data {
       }
 
       /**
+       * Check if a predicate is fulfilled and ok to be requested
+       *
+       * Use {@link Extension.encode} to convert to SQLPredicate before checking
+       */
+      export function is_predicate_fulfilled(p: SQLPredicate): boolean {
+        const { op, column, value } = p;
+        if (!op) return false;
+        if (!column) return false;
+        return value !== null && value !== undefined;
+      }
+
+      /**
        * Handy Predicate Extension
        */
       export namespace Extension {
@@ -656,16 +678,27 @@ export namespace Data {
          * Caution: this should be constant. changing the key might impact persistence (e.g. predicates value saved to service db or local storage)
          */
         export type PrediacteExtensionType =
-          | "EXT_CONTAINS"
-          | "EXT_STARTS_WITH"
-          | "EXT_ENDS_WITH"
+          | "EXT_ILIKE_IS"
+          | "EXT_ILIKE_CONTAINS"
+          | "EXT_ILIKE_STARTS_WITH"
+          | "EXT_ILIKE_ENDS_WITH"
           | "EXT_IS_EMPTY"
           | "EXT_IS_NOT_EMPTY";
 
+        /**
+         * Convert a predicate extension to SQLPredicate
+         */
         export function encode(p: ExtendedPredicate): SQLPredicate {
           const { op, value, column } = p;
           switch (op) {
-            case "EXT_CONTAINS": {
+            case "EXT_ILIKE_IS": {
+              return {
+                op: "ilike",
+                value,
+                column,
+              };
+            }
+            case "EXT_ILIKE_CONTAINS": {
               // txt => %txt%
               // omit if null, undefined or empty string (we can ignore the 0 case as its ilike, only string value is expected)
               const encoded = value ? `%${value}%` : undefined;
@@ -675,7 +708,7 @@ export namespace Data {
                 column,
               };
             }
-            case "EXT_ENDS_WITH": {
+            case "EXT_ILIKE_ENDS_WITH": {
               // txt => %txt
               // omit if null, undefined or empty string (we can ignore the 0 case as its ilike, only string value is expected)
               const encoded = value ? `%${value}` : undefined;
@@ -685,7 +718,7 @@ export namespace Data {
                 column,
               };
             }
-            case "EXT_STARTS_WITH": {
+            case "EXT_ILIKE_STARTS_WITH": {
               // txt => ilike txt%
               // omit if null, undefined or empty string (we can ignore the 0 case as its ilike, only string value is expected)
               const encoded = value ? `${value}%` : undefined;
