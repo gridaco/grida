@@ -1,5 +1,5 @@
 import { OnSubmitProcessors } from "@/app/(api)/submit/[id]/hooks";
-import { createRouteHandlerFormsClient } from "@/lib/supabase/server";
+import { createRouteHandlerClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -12,7 +12,7 @@ export async function POST(
   }
 ) {
   const cookieStore = cookies();
-  const supabase = createRouteHandlerFormsClient(cookieStore);
+  const supabase = createRouteHandlerClient(cookieStore);
 
   const { data: getuser } = await supabase.auth.getUser();
   if (!getuser.user) {

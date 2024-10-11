@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import { createServerComponentFormsClient } from "@/lib/supabase/server";
+import { createServerComponentClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { GoogleAnalytics } from "@next/third-parties/google";
@@ -21,7 +21,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const cookieStore = cookies();
-  const supabase = createServerComponentFormsClient(cookieStore);
+  const supabase = createServerComponentClient(cookieStore);
 
   const { data } = await supabase.auth.getUser();
 

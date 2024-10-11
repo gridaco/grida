@@ -4,7 +4,7 @@ import { createRouteHandlerClient as _createRouteHandlerClient } from "@supabase
 import { createClient } from "@supabase/supabase-js";
 import type { ReadonlyRequestCookies } from "next/dist/server/web/spec-extension/adapters/request-cookies";
 
-export const workspace_service_client = createClient<Database, "public">(
+export const workspaceclient = createClient<Database, "public">(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_KEY!,
   {
@@ -14,7 +14,7 @@ export const workspace_service_client = createClient<Database, "public">(
   }
 );
 
-export const grida_forms_service_client = createClient<Database, "grida_forms">(
+export const grida_forms_client = createClient<Database, "grida_forms">(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_KEY!,
   {
@@ -24,7 +24,7 @@ export const grida_forms_service_client = createClient<Database, "grida_forms">(
   }
 );
 
-export const grida_sites_service_client = createClient<Database, "grida_sites">(
+export const grida_sites_client = createClient<Database, "grida_sites">(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_KEY!,
   {
@@ -34,16 +34,17 @@ export const grida_sites_service_client = createClient<Database, "grida_sites">(
   }
 );
 
-export const grida_commerce_service_client = createClient<
-  Database,
-  "grida_commerce"
->(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!, {
-  db: {
-    schema: "grida_commerce",
-  },
-});
+export const grida_commerce_client = createClient<Database, "grida_commerce">(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_KEY!,
+  {
+    db: {
+      schema: "grida_commerce",
+    },
+  }
+);
 
-export const grida_xsupabase_service_client = createClient<
+export const grida_xsupabase_client = createClient<
   Database,
   "grida_x_supabase"
 >(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!, {
@@ -62,7 +63,8 @@ export const grida_g11n_service_client = createClient<Database, "grida_g11n">(
   }
 );
 
-export const createServerComponentFormsClient = (
+// TODO: rename to createServerComponentFormsClient
+export const createServerComponentClient = (
   cookieStore: ReadonlyRequestCookies
 ) =>
   _createServerComponentClient<Database, "grida_forms">(
@@ -104,9 +106,8 @@ export const createServerComponentG11nClient = (
     }
   );
 
-export const createRouteHandlerFormsClient = (
-  cookieStore: ReadonlyRequestCookies
-) =>
+// TODO: rename to createRouteHandlerFormsClient
+export const createRouteHandlerClient = (cookieStore: ReadonlyRequestCookies) =>
   _createRouteHandlerClient<Database, "grida_forms">(
     {
       cookies: () => cookieStore,

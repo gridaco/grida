@@ -1,4 +1,4 @@
-import { createServerComponentFormsClient } from "@/lib/supabase/server";
+import { createServerComponentClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import Playground from "@/scaffolds/playground";
@@ -14,7 +14,7 @@ export default async function SharedPlaygroundPage({
 }) {
   const { slug } = params;
   const cookieStore = cookies();
-  const supabase = createServerComponentFormsClient(cookieStore);
+  const supabase = createServerComponentClient(cookieStore);
 
   const { data: _gist } = await supabase
     .from("gist")

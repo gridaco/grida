@@ -1,5 +1,5 @@
 import { editorlink } from "@/lib/forms/url";
-import { createRouteHandlerFormsClient } from "@/lib/supabase/server";
+import { createRouteHandlerClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import type { GDocEditorRouteParams } from "@/scaffolds/editor/state";
@@ -17,7 +17,7 @@ export async function GET(
   const origin = request.nextUrl.origin;
   const cookieStore = cookies();
 
-  const supabase = createRouteHandlerFormsClient(cookieStore);
+  const supabase = createRouteHandlerClient(cookieStore);
 
   const { data: formdoc } = await supabase
     .from("form_document")

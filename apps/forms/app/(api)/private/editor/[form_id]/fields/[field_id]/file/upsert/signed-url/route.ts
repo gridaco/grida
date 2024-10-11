@@ -1,4 +1,4 @@
-import { createRouteHandlerFormsClient } from "@/lib/supabase/server";
+import { createRouteHandlerClient } from "@/lib/supabase/server";
 import type { FormFieldStorageSchema } from "@/types";
 import type {
   FormsApiResponse,
@@ -36,7 +36,7 @@ export async function PUT(req: NextRequest, context: Context) {
   assert(path);
 
   const cookieStore = cookies();
-  const supabase = createRouteHandlerFormsClient(cookieStore);
+  const supabase = createRouteHandlerClient(cookieStore);
 
   const { data: form, error: formerr } = await supabase
     .from("form")
