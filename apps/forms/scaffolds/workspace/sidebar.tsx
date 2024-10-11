@@ -26,6 +26,12 @@ import {
   SidebarHeader,
   SidebarMenuLink,
 } from "@/components/sidebar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { CreateNewProjectDialog } from "./new-project-dialog";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
 import { useWorkspace } from "./workspace";
@@ -114,6 +120,35 @@ export function WorkspaceSidebar() {
                             className="inline align-middle me-2 w-4 h-4"
                           />
                           {p.name}
+                          <SidebarMenuItemActions>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger>
+                                <SidebarMenuItemAction>
+                                  <DotsHorizontalIcon className="w-4 h-4" />
+                                </SidebarMenuItemAction>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent>
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    // TODO:
+                                    alert("not implemented");
+                                  }}
+                                >
+                                  <Pencil1Icon className="me-2 min-w-4 w-4 h-4 align-middle" />
+                                  Rename
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    // TODO:
+                                    alert("not implemented");
+                                  }}
+                                >
+                                  <TrashIcon className="me-2 min-w-4 w-4 h-4 align-middle text-destructive" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </SidebarMenuItemActions>
                         </SidebarMenuItem>
                       </SidebarMenuLink>
 
