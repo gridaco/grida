@@ -11,8 +11,8 @@ export namespace DataGridLocalPreferencesStorage {
   const version = "0";
   //
   export type DataGridLocalPreference = {
-    predicates?: Array<Data.Query.Predicate.TPredicate> | null;
-    orderby?: { [key: string]: Data.Query.OrderBy.TOrderBy } | null;
+    predicates?: Array<Data.Query.Predicate.ExtendedPredicate> | null;
+    orderby?: { [key: string]: Data.Query.OrderBy.SQLOrderBy } | null;
     masking_enabled?: boolean | null;
   };
 

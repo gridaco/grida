@@ -5,7 +5,7 @@ import {
   type PostgrestTransformBuilder,
 } from "@supabase/postgrest-js";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Data } from "@/lib/data";
+import { Data } from "@/lib/data";
 
 export namespace XPostgrestQuery {
   export namespace PredicateOperator {
@@ -87,7 +87,7 @@ export namespace XPostgrestQuery {
     values: ReadonlyArray<unknown>;
   }
 
-  export type OrderBy = { [col: string]: Data.Query.OrderBy.TOrderBy };
+  export type OrderBy = { [col: string]: Data.Query.OrderBy.SQLOrderBy };
 
   /**
    * modular, partial postgrest query string builder / parser
@@ -108,8 +108,8 @@ export namespace XPostgrestQuery {
       columns?: string;
       limit?: number;
       range?: { from: number; to: number };
-      order?: { [col: string]: Data.Query.OrderBy.TOrderBy };
-      filters?: ReadonlyArray<Data.Query.Predicate.TPredicate>;
+      order?: { [col: string]: Data.Query.OrderBy.SQLOrderBy };
+      filters?: ReadonlyArray<Data.Query.Predicate.SQLPredicate>;
       textSearch?: Data.Query.Predicate.TextSearchQuery;
     }) {
       const pq = new PostgrestQueryBuilder(new URL("noop:noop"), {});
@@ -169,8 +169,10 @@ export namespace XPostgrestQuery {
                 to: (query.q_page_index + 1) * query.q_page_limit - 1,
               }
             : undefined,
-        // only pass predicates with value set
-        filters: query.q_predicates?.filter((p) => p.value ?? false),
+        filters: query.q_predicates
+          ?.map(Data.Query.Predicate.Extension.encode)
+          // only pass predicates with value set
+          ?.filter((p) => p.value ?? false),
         textSearch: query.q_text_search ?? undefined,
       });
 
@@ -189,7 +191,7 @@ export namespace XPostgrestQuery {
         const column = parts[0];
         if (!column) return; // Skip empty column names
 
-        const orderBy: Data.Query.OrderBy.TOrderBy = { column };
+        const orderBy: Data.Query.OrderBy.SQLOrderBy = { column };
 
         // Default order is ascending
         orderBy.ascending = parts.includes("asc");

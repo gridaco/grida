@@ -161,12 +161,12 @@ export namespace Data {
       /**
        * predicates, aka filter queries. eq, is, in...
        */
-      q_predicates: Array<Query.Predicate.TPredicate>;
+      q_predicates: Array<Query.Predicate.ExtendedPredicate>;
 
       /**
        * orderby queries in {ATTRIBUTE:SORT} format (as sorting can be applied only once per attribute)
        */
-      q_orderby: { [key: string]: Query.OrderBy.TOrderBy };
+      q_orderby: { [key: string]: Query.OrderBy.SQLOrderBy };
 
       /**
        * Only relevant for text and tsvector columns. Match only rows where
@@ -178,7 +178,7 @@ export namespace Data {
 
   export namespace Query {
     export namespace OrderBy {
-      export interface TOrderBy {
+      export interface SQLOrderBy {
         column: string;
         ascending?: boolean;
         nullsFirst?: boolean;
@@ -202,11 +202,17 @@ export namespace Data {
         type: "plain" | "phrase" | "websearch";
       };
 
-      export interface TPredicate {
+      export type TPredicate<OP extends string> = {
         column: string;
-        op: PredicateOperatorKeyword;
+        op: OP;
         value: unknown;
-      }
+      };
+
+      export type ExtendedPredicate = TPredicate<
+        PredicateOperatorKeyword | Extension.PrediacteExtensionType
+      >;
+
+      export type SQLPredicate = TPredicate<PredicateOperatorKeyword>;
 
       export type PredicateOperatorKeyword =
         | "eq" // Equals
@@ -634,6 +640,17 @@ export namespace Data {
        * Handy Predicate Extension
        */
       export namespace Extension {
+        /**
+         * Predicate extensions (templates) type
+         *
+         * - `EXT_CONTAINS` - `ilike %txt%`
+         * - `EXT_STARTS_WITH` - `ilike txt%`
+         * - `EXT_ENDS_WITH` - `ilike %txt`
+         * - `EXT_IS_EMPTY` - `eq ""`
+         * - `EXT_IS_NOT_EMPTY` - `neq ""`
+         *
+         * Caution: this should be constant. changing the key might impact persistence (e.g. predicates value saved to service db or local storage)
+         */
         export type PrediacteExtensionType =
           | "EXT_CONTAINS"
           | "EXT_STARTS_WITH"
@@ -641,87 +658,56 @@ export namespace Data {
           | "EXT_IS_EMPTY"
           | "EXT_IS_NOT_EMPTY";
 
-        export type TransformedFormalPredicate = {
-          op: Data.Query.Predicate.PredicateOperatorKeyword;
-          value: unknown;
-        };
-
-        export function encode(
-          type: PrediacteExtensionType,
-          input: unknown
-        ): TransformedFormalPredicate {
-          switch (type) {
+        export function encode(p: ExtendedPredicate): SQLPredicate {
+          const { op, value, column } = p;
+          switch (op) {
             case "EXT_CONTAINS": {
+              // txt => %txt%
+              const encoded = `%${value}%`;
               return {
                 op: "ilike",
-                value: `%${input}%`,
-              };
-            }
-            case "EXT_STARTS_WITH": {
-              return {
-                op: "ilike",
-                value: `${input}%`,
+                value: encoded,
+                column,
               };
             }
             case "EXT_ENDS_WITH": {
+              // txt => %txt
+              const encoded = `%${value}`;
               return {
                 op: "ilike",
-                value: `%${input}`,
+                value: encoded,
+                column,
+              };
+            }
+            case "EXT_STARTS_WITH": {
+              // txt => ilike txt%
+              const encoded = `${value}%`;
+              return {
+                op: "ilike",
+                value: encoded,
+                column,
               };
             }
             case "EXT_IS_EMPTY": {
               return {
                 op: "eq",
                 value: "",
+                column,
               };
             }
             case "EXT_IS_NOT_EMPTY": {
               return {
                 op: "neq",
                 value: "",
+                column,
               };
             }
-          }
-        }
-
-        export function decode(type: PrediacteExtensionType, value: unknown) {
-          switch (type) {
-            case "EXT_CONTAINS": {
-              // %txt% => txt
-              const decoded = (value as string | undefined)?.slice(1, -1);
+            default:
               return {
-                op: "ilike",
-                value: decoded,
-              };
-            }
-            case "EXT_ENDS_WITH": {
-              // %txt => txt
-              const decoded = (value as string | undefined)?.slice(1);
-              return {
-                op: "ilike",
-                value: decoded,
-              };
-            }
-            case "EXT_STARTS_WITH": {
-              // txt% => txt
-              const decoded = (value as string | undefined)?.slice(0, -1);
-              return {
-                op: "ilike",
-                value: decoded,
-              };
-            }
-            case "EXT_IS_EMPTY": {
-              return {
-                op: "eq",
-                value: "",
-              };
-            }
-            case "EXT_IS_NOT_EMPTY": {
-              return {
-                op: "neq",
-                value: "",
-              };
-            }
+                op,
+                value,
+                column,
+              } satisfies SQLPredicate;
           }
         }
       }

@@ -88,7 +88,7 @@ export function DataQueryPredicatesMenu({
                 const format = properties[q.column].format;
 
                 const onchange = (
-                  predicate: Partial<Data.Query.Predicate.TPredicate>
+                  predicate: Partial<Data.Query.Predicate.ExtendedPredicate>
                 ) => {
                   onUpdate(i, predicate);
                 };
@@ -293,7 +293,7 @@ export function DataQueryPredicateChip({
   }, [onPredicatesRemove, index]);
 
   const onChange = useCallback(
-    (predicate: Partial<Data.Query.Predicate.TPredicate>) => {
+    (predicate: Partial<Data.Query.Predicate.ExtendedPredicate>) => {
       onPredicatesUpdate(index, predicate);
     },
     [onPredicatesUpdate, index]

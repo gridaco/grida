@@ -159,7 +159,7 @@ export function useStandaloneSchemaDataQueryConsumer(
   const onOrderbyAdd: DataQueryOrderbyAddDispatcher = useCallback(
     (
       column_id: string,
-      initial?: Partial<Omit<Data.Query.OrderBy.TOrderBy, "column">>
+      initial?: Partial<Omit<Data.Query.OrderBy.SQLOrderBy, "column">>
     ) => {
       dispatch({
         type: "data/query/orderby",
@@ -173,7 +173,7 @@ export function useStandaloneSchemaDataQueryConsumer(
   const onOrderbyUpdate: DataQueryOrderbyUpdateDispatcher = useCallback(
     (
       column_id: string,
-      data: Partial<Omit<Data.Query.OrderBy.TOrderBy, "column">>
+      data: Partial<Omit<Data.Query.OrderBy.SQLOrderBy, "column">>
     ) => {
       dispatch({
         type: "data/query/orderby",
@@ -206,7 +206,7 @@ export function useStandaloneSchemaDataQueryConsumer(
   const isPredicatesSet = q_predicates.length > 0;
 
   const onPredicatesAdd: DataQueryPredicateAddDispatcher = useCallback(
-    (predicate: Data.Query.Predicate.TPredicate) => {
+    (predicate: Data.Query.Predicate.ExtendedPredicate) => {
       dispatch({
         type: "data/query/predicates/add",
         predicate: predicate,
@@ -216,7 +216,10 @@ export function useStandaloneSchemaDataQueryConsumer(
   );
 
   const onPredicatesUpdate: DataQueryPredicateUpdateDispatcher = useCallback(
-    (index: number, predicate: Partial<Data.Query.Predicate.TPredicate>) => {
+    (
+      index: number,
+      predicate: Partial<Data.Query.Predicate.ExtendedPredicate>
+    ) => {
       dispatch({
         type: "data/query/predicates/update",
         index: index,

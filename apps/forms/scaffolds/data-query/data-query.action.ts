@@ -36,7 +36,7 @@ export interface DataQueryPaginateAction {
 export interface DataQueryOrderByUpsertAction {
   type: "data/query/orderby";
   column_id: string;
-  data: Omit<Data.Query.OrderBy.TOrderBy, "column">;
+  data: Omit<Data.Query.OrderBy.SQLOrderBy, "column">;
 }
 
 export interface DataQueryOrderByRemoveAction {
@@ -50,13 +50,13 @@ export interface DataQueryOrderByClearAction {
 
 export interface DataQueryPredicatesAddAction {
   type: "data/query/predicates/add";
-  predicate: Data.Query.Predicate.TPredicate;
+  predicate: Data.Query.Predicate.ExtendedPredicate;
 }
 
 export interface DataQueryPredicatesUpdateAction {
   type: "data/query/predicates/update";
   index: number;
-  predicate: Partial<Data.Query.Predicate.TPredicate>;
+  predicate: Partial<Data.Query.Predicate.ExtendedPredicate>;
 }
 
 export interface DataQueryPredicatesRemoveAction {

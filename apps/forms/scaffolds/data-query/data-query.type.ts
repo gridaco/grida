@@ -14,11 +14,11 @@ export type DataQueryPaginationNextDispatcher = () => void;
 //
 export type DataQueryOrderbyAddDispatcher = (
   column: string,
-  initial?: Partial<Omit<Data.Query.OrderBy.TOrderBy, "column">>
+  initial?: Partial<Omit<Data.Query.OrderBy.SQLOrderBy, "column">>
 ) => void;
 export type DataQueryOrderbyUpdateDispatcher = (
   column: string,
-  data: Partial<Omit<Data.Query.OrderBy.TOrderBy, "column">>
+  data: Partial<Omit<Data.Query.OrderBy.SQLOrderBy, "column">>
 ) => void;
 export type DataQueryOrderbyRemoveDispatcher = (column: string) => void;
 export type DataQueryOrderbyRemoveAllDispatcher = () => void;
@@ -28,11 +28,11 @@ export type DataQueryOrderbyRemoveAllDispatcher = () => void;
 // #region predicates
 //
 export type DataQueryPredicateAddDispatcher = (
-  predicate: Data.Query.Predicate.TPredicate
+  predicate: Data.Query.Predicate.ExtendedPredicate
 ) => void;
 export type DataQueryPredicateUpdateDispatcher = (
   index: number,
-  predicate: Partial<Data.Query.Predicate.TPredicate>
+  predicate: Partial<Data.Query.Predicate.ExtendedPredicate>
 ) => void;
 export type DataQueryPredicateRemoveDispatcher = (index: number) => void;
 export type DataQueryPredicateRemoveAllDispatcher = () => void;
