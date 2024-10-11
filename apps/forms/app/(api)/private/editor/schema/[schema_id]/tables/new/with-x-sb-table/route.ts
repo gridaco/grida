@@ -2,7 +2,7 @@ import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import {
   createRouteHandlerFormsClient,
   createRouteHandlerXSBClient,
-} from "@/supabase/server";
+} from "@/lib/supabase/server";
 import { GridaXSupabase } from "@/types";
 import {
   CreateNewSchemaTableWithXSBTableConnectionRequest,

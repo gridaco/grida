@@ -1,4 +1,4 @@
-import { createRouteHandlerFormsClient } from "@/supabase/server";
+import { createRouteHandlerFormsClient } from "@/lib/supabase/server";
 import {
   EditorApiResponseOk,
   UpdateFormAccessMaxResponseByCustomerRequest,

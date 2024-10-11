@@ -7,7 +7,7 @@ import {
 import {
   grida_forms_service_client,
   grida_commerce_service_client,
-} from "@/supabase/server";
+} from "@/lib/supabase/server";
 import { upsert_customer_with } from "@/services/customer";
 import {
   validate_max_access_by_customer,

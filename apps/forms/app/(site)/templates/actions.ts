@@ -1,6 +1,6 @@
 "use server";
 
-import { createRouteHandlerFormsClient } from "@/supabase/server";
+import { createRouteHandlerFormsClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 
 export async function fetchTemplates() {

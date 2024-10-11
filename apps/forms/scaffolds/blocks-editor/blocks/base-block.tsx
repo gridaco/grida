@@ -1,6 +1,6 @@
 "use client";
 
-import { createClientComponentFormsClient } from "@/supabase/client";
+import { createClientComponentFormsClient } from "@/lib/supabase/client";
 import { useEditorState } from "@/scaffolds/editor";
 import { useCallback } from "react";
 import toast from "react-hot-toast";

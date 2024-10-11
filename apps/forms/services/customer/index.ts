@@ -1,4 +1,4 @@
-import { workspace_service_client } from "@/supabase/server";
+import { workspace_service_client } from "@/lib/supabase/server";
 import { is_uuid_v4 } from "@/utils/is";
 
 export async function upsert_customer_with({

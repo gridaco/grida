@@ -16,7 +16,7 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { createClientComponentFormsClient } from "@/supabase/client";
+import { createClientComponentFormsClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
 import { InsertMenuTrigger } from "./insert-menu-trigger";
 import { SectionStyle } from "../agent/theme";

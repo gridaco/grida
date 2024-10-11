@@ -1,5 +1,5 @@
 import { editorlink } from "@/lib/forms/url";
-import { createRouteHandlerFormsClient } from "@/supabase/server";
+import { createRouteHandlerFormsClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import type { GDocEditorRouteParams } from "@/scaffolds/editor/state";

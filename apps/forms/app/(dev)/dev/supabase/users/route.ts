@@ -1,4 +1,4 @@
-import { grida_forms_service_client } from "@/supabase/server";
+import { grida_forms_service_client } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {

@@ -1,4 +1,4 @@
-import type { TGridaCommerceSupabaseClient } from "@/supabase/types";
+import type { TGridaCommerceSupabaseClient } from "@/lib/supabase/types";
 import assert from "assert";
 
 export class GridaCommerceClient {

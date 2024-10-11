@@ -3,7 +3,7 @@ import { editorlink, formlink } from "@/lib/forms/url";
 import {
   createRouteHandlerFormsClient,
   workspace_service_client,
-} from "@/supabase/server";
+} from "@/lib/supabase/server";
 import { JSONFrom2DB } from "@/services/new/json2db";
 import { JSONFormParser } from "@/types";
 import assert from "assert";

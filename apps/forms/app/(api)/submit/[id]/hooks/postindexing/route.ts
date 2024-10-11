@@ -1,7 +1,7 @@
 import {
   grida_forms_service_client,
   workspace_service_client,
-} from "@/supabase/server";
+} from "@/lib/supabase/server";
 import { process_response_provisional_info } from "@/services/customer/utils";
 import { unique } from "@/utils/unique";
 import assert from "assert";

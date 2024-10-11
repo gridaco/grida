@@ -1,4 +1,4 @@
-import { workspace_service_client } from "@/supabase/server";
+import { workspace_service_client } from "@/lib/supabase/server";
 import {
   isValidUsername,
   username_validation_messages,

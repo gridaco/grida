@@ -1,4 +1,4 @@
-import { createServerComponentFormsClient } from "@/supabase/server";
+import { createServerComponentFormsClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import Playground from "@/scaffolds/playground";

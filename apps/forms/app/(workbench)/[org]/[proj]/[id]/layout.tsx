@@ -8,7 +8,7 @@ import {
   createServerComponentG11nClient,
   createServerComponentWorkspaceClient,
   grida_xsupabase_service_client,
-} from "@/supabase/server";
+} from "@/lib/supabase/server";
 import { GridaLogo } from "@/components/grida-logo";
 import { SlashIcon } from "@radix-ui/react-icons";
 import { Sidebar } from "@/scaffolds/sidebar/sidebar";

@@ -1,4 +1,4 @@
-import { createClientComponentFormsClient } from "@/supabase/client";
+import { createClientComponentFormsClient } from "@/lib/supabase/client";
 import {
   GRIDA_FORMS_RESPONSE_BUCKET,
   GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT,
@@ -15,7 +15,7 @@ import type {
   StoragePublicUrlData,
   SessionSignedUploadUrlData,
 } from "@/types/private/api";
-import { SupabaseStorageExtensions } from "@/supabase/storage-ext";
+import { SupabaseStorageExtensions } from "@/lib/supabase/storage-ext";
 
 export type FileUploaderFn = (
   file: File

@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useReducer, useEffect } from "react";
 import produce from "immer";
 import type { GDocument, Organization, Project } from "@/types";
-import { createClientComponentWorkspaceClient } from "@/supabase/client";
+import { createClientComponentWorkspaceClient } from "@/lib/supabase/client";
 import { PublicUrls } from "@/services/public-urls";
 import useSWR from "swr";
 import { EditorApiResponse } from "@/types/private/api";

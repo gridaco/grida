@@ -2,7 +2,7 @@ import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import {
   createRouteHandlerFormsClient,
   grida_xsupabase_service_client,
-} from "@/supabase/server";
+} from "@/lib/supabase/server";
 import { GridaXSupabase } from "@/types";
 import { XSupabasePrivateApiTypes } from "@/types/private/api";
 import assert from "assert";

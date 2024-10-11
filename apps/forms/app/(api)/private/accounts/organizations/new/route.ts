@@ -1,7 +1,7 @@
 import {
   createRouteHandlerWorkspaceClient,
   workspace_service_client,
-} from "@/supabase/server";
+} from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 

@@ -1,7 +1,7 @@
 import {
   grida_forms_service_client,
   workspace_service_client,
-} from "@/supabase/server";
+} from "@/lib/supabase/server";
 import type {
   FormResponseUnknownFieldHandlingStrategyType,
   GDocumentType,

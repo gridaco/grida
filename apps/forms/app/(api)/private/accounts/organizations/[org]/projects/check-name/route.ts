@@ -1,4 +1,4 @@
-import { createRouteHandlerWorkspaceClient } from "@/supabase/server";
+import { createRouteHandlerWorkspaceClient } from "@/lib/supabase/server";
 import {
   isValidUsername,
   username_validation_messages,

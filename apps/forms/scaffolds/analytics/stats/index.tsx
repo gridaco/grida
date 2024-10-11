@@ -5,7 +5,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   createClientComponentFormsClient,
   createClientComponentWorkspaceClient,
-} from "@/supabase/client";
+} from "@/lib/supabase/client";
 import TimeSeriesChart from "../charts/timeseries";
 import { GraphSkeleton, NumberSkeleton } from "../charts/skeleton";
 import { SupabaseClient } from "@supabase/supabase-js";

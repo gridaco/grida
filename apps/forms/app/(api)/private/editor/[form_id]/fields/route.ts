@@ -2,7 +2,7 @@ import { FieldSupports } from "@/k/supported_field_types";
 import {
   grida_commerce_service_client,
   createRouteHandlerFormsClient,
-} from "@/supabase/server";
+} from "@/lib/supabase/server";
 import { GridaCommerceClient } from "@/services/commerce";
 import assert from "assert";
 import { cookies } from "next/headers";

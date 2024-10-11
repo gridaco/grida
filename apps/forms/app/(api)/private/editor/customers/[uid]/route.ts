@@ -1,7 +1,7 @@
 import {
   createRouteHandlerFormsClient,
   createRouteHandlerWorkspaceClient,
-} from "@/supabase/server";
+} from "@/lib/supabase/server";
 import { Customer, Form, FormResponse } from "@/types";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";

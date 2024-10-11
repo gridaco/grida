@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { CreateSignedUploadUrlRequest } from "@/types/private/api";
 import { cookies } from "next/headers";
-import { createRouteHandlerFormsClient } from "@/supabase/server";
+import { createRouteHandlerFormsClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { FieldStorageService } from "@/services/form/storage";
 import type { FormFieldStorageSchema } from "@/types";

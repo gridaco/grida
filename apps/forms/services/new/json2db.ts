@@ -4,7 +4,7 @@ import type { Database } from "@/database.types";
 import { toArrayOf } from "@/types/utility";
 import { SupabaseClient } from "@supabase/supabase-js";
 import assert from "assert";
-import { workspace_service_client } from "@/supabase/server";
+import { workspace_service_client } from "@/lib/supabase/server";
 
 type ID = string;
 type FormFieldInsertion =

@@ -1,4 +1,4 @@
-import type { TGridaG11nSupabaseClient } from "@/supabase/types";
+import type { TGridaG11nSupabaseClient } from "@/lib/supabase/types";
 import { PGINT8ID } from "@/types";
 
 ///
