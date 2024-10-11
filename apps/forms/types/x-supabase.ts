@@ -206,10 +206,14 @@ export namespace GridaXSupabase {
      * Meta Type for pointing to the x-supabase search
      * In v0_forms context, the xsb search shall happen in a secure context, this only provides the meta information for making the actual query.
      */
-    export type XSBSearchMetaResult = GridaXSupabase.XSBSearchMetaResult<{
-      provider: "x-supabase";
-      supabase_project_id: number;
-      referenced_column: string;
-    }>;
+    export type XSBSearchMetaResult = {
+      meta: {
+        provider: "x-supabase";
+        schema_name: string;
+        referenced_table: string;
+        supabase_project_id: number;
+        referenced_column: string;
+      };
+    };
   }
 }

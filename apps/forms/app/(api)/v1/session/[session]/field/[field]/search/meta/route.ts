@@ -52,14 +52,6 @@ export async function GET(
       case "x-supabase": {
         assert(supabase_connection, "No connection found");
 
-        const xsupabase = new GridaXSupabaseService();
-        const conn =
-          await xsupabase.getXSBMainTableConnectionState(supabase_connection);
-        assert(conn, "connection fetch failed");
-        const {
-          supabase_project: { sb_schema_definitions },
-        } = conn;
-
         switch (schema) {
           case "auth": {
             assert(
@@ -72,8 +64,7 @@ export async function GET(
                 provider: "x-supabase",
                 supabase_project_id: supabase_connection.supabase_project_id,
                 schema_name: "auth",
-                table_name: table,
-                table_schema: GridaXSupabase.SupabaseUserJsonSchema as any,
+                referenced_table: table,
                 referenced_column: column,
               },
             } satisfies GridaXSupabase.Forms.XSBSearchMetaResult);
@@ -85,8 +76,7 @@ export async function GET(
                 provider: "x-supabase",
                 supabase_project_id: supabase_connection.supabase_project_id,
                 schema_name: schema,
-                table_name: table,
-                table_schema: sb_schema_definitions[schema][table],
+                referenced_table: table,
                 referenced_column: column,
               },
             } satisfies GridaXSupabase.Forms.XSBSearchMetaResult);
@@ -127,9 +117,8 @@ export async function GET(
             meta: {
               provider: "x-supabase",
               supabase_project_id: supabase_connection.supabase_project_id,
-              schema_name: sb_schema_name,
-              table_schema: schema_json,
-              table_name: column.fk.referenced_table,
+              schema_name: sb_schema_name, // forced to be within the same schema
+              referenced_table: column.fk.referenced_table,
               referenced_column: column.fk.referenced_column,
             },
           } satisfies GridaXSupabase.Forms.XSBSearchMetaResult);

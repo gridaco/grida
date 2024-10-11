@@ -58,7 +58,7 @@ export function ReferenceSearch({
         <FormsSecureXSBSQLForeignKeySearchInput
           relation={{
             referenced_column: data.meta.referenced_column,
-            referenced_table: data.meta.table_name,
+            referenced_table: data.meta.referenced_table,
           }}
           supabase_project_id={data.meta.supabase_project_id}
           supabase_schema_name={data.meta.schema_name}
