@@ -27,6 +27,7 @@ import {
   useTableDefinition,
   type IDataQueryOrderbyConsumer,
 } from "@/scaffolds/data-query";
+import { toShorter } from "@/lib/pg-meta/k/alias";
 
 type SortIconType = "up" | "down" | "mixed";
 function SortIcon({
@@ -194,7 +195,7 @@ function DataQueryAddOrderbyMenu({
           <DropdownMenuItem key={key} onSelect={() => onAdd(key)}>
             {key}{" "}
             <span className="ms-2 text-xs text-muted-foreground">
-              {properties[key].format}
+              {toShorter(properties[key].format)}
             </span>
           </DropdownMenuItem>
         ))}

@@ -11,7 +11,6 @@ import type {
   FormStyleSheetV1Schema,
   FormsPageLanguage,
   GridaXSupabase,
-  SQLPredicate,
 } from "@/types";
 import type {
   EditorFlatFormBlock,

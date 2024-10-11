@@ -1,5 +1,4 @@
 import type { Data } from "@/lib/data";
-import type { SQLOrderBy, SQLPredicate } from "@/types";
 
 //
 // #region pagination
@@ -15,11 +14,11 @@ export type DataQueryPaginationNextDispatcher = () => void;
 //
 export type DataQueryOrderbyAddDispatcher = (
   column: string,
-  initial?: Partial<Omit<SQLOrderBy, "column">>
+  initial?: Partial<Omit<Data.Query.OrderBy.TOrderBy, "column">>
 ) => void;
 export type DataQueryOrderbyUpdateDispatcher = (
   column: string,
-  data: Partial<Omit<SQLOrderBy, "column">>
+  data: Partial<Omit<Data.Query.OrderBy.TOrderBy, "column">>
 ) => void;
 export type DataQueryOrderbyRemoveDispatcher = (column: string) => void;
 export type DataQueryOrderbyRemoveAllDispatcher = () => void;
@@ -28,10 +27,12 @@ export type DataQueryOrderbyRemoveAllDispatcher = () => void;
 //
 // #region predicates
 //
-export type DataQueryPredicateAddDispatcher = (predicate: SQLPredicate) => void;
+export type DataQueryPredicateAddDispatcher = (
+  predicate: Data.Query.Predicate.TPredicate
+) => void;
 export type DataQueryPredicateUpdateDispatcher = (
   index: number,
-  predicate: Partial<SQLPredicate>
+  predicate: Partial<Data.Query.Predicate.TPredicate>
 ) => void;
 export type DataQueryPredicateRemoveDispatcher = (index: number) => void;
 export type DataQueryPredicateRemoveAllDispatcher = () => void;
