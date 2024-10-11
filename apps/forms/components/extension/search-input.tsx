@@ -16,8 +16,8 @@ export function SearchInput({
   }
 
   return (
-    <div className="relative ml-auto flex-1 md:grow-0">
-      <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+    <div className="relative flex-1 md:grow-0">
+      <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
       <Input
         type="search"
         placeholder="Search"

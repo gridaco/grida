@@ -26,7 +26,7 @@ import { XSBUserRow } from "@/scaffolds/grid";
 import { useXSBListUsers } from "@/scaffolds/x-supabase/use-xsb-list-users";
 import assert from "assert";
 
-export default function XTablePage() {
+export default function XAuthUsersTablePage() {
   const [state, dispatch] = useEditorState();
   const [total, setTotal] = useState<number>();
 

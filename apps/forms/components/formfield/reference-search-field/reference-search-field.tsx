@@ -52,7 +52,7 @@ export function ReferenceSearch({
     return <InputSkeleton disabled {...props} />;
   }
 
-  switch (data?.meta.provider) {
+  switch (data?.meta?.provider) {
     case "x-supabase": {
       return (
         <FormsSecureXSBSQLForeignKeySearchInput
@@ -72,7 +72,7 @@ export function ReferenceSearch({
       //
     }
     default: {
-      return <></>;
+      return <SearchInput {...props} />;
     }
   }
 }

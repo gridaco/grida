@@ -7,6 +7,7 @@ import { Link2Icon } from "@radix-ui/react-icons";
 import { Data } from "@/lib/data";
 import { XSBSearchTableSheet, XSBListUsersSheet } from "@/scaffolds/x-supabase";
 import { cn } from "@/utils";
+import { SearchIcon } from "lucide-react";
 
 type SQLForeignKeyValue = string | number | undefined;
 
@@ -52,13 +53,14 @@ export function FormsSecureXSBSQLForeignKeySearchInput({
       )}
 
       <div className="relative group">
+        <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
         <Input
           type="search"
           placeholder="Search for reference..."
           {...props}
           value={value}
           onChange={(e) => onValueChange?.(e.target.value)}
-          className={cn("group-hover:pr-8", className)}
+          className={cn("pl-8 group-hover:pr-8", className)}
         />
         <div className="absolute hidden group-hover:flex items-center justify-end right-2 top-2 bottom-2">
           <Button
