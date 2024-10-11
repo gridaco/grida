@@ -244,7 +244,7 @@ export function DataQueryPrediateAddMenu({
           return (
             <DropdownMenuItem
               key={key}
-              onSelect={() => onAdd({ column: key, op: "eq", value: "" })}
+              onSelect={() => onAdd({ column: key, op: "eq", value: null })}
             >
               <div className="w-4 h-4 flex items-center justify-center gap-2">
                 {property.pk && <KeyIcon className="w-3 h-3" />}
@@ -299,6 +299,19 @@ export function DataQueryPredicateChip({
     [onPredicatesUpdate, index]
   );
 
+  const onOpChange = useCallback(
+    (
+      op:
+        | Data.Query.Predicate.PredicateOperatorKeyword
+        | Data.Query.Predicate.Extension.PrediacteExtensionType
+    ) => {
+      const config = Predicate.K.operators[op];
+      if (config.required) onChange({ op });
+      else onChange({ op, value: null });
+    },
+    [onChange]
+  );
+
   useEffect(() => {
     onChange({ value: debouncedSearch });
   }, [onChange, debouncedSearch]);
@@ -327,7 +340,7 @@ export function DataQueryPredicateChip({
       <PopoverTrigger>
         <QueryChip badge={!fulfilled} active={fulfilled}>
           {predicate.column} {Predicate.K.operators[predicate.op].symbol}{" "}
-          {!!predicate.value ? String(predicate.value) : "..."}
+          {fulfilled ? (requires_value ? String(predicate.value) : "") : "..."}
         </QueryChip>
       </PopoverTrigger>
       <PopoverContent className="flex flex-col gap-2 w-[200px] p-2">
@@ -338,7 +351,7 @@ export function DataQueryPredicateChip({
             </span>
             <Select
               value={predicate.op}
-              onValueChange={(v) => onChange({ op: v as any })}
+              onValueChange={(v) => onOpChange(v as any)}
             >
               <SelectPrimitive.Trigger>
                 <Badge

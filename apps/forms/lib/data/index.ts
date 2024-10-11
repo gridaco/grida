@@ -205,7 +205,11 @@ export namespace Data {
       export type TPredicate<OP extends string> = {
         column: string;
         op: OP;
-        value: unknown;
+        /**
+         * value must be set for this predicate to be fulfilled
+         * for `null | undefined`, the predicate will be ignored
+         */
+        value: unknown | null | undefined;
       };
 
       export type ExtendedPredicate = TPredicate<
@@ -663,7 +667,8 @@ export namespace Data {
           switch (op) {
             case "EXT_CONTAINS": {
               // txt => %txt%
-              const encoded = `%${value}%`;
+              // omit if null, undefined or empty string (we can ignore the 0 case as its ilike, only string value is expected)
+              const encoded = value ? `%${value}%` : undefined;
               return {
                 op: "ilike",
                 value: encoded,
@@ -672,7 +677,8 @@ export namespace Data {
             }
             case "EXT_ENDS_WITH": {
               // txt => %txt
-              const encoded = `%${value}`;
+              // omit if null, undefined or empty string (we can ignore the 0 case as its ilike, only string value is expected)
+              const encoded = value ? `%${value}` : undefined;
               return {
                 op: "ilike",
                 value: encoded,
@@ -681,7 +687,8 @@ export namespace Data {
             }
             case "EXT_STARTS_WITH": {
               // txt => ilike txt%
-              const encoded = `${value}%`;
+              // omit if null, undefined or empty string (we can ignore the 0 case as its ilike, only string value is expected)
+              const encoded = value ? `${value}%` : undefined;
               return {
                 op: "ilike",
                 value: encoded,

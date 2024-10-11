@@ -159,6 +159,11 @@ export namespace XPostgrestQuery {
     }
 
     export function fromQueryState(query: Partial<Data.Relation.QueryState>) {
+      const sql_predicates = query.q_predicates
+        ?.map(Data.Query.Predicate.Extension.encode)
+        // only pass predicates with value set
+        ?.filter((p) => p.value !== null && p.value !== undefined);
+
       const search = XPostgrestQuery.QS.select({
         limit: query.q_page_limit,
         order: query.q_orderby,
@@ -169,10 +174,7 @@ export namespace XPostgrestQuery {
                 to: (query.q_page_index + 1) * query.q_page_limit - 1,
               }
             : undefined,
-        filters: query.q_predicates
-          ?.map(Data.Query.Predicate.Extension.encode)
-          // only pass predicates with value set
-          ?.filter((p) => p.value ?? false),
+        filters: sql_predicates,
         textSearch: query.q_text_search ?? undefined,
       });
 
