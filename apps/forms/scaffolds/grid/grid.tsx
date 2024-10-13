@@ -634,10 +634,13 @@ function FieldCell({ column, row }: RenderCellProps<RenderingRow>) {
       );
     }
     case "toggle-group": {
-      const items = unwrapped as Array<string>;
+      const items = multiple
+        ? Array.from((unwrapped as unknown as Array<string>) ?? [])
+        : [unwrapped as unknown as string];
+
       return (
         <CellRoot {...rootprops} className="w-full flex items-center gap-0.5">
-          {items.map((it, i) => {
+          {items?.map((it, i) => {
             return (
               <Badge
                 variant="outline"

@@ -79,8 +79,8 @@ export type DGColumn = {
 export type GFResponseFieldData = {
   type?: FormInputType;
   value: any;
-  readonly?: boolean;
-  multiple?: boolean;
+  readonly: boolean;
+  multiple: boolean;
   option_id?: string | null;
   options?: {
     [key: string]: { value: string; label?: string };

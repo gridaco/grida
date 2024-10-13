@@ -513,6 +513,7 @@ export namespace GridData {
             value: value,
             type: field?.type,
             readonly: field?.readonly || false,
+            multiple: field?.multiple || false,
           };
         });
         return row;
@@ -552,6 +553,7 @@ export namespace GridData {
           type: field.type,
           value: valuefn(row, field),
           readonly: field.readonly || false,
+          multiple: field.multiple || false,
           options: field.options?.reduce(
             (
               acc: { [key: string]: { value: string; label?: string } },
