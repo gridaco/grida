@@ -169,7 +169,10 @@ const config: Config = {
     },
     plugins: [require("tailwindcss-animate")],
   },
-  plugins: [require("@tailwindcss/typography")],
+  plugins: [
+    require("@tailwindcss/typography"),
+    require("@tailwindcss/container-queries"),
+  ],
 };
 
 export default config;
