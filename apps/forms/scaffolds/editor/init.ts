@@ -574,15 +574,16 @@ function formdocumentpagesinit({
       icon: "folder",
       data: {},
     },
-    {
-      section: "Design",
-      id: "start",
-      label: "Cover",
-      href: `/${basepath}/${document_id}/form/start`,
-      icon: "file",
-      level: 1,
-      data: {},
-    },
+    // TODO: not ready
+    // {
+    //   section: "Design",
+    //   id: "start",
+    //   label: "Cover",
+    //   href: `/${basepath}/${document_id}/form/start`,
+    //   icon: "file",
+    //   level: 1,
+    //   data: {},
+    // },
     {
       section: "Design",
       id: "form",
