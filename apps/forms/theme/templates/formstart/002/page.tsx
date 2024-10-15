@@ -106,13 +106,15 @@ export default function StartPage_002() {
                           </>
                         )}
                       />
-                      <Button
-                        variant="outline"
-                        className="border-foreground bg-transparent rounded-none"
-                      >
-                        <span>시승 예약 하기</span>
-                        <ArrowRightIcon className="ms-2 w-4 h-4 text-orange-400" />
-                      </Button>
+                      <Link href="https://app.grida.co/d/e/8516e066-f620-416d-955c-1ec9b3e4dc75">
+                        <Button
+                          variant="outline"
+                          className="border-foreground bg-transparent rounded-none"
+                        >
+                          <span>시승 예약 하기</span>
+                          <ArrowRightIcon className="ms-2 w-4 h-4 text-orange-400" />
+                        </Button>
+                      </Link>
                     </div>
                   </div>
                 </div>
