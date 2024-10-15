@@ -87,14 +87,14 @@ export default function StartPage_002() {
                         </div>
                       </ModeratorDrawer>
                     </div>
-                    <div className="flex justify-end items-center gap-4">
+                    <div className="flex flex-col justify-end items-center gap-2">
                       <Timer
                         date={"2024-12-15"}
                         render={({ ready, h, m, s }) => (
                           <>
                             <div
                               data-ready={ready}
-                              className="flex gap-1 opacity-0 transition-opacity duration-1000 data-[ready=true]:opacity-100"
+                              className="flex gap-0.5 opacity-0 text-xs transition-opacity duration-1000 data-[ready=true]:opacity-100"
                             >
                               <span>{digit2(h)}</span>
                               <span>:</span>
