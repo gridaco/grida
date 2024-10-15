@@ -6,7 +6,7 @@ import {
   FormResponseFeedProvider,
   FormResponseSessionFeedProvider,
 } from "@/scaffolds/editor/feed";
-import { MapGL } from "@/theme/templates/formstart/default/mapgl";
+import { MapGL } from "@/components/mapgl";
 import React, { useEffect, useMemo, useState } from "react";
 import { MapProvider, useMap } from "react-map-gl";
 import { useDarkMode } from "usehooks-ts";

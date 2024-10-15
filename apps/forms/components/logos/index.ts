@@ -6,4 +6,5 @@ export * from "./supabase";
 export * from "./whatsapp";
 export * from "./stripe";
 export * from "./toss";
+export * from "./polestar-type";
 export * from "./postgresql";

@@ -602,9 +602,18 @@ function BlockRenderer({
       return (
         <div
           {...__shared_root_attr}
-          className="rounded overflow-hidden border border-black/20 dark:bg-white/10 aspect-video"
+          className="rounded overflow-hidden border border-black/20 aspect-video"
         >
-          <ReactPlayer width={"100%"} height={"100%"} url={block.src ?? ""} />
+          <ReactPlayer
+            width={"100%"}
+            height={"100%"}
+            url={block.src ?? ""}
+            controls={false}
+            playing
+            playsinline
+            loop
+            muted
+          />
         </div>
       );
     }
