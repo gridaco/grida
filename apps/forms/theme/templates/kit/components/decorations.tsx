@@ -2,15 +2,7 @@ import { cn } from "@/utils";
 import { PlusIcon } from "@radix-ui/react-icons";
 import { motion } from "framer-motion";
 
-export function ScreenDecorations({ children }: React.PropsWithChildren<{}>) {
-  return (
-    <div className="absolute inset-0 w-full h-full z-50 pointer-events-none select-none">
-      {children}
-    </div>
-  );
-}
-
-export function ScreenCameraCrossDecoration({
+export function CameraCrossDecoration({
   crossSize,
   className,
 }: {

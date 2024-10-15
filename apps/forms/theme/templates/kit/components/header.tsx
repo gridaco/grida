@@ -3,6 +3,22 @@ import Image from "next/image";
 import React from "react";
 
 export function HeaderLogo({
+  children,
+  className,
+}: React.PropsWithChildren<{ className?: string }>) {
+  return (
+    <div
+      className={cn(
+        "w-full h-full flex items-center justify-center",
+        className
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+export function HeaderLogoImage({
   src,
   alt,
   width,

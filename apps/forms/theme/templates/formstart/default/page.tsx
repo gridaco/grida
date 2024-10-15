@@ -2,15 +2,38 @@ import { GridaLogo } from "@/components/grida-logo";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import React from "react";
-import { CalendarBoxIcon, LocationBoxIcon } from "../components/icons";
-import { MapGL } from "../components/mapgl";
-import dummy from "../data/01.dummy.json";
+import { CalendarBoxIcon, LocationBoxIcon } from "../../kit/components/icons";
+import { MapGL } from "@/components/mapgl";
 import { TwitterLogoIcon } from "@radix-ui/react-icons";
 import { YoutubeIcon } from "lucide-react";
 
-const data = dummy;
+interface Props {
+  data: {
+    title: string;
+    body: string;
+    artworks: string[];
+    ticket: {
+      schedule: {
+        open: string;
+        close: string;
+      };
+      count: number;
+    };
+    location?: {
+      name: string;
+      address: string;
+      city: string;
+      state: string;
+      zip: string;
+      map: {
+        lat: number;
+        lng: number;
+      };
+    };
+  };
+}
 
-export default function FormStartPage() {
+export default function FormStartPage({ data }: Props) {
   return (
     <main className="@container/preview">
       <header className="p-4">
@@ -20,7 +43,7 @@ export default function FormStartPage() {
         <aside>
           <section className="mt-10">
             <Image
-              className="aspect-square rounded-md overflow-hidden object-cover max-w-sm mx-auto shadow-2xl @2xl/preview:max-w-60 @3xl/preview:max-w-80"
+              className="aspect-square rounded-md overflow-hidden object-cover max-w-80 mx-auto shadow-2xl @2xl/preview:max-w-60 @3xl/preview:max-w-80"
               width={960}
               height={960}
               src="/images/abstract-placeholder.jpg"
@@ -30,8 +53,8 @@ export default function FormStartPage() {
         </aside>
         <aside className="flex-1 md:max-w-xl">
           <section className="p-4 mt-10">
-            <div className="text-4xl font-bold">
-              <h1 className="">{data.title}</h1>
+            <div>
+              <h1 className="text-3xl font-bold">{data.title}</h1>
             </div>
           </section>
           <section className="p-4 flex flex-col gap-2">
@@ -66,7 +89,7 @@ export default function FormStartPage() {
           </section>
           <section className="p-4">
             <SectionHeader>About Event</SectionHeader>
-            <article className="prose dark:prose-invert">
+            <article className="prose dark:prose-invert !text-foreground prose-headings:!text-foreground prose-p:!text-foreground prose-strong:!text-foreground">
               <span
                 dangerouslySetInnerHTML={{
                   __html: data.body,

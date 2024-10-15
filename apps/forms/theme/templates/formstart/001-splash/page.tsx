@@ -1,13 +1,24 @@
 "use client";
 
-import Image from "next/image";
-import { Header, HeaderLogo } from "../components/header";
-import {
-  ScreenDecorations,
-  ScreenCameraCrossDecoration,
-  LinearBoxScaleDecoration,
-} from "../components/decorations";
 import React, { useEffect, useState } from "react";
+import Image from "next/image";
+
+import {
+  ScreenGrid,
+  ScreenGridPosition,
+  ScreenDecorations,
+  ScreenBackground,
+  ScreenRootBackground,
+  ScreenRoot,
+  ScreenMobileFrame,
+  CameraCrossDecoration,
+  LinearBoxScaleDecoration,
+  Header,
+  HeaderLogoImage,
+  CardBackgroundGradientBlur,
+  Timer,
+  digit2,
+} from "@/theme/templates/kit/components";
 import data from "../data/02.dummy.json";
 import { cn } from "@/utils";
 import { Button } from "@/components/ui/button";
@@ -16,10 +27,10 @@ import ReactPlayer from "react-player";
 
 export default function StartPage_001_Slash() {
   return (
-    <div className="h-dvh w-dvw overflow-hidden md:p-4">
-      <main className="relative overflow-hidden md:container w-full h-full md:max-w-md mx-auto md:rounded-lg md:shadow-lg !p-0">
+    <ScreenRoot>
+      <ScreenMobileFrame>
         <Header>
-          <HeaderLogo
+          <HeaderLogoImage
             className="h-10 invert"
             src="/templates/sample-brand-prism/logo.png"
             alt=""
@@ -40,7 +51,7 @@ export default function StartPage_001_Slash() {
               }}
             >
               <ContentCard>
-                <GradientBackgroundBlur className="rounded-xl border border-foreground/10 shadow-xl">
+                <CardBackgroundGradientBlur className="rounded-xl border border-foreground/10 shadow-xl">
                   <div className="flex flex-col gap-4 p-4">
                     <article className="prose prose-sm dark:prose-invert">
                       <h2 className="w-2/3">{data.title}</h2>
@@ -72,7 +83,7 @@ export default function StartPage_001_Slash() {
                       </Button>
                     </div>
                   </div>
-                </GradientBackgroundBlur>
+                </CardBackgroundGradientBlur>
               </ContentCard>
             </motion.div>
           </ScreenGridPosition>
@@ -83,7 +94,7 @@ export default function StartPage_001_Slash() {
           transition={{ duration: 1.2, delay: 1.2 }}
         >
           <ScreenDecorations>
-            <ScreenCameraCrossDecoration className="p-4" crossSize={20} />
+            <CameraCrossDecoration className="p-4" crossSize={20} />
             <div className="absolute top-1/3 right-8">
               <LinearBoxScaleDecoration
                 orientation="vertical"
@@ -107,7 +118,7 @@ export default function StartPage_001_Slash() {
               className="w-full h-full"
             >
               <Image
-                src="/templates/sample-images/winter-dev-only.png"
+                src="/templates/sample-images/licensed/winter-dev-only.png"
                 alt=""
                 width={1080}
                 height={1920}
@@ -130,110 +141,17 @@ export default function StartPage_001_Slash() {
             />
           </ScreenBackground>
         </motion.div>
-      </main>
-      <div className="fixed inset-0 w-full h-full -z-50 pointer-events-none select-none">
+      </ScreenMobileFrame>
+      <ScreenRootBackground>
         <Image
-          src="/templates/sample-images/winter-dev-only.png"
+          src="/templates/sample-images/licensed/winter-dev-only.png"
           alt=""
           width={1080}
           height={1920}
           className="h-full w-full object-cover blur-3xl"
         />
-      </div>
-    </div>
-  );
-}
-
-function digit2(digit: number) {
-  return digit.toString().padStart(2, "0");
-}
-
-function Timer({
-  date,
-  render,
-}: {
-  date: string | Date;
-  render: ({
-    ready,
-    d,
-    h,
-    m,
-    s,
-  }: {
-    ready: boolean;
-    d: number;
-    h: number;
-    m: number;
-    s: number;
-  }) => React.ReactNode;
-}) {
-  const [remaining, setRemaining] = useState<number>(-1);
-
-  const ready = remaining >= 0;
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setRemaining(new Date(date).getTime() - new Date().getTime());
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [date]);
-
-  const remainingSeconds = Math.max(remaining / 1000, 0); // Ensure non-negative time
-  const d = Math.floor(remainingSeconds / 86400);
-  const h = Math.floor((remainingSeconds % 86400) / 3600);
-  const m = Math.floor((remainingSeconds % 3600) / 60);
-  const s = Math.floor(remainingSeconds % 60);
-
-  return render({ ready, d, h, m, s });
-}
-
-function ScreenBackground({ children }: React.PropsWithChildren<{}>) {
-  return (
-    <div className="relative inset-0 w-full h-full -z-40 select-none">
-      {children}
-    </div>
-  );
-}
-
-function ScreenGrid({
-  children,
-  columns,
-  rows,
-}: React.PropsWithChildren<{
-  columns: number;
-  rows: number;
-}>) {
-  return (
-    <div
-      className="absolute inset-0 w-full h-full grid grid-cols-2 grid-rows-2"
-      style={{
-        gridTemplateColumns: `repeat(${columns}, 1fr)`,
-        gridTemplateRows: `repeat(${rows}, 1fr)`,
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-function ScreenGridPosition({
-  children,
-  col,
-  row,
-}: React.PropsWithChildren<{
-  col: number;
-  row: number;
-}>) {
-  return (
-    <div
-      className={"absolute inset-0 w-full h-full"}
-      style={{
-        gridColumn: col,
-        gridRow: row,
-      }}
-    >
-      {children}
-    </div>
+      </ScreenRootBackground>
+    </ScreenRoot>
   );
 }
 
@@ -243,23 +161,6 @@ function ContentCard({
 }: React.PropsWithChildren<{ className?: string }>) {
   return (
     <div className={cn("p-4 flex flex-col gap-4 rounded-sm", className)}>
-      {children}
-    </div>
-  );
-}
-
-function GradientBackgroundBlur({
-  children,
-  className,
-}: React.PropsWithChildren<{ className?: string }>) {
-  return (
-    <div className="relative w-full h-full">
-      <div
-        className={cn(
-          "-z-10 absolute inset-0 w-full h-full backdrop-blur-xl bg-gradient-to-b from-transparent to-background/40",
-          className
-        )}
-      ></div>
       {children}
     </div>
   );

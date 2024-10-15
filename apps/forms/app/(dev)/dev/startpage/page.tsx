@@ -1,7 +1,7 @@
 import { Card, CardHeader } from "@/components/ui/card";
 import Link from "next/link";
 
-const demos = ["000", "001"];
+const demos = ["000", "001", "002"];
 
 export default function CampaignStartPageDevIndex() {
   return (
