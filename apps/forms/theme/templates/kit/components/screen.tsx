@@ -1,5 +1,17 @@
 export function ScreenRoot({ children }: React.PropsWithChildren<{}>) {
-  return <div className="h-dvh w-dvw overflow-hidden md:p-4">{children}</div>;
+  return (
+    <div className="relative h-dvh w-dvw max-w-screen-2xl mx-auto overflow-hidden md:p-4">
+      {children}
+    </div>
+  );
+}
+
+export function ScreenCenter({ children }: React.PropsWithChildren<{}>) {
+  return (
+    <div className="relative flex justify-center items-center h-full w-full md:rounded-md md:shadow-md overflow-hidden">
+      {children}
+    </div>
+  );
 }
 
 export function ScreenMobileFrame({ children }: React.PropsWithChildren<{}>) {
@@ -20,11 +32,28 @@ export function ScreenRootBackground({
   );
 }
 
-export function ScreenBackground({ children }: React.PropsWithChildren<{}>) {
+export function ScreenBackground({
+  children,
+  overlay,
+}: React.PropsWithChildren<{
+  overlay?: {
+    opacity?: number;
+  };
+}>) {
   return (
-    <div className="relative inset-0 w-full h-full -z-40 select-none">
-      {children}
-    </div>
+    <>
+      {overlay && (
+        <div
+          className="absolute inset-0 w-full h-full bg-background"
+          style={{
+            opacity: overlay.opacity,
+          }}
+        />
+      )}
+      <div className="absolute inset-0 w-full h-full -z-40 select-none">
+        {children}
+      </div>
+    </>
   );
 }
 
