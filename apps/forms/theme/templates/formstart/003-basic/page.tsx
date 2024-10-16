@@ -6,6 +6,7 @@ import {
   ScreenBackground,
   ScreenCenter,
   ScreenRoot,
+  TextAlign,
 } from "@/theme/templates/kit/components";
 import Image from "next/image";
 
@@ -40,22 +41,5 @@ export default function _003() {
         </ScreenBackground>
       </ScreenCenter>
     </ScreenRoot>
-  );
-}
-
-function TextAlign({
-  children,
-  align = "left",
-}: React.PropsWithChildren<{
-  align: "left" | "center" | "right";
-}>) {
-  return (
-    <span
-      style={{
-        textAlign: align,
-      }}
-    >
-      {children}
-    </span>
   );
 }

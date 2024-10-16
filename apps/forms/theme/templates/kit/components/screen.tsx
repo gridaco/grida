@@ -16,7 +16,7 @@ export function ScreenCenter({ children }: React.PropsWithChildren<{}>) {
 
 export function ScreenMobileFrame({ children }: React.PropsWithChildren<{}>) {
   return (
-    <main className="relative overflow-hidden md:container w-full h-full md:max-w-md mx-auto md:rounded-lg md:shadow-lg !p-0">
+    <main className="relative overflow-hidden md:container w-full h-full md:max-w-md mx-auto md:rounded-lg md:shadow-lg md:border !p-0">
       {children}
     </main>
   );
@@ -102,11 +102,13 @@ export function ScreenGridPosition({
 export function ScreenGridArea({
   children,
   area,
+  zIndex,
 }: React.PropsWithChildren<{
   /**
    * [startRow, startCol, endRow, endCol]
    */
   area: [number, number, number, number];
+  zIndex?: number;
 }>) {
   const [startRow, startCol, endRow, endCol] = area;
   return (
@@ -115,6 +117,7 @@ export function ScreenGridArea({
       style={{
         gridColumn: `${startCol} / ${endCol}`,
         gridRow: `${startRow} / ${endRow}`,
+        zIndex: zIndex,
       }}
     >
       {children}
