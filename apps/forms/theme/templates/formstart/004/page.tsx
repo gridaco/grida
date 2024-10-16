@@ -4,13 +4,9 @@ import {
   Carousel,
   CarouselContent,
   CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
 } from "@/components/ui/carousel";
 import Autoplay from "embla-carousel-autoplay";
 import {
-  ScreenBackground,
-  ScreenCenter,
   ScreenDecorations,
   ScreenGrid,
   ScreenGridArea,
@@ -37,7 +33,6 @@ const cards = [
       src: "https://images.unsplash.com/photo-1559223694-98ed5e272fef?q=80&w=2670&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
     },
   },
-  ,
 ];
 
 export default function _004() {
