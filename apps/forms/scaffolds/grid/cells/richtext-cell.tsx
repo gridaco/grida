@@ -93,6 +93,7 @@ export function RichTextEditCell({
     schema: schema,
     initialContent: safevalue(defaultValue),
     uploadFile: uploader,
+    animations: false,
   });
 
   const onSaveClick = () => {

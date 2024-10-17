@@ -37,7 +37,7 @@ export function RichTextEditorField({
   uploader,
   resolver,
 }: {
-  name: string;
+  name?: string;
   required?: boolean;
   placeholder?: string;
   initialContent?: Block[];
@@ -59,6 +59,7 @@ export function RichTextEditorField({
         default: placeholder || locales.en.placeholders.default,
       },
     },
+    animations: false,
     // https://github.com/TypeCellOS/BlockNote/issues/884
     // trailingBlock: false,
     uploadFile: uploader
