@@ -1,9 +1,9 @@
-import _004 from "@/theme/templates/formstart/004/page";
+import _005 from "@/theme/templates/formstart/005/page";
 import { ScreenWindowRoot } from "@/theme/templates/kit/components";
 export default function Page() {
   return (
     <ScreenWindowRoot>
-      <_004 />
+      <_005 />
     </ScreenWindowRoot>
   );
 }

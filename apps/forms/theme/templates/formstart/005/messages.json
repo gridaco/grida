@@ -1,0 +1,12 @@
+{
+  "en": {
+    "title": "Your Campaign Title Goes Here.",
+    "body": "[Your Campaign Content Body Goes Here.]",
+    "button": "Next"
+  },
+  "ko": {
+    "title": "이곳에 캠페인 제목을 입력하세요.",
+    "body": "[캠페인 본문 내용을 입력하세요.]",
+    "button": "다음"
+  }
+}

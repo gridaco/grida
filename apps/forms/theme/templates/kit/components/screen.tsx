@@ -1,7 +1,15 @@
+export function ScreenWindowRoot({ children }: React.PropsWithChildren<{}>) {
+  return (
+    <div className="relative h-dvh w-dvw max-w-screen-2xl mx-auto overflow-hidden">
+      {children}
+    </div>
+  );
+}
+
 export function ScreenRoot({ children }: React.PropsWithChildren<{}>) {
   return (
-    <div className="relative h-dvh w-dvw max-w-screen-2xl mx-auto overflow-hidden md:p-4">
-      {children}
+    <div className="@container/screen relative w-full h-full">
+      <div className="relative w-full h-full @lg/screen:p-4">{children}</div>
     </div>
   );
 }
@@ -16,9 +24,15 @@ export function ScreenCenter({ children }: React.PropsWithChildren<{}>) {
 
 export function ScreenMobileFrame({ children }: React.PropsWithChildren<{}>) {
   return (
-    <main className="relative overflow-hidden md:container w-full h-full md:max-w-md mx-auto md:rounded-lg md:shadow-lg md:border !p-0">
+    <main className="relative overflow-hidden @lg/screen:container w-full h-full @lg/screen:max-w-md mx-auto @lg/screen:rounded-lg @lg/screen:shadow-lg @lg/screen:border !p-0">
       {children}
     </main>
+  );
+}
+
+export function ScreenScrollable({ children }: React.PropsWithChildren<{}>) {
+  return (
+    <div className="relative overflow-y-scroll w-full h-full">{children}</div>
   );
 }
 
@@ -26,7 +40,7 @@ export function ScreenRootBackground({
   children,
 }: React.PropsWithChildren<{}>) {
   return (
-    <div className="fixed inset-0 w-full h-full -z-50 pointer-events-none select-none">
+    <div className="absolute inset-0 w-full h-full -z-50 pointer-events-none select-none">
       {children}
     </div>
   );
