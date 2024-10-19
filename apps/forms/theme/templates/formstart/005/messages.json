@@ -1,12 +1,50 @@
 {
   "en": {
-    "title": "Your Campaign Title Goes Here.",
-    "body": "[Your Campaign Content Body Goes Here.]",
-    "button": "Next"
+    "translation": {
+      "title": "Your Campaign Title Goes Here.",
+      "body": "We are thrilled to announce the upcoming [Event Name], happening on [Date]. This is your chance to be part of an exclusive gathering of professionals, enthusiasts, and innovators in the [Industry/Field]. Whether you're looking to expand your network, gain valuable insights from industry leaders, or discover the latest trends and tools, [Event Name] offers something for everyone.<br/><br/>Over the course of [Number of Days] days, you will have the opportunity to attend workshops, keynotes, and panel discussions led by experts from around the world. Our carefully curated sessions will cover a wide range of topics, from [Topic 1] to [Topic 2], ensuring that there is something to match your interests and needs.<br/><br/><img src='/placeholders/image-4:3-transparent.png' alt='Event Image'/><br/>Don’t miss out on this unique opportunity to grow your skills, connect with peers, and take your career to the next level. Reserve your spot today!",
+      "button": "Register",
+      "registration_banner": {
+        "before_open": "Registration opens at {{date}}",
+        "after_open_before_close": "Registration close at {{date}}",
+        "after_open_before_close_alt": "",
+        "after_close": "Registration is closed"
+      },
+      "registration_footer": {
+        "before_open": "Open in",
+        "after_open_before_close": "Closing in",
+        "after_close": "Registration is closed"
+      },
+      "date": {
+        "d": "{{d}}d",
+        "h": "{{h}}h",
+        "m": "{{m}}m",
+        "s": "{{s}}s"
+      }
+    }
   },
   "ko": {
-    "title": "이곳에 캠페인 제목을 입력하세요.",
-    "body": "[캠페인 본문 내용을 입력하세요.]",
-    "button": "다음"
+    "translation": {
+      "title": "이곳에 캠페인 제목을 입력하세요.",
+      "body": "다가오는 [이벤트 이름]이 [날짜]에 개최된다는 소식을 전하게 되어 매우 기쁩니다. 이 행사는 [산업/분야]의 전문가, 열정가, 혁신가들이 모이는 독점적인 기회입니다. 네트워크를 확장하고, 업계 리더로부터 귀중한 통찰을 얻으며, 최신 트렌드와 도구를 발견하고자 하는 분들께 [이벤트 이름]은 모두에게 알맞은 기회를 제공합니다.<br/><br/>[일수]일 동안 전 세계의 전문가들이 이끄는 워크숍, 기조연설, 패널 토론에 참석할 수 있습니다. 우리의 신중하게 선정된 세션은 [주제 1]에서 [주제 2]에 이르기까지 다양한 주제를 다루며, 여러분의 관심사와 요구에 맞는 프로그램을 제공합니다.<br/><br/><img src='/placeholders/image-4:3-transparent.png' alt='Event Image'/><br/>이번 특별한 기회를 놓치지 마세요. 스킬을 향상시키고, 동료들과 연결하며, 경력을 한 단계 업그레이드할 수 있는 절호의 기회를 잡으세요. 지금 자리 예약을 하세요!",
+      "button": "신청하기",
+      "registration_banner": {
+        "before_open": "{{date}} 에 모집이 시작됩니다.",
+        "after_open_before_close": "{{date}} 에 모집이 종료됩니다.",
+        "after_open_before_close_alt": "",
+        "after_close": "모집이 종료되었습니다."
+      },
+      "registration_footer": {
+        "before_open": "모집 오픈까지",
+        "after_open_before_close": "모집 종료까지",
+        "after_close": "모집이 종료되었습니다."
+      },
+      "date": {
+        "d": "{{d}}일",
+        "h": "{{h}}시간",
+        "m": "{{m}}분",
+        "s": "{{s}}초"
+      }
+    }
   }
 }

@@ -29,7 +29,7 @@ describe("ScheduleState", () => {
   });
 
   test("should return before_open when current date is before open_at", () => {
-    const schedule: Schedule = { open: mockDate(1), close: mockDate(2) }; // opens tomorrow, closes the day after
+    const schedule: Schedule = { open: mockDate(10), close: mockDate(20) }; // opens tomorrow, closes the day after
     const state = new ScheduleState(schedule);
 
     expect(state.state(now)).toBe("before_open");

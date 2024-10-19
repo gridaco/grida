@@ -24,8 +24,16 @@ import {
 import { FileUploadField } from "@/components/formfield/file-upload-field";
 import { cn } from "@/utils";
 import FormStartPage from "@/theme/templates/formstart/005/page";
+import { useEditorState } from "@/scaffolds/editor";
 
 export default function FormStartEditPage() {
+  const [state] = useEditorState();
+
+  const {
+    form: { campaign },
+    theme: { lang },
+  } = state;
+
   const [edit, setEdit] = useState(false);
 
   return (
@@ -41,8 +49,7 @@ export default function FormStartEditPage() {
               }}
             >
               <div className="w-full min-h-[852px] h-[80dvh]">
-                {/* @ts-ignore FIXME:  */}
-                <FormStartPage data={dummy} />
+                <FormStartPage data={dummy} meta={campaign} lang={lang} />
               </div>
             </SandboxWrapper>
           </div>
@@ -136,15 +143,15 @@ function EditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
           </div>
           <div className="grid gap-2">
             <Label>Title</Label>
-            <Input />
+            <Input placeholder="Enter your Campaign Title" />
           </div>
           <div className="grid gap-2">
             <Label>Content</Label>
             <RichTextEditorField />
           </div>
           <div className="grid gap-2">
-            <Label>Button Text</Label>
-            <RichTextEditorField />
+            <Label>Register Button Text</Label>
+            <Input placeholder="Register" />
           </div>
         </div>
       </SheetContent>

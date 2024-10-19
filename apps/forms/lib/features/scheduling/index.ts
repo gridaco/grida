@@ -50,16 +50,27 @@ export namespace Features {
    * if enabled and neither open_at nor close_at is set, the campaign is open during the open_at or close_at time
    */
   export class ScheduleState {
-    constructor(private readonly schedule: Schedule) {
+    readonly open_at: Date | null;
+    readonly close_at: Date | null;
+    constructor(private readonly __schedule: Schedule) {
       // Assert that at least one of open_at or close_at must be set if scheduling is enabled
       assert(
-        this.schedule.open || this.schedule.close,
+        this.__schedule.open || this.__schedule.close,
         "Either open or close must be set."
       );
+
+      this.open_at =
+        typeof this.__schedule.open === "string"
+          ? new Date(this.__schedule.open)
+          : this.__schedule.open;
+      this.close_at =
+        typeof this.__schedule.close === "string"
+          ? new Date(this.__schedule.close)
+          : this.__schedule.close;
     }
 
     is_open(_now?: Date) {
-      return schedule_in_range(this.schedule, _now);
+      return schedule_in_range(this.__schedule, _now);
     }
 
     state(
@@ -69,29 +80,40 @@ export namespace Features {
       const now = _now ?? new Date();
 
       // Case where both open and close are set
-      if (this.schedule.open && this.schedule.close) {
+      if (this.open_at && this.close_at) {
         return is_open
           ? "after_open_before_close"
-          : now < this.schedule.open
+          : now < this.open_at
             ? "before_open"
             : "after_close";
       }
 
       // Case where only open is set
-      if (this.schedule.open) {
+      if (this.open_at) {
         return is_open ? "after_open_before_close" : "before_open";
       }
 
       // Case where only close is set
-      if (this.schedule.close) {
+      if (this.close_at) {
         // If we only have close_at, we consider it "open" until the close date
-        return now < this.schedule.close
-          ? "after_open_before_close"
-          : "after_close";
+        return now < this.close_at ? "after_open_before_close" : "after_close";
       }
 
       // Default to after_close if neither is set
       return "after_close";
+    }
+
+    next(_now?: Date): Date | null {
+      const now = _now ?? new Date();
+      const state = this.state(now);
+      switch (state) {
+        case "after_close":
+          return null;
+        case "before_open":
+          return this.open_at;
+        case "after_open_before_close":
+          return this.close_at;
+      }
     }
   }
 }

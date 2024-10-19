@@ -1,5 +1,6 @@
 "use client";
 
+import React, { createContext, useEffect, useMemo } from "react";
 import {
   Carousel,
   CarouselContent,
@@ -16,12 +17,20 @@ import {
   ScreenScrollable,
   Timer,
 } from "@/theme/templates/kit/components";
+import {
+  CampaignTemplateProps,
+  FormCampaignStartPageContextProvider,
+  useCampaignMeta,
+} from "@/theme/templates/kit/campaign";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { usePreferredLanguage } from "@uidotdev/usehooks";
 import { motion } from "framer-motion";
-import { useMemo } from "react";
+import _messages from "./messages.json";
+import { Features } from "@/lib/features/scheduling";
+import { I18nextProvider, useTranslation } from "react-i18next";
+import i18next from "i18next";
+import { cn } from "@/utils";
 
 const medias = [
   {
@@ -41,65 +50,65 @@ const medias = [
   },
 ];
 
-const close_at = new Date("2025-06-01T00:00:00Z");
+type Messages = typeof _messages;
 
-interface CampaignMeta {
-  max_form_responses_by_customer: number | null;
-  is_max_form_responses_by_customer_enabled: boolean;
-  max_form_responses_in_total: number | null;
-  is_max_form_responses_in_total_enabled: boolean;
-  is_force_closed: boolean;
-  is_scheduling_enabled: boolean;
-  scheduling_open_at: string | null;
-  scheduling_close_at: string | null;
-  scheduling_tz?: string;
+export default function _005({
+  meta,
+  data,
+  resources = _messages,
+  lang,
+}: CampaignTemplateProps<Messages>) {
+  const i18n = useMemo(() => {
+    return i18next.createInstance(
+      {
+        fallbackLng: "en",
+        resources: resources,
+        lng: lang,
+      },
+      (err, t) => {
+        if (err) return console.log("something went wrong loading", err);
+      }
+    );
+  }, [lang]);
+
+  return (
+    <FormCampaignStartPageContextProvider value={meta}>
+      <I18nextProvider
+        // @ts-expect-error
+        i18n={i18n}
+      >
+        <Consumer />
+      </I18nextProvider>
+    </FormCampaignStartPageContextProvider>
+  );
 }
 
-interface TemplateProps {
-  meta: CampaignMeta;
-  data: {};
-  messages: Record<string, string>;
-  lang: string;
-}
-
-export default function _005() {
+function Consumer() {
+  const { t } = useTranslation<any>();
   return (
     <ScreenRoot>
       <ScreenMobileFrame>
         <ScreenScrollable>
-          <div>
-            <Media />
-          </div>
-          <div className="pt-5">
-            <header className="px-4">
-              <h1 className="text-2xl font-bold w-4/5">
-                Your Campaign Title Goes Here.
-              </h1>
-            </header>
-            <div className="py-10 flex justify-center items-center px-4">
-              <NextEventState />
+          <div className="min-h-full">
+            <div>
+              <Media />
             </div>
-            <article className="prose prose-sm dark:prose-invert">
-              <div className="prose-img:p-0 prose-video:p-0 px-4">
-                <p>
-                  <i>[Your Campaign Content Body Goes Here.]</i>
-                  <br />
-                  Lorem ipsum dolor sit amet consectetur adipisicing elit.
-                  Voluptates, doloremque.
-                </p>
-                <Image
-                  src={medias[0].media.src}
-                  alt=""
-                  width={300}
-                  height={300}
-                  className="w-full h-full aspect-square object-cover"
+            <div className="pt-5">
+              <header className="flex flex-col items-center gap-4 px-4">
+                <div className="w-full text-start">
+                  <h1 className="text-2xl font-bold w-4/5">{t("title")}</h1>
+                </div>
+                <NextEventState className="py-4" />
+              </header>
+              {/* <div className="py-10 flex justify-center items-center px-4">
+              </div> */}
+              <article className="py-10 prose prose-sm dark:prose-invert">
+                <div
+                  className="prose-img:p-0 prose-video:p-0 px-4"
+                  dangerouslySetInnerHTML={{ __html: t("body") }}
                 />
-                <p>
-                  Lorem ipsum dolor sit amet consectetur adipisicing elit.
-                  Voluptates, doloremque.
-                </p>
-              </div>
-            </article>
+              </article>
+            </div>
           </div>
           <CTAFooter />
         </ScreenScrollable>
@@ -129,6 +138,38 @@ function Media() {
 }
 
 function CTAFooter() {
+  const { t } = useTranslation<any>();
+
+  const {
+    is_scheduling_enabled,
+    scheduling_close_at,
+    scheduling_open_at,
+    scheduling_tz,
+    is_force_closed,
+    is_schedule_in_range,
+  } = useCampaignMeta();
+
+  const schedule = useMemo(
+    () =>
+      is_scheduling_enabled
+        ? new Features.ScheduleState({
+            open: scheduling_open_at,
+            close: scheduling_close_at,
+          })
+        : null,
+    [is_scheduling_enabled, scheduling_open_at, scheduling_close_at]
+  );
+
+  const schedulestate = useMemo(() => schedule?.state(), [schedule]);
+  const next = useMemo(() => schedule?.next(), [schedule]);
+
+  const closed = useMemo(() => {
+    if (is_force_closed) return true;
+    if (is_scheduling_enabled && schedulestate !== "after_open_before_close")
+      return true;
+    return false;
+  }, [is_force_closed, schedulestate]);
+
   return (
     <motion.footer
       initial={{ y: 100 }}
@@ -139,39 +180,41 @@ function CTAFooter() {
       <div className="flex justify-between gap-4 items-center p-4 pb-8">
         <div>
           <div>
-            <Timer
-              date={close_at}
-              render={({ ready, d, h, m, s }) => (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={ready ? { opacity: 1 } : {}}
-                  className="flex flex-wrap items-center gap-2"
-                >
-                  <span className="text-xs text-muted-foreground">
-                    Closing in
-                  </span>
-                  <Badge
-                    data-ready={ready}
-                    variant="secondary"
-                    className="uppercase whitespace-nowrap opacity-0 data-[ready=true]:opacity-100"
+            {schedulestate && next && (
+              <Timer
+                date={next}
+                render={({ ready, d, h, m, s }) => (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={ready ? { opacity: 1 } : {}}
+                    className="flex flex-wrap items-center gap-2"
                   >
-                    {d ? (
-                      `${d}d `
-                    ) : (
-                      <>
-                        {h && `${h}h `}
-                        {m && `${m}m `}
-                        {s && `${s}s`}
-                      </>
-                    )}
-                  </Badge>
-                </motion.div>
-              )}
-            />
+                    <span className="text-xs text-muted-foreground">
+                      {t(`registration_footer.${schedulestate}`)}
+                    </span>
+                    <Badge
+                      data-ready={ready}
+                      variant="secondary"
+                      className="uppercase whitespace-nowrap opacity-0 data-[ready=true]:opacity-100"
+                    >
+                      {d ? (
+                        `${t("date.d", { d })} `
+                      ) : (
+                        <>
+                          {h && `${h}${(t("date.h"), { h })} `}
+                          {m && `${m}${t("date.m", { m })} `}
+                          {s && `${s}${t("date.s", { s })}`}
+                        </>
+                      )}
+                    </Badge>
+                  </motion.div>
+                )}
+              />
+            )}
           </div>
         </div>
         <div className="flex justify-end items-center">
-          <Button>Register Now</Button>
+          <Button disabled={closed}>{t("button")}</Button>
         </div>
       </div>
     </motion.footer>
@@ -184,31 +227,64 @@ function CTAFooter() {
  * if the event is open, it displays the closing date.
  * if the event is closed (by time or by capacity), it displays the event is closed.
  */
-function NextEventState() {
-  const language = usePreferredLanguage();
+function NextEventState({ className }: { className?: string }) {
+  const { t, i18n } = useTranslation<any>();
+  const lang = i18n.language;
+  const {
+    is_scheduling_enabled,
+    scheduling_close_at,
+    scheduling_open_at,
+    scheduling_tz,
+    is_schedule_in_range: is_open,
+  } = useCampaignMeta();
 
-  const cal_month = useMemo(
-    () => close_at.toLocaleDateString(language, { month: "short" }),
-    [close_at]
+  const schedule = useMemo(
+    () =>
+      is_scheduling_enabled
+        ? new Features.ScheduleState({
+            open: scheduling_open_at,
+            close: scheduling_close_at,
+          })
+        : null,
+    [is_scheduling_enabled, scheduling_open_at, scheduling_close_at]
   );
 
-  const cal_day = useMemo(
-    () => close_at.toLocaleDateString(language, { day: "numeric" }),
-    [close_at]
-  );
+  const schedulestate = useMemo(() => schedule?.state(), [schedule]);
+  const next = useMemo(() => schedule?.next(), [schedule]);
 
-  return (
-    <div className="flex items-start gap-2">
-      <CalendarBoxIcon month={cal_month} day={cal_day}></CalendarBoxIcon>
-      <div className="inline-flex items-center min-h-10 gap-2 bg-background border px-4 py-2 rounded text-xs">
-        Registration close at{" "}
-        {close_at.toLocaleDateString(language, {
-          month: "long",
-          day: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        })}
+  const cal_text = useMemo(() => {
+    if (!next) return null;
+
+    return {
+      month: next.toLocaleDateString(lang, { month: "short" }),
+      day: next.toLocaleDateString(lang, { day: "numeric" }),
+    };
+  }, [next, lang]);
+
+  const state_text = useMemo(() => {
+    return t(`registration_banner.${schedulestate}`, {
+      context: next ? undefined : "alt",
+      date: next?.toLocaleDateString(lang, {
+        month: "long",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    });
+  }, [schedulestate, lang, next]);
+
+  if (is_scheduling_enabled && state_text) {
+    return (
+      <div className={cn("flex items-start gap-2", className)}>
+        {cal_text && (
+          <CalendarBoxIcon month={cal_text.month} day={cal_text.day} />
+        )}
+        <div className="inline-flex items-center min-h-10 gap-2 bg-background border px-4 py-2 rounded text-xs">
+          {state_text}
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
+
+  return <></>;
 }

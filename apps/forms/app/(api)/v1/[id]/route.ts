@@ -50,11 +50,16 @@ export const revalidate = 0;
 const cjk = ["ko", "ja"];
 
 interface FormClientFetchResponse {
-  data: FormClientFetchResponseData | null;
+  data: FormAgentPrefetchData | null;
   error: FormClientFetchResponseError | null;
 }
 
-export interface FormClientFetchResponseData {
+/**
+ * v1/ prefetch for the form (campaign)
+ *
+ * includes the render tree and access state
+ */
+export interface FormAgentPrefetchData {
   title: string;
   session_id: string;
   method: FormMethod;
@@ -474,7 +479,7 @@ export async function GET(
   );
 
   const is_open = !__is_force_closed && response.error === null;
-  const payload: FormClientFetchResponseData = {
+  const payload: FormAgentPrefetchData = {
     title: title,
     session_id: session.id,
     method,
