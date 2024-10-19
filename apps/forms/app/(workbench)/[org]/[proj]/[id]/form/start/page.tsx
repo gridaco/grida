@@ -2,7 +2,7 @@
 import { AgentThemeProvider } from "@/scaffolds/agent/theme";
 import { SideControl } from "@/scaffolds/sidecontrol";
 import dummy from "@/theme/templates/formstart/data/01.dummy.json";
-import React, { useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   Sheet,
   SheetContent,
@@ -26,10 +26,41 @@ import { cn } from "@/utils";
 import FormStartPage from "@/theme/templates/formstart/005/page";
 import { useEditorState } from "@/scaffolds/editor";
 
-export default function FormStartEditPage() {
-  const [state] = useEditorState();
+function useTemplateEditor() {
+  const [state, dispatch] = useEditorState();
 
   const {
+    document: { selected_node_id },
+  } = state;
+
+  const changeproperty = useCallback(
+    (key: string, value: any) => {
+      dispatch({
+        type: "editor/document/node/property",
+        node_id: selected_node_id!,
+        data: {
+          [key]: value,
+        },
+      });
+    },
+    [dispatch, selected_node_id]
+  );
+
+  return useMemo(
+    () => ({
+      changeproperty,
+    }),
+    [changeproperty]
+  );
+}
+
+export default function FormStartEditPage() {
+  const [state, dispatch] = useEditorState();
+
+  const { changeproperty } = useTemplateEditor();
+
+  const {
+    document: { selected_node_id },
     form: { campaign },
     theme: { lang },
   } = state;
@@ -49,7 +80,13 @@ export default function FormStartEditPage() {
               }}
             >
               <div className="w-full min-h-[852px] h-[80dvh]">
-                <FormStartPage data={dummy} meta={campaign} lang={lang} />
+                <FormStartPage
+                  data={{
+                    title: "",
+                  }}
+                  meta={campaign}
+                  lang={lang}
+                />
               </div>
             </SandboxWrapper>
           </div>
@@ -89,6 +126,8 @@ function SandboxWrapper({
 }
 
 function EditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
+  const { changeproperty } = useTemplateEditor();
+
   return (
     <Sheet {...props}>
       <SheetContent className="flex flex-col xl:w-[800px] xl:max-w-none sm:w-[500px] sm:max-w-none w-screen max-w-none">

@@ -54,7 +54,7 @@ function CurrentPageCanvas() {
 
   const {
     theme: { lang },
-    document: { selected_page_id },
+    selected_page_id,
   } = state;
 
   switch (selected_page_id) {

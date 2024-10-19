@@ -29,6 +29,7 @@ import type {
   // DataGridViewAction,
   DataGridTableViewAction,
   DataGridSelectCellAction,
+  EditorSelectPageAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { EditorSymbols } from "./symbols";
@@ -98,7 +99,6 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
     case "blocks/blur":
       return blockReducer(state, action);
 
-    case "editor/document/select-page":
     case "editor/document/sampledata":
     case "editor/document/node/select":
     case "editor/document/node/template":
@@ -112,6 +112,14 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
       const { saving } = <GlobalSavingAction>action;
       return produce(state, (draft) => {
         draft.saving = saving;
+      });
+    }
+
+    case "editor/select-page": {
+      const { page_id } = <EditorSelectPageAction>action;
+
+      return produce(state, (draft) => {
+        draft.selected_page_id = page_id;
       });
     }
 

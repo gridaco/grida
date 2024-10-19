@@ -36,6 +36,7 @@ export type EditorAction =
   //
   | GlobalSavingAction
   | EditorSidebarModeAction
+  | EditorSelectPageAction
   | OpenFieldEditPanelAction
   | OpenRecordEditPanelAction
   | OpenCustomerDetailsPanelAction
@@ -66,6 +67,11 @@ export type EditorAction =
 
 export interface InitAssetAction extends Partial<EditorState["assets"]> {
   type: "editor/assets/init";
+}
+
+export interface EditorSelectPageAction {
+  type: "editor/select-page";
+  page_id: string;
 }
 
 // #region block
@@ -433,7 +439,6 @@ export interface FormEndingPreferencesAction
 }
 
 export type DocumentAction =
-  | DocumentSelectPageAction
   | DocumentTemplateSampleDataAction
   | DocumentSelectNodeAction
   | DocumentNodeChangeTemplateAction
@@ -441,11 +446,6 @@ export type DocumentAction =
   | DocumentNodeUpdateStyleAction
   | DocumentNodeUpdateAttributeAction
   | DocumentNodeUpdatePropertyAction;
-
-export interface DocumentSelectPageAction {
-  type: "editor/document/select-page";
-  page_id: string;
-}
 
 // TODO: consider removing this
 export interface DocumentTemplateSampleDataAction {

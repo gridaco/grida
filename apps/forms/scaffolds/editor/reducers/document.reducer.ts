@@ -1,8 +1,7 @@
 import { produce, type Draft } from "immer";
 
-import {
+import type {
   DocumentAction,
-  DocumentSelectPageAction,
   DocumentSelectNodeAction,
   DocumentNodeChangeTemplateAction,
   DocumentNodeUpdateStyleAction,
@@ -18,13 +17,6 @@ export default function documentReducer(
   action: DocumentAction
 ): EditorState {
   switch (action.type) {
-    case "editor/document/select-page": {
-      const { page_id } = <DocumentSelectPageAction>action;
-
-      return produce(state, (draft) => {
-        draft.document.selected_page_id = page_id;
-      });
-    }
     case "editor/document/sampledata": {
       const { sampledata } = <DocumentTemplateSampleDataAction>action;
       return produce(state, (draft) => {

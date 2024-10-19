@@ -32,20 +32,19 @@ import { renderMenuItems } from "./render";
 export function ModeDesign() {
   const [state, dispatch] = useEditorState();
 
-  const {
-    document: { pages },
-  } = state;
+  const { pages } = state;
 
   const show_hierarchy =
-    state.document.selected_page_id &&
-    ["form", "collection"].includes(state.document.selected_page_id);
+    state.selected_page_id &&
+    // TODO: need typing
+    ["form", "collection"].includes(state.selected_page_id);
 
   return (
     <>
       {renderMenuItems(pages, {
         onSelect: (page) => {
           dispatch({
-            type: "editor/document/select-page",
+            type: "editor/select-page",
             page_id: page.id,
           });
         },

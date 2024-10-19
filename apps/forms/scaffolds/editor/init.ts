@@ -45,7 +45,7 @@ const initial_sidebar_mode = {
 
 function initialBaseDocumentEditorState(
   init: BaseDocumentEditorInit
-): Omit<BaseDocumentEditorState, "document"> {
+): Omit<BaseDocumentEditorState, "document" | "pages" | "selected_page_id"> {
   const basepath = editorbasepath({
     org: init.organization.name,
     proj: init.project.name,
@@ -196,8 +196,8 @@ function initialDatabaseEditorState(
     ...base,
     supabase_project: init.supabase_project,
     connections: {},
+    pages: [],
     document: {
-      pages: [],
       nodes: [],
       templatedata: {},
     },
@@ -273,12 +273,12 @@ function initialSiteEditorState(init: SiteDocumentEditorInit): EditorState {
   // @ts-ignore
   return {
     ...base,
+    pages: sitedocumentpagesinit({
+      basepath: base.basepath,
+      document_id: init.document_id,
+    }),
+    selected_page_id: "collection",
     document: {
-      pages: sitedocumentpagesinit({
-        basepath: base.basepath,
-        document_id: init.document_id,
-      }),
-      selected_page_id: "collection",
       nodes: [],
       templatesample: "formcollection_sample_001_the_bundle",
       templatedata: {},
@@ -484,12 +484,12 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
     tables: values,
 
     blocks: blockstreeflat(init.blocks),
+    pages: formdocumentpagesinit({
+      basepath: base.basepath,
+      document_id: init.document_id,
+    }),
+    selected_page_id: "", // "form",
     document: {
-      pages: formdocumentpagesinit({
-        basepath: base.basepath,
-        document_id: init.document_id,
-      }),
-      selected_page_id: "", // "form",
       nodes: [],
       templatedata: {},
     },
