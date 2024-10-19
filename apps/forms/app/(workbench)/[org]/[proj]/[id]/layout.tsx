@@ -19,6 +19,7 @@ import type {
   FormBlock,
   FormFieldDefinition,
   FormPageBackgroundSchema,
+  FormStartPageSchema,
   FormStyleSheetV1Schema,
 } from "@/types";
 import type {
@@ -226,6 +227,10 @@ export default async function Layout({
                     form.unknown_field_handling_strategy,
                   method: data.method,
                 },
+                start: data.start_page
+                  ? // TODO: type it
+                    (data.start_page as FormStartPageSchema)
+                  : null,
                 ending: {
                   is_redirect_after_response_uri_enabled:
                     data.is_redirect_after_response_uri_enabled,

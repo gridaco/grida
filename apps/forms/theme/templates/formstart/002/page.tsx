@@ -180,8 +180,8 @@ export default function StartPage_002() {
         </motion.div>
       </ScreenMobileFrame>
       <ScreenRootBackground>
-        <Image
-          src="/templates/sample-images/licensed/winter-dev-only.png"
+        <img
+          src="https://sdl-assets.ams3.cdn.digitaloceanspaces.com/sdl/2021/08/sdl-polestar-interior-steering-2000x1333.jpg"
           alt=""
           width={1080}
           height={1920}

@@ -30,11 +30,8 @@ interface TemplateNode {
 }
 
 export interface ITemplateEditorState extends IDocumentSelectedNodeState {
-  /**
-   * Sample data id for this instance
-   */
-  templatesample?: string;
-  templatedata: {
+  data: Record<string, any>;
+  overrides: {
     [node_id: string]: TemplateNode;
   };
 }

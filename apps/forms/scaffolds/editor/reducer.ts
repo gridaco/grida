@@ -99,7 +99,7 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
     case "blocks/blur":
       return blockReducer(state, action);
 
-    case "editor/document/sampledata":
+    case "editor/document/data":
     case "editor/document/node/select":
     case "editor/document/node/switch-component":
     case "editor/document/node/text":
@@ -365,6 +365,11 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
 
     default:
       console.error("unhandled action by main editor reducer", action);
+      if (process.env.NODE_ENV === "development") {
+        throw new Error(
+          "unhandled action by main editor reducer. see console for details"
+        );
+      }
       return state;
   }
 }

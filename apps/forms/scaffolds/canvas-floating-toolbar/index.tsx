@@ -13,6 +13,8 @@ import {
   SmartphoneIcon,
 } from "lucide-react";
 import { Toggle } from "@/components/ui/toggle";
+import { useEffect, useState } from "react";
+import * as samples from "@/theme/templates/formcollection/samples";
 
 export function CanvasFloatingToolbar() {
   return (
@@ -26,17 +28,21 @@ export function CanvasFloatingToolbar() {
 
 export function SamplesSelect() {
   const [state, dispatch] = useEditorState();
+  const [sample, setSample] = useState<keyof typeof samples>(
+    "formcollection_sample_001_the_bundle"
+  );
+
+  useEffect(() => {
+    const data = samples[sample as keyof typeof samples];
+
+    dispatch({
+      type: "editor/document/data",
+      data: data,
+    });
+  }, [sample]);
 
   return (
-    <Select
-      value={state.document.templatesample}
-      onValueChange={(value) => {
-        dispatch({
-          type: "editor/document/sampledata",
-          sampledata: value,
-        });
-      }}
-    >
+    <Select value={sample} onValueChange={(value) => setSample(value as any)}>
       <SelectTrigger className="border-none focus:ring-0">
         <SelectValue />
       </SelectTrigger>

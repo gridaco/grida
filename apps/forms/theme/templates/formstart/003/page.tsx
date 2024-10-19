@@ -17,10 +17,10 @@ export default function _003() {
         <section className="px-4 max-w-screen-sm">
           <TextAlign align="center">
             <div className="flex flex-col justify-center items-center gap-4">
-              <h1 className="text-6xl font-bold">
+              <h1 className="text-6xl font-bold w-4/5">
                 Help us build future of forms
               </h1>
-              <p className="text-lg text-muted-foreground w-4/5">
+              <p className="text-lg text-foreground/80 w-4/5">
                 Your feedback will directly influence the prioritization of our
                 upcoming features.
               </p>

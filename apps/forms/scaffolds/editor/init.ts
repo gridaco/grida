@@ -23,6 +23,7 @@ import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { nanoid } from "nanoid";
 import { DataGridLocalPreferencesStorage } from "./storage/datagrid.storage";
 import { Data } from "@/lib/data";
+import * as samples from "@/theme/templates/formcollection/samples";
 
 export function initialEditorState(init: EditorInit): EditorState {
   switch (init.doctype) {
@@ -198,7 +199,8 @@ function initialDatabaseEditorState(
     connections: {},
     pages: [],
     document: {
-      templatedata: {},
+      data: {},
+      overrides: {},
     },
     sidebar: {
       mode: initial_sidebar_mode[init.doctype],
@@ -278,8 +280,8 @@ function initialSiteEditorState(init: SiteDocumentEditorInit): EditorState {
     }),
     selected_page_id: "collection",
     document: {
-      templatesample: "formcollection_sample_001_the_bundle",
-      templatedata: {},
+      data: samples["formcollection_sample_001_the_bundle"],
+      overrides: {},
     },
     sidebar: {
       mode: initial_sidebar_mode[init.doctype],
@@ -488,12 +490,14 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
     }),
     selected_page_id: "", // "form",
     document: {
-      templatedata: {},
+      data: {},
+      overrides: {},
     },
     form: {
       form_id: init.form_id,
       form_title: init.form_title,
       campaign: init.campaign,
+      startpage: init.start,
       ending: init.ending,
       fields: init.fields,
       form_security: init.form_security,

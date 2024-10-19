@@ -76,7 +76,7 @@ function SelectedNodeProperties() {
     style,
     properties: _properties,
     text,
-  } = state.document.templatedata[selected_node_id!] || {};
+  } = state.document.overrides[selected_node_id!] || {};
 
   const { hidden } = attributes || {};
 

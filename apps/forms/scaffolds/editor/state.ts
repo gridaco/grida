@@ -15,6 +15,7 @@ import type {
   FormResponseField,
   FormResponseSession,
   FormResponseUnknownFieldHandlingStrategyType,
+  FormStartPageSchema,
   FormStyleSheetV1Schema,
   FormsPageLanguage,
   GDocumentType,
@@ -83,6 +84,7 @@ export interface FormDocumentEditorInit extends BaseDocumentEditorInit {
   form_id: string;
   campaign: EditorState["form"]["campaign"];
   form_security: EditorState["form"]["form_security"];
+  start: EditorState["form"]["startpage"];
   ending: EditorState["form"]["ending"];
   connections?: {
     store_id?: number | null;
@@ -509,6 +511,7 @@ export interface FormEditorState
       scheduling_close_at: string | null;
       scheduling_tz?: string;
     };
+    startpage: FormStartPageSchema | null;
     ending: {
       is_redirect_after_response_uri_enabled: boolean;
       redirect_after_response_uri: string | null;

@@ -2,7 +2,7 @@ import type { ZodObject } from "zod";
 import type { Tokens } from "@/ast";
 
 export type BuilderAction =
-  | BuilderTemplateSampleDataAction
+  | BuilderSetDataAction
   | BuilderSelectNodeAction
   | BuilderNodeSwitchComponentAction
   | BuilderNodeChangeTextAction
@@ -10,10 +10,9 @@ export type BuilderAction =
   | BuilderNodeUpdateAttributeAction
   | BuilderNodeUpdatePropertyAction;
 
-// TODO: consider removing this
-export interface BuilderTemplateSampleDataAction {
-  type: "editor/document/sampledata";
-  sampledata: string;
+export interface BuilderSetDataAction {
+  type: "editor/document/data";
+  data: Record<string, any>;
 }
 
 export interface BuilderSelectNodeAction {

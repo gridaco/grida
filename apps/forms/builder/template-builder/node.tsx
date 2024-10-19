@@ -53,7 +53,7 @@ export function SlotNode<P extends Record<string, any>>({
   const selected = !!selected_node_id && selected_node_id === node_id;
 
   const { component_id, properties, style, attributes, text } =
-    state.document.templatedata[node_id] || {};
+    state.document.overrides[node_id] || {};
 
   const renderer = component_id
     ? TemplateComponents.components[component_id]

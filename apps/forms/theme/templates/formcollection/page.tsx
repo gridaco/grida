@@ -22,9 +22,13 @@ import {
 import { Factory } from "@/ast/factory";
 import ArrayMap from "@/builder/core/data-context/array";
 
+type ISample = (typeof samples)[keyof typeof samples];
+
 export default function FormCollectionPage() {
   const [state] = useEditorState();
-  const data = samples[state.document.templatesample as keyof typeof samples];
+
+  const { data } = state.document;
+
   return (
     <RootDataContextProvider>
       <DataProvider namespace="dummy" initialData={data}>
@@ -34,15 +38,15 @@ export default function FormCollectionPage() {
             node_id="hero"
             component={Hero_002}
             defaultProperties={{
-              h1: Factory.createPropertyAccessExpression<typeof data>([
+              h1: Factory.createPropertyAccessExpression<ISample>([
                 "featured",
                 "h1",
               ]),
-              media: Factory.createPropertyAccessExpression<typeof data>([
+              media: Factory.createPropertyAccessExpression<ISample>([
                 "featured",
                 "media",
               ]),
-              p: Factory.createPropertyAccessExpression<typeof data>([
+              p: Factory.createPropertyAccessExpression<ISample>([
                 "featured",
                 "p",
               ]),
@@ -54,9 +58,10 @@ export default function FormCollectionPage() {
                 <SlotNode
                   node_id="list-header-title"
                   component={TemplateBuilderWidgets.Text}
-                  defaultText={Factory.createPropertyAccessExpression<
-                    typeof data
-                  >(["listheader", "text"])}
+                  defaultText={Factory.createPropertyAccessExpression<ISample>([
+                    "listheader",
+                    "text",
+                  ])}
                   defaultStyle={{
                     fontSize: 24,
                     fontWeight: 700,
