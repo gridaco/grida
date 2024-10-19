@@ -22,7 +22,7 @@ import type {
 } from "@/types";
 import type { ResourceTypeIconName } from "@/components/resource-type-icon";
 import type { Data } from "@/lib/data";
-import type { IDocumentState } from "@/builder/types";
+import type { ITemplateEditorState } from "@/builder/types";
 import { SYM_LOCALTZ, EditorSymbols } from "./symbols";
 
 export type GDocEditorRouteParams = {
@@ -395,7 +395,7 @@ export interface BaseDocumentEditorState
   document_id: string;
   document_title: string;
   doctype: GDocumentType;
-  document: IDocumentState;
+  document: ITemplateEditorState;
   theme: {
     is_powered_by_branding_enabled: boolean;
     lang: FormsPageLanguage;

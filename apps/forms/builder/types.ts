@@ -11,19 +11,30 @@ export interface IDocumentSelectedNodeState {
   selected_node_context?: Record<string, any>;
 }
 
-export interface IDocumentState extends IDocumentSelectedNodeState {
-  nodes: any[];
+interface TemplateNode {
+  text?: Tokens.StringValueExpression;
+  /**
+   * ID of component that this instance came from, refers to components table
+   */
+  component_id: string;
+  attributes?: {
+    hidden?: boolean;
+  };
+  /**
+   * properties - props data
+   *
+   * expression that will be passed to this instance
+   */
+  properties?: { [key: string]: Tokens.StringValueExpression };
+  style?: React.CSSProperties;
+}
+
+export interface ITemplateEditorState extends IDocumentSelectedNodeState {
+  /**
+   * Sample data id for this instance
+   */
   templatesample?: string;
   templatedata: {
-    [key: string]: {
-      text?: Tokens.StringValueExpression;
-      template_id: string;
-      attributes?: Omit<
-        React.HtmlHTMLAttributes<HTMLDivElement>,
-        "style" | "className"
-      >;
-      properties?: { [key: string]: Tokens.StringValueExpression };
-      style?: React.CSSProperties;
-    };
+    [node_id: string]: TemplateNode;
   };
 }

@@ -198,7 +198,6 @@ function initialDatabaseEditorState(
     connections: {},
     pages: [],
     document: {
-      nodes: [],
       templatedata: {},
     },
     sidebar: {
@@ -279,7 +278,6 @@ function initialSiteEditorState(init: SiteDocumentEditorInit): EditorState {
     }),
     selected_page_id: "collection",
     document: {
-      nodes: [],
       templatesample: "formcollection_sample_001_the_bundle",
       templatedata: {},
     },
@@ -490,7 +488,6 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
     }),
     selected_page_id: "", // "form",
     document: {
-      nodes: [],
       templatedata: {},
     },
     form: {

@@ -20,9 +20,9 @@ import type {
   TableXSBMainTableConnection,
 } from "./state";
 import type { Tokens } from "@/ast";
-import { SYM_LOCALTZ } from "./symbols";
-import { ZodObject } from "zod";
-import { DataQueryAction } from "../data-query";
+import type { DataQueryAction } from "../data-query";
+import type { BuilderAction } from "@/builder/action";
+import type { SYM_LOCALTZ } from "./symbols";
 
 export type EditorAction =
   //
@@ -32,7 +32,7 @@ export type EditorAction =
   //
   | InitAssetAction
   //
-  | DocumentAction
+  | BuilderAction
   //
   | GlobalSavingAction
   | EditorSidebarModeAction
@@ -436,60 +436,4 @@ export interface FormCampaignPreferencesAction
 export interface FormEndingPreferencesAction
   extends Partial<EditorState["form"]["ending"]> {
   type: "editor/form/ending/preferences";
-}
-
-export type DocumentAction =
-  | DocumentTemplateSampleDataAction
-  | DocumentSelectNodeAction
-  | DocumentNodeChangeTemplateAction
-  | DocumentNodeChangeTextAction
-  | DocumentNodeUpdateStyleAction
-  | DocumentNodeUpdateAttributeAction
-  | DocumentNodeUpdatePropertyAction;
-
-// TODO: consider removing this
-export interface DocumentTemplateSampleDataAction {
-  type: "editor/document/sampledata";
-  sampledata: string;
-}
-
-export interface DocumentSelectNodeAction {
-  type: "editor/document/node/select";
-  node_id?: string;
-  node_type?: string;
-  schema?: ZodObject<any>;
-  context?: any;
-  default_properties?: Record<string, any>;
-  default_style?: React.CSSProperties;
-  default_text?: Tokens.StringValueExpression;
-}
-
-export interface DocumentNodeChangeTemplateAction {
-  type: "editor/document/node/template";
-  node_id: string;
-  template_id: string;
-}
-
-export interface DocumentNodeChangeTextAction {
-  type: "editor/document/node/text";
-  node_id: string;
-  text?: Tokens.StringValueExpression;
-}
-
-export interface DocumentNodeUpdateStyleAction {
-  type: "editor/document/node/style";
-  node_id: string;
-  data: { [key: string]: any };
-}
-
-export interface DocumentNodeUpdateAttributeAction {
-  type: "editor/document/node/attribute";
-  node_id: string;
-  data: { [key: string]: any };
-}
-
-export interface DocumentNodeUpdatePropertyAction {
-  type: "editor/document/node/property";
-  node_id: string;
-  data: { [key: string]: any };
 }

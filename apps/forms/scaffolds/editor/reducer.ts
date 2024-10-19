@@ -37,8 +37,8 @@ import { initialDatagridState } from "./init";
 import { DataGridLocalPreferencesStorage } from "./storage/datagrid.storage";
 import databaseRecucer from "./reducers/database.reducer";
 import blockReducer from "./reducers/block.reducer";
-import documentReducer from "./reducers/document.reducer";
 import datagridQueryReducer from "../data-query/data-query.reducer";
+import builderReducer from "@/builder/reducer";
 
 export function reducer(state: EditorState, action: EditorAction): EditorState {
   switch (action.type) {
@@ -101,12 +101,15 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
 
     case "editor/document/sampledata":
     case "editor/document/node/select":
-    case "editor/document/node/template":
+    case "editor/document/node/switch-component":
     case "editor/document/node/text":
     case "editor/document/node/style":
     case "editor/document/node/attribute":
-    case "editor/document/node/property":
-      return documentReducer(state, action);
+    case "editor/document/node/property": {
+      return produce(state, (draft) => {
+        draft.document = builderReducer(state.document, action);
+      });
+    }
 
     case "saving": {
       const { saving } = <GlobalSavingAction>action;

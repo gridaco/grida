@@ -71,7 +71,7 @@ function SelectedNodeProperties() {
   const islayout = isflex;
 
   const {
-    template_id,
+    component_id,
     attributes,
     style,
     properties: _properties,
@@ -118,11 +118,11 @@ function SelectedNodeProperties() {
   };
 
   const changetemplate = useCallback(
-    (template_id: string) => {
+    (component_id: string) => {
       dispatch({
-        type: "editor/document/node/template",
+        type: "editor/document/node/switch-component",
         node_id: selected_node_id!,
-        template_id,
+        component_id,
       });
     },
     [dispatch, selected_node_id]
@@ -244,7 +244,10 @@ function SelectedNodeProperties() {
           <SidebarSectionHeaderLabel>Template</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuSectionContent>
-          <TemplateControl value={template_id} onValueChange={changetemplate} />
+          <TemplateControl
+            value={component_id}
+            onValueChange={changetemplate}
+          />
         </SidebarMenuSectionContent>
       </SidebarSection>
       <SidebarSection hidden={!istemplate} className="border-b pb-4">
