@@ -36,10 +36,14 @@ export function SamplesSelect() {
     const data = samples[sample as keyof typeof samples];
 
     dispatch({
-      type: "editor/document/data",
-      data: data,
+      type: "editor/document",
+      key: "form/collection",
+      action: {
+        type: "editor/document/data",
+        data: data,
+      },
     });
-  }, [sample]);
+  }, [dispatch, sample]);
 
   return (
     <Select value={sample} onValueChange={(value) => setSample(value as any)}>

@@ -1,5 +1,6 @@
 import type { ZodObject } from "zod";
 import type { Tokens } from "@/ast";
+import { Properties } from "./types";
 
 export type BuilderAction =
   | BuilderSetDataAction
@@ -8,7 +9,8 @@ export type BuilderAction =
   | BuilderNodeChangeTextAction
   | BuilderNodeUpdateStyleAction
   | BuilderNodeUpdateAttributeAction
-  | BuilderNodeUpdatePropertyAction;
+  | BuilderNodeUpdatePropertyAction
+  | BuilderTemplateNodeUpdatePropertyAction;
 
 export interface BuilderSetDataAction {
   type: "editor/document/data";
@@ -53,5 +55,10 @@ export interface BuilderNodeUpdateAttributeAction {
 export interface BuilderNodeUpdatePropertyAction {
   type: "editor/document/node/property";
   node_id: string;
-  data: { [key: string]: any };
+  data: Partial<Properties>;
+}
+
+export interface BuilderTemplateNodeUpdatePropertyAction {
+  type: "editor/template/node/property";
+  data: Partial<Properties>;
 }

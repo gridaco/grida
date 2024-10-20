@@ -38,10 +38,9 @@ export function StringValueControl({
 }) {
   const [state] = useEditorState();
 
-  assert(state.document, "state.document is required");
-  const {
-    document: { selected_node_context },
-  } = state;
+  assert(state.documents, "state.documents is required");
+  // TODO: support other than [collection]
+  const { selected_node_context } = state.documents["form/collection"] || {};
 
   const schema = useMemo(
     () =>

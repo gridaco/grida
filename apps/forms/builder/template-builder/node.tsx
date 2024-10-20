@@ -20,6 +20,7 @@ import type { Tokens } from "@/ast";
 import { useComputed } from "./use-computed";
 import { useValue } from "../core/data-context";
 import assert from "assert";
+import { useDocument } from "@/scaffolds/editor/use-document";
 
 interface SlotProps<P extends Record<string, any>> {
   node_id: string;
@@ -47,16 +48,16 @@ export function SlotNode<P extends Record<string, any>>({
 
   const portal = document.getElementById("canvas-overlay-portal")!;
 
-  assert(state.document, "state.document is required");
   const {
-    document: { selected_node_id },
-  } = state;
+    document: { selected_node_id, template },
+    // TODO: support other than collection
+  } = useDocument("form/collection");
 
   const selected = !!selected_node_id && selected_node_id === node_id;
 
   // @ts-ignore TODO:
   const { component_id, properties, style, attributes, text } =
-    state.document.template.overrides[node_id] || {};
+    template.overrides[node_id] || {};
 
   const renderer = component_id
     ? TemplateComponents.components[component_id]
@@ -82,15 +83,19 @@ export function SlotNode<P extends Record<string, any>>({
 
   const onSelect = useCallback(() => {
     dispatch({
-      type: "editor/document/node/select",
-      node_id: node_id,
-      node_type: component.type,
-      // @ts-ignore TODO:
-      schema: componentschema,
-      default_properties: defaultProperties,
-      default_style: defaultStyle,
-      default_text: defaultText,
-      context,
+      type: "editor/document",
+      key: "form/collection",
+      action: {
+        type: "editor/document/node/select",
+        node_id: node_id,
+        node_type: component.type,
+        // @ts-ignore TODO:
+        schema: componentschema,
+        default_properties: defaultProperties,
+        default_style: defaultStyle,
+        default_text: defaultText,
+        context,
+      },
     });
 
     // eslint-disable-next-line react-hooks/exhaustive-deps

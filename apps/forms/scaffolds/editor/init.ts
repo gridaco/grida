@@ -46,7 +46,7 @@ const initial_sidebar_mode = {
 
 function initialBaseDocumentEditorState(
   init: BaseDocumentEditorInit
-): Omit<BaseDocumentEditorState, "document" | "pages" | "selected_page_id"> {
+): Omit<BaseDocumentEditorState, "documents" | "pages" | "selected_page_id"> {
   const basepath = editorbasepath({
     org: init.organization.name,
     proj: init.project.name,
@@ -198,7 +198,7 @@ function initialDatabaseEditorState(
     supabase_project: init.supabase_project,
     connections: {},
     pages: [],
-    document: null,
+    documents: {},
     sidebar: {
       mode: initial_sidebar_mode[init.doctype],
       mode_data: {
@@ -275,13 +275,15 @@ function initialSiteEditorState(init: SiteDocumentEditorInit): EditorState {
       basepath: base.basepath,
       document_id: init.document_id,
     }),
-    selected_page_id: "collection",
-    document: {
-      template: {
-        template_id: "formcollection_sample_001_the_bundle",
-        type: "template",
-        data: samples["formcollection_sample_001_the_bundle"],
-        overrides: {},
+    selected_page_id: "form/collection",
+    documents: {
+      ["form/collection"]: {
+        template: {
+          template_id: "formcollection_sample_001_the_bundle",
+          type: "template",
+          properties: samples["formcollection_sample_001_the_bundle"] as any,
+          overrides: {},
+        },
       },
     },
     sidebar: {
@@ -490,21 +492,22 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
       document_id: init.document_id,
     }),
     selected_page_id: "", // "form",
-    document: null,
-    form: {
-      form_id: init.form_id,
-      form_title: init.form_title,
-      campaign: init.campaign,
-      startpage: init.start
+    documents: {
+      "form/startpage": init.start
         ? {
             template: {
               type: "template",
               template_id: init.start?.template_id,
               overrides: {},
-              data: {},
+              properties: {},
             },
           }
-        : null,
+        : undefined,
+    },
+    form: {
+      form_id: init.form_id,
+      form_title: init.form_title,
+      campaign: init.campaign,
       ending: init.ending,
       fields: init.fields,
       form_security: init.form_security,
@@ -557,7 +560,7 @@ function sitedocumentpagesinit({
   return [
     {
       section: "Pages",
-      id: "collection",
+      id: "form/collection",
       label: "home",
       href: `/${basepath}/${document_id}/design`,
       icon: "file",
@@ -585,7 +588,7 @@ function formdocumentpagesinit({
     // TODO: not ready
     {
       section: "Design",
-      id: "start",
+      id: "form/startpage",
       label: "Cover",
       href: `/${basepath}/${document_id}/form/start`,
       icon: "file",

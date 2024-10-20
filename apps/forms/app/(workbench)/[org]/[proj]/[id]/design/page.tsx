@@ -8,6 +8,7 @@ import BlocksEditor from "@/scaffolds/blocks-editor";
 import FormCollectionPage from "@/theme/templates/formcollection/page";
 import FormStartPage from "@/theme/templates/formstart/default/page";
 import { CanvasFloatingToolbar } from "@/scaffolds/canvas-floating-toolbar";
+import { useDocument } from "@/scaffolds/editor/use";
 
 export default function EditFormPage() {
   return (
@@ -31,13 +32,10 @@ function CanvasEventTarget({
 }: React.PropsWithChildren<{
   className?: string;
 }>) {
-  const [state, dispatch] = useEditorState();
-
-  const clearselection = () =>
-    dispatch({ type: "editor/document/node/select" });
+  const { clearSelection } = useDocument("form/collection");
 
   return (
-    <div className={className} onPointerDown={clearselection}>
+    <div className={className} onPointerDown={clearSelection}>
       {children}
     </div>
   );
@@ -62,7 +60,7 @@ function CurrentPageCanvas() {
   switch (selected_page_id) {
     case "form":
       return <BlocksEditor />;
-    case "collection":
+    case "form/collection":
       return (
         <>
           {/* // 430 932 max-h-[932px] no-scrollbar overflow-y-scroll */}
@@ -74,7 +72,7 @@ function CurrentPageCanvas() {
           </div>
         </>
       );
-    case "start": {
+    case "form/startpage": {
       return (
         <div className="mx-auto my-20 max-w-[430px] border rounded-2xl shadow-2xl bg-background overflow-hidden">
           {/* <FormStartPage /> */}

@@ -37,7 +37,9 @@ export function ModeDesign() {
   const show_hierarchy =
     state.selected_page_id &&
     // TODO: need typing
-    ["form", "collection"].includes(state.selected_page_id);
+    ["form", "form/collection", "form/startpage"].includes(
+      state.selected_page_id
+    );
 
   return (
     <>

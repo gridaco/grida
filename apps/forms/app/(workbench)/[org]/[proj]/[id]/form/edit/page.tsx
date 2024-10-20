@@ -31,8 +31,7 @@ function CanvasEventTarget({
 }>) {
   const [state, dispatch] = useEditorState();
 
-  const clearselection = () =>
-    dispatch({ type: "editor/document/node/select" });
+  const clearselection = () => dispatch({ type: "blocks/blur" });
 
   return (
     <div className={className} onPointerDown={clearselection}>
@@ -60,18 +59,6 @@ function CurrentPageCanvas() {
   switch (selected_page_id) {
     case "form":
       return <BlocksEditor />;
-    // case "collection":
-    //   return (
-    //     <>
-    //       {/* // 430 932 max-h-[932px] no-scrollbar overflow-y-scroll */}
-    //       <div className="mx-auto my-20 max-w-[430px] border rounded-2xl shadow-2xl bg-background select-none">
-    //         <FormCollectionPage />
-    //       </div>
-    //       <div className="fixed bottom-5 left-0 right-0 flex items-center justify-center z-50">
-    //         <CanvasFloatingToolbar />
-    //       </div>
-    //     </>
-    //   );
 
     default:
       return (

@@ -28,14 +28,19 @@ type ISample = (typeof samples)[keyof typeof samples];
 export default function FormCollectionPage() {
   const [state] = useEditorState();
 
-  assert(state.document, "state.document is required");
-  const { data } = state.document.template;
+  assert(state.documents, "state.documents is required");
+  const { properties } = state.documents["form/collection"]!.template;
 
   return (
     <RootDataContextProvider>
-      <DataProvider namespace="dummy" initialData={data}>
+      <DataProvider namespace="dummy" initialData={properties}>
         <div className="@container/preview">
-          <Header_001 logo={data.brand.logo} />
+          <Header_001
+            logo={
+              // @ts-expect-error
+              properties["brand"]?.["logo"] as string
+            }
+          />
           <SlotNode
             node_id="hero"
             component={Hero_002}
@@ -70,7 +75,7 @@ export default function FormCollectionPage() {
                   }}
                 />
                 <div className="py-2">
-                  <Filter tags={data.tags as any as string[]} />
+                  <Filter tags={properties.tags as any as string[]} />
                 </div>
               </header>
               <div className="grid gap-6 grid-cols-1 @3xl/preview:grid-cols-2 @5xl/preview:grid-cols-3 @7xl/preview:grid-cols-4">

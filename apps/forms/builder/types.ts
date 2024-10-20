@@ -24,23 +24,33 @@ interface IText {
   text: Tokens.StringValueExpression;
 }
 
-export interface TextNode extends IStylable, IText {
-  type: "text";
-}
+export type Properties = {
+  [key: string]:
+    | Tokens.NumericValueExpression
+    | Tokens.StringValueExpression
+    | Tokens.StringValueExpression[]
+    | Properties;
+};
 
-export interface InstanceNode extends IStylable {
-  type: "instance";
-  /**
-   * ID of component that this instance came from, refers to components table
-   */
-  component_id: string;
-
+interface IProperties {
   /**
    * properties - props data
    *
    * expression that will be passed to this instance
    */
-  properties?: { [key: string]: Tokens.StringValueExpression };
+  properties: Properties;
+}
+
+export interface TextNode extends IStylable, IText {
+  type: "text";
+}
+
+export interface InstanceNode extends IStylable, IProperties {
+  type: "instance";
+  /**
+   * ID of component that this instance came from, refers to components table
+   */
+  component_id: string;
 }
 
 /**
@@ -50,15 +60,13 @@ export interface InstanceNode extends IStylable {
  *
  * This will be used until we have a fully working tree editor.
  */
-interface TemplateNode {
+interface TemplateNode extends IProperties {
   type: "template";
 
   /**
    * ID of template that this instance came from
    */
   template_id: string;
-
-  data: Record<string, any>;
 
   /**
    * children override data

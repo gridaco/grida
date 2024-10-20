@@ -32,7 +32,7 @@ export type EditorAction =
   //
   | InitAssetAction
   //
-  | BuilderAction
+  | EditorDocumentAction
   //
   | GlobalSavingAction
   | EditorSidebarModeAction
@@ -445,4 +445,10 @@ export interface FormStartPageInitAction {
     template_id: string;
     data: Record<string, any>;
   };
+}
+
+export interface EditorDocumentAction {
+  type: "editor/document";
+  key: "form/collection" | "form/startpage";
+  action: BuilderAction;
 }

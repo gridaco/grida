@@ -14,6 +14,7 @@ import type {
   DataGridDateTZAction,
   DataGridLocalFilterAction,
   DataTableLoadingAction,
+  EditorDocumentAction,
   EditorThemeLangAction,
   EditorThemePaletteAction,
   EditorThemeFontFamilyAction,
@@ -101,16 +102,13 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
     case "blocks/blur":
       return blockReducer(state, action);
 
-    case "editor/document/data":
-    case "editor/document/node/select":
-    case "editor/document/node/switch-component":
-    case "editor/document/node/text":
-    case "editor/document/node/style":
-    case "editor/document/node/attribute":
-    case "editor/document/node/property": {
+    case "editor/document": {
+      const { key, action: _action } = <EditorDocumentAction>action;
       return produce(state, (draft) => {
-        assert(draft.document, "draft.document is required");
-        draft.document = builderReducer(state.document!, action);
+        assert(draft.documents, "draft.documents is required");
+        const document = draft.documents[key];
+        assert(document, "document is required");
+        draft.documents[key] = builderReducer(state.documents[key]!, _action);
       });
     }
 
@@ -370,11 +368,11 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
     case "editor/form/startpage/init": {
       const { startpage } = <FormStartPageInitAction>action;
       return produce(state, (draft) => {
-        draft.form.startpage = {
+        draft.documents["form/startpage"] = {
           template: {
             type: "template",
             template_id: startpage.template_id,
-            data: startpage.data,
+            properties: startpage.data,
             overrides: {},
           },
         };

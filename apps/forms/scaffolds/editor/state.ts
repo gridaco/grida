@@ -397,7 +397,11 @@ export interface BaseDocumentEditorState
   document_id: string;
   document_title: string;
   doctype: GDocumentType;
-  document: ITemplateEditorState | null;
+  documents: {
+    ["form/collection"]?: ITemplateEditorState;
+    ["form/startpage"]?: ITemplateEditorState;
+    // [key: string]: ITemplateEditorState;
+  };
   theme: {
     is_powered_by_branding_enabled: boolean;
     lang: FormsPageLanguage;
@@ -511,7 +515,6 @@ export interface FormEditorState
       scheduling_close_at: string | null;
       scheduling_tz?: string;
     };
-    startpage: ITemplateEditorState | null;
     ending: {
       is_redirect_after_response_uri_enabled: boolean;
       redirect_after_response_uri: string | null;

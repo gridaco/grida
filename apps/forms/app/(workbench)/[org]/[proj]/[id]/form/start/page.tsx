@@ -50,40 +50,17 @@ import { ArrowLeftIcon, ArrowRightIcon } from "@radix-ui/react-icons";
 import { useStep } from "usehooks-ts";
 import { motion } from "framer-motion";
 import assert from "assert";
+import { useDocument } from "@/scaffolds/editor/use";
 
-// function useTemplateEditor() {
-//   const [state, dispatch] = useEditorState();
-
-//   const {
-//     document: { selected_node_id },
-//   } = state;
-
-//   const changeproperty = useCallback(
-//     (key: string, value: any) => {
-//       dispatch({
-//         type: "editor/document/node/property",
-//         node_id: selected_node_id!,
-//         data: {
-//           [key]: value,
-//         },
-//       });
-//     },
-//     [dispatch, selected_node_id]
-//   );
-
-//   return useMemo(
-//     () => ({
-//       changeproperty,
-//     }),
-//     [changeproperty]
-//   );
-// }
+function useStartPageTemplateEditor() {
+  return useDocument("form/startpage");
+}
 
 export default function FormStartEditPage() {
   const [state, dispatch] = useEditorState();
 
   const {
-    form: { startpage },
+    documents: { "form/startpage": startpage },
   } = state;
 
   return (
@@ -177,7 +154,7 @@ function BrowseStartPageTemplatesDialog({
   const [state] = useEditorState();
 
   const {
-    form: { campaign, startpage },
+    form: { campaign },
     theme: { lang },
   } = state;
 
@@ -278,11 +255,11 @@ function StartPageEditor() {
   const [state, dispatch] = useEditorState();
 
   const {
-    form: { campaign, startpage },
+    form: { campaign },
     theme: { lang },
   } = state;
 
-  assert(startpage, "startpage is required");
+  const { document: startpage } = useDocument("form/startpage");
 
   const Component = useMemo(
     () =>
@@ -306,7 +283,7 @@ function StartPageEditor() {
             <div className="w-full min-h-[852px] h-[80dvh]">
               {Component && (
                 <Component
-                  data={startpage.template.data}
+                  data={startpage.template.properties}
                   meta={campaign}
                   lang={lang}
                 />
@@ -348,11 +325,11 @@ function SandboxWrapper({
 }
 
 function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
+  const { changeRootProperties, rootProperties } = useStartPageTemplateEditor();
   const [state, dispatch] = useEditorState();
 
   const {
-    form: { campaign, startpage },
-    theme: { lang },
+    form: { campaign },
   } = state;
 
   return (
@@ -423,11 +400,24 @@ function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
           </div>
           <div className="grid gap-2">
             <Label>Title</Label>
-            <Input placeholder="Enter your Campaign Title" />
+            <Input
+              // TODO: support tokens
+              value={rootProperties.title as string}
+              onChange={(e) => {
+                changeRootProperties("title", e.target.value);
+              }}
+              placeholder="Enter your Campaign Title"
+            />
           </div>
           <div className="grid gap-2">
             <Label>Content</Label>
-            <RichTextEditorField />
+            <RichTextEditorField
+              // TODO: support tokens
+              initialContent={rootProperties.body as any}
+              onContentChange={(content) => {
+                changeRootProperties("body", content);
+              }}
+            />
           </div>
           <div className="grid gap-2">
             <Label>Register Button Text</Label>

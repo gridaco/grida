@@ -36,12 +36,13 @@ import { useEditorState } from "../editor";
 import { PropertyLine, PropertyLineLabel } from "./ui";
 import { SideControlGlobal } from "./sidecontrol-global";
 import assert from "assert";
+import { useDocument } from "../editor/use-document";
 
 export function SideControlDoctypeSite() {
   const [state, dispatch] = useEditorState();
 
-  assert(state.document, "state.document is required");
-  if (state.document.selected_node_id) {
+  assert(state.documents, "state.documents is required");
+  if (state.documents["form/collection"]!.selected_node_id) {
     return <SelectedNodeProperties />;
   } else {
     return <SideControlGlobal />;
@@ -52,7 +53,7 @@ function SelectedNodeProperties() {
   const [state, dispatch] = useEditorState();
 
   // - color - variables
-  assert(state.document, "state.document is required");
+  assert(state.documents, "state.documents is required");
   const {
     selected_node_id,
     selected_node_schema,
@@ -60,7 +61,7 @@ function SelectedNodeProperties() {
     selected_node_default_properties,
     selected_node_default_style,
     selected_node_default_text,
-  } = state.document;
+  } = state.documents["form/collection"]!;
 
   const propertyNames = Object.keys(
     // TODO: add typings to schema
@@ -81,7 +82,9 @@ function SelectedNodeProperties() {
     properties: _properties,
     // @ts-ignore TODO:
     text,
-  } = state.document.template.overrides[selected_node_id!] || {};
+  } = state.documents["form/collection"]!.template.overrides[
+    selected_node_id!
+  ] || {};
 
   const { hidden } = attributes || {};
 
@@ -116,101 +119,13 @@ function SelectedNodeProperties() {
   } = {
     ...selected_node_default_style,
     ...(style || {}),
-  };
+  } satisfies React.CSSProperties;
 
   const border = {
     borderWidth,
   };
 
-  const changetemplate = useCallback(
-    (component_id: string) => {
-      dispatch({
-        type: "editor/document/node/switch-component",
-        node_id: selected_node_id!,
-        component_id: component_id,
-      });
-    },
-    [dispatch, selected_node_id]
-  );
-
-  const changetext = useCallback(
-    (text?: Tokens.StringValueExpression) => {
-      dispatch({
-        type: "editor/document/node/text",
-        node_id: selected_node_id!,
-        text,
-      });
-    },
-    [dispatch, selected_node_id]
-  );
-
-  const changeattribute = useCallback(
-    (key: string, value: any) => {
-      dispatch({
-        type: "editor/document/node/attribute",
-        node_id: selected_node_id!,
-        data: {
-          [key]: value,
-        },
-      });
-    },
-    [dispatch, selected_node_id]
-  );
-
-  const changestyle = useCallback(
-    (key: string, value: any) => {
-      dispatch({
-        type: "editor/document/node/style",
-        node_id: selected_node_id!,
-        data: {
-          [key]: value,
-        },
-      });
-    },
-    [dispatch, selected_node_id]
-  );
-
-  const changeproperty = useCallback(
-    (key: string, value: any) => {
-      dispatch({
-        type: "editor/document/node/property",
-        node_id: selected_node_id!,
-        data: {
-          [key]: value,
-        },
-      });
-    },
-    [dispatch, selected_node_id]
-  );
-
-  // attributes
-  const changehidden = (value: boolean) => changeattribute("hidden", value);
-
-  // style
-  const changeopacity = (value: number) => changestyle("opacity", value);
-  const changefontWeight = (value: number) => changestyle("fontWeight", value);
-  const changefontSize = (value?: number) => changestyle("fontSize", value);
-  const changetextAlign = (value: string) => changestyle("textAlign", value);
-  const changeborderRadius = (value?: number) =>
-    changestyle("borderRadius", value);
-  const changemargin = (value?: number) => changestyle("margin", value);
-  const changepadding = (value?: number) => changestyle("padding", value);
-  const changeaspectRatio = (value?: number) =>
-    changestyle("aspectRatio", value);
-  const changeBorder = (value?: any) => {
-    changestyle("borderWidth", value.borderWidth);
-  };
-  const changeboxShadow = (value?: any) => {
-    changestyle("boxShadow", value.boxShadow);
-  };
-  const changegap = (value?: number) => changestyle("gap", value);
-  const changeflexDirection = (value?: string) =>
-    changestyle("flexDirection", value);
-  const changeflexWrap = (value?: string) => changestyle("flexWrap", value);
-  const changejustifyContent = (value?: string) =>
-    changestyle("justifyContent", value);
-  const changealignItems = (value?: string) => changestyle("alignItems", value);
-  const changecursor = (value?: string) => changestyle("cursor", value);
+  const { changeSelectedNode, document } = useDocument("form/collection");
 
   return (
     <div key={selected_node_id}>
@@ -219,7 +134,7 @@ function SelectedNodeProperties() {
           <SidebarSectionHeaderLabel>Debug</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuSectionContent>
-          <div>Node {state.document.selected_node_id}</div>
+          <div>Node {document.selected_node_id}</div>
         </SidebarMenuSectionContent>
       </SidebarSection>
       <SidebarSection className="border-b pb-4">
@@ -229,7 +144,10 @@ function SelectedNodeProperties() {
         <SidebarMenuSectionContent className="space-y-2">
           <PropertyLine>
             <PropertyLineLabel>Hidden</PropertyLineLabel>
-            <HiddenControl value={hidden} onValueChange={changehidden} />
+            <HiddenControl
+              value={hidden}
+              onValueChange={changeSelectedNode.hidden}
+            />
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>
@@ -251,7 +169,7 @@ function SelectedNodeProperties() {
         <SidebarMenuSectionContent>
           <TemplateControl
             value={component_id}
-            onValueChange={changetemplate}
+            onValueChange={changeSelectedNode.component}
           />
         </SidebarMenuSectionContent>
       </SidebarSection>
@@ -270,7 +188,7 @@ function SelectedNodeProperties() {
                   placeholder={key}
                   value={value}
                   onValueChange={(value) => {
-                    changeproperty(key, value || undefined);
+                    changeSelectedNode.property(key, value || undefined);
                   }}
                 />
               </PropertyLine>
@@ -288,28 +206,28 @@ function SelectedNodeProperties() {
             <PropertyLineLabel>Value</PropertyLineLabel>
             <StringValueControl
               value={text || selected_node_default_text}
-              onValueChange={changetext}
+              onValueChange={changeSelectedNode.text}
             />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Weight</PropertyLineLabel>
             <FontWeightControl
               value={fontWeight as any}
-              onValueChange={changefontWeight}
+              onValueChange={changeSelectedNode.fontWeight}
             />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Size</PropertyLineLabel>
             <FontSizeControl
               value={fontSize as any}
-              onValueChange={changefontSize}
+              onValueChange={changeSelectedNode.fontSize}
             />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Align</PropertyLineLabel>
             <TextAlignControl
               value={textAlign as any}
-              onValueChange={changetextAlign}
+              onValueChange={changeSelectedNode.textAlign}
             />
           </PropertyLine>
         </SidebarMenuSectionContent>
@@ -323,21 +241,21 @@ function SelectedNodeProperties() {
             <PropertyLineLabel>Direction</PropertyLineLabel>
             <FlexDirectionControl
               value={flexDirection as any}
-              onValueChange={changeflexDirection}
+              onValueChange={changeSelectedNode.flexDirection}
             />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Wrap</PropertyLineLabel>
             <FlexWrapControl
               value={flexWrap as any}
-              onValueChange={changeflexWrap}
+              onValueChange={changeSelectedNode.flexWrap}
             />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Distribute</PropertyLineLabel>
             <JustifyContentControl
               value={justifyContent as any}
-              onValueChange={changejustifyContent}
+              onValueChange={changeSelectedNode.justifyContent}
             />
           </PropertyLine>
           <PropertyLine>
@@ -345,12 +263,15 @@ function SelectedNodeProperties() {
             <AlignItemsControl
               value={alignItems as any}
               flexDirection={flexDirection as any}
-              onValueChange={changealignItems}
+              onValueChange={changeSelectedNode.alignItems}
             />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Gap</PropertyLineLabel>
-            <GapControl value={gap as any} onValueChange={changegap} />
+            <GapControl
+              value={gap as any}
+              onValueChange={changeSelectedNode.gap}
+            />
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>
@@ -363,19 +284,22 @@ function SelectedNodeProperties() {
             <PropertyLineLabel>Opacity</PropertyLineLabel>
             <OpacityControl
               value={opacity as any}
-              onValueChange={changeopacity}
+              onValueChange={changeSelectedNode.opacity}
             />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Radius</PropertyLineLabel>
             <BorderRadiusControl
               value={borderRadius as any}
-              onValueChange={changeborderRadius}
+              onValueChange={changeSelectedNode.borderRadius}
             />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Border</PropertyLineLabel>
-            <BorderControl value={border as any} onValueChange={changeBorder} />
+            <BorderControl
+              value={border as any}
+              onValueChange={changeSelectedNode.border}
+            />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Background</PropertyLineLabel>
@@ -388,30 +312,36 @@ function SelectedNodeProperties() {
             <PropertyLineLabel>Shadow</PropertyLineLabel>
             <BoxShadowControl
               value={{ boxShadow }}
-              onValueChange={changeboxShadow}
+              onValueChange={changeSelectedNode.boxShadow}
             />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Margin</PropertyLineLabel>
-            <MarginControl value={margin as any} onValueChange={changemargin} />
+            <MarginControl
+              value={margin as any}
+              onValueChange={changeSelectedNode.margin}
+            />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Padding</PropertyLineLabel>
             <PaddingControl
               value={padding as any}
-              onValueChange={changepadding}
+              onValueChange={changeSelectedNode.padding}
             />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Ratio</PropertyLineLabel>
             <AspectRatioControl
               value={aspectRatio as any}
-              onValueChange={changeaspectRatio}
+              onValueChange={changeSelectedNode.aspectRatio}
             />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Cursor</PropertyLineLabel>
-            <CursorControl value={cursor} onValueChange={changecursor} />
+            <CursorControl
+              value={cursor}
+              onValueChange={changeSelectedNode.cursor}
+            />
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>
