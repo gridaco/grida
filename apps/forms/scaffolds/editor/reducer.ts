@@ -30,6 +30,7 @@ import type {
   DataGridTableViewAction,
   DataGridSelectCellAction,
   EditorSelectPageAction,
+  FormStartPageInitAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { EditorSymbols } from "./symbols";
@@ -39,6 +40,7 @@ import databaseRecucer from "./reducers/database.reducer";
 import blockReducer from "./reducers/block.reducer";
 import datagridQueryReducer from "../data-query/data-query.reducer";
 import builderReducer from "@/builder/reducer";
+import assert from "assert";
 
 export function reducer(state: EditorState, action: EditorAction): EditorState {
   switch (action.type) {
@@ -107,7 +109,8 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
     case "editor/document/node/attribute":
     case "editor/document/node/property": {
       return produce(state, (draft) => {
-        draft.document = builderReducer(state.document, action);
+        assert(draft.document, "draft.document is required");
+        draft.document = builderReducer(state.document!, action);
       });
     }
 
@@ -331,6 +334,21 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
         draft.theme.background = background;
       });
     }
+    case "editor/theme/section": {
+      const { section } = <EditorThemeSectionStyleAction>action;
+      return produce(state, (draft) => {
+        draft.theme.section = section || undefined;
+      });
+    }
+    case "editor/theme/custom-css": {
+      const { custom } = <EditorThemeCustomCSSAction>action;
+      return produce(state, (draft) => {
+        draft.theme.customCSS = custom;
+      });
+    }
+    //
+
+    //
     case "editor/form/campaign/preferences": {
       const { type, ...pref } = <FormCampaignPreferencesAction>action;
       return produce(state, (draft) => {
@@ -349,16 +367,17 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
         };
       });
     }
-    case "editor/theme/section": {
-      const { section } = <EditorThemeSectionStyleAction>action;
+    case "editor/form/startpage/init": {
+      const { startpage } = <FormStartPageInitAction>action;
       return produce(state, (draft) => {
-        draft.theme.section = section || undefined;
-      });
-    }
-    case "editor/theme/custom-css": {
-      const { custom } = <EditorThemeCustomCSSAction>action;
-      return produce(state, (draft) => {
-        draft.theme.customCSS = custom;
+        draft.form.startpage = {
+          template: {
+            type: "template",
+            template_id: startpage.template_id,
+            data: startpage.data,
+            overrides: {},
+          },
+        };
       });
     }
     //

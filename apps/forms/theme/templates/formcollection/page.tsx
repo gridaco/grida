@@ -21,13 +21,15 @@ import {
 } from "@/builder/core/data-context";
 import { Factory } from "@/ast/factory";
 import ArrayMap from "@/builder/core/data-context/array";
+import assert from "assert";
 
 type ISample = (typeof samples)[keyof typeof samples];
 
 export default function FormCollectionPage() {
   const [state] = useEditorState();
 
-  const { data } = state.document;
+  assert(state.document, "state.document is required");
+  const { data } = state.document.template;
 
   return (
     <RootDataContextProvider>

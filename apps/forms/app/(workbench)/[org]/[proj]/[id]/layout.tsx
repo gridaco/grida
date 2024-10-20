@@ -228,8 +228,7 @@ export default async function Layout({
                   method: data.method,
                 },
                 start: data.start_page
-                  ? // TODO: type it
-                    (data.start_page as FormStartPageSchema)
+                  ? (data.start_page as FormStartPageSchema)
                   : null,
                 ending: {
                   is_redirect_after_response_uri_enabled:

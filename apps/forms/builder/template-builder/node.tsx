@@ -19,6 +19,7 @@ import type {
 import type { Tokens } from "@/ast";
 import { useComputed } from "./use-computed";
 import { useValue } from "../core/data-context";
+import assert from "assert";
 
 interface SlotProps<P extends Record<string, any>> {
   node_id: string;
@@ -46,14 +47,16 @@ export function SlotNode<P extends Record<string, any>>({
 
   const portal = document.getElementById("canvas-overlay-portal")!;
 
+  assert(state.document, "state.document is required");
   const {
     document: { selected_node_id },
   } = state;
 
   const selected = !!selected_node_id && selected_node_id === node_id;
 
+  // @ts-ignore TODO:
   const { component_id, properties, style, attributes, text } =
-    state.document.overrides[node_id] || {};
+    state.document.template.overrides[node_id] || {};
 
   const renderer = component_id
     ? TemplateComponents.components[component_id]

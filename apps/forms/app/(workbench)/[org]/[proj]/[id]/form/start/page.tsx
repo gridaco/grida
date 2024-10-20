@@ -49,39 +49,38 @@ import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { ArrowLeftIcon, ArrowRightIcon } from "@radix-ui/react-icons";
 import { useStep } from "usehooks-ts";
 import { motion } from "framer-motion";
+import assert from "assert";
 
-function useTemplateEditor() {
-  const [state, dispatch] = useEditorState();
+// function useTemplateEditor() {
+//   const [state, dispatch] = useEditorState();
 
-  const {
-    document: { selected_node_id },
-  } = state;
+//   const {
+//     document: { selected_node_id },
+//   } = state;
 
-  const changeproperty = useCallback(
-    (key: string, value: any) => {
-      dispatch({
-        type: "editor/document/node/property",
-        node_id: selected_node_id!,
-        data: {
-          [key]: value,
-        },
-      });
-    },
-    [dispatch, selected_node_id]
-  );
+//   const changeproperty = useCallback(
+//     (key: string, value: any) => {
+//       dispatch({
+//         type: "editor/document/node/property",
+//         node_id: selected_node_id!,
+//         data: {
+//           [key]: value,
+//         },
+//       });
+//     },
+//     [dispatch, selected_node_id]
+//   );
 
-  return useMemo(
-    () => ({
-      changeproperty,
-    }),
-    [changeproperty]
-  );
-}
+//   return useMemo(
+//     () => ({
+//       changeproperty,
+//     }),
+//     [changeproperty]
+//   );
+// }
 
 export default function FormStartEditPage() {
   const [state, dispatch] = useEditorState();
-
-  const { changeproperty } = useTemplateEditor();
 
   const {
     form: { startpage },
@@ -100,11 +99,27 @@ export default function FormStartEditPage() {
 }
 
 function SetupStartPage() {
+  const [state, dispatch] = useEditorState();
   const dialog = useDialogState("browse-start-page-templates");
+
+  const setupStartPage = useCallback(
+    (template_id: string) => {
+      dispatch({
+        type: "editor/form/startpage/init",
+        startpage: { template_id, data: {} },
+      });
+    },
+    [dispatch]
+  );
 
   return (
     <>
-      <BrowseStartPageTemplatesDialog {...dialog} />
+      <BrowseStartPageTemplatesDialog
+        {...dialog}
+        onValueCommit={(template_id) => {
+          setupStartPage(template_id);
+        }}
+      />
 
       <div className="w-full h-full flex items-center justify-center">
         <Card className="max-w-sm">
@@ -162,7 +177,6 @@ function BrowseStartPageTemplatesDialog({
   const [state] = useEditorState();
 
   const {
-    document: { selected_node_id },
     form: { campaign, startpage },
     theme: { lang },
   } = state;
@@ -264,10 +278,18 @@ function StartPageEditor() {
   const [state, dispatch] = useEditorState();
 
   const {
-    document: { selected_node_id },
     form: { campaign, startpage },
     theme: { lang },
   } = state;
+
+  assert(startpage, "startpage is required");
+
+  const Component = useMemo(
+    () =>
+      startpage_templates.find((t) => t.id === startpage?.template.template_id)
+        ?.component,
+    [startpage]
+  );
 
   return (
     <>
@@ -282,13 +304,13 @@ function StartPageEditor() {
             }}
           >
             <div className="w-full min-h-[852px] h-[80dvh]">
-              <FormStartPage005
-                data={{
-                  title: "",
-                }}
-                meta={campaign}
-                lang={lang}
-              />
+              {Component && (
+                <Component
+                  data={startpage.template.data}
+                  meta={campaign}
+                  lang={lang}
+                />
+              )}
             </div>
           </SandboxWrapper>
         </div>
@@ -326,7 +348,12 @@ function SandboxWrapper({
 }
 
 function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
-  const { changeproperty } = useTemplateEditor();
+  const [state, dispatch] = useEditorState();
+
+  const {
+    form: { campaign, startpage },
+    theme: { lang },
+  } = state;
 
   return (
     <Sheet {...props}>
@@ -351,27 +378,41 @@ function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
               <TableBody>
                 <TableRow>
                   <TableCell>Scheduling</TableCell>
-                  <TableCell>ON</TableCell>
+                  <TableCell>
+                    {campaign.is_scheduling_enabled ? "ON" : "OFF"}
+                  </TableCell>
                 </TableRow>
-                <TableRow>
-                  <TableCell>Scheduling Time Zone</TableCell>
-                  <TableCell>Asia/Tokyo</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Scheduling Open At</TableCell>
-                  <TableCell>Asia/Tokyo</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Scheduling Close At</TableCell>
-                  <TableCell>Asia/Tokyo</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Max Responses in total</TableCell>
-                  <TableCell>100</TableCell>
-                </TableRow>
+                {campaign.is_scheduling_enabled && (
+                  <>
+                    <TableRow>
+                      <TableCell>Scheduling Time Zone</TableCell>
+                      <TableCell>{campaign.scheduling_tz ?? "-"}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell>Scheduling Open At</TableCell>
+                      <TableCell>
+                        {campaign.scheduling_open_at ?? "-"}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell>Scheduling Close At</TableCell>
+                      <TableCell>
+                        {campaign.scheduling_close_at ?? "-"}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell>Max Responses in total</TableCell>
+                      <TableCell>
+                        {campaign.max_form_responses_in_total ?? "∞"}
+                      </TableCell>
+                    </TableRow>
+                  </>
+                )}
                 <TableRow>
                   <TableCell>Max Responses per user</TableCell>
-                  <TableCell>1</TableCell>
+                  <TableCell>
+                    {campaign.max_form_responses_by_customer ?? "∞"}
+                  </TableCell>
                 </TableRow>
               </TableBody>
             </Table>

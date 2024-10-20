@@ -10,7 +10,8 @@ import type {
   BuilderNodeUpdatePropertyAction,
   BuilderNodeChangeTextAction,
 } from "./action";
-import type { ITemplateEditorState } from "./types";
+import type { InstanceNode, ITemplateEditorState, TextNode } from "./types";
+import assert from "assert";
 
 export default function reducer(
   state: ITemplateEditorState,
@@ -20,7 +21,7 @@ export default function reducer(
     case "editor/document/data": {
       const { data } = <BuilderSetDataAction>action;
       return produce(state, (draft) => {
-        draft.data = data;
+        draft.template.data = data;
       });
     }
     case "editor/document/node/select": {
@@ -47,29 +48,30 @@ export default function reducer(
       const { node_id, component_id } = <BuilderNodeSwitchComponentAction>(
         action
       );
+
       return produce(state, (draft) => {
-        draft.overrides[node_id] = {
-          ...(draft.overrides[node_id] || {}),
+        draft.template.overrides[node_id] = {
+          ...(draft.template.overrides[node_id] || {}),
           component_id,
-        };
+        } as InstanceNode;
       });
     }
     case "editor/document/node/text": {
       const { node_id, text } = <BuilderNodeChangeTextAction>action;
       return produce(state, (draft) => {
-        draft.overrides[node_id] = {
-          ...(draft.overrides[node_id] || {}),
+        draft.template.overrides[node_id] = {
+          ...(draft.template.overrides[node_id] || {}),
           text,
-        };
+        } as TextNode;
       });
     }
     case "editor/document/node/style": {
       const { node_id, data } = <BuilderNodeUpdateStyleAction>action;
       return produce(state, (draft) => {
-        draft.overrides[node_id] = {
-          ...(draft.overrides[node_id] || {}),
+        draft.template.overrides[node_id] = {
+          ...(draft.template.overrides[node_id] || {}),
           style: {
-            ...(draft.overrides[node_id]?.style || {}),
+            ...(draft.template.overrides[node_id]?.style || {}),
             ...data,
           },
         };
@@ -78,10 +80,10 @@ export default function reducer(
     case "editor/document/node/attribute": {
       const { node_id, data } = <BuilderNodeUpdateAttributeAction>action;
       return produce(state, (draft) => {
-        draft.overrides[node_id] = {
-          ...(draft.overrides[node_id] || {}),
+        draft.template.overrides[node_id] = {
+          ...(draft.template.overrides[node_id] || {}),
           attributes: {
-            ...(draft.overrides[node_id]?.attributes || {}),
+            ...(draft.template.overrides[node_id]?.attributes || {}),
             ...data,
           },
         };
@@ -90,13 +92,14 @@ export default function reducer(
     case "editor/document/node/property": {
       const { node_id, data } = <BuilderNodeUpdatePropertyAction>action;
       return produce(state, (draft) => {
-        draft.overrides[node_id] = {
-          ...(draft.overrides[node_id] || {}),
+        draft.template.overrides[node_id] = {
+          ...(draft.template.overrides[node_id] || {}),
           properties: {
-            ...(draft.overrides[node_id]?.properties || {}),
+            ...((draft.template.overrides[node_id] as InstanceNode)
+              ?.properties || {}),
             ...data,
           },
-        };
+        } as InstanceNode;
       });
     }
   }

@@ -84,7 +84,7 @@ export interface FormDocumentEditorInit extends BaseDocumentEditorInit {
   form_id: string;
   campaign: EditorState["form"]["campaign"];
   form_security: EditorState["form"]["form_security"];
-  start: EditorState["form"]["startpage"];
+  start: FormStartPageSchema | null;
   ending: EditorState["form"]["ending"];
   connections?: {
     store_id?: number | null;
@@ -397,7 +397,7 @@ export interface BaseDocumentEditorState
   document_id: string;
   document_title: string;
   doctype: GDocumentType;
-  document: ITemplateEditorState;
+  document: ITemplateEditorState | null;
   theme: {
     is_powered_by_branding_enabled: boolean;
     lang: FormsPageLanguage;
@@ -511,7 +511,7 @@ export interface FormEditorState
       scheduling_close_at: string | null;
       scheduling_tz?: string;
     };
-    startpage: FormStartPageSchema | null;
+    startpage: ITemplateEditorState | null;
     ending: {
       is_redirect_after_response_uri_enabled: boolean;
       redirect_after_response_uri: string | null;

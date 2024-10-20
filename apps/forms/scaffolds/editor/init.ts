@@ -198,10 +198,7 @@ function initialDatabaseEditorState(
     supabase_project: init.supabase_project,
     connections: {},
     pages: [],
-    document: {
-      data: {},
-      overrides: {},
-    },
+    document: null,
     sidebar: {
       mode: initial_sidebar_mode[init.doctype],
       mode_data: {
@@ -280,8 +277,12 @@ function initialSiteEditorState(init: SiteDocumentEditorInit): EditorState {
     }),
     selected_page_id: "collection",
     document: {
-      data: samples["formcollection_sample_001_the_bundle"],
-      overrides: {},
+      template: {
+        template_id: "formcollection_sample_001_the_bundle",
+        type: "template",
+        data: samples["formcollection_sample_001_the_bundle"],
+        overrides: {},
+      },
     },
     sidebar: {
       mode: initial_sidebar_mode[init.doctype],
@@ -489,15 +490,21 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
       document_id: init.document_id,
     }),
     selected_page_id: "", // "form",
-    document: {
-      data: {},
-      overrides: {},
-    },
+    document: null,
     form: {
       form_id: init.form_id,
       form_title: init.form_title,
       campaign: init.campaign,
-      startpage: init.start,
+      startpage: init.start
+        ? {
+            template: {
+              type: "template",
+              template_id: init.start?.template_id,
+              overrides: {},
+              data: {},
+            },
+          }
+        : null,
       ending: init.ending,
       fields: init.fields,
       form_security: init.form_security,

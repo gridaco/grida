@@ -35,10 +35,12 @@ import { Tokens } from "@/ast";
 import { useEditorState } from "../editor";
 import { PropertyLine, PropertyLineLabel } from "./ui";
 import { SideControlGlobal } from "./sidecontrol-global";
+import assert from "assert";
 
 export function SideControlDoctypeSite() {
   const [state, dispatch] = useEditorState();
 
+  assert(state.document, "state.document is required");
   if (state.document.selected_node_id) {
     return <SelectedNodeProperties />;
   } else {
@@ -50,7 +52,7 @@ function SelectedNodeProperties() {
   const [state, dispatch] = useEditorState();
 
   // - color - variables
-
+  assert(state.document, "state.document is required");
   const {
     selected_node_id,
     selected_node_schema,
@@ -71,12 +73,15 @@ function SelectedNodeProperties() {
   const islayout = isflex;
 
   const {
+    // @ts-ignore TODO:
     component_id,
     attributes,
     style,
+    // @ts-ignore TODO:
     properties: _properties,
+    // @ts-ignore TODO:
     text,
-  } = state.document.overrides[selected_node_id!] || {};
+  } = state.document.template.overrides[selected_node_id!] || {};
 
   const { hidden } = attributes || {};
 
@@ -122,7 +127,7 @@ function SelectedNodeProperties() {
       dispatch({
         type: "editor/document/node/switch-component",
         node_id: selected_node_id!,
-        component_id,
+        component_id: component_id,
       });
     },
     [dispatch, selected_node_id]

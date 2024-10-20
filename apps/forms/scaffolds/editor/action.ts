@@ -63,7 +63,8 @@ export type EditorAction =
   | EditorThemeCustomCSSAction
   | EditorThemeBackgroundAction
   | FormCampaignPreferencesAction
-  | FormEndingPreferencesAction;
+  | FormEndingPreferencesAction
+  | FormStartPageInitAction;
 
 export interface InitAssetAction extends Partial<EditorState["assets"]> {
   type: "editor/assets/init";
@@ -436,4 +437,12 @@ export interface FormCampaignPreferencesAction
 export interface FormEndingPreferencesAction
   extends Partial<EditorState["form"]["ending"]> {
   type: "editor/form/ending/preferences";
+}
+
+export interface FormStartPageInitAction {
+  type: "editor/form/startpage/init";
+  startpage: {
+    template_id: string;
+    data: Record<string, any>;
+  };
 }

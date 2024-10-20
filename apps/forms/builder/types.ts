@@ -11,27 +11,63 @@ export interface IDocumentSelectedNodeState {
   selected_node_context?: Record<string, any>;
 }
 
-interface TemplateNode {
-  text?: Tokens.StringValueExpression;
+type Node = TextNode | InstanceNode;
+
+interface IStylable {
+  attributes?: {
+    hidden?: boolean;
+  };
+  style?: React.CSSProperties;
+}
+
+interface IText {
+  text: Tokens.StringValueExpression;
+}
+
+export interface TextNode extends IStylable, IText {
+  type: "text";
+}
+
+export interface InstanceNode extends IStylable {
+  type: "instance";
   /**
    * ID of component that this instance came from, refers to components table
    */
   component_id: string;
-  attributes?: {
-    hidden?: boolean;
-  };
+
   /**
    * properties - props data
    *
    * expression that will be passed to this instance
    */
   properties?: { [key: string]: Tokens.StringValueExpression };
-  style?: React.CSSProperties;
+}
+
+/**
+ * [Template Node] Template node is a static, hand crafted template that does not have a intrinsic tree, only a root properties [data] and [overrides] to each customizable node
+ *
+ * Template Node cannot be used as a child node.
+ *
+ * This will be used until we have a fully working tree editor.
+ */
+interface TemplateNode {
+  type: "template";
+
+  /**
+   * ID of template that this instance came from
+   */
+  template_id: string;
+
+  data: Record<string, any>;
+
+  /**
+   * children override data
+   */
+  overrides: {
+    [node_id: string]: Node;
+  };
 }
 
 export interface ITemplateEditorState extends IDocumentSelectedNodeState {
-  data: Record<string, any>;
-  overrides: {
-    [node_id: string]: TemplateNode;
-  };
+  template: TemplateNode;
 }
