@@ -8,11 +8,11 @@ export function CalendarBoxIcon({
   day: string;
 }) {
   return (
-    <div className="rounded border w-10 h-10 uppercase">
-      <div id="month" className="flex justify-center items-center bg-secondary">
-        <span className="text-[0.5rem] text-muted-foreground">{month}</span>
+    <div className="rounded border w-10 h-10 uppercase overflow-hidden">
+      <div id="month" className="flex justify-center items-center bg-primary">
+        <span className="text-[0.5rem] text-primary-foreground">{month}</span>
       </div>
-      <div id="day" className="flex justify-center items-center">
+      <div id="day" className="flex justify-center items-center bg-background">
         <span className="font-semibold">{day}</span>
       </div>
     </div>

@@ -14,16 +14,16 @@ import { ThemeWidget } from "./theme";
 
 export namespace TemplateBuilderWidgets {
   export const Container = ContainerWidget;
-  export const Component = ComponentWidget;
+  // export const Component = ComponentWidget;
   export const Flex = FlexWidget;
-  export const Grid = GridWidget;
+  // export const Grid = GridWidget;
   export const Icon = IconWidget;
-  export const Layer = LayerkWidget;
+  // export const Layer = LayerkWidget;
   export const Layout = LayoutWidget;
   export const Link = LinkWidget;
-  export const RichText = RichTextWidget;
-  export const Slot = SlotWidget;
-  export const Svg = SvgWidget;
+  // export const RichText = RichTextWidget;
+  // export const Slot = SlotWidget;
+  // export const Svg = SvgWidget;
   export const Text = TextWidget;
-  export const Theme = ThemeWidget;
+  // export const Theme = ThemeWidget;
 }

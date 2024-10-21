@@ -24,11 +24,7 @@ import { useEditorState } from "@/scaffolds/editor";
 export default function FormDashboard() {
   const [state, dispatch] = useEditorState();
 
-  const {
-    form,
-    theme: { lang },
-    document: { selected_page_id },
-  } = state;
+  const { form } = state;
 
   return (
     <main className="max-w-2xl mx-auto">

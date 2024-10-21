@@ -25,6 +25,7 @@ import PropertyAccessDropdownMenu from "./context/variable";
 import PropertyTypeIcon from "@/components/property-type-icon";
 import { useMemo } from "react";
 import { inferSchemaFromData } from "@/lib/spock";
+import assert from "assert";
 
 export function StringValueControl({
   value,
@@ -37,9 +38,9 @@ export function StringValueControl({
 }) {
   const [state] = useEditorState();
 
-  const {
-    document: { selected_node_context },
-  } = state;
+  assert(state.documents, "state.documents is required");
+  // TODO: support other than [collection]
+  const { selected_node_context } = state.documents["form/collection"] || {};
 
   const schema = useMemo(
     () =>
