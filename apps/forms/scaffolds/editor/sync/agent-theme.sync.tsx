@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useCallback, useEffect, useId, useMemo, useRef } from "react";
+import React, { useEffect, useMemo } from "react";
 import { createClientFormsClient } from "@/lib/supabase/client";
 import { usePrevious } from "@uidotdev/usehooks";
-import equal from "deep-equal";
 import { FormPageBackgroundSchema, FormStyleSheetV1Schema } from "@/types";
-import { useEditorState } from "../use-editor";
+import { useEditorState } from "@/scaffolds/editor/use-editor";
+import equal from "deep-equal";
 
 /**
  * sync agent theme to server

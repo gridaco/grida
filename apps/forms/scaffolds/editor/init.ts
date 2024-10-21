@@ -498,8 +498,8 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
             template: {
               type: "template",
               template_id: init.start?.template_id,
+              properties: init.start.data,
               overrides: {},
-              properties: {},
             },
           }
         : undefined,

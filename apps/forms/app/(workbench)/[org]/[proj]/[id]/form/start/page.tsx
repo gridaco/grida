@@ -1,7 +1,6 @@
 "use client";
 import { AgentThemeProvider } from "@/scaffolds/agent/theme";
 import { SideControl } from "@/scaffolds/sidecontrol";
-import dummy from "@/theme/templates/formstart/data/01.dummy.json";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Sheet,
@@ -52,10 +51,10 @@ import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { ArrowLeftIcon, ArrowRightIcon } from "@radix-ui/react-icons";
 import { useDebounceCallback, useStep } from "usehooks-ts";
 import { motion } from "framer-motion";
-import assert from "assert";
 import { useDocument } from "@/scaffolds/editor/use";
 import { Block, BlockNoteEditor } from "@blocknote/core";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { useSyncFormAgentStartPage } from "@/scaffolds/editor/sync";
 
 function useStartPageTemplateEditor() {
   return useDocument("form/startpage");
@@ -63,6 +62,8 @@ function useStartPageTemplateEditor() {
 
 export default function FormStartEditPage() {
   const [state, dispatch] = useEditorState();
+
+  useSyncFormAgentStartPage();
 
   const {
     documents: { "form/startpage": startpage },
