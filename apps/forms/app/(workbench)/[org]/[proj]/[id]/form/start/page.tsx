@@ -25,11 +25,6 @@ import {
   makeUploader,
 } from "@/components/formfield/file-upload-field";
 import { cn } from "@/utils";
-import FormStartPage001 from "@/theme/templates/formstart/001/page";
-import FormStartPage002 from "@/theme/templates/formstart/002/page";
-import FormStartPage003 from "@/theme/templates/formstart/003/page";
-import FormStartPage004 from "@/theme/templates/formstart/004/page";
-import FormStartPage005 from "@/theme/templates/formstart/005/page";
 import { useEditorState } from "@/scaffolds/editor";
 import { Button } from "@/components/ui/button";
 import {
@@ -55,6 +50,7 @@ import { useDocument } from "@/scaffolds/editor/use";
 import { Block, BlockNoteEditor } from "@blocknote/core";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useSyncFormAgentStartPage } from "@/scaffolds/editor/sync";
+import { FormStartPage } from "@/theme/templates/formstart";
 
 function useStartPageTemplateEditor() {
   return useDocument("form/startpage");
@@ -123,34 +119,6 @@ function SetupStartPage() {
   );
 }
 
-const startpage_templates = [
-  {
-    id: "001",
-    name: "001",
-    component: FormStartPage001,
-  },
-  {
-    id: "002",
-    name: "002",
-    component: FormStartPage002,
-  },
-  {
-    id: "003",
-    name: "003",
-    component: FormStartPage003,
-  },
-  {
-    id: "004",
-    name: "004",
-    component: FormStartPage004,
-  },
-  {
-    id: "005",
-    name: "005",
-    component: FormStartPage005,
-  },
-];
-
 function BrowseStartPageTemplatesDialog({
   onValueCommit,
   ...props
@@ -167,15 +135,15 @@ function BrowseStartPageTemplatesDialog({
   const [
     step,
     { goToNextStep, goToPrevStep, canGoToNextStep, canGoToPrevStep },
-  ] = useStep(startpage_templates.length);
+  ] = useStep(FormStartPage.templates.length);
 
   useEffect(() => {
-    setSelection(startpage_templates[step - 1].id);
+    setSelection(FormStartPage.templates[step - 1].id);
   }, [step]);
 
   const [selection, setSelection] = useState<string>("001");
 
-  const template = startpage_templates.find((t) => t.id === selection)!;
+  const template = FormStartPage.getTemplate(selection)!;
 
   return (
     <Dialog {...props}>
@@ -265,15 +233,7 @@ function StartPageEditor() {
     theme: { lang },
   } = state;
 
-  const { changeRootProperties, rootProperties, document } =
-    useStartPageTemplateEditor();
-
-  const Component = useMemo(
-    () =>
-      startpage_templates.find((t) => t.id === document.template.template_id)
-        ?.component,
-    [document]
-  );
+  const { document } = useStartPageTemplateEditor();
 
   return (
     <>
@@ -288,13 +248,12 @@ function StartPageEditor() {
             }}
           >
             <div className="w-full min-h-[852px] h-[80dvh]">
-              {Component && (
-                <Component
-                  data={document.template.properties}
-                  meta={campaign}
-                  lang={lang}
-                />
-              )}
+              <FormStartPage.Renderer
+                template_id={document.template.template_id}
+                data={document.template.properties}
+                meta={campaign}
+                lang={lang}
+              />
             </div>
           </SandboxWrapper>
         </div>

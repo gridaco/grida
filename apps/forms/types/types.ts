@@ -245,6 +245,7 @@ export interface FormDocument {
   ending_page_template_id: string | null;
   ending_page_i18n_overrides: EndingPageI18nOverrides | null;
   method: FormMethod;
+  start_page: FormStartPageSchema | null;
 }
 
 export interface IFormBlock<T = FormBlockType> {
@@ -427,6 +428,18 @@ export interface EndingPageI18nOverrides {
   $schema: "https://forms.grida.co/schemas/v1/endingpage.json";
   template_id: EndingPageTemplateID;
   overrides: Record<string, string>;
+}
+
+export interface CampaignMeta {
+  max_form_responses_by_customer: number | null;
+  is_max_form_responses_by_customer_enabled: boolean;
+  max_form_responses_in_total: number | null;
+  is_max_form_responses_in_total_enabled: boolean;
+  is_force_closed: boolean;
+  is_scheduling_enabled: boolean;
+  scheduling_open_at: string | null;
+  scheduling_close_at: string | null;
+  scheduling_tz?: string;
 }
 
 export interface Geo {

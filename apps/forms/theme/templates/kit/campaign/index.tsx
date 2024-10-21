@@ -2,39 +2,7 @@
 
 import { Features } from "@/lib/features/scheduling";
 import React, { createContext, useContext, useMemo } from "react";
-
-export interface CampaignMeta {
-  max_form_responses_by_customer: number | null;
-  is_max_form_responses_by_customer_enabled: boolean;
-  max_form_responses_in_total: number | null;
-  is_max_form_responses_in_total_enabled: boolean;
-  is_force_closed: boolean;
-  is_scheduling_enabled: boolean;
-  scheduling_open_at: string | null;
-  scheduling_close_at: string | null;
-  scheduling_tz?: string;
-}
-
-type ResourceKey =
-  | string
-  | {
-      [key: string]: any;
-    };
-
-interface ResourceLanguage {
-  [namespace: string]: ResourceKey;
-}
-
-interface Resource {
-  [language: string]: ResourceLanguage;
-}
-
-export interface CampaignTemplateProps<M extends Resource> {
-  meta: CampaignMeta;
-  data: {};
-  resources?: M;
-  lang: string;
-}
+import type { CampaignMeta } from "@/types";
 
 interface State {
   campaign: CampaignMeta;

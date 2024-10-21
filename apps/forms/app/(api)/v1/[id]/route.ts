@@ -39,6 +39,8 @@ import type {
   FormDocument,
   Option,
   FormsPageLanguage,
+  FormStartPageSchema,
+  CampaignMeta,
 } from "@/types";
 import { Features } from "@/lib/features/scheduling";
 import { requesterurl, resolverurl } from "@/services/form/session-storage";
@@ -63,6 +65,7 @@ export interface FormAgentPrefetchData {
   title: string;
   session_id: string;
   method: FormMethod;
+  start_page: FormStartPageSchema | null;
   tree: FormBlockTree<ClientRenderBlock[]>;
   blocks: ClientRenderBlock[];
   fields: FormFieldDefinition[];
@@ -75,6 +78,7 @@ export interface FormAgentPrefetchData {
   background?: FormDocument["background"];
   stylesheet?: FormDocument["stylesheet"];
   default_values: { [key: string]: string };
+  campaign: CampaignMeta;
   // access
   is_open: boolean;
   customer_access: {
@@ -213,6 +217,9 @@ export async function GET(
       ?.is_powered_by_branding_enabled ?? true;
   const method: FormMethod =
     (default_page as unknown as FormDocument | null)?.method ?? "post";
+
+  const start_page =
+    (default_page as unknown as FormDocument | null)?.start_page ?? null;
 
   // load serverside i18n
   await i18next.init({
@@ -483,6 +490,7 @@ export async function GET(
     title: title,
     session_id: session.id,
     method,
+    start_page,
     tree: renderer.tree(),
     blocks: renderer.blocks(),
     fields: fields,
@@ -500,6 +508,20 @@ export async function GET(
     // default value
     default_values: default_values,
 
+    //
+    campaign: {
+      max_form_responses_by_customer: data.max_form_responses_by_customer,
+      is_max_form_responses_by_customer_enabled:
+        data.is_max_form_responses_by_customer_enabled,
+      max_form_responses_in_total: data.max_form_responses_in_total,
+      is_max_form_responses_in_total_enabled:
+        data.is_max_form_responses_in_total_enabled,
+      is_force_closed: data.is_force_closed,
+      is_scheduling_enabled: data.is_scheduling_enabled,
+      scheduling_open_at: data.scheduling_open_at,
+      scheduling_close_at: data.scheduling_close_at,
+      scheduling_tz: data.scheduling_tz ?? undefined,
+    },
     // access
     is_open: is_open,
     customer_access: {
