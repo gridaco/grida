@@ -31,18 +31,15 @@ function safevalue(value: any) {
   return undefined;
 }
 
-export function RichTextEditCell({
-  row_id,
+function useUploader({
+  db_table_id,
   field_id,
-  defaultValue,
-  onValueCommit,
+  row_id,
 }: {
-  row_id: string;
+  db_table_id: string | null;
   field_id: string;
-  defaultValue?: any;
-  onValueCommit?: (value: any) => void;
+  row_id: string;
 }) {
-  const db_table_id = useDatabaseTableId();
   const uploader = useCallback(
     async (file: File) => {
       if (!db_table_id) {
@@ -88,6 +85,23 @@ export function RichTextEditCell({
     },
     [db_table_id, field_id, row_id]
   );
+
+  return uploader;
+}
+
+export function RichTextEditCell({
+  row_id,
+  field_id,
+  defaultValue,
+  onValueCommit,
+}: {
+  row_id: string;
+  field_id: string;
+  defaultValue?: any;
+  onValueCommit?: (value: any) => void;
+}) {
+  const db_table_id = useDatabaseTableId();
+  const uploader = useUploader({ db_table_id, field_id, row_id });
 
   const editor = useCreateBlockNote({
     schema: schema,
