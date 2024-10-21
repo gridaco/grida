@@ -4,6 +4,7 @@ import { ThemedRichTextEditorContent } from "@/components/richtext";
 import { useCreateBlockNote } from "@blocknote/react";
 import {
   Block,
+  BlockNoteEditor,
   BlockNoteSchema,
   defaultBlockSpecs,
   locales,
@@ -40,8 +41,8 @@ export function RichTextEditorField({
   name?: string;
   required?: boolean;
   placeholder?: string;
-  initialContent?: Block[];
-  onContentChange?: (content: Block[]) => void;
+  initialContent?: Block[] | string;
+  onContentChange?: (editor: BlockNoteEditor<any>, content: Block[]) => void;
 } & FileHandler) {
   const [txtjsonvalue, settxtjsonvalue] = useState<string | undefined>(
     undefined
@@ -90,7 +91,7 @@ export function RichTextEditorField({
       const content = editor.document;
       try {
         settxtjsonvalue(JSON.stringify(content));
-        onContentChange?.(content);
+        onContentChange?.(editor, content);
       } catch (e) {}
     };
     editor.onEditorContentChange(fn);
@@ -99,7 +100,15 @@ export function RichTextEditorField({
   return (
     <div
       className="shadow-sm h-full w-full py-10 rounded-md border border-input bg-transparent text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-      onClick={() => editor.focus()}
+      onClick={(event) => {
+        // ignore when input
+
+        if (event.target instanceof HTMLInputElement) {
+          return;
+        }
+
+        editor.focus();
+      }}
     >
       <ThemedRichTextEditorContent editor={editor}>
         <input

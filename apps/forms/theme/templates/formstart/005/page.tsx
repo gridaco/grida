@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useEffect, useMemo } from "react";
+import React, { createContext, useContext, useEffect, useMemo } from "react";
 import {
   Carousel,
   CarouselContent,
@@ -52,6 +52,12 @@ const medias = [
 
 type Messages = typeof _messages;
 
+const DataContext = createContext<Record<string, any>>({});
+
+function useData() {
+  return useContext(DataContext);
+}
+
 export default function _005({
   meta,
   data,
@@ -72,19 +78,23 @@ export default function _005({
   }, [lang]);
 
   return (
-    <FormCampaignStartPageContextProvider value={meta}>
-      <I18nextProvider
-        // @ts-expect-error
-        i18n={i18n}
-      >
-        <Consumer />
-      </I18nextProvider>
-    </FormCampaignStartPageContextProvider>
+    <DataContext.Provider value={data}>
+      <FormCampaignStartPageContextProvider value={meta}>
+        <I18nextProvider
+          // @ts-expect-error
+          i18n={i18n}
+        >
+          <Consumer />
+        </I18nextProvider>
+      </FormCampaignStartPageContextProvider>
+    </DataContext.Provider>
   );
 }
 
 function Consumer() {
   const { t } = useTranslation<any>();
+  const data = useData();
+
   return (
     <ScreenRoot>
       <ScreenMobileFrame>
@@ -96,16 +106,18 @@ function Consumer() {
             <div className="pt-5">
               <header className="flex flex-col items-center gap-4 px-4">
                 <div className="w-full text-start">
-                  <h1 className="text-2xl font-bold w-4/5">{t("title")}</h1>
+                  <h1 className="text-2xl font-bold w-4/5">
+                    {data.title || t("title")}
+                  </h1>
                 </div>
                 <NextEventState className="py-4" />
               </header>
-              {/* <div className="py-10 flex justify-center items-center px-4">
-              </div> */}
               <article className="py-10 prose prose-sm dark:prose-invert">
                 <div
                   className="prose-img:p-0 prose-video:p-0 px-4"
-                  dangerouslySetInnerHTML={{ __html: t("body") }}
+                  dangerouslySetInnerHTML={{
+                    __html: data.body_html || t("body_html"),
+                  }}
                 />
               </article>
             </div>

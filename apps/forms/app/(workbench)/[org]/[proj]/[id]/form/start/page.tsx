@@ -21,7 +21,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { FileUploadField } from "@/components/formfield/file-upload-field";
+import {
+  FileUploadField,
+  makeUploader,
+} from "@/components/formfield/file-upload-field";
 import { cn } from "@/utils";
 import FormStartPage001 from "@/theme/templates/formstart/001/page";
 import FormStartPage002 from "@/theme/templates/formstart/002/page";
@@ -47,10 +50,12 @@ import {
 } from "@/components/ui/dialog";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { ArrowLeftIcon, ArrowRightIcon } from "@radix-ui/react-icons";
-import { useStep } from "usehooks-ts";
+import { useDebounceCallback, useStep } from "usehooks-ts";
 import { motion } from "framer-motion";
 import assert from "assert";
 import { useDocument } from "@/scaffolds/editor/use";
+import { Block, BlockNoteEditor } from "@blocknote/core";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 function useStartPageTemplateEditor() {
   return useDocument("form/startpage");
@@ -259,13 +264,14 @@ function StartPageEditor() {
     theme: { lang },
   } = state;
 
-  const { document: startpage } = useDocument("form/startpage");
+  const { changeRootProperties, rootProperties, document } =
+    useStartPageTemplateEditor();
 
   const Component = useMemo(
     () =>
-      startpage_templates.find((t) => t.id === startpage?.template.template_id)
+      startpage_templates.find((t) => t.id === document.template.template_id)
         ?.component,
-    [startpage]
+    [document]
   );
 
   return (
@@ -283,7 +289,7 @@ function StartPageEditor() {
             <div className="w-full min-h-[852px] h-[80dvh]">
               {Component && (
                 <Component
-                  data={startpage.template.properties}
+                  data={document.template.properties}
                   meta={campaign}
                   lang={lang}
                 />
@@ -328,102 +334,129 @@ function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
   const { changeRootProperties, rootProperties } = useStartPageTemplateEditor();
   const [state, dispatch] = useEditorState();
 
+  const debouncedRichTextHtmlChange = useDebounceCallback(
+    (editor: BlockNoteEditor<any>, content: Block[]) => {
+      editor.blocksToHTMLLossy(content).then((html) => {
+        changeRootProperties("body_html", html);
+      });
+    },
+    300
+  );
+
   const {
     form: { campaign },
   } = state;
 
   return (
     <Sheet {...props}>
-      <SheetContent className="flex flex-col xl:w-[800px] xl:max-w-none sm:w-[500px] sm:max-w-none w-screen max-w-none">
-        <SheetHeader>
+      <SheetContent className="flex flex-col xl:w-[800px] xl:max-w-none sm:w-[500px] sm:max-w-none w-screen max-w-none p-0">
+        <SheetHeader className="p-4">
           <SheetTitle>Page Content</SheetTitle>
           <SheetDescription>
             Edit the content of the page here.
           </SheetDescription>
         </SheetHeader>
         <hr />
-        <div className="grid gap-4">
-          <div className="grid gap-2">
-            <Label>About This Campaign</Label>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Value</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <TableRow>
-                  <TableCell>Scheduling</TableCell>
-                  <TableCell>
-                    {campaign.is_scheduling_enabled ? "ON" : "OFF"}
-                  </TableCell>
-                </TableRow>
-                {campaign.is_scheduling_enabled && (
-                  <>
-                    <TableRow>
-                      <TableCell>Scheduling Time Zone</TableCell>
-                      <TableCell>{campaign.scheduling_tz ?? "-"}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell>Scheduling Open At</TableCell>
-                      <TableCell>
-                        {campaign.scheduling_open_at ?? "-"}
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell>Scheduling Close At</TableCell>
-                      <TableCell>
-                        {campaign.scheduling_close_at ?? "-"}
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell>Max Responses in total</TableCell>
-                      <TableCell>
-                        {campaign.max_form_responses_in_total ?? "∞"}
-                      </TableCell>
-                    </TableRow>
-                  </>
-                )}
-                <TableRow>
-                  <TableCell>Max Responses per user</TableCell>
-                  <TableCell>
-                    {campaign.max_form_responses_by_customer ?? "∞"}
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
+        <ScrollArea>
+          <ScrollBar />
+          <div className="px-4 grid gap-4">
+            <div className="grid gap-2">
+              <Label>About This Campaign</Label>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Value</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow>
+                    <TableCell>Scheduling</TableCell>
+                    <TableCell>
+                      {campaign.is_scheduling_enabled ? "ON" : "OFF"}
+                    </TableCell>
+                  </TableRow>
+                  {campaign.is_scheduling_enabled && (
+                    <>
+                      <TableRow>
+                        <TableCell>Scheduling Time Zone</TableCell>
+                        <TableCell>{campaign.scheduling_tz ?? "-"}</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell>Scheduling Open At</TableCell>
+                        <TableCell>
+                          {campaign.scheduling_open_at
+                            ? new Date(
+                                campaign.scheduling_open_at
+                              ).toLocaleString()
+                            : "-"}
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell>Scheduling Close At</TableCell>
+                        <TableCell>
+                          {campaign.scheduling_close_at
+                            ? new Date(
+                                campaign.scheduling_close_at
+                              ).toLocaleString()
+                            : "-"}
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell>Max Responses in total</TableCell>
+                        <TableCell>
+                          {campaign.max_form_responses_in_total ?? "∞"}
+                        </TableCell>
+                      </TableRow>
+                    </>
+                  )}
+                  <TableRow>
+                    <TableCell>Max Responses by customer</TableCell>
+                    <TableCell>
+                      {campaign.max_form_responses_by_customer ?? "∞"}
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+            <div className="grid gap-2">
+              <Label>Media</Label>
+              <FileUploadField
+                accept="image/*"
+                multiple
+                uploader={makeUploader({
+                  type: "requesturl",
+                  request_url:
+                    // TODO:
+                    "",
+                })}
+                maxSize={5 * 1024 * 1024}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Title</Label>
+              <Input
+                // TODO: support tokens
+                value={rootProperties.title as string}
+                onChange={(e) => {
+                  changeRootProperties("title", e.target.value);
+                }}
+                placeholder="Enter your Campaign Title"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Content</Label>
+              <RichTextEditorField
+                initialContent={rootProperties.body as any}
+                onContentChange={(editor, content) => {
+                  changeRootProperties("body", content);
+                  debouncedRichTextHtmlChange(editor, content);
+                }}
+              />
+            </div>
           </div>
-          <div className="grid gap-2">
-            <Label>Media</Label>
-            <FileUploadField />
-          </div>
-          <div className="grid gap-2">
-            <Label>Title</Label>
-            <Input
-              // TODO: support tokens
-              value={rootProperties.title as string}
-              onChange={(e) => {
-                changeRootProperties("title", e.target.value);
-              }}
-              placeholder="Enter your Campaign Title"
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label>Content</Label>
-            <RichTextEditorField
-              // TODO: support tokens
-              initialContent={rootProperties.body as any}
-              onContentChange={(content) => {
-                changeRootProperties("body", content);
-              }}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label>Register Button Text</Label>
-            <Input placeholder="Register" />
-          </div>
-        </div>
+          <div className="h-40" />
+        </ScrollArea>
       </SheetContent>
     </Sheet>
   );
