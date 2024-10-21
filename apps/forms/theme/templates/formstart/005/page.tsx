@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useMemo } from "react";
+import React, { createContext, useContext, useMemo } from "react";
 import {
   Carousel,
   CarouselContent,
@@ -9,16 +9,12 @@ import {
 import Autoplay from "embla-carousel-autoplay";
 import {
   CalendarBoxIcon,
-  ScreenDecorations,
-  ScreenGrid,
-  ScreenGridArea,
   ScreenMobileFrame,
   ScreenRoot,
   ScreenScrollable,
   Timer,
 } from "@/theme/templates/kit/components";
 import {
-  CampaignTemplateProps,
   FormCampaignStartPageContextProvider,
   useCampaignMeta,
 } from "@/theme/templates/kit/campaign";
@@ -31,6 +27,9 @@ import { Features } from "@/lib/features/scheduling";
 import { I18nextProvider, useTranslation } from "react-i18next";
 import i18next from "i18next";
 import { cn } from "@/utils";
+import type { FormStartPage } from "..";
+import { DataProvider, useData } from "../../kit/contexts/data.context";
+import { useCTAContext } from "../../kit/contexts/cta.context";
 
 const medias = [
   {
@@ -52,18 +51,12 @@ const medias = [
 
 type Messages = typeof _messages;
 
-const DataContext = createContext<Record<string, any>>({});
-
-function useData() {
-  return useContext(DataContext);
-}
-
 export default function _005({
   meta,
   data,
   resources = _messages,
   lang,
-}: CampaignTemplateProps<Messages>) {
+}: FormStartPage.CampaignTemplateProps<Messages>) {
   const i18n = useMemo(() => {
     return i18next.createInstance(
       {
@@ -78,7 +71,7 @@ export default function _005({
   }, [lang]);
 
   return (
-    <DataContext.Provider value={data}>
+    <DataProvider data={data}>
       <FormCampaignStartPageContextProvider value={meta}>
         <I18nextProvider
           // @ts-expect-error
@@ -87,13 +80,20 @@ export default function _005({
           <Consumer />
         </I18nextProvider>
       </FormCampaignStartPageContextProvider>
-    </DataContext.Provider>
+    </DataProvider>
   );
 }
 
 function Consumer() {
   const { t } = useTranslation<any>();
   const data = useData();
+
+  const bodyHtml = useMemo(
+    () => ({
+      __html: data.body_html || t("body_html"),
+    }),
+    [data.body_html, t]
+  );
 
   return (
     <ScreenRoot>
@@ -115,9 +115,7 @@ function Consumer() {
               <article className="py-10 prose prose-sm dark:prose-invert">
                 <div
                   className="prose-img:p-0 prose-video:p-0 px-4"
-                  dangerouslySetInnerHTML={{
-                    __html: data.body_html || t("body_html"),
-                  }}
+                  dangerouslySetInnerHTML={bodyHtml}
                 />
               </article>
             </div>
@@ -151,6 +149,7 @@ function Media() {
 
 function CTAFooter() {
   const { t } = useTranslation<any>();
+  const { onClick } = useCTAContext();
 
   const {
     is_scheduling_enabled,
@@ -210,13 +209,13 @@ function CTAFooter() {
                       className="uppercase whitespace-nowrap opacity-0 data-[ready=true]:opacity-100"
                     >
                       {d ? (
-                        `${t("date.d", { d })} `
+                        t("date.d", { d })
                       ) : (
-                        <>
-                          {h && `${h}${(t("date.h"), { h })} `}
-                          {m && `${m}${t("date.m", { m })} `}
-                          {s && `${s}${t("date.s", { s })}`}
-                        </>
+                        <span className="flex items-center gap-1">
+                          {h > 0 && <span>{t("date.h", { h })}</span>}
+                          {m > 0 && <span>{t("date.m", { m })}</span>}
+                          <span>{t("date.s", { s })}</span>
+                        </span>
                       )}
                     </Badge>
                   </motion.div>
@@ -226,7 +225,9 @@ function CTAFooter() {
           </div>
         </div>
         <div className="flex justify-end items-center">
-          <Button disabled={closed}>{t("button")}</Button>
+          <Button disabled={closed} onClick={onClick}>
+            {t("button")}
+          </Button>
         </div>
       </div>
     </motion.footer>
@@ -283,7 +284,7 @@ function NextEventState({ className }: { className?: string }) {
         minute: "2-digit",
       }),
     });
-  }, [schedulestate, lang, next]);
+  }, [t, schedulestate, lang, next]);
 
   if (is_scheduling_enabled && state_text) {
     return (

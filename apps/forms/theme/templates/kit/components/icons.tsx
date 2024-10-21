@@ -12,7 +12,7 @@ export function CalendarBoxIcon({
       <div id="month" className="flex justify-center items-center bg-primary">
         <span className="text-[0.5rem] text-primary-foreground">{month}</span>
       </div>
-      <div id="day" className="flex justify-center items-center">
+      <div id="day" className="flex justify-center items-center bg-background">
         <span className="font-semibold">{day}</span>
       </div>
     </div>
