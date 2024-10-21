@@ -4,9 +4,7 @@ import React from "react";
 import { AgentThemeProvider } from "@/scaffolds/agent/theme";
 import { useEditorState } from "@/scaffolds/editor";
 import { SideControl } from "@/scaffolds/sidecontrol";
-import BlocksEditor from "@/scaffolds/blocks-editor";
 import FormCollectionPage from "@/theme/templates/formcollection/page";
-import FormStartPage from "@/theme/templates/formstart/default/page";
 import { CanvasFloatingToolbar } from "@/scaffolds/canvas-floating-toolbar";
 import { useDocument } from "@/scaffolds/editor/use";
 
@@ -58,8 +56,6 @@ function CurrentPageCanvas() {
   } = state;
 
   switch (selected_page_id) {
-    case "form":
-      return <BlocksEditor />;
     case "form/collection":
       return (
         <>

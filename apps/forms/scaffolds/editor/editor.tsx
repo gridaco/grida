@@ -28,6 +28,7 @@ import toast from "react-hot-toast";
 import { EditorSymbols } from "./symbols";
 import { fmt_local_index } from "@/utils/fmt";
 import Multiplayer from "./multiplayer";
+import { FormAgentThemeSyncProvider } from "./sync";
 
 export function EditorProvider({
   initial,
@@ -116,17 +117,19 @@ export function FormDocumentEditorProvider({
 
   return (
     <StateProvider state={state} dispatch={dispatch}>
-      <Multiplayer>
-        <TooltipProvider>
-          <AssetsBackgroundsResolver />
-          <MediaViewerProvider>
-            <FormFieldEditPanelProvider />
-            <RowEditPanelProvider />
-            <CustomerPanelProvider />
-            {children}
-          </MediaViewerProvider>
-        </TooltipProvider>
-      </Multiplayer>
+      <FormAgentThemeSyncProvider>
+        <Multiplayer>
+          <TooltipProvider>
+            <AssetsBackgroundsResolver />
+            <MediaViewerProvider>
+              <FormFieldEditPanelProvider />
+              <RowEditPanelProvider />
+              <CustomerPanelProvider />
+              {children}
+            </MediaViewerProvider>
+          </TooltipProvider>
+        </Multiplayer>
+      </FormAgentThemeSyncProvider>
     </StateProvider>
   );
 }
