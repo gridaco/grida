@@ -8,12 +8,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/spinner";
-import { useUploadFile } from "../media";
+import { useGridaFormsPublicUpload } from "@/scaffolds/asset";
 
 export function AdminMediaPicker({
   ...props
 }: Omit<React.ComponentProps<typeof MediaPicker>, "uploader">) {
-  const uploadFile = useUploadFile();
+  const uploadFile = useGridaFormsPublicUpload();
 
   return <MediaPicker {...props} uploader={uploadFile} />;
 }

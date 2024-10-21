@@ -2000,6 +2000,41 @@ export type Database = {
   }
   public: {
     Tables: {
+      asset: {
+        Row: {
+          bucket_id: string
+          created_at: string | null
+          document_id: string | null
+          id: string
+          name: string | null
+          user_id: string | null
+        }
+        Insert: {
+          bucket_id?: string
+          created_at?: string | null
+          document_id?: string | null
+          id?: string
+          name?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          bucket_id?: string
+          created_at?: string | null
+          document_id?: string | null
+          id?: string
+          name?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "document"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer: {
         Row: {
           _fp_fingerprintjs_visitorid: string | null
