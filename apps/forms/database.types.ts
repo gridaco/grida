@@ -2002,28 +2002,25 @@ export type Database = {
     Tables: {
       asset: {
         Row: {
-          bucket_id: string
           created_at: string | null
-          document_id: string | null
+          document_id: string
           id: string
-          name: string | null
-          user_id: string | null
+          is_public: boolean
+          object_id: string | null
         }
         Insert: {
-          bucket_id?: string
           created_at?: string | null
-          document_id?: string | null
+          document_id: string
           id?: string
-          name?: string | null
-          user_id?: string | null
+          is_public: boolean
+          object_id?: string | null
         }
         Update: {
-          bucket_id?: string
           created_at?: string | null
-          document_id?: string | null
+          document_id?: string
           id?: string
-          name?: string | null
-          user_id?: string | null
+          is_public?: boolean
+          object_id?: string | null
         }
         Relationships: [
           {
@@ -2424,6 +2421,18 @@ export type Database = {
           user_id: string
         }
         Returns: number[]
+      }
+      rls_asset: {
+        Args: {
+          p_asset_id: string
+        }
+        Returns: boolean
+      }
+      rls_document: {
+        Args: {
+          p_document_id: string
+        }
+        Returns: boolean
       }
       rls_manifest: {
         Args: {

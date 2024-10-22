@@ -51,6 +51,7 @@ import { Block, BlockNoteEditor } from "@blocknote/core";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useSyncFormAgentStartPage } from "@/scaffolds/editor/sync";
 import { FormStartPage } from "@/theme/templates/formstart";
+import { useDocumentAssetUpload } from "@/scaffolds/asset";
 
 function useStartPageTemplateEditor() {
   return useDocument("form/startpage");
@@ -294,6 +295,8 @@ function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
   const { changeRootProperties, rootProperties } = useStartPageTemplateEditor();
   const [state, dispatch] = useEditorState();
 
+  const upload = useDocumentAssetUpload();
+
   const debouncedRichTextHtmlChange = useDebounceCallback(
     (editor: BlockNoteEditor<any>, content: Block[]) => {
       editor.blocksToHTMLLossy(content).then((html) => {
@@ -408,6 +411,7 @@ function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
               <Label>Content</Label>
               <RichTextEditorField
                 initialContent={rootProperties.body as any}
+                uploader={upload}
                 onContentChange={(editor, content) => {
                   changeRootProperties("body", content);
                   debouncedRichTextHtmlChange(editor, content);

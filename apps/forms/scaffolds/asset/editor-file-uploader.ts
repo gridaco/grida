@@ -6,6 +6,24 @@ import { v4 } from "uuid";
 import * as k from "./k";
 import assert from "assert";
 
+export type UploadResult = {
+  /**
+   * supabase storage object id
+   */
+  object_id: string;
+  bucket: string;
+  path: string;
+  fullPath: string;
+  publicUrl: string;
+};
+
+// export type AssetUploadResult = UploadResult & {
+//   /**
+//    * asset id
+//    */
+//   id: string;
+// };
+
 function useStorageClient() {
   return useMemo(() => createClientWorkspaceClient().storage, []);
 }
@@ -24,12 +42,16 @@ function useBucketUpload(bucket: string) {
   return useMemo(() => storage.from(bucket).upload, [storage, bucket]);
 }
 
-function useUpload(bucket: string, path: () => string | Promise<string>) {
+function useUpload(
+  bucket: string,
+  path: () => string | Promise<string>,
+  onUpload?: (result: UploadResult) => void
+) {
   const storage = useStorageClient();
   const upload = useBucketUpload(bucket);
 
   return useCallback(
-    async (file: Blob | File) => {
+    async (file: Blob | File): Promise<UploadResult> => {
       if (!file) throw new Error("No file provided");
       const _path = await path();
       if (!_path) throw new Error("No path provided");
@@ -39,10 +61,22 @@ function useUpload(bucket: string, path: () => string | Promise<string>) {
         if (error) {
           throw new Error("Failed to upload file");
         }
-        return storage.from(bucket).getPublicUrl(_path).data.publicUrl;
+        const publicUrl = storage.from(bucket).getPublicUrl(_path)
+          .data.publicUrl;
+
+        const result: UploadResult = {
+          object_id: data.id,
+          bucket,
+          path: data.path,
+          fullPath: data.fullPath,
+          publicUrl,
+        };
+
+        onUpload?.(result);
+        return result;
       });
     },
-    [storage, bucket, path]
+    [storage, bucket, path, onUpload]
   );
 }
 
@@ -52,30 +86,38 @@ function useCreateAsset() {
 
   const supabase = useMemo(() => createClientWorkspaceClient(), []);
 
-  const createAsset = useCallback(async () => {
-    const id = v4();
+  const createAsset = useCallback(
+    async (is_public: boolean) => {
+      const id = v4();
 
-    return supabase
-      .from("asset")
-      .insert({
-        id,
-        document_id: document_id,
-      })
-      .select()
-      .single();
-  }, [supabase, document_id]);
-
-  return useCallback(
-    async ({ public: isPublic }: { public: boolean }) => {
-      assert(isPublic, "only public is supported atm.");
-      const { data, error } = await createAsset();
-
-      if (error) return;
-      const { id } = data;
-      const name = isPublic ? "public/" + id : id;
-      return { id, name };
+      return supabase
+        .from("asset")
+        .insert({
+          id,
+          is_public,
+          document_id: document_id,
+        })
+        .select()
+        .single();
     },
-    [createAsset]
+    [supabase, document_id]
+  );
+
+  const resolveAssetObject = useCallback(
+    (asset_id: string, object_id: string) => {
+      return supabase
+        .from("asset")
+        .update({
+          object_id: object_id,
+        })
+        .eq("id", asset_id);
+    },
+    [supabase]
+  );
+
+  return useMemo(
+    () => ({ createAsset, resolveAssetObject }),
+    [createAsset, resolveAssetObject]
   );
 }
 
@@ -85,12 +127,32 @@ function useCreateAsset() {
  * id and file names are uuid generated - fire and forget
  */
 export function useDocumentAssetUpload() {
-  const createAsset = useCreateAsset();
+  const { createAsset, resolveAssetObject } = useCreateAsset();
 
-  return useUpload(k.BUCKET_ASSETS, async () => {
-    const asset = await createAsset({ public: true });
-    return asset!.name;
-  });
+  const createAssetId = useCallback(
+    async ({ public: isPublic }: { public: boolean }) => {
+      assert(isPublic, "only public is supported atm.");
+      const { data, error } = await createAsset(isPublic);
+
+      if (error) return;
+      const { id } = data;
+      return { id };
+    },
+    [createAsset]
+  );
+
+  return useUpload(
+    k.BUCKET_ASSETS,
+    async () => {
+      const asset = await createAssetId({ public: true });
+      return asset!.id;
+    },
+    (result) => {
+      // TODO:
+      // set the object id to the asset id
+      // result;
+    }
+  );
 }
 
 /**
