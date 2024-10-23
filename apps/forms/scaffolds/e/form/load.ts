@@ -9,7 +9,7 @@ import {
 } from "@/k/system";
 import type { EditorApiResponse } from "@/types/private/api";
 import type {
-  FormClientFetchResponseData,
+  FormAgentPrefetchData,
   FormClientFetchResponseError,
 } from "@/app/(api)/v1/[id]/route";
 import { Env } from "@/env";
@@ -132,7 +132,7 @@ export function useFormSession(
   }
 
   return useSWR<
-    EditorApiResponse<FormClientFetchResponseData, FormClientFetchResponseError>
+    EditorApiResponse<FormAgentPrefetchData, FormClientFetchResponseError>
   >(
     req_url,
     async (url: string) => {

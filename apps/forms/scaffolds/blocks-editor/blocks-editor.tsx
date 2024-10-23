@@ -20,9 +20,6 @@ import { createClientFormsClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
 import { InsertMenuTrigger } from "./insert-menu-trigger";
 import { SectionStyle } from "../agent/theme";
-import { usePrevious } from "@uidotdev/usehooks";
-import equal from "deep-equal";
-import { FormPageBackgroundSchema, FormStyleSheetV1Schema } from "@/types";
 import { FormAgentProvider, initdummy } from "@/lib/formstate";
 
 export default function BlocksEditorRoot() {
@@ -221,60 +218,6 @@ function OptimisticBlocksSyncProvider({
   return <>{children}</>;
 }
 
-function AgentThemeSyncProvider({ children }: React.PropsWithChildren<{}>) {
-  const [state] = useEditorState();
-  const { document_id, theme } = state;
-  const prev = usePrevious(state.theme);
-  const supabase = createClientFormsClient();
-
-  useEffect(() => {
-    if (!prev) {
-      return;
-    }
-
-    // sync theme to server
-
-    if (!equal(prev, state.theme)) {
-      supabase
-        .from("form_document")
-        .update({
-          lang: theme.lang,
-          is_powered_by_branding_enabled: theme.is_powered_by_branding_enabled,
-          stylesheet: {
-            appearance: theme.appearance,
-            custom: theme.customCSS,
-            "font-family": theme.fontFamily,
-            palette: theme.palette,
-            section: theme.section,
-          } satisfies FormStyleSheetV1Schema,
-          background: theme.background satisfies
-            | FormPageBackgroundSchema
-            | undefined as {},
-        })
-        .eq("id", document_id!)
-        .then(({ error }) => {
-          if (error) console.error(error);
-        });
-      return;
-    }
-  }, [
-    state.theme,
-    prev,
-    supabase,
-    document_id,
-    theme.is_powered_by_branding_enabled,
-    theme.lang,
-    theme.appearance,
-    theme.customCSS,
-    theme.fontFamily,
-    theme.palette,
-    theme.section,
-    theme.background,
-  ]);
-
-  return <>{children}</>;
-}
-
 function BlocksEditor() {
   const [state, dispatch] = useEditorState();
 
@@ -294,7 +237,6 @@ function BlocksEditor() {
       <div className="py-20 container mx-auto max-w-screen-sm">
         <PendingBlocksResolver />
         <OptimisticBlocksSyncProvider />
-        <AgentThemeSyncProvider />
         <BlocksCanvas id="root" className="mt-10">
           <SortableContext
             items={state.blocks.map((b) => b.id)}

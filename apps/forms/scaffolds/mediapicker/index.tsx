@@ -8,12 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/spinner";
-import { useUploadFile } from "../media";
+import { useGridaFormsPublicUpload } from "@/scaffolds/asset";
+import { FileIO } from "@/lib/file";
 
 export function AdminMediaPicker({
   ...props
 }: Omit<React.ComponentProps<typeof MediaPicker>, "uploader">) {
-  const uploadFile = useUploadFile();
+  const uploadFile = useGridaFormsPublicUpload();
 
   return <MediaPicker {...props} uploader={uploadFile} />;
 }
@@ -27,7 +28,7 @@ export function MediaPicker({
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   onUseImage?: (url: string) => void;
-  uploader?: (file: File | Blob) => Promise<string>;
+  uploader?: (file: File) => Promise<FileIO.UploadResult>;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -92,7 +93,7 @@ function FromFilePicker({
   uploader,
 }: {
   onUseImage?: (url: string) => void;
-  uploader?: (file: File | Blob) => Promise<string>;
+  uploader?: (file: File) => Promise<FileIO.UploadResult>;
 }) {
   const [uploading, setUploading] = useState(false);
   const [src, setSrc] = useState<string | null>(null);
@@ -118,7 +119,7 @@ function FromFilePicker({
     if (plainfile) {
       setUploading(true);
       uploader?.(plainfile)
-        .then(setSrc)
+        .then((result) => setSrc(result.publicUrl))
         .finally(() => setUploading(false));
     }
     // setting uploadFile as deps will cause infinite re-render

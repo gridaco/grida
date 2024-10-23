@@ -24,6 +24,10 @@ const nextConfig = withMDX()({
         protocol: "https",
         hostname: "backgrounds.grida.co",
       },
+      {
+        protocol: "https",
+        hostname: "images.unsplash.com",
+      },
     ],
   },
   async redirects() {

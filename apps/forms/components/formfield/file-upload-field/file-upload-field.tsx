@@ -16,9 +16,17 @@ import { DropzoneOptions } from "react-dropzone";
 import { UploadStatus, useFileUploader } from "./use-file-uploader";
 import type { FileUploaderFn } from "./uploader";
 import Image from "next/image";
+import assert from "assert";
 
 type Accept = {
   [key: string]: string[];
+};
+
+type UploadedFile = {
+  name?: string;
+  type?: string;
+  src: string;
+  path: string;
 };
 
 type FileUploadDropzoneProps = {
@@ -30,6 +38,15 @@ type FileUploadDropzoneProps = {
   maxFiles?: number;
   uploader?: FileUploaderFn;
   onFilesChange?: (files: File[]) => void;
+  /**
+   * if true, the file will be uploaded as multipart/form-data
+   *
+   * if false, the uploader is required
+   *
+   * @default false
+   */
+  isMultipartFile?: boolean;
+  // files?: UploadedFile[];
 };
 
 export const FileUploadField = ({
@@ -41,7 +58,17 @@ export const FileUploadField = ({
   required,
   uploader,
   onFilesChange,
+  isMultipartFile,
 }: FileUploadDropzoneProps) => {
+  useEffect(() => {
+    if (isMultipartFile) return;
+    if (!uploader) {
+      console.error(
+        "FileUploadField: uploader is required when isMultipartFile is false"
+      );
+    }
+  }, [isMultipartFile, uploader]);
+
   const [files, setFiles] = useState<File[]>([]);
   const { getStatus, data } = useFileUploader({
     files,
@@ -64,7 +91,6 @@ export const FileUploadField = ({
     onFilesChange?.(newFiles || []);
   };
 
-  const isMultipartFile = !uploader;
   const uploadedFilesPaths = useMemo(
     () => data.map((info) => info.path).filter(Boolean) as string[],
     [data]
@@ -118,7 +144,7 @@ export const FileUploadField = ({
             className="h-20 p-0 rounded-md overflow-hidden"
             aria-roledescription={`file ${i + 1} containing ${file.name}`}
           >
-            <FilePreview file={file} status={getStatus(file)} />
+            <FilePreview file={file} status={getStatus(file)} accept={accept} />
           </FileUploaderItem>
         ))}
       </FileUploaderContent>
@@ -126,16 +152,30 @@ export const FileUploadField = ({
   );
 };
 
-function FilePreview({ file, status }: { file: File; status: UploadStatus }) {
-  const src = useMemo(() => URL.createObjectURL(file), [file]);
+function FilePreview({
+  file,
+  status,
+  accept,
+}: {
+  file: File | UploadedFile;
+  status: UploadStatus;
+  accept?: string;
+}) {
+  const src = useMemo(() => {
+    if (file instanceof File) {
+      return URL.createObjectURL(file);
+    } else {
+      return file.src;
+    }
+  }, [file]);
 
   const Body = () => {
-    if (file.type.startsWith("image/")) {
+    if (file.type?.startsWith("image/") || accept?.includes("image/")) {
       return (
         <Image
           className="size-20 rounded-md object-cover"
           src={src}
-          alt={file.name}
+          alt={file.name ?? ""}
           height={80}
           width={80}
         />

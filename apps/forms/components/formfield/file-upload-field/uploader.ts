@@ -23,7 +23,7 @@ export type FileUploaderFn = (
 
 export type FileResolverFn = (file: {
   path: string;
-}) => Promise<{ publicUrl: string } | null>;
+}) => Promise<{ publicUrl: string } | null> | { publicUrl: string };
 
 export function getMaxUploadSize(strategy?: FileUploadStrategy["type"]) {
   switch (strategy) {

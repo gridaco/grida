@@ -162,7 +162,7 @@ export function FileEditCell({
               )}
             </Tooltip>
             <MediaPicker
-              uploader={uploader}
+              // uploader={uploader}
               open={mediaPickerOpen}
               onOpenChange={setMediaPickerOpen}
               onUseImage={(src) => {

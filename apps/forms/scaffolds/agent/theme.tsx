@@ -23,7 +23,7 @@ export function AgentThemeProvider({ children }: React.PropsWithChildren<{}>) {
   const customcss = state.theme.customCSS;
 
   return (
-    <div id="agent-theme-provider" className="relative">
+    <div id="agent-theme-provider" className="relative w-full h-full">
       <PaletteProvider />
       <CustomCSSProvider css={customcss}>
         <FontFamilyProvider font={font}>{children}</FontFamilyProvider>
@@ -72,7 +72,9 @@ function CustomCSSProvider({
           dangerouslySetInnerHTML={{ __html: compiledcss }}
         />
       )}
-      <div {...props}>{children}</div>
+      <div {...props} className="w-full h-full">
+        {children}
+      </div>
     </>
   );
 }
@@ -81,7 +83,7 @@ function FontFamilyProvider({
   font,
   children,
 }: React.PropsWithChildren<{ font: NextFont }>) {
-  return <div className={font.className}>{children}</div>;
+  return <div className={cn("w-full h-full", font.className)}>{children}</div>;
 }
 
 function PaletteProvider({ children }: React.PropsWithChildren<{}>) {

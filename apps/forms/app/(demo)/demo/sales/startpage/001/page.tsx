@@ -1,5 +1,10 @@
-import Page from "@/theme/templates/formstart/001-splash/page";
-
+import Page from "@/theme/templates/formstart/001/page";
+import { ScreenWindowRoot } from "@/theme/templates/kit/components";
 export default function CampaignStartPageDev() {
-  return <Page />;
+  return (
+    <ScreenWindowRoot>
+      {/* @ts-ignore */}
+      <Page />
+    </ScreenWindowRoot>
+  );
 }

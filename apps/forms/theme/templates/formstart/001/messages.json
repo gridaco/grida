@@ -1,0 +1,11 @@
+{
+  "en": {
+    "translation": {
+      "title": "Your Campaign Title Goes Here.",
+      "background_video": "https://www.youtube.com/watch?v=MODJZjOUwNA&ab_channel=aespa",
+      "excerpt": "Don't miss aespa's electrifying 'SYNK Hyper Line' concert! Experience their groundbreaking performances, stunning visuals, and chart-topping hits live on stage.",
+      "body_html": "\n<p>Get ready for an unforgettable night as aespa takes the stage with their highly anticipated 'SYNK Hyper Line' concert! Join Karina, Giselle, Winter, and Ningning for an immersive performance filled with high-energy dance routines, mesmerizing visuals, and fan-favorite tracks that have taken the world by storm.</p>\n\n<h2>Concert Highlights:</h2>\n<ul>\n  <li><strong>Live Performances:</strong> Witness aespa perform their biggest hits like \"Next Level,\" \"Savage,\" and \"Spicy\" live on stage.</li>\n  <li><strong>Stunning Visuals:</strong> Experience state-of-the-art production with captivating stage designs and dynamic choreography.</li>\n  <li><strong>Fan Interactions:</strong> aespa will engage with the audience through special fan events and interactive moments.</li>\n  <li><strong>Exclusive Merchandise:</strong> Grab your limited-edition concert merchandise available only at the venue!</li>\n</ul>\n\n<h2>Setlist Highlights:</h2>\n<ul>\n  <li>\"Next Level\"</li>\n  <li>\"Savage\"</li>\n  <li>\"Black Mamba\"</li>\n  <li>\"Spicy\"</li>\n  <li>\"Hold On Tight\"</li>\n</ul>\n\n<h2>Event Details:</h2>\n<ul>\n  <li><strong>Date:</strong> December 15, 2024</li>\n  <li><strong>Time:</strong> 7:00 PM (Doors open at 6:00 PM)</li>\n  <li><strong>Venue:</strong> [Insert Venue Name and Location]</li>\n  <li><strong>Tickets:</strong> <a href=\"[Insert Ticket Link]\">Buy Tickets Here</a></li>\n</ul>\n\n<p>Don't miss your chance to see aespa live in action as they deliver a once-in-a-lifetime concert experience. Get your tickets now and prepare to be part of the 'SYNK Hyper Line'!</p>\n\n<p>For more information and to purchase tickets, visit <a href=\"[Insert Event Website/Link]\">[Insert Event Website/Link]</a>.</p>\n\n<p>We can't wait to see you there!</p>",
+      "button": "Register"
+    }
+  }
+}

@@ -70,12 +70,27 @@ import {
 } from "@/k/supported_languages";
 import { Switch } from "@/components/ui/switch";
 import { PoweredByGridaWaterMark } from "@/components/powered-by-branding";
+import { BrowseStartPageTemplatesDialog } from "../form-templates/startpage-templates-dialog";
+import { useDialogState } from "@/components/hooks/use-dialog-state";
 
 const { default: all, ...variants } = _variants;
 
 export function SideControlGlobal() {
+  const [state, dispatch] = useEditorState();
+  state.documents["form/startpage"];
+
   return (
     <>
+      {state.selected_page_id === "form/startpage" && (
+        <SidebarSection className="border-b pb-4">
+          <SidebarSectionHeaderItem>
+            <SidebarSectionHeaderLabel>Template</SidebarSectionHeaderLabel>
+          </SidebarSectionHeaderItem>
+          <SidebarMenuSectionContent>
+            <StartPageTemplateControl />
+          </SidebarMenuSectionContent>
+        </SidebarSection>
+      )}
       <SidebarSection className="border-b pb-4">
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Type</SidebarSectionHeaderLabel>
@@ -124,6 +139,33 @@ export function SideControlGlobal() {
           <Settings />
         </SidebarMenuSectionContent>
       </SidebarSection>
+    </>
+  );
+}
+
+function StartPageTemplateControl() {
+  const [state, dispatch] = useEditorState();
+
+  const dialog = useDialogState("switch-template-dialog");
+
+  const setupStartPage = useCallback(
+    (template_id: string) => {
+      dispatch({
+        type: "editor/form/startpage/init",
+        startpage: { template_id, data: {} },
+      });
+    },
+    [dispatch]
+  );
+
+  return (
+    <>
+      <BrowseStartPageTemplatesDialog
+        {...dialog}
+        defaultValue={state.documents["form/startpage"]?.template?.template_id}
+        onValueCommit={setupStartPage}
+      />
+      <Button onClick={dialog.openDialog}>Switch Template</Button>
     </>
   );
 }
