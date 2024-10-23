@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/spinner";
-import { UploadResult, useGridaFormsPublicUpload } from "@/scaffolds/asset";
+import { useGridaFormsPublicUpload } from "@/scaffolds/asset";
+import { FileIO } from "@/lib/file";
 
 export function AdminMediaPicker({
   ...props
@@ -27,7 +28,7 @@ export function MediaPicker({
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   onUseImage?: (url: string) => void;
-  uploader?: (file: File | Blob) => Promise<UploadResult>;
+  uploader?: (file: File) => Promise<FileIO.GridaStorageUploadResult>;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -92,7 +93,7 @@ function FromFilePicker({
   uploader,
 }: {
   onUseImage?: (url: string) => void;
-  uploader?: (file: File | Blob) => Promise<UploadResult>;
+  uploader?: (file: File) => Promise<FileIO.GridaStorageUploadResult>;
 }) {
   const [uploading, setUploading] = useState(false);
   const [src, setSrc] = useState<string | null>(null);

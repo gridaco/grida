@@ -2006,30 +2006,30 @@ export type Database = {
           document_id: string
           id: string
           is_public: boolean
-          name: string | null
+          name: string
           object_id: string | null
-          size: number | null
-          type: string | null
+          size: number
+          type: string
         }
         Insert: {
           created_at?: string | null
           document_id: string
           id?: string
           is_public: boolean
-          name?: string | null
+          name: string
           object_id?: string | null
-          size?: number | null
-          type?: string | null
+          size: number
+          type: string
         }
         Update: {
           created_at?: string | null
           document_id?: string
           id?: string
           is_public?: boolean
-          name?: string | null
+          name?: string
           object_id?: string | null
-          size?: number | null
-          type?: string | null
+          size?: number
+          type?: string
         }
         Relationships: [
           {

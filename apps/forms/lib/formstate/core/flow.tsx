@@ -26,6 +26,7 @@ export function AgentPagesFlow({
           { id: "main", page: pages.main },
         ].filter(Boolean) as Step[])
       ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   );
 
