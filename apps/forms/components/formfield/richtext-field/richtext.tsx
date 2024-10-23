@@ -1,6 +1,6 @@
 "use client";
 
-import { ThemedRichTextEditorContent } from "@/components/richtext";
+import { RichTextContent } from "@/components/richtext";
 import { useCreateBlockNote } from "@blocknote/react";
 import {
   Block,
@@ -110,7 +110,7 @@ export function RichTextEditorField({
         editor.focus();
       }}
     >
-      <ThemedRichTextEditorContent editor={editor}>
+      <RichTextContent editor={editor}>
         <input
           type="text"
           name={name}
@@ -118,7 +118,7 @@ export function RichTextEditorField({
           required={required}
           className="sr-only"
         />
-      </ThemedRichTextEditorContent>
+      </RichTextContent>
     </div>
   );
 }

@@ -14,8 +14,17 @@ export const BUCKET_DUMMY = "dummy";
 export const BUCKET_GRIDA_FORMS = "grida-forms";
 
 /**
- * asset files
+ * private asset files
  *
- * @public default false, public if under public
+ * @private
  */
 export const BUCKET_ASSETS = "assets";
+
+/**
+ * public asset files
+ *
+ * for user uploaded contents in public cms
+ *
+ * @public
+ */
+export const BUCKET_ASSETS_PUBLIC = "assets-public";

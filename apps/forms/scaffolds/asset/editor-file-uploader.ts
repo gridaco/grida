@@ -17,29 +17,8 @@ export type UploadResult = {
   publicUrl: string;
 };
 
-// export type AssetUploadResult = UploadResult & {
-//   /**
-//    * asset id
-//    */
-//   id: string;
-// };
-
 function useStorageClient() {
   return useMemo(() => createClientWorkspaceClient().storage, []);
-}
-
-/**
- *
- * @param bucket bucket name
- * @returns upload function
- * @example
- * const upload = useBucketUpload("bucket-name");
- * upload("path/to/file", file, { contentType: file.type });
- */
-function useBucketUpload(bucket: string) {
-  const storage = useStorageClient();
-
-  return useMemo(() => storage.from(bucket).upload, [storage, bucket]);
 }
 
 function useUpload(
@@ -48,33 +27,39 @@ function useUpload(
   onUpload?: (result: UploadResult) => void
 ) {
   const storage = useStorageClient();
-  const upload = useBucketUpload(bucket);
 
   return useCallback(
     async (file: Blob | File): Promise<UploadResult> => {
       if (!file) throw new Error("No file provided");
       const _path = await path();
       if (!_path) throw new Error("No path provided");
-      return await upload(_path, file, {
-        contentType: file.type,
-      }).then(({ data, error }) => {
-        if (error) {
-          throw new Error("Failed to upload file");
-        }
-        const publicUrl = storage.from(bucket).getPublicUrl(_path)
-          .data.publicUrl;
+      return await storage
+        .from(bucket)
+        .upload(_path, file, {
+          contentType: file.type,
+        })
+        .then(({ data, error }) => {
+          if (error) {
+            throw new Error("Failed to upload file");
+          }
+          const publicUrl = storage.from(bucket).getPublicUrl(_path)
+            .data.publicUrl;
 
-        const result: UploadResult = {
-          object_id: data.id,
-          bucket,
-          path: data.path,
-          fullPath: data.fullPath,
-          publicUrl,
-        };
+          const result: UploadResult = {
+            object_id: data.id,
+            bucket,
+            path: data.path,
+            fullPath: data.fullPath,
+            publicUrl,
+          };
 
-        onUpload?.(result);
-        return result;
-      });
+          onUpload?.(result);
+          return result;
+        })
+        .catch((e) => {
+          console.error("upload error", e);
+          throw e;
+        });
     },
     [storage, bucket, path, onUpload]
   );
@@ -86,7 +71,7 @@ function useCreateAsset() {
 
   const supabase = useMemo(() => createClientWorkspaceClient(), []);
 
-  const createAsset = useCallback(
+  return useCallback(
     async (is_public: boolean) => {
       const id = v4();
 
@@ -102,23 +87,6 @@ function useCreateAsset() {
     },
     [supabase, document_id]
   );
-
-  const resolveAssetObject = useCallback(
-    (asset_id: string, object_id: string) => {
-      return supabase
-        .from("asset")
-        .update({
-          object_id: object_id,
-        })
-        .eq("id", asset_id);
-    },
-    [supabase]
-  );
-
-  return useMemo(
-    () => ({ createAsset, resolveAssetObject }),
-    [createAsset, resolveAssetObject]
-  );
 }
 
 /**
@@ -127,11 +95,11 @@ function useCreateAsset() {
  * id and file names are uuid generated - fire and forget
  */
 export function useDocumentAssetUpload() {
-  const { createAsset, resolveAssetObject } = useCreateAsset();
+  const supabase = useMemo(() => createClientWorkspaceClient(), []);
+  const createAsset = useCreateAsset();
 
   const createAssetId = useCallback(
     async ({ public: isPublic }: { public: boolean }) => {
-      assert(isPublic, "only public is supported atm.");
       const { data, error } = await createAsset(isPublic);
 
       if (error) return;
@@ -141,17 +109,19 @@ export function useDocumentAssetUpload() {
     [createAsset]
   );
 
-  return useUpload(
-    k.BUCKET_ASSETS,
-    async () => {
-      const asset = await createAssetId({ public: true });
-      return asset!.id;
-    },
-    (result) => {
-      // TODO:
-      // set the object id to the asset id
-      // result;
-    }
+  const uploadPublic = useUpload(k.BUCKET_ASSETS_PUBLIC, async () => {
+    const asset = await createAssetId({ public: true });
+    return asset!.id;
+  });
+
+  const uploadPrivate = useUpload(k.BUCKET_ASSETS, async () => {
+    const asset = await createAssetId({ public: false });
+    return asset!.id;
+  });
+
+  return useMemo(
+    () => ({ uploadPrivate, uploadPublic }),
+    [uploadPrivate, uploadPublic]
   );
 }
 

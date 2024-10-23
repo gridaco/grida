@@ -1,6 +1,10 @@
 "use client";
 
-import { ThemedRichTextEditorContent } from "@/components/richtext";
+import {
+  RichTextContent,
+  schema,
+  safeInitialContent,
+} from "@/components/richtext";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -11,25 +15,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { BlockNoteSchema, defaultBlockSpecs } from "@blocknote/core";
 import { useCreateBlockNote } from "@blocknote/react";
 import { useDatabaseTableId } from "@/scaffolds/editor";
 import { SupabaseStorageExtensions } from "@/lib/supabase/storage-ext";
 import { PrivateEditorApi } from "@/lib/private";
 import { filemeta } from "@/utils/file";
 import { useCallback } from "react";
-
-const { table: _noop1, ...remainingSpecs } = defaultBlockSpecs;
-const schema = BlockNoteSchema.create({
-  blockSpecs: remainingSpecs,
-});
-
-function safevalue(value: any) {
-  if (Array.isArray(value) && value.length > 0) {
-    return value;
-  }
-  return undefined;
-}
 
 function useUploader({
   db_table_id,
@@ -105,7 +96,7 @@ export function RichTextEditCell({
 
   const editor = useCreateBlockNote({
     schema: schema,
-    initialContent: safevalue(defaultValue),
+    initialContent: safeInitialContent(defaultValue),
     uploadFile: uploader,
     animations: false,
   });
@@ -123,7 +114,7 @@ export function RichTextEditCell({
         </DialogHeader>
         <ScrollArea className="flex-1" onClick={() => editor.focus()}>
           <div className="prose dark:prose-invert mx-auto w-full">
-            <ThemedRichTextEditorContent
+            <RichTextContent
               onKeyDown={(e) => {
                 // this is required for preventing exit on enter pressed
                 e.stopPropagation();
