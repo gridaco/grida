@@ -28,7 +28,7 @@ export function MediaPicker({
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   onUseImage?: (url: string) => void;
-  uploader?: (file: File) => Promise<FileIO.GridaStorageUploadResult>;
+  uploader?: (file: File) => Promise<FileIO.UploadResult>;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -93,7 +93,7 @@ function FromFilePicker({
   uploader,
 }: {
   onUseImage?: (url: string) => void;
-  uploader?: (file: File) => Promise<FileIO.GridaStorageUploadResult>;
+  uploader?: (file: File) => Promise<FileIO.UploadResult>;
 }) {
   const [uploading, setUploading] = useState(false);
   const [src, setSrc] = useState<string | null>(null);

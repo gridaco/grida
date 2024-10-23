@@ -23,11 +23,18 @@ export namespace FileIO {
    */
   export type VirtualFile<Virtual extends IResolvedFileRef> = File | Virtual;
 
-  export type Asset = {
-    url: string;
+  export type GridaAsset = UploadResult & {
+    id: string;
+    name: string;
+    size: number;
+    type: string;
+    is_public: boolean;
+    document_id: string | null;
   };
 
-  export type GridaStorageUploadResult = {
+  export type GridaAssetUploaderFn = (file: File) => Promise<GridaAsset>;
+
+  export type UploadResult = {
     /**
      * storage.objects.id
      */
@@ -41,9 +48,7 @@ export namespace FileIO {
   /**
    * direct uploader - uploads directly to resolved path
    */
-  export type DirectFileUploaderFn = (
-    file: File
-  ) => Promise<GridaStorageUploadResult>;
+  export type DirectFileUploaderFn = (file: File) => Promise<UploadResult>;
 
   /**
    * staged uploader - uploads to tmp staged

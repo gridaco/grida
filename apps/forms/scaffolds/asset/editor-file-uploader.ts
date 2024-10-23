@@ -5,6 +5,7 @@ import { nanoid } from "nanoid";
 import { v4 } from "uuid";
 import * as k from "./k";
 import { FileIO } from "@/lib/file";
+import { StorageClient } from "@supabase/storage-js";
 
 function useStorageClient() {
   return useMemo(() => createClientWorkspaceClient().storage, []);
@@ -12,15 +13,14 @@ function useStorageClient() {
 
 function useUpload(
   bucket: string,
-  path: (file: File) => string | Promise<string>,
-  onUpload?: (result: FileIO.GridaStorageUploadResult) => void
+  path: string | ((file: File) => string | Promise<string>)
 ) {
   const storage = useStorageClient();
 
   return useCallback(
-    async (file: File): Promise<FileIO.GridaStorageUploadResult> => {
+    async (file: File): Promise<FileIO.UploadResult> => {
       if (!file) throw new Error("No file provided");
-      const _path = await path(file);
+      const _path = typeof path === "function" ? await path(file) : path;
       if (!_path) throw new Error("No path provided");
       return await storage
         .from(bucket)
@@ -34,15 +34,14 @@ function useUpload(
           const publicUrl = storage.from(bucket).getPublicUrl(_path)
             .data.publicUrl;
 
-          const result: FileIO.GridaStorageUploadResult = {
+          const result = {
             object_id: data.id,
             bucket,
             path: data.path,
             fullPath: data.fullPath,
             publicUrl,
-          };
+          } satisfies FileIO.UploadResult;
 
-          onUpload?.(result);
           return result;
         })
         .catch((e) => {
@@ -50,7 +49,7 @@ function useUpload(
           throw e;
         });
     },
-    [storage, bucket, path, onUpload]
+    [storage, bucket, path]
   );
 }
 
@@ -81,40 +80,91 @@ function useCreateAsset() {
   );
 }
 
+const __make_asset_uploader = ({
+  createAsset,
+  storage,
+  is_public,
+}: {
+  createAsset: ReturnType<typeof useCreateAsset>;
+  storage: StorageClient;
+  is_public: boolean;
+}): FileIO.GridaAssetUploaderFn => {
+  return async (file: File): Promise<FileIO.GridaAsset> => {
+    if (!file) throw new Error("No file provided");
+
+    // create asset
+    const { data: asset, error } = await createAsset({ file, is_public });
+    if (error) throw error;
+
+    const bucket = is_public ? k.BUCKET_ASSETS_PUBLIC : k.BUCKET_ASSETS;
+    const path = asset.id;
+
+    return await storage
+      .from(bucket)
+      .upload(path, file, {
+        contentType: file.type,
+      })
+      .then(({ data, error }) => {
+        if (error) {
+          throw new Error("Failed to upload file");
+        }
+        const publicUrl = storage.from(bucket).getPublicUrl(path)
+          .data.publicUrl;
+
+        const result = {
+          id: asset.id,
+          object_id: data.id,
+          bucket,
+          path: data.path,
+          fullPath: data.fullPath,
+          publicUrl,
+          name: asset.name,
+          size: asset.size,
+          type: asset.type,
+          is_public: asset.is_public,
+          document_id: asset.document_id,
+        } satisfies FileIO.GridaAsset;
+
+        return result;
+      })
+      .catch((e) => {
+        console.error("upload error", e);
+        throw e;
+      });
+  };
+};
+
 /**
  * upload file to document asset bucket
  *
  * id and file names are uuid generated - fire and forget
  */
-export function useDocumentAssetUpload() {
-  const supabase = useMemo(() => createClientWorkspaceClient(), []);
+export function useDocumentAssetUpload(): {
+  uploadPublic: FileIO.GridaAssetUploaderFn;
+  uploadPrivate: FileIO.GridaAssetUploaderFn;
+} {
+  const storage = useStorageClient();
   const createAsset = useCreateAsset();
 
-  const createAssetId = useCallback(
-    async ({ file, public: is_public }: { file: File; public: boolean }) => {
-      const { data, error } = await createAsset({ file, is_public });
-
-      if (error) return;
-      const { id } = data;
-      return { id };
-    },
-    [createAsset]
+  const uploadPrivate = useCallback(
+    __make_asset_uploader({
+      createAsset,
+      storage,
+      is_public: false,
+    }),
+    [storage, createAsset]
   );
 
-  const uploadPublic = useUpload(k.BUCKET_ASSETS_PUBLIC, async (file) => {
-    const asset = await createAssetId({ file, public: true });
-    return asset!.id;
-  });
-
-  const uploadPrivate = useUpload(k.BUCKET_ASSETS, async (file) => {
-    const asset = await createAssetId({ file, public: false });
-    return asset!.id;
-  });
-
-  return useMemo(
-    () => ({ uploadPrivate, uploadPublic }),
-    [uploadPrivate, uploadPublic]
+  const uploadPublic = useCallback(
+    __make_asset_uploader({
+      createAsset,
+      storage,
+      is_public: true,
+    }),
+    [storage, createAsset]
   );
+
+  return { uploadPrivate, uploadPublic };
 }
 
 /**

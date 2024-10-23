@@ -19,10 +19,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  FileUploadField,
-  makeUploader,
-} from "@/components/formfield/file-upload-field";
 import { cn } from "@/utils";
 import { useEditorState } from "@/scaffolds/editor";
 import { Button } from "@/components/ui/button";
@@ -51,12 +47,7 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useSyncFormAgentStartPage } from "@/scaffolds/editor/sync";
 import { FormStartPage } from "@/theme/templates/formstart";
 import { useDocumentAssetUpload } from "@/scaffolds/asset";
-import { useCreateBlockNote } from "@blocknote/react";
-import {
-  RichTextContent,
-  safeInitialContent,
-  schema,
-} from "@/components/richtext";
+import { CMSImageAssetField, CMSRichText } from "@/components/formfield-cms";
 
 function useStartPageTemplateEditor() {
   return useDocument("form/startpage");
@@ -300,6 +291,8 @@ function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
   const { changeRootProperties, rootProperties } = useStartPageTemplateEditor();
   const [state, dispatch] = useEditorState();
 
+  const { uploadPublic } = useDocumentAssetUpload();
+
   const debouncedRichTextHtmlChange = useDebounceCallback(
     (editor: BlockNoteEditor<any>, content: Block[]) => {
       editor.blocksToHTMLLossy(content).then((html) => {
@@ -387,16 +380,12 @@ function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
             </div>
             <div className="grid gap-2">
               <Label>Media</Label>
-              <FileUploadField
-                accept="image/*"
-                multiple
-                uploader={makeUploader({
-                  type: "requesturl",
-                  request_url:
-                    // TODO:
-                    "",
-                })}
-                maxSize={5 * 1024 * 1024}
+              <CMSImageAssetField
+                uploader={uploadPublic}
+                value={rootProperties.media as any}
+                onValueChange={(asset) => {
+                  changeRootProperties("media", asset);
+                }}
               />
             </div>
             <div className="grid gap-2">
@@ -426,40 +415,4 @@ function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
       </SheetContent>
     </Sheet>
   );
-}
-
-function CMSRichText({
-  defaultValue,
-  onContentChange,
-}: {
-  defaultValue: any;
-  onContentChange: (editor: BlockNoteEditor<any>, content: Block[]) => void;
-}) {
-  const { uploadPublic } = useDocumentAssetUpload();
-
-  const uploadFile = useCallback(
-    (file: File) => {
-      return uploadPublic(file).then((r) => r.publicUrl);
-    },
-    [uploadPublic]
-  );
-
-  const editor = useCreateBlockNote({
-    schema: schema,
-    initialContent: safeInitialContent(defaultValue),
-    uploadFile: uploadFile,
-    animations: false,
-  });
-
-  useEffect(() => {
-    const fn = () => {
-      const content = editor.document;
-      try {
-        onContentChange?.(editor, content);
-      } catch (e) {}
-    };
-    editor.onEditorContentChange(fn);
-  }, [editor, onContentChange]);
-
-  return <RichTextContent editor={editor} />;
 }

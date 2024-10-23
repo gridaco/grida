@@ -43,5 +43,9 @@ export function CMSRichText({
     editor.onEditorContentChange(fn);
   }, [editor, onContentChange]);
 
-  return <RichTextContent editor={editor} />;
+  return (
+    <div className="bg-card shadow-card rounded border">
+      <RichTextContent editor={editor} className="pt-10 pb-4" />
+    </div>
+  );
 }

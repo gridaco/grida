@@ -30,24 +30,7 @@ import { cn } from "@/utils";
 import type { FormStartPage } from "..";
 import { DataProvider, useData } from "../../kit/contexts/data.context";
 import { useCTAContext } from "../../kit/contexts/cta.context";
-
-const medias = [
-  {
-    media: {
-      src: "/templates/sample-brand-seoul-tech-week/cover.png",
-    },
-  },
-  {
-    media: {
-      src: "https://images.unsplash.com/photo-1556505622-49ea9f8eaf76?q=80&w=3688&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-    },
-  },
-  {
-    media: {
-      src: "https://images.unsplash.com/photo-1586274677440-231405a4c74c?q=80&w=3456&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-    },
-  },
-];
+import { FileIO } from "@/lib/file";
 
 type Messages = typeof _messages;
 
@@ -101,7 +84,7 @@ function Consumer() {
         <ScreenScrollable>
           <div className="min-h-full">
             <div>
-              <Media />
+              <Media assets={data.media} />
             </div>
             <div className="pt-5">
               <header className="flex flex-col items-center gap-4 px-4">
@@ -112,11 +95,8 @@ function Consumer() {
                 </div>
                 <NextEventState className="py-4" />
               </header>
-              <article className="py-10 prose prose-sm dark:prose-invert">
-                <div
-                  className="prose-img:p-0 prose-video:p-0 px-4"
-                  dangerouslySetInnerHTML={bodyHtml}
-                />
+              <article className="py-10 px-4 prose prose-sm dark:prose-invert prose-img:w-screen">
+                <div dangerouslySetInnerHTML={bodyHtml} />
               </article>
             </div>
           </div>
@@ -127,21 +107,22 @@ function Consumer() {
   );
 }
 
-function Media() {
+function Media({ assets }: { assets: FileIO.GridaAsset[] }) {
   return (
     <Carousel opts={{ loop: true }} plugins={[Autoplay()]}>
       <CarouselContent className="m-0">
-        {medias.map((it, index) => (
-          <CarouselItem key={index} className="p-0">
-            <Image
-              src={it.media.src}
-              alt=""
-              width={300}
-              height={300}
-              className="w-full h-full aspect-square object-cover"
-            />
-          </CarouselItem>
-        ))}
+        {assets?.length > 0 &&
+          assets?.map((it, index) => (
+            <CarouselItem key={index} className="p-0">
+              <img
+                src={it.publicUrl}
+                alt=""
+                width={300}
+                height={300}
+                className="w-full h-full aspect-square object-cover"
+              />
+            </CarouselItem>
+          ))}
       </CarouselContent>
     </Carousel>
   );
