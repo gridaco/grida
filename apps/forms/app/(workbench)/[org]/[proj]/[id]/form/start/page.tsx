@@ -29,25 +29,21 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
-import { ArrowLeftIcon, ArrowRightIcon } from "@radix-ui/react-icons";
 import { useDebounceCallback, useStep } from "usehooks-ts";
-import { motion } from "framer-motion";
 import { useDocument } from "@/scaffolds/editor/use";
 import { Block, BlockNoteEditor } from "@blocknote/core";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useSyncFormAgentStartPage } from "@/scaffolds/editor/sync";
 import { FormStartPage } from "@/theme/templates/formstart";
 import { useDocumentAssetUpload } from "@/scaffolds/asset";
-import { CMSImageAssetField, CMSRichText } from "@/components/formfield-cms";
+import {
+  CMSImageAssetField,
+  CMSRichText,
+  CMSVideoAssetField,
+} from "@/components/formfield-cms";
+import { SandboxWrapper } from "@/scaffolds/form-templates/sandbox";
+import { BrowseStartPageTemplatesDialog } from "@/scaffolds/form-templates/startpage-templates-dialog";
 
 function useStartPageTemplateEditor() {
   return useDocument("form/startpage");
@@ -116,110 +112,6 @@ function SetupStartPage() {
   );
 }
 
-function BrowseStartPageTemplatesDialog({
-  onValueCommit,
-  ...props
-}: React.ComponentProps<typeof Dialog> & {
-  onValueCommit?: (value: string) => void;
-}) {
-  const [state] = useEditorState();
-
-  const {
-    form: { campaign },
-    theme: { lang },
-  } = state;
-
-  const [
-    step,
-    { goToNextStep, goToPrevStep, canGoToNextStep, canGoToPrevStep },
-  ] = useStep(FormStartPage.templates.length);
-
-  useEffect(() => {
-    setSelection(FormStartPage.templates[step - 1].id);
-  }, [step]);
-
-  const [selection, setSelection] = useState<string>("001");
-
-  const template = FormStartPage.getTemplate(selection)!;
-
-  return (
-    <Dialog {...props}>
-      <DialogContent className="w-dvw h-dvh max-w-none p-0 overflow-hidden flex flex-col">
-        <DialogHeader className="p-4 w-full relative">
-          <DialogTitle>Browse Templates</DialogTitle>
-          <div className="absolute top-2 flex w-full justify-center">
-            <header className="flex w-min items-center justify-center gap-4 px-4 py-2 border rounded">
-              <Button
-                variant="ghost"
-                size="icon"
-                disabled={!canGoToPrevStep}
-                onClick={goToPrevStep}
-              >
-                <ArrowLeftIcon />
-              </Button>
-              <h6 className="text-lg font-bold">{template.name}</h6>
-              <Button
-                variant="ghost"
-                size="icon"
-                disabled={!canGoToNextStep}
-                onClick={goToNextStep}
-              >
-                <ArrowRightIcon />
-              </Button>
-            </header>
-          </div>
-        </DialogHeader>
-        <div className="flex-1 overflow-auto w-full p-4">
-          {template && (
-            <motion.div
-              key={template.id}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2, delay: 0.1 }}
-              className="mx-auto max-w-screen-sm w-full h-full"
-            >
-              <SandboxWrapper
-                className="rounded-2xl shadow-2xl w-full h-full overflow-hidden"
-                onClick={() => {
-                  setSelection?.(template.id);
-                }}
-                onDoubleClick={() => {
-                  onValueCommit?.(template.id);
-                }}
-              >
-                <template.component
-                  data={{
-                    title: "",
-                  }}
-                  meta={campaign}
-                  lang={lang}
-                />
-              </SandboxWrapper>
-            </motion.div>
-          )}
-        </div>
-
-        <DialogFooter className="p-4">
-          <DialogClose asChild>
-            <Button variant="secondary">Cancel</Button>
-          </DialogClose>
-          <DialogClose asChild>
-            <Button
-              disabled={!selection}
-              onClick={() => {
-                onValueCommit?.(selection!);
-              }}
-            >
-              Use
-            </Button>
-          </DialogClose>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 function StartPageEditor() {
   const [edit, setEdit] = useState(false);
 
@@ -256,34 +148,6 @@ function StartPageEditor() {
         </div>
       </div>
     </>
-  );
-}
-
-function SandboxWrapper({
-  children,
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLDivElement>) {
-  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    // ignore all
-    e.preventDefault();
-    // // Ignore link clicks
-    // if ((e.target as HTMLElement).tagName === "A") {
-    //   e.preventDefault();
-    // }
-
-    props.onClick?.(e);
-  };
-
-  return (
-    <div
-      {...props}
-      className={cn("select-none", className)}
-      onClick={handleClick}
-    >
-      {/* <link rel="stylesheet" href="/shadow/editor.css" /> */}
-      {children}
-    </div>
   );
 }
 
@@ -389,6 +253,16 @@ function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
               />
             </div>
             <div className="grid gap-2">
+              <Label>Background Video</Label>
+              <CMSVideoAssetField
+                uploader={uploadPublic}
+                value={rootProperties.background as any}
+                onValueChange={(asset) => {
+                  changeRootProperties("background", asset);
+                }}
+              />
+            </div>
+            <div className="grid gap-2">
               <Label>Title</Label>
               <Input
                 // TODO: support tokens
@@ -397,6 +271,17 @@ function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
                   changeRootProperties("title", e.target.value);
                 }}
                 placeholder="Enter your Campaign Title"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Excerpt</Label>
+              <Input
+                // TODO: support tokens
+                value={rootProperties.excerpt as string}
+                onChange={(e) => {
+                  changeRootProperties("excerpt", e.target.value);
+                }}
+                placeholder="excerpt"
               />
             </div>
             <div className="grid gap-2">

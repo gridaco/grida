@@ -1,13 +1,20 @@
+import FormStartPage000 from "@/theme/templates/formstart/default/page";
 import FormStartPage001 from "@/theme/templates/formstart/001/page";
 import FormStartPage002 from "@/theme/templates/formstart/002/page";
 import FormStartPage003 from "@/theme/templates/formstart/003/page";
 import FormStartPage004 from "@/theme/templates/formstart/004/page";
 import FormStartPage005 from "@/theme/templates/formstart/005/page";
+import FormStartPage006 from "@/theme/templates/formstart/006/page";
 import { CampaignMeta } from "@/types";
 import { useMemo } from "react";
 
 export namespace FormStartPage {
   export const templates = [
+    // {
+    //   id: "000",
+    //   name: "000",
+    //   component: FormStartPage000,
+    // },
     {
       id: "001",
       name: "001",
@@ -32,6 +39,11 @@ export namespace FormStartPage {
       id: "005",
       name: "005",
       component: FormStartPage005,
+    },
+    {
+      id: "006",
+      name: "006",
+      component: FormStartPage006,
     },
   ];
 

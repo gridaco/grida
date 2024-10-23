@@ -30,10 +30,14 @@ import { DataProvider, useData } from "../../kit/contexts/data.context";
 import { I18nextProvider, useTranslation } from "react-i18next";
 import i18next from "i18next";
 import _messages from "./messages.json";
+import { LeviLogo } from "@/components/logos/levi";
 
 type Messages = typeof _messages;
 
-export default function _001({
+const image =
+  "https://www.levi.co.kr/on/demandware.static/-/Sites-LeviKR-Library/default/dwe83fbc3c/images/redtabimg/images/RedTab-Header.jpg";
+
+export default function _006({
   meta,
   data,
   resources = _messages,
@@ -74,13 +78,7 @@ function Consumer() {
     <ScreenRoot>
       <ScreenMobileFrame>
         <Header>
-          <HeaderLogoImage
-            className="h-10 invert"
-            src="/templates/sample-brand-prism/logo.png"
-            alt=""
-            width={400}
-            height={200}
-          />
+          <LeviLogo className="fill-[#C41230]" />
         </Header>
         <ScreenGrid columns={8} rows={16}>
           <ScreenGridPosition col={1} row={11}>
@@ -95,7 +93,7 @@ function Consumer() {
               }}
             >
               <ContentCard>
-                <CardBackgroundGradientBlur className="rounded-xl border border-foreground/10 shadow-xl">
+                <CardBackground>
                   <div className="flex flex-col gap-4 p-4">
                     <article className="prose prose-sm dark:prose-invert">
                       <h2 className="w-2/3">{data.title || t("title")}</h2>
@@ -104,32 +102,15 @@ function Consumer() {
                       </p>
                     </article>
                     <div className="flex justify-end items-center gap-4">
-                      <Timer
-                        date={"2024-12-15"}
-                        render={({ ready, h, m, s }) => (
-                          <>
-                            <div
-                              data-ready={ready}
-                              className="flex gap-1 opacity-0 transition-opacity duration-1000 data-[ready=true]:opacity-100"
-                            >
-                              <span>{digit2(h)}</span>
-                              <span>:</span>
-                              <span>{digit2(m)}</span>
-                              <span>:</span>
-                              <span>{digit2(s)}</span>
-                            </div>
-                          </>
-                        )}
-                      />
                       <Button
-                        variant="outline"
-                        className="border-foreground bg-transparent uppercase"
+                        variant="default"
+                        className="uppercase rounded-none"
                       >
                         {t("button")}
                       </Button>
                     </div>
                   </div>
-                </CardBackgroundGradientBlur>
+                </CardBackground>
               </ContentCard>
             </motion.div>
           </ScreenGridPosition>
@@ -163,35 +144,28 @@ function Consumer() {
               transition={{ duration: 1, delay: 2 }}
               className="w-full h-full"
             >
-              <Image
-                src="/templates/sample-images/licensed/winter-dev-only.png"
+              <img
+                src={image}
                 alt=""
                 width={1080}
                 height={1920}
                 className="h-full w-full object-cover"
               />
             </motion.div>
-            <ReactPlayer
-              url={data.background?.[0]?.publicUrl || t("background_video")}
-              width="100%"
-              height="100%"
-              playing={true}
-              muted={true}
-              loop={true}
-              style={{
-                objectFit: "cover",
-                position: "absolute",
-                inset: 0,
-                scale: 1.2,
-                zIndex: -1,
-              }}
+            <video
+              className="absolute inset-0 w-full h-full object-cover z-[-1]"
+              src={data.background?.[0]?.publicUrl || t("background_video")}
+              playsInline
+              autoPlay
+              muted
+              loop
             />
           </ScreenBackground>
         </motion.div>
       </ScreenMobileFrame>
       <ScreenRootBackground>
-        <Image
-          src="/templates/sample-images/licensed/winter-dev-only.png"
+        <img
+          src={image}
           alt=""
           width={1080}
           height={1920}
@@ -211,4 +185,8 @@ function ContentCard({
       {children}
     </div>
   );
+}
+
+function CardBackground({ children }: React.PropsWithChildren<{}>) {
+  return <div className="bg-background p-2">{children}</div>;
 }

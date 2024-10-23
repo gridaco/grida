@@ -11,7 +11,9 @@ export function DataProvider({
   data: Record<string, any>;
   children: React.ReactNode;
 }) {
-  return <DataContext.Provider value={data}>{children}</DataContext.Provider>;
+  return (
+    <DataContext.Provider value={data ?? {}}>{children}</DataContext.Provider>
+  );
 }
 
 export function useData() {

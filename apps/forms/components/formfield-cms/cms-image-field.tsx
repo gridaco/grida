@@ -2,11 +2,54 @@ import { FileIO } from "@/lib/file";
 import { Cross2Icon } from "@radix-ui/react-icons";
 import { useEffect } from "react";
 import { useFilePicker } from "use-file-picker";
+import ReactPlayer from "react-player";
 
 interface ImageAssetFieldProps {
   uploader: FileIO.GridaAssetUploaderFn;
   value?: FileIO.GridaAsset[];
   onValueChange?: (value?: FileIO.GridaAsset[]) => void;
+}
+
+export function CMSVideoAssetField({
+  value,
+  uploader,
+  onValueChange,
+}: ImageAssetFieldProps) {
+  const { openFilePicker, plainFiles, loading } = useFilePicker({
+    readAs: "ArrayBuffer",
+    accept: "video/*",
+    multiple: false,
+  });
+
+  useEffect(() => {
+    if (plainFiles.length > 0) {
+      uploader(plainFiles[0]).then((r) =>
+        onValueChange?.([...(value ?? []), r])
+      );
+    }
+  }, [plainFiles]);
+
+  return (
+    <div
+      onClick={openFilePicker}
+      className="flex gap-2 w-full h-20 bg-card rounded-md border shadow-card p-2 overflow-x-scroll"
+    >
+      {value && value.length > 0 ? (
+        value.map((v) => (
+          <AssetItem
+            type="video"
+            key={v.id}
+            asset={v}
+            onRemoveClick={() =>
+              onValueChange?.(value.filter((it) => it.id !== v.id))
+            }
+          />
+        ))
+      ) : (
+        <Placeholder />
+      )}
+    </div>
+  );
 }
 
 export function CMSImageAssetField({
@@ -36,6 +79,7 @@ export function CMSImageAssetField({
       {value && value.length > 0 ? (
         value.map((v) => (
           <AssetItem
+            type="image"
             key={v.id}
             asset={v}
             onRemoveClick={() =>
@@ -59,10 +103,12 @@ function Placeholder() {
 }
 
 function AssetItem({
+  type,
   asset,
   onClick,
   onRemoveClick,
 }: {
+  type: "video" | "image";
   asset: FileIO.GridaAsset;
   onRemoveClick?: () => void;
   onClick?: () => void;
@@ -78,10 +124,23 @@ function AssetItem({
       >
         <Cross2Icon className="w-3 h-3" />
       </button>
-      <img
-        className="border shadow-sm w-full h-full object-cover rounded-lg overflow-hidden"
-        src={asset.publicUrl}
-      />
+      {type === "image" ? (
+        <img
+          className="border shadow-sm w-full h-full object-cover rounded-lg overflow-hidden"
+          src={asset.publicUrl}
+        />
+      ) : (
+        <div className="border shadow-sm w-full h-full object-cover rounded-lg overflow-hidden">
+          <ReactPlayer
+            url={asset.publicUrl}
+            muted
+            playsinline
+            playing
+            width="100%"
+            height="100%"
+          />
+        </div>
+      )}
     </div>
   );
 }
