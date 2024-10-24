@@ -72,6 +72,7 @@ import { Switch } from "@/components/ui/switch";
 import { PoweredByGridaWaterMark } from "@/components/powered-by-branding";
 import { BrowseStartPageTemplatesDialog } from "../form-templates/startpage-templates-dialog";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
+import { FormStartPage } from "@/theme/templates/formstart";
 
 const { default: all, ...variants } = _variants;
 
@@ -150,9 +151,11 @@ function StartPageTemplateControl() {
 
   const setupStartPage = useCallback(
     (name: string) => {
+      // TODO: exclude .component
+      const __template = FormStartPage.getTemplate(name);
       dispatch({
         type: "editor/form/startpage/init",
-        startpage: { name, data: {} },
+        template: __template,
       });
     },
     [dispatch]

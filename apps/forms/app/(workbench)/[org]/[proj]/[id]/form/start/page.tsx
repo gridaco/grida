@@ -1,7 +1,7 @@
 "use client";
 import { AgentThemeProvider } from "@/scaffolds/agent/theme";
 import { SideControl } from "@/scaffolds/sidecontrol";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
   Sheet,
   SheetContent,
@@ -19,7 +19,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { cn } from "@/utils";
 import { useEditorState } from "@/scaffolds/editor";
 import { Button } from "@/components/ui/button";
 import {
@@ -44,6 +43,13 @@ import {
 } from "@/components/formfield-cms";
 import { SandboxWrapper } from "@/scaffolds/form-templates/sandbox";
 import { BrowseStartPageTemplatesDialog } from "@/scaffolds/form-templates/startpage-templates-dialog";
+import { ErrorBoundary } from "react-error-boundary";
+import { grida } from "@/grida";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 function useStartPageTemplateEditor() {
   return useDocument("form/startpage");
@@ -75,10 +81,12 @@ function SetupStartPage() {
   const dialog = useDialogState("browse-start-page-templates");
 
   const setupStartPage = useCallback(
-    (template_id: string) => {
+    (name: string) => {
+      // TODO: exclude .component
+      const __template = FormStartPage.getTemplate(name);
       dispatch({
         type: "editor/form/startpage/init",
-        startpage: { name: template_id, data: {} },
+        template: __template,
       });
     },
     [dispatch]
@@ -126,7 +134,9 @@ function StartPageEditor() {
 
   return (
     <>
-      <PropertiesEditSheet open={edit} onOpenChange={setEdit} />
+      <ErrorBoundary fallback={<div>Something went wrong</div>}>
+        <PropertiesEditSheet open={edit} onOpenChange={setEdit} />
+      </ErrorBoundary>
 
       <div className="w-full px-10 overflow-scroll">
         <div className="w-full mx-auto my-20 max-w-sm xl:max-w-4xl z-[-999]">
@@ -138,7 +148,7 @@ function StartPageEditor() {
           >
             <div className="w-full min-h-[852px] h-[80dvh]">
               <FormStartPage.Renderer
-                template_id={document.template.name}
+                name={document.template.name}
                 values={document.template.values}
                 meta={campaign}
                 lang={lang}
@@ -152,8 +162,11 @@ function StartPageEditor() {
 }
 
 function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
-  const { changeRootValues: changeRootProperties, rootValues: rootProperties } =
-    useStartPageTemplateEditor();
+  const {
+    changeRootValues: changeRootProperties,
+    rootValues,
+    rootProperties,
+  } = useStartPageTemplateEditor();
   const [state, dispatch] = useEditorState();
 
   const { uploadPublic } = useDocumentAssetUpload();
@@ -171,6 +184,8 @@ function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
     form: { campaign },
   } = state;
 
+  const keys = Object.keys(rootProperties);
+
   return (
     <Sheet {...props}>
       <SheetContent className="flex flex-col xl:w-[800px] xl:max-w-none sm:w-[500px] sm:max-w-none w-screen max-w-none p-0">
@@ -185,69 +200,101 @@ function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
           <ScrollBar />
           <div className="px-4 grid gap-4">
             <div className="grid gap-2">
-              <Label>About This Campaign</Label>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Value</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <TableRow>
-                    <TableCell>Scheduling</TableCell>
-                    <TableCell>
-                      {campaign.is_scheduling_enabled ? "ON" : "OFF"}
-                    </TableCell>
-                  </TableRow>
-                  {campaign.is_scheduling_enabled && (
-                    <>
+              <Collapsible>
+                <CollapsibleTrigger>
+                  <Label>About This Campaign</Label>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <Table>
+                    <TableHeader>
                       <TableRow>
-                        <TableCell>Scheduling Time Zone</TableCell>
-                        <TableCell>{campaign.scheduling_tz ?? "-"}</TableCell>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Value</TableHead>
                       </TableRow>
+                    </TableHeader>
+                    <TableBody>
                       <TableRow>
-                        <TableCell>Scheduling Open At</TableCell>
+                        <TableCell>Scheduling</TableCell>
                         <TableCell>
-                          {campaign.scheduling_open_at
-                            ? new Date(
-                                campaign.scheduling_open_at
-                              ).toLocaleString()
-                            : "-"}
+                          {campaign.is_scheduling_enabled ? "ON" : "OFF"}
                         </TableCell>
                       </TableRow>
+                      {campaign.is_scheduling_enabled && (
+                        <>
+                          <TableRow>
+                            <TableCell>Scheduling Time Zone</TableCell>
+                            <TableCell>
+                              {campaign.scheduling_tz ?? "-"}
+                            </TableCell>
+                          </TableRow>
+                          <TableRow>
+                            <TableCell>Scheduling Open At</TableCell>
+                            <TableCell>
+                              {campaign.scheduling_open_at
+                                ? new Date(
+                                    campaign.scheduling_open_at
+                                  ).toLocaleString()
+                                : "-"}
+                            </TableCell>
+                          </TableRow>
+                          <TableRow>
+                            <TableCell>Scheduling Close At</TableCell>
+                            <TableCell>
+                              {campaign.scheduling_close_at
+                                ? new Date(
+                                    campaign.scheduling_close_at
+                                  ).toLocaleString()
+                                : "-"}
+                            </TableCell>
+                          </TableRow>
+                          <TableRow>
+                            <TableCell>Max Responses in total</TableCell>
+                            <TableCell>
+                              {campaign.max_form_responses_in_total ?? "∞"}
+                            </TableCell>
+                          </TableRow>
+                        </>
+                      )}
                       <TableRow>
-                        <TableCell>Scheduling Close At</TableCell>
+                        <TableCell>Max Responses by customer</TableCell>
                         <TableCell>
-                          {campaign.scheduling_close_at
-                            ? new Date(
-                                campaign.scheduling_close_at
-                              ).toLocaleString()
-                            : "-"}
+                          {campaign.max_form_responses_by_customer ?? "∞"}
                         </TableCell>
                       </TableRow>
-                      <TableRow>
-                        <TableCell>Max Responses in total</TableCell>
-                        <TableCell>
-                          {campaign.max_form_responses_in_total ?? "∞"}
-                        </TableCell>
-                      </TableRow>
-                    </>
-                  )}
-                  <TableRow>
-                    <TableCell>Max Responses by customer</TableCell>
-                    <TableCell>
-                      {campaign.max_form_responses_by_customer ?? "∞"}
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
+                    </TableBody>
+                  </Table>
+                </CollapsibleContent>
+              </Collapsible>
             </div>
-            <div className="grid gap-2">
+            <div className="w-full grid gap-4">
+              {keys.map((key) => {
+                const def = rootProperties[key];
+
+                const change = (value: any) => {
+                  changeRootProperties(key, value);
+                };
+
+                const value = rootValues[key];
+
+                return (
+                  <div className="grid gap-2">
+                    <Label>{key}</Label>
+                    <PropertyField
+                      name={key}
+                      definition={def}
+                      value={value}
+                      onValueChange={change}
+                      key={key}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+            {/* <div className="grid gap-2">
               <Label>Media</Label>
               <CMSImageAssetField
                 uploader={uploadPublic}
-                value={rootProperties.media as any}
+                value={rootValues.media as any}
                 onValueChange={(asset) => {
                   changeRootProperties("media", asset);
                 }}
@@ -257,7 +304,7 @@ function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
               <Label>Background Video</Label>
               <CMSVideoAssetField
                 uploader={uploadPublic}
-                value={rootProperties.background as any}
+                value={rootValues.background as any}
                 onValueChange={(asset) => {
                   changeRootProperties("background", asset);
                 }}
@@ -267,7 +314,7 @@ function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
               <Label>Title</Label>
               <Input
                 // TODO: support tokens
-                value={rootProperties.title as string}
+                value={rootValues.title as string}
                 onChange={(e) => {
                   changeRootProperties("title", e.target.value);
                 }}
@@ -278,7 +325,7 @@ function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
               <Label>Excerpt</Label>
               <Input
                 // TODO: support tokens
-                value={rootProperties.excerpt as string}
+                value={rootValues.excerpt as string}
                 onChange={(e) => {
                   changeRootProperties("excerpt", e.target.value);
                 }}
@@ -288,17 +335,68 @@ function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
             <div className="grid gap-2">
               <Label>Content</Label>
               <CMSRichText
-                defaultValue={rootProperties.body as any}
+                defaultValue={rootValues.body as any}
                 onContentChange={(editor, content) => {
                   changeRootProperties("body", content);
                   debouncedRichTextHtmlChange(editor, content);
                 }}
               />
-            </div>
+            </div> */}
           </div>
           <div className="h-40" />
         </ScrollArea>
       </SheetContent>
     </Sheet>
   );
+}
+
+function PropertyField({
+  definition,
+  name,
+  value,
+  onValueChange,
+}: {
+  definition: grida.program.schema.PropertyDefinition;
+  value: any;
+  onValueChange: (value: any) => void;
+  name: string;
+}) {
+  const { uploadPublic } = useDocumentAssetUpload();
+
+  switch (definition.type) {
+    case "string":
+      return (
+        <Input
+          // TODO: support tokens
+          value={value}
+          onChange={(e) => {
+            onValueChange(e.target.value);
+          }}
+          placeholder={definition.default as string}
+        />
+      );
+
+    case "image":
+      return (
+        <CMSImageAssetField
+          uploader={uploadPublic}
+          value={value as any}
+          onValueChange={(asset) => {
+            // FIXME: match signature
+            onValueChange(asset);
+          }}
+        />
+      );
+    case "video":
+      return (
+        <CMSVideoAssetField
+          uploader={uploadPublic}
+          value={value as any}
+          onValueChange={(asset) => {
+            // FIXME: match signature
+            onValueChange(asset);
+          }}
+        />
+      );
+  }
 }

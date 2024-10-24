@@ -1,6 +1,7 @@
 import { IpInfo } from "@/clients/ipinfo";
 import palettes from "@/theme/palettes";
 import type { Tokens } from "@/ast";
+import { grida } from "@/grida";
 
 type UUID = string;
 
@@ -416,14 +417,8 @@ interface FormPageThemeEmbeddedBackgroundData {
   "background-color"?: string;
 }
 
-/**
- * @deprecated
- * FIXME: interface
- */
-export type FormStartPageSchema = {
-  $schema: "https://forms.grida.co/schemas/v1/startpage.json";
-  template_id: string;
-  data: Record<string, any>;
+export type FormStartPageSchema = grida.program.template.TemplateInstance & {
+  __schema_version: "2024-10-24";
 };
 
 export type EndingPageTemplateID = "default" | "receipt01";

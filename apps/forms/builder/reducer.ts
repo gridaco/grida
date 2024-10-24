@@ -11,13 +11,8 @@ import type {
   BuilderNodeChangeTextAction,
   BuilderTemplateNodeUpdatePropertyAction,
 } from "./action";
-import type {
-  InstanceNode,
-  ITemplateEditorState,
-  Values,
-  TextNode,
-} from "./types";
-import assert from "assert";
+import type { ITemplateEditorState, Values } from "./types";
+import { grida } from "@/grida";
 
 export default function reducer(
   state: ITemplateEditorState,
@@ -60,7 +55,7 @@ export default function reducer(
           ...(draft.template.overrides[node_id] || {}),
           type: "instance",
           component_id,
-        } as InstanceNode;
+        } as grida.program.nodes.InstanceNode;
       });
     }
     case "editor/document/node/text": {
@@ -69,7 +64,7 @@ export default function reducer(
         draft.template.overrides[node_id] = {
           ...(draft.template.overrides[node_id] || {}),
           text,
-        } as TextNode;
+        } as grida.program.nodes.TextNode;
       });
     }
     case "editor/document/node/style": {
@@ -101,12 +96,15 @@ export default function reducer(
       return produce(state, (draft) => {
         draft.template.overrides[node_id] = {
           ...(draft.template.overrides[node_id] || {}),
-          properties: {
-            ...((draft.template.overrides[node_id] as InstanceNode)
-              ?.properties || {}),
+          values: {
+            ...((
+              draft.template.overrides[
+                node_id
+              ] as grida.program.nodes.InstanceNode
+            )?.values || {}),
             ...data,
           },
-        } as InstanceNode;
+        } as grida.program.nodes.InstanceNode;
       });
     }
     case "editor/template/node/property": {

@@ -16,6 +16,7 @@ import {
   CardBackgroundGradientBlur,
   Timer,
   digit2,
+  BackgroundVideo,
 } from "@/theme/templates/kit/components";
 import { cn } from "@/utils";
 import { Button } from "@/components/ui/button";
@@ -30,15 +31,24 @@ import { DataProvider, useData } from "../../kit/contexts/data.context";
 import { I18nextProvider, useTranslation } from "react-i18next";
 import i18next from "i18next";
 import _messages from "./messages.json";
+import type { grida } from "@/grida";
 
 type Messages = typeof _messages;
+
+const userprops = {
+  title: { type: "string" },
+  excerpt: { type: "string" },
+  background_video: { type: "video" },
+} satisfies grida.program.template.TemplateDefinition["properties"];
+
+type UserProps = grida.program.schema.TInferredPropTypes<typeof userprops>;
 
 export default function _001({
   meta,
   values: data,
   resources = _messages,
   lang,
-}: FormStartPage.CampaignTemplateProps<Messages>) {
+}: FormStartPage.CampaignTemplateProps<UserProps, Messages>) {
   const i18n = useMemo(() => {
     return i18next.createInstance(
       {
@@ -68,7 +78,7 @@ export default function _001({
 
 function Consumer() {
   const { t } = useTranslation<any>();
-  const data = useData();
+  const data = useData<UserProps>();
 
   return (
     <ScreenRoot>
@@ -171,13 +181,10 @@ function Consumer() {
                 className="h-full w-full object-cover"
               />
             </motion.div>
-            <ReactPlayer
-              url={data.background?.[0]?.publicUrl || t("background_video")}
+            <BackgroundVideo
+              source={data.background_video || t("background_video")}
               width="100%"
               height="100%"
-              playing={true}
-              muted={true}
-              loop={true}
               style={{
                 objectFit: "cover",
                 position: "absolute",
@@ -212,3 +219,5 @@ function ContentCard({
     </div>
   );
 }
+
+_001.properties = userprops;

@@ -40,6 +40,9 @@ import {
 } from "@/components/ui/drawer";
 import { PhoneIcon } from "lucide-react";
 import Link from "next/link";
+import type { grida } from "@/grida";
+
+const userprops: grida.program.template.TemplateDefinition["properties"] = {};
 
 // https://www.polestar.com/dato-assets/11286/1709559099-02-polestar-3-overview-stats-t.mp4
 
@@ -246,3 +249,5 @@ function ModeratorDrawer({ children }: React.PropsWithChildren<{}>) {
     </Drawer>
   );
 }
+
+StartPage_002.properties = userprops;

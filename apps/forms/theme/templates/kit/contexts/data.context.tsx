@@ -16,6 +16,6 @@ export function DataProvider({
   );
 }
 
-export function useData() {
-  return useContext(DataContext);
+export function useData<T extends Record<string, any>>() {
+  return useContext(DataContext) as T;
 }

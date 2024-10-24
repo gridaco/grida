@@ -1,6 +1,8 @@
 "use client";
 import React from "react";
+import { ErrorBoundary, FallbackProps } from "react-error-boundary";
 import { cn } from "@/utils";
+import { Button } from "@/components/ui/button";
 
 export function SandboxWrapper({
   children,
@@ -24,8 +26,18 @@ export function SandboxWrapper({
       className={cn("select-none", className)}
       onClick={handleClick}
     >
-      {/* <link rel="stylesheet" href="/shadow/editor.css" /> */}
-      {children}
+      <ErrorBoundary fallbackRender={Fallback}>{children}</ErrorBoundary>
+    </div>
+  );
+}
+
+function Fallback(props: FallbackProps) {
+  return (
+    <div className="prose dark:prose-invert prose-sm">
+      <h2>Something Went Wrong</h2>
+      <hr />
+      <pre>{props.error}</pre>
+      <Button onClick={props.resetErrorBoundary}>clear</Button>
     </div>
   );
 }

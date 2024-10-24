@@ -16,6 +16,7 @@ import {
 } from "@/theme/templates/kit/components";
 import { Card } from "@/components/ui/card";
 import Image from "next/image";
+import type { grida } from "@/grida";
 
 const cards = [
   {
@@ -34,6 +35,8 @@ const cards = [
     },
   },
 ];
+
+const userprops: grida.program.template.TemplateDefinition["properties"] = {};
 
 export default function _004() {
   return (
@@ -148,3 +151,5 @@ function ScreenStockTickerTape() {
     </div>
   );
 }
+
+_004.properties = userprops;

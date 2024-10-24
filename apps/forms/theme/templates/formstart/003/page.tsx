@@ -9,6 +9,9 @@ import {
   TextAlign,
 } from "@/theme/templates/kit/components";
 import Image from "next/image";
+import type { grida } from "@/grida";
+
+const userprops: grida.program.template.TemplateDefinition["properties"] = {};
 
 export default function _003() {
   return (
@@ -43,3 +46,5 @@ export default function _003() {
     </ScreenRoot>
   );
 }
+
+_003.properties = userprops;

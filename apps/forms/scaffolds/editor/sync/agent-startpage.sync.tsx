@@ -23,10 +23,9 @@ export function useSyncFormAgentStartPage() {
         .update({
           start_page: debounced
             ? ({
-                $schema: "https://forms.grida.co/schemas/v1/startpage.json",
-                template_id: debounced.name,
-                data: debounced.values,
-              } satisfies FormStartPageSchema)
+                __schema_version: "2024-10-24",
+                ...debounced,
+              } satisfies FormStartPageSchema as {})
             : null,
         })
         .eq("id", document_id!)

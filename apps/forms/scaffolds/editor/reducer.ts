@@ -366,17 +366,10 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
       });
     }
     case "editor/form/startpage/init": {
-      const { startpage } = <FormStartPageInitAction>action;
+      const { template: startpage } = <FormStartPageInitAction>action;
       return produce(state, (draft) => {
         draft.documents["form/startpage"] = {
-          template: {
-            type: "template",
-            name: startpage.name,
-            values: startpage.data,
-            default: {},
-            overrides: {},
-            version: "0.0.0",
-          },
+          template: { ...startpage, default: {}, overrides: {}, values: {} },
         };
       });
     }

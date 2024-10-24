@@ -31,15 +31,24 @@ import type { FormStartPage } from "..";
 import { DataProvider, useData } from "../../kit/contexts/data.context";
 import { useCTAContext } from "../../kit/contexts/cta.context";
 import { FileIO } from "@/lib/file";
+import type { grida } from "@/grida";
 
 type Messages = typeof _messages;
+
+const userprops = {
+  title: { type: "string", default: "[Your Title Goes Here.]" },
+  body_html: { type: "string", default: "" },
+  metia: { type: "array", items: { type: "image" }, default: [] },
+} satisfies grida.program.template.TemplateDefinition["properties"];
+
+type UserProps = grida.program.schema.TInferredPropTypes<typeof userprops>;
 
 export default function _005({
   meta,
   values: data,
   resources = _messages,
   lang,
-}: FormStartPage.CampaignTemplateProps<Messages>) {
+}: FormStartPage.CampaignTemplateProps<UserProps, Messages>) {
   const i18n = useMemo(() => {
     return i18next.createInstance(
       {
@@ -282,3 +291,5 @@ function NextEventState({ className }: { className?: string }) {
 
   return <></>;
 }
+
+_005.properties = userprops;

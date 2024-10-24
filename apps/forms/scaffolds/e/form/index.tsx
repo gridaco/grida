@@ -142,9 +142,9 @@ function FormStartPage({
     <CTAProvider value={{ onClick: next }}>
       <ScreenWindowRoot>
         <FormStartPageRenderer.Renderer
-          template_id={start_page.template_id}
-          values={start_page.data}
-          // TODO: handle more data - errors
+          name={start_page.name}
+          values={start_page.values}
+          // TODO: handle more data - agent errors states
           meta={campaign}
           lang={lang}
         />

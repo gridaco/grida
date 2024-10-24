@@ -282,10 +282,11 @@ function initialSiteEditorState(init: SiteDocumentEditorInit): EditorState {
         template: {
           name: "formcollection_sample_001_the_bundle",
           type: "template",
+          properties: {},
+          default: {},
           values: samples["formcollection_sample_001_the_bundle"] as any,
           overrides: {},
           version: "0.0.0",
-          default: {},
         },
       },
     },
@@ -500,11 +501,12 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
         ? {
             template: {
               type: "template",
-              name: init.start?.template_id,
-              values: init.start.data,
-              overrides: {},
-              default: {},
               version: "0.0.0",
+              name: init.start.name,
+              values: init.start.values,
+              properties: init.start.properties,
+              overrides: init.start.overrides,
+              default: init.start.default,
             } satisfies grida.program.template.TemplateInstance,
           }
         : undefined,

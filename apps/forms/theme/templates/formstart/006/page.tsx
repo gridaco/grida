@@ -31,8 +31,14 @@ import { I18nextProvider, useTranslation } from "react-i18next";
 import i18next from "i18next";
 import _messages from "./messages.json";
 import { LeviLogo } from "@/components/logos/levi";
+import type { grida } from "@/grida";
 
 type Messages = typeof _messages;
+
+const userprops =
+  {} satisfies grida.program.template.TemplateDefinition["properties"];
+
+type UserProps = grida.program.schema.TInferredPropTypes<typeof userprops>;
 
 const image =
   "https://www.levi.co.kr/on/demandware.static/-/Sites-LeviKR-Library/default/dwe83fbc3c/images/redtabimg/images/RedTab-Header.jpg";
@@ -42,7 +48,7 @@ export default function _006({
   values: data,
   resources = _messages,
   lang,
-}: FormStartPage.CampaignTemplateProps<Messages>) {
+}: FormStartPage.CampaignTemplateProps<UserProps, Messages>) {
   const i18n = useMemo(() => {
     return i18next.createInstance(
       {
@@ -190,3 +196,5 @@ function ContentCard({
 function CardBackground({ children }: React.PropsWithChildren<{}>) {
   return <div className="bg-background p-2">{children}</div>;
 }
+
+_006.properties = userprops;

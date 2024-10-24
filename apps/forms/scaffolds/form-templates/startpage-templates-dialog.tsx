@@ -40,14 +40,15 @@ export function BrowseStartPageTemplatesDialog({
   useEffect(() => {
     if (defaultValue) {
       const index = FormStartPage.templates.findIndex(
-        (t) => t.id === defaultValue
+        (t) => t.name === defaultValue
       );
       setStep(index + 1);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defaultValue]);
 
   useEffect(() => {
-    setSelection(FormStartPage.templates[step - 1].id);
+    setSelection(FormStartPage.templates[step - 1].name);
   }, [step]);
 
   const [selection, setSelection] = useState<string>("001");
@@ -84,7 +85,7 @@ export function BrowseStartPageTemplatesDialog({
         <div className="flex-1 overflow-auto w-full p-4">
           {template && (
             <motion.div
-              key={template.id}
+              key={template.name}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -94,10 +95,10 @@ export function BrowseStartPageTemplatesDialog({
               <SandboxWrapper
                 className="rounded-2xl shadow-2xl w-full h-full overflow-hidden"
                 onClick={() => {
-                  setSelection?.(template.id);
+                  setSelection?.(template.name);
                 }}
                 onDoubleClick={() => {
-                  onValueCommit?.(template.id);
+                  onValueCommit?.(template.name);
                 }}
               >
                 <template.component

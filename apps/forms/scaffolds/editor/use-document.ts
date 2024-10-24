@@ -27,6 +27,7 @@ export function useDocument(
   const { selected_node_id } = document;
 
   const rootValues = document.template.values;
+  const rootProperties = document.template.properties;
 
   const changeRootValues = useCallback(
     (key: string, value: any) => {
@@ -187,6 +188,7 @@ export function useDocument(
     return {
       document,
       rootValues,
+      rootProperties,
       changeSelectedNode,
       changeRootValues,
       clearSelection,
@@ -199,6 +201,7 @@ export function useDocument(
   }, [
     document,
     rootValues,
+    rootProperties,
     changeSelectedNode,
     changeRootValues,
     clearSelection,

@@ -7,3 +7,4 @@ export * from "./timer";
 export * from "./utils";
 export * from "./ticket-tape";
 export * from "./motion";
+export * from "./video";

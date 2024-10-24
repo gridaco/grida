@@ -25,6 +25,7 @@ import type { ResourceTypeIconName } from "@/components/resource-type-icon";
 import type { Data } from "@/lib/data";
 import type { ITemplateEditorState } from "@/builder/types";
 import { SYM_LOCALTZ, EditorSymbols } from "./symbols";
+import { grida } from "@/grida";
 
 export type GDocEditorRouteParams = {
   org: string;
@@ -84,7 +85,7 @@ export interface FormDocumentEditorInit extends BaseDocumentEditorInit {
   form_id: string;
   campaign: EditorState["form"]["campaign"];
   form_security: EditorState["form"]["form_security"];
-  start: FormStartPageSchema | null;
+  start: grida.program.template.TemplateInstance | null;
   ending: EditorState["form"]["ending"];
   connections?: {
     store_id?: number | null;

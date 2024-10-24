@@ -23,6 +23,7 @@ import type { Tokens } from "@/ast";
 import type { DataQueryAction } from "../data-query";
 import type { BuilderAction } from "@/builder/action";
 import type { SYM_LOCALTZ } from "./symbols";
+import { grida } from "@/grida";
 
 export type EditorAction =
   //
@@ -441,10 +442,7 @@ export interface FormEndingPreferencesAction
 
 export interface FormStartPageInitAction {
   type: "editor/form/startpage/init";
-  startpage: {
-    name: string;
-    data: Record<string, any>;
-  };
+  template: grida.program.template.TemplateDefinition;
 }
 
 export interface EditorDocumentAction {

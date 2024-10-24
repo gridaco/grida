@@ -6,49 +6,74 @@ import FormStartPage004 from "@/theme/templates/formstart/004/page";
 import FormStartPage005 from "@/theme/templates/formstart/005/page";
 import FormStartPage006 from "@/theme/templates/formstart/006/page";
 import { CampaignMeta } from "@/types";
-import { useMemo } from "react";
+import React, { useMemo } from "react";
+import { grida } from "@/grida";
 
 export namespace FormStartPage {
-  export const templates = [
+  type ClientTemplateDefinition = grida.program.template.TemplateDefinition & {
+    component: React.ComponentType<
+      FormStartPage.CampaignTemplateProps<any, any>
+    >;
+  };
+
+  export const templates: ClientTemplateDefinition[] = [
     // {
     //   id: "000",
     //   name: "000",
     //   component: FormStartPage000,
     // },
     {
-      id: "001",
+      type: "template",
       name: "001",
+      version: "0.0.0",
+      default: {},
+      properties: FormStartPage001.properties,
       component: FormStartPage001,
     },
     {
-      id: "002",
+      type: "template",
       name: "002",
+      version: "0.0.0",
+      default: {},
+      properties: FormStartPage002.properties,
       component: FormStartPage002,
     },
     {
-      id: "003",
+      type: "template",
       name: "003",
+      version: "0.0.0",
+      default: {},
+      properties: FormStartPage003.properties,
       component: FormStartPage003,
     },
     {
-      id: "004",
+      type: "template",
       name: "004",
+      version: "0.0.0",
+      default: {},
+      properties: FormStartPage004.properties,
       component: FormStartPage004,
     },
     {
-      id: "005",
+      type: "template",
       name: "005",
+      version: "0.0.0",
+      default: {},
+      properties: FormStartPage005.properties,
       component: FormStartPage005,
     },
     {
-      id: "006",
+      type: "template",
       name: "006",
+      version: "0.0.0",
+      default: {},
+      properties: FormStartPage006.properties,
       component: FormStartPage006,
     },
   ];
 
-  export function getTemplate(template_id: string) {
-    return templates.find((t) => t.id === template_id)!;
+  export function getTemplate(name: string) {
+    return templates.find((t) => t.name === name)!;
   }
 
   type ResourceKey =
@@ -65,25 +90,22 @@ export namespace FormStartPage {
     [language: string]: ResourceLanguage;
   }
 
-  export interface CampaignTemplateProps<M extends Resource> {
+  export interface CampaignTemplateProps<P, M extends Resource> {
     meta: CampaignMeta;
-    values: {};
+    values: P;
     resources?: M;
     lang: string;
   }
 
   export function Renderer({
-    template_id,
+    name,
     values: data,
     meta,
     lang,
   }: {
-    template_id: string;
-  } & CampaignTemplateProps<Resource>) {
-    const template = useMemo(
-      () => FormStartPage.getTemplate(template_id),
-      [template_id]
-    )!;
+    name: string;
+  } & CampaignTemplateProps<any, Resource>) {
+    const template = useMemo(() => FormStartPage.getTemplate(name), [name])!;
 
     return <template.component values={data} meta={meta} lang={lang} />;
   }
