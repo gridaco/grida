@@ -24,7 +24,7 @@ import { nanoid } from "nanoid";
 import { DataGridLocalPreferencesStorage } from "./storage/datagrid.storage";
 import { Data } from "@/lib/data";
 import * as samples from "@/theme/templates/formcollection/samples";
-import { grida } from "@/builder/types";
+import { grida } from "@/grida";
 
 export function initialEditorState(init: EditorInit): EditorState {
   switch (init.doctype) {
