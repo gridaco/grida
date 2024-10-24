@@ -11,7 +11,7 @@ import {
   TableViews,
 } from "@/scaffolds/grid-editor/components";
 import * as GridLayout from "@/scaffolds/grid-editor/components/layout";
-import { CurrentTable } from "@/scaffolds/editor/utils/switch-table";
+import { CurrentTable } from "@/scaffolds/editor/utils/current-table";
 import { useEditorState } from "@/scaffolds/editor";
 import { CustomerFeedProvider } from "@/scaffolds/editor/feed";
 import { useMemo } from "react";

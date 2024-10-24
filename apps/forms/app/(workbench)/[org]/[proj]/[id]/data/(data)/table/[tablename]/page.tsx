@@ -15,7 +15,7 @@ import {
   TablespaceSchemaTableStreamType,
 } from "@/scaffolds/editor/state";
 import { useDatagridTable } from "@/scaffolds/editor/use";
-import { CurrentTable } from "@/scaffolds/editor/utils/switch-table";
+import { CurrentTable } from "@/scaffolds/editor/utils/current-table";
 import { GridEditor } from "@/scaffolds/grid-editor";
 import { GridData } from "@/scaffolds/grid-editor/grid-data";
 import { DGResponseRow } from "@/scaffolds/grid/types";
