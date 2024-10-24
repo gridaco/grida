@@ -26,14 +26,14 @@ export function useDocument(
 
   const { selected_node_id } = document;
 
-  const rootProperties = document.template.properties;
+  const rootValues = document.template.values;
 
-  const changeRootProperties = useCallback(
+  const changeRootValues = useCallback(
     (key: string, value: any) => {
       dispatch(
         composeDocumentAction(document_key, {
           type: "editor/template/node/property",
-          data: {
+          values: {
             [key]: value,
           },
         })
@@ -109,13 +109,13 @@ export function useDocument(
     [dispatch, document_key]
   );
 
-  const changeNodeProperty = useCallback(
+  const changeNodeValue = useCallback(
     (node_id: string, key: string, value: any) => {
       dispatch(
         composeDocumentAction(document_key, {
           type: "editor/document/node/property",
           node_id: node_id,
-          data: {
+          values: {
             [key]: value,
           },
         })
@@ -134,8 +134,8 @@ export function useDocument(
         changeNodeAttribute(selected_node_id!, key, value),
       style: (key: string, value: any) =>
         changeNodeStyle(selected_node_id!, key, value),
-      property: (key: string, value: any) =>
-        changeNodeProperty(selected_node_id!, key, value),
+      value: (key: string, value: any) =>
+        changeNodeValue(selected_node_id!, key, value),
       // attributes
       hidden: (value: boolean) =>
         changeNodeAttribute(selected_node_id!, "hidden", value),
@@ -179,33 +179,33 @@ export function useDocument(
       changeNodeText,
       changeNodeAttribute,
       changeNodeStyle,
-      changeNodeProperty,
+      changeNodeValue,
     ]
   );
 
   return useMemo(() => {
     return {
       document,
-      rootProperties,
+      rootValues,
       changeSelectedNode,
-      changeRootProperties,
+      changeRootValues,
       clearSelection,
       changeNodeComponent,
       changeNodeText,
       changeNodeAttribute,
       changeNodeStyle,
-      changeNodeProperty,
+      changeNodeValue,
     };
   }, [
     document,
-    rootProperties,
+    rootValues,
     changeSelectedNode,
-    changeRootProperties,
+    changeRootValues,
     clearSelection,
     changeNodeComponent,
     changeNodeText,
     changeNodeAttribute,
     changeNodeStyle,
-    changeNodeProperty,
+    changeNodeValue,
   ]);
 }

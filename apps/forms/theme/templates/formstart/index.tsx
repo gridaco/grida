@@ -67,14 +67,14 @@ export namespace FormStartPage {
 
   export interface CampaignTemplateProps<M extends Resource> {
     meta: CampaignMeta;
-    data: {};
+    values: {};
     resources?: M;
     lang: string;
   }
 
   export function Renderer({
     template_id,
-    data,
+    values: data,
     meta,
     lang,
   }: {
@@ -85,6 +85,6 @@ export namespace FormStartPage {
       [template_id]
     )!;
 
-    return <template.component data={data} meta={meta} lang={lang} />;
+    return <template.component values={data} meta={meta} lang={lang} />;
   }
 }

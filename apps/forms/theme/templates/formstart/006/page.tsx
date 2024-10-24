@@ -39,7 +39,7 @@ const image =
 
 export default function _006({
   meta,
-  data,
+  values: data,
   resources = _messages,
   lang,
 }: FormStartPage.CampaignTemplateProps<Messages>) {

@@ -35,7 +35,7 @@ type Messages = typeof _messages;
 
 export default function _001({
   meta,
-  data,
+  values: data,
   resources = _messages,
   lang,
 }: FormStartPage.CampaignTemplateProps<Messages>) {

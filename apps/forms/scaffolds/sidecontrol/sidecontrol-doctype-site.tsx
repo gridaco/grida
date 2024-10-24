@@ -188,7 +188,7 @@ function SelectedNodeProperties() {
                   placeholder={key}
                   value={value}
                   onValueChange={(value) => {
-                    changeSelectedNode.property(key, value || undefined);
+                    changeSelectedNode.value(key, value || undefined);
                   }}
                 />
               </PropertyLine>

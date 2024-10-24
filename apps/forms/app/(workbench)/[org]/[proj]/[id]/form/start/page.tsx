@@ -78,7 +78,7 @@ function SetupStartPage() {
     (template_id: string) => {
       dispatch({
         type: "editor/form/startpage/init",
-        startpage: { template_id, data: {} },
+        startpage: { name: template_id, data: {} },
       });
     },
     [dispatch]
@@ -138,8 +138,8 @@ function StartPageEditor() {
           >
             <div className="w-full min-h-[852px] h-[80dvh]">
               <FormStartPage.Renderer
-                template_id={document.template.template_id}
-                data={document.template.properties}
+                template_id={document.template.name}
+                values={document.template.values}
                 meta={campaign}
                 lang={lang}
               />
@@ -152,7 +152,8 @@ function StartPageEditor() {
 }
 
 function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
-  const { changeRootProperties, rootProperties } = useStartPageTemplateEditor();
+  const { changeRootValues: changeRootProperties, rootValues: rootProperties } =
+    useStartPageTemplateEditor();
   const [state, dispatch] = useEditorState();
 
   const { uploadPublic } = useDocumentAssetUpload();

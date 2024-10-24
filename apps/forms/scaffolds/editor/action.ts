@@ -442,7 +442,7 @@ export interface FormEndingPreferencesAction
 export interface FormStartPageInitAction {
   type: "editor/form/startpage/init";
   startpage: {
-    template_id: string;
+    name: string;
     data: Record<string, any>;
   };
 }

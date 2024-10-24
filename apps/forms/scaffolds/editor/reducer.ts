@@ -371,9 +371,11 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
         draft.documents["form/startpage"] = {
           template: {
             type: "template",
-            template_id: startpage.template_id,
-            properties: startpage.data,
+            name: startpage.name,
+            values: startpage.data,
+            default: {},
             overrides: {},
+            version: "0.0.0",
           },
         };
       });

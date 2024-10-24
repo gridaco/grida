@@ -15,7 +15,7 @@ export default function Page() {
           scheduling_open_at: "2024-10-17T00:00:00Z",
           scheduling_close_at: "2024-12-18T00:00:00Z",
         }}
-        data={{}}
+        values={{}}
         resources={_messages}
         lang={"ko"}
       />

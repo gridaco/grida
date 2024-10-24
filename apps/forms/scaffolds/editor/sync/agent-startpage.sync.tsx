@@ -24,8 +24,8 @@ export function useSyncFormAgentStartPage() {
           start_page: debounced
             ? ({
                 $schema: "https://forms.grida.co/schemas/v1/startpage.json",
-                template_id: debounced.template_id,
-                data: debounced.properties,
+                template_id: debounced.name,
+                data: debounced.values,
               } satisfies FormStartPageSchema)
             : null,
         })

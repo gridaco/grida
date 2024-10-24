@@ -29,16 +29,16 @@ export default function FormCollectionPage() {
   const [state] = useEditorState();
 
   assert(state.documents, "state.documents is required");
-  const { properties } = state.documents["form/collection"]!.template;
+  const { values } = state.documents["form/collection"]!.template;
 
   return (
     <RootDataContextProvider>
-      <DataProvider namespace="dummy" initialData={properties}>
+      <DataProvider namespace="dummy" initialData={values}>
         <div className="@container/preview">
           <Header_001
             logo={
               // @ts-expect-error
-              properties["brand"]?.["logo"] as string
+              values["brand"]?.["logo"] as string
             }
           />
           <SlotNode
@@ -75,7 +75,7 @@ export default function FormCollectionPage() {
                   }}
                 />
                 <div className="py-2">
-                  <Filter tags={properties.tags as any as string[]} />
+                  <Filter tags={values.tags as any as string[]} />
                 </div>
               </header>
               <div className="grid gap-6 grid-cols-1 @3xl/preview:grid-cols-2 @5xl/preview:grid-cols-3 @7xl/preview:grid-cols-4">

@@ -143,7 +143,7 @@ function FormStartPage({
       <ScreenWindowRoot>
         <FormStartPageRenderer.Renderer
           template_id={start_page.template_id}
-          data={start_page.data}
+          values={start_page.data}
           // TODO: handle more data - errors
           meta={campaign}
           lang={lang}

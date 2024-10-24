@@ -21,13 +21,17 @@ export function CMSVideoAssetField({
     multiple: false,
   });
 
-  useEffect(() => {
-    if (plainFiles.length > 0) {
-      uploader(plainFiles[0]).then((r) =>
-        onValueChange?.([...(value ?? []), r])
-      );
-    }
-  }, [plainFiles]);
+  useEffect(
+    () => {
+      if (plainFiles.length > 0) {
+        uploader(plainFiles[0]).then((r) =>
+          onValueChange?.([...(value ?? []), r])
+        );
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [plainFiles]
+  );
 
   return (
     <div
@@ -63,13 +67,17 @@ export function CMSImageAssetField({
     multiple: false,
   });
 
-  useEffect(() => {
-    if (plainFiles.length > 0) {
-      uploader(plainFiles[0]).then((r) =>
-        onValueChange?.([...(value ?? []), r])
-      );
-    }
-  }, [plainFiles]);
+  useEffect(
+    () => {
+      if (plainFiles.length > 0) {
+        uploader(plainFiles[0]).then((r) =>
+          onValueChange?.([...(value ?? []), r])
+        );
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [plainFiles]
+  );
 
   return (
     <div
@@ -125,9 +133,11 @@ function AssetItem({
         <Cross2Icon className="w-3 h-3" />
       </button>
       {type === "image" ? (
+        // eslint-disable-next-line @next/next/no-img-element
         <img
           className="border shadow-sm w-full h-full object-cover rounded-lg overflow-hidden"
           src={asset.publicUrl}
+          alt=""
         />
       ) : (
         <div className="border shadow-sm w-full h-full object-cover rounded-lg overflow-hidden">

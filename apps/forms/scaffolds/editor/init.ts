@@ -24,6 +24,7 @@ import { nanoid } from "nanoid";
 import { DataGridLocalPreferencesStorage } from "./storage/datagrid.storage";
 import { Data } from "@/lib/data";
 import * as samples from "@/theme/templates/formcollection/samples";
+import { grida } from "@/builder/types";
 
 export function initialEditorState(init: EditorInit): EditorState {
   switch (init.doctype) {
@@ -279,10 +280,12 @@ function initialSiteEditorState(init: SiteDocumentEditorInit): EditorState {
     documents: {
       ["form/collection"]: {
         template: {
-          template_id: "formcollection_sample_001_the_bundle",
+          name: "formcollection_sample_001_the_bundle",
           type: "template",
-          properties: samples["formcollection_sample_001_the_bundle"] as any,
+          values: samples["formcollection_sample_001_the_bundle"] as any,
           overrides: {},
+          version: "0.0.0",
+          default: {},
         },
       },
     },
@@ -497,10 +500,12 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
         ? {
             template: {
               type: "template",
-              template_id: init.start?.template_id,
-              properties: init.start.data,
+              name: init.start?.template_id,
+              values: init.start.data,
               overrides: {},
-            },
+              default: {},
+              version: "0.0.0",
+            } satisfies grida.program.template.TemplateInstance,
           }
         : undefined,
     },

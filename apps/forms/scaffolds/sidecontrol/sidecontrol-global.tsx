@@ -149,10 +149,10 @@ function StartPageTemplateControl() {
   const dialog = useDialogState("switch-template-dialog");
 
   const setupStartPage = useCallback(
-    (template_id: string) => {
+    (name: string) => {
       dispatch({
         type: "editor/form/startpage/init",
-        startpage: { template_id, data: {} },
+        startpage: { name, data: {} },
       });
     },
     [dispatch]
@@ -162,7 +162,7 @@ function StartPageTemplateControl() {
     <>
       <BrowseStartPageTemplatesDialog
         {...dialog}
-        defaultValue={state.documents["form/startpage"]?.template?.template_id}
+        defaultValue={state.documents["form/startpage"]?.template?.name}
         onValueCommit={setupStartPage}
       />
       <Button onClick={dialog.openDialog}>Switch Template</Button>

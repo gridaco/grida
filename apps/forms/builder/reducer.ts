@@ -14,7 +14,7 @@ import type {
 import type {
   InstanceNode,
   ITemplateEditorState,
-  Properties,
+  Values,
   TextNode,
 } from "./types";
 import assert from "assert";
@@ -27,7 +27,7 @@ export default function reducer(
     case "editor/document/data": {
       const { data } = <BuilderSetDataAction>action;
       return produce(state, (draft) => {
-        draft.template.properties = data;
+        draft.template.values = data;
       });
     }
     case "editor/document/node/select": {
@@ -97,7 +97,7 @@ export default function reducer(
       });
     }
     case "editor/document/node/property": {
-      const { node_id, data } = <BuilderNodeUpdatePropertyAction>action;
+      const { node_id, values: data } = <BuilderNodeUpdatePropertyAction>action;
       return produce(state, (draft) => {
         draft.template.overrides[node_id] = {
           ...(draft.template.overrides[node_id] || {}),
@@ -110,12 +110,12 @@ export default function reducer(
       });
     }
     case "editor/template/node/property": {
-      const { data } = <BuilderTemplateNodeUpdatePropertyAction>action;
+      const { values: data } = <BuilderTemplateNodeUpdatePropertyAction>action;
       return produce(state, (draft) => {
-        draft.template.properties = {
-          ...(draft.template.properties || {}),
+        draft.template.values = {
+          ...(draft.template.values || {}),
           ...data,
-        } as Properties;
+        } as Values;
       });
     }
   }

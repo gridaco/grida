@@ -416,6 +416,10 @@ interface FormPageThemeEmbeddedBackgroundData {
   "background-color"?: string;
 }
 
+/**
+ * @deprecated
+ * FIXME: interface
+ */
 export type FormStartPageSchema = {
   $schema: "https://forms.grida.co/schemas/v1/startpage.json";
   template_id: string;

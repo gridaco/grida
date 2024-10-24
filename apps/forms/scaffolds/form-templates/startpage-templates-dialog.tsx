@@ -101,7 +101,7 @@ export function BrowseStartPageTemplatesDialog({
                 }}
               >
                 <template.component
-                  data={{
+                  values={{
                     title: "",
                   }}
                   meta={campaign}

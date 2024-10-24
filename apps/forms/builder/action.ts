@@ -1,6 +1,6 @@
 import type { ZodObject } from "zod";
 import type { Tokens } from "@/ast";
-import { Properties } from "./types";
+import { Values } from "./types";
 
 export type BuilderAction =
   | BuilderSetDataAction
@@ -55,10 +55,10 @@ export interface BuilderNodeUpdateAttributeAction {
 export interface BuilderNodeUpdatePropertyAction {
   type: "editor/document/node/property";
   node_id: string;
-  data: Partial<Properties>;
+  values: Partial<Values>;
 }
 
 export interface BuilderTemplateNodeUpdatePropertyAction {
   type: "editor/template/node/property";
-  data: Partial<Properties>;
+  values: Partial<Values>;
 }
