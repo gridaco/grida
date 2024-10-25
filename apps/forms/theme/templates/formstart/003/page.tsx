@@ -74,10 +74,10 @@ function Consumer() {
   return (
     <ScreenRoot>
       <ScreenCenter>
-        <section className="px-4 max-w-screen-sm">
+        <section className="px-4 max-w-screen-sm z-10">
           <TextAlign align="center">
             <SlotNode
-              node_id="list-header-title"
+              node_id="title"
               component={TemplateBuilderWidgets.Text}
               defaultText={"AAA"}
               defaultStyle={{
@@ -100,15 +100,28 @@ function Consumer() {
             <Button>Start Now</Button>
           </div>
         </section>
-        <ScreenBackground overlay={{ opacity: 0.1 }}>
-          <Image
-            src="/images/abstract-placeholder.jpg"
-            alt="background"
-            width={1000}
-            height={1000}
-            className="w-full h-full object-cover"
-          />
-        </ScreenBackground>
+        <SlotNode
+          node_id="background"
+          component={TemplateBuilderWidgets.Image}
+          className="bg-black"
+          defaultStyle={{
+            position: "absolute",
+            inset: 0,
+            objectFit: "cover",
+            width: "100%",
+            height: "100%",
+          }}
+          defaultProperties={{ src: "/images/abstract-placeholder.jpg" }}
+        />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {/* <img
+          src="/images/abstract-placeholder.jpg"
+          alt="background"
+          width={1000}
+          height={1000}
+          className="absolute inset-0 w-full h-full object-cover select-none pointer-events-none -z-10"
+        /> */}
+        {/* <ScreenBackground overlay={{ opacity: 0.1 }}></ScreenBackground> */}
       </ScreenCenter>
     </ScreenRoot>
   );

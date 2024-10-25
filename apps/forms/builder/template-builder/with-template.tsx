@@ -37,7 +37,7 @@ export function withTemplate<P>(
     //   );
     // }
 
-    return <Component {...props} __type={type} />;
+    return <Component {...props} data-grida-widget-type={type} />;
   };
 
   WrappedComponent.displayName = `withTemplate(${Component.displayName || Component.name || "Component"})`;

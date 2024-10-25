@@ -1,6 +1,5 @@
-import { z } from "zod";
-import { withTemplate, ZTemplateSchema } from "../with-template";
 import React from "react";
+import { withTemplate } from "../with-template";
 
 export const ContainerWidget = withTemplate(
   ({

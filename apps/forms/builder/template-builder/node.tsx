@@ -32,8 +32,6 @@ export function SlotNode<P extends Record<string, any>>({
   className,
   children,
 }: React.PropsWithChildren<SlotProps<P>>) {
-  const containerRef = useRef<HTMLDivElement>(null);
-
   const {
     document: { template },
     selectNode,
@@ -65,6 +63,7 @@ export function SlotNode<P extends Record<string, any>>({
       ...defaultStyle,
       ...style,
     },
+    attributes,
   };
 
   const onSelect = useCallback(() => {
@@ -82,7 +81,7 @@ export function SlotNode<P extends Record<string, any>>({
 
   // const child = React.Children.only(children);
   // const childProps = (child as React.ReactElement).props;
-  // console.log("meta in Node", childProps.__type, childProps, children);
+  // console.log("meta in Node", childProps['data-grida-widget-type'], childProps, children);
 
   // console.log(component.schema);
 
@@ -108,17 +107,16 @@ export function SlotNode<P extends Record<string, any>>({
 
   return (
     <>
-      <div id={node_id} ref={containerRef} {...bind()}>
-        <div
-          {...(attributes || {})}
-          style={{
-            opacity: props.style?.opacity,
-          }}
-          className={cn(className)}
-        >
-          {/*  */}
-          {React.createElement(renderer, props, children)}
-        </div>
+      <div {...bind()}>
+        {React.createElement<any>(
+          renderer,
+          {
+            id: node_id,
+            ...props,
+            className,
+          },
+          children
+        )}
       </div>
     </>
   );

@@ -75,7 +75,7 @@ export default function FormStartEditPage() {
       <main className="h-full flex flex-1 w-full">
         <AgentThemeProvider>
           {startpage ? (
-            <CanvasEventTarget className="relative w-full no-scrollbar overflow-y-auto bg-transparent">
+            <CanvasEventTarget className="relative w-full no-scrollbar overflow-y-auto bg-transparent pointer-events-none">
               <CanvasOverlay />
               <StartPageEditor />
             </CanvasEventTarget>
@@ -158,7 +158,8 @@ function StartPageEditor() {
       <div className="w-full px-10 overflow-scroll">
         <div className="w-full mx-auto my-20 max-w-sm xl:max-w-4xl z-[-999]">
           <SandboxWrapper
-            className="hover:outline hover:outline-2 hover:outline-workbench-accent-sky rounded-2xl shadow-2xl border overflow-hidden"
+            // hover:outline hover:outline-2 hover:outline-workbench-accent-sky
+            className={"rounded-2xl shadow-2xl border overflow-hidden"}
             onDoubleClick={() => {
               setEdit(true);
             }}

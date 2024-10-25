@@ -30,7 +30,11 @@ export function CanvasEventTarget({
 
   return (
     <Context.Provider value={{ portal: overlay, setPortalRef: setOverlayRef }}>
-      <div className={className} onPointerDown={clearSelection}>
+      <div
+        className={className}
+        onPointerDown={clearSelection}
+        style={{ pointerEvents: "auto" }}
+      >
         {children}
       </div>
     </Context.Provider>
@@ -87,13 +91,13 @@ function NodeOverlay({ node_id }: { node_id: string }) {
 
   return (
     <div
-      className="pointer-events-none select-none z-10 border-2 border-blue-500"
+      className="pointer-events-none select-none z-10 border-2 border-workbench-accent-sky"
       style={{
         position: "absolute",
-        top: `${top}px`,
-        left: `${left}px`,
-        width: `${width}px`,
-        height: `${height}px`,
+        top: top,
+        left: left,
+        width: width,
+        height: height,
       }}
     />
   );

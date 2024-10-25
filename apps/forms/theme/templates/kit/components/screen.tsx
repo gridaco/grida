@@ -64,7 +64,7 @@ export function ScreenBackground({
           }}
         />
       )}
-      <div className="absolute inset-0 w-full h-full -z-40 select-none pointer-events-none select-none">
+      <div className="absolute inset-0 w-full h-full -z-40 select-none pointer-events-none">
         {children}
       </div>
     </>

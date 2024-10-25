@@ -10,7 +10,7 @@ import { RichTextWidget } from "./richtext";
 import { SvgWidget } from "./svg";
 import { TextWidget } from "./text";
 import { ThemeWidget } from "./theme";
-
+import { ImageWidget } from "./image";
 export namespace TemplateBuilderWidgets {
   export const Container = ContainerWidget;
   // export const Component = ComponentWidget;
@@ -21,8 +21,8 @@ export namespace TemplateBuilderWidgets {
   export const Layout = LayoutWidget;
   export const Link = LinkWidget;
   // export const RichText = RichTextWidget;
-  // export const Slot = SlotWidget;
   // export const Svg = SvgWidget;
   export const Text = TextWidget;
+  export const Image = ImageWidget;
   // export const Theme = ThemeWidget;
 }
