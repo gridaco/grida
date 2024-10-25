@@ -41,11 +41,13 @@ export function SelectedNodeProperties() {
   // - color - variables
   const {
     selected_node_id,
-    selected_node_schema,
-    selected_node_type,
-    selected_node_default_properties,
-    selected_node_default_style,
-    selected_node_default_text,
+    selected_node_meta: {
+      selected_node_schema,
+      selected_node_type,
+      selected_node_default_properties,
+      selected_node_default_style,
+      selected_node_default_text,
+    } = {},
   } = document;
 
   const propertyNames = Object.keys(
@@ -110,12 +112,18 @@ export function SelectedNodeProperties() {
 
   return (
     <div key={selected_node_id}>
-      <SidebarSection hidden className="border-b pb-4">
+      <SidebarSection
+        // hidden
+        className="border-b pb-4"
+      >
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Debug</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuSectionContent>
-          <div>Node {document.selected_node_id}</div>
+          <pre className="text-xs font-mono">
+            <div>Node {selected_node_id}</div>
+            <div>Type {selected_node_type}</div>
+          </pre>
         </SidebarMenuSectionContent>
       </SidebarSection>
       <SidebarSection className="border-b pb-4">

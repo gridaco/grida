@@ -42,6 +42,7 @@ import blockReducer from "./reducers/block.reducer";
 import datagridQueryReducer from "../data-query/data-query.reducer";
 import builderReducer from "@/builder/reducer";
 import assert from "assert";
+import React from "react";
 
 export function reducer(state: EditorState, action: EditorAction): EditorState {
   switch (action.type) {

@@ -26,23 +26,11 @@ export default function reducer(
       });
     }
     case "editor/document/node/select": {
-      const {
-        node_id,
-        node_type,
-        schema,
-        context,
-        default_properties,
-        default_style,
-        default_text,
-      } = <BuilderSelectNodeAction>action;
+      const { node_id, meta } = <BuilderSelectNodeAction>action;
+
       return produce(state, (draft) => {
         draft.selected_node_id = node_id;
-        draft.selected_node_type = node_type;
-        draft.selected_node_schema = schema || null;
-        draft.selected_node_context = context;
-        draft.selected_node_default_properties = default_properties;
-        draft.selected_node_default_style = default_style;
-        draft.selected_node_default_text = default_text;
+        draft.selected_node_meta = meta;
       });
     }
     case "editor/document/node/switch-component": {

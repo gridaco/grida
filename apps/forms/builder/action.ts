@@ -1,6 +1,6 @@
 import type { ZodObject } from "zod";
 import type { Tokens } from "@/ast";
-import { Values } from "./types";
+import { UnknwonNodeMeta, Values } from "./types";
 
 export type BuilderAction =
   | BuilderSetDataAction
@@ -20,12 +20,7 @@ export interface BuilderSetDataAction {
 export interface BuilderSelectNodeAction {
   type: "editor/document/node/select";
   node_id?: string;
-  node_type?: string;
-  schema?: ZodObject<any>;
-  context?: any;
-  default_properties?: Record<string, any>;
-  default_style?: React.CSSProperties;
-  default_text?: Tokens.StringValueExpression;
+  meta?: UnknwonNodeMeta;
 }
 
 export interface BuilderNodeSwitchComponentAction {

@@ -83,9 +83,11 @@ export default function FormStartEditPage() {
             <SetupStartPage />
           )}
         </AgentThemeProvider>
-        <aside className="hidden lg:flex h-full">
-          <SideControl />
-        </aside>
+        {startpage && (
+          <aside className="hidden lg:flex h-full">
+            <SideControl />
+          </aside>
+        )}
       </main>
     </CurrentPage>
   );

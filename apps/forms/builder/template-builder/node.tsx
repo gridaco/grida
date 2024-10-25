@@ -82,7 +82,16 @@ export function SlotNode<P extends Record<string, any>>({
   };
 
   const onSelect = useCallback(() => {
-    selectNode(node_id);
+    selectNode(node_id, {
+      selected_node_type: component.type,
+      // @ts-ignore TODO:
+      selected_node_schema: componentschema,
+      selected_node_context: context,
+      selected_node_default_properties: defaultProperties,
+      selected_node_default_style: defaultStyle,
+      selected_node_default_text: defaultText,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectNode, node_id]);
 
   // const child = React.Children.only(children);
@@ -134,7 +143,7 @@ export function SlotNode<P extends Record<string, any>>({
 
   return (
     <>
-      <div ref={containerRef} {...bind()}>
+      <div id={node_id} ref={containerRef} {...bind()}>
         <div
           {...(attributes || {})}
           style={{

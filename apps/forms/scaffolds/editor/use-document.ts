@@ -4,6 +4,7 @@ import { useCallback, useMemo } from "react";
 import { EditorDocumentAction } from "./action";
 import { BuilderAction } from "@/builder/action";
 import { Tokens } from "@/ast";
+import { UnknwonNodeMeta } from "@/builder/types";
 
 function composeDocumentAction(
   document_key: "form/collection" | "form/startpage",
@@ -27,11 +28,12 @@ export function useDocument(
   const { selected_node_id } = document;
 
   const selectNode = useCallback(
-    (node_id: string) => {
+    (node_id: string, meta?: UnknwonNodeMeta) => {
       dispatch(
         composeDocumentAction(document_key, {
           type: "editor/document/node/select",
           node_id,
+          meta,
         })
       );
     },

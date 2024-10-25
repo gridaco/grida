@@ -7,7 +7,6 @@ import { LayerkWidget } from "./layer";
 import { LayoutWidget } from "./layout";
 import { LinkWidget } from "./link";
 import { RichTextWidget } from "./richtext";
-import { SlotWidget } from "./slot";
 import { SvgWidget } from "./svg";
 import { TextWidget } from "./text";
 import { ThemeWidget } from "./theme";

@@ -12,7 +12,7 @@ export function BorderRadiusControl({
     <Input
       type="number"
       value={value}
-      placeholder="inherit"
+      placeholder="0"
       min={0}
       step={1}
       className={WorkbenchUI.inputVariants({ size: "sm" })}
