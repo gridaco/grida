@@ -42,18 +42,21 @@ export function SlotNode<P extends Record<string, any>>({
   children,
 }: React.PropsWithChildren<SlotProps<P>>) {
   const [state, dispatch] = useEditorState();
-  const [hovered, setHovered] = useState(false);
+  // const [hovered, setHovered] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const portal = useCanvasOverlayPortal();
 
   const {
-    document: { selected_node_id, template },
+    document: { selected_node_id, hovered_node_id, template },
     selectNode,
+    pointerEnterNode,
+    pointerLeaveNode,
   } = useCurrentDocument();
 
   const selected = !!selected_node_id && selected_node_id === node_id;
+  const hovered = !!hovered_node_id && hovered_node_id === node_id;
 
   // @ts-ignore TODO:
   const { component_id, properties, style, attributes, text } =
@@ -92,7 +95,7 @@ export function SlotNode<P extends Record<string, any>>({
       selected_node_default_text: defaultText,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectNode, node_id]);
+  }, [selectNode]);
 
   // const child = React.Children.only(children);
   // const childProps = (child as React.ReactElement).props;
@@ -102,11 +105,11 @@ export function SlotNode<P extends Record<string, any>>({
 
   const bind = useGesture(
     {
-      onMouseEnter: ({ event }) => {
-        setHovered(true);
+      onPointerEnter: ({ event }) => {
+        pointerEnterNode(node_id);
       },
-      onMouseLeave: ({ event }) => {
-        setHovered(false);
+      onPointerLeave: ({ event }) => {
+        pointerLeaveNode(node_id);
       },
       onPointerDown: ({ event }) => {
         event.stopPropagation();

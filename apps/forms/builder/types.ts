@@ -2,9 +2,10 @@ import type { ZodObject } from "zod";
 import type { Tokens } from "@/ast";
 import { grida } from "@/grida";
 
-export interface IDocumentSelectedNodeState {
+export interface IDocumentCursorState {
   selected_node_id?: string;
   selected_node_meta?: UnknwonNodeMeta;
+  hovered_node_id?: string;
 }
 
 export interface UnknwonNodeMeta {
@@ -23,6 +24,6 @@ export type Values = {
   [key: string]: grida.program.schema.Value;
 };
 
-export interface ITemplateEditorState extends IDocumentSelectedNodeState {
+export interface ITemplateEditorState extends IDocumentCursorState {
   template: grida.program.template.TemplateInstance;
 }

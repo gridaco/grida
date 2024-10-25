@@ -5,6 +5,8 @@ import { UnknwonNodeMeta, Values } from "./types";
 export type BuilderAction =
   | BuilderSetDataAction
   | BuilderSelectNodeAction
+  | BuilderNodePointerEnterAction
+  | BuilderNodePointerLeaveAction
   | BuilderNodeSwitchComponentAction
   | BuilderNodeChangeTextAction
   | BuilderNodeUpdateStyleAction
@@ -21,6 +23,15 @@ export interface BuilderSelectNodeAction {
   type: "editor/document/node/select";
   node_id?: string;
   meta?: UnknwonNodeMeta;
+}
+export interface BuilderNodePointerEnterAction {
+  type: "editor/document/node/pointer-enter";
+  node_id?: string;
+}
+
+export interface BuilderNodePointerLeaveAction {
+  type: "editor/document/node/pointer-leave";
+  node_id?: string;
 }
 
 export interface BuilderNodeSwitchComponentAction {

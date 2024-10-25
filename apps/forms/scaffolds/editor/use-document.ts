@@ -40,6 +40,30 @@ export function useDocument(
     [dispatch, document_key]
   );
 
+  const pointerEnterNode = useCallback(
+    (node_id: string) => {
+      dispatch(
+        composeDocumentAction(document_key, {
+          type: "editor/document/node/pointer-enter",
+          node_id,
+        })
+      );
+    },
+    [dispatch, document_key]
+  );
+
+  const pointerLeaveNode = useCallback(
+    (node_id: string) => {
+      dispatch(
+        composeDocumentAction(document_key, {
+          type: "editor/document/node/pointer-leave",
+          node_id,
+        })
+      );
+    },
+    [dispatch, document_key]
+  );
+
   const rootValues = document.template.values;
   const rootProperties = document.template.properties;
 
@@ -205,6 +229,8 @@ export function useDocument(
       rootProperties,
       selectedNode,
       selectNode,
+      pointerEnterNode,
+      pointerLeaveNode,
       changeRootValues,
       clearSelection,
       changeNodeComponent,
@@ -219,6 +245,8 @@ export function useDocument(
     rootProperties,
     selectedNode,
     selectNode,
+    pointerEnterNode,
+    pointerLeaveNode,
     changeRootValues,
     clearSelection,
     changeNodeComponent,

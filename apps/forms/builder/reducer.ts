@@ -4,6 +4,8 @@ import type {
   BuilderAction,
   BuilderSetDataAction,
   BuilderSelectNodeAction,
+  BuilderNodePointerEnterAction,
+  BuilderNodePointerLeaveAction,
   BuilderNodeSwitchComponentAction,
   BuilderNodeUpdateStyleAction,
   BuilderNodeUpdateAttributeAction,
@@ -31,6 +33,20 @@ export default function reducer(
       return produce(state, (draft) => {
         draft.selected_node_id = node_id;
         draft.selected_node_meta = meta;
+      });
+    }
+    case "editor/document/node/pointer-enter": {
+      const { node_id } = <BuilderNodePointerEnterAction>action;
+      return produce(state, (draft) => {
+        draft.hovered_node_id = node_id;
+      });
+    }
+    case "editor/document/node/pointer-leave": {
+      const { node_id } = <BuilderNodePointerLeaveAction>action;
+      return produce(state, (draft) => {
+        if (draft.hovered_node_id === node_id) {
+          draft.hovered_node_id = undefined;
+        }
       });
     }
     case "editor/document/node/switch-component": {
