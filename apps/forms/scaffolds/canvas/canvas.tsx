@@ -1,6 +1,12 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useRef } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+} from "react";
 import { useCurrentDocument } from "@/scaffolds/editor/use";
 
 interface CanvasEventTargetContext {
@@ -33,6 +39,9 @@ export function CanvasEventTarget({
 
 // CanvasOverlay component that sets the ref in the context
 export function CanvasOverlay() {
+  const {
+    document: { hovered_node_id, selected_node_id },
+  } = useCurrentDocument();
   const ref = useRef<HTMLDivElement>(null);
   const context = useContext(Context);
 
@@ -51,8 +60,42 @@ export function CanvasOverlay() {
 
   return (
     <div className="absolute inset-0 pointer-events-none z-10">
-      <div className="w-full h-full" id="canvas-overlay-portal" ref={ref} />
+      <div className="w-full h-full" id="canvas-overlay-portal" ref={ref}>
+        {selected_node_id && <NodeOverlay node_id={selected_node_id} />}
+        {hovered_node_id && <NodeOverlay node_id={hovered_node_id} />}
+      </div>
     </div>
+  );
+}
+
+const __rect_fallback = { top: 0, left: 0, width: 0, height: 0 };
+
+function NodeOverlay({ node_id }: { node_id: string }) {
+  const portal = useCanvasOverlayPortal();
+  const container = useMemo(() => {
+    return document.getElementById(node_id);
+  }, [node_id]);
+
+  const portalRect = portal?.getBoundingClientRect() ?? __rect_fallback;
+  const containerRect = container?.getBoundingClientRect() ?? __rect_fallback;
+
+  // Calculate the position of the target relative to the portal
+  const top = containerRect.top - portalRect.top;
+  const left = containerRect.left - portalRect.left;
+  const width = containerRect.width;
+  const height = containerRect.height;
+
+  return (
+    <div
+      className="pointer-events-none select-none z-10 border-2 border-blue-500"
+      style={{
+        position: "absolute",
+        top: `${top}px`,
+        left: `${left}px`,
+        width: `${width}px`,
+        height: `${height}px`,
+      }}
+    />
   );
 }
 

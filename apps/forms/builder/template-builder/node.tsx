@@ -1,16 +1,8 @@
 "use client";
 
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import ReactDOM from "react-dom";
+import React, { useCallback, useRef } from "react";
 import { cn } from "@/utils";
 import { useGesture } from "@use-gesture/react";
-import { useEditorState } from "@/scaffolds/editor";
 import { TemplateComponents } from "@/builder/template-builder";
 import type {
   TemplateValueProperties,
@@ -20,7 +12,6 @@ import type { Tokens } from "@/ast";
 import { useComputed } from "./use-computed";
 import { useValue } from "../core/data-context";
 import { useCurrentDocument } from "@/scaffolds/editor/use-document";
-import { useCanvasOverlayPortal } from "@/scaffolds/canvas/canvas";
 
 interface SlotProps<P extends Record<string, any>> {
   node_id: string;
@@ -41,22 +32,14 @@ export function SlotNode<P extends Record<string, any>>({
   className,
   children,
 }: React.PropsWithChildren<SlotProps<P>>) {
-  const [state, dispatch] = useEditorState();
-  // const [hovered, setHovered] = useState(false);
-  const overlayRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const portal = useCanvasOverlayPortal();
-
   const {
-    document: { selected_node_id, hovered_node_id, template },
+    document: { template },
     selectNode,
     pointerEnterNode,
     pointerLeaveNode,
   } = useCurrentDocument();
-
-  const selected = !!selected_node_id && selected_node_id === node_id;
-  const hovered = !!hovered_node_id && hovered_node_id === node_id;
 
   // @ts-ignore TODO:
   const { component_id, properties, style, attributes, text } =
@@ -123,27 +106,6 @@ export function SlotNode<P extends Record<string, any>>({
     }
   );
 
-  useEffect(() => {
-    if (!portal) return;
-    if ((hovered || selected) && containerRef.current && overlayRef.current) {
-      const containerRect = containerRef.current.getBoundingClientRect();
-      const portalRect = portal.getBoundingClientRect();
-      const overlay = overlayRef.current;
-
-      // Calculate the position of the target relative to the portal
-      const top = containerRect.top - portalRect.top;
-      const left = containerRect.left - portalRect.left;
-      const width = containerRect.width;
-      const height = containerRect.height;
-
-      overlay.style.position = "absolute";
-      overlay.style.top = `${top}px`;
-      overlay.style.left = `${left}px`;
-      overlay.style.width = `${width}px`;
-      overlay.style.height = `${height}px`;
-    }
-  }, [hovered, portal, selected]);
-
   return (
     <>
       <div id={node_id} ref={containerRef} {...bind()}>
@@ -158,22 +120,6 @@ export function SlotNode<P extends Record<string, any>>({
           {React.createElement(renderer, props, children)}
         </div>
       </div>
-      {(hovered || selected) && portal && (
-        <>
-          {ReactDOM.createPortal(
-            <div
-              data-node-id={node_id}
-              data-selected={selected}
-              data-hovered={hovered}
-              ref={overlayRef}
-              className={cn(
-                "pointer-events-none select-none z-10 border-2 border-blue-500"
-              )}
-            />,
-            portal
-          )}
-        </>
-      )}
     </>
   );
 }
