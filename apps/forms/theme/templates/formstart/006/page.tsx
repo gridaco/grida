@@ -1,6 +1,5 @@
 "use client";
-import React, { createContext, useContext, useMemo } from "react";
-import Image from "next/image";
+import React, { useMemo } from "react";
 import {
   ScreenGrid,
   ScreenGridPosition,
@@ -12,19 +11,11 @@ import {
   CameraCrossDecoration,
   LinearBoxScaleDecoration,
   Header,
-  HeaderLogoImage,
-  CardBackgroundGradientBlur,
-  Timer,
-  digit2,
 } from "@/theme/templates/kit/components";
 import { cn } from "@/utils";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
-import ReactPlayer from "react-player";
-import {
-  FormCampaignStartPageContextProvider,
-  useCampaignMeta,
-} from "@/theme/templates/kit/campaign";
+import { FormCampaignStartPageContextProvider } from "@/theme/templates/kit/campaign";
 import type { FormStartPage } from "..";
 import { DataProvider, useData } from "../../kit/contexts/data.context";
 import { I18nextProvider, useTranslation } from "react-i18next";
@@ -104,7 +95,7 @@ function Consumer() {
                     <article className="prose prose-sm dark:prose-invert">
                       <h2 className="w-2/3">{data.title || t("title")}</h2>
                       <p className="w-full max-w-sm">
-                        {data.excerpt || t("excerpt")}
+                        {data.subtitle || t("subtitle")}
                       </p>
                     </article>
                     <div className="flex justify-end items-center gap-4">

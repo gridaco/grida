@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/card";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { useDebounceCallback, useStep } from "usehooks-ts";
-import { useDocument } from "@/scaffolds/editor/use";
+import { useCurrentDocument, useDocument } from "@/scaffolds/editor/use";
 import { Block, BlockNoteEditor } from "@blocknote/core";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useSyncFormAgentStartPage } from "@/scaffolds/editor/sync";
@@ -50,10 +50,9 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-
-function useStartPageTemplateEditor() {
-  return useDocument("form/startpage");
-}
+import { CanvasEventTarget, CanvasOverlay } from "@/scaffolds/canvas/canvas";
+import { CurrentPage } from "@/scaffolds/editor/utils/current-page";
+import { Spinner } from "@/components/spinner";
 
 export default function FormStartEditPage() {
   const [state, dispatch] = useEditorState();
@@ -65,14 +64,30 @@ export default function FormStartEditPage() {
   } = state;
 
   return (
-    <main className="h-full flex flex-1 w-full">
-      <AgentThemeProvider>
-        {startpage ? <StartPageEditor /> : <SetupStartPage />}
-      </AgentThemeProvider>
-      <aside className="hidden lg:flex h-full">
-        <SideControl />
-      </aside>
-    </main>
+    <CurrentPage
+      page="form/startpage"
+      fallback={
+        <div className="h-full w-full flex items-center justify-center">
+          <Spinner />
+        </div>
+      }
+    >
+      <main className="h-full flex flex-1 w-full">
+        <AgentThemeProvider>
+          {startpage ? (
+            <CanvasEventTarget className="relative w-full no-scrollbar overflow-y-auto bg-transparent">
+              <CanvasOverlay />
+              <StartPageEditor />
+            </CanvasEventTarget>
+          ) : (
+            <SetupStartPage />
+          )}
+        </AgentThemeProvider>
+        <aside className="hidden lg:flex h-full">
+          <SideControl />
+        </aside>
+      </main>
+    </CurrentPage>
   );
 }
 
@@ -130,7 +145,7 @@ function StartPageEditor() {
     theme: { lang },
   } = state;
 
-  const { document } = useStartPageTemplateEditor();
+  const { document } = useCurrentDocument();
 
   return (
     <>
@@ -166,7 +181,7 @@ function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
     changeRootValues: changeRootProperties,
     rootValues,
     rootProperties,
-  } = useStartPageTemplateEditor();
+  } = useCurrentDocument();
   const [state, dispatch] = useEditorState();
 
   const { uploadPublic } = useDocumentAssetUpload();
@@ -277,14 +292,13 @@ function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
                 const value = rootValues[key];
 
                 return (
-                  <div className="grid gap-2">
+                  <div key={key} className="grid gap-2">
                     <Label>{key}</Label>
                     <PropertyField
                       name={key}
                       definition={def}
                       value={value}
                       onValueChange={change}
-                      key={key}
                     />
                   </div>
                 );
@@ -298,38 +312,6 @@ function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
                 onValueChange={(asset) => {
                   changeRootProperties("media", asset);
                 }}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label>Background Video</Label>
-              <CMSVideoAssetField
-                uploader={uploadPublic}
-                value={rootValues.background as any}
-                onValueChange={(asset) => {
-                  changeRootProperties("background", asset);
-                }}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label>Title</Label>
-              <Input
-                // TODO: support tokens
-                value={rootValues.title as string}
-                onChange={(e) => {
-                  changeRootProperties("title", e.target.value);
-                }}
-                placeholder="Enter your Campaign Title"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label>Excerpt</Label>
-              <Input
-                // TODO: support tokens
-                value={rootValues.excerpt as string}
-                onChange={(e) => {
-                  changeRootProperties("excerpt", e.target.value);
-                }}
-                placeholder="excerpt"
               />
             </div>
             <div className="grid gap-2">

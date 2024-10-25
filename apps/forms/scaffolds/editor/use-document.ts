@@ -26,6 +26,18 @@ export function useDocument(
 
   const { selected_node_id } = document;
 
+  const selectNode = useCallback(
+    (node_id: string) => {
+      dispatch(
+        composeDocumentAction(document_key, {
+          type: "editor/document/node/select",
+          node_id,
+        })
+      );
+    },
+    [dispatch, document_key]
+  );
+
   const rootValues = document.template.values;
   const rootProperties = document.template.properties;
 
@@ -125,8 +137,9 @@ export function useDocument(
     [dispatch, document_key]
   );
 
-  const changeSelectedNode = useMemo(
-    () => ({
+  const selectedNode = useMemo(() => {
+    if (!selected_node_id) return;
+    return {
       component: (component_id: string) =>
         changeNodeComponent(selected_node_id!, component_id),
       text: (text?: Tokens.StringValueExpression) =>
@@ -173,23 +186,23 @@ export function useDocument(
         changeNodeStyle(selected_node_id!, "alignItems", value),
       cursor: (value?: string) =>
         changeNodeStyle(selected_node_id!, "cursor", value),
-    }),
-    [
-      selected_node_id,
-      changeNodeComponent,
-      changeNodeText,
-      changeNodeAttribute,
-      changeNodeStyle,
-      changeNodeValue,
-    ]
-  );
+    };
+  }, [
+    selected_node_id,
+    changeNodeComponent,
+    changeNodeText,
+    changeNodeAttribute,
+    changeNodeStyle,
+    changeNodeValue,
+  ]);
 
   return useMemo(() => {
     return {
       document,
       rootValues,
       rootProperties,
-      changeSelectedNode,
+      selectedNode,
+      selectNode,
       changeRootValues,
       clearSelection,
       changeNodeComponent,
@@ -202,7 +215,8 @@ export function useDocument(
     document,
     rootValues,
     rootProperties,
-    changeSelectedNode,
+    selectedNode,
+    selectNode,
     changeRootValues,
     clearSelection,
     changeNodeComponent,
@@ -211,4 +225,11 @@ export function useDocument(
     changeNodeStyle,
     changeNodeValue,
   ]);
+}
+
+export function useCurrentDocument() {
+  const [state, dispatch] = useEditorState();
+  const { selected_page_id } = state;
+  assert(selected_page_id, "selected_page_id is required");
+  return useDocument(selected_page_id as any);
 }

@@ -6,9 +6,9 @@ import { useEditorState } from "@/scaffolds/editor";
 import { SideControl } from "@/scaffolds/sidecontrol";
 import FormCollectionPage from "@/theme/templates/formcollection/page";
 import { CanvasFloatingToolbar } from "@/scaffolds/canvas-floating-toolbar";
-import { useDocument } from "@/scaffolds/editor/use";
+import { CanvasEventTarget, CanvasOverlay } from "@/scaffolds/canvas/canvas";
 
-export default function EditFormPage() {
+export default function SiteDeisngPage() {
   return (
     <main className="h-full flex flex-1 w-full">
       <CanvasEventTarget className="relative w-full no-scrollbar overflow-y-auto bg-transparent">
@@ -21,29 +21,6 @@ export default function EditFormPage() {
         <SideControl />
       </aside>
     </main>
-  );
-}
-
-function CanvasEventTarget({
-  className,
-  children,
-}: React.PropsWithChildren<{
-  className?: string;
-}>) {
-  const { clearSelection } = useDocument("form/collection");
-
-  return (
-    <div className={className} onPointerDown={clearSelection}>
-      {children}
-    </div>
-  );
-}
-
-function CanvasOverlay() {
-  return (
-    <div className="absolute inset-0 pointer-events-none z-10">
-      <div className="w-full h-full" id="canvas-overlay-portal" />
-    </div>
   );
 }
 
@@ -68,13 +45,6 @@ function CurrentPageCanvas() {
           </div>
         </>
       );
-    case "form/startpage": {
-      return (
-        <div className="mx-auto my-20 max-w-[430px] border rounded-2xl shadow-2xl bg-background overflow-hidden">
-          {/* <FormStartPage /> */}
-        </div>
-      );
-    }
 
     default:
       return <>UNKNOWN PAGE {selected_page_id}</>;

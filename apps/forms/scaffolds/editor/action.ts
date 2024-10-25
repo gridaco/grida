@@ -73,7 +73,7 @@ export interface InitAssetAction extends Partial<EditorState["assets"]> {
 
 export interface EditorSelectPageAction {
   type: "editor/select-page";
-  page_id: string;
+  page_id: EditorState["selected_page_id"];
 }
 
 // #region block

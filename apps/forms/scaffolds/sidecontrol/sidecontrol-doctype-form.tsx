@@ -16,18 +16,22 @@ import {
 import { useEditorState, useFormFields } from "@/scaffolds/editor";
 import { MixIcon } from "@radix-ui/react-icons";
 import { Tokens } from "@/ast";
-import { KeyIcon } from "lucide-react";
 import toast from "react-hot-toast";
 import { FormExpression } from "@/lib/forms/expression";
 import { PropertyLine, PropertyLineLabel } from "./ui";
 import { EditBinaryExpression } from "../panels/extensions/v-edit";
 import { PopoverClose } from "@radix-ui/react-popover";
+import { useCurrentDocument } from "../editor/use";
+import { SelectedNodeProperties } from "./sidecontrol-selected-node";
 
 export function SideControlDoctypeForm() {
+  const { selectedNode } = useCurrentDocument();
   const [state, dispatch] = useEditorState();
 
   if (state.focus_block_id) {
     return <SelectedFormBlockProperties />;
+  } else if (selectedNode) {
+    return <SelectedNodeProperties />;
   } else {
     return <SideControlGlobal />;
   }

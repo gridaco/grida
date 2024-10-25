@@ -37,7 +37,7 @@ type Messages = typeof _messages;
 
 const userprops = {
   title: { type: "string" },
-  excerpt: { type: "string" },
+  subtitle: { type: "string" },
   background_video: { type: "video" },
 } satisfies grida.program.template.TemplateDefinition["properties"];
 
@@ -110,7 +110,7 @@ function Consumer() {
                     <article className="prose prose-sm dark:prose-invert">
                       <h2 className="w-2/3">{data.title || t("title")}</h2>
                       <p className="w-full max-w-sm">
-                        {data.excerpt || t("excerpt")}
+                        {data.subtitle || t("subtitle")}
                       </p>
                     </article>
                     <div className="flex justify-end items-center gap-4">

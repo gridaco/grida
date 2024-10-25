@@ -372,7 +372,11 @@ export type NodePos = { type: "cell"; pos: DataGridCellPositionQuery };
 
 interface IEditorPagesState {
   pages: MenuItem<string>[];
-  selected_page_id?: string;
+  selected_page_id?:
+    | "form"
+    | "form/startpage"
+    | "form/collection"
+    | (string & {});
 }
 
 export interface BaseDocumentEditorState

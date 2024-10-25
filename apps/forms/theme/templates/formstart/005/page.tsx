@@ -38,7 +38,7 @@ type Messages = typeof _messages;
 const userprops = {
   title: { type: "string", default: "[Your Title Goes Here.]" },
   body_html: { type: "string", default: "" },
-  metia: { type: "array", items: { type: "image" }, default: [] },
+  media: { type: "array", items: { type: "image" }, default: [] },
 } satisfies grida.program.template.TemplateDefinition["properties"];
 
 type UserProps = grida.program.schema.TInferredPropTypes<typeof userprops>;

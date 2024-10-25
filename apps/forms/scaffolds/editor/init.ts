@@ -495,7 +495,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
       basepath: base.basepath,
       document_id: init.document_id,
     }),
-    selected_page_id: "", // "form",
+    selected_page_id: "form",
     documents: {
       "form/startpage": init.start
         ? {

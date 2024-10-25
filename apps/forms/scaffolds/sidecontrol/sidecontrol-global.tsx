@@ -78,11 +78,12 @@ const { default: all, ...variants } = _variants;
 
 export function SideControlGlobal() {
   const [state, dispatch] = useEditorState();
-  state.documents["form/startpage"];
+
+  const { selected_page_id } = state;
 
   return (
     <>
-      {state.selected_page_id === "form/startpage" && (
+      {selected_page_id === "form/startpage" && (
         <SidebarSection className="border-b pb-4">
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Template</SidebarSectionHeaderLabel>
@@ -108,22 +109,26 @@ export function SideControlGlobal() {
           <AppearanceControl />
         </SidebarMenuSectionContent>
       </SidebarSection>
-      <SidebarSection className="border-b pb-4">
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Background</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent>
-          <Background />
-        </SidebarMenuSectionContent>
-      </SidebarSection>
-      <SidebarSection className="border-b pb-4">
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Section Style</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent>
-          <SectionStyle />
-        </SidebarMenuSectionContent>
-      </SidebarSection>
+      {selected_page_id === "form" && (
+        <SidebarSection className="border-b pb-4">
+          <SidebarSectionHeaderItem>
+            <SidebarSectionHeaderLabel>Background</SidebarSectionHeaderLabel>
+          </SidebarSectionHeaderItem>
+          <SidebarMenuSectionContent>
+            <Background />
+          </SidebarMenuSectionContent>
+        </SidebarSection>
+      )}
+      {selected_page_id === "form" && (
+        <SidebarSection className="border-b pb-4">
+          <SidebarSectionHeaderItem>
+            <SidebarSectionHeaderLabel>Section Style</SidebarSectionHeaderLabel>
+          </SidebarSectionHeaderItem>
+          <SidebarMenuSectionContent>
+            <SectionStyle />
+          </SidebarMenuSectionContent>
+        </SidebarSection>
+      )}
       <SidebarSection className="border-b pb-4">
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Custom CSS</SidebarSectionHeaderLabel>

@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import React from "react";
+import React, { useMemo } from "react";
 import {
   ScreenBackground,
   ScreenCenter,
@@ -10,22 +10,89 @@ import {
 } from "@/theme/templates/kit/components";
 import Image from "next/image";
 import type { grida } from "@/grida";
+import type { FormStartPage } from "..";
+// import { DataProvider, useData } from "../../kit/contexts/data.context";
+import { I18nextProvider, useTranslation } from "react-i18next";
+import i18next from "i18next";
+import {
+  FormCampaignStartPageContextProvider,
+  useCampaignMeta,
+} from "@/theme/templates/kit/campaign";
+import { TextWidget } from "@/builder/template-builder/widgets/text";
+import { TemplateBuilderWidgets } from "@/builder/template-builder/widgets";
+import { SlotNode } from "@/builder/template-builder/node";
+import {
+  DataProvider,
+  RootDataContextProvider,
+} from "@/builder/core/data-context";
 
-const userprops: grida.program.template.TemplateDefinition["properties"] = {};
+const userprops = {
+  title: { type: "string" },
+  subtitle: { type: "string" },
+} satisfies grida.program.template.TemplateDefinition["properties"];
 
-export default function _003() {
+type UserProps = grida.program.schema.TInferredPropTypes<typeof userprops>;
+
+export default function _003({
+  meta,
+  values,
+  resources = {},
+  lang,
+}: FormStartPage.CampaignTemplateProps<UserProps, {}>) {
+  const i18n = useMemo(() => {
+    return i18next.createInstance(
+      {
+        fallbackLng: "en",
+        resources: resources,
+        lng: lang,
+      },
+      (err, t) => {
+        if (err) return console.log("something went wrong loading", err);
+      }
+    );
+  }, [lang]);
+
+  return (
+    <RootDataContextProvider>
+      <DataProvider namespace="dummy" initialData={values}>
+        <FormCampaignStartPageContextProvider value={meta}>
+          <I18nextProvider
+            // @ts-expect-error
+            i18n={i18n}
+          >
+            <Consumer />
+          </I18nextProvider>
+        </FormCampaignStartPageContextProvider>
+      </DataProvider>
+    </RootDataContextProvider>
+  );
+}
+
+function Consumer() {
+  // const data = useData<UserProps>();
+
   return (
     <ScreenRoot>
       <ScreenCenter>
         <section className="px-4 max-w-screen-sm">
           <TextAlign align="center">
+            <SlotNode
+              node_id="list-header-title"
+              component={TemplateBuilderWidgets.Text}
+              defaultText={"AAA"}
+              defaultStyle={{
+                fontSize: 24,
+                fontWeight: 700,
+              }}
+            />
             <div className="flex flex-col justify-center items-center gap-4">
               <h1 className="text-6xl font-bold w-4/5">
-                Help us build future of forms
+                AA
+                {/* {data.title} */}
               </h1>
               <p className="text-lg text-foreground/80 w-4/5">
-                Your feedback will directly influence the prioritization of our
-                upcoming features.
+                AA
+                {/* {data.subtitle} */}
               </p>
             </div>
           </TextAlign>

@@ -10,12 +10,10 @@ export function SandboxWrapper({
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) {
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    // ignore all
-    e.preventDefault();
-    // // Ignore link clicks
-    // if ((e.target as HTMLElement).tagName === "A") {
-    //   e.preventDefault();
-    // }
+    // Ignore link clicks
+    if ((e.target as HTMLElement).tagName === "A") {
+      e.preventDefault();
+    }
 
     props.onClick?.(e);
   };
@@ -36,7 +34,7 @@ function Fallback(props: FallbackProps) {
     <div className="prose dark:prose-invert prose-sm">
       <h2>Something Went Wrong</h2>
       <hr />
-      <pre>{props.error}</pre>
+      <pre>{JSON.stringify(props.error, null, 2)}</pre>
       <Button onClick={props.resetErrorBoundary}>clear</Button>
     </div>
   );

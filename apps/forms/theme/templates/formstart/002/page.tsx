@@ -22,7 +22,7 @@ import {
   CardBackgroundGradient,
   ScreenGridArea,
 } from "@/theme/templates/kit/components";
-import data from "../data/03.dummy.json";
+import data from "./messages.json";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { KakaoTalkLogo, PolestarTypeLogo } from "@/components/logos";
@@ -42,7 +42,10 @@ import { PhoneIcon } from "lucide-react";
 import Link from "next/link";
 import type { grida } from "@/grida";
 
-const userprops: grida.program.template.TemplateDefinition["properties"] = {};
+const userprops =
+  {} satisfies grida.program.template.TemplateDefinition["properties"];
+
+type UserProps = grida.program.schema.TInferredPropTypes<typeof userprops>;
 
 // https://www.polestar.com/dato-assets/11286/1709559099-02-polestar-3-overview-stats-t.mp4
 
@@ -72,7 +75,7 @@ export default function StartPage_002() {
                 <div className="flex flex-col gap-4 p-4">
                   <article className="prose prose-sm dark:prose-invert">
                     <h2 className="w-2/3">{data.title}</h2>
-                    <p className="w-full max-w-sm">{data.excerpt}</p>
+                    <p className="w-full max-w-sm">{data.subtitle}</p>
                   </article>
                   <div className="flex justify-between items-center gap-4">
                     <div>

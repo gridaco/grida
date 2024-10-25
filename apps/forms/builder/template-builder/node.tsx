@@ -19,8 +19,8 @@ import type {
 import type { Tokens } from "@/ast";
 import { useComputed } from "./use-computed";
 import { useValue } from "../core/data-context";
-import assert from "assert";
-import { useDocument } from "@/scaffolds/editor/use-document";
+import { useCurrentDocument } from "@/scaffolds/editor/use-document";
+import { useCanvasOverlayPortal } from "@/scaffolds/canvas/canvas";
 
 interface SlotProps<P extends Record<string, any>> {
   node_id: string;
@@ -46,12 +46,12 @@ export function SlotNode<P extends Record<string, any>>({
   const overlayRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const portal = document.getElementById("canvas-overlay-portal")!;
+  const portal = useCanvasOverlayPortal();
 
   const {
     document: { selected_node_id, template },
-    // TODO: support other than collection
-  } = useDocument("form/collection");
+    selectNode,
+  } = useCurrentDocument();
 
   const selected = !!selected_node_id && selected_node_id === node_id;
 
@@ -82,24 +82,8 @@ export function SlotNode<P extends Record<string, any>>({
   };
 
   const onSelect = useCallback(() => {
-    dispatch({
-      type: "editor/document",
-      key: "form/collection",
-      action: {
-        type: "editor/document/node/select",
-        node_id: node_id,
-        node_type: component.type,
-        // @ts-ignore TODO:
-        schema: componentschema,
-        default_properties: defaultProperties,
-        default_style: defaultStyle,
-        default_text: defaultText,
-        context,
-      },
-    });
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dispatch, node_id]);
+    selectNode(node_id);
+  }, [selectNode, node_id]);
 
   // const child = React.Children.only(children);
   // const childProps = (child as React.ReactElement).props;
@@ -128,6 +112,7 @@ export function SlotNode<P extends Record<string, any>>({
   );
 
   useEffect(() => {
+    if (!portal) return;
     if ((hovered || selected) && containerRef.current && overlayRef.current) {
       const containerRect = containerRef.current.getBoundingClientRect();
       const portalRect = portal.getBoundingClientRect();
@@ -161,7 +146,7 @@ export function SlotNode<P extends Record<string, any>>({
           {React.createElement(renderer, props, children)}
         </div>
       </div>
-      {(hovered || selected) && (
+      {(hovered || selected) && portal && (
         <>
           {ReactDOM.createPortal(
             <div

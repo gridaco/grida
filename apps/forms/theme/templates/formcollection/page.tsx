@@ -17,19 +17,20 @@ import * as samples from "./samples";
 import {
   RootDataContextProvider,
   DataProvider,
-  ScopedVariableProvider,
 } from "@/builder/core/data-context";
 import { Factory } from "@/ast/factory";
 import ArrayMap from "@/builder/core/data-context/array";
-import assert from "assert";
+import { useCurrentDocument } from "@/scaffolds/editor/use-document";
 
 type ISample = (typeof samples)[keyof typeof samples];
 
 export default function FormCollectionPage() {
   const [state] = useEditorState();
 
-  assert(state.documents, "state.documents is required");
-  const { values } = state.documents["form/collection"]!.template;
+  const {
+    document: { template },
+  } = useCurrentDocument();
+  const { values } = template;
 
   return (
     <RootDataContextProvider>

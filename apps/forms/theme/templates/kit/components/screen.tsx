@@ -58,13 +58,13 @@ export function ScreenBackground({
     <>
       {overlay && (
         <div
-          className="absolute inset-0 w-full h-full bg-background"
+          className="absolute inset-0 w-full h-full bg-background pointer-events-none select-none"
           style={{
             opacity: overlay.opacity,
           }}
         />
       )}
-      <div className="absolute inset-0 w-full h-full -z-40 select-none">
+      <div className="absolute inset-0 w-full h-full -z-40 select-none pointer-events-none select-none">
         {children}
       </div>
     </>
