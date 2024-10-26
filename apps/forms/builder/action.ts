@@ -4,6 +4,7 @@ import { UnknwonNodeMeta, Values } from "./types";
 
 export type BuilderAction =
   | BuilderSetDataAction
+  | BuilderNodeHiddenAction
   | BuilderSelectNodeAction
   | BuilderNodePointerEnterAction
   | BuilderNodePointerLeaveAction
@@ -13,6 +14,12 @@ export type BuilderAction =
   | BuilderNodeUpdateAttributeAction
   | BuilderNodeUpdatePropertyAction
   | BuilderTemplateNodeUpdatePropertyAction;
+
+export interface BuilderNodeHiddenAction {
+  type: "editor/document/node/hidden";
+  node_id: string;
+  hidden: boolean;
+}
 
 export interface BuilderSetDataAction {
   type: "editor/document/data";

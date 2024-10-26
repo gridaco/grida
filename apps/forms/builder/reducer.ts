@@ -12,6 +12,7 @@ import type {
   BuilderNodeUpdatePropertyAction,
   BuilderNodeChangeTextAction,
   BuilderTemplateNodeUpdatePropertyAction,
+  BuilderNodeHiddenAction,
 } from "./action";
 import type { ITemplateEditorState, Values } from "./types";
 import { grida } from "@/grida";
@@ -33,6 +34,15 @@ export default function reducer(
       return produce(state, (draft) => {
         draft.selected_node_id = node_id;
         draft.selected_node_meta = meta;
+      });
+    }
+    case "editor/document/node/hidden": {
+      const { node_id, hidden } = <BuilderNodeHiddenAction>action;
+      return produce(state, (draft) => {
+        draft.template.overrides[node_id] = {
+          ...(draft.template.overrides[node_id] || {}),
+          hidden,
+        } as grida.program.nodes.InstanceNode;
       });
     }
     case "editor/document/node/pointer-enter": {
@@ -83,29 +93,29 @@ export default function reducer(
         };
       });
     }
-    case "editor/document/node/attribute": {
-      const { node_id, data } = <BuilderNodeUpdateAttributeAction>action;
-      return produce(state, (draft) => {
-        draft.template.overrides[node_id] = {
-          ...(draft.template.overrides[node_id] || {}),
-          attributes: {
-            ...(draft.template.overrides[node_id]?.attributes || {}),
-            ...data,
-          },
-        };
-      });
-    }
+    // case "editor/document/node/attribute": {
+    //   const { node_id, data } = <BuilderNodeUpdateAttributeAction>action;
+    //   return produce(state, (draft) => {
+    //     draft.template.overrides[node_id] = {
+    //       ...(draft.template.overrides[node_id] || {}),
+    //       attributes: {
+    //         ...(draft.template.overrides[node_id]?.attributes || {}),
+    //         ...data,
+    //       },
+    //     };
+    //   });
+    // }
     case "editor/document/node/property": {
       const { node_id, values: data } = <BuilderNodeUpdatePropertyAction>action;
       return produce(state, (draft) => {
         draft.template.overrides[node_id] = {
           ...(draft.template.overrides[node_id] || {}),
-          values: {
+          props: {
             ...((
               draft.template.overrides[
                 node_id
               ] as grida.program.nodes.InstanceNode
-            )?.values || {}),
+            )?.props || {}),
             ...data,
           },
         } as grida.program.nodes.InstanceNode;

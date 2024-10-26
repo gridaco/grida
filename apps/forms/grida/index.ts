@@ -167,37 +167,101 @@ export namespace grida {
     }
 
     export namespace nodes {
-      export type Node = TextNode | InstanceNode;
+      export type Node = TextNode | ImageNode | ContainerNode | InstanceNode;
 
-      export namespace interfaces {
+      export namespace i {
+        export interface IBaseNode {
+          readonly id: string;
+          name: string;
+        }
+
+        export interface ISceneNode {
+          /**
+           * whether this node is hidden / disabled within the editor context
+           *
+           * unlike HtmlElement#hidden attrubute, this will act prior regardless to the display property
+           *
+           * when node is hidden, its content will not be included in the runtime tree
+           *
+           * its exact behaviour varies by the environment
+           *
+           * @default false
+           * @example when true, display:none
+           */
+          hidden: boolean;
+
+          /**
+           * whether this node is locked
+           *
+           * when the node is locked, on editor environment, the node cannot be selected or edited via viewport
+           *
+           * on production environment, this property is ignored
+           *
+           * @default false
+           * @example when true, pointer-events:none
+           */
+          locked: boolean;
+        }
+
+        /**
+         * Node that can be expanded in hierarchy
+         */
+        export interface IExpandable {
+          expanded: boolean;
+        }
+
         export interface IStylable {
-          attributes?: {
-            hidden?: boolean;
-          };
           style?: React.CSSProperties;
         }
 
-        export interface IText {
+        export interface ITextValue {
           text: Tokens.StringValueExpression;
         }
 
-        export interface IValues {
+        export interface IProps {
           /**
-           * properties - props data
+           * props data
            *
            * expression that will be passed to this instance
+           *
+           * it should match the signature with defined properties
            */
-          values: Record<string, schema.Value>;
+          props: Record<string, schema.Value>;
         }
       }
 
-      export interface TextNode extends interfaces.IStylable, interfaces.IText {
+      export interface TextNode
+        extends i.IBaseNode,
+          i.ISceneNode,
+          i.IStylable,
+          i.ITextValue {
         type: "text";
       }
 
+      export interface ImageNode
+        extends i.IBaseNode,
+          i.ISceneNode,
+          i.IStylable {
+        src: string;
+        alt?: string;
+        width?: number;
+        height?: number;
+      }
+
+      export interface ContainerNode
+        extends i.IBaseNode,
+          i.ISceneNode,
+          i.IStylable,
+          i.IExpandable {
+        type: "container";
+        //
+      }
+
       export interface InstanceNode
-        extends interfaces.IStylable,
-          interfaces.IValues {
+        extends i.IBaseNode,
+          i.ISceneNode,
+          i.IStylable,
+          i.IProps {
         type: "instance";
         /**
          * ID of component that this instance came from, refers to components table

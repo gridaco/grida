@@ -39,9 +39,18 @@ export function SlotNode<P extends Record<string, any>>({
     pointerLeaveNode,
   } = useCurrentDocument();
 
-  // @ts-ignore TODO:
-  const { component_id, properties, style, attributes, text } =
-    template.overrides[node_id] || {};
+  const {
+    id,
+    hidden,
+    name,
+    style,
+    // @ts-ignore TODO:
+    component_id,
+    // @ts-ignore TODO:
+    properties,
+    // @ts-ignore TODO:
+    text,
+  } = template.overrides[node_id] || {};
 
   const renderer = component_id
     ? TemplateComponents.components[component_id]
@@ -63,7 +72,6 @@ export function SlotNode<P extends Record<string, any>>({
       ...defaultStyle,
       ...style,
     },
-    attributes,
   };
 
   const onSelect = useCallback(() => {
@@ -107,7 +115,7 @@ export function SlotNode<P extends Record<string, any>>({
 
   return (
     <>
-      <div {...bind()}>
+      <div {...bind()} style={{ display: hidden ? "none" : undefined }}>
         {React.createElement<any>(
           renderer,
           {

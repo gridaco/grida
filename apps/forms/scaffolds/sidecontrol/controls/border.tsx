@@ -23,6 +23,7 @@ export function BorderControl({
     <Input
       type="number"
       className={WorkbenchUI.inputVariants({ size: "sm" })}
+      min={0}
       value={value?.borderWidth}
       onChange={onChange}
     />

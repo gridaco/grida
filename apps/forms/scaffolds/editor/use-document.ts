@@ -118,6 +118,19 @@ export function useDocument(
     [dispatch, document_key]
   );
 
+  const changeNodeHidden = useCallback(
+    (node_id: string, hidden: boolean) => {
+      dispatch(
+        composeDocumentAction(document_key, {
+          type: "editor/document/node/hidden",
+          node_id: node_id,
+          hidden,
+        })
+      );
+    },
+    [dispatch, document_key]
+  );
+
   const changeNodeAttribute = useCallback(
     (node_id: string, key: string, value: any) => {
       dispatch(
@@ -177,8 +190,9 @@ export function useDocument(
       value: (key: string, value: any) =>
         changeNodeValue(selected_node_id!, key, value),
       // attributes
-      hidden: (value: boolean) =>
-        changeNodeAttribute(selected_node_id!, "hidden", value),
+      hidden: (hidden: boolean) => changeNodeHidden(selected_node_id!, hidden),
+      src: (value?: string) =>
+        changeNodeAttribute(selected_node_id!, "src", value),
 
       // style
       opacity: (value: number) =>
@@ -229,6 +243,7 @@ export function useDocument(
       rootProperties,
       selectedNode,
       selectNode,
+      changeNodeHidden,
       pointerEnterNode,
       pointerLeaveNode,
       changeRootValues,
@@ -245,6 +260,7 @@ export function useDocument(
     rootProperties,
     selectedNode,
     selectNode,
+    changeNodeHidden,
     pointerEnterNode,
     pointerLeaveNode,
     changeRootValues,

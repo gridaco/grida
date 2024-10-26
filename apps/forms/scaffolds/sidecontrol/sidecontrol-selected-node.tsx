@@ -33,6 +33,7 @@ import { CursorControl } from "./controls/cursor";
 import { PropertyLine, PropertyLineLabel } from "./ui";
 import { useCurrentDocument } from "../editor/use-document";
 import assert from "assert";
+import { SrcControl } from "./controls/src";
 
 export function SelectedNodeProperties() {
   const { document, selectedNode } = useCurrentDocument();
@@ -57,21 +58,22 @@ export function SelectedNodeProperties() {
 
   const istemplate = selected_node_type?.startsWith("templates/");
   const istext = selected_node_type === "text";
+  const isimage = selected_node_type === "image";
   const isflex = selected_node_type === "flex";
   const islayout = isflex;
 
   const {
+    id,
+    name,
+    hidden,
     // @ts-ignore TODO:
     component_id,
-    attributes,
     style,
     // @ts-ignore TODO:
     properties: _properties,
     // @ts-ignore TODO:
     text,
   } = document.template.overrides[selected_node_id!] || {};
-
-  const { hidden } = attributes || {};
 
   const properties = {
     ...(selected_node_default_properties || {}),
@@ -123,6 +125,7 @@ export function SelectedNodeProperties() {
           <pre className="text-xs font-mono">
             <div>Node {selected_node_id}</div>
             <div>Type {selected_node_type}</div>
+            <div>Name {name}</div>
           </pre>
         </SidebarMenuSectionContent>
       </SidebarSection>
@@ -214,6 +217,20 @@ export function SelectedNodeProperties() {
             <TextAlignControl
               value={textAlign as any}
               onValueChange={selectedNode.textAlign}
+            />
+          </PropertyLine>
+        </SidebarMenuSectionContent>
+      </SidebarSection>
+      <SidebarSection hidden={!isimage} className="border-b pb-4">
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>Image</SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuSectionContent className="space-y-2">
+          <PropertyLine>
+            <PropertyLineLabel>Source</PropertyLineLabel>
+            <SrcControl
+              value={text || selected_node_default_text}
+              onValueChange={selectedNode.src}
             />
           </PropertyLine>
         </SidebarMenuSectionContent>
