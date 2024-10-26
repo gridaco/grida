@@ -25,25 +25,24 @@ import { useCurrentDocument } from "@/scaffolds/editor/use-document";
 type ISample = (typeof samples)[keyof typeof samples];
 
 export default function FormCollectionPage() {
-  const [state] = useEditorState();
-
   const {
     document: { template },
   } = useCurrentDocument();
-  const { values } = template;
+  const { props: props } = template;
 
   return (
     <RootDataContextProvider>
-      <DataProvider namespace="dummy" initialData={values}>
+      <DataProvider namespace="dummy" initialData={props}>
         <div className="@container/preview">
           <Header_001
             logo={
               // @ts-expect-error
-              values["brand"]?.["logo"] as string
+              props["brand"]?.["logo"] as string
             }
           />
           <SlotNode
             node_id="hero"
+            name="Hero"
             component={Hero_002}
             defaultProperties={{
               h1: Factory.createPropertyAccessExpression<ISample>([
@@ -65,6 +64,7 @@ export default function FormCollectionPage() {
               <header className="py-10">
                 <SlotNode
                   node_id="list-header-title"
+                  name="List Header Title"
                   component={TemplateBuilderWidgets.Text}
                   defaultText={Factory.createPropertyAccessExpression<ISample>([
                     "listheader",
@@ -76,7 +76,7 @@ export default function FormCollectionPage() {
                   }}
                 />
                 <div className="py-2">
-                  <Filter tags={values.tags as any as string[]} />
+                  <Filter tags={props.tags as any as string[]} />
                 </div>
               </header>
               <div className="grid gap-6 grid-cols-1 @3xl/preview:grid-cols-2 @5xl/preview:grid-cols-3 @7xl/preview:grid-cols-4">
@@ -84,6 +84,7 @@ export default function FormCollectionPage() {
                   {(data) => (
                     <SlotNode
                       node_id={"event-card"}
+                      name="Event Card"
                       component={Card_002}
                       defaultProperties={{
                         media: Factory.createPropertyAccessExpression([

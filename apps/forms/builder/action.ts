@@ -1,26 +1,19 @@
-import type { ZodObject } from "zod";
 import type { Tokens } from "@/ast";
-import { UnknwonNodeMeta, Values } from "./types";
+import { UnknwonNodeMeta } from "./types";
+import { grida } from "@/grida";
 
 export type BuilderAction =
   | BuilderSetDataAction
-  | BuilderNodeHiddenAction
+  | TemplateEditorNodeChangeHiddenAction
   | BuilderSelectNodeAction
   | BuilderNodePointerEnterAction
   | BuilderNodePointerLeaveAction
-  | BuilderNodeSwitchComponentAction
-  | BuilderNodeChangeTextAction
-  | BuilderNodeChangeSrcAction
-  | BuilderNodeUpdateStyleAction
-  | BuilderNodeUpdateAttributeAction
-  | BuilderNodeUpdatePropertyAction
-  | BuilderTemplateNodeUpdatePropertyAction;
-
-export interface BuilderNodeHiddenAction {
-  type: "editor/document/node/hidden";
-  node_id: string;
-  hidden: boolean;
-}
+  | TemplateEditorNodeChangeComponentAction
+  | TemplateEditorNodeChangeTextAction
+  | TemplateEditorNodeChangeSrcAction
+  | TemplateEditorNodeChangeStyleAction
+  | TemplateEditorNodeChangePropsAction
+  | TemplateEditorChangeTemplatePropsAction;
 
 export interface BuilderSetDataAction {
   type: "editor/document/data";
@@ -28,57 +21,75 @@ export interface BuilderSetDataAction {
 }
 
 export interface BuilderSelectNodeAction {
-  type: "editor/document/node/select";
+  type: "document/node/select";
   node_id?: string;
   meta?: UnknwonNodeMeta;
 }
-export interface BuilderNodePointerEnterAction {
-  type: "editor/document/node/pointer-enter";
-  node_id?: string;
-}
 
-export interface BuilderNodePointerLeaveAction {
-  type: "editor/document/node/pointer-leave";
-  node_id?: string;
-}
-
-export interface BuilderNodeSwitchComponentAction {
-  type: "editor/document/node/switch-component";
+interface INodeAction {
   node_id: string;
+}
+
+export type BuilderNodePointerEnterAction = INodeAction & {
+  type: "document/node/on-pointer-enter";
+};
+
+export type BuilderNodePointerLeaveAction = INodeAction & {
+  type: "document/node/on-pointer-leave";
+};
+
+interface INodeChangeHiddenAction extends INodeAction {
+  hidden: boolean;
+}
+
+interface INodeChangeComponentAction extends INodeAction {
   component_id: string;
 }
 
-export interface BuilderNodeChangeTextAction {
-  type: "editor/document/node/text";
-  node_id: string;
+interface INodeChangeTextAction extends INodeAction {
   text?: Tokens.StringValueExpression;
 }
 
-export interface BuilderNodeUpdateStyleAction {
-  type: "editor/document/node/style";
-  node_id: string;
-  data: { [key: string]: any };
+interface INodeChangeStyleAction extends INodeAction {
+  style: Partial<React.CSSProperties>;
 }
 
-export interface BuilderNodeChangeSrcAction {
-  type: "editor/document/node/src";
-  node_id: string;
+interface INodeChangeSrcAction extends INodeAction {
   src: string;
 }
 
-export interface BuilderNodeUpdateAttributeAction {
-  type: "editor/document/node/attribute";
-  node_id: string;
-  data: { [key: string]: any };
+interface INodeChangePropsAction extends INodeAction {
+  props: Partial<grida.program.nodes.i.IProps["props"]>;
 }
 
-export interface BuilderNodeUpdatePropertyAction {
-  type: "editor/document/node/property";
-  node_id: string;
-  values: Partial<Values>;
-}
+export type TemplateEditorNodeChangeComponentAction =
+  INodeChangeComponentAction & {
+    type: "document/template/override/node/change/component";
+  };
 
-export interface BuilderTemplateNodeUpdatePropertyAction {
-  type: "editor/template/node/property";
-  values: Partial<Values>;
-}
+export type TemplateEditorNodeChangeTextAction = INodeChangeTextAction & {
+  type: "document/template/override/node/change/text";
+};
+
+export type TemplateEditorNodeChangeStyleAction = INodeChangeStyleAction & {
+  type: "document/template/override/node/change/style";
+};
+
+export type TemplateEditorNodeChangeSrcAction = INodeChangeSrcAction & {
+  type: "document/template/override/node/change/src";
+};
+
+export type TemplateEditorNodeChangePropsAction = INodeChangePropsAction & {
+  type: "document/template/override/node/change/props";
+};
+
+export type TemplateEditorNodeChangeHiddenAction = INodeChangeHiddenAction & {
+  type: "document/template/override/node/change/hidden";
+};
+
+export type TemplateEditorChangeTemplatePropsAction = Omit<
+  INodeChangePropsAction,
+  "node_id"
+> & {
+  type: "document/template/change/props";
+};

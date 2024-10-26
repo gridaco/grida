@@ -16,11 +16,15 @@ import { grida } from "@/grida";
 
 interface SlotProps<P extends Record<string, any>> {
   node_id: string;
+  name: string;
   // templatePath
   component: TemplateComponent<P>;
   className?: string;
   defaultText?: Tokens.StringValueExpression;
-  defaultProperties?: TemplateValueProperties<P, Tokens.StringValueExpression>;
+  defaultProperties?: TemplateValueProperties<
+    Omit<P, "id" | "name" | "hidden" | "locked">,
+    Tokens.StringValueExpression
+  >;
   defaultStyle?: React.CSSProperties;
 }
 

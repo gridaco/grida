@@ -5,6 +5,7 @@ import { TemplateBuilderWidgets } from "../widgets";
 export function Header_001({ logo }: { logo?: string }) {
   return (
     <SlotNode
+      name="Header"
       node_id="header"
       component={TemplateBuilderWidgets.Flex}
       defaultStyle={{
@@ -18,7 +19,11 @@ export function Header_001({ logo }: { logo?: string }) {
         zIndex: 10,
       }}
     >
-      <SlotNode node_id="logo" component={TemplateBuilderWidgets.Container}>
+      <SlotNode
+        node_id="logo"
+        name="Logo"
+        component={TemplateBuilderWidgets.Container}
+      >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={logo} alt="logo" className="w-full h-5 object-contain" />
       </SlotNode>

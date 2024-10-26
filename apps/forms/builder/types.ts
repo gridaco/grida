@@ -20,10 +20,6 @@ export interface UnknwonNodeMeta {
   selected_node_default_text?: Tokens.StringValueExpression;
 }
 
-export type Values = {
-  [key: string]: grida.program.schema.Value;
-};
-
 export interface ITemplateEditorState extends IDocumentCursorState {
   template: grida.program.template.TemplateInstance;
 }

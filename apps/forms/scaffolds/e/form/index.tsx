@@ -143,7 +143,7 @@ function FormStartPage({
       <ScreenWindowRoot>
         <FormStartPageRenderer.Renderer
           name={start_page.name}
-          values={start_page.values}
+          values={start_page.props}
           // TODO: handle more data - agent errors states
           meta={campaign}
           lang={lang}

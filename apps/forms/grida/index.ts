@@ -41,6 +41,8 @@ export namespace grida {
         | Tokens.StringValueExpression[]
         | { [key: string]: Value };
 
+      export type Props = Record<string, Value>;
+
       export type PropertyDefinition =
         | TypeScalarPropertyDefinition
         | TypeArrayPropertyDefinition<any[]>
@@ -157,12 +159,12 @@ export namespace grida {
         /**
          * arguments matching properties
          */
-        values: Record<string, schema.Value>;
+        props: Record<string, schema.Value>;
 
         /**
          * exposed child node overrides
          */
-        overrides: Record<string, nodes.Node>;
+        overrides: Record<string, nodes.Node | undefined>;
       }
     }
 

@@ -7,6 +7,7 @@ import Link from "next/link";
 export function Footer_001() {
   return (
     <SlotNode
+      name="Footer"
       className={"py-10 w-full"}
       node_id={"footer-flex"}
       component={TemplateBuilderWidgets.Flex}

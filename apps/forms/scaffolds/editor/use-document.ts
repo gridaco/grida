@@ -31,7 +31,7 @@ export function useDocument(
     (node_id: string, meta?: UnknwonNodeMeta) => {
       dispatch(
         composeDocumentAction(document_key, {
-          type: "editor/document/node/select",
+          type: "document/node/select",
           node_id,
           meta,
         })
@@ -44,7 +44,7 @@ export function useDocument(
     (node_id: string) => {
       dispatch(
         composeDocumentAction(document_key, {
-          type: "editor/document/node/pointer-enter",
+          type: "document/node/on-pointer-enter",
           node_id,
         })
       );
@@ -56,7 +56,7 @@ export function useDocument(
     (node_id: string) => {
       dispatch(
         composeDocumentAction(document_key, {
-          type: "editor/document/node/pointer-leave",
+          type: "document/node/on-pointer-leave",
           node_id,
         })
       );
@@ -64,15 +64,15 @@ export function useDocument(
     [dispatch, document_key]
   );
 
-  const rootValues = document.template.values;
+  const rootValues = document.template.props;
   const rootProperties = document.template.properties;
 
   const changeRootValues = useCallback(
     (key: string, value: any) => {
       dispatch(
         composeDocumentAction(document_key, {
-          type: "editor/template/node/property",
-          values: {
+          type: "document/template/change/props",
+          props: {
             [key]: value,
           },
         })
@@ -85,7 +85,7 @@ export function useDocument(
     () =>
       dispatch(
         composeDocumentAction(document_key, {
-          type: "editor/document/node/select",
+          type: "document/node/select",
           node_id: undefined,
         })
       ),
@@ -96,7 +96,7 @@ export function useDocument(
     (node_id: string, component_id: string) => {
       dispatch(
         composeDocumentAction(document_key, {
-          type: "editor/document/node/switch-component",
+          type: "document/template/override/node/change/component",
           node_id: node_id,
           component_id: component_id,
         })
@@ -109,7 +109,7 @@ export function useDocument(
     (node_id: string, text?: Tokens.StringValueExpression) => {
       dispatch(
         composeDocumentAction(document_key, {
-          type: "editor/document/node/text",
+          type: "document/template/override/node/change/text",
           node_id: node_id,
           text,
         })
@@ -122,7 +122,7 @@ export function useDocument(
     (node_id: string, hidden: boolean) => {
       dispatch(
         composeDocumentAction(document_key, {
-          type: "editor/document/node/hidden",
+          type: "document/template/override/node/change/hidden",
           node_id: node_id,
           hidden,
         })
@@ -150,7 +150,7 @@ export function useDocument(
     (node_id: string, src: string) => {
       dispatch(
         composeDocumentAction(document_key, {
-          type: "editor/document/node/src",
+          type: "document/template/override/node/change/src",
           node_id: node_id,
           src,
         })
@@ -163,9 +163,9 @@ export function useDocument(
     (node_id: string, key: string, value: any) => {
       dispatch(
         composeDocumentAction(document_key, {
-          type: "editor/document/node/style",
+          type: "document/template/override/node/change/style",
           node_id: node_id,
-          data: {
+          style: {
             [key]: value,
           },
         })
@@ -178,9 +178,9 @@ export function useDocument(
     (node_id: string, key: string, value: any) => {
       dispatch(
         composeDocumentAction(document_key, {
-          type: "editor/document/node/property",
+          type: "document/template/override/node/change/props",
           node_id: node_id,
-          values: {
+          props: {
             [key]: value,
           },
         })

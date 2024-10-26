@@ -6,17 +6,17 @@ import type {
   BuilderSelectNodeAction,
   BuilderNodePointerEnterAction,
   BuilderNodePointerLeaveAction,
-  BuilderNodeSwitchComponentAction,
-  BuilderNodeUpdateStyleAction,
-  BuilderNodeUpdateAttributeAction,
-  BuilderNodeUpdatePropertyAction,
-  BuilderNodeChangeTextAction,
-  BuilderTemplateNodeUpdatePropertyAction,
-  BuilderNodeHiddenAction,
-  BuilderNodeChangeSrcAction,
+  TemplateEditorNodeChangeComponentAction,
+  TemplateEditorNodeChangeStyleAction,
+  TemplateEditorNodeChangePropsAction,
+  TemplateEditorNodeChangeTextAction,
+  TemplateEditorChangeTemplatePropsAction,
+  TemplateEditorNodeChangeHiddenAction,
+  TemplateEditorNodeChangeSrcAction,
 } from "./action";
-import type { ITemplateEditorState, Values } from "./types";
+import type { ITemplateEditorState } from "./types";
 import { grida } from "@/grida";
+import { deepAssign } from "@/utils";
 
 export default function reducer(
   state: ITemplateEditorState,
@@ -26,10 +26,10 @@ export default function reducer(
     case "editor/document/data": {
       const { data } = <BuilderSetDataAction>action;
       return produce(state, (draft) => {
-        draft.template.values = data;
+        draft.template.props = data;
       });
     }
-    case "editor/document/node/select": {
+    case "document/node/select": {
       const { node_id, meta } = <BuilderSelectNodeAction>action;
 
       return produce(state, (draft) => {
@@ -37,22 +37,13 @@ export default function reducer(
         draft.selected_node_meta = meta;
       });
     }
-    case "editor/document/node/hidden": {
-      const { node_id, hidden } = <BuilderNodeHiddenAction>action;
-      return produce(state, (draft) => {
-        draft.template.overrides[node_id] = {
-          ...(draft.template.overrides[node_id] || {}),
-          hidden,
-        } as grida.program.nodes.InstanceNode;
-      });
-    }
-    case "editor/document/node/pointer-enter": {
+    case "document/node/on-pointer-enter": {
       const { node_id } = <BuilderNodePointerEnterAction>action;
       return produce(state, (draft) => {
         draft.hovered_node_id = node_id;
       });
     }
-    case "editor/document/node/pointer-leave": {
+    case "document/node/on-pointer-leave": {
       const { node_id } = <BuilderNodePointerLeaveAction>action;
       return produce(state, (draft) => {
         if (draft.hovered_node_id === node_id) {
@@ -60,86 +51,66 @@ export default function reducer(
         }
       });
     }
-    case "editor/document/node/switch-component": {
-      const { node_id, component_id } = <BuilderNodeSwitchComponentAction>(
-        action
-      );
+    case "document/template/change/props": {
+      const { props: data } = <TemplateEditorChangeTemplatePropsAction>action;
+      return produce(state, (draft) => {
+        draft.template.props = {
+          ...(draft.template.props || {}),
+          ...data,
+        } as grida.program.schema.Props;
+      });
+    }
+    case "document/template/override/node/change/hidden": {
+      const { node_id, hidden } = <TemplateEditorNodeChangeHiddenAction>action;
+      return produce(state, (draft) => {
+        override(draft, { node_id, payload: { hidden } });
+      });
+    }
+    case "document/template/override/node/change/component": {
+      const { node_id, component_id } = <
+        TemplateEditorNodeChangeComponentAction
+      >action;
 
       return produce(state, (draft) => {
-        draft.template.overrides[node_id] = {
-          ...(draft.template.overrides[node_id] || {}),
-          type: "instance",
-          component_id,
-        } as grida.program.nodes.InstanceNode;
+        override(draft, { node_id, payload: { component_id } });
       });
     }
-    case "editor/document/node/text": {
-      const { node_id, text } = <BuilderNodeChangeTextAction>action;
+    case "document/template/override/node/change/text": {
+      const { node_id, text } = <TemplateEditorNodeChangeTextAction>action;
       return produce(state, (draft) => {
-        draft.template.overrides[node_id] = {
-          ...(draft.template.overrides[node_id] || {}),
-          text,
-        } as grida.program.nodes.TextNode;
+        override(draft, { node_id, payload: { text } });
       });
     }
-    case "editor/document/node/src": {
-      const { node_id, src } = <BuilderNodeChangeSrcAction>action;
+    case "document/template/override/node/change/src": {
+      const { node_id, src } = <TemplateEditorNodeChangeSrcAction>action;
       return produce(state, (draft) => {
-        (
-          draft.template.overrides[node_id] as grida.program.nodes.ImageNode
-        ).src = src;
+        override(draft, { node_id, payload: { src } });
       });
     }
-    case "editor/document/node/style": {
-      const { node_id, data } = <BuilderNodeUpdateStyleAction>action;
+    case "document/template/override/node/change/style": {
+      const { node_id, style } = <TemplateEditorNodeChangeStyleAction>action;
       return produce(state, (draft) => {
-        draft.template.overrides[node_id] = {
-          ...(draft.template.overrides[node_id] || {}),
-          style: {
-            ...(draft.template.overrides[node_id]?.style || {}),
-            ...data,
-          },
-        };
+        override(draft, { node_id, payload: { style } });
       });
     }
-    // case "editor/document/node/attribute": {
-    //   const { node_id, data } = <BuilderNodeUpdateAttributeAction>action;
-    //   return produce(state, (draft) => {
-    //     draft.template.overrides[node_id] = {
-    //       ...(draft.template.overrides[node_id] || {}),
-    //       attributes: {
-    //         ...(draft.template.overrides[node_id]?.attributes || {}),
-    //         ...data,
-    //       },
-    //     };
-    //   });
-    // }
-    case "editor/document/node/property": {
-      const { node_id, values: data } = <BuilderNodeUpdatePropertyAction>action;
+    case "document/template/override/node/change/props": {
+      const { node_id, props } = <TemplateEditorNodeChangePropsAction>action;
       return produce(state, (draft) => {
-        draft.template.overrides[node_id] = {
-          ...(draft.template.overrides[node_id] || {}),
-          props: {
-            ...((
-              draft.template.overrides[
-                node_id
-              ] as grida.program.nodes.InstanceNode
-            )?.props || {}),
-            ...data,
-          },
-        } as grida.program.nodes.InstanceNode;
-      });
-    }
-    case "editor/template/node/property": {
-      const { values: data } = <BuilderTemplateNodeUpdatePropertyAction>action;
-      return produce(state, (draft) => {
-        draft.template.values = {
-          ...(draft.template.values || {}),
-          ...data,
-        } as Values;
+        override(draft, { node_id, payload: { props } });
       });
     }
   }
 
   return state;
+}
+
+function override(
+  draft: Draft<ITemplateEditorState>,
+  { node_id, payload }: { node_id: string; payload: {} }
+) {
+  draft.template.overrides[node_id] =
+    draft.template.overrides[node_id] ||
+    ({ id: node_id, style: {} } as grida.program.nodes.Node);
+
+  deepAssign(draft.template.overrides[node_id], payload);
 }

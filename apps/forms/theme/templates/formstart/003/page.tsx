@@ -76,22 +76,25 @@ function Consumer() {
       <ScreenCenter>
         <section className="px-4 max-w-screen-sm z-10">
           <TextAlign align="center">
-            <SlotNode
-              node_id="title"
-              component={TemplateBuilderWidgets.Text}
-              defaultText={"AAA"}
-              defaultStyle={{
-                fontSize: 24,
-                fontWeight: 700,
-              }}
-            />
             <div className="flex flex-col justify-center items-center gap-4">
               <h1 className="text-6xl font-bold w-4/5">
-                AA
+                <SlotNode
+                  node_id="title"
+                  name="Title"
+                  component={TemplateBuilderWidgets.Text}
+                  defaultText={"AAA"}
+                  defaultStyle={{}}
+                />
                 {/* {data.title} */}
               </h1>
               <p className="text-lg text-foreground/80 w-4/5">
-                AA
+                <SlotNode
+                  node_id="subtitle"
+                  name="Subtitle"
+                  component={TemplateBuilderWidgets.Text}
+                  defaultText={"AAA"}
+                  defaultStyle={{}}
+                />
                 {/* {data.subtitle} */}
               </p>
             </div>
@@ -102,6 +105,7 @@ function Consumer() {
         </section>
         <SlotNode
           node_id="background"
+          name="Background"
           component={TemplateBuilderWidgets.Image}
           className="bg-black"
           defaultStyle={{

@@ -167,7 +167,7 @@ function StartPageEditor() {
             <div className="w-full min-h-[852px] h-[80dvh]">
               <FormStartPage.Renderer
                 name={document.template.name}
-                values={document.template.values}
+                values={document.template.props}
                 meta={campaign}
                 lang={lang}
               />
