@@ -10,6 +10,7 @@ export type BuilderAction =
   | BuilderNodePointerLeaveAction
   | BuilderNodeSwitchComponentAction
   | BuilderNodeChangeTextAction
+  | BuilderNodeChangeSrcAction
   | BuilderNodeUpdateStyleAction
   | BuilderNodeUpdateAttributeAction
   | BuilderNodeUpdatePropertyAction
@@ -57,6 +58,12 @@ export interface BuilderNodeUpdateStyleAction {
   type: "editor/document/node/style";
   node_id: string;
   data: { [key: string]: any };
+}
+
+export interface BuilderNodeChangeSrcAction {
+  type: "editor/document/node/src";
+  node_id: string;
+  src: string;
 }
 
 export interface BuilderNodeUpdateAttributeAction {

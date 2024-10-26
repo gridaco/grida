@@ -13,6 +13,7 @@ import type {
   BuilderNodeChangeTextAction,
   BuilderTemplateNodeUpdatePropertyAction,
   BuilderNodeHiddenAction,
+  BuilderNodeChangeSrcAction,
 } from "./action";
 import type { ITemplateEditorState, Values } from "./types";
 import { grida } from "@/grida";
@@ -79,6 +80,14 @@ export default function reducer(
           ...(draft.template.overrides[node_id] || {}),
           text,
         } as grida.program.nodes.TextNode;
+      });
+    }
+    case "editor/document/node/src": {
+      const { node_id, src } = <BuilderNodeChangeSrcAction>action;
+      return produce(state, (draft) => {
+        (
+          draft.template.overrides[node_id] as grida.program.nodes.ImageNode
+        ).src = src;
       });
     }
     case "editor/document/node/style": {

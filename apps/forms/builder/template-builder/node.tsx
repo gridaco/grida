@@ -12,6 +12,7 @@ import type { Tokens } from "@/ast";
 import { useComputed } from "./use-computed";
 import { useValue } from "../core/data-context";
 import { useCurrentDocument } from "@/scaffolds/editor/use-document";
+import { grida } from "@/grida";
 
 interface SlotProps<P extends Record<string, any>> {
   node_id: string;
@@ -39,18 +40,8 @@ export function SlotNode<P extends Record<string, any>>({
     pointerLeaveNode,
   } = useCurrentDocument();
 
-  const {
-    id,
-    hidden,
-    name,
-    style,
-    // @ts-ignore TODO:
-    component_id,
-    // @ts-ignore TODO:
-    properties,
-    // @ts-ignore TODO:
-    text,
-  } = template.overrides[node_id] || {};
+  const { id, hidden, name, style, component_id, props, text, src } = (template
+    .overrides[node_id] || {}) as grida.program.nodes.AnyNode;
 
   const renderer = component_id
     ? TemplateComponents.components[component_id]
@@ -61,13 +52,14 @@ export function SlotNode<P extends Record<string, any>>({
   const context = useValue();
   const computedProperties = useComputed({
     ...defaultProperties,
-    ...properties,
+    ...props,
   });
   const computedText = useComputed({ text: text ?? defaultText });
 
-  const props = {
+  const finalprops = {
     text: computedText.text,
     properties: computedProperties,
+    src,
     style: {
       ...defaultStyle,
       ...style,
@@ -120,7 +112,7 @@ export function SlotNode<P extends Record<string, any>>({
           renderer,
           {
             id: node_id,
-            ...props,
+            ...finalprops,
             className,
           },
           children

@@ -34,6 +34,7 @@ import { PropertyLine, PropertyLineLabel } from "./ui";
 import { useCurrentDocument } from "../editor/use-document";
 import assert from "assert";
 import { SrcControl } from "./controls/src";
+import { grida } from "@/grida";
 
 export function SelectedNodeProperties() {
   const { document, selectedNode } = useCurrentDocument();
@@ -62,22 +63,13 @@ export function SelectedNodeProperties() {
   const isflex = selected_node_type === "flex";
   const islayout = isflex;
 
-  const {
-    id,
-    name,
-    hidden,
-    // @ts-ignore TODO:
-    component_id,
-    style,
-    // @ts-ignore TODO:
-    properties: _properties,
-    // @ts-ignore TODO:
-    text,
-  } = document.template.overrides[selected_node_id!] || {};
+  const { id, name, hidden, component_id, style, props, text, src } = (document
+    .template.overrides[selected_node_id!] ||
+    {}) as grida.program.nodes.AnyNode;
 
-  const properties = {
+  const finalprops = {
     ...(selected_node_default_properties || {}),
-    ...(_properties || {}),
+    ...(props || {}),
   };
 
   const {
@@ -168,7 +160,7 @@ export function SelectedNodeProperties() {
         </SidebarSectionHeaderItem>
         <SidebarMenuSectionContent className="space-y-2">
           {propertyNames.map((key) => {
-            const value = properties?.[key];
+            const value = finalprops?.[key];
 
             return (
               <PropertyLine key={key}>
@@ -228,10 +220,7 @@ export function SelectedNodeProperties() {
         <SidebarMenuSectionContent className="space-y-2">
           <PropertyLine>
             <PropertyLineLabel>Source</PropertyLineLabel>
-            <SrcControl
-              value={text || selected_node_default_text}
-              onValueChange={selectedNode.src}
-            />
+            <SrcControl value={src} onValueChange={selectedNode.src} />
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>

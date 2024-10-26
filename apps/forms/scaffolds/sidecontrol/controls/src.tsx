@@ -6,13 +6,13 @@ export function SrcControl({
   onValueChange,
 }: {
   value?: string;
-  onValueChange?: (value?: string) => void;
+  onValueChange?: (value: string) => void;
 }) {
   return (
     <Input
       type="url"
       value={value}
-      placeholder="inherit"
+      placeholder="none"
       min={0}
       step={1}
       className={WorkbenchUI.inputVariants({ size: "sm" })}

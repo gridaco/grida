@@ -131,15 +131,28 @@ export function useDocument(
     [dispatch, document_key]
   );
 
-  const changeNodeAttribute = useCallback(
-    (node_id: string, key: string, value: any) => {
+  // const changeNodeAttribute = useCallback(
+  //   (node_id: string, key: string, value: any) => {
+  //     dispatch(
+  //       composeDocumentAction(document_key, {
+  //         type: "editor/document/node/attribute",
+  //         node_id: node_id,
+  //         data: {
+  //           [key]: value,
+  //         },
+  //       })
+  //     );
+  //   },
+  //   [dispatch, document_key]
+  // );
+
+  const changeNodeSrc = useCallback(
+    (node_id: string, src: string) => {
       dispatch(
         composeDocumentAction(document_key, {
-          type: "editor/document/node/attribute",
+          type: "editor/document/node/src",
           node_id: node_id,
-          data: {
-            [key]: value,
-          },
+          src,
         })
       );
     },
@@ -183,16 +196,13 @@ export function useDocument(
         changeNodeComponent(selected_node_id!, component_id),
       text: (text?: Tokens.StringValueExpression) =>
         changeNodeText(selected_node_id!, text),
-      attribute: (key: string, value: any) =>
-        changeNodeAttribute(selected_node_id!, key, value),
       style: (key: string, value: any) =>
         changeNodeStyle(selected_node_id!, key, value),
       value: (key: string, value: any) =>
         changeNodeValue(selected_node_id!, key, value),
       // attributes
       hidden: (hidden: boolean) => changeNodeHidden(selected_node_id!, hidden),
-      src: (value?: string) =>
-        changeNodeAttribute(selected_node_id!, "src", value),
+      src: (src: string) => changeNodeSrc(selected_node_id!, src),
 
       // style
       opacity: (value: number) =>
@@ -231,7 +241,7 @@ export function useDocument(
     selected_node_id,
     changeNodeComponent,
     changeNodeText,
-    changeNodeAttribute,
+    // changeNodeAttribute,
     changeNodeStyle,
     changeNodeValue,
   ]);
@@ -250,7 +260,7 @@ export function useDocument(
       clearSelection,
       changeNodeComponent,
       changeNodeText,
-      changeNodeAttribute,
+      // changeNodeAttribute,
       changeNodeStyle,
       changeNodeValue,
     };
@@ -267,7 +277,7 @@ export function useDocument(
     clearSelection,
     changeNodeComponent,
     changeNodeText,
-    changeNodeAttribute,
+    // changeNodeAttribute,
     changeNodeStyle,
     changeNodeValue,
   ]);

@@ -169,6 +169,17 @@ export namespace grida {
     export namespace nodes {
       export type Node = TextNode | ImageNode | ContainerNode | InstanceNode;
 
+      /**
+       * Any node utility type - use within the correct context
+       */
+      export type AnyNode = Partial<TextNode> &
+        Partial<ImageNode> &
+        Partial<ContainerNode> &
+        Partial<InstanceNode> &
+        i.IBaseNode &
+        i.ISceneNode &
+        i.IStylable;
+
       export namespace i {
         export interface IBaseNode {
           readonly id: string;
