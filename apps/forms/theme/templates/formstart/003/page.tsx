@@ -20,7 +20,7 @@ import {
 } from "@/theme/templates/kit/campaign";
 import { TextWidget } from "@/builder/template-builder/widgets/text";
 import { TemplateBuilderWidgets } from "@/builder/template-builder/widgets";
-import { SlotNode } from "@/builder/template-builder/node";
+import { NodeSlot } from "@/builder/template-builder/node";
 import {
   DataProvider,
   RootDataContextProvider,
@@ -78,7 +78,7 @@ function Consumer() {
           <TextAlign align="center">
             <div className="flex flex-col justify-center items-center gap-4">
               <h1 className="text-6xl font-bold w-4/5">
-                <SlotNode
+                <NodeSlot
                   node_id="title"
                   name="Title"
                   component={TemplateBuilderWidgets.Text}
@@ -88,7 +88,7 @@ function Consumer() {
                 {/* {data.title} */}
               </h1>
               <p className="text-lg text-foreground/80 w-4/5">
-                <SlotNode
+                <NodeSlot
                   node_id="subtitle"
                   name="Subtitle"
                   component={TemplateBuilderWidgets.Text}
@@ -103,7 +103,7 @@ function Consumer() {
             <Button>Start Now</Button>
           </div>
         </section>
-        <SlotNode
+        <NodeSlot
           node_id="background"
           name="Background"
           component={TemplateBuilderWidgets.Image}

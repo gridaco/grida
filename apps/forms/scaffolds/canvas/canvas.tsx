@@ -63,7 +63,7 @@ export function CanvasOverlay() {
   }, [context]);
 
   return (
-    <div className="absolute inset-0 pointer-events-none z-10">
+    <div className="absolute inset-0 pointer-events-none z-50">
       <div className="w-full h-full" id="canvas-overlay-portal" ref={ref}>
         {selected_node_id && <NodeOverlay node_id={selected_node_id} />}
         {hovered_node_id && <NodeOverlay node_id={hovered_node_id} />}

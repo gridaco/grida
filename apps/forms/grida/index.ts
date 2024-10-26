@@ -41,7 +41,9 @@ export namespace grida {
         | Tokens.StringValueExpression[]
         | { [key: string]: Value };
 
-      export type Props = Record<string, Value>;
+      export type Properties = { [name: string]: schema.PropertyDefinition };
+
+      export type Props = { [name: string]: Value };
 
       export type PropertyDefinition =
         | TypeScalarPropertyDefinition
@@ -139,13 +141,23 @@ export namespace grida {
     }
 
     export namespace template {
-      export interface TemplateDefinition {
+      export interface TemplateDefinition<
+        P extends schema.Properties = schema.Properties,
+      > {
         name: string;
         version: string;
         type: "template";
-        properties: { [name: string]: schema.PropertyDefinition };
+        properties: P;
         default: Record<string, schema.Value>;
         //
+      }
+
+      export interface IBuiltinTemplateNodeReactComponentRenderProps<P>
+        extends nodes.i.IBaseNode,
+          nodes.i.ISceneNode,
+          nodes.i.IStylable,
+          nodes.i.IExpandable {
+        props: P;
       }
 
       /**
@@ -255,7 +267,10 @@ export namespace grida {
         extends i.IBaseNode,
           i.ISceneNode,
           i.IStylable {
-        src: string;
+        /**
+         * required - when falsy, the image will not be rendered
+         */
+        src?: string;
         alt?: string;
         width?: number;
         height?: number;

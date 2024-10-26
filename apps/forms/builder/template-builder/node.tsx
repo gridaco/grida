@@ -1,7 +1,6 @@
 "use client";
 
-import React, { useCallback, useRef } from "react";
-import { cn } from "@/utils";
+import React, { useCallback } from "react";
 import { useGesture } from "@use-gesture/react";
 import { TemplateComponents } from "@/builder/template-builder";
 import type {
@@ -13,12 +12,17 @@ import { useComputed } from "./use-computed";
 import { useValue } from "../core/data-context";
 import { useCurrentDocument } from "@/scaffolds/editor/use-document";
 import { grida } from "@/grida";
+import { TemplateBuilderWidgets } from "./widgets";
 
 interface SlotProps<P extends Record<string, any>> {
   node_id: string;
   name: string;
-  // templatePath
-  component: TemplateComponent<P>;
+  component:
+    | TemplateComponent
+    | typeof TemplateBuilderWidgets.Text
+    | typeof TemplateBuilderWidgets.Image
+    | typeof TemplateBuilderWidgets.Container;
+
   className?: string;
   defaultText?: Tokens.StringValueExpression;
   defaultProperties?: TemplateValueProperties<
@@ -28,7 +32,7 @@ interface SlotProps<P extends Record<string, any>> {
   defaultStyle?: React.CSSProperties;
 }
 
-export function SlotNode<P extends Record<string, any>>({
+export function NodeSlot<P extends Record<string, any>>({
   node_id,
   component,
   defaultText,
@@ -51,34 +55,35 @@ export function SlotNode<P extends Record<string, any>>({
     ? TemplateComponents.components[component_id]
     : component;
 
-  const componentschema = component.schema;
-
   const context = useValue();
   const computedProperties = useComputed({
     ...defaultProperties,
     ...props,
-  });
+  }) as P;
+
   const computedText = useComputed({ text: text ?? defaultText });
 
-  const finalprops = {
+  const masterprops = {
     text: computedText.text,
-    properties: computedProperties,
+    props: computedProperties,
     src,
     style: {
       ...defaultStyle,
       ...style,
     },
-  };
+    // @ts-ignore
+  } satisfies
+    | grida.program.template.IBuiltinTemplateNodeReactComponentRenderProps<P>
+    | grida.program.nodes.AnyNode;
 
   const onSelect = useCallback(() => {
     selectNode(node_id, {
-      selected_node_type: component.type,
-      // @ts-ignore TODO:
-      selected_node_schema: componentschema,
-      selected_node_context: context,
-      selected_node_default_properties: defaultProperties,
-      selected_node_default_style: defaultStyle,
-      selected_node_default_text: defaultText,
+      type: component.type,
+      // TODO:
+      properties: "properties" in component ? component.properties : undefined,
+      default: defaultProperties,
+      default_style: defaultStyle,
+      default_text: defaultText,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectNode]);
@@ -116,7 +121,7 @@ export function SlotNode<P extends Record<string, any>>({
           renderer,
           {
             id: node_id,
-            ...finalprops,
+            ...masterprops,
             className,
           },
           children

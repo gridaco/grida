@@ -108,6 +108,8 @@ const inferType = (
  * @param options.transformthis - When set to `true`, injects the 'this' property into object properties.
  *
  * @returns A JSON schema inferred from the input data.
+ *
+ * @deprecated
  */
 export const inferSchemaFromData = (
   data: Record<string, any>,

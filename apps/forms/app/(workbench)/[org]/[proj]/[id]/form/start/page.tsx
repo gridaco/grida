@@ -182,8 +182,8 @@ function StartPageEditor() {
 function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
   const {
     changeRootValues: changeRootProperties,
-    rootValues,
     rootProperties,
+    rootProps,
   } = useCurrentDocument();
   const [state, dispatch] = useEditorState();
 
@@ -292,7 +292,7 @@ function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
                   changeRootProperties(key, value);
                 };
 
-                const value = rootValues[key];
+                const value = rootProps[key];
 
                 return (
                   <div key={key} className="grid gap-2">

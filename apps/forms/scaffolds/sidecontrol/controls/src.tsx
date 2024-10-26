@@ -11,7 +11,7 @@ export function SrcControl({
   onValueChange,
 }: {
   value?: string;
-  onValueChange?: (value: string) => void;
+  onValueChange?: (value?: string) => void;
 }) {
   const { uploadPublic } = useDocumentAssetUpload();
 
@@ -46,25 +46,30 @@ export function SrcControl({
         WorkbenchUI.inputVariants({ size: "sm" })
       )}
     >
-      <div className="flex items-center flex-1">
-        <Thumb src={value} />
-        <span className="ms-2 text-xs">Image</span>
-      </div>
-      <button>
-        <Cross2Icon className="w-3 h-3 text-muted-foreground" />
-      </button>
+      {value ? (
+        <>
+          <div className="flex items-center flex-1">
+            <Thumb src={value} />
+            <span className="ms-2 text-xs">Image</span>
+          </div>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onValueChange?.(undefined);
+            }}
+          >
+            <Cross2Icon className="w-3 h-3 text-muted-foreground" />
+          </button>
+        </>
+      ) : (
+        <>
+          <div className="flex items-center flex-1 text-muted-foreground">
+            <ThumbPlaceholder />
+            <span className="ms-2 text-xs">Add...</span>
+          </div>
+        </>
+      )}
     </div>
-    // <Input
-    //   type="url"
-    //   value={value}
-    //   placeholder="none"
-    //   min={0}
-    //   step={1}
-    //   className={WorkbenchUI.inputVariants({ size: "sm" })}
-    //   onChange={(e) => {
-    //     onValueChange?.(e.target.value);
-    //   }}
-    // />
   );
 }
 
@@ -76,5 +81,11 @@ function Thumb({ src }: { src: string }) {
       height={40}
       className="object-cover w-6 h-6 overflow-hidden rounded border"
     />
+  );
+}
+
+function ThumbPlaceholder() {
+  return (
+    <div className="w-6 h-6 overflow-hidden rounded border bg-secondary" />
   );
 }

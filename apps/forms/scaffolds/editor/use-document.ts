@@ -4,7 +4,7 @@ import { useCallback, useMemo } from "react";
 import { EditorDocumentAction } from "./action";
 import { BuilderAction } from "@/builder/action";
 import { Tokens } from "@/ast";
-import { UnknwonNodeMeta } from "@/builder/types";
+import { NodeSlotMeta } from "@/builder/types";
 
 function composeDocumentAction(
   document_key: "form/collection" | "form/startpage",
@@ -28,7 +28,7 @@ export function useDocument(
   const { selected_node_id } = document;
 
   const selectNode = useCallback(
-    (node_id: string, meta?: UnknwonNodeMeta) => {
+    (node_id: string, meta?: NodeSlotMeta) => {
       dispatch(
         composeDocumentAction(document_key, {
           type: "document/node/select",
@@ -64,8 +64,8 @@ export function useDocument(
     [dispatch, document_key]
   );
 
-  const rootValues = document.template.props;
-  const rootProperties = document.template.properties;
+  const rootProperties = document.template.properties || {};
+  const rootProps = document.template.props || {};
 
   const changeRootValues = useCallback(
     (key: string, value: any) => {
@@ -147,7 +147,7 @@ export function useDocument(
   // );
 
   const changeNodeSrc = useCallback(
-    (node_id: string, src: string) => {
+    (node_id: string, src?: string) => {
       dispatch(
         composeDocumentAction(document_key, {
           type: "document/template/override/node/change/src",
@@ -202,7 +202,7 @@ export function useDocument(
         changeNodeValue(selected_node_id!, key, value),
       // attributes
       hidden: (hidden: boolean) => changeNodeHidden(selected_node_id!, hidden),
-      src: (src: string) => changeNodeSrc(selected_node_id!, src),
+      src: (src?: string) => changeNodeSrc(selected_node_id!, src),
 
       // style
       opacity: (value: number) =>
@@ -251,7 +251,7 @@ export function useDocument(
   return useMemo(() => {
     return {
       document,
-      rootValues,
+      rootProps,
       rootProperties,
       selectedNode,
       selectNode,
@@ -268,7 +268,7 @@ export function useDocument(
     };
   }, [
     document,
-    rootValues,
+    rootProps,
     rootProperties,
     selectedNode,
     selectNode,

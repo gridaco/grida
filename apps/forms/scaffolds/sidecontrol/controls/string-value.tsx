@@ -32,26 +32,22 @@ export function StringValueControl({
   value,
   onValueChange,
   placeholder = "Value",
+  disabled,
 }: {
   value?: Tokens.StringValueExpression;
   onValueChange?: (value?: Tokens.StringValueExpression) => void;
   placeholder?: string;
+  disabled?: boolean;
 }) {
   const [state] = useEditorState();
 
-  assert(state.documents, "state.documents is required");
-
-  const {
-    document: { selected_node_meta: { selected_node_context } = {} },
-  } = useCurrentDocument();
-
-  const schema = useMemo(
-    () =>
-      selected_node_context
-        ? inferSchemaFromData(selected_node_context)
-        : undefined,
-    [selected_node_context]
-  );
+  // const schema = useMemo(
+  //   () =>
+  //     selected_node_context
+  //       ? inferSchemaFromData(selected_node_context)
+  //       : undefined,
+  //   [selected_node_context]
+  // );
 
   return (
     <div className="relative group w-full">
@@ -59,6 +55,7 @@ export function StringValueControl({
         value={value}
         onValueChange={onValueChange}
         placeholder={placeholder}
+        disabled={disabled}
       />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -71,7 +68,7 @@ export function StringValueControl({
           side="bottom"
           className="max-w-sm overflow-hidden min-w-96"
         >
-          <PropertyAccessDropdownMenu
+          {/* <PropertyAccessDropdownMenu
             asSubmenu
             schema={schema}
             onSelect={(path) => {
@@ -80,7 +77,7 @@ export function StringValueControl({
           >
             <PropertyTypeIcon type="object" className="me-2 w-4 h-4" />
             Page
-          </PropertyAccessDropdownMenu>
+          </PropertyAccessDropdownMenu> */}
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>
               <TokensIcon className="me-2 w-4 h-4" />
@@ -168,10 +165,12 @@ function Control({
   value,
   onValueChange,
   placeholder,
+  disabled,
 }: {
   value?: Tokens.StringValueExpression;
   onValueChange?: (value: Tokens.StringValueExpression) => void;
   placeholder?: string;
+  disabled?: boolean;
 }) {
   if (Tokens.is.templateExpression(value)) {
     return <TemplateExpressionControl value={value} />;
@@ -184,6 +183,7 @@ function Control({
       value={value as string}
       onValueChange={onValueChange}
       placeholder={placeholder}
+      disabled={disabled}
     />
   );
 }
@@ -192,16 +192,19 @@ function StringLiteralControl({
   value,
   onValueChange,
   placeholder,
+  disabled,
 }: {
   value?: string;
   onValueChange?: (value: string) => void;
   placeholder?: string;
+  disabled?: boolean;
 }) {
   return (
     <Input
       type="text"
       value={(value as string) || ""}
       placeholder={placeholder}
+      disabled={disabled}
       onChange={(e) => onValueChange?.(e.target.value)}
       className={WorkbenchUI.inputVariants({ size: "sm" })}
     />

@@ -32,10 +32,10 @@ import { TemplateControl } from "./controls/template";
 import { CursorControl } from "./controls/cursor";
 import { PropertyLine, PropertyLineLabel } from "./ui";
 import { useCurrentDocument } from "../editor/use-document";
-import assert from "assert";
 import { SrcControl } from "./controls/src";
 import { grida } from "@/grida";
 import { ObjectFitControl } from "./controls/object-fit";
+import assert from "assert";
 
 export function SelectedNodeProperties() {
   const { document, selectedNode } = useCurrentDocument();
@@ -45,23 +45,18 @@ export function SelectedNodeProperties() {
   const {
     selected_node_id,
     selected_node_meta: {
-      selected_node_schema,
-      selected_node_type,
-      selected_node_default_properties,
-      selected_node_default_style,
-      selected_node_default_text,
+      type,
+      properties,
+      default: default_props,
+      default_style: selected_node_default_style,
+      default_text: selected_node_default_text,
     } = {},
   } = document;
 
-  const propertyNames = Object.keys(
-    // TODO: add typings to schema
-    selected_node_schema?.shape?.properties?.shape || {}
-  );
-
-  const istemplate = selected_node_type?.startsWith("templates/");
-  const istext = selected_node_type === "text";
-  const isimage = selected_node_type === "image";
-  const isflex = selected_node_type === "flex";
+  const istemplate = type?.startsWith("templates/");
+  const istext = type === "text";
+  const isimage = type === "image";
+  const isflex = type === "flex";
   const islayout = isflex;
 
   const { id, name, hidden, component_id, style, props, text, src } = (document
@@ -69,7 +64,7 @@ export function SelectedNodeProperties() {
     {}) as grida.program.nodes.AnyNode;
 
   const finalprops = {
-    ...(selected_node_default_properties || {}),
+    ...(default_props || {}),
     ...(props || {}),
   };
 
@@ -120,7 +115,7 @@ export function SelectedNodeProperties() {
         <SidebarMenuSectionContent>
           <pre className="text-xs font-mono">
             <div>Node {selected_node_id}</div>
-            <div>Type {selected_node_type}</div>
+            <div>Type {type}</div>
             <div>Name {name}</div>
           </pre>
         </SidebarMenuSectionContent>
@@ -162,24 +157,29 @@ export function SelectedNodeProperties() {
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Component</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          {propertyNames.map((key) => {
-            const value = finalprops?.[key];
+        {properties && (
+          <SidebarMenuSectionContent className="space-y-2">
+            {Object.keys(properties).map((key) => {
+              const def = properties[key];
+              const value = finalprops?.[key];
 
-            return (
-              <PropertyLine key={key}>
-                <PropertyLineLabel>{key}</PropertyLineLabel>
-                <StringValueControl
-                  placeholder={key}
-                  value={value}
-                  onValueChange={(value) => {
-                    selectedNode.value(key, value || undefined);
-                  }}
-                />
-              </PropertyLine>
-            );
-          })}
-        </SidebarMenuSectionContent>
+              return (
+                <PropertyLine key={key}>
+                  <PropertyLineLabel>{key}</PropertyLineLabel>
+                  {/* TODO: only string value is supported atm */}
+                  <StringValueControl
+                    placeholder={key}
+                    value={value}
+                    disabled={def.type !== "string"}
+                    onValueChange={(value) => {
+                      selectedNode.value(key, value || undefined);
+                    }}
+                  />
+                </PropertyLine>
+              );
+            })}
+          </SidebarMenuSectionContent>
+        )}
       </SidebarSection>
 
       <SidebarSection hidden={!istext} className="border-b pb-4">
