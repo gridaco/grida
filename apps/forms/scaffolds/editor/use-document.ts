@@ -236,6 +236,8 @@ export function useDocument(
         changeNodeStyle(selected_node_id!, "alignItems", value),
       cursor: (value?: string) =>
         changeNodeStyle(selected_node_id!, "cursor", value),
+      objectFit: (value?: string) =>
+        changeNodeStyle(selected_node_id!, "objectFit", value),
     };
   }, [
     selected_node_id,

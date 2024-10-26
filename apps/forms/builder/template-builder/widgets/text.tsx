@@ -1,20 +1,8 @@
-import {
-  PropsWithStyle,
-  ZTemplateSchema,
-  withTemplate,
-} from "../with-template";
-import { z } from "zod";
-
-const TextSchema = z.object({
-  properties: z.object({
-    text: z.string(),
-  }),
-}) satisfies ZTemplateSchema<any>;
-
-type TextProps = z.infer<typeof TextSchema>["properties"];
+import { grida } from "@/grida";
+import { withTemplate } from "../with-template";
 
 export const TextWidget = withTemplate(
-  ({ text, style, ...props }: PropsWithStyle<TextProps>) => {
+  ({ text, style, ...props }: grida.program.nodes.TextNode) => {
     const children = text.toString();
 
     return (
@@ -23,6 +11,5 @@ export const TextWidget = withTemplate(
       </div>
     );
   },
-  "text",
-  TextSchema
+  "text"
 );

@@ -1,5 +1,10 @@
-import { Input } from "@/components/ui/input";
 import { WorkbenchUI } from "@/components/workbench";
+import { useDocumentAssetUpload } from "@/scaffolds/asset";
+import { cn } from "@/utils";
+import { Cross2Icon } from "@radix-ui/react-icons";
+import { useEffect } from "react";
+import toast from "react-hot-toast";
+import { useFilePicker } from "use-file-picker";
 
 export function SrcControl({
   value = "",
@@ -8,17 +13,68 @@ export function SrcControl({
   value?: string;
   onValueChange?: (value: string) => void;
 }) {
+  const { uploadPublic } = useDocumentAssetUpload();
+
+  const { openFilePicker, plainFiles, loading } = useFilePicker({
+    readAs: "ArrayBuffer",
+    accept: "image/*",
+    multiple: false,
+  });
+
+  useEffect(
+    () => {
+      if (plainFiles.length > 0) {
+        const uploading = uploadPublic(plainFiles[0]).then((r) =>
+          onValueChange?.(r.publicUrl)
+        );
+        toast.promise(uploading, {
+          loading: "Uploading...",
+          success: "Uploaded",
+          error: "Failed to upload",
+        });
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [plainFiles]
+  );
+
   return (
-    <Input
-      type="url"
-      value={value}
-      placeholder="none"
-      min={0}
-      step={1}
-      className={WorkbenchUI.inputVariants({ size: "sm" })}
-      onChange={(e) => {
-        onValueChange?.(e.target.value);
-      }}
+    <div
+      onClick={openFilePicker}
+      className={cn(
+        "flex items-center border cursor-default",
+        WorkbenchUI.inputVariants({ size: "sm" })
+      )}
+    >
+      <div className="flex items-center flex-1">
+        <Thumb src={value} />
+        <span className="ms-2 text-xs">Image</span>
+      </div>
+      <button>
+        <Cross2Icon className="w-3 h-3 text-muted-foreground" />
+      </button>
+    </div>
+    // <Input
+    //   type="url"
+    //   value={value}
+    //   placeholder="none"
+    //   min={0}
+    //   step={1}
+    //   className={WorkbenchUI.inputVariants({ size: "sm" })}
+    //   onChange={(e) => {
+    //     onValueChange?.(e.target.value);
+    //   }}
+    // />
+  );
+}
+
+function Thumb({ src }: { src: string }) {
+  return (
+    <img
+      src={src}
+      width={40}
+      height={40}
+      className="object-cover w-6 h-6 overflow-hidden rounded border"
     />
   );
 }

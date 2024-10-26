@@ -35,6 +35,7 @@ import { useCurrentDocument } from "../editor/use-document";
 import assert from "assert";
 import { SrcControl } from "./controls/src";
 import { grida } from "@/grida";
+import { ObjectFitControl } from "./controls/object-fit";
 
 export function SelectedNodeProperties() {
   const { document, selectedNode } = useCurrentDocument();
@@ -95,6 +96,9 @@ export function SelectedNodeProperties() {
     gap,
     //
     cursor,
+    //
+    objectFit,
+    //
   } = {
     ...selected_node_default_style,
     ...(style || {}),
@@ -221,6 +225,13 @@ export function SelectedNodeProperties() {
           <PropertyLine>
             <PropertyLineLabel>Source</PropertyLineLabel>
             <SrcControl value={src} onValueChange={selectedNode.src} />
+          </PropertyLine>
+          <PropertyLine>
+            <PropertyLineLabel>Fit</PropertyLineLabel>
+            <ObjectFitControl
+              value={objectFit as any}
+              onValueChange={selectedNode.objectFit}
+            />
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>
