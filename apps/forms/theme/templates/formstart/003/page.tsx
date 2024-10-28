@@ -23,7 +23,7 @@ import { TemplateBuilderWidgets } from "@/builder/template-builder/widgets";
 import { NodeSlot } from "@/builder/template-builder/node";
 import {
   DataProvider,
-  RootDataContextProvider,
+  ProgramDataContextHost,
 } from "@/grida/react-runtime/data-context";
 import { Factory } from "@/ast";
 
@@ -54,7 +54,7 @@ export default function _003({
   }, [lang]);
 
   return (
-    <RootDataContextProvider>
+    <ProgramDataContextHost>
       <DataProvider namespace="dummy" initialData={values}>
         <FormCampaignStartPageContextProvider value={meta}>
           <I18nextProvider
@@ -65,7 +65,7 @@ export default function _003({
           </I18nextProvider>
         </FormCampaignStartPageContextProvider>
       </DataProvider>
-    </RootDataContextProvider>
+    </ProgramDataContextHost>
   );
 }
 

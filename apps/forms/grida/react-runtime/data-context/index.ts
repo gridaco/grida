@@ -1,6 +1,6 @@
 export {
-  RootDataContextProvider,
+  ProgramDataContextHost,
   DataProvider,
-  ScopedVariableProvider,
+  ScopedVariableBoundary,
 } from "./context";
 export * from "./use";

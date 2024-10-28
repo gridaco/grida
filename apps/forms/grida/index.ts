@@ -1,10 +1,6 @@
 import type { Tokens } from "@/ast";
-import * as _react_runtime from "./react-runtime";
 
 export namespace grida {
-  export namespace runtime {
-    export namespace react {}
-  }
   export namespace program {
     export namespace schema {
       /**

@@ -1,6 +1,6 @@
 import React from "react";
 import { useValue } from "./use";
-import { ScopedVariableProvider } from "./context";
+import { ScopedVariableBoundary } from "./context";
 
 interface ArrayMapProps {
   identifier: string;
@@ -18,13 +18,13 @@ const ArrayMap: React.FC<ArrayMapProps> = ({
   return (
     <>
       {arrayData.map((item: any, index: number) => (
-        <ScopedVariableProvider
+        <ScopedVariableBoundary
           key={index}
           identifier={identifier}
           expression={expression.concat([index.toString()]) as any}
         >
           {children(item, index)}
-        </ScopedVariableProvider>
+        </ScopedVariableBoundary>
       ))}
     </>
   );

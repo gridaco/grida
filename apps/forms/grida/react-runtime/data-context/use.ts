@@ -46,11 +46,3 @@ export const useSelectValue = <T>({
     return selected;
   }, [keys, data, variablePaths]);
 };
-
-export const useNamespaces = (): string[] => {
-  const context = useContext(DataContext);
-  if (!context) {
-    throw new Error("useNamespaces must be used within a DataProvider");
-  }
-  return context.namespaces;
-};

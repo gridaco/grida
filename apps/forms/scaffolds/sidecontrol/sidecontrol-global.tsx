@@ -73,6 +73,8 @@ import { PoweredByGridaWaterMark } from "@/components/powered-by-branding";
 import { BrowseStartPageTemplatesDialog } from "../form-templates/startpage-templates-dialog";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { FormStartPage } from "@/theme/templates/formstart";
+import { PropsControl } from "./controls/props";
+import { useDocument } from "@/builder/provider";
 
 const { default: all, ...variants } = _variants;
 
@@ -83,16 +85,7 @@ export function SideControlGlobal() {
 
   return (
     <>
-      {selected_page_id === "form/startpage" && (
-        <SidebarSection className="border-b pb-4">
-          <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>Template</SidebarSectionHeaderLabel>
-          </SidebarSectionHeaderItem>
-          <SidebarMenuSectionContent>
-            <StartPageTemplateControl />
-          </SidebarMenuSectionContent>
-        </SidebarSection>
-      )}
+      {selected_page_id === "form/startpage" && <FormStartPageControl />}
       <SidebarSection className="border-b pb-4">
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Type</SidebarSectionHeaderLabel>
@@ -149,7 +142,37 @@ export function SideControlGlobal() {
   );
 }
 
-function StartPageTemplateControl() {
+function FormStartPageControl() {
+  const { document, rootProperties, rootProps, changeRootProps } =
+    useDocument();
+
+  return (
+    <>
+      <SidebarSection className="border-b pb-4">
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>Template</SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuSectionContent>
+          <FormStartPageTemplateControl />
+        </SidebarMenuSectionContent>
+      </SidebarSection>
+      <SidebarSection className="border-b pb-4">
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>Component</SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuSectionContent className="space-y-2">
+          <PropsControl
+            properties={rootProperties}
+            props={rootProps}
+            onValueChange={changeRootProps}
+          />
+        </SidebarMenuSectionContent>
+      </SidebarSection>
+    </>
+  );
+}
+
+function FormStartPageTemplateControl() {
   const [state, dispatch] = useEditorState();
 
   const dialog = useDialogState("switch-template-dialog");

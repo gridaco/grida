@@ -32,9 +32,10 @@ import { TemplateControl } from "./controls/template";
 import { CursorControl } from "./controls/cursor";
 import { PropertyLine, PropertyLineLabel } from "./ui";
 import { SrcControl } from "./controls/src";
-import { grida } from "@/grida";
 import { ObjectFitControl } from "./controls/object-fit";
+import { PropsControl } from "./controls/props";
 import { useDocument } from "@/builder/provider";
+import { grida } from "@/grida";
 import assert from "assert";
 
 export function SelectedNodeProperties() {
@@ -157,27 +158,14 @@ export function SelectedNodeProperties() {
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Component</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
+
         {properties && (
           <SidebarMenuSectionContent className="space-y-2">
-            {Object.keys(properties).map((key) => {
-              const def = properties[key];
-              const value = finalprops?.[key];
-
-              return (
-                <PropertyLine key={key}>
-                  <PropertyLineLabel>{key}</PropertyLineLabel>
-                  {/* TODO: only string value is supported atm */}
-                  <StringValueControl
-                    placeholder={key}
-                    value={value}
-                    disabled={def.type !== "string"}
-                    onValueChange={(value) => {
-                      selectedNode.value(key, value || undefined);
-                    }}
-                  />
-                </PropertyLine>
-              );
-            })}
+            <PropsControl
+              properties={properties}
+              props={finalprops}
+              onValueChange={selectedNode.value}
+            />
           </SidebarMenuSectionContent>
         )}
       </SidebarSection>

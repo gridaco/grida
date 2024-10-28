@@ -88,7 +88,7 @@ export function useDocument() {
   const rootProperties = document.template.properties || {};
   const rootProps = document.template.props || {};
 
-  const changeRootValues = useCallback(
+  const changeRootProps = useCallback(
     (key: string, value: any) => {
       dispatch({
         type: "document/template/change/props",
@@ -263,7 +263,7 @@ export function useDocument() {
       changeNodeHidden,
       pointerEnterNode,
       pointerLeaveNode,
-      changeRootValues,
+      changeRootProps,
       clearSelection,
       changeNodeComponent,
       changeNodeText,
@@ -280,7 +280,7 @@ export function useDocument() {
     changeNodeHidden,
     pointerEnterNode,
     pointerLeaveNode,
-    changeRootValues,
+    changeRootProps,
     clearSelection,
     changeNodeComponent,
     changeNodeText,

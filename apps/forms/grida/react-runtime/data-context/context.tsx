@@ -26,7 +26,7 @@ interface RootDataContextProviderProps {
   children: ReactNode;
 }
 
-export const RootDataContextProvider: FC<RootDataContextProviderProps> = ({
+export const ProgramDataContextHost: FC<RootDataContextProviderProps> = ({
   children,
 }) => {
   const [rootData, setRootData] = useState<Record<string, any>>({});
@@ -95,7 +95,7 @@ export const DataProvider: FC<DataProviderProps> = ({
   const rootContext = useContext(RootDataContext);
   if (!rootContext) {
     throw new Error(
-      "DataProvider must be used within a RootDataContextProvider"
+      "DataProvider must be used within a ProgramDataContextHost"
     );
   }
   const {
@@ -159,7 +159,7 @@ interface ScopedVariableContextProps {
  * Does not support nested scoped variable providers.
  * This only works for a single level of scoping.
  */
-export const ScopedVariableProvider: FC<{
+export const ScopedVariableBoundary: FC<{
   identifier: string;
   expression: Access.KeyPath<any>;
   children: ReactNode;

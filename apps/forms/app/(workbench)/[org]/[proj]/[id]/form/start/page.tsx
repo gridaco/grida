@@ -200,7 +200,7 @@ function StartPageEditor() {
 
 function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
   const {
-    changeRootValues: changeRootProperties,
+    changeRootProps: changeRootProperties,
     rootProperties,
     rootProps,
   } = useDocument();

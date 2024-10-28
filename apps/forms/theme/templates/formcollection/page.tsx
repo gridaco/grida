@@ -14,7 +14,7 @@ import { TemplateBuilderWidgets } from "@/builder/template-builder/widgets";
 import { Header_001 } from "@/builder/template-builder/components/headers";
 import * as samples from "./samples";
 import {
-  RootDataContextProvider,
+  ProgramDataContextHost,
   DataProvider,
 } from "@/grida/react-runtime/data-context";
 import { Factory } from "@/ast/factory";
@@ -30,7 +30,7 @@ export default function FormCollectionPage() {
   const { props: props } = template;
 
   return (
-    <RootDataContextProvider>
+    <ProgramDataContextHost>
       <DataProvider namespace="dummy" initialData={props}>
         <div className="@container/preview">
           <Header_001
@@ -131,7 +131,7 @@ export default function FormCollectionPage() {
           </footer>
         </div>
       </DataProvider>
-    </RootDataContextProvider>
+    </ProgramDataContextHost>
   );
 }
 
