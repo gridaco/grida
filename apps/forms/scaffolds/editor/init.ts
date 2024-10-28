@@ -276,9 +276,9 @@ function initialSiteEditorState(init: SiteDocumentEditorInit): EditorState {
       basepath: base.basepath,
       document_id: init.document_id,
     }),
-    selected_page_id: "form/collection",
+    selected_page_id: "site/dev-collection",
     documents: {
-      ["form/collection"]: {
+      ["site/dev-collection"]: {
         readonly: false,
         template: {
           name: "formcollection_sample_001_the_bundle",
@@ -569,7 +569,7 @@ function sitedocumentpagesinit({
   return [
     {
       section: "Pages",
-      id: "form/collection",
+      id: "site/dev-collection",
       label: "home",
       href: `/${basepath}/${document_id}/design`,
       icon: "file",

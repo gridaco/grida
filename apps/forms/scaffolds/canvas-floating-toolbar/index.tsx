@@ -37,7 +37,7 @@ export function SamplesSelect() {
 
     dispatch({
       type: "editor/document",
-      key: "form/collection",
+      key: "site/dev-collection",
       action: {
         type: "editor/document/data",
         data: data,

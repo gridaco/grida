@@ -375,7 +375,7 @@ interface IEditorPagesState {
   selected_page_id?:
     | "form"
     | "form/startpage"
-    | "form/collection"
+    | "site/dev-collection"
     | (string & {});
 }
 
@@ -403,7 +403,7 @@ export interface BaseDocumentEditorState
   document_title: string;
   doctype: GDocumentType;
   documents: {
-    ["form/collection"]?: ITemplateEditorState;
+    ["site/dev-collection"]?: ITemplateEditorState;
     ["form/startpage"]?: ITemplateEditorState;
     // [key: string]: ITemplateEditorState;
   };

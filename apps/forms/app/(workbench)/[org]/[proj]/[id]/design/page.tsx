@@ -45,7 +45,7 @@ function CurrentPageCanvas() {
   );
 
   switch (selected_page_id) {
-    case "form/collection":
+    case "site/dev-collection":
       return (
         <StandaloneDocumentEditor state={document} dispatch={documentDispatch}>
           <CanvasEventTarget className="relative w-full no-scrollbar overflow-y-auto bg-transparent">

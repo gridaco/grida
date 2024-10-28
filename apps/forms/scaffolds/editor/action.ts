@@ -447,12 +447,12 @@ export interface FormStartPageInitAction {
 
 export interface EditorDocumentAction {
   type: "editor/document";
-  key: "form/collection" | "form/startpage";
+  key: "site/dev-collection" | "form/startpage";
   action: BuilderAction;
 }
 
 export function composeEditorDocumentAction(
-  document_key: "form/collection" | "form/startpage",
+  document_key: "site/dev-collection" | "form/startpage",
   action: BuilderAction
 ): EditorDocumentAction {
   return {

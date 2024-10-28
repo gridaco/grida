@@ -82,7 +82,7 @@ function Consumer() {
                   node_id="title"
                   name="Title"
                   component={TemplateBuilderWidgets.Text}
-                  defaultText={"AAA"}
+                  defaultText={"Enter Title"}
                   defaultStyle={{}}
                 />
                 {/* {data.title} */}
@@ -92,7 +92,7 @@ function Consumer() {
                   node_id="subtitle"
                   name="Subtitle"
                   component={TemplateBuilderWidgets.Text}
-                  defaultText={"AAA"}
+                  defaultText={"Enter Subtitle"}
                   defaultStyle={{}}
                 />
                 {/* {data.subtitle} */}
