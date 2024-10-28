@@ -24,7 +24,8 @@ import { NodeSlot } from "@/builder/template-builder/node";
 import {
   DataProvider,
   RootDataContextProvider,
-} from "@/builder/core/data-context";
+} from "@/grida/react-runtime/data-context";
+import { Factory } from "@/ast";
 
 const userprops = {
   title: { type: "string" },
@@ -82,7 +83,10 @@ function Consumer() {
                   node_id="title"
                   name="Title"
                   component={TemplateBuilderWidgets.Text}
-                  defaultText={"Enter Title"}
+                  text={Factory.createPropertyAccessExpression([
+                    "props",
+                    "title",
+                  ])}
                   defaultStyle={{}}
                 />
                 {/* {data.title} */}
@@ -92,7 +96,7 @@ function Consumer() {
                   node_id="subtitle"
                   name="Subtitle"
                   component={TemplateBuilderWidgets.Text}
-                  defaultText={"Enter Subtitle"}
+                  text={"Enter Subtitle"}
                   defaultStyle={{}}
                 />
                 {/* {data.subtitle} */}

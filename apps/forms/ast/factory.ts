@@ -1,5 +1,5 @@
 import { Access } from "./access";
-import type { Tokens } from "./tokens";
+import { Tokens } from "./tokens";
 
 export namespace Factory {
   export function createStringLiteral(text: string): Tokens.StringLiteral {
@@ -103,6 +103,30 @@ export namespace Factory {
     }
 
     return paths;
+  }
+
+  /**
+   *
+   * resolve expression access identifiers - used to prepare required context data for rendering
+   *
+   * @example
+   * - template expression "`literal ~ ${props.a} ${props.b} ~ literal`" => [["props", "a"], ["props", "b"]]
+   * - property access expression `"props.value"` => [["props", "value"]]
+   *
+   *
+   * @param props passed props { key: expression }
+   * @returns [dependency array of [access identifiers]]
+   */
+  export function getStringValueExpressionAccessIdentifiersDependencyArray(
+    exp: Tokens.StringValueExpression
+  ) {
+    if (Tokens.is.propertyAccessExpression(exp)) {
+      return [exp.expression];
+    } else if (Tokens.is.templateExpression(exp)) {
+      return Factory.getTemplateExpressionDataKeyPaths(exp);
+    } else {
+      return [];
+    }
   }
 
   export function renderPropertyAccessExpression(

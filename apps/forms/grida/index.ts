@@ -1,6 +1,10 @@
 import type { Tokens } from "@/ast";
+import * as _react_runtime from "./react-runtime";
 
 export namespace grida {
+  export namespace runtime {
+    export namespace react {}
+  }
   export namespace program {
     export namespace schema {
       /**
@@ -240,6 +244,19 @@ export namespace grida {
         }
 
         export interface ITextValue {
+          /**
+           * text value
+           *
+           * - expression - {@link Tokens.StringValueExpression} - computed or literal
+           *   - literal - e.g. `"A text value"`
+           *   - property access - {@link Tokens.PropertyAccessExpression} - computed, , e.g. `userdata.title`
+           *   - identifier - {@link Tokens.Identifier} - computed, e.g. `title`
+           *   - others - all {@link Tokens.StringValueExpression} types
+           *
+           * when used under a component / instance / template, the `props.` expression is reserved and refers to adjacent parent's props.
+           * - by the standard implementation, the `props.[x]` is recommended to be referenced only once in a single node.
+           * - by the standard implementation, within the visual editor context, when user attempts to updates the literal value (where it is a `props.[x]` and `props.[x] is literal`), it should actually update the `props.[x]` value, not this `text` literal value.
+           */
           text: Tokens.StringValueExpression;
         }
 

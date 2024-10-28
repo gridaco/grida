@@ -41,7 +41,7 @@ function CurrentPageCanvas() {
         )
       );
     },
-    [dispatch]
+    [selected_page_id, dispatch]
   );
 
   switch (selected_page_id) {

@@ -57,7 +57,7 @@ export const Card_001 = withTemplateDefinition(
           <NodeSlot
             name="Title"
             component={TemplateBuilderWidgets.Text}
-            defaultText={h1}
+            text={h1}
             node_id={".h1"}
           />
           {/* <h3 className="text-lg font-semibold text-foreground">{h1}</h3> */}

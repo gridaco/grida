@@ -16,9 +16,9 @@ import * as samples from "./samples";
 import {
   RootDataContextProvider,
   DataProvider,
-} from "@/builder/core/data-context";
+} from "@/grida/react-runtime/data-context";
 import { Factory } from "@/ast/factory";
-import ArrayMap from "@/builder/core/data-context/array";
+import ArrayMap from "@/grida/react-runtime/data-context/array";
 import { useDocument } from "@/builder/provider";
 
 type ISample = (typeof samples)[keyof typeof samples];
@@ -65,7 +65,7 @@ export default function FormCollectionPage() {
                   node_id="list-header-title"
                   name="List Header Title"
                   component={TemplateBuilderWidgets.Text}
-                  defaultText={Factory.createPropertyAccessExpression<ISample>([
+                  text={Factory.createPropertyAccessExpression<ISample>([
                     "listheader",
                     "text",
                   ])}

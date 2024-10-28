@@ -14,7 +14,7 @@ import { cn } from "@/utils";
 import {
   DataProvider,
   RootDataContextProvider,
-} from "@/builder/core/data-context";
+} from "@/grida/react-runtime/data-context";
 
 export function TemplateControl({
   value,

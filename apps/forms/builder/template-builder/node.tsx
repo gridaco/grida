@@ -9,7 +9,7 @@ import type {
 } from "./with-template";
 import type { Tokens } from "@/ast";
 import { useComputed } from "./use-computed";
-import { useValue } from "../core/data-context";
+import { useValue } from "../../grida/react-runtime/data-context";
 import { grida } from "@/grida";
 import { TemplateBuilderWidgets } from "./widgets";
 import { useDocument } from "../provider";
@@ -24,7 +24,7 @@ interface SlotProps<P extends Record<string, any>> {
     | typeof TemplateBuilderWidgets.Container;
 
   className?: string;
-  defaultText?: Tokens.StringValueExpression;
+  text?: Tokens.StringValueExpression;
   defaultProperties?: TemplateValueProperties<
     Omit<P, "id" | "name" | "hidden" | "locked">,
     Tokens.StringValueExpression
@@ -35,7 +35,7 @@ interface SlotProps<P extends Record<string, any>> {
 export function NodeSlot<P extends Record<string, any>>({
   node_id,
   component,
-  defaultText,
+  text: defaultText,
   defaultProperties,
   defaultStyle,
   className,

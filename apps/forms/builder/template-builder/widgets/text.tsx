@@ -5,7 +5,7 @@ export const TextWidget = ({
   style,
   ...props
 }: grida.program.nodes.TextNode) => {
-  const children = text.toString();
+  const children = text?.toString();
 
   return (
     <div {...props} style={style}>
