@@ -60,10 +60,10 @@ export default function reducer(
         } as grida.program.schema.Props;
       });
     }
-    case "document/template/override/node/change/hidden": {
-      const { node_id, hidden } = <TemplateEditorNodeChangeHiddenAction>action;
+    case "document/template/override/node/change/active": {
+      const { node_id, active } = <TemplateEditorNodeChangeHiddenAction>action;
       return produce(state, (draft) => {
-        override(draft, { node_id, payload: { hidden } });
+        override(draft, { node_id, payload: { active } });
       });
     }
     case "document/template/override/node/change/component": {

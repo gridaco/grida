@@ -131,12 +131,12 @@ export function useDocument() {
     [dispatch]
   );
 
-  const changeNodeHidden = useCallback(
+  const changeNodeActive = useCallback(
     (node_id: string, hidden: boolean) => {
       dispatch({
-        type: "document/template/override/node/change/hidden",
+        type: "document/template/override/node/change/active",
         node_id: node_id,
-        hidden,
+        active: hidden,
       });
     },
     [dispatch]
@@ -206,7 +206,7 @@ export function useDocument() {
       value: (key: string, value: any) =>
         changeNodeValue(selected_node_id!, key, value),
       // attributes
-      hidden: (hidden: boolean) => changeNodeHidden(selected_node_id!, hidden),
+      active: (active: boolean) => changeNodeActive(selected_node_id!, active),
       src: (src?: string) => changeNodeSrc(selected_node_id!, src),
 
       // style
@@ -260,7 +260,7 @@ export function useDocument() {
       rootProperties,
       selectedNode,
       selectNode,
-      changeNodeHidden,
+      changeNodeActive,
       pointerEnterNode,
       pointerLeaveNode,
       changeRootProps,
@@ -277,7 +277,7 @@ export function useDocument() {
     rootProperties,
     selectedNode,
     selectNode,
-    changeNodeHidden,
+    changeNodeActive,
     pointerEnterNode,
     pointerLeaveNode,
     changeRootProps,

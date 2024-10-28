@@ -38,8 +38,8 @@ export type BuilderNodePointerLeaveAction = INodeAction & {
   type: "document/node/on-pointer-leave";
 };
 
-interface INodeChangeHiddenAction extends INodeAction {
-  hidden: boolean;
+interface INodeChangeActiveAction extends INodeAction {
+  active: boolean;
 }
 
 interface INodeChangeComponentAction extends INodeAction {
@@ -83,8 +83,8 @@ export type TemplateEditorNodeChangePropsAction = INodeChangePropsAction & {
   type: "document/template/override/node/change/props";
 };
 
-export type TemplateEditorNodeChangeHiddenAction = INodeChangeHiddenAction & {
-  type: "document/template/override/node/change/hidden";
+export type TemplateEditorNodeChangeHiddenAction = INodeChangeActiveAction & {
+  type: "document/template/override/node/change/active";
 };
 
 export type TemplateEditorChangeTemplatePropsAction = Omit<

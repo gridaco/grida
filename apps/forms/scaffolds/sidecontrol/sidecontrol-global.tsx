@@ -158,7 +158,7 @@ function FormStartPageControl() {
       </SidebarSection>
       <SidebarSection className="border-b pb-4">
         <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Component</SidebarSectionHeaderLabel>
+          <SidebarSectionHeaderLabel>Props</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuSectionContent className="space-y-2">
           <PropsControl

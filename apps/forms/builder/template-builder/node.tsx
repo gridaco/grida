@@ -48,7 +48,7 @@ export function NodeSlot<P extends Record<string, any>>({
     pointerLeaveNode,
   } = useDocument();
 
-  const { id, hidden, name, style, component_id, props, text, src } = (template
+  const { id, active, name, style, component_id, props, text, src } = (template
     .overrides[node_id] || {}) as grida.program.nodes.AnyNode;
 
   const renderer = component_id
@@ -116,7 +116,7 @@ export function NodeSlot<P extends Record<string, any>>({
 
   return (
     <>
-      <div {...bind()} style={{ display: hidden ? "none" : undefined }}>
+      <div {...bind()} style={{ display: active ? undefined : "none" }}>
         {React.createElement<any>(
           renderer,
           {

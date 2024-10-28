@@ -202,18 +202,16 @@ export namespace grida {
 
         export interface ISceneNode {
           /**
-           * whether this node is hidden / disabled within the editor context
+           * whether this node is active within the editor context
            *
-           * unlike HtmlElement#hidden attrubute, this will act prior regardless to the display property
-           *
-           * when node is hidden, its content will not be included in the runtime tree
+           * when active is false, its content will not be included in the runtime tree
            *
            * its exact behaviour varies by the environment
            *
-           * @default false
-           * @example when true, display:none
+           * @default true
+           * @example when false, display:none or not included in the tree
            */
-          hidden: boolean;
+          active: boolean;
 
           /**
            * whether this node is locked

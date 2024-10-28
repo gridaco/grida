@@ -60,7 +60,7 @@ export function SelectedNodeProperties() {
   const isflex = type === "flex";
   const islayout = isflex;
 
-  const { id, name, hidden, component_id, style, props, text, src } = (document
+  const { id, name, active, component_id, style, props, text, src } = (document
     .template.overrides[selected_node_id!] ||
     {}) as grida.program.nodes.AnyNode;
 
@@ -127,8 +127,8 @@ export function SelectedNodeProperties() {
         </SidebarSectionHeaderItem>
         <SidebarMenuSectionContent className="space-y-2">
           <PropertyLine>
-            <PropertyLineLabel>Hidden</PropertyLineLabel>
-            <HiddenControl value={hidden} onValueChange={selectedNode.hidden} />
+            <PropertyLineLabel>Active</PropertyLineLabel>
+            <HiddenControl value={active} onValueChange={selectedNode.active} />
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>
@@ -156,7 +156,7 @@ export function SelectedNodeProperties() {
       </SidebarSection>
       <SidebarSection hidden={!istemplate} className="border-b pb-4">
         <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Component</SidebarSectionHeaderLabel>
+          <SidebarSectionHeaderLabel>Props</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
 
         {properties && (
