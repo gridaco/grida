@@ -10,6 +10,7 @@ import {
   SidebarMenuItemAction,
   SidebarSectionHeaderItem,
   SidebarSectionHeaderLabel,
+  SidebarMenuItemLabel,
 } from "@/components/sidebar";
 import { EditorFlatFormBlock, MenuItem } from "../editor/state";
 import { FormBlockType, FormFieldDefinition, FormInputType } from "@/types";
@@ -20,7 +21,13 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { BoxIcon, DotsHorizontalIcon } from "@radix-ui/react-icons";
+import {
+  BoxIcon,
+  ComponentInstanceIcon,
+  DotsHorizontalIcon,
+  ImageIcon,
+  TextIcon,
+} from "@radix-ui/react-icons";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,6 +38,7 @@ import { renderMenuItems } from "./render";
 import { StandaloneDocumentEditor, useDocument } from "@/builder/provider";
 import { BuilderAction } from "@/builder/action";
 import { composeEditorDocumentAction } from "../editor/action";
+import { grida } from "@/grida";
 
 export function ModeDesign() {
   const [state, dispatch] = useEditorState();
@@ -131,9 +139,9 @@ function NodeHierarchyList() {
             onSelect={() => {
               selectNode(n.id);
             }}
-            icon={<NodeHierarchyItemIcon className="w-4 h-4" />}
+            icon={<NodeHierarchyItemIcon type={n.type} className="w-4 h-4" />}
           >
-            {n.name}
+            <SidebarMenuItemLabel>{n.name}</SidebarMenuItemLabel>
           </SidebarMenuItem>
         );
       })}
@@ -199,7 +207,23 @@ function FormBlockHierarchyList() {
   );
 }
 
-function NodeHierarchyItemIcon({ className }: { className?: string }) {
+function NodeHierarchyItemIcon({
+  className,
+  type,
+}: {
+  type: grida.program.nodes.Node["type"];
+  className?: string;
+}) {
+  switch (type) {
+    case "container":
+      return <BoxIcon className={className} />;
+    case "image":
+      return <ImageIcon className={className} />;
+    case "text":
+      return <TextIcon className={className} />;
+    case "instance":
+      return <ComponentInstanceIcon className={className} />;
+  }
   return <BoxIcon className={className} />;
 }
 

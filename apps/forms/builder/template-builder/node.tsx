@@ -87,16 +87,19 @@ export function NodeSlot<P extends Record<string, any>>({
 
   return (
     <>
-      <div {...bind()} style={{ display: node.active ? undefined : "none" }}>
-        {React.createElement<any>(
-          renderer,
-          {
-            id: node_id,
-            ...masterprops,
+      {React.createElement<any>(
+        renderer,
+        {
+          id: node_id,
+          ...masterprops,
+          ...bind(),
+          style: {
+            ...masterprops.style,
+            display: node.active ? masterprops.style.display : "none",
           },
-          children
-        )}
-      </div>
+        },
+        children
+      )}
     </>
   );
 }
