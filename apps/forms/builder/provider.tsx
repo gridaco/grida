@@ -5,12 +5,14 @@ import React, {
   useEffect,
   useMemo,
 } from "react";
-import type {
-  DocumentDispatcher,
-  ITemplateEditorState,
-  NodeSlotMeta,
-} from "./types";
+import type { DocumentDispatcher, ITemplateEditorState } from "./types";
 import type { Tokens } from "@/ast";
+import { grida } from "@/grida";
+import { useComputed } from "./template-builder/use-computed";
+import {
+  DataProvider,
+  ProgramDataContextHost,
+} from "@/grida/react-runtime/data-context/context";
 
 const DocumentContext = createContext<ITemplateEditorState | null>(null);
 
@@ -35,10 +37,16 @@ export function StandaloneDocumentEditor({
 
   const __dispatch = state.readonly ? __noop : dispatch ?? __noop;
 
+  const shallowProps = useMemo(() => {
+    return Object.assign({}, state.template.default, state.template.props);
+  }, [state.template.default, state.template.props]);
+
   return (
     <DocumentContext.Provider value={state}>
       <DocumentDispatcherContext.Provider value={__dispatch}>
-        {children}
+        <ProgramDataContextHost>
+          <DataProvider data={{ props: shallowProps }}>{children}</DataProvider>
+        </ProgramDataContextHost>
       </DocumentDispatcherContext.Provider>
     </DocumentContext.Provider>
   );
@@ -55,11 +63,10 @@ export function useDocument() {
   const { selected_node_id } = document;
 
   const selectNode = useCallback(
-    (node_id: string, meta?: NodeSlotMeta) => {
+    (node_id: string) => {
       dispatch({
         type: "document/node/select",
         node_id,
-        meta,
       });
     },
     [dispatch]
@@ -87,6 +94,7 @@ export function useDocument() {
 
   const rootProperties = document.template.properties || {};
   const rootProps = document.template.props || {};
+  const rootDefault = document.template.default || {};
 
   const changeRootProps = useCallback(
     (key: string, value: any) => {
@@ -158,7 +166,7 @@ export function useDocument() {
   // );
 
   const changeNodeSrc = useCallback(
-    (node_id: string, src?: string) => {
+    (node_id: string, src?: Tokens.StringValueExpression) => {
       dispatch({
         type: "document/template/override/node/change/src",
         node_id: node_id,
@@ -207,7 +215,8 @@ export function useDocument() {
         changeNodeValue(selected_node_id!, key, value),
       // attributes
       active: (active: boolean) => changeNodeActive(selected_node_id!, active),
-      src: (src?: string) => changeNodeSrc(selected_node_id!, src),
+      src: (src?: Tokens.StringValueExpression) =>
+        changeNodeSrc(selected_node_id!, src),
 
       // style
       opacity: (value: number) =>
@@ -257,6 +266,7 @@ export function useDocument() {
     return {
       document,
       rootProps,
+      rootDefault,
       rootProperties,
       selectedNode,
       selectNode,
@@ -274,6 +284,7 @@ export function useDocument() {
   }, [
     document,
     rootProps,
+    rootDefault,
     rootProperties,
     selectedNode,
     selectNode,
@@ -288,4 +299,37 @@ export function useDocument() {
     changeNodeStyle,
     changeNodeValue,
   ]);
+}
+
+export function useNode(node_id: string) {
+  const {
+    document: {
+      template: { nodes, overrides },
+    },
+  } = useDocument();
+
+  const node_definition = useMemo(
+    () => nodes.find((n) => n.id === node_id),
+    [nodes, node_id]
+  );
+
+  const node_overrides = overrides[node_id];
+
+  const node: grida.program.nodes.AnyNode = useMemo(() => {
+    return Object.assign(
+      {},
+      node_definition,
+      node_overrides
+    ) as grida.program.nodes.AnyNode;
+  }, [node_definition, node_overrides]);
+
+  return node;
+}
+
+export function useComputedNode(node_id: string) {
+  const node = useNode(node_id);
+  const { active, style, component_id, props, text, src } = node;
+  const computed = useComputed({ text: text, src: src, props: props });
+
+  return computed;
 }

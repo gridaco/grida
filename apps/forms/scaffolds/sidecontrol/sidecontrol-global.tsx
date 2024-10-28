@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import {
   SidebarMenuSectionContent,
@@ -143,8 +143,13 @@ export function SideControlGlobal() {
 }
 
 function FormStartPageControl() {
-  const { document, rootProperties, rootProps, changeRootProps } =
+  const { document, rootProperties, rootProps, rootDefault, changeRootProps } =
     useDocument();
+
+  const shallowProps = useMemo(
+    () => Object.assign({}, rootDefault, rootProps),
+    [rootDefault, rootProps]
+  );
 
   return (
     <>
@@ -163,7 +168,7 @@ function FormStartPageControl() {
         <SidebarMenuSectionContent className="space-y-2">
           <PropsControl
             properties={rootProperties}
-            props={rootProps}
+            props={shallowProps}
             onValueChange={changeRootProps}
           />
         </SidebarMenuSectionContent>

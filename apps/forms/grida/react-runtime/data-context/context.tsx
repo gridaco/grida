@@ -76,20 +76,19 @@ export const DataContext = createContext<DataContextProps | undefined>(
 
 interface DataContextProps {
   data: Record<string, any>;
-  updateData: (key: string, value: any) => void;
   transformers: Record<string, TransformerFunction>;
   namespaces: string[];
 }
 
 interface DataProviderProps {
   namespace?: string;
-  initialData?: Record<string, any>;
+  data?: Record<string, any>;
   children: ReactNode;
 }
 
 export const DataProvider: FC<DataProviderProps> = ({
   namespace,
-  initialData = {},
+  data: localdata = {},
   children,
 }) => {
   const rootContext = useContext(RootDataContext);
@@ -98,46 +97,23 @@ export const DataProvider: FC<DataProviderProps> = ({
       "DataProvider must be used within a ProgramDataContextHost"
     );
   }
-  const {
-    rootData,
-    updateRootData,
-    transformers,
-    namespaces: rootNamespaces,
-  } = rootContext;
-
-  const [localData, setLocalData] = useState<Record<string, any>>(initialData);
-  const [localNamespaces, setLocalNamespaces] = useState<string[]>(
-    namespace ? [namespace] : []
-  );
-
-  const updateData = (key: string, value: any) => {
-    if (namespace) {
-      setLocalData((prevData) => ({
-        ...prevData,
-        [key]: value,
-      }));
-      if (!localNamespaces.includes(key)) {
-        setLocalNamespaces([...localNamespaces, key]);
-      }
-    } else {
-      updateRootData(key, value);
-    }
-  };
+  const { rootData, transformers, namespaces: rootNamespaces } = rootContext;
 
   const combinedData = useMemo(
-    () => ({ ...rootData, ...localData }),
-    [rootData, localData]
+    () => ({ ...rootData, ...localdata }),
+    [rootData, localdata]
   );
-  const combinedNamespaces = useMemo(
-    () => Array.from(new Set([...rootNamespaces, ...localNamespaces])),
-    [rootNamespaces, localNamespaces]
-  );
+  const combinedNamespaces = useMemo(() => {
+    if (!namespace) {
+      return rootNamespaces;
+    }
+    return Array.from(new Set([...rootNamespaces, namespace]));
+  }, [rootNamespaces, namespace]);
 
   return (
     <DataContext.Provider
       value={{
         data: combinedData,
-        updateData,
         transformers,
         namespaces: combinedNamespaces,
       }}

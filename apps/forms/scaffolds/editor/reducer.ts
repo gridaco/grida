@@ -371,7 +371,7 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
       return produce(state, (draft) => {
         draft.documents["form/startpage"] = {
           readonly: false,
-          template: { ...startpage, default: {}, overrides: {}, props: {} },
+          template: { ...startpage, overrides: {}, props: {} },
         };
       });
     }

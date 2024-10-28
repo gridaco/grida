@@ -12,34 +12,26 @@ import { useComputed } from "./use-computed";
 import { useValue } from "../../grida/react-runtime/data-context";
 import { grida } from "@/grida";
 import { TemplateBuilderWidgets } from "./widgets";
-import { useDocument } from "../provider";
+import { useComputedNode, useDocument, useNode } from "../provider";
 
 interface SlotProps<P extends Record<string, any>> {
   node_id: string;
-  name: string;
   component:
     | TemplateComponent
     | typeof TemplateBuilderWidgets.Text
     | typeof TemplateBuilderWidgets.Image
     | typeof TemplateBuilderWidgets.Container;
 
-  className?: string;
-  text?: Tokens.StringValueExpression;
-  defaultProperties?: TemplateValueProperties<
-    Omit<P, "id" | "name" | "hidden" | "locked">,
-    Tokens.StringValueExpression
-  >;
-  defaultStyle?: React.CSSProperties;
+  // className?: string;
+  style?: React.CSSProperties;
+  // defaultStyle?: React.CSSProperties;
 }
 
 export function NodeSlot<P extends Record<string, any>>({
   node_id,
   component,
-  text: defaultText,
-  defaultProperties,
-  defaultStyle,
-  className,
   children,
+  style,
 }: React.PropsWithChildren<SlotProps<P>>) {
   const {
     document: { template },
@@ -48,28 +40,21 @@ export function NodeSlot<P extends Record<string, any>>({
     pointerLeaveNode,
   } = useDocument();
 
-  const { id, active, name, style, component_id, props, text, src } = (template
-    .overrides[node_id] || {}) as grida.program.nodes.AnyNode;
+  const node = useNode(node_id);
+  const computed = useComputedNode(node_id);
 
+  const { component_id } = node;
   const renderer = component_id
     ? TemplateComponents.components[component_id]
     : component;
 
-  const context = useValue();
-  const computedProperties = useComputed({
-    ...defaultProperties,
-    ...props,
-  }) as P;
-
-  const computedText = useComputed({ text: text ?? defaultText });
-
   const masterprops = {
-    text: computedText.text,
-    props: computedProperties,
-    src,
+    text: computed.text,
+    props: computed.props,
+    src: computed.src,
     style: {
-      ...defaultStyle,
       ...style,
+      ...node.style,
     },
     // @ts-ignore
   } satisfies
@@ -77,22 +62,8 @@ export function NodeSlot<P extends Record<string, any>>({
     | grida.program.nodes.AnyNode;
 
   const onSelect = useCallback(() => {
-    selectNode(node_id, {
-      type: component.type,
-      // TODO:
-      properties: "properties" in component ? component.properties : undefined,
-      default: defaultProperties,
-      default_style: defaultStyle,
-      default_text: defaultText,
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectNode]);
-
-  // const child = React.Children.only(children);
-  // const childProps = (child as React.ReactElement).props;
-  // console.log("meta in Node", childProps['data-grida-widget-type'], childProps, children);
-
-  // console.log(component.schema);
+    selectNode(node_id);
+  }, [node_id, selectNode]);
 
   const bind = useGesture(
     {
@@ -116,13 +87,12 @@ export function NodeSlot<P extends Record<string, any>>({
 
   return (
     <>
-      <div {...bind()} style={{ display: active ? undefined : "none" }}>
+      <div {...bind()} style={{ display: node.active ? undefined : "none" }}>
         {React.createElement<any>(
           renderer,
           {
             id: node_id,
             ...masterprops,
-            className,
           },
           children
         )}

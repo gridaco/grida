@@ -1,3 +1,4 @@
+import { Tokens } from "@/ast";
 import { WorkbenchUI } from "@/components/workbench";
 import { useDocumentAssetUpload } from "@/scaffolds/asset";
 import { cn } from "@/utils";
@@ -10,8 +11,8 @@ export function SrcControl({
   value = "",
   onValueChange,
 }: {
-  value?: string;
-  onValueChange?: (value?: string) => void;
+  value?: Tokens.StringValueExpression;
+  onValueChange?: (value?: Tokens.StringValueExpression) => void;
 }) {
   const { uploadPublic } = useDocumentAssetUpload();
 
@@ -49,7 +50,7 @@ export function SrcControl({
       {value ? (
         <>
           <div className="flex items-center flex-1">
-            <Thumb src={value} />
+            {typeof value === "string" && <Thumb src={value} />}
             <span className="ms-2 text-xs">Image</span>
           </div>
           <button

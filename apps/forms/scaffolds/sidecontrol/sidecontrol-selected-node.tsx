@@ -34,8 +34,7 @@ import { PropertyLine, PropertyLineLabel } from "./ui";
 import { SrcControl } from "./controls/src";
 import { ObjectFitControl } from "./controls/object-fit";
 import { PropsControl } from "./controls/props";
-import { useDocument } from "@/builder/provider";
-import { grida } from "@/grida";
+import { useComputedNode, useDocument, useNode } from "@/builder/provider";
 import assert from "assert";
 
 export function SelectedNodeProperties() {
@@ -43,31 +42,21 @@ export function SelectedNodeProperties() {
   assert(selectedNode);
 
   // - color - variables
-  const {
-    selected_node_id,
-    selected_node_meta: {
-      type,
-      properties,
-      default: default_props,
-      default_style: selected_node_default_style,
-      default_text: selected_node_default_text,
-    } = {},
-  } = document;
+  const { selected_node_id } = document;
+
+  const node = useNode(selected_node_id!);
+  const computed = useComputedNode(selected_node_id!);
+  const { id, name, active, component_id, style, type, properties } = node;
 
   const istemplate = type?.startsWith("templates/");
   const istext = type === "text";
   const isimage = type === "image";
-  const isflex = type === "flex";
-  const islayout = isflex;
+  const iscontainer = type === "container";
+  const islayout = iscontainer;
 
-  const { id, name, active, component_id, style, props, text, src } = (document
-    .template.overrides[selected_node_id!] ||
-    {}) as grida.program.nodes.AnyNode;
-
-  const finalprops = {
-    ...(default_props || {}),
-    ...(props || {}),
-  };
+  // const { id, name, active, component_id, style, props, text, src } = (document
+  //   .template.overrides[selected_node_id!] ||
+  //   {}) as grida.program.nodes.AnyNode;
 
   const {
     opacity,
@@ -96,7 +85,7 @@ export function SelectedNodeProperties() {
     objectFit,
     //
   } = {
-    ...selected_node_default_style,
+    // ...selected_node_default_style,
     ...(style || {}),
   } satisfies React.CSSProperties;
 
@@ -163,7 +152,7 @@ export function SelectedNodeProperties() {
           <SidebarMenuSectionContent className="space-y-2">
             <PropsControl
               properties={properties}
-              props={finalprops}
+              props={computed.props || {}}
               onValueChange={selectedNode.value}
             />
           </SidebarMenuSectionContent>
@@ -178,7 +167,7 @@ export function SelectedNodeProperties() {
           <PropertyLine>
             <PropertyLineLabel>Value</PropertyLineLabel>
             <StringValueControl
-              value={text || selected_node_default_text}
+              value={node.text}
               onValueChange={selectedNode.text}
             />
           </PropertyLine>
@@ -212,7 +201,7 @@ export function SelectedNodeProperties() {
         <SidebarMenuSectionContent className="space-y-2">
           <PropertyLine>
             <PropertyLineLabel>Source</PropertyLineLabel>
-            <SrcControl value={src} onValueChange={selectedNode.src} />
+            <SrcControl value={node.src} onValueChange={selectedNode.src} />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Fit</PropertyLineLabel>

@@ -35,8 +35,6 @@ export function StringValueControl({
   placeholder?: string;
   disabled?: boolean;
 }) {
-  const [state] = useEditorState();
-
   // const schema = useMemo(
   //   () =>
   //     selected_node_context

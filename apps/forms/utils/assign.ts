@@ -29,7 +29,7 @@
  * //   c: { nested: { value: "changed" } }
  * // }
  */
-export function deepAssign(target: any, source: any): void {
+export function deepAssign(target: any, source: any): any {
   for (const key in source) {
     if (
       source[key] &&
@@ -42,4 +42,5 @@ export function deepAssign(target: any, source: any): void {
       target[key] = source[key];
     }
   }
+  return target;
 }

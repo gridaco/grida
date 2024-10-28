@@ -31,7 +31,7 @@ export default function FormCollectionPage() {
 
   return (
     <ProgramDataContextHost>
-      <DataProvider namespace="dummy" initialData={props}>
+      <DataProvider namespace="dummy" data={props}>
         <div className="@container/preview">
           <Header_001
             logo={
@@ -41,35 +41,35 @@ export default function FormCollectionPage() {
           />
           <NodeSlot
             node_id="hero"
-            name="Hero"
+            // name="Hero"
             component={Hero_002}
-            defaultProperties={{
-              h1: Factory.createPropertyAccessExpression<ISample>([
-                "featured",
-                "h1",
-              ]),
-              media: Factory.createPropertyAccessExpression<ISample>([
-                "featured",
-                "media",
-              ]),
-              p: Factory.createPropertyAccessExpression<ISample>([
-                "featured",
-                "p",
-              ]),
-            }}
+            // defaultProperties={{
+            //   h1: Factory.createPropertyAccessExpression<ISample>([
+            //     "featured",
+            //     "h1",
+            //   ]),
+            //   media: Factory.createPropertyAccessExpression<ISample>([
+            //     "featured",
+            //     "media",
+            //   ]),
+            //   p: Factory.createPropertyAccessExpression<ISample>([
+            //     "featured",
+            //     "p",
+            //   ]),
+            // }}
           />
           <main className="container">
             <section>
               <header className="py-10">
                 <NodeSlot
                   node_id="list-header-title"
-                  name="List Header Title"
+                  // name="List Header Title"
                   component={TemplateBuilderWidgets.Text}
-                  text={Factory.createPropertyAccessExpression<ISample>([
-                    "listheader",
-                    "text",
-                  ])}
-                  defaultStyle={{
+                  // text={Factory.createPropertyAccessExpression<ISample>([
+                  //   "listheader",
+                  //   "text",
+                  // ])}
+                  style={{
                     fontSize: 24,
                     fontWeight: 700,
                   }}
@@ -83,42 +83,42 @@ export default function FormCollectionPage() {
                   {(data) => (
                     <NodeSlot
                       node_id={"event-card"}
-                      name="Event Card"
+                      // name="Event Card"
                       component={Card_002}
-                      defaultProperties={{
-                        media: Factory.createPropertyAccessExpression([
-                          "event",
-                          "media",
-                        ]),
-                        h1: Factory.createPropertyAccessExpression([
-                          "event",
-                          "title",
-                        ]),
-                        badge: Factory.createPropertyAccessExpression([
-                          "event",
-                          "status",
-                        ]),
-                        tags: Factory.createPropertyAccessExpression([
-                          "event",
-                          "tags",
-                        ]),
-                        p: Factory.createPropertyAccessExpression([
-                          "event",
-                          "cta",
-                        ]),
-                        n: Factory.createPropertyAccessExpression([
-                          "event",
-                          "attendees",
-                        ]),
-                        date1: Factory.createPropertyAccessExpression([
-                          "event",
-                          "date",
-                        ]),
-                        date2: Factory.createPropertyAccessExpression([
-                          "event",
-                          "date",
-                        ]),
-                      }}
+                      // defaultProperties={{
+                      //   media: Factory.createPropertyAccessExpression([
+                      //     "event",
+                      //     "media",
+                      //   ]),
+                      //   h1: Factory.createPropertyAccessExpression([
+                      //     "event",
+                      //     "title",
+                      //   ]),
+                      //   badge: Factory.createPropertyAccessExpression([
+                      //     "event",
+                      //     "status",
+                      //   ]),
+                      //   tags: Factory.createPropertyAccessExpression([
+                      //     "event",
+                      //     "tags",
+                      //   ]),
+                      //   p: Factory.createPropertyAccessExpression([
+                      //     "event",
+                      //     "cta",
+                      //   ]),
+                      //   n: Factory.createPropertyAccessExpression([
+                      //     "event",
+                      //     "attendees",
+                      //   ]),
+                      //   date1: Factory.createPropertyAccessExpression([
+                      //     "event",
+                      //     "date",
+                      //   ]),
+                      //   date2: Factory.createPropertyAccessExpression([
+                      //     "event",
+                      //     "date",
+                      //   ]),
+                      // }}
                     />
                   )}
                 </ArrayMap>

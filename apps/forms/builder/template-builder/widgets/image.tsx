@@ -17,7 +17,7 @@ export const ImageWidget = ({
       {/* eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text */}
       {src && (
         <img
-          src={src}
+          src={src as string}
           width={width}
           height={height}
           alt={alt}

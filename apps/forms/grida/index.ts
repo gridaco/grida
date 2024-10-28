@@ -149,6 +149,12 @@ export namespace grida {
         type: "template";
         properties: P;
         default: Record<string, schema.Value>;
+        /**
+         * staticly defined nodes (this does not represent the entire tree)
+         *
+         * exposed nodes that can be overriden by the user
+         */
+        nodes: nodes.Node[];
         //
       }
 
@@ -186,11 +192,15 @@ export namespace grida {
       /**
        * Any node utility type - use within the correct context
        */
-      export type AnyNode = Partial<TextNode> &
-        Partial<ImageNode> &
-        Partial<ContainerNode> &
-        Partial<InstanceNode> &
-        i.IBaseNode &
+      export type AnyNode = Omit<
+        Partial<TextNode> &
+          Partial<ImageNode> &
+          Partial<ContainerNode> &
+          Partial<InstanceNode>,
+        "type"
+      > & {
+        type: Node["type"];
+      } & i.IBaseNode &
         i.ISceneNode &
         i.IStylable;
 
@@ -254,6 +264,10 @@ export namespace grida {
           text: Tokens.StringValueExpression;
         }
 
+        export interface IProperties {
+          properties: Record<string, schema.PropertyDefinition>;
+        }
+
         export interface IProps {
           /**
            * props data
@@ -278,10 +292,11 @@ export namespace grida {
         extends i.IBaseNode,
           i.ISceneNode,
           i.IStylable {
+        type: "image";
         /**
          * required - when falsy, the image will not be rendered
          */
-        src?: string;
+        src?: Tokens.StringValueExpression;
         alt?: string;
         width?: number;
         height?: number;
@@ -300,6 +315,7 @@ export namespace grida {
         extends i.IBaseNode,
           i.ISceneNode,
           i.IStylable,
+          i.IProperties,
           i.IProps {
         type: "instance";
         /**

@@ -51,7 +51,7 @@ export function BrowseStartPageTemplatesDialog({
     setSelection(FormStartPage.templates[step - 1].name);
   }, [step]);
 
-  const [selection, setSelection] = useState<string>("001");
+  const [selection, setSelection] = useState<string>(defaultValue ?? "003");
 
   const template = FormStartPage.getTemplate(selection)!;
 
@@ -102,9 +102,9 @@ export function BrowseStartPageTemplatesDialog({
                 }}
               >
                 <template.component
-                  values={{
-                    title: "",
-                  }}
+                  // props={{
+                  //   title: "",
+                  // }}
                   meta={campaign}
                   lang={lang}
                 />

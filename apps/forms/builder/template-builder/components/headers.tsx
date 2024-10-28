@@ -5,10 +5,10 @@ import { TemplateBuilderWidgets } from "../widgets";
 export function Header_001({ logo }: { logo?: string }) {
   return (
     <NodeSlot
-      name="Header"
+      // name="Header"
       node_id="header"
       component={TemplateBuilderWidgets.Flex}
-      defaultStyle={{
+      style={{
         backgroundColor: "transparent",
         top: 0,
         left: 0,
@@ -21,7 +21,7 @@ export function Header_001({ logo }: { logo?: string }) {
     >
       <NodeSlot
         node_id="logo"
-        name="Logo"
+        // name="Logo"
         component={TemplateBuilderWidgets.Container}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}

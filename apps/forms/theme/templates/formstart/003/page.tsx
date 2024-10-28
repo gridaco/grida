@@ -11,20 +11,14 @@ import {
 import Image from "next/image";
 import type { grida } from "@/grida";
 import type { FormStartPage } from "..";
-// import { DataProvider, useData } from "../../kit/contexts/data.context";
 import { I18nextProvider, useTranslation } from "react-i18next";
 import i18next from "i18next";
 import {
   FormCampaignStartPageContextProvider,
   useCampaignMeta,
 } from "@/theme/templates/kit/campaign";
-import { TextWidget } from "@/builder/template-builder/widgets/text";
 import { TemplateBuilderWidgets } from "@/builder/template-builder/widgets";
 import { NodeSlot } from "@/builder/template-builder/node";
-import {
-  DataProvider,
-  ProgramDataContextHost,
-} from "@/grida/react-runtime/data-context";
 import { Factory } from "@/ast";
 
 const userprops = {
@@ -37,7 +31,6 @@ type UserProps = grida.program.schema.TInferredPropTypes<typeof userprops>;
 
 export default function _003({
   meta,
-  values,
   resources = {},
   lang,
 }: FormStartPage.CampaignTemplateProps<UserProps, {}>) {
@@ -55,24 +48,18 @@ export default function _003({
   }, [lang]);
 
   return (
-    <ProgramDataContextHost>
-      <DataProvider namespace="dummy" initialData={values}>
-        <FormCampaignStartPageContextProvider value={meta}>
-          <I18nextProvider
-            // @ts-expect-error
-            i18n={i18n}
-          >
-            <Consumer />
-          </I18nextProvider>
-        </FormCampaignStartPageContextProvider>
-      </DataProvider>
-    </ProgramDataContextHost>
+    <FormCampaignStartPageContextProvider value={meta}>
+      <I18nextProvider
+        // @ts-expect-error
+        i18n={i18n}
+      >
+        <Consumer />
+      </I18nextProvider>
+    </FormCampaignStartPageContextProvider>
   );
 }
 
 function Consumer() {
-  // const data = useData<UserProps>();
-
   return (
     <ScreenRoot>
       <ScreenCenter>
@@ -81,24 +68,16 @@ function Consumer() {
             <div className="flex flex-col justify-center items-center gap-4">
               <h1 className="text-6xl font-bold w-4/5">
                 <NodeSlot
-                  node_id="title"
-                  name="Title"
+                  node_id="003.title"
                   component={TemplateBuilderWidgets.Text}
-                  text={Factory.createPropertyAccessExpression([
-                    "props",
-                    "title",
-                  ])}
-                  defaultStyle={{}}
+                  style={{}}
                 />
-                {/* {data.title} */}
               </h1>
               <p className="text-lg text-foreground/80 w-4/5">
                 <NodeSlot
-                  node_id="subtitle"
-                  name="Subtitle"
+                  node_id="003.subtitle"
                   component={TemplateBuilderWidgets.Text}
-                  text={"Enter Subtitle"}
-                  defaultStyle={{}}
+                  style={{}}
                 />
                 {/* {data.subtitle} */}
               </p>
@@ -109,31 +88,55 @@ function Consumer() {
           </div>
         </section>
         <NodeSlot
-          node_id="background"
-          name="Background"
+          node_id="003.background"
           component={TemplateBuilderWidgets.Image}
-          className="bg-black"
-          defaultStyle={{
+          style={{
             position: "absolute",
             inset: 0,
             objectFit: "cover",
             width: "100%",
             height: "100%",
           }}
-          defaultProperties={{ src: "/images/abstract-placeholder.jpg" }}
         />
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        {/* <img
-          src="/images/abstract-placeholder.jpg"
-          alt="background"
-          width={1000}
-          height={1000}
-          className="absolute inset-0 w-full h-full object-cover select-none pointer-events-none -z-10"
-        /> */}
-        {/* <ScreenBackground overlay={{ opacity: 0.1 }}></ScreenBackground> */}
       </ScreenCenter>
     </ScreenRoot>
   );
 }
 
-_003.properties = userprops;
+_003.definition = {
+  type: "template",
+  name: "003",
+  properties: userprops,
+  version: "1.0.0",
+  default: {
+    title: "Enter Title",
+    subtitle: "Enter Subtitle",
+    background: "/images/abstract-placeholder.jpg",
+  },
+  nodes: [
+    {
+      active: true,
+      locked: false,
+      type: "text",
+      id: "003.title",
+      name: "Title",
+      text: Factory.createPropertyAccessExpression(["props", "title"]),
+    },
+    {
+      active: true,
+      locked: false,
+      type: "text",
+      id: "003.subtitle",
+      name: "Subtitle",
+      text: Factory.createPropertyAccessExpression(["props", "subtitle"]),
+    },
+    {
+      active: true,
+      locked: false,
+      type: "image",
+      id: "003.background",
+      name: "Background",
+      src: Factory.createPropertyAccessExpression(["props", "background"]),
+    },
+  ],
+} satisfies grida.program.template.TemplateDefinition;

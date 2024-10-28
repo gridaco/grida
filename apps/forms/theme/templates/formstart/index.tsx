@@ -22,54 +22,50 @@ export namespace FormStartPage {
     //   name: "000",
     //   component: FormStartPage000,
     // },
+    // {
+    //   type: "template",
+    //   name: "001",
+    //   version: "0.0.0",
+    //   default: {},
+    //   properties: FormStartPage001.properties,
+    //   component: FormStartPage001,
+    // },
+    // {
+    //   type: "template",
+    //   name: "002",
+    //   version: "0.0.0",
+    //   default: {},
+    //   properties: FormStartPage002.properties,
+    //   component: FormStartPage002,
+    // },
     {
-      type: "template",
-      name: "001",
-      version: "0.0.0",
-      default: {},
-      properties: FormStartPage001.properties,
-      component: FormStartPage001,
-    },
-    {
-      type: "template",
-      name: "002",
-      version: "0.0.0",
-      default: {},
-      properties: FormStartPage002.properties,
-      component: FormStartPage002,
-    },
-    {
-      type: "template",
-      name: "003",
-      version: "0.0.0",
-      default: {},
-      properties: FormStartPage003.properties,
+      ...FormStartPage003.definition,
       component: FormStartPage003,
     },
-    {
-      type: "template",
-      name: "004",
-      version: "0.0.0",
-      default: {},
-      properties: FormStartPage004.properties,
-      component: FormStartPage004,
-    },
-    {
-      type: "template",
-      name: "005",
-      version: "0.0.0",
-      default: {},
-      properties: FormStartPage005.properties,
-      component: FormStartPage005,
-    },
-    {
-      type: "template",
-      name: "006",
-      version: "0.0.0",
-      default: {},
-      properties: FormStartPage006.properties,
-      component: FormStartPage006,
-    },
+    // {
+    //   type: "template",
+    //   name: "004",
+    //   version: "0.0.0",
+    //   default: {},
+    //   properties: FormStartPage004.properties,
+    //   component: FormStartPage004,
+    // },
+    // {
+    //   type: "template",
+    //   name: "005",
+    //   version: "0.0.0",
+    //   default: {},
+    //   properties: FormStartPage005.properties,
+    //   component: FormStartPage005,
+    // },
+    // {
+    //   type: "template",
+    //   name: "006",
+    //   version: "0.0.0",
+    //   default: {},
+    //   properties: FormStartPage006.properties,
+    //   component: FormStartPage006,
+    // },
   ];
 
   export function getTemplate(name: string) {
@@ -92,14 +88,14 @@ export namespace FormStartPage {
 
   export interface CampaignTemplateProps<P, M extends Resource> {
     meta: CampaignMeta;
-    values: P;
+    // props: P;
     resources?: M;
     lang: string;
   }
 
   export function Renderer({
     name,
-    values: data,
+    // props = {},
     meta,
     lang,
   }: {
@@ -107,6 +103,6 @@ export namespace FormStartPage {
   } & CampaignTemplateProps<any, Resource>) {
     const template = useMemo(() => FormStartPage.getTemplate(name), [name])!;
 
-    return <template.component values={data} meta={meta} lang={lang} />;
+    return <template.component meta={meta} lang={lang} />;
   }
 }

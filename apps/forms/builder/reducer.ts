@@ -30,11 +30,10 @@ export default function reducer(
       });
     }
     case "document/node/select": {
-      const { node_id, meta } = <BuilderSelectNodeAction>action;
+      const { node_id } = <BuilderSelectNodeAction>action;
 
       return produce(state, (draft) => {
         draft.selected_node_id = node_id;
-        draft.selected_node_meta = meta;
       });
     }
     case "document/node/on-pointer-enter": {

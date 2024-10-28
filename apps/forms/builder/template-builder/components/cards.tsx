@@ -55,9 +55,8 @@ export const Card_001 = withTemplateDefinition(
         </div>
         <div className="space-y-2 bg-background p-4">
           <NodeSlot
-            name="Title"
             component={TemplateBuilderWidgets.Text}
-            text={h1}
+            // text={h1}
             node_id={".h1"}
           />
           {/* <h3 className="text-lg font-semibold text-foreground">{h1}</h3> */}
@@ -68,10 +67,9 @@ export const Card_001 = withTemplateDefinition(
           </div>
           <div className="text-sm text-muted-foreground">{p}</div>
           <NodeSlot
-            name="Tags"
             node_id="tags-layout"
             component={TemplateBuilderWidgets.Flex}
-            defaultStyle={{
+            style={{
               gap: 4,
             }}
           >
@@ -82,7 +80,89 @@ export const Card_001 = withTemplateDefinition(
     );
   },
   "templates/components/cards/card-001",
-  card_properties_definition
+  {
+    name: "templates/components/cards/card-001",
+    default: {
+      h1: "Title",
+      p: "Description",
+      date1: "2021-01-01",
+      n: 0,
+      badge: "New",
+      media: { type: "image", src: "" },
+      date2: "2021-01-01",
+      tags: ["tag1", "tag2"],
+    },
+    nodes: [
+      {
+        active: true,
+        locked: false,
+        type: "text",
+        id: ".h1",
+        name: "Title",
+        text: "Title",
+      },
+      {
+        active: true,
+        locked: false,
+        type: "text",
+        id: ".p",
+        name: "Description",
+        text: "Description",
+      },
+      {
+        active: true,
+        locked: false,
+        type: "text",
+        id: ".date1",
+        name: "Date 1",
+        text: "2021-01-01",
+      },
+      {
+        active: true,
+        locked: false,
+        type: "text",
+        id: ".n",
+        name: "Number",
+        text: "0",
+      },
+      {
+        active: true,
+        locked: false,
+        type: "text",
+        id: ".badge",
+        name: "Badge",
+        text: "New",
+      },
+      {
+        active: true,
+        locked: false,
+        type: "image",
+        id: ".media",
+        name: "Media",
+        src: "",
+        alt: "",
+      },
+      {
+        active: true,
+        locked: false,
+        type: "text",
+        id: ".date2",
+        name: "Date 2",
+        text: "2021-01-01",
+      },
+      {
+        active: true,
+        locked: false,
+        type: "container",
+        id: ".tags",
+        name: "Tags",
+        expanded: false,
+      },
+    ],
+    type: "template",
+    properties: card_properties_definition,
+    version: "0.0.0",
+  }
 );
 
 export const Card_002 = withTemplateDefinition(
@@ -126,7 +206,89 @@ export const Card_002 = withTemplateDefinition(
     );
   },
   "templates/components/cards/card-002",
-  card_properties_definition
+  {
+    name: "templates/components/cards/card-002",
+    default: {
+      h1: "Title",
+      p: "Description",
+      date1: "2021-01-01",
+      n: 0,
+      badge: "New",
+      media: { type: "image", src: "" },
+      date2: "2021-01-01",
+      tags: ["tag1", "tag2"],
+    },
+    nodes: [
+      {
+        active: true,
+        locked: false,
+        type: "text",
+        id: ".h1",
+        name: "Title",
+        text: "Title",
+      },
+      {
+        active: true,
+        locked: false,
+        type: "text",
+        id: ".p",
+        name: "Description",
+        text: "Description",
+      },
+      {
+        active: true,
+        locked: false,
+        type: "text",
+        id: ".date1",
+        name: "Date 1",
+        text: "2021-01-01",
+      },
+      {
+        active: true,
+        locked: false,
+        type: "text",
+        id: ".n",
+        name: "Number",
+        text: "0",
+      },
+      {
+        active: true,
+        locked: false,
+        type: "text",
+        id: ".badge",
+        name: "Badge",
+        text: "New",
+      },
+      {
+        active: true,
+        locked: false,
+        type: "image",
+        id: ".media",
+        name: "Media",
+        src: "",
+        alt: "",
+      },
+      {
+        active: true,
+        locked: false,
+        type: "text",
+        id: ".date2",
+        name: "Date 2",
+        text: "2021-01-01",
+      },
+      {
+        active: true,
+        locked: false,
+        type: "container",
+        id: ".tags",
+        name: "Tags",
+        expanded: false,
+      },
+    ],
+    type: "template",
+    properties: card_properties_definition,
+    version: "0.0.0",
+  }
 );
 
 export const Card_003 = withTemplateDefinition(
@@ -137,10 +299,9 @@ export const Card_003 = withTemplateDefinition(
     return (
       <Card className="p-4" style={style}>
         <NodeSlot
-          name="Layout"
           component={TemplateBuilderWidgets.Flex}
           node_id="root"
-          defaultStyle={{
+          style={{
             gap: 4,
             flexDirection: "row",
             justifyContent: "space-between",
@@ -148,10 +309,9 @@ export const Card_003 = withTemplateDefinition(
         >
           <div className="flex-1 flex flex-col gap-1 z-20">
             <NodeSlot
-              name="Header"
               node_id="header-layout"
               component={TemplateBuilderWidgets.Flex}
-              defaultStyle={{
+              style={{
                 gap: 4,
                 flexDirection: "column",
               }}
@@ -168,10 +328,9 @@ export const Card_003 = withTemplateDefinition(
             </NodeSlot>
             <p className="text-xs font-regular opacity-80">{p}</p>
             <NodeSlot
-              name="Tags"
               node_id="tags-layout"
               component={TemplateBuilderWidgets.Flex}
-              defaultStyle={{
+              style={{
                 gap: 4,
               }}
             >
@@ -180,9 +339,8 @@ export const Card_003 = withTemplateDefinition(
           </div>
           <NodeSlot
             node_id="media-layout"
-            name="Media"
             component={TemplateBuilderWidgets.Container}
-            defaultStyle={
+            style={
               {
                 width: 80,
                 height: 80,
@@ -205,7 +363,89 @@ export const Card_003 = withTemplateDefinition(
     );
   },
   "templates/components/cards/card-003",
-  card_properties_definition
+  {
+    name: "templates/components/cards/card-003",
+    default: {
+      h1: "Title",
+      p: "Description",
+      date1: "2021-01-01",
+      n: 0,
+      badge: "New",
+      media: { type: "image", src: "" },
+      date2: "2021-01-01",
+      tags: ["tag1", "tag2"],
+    },
+    nodes: [
+      {
+        active: true,
+        locked: false,
+        type: "text",
+        id: ".h1",
+        name: "Title",
+        text: "Title",
+      },
+      {
+        active: true,
+        locked: false,
+        type: "text",
+        id: ".p",
+        name: "Description",
+        text: "Description",
+      },
+      {
+        active: true,
+        locked: false,
+        type: "text",
+        id: ".date1",
+        name: "Date 1",
+        text: "2021-01-01",
+      },
+      {
+        active: true,
+        locked: false,
+        type: "text",
+        id: ".n",
+        name: "Number",
+        text: "0",
+      },
+      {
+        active: true,
+        locked: false,
+        type: "text",
+        id: ".badge",
+        name: "Badge",
+        text: "New",
+      },
+      {
+        active: true,
+        locked: false,
+        type: "image",
+        id: ".media",
+        name: "Media",
+        src: "",
+        alt: "",
+      },
+      {
+        active: true,
+        locked: false,
+        type: "text",
+        id: ".date2",
+        name: "Date 2",
+        text: "2021-01-01",
+      },
+      {
+        active: true,
+        locked: false,
+        type: "container",
+        id: ".tags",
+        name: "Tags",
+        expanded: false,
+      },
+    ],
+    type: "template",
+    properties: card_properties_definition,
+    version: "0.0.0",
+  }
 );
 
 const hero_card_properties_definition = {
@@ -251,7 +491,44 @@ export const Hero_001 = withTemplateDefinition(
     );
   },
   "templates/components/cards/hero-001",
-  hero_card_properties_definition
+  {
+    name: "templates/components/cards/hero-001",
+    default: {
+      h1: "Title",
+      p: "Description",
+      media: { type: "image", src: "" },
+    },
+    nodes: [
+      {
+        active: true,
+        locked: false,
+        type: "text",
+        id: ".h1",
+        name: "Title",
+        text: "Title",
+      },
+      {
+        active: true,
+        locked: false,
+        type: "text",
+        id: ".p",
+        name: "Description",
+        text: "Description",
+      },
+      {
+        active: true,
+        locked: false,
+        type: "image",
+        id: ".media",
+        name: "Media",
+        src: "",
+        alt: "",
+      },
+    ],
+    type: "template",
+    properties: hero_card_properties_definition,
+    version: "0.0.0",
+  }
 );
 
 export const Hero_002 = withTemplateDefinition(
@@ -277,5 +554,42 @@ export const Hero_002 = withTemplateDefinition(
     );
   },
   "templates/components/cards/hero-002",
-  hero_card_properties_definition
+  {
+    name: "templates/components/cards/hero-002",
+    default: {
+      h1: "Title",
+      p: "Description",
+      media: { type: "image", src: "" },
+    },
+    nodes: [
+      {
+        active: true,
+        locked: false,
+        type: "text",
+        id: ".h1",
+        name: "Title",
+        text: "Title",
+      },
+      {
+        active: true,
+        locked: false,
+        type: "text",
+        id: ".p",
+        name: "Description",
+        text: "Description",
+      },
+      {
+        active: true,
+        locked: false,
+        type: "image",
+        id: ".media",
+        name: "Media",
+        src: "",
+        alt: "",
+      },
+    ],
+    type: "template",
+    properties: hero_card_properties_definition,
+    version: "0.0.0",
+  }
 );

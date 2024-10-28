@@ -7,11 +7,10 @@ import Link from "next/link";
 export function Footer_001() {
   return (
     <NodeSlot
-      name="Footer"
-      className={"py-10 w-full"}
+      // className={"py-10 w-full"}
       node_id={"footer-flex"}
       component={TemplateBuilderWidgets.Flex}
-      defaultStyle={{
+      style={{
         flexWrap: "wrap",
         justifyContent: "center",
         alignItems: "center",

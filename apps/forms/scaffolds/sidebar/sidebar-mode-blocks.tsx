@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useCallback } from "react";
 import { useEditorState, useFormFields } from "../editor";
 import {
   SidebarMenuItem,
@@ -20,7 +20,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { DotsHorizontalIcon } from "@radix-ui/react-icons";
+import { BoxIcon, DotsHorizontalIcon } from "@radix-ui/react-icons";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,6 +28,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { FormFieldBlockMenuItems } from "../blocks-editor/blocks/field-block";
 import { renderMenuItems } from "./render";
+import { StandaloneDocumentEditor, useDocument } from "@/builder/provider";
+import { BuilderAction } from "@/builder/action";
+import { composeEditorDocumentAction } from "../editor/action";
 
 export function ModeDesign() {
   const [state, dispatch] = useEditorState();
@@ -58,6 +61,82 @@ export function ModeDesign() {
           <HierarchyView />
         </>
       )}
+    </>
+  );
+}
+
+function HierarchyView() {
+  const [state, dispatch] = useEditorState();
+  const { doctype, selected_page_id, documents } = state;
+
+  const documentDispatch = useCallback(
+    (action: BuilderAction) => {
+      dispatch(
+        composeEditorDocumentAction(
+          // @ts-ignore
+          selected_page_id,
+          action
+        )
+      );
+    },
+    [dispatch, selected_page_id]
+  );
+
+  // @ts-ignore
+  const document = documents[selected_page_id];
+
+  return (
+    <Collapsible defaultOpen>
+      <SidebarSection>
+        <CollapsibleTrigger className="w-full">
+          <SidebarSectionHeaderItem>
+            <SidebarSectionHeaderLabel>
+              <span>Layers</span>
+            </SidebarSectionHeaderLabel>
+          </SidebarSectionHeaderItem>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <SidebarMenuList>
+            {selected_page_id === "form" && <FormBlockHierarchyList />}
+            {(selected_page_id === "form/startpage" ||
+              selected_page_id === "site/dev-collection") &&
+              document && (
+                <StandaloneDocumentEditor
+                  state={document}
+                  dispatch={documentDispatch}
+                >
+                  <NodeHierarchyList />
+                </StandaloneDocumentEditor>
+              )}
+          </SidebarMenuList>
+        </CollapsibleContent>
+      </SidebarSection>
+    </Collapsible>
+  );
+}
+
+function NodeHierarchyList() {
+  const { document, selectNode } = useDocument();
+  // console.log("document.template.nodes", document.template.nodes);
+  return (
+    <>
+      {document.template.nodes.map((n) => {
+        const selected = document.selected_node_id === n.id;
+        return (
+          <SidebarMenuItem
+            key={n.id}
+            muted
+            level={1}
+            selected={selected}
+            onSelect={() => {
+              selectNode(n.id);
+            }}
+            icon={<NodeHierarchyItemIcon className="w-4 h-4" />}
+          >
+            {n.name}
+          </SidebarMenuItem>
+        );
+      })}
     </>
   );
 }
@@ -120,33 +199,8 @@ function FormBlockHierarchyList() {
   );
 }
 
-function SiteLayerHierarchyList() {
-  return <></>;
-}
-
-function HierarchyView() {
-  const [state] = useEditorState();
-  const { doctype } = state;
-
-  return (
-    <Collapsible defaultOpen>
-      <SidebarSection>
-        <CollapsibleTrigger className="w-full">
-          <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>
-              <span>Layers</span>
-            </SidebarSectionHeaderLabel>
-          </SidebarSectionHeaderItem>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <SidebarMenuList>
-            {doctype === "v0_form" && <FormBlockHierarchyList />}
-            {doctype === "v0_site" && <SiteLayerHierarchyList />}
-          </SidebarMenuList>
-        </CollapsibleContent>
-      </SidebarSection>
-    </Collapsible>
-  );
+function NodeHierarchyItemIcon({ className }: { className?: string }) {
+  return <BoxIcon className={className} />;
 }
 
 function FormHierarchyItemIcon({

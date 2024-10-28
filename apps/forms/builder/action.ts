@@ -1,5 +1,4 @@
 import type { Tokens } from "@/ast";
-import { NodeSlotMeta } from "./types";
 import { grida } from "@/grida";
 
 export type BuilderAction =
@@ -23,7 +22,6 @@ export interface BuilderSetDataAction {
 export interface BuilderSelectNodeAction {
   type: "document/node/select";
   node_id?: string;
-  meta?: NodeSlotMeta;
 }
 
 interface INodeAction {
@@ -55,7 +53,7 @@ interface INodeChangeStyleAction extends INodeAction {
 }
 
 interface INodeChangeSrcAction extends INodeAction {
-  src?: string;
+  src?: Tokens.StringValueExpression;
 }
 
 interface INodeChangePropsAction extends INodeAction {

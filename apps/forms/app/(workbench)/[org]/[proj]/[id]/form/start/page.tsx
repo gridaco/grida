@@ -82,30 +82,23 @@ export default function FormStartEditPage() {
       }
     >
       <main className="h-full flex flex-1 w-full">
-        <AgentThemeProvider>
-          {startpage ? (
-            <StandaloneDocumentEditor
-              state={startpage}
-              dispatch={startPageDocumentDispatch}
-            >
-              <CanvasEventTarget className="relative w-full no-scrollbar overflow-y-auto bg-transparent pointer-events-none">
-                <CanvasOverlay />
+        {startpage ? (
+          <StandaloneDocumentEditor
+            state={startpage}
+            dispatch={startPageDocumentDispatch}
+          >
+            <CanvasEventTarget className="relative w-full no-scrollbar overflow-y-auto bg-transparent pointer-events-none">
+              <CanvasOverlay />
+              <AgentThemeProvider>
                 <StartPageEditor />
-              </CanvasEventTarget>
-            </StandaloneDocumentEditor>
-          ) : (
-            <SetupStartPage />
-          )}
-        </AgentThemeProvider>
-        {startpage && (
-          <aside className="hidden lg:flex h-full">
-            <StandaloneDocumentEditor
-              state={startpage}
-              dispatch={startPageDocumentDispatch}
-            >
+              </AgentThemeProvider>
+            </CanvasEventTarget>
+            <aside className="hidden lg:flex h-full">
               <SideControl />
-            </StandaloneDocumentEditor>
-          </aside>
+            </aside>
+          </StandaloneDocumentEditor>
+        ) : (
+          <SetupStartPage />
         )}
       </main>
     </CurrentPage>
@@ -120,6 +113,8 @@ function SetupStartPage() {
     (name: string) => {
       // TODO: exclude .component
       const __template = FormStartPage.getTemplate(name);
+
+      console.log("__template", __template);
       dispatch({
         type: "editor/form/startpage/init",
         template: __template,
@@ -186,7 +181,6 @@ function StartPageEditor() {
             <div className="w-full min-h-[852px] h-[80dvh]">
               <FormStartPage.Renderer
                 name={document.template.name}
-                values={document.template.props}
                 meta={campaign}
                 lang={lang}
               />

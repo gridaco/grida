@@ -45,7 +45,6 @@ type UserProps = grida.program.schema.TInferredPropTypes<typeof userprops>;
 
 export default function _001({
   meta,
-  values: data,
   resources = _messages,
   lang,
 }: FormStartPage.CampaignTemplateProps<UserProps, Messages>) {
@@ -63,16 +62,14 @@ export default function _001({
   }, [lang]);
 
   return (
-    <DataProvider data={data}>
-      <FormCampaignStartPageContextProvider value={meta}>
-        <I18nextProvider
-          // @ts-expect-error
-          i18n={i18n}
-        >
-          <Consumer />
-        </I18nextProvider>
-      </FormCampaignStartPageContextProvider>
-    </DataProvider>
+    <FormCampaignStartPageContextProvider value={meta}>
+      <I18nextProvider
+        // @ts-expect-error
+        i18n={i18n}
+      >
+        <Consumer />
+      </I18nextProvider>
+    </FormCampaignStartPageContextProvider>
   );
 }
 

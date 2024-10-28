@@ -66,7 +66,7 @@ export function TemplateControl({
                           setOpen(false);
                         }}
                       >
-                        <DataProvider namespace="dummy" initialData={{}}>
+                        <DataProvider namespace="dummy" data={{}}>
                           {React.createElement(
                             TemplateComponents.components[key],
                             {

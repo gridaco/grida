@@ -288,6 +288,7 @@ function initialSiteEditorState(init: SiteDocumentEditorInit): EditorState {
           props: samples["formcollection_sample_001_the_bundle"] as any,
           overrides: {},
           version: "0.0.0",
+          nodes: [],
         },
       },
     },
@@ -501,15 +502,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
       "form/startpage": init.start
         ? {
             readonly: false,
-            template: {
-              type: "template",
-              version: "0.0.0",
-              name: init.start.name,
-              props: init.start.props,
-              properties: init.start.properties,
-              overrides: init.start.overrides,
-              default: init.start.default,
-            } satisfies grida.program.template.TemplateInstance,
+            template: init.start,
           }
         : undefined,
     },
