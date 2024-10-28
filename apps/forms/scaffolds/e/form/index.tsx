@@ -20,6 +20,7 @@ import type {
   FormClientFetchResponseError,
 } from "@/app/(api)/v1/[id]/route";
 import { CTAProvider } from "@/theme/templates/kit/contexts/cta.context";
+import { StandaloneDocumentEditor } from "@/builder/provider";
 
 export function Agent({
   form_id,
@@ -139,17 +140,24 @@ function FormStartPage({
   const { next } = useAgentFlow();
 
   return (
-    <CTAProvider value={{ onClick: next }}>
-      <ScreenWindowRoot>
-        <FormStartPageRenderer.Renderer
-          name={start_page.name}
-          values={start_page.props}
-          // TODO: handle more data - agent errors states
-          meta={campaign}
-          lang={lang}
-        />
-      </ScreenWindowRoot>
-    </CTAProvider>
+    <StandaloneDocumentEditor
+      state={{
+        template: start_page,
+        readonly: true,
+      }}
+    >
+      <CTAProvider value={{ onClick: next }}>
+        <ScreenWindowRoot>
+          <FormStartPageRenderer.Renderer
+            name={start_page.name}
+            values={start_page.props}
+            // TODO: handle more data - agent errors states
+            meta={campaign}
+            lang={lang}
+          />
+        </ScreenWindowRoot>
+      </CTAProvider>
+    </StandaloneDocumentEditor>
   );
 }
 

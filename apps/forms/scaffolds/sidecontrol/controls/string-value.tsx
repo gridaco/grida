@@ -23,10 +23,6 @@ import { Factory } from "@/ast/factory";
 import { useEditorState } from "@/scaffolds/editor";
 import PropertyAccessDropdownMenu from "./context/variable";
 import PropertyTypeIcon from "@/components/property-type-icon";
-import { useMemo } from "react";
-import { inferSchemaFromData } from "@/lib/spock";
-import assert from "assert";
-import { useCurrentDocument } from "@/scaffolds/editor/use-document";
 
 export function StringValueControl({
   value,
@@ -68,16 +64,17 @@ export function StringValueControl({
           side="bottom"
           className="max-w-sm overflow-hidden min-w-96"
         >
-          {/* <PropertyAccessDropdownMenu
+          {/* TODO: */}
+          <PropertyAccessDropdownMenu
             asSubmenu
-            schema={schema}
+            // schema={schema}
             onSelect={(path) => {
               onValueChange?.(Factory.createPropertyAccessExpression(path));
             }}
           >
             <PropertyTypeIcon type="object" className="me-2 w-4 h-4" />
             Page
-          </PropertyAccessDropdownMenu> */}
+          </PropertyAccessDropdownMenu>
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>
               <TokensIcon className="me-2 w-4 h-4" />

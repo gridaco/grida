@@ -3,7 +3,6 @@
 import React from "react";
 import { PoweredByGridaFooter } from "@/scaffolds/e/form/powered-by-brand-footer";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { useEditorState } from "@/scaffolds/editor";
 import { NodeSlot } from "@/builder/template-builder/node";
 import {
   Card_002,
@@ -20,14 +19,14 @@ import {
 } from "@/builder/core/data-context";
 import { Factory } from "@/ast/factory";
 import ArrayMap from "@/builder/core/data-context/array";
-import { useCurrentDocument } from "@/scaffolds/editor/use-document";
+import { useDocument } from "@/builder/provider";
 
 type ISample = (typeof samples)[keyof typeof samples];
 
 export default function FormCollectionPage() {
   const {
     document: { template },
-  } = useCurrentDocument();
+  } = useDocument();
   const { props: props } = template;
 
   return (

@@ -7,7 +7,7 @@ import React, {
   useMemo,
   useRef,
 } from "react";
-import { useCurrentDocument } from "@/scaffolds/editor/use";
+import { useDocument } from "@/builder/provider";
 
 interface CanvasEventTargetContext {
   portal?: HTMLDivElement | null;
@@ -24,7 +24,7 @@ export function CanvasEventTarget({
 }: React.PropsWithChildren<{
   className?: string;
 }>) {
-  const { clearSelection } = useCurrentDocument();
+  const { clearSelection } = useDocument();
 
   const [overlay, setOverlayRef] = React.useState<HTMLDivElement | null>(null);
 
@@ -45,7 +45,7 @@ export function CanvasEventTarget({
 export function CanvasOverlay() {
   const {
     document: { hovered_node_id, selected_node_id },
-  } = useCurrentDocument();
+  } = useDocument();
   const ref = useRef<HTMLDivElement>(null);
   const context = useContext(Context);
 

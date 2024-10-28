@@ -31,14 +31,14 @@ import { JustifyContentControl } from "./controls/justify-content";
 import { TemplateControl } from "./controls/template";
 import { CursorControl } from "./controls/cursor";
 import { PropertyLine, PropertyLineLabel } from "./ui";
-import { useCurrentDocument } from "../editor/use-document";
 import { SrcControl } from "./controls/src";
 import { grida } from "@/grida";
 import { ObjectFitControl } from "./controls/object-fit";
+import { useDocument } from "@/builder/provider";
 import assert from "assert";
 
 export function SelectedNodeProperties() {
-  const { document, selectedNode } = useCurrentDocument();
+  const { document, selectedNode } = useDocument();
   assert(selectedNode);
 
   // - color - variables

@@ -29,8 +29,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
-import { useDebounceCallback, useStep } from "usehooks-ts";
-import { useCurrentDocument, useDocument } from "@/scaffolds/editor/use";
+import { useDebounceCallback } from "usehooks-ts";
 import { Block, BlockNoteEditor } from "@blocknote/core";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useSyncFormAgentStartPage } from "@/scaffolds/editor/sync";
@@ -53,6 +52,9 @@ import {
 import { CanvasEventTarget, CanvasOverlay } from "@/scaffolds/canvas/canvas";
 import { CurrentPage } from "@/scaffolds/editor/utils/current-page";
 import { Spinner } from "@/components/spinner";
+import { StandaloneDocumentEditor, useDocument } from "@/builder/provider";
+import { composeEditorDocumentAction } from "@/scaffolds/editor/action";
+import { BuilderAction } from "@/builder/action";
 
 export default function FormStartEditPage() {
   const [state, dispatch] = useEditorState();
@@ -62,6 +64,13 @@ export default function FormStartEditPage() {
   const {
     documents: { "form/startpage": startpage },
   } = state;
+
+  const startPageDocumentDispatch = useCallback(
+    (action: BuilderAction) => {
+      dispatch(composeEditorDocumentAction("form/startpage", action));
+    },
+    [dispatch]
+  );
 
   return (
     <CurrentPage
@@ -75,17 +84,27 @@ export default function FormStartEditPage() {
       <main className="h-full flex flex-1 w-full">
         <AgentThemeProvider>
           {startpage ? (
-            <CanvasEventTarget className="relative w-full no-scrollbar overflow-y-auto bg-transparent pointer-events-none">
-              <CanvasOverlay />
-              <StartPageEditor />
-            </CanvasEventTarget>
+            <StandaloneDocumentEditor
+              state={startpage}
+              dispatch={startPageDocumentDispatch}
+            >
+              <CanvasEventTarget className="relative w-full no-scrollbar overflow-y-auto bg-transparent pointer-events-none">
+                <CanvasOverlay />
+                <StartPageEditor />
+              </CanvasEventTarget>
+            </StandaloneDocumentEditor>
           ) : (
             <SetupStartPage />
           )}
         </AgentThemeProvider>
         {startpage && (
           <aside className="hidden lg:flex h-full">
-            <SideControl />
+            <StandaloneDocumentEditor
+              state={startpage}
+              dispatch={startPageDocumentDispatch}
+            >
+              <SideControl />
+            </StandaloneDocumentEditor>
           </aside>
         )}
       </main>
@@ -147,7 +166,7 @@ function StartPageEditor() {
     theme: { lang },
   } = state;
 
-  const { document } = useCurrentDocument();
+  const { document } = useDocument();
 
   return (
     <>
@@ -184,7 +203,7 @@ function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
     changeRootValues: changeRootProperties,
     rootProperties,
     rootProps,
-  } = useCurrentDocument();
+  } = useDocument();
   const [state, dispatch] = useEditorState();
 
   const { uploadPublic } = useDocumentAssetUpload();

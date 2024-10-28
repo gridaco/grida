@@ -10,9 +10,9 @@ import type {
 import type { Tokens } from "@/ast";
 import { useComputed } from "./use-computed";
 import { useValue } from "../core/data-context";
-import { useCurrentDocument } from "@/scaffolds/editor/use-document";
 import { grida } from "@/grida";
 import { TemplateBuilderWidgets } from "./widgets";
+import { useDocument } from "../provider";
 
 interface SlotProps<P extends Record<string, any>> {
   node_id: string;
@@ -46,7 +46,7 @@ export function NodeSlot<P extends Record<string, any>>({
     selectNode,
     pointerEnterNode,
     pointerLeaveNode,
-  } = useCurrentDocument();
+  } = useDocument();
 
   const { id, hidden, name, style, component_id, props, text, src } = (template
     .overrides[node_id] || {}) as grida.program.nodes.AnyNode;

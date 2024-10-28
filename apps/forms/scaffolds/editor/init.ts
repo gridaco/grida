@@ -279,6 +279,7 @@ function initialSiteEditorState(init: SiteDocumentEditorInit): EditorState {
     selected_page_id: "form/collection",
     documents: {
       ["form/collection"]: {
+        readonly: false,
         template: {
           name: "formcollection_sample_001_the_bundle",
           type: "template",
@@ -499,6 +500,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
     documents: {
       "form/startpage": init.start
         ? {
+            readonly: false,
             template: {
               type: "template",
               version: "0.0.0",

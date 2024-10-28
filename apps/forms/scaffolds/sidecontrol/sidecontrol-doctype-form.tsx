@@ -21,11 +21,11 @@ import { FormExpression } from "@/lib/forms/expression";
 import { PropertyLine, PropertyLineLabel } from "./ui";
 import { EditBinaryExpression } from "../panels/extensions/v-edit";
 import { PopoverClose } from "@radix-ui/react-popover";
-import { useCurrentDocument } from "../editor/use";
 import { SelectedNodeProperties } from "./sidecontrol-selected-node";
+import { useDocument } from "@/builder/provider";
 
 export function SideControlDoctypeForm() {
-  const { selectedNode } = useCurrentDocument();
+  const { selectedNode } = useDocument();
   const [state, dispatch] = useEditorState();
 
   if (state.focus_block_id) {

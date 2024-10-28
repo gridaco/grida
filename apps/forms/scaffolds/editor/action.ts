@@ -450,3 +450,14 @@ export interface EditorDocumentAction {
   key: "form/collection" | "form/startpage";
   action: BuilderAction;
 }
+
+export function composeEditorDocumentAction(
+  document_key: "form/collection" | "form/startpage",
+  action: BuilderAction
+): EditorDocumentAction {
+  return {
+    type: "editor/document",
+    key: document_key,
+    action,
+  };
+}
