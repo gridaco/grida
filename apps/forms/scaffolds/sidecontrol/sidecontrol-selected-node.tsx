@@ -34,6 +34,7 @@ import { PropertyLine, PropertyLineLabel } from "./ui";
 import { SrcControl } from "./controls/src";
 import { ObjectFitControl } from "./controls/object-fit";
 import { PropsControl } from "./controls/props";
+import { TargetBlankControl } from "./controls/target";
 import { useComputedNode, useDocument, useNode } from "@/builder/provider";
 import assert from "assert";
 
@@ -125,11 +126,20 @@ export function SelectedNodeProperties() {
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Link</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent>
+        <SidebarMenuSectionContent className="space-y-2">
           <PropertyLine>
             <PropertyLineLabel>Link To</PropertyLineLabel>
-            <HrefControl />
+            <HrefControl value={node.href} onValueChange={selectedNode.href} />
           </PropertyLine>
+          {node.href && (
+            <PropertyLine>
+              <PropertyLineLabel>New Tab</PropertyLineLabel>
+              <TargetBlankControl
+                value={node.target}
+                onValueChange={selectedNode.target}
+              />
+            </PropertyLine>
+          )}
         </SidebarMenuSectionContent>
       </SidebarSection>
       <SidebarSection hidden={!istemplate} className="border-b pb-4">

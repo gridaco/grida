@@ -178,6 +178,28 @@ export function useDocument() {
     [dispatch]
   );
 
+  const changeNodeHref = useCallback(
+    (node_id: string, href?: grida.program.nodes.i.IHrefable["href"]) => {
+      dispatch({
+        type: "document/template/override/node/change/href",
+        node_id: node_id,
+        href,
+      });
+    },
+    [dispatch]
+  );
+
+  const changeNodeTarget = useCallback(
+    (node_id: string, target?: grida.program.nodes.i.IHrefable["target"]) => {
+      dispatch({
+        type: "document/template/override/node/change/target",
+        node_id: node_id,
+        target,
+      });
+    },
+    [dispatch]
+  );
+
   const changeNodeStyle = useCallback(
     (node_id: string, key: string, value: any) => {
       dispatch({
@@ -219,6 +241,10 @@ export function useDocument() {
       active: (active: boolean) => changeNodeActive(selected_node_id!, active),
       src: (src?: Tokens.StringValueExpression) =>
         changeNodeSrc(selected_node_id!, src),
+      href: (href?: grida.program.nodes.i.IHrefable["href"]) =>
+        changeNodeHref(selected_node_id!, href),
+      target: (target?: grida.program.nodes.i.IHrefable["target"]) =>
+        changeNodeTarget(selected_node_id!, target),
 
       // style
       opacity: (value: number) =>
@@ -330,8 +356,13 @@ export function useNode(node_id: string) {
 
 export function useComputedNode(node_id: string) {
   const node = useNode(node_id);
-  const { active, style, component_id, props, text, src } = node;
-  const computed = useComputed({ text: text, src: src, props: props });
+  const { active, style, component_id, props, text, src, href } = node;
+  const computed = useComputed({
+    text: text,
+    src: src,
+    href: href,
+    props: props,
+  });
 
   return computed;
 }

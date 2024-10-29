@@ -3,13 +3,7 @@
 import React, { useCallback } from "react";
 import { useGesture } from "@use-gesture/react";
 import { TemplateComponents } from "@/builder/template-builder";
-import type {
-  TemplateValueProperties,
-  TemplateComponent,
-} from "./with-template";
-import type { Tokens } from "@/ast";
-import { useComputed } from "./use-computed";
-import { useValue } from "../../grida/react-runtime/data-context";
+import type { TemplateComponent } from "./with-template";
 import { grida } from "@/grida";
 import { TemplateBuilderWidgets } from "./widgets";
 import { useComputedNode, useDocument, useNode } from "../provider";
@@ -86,7 +80,7 @@ export function NodeSlot<P extends Record<string, any>>({
   );
 
   return (
-    <>
+    <HrefWrapper href={computed.href} target={node.target}>
       {React.createElement<any>(
         renderer,
         {
@@ -100,6 +94,29 @@ export function NodeSlot<P extends Record<string, any>>({
         },
         children
       )}
-    </>
+    </HrefWrapper>
   );
+}
+
+function HrefWrapper({
+  href,
+  target,
+  children,
+}: React.PropsWithChildren<{
+  href?: string;
+  target?: string;
+}>) {
+  const {
+    document: { readonly },
+  } = useDocument();
+
+  // only render a tag on viewer mode
+  if (readonly && href) {
+    return (
+      <a href={href} target={target}>
+        {children}
+      </a>
+    );
+  }
+  return <>{children}</>;
 }

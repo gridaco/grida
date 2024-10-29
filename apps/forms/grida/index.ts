@@ -247,6 +247,11 @@ export namespace grida {
           style?: React.CSSProperties;
         }
 
+        export interface IHrefable {
+          href?: string;
+          target?: "_self" | "_blank" | undefined;
+        }
+
         export interface ITextValue {
           /**
            * text value
@@ -284,6 +289,7 @@ export namespace grida {
         extends i.IBaseNode,
           i.ISceneNode,
           i.IStylable,
+          i.IHrefable,
           i.ITextValue {
         type: "text";
       }
@@ -291,7 +297,8 @@ export namespace grida {
       export interface ImageNode
         extends i.IBaseNode,
           i.ISceneNode,
-          i.IStylable {
+          i.IStylable,
+          i.IHrefable {
         type: "image";
         /**
          * required - when falsy, the image will not be rendered
@@ -306,6 +313,7 @@ export namespace grida {
         extends i.IBaseNode,
           i.ISceneNode,
           i.IStylable,
+          i.IHrefable,
           i.IExpandable {
         type: "container";
         //
@@ -315,6 +323,7 @@ export namespace grida {
         extends i.IBaseNode,
           i.ISceneNode,
           i.IStylable,
+          i.IHrefable,
           i.IProperties,
           i.IProps {
         type: "instance";

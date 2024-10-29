@@ -13,6 +13,8 @@ import type {
   TemplateEditorChangeTemplatePropsAction,
   TemplateEditorNodeChangeHiddenAction,
   TemplateEditorNodeChangeSrcAction,
+  TemplateEditorNodeChangeHrefAction,
+  TemplateEditorNodeChangeTargetAction,
 } from "./action";
 import type { ITemplateEditorState } from "./types";
 import { grida } from "@/grida";
@@ -84,6 +86,18 @@ export default function reducer(
       const { node_id, src } = <TemplateEditorNodeChangeSrcAction>action;
       return produce(state, (draft) => {
         override(draft, { node_id, payload: { src } });
+      });
+    }
+    case "document/template/override/node/change/href": {
+      const { node_id, href } = <TemplateEditorNodeChangeHrefAction>action;
+      return produce(state, (draft) => {
+        override(draft, { node_id, payload: { href } });
+      });
+    }
+    case "document/template/override/node/change/target": {
+      const { node_id, target } = <TemplateEditorNodeChangeTargetAction>action;
+      return produce(state, (draft) => {
+        override(draft, { node_id, payload: { target } });
       });
     }
     case "document/template/override/node/change/style": {

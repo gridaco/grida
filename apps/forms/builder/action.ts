@@ -10,6 +10,8 @@ export type BuilderAction =
   | TemplateEditorNodeChangeComponentAction
   | TemplateEditorNodeChangeTextAction
   | TemplateEditorNodeChangeSrcAction
+  | TemplateEditorNodeChangeHrefAction
+  | TemplateEditorNodeChangeTargetAction
   | TemplateEditorNodeChangeStyleAction
   | TemplateEditorNodeChangePropsAction
   | TemplateEditorChangeTemplatePropsAction;
@@ -56,6 +58,14 @@ interface INodeChangeSrcAction extends INodeAction {
   src?: Tokens.StringValueExpression;
 }
 
+interface INodeChangeHrefAction extends INodeAction {
+  href?: grida.program.nodes.i.IHrefable["href"];
+}
+
+interface INodeChangeTargetAction extends INodeAction {
+  target?: grida.program.nodes.i.IHrefable["target"];
+}
+
 interface INodeChangePropsAction extends INodeAction {
   props: Partial<grida.program.nodes.i.IProps["props"]>;
 }
@@ -75,6 +85,14 @@ export type TemplateEditorNodeChangeStyleAction = INodeChangeStyleAction & {
 
 export type TemplateEditorNodeChangeSrcAction = INodeChangeSrcAction & {
   type: "document/template/override/node/change/src";
+};
+
+export type TemplateEditorNodeChangeHrefAction = INodeChangeHrefAction & {
+  type: "document/template/override/node/change/href";
+};
+
+export type TemplateEditorNodeChangeTargetAction = INodeChangeTargetAction & {
+  type: "document/template/override/node/change/target";
 };
 
 export type TemplateEditorNodeChangePropsAction = INodeChangePropsAction & {
