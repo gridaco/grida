@@ -85,7 +85,6 @@ export function SideControlGlobal() {
 
   return (
     <>
-      {selected_page_id === "form/startpage" && <FormStartPageControl />}
       <SidebarSection className="border-b pb-4">
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Type</SidebarSectionHeaderLabel>
@@ -102,6 +101,7 @@ export function SideControlGlobal() {
           <AppearanceControl />
         </SidebarMenuSectionContent>
       </SidebarSection>
+      {selected_page_id === "form/startpage" && <FormStartPageControl />}
       {selected_page_id === "form" && (
         <SidebarSection className="border-b pb-4">
           <SidebarSectionHeaderItem>

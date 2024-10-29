@@ -55,7 +55,9 @@ export function StandaloneDocumentEditor({
 export function useDocument() {
   const document = useContext(DocumentContext);
   if (!document) {
-    throw new Error("useDocument must be used within a DocumentEditor");
+    throw new Error(
+      "useDocument must be used within a StandaloneDocumentEditor"
+    );
   }
 
   const dispatch = useContext(DocumentDispatcherContext);

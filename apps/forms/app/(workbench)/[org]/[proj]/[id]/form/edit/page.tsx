@@ -6,20 +6,30 @@ import { useEditorState } from "@/scaffolds/editor";
 import { SideControl } from "@/scaffolds/sidecontrol";
 import BlocksEditor from "@/scaffolds/blocks-editor";
 import { Spinner } from "@/components/spinner";
+import { CurrentPage } from "@/scaffolds/editor/utils/current-page";
 
 export default function EditFormPage() {
   return (
-    <main className="h-full flex flex-1 w-full">
-      <CanvasEventTarget className="relative w-full no-scrollbar overflow-y-auto bg-transparent">
-        <CanvasOverlay />
-        <AgentThemeProvider>
-          <CurrentPageCanvas />
-        </AgentThemeProvider>
-      </CanvasEventTarget>
-      <aside className="hidden lg:flex h-full">
-        <SideControl />
-      </aside>
-    </main>
+    <CurrentPage
+      page="form"
+      fallback={
+        <div className="h-full w-full flex items-center justify-center">
+          <Spinner />
+        </div>
+      }
+    >
+      <main className="h-full flex flex-1 w-full">
+        <CanvasEventTarget className="relative w-full no-scrollbar overflow-y-auto bg-transparent">
+          <CanvasOverlay />
+          <AgentThemeProvider>
+            <CurrentPageCanvas />
+          </AgentThemeProvider>
+        </CanvasEventTarget>
+        <aside className="hidden lg:flex h-full">
+          <SideControl />
+        </aside>
+      </main>
+    </CurrentPage>
   );
 }
 
