@@ -248,7 +248,7 @@ export namespace grida {
           /**
            * exposed child node overrides
            */
-          overrides: Record<string, nodes.Node | undefined>;
+          overrides: Record<string, Partial<nodes.Node> | undefined>;
         }
       }
     }
@@ -273,7 +273,7 @@ export namespace grida {
           Partial<InstanceNode>,
         "type"
       > & {
-        type: Node["type"];
+        readonly type: Node["type"];
       } & i.IBaseNode &
         i.ISceneNode &
         i.IStylable;
@@ -370,7 +370,7 @@ export namespace grida {
           i.IStylable,
           i.IHrefable,
           i.ITextValue {
-        type: "text";
+        readonly type: "text";
       }
 
       export interface ImageNode
@@ -378,7 +378,7 @@ export namespace grida {
           i.ISceneNode,
           i.IStylable,
           i.IHrefable {
-        type: "image";
+        readonly type: "image";
         /**
          * required - when falsy, the image will not be rendered
          */
@@ -394,7 +394,7 @@ export namespace grida {
           i.IStylable,
           i.IHrefable,
           i.IExpandable {
-        type: "container";
+        readonly type: "container";
         //
       }
 
@@ -449,7 +449,7 @@ export namespace grida {
           i.IHrefable,
           i.IProperties,
           i.IProps {
-        type: "instance";
+        readonly type: "instance";
         /**
          * ID of component that this instance came from, refers to components table
          */

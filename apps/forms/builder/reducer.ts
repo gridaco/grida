@@ -73,8 +73,9 @@ export default function reducer(
 
       return produce(state, (draft) => {
         const { node_id } = __action;
-        const nodedata = draft.template.overrides[node_id];
-        assert(nodedata);
+        const node = draft.template.nodes[node_id];
+        assert(node);
+        const nodedata = draft.template.overrides[node_id] || {};
         draft.template.overrides[node_id] = nodeReducer(nodedata, __action);
       });
     }
@@ -83,47 +84,50 @@ export default function reducer(
   return state;
 }
 
-function nodeReducer(node: grida.program.nodes.Node, action: NodeChangeAction) {
+function nodeReducer(
+  node: Partial<grida.program.nodes.Node>,
+  action: NodeChangeAction
+) {
   return produce(node, (draft) => {
     switch (action.type) {
       case "node/change/active": {
-        node.active = action.active;
+        draft.active = action.active;
         break;
       }
       case "node/change/name": {
-        node.name = action.name;
+        draft.name = action.name;
         break;
       }
       case "node/change/href": {
-        node.href = action.href;
+        draft.href = action.href;
         break;
       }
       case "node/change/target": {
-        node.target = action.target;
+        draft.target = action.target;
         break;
       }
       case "node/change/component": {
-        assert(node.type === "instance");
-        node.component_id = action.component_id;
+        assert(draft.type === "instance");
+        draft.component_id = action.component_id;
         break;
       }
       case "node/change/src": {
-        assert(node.type === "image");
-        node.src = action.src;
+        assert(draft.type === "image");
+        draft.src = action.src;
         break;
       }
       case "node/change/props": {
-        assert(node.type === "instance");
-        node.props = Object.assign({}, node.props, action.props);
+        assert(draft.type === "instance");
+        draft.props = Object.assign({}, draft.props, action.props);
         break;
       }
       case "node/change/style": {
-        node.style = Object.assign({}, node.style, action.style);
+        draft.style = Object.assign({}, draft.style, action.style);
         break;
       }
       case "node/change/text": {
-        assert(node.type === "text");
-        node.text = action.text ?? null;
+        assert(draft.type === "text");
+        draft.text = draft.text ?? null;
         break;
       }
     }
