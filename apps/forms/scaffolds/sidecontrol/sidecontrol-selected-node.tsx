@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback } from "react";
+import React from "react";
 
 import {
   SidebarMenuSectionContent,
@@ -35,6 +35,8 @@ import { SrcControl } from "./controls/src";
 import { ObjectFitControl } from "./controls/object-fit";
 import { PropsControl } from "./controls/props";
 import { TargetBlankControl } from "./controls/target";
+import { ExportNodeWithHtmlToImage } from "./controls/export";
+
 import { useComputedNode, useDocument, useNode } from "@/builder/provider";
 import assert from "assert";
 
@@ -326,6 +328,16 @@ export function SelectedNodeProperties() {
           <PropertyLine>
             <PropertyLineLabel>Cursor</PropertyLineLabel>
             <CursorControl value={cursor} onValueChange={selectedNode.cursor} />
+          </PropertyLine>
+        </SidebarMenuSectionContent>
+      </SidebarSection>
+      <SidebarSection className="border-b pb-4">
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>Export</SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuSectionContent className="space-y-2">
+          <PropertyLine>
+            <ExportNodeWithHtmlToImage node_id={id} name={name} />
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>
