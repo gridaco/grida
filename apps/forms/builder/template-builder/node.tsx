@@ -52,7 +52,7 @@ export function NodeSlot<P extends Record<string, any>>({
     },
     // @ts-ignore
   } satisfies
-    | grida.program.template.IBuiltinTemplateNodeReactComponentRenderProps<P>
+    | grida.program.document.template.IBuiltinTemplateNodeReactComponentRenderProps<P>
     | grida.program.nodes.AnyNode;
 
   const onSelect = useCallback(() => {

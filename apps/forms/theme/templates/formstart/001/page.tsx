@@ -39,7 +39,7 @@ const userprops = {
   title: { type: "string" },
   subtitle: { type: "string" },
   background_video: { type: "video" },
-} satisfies grida.program.template.TemplateDefinition["properties"];
+} satisfies grida.program.document.template.TemplateDocumentDefinition["properties"];
 
 type UserProps = grida.program.schema.TInferredPropTypes<typeof userprops>;
 

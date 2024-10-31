@@ -288,7 +288,7 @@ function initialSiteEditorState(init: SiteDocumentEditorInit): EditorState {
           props: samples["formcollection_sample_001_the_bundle"] as any,
           overrides: {},
           version: "0.0.0",
-          nodes: [],
+          nodes: {},
         },
       },
     },

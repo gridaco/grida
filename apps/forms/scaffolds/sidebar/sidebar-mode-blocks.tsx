@@ -126,9 +126,12 @@ function HierarchyView() {
 function NodeHierarchyList() {
   const { document, selectNode } = useDocument();
   // console.log("document.template.nodes", document.template.nodes);
+
+  const ids = Object.keys(document.template.nodes);
   return (
     <>
-      {document.template.nodes.map((n) => {
+      {ids.map((id) => {
+        const n = document.template.nodes[id];
         const selected = document.selected_node_id === n.id;
         return (
           <SidebarMenuItem

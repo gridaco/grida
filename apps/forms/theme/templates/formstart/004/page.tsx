@@ -36,7 +36,8 @@ const cards = [
   },
 ];
 
-const userprops: grida.program.template.TemplateDefinition["properties"] = {};
+const userprops: grida.program.document.template.TemplateDocumentDefinition["properties"] =
+  {};
 
 export default function _004() {
   return (

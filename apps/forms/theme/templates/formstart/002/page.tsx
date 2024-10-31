@@ -43,7 +43,7 @@ import Link from "next/link";
 import type { grida } from "@/grida";
 
 const userprops =
-  {} satisfies grida.program.template.TemplateDefinition["properties"];
+  {} satisfies grida.program.document.template.TemplateDocumentDefinition["properties"];
 
 type UserProps = grida.program.schema.TInferredPropTypes<typeof userprops>;
 

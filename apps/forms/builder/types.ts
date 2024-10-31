@@ -4,12 +4,13 @@ import type { grida } from "@/grida";
 
 export type DocumentDispatcher = (action: BuilderAction) => void;
 
-export interface IDocumentCursorState {
+export interface IDocumentEditorInteractionCursorState {
   selected_node_id?: string;
   hovered_node_id?: string;
 }
 
-export interface ITemplateEditorState extends IDocumentCursorState {
-  template: grida.program.template.TemplateInstance;
+export interface ITemplateEditorState
+  extends IDocumentEditorInteractionCursorState {
+  template: grida.program.document.template.TemplateInstance;
   readonly: boolean;
 }

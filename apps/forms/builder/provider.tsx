@@ -345,11 +345,7 @@ export function useNode(node_id: string) {
     },
   } = useDocument();
 
-  const node_definition = useMemo(
-    () => nodes.find((n) => n.id === node_id),
-    [nodes, node_id]
-  );
-
+  const node_definition = nodes[node_id];
   const node_overrides = overrides[node_id];
 
   const node: grida.program.nodes.AnyNode = useMemo(() => {

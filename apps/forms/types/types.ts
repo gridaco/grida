@@ -417,9 +417,10 @@ interface FormPageThemeEmbeddedBackgroundData {
   "background-color"?: string;
 }
 
-export type FormStartPageSchema = grida.program.template.TemplateInstance & {
-  __schema_version: "2024-10-24";
-};
+export type FormStartPageSchema =
+  grida.program.document.template.TemplateInstance & {
+    __schema_version: "2024-10-24";
+  };
 
 export type EndingPageTemplateID = "default" | "receipt01";
 

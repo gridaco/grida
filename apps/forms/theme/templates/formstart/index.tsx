@@ -10,11 +10,12 @@ import React, { useMemo } from "react";
 import { grida } from "@/grida";
 
 export namespace FormStartPage {
-  type ClientTemplateDefinition = grida.program.template.TemplateDefinition & {
-    component: React.ComponentType<
-      FormStartPage.CampaignTemplateProps<any, any>
-    >;
-  };
+  type ClientTemplateDefinition =
+    grida.program.document.template.TemplateDocumentDefinition & {
+      component: React.ComponentType<
+        FormStartPage.CampaignTemplateProps<any, any>
+      >;
+    };
 
   export const templates: ClientTemplateDefinition[] = [
     // {

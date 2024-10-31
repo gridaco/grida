@@ -140,54 +140,128 @@ export namespace grida {
       };
     }
 
-    export namespace template {
-      export interface TemplateDefinition<
-        P extends schema.Properties = schema.Properties,
-      > {
-        name: string;
-        version: string;
-        type: "template";
-        properties: P;
-        default: Record<string, schema.Value>;
-        /**
-         * staticly defined nodes (this does not represent the entire tree)
-         *
-         * exposed nodes that can be overriden by the user
-         */
-        nodes: nodes.Node[];
-        //
-      }
-
-      export interface IBuiltinTemplateNodeReactComponentRenderProps<P>
-        extends nodes.i.IBaseNode,
-          nodes.i.ISceneNode,
-          nodes.i.IStylable,
-          nodes.i.IExpandable {
-        props: P;
-      }
-
+    export namespace document {
       /**
-       * [Template Node] Template node is a static, hand crafted template that does not have a intrinsic tree, only a root properties [data] and [overrides] to each customizable node
+       * Represents a normalized document structure where all nodes are stored in a flat map
+       * with a single `root_id` as the entry point for traversal.
        *
-       * Template Node cannot be used as a child node.
+       * @remarks
+       * This structure is designed to improve efficiency and scalability by avoiding deep nesting.
+       * Instead of storing child nodes within each parent node (deeply nested children), we store
+       * all nodes in a flat `Record<string, Node>` and reference child nodes by their IDs. This
+       * setup allows for constant-time access to nodes, simplifies updates, and enhances compatibility
+       * with React's rendering model.
        *
-       * This will be used until we have a fully working tree editor.
+       * ## Benefits of a Flat Structure over Nested Children:
+       * 1. **Performance and Efficiency**:
+       *    - **Constant-Time Lookup**: Storing nodes in a flat map (`nodes: Record<string, Node>`) allows
+       *      for quick lookups by ID with `O(1)` access time, regardless of the document's complexity or depth.
+       *    - **Simplified Updates**: With each node accessible directly by ID, modifications do not require
+       *      traversing deeply nested structures, reducing the computational cost of updates.
+       *
+       * 2. **Compatibility with React**:
+       *    - **Minimized Re-renders**: In React, deeply nested structures can trigger unnecessary re-renders
+       *      across the component tree. A flat structure allows React components to request only the specific
+       *      node data they need, which reduces re-renders and optimizes the virtual DOM diffing process.
+       *    - **Memoization-Friendly**: By accessing nodes through IDs rather than deeply nested props,
+       *      components can be memoized effectively, re-rendering only when the specific node data they depend on changes.
+       *
+       * 3. **Scalability and Flexibility**:
+       *    - This normalized structure is easier to scale, allowing for flexible hierarchical changes (e.g., moving
+       *      nodes, reordering) without requiring deep restructuring.
+       *    - Maintaining a `root_id` as the document's starting point simplifies traversal, ensuring that
+       *      complex documents can still be navigated in a straightforward manner.
+       *
+       * ## Querying Nodes Efficiently
+       * - Developers should access nodes through the `nodes` map using their unique IDs, starting from `root_id`.
+       * - Traversal operations (e.g., rendering the document tree) can begin from `root_id` and recursively fetch child nodes by referencing `children` arrays in each `Node`.
+       * - If frequent queries are necessary (e.g., repeated lookups in deeply nested areas), consider memoizing the result of these queries or using selector functions.
+       *
+       * ## Using in React Efficiently
+       * - **React Context**: To avoid prop drilling, consider placing the `nodes` map in a React Context, allowing deeply nested components to access nodes by ID without passing them as props.
+       * - **Memoized Selectors**: Use `useMemo` or selector functions (e.g., with libraries like Reselect) to derive specific subtrees or frequently accessed nodes, avoiding redundant calculations on each render.
+       * - **Component Memoization**: Use `React.memo` or `useMemo` on components accessing nodes by ID to limit re-renders. This way, only components with changing dependencies re-render.
+       *
+       * @example
+       * ```typescript
+       * // Basic structure example:
+       * const document: NormalizedNodeDocument = {
+       *   root_id: "1",
+       *   nodes: {
+       *     "1": { id: "1", type: "container", children: ["2", "3"] },
+       *     "2": { id: "2", type: "text", children: [] },
+       *     "3": { id: "3", type: "image", children: [] },
+       *   }
+       * };
+       *
+       * // Example query: Render a node and its children
+       * function NodeComponent({ id }: { id: string }) {
+       *   const node = document.nodes[id];
+       *   return (
+       *     <div>
+       *       <p>{node.type}</p>
+       *       {node.children.map((childId) => (
+       *         <NodeComponent key={childId} id={childId} />
+       *       ))}
+       *     </div>
+       *   );
+       * }
+       * ```
        */
-      export interface TemplateInstance extends TemplateDefinition {
-        /**
-         * arguments matching properties
-         */
-        props: Record<string, schema.Value>;
+      export interface IDocumentDefinition {
+        // root_id: string;
+        nodes: Record<string, nodes.Node>;
+      }
+
+      export namespace template {
+        export interface TemplateDocumentDefinition<
+          P extends schema.Properties = schema.Properties,
+        > extends IDocumentDefinition {
+          name: string;
+          version: string;
+          type: "template";
+          properties: P;
+          default: Record<string, schema.Value>;
+        }
+
+        export interface IBuiltinTemplateNodeReactComponentRenderProps<P>
+          extends nodes.i.IBaseNode,
+            nodes.i.ISceneNode,
+            nodes.i.IStylable,
+            nodes.i.IExpandable {
+          props: P;
+        }
 
         /**
-         * exposed child node overrides
+         * [Template Node] Template node is a static, hand crafted template that does not have a intrinsic tree, only a root properties [data] and [overrides] to each customizable node
+         *
+         * Template Node cannot be used as a child node.
+         *
+         * This will be used until we have a fully working tree editor.
          */
-        overrides: Record<string, nodes.Node | undefined>;
+        export interface TemplateInstance extends TemplateDocumentDefinition {
+          /**
+           * arguments matching properties
+           */
+          props: Record<string, schema.Value>;
+
+          /**
+           * exposed child node overrides
+           */
+          overrides: Record<string, nodes.Node | undefined>;
+        }
       }
     }
 
     export namespace nodes {
-      export type Node = TextNode | ImageNode | ContainerNode | InstanceNode;
+      export type Node =
+        | TextNode
+        | ImageNode
+        | ContainerNode
+        // | SvgRectNode
+        // | SvgCircleNode
+        // | SvgEllipseNode
+        | InstanceNode;
 
       /**
        * Any node utility type - use within the correct context
@@ -250,6 +324,11 @@ export namespace grida {
         export interface IHrefable {
           href?: string;
           target?: "_self" | "_blank" | undefined;
+        }
+
+        export interface IDimension {
+          width: number;
+          height: number;
         }
 
         export interface ITextValue {
@@ -318,6 +397,50 @@ export namespace grida {
         type: "container";
         //
       }
+
+      // export interface SvgNode
+      //   extends i.IBaseNode,
+      //     i.ISceneNode,
+      //     i.IStylable,
+      //     i.IHrefable,
+      //     i.IDimension {
+      //   type: "svg";
+      // }
+
+      // export interface SvgRectNode
+      //   extends i.IBaseNode,
+      //     i.ISceneNode,
+      //     i.IHrefable,
+      //     i.IDimension {
+      //   type: "rect";
+      //   rx: number | null;
+      //   ry: number | null;
+      //   width: number;
+      //   height: number;
+      // }
+
+      // export interface SvgCircleNode
+      //   extends i.IBaseNode,
+      //     i.ISceneNode,
+      //     i.IHrefable,
+      //     i.IDimension {
+      //   type: "circle";
+      //   cx: number | null;
+      //   cy: number | null;
+      //   r: number;
+      // }
+
+      // export interface SvgEllipseNode
+      //   extends i.IBaseNode,
+      //     i.ISceneNode,
+      //     i.IHrefable,
+      //     i.IDimension {
+      //   type: "ellipse";
+      //   cx: number | null;
+      //   cy: number | null;
+      //   rx: number;
+      //   ry: number;
+      // }
 
       export interface InstanceNode
         extends i.IBaseNode,

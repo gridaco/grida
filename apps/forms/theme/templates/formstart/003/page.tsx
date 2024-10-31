@@ -25,7 +25,7 @@ const userprops = {
   title: { type: "string" },
   subtitle: { type: "string" },
   background: { type: "image" },
-} satisfies grida.program.template.TemplateDefinition["properties"];
+} satisfies grida.program.document.template.TemplateDocumentDefinition["properties"];
 
 type UserProps = grida.program.schema.TInferredPropTypes<typeof userprops>;
 
@@ -113,30 +113,30 @@ _003.definition = {
     subtitle: "Enter Subtitle",
     background: "/images/abstract-placeholder.jpg",
   },
-  nodes: [
-    {
+  nodes: {
+    "003.title": {
+      id: "003.title",
       active: true,
       locked: false,
       type: "text",
-      id: "003.title",
       name: "Title",
       text: Factory.createPropertyAccessExpression(["props", "title"]),
     },
-    {
+    "003.subtitle": {
+      id: "003.subtitle",
       active: true,
       locked: false,
       type: "text",
-      id: "003.subtitle",
       name: "Subtitle",
       text: Factory.createPropertyAccessExpression(["props", "subtitle"]),
     },
-    {
+    "003.background": {
+      id: "003.background",
       active: true,
       locked: false,
       type: "image",
-      id: "003.background",
       name: "Background",
       src: Factory.createPropertyAccessExpression(["props", "background"]),
     },
-  ],
-} satisfies grida.program.template.TemplateDefinition;
+  },
+} satisfies grida.program.document.template.TemplateDocumentDefinition;

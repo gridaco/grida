@@ -19,14 +19,14 @@ const card_properties_definition = {
   n: { type: "number" },
   media: { type: "image" },
   // media: MediaSchema,
-} satisfies grida.program.template.TemplateDefinition["properties"];
+} satisfies grida.program.document.template.TemplateDocumentDefinition["properties"];
 
 type CardUserProps = grida.program.schema.TInferredPropTypes<
   typeof card_properties_definition
 >;
 
 type CardMasterProps =
-  grida.program.template.IBuiltinTemplateNodeReactComponentRenderProps<CardUserProps>;
+  grida.program.document.template.IBuiltinTemplateNodeReactComponentRenderProps<CardUserProps>;
 
 export const Card_001 = withTemplateDefinition(
   ({
@@ -92,73 +92,73 @@ export const Card_001 = withTemplateDefinition(
       date2: "2021-01-01",
       tags: ["tag1", "tag2"],
     },
-    nodes: [
-      {
+    nodes: {
+      ".h1": {
+        id: ".h1",
         active: true,
         locked: false,
         type: "text",
-        id: ".h1",
         name: "Title",
         text: "Title",
       },
-      {
+      ".p": {
+        id: ".p",
         active: true,
         locked: false,
         type: "text",
-        id: ".p",
         name: "Description",
         text: "Description",
       },
-      {
+      ".date1": {
+        id: ".date1",
         active: true,
         locked: false,
         type: "text",
-        id: ".date1",
         name: "Date 1",
         text: "2021-01-01",
       },
-      {
+      ".n": {
+        id: ".n",
         active: true,
         locked: false,
         type: "text",
-        id: ".n",
         name: "Number",
         text: "0",
       },
-      {
+      ".badge": {
+        id: ".badge",
         active: true,
         locked: false,
         type: "text",
-        id: ".badge",
         name: "Badge",
         text: "New",
       },
-      {
+      ".media": {
+        id: ".media",
         active: true,
         locked: false,
         type: "image",
-        id: ".media",
         name: "Media",
         src: "",
         alt: "",
       },
-      {
+      ".date2": {
+        id: ".date2",
         active: true,
         locked: false,
         type: "text",
-        id: ".date2",
         name: "Date 2",
         text: "2021-01-01",
       },
-      {
+      ".tags": {
+        id: ".tags",
         active: true,
         locked: false,
         type: "container",
-        id: ".tags",
         name: "Tags",
         expanded: false,
       },
-    ],
+    },
     type: "template",
     properties: card_properties_definition,
     version: "0.0.0",
@@ -218,73 +218,73 @@ export const Card_002 = withTemplateDefinition(
       date2: "2021-01-01",
       tags: ["tag1", "tag2"],
     },
-    nodes: [
-      {
+    nodes: {
+      ".h1": {
+        id: ".h1",
         active: true,
         locked: false,
         type: "text",
-        id: ".h1",
         name: "Title",
         text: "Title",
       },
-      {
+      ".p": {
+        id: ".p",
         active: true,
         locked: false,
         type: "text",
-        id: ".p",
         name: "Description",
         text: "Description",
       },
-      {
+      ".date1": {
+        id: ".date1",
         active: true,
         locked: false,
         type: "text",
-        id: ".date1",
         name: "Date 1",
         text: "2021-01-01",
       },
-      {
+      ".n": {
+        id: ".n",
         active: true,
         locked: false,
         type: "text",
-        id: ".n",
         name: "Number",
         text: "0",
       },
-      {
+      ".badge": {
+        id: ".badge",
         active: true,
         locked: false,
         type: "text",
-        id: ".badge",
         name: "Badge",
         text: "New",
       },
-      {
+      ".media": {
+        id: ".media",
         active: true,
         locked: false,
         type: "image",
-        id: ".media",
         name: "Media",
         src: "",
         alt: "",
       },
-      {
+      ".date2": {
+        id: ".date2",
         active: true,
         locked: false,
         type: "text",
-        id: ".date2",
         name: "Date 2",
         text: "2021-01-01",
       },
-      {
+      ".tags": {
+        id: ".tags",
         active: true,
         locked: false,
         type: "container",
-        id: ".tags",
         name: "Tags",
         expanded: false,
       },
-    ],
+    },
     type: "template",
     properties: card_properties_definition,
     version: "0.0.0",
@@ -375,73 +375,73 @@ export const Card_003 = withTemplateDefinition(
       date2: "2021-01-01",
       tags: ["tag1", "tag2"],
     },
-    nodes: [
-      {
+    nodes: {
+      ".h1": {
+        id: ".h1",
         active: true,
         locked: false,
         type: "text",
-        id: ".h1",
         name: "Title",
         text: "Title",
       },
-      {
+      ".p": {
+        id: ".p",
         active: true,
         locked: false,
         type: "text",
-        id: ".p",
         name: "Description",
         text: "Description",
       },
-      {
+      ".date1": {
+        id: ".date1",
         active: true,
         locked: false,
         type: "text",
-        id: ".date1",
         name: "Date 1",
         text: "2021-01-01",
       },
-      {
+      ".n": {
+        id: ".n",
         active: true,
         locked: false,
         type: "text",
-        id: ".n",
         name: "Number",
         text: "0",
       },
-      {
+      ".badge": {
+        id: ".badge",
         active: true,
         locked: false,
         type: "text",
-        id: ".badge",
         name: "Badge",
         text: "New",
       },
-      {
+      ".media": {
+        id: ".media",
         active: true,
         locked: false,
         type: "image",
-        id: ".media",
         name: "Media",
         src: "",
         alt: "",
       },
-      {
+      ".date2": {
+        id: ".date2",
         active: true,
         locked: false,
         type: "text",
-        id: ".date2",
         name: "Date 2",
         text: "2021-01-01",
       },
-      {
+      ".tags": {
+        id: ".tags",
         active: true,
         locked: false,
         type: "container",
-        id: ".tags",
         name: "Tags",
         expanded: false,
       },
-    ],
+    },
     type: "template",
     properties: card_properties_definition,
     version: "0.0.0",
@@ -452,14 +452,14 @@ const hero_card_properties_definition = {
   media: { type: "image" },
   h1: { type: "string" },
   p: { type: "string" },
-} satisfies grida.program.template.TemplateDefinition["properties"];
+} satisfies grida.program.document.template.TemplateDocumentDefinition["properties"];
 
 type HeroCardProps = grida.program.schema.TInferredPropTypes<
   typeof hero_card_properties_definition
 >;
 
 type HeroCardMasterProps =
-  grida.program.template.IBuiltinTemplateNodeReactComponentRenderProps<HeroCardProps>;
+  grida.program.document.template.IBuiltinTemplateNodeReactComponentRenderProps<HeroCardProps>;
 
 export const Hero_001 = withTemplateDefinition(
   function Hero_001({ props: { h1, p, media }, style }: HeroCardMasterProps) {
@@ -498,33 +498,33 @@ export const Hero_001 = withTemplateDefinition(
       p: "Description",
       media: { type: "image", src: "" },
     },
-    nodes: [
-      {
+    nodes: {
+      ".h1": {
+        id: ".h1",
         active: true,
         locked: false,
         type: "text",
-        id: ".h1",
         name: "Title",
         text: "Title",
       },
-      {
+      ".p": {
+        id: ".p",
         active: true,
         locked: false,
         type: "text",
-        id: ".p",
         name: "Description",
         text: "Description",
       },
-      {
+      ".media": {
+        id: ".media",
         active: true,
         locked: false,
         type: "image",
-        id: ".media",
         name: "Media",
         src: "",
         alt: "",
       },
-    ],
+    },
     type: "template",
     properties: hero_card_properties_definition,
     version: "0.0.0",
@@ -561,33 +561,33 @@ export const Hero_002 = withTemplateDefinition(
       p: "Description",
       media: { type: "image", src: "" },
     },
-    nodes: [
-      {
+    nodes: {
+      ".h1": {
+        id: ".h1",
         active: true,
         locked: false,
         type: "text",
-        id: ".h1",
         name: "Title",
         text: "Title",
       },
-      {
+      ".p": {
+        id: ".p",
         active: true,
         locked: false,
         type: "text",
-        id: ".p",
         name: "Description",
         text: "Description",
       },
-      {
+      ".media": {
+        id: ".media",
         active: true,
         locked: false,
         type: "image",
-        id: ".media",
         name: "Media",
         src: "",
         alt: "",
       },
-    ],
+    },
     type: "template",
     properties: hero_card_properties_definition,
     version: "0.0.0",

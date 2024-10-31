@@ -442,7 +442,7 @@ export interface FormEndingPreferencesAction
 
 export interface FormStartPageInitAction {
   type: "editor/form/startpage/init";
-  template: grida.program.template.TemplateDefinition;
+  template: grida.program.document.template.TemplateDocumentDefinition;
 }
 
 export interface EditorDocumentAction {

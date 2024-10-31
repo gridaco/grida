@@ -39,7 +39,7 @@ const userprops = {
   title: { type: "string", default: "[Your Title Goes Here.]" },
   body_html: { type: "string", default: "" },
   media: { type: "array", items: { type: "image" }, default: [] },
-} satisfies grida.program.template.TemplateDefinition["properties"];
+} satisfies grida.program.document.template.TemplateDocumentDefinition["properties"];
 
 type UserProps = grida.program.schema.TInferredPropTypes<typeof userprops>;
 

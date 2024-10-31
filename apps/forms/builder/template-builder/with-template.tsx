@@ -17,7 +17,7 @@ export type TemplateComponent = React.FC<any> & {
 export function withTemplateDefinition<P>(
   Component: React.FC<P>,
   type: string,
-  definition: grida.program.template.TemplateDefinition
+  definition: grida.program.document.template.TemplateDocumentDefinition
 ): TemplateComponent {
   const WrappedComponent: React.FC<P> = (props: P) => {
     return <Component {...props} data-grida-widget-type={type} />;

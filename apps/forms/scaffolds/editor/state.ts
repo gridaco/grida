@@ -85,7 +85,7 @@ export interface FormDocumentEditorInit extends BaseDocumentEditorInit {
   form_id: string;
   campaign: EditorState["form"]["campaign"];
   form_security: EditorState["form"]["form_security"];
-  start: grida.program.template.TemplateInstance | null;
+  start: grida.program.document.template.TemplateInstance | null;
   ending: EditorState["form"]["ending"];
   connections?: {
     store_id?: number | null;
