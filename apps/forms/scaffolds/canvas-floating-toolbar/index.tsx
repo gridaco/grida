@@ -39,7 +39,7 @@ export function SamplesSelect() {
       type: "editor/document",
       key: "site/dev-collection",
       action: {
-        type: "editor/document/data",
+        type: "document/template/set/props",
         data: data,
       },
     });

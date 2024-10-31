@@ -30,7 +30,7 @@ export function StringValueControl({
   placeholder = "Value",
   disabled,
 }: {
-  value?: Tokens.StringValueExpression;
+  value?: Tokens.StringValueExpression | null;
   onValueChange?: (value?: Tokens.StringValueExpression) => void;
   placeholder?: string;
   disabled?: boolean;
@@ -46,7 +46,7 @@ export function StringValueControl({
   return (
     <div className="relative group w-full">
       <Control
-        value={value}
+        value={value ?? undefined}
         onValueChange={onValueChange}
         placeholder={placeholder}
         disabled={disabled}

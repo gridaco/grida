@@ -2,105 +2,81 @@ import type { Tokens } from "@/ast";
 import { grida } from "@/grida";
 
 export type BuilderAction =
-  | BuilderSetDataAction
-  | TemplateEditorNodeChangeHiddenAction
-  | BuilderSelectNodeAction
-  | BuilderNodePointerEnterAction
-  | BuilderNodePointerLeaveAction
-  | TemplateEditorNodeChangeComponentAction
-  | TemplateEditorNodeChangeTextAction
-  | TemplateEditorNodeChangeSrcAction
-  | TemplateEditorNodeChangeHrefAction
-  | TemplateEditorNodeChangeTargetAction
-  | TemplateEditorNodeChangeStyleAction
-  | TemplateEditorNodeChangePropsAction
+  | DocumentEditorNodeSelectAction
+  | DocumentEditorNodePointerEnterAction
+  | DocumentEditorNodePointerLeaveAction
+  | NodeChangeAction
+  | TemplateNodeOverrideChangeAction
+  | TemplateEditorSetTemplatePropsAction
   | TemplateEditorChangeTemplatePropsAction;
 
-export interface BuilderSetDataAction {
-  type: "editor/document/data";
-  data: Record<string, any>;
-}
-
-export interface BuilderSelectNodeAction {
+export interface DocumentEditorNodeSelectAction {
   type: "document/node/select";
   node_id?: string;
 }
 
-interface INodeAction {
+interface INodeID {
   node_id: string;
 }
 
-export type BuilderNodePointerEnterAction = INodeAction & {
+export type DocumentEditorNodePointerEnterAction = INodeID & {
   type: "document/node/on-pointer-enter";
 };
 
-export type BuilderNodePointerLeaveAction = INodeAction & {
+export type DocumentEditorNodePointerLeaveAction = INodeID & {
   type: "document/node/on-pointer-leave";
 };
 
-interface INodeChangeActiveAction extends INodeAction {
+interface INodeChangeNameAction extends INodeID {
+  name: string;
+}
+
+interface INodeChangeActiveAction extends INodeID {
   active: boolean;
 }
 
-interface INodeChangeComponentAction extends INodeAction {
+interface INodeChangeComponentAction extends INodeID {
   component_id: string;
 }
 
-interface INodeChangeTextAction extends INodeAction {
+interface INodeChangeTextAction extends INodeID {
   text?: Tokens.StringValueExpression;
 }
 
-interface INodeChangeStyleAction extends INodeAction {
+interface INodeChangeStyleAction extends INodeID {
   style: Partial<React.CSSProperties>;
 }
 
-interface INodeChangeSrcAction extends INodeAction {
+interface INodeChangeSrcAction extends INodeID {
   src?: Tokens.StringValueExpression;
 }
 
-interface INodeChangeHrefAction extends INodeAction {
+interface INodeChangeHrefAction extends INodeID {
   href?: grida.program.nodes.i.IHrefable["href"];
 }
 
-interface INodeChangeTargetAction extends INodeAction {
+interface INodeChangeTargetAction extends INodeID {
   target?: grida.program.nodes.i.IHrefable["target"];
 }
 
-interface INodeChangePropsAction extends INodeAction {
+interface INodeChangePropsAction extends INodeID {
   props: Partial<grida.program.nodes.i.IProps["props"]>;
 }
 
-export type TemplateEditorNodeChangeComponentAction =
-  INodeChangeComponentAction & {
-    type: "document/template/override/node/change/component";
-  };
+export type NodeChangeAction =
+  | ({ type: "node/change/name" } & INodeChangeNameAction)
+  | ({ type: "node/change/active" } & INodeChangeActiveAction)
+  | ({ type: "node/change/component" } & INodeChangeComponentAction)
+  | ({ type: "node/change/text" } & INodeChangeTextAction)
+  | ({ type: "node/change/style" } & INodeChangeStyleAction)
+  | ({ type: "node/change/src" } & INodeChangeSrcAction)
+  | ({ type: "node/change/href" } & INodeChangeHrefAction)
+  | ({ type: "node/change/target" } & INodeChangeTargetAction)
+  | ({ type: "node/change/props" } & INodeChangePropsAction);
 
-export type TemplateEditorNodeChangeTextAction = INodeChangeTextAction & {
-  type: "document/template/override/node/change/text";
-};
-
-export type TemplateEditorNodeChangeStyleAction = INodeChangeStyleAction & {
-  type: "document/template/override/node/change/style";
-};
-
-export type TemplateEditorNodeChangeSrcAction = INodeChangeSrcAction & {
-  type: "document/template/override/node/change/src";
-};
-
-export type TemplateEditorNodeChangeHrefAction = INodeChangeHrefAction & {
-  type: "document/template/override/node/change/href";
-};
-
-export type TemplateEditorNodeChangeTargetAction = INodeChangeTargetAction & {
-  type: "document/template/override/node/change/target";
-};
-
-export type TemplateEditorNodeChangePropsAction = INodeChangePropsAction & {
-  type: "document/template/override/node/change/props";
-};
-
-export type TemplateEditorNodeChangeHiddenAction = INodeChangeActiveAction & {
-  type: "document/template/override/node/change/active";
+export type TemplateNodeOverrideChangeAction = {
+  type: "document/template/override/change/*";
+  action: NodeChangeAction;
 };
 
 export type TemplateEditorChangeTemplatePropsAction = Omit<
@@ -109,3 +85,8 @@ export type TemplateEditorChangeTemplatePropsAction = Omit<
 > & {
   type: "document/template/change/props";
 };
+
+export interface TemplateEditorSetTemplatePropsAction {
+  type: "document/template/set/props";
+  data: Record<string, any>;
+}

@@ -266,7 +266,7 @@ export namespace grida {
            * - by the standard implementation, the `props.[x]` is recommended to be referenced only once in a single node.
            * - by the standard implementation, within the visual editor context, when user attempts to updates the literal value (where it is a `props.[x]` and `props.[x] is literal`), it should actually update the `props.[x]` value, not this `text` literal value.
            */
-          text: Tokens.StringValueExpression;
+          text: Tokens.StringValueExpression | null;
         }
 
         export interface IProperties {

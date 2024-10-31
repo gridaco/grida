@@ -2,50 +2,44 @@ import { produce, type Draft } from "immer";
 
 import type {
   BuilderAction,
-  BuilderSetDataAction,
-  BuilderSelectNodeAction,
-  BuilderNodePointerEnterAction,
-  BuilderNodePointerLeaveAction,
-  TemplateEditorNodeChangeComponentAction,
-  TemplateEditorNodeChangeStyleAction,
-  TemplateEditorNodeChangePropsAction,
-  TemplateEditorNodeChangeTextAction,
+  TemplateEditorSetTemplatePropsAction,
+  DocumentEditorNodeSelectAction,
+  DocumentEditorNodePointerEnterAction,
+  DocumentEditorNodePointerLeaveAction,
+  NodeChangeAction,
+  TemplateNodeOverrideChangeAction,
   TemplateEditorChangeTemplatePropsAction,
-  TemplateEditorNodeChangeHiddenAction,
-  TemplateEditorNodeChangeSrcAction,
-  TemplateEditorNodeChangeHrefAction,
-  TemplateEditorNodeChangeTargetAction,
 } from "./action";
 import type { ITemplateEditorState } from "./types";
 import { grida } from "@/grida";
-import { deepAssign } from "@/utils";
+import assert from "assert";
 
 export default function reducer(
   state: ITemplateEditorState,
   action: BuilderAction
 ): ITemplateEditorState {
   switch (action.type) {
-    case "editor/document/data": {
-      const { data } = <BuilderSetDataAction>action;
+    case "document/template/set/props": {
+      const { data } = <TemplateEditorSetTemplatePropsAction>action;
       return produce(state, (draft) => {
         draft.template.props = data;
       });
     }
     case "document/node/select": {
-      const { node_id } = <BuilderSelectNodeAction>action;
+      const { node_id } = <DocumentEditorNodeSelectAction>action;
 
       return produce(state, (draft) => {
         draft.selected_node_id = node_id;
       });
     }
     case "document/node/on-pointer-enter": {
-      const { node_id } = <BuilderNodePointerEnterAction>action;
+      const { node_id } = <DocumentEditorNodePointerEnterAction>action;
       return produce(state, (draft) => {
         draft.hovered_node_id = node_id;
       });
     }
     case "document/node/on-pointer-leave": {
-      const { node_id } = <BuilderNodePointerLeaveAction>action;
+      const { node_id } = <DocumentEditorNodePointerLeaveAction>action;
       return produce(state, (draft) => {
         if (draft.hovered_node_id === node_id) {
           draft.hovered_node_id = undefined;
@@ -61,55 +55,27 @@ export default function reducer(
         } as grida.program.schema.Props;
       });
     }
-    case "document/template/override/node/change/active": {
-      const { node_id, active } = <TemplateEditorNodeChangeHiddenAction>action;
-      return produce(state, (draft) => {
-        override(draft, { node_id, payload: { active } });
-      });
+
+    case "node/change/active":
+    case "node/change/name":
+    case "node/change/component":
+    case "node/change/href":
+    case "node/change/target":
+    case "node/change/src":
+    case "node/change/props":
+    case "node/change/style":
+    case "node/change/text": {
+      throw new Error("Not implemented");
+      // nodes[node_id] = nodeReducer(node, __action);
     }
-    case "document/template/override/node/change/component": {
-      const { node_id, component_id } = <
-        TemplateEditorNodeChangeComponentAction
-      >action;
+    case "document/template/override/change/*": {
+      const { action: __action } = <TemplateNodeOverrideChangeAction>action;
 
       return produce(state, (draft) => {
-        override(draft, { node_id, payload: { component_id } });
-      });
-    }
-    case "document/template/override/node/change/text": {
-      const { node_id, text } = <TemplateEditorNodeChangeTextAction>action;
-      return produce(state, (draft) => {
-        override(draft, { node_id, payload: { text } });
-      });
-    }
-    case "document/template/override/node/change/src": {
-      const { node_id, src } = <TemplateEditorNodeChangeSrcAction>action;
-      return produce(state, (draft) => {
-        override(draft, { node_id, payload: { src } });
-      });
-    }
-    case "document/template/override/node/change/href": {
-      const { node_id, href } = <TemplateEditorNodeChangeHrefAction>action;
-      return produce(state, (draft) => {
-        override(draft, { node_id, payload: { href } });
-      });
-    }
-    case "document/template/override/node/change/target": {
-      const { node_id, target } = <TemplateEditorNodeChangeTargetAction>action;
-      return produce(state, (draft) => {
-        override(draft, { node_id, payload: { target } });
-      });
-    }
-    case "document/template/override/node/change/style": {
-      const { node_id, style } = <TemplateEditorNodeChangeStyleAction>action;
-      return produce(state, (draft) => {
-        override(draft, { node_id, payload: { style } });
-      });
-    }
-    case "document/template/override/node/change/props": {
-      const { node_id, props } = <TemplateEditorNodeChangePropsAction>action;
-      return produce(state, (draft) => {
-        override(draft, { node_id, payload: { props } });
+        const { node_id } = __action;
+        const nodedata = draft.template.overrides[node_id];
+        assert(nodedata);
+        draft.template.overrides[node_id] = nodeReducer(nodedata, __action);
       });
     }
   }
@@ -117,13 +83,49 @@ export default function reducer(
   return state;
 }
 
-function override(
-  draft: Draft<ITemplateEditorState>,
-  { node_id, payload }: { node_id: string; payload: {} }
-) {
-  draft.template.overrides[node_id] =
-    draft.template.overrides[node_id] ||
-    ({ id: node_id, style: {} } as grida.program.nodes.Node);
-
-  deepAssign(draft.template.overrides[node_id], payload);
+function nodeReducer(node: grida.program.nodes.Node, action: NodeChangeAction) {
+  return produce(node, (draft) => {
+    switch (action.type) {
+      case "node/change/active": {
+        node.active = action.active;
+        break;
+      }
+      case "node/change/name": {
+        node.name = action.name;
+        break;
+      }
+      case "node/change/href": {
+        node.href = action.href;
+        break;
+      }
+      case "node/change/target": {
+        node.target = action.target;
+        break;
+      }
+      case "node/change/component": {
+        assert(node.type === "instance");
+        node.component_id = action.component_id;
+        break;
+      }
+      case "node/change/src": {
+        assert(node.type === "image");
+        node.src = action.src;
+        break;
+      }
+      case "node/change/props": {
+        assert(node.type === "instance");
+        node.props = Object.assign({}, node.props, action.props);
+        break;
+      }
+      case "node/change/style": {
+        node.style = Object.assign({}, node.style, action.style);
+        break;
+      }
+      case "node/change/text": {
+        assert(node.type === "text");
+        node.text = action.text ?? null;
+        break;
+      }
+    }
+  });
 }
