@@ -55,7 +55,6 @@ export const Card_001 = withTemplateDefinition(
         </div>
         <div className="space-y-2 bg-background p-4">
           <NodeElement
-            component={TemplateBuilderWidgets.Text}
             // text={h1}
             node_id={".h1"}
           />
@@ -68,7 +67,6 @@ export const Card_001 = withTemplateDefinition(
           <div className="text-sm text-muted-foreground">{p}</div>
           <NodeElement
             node_id="tags-layout"
-            component={TemplateBuilderWidgets.Flex}
             style={{
               gap: 4,
             }}
@@ -315,7 +313,6 @@ export const Card_003 = withTemplateDefinition(
     return (
       <Card className="p-4" style={style}>
         <NodeElement
-          component={TemplateBuilderWidgets.Flex}
           node_id="root"
           style={{
             gap: 4,
@@ -326,7 +323,6 @@ export const Card_003 = withTemplateDefinition(
           <div className="flex-1 flex flex-col gap-1 z-20">
             <NodeElement
               node_id="header-layout"
-              component={TemplateBuilderWidgets.Flex}
               style={{
                 gap: 4,
                 flexDirection: "column",
@@ -345,7 +341,6 @@ export const Card_003 = withTemplateDefinition(
             <p className="text-xs font-regular opacity-80">{p}</p>
             <NodeElement
               node_id="tags-layout"
-              component={TemplateBuilderWidgets.Flex}
               style={{
                 gap: 4,
               }}
@@ -355,7 +350,6 @@ export const Card_003 = withTemplateDefinition(
           </div>
           <NodeElement
             node_id="media-layout"
-            component={TemplateBuilderWidgets.Container}
             style={
               {
                 width: 80,

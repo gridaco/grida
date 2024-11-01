@@ -7,7 +7,7 @@ export function Header_001({ logo }: { logo?: string }) {
     <NodeElement
       // name="Header"
       node_id="header"
-      component={TemplateBuilderWidgets.Flex}
+      // component={TemplateBuilderWidgets.flex}
       style={{
         backgroundColor: "transparent",
         top: 0,
@@ -22,7 +22,7 @@ export function Header_001({ logo }: { logo?: string }) {
       <NodeElement
         node_id="logo"
         // name="Logo"
-        component={TemplateBuilderWidgets.Container}
+        // component={TemplateBuilderWidgets.container}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={logo} alt="logo" className="w-full h-5 object-contain" />

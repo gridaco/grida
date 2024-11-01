@@ -68,7 +68,6 @@ export default function FormCollectionPage() {
                 <NodeElement
                   node_id="list-header-title"
                   // name="List Header Title"
-                  component={TemplateBuilderWidgets.Text}
                   // text={Factory.createPropertyAccessExpression<ISample>([
                   //   "listheader",
                   //   "text",

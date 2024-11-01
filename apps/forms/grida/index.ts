@@ -371,7 +371,7 @@ export namespace grida {
         }
 
         export interface IChildren {
-          children: NodeID[];
+          children?: NodeID[];
         }
 
         export interface IStylable {

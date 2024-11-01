@@ -12,17 +12,17 @@ import { TextWidget } from "./text";
 import { ThemeWidget } from "./theme";
 import { ImageWidget } from "./image";
 export namespace TemplateBuilderWidgets {
-  export const Container = ContainerWidget;
+  export const container = ContainerWidget;
   // export const Component = ComponentWidget;
-  export const Flex = FlexWidget;
+  export const flex = FlexWidget;
   // export const Grid = GridWidget;
-  export const Icon = IconWidget;
+  export const icon = IconWidget;
   // export const Layer = LayerkWidget;
   export const Layout = LayoutWidget;
-  export const Link = LinkWidget;
+  // export const Link = LinkWidget;
   // export const RichText = RichTextWidget;
   // export const Svg = SvgWidget;
-  export const Text = TextWidget;
-  export const Image = ImageWidget;
+  export const text = TextWidget;
+  export const image = ImageWidget;
   // export const Theme = ThemeWidget;
 }

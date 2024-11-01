@@ -67,18 +67,10 @@ function Consumer() {
           <TextAlign align="center">
             <div className="flex flex-col justify-center items-center gap-4">
               <h1 className="text-6xl font-bold w-4/5">
-                <NodeElement
-                  node_id="003.title"
-                  component={TemplateBuilderWidgets.Text}
-                  style={{}}
-                />
+                <NodeElement node_id="003.title" style={{}} />
               </h1>
               <p className="text-lg text-foreground/80 w-4/5">
-                <NodeElement
-                  node_id="003.subtitle"
-                  component={TemplateBuilderWidgets.Text}
-                  style={{}}
-                />
+                <NodeElement node_id="003.subtitle" style={{}} />
                 {/* {data.subtitle} */}
               </p>
             </div>
@@ -89,7 +81,6 @@ function Consumer() {
         </section>
         <NodeElement
           node_id="003.background"
-          component={TemplateBuilderWidgets.Image}
           style={{
             position: "absolute",
             inset: 0,

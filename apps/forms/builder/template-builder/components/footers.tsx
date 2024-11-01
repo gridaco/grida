@@ -9,7 +9,7 @@ export function Footer_001() {
     <NodeElement
       // className={"py-10 w-full"}
       node_id={"footer-flex"}
-      component={TemplateBuilderWidgets.Flex}
+      // component={TemplateBuilderWidgets.container}
       style={{
         flexWrap: "wrap",
         justifyContent: "center",
