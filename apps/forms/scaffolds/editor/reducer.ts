@@ -43,6 +43,8 @@ import datagridQueryReducer from "../data-query/data-query.reducer";
 import builderReducer from "@/builder/reducer";
 import assert from "assert";
 import React from "react";
+import { grida } from "@/grida";
+import { IDocumentEditorState } from "@/builder/types";
 
 export function reducer(state: EditorState, action: EditorAction): EditorState {
   switch (action.type) {
@@ -109,7 +111,10 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
         assert(draft.documents, "draft.documents is required");
         const document = draft.documents[key];
         assert(document, "document is required");
-        draft.documents[key] = builderReducer(state.documents[key]!, _action);
+        draft.documents[key] = builderReducer(
+          state.documents[key]!,
+          _action
+        ) as IDocumentEditorState & { template_id: string };
       });
     }
 
@@ -369,9 +374,23 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
     case "editor/form/startpage/init": {
       const { template: startpage } = <FormStartPageInitAction>action;
       return produce(state, (draft) => {
+        const template_id = startpage.name;
         draft.documents["form/startpage"] = {
+          template_id: template_id,
           editable: true,
-          template: { ...startpage, overrides: {}, props: {} },
+          document: {
+            root_id: "page",
+            nodes: {
+              ["page"]:
+                grida.program.nodes.createTemplateInstanceNodeFromTemplateDefinition(
+                  "page",
+                  startpage
+                ),
+            },
+          },
+          templates: {
+            [template_id]: startpage,
+          },
         };
       });
     }

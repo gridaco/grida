@@ -41,7 +41,7 @@ import { useComputedNode, useDocument, useNode } from "@/builder/provider";
 import assert from "assert";
 
 export function SelectedNodeProperties() {
-  const { document, selectedNode } = useDocument();
+  const { state: document, selectedNode } = useDocument();
   assert(selectedNode);
 
   // - color - variables
@@ -51,15 +51,14 @@ export function SelectedNodeProperties() {
   const computed = useComputedNode(selected_node_id!);
   const { id, name, active, component_id, style, type, properties } = node;
 
-  const istemplate = type?.startsWith("templates/");
-  const istext = type === "text";
-  const isimage = type === "image";
-  const iscontainer = type === "container";
-  const islayout = iscontainer;
-
-  // const { id, name, active, component_id, style, props, text, src } = (document
-  //   .template.overrides[selected_node_id!] ||
-  //   {}) as grida.program.nodes.AnyNode;
+  // const istemplate = type?.startsWith("templates/");
+  const is_instance = type === "instance";
+  const is_templateinstance = type === "template_instance";
+  const is_text = type === "text";
+  const is_image = type === "image";
+  const is_container = type === "container";
+  const is_layout = is_container;
+  const is_stylable = type !== "template_instance";
 
   const {
     opacity,
@@ -144,7 +143,7 @@ export function SelectedNodeProperties() {
           )}
         </SidebarMenuSectionContent>
       </SidebarSection>
-      <SidebarSection hidden={!istemplate} className="border-b pb-4">
+      <SidebarSection hidden={!is_templateinstance} className="border-b pb-4">
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Template</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
@@ -155,7 +154,7 @@ export function SelectedNodeProperties() {
           />
         </SidebarMenuSectionContent>
       </SidebarSection>
-      <SidebarSection hidden={!istemplate} className="border-b pb-4">
+      <SidebarSection hidden={!is_templateinstance} className="border-b pb-4">
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Props</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
@@ -171,7 +170,7 @@ export function SelectedNodeProperties() {
         )}
       </SidebarSection>
 
-      <SidebarSection hidden={!istext} className="border-b pb-4">
+      <SidebarSection hidden={!is_text} className="border-b pb-4">
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Text</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
@@ -206,7 +205,7 @@ export function SelectedNodeProperties() {
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>
-      <SidebarSection hidden={!isimage} className="border-b pb-4">
+      <SidebarSection hidden={!is_image} className="border-b pb-4">
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Image</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
@@ -224,7 +223,7 @@ export function SelectedNodeProperties() {
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>
-      <SidebarSection hidden={!islayout} className="border-b pb-4">
+      <SidebarSection hidden={!is_layout} className="border-b pb-4">
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Layout</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
@@ -264,7 +263,7 @@ export function SelectedNodeProperties() {
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>
-      <SidebarSection className="border-b pb-4">
+      <SidebarSection hidden={!is_stylable} className="border-b pb-4">
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Styles</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>

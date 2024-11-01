@@ -111,13 +111,13 @@ function SetupStartPage() {
 
   const setupStartPage = useCallback(
     (name: string) => {
-      // TODO: exclude .component
       const __template = FormStartPage.getTemplate(name);
+      // exclude component
+      const { component: __exclude, ...template } = __template;
 
-      console.log("__template", __template);
       dispatch({
         type: "editor/form/startpage/init",
-        template: __template,
+        template: template,
       });
     },
     [dispatch]
@@ -154,14 +154,14 @@ function SetupStartPage() {
 function StartPageEditor() {
   const [edit, setEdit] = useState(false);
 
-  const [state, dispatch] = useEditorState();
+  const [rootstate] = useEditorState();
 
   const {
     form: { campaign },
     theme: { lang },
-  } = state;
+  } = rootstate;
 
-  const { document } = useDocument();
+  const { state } = useDocument();
 
   return (
     <>
@@ -179,8 +179,15 @@ function StartPageEditor() {
             }}
           >
             <div className="w-full min-h-[852px] h-[80dvh]">
-              <FormStartPage.Renderer
-                name={document.template.name}
+              <FormStartPage.TemplateRenderer
+                // TODO: with dynamic renderer
+                name={
+                  (
+                    state.document.nodes[
+                      state.document.root_id!
+                    ] as grida.program.nodes.TemplateInstanceNode
+                  ).template_id
+                }
                 meta={campaign}
                 lang={lang}
               />

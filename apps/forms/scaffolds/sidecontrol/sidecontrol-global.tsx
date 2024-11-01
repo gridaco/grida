@@ -74,7 +74,11 @@ import { BrowseStartPageTemplatesDialog } from "../form-templates/startpage-temp
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { FormStartPage } from "@/theme/templates/formstart";
 import { PropsControl } from "./controls/props";
-import { useDocument } from "@/builder/provider";
+import {
+  useDocument,
+  useNode,
+  useTemplateDefinition,
+} from "@/builder/provider";
 
 const { default: all, ...variants } = _variants;
 
@@ -143,12 +147,17 @@ export function SideControlGlobal() {
 }
 
 function FormStartPageControl() {
-  const { document, rootProperties, rootProps, rootDefault, changeRootProps } =
-    useDocument();
+  const {
+    state: { document },
+    changeNodeProps,
+  } = useDocument();
+
+  const { props, template_id, properties } = useNode(document.root_id);
+  const { default: defaultProps } = useTemplateDefinition(template_id!);
 
   const shallowProps = useMemo(
-    () => Object.assign({}, rootDefault, rootProps),
-    [rootDefault, rootProps]
+    () => Object.assign({}, defaultProps, props),
+    [defaultProps, props]
   );
 
   return (
@@ -163,13 +172,15 @@ function FormStartPageControl() {
       </SidebarSection>
       <SidebarSection className="border-b pb-4">
         <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Props</SidebarSectionHeaderLabel>
+          <SidebarSectionHeaderLabel>Template Props</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuSectionContent className="space-y-2">
           <PropsControl
-            properties={rootProperties}
+            properties={properties!}
             props={shallowProps}
-            onValueChange={changeRootProps}
+            onValueChange={(k, v) => {
+              changeNodeProps(document.root_id, k, v);
+            }}
           />
         </SidebarMenuSectionContent>
       </SidebarSection>
@@ -198,7 +209,7 @@ function FormStartPageTemplateControl() {
     <>
       <BrowseStartPageTemplatesDialog
         {...dialog}
-        defaultValue={state.documents["form/startpage"]?.template?.name}
+        defaultValue={state.documents["form/startpage"]?.template_id}
         onValueCommit={setupStartPage}
       />
       <Button onClick={dialog.openDialog}>Switch Template</Button>

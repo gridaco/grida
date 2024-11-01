@@ -23,7 +23,7 @@ import type {
 } from "@/types";
 import type { ResourceTypeIconName } from "@/components/resource-type-icon";
 import type { Data } from "@/lib/data";
-import type { ITemplateEditorState } from "@/builder/types";
+import type { IDocumentEditorState } from "@/builder/types";
 import { SYM_LOCALTZ, EditorSymbols } from "./symbols";
 import { grida } from "@/grida";
 
@@ -85,7 +85,9 @@ export interface FormDocumentEditorInit extends BaseDocumentEditorInit {
   form_id: string;
   campaign: EditorState["form"]["campaign"];
   form_security: EditorState["form"]["form_security"];
-  start: grida.program.document.template.TemplateInstance | null;
+  start:
+    | (grida.program.document.IDocumentDefinition & { template_id: string })
+    | null;
   ending: EditorState["form"]["ending"];
   connections?: {
     store_id?: number | null;
@@ -403,8 +405,8 @@ export interface BaseDocumentEditorState
   document_title: string;
   doctype: GDocumentType;
   documents: {
-    ["site/dev-collection"]?: ITemplateEditorState;
-    ["form/startpage"]?: ITemplateEditorState;
+    ["site/dev-collection"]?: IDocumentEditorState;
+    ["form/startpage"]?: IDocumentEditorState & { template_id: string };
     // [key: string]: ITemplateEditorState;
   };
   theme: {

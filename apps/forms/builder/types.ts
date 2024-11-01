@@ -9,8 +9,22 @@ export interface IDocumentEditorInteractionCursorState {
   hovered_node_id?: string;
 }
 
-export interface ITemplateEditorState
+export interface IDocumentEditorState
   extends IDocumentEditorInteractionCursorState {
-  template: grida.program.document.template.TemplateInstance;
+  /**
+   *
+   * when editable is false, the document definition is not editable
+   * set editable false on production context - end-user-facing context
+   */
   editable: boolean;
+
+  document: grida.program.document.IDocumentDefinition;
+
+  /**
+   * user registered templates
+   */
+  templates?: Record<
+    string,
+    grida.program.document.template.TemplateDocumentDefinition
+  >;
 }

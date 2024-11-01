@@ -26,7 +26,7 @@ export function NodeElement<P extends Record<string, any>>({
   children,
   style,
 }: React.PropsWithChildren<NodeElementProps<P>>) {
-  const { document, selected_node_id } = useDocument();
+  const { state: document, selected_node_id } = useDocument();
 
   const node = useNode(node_id);
   const computed = useComputedNode(node_id);
@@ -48,7 +48,7 @@ export function NodeElement<P extends Record<string, any>>({
     },
     // @ts-ignore
   } satisfies
-    | grida.program.document.template.IBuiltinTemplateNodeReactComponentRenderProps<P>
+    | grida.program.document.template.IUserDefinedTemplateNodeReactComponentRenderProps<P>
     | grida.program.nodes.AnyNode;
 
   if (!node.active) return <></>;
@@ -85,7 +85,7 @@ function HrefWrapper({
   target?: string;
 }>) {
   const {
-    document: { editable },
+    state: { editable },
   } = useDocument();
 
   // only render a tag on viewer mode

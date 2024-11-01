@@ -26,7 +26,7 @@ type CardUserProps = grida.program.schema.TInferredPropTypes<
 >;
 
 type CardMasterProps =
-  grida.program.document.template.IBuiltinTemplateNodeReactComponentRenderProps<CardUserProps>;
+  grida.program.document.template.IUserDefinedTemplateNodeReactComponentRenderProps<CardUserProps>;
 
 export const Card_001 = withTemplateDefinition(
   ({
@@ -100,6 +100,7 @@ export const Card_001 = withTemplateDefinition(
         type: "text",
         name: "Title",
         text: "Title",
+        style: {},
       },
       ".p": {
         id: ".p",
@@ -108,6 +109,7 @@ export const Card_001 = withTemplateDefinition(
         type: "text",
         name: "Description",
         text: "Description",
+        style: {},
       },
       ".date1": {
         id: ".date1",
@@ -116,6 +118,7 @@ export const Card_001 = withTemplateDefinition(
         type: "text",
         name: "Date 1",
         text: "2021-01-01",
+        style: {},
       },
       ".n": {
         id: ".n",
@@ -124,6 +127,7 @@ export const Card_001 = withTemplateDefinition(
         type: "text",
         name: "Number",
         text: "0",
+        style: {},
       },
       ".badge": {
         id: ".badge",
@@ -132,6 +136,7 @@ export const Card_001 = withTemplateDefinition(
         type: "text",
         name: "Badge",
         text: "New",
+        style: {},
       },
       ".media": {
         id: ".media",
@@ -141,6 +146,7 @@ export const Card_001 = withTemplateDefinition(
         name: "Media",
         src: "",
         alt: "",
+        style: {},
       },
       ".date2": {
         id: ".date2",
@@ -149,6 +155,7 @@ export const Card_001 = withTemplateDefinition(
         type: "text",
         name: "Date 2",
         text: "2021-01-01",
+        style: {},
       },
       ".tags": {
         id: ".tags",
@@ -157,6 +164,7 @@ export const Card_001 = withTemplateDefinition(
         type: "container",
         name: "Tags",
         expanded: false,
+        style: {},
       },
     },
     type: "template",
@@ -226,6 +234,7 @@ export const Card_002 = withTemplateDefinition(
         type: "text",
         name: "Title",
         text: "Title",
+        style: {},
       },
       ".p": {
         id: ".p",
@@ -234,6 +243,7 @@ export const Card_002 = withTemplateDefinition(
         type: "text",
         name: "Description",
         text: "Description",
+        style: {},
       },
       ".date1": {
         id: ".date1",
@@ -242,6 +252,7 @@ export const Card_002 = withTemplateDefinition(
         type: "text",
         name: "Date 1",
         text: "2021-01-01",
+        style: {},
       },
       ".n": {
         id: ".n",
@@ -250,6 +261,7 @@ export const Card_002 = withTemplateDefinition(
         type: "text",
         name: "Number",
         text: "0",
+        style: {},
       },
       ".badge": {
         id: ".badge",
@@ -258,6 +270,7 @@ export const Card_002 = withTemplateDefinition(
         type: "text",
         name: "Badge",
         text: "New",
+        style: {},
       },
       ".media": {
         id: ".media",
@@ -267,6 +280,7 @@ export const Card_002 = withTemplateDefinition(
         name: "Media",
         src: "",
         alt: "",
+        style: {},
       },
       ".date2": {
         id: ".date2",
@@ -275,6 +289,7 @@ export const Card_002 = withTemplateDefinition(
         type: "text",
         name: "Date 2",
         text: "2021-01-01",
+        style: {},
       },
       ".tags": {
         id: ".tags",
@@ -283,6 +298,7 @@ export const Card_002 = withTemplateDefinition(
         type: "container",
         name: "Tags",
         expanded: false,
+        style: {},
       },
     },
     type: "template",
@@ -383,6 +399,7 @@ export const Card_003 = withTemplateDefinition(
         type: "text",
         name: "Title",
         text: "Title",
+        style: {},
       },
       ".p": {
         id: ".p",
@@ -391,6 +408,7 @@ export const Card_003 = withTemplateDefinition(
         type: "text",
         name: "Description",
         text: "Description",
+        style: {},
       },
       ".date1": {
         id: ".date1",
@@ -399,6 +417,7 @@ export const Card_003 = withTemplateDefinition(
         type: "text",
         name: "Date 1",
         text: "2021-01-01",
+        style: {},
       },
       ".n": {
         id: ".n",
@@ -407,6 +426,7 @@ export const Card_003 = withTemplateDefinition(
         type: "text",
         name: "Number",
         text: "0",
+        style: {},
       },
       ".badge": {
         id: ".badge",
@@ -415,6 +435,7 @@ export const Card_003 = withTemplateDefinition(
         type: "text",
         name: "Badge",
         text: "New",
+        style: {},
       },
       ".media": {
         id: ".media",
@@ -424,6 +445,7 @@ export const Card_003 = withTemplateDefinition(
         name: "Media",
         src: "",
         alt: "",
+        style: {},
       },
       ".date2": {
         id: ".date2",
@@ -432,6 +454,7 @@ export const Card_003 = withTemplateDefinition(
         type: "text",
         name: "Date 2",
         text: "2021-01-01",
+        style: {},
       },
       ".tags": {
         id: ".tags",
@@ -440,6 +463,7 @@ export const Card_003 = withTemplateDefinition(
         type: "container",
         name: "Tags",
         expanded: false,
+        style: {},
       },
     },
     type: "template",
@@ -459,7 +483,7 @@ type HeroCardProps = grida.program.schema.TInferredPropTypes<
 >;
 
 type HeroCardMasterProps =
-  grida.program.document.template.IBuiltinTemplateNodeReactComponentRenderProps<HeroCardProps>;
+  grida.program.document.template.IUserDefinedTemplateNodeReactComponentRenderProps<HeroCardProps>;
 
 export const Hero_001 = withTemplateDefinition(
   function Hero_001({ props: { h1, p, media }, style }: HeroCardMasterProps) {
@@ -506,6 +530,7 @@ export const Hero_001 = withTemplateDefinition(
         type: "text",
         name: "Title",
         text: "Title",
+        style: {},
       },
       ".p": {
         id: ".p",
@@ -514,6 +539,7 @@ export const Hero_001 = withTemplateDefinition(
         type: "text",
         name: "Description",
         text: "Description",
+        style: {},
       },
       ".media": {
         id: ".media",
@@ -523,6 +549,7 @@ export const Hero_001 = withTemplateDefinition(
         name: "Media",
         src: "",
         alt: "",
+        style: {},
       },
     },
     type: "template",
@@ -569,6 +596,7 @@ export const Hero_002 = withTemplateDefinition(
         type: "text",
         name: "Title",
         text: "Title",
+        style: {},
       },
       ".p": {
         id: ".p",
@@ -577,6 +605,7 @@ export const Hero_002 = withTemplateDefinition(
         type: "text",
         name: "Description",
         text: "Description",
+        style: {},
       },
       ".media": {
         id: ".media",
@@ -586,6 +615,7 @@ export const Hero_002 = withTemplateDefinition(
         name: "Media",
         src: "",
         alt: "",
+        style: {},
       },
     },
     type: "template",

@@ -9,8 +9,7 @@ export type BuilderAction =
   | DocumentEditorNodePointerLeaveAction
   | NodeChangeAction
   | TemplateNodeOverrideChangeAction
-  | TemplateEditorSetTemplatePropsAction
-  | TemplateEditorChangeTemplatePropsAction;
+  | TemplateEditorSetTemplatePropsAction;
 
 interface IHtmlBackendCanvasEventTargetPointerEvent {
   /**
@@ -38,6 +37,10 @@ export interface DocumentEditorNodeSelectAction {
 
 interface INodeID {
   node_id: string;
+}
+
+interface ITemplateInstanceNodeID {
+  template_instance_node_id: string;
 }
 
 export type DocumentEditorNodePointerEnterAction = INodeID & {
@@ -95,16 +98,9 @@ export type NodeChangeAction =
   | ({ type: "node/change/target" } & INodeChangeTargetAction)
   | ({ type: "node/change/props" } & INodeChangePropsAction);
 
-export type TemplateNodeOverrideChangeAction = {
+export type TemplateNodeOverrideChangeAction = ITemplateInstanceNodeID & {
   type: "document/template/override/change/*";
   action: NodeChangeAction;
-};
-
-export type TemplateEditorChangeTemplatePropsAction = Omit<
-  INodeChangePropsAction,
-  "node_id"
-> & {
-  type: "document/template/change/props";
 };
 
 export interface TemplateEditorSetTemplatePropsAction {

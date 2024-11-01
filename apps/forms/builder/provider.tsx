@@ -5,7 +5,7 @@ import React, {
   useEffect,
   useMemo,
 } from "react";
-import type { DocumentDispatcher, ITemplateEditorState } from "./types";
+import type { DocumentDispatcher, IDocumentEditorState } from "./types";
 import type { Tokens } from "@/ast";
 import { grida } from "@/grida";
 import { useComputed } from "./template-builder/use-computed";
@@ -13,8 +13,9 @@ import {
   DataProvider,
   ProgramDataContextHost,
 } from "@/grida/react-runtime/data-context/context";
+import assert from "assert";
 
-const DocumentContext = createContext<ITemplateEditorState | null>(null);
+const DocumentContext = createContext<IDocumentEditorState | null>(null);
 
 const __noop: DocumentDispatcher = () => void 0;
 const DocumentDispatcherContext = createContext<DocumentDispatcher>(__noop);
@@ -24,7 +25,7 @@ export function StandaloneDocumentEditor({
   dispatch,
   children,
 }: React.PropsWithChildren<{
-  state: ITemplateEditorState;
+  state: IDocumentEditorState;
   dispatch?: DocumentDispatcher;
 }>) {
   useEffect(() => {
@@ -37,9 +38,26 @@ export function StandaloneDocumentEditor({
 
   const __dispatch = state.editable ? dispatch ?? __noop : __noop;
 
-  const shallowProps = useMemo(() => {
-    return Object.assign({}, state.template.default, state.template.props);
-  }, [state.template.default, state.template.props]);
+  const rootnode = state.document.nodes[state.document.root_id!];
+  const shallowProps = useMemo(
+    () => {
+      // TODO: non-safe casting
+      const instance = rootnode as grida.program.nodes.TemplateInstanceNode;
+      const defaultProps =
+        // TODO: non-safe casting
+        state.templates![
+          (rootnode as grida.program.nodes.TemplateInstanceNode).template_id
+        ].default;
+      return Object.assign({}, defaultProps, instance.props);
+    },
+    // TODO: non-safe casting
+    [
+      state.templates![
+        (rootnode as grida.program.nodes.TemplateInstanceNode).template_id
+      ].default,
+      rootnode,
+    ]
+  );
 
   return (
     <DocumentContext.Provider value={state}>
@@ -65,8 +83,8 @@ function get_grida_node_elements_from_point(x: number, y: number) {
 }
 
 export function useDocument() {
-  const document = useContext(DocumentContext);
-  if (!document) {
+  const state = useContext(DocumentContext);
+  if (!state) {
     throw new Error(
       "useDocument must be used within a StandaloneDocumentEditor"
     );
@@ -74,7 +92,9 @@ export function useDocument() {
 
   const dispatch = useContext(DocumentDispatcherContext);
 
-  const { selected_node_id } = document;
+  const { selected_node_id } = state;
+
+  const rootnode = state.document.nodes[state.document.root_id!];
 
   const pointerMove = useCallback(
     (event: PointerEvent) => {
@@ -136,20 +156,39 @@ export function useDocument() {
     [dispatch]
   );
 
-  const rootProperties = document.template.properties || {};
-  const rootProps = document.template.props || {};
-  const rootDefault = document.template.default || {};
+  const rootProperties =
+    // TODO: non-safe casting
+    (rootnode as grida.program.nodes.TemplateInstanceNode).properties || {};
+  // TODO: non-safe casting
+  const rootProps =
+    (rootnode as grida.program.nodes.TemplateInstanceNode).props || {};
+  // TODO: non-safe casting
+  const rootDefault =
+    state.templates![
+      (rootnode as grida.program.nodes.TemplateInstanceNode).template_id
+    ].default || {};
 
-  const changeRootProps = useCallback(
-    (key: string, value: any) => {
+  const changeNodeProps = useCallback(
+    (node_id: string, key: string, value?: Tokens.StringValueExpression) => {
       dispatch({
-        type: "document/template/change/props",
+        type: "node/change/props",
+        node_id: node_id,
         props: {
           [key]: value,
         },
       });
     },
     [dispatch]
+  );
+
+  /**
+   * Must be used when root node is {@link grida.program.nodes.TemplateInstanceNode} node
+   */
+  const changeRootProps = useCallback(
+    (key: string, value: any) => {
+      changeNodeProps(state.document.root_id!, key, value);
+    },
+    [changeNodeProps, state.document.root_id]
   );
 
   const clearSelection = useCallback(
@@ -165,6 +204,8 @@ export function useDocument() {
     (node_id: string, component_id: string) => {
       dispatch({
         type: "document/template/override/change/*",
+        // TODO: non-safe casting
+        template_instance_node_id: state.document.root_id!,
         action: {
           type: "node/change/component",
           node_id: node_id,
@@ -179,6 +220,8 @@ export function useDocument() {
     (node_id: string, text?: Tokens.StringValueExpression) => {
       dispatch({
         type: "document/template/override/change/*",
+        // TODO: non-safe casting
+        template_instance_node_id: state.document.root_id!,
         action: {
           type: "node/change/text",
           node_id: node_id,
@@ -193,6 +236,8 @@ export function useDocument() {
     (node_id: string, hidden: boolean) => {
       dispatch({
         type: "document/template/override/change/*",
+        // TODO: non-safe casting
+        template_instance_node_id: state.document.root_id!,
         action: {
           type: "node/change/active",
           node_id: node_id,
@@ -207,6 +252,8 @@ export function useDocument() {
     (node_id: string, src?: Tokens.StringValueExpression) => {
       dispatch({
         type: "document/template/override/change/*",
+        // TODO: non-safe casting
+        template_instance_node_id: state.document.root_id!,
         action: {
           type: "node/change/src",
           node_id: node_id,
@@ -221,6 +268,8 @@ export function useDocument() {
     (node_id: string, href?: grida.program.nodes.i.IHrefable["href"]) => {
       dispatch({
         type: "document/template/override/change/*",
+        // TODO: non-safe casting
+        template_instance_node_id: state.document.root_id!,
         action: {
           type: "node/change/href",
           node_id: node_id,
@@ -235,6 +284,8 @@ export function useDocument() {
     (node_id: string, target?: grida.program.nodes.i.IHrefable["target"]) => {
       dispatch({
         type: "document/template/override/change/*",
+        // TODO: non-safe casting
+        template_instance_node_id: state.document.root_id!,
         action: {
           type: "node/change/target",
           node_id: node_id,
@@ -249,6 +300,8 @@ export function useDocument() {
     (node_id: string, key: string, value: any) => {
       dispatch({
         type: "document/template/override/change/*",
+        // TODO: non-safe casting
+        template_instance_node_id: state.document.root_id!,
         action: {
           type: "node/change/style",
           node_id: node_id,
@@ -265,6 +318,8 @@ export function useDocument() {
     (node_id: string, key: string, value: any) => {
       dispatch({
         type: "document/template/override/change/*",
+        // TODO: non-safe casting
+        template_instance_node_id: state.document.root_id!,
         action: {
           type: "node/change/props",
           node_id: node_id,
@@ -343,7 +398,7 @@ export function useDocument() {
 
   return useMemo(() => {
     return {
-      document,
+      state,
       selected_node_id,
       rootProps,
       rootDefault,
@@ -355,6 +410,7 @@ export function useDocument() {
       changeNodeActive,
       pointerEnterNode,
       pointerLeaveNode,
+      changeNodeProps,
       changeRootProps,
       clearSelection,
       changeNodeComponent,
@@ -364,7 +420,7 @@ export function useDocument() {
       changeNodeValue,
     };
   }, [
-    document,
+    state,
     selected_node_id,
     rootProps,
     rootDefault,
@@ -376,6 +432,7 @@ export function useDocument() {
     changeNodeActive,
     pointerEnterNode,
     pointerLeaveNode,
+    changeNodeProps,
     changeRootProps,
     clearSelection,
     changeNodeComponent,
@@ -388,19 +445,63 @@ export function useDocument() {
 
 export function useNode(node_id: string) {
   const {
-    document: {
-      template: { nodes, overrides },
+    state: {
+      document: { nodes },
+      templates,
     },
   } = useDocument();
 
-  const node_definition = nodes[node_id];
-  const node_overrides = overrides[node_id];
+  let node_definition: grida.program.nodes.Node | undefined = undefined;
+  let node_overrides:
+    | grida.program.document.template.NodeChanges[string]
+    | undefined = undefined;
+
+  if (nodes[node_id]) {
+    node_overrides = undefined;
+    node_definition = nodes[node_id];
+  } else {
+    assert(
+      templates,
+      'node is not found under "nodes", but templates are not provided for additional lookup'
+    );
+    // TODO: can do better with the query - performance
+    // find the template definition that contains this node id
+    const template_id = Object.keys(templates).find((k) => {
+      return templates[k].nodes[node_id] !== undefined;
+    });
+
+    assert(
+      template_id,
+      `node_id ${node_id} is not found in any templates' node definitions`
+    );
+
+    const template_instance_node_id = Object.keys(nodes).find((k) => {
+      const node = nodes[k];
+      return (
+        node.type === "template_instance" && node.template_id === template_id
+      );
+    });
+
+    assert(
+      template_instance_node_id,
+      `template_instance node is not found for template_id ${template_id}`
+    );
+
+    const overrides = (
+      nodes[
+        template_instance_node_id
+      ] as grida.program.nodes.TemplateInstanceNode
+    ).overrides;
+
+    node_overrides = overrides[node_id];
+    node_definition = templates[template_id].nodes[node_id];
+  }
 
   const node: grida.program.nodes.AnyNode = useMemo(() => {
     return Object.assign(
       {},
       node_definition,
-      node_overrides
+      node_overrides || {}
     ) as grida.program.nodes.AnyNode;
   }, [node_definition, node_overrides]);
 
@@ -418,4 +519,12 @@ export function useComputedNode(node_id: string) {
   });
 
   return computed;
+}
+
+export function useTemplateDefinition(template_id: string) {
+  const {
+    state: { templates },
+  } = useDocument();
+
+  return templates![template_id];
 }

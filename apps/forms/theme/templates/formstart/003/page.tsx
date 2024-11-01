@@ -121,6 +121,7 @@ _003.definition = {
       type: "text",
       name: "Title",
       text: Factory.createPropertyAccessExpression(["props", "title"]),
+      style: {},
     },
     "003.subtitle": {
       id: "003.subtitle",
@@ -129,6 +130,7 @@ _003.definition = {
       type: "text",
       name: "Subtitle",
       text: Factory.createPropertyAccessExpression(["props", "subtitle"]),
+      style: {},
     },
     "003.background": {
       id: "003.background",
@@ -137,6 +139,7 @@ _003.definition = {
       type: "image",
       name: "Background",
       src: Factory.createPropertyAccessExpression(["props", "background"]),
+      style: {},
     },
   },
 } satisfies grida.program.document.template.TemplateDocumentDefinition;

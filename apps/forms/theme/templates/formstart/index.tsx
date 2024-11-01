@@ -94,7 +94,7 @@ export namespace FormStartPage {
     lang: string;
   }
 
-  export function Renderer({
+  export function TemplateRenderer({
     name,
     // props = {},
     meta,

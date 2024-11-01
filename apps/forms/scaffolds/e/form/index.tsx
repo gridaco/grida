@@ -21,6 +21,7 @@ import type {
 } from "@/app/(api)/v1/[id]/route";
 import { CTAProvider } from "@/theme/templates/kit/contexts/cta.context";
 import { StandaloneDocumentEditor } from "@/builder/provider";
+import { grida } from "@/grida";
 
 export function Agent({
   form_id,
@@ -142,14 +143,34 @@ function FormStartPage({
   return (
     <StandaloneDocumentEditor
       state={{
-        template: start_page,
         editable: false,
+        document: start_page,
+        templates: {
+          [(
+            start_page.nodes[
+              start_page.root_id
+            ] as grida.program.nodes.TemplateInstanceNode
+          ).template_id]: FormStartPageRenderer.getTemplate(
+            (
+              start_page.nodes[
+                start_page.root_id
+              ] as grida.program.nodes.TemplateInstanceNode
+            ).template_id
+          ),
+        },
       }}
     >
       <CTAProvider value={{ onClick: next }}>
         <ScreenWindowRoot>
-          <FormStartPageRenderer.Renderer
-            name={start_page.name}
+          {/* TODO: use a unified renderer */}
+          <FormStartPageRenderer.TemplateRenderer
+            name={
+              (
+                start_page.nodes[
+                  start_page.root_id
+                ] as grida.program.nodes.TemplateInstanceNode
+              ).template_id
+            }
             // TODO: handle more data - agent errors states
             meta={campaign}
             lang={lang}

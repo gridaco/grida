@@ -124,15 +124,21 @@ function HierarchyView() {
 }
 
 function NodeHierarchyList() {
-  const { document, selectNode, pointerEnterNode } = useDocument();
+  const {
+    state: { document, selected_node_id, hovered_node_id },
+    selectNode,
+    pointerEnterNode,
+  } = useDocument();
 
-  const ids = Object.keys(document.template.nodes);
+  // TODO: need nested nodes for templates
+
+  const ids = Object.keys(document.nodes);
   return (
     <>
       {ids.map((id) => {
-        const n = document.template.nodes[id];
-        const selected = document.selected_node_id === n.id;
-        const hovered = document.hovered_node_id === n.id;
+        const n = document.nodes[id];
+        const selected = selected_node_id === n.id;
+        const hovered = hovered_node_id === n.id;
         return (
           <SidebarMenuItem
             key={n.id}

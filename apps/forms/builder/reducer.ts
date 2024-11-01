@@ -11,16 +11,15 @@ import type {
   DocumentEditorNodePointerLeaveAction,
   NodeChangeAction,
   TemplateNodeOverrideChangeAction,
-  TemplateEditorChangeTemplatePropsAction,
 } from "./action";
-import type { ITemplateEditorState } from "./types";
+import type { IDocumentEditorState } from "./types";
 import { grida } from "@/grida";
 import assert from "assert";
 
-export default function reducer(
-  state: ITemplateEditorState,
+export default function reducer<S extends IDocumentEditorState>(
+  state: S,
   action: BuilderAction
-): ITemplateEditorState {
+): S {
   switch (action.type) {
     case "document/canvas/backend/html/event/on-pointer-move": {
       const { node_ids_from_point } = <
@@ -41,8 +40,12 @@ export default function reducer(
     }
     case "document/template/set/props": {
       const { data } = <TemplateEditorSetTemplatePropsAction>action;
+
       return produce(state, (draft) => {
-        draft.template.props = data;
+        const root_template_instance =
+          draft.document.nodes[draft.document.root_id!];
+        assert(root_template_instance.type === "template_instance");
+        root_template_instance.props = data;
       });
     }
     case "document/node/select": {
@@ -66,15 +69,18 @@ export default function reducer(
         }
       });
     }
-    case "document/template/change/props": {
-      const { props: data } = <TemplateEditorChangeTemplatePropsAction>action;
-      return produce(state, (draft) => {
-        draft.template.props = {
-          ...(draft.template.props || {}),
-          ...data,
-        } as grida.program.schema.Props;
-      });
-    }
+    // case "document/template/change/props": {
+    //   const { props: partialProps } = <TemplateEditorChangeTemplatePropsAction>(
+    //     action
+    //   );
+
+    //   return produce(state, (draft) => {
+    //     draft.template.props = {
+    //       ...(draft.template.props || {}),
+    //       ...partialProps,
+    //     } as grida.program.schema.Props;
+    //   });
+    // }
 
     case "node/change/active":
     case "node/change/name":
@@ -85,18 +91,33 @@ export default function reducer(
     case "node/change/props":
     case "node/change/style":
     case "node/change/text": {
-      throw new Error("Not implemented");
-      // nodes[node_id] = nodeReducer(node, __action);
+      const { node_id } = <NodeChangeAction>action;
+      return produce(state, (draft) => {
+        const node = draft.document.nodes[node_id];
+        assert(node, `node not found with node_id: "${node_id}"`);
+        draft.document.nodes[node_id] = nodeReducer(node, action);
+      });
     }
     case "document/template/override/change/*": {
-      const { action: __action } = <TemplateNodeOverrideChangeAction>action;
+      const { template_instance_node_id, action: __action } = <
+        TemplateNodeOverrideChangeAction
+      >action;
 
       return produce(state, (draft) => {
         const { node_id } = __action;
-        const node = draft.template.nodes[node_id];
-        assert(node);
-        const nodedata = draft.template.overrides[node_id] || {};
-        draft.template.overrides[node_id] = nodeReducer(nodedata, __action);
+        const template_instance_node =
+          draft.document.nodes[template_instance_node_id];
+
+        assert(
+          template_instance_node &&
+            template_instance_node.type === "template_instance"
+        );
+
+        const nodedata = template_instance_node.overrides[node_id] || {};
+        template_instance_node.overrides[node_id] = nodeReducer(
+          nodedata,
+          __action
+        );
       });
     }
   }
@@ -104,10 +125,10 @@ export default function reducer(
   return state;
 }
 
-function nodeReducer(
-  node: Partial<grida.program.nodes.Node>,
+function nodeReducer<N extends Partial<grida.program.nodes.Node>>(
+  node: N,
   action: NodeChangeAction
-) {
+): N {
   return produce(node, (draft) => {
     switch (action.type) {
       case "node/change/active": {
@@ -115,7 +136,7 @@ function nodeReducer(
         break;
       }
       case "node/change/name": {
-        draft.name = action.name;
+        (draft as grida.program.nodes.i.IBaseNode).name = action.name;
         break;
       }
       case "node/change/href": {
@@ -137,12 +158,17 @@ function nodeReducer(
         break;
       }
       case "node/change/props": {
-        assert(draft.type === "instance");
+        assert(draft.type === "instance" || draft.type === "template_instance");
         draft.props = Object.assign({}, draft.props, action.props);
         break;
       }
       case "node/change/style": {
-        draft.style = Object.assign({}, draft.style, action.style);
+        // assert(draft.type !== 'template_instance')
+        (draft as Draft<grida.program.nodes.i.IStylable>).style = Object.assign(
+          {},
+          (draft as Draft<grida.program.nodes.i.IStylable>).style,
+          action.style
+        );
         break;
       }
       case "node/change/text": {

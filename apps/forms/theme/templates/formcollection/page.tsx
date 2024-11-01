@@ -20,14 +20,18 @@ import {
 import { Factory } from "@/ast/factory";
 import ArrayMap from "@/grida/react-runtime/data-context/array";
 import { useDocument } from "@/builder/provider";
+import assert from "assert";
 
 type ISample = (typeof samples)[keyof typeof samples];
 
 export default function FormCollectionPage() {
   const {
-    document: { template },
+    state: { document, templates },
   } = useDocument();
-  const { props: props } = template;
+
+  const root = document.nodes[document.root_id];
+  assert(root.type === "template_instance");
+  const { props: props } = root;
 
   return (
     <ProgramDataContextHost>

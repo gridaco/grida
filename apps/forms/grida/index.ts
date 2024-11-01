@@ -141,6 +141,25 @@ export namespace grida {
     }
 
     export namespace document {
+      export namespace k {
+        /**
+         * Key for the data attribute that stores the node ID in the HTML document.
+         *
+         * @see {@link INodeHtmlDocumentQueryDataAttributes}
+         */
+        export const HTML_ELEMET_DATA_ATTRIBUTE_GRIDA_NODE_ID_KEY =
+          "data-grida-node-id";
+      }
+
+      /**
+       * contains all nodes under this defined document in k:v pair
+       *
+       * @see {@link IDocumentDefinition}
+       */
+      export interface IDocumentNodesRepository {
+        nodes: Record<string, nodes.Node>;
+      }
+
       /**
        * Represents a normalized document structure where all nodes are stored in a flat map
        * with a single `root_id` as the entry point for traversal.
@@ -208,19 +227,11 @@ export namespace grida {
        * }
        * ```
        */
-      export interface IDocumentDefinition {
-        // root_id: string;
-        nodes: Record<string, nodes.Node>;
-      }
-
-      export namespace k {
+      export interface IDocumentDefinition extends IDocumentNodesRepository {
         /**
-         * Key for the data attribute that stores the node ID in the HTML document.
-         *
-         * @see {@link INodeHtmlDocumentQueryDataAttributes}
+         * root node id. must be defined in {@link IDocumentDefinition.nodes}
          */
-        export const HTML_ELEMET_DATA_ATTRIBUTE_GRIDA_NODE_ID_KEY =
-          "data-grida-node-id";
+        root_id: string;
       }
 
       export interface INodeHtmlDocumentQueryDataAttributes {
@@ -259,17 +270,7 @@ export namespace grida {
       > = INodeHtmlDocumentQueryDataAttributes & N;
 
       export namespace template {
-        export interface TemplateDocumentDefinition<
-          P extends schema.Properties = schema.Properties,
-        > extends IDocumentDefinition {
-          name: string;
-          version: string;
-          type: "template";
-          properties: P;
-          default: Record<string, schema.Value>;
-        }
-
-        export interface IBuiltinTemplateNodeReactComponentRenderProps<P>
+        export interface IUserDefinedTemplateNodeReactComponentRenderProps<P>
           extends nodes.i.IBaseNode,
             nodes.i.ISceneNode,
             nodes.i.IStylable,
@@ -277,24 +278,28 @@ export namespace grida {
           props: P;
         }
 
-        /**
-         * [Template Node] Template node is a static, hand crafted template that does not have a intrinsic tree, only a root properties [data] and [overrides] to each customizable node
-         *
-         * Template Node cannot be used as a child node.
-         *
-         * This will be used until we have a fully working tree editor.
-         */
-        export interface TemplateInstance extends TemplateDocumentDefinition {
+        export interface TemplateDocumentDefinition<
+          P extends schema.Properties = schema.Properties,
+        > extends IDocumentNodesRepository {
           /**
-           * arguments matching properties
+           * @deprecated - rename to template_id
            */
-          props: Record<string, schema.Value>;
-
-          /**
-           * exposed child node overrides
-           */
-          overrides: Record<string, Partial<nodes.Node> | undefined>;
+          name: string;
+          version: string;
+          type: "template";
+          properties: P;
+          default: Record<string, schema.Value>;
         }
+
+        /**
+         * Type for containing template instance's node changes data relative to master template definition
+         *
+         * {@link nodes.TemplateInstanceNode.overrides}
+         */
+        export type NodeChanges = Record<
+          string,
+          Partial<nodes.Node> | undefined
+        >;
       }
     }
 
@@ -306,7 +311,8 @@ export namespace grida {
         // | SvgRectNode
         // | SvgCircleNode
         // | SvgEllipseNode
-        | InstanceNode;
+        | InstanceNode
+        | TemplateInstanceNode;
 
       /**
        * Any node utility type - use within the correct context
@@ -315,7 +321,8 @@ export namespace grida {
         Partial<TextNode> &
           Partial<ImageNode> &
           Partial<ContainerNode> &
-          Partial<InstanceNode>,
+          Partial<InstanceNode> &
+          Partial<TemplateInstanceNode>,
         "type"
       > & {
         readonly type: Node["type"];
@@ -363,7 +370,7 @@ export namespace grida {
         }
 
         export interface IStylable {
-          style?: React.CSSProperties;
+          style: React.CSSProperties;
         }
 
         export interface IHrefable {
@@ -500,6 +507,65 @@ export namespace grida {
          */
         component_id: string;
       }
+
+      /**
+       * [Template Instance Node] Template node is a static, hand crafted template that does not have a intrinsic tree, only a root properties [data] and [overrides] to each customizable node
+       *
+       * Template Node cannot be used as a child node.
+       *
+       * This is useful when you have a complex structure with custom loggics and state management, use this node and expose only customizable nodes and properties.
+       */
+      export interface TemplateInstanceNode
+        extends i.IBaseNode,
+          i.IHrefable,
+          i.ISceneNode,
+          i.IProperties,
+          i.IProps {
+        readonly type: "template_instance";
+
+        /**
+         * ID of template definition that this instance came from, refers to user defined templates table
+         */
+        template_id: string;
+
+        /**
+         * template definition exposed child node overrides
+         */
+        overrides: document.template.NodeChanges;
+      }
+
+      /**
+       * calling this does not actually contribute to the rendering by itself, it creates a {@link TemplateInstanceNode} data.
+       */
+      export function createTemplateInstanceNodeFromTemplateDefinition(
+        id: string,
+        def: document.template.TemplateDocumentDefinition,
+        seed?: Partial<Omit<TemplateInstanceNode, "id">>
+      ): TemplateInstanceNode {
+        const { nodes, properties } = def;
+
+        return {
+          id,
+          name: def.name,
+          type: "template_instance",
+          active: true,
+          locked: false,
+          properties,
+          props: {},
+          overrides: cloneWithUndefinedValues(nodes),
+          template_id: def.name,
+          ...seed,
+        };
+        //
+      }
     }
   }
 }
+
+const cloneWithUndefinedValues = (
+  obj: Record<string, any>
+): Record<string, undefined> =>
+  Object.fromEntries(Object.keys(obj).map((key) => [key, undefined])) as Record<
+    string,
+    undefined
+  >;

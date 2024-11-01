@@ -25,6 +25,7 @@ import { DataGridLocalPreferencesStorage } from "./storage/datagrid.storage";
 import { Data } from "@/lib/data";
 import * as samples from "@/theme/templates/formcollection/samples";
 import { grida } from "@/grida";
+import { FormStartPage } from "@/theme/templates/formstart";
 
 export function initialEditorState(init: EditorInit): EditorState {
   switch (init.doctype) {
@@ -280,15 +281,18 @@ function initialSiteEditorState(init: SiteDocumentEditorInit): EditorState {
     documents: {
       ["site/dev-collection"]: {
         editable: true,
-        template: {
-          name: "formcollection_sample_001_the_bundle",
-          type: "template",
-          properties: {},
-          default: {},
-          props: samples["formcollection_sample_001_the_bundle"] as any,
-          overrides: {},
-          version: "0.0.0",
-          nodes: {},
+        document: { nodes: {}, root_id: "root" },
+        templates: {
+          ["formcollection_sample_001_the_bundle"]: {
+            name: "formcollection_sample_001_the_bundle",
+            type: "template",
+            properties: {},
+            default: {},
+            // props: samples["formcollection_sample_001_the_bundle"] as any,
+            // overrides: {},
+            version: "0.0.0",
+            nodes: {},
+          },
         },
       },
     },
@@ -501,8 +505,14 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
     documents: {
       "form/startpage": init.start
         ? {
+            template_id: init.start.template_id,
             editable: true,
-            template: init.start,
+            document: init.start,
+            templates: {
+              [init.start.template_id]: FormStartPage.getTemplate(
+                init.start.template_id
+              ),
+            },
           }
         : undefined,
     },
