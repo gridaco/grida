@@ -9,3 +9,4 @@ export {
 export { StandaloneDocumentEditorContent } from "./renderer";
 export * from "./types";
 export * from "./canvas/canvas";
+export { default as standaloneDocumentReducer } from "./reducer";

@@ -21,13 +21,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import {
-  BoxIcon,
-  ComponentInstanceIcon,
-  DotsHorizontalIcon,
-  ImageIcon,
-  TextIcon,
-} from "@radix-ui/react-icons";
+import { DotsHorizontalIcon } from "@radix-ui/react-icons";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,10 +29,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { FormFieldBlockMenuItems } from "../blocks-editor/blocks/field-block";
 import { renderMenuItems } from "./render";
-import { StandaloneDocumentEditor, useDocument } from "@/builder/provider";
+import { StandaloneDocumentEditor } from "@/builder";
 import { BuilderAction } from "@/builder/action";
 import { composeEditorDocumentAction } from "../editor/action";
-import { grida } from "@/grida";
+import { NodeHierarchyList } from "./sidebar-node-hierarchy-list";
 
 export function ModeDesign() {
   const [state, dispatch] = useEditorState();
@@ -123,48 +117,6 @@ function HierarchyView() {
   );
 }
 
-function NodeHierarchyList() {
-  const {
-    state: { document, selected_node_id, hovered_node_id },
-    selectNode,
-    pointerEnterNode,
-  } = useDocument();
-
-  // TODO: need nested nodes for templates
-
-  const ids = Object.keys(document.nodes);
-  return (
-    <>
-      {ids.map((id) => {
-        const n = document.nodes[id];
-        const selected = selected_node_id === n.id;
-        const hovered = hovered_node_id === n.id;
-        return (
-          <SidebarMenuItem
-            key={n.id}
-            muted
-            hovered={hovered}
-            level={1}
-            selected={selected}
-            onSelect={() => {
-              selectNode(n.id);
-            }}
-            icon={<NodeHierarchyItemIcon type={n.type} className="w-4 h-4" />}
-            onPointerEnter={() => {
-              pointerEnterNode(n.id);
-            }}
-            onPointerLeave={() => {
-              pointerEnterNode(n.id);
-            }}
-          >
-            <SidebarMenuItemLabel>{n.name}</SidebarMenuItemLabel>
-          </SidebarMenuItem>
-        );
-      })}
-    </>
-  );
-}
-
 function FormBlockHierarchyList() {
   const [state, dispatch] = useEditorState();
   const fields = useFormFields();
@@ -221,26 +173,6 @@ function FormBlockHierarchyList() {
       })}
     </>
   );
-}
-
-function NodeHierarchyItemIcon({
-  className,
-  type,
-}: {
-  type: grida.program.nodes.Node["type"];
-  className?: string;
-}) {
-  switch (type) {
-    case "container":
-      return <BoxIcon className={className} />;
-    case "image":
-      return <ImageIcon className={className} />;
-    case "text":
-      return <TextIcon className={className} />;
-    case "instance":
-      return <ComponentInstanceIcon className={className} />;
-  }
-  return <BoxIcon className={className} />;
 }
 
 function FormHierarchyItemIcon({

@@ -297,13 +297,14 @@ export namespace grida {
          * {@link nodes.TemplateInstanceNode.overrides}
          */
         export type NodeChanges = Record<
-          string,
+          nodes.NodeID,
           Partial<nodes.Node> | undefined
         >;
       }
     }
 
     export namespace nodes {
+      export type NodeID = string;
       export type Node =
         | TextNode
         | ImageNode
@@ -332,7 +333,7 @@ export namespace grida {
 
       export namespace i {
         export interface IBaseNode {
-          readonly id: string;
+          readonly id: NodeID;
           name: string;
         }
 
@@ -367,6 +368,10 @@ export namespace grida {
          */
         export interface IExpandable {
           expanded: boolean;
+        }
+
+        export interface IChildren {
+          children: NodeID[];
         }
 
         export interface IStylable {
@@ -445,7 +450,8 @@ export namespace grida {
           i.ISceneNode,
           i.IStylable,
           i.IHrefable,
-          i.IExpandable {
+          i.IExpandable,
+          i.IChildren {
         readonly type: "container";
         //
       }
@@ -505,7 +511,7 @@ export namespace grida {
         /**
          * ID of component that this instance came from, refers to components table
          */
-        component_id: string;
+        component_id: NodeID;
       }
 
       /**

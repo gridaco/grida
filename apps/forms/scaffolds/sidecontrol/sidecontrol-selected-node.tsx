@@ -37,7 +37,7 @@ import { PropsControl } from "./controls/props";
 import { TargetBlankControl } from "./controls/target";
 import { ExportNodeWithHtmlToImage } from "./controls/export";
 
-import { useComputedNode, useDocument, useNode } from "@/builder/provider";
+import { useComputedNode, useDocument, useNode } from "@/builder";
 import assert from "assert";
 
 export function SelectedNodeProperties() {

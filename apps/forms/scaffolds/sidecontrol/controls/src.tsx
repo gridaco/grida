@@ -1,11 +1,56 @@
+"use client";
+
+import React, { createContext, useEffect } from "react";
 import { Tokens } from "@/ast";
 import { WorkbenchUI } from "@/components/workbench";
-import { useDocumentAssetUpload } from "@/scaffolds/asset";
 import { cn } from "@/utils";
 import { Cross2Icon } from "@radix-ui/react-icons";
-import { useEffect } from "react";
 import toast from "react-hot-toast";
 import { useFilePicker } from "use-file-picker";
+
+/**
+ * default value - only for development & playground
+ *
+ * @param file
+ * @returns
+ */
+async function localBlobUploader(file: File) {
+  console.warn("localBlobUploader is used. This is only for development.");
+  const url = URL.createObjectURL(file);
+  return { src: url };
+}
+
+interface SrcUploaderContext {
+  uploader: (file: File) => Promise<{ src: string }>;
+}
+
+const SrcUploaderContext = createContext<SrcUploaderContext | null>({
+  uploader: localBlobUploader,
+});
+
+export function SrcUploaderProvider({
+  uploader,
+  children,
+}: React.PropsWithChildren<SrcUploaderContext>) {
+  return (
+    <SrcUploaderContext.Provider
+      value={{
+        uploader,
+      }}
+    >
+      {children}
+    </SrcUploaderContext.Provider>
+  );
+  //
+}
+
+function useSrcUploader() {
+  const context = React.useContext(SrcUploaderContext);
+  if (!context) {
+    throw new Error("useSrcUploader must be used within a SrcUploaderProvider");
+  }
+  return context;
+}
 
 export function SrcControl({
   value = "",
@@ -14,8 +59,7 @@ export function SrcControl({
   value?: Tokens.StringValueExpression;
   onValueChange?: (value?: Tokens.StringValueExpression) => void;
 }) {
-  const { uploadPublic } = useDocumentAssetUpload();
-
+  const { uploader } = useSrcUploader();
   const { openFilePicker, plainFiles, loading } = useFilePicker({
     readAs: "ArrayBuffer",
     accept: "image/*",
@@ -25,9 +69,10 @@ export function SrcControl({
   useEffect(
     () => {
       if (plainFiles.length > 0) {
-        const uploading = uploadPublic(plainFiles[0]).then((r) =>
-          onValueChange?.(r.publicUrl)
+        const uploading = uploader(plainFiles[0]).then((r) =>
+          onValueChange?.(r.src)
         );
+
         toast.promise(uploading, {
           loading: "Uploading...",
           success: "Uploaded",
@@ -76,11 +121,13 @@ export function SrcControl({
 
 function Thumb({ src }: { src: string }) {
   return (
+    // eslint-disable-next-line @next/next/no-img-element
     <img
       src={src}
       width={40}
       height={40}
       className="object-cover w-6 h-6 overflow-hidden rounded border"
+      alt="thumb"
     />
   );
 }

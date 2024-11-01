@@ -20,7 +20,6 @@ import {
 import { Tokens } from "@/ast";
 import { Badge } from "@/components/ui/badge";
 import { Factory } from "@/ast/factory";
-import { useEditorState } from "@/scaffolds/editor";
 import PropertyAccessDropdownMenu from "./context/variable";
 import PropertyTypeIcon from "@/components/property-type-icon";
 
