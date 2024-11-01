@@ -279,7 +279,7 @@ function initialSiteEditorState(init: SiteDocumentEditorInit): EditorState {
     selected_page_id: "site/dev-collection",
     documents: {
       ["site/dev-collection"]: {
-        readonly: false,
+        editable: true,
         template: {
           name: "formcollection_sample_001_the_bundle",
           type: "template",
@@ -501,7 +501,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
     documents: {
       "form/startpage": init.start
         ? {
-            readonly: false,
+            editable: true,
             template: init.start,
           }
         : undefined,

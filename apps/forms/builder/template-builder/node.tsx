@@ -28,14 +28,16 @@ export function NodeSlot<P extends Record<string, any>>({
   style,
 }: React.PropsWithChildren<SlotProps<P>>) {
   const {
-    document: { template },
+    document: { editable },
     selectNode,
     pointerEnterNode,
     pointerLeaveNode,
+    selected_node_id,
   } = useDocument();
 
   const node = useNode(node_id);
   const computed = useComputedNode(node_id);
+  const selected = node_id === selected_node_id;
 
   const { component_id } = node;
   const renderer = component_id
@@ -87,10 +89,12 @@ export function NodeSlot<P extends Record<string, any>>({
           id: node_id,
           ...masterprops,
           ...bind(),
+          ["data-editor-selected"]: selected,
           style: {
             ...masterprops.style,
             display: node.active ? masterprops.style.display : "none",
-          },
+            userSelect: editable ? "none" : undefined,
+          } satisfies React.CSSProperties,
         },
         children
       )}
@@ -107,11 +111,11 @@ function HrefWrapper({
   target?: string;
 }>) {
   const {
-    document: { readonly },
+    document: { editable },
   } = useDocument();
 
   // only render a tag on viewer mode
-  if (readonly && href) {
+  if (!editable && href) {
     return (
       <a href={href} target={target}>
         {children}

@@ -14,10 +14,8 @@ interface CanvasEventTargetContext {
   setPortalRef?: (ref: HTMLDivElement | null) => void;
 }
 
-// Create the context
-const Context = createContext<CanvasEventTargetContext | null>(null);
+const EventTargetContext = createContext<CanvasEventTargetContext | null>(null);
 
-// CanvasEventTarget provider component
 export function CanvasEventTarget({
   className,
   children,
@@ -29,7 +27,9 @@ export function CanvasEventTarget({
   const [overlay, setOverlayRef] = React.useState<HTMLDivElement | null>(null);
 
   return (
-    <Context.Provider value={{ portal: overlay, setPortalRef: setOverlayRef }}>
+    <EventTargetContext.Provider
+      value={{ portal: overlay, setPortalRef: setOverlayRef }}
+    >
       <div
         className={className}
         onPointerDown={clearSelection}
@@ -37,17 +37,16 @@ export function CanvasEventTarget({
       >
         {children}
       </div>
-    </Context.Provider>
+    </EventTargetContext.Provider>
   );
 }
 
-// CanvasOverlay component that sets the ref in the context
 export function CanvasOverlay() {
   const {
     document: { hovered_node_id, selected_node_id },
   } = useDocument();
   const ref = useRef<HTMLDivElement>(null);
-  const context = useContext(Context);
+  const context = useContext(EventTargetContext);
 
   useEffect(() => {
     if (context?.setPortalRef) {
@@ -76,18 +75,19 @@ const __rect_fallback = { top: 0, left: 0, width: 0, height: 0 };
 
 function NodeOverlay({ node_id }: { node_id: string }) {
   const portal = useCanvasOverlayPortal();
-  const container = useMemo(() => {
+  const node_element = useMemo(() => {
     return document.getElementById(node_id);
   }, [node_id]);
 
-  const portalRect = portal?.getBoundingClientRect() ?? __rect_fallback;
-  const containerRect = container?.getBoundingClientRect() ?? __rect_fallback;
+  const portal_rect = portal?.getBoundingClientRect() ?? __rect_fallback;
+  const node_element_rect =
+    node_element?.getBoundingClientRect() ?? __rect_fallback;
 
   // Calculate the position of the target relative to the portal
-  const top = containerRect.top - portalRect.top;
-  const left = containerRect.left - portalRect.left;
-  const width = containerRect.width;
-  const height = containerRect.height;
+  const top = node_element_rect.top - portal_rect.top;
+  const left = node_element_rect.left - portal_rect.left;
+  const width = node_element_rect.width;
+  const height = node_element_rect.height;
 
   return (
     <div
@@ -104,7 +104,7 @@ function NodeOverlay({ node_id }: { node_id: string }) {
 }
 
 export function useCanvasOverlayPortal() {
-  const context = useContext(Context);
+  const context = useContext(EventTargetContext);
   if (!context) {
     throw new Error(
       "useCanvasOverlay must be used within a CanvasEventTarget."

@@ -143,7 +143,7 @@ function FormStartPage({
     <StandaloneDocumentEditor
       state={{
         template: start_page,
-        readonly: true,
+        editable: false,
       }}
     >
       <CTAProvider value={{ onClick: next }}>

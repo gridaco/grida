@@ -28,14 +28,14 @@ export function StandaloneDocumentEditor({
   dispatch?: DocumentDispatcher;
 }>) {
   useEffect(() => {
-    if (!state.readonly && !dispatch) {
+    if (state.editable && !dispatch) {
       console.error(
         "DocumentEditor: dispatch is required when readonly is false"
       );
     }
-  }, [state.readonly, dispatch]);
+  }, [state.editable, dispatch]);
 
-  const __dispatch = state.readonly ? __noop : dispatch ?? __noop;
+  const __dispatch = state.editable ? dispatch ?? __noop : __noop;
 
   const shallowProps = useMemo(() => {
     return Object.assign({}, state.template.default, state.template.props);
@@ -302,6 +302,7 @@ export function useDocument() {
   return useMemo(() => {
     return {
       document,
+      selected_node_id,
       rootProps,
       rootDefault,
       rootProperties,
@@ -320,6 +321,7 @@ export function useDocument() {
     };
   }, [
     document,
+    selected_node_id,
     rootProps,
     rootDefault,
     rootProperties,

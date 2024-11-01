@@ -49,7 +49,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { CanvasEventTarget, CanvasOverlay } from "@/scaffolds/canvas/canvas";
+import { CanvasEventTarget, CanvasOverlay } from "@/builder/canvas/canvas";
 import { CurrentPage } from "@/scaffolds/editor/utils/current-page";
 import { Spinner } from "@/components/spinner";
 import { StandaloneDocumentEditor, useDocument } from "@/builder/provider";

@@ -12,5 +12,5 @@ export interface IDocumentEditorInteractionCursorState {
 export interface ITemplateEditorState
   extends IDocumentEditorInteractionCursorState {
   template: grida.program.document.template.TemplateInstance;
-  readonly: boolean;
+  editable: boolean;
 }

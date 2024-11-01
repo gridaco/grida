@@ -6,7 +6,7 @@ import { useEditorState } from "@/scaffolds/editor";
 import { SideControl } from "@/scaffolds/sidecontrol";
 import FormCollectionPage from "@/theme/templates/formcollection/page";
 import { CanvasFloatingToolbar } from "@/scaffolds/canvas-floating-toolbar";
-import { CanvasEventTarget, CanvasOverlay } from "@/scaffolds/canvas/canvas";
+import { CanvasEventTarget, CanvasOverlay } from "@/builder/canvas/canvas";
 import { composeEditorDocumentAction } from "@/scaffolds/editor/action";
 import { BuilderAction } from "@/builder/action";
 import { StandaloneDocumentEditor } from "@/builder/provider";
