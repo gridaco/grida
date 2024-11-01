@@ -2,6 +2,9 @@ import { produce, type Draft } from "immer";
 
 import type {
   BuilderAction,
+  //
+  DocumentEditorCanvasEventTargetHtmlBackendPointerMove,
+  DocumentEditorCanvasEventTargetHtmlBackendPointerDown,
   TemplateEditorSetTemplatePropsAction,
   DocumentEditorNodeSelectAction,
   DocumentEditorNodePointerEnterAction,
@@ -19,6 +22,23 @@ export default function reducer(
   action: BuilderAction
 ): ITemplateEditorState {
   switch (action.type) {
+    case "document/canvas/backend/html/event/on-pointer-move": {
+      const { node_ids_from_point } = <
+        DocumentEditorCanvasEventTargetHtmlBackendPointerMove
+      >action;
+      return produce(state, (draft) => {
+        draft.hovered_node_id = node_ids_from_point[0];
+      });
+    }
+    case "document/canvas/backend/html/event/on-pointer-down": {
+      const { node_ids_from_point } = <
+        DocumentEditorCanvasEventTargetHtmlBackendPointerDown
+      >action;
+      return produce(state, (draft) => {
+        const selected_node_id = node_ids_from_point[0];
+        draft.selected_node_id = selected_node_id;
+      });
+    }
     case "document/template/set/props": {
       const { data } = <TemplateEditorSetTemplatePropsAction>action;
       return produce(state, (draft) => {

@@ -1,12 +1,12 @@
 import { Button } from "@/components/ui/button";
 import { TemplateBuilderWidgets } from "../widgets";
-import { NodeSlot } from "../node";
+import { NodeElement } from "../node";
 import { IconWidget } from "../widgets/icon";
 import Link from "next/link";
 
 export function Footer_001() {
   return (
-    <NodeSlot
+    <NodeElement
       // className={"py-10 w-full"}
       node_id={"footer-flex"}
       component={TemplateBuilderWidgets.Flex}
@@ -42,6 +42,6 @@ export function Footer_001() {
           <IconWidget repository="radix-ui/icons" name="LinkedInLogoIcon" />
         </Button>
       </Link>
-    </NodeSlot>
+    </NodeElement>
   );
 }

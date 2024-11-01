@@ -2,6 +2,8 @@ import type { Tokens } from "@/ast";
 import { grida } from "@/grida";
 
 export type BuilderAction =
+  | DocumentEditorCanvasEventTargetHtmlBackendPointerMove
+  | DocumentEditorCanvasEventTargetHtmlBackendPointerDown
   | DocumentEditorNodeSelectAction
   | DocumentEditorNodePointerEnterAction
   | DocumentEditorNodePointerLeaveAction
@@ -9,6 +11,25 @@ export type BuilderAction =
   | TemplateNodeOverrideChangeAction
   | TemplateEditorSetTemplatePropsAction
   | TemplateEditorChangeTemplatePropsAction;
+
+interface IHtmlBackendCanvasEventTargetPointerEvent {
+  /**
+   * The node ids from the point.
+   *
+   * use document.elementFromPoint with filtering
+   */
+  node_ids_from_point: string[];
+}
+
+export type DocumentEditorCanvasEventTargetHtmlBackendPointerMove =
+  IHtmlBackendCanvasEventTargetPointerEvent & {
+    type: "document/canvas/backend/html/event/on-pointer-move";
+  };
+
+export type DocumentEditorCanvasEventTargetHtmlBackendPointerDown =
+  IHtmlBackendCanvasEventTargetPointerEvent & {
+    type: "document/canvas/backend/html/event/on-pointer-down";
+  };
 
 export interface DocumentEditorNodeSelectAction {
   type: "document/node/select";

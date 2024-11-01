@@ -3,7 +3,7 @@
 import React from "react";
 import { PoweredByGridaFooter } from "@/scaffolds/e/form/powered-by-brand-footer";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { NodeSlot } from "@/builder/template-builder/node";
+import { NodeElement } from "@/builder/template-builder/node";
 import {
   Card_002,
   Card_003,
@@ -39,7 +39,7 @@ export default function FormCollectionPage() {
               props["brand"]?.["logo"] as string
             }
           />
-          <NodeSlot
+          <NodeElement
             node_id="hero"
             // name="Hero"
             component={Hero_002}
@@ -61,7 +61,7 @@ export default function FormCollectionPage() {
           <main className="container">
             <section>
               <header className="py-10">
-                <NodeSlot
+                <NodeElement
                   node_id="list-header-title"
                   // name="List Header Title"
                   component={TemplateBuilderWidgets.Text}
@@ -81,7 +81,7 @@ export default function FormCollectionPage() {
               <div className="grid gap-6 grid-cols-1 @3xl/preview:grid-cols-2 @5xl/preview:grid-cols-3 @7xl/preview:grid-cols-4">
                 <ArrayMap identifier="event" expression={["events"]}>
                   {(data) => (
-                    <NodeSlot
+                    <NodeElement
                       node_id={"event-card"}
                       // name="Event Card"
                       component={Card_002}

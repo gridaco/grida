@@ -5,7 +5,9 @@ export const ContainerWidget = ({
   style,
   children,
   ...props
-}: React.PropsWithChildren<grida.program.nodes.ContainerNode>) => {
+}: React.PropsWithChildren<
+  grida.program.document.INodeWithHtmlDocumentQueryDataAttributes<grida.program.nodes.ContainerNode>
+>) => {
   return (
     <div {...props} style={style}>
       {children}

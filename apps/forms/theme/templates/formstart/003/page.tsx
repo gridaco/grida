@@ -18,7 +18,7 @@ import {
   useCampaignMeta,
 } from "@/theme/templates/kit/campaign";
 import { TemplateBuilderWidgets } from "@/builder/template-builder/widgets";
-import { NodeSlot } from "@/builder/template-builder/node";
+import { NodeElement } from "@/builder/template-builder/node";
 import { Factory } from "@/ast";
 
 const userprops = {
@@ -67,14 +67,14 @@ function Consumer() {
           <TextAlign align="center">
             <div className="flex flex-col justify-center items-center gap-4">
               <h1 className="text-6xl font-bold w-4/5">
-                <NodeSlot
+                <NodeElement
                   node_id="003.title"
                   component={TemplateBuilderWidgets.Text}
                   style={{}}
                 />
               </h1>
               <p className="text-lg text-foreground/80 w-4/5">
-                <NodeSlot
+                <NodeElement
                   node_id="003.subtitle"
                   component={TemplateBuilderWidgets.Text}
                   style={{}}
@@ -87,7 +87,7 @@ function Consumer() {
             <Button>Start Now</Button>
           </div>
         </section>
-        <NodeSlot
+        <NodeElement
           node_id="003.background"
           component={TemplateBuilderWidgets.Image}
           style={{

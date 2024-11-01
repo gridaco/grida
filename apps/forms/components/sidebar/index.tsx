@@ -123,39 +123,52 @@ export const SidebarMenuItem = React.forwardRef(function SidebarMenuItem(
     level,
     muted,
     selected,
+    hovered,
     className,
     disabled,
     children,
     onSelect,
     onExpandChange,
+    onPointerEnter,
+    onPointerLeave,
   }: React.PropsWithChildren<{
     expandable?: boolean;
     expanded?: boolean;
     level?: number;
     muted?: boolean;
     selected?: boolean;
+    /**
+     * when externally hoverred (e.g. in design editor) if true, this will mimic hover state
+     * even when false, this will not prevent from hover: being styled when user interaction
+     */
+    hovered?: boolean;
     className?: string;
     disabled?: boolean;
     icon?: React.ReactNode;
     onSelect?: () => void;
     onExpandChange?: (expand: boolean) => void;
+    onPointerEnter?: () => void;
+    onPointerLeave?: () => void;
   }>,
   forwardedRef
 ) {
-  const hasiconslot = icon !== undefined || expandable;
+  const has_icon_slot = icon !== undefined || expandable;
   return (
     <div
       ref={forwardedRef as any}
       data-level={level}
       data-muted={muted}
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
       data-disabled={disabled}
+      data-hovered={hovered}
       data-selected={selected}
       className={cn(
         "flex items-center",
         "relative group",
         "w-full px-2 py-1 rounded text-sm font-medium text-foreground",
         "text-ellipsis whitespace-nowrap overflow-hidden",
-        "hover:bg-accent hover:text-accent-foreground",
+        "hover:bg-accent hover:text-accent-foreground data-[hovered='true']:bg-accent data-[hovered='true']:text-accent-foreground",
         "data-[muted='true']:text-muted-foreground",
         "data-[disabled='true']:cursor-not-allowed data-[disabled='true']:opacity-40 data-[disabled='true']:bg-background",
         "data-[selected='true']:bg-accent data-[selected='true']:text-accent-foreground",
@@ -166,7 +179,7 @@ export const SidebarMenuItem = React.forwardRef(function SidebarMenuItem(
       }}
       onClick={onSelect}
     >
-      {hasiconslot && (
+      {has_icon_slot && (
         <div className="relative w-4 h-4 me-2">
           {expandable && (
             <button

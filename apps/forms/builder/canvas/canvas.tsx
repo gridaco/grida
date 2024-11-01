@@ -8,6 +8,8 @@ import React, {
   useRef,
 } from "react";
 import { useDocument } from "@/builder/provider";
+import { useGesture } from "@use-gesture/react";
+import { grida } from "@/grida";
 
 interface CanvasEventTargetContext {
   portal?: HTMLDivElement | null;
@@ -22,19 +24,13 @@ export function CanvasEventTarget({
 }: React.PropsWithChildren<{
   className?: string;
 }>) {
-  const { clearSelection } = useDocument();
-
   const [overlay, setOverlayRef] = React.useState<HTMLDivElement | null>(null);
 
   return (
     <EventTargetContext.Provider
       value={{ portal: overlay, setPortalRef: setOverlayRef }}
     >
-      <div
-        className={className}
-        onPointerDown={clearSelection}
-        style={{ pointerEvents: "auto" }}
-      >
+      <div className={className} style={{ pointerEvents: "auto" }}>
         {children}
       </div>
     </EventTargetContext.Provider>
@@ -44,6 +40,10 @@ export function CanvasEventTarget({
 export function CanvasOverlay() {
   const {
     document: { hovered_node_id, selected_node_id },
+    pointerMove,
+    pointerDown,
+    pointerEnterNode,
+    pointerLeaveNode,
   } = useDocument();
   const ref = useRef<HTMLDivElement>(null);
   const context = useContext(EventTargetContext);
@@ -61,8 +61,17 @@ export function CanvasOverlay() {
     };
   }, [context]);
 
+  const bind = useGesture({
+    onPointerMove: ({ event }) => {
+      pointerMove(event);
+    },
+    onPointerDown: ({ event }) => {
+      pointerDown(event);
+    },
+  });
+
   return (
-    <div className="absolute inset-0 pointer-events-none z-50">
+    <div {...bind()} className="absolute inset-0 pointer-events-auto z-50">
       <div className="w-full h-full" id="canvas-overlay-portal" ref={ref}>
         {selected_node_id && <NodeOverlay node_id={selected_node_id} />}
         {hovered_node_id && <NodeOverlay node_id={hovered_node_id} />}
@@ -89,9 +98,17 @@ function NodeOverlay({ node_id }: { node_id: string }) {
   const width = node_element_rect.width;
   const height = node_element_rect.height;
 
+  //
+  // const bind = useGesture({
+  //   onDrag: () => {
+  //     console.log("dragging");
+  //   },
+  // });
+
   return (
     <div
-      className="pointer-events-none select-none z-10 border-2 border-workbench-accent-sky"
+      // {...bind()}
+      className="pointer-events-auto select-none z-10 border-2 border-workbench-accent-sky"
       style={{
         position: "absolute",
         top: top,

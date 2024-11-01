@@ -52,6 +52,18 @@ export function StandaloneDocumentEditor({
   );
 }
 
+function get_grida_node_elements_from_point(x: number, y: number) {
+  const hits = window.document.elementsFromPoint(x, y);
+
+  const node_elements = hits.filter((h) =>
+    h.attributes.getNamedItem(
+      grida.program.document.k.HTML_ELEMET_DATA_ATTRIBUTE_GRIDA_NODE_ID_KEY
+    )
+  );
+
+  return node_elements;
+}
+
 export function useDocument() {
   const document = useContext(DocumentContext);
   if (!document) {
@@ -63,6 +75,36 @@ export function useDocument() {
   const dispatch = useContext(DocumentDispatcherContext);
 
   const { selected_node_id } = document;
+
+  const pointerMove = useCallback(
+    (event: PointerEvent) => {
+      const els = get_grida_node_elements_from_point(
+        event.clientX,
+        event.clientY
+      );
+
+      dispatch({
+        type: "document/canvas/backend/html/event/on-pointer-move",
+        node_ids_from_point: els.map((n) => n.id),
+      });
+    },
+    [dispatch]
+  );
+
+  const pointerDown = useCallback(
+    (event: PointerEvent) => {
+      const els = get_grida_node_elements_from_point(
+        event.clientX,
+        event.clientY
+      );
+
+      dispatch({
+        type: "document/canvas/backend/html/event/on-pointer-down",
+        node_ids_from_point: els.map((n) => n.id),
+      });
+    },
+    [dispatch]
+  );
 
   const selectNode = useCallback(
     (node_id: string) => {
@@ -307,6 +349,8 @@ export function useDocument() {
       rootDefault,
       rootProperties,
       selectedNode,
+      pointerMove,
+      pointerDown,
       selectNode,
       changeNodeActive,
       pointerEnterNode,
@@ -326,6 +370,8 @@ export function useDocument() {
     rootDefault,
     rootProperties,
     selectedNode,
+    pointerMove,
+    pointerDown,
     selectNode,
     changeNodeActive,
     pointerEnterNode,

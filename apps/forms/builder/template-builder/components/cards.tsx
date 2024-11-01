@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { HalfHeightGradient } from "./gradient-overlay";
 import { SlashIcon } from "@radix-ui/react-icons";
 import { withTemplateDefinition } from "@/builder/template-builder/with-template";
-import { NodeSlot } from "@/builder/template-builder/node";
+import { NodeElement } from "@/builder/template-builder/node";
 import { Media } from "./media";
 import { TemplateBuilderWidgets } from "../widgets";
 import { grida } from "@/grida";
@@ -54,7 +54,7 @@ export const Card_001 = withTemplateDefinition(
           />
         </div>
         <div className="space-y-2 bg-background p-4">
-          <NodeSlot
+          <NodeElement
             component={TemplateBuilderWidgets.Text}
             // text={h1}
             node_id={".h1"}
@@ -66,7 +66,7 @@ export const Card_001 = withTemplateDefinition(
             <span>{date2}</span>
           </div>
           <div className="text-sm text-muted-foreground">{p}</div>
-          <NodeSlot
+          <NodeElement
             node_id="tags-layout"
             component={TemplateBuilderWidgets.Flex}
             style={{
@@ -74,7 +74,7 @@ export const Card_001 = withTemplateDefinition(
             }}
           >
             {tags?.map((t, i) => <Badge key={i}>{t}</Badge>)}
-          </NodeSlot>
+          </NodeElement>
         </div>
       </Card>
     );
@@ -298,7 +298,7 @@ export const Card_003 = withTemplateDefinition(
   }: CardMasterProps) => {
     return (
       <Card className="p-4" style={style}>
-        <NodeSlot
+        <NodeElement
           component={TemplateBuilderWidgets.Flex}
           node_id="root"
           style={{
@@ -308,7 +308,7 @@ export const Card_003 = withTemplateDefinition(
           }}
         >
           <div className="flex-1 flex flex-col gap-1 z-20">
-            <NodeSlot
+            <NodeElement
               node_id="header-layout"
               component={TemplateBuilderWidgets.Flex}
               style={{
@@ -325,9 +325,9 @@ export const Card_003 = withTemplateDefinition(
                 </span>
               </div>
               <h1 className="text-lg font-bold break-keep">{h1}</h1>
-            </NodeSlot>
+            </NodeElement>
             <p className="text-xs font-regular opacity-80">{p}</p>
-            <NodeSlot
+            <NodeElement
               node_id="tags-layout"
               component={TemplateBuilderWidgets.Flex}
               style={{
@@ -335,9 +335,9 @@ export const Card_003 = withTemplateDefinition(
               }}
             >
               {tags?.map((t, i) => <Badge key={i}>{t}</Badge>)}
-            </NodeSlot>
+            </NodeElement>
           </div>
-          <NodeSlot
+          <NodeElement
             node_id="media-layout"
             component={TemplateBuilderWidgets.Container}
             style={
@@ -357,8 +357,8 @@ export const Card_003 = withTemplateDefinition(
               height={400}
               className="object-cover w-full h-full"
             />
-          </NodeSlot>
-        </NodeSlot>
+          </NodeElement>
+        </NodeElement>
       </Card>
     );
   },

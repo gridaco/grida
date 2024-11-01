@@ -1,14 +1,13 @@
 "use client";
 
 import React, { useCallback } from "react";
-import { useGesture } from "@use-gesture/react";
 import { TemplateComponents } from "@/builder/template-builder";
 import type { TemplateComponent } from "./with-template";
 import { grida } from "@/grida";
 import { TemplateBuilderWidgets } from "./widgets";
 import { useComputedNode, useDocument, useNode } from "../provider";
 
-interface SlotProps<P extends Record<string, any>> {
+interface NodeElementProps<P extends Record<string, any>> {
   node_id: string;
   component:
     | TemplateComponent
@@ -21,23 +20,18 @@ interface SlotProps<P extends Record<string, any>> {
   // defaultStyle?: React.CSSProperties;
 }
 
-export function NodeSlot<P extends Record<string, any>>({
+export function NodeElement<P extends Record<string, any>>({
   node_id,
   component,
   children,
   style,
-}: React.PropsWithChildren<SlotProps<P>>) {
-  const {
-    document: { editable },
-    selectNode,
-    pointerEnterNode,
-    pointerLeaveNode,
-    selected_node_id,
-  } = useDocument();
+}: React.PropsWithChildren<NodeElementProps<P>>) {
+  const { document, selected_node_id } = useDocument();
 
   const node = useNode(node_id);
   const computed = useComputedNode(node_id);
   const selected = node_id === selected_node_id;
+  const hovered = node_id === document.hovered_node_id;
 
   const { component_id } = node;
   const renderer = component_id
@@ -57,30 +51,7 @@ export function NodeSlot<P extends Record<string, any>>({
     | grida.program.document.template.IBuiltinTemplateNodeReactComponentRenderProps<P>
     | grida.program.nodes.AnyNode;
 
-  const onSelect = useCallback(() => {
-    selectNode(node_id);
-  }, [node_id, selectNode]);
-
-  const bind = useGesture(
-    {
-      onPointerEnter: ({ event }) => {
-        pointerEnterNode(node_id);
-      },
-      onPointerLeave: ({ event }) => {
-        pointerLeaveNode(node_id);
-      },
-      onPointerDown: ({ event }) => {
-        event.stopPropagation();
-        onSelect();
-      },
-    },
-    {
-      eventOptions: {
-        capture: true,
-      },
-    }
-  );
-
+  if (!node.active) return <></>;
   return (
     <HrefWrapper href={computed.href} target={node.target}>
       {React.createElement<any>(
@@ -88,12 +59,15 @@ export function NodeSlot<P extends Record<string, any>>({
         {
           id: node_id,
           ...masterprops,
-          ...bind(),
-          ["data-editor-selected"]: selected,
+          ...({
+            ["data-grida-node-id"]: node_id,
+            ["data-grida-node-type"]: node.type,
+            ["data-dev-editor-selected"]: selected,
+            ["data-dev-editor-hovered"]: hovered,
+          } satisfies grida.program.document.INodeHtmlDocumentQueryDataAttributes),
           style: {
             ...masterprops.style,
-            display: node.active ? masterprops.style.display : "none",
-            userSelect: editable ? "none" : undefined,
+            userSelect: document.editable ? "none" : undefined,
           } satisfies React.CSSProperties,
         },
         children

@@ -124,8 +124,7 @@ function HierarchyView() {
 }
 
 function NodeHierarchyList() {
-  const { document, selectNode } = useDocument();
-  // console.log("document.template.nodes", document.template.nodes);
+  const { document, selectNode, pointerEnterNode } = useDocument();
 
   const ids = Object.keys(document.template.nodes);
   return (
@@ -133,16 +132,24 @@ function NodeHierarchyList() {
       {ids.map((id) => {
         const n = document.template.nodes[id];
         const selected = document.selected_node_id === n.id;
+        const hovered = document.hovered_node_id === n.id;
         return (
           <SidebarMenuItem
             key={n.id}
             muted
+            hovered={hovered}
             level={1}
             selected={selected}
             onSelect={() => {
               selectNode(n.id);
             }}
             icon={<NodeHierarchyItemIcon type={n.type} className="w-4 h-4" />}
+            onPointerEnter={() => {
+              pointerEnterNode(n.id);
+            }}
+            onPointerLeave={() => {
+              pointerEnterNode(n.id);
+            }}
           >
             <SidebarMenuItemLabel>{n.name}</SidebarMenuItemLabel>
           </SidebarMenuItem>
