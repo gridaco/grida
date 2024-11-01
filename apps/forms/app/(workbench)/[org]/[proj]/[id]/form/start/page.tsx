@@ -49,10 +49,15 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { CanvasEventTarget, CanvasOverlay } from "@/builder/canvas/canvas";
 import { CurrentPage } from "@/scaffolds/editor/utils/current-page";
 import { Spinner } from "@/components/spinner";
-import { StandaloneDocumentEditor, useDocument } from "@/builder/provider";
+import {
+  StandaloneDocumentEditor,
+  CanvasEventTarget,
+  CanvasOverlay,
+  useDocument,
+  useRootTemplateInstanceNode,
+} from "@/builder";
 import { composeEditorDocumentAction } from "@/scaffolds/editor/action";
 import { BuilderAction } from "@/builder/action";
 
@@ -200,11 +205,8 @@ function StartPageEditor() {
 }
 
 function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
-  const {
-    changeRootProps: changeRootProperties,
-    rootProperties,
-    rootProps,
-  } = useDocument();
+  const { changeRootProps, rootProperties, rootProps } =
+    useRootTemplateInstanceNode();
   const [state, dispatch] = useEditorState();
 
   const { uploadPublic } = useDocumentAssetUpload();
@@ -212,7 +214,7 @@ function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
   const debouncedRichTextHtmlChange = useDebounceCallback(
     (editor: BlockNoteEditor<any>, content: Block[]) => {
       editor.blocksToHTMLLossy(content).then((html) => {
-        changeRootProperties("body_html", html);
+        changeRootProps("body_html", html);
       });
     },
     300
@@ -309,7 +311,7 @@ function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
                 const def = rootProperties[key];
 
                 const change = (value: any) => {
-                  changeRootProperties(key, value);
+                  changeRootProps(key, value);
                 };
 
                 const value = rootProps[key];

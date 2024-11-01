@@ -38,32 +38,24 @@ export function StandaloneDocumentEditor({
 
   const __dispatch = state.editable ? dispatch ?? __noop : __noop;
 
-  const rootnode = state.document.nodes[state.document.root_id!];
-  const shallowProps = useMemo(
-    () => {
-      // TODO: non-safe casting
-      const instance = rootnode as grida.program.nodes.TemplateInstanceNode;
-      const defaultProps =
-        // TODO: non-safe casting
-        state.templates![
-          (rootnode as grida.program.nodes.TemplateInstanceNode).template_id
-        ].default;
-      return Object.assign({}, defaultProps, instance.props);
-    },
-    // TODO: non-safe casting
-    [
-      state.templates![
-        (rootnode as grida.program.nodes.TemplateInstanceNode).template_id
-      ].default,
-      rootnode,
-    ]
-  );
+  const rootnode = state.document.nodes[state.document.root_id];
+  assert(rootnode, "root node is not found");
+  const shallowRootProps = useMemo(() => {
+    if (rootnode.type === "template_instance") {
+      const defaultProps = state.templates![rootnode.template_id].default;
+      return Object.assign({}, defaultProps, rootnode.props);
+    } else {
+      return {};
+    }
+  }, [rootnode]);
 
   return (
     <DocumentContext.Provider value={state}>
       <DocumentDispatcherContext.Provider value={__dispatch}>
         <ProgramDataContextHost>
-          <DataProvider data={{ props: shallowProps }}>{children}</DataProvider>
+          <DataProvider data={{ props: shallowRootProps }}>
+            {children}
+          </DataProvider>
         </ProgramDataContextHost>
       </DocumentDispatcherContext.Provider>
     </DocumentContext.Provider>
@@ -93,8 +85,6 @@ export function useDocument() {
   const dispatch = useContext(DocumentDispatcherContext);
 
   const { selected_node_id } = state;
-
-  const rootnode = state.document.nodes[state.document.root_id!];
 
   const pointerMove = useCallback(
     (event: PointerEvent) => {
@@ -156,18 +146,6 @@ export function useDocument() {
     [dispatch]
   );
 
-  const rootProperties =
-    // TODO: non-safe casting
-    (rootnode as grida.program.nodes.TemplateInstanceNode).properties || {};
-  // TODO: non-safe casting
-  const rootProps =
-    (rootnode as grida.program.nodes.TemplateInstanceNode).props || {};
-  // TODO: non-safe casting
-  const rootDefault =
-    state.templates![
-      (rootnode as grida.program.nodes.TemplateInstanceNode).template_id
-    ].default || {};
-
   const changeNodeProps = useCallback(
     (node_id: string, key: string, value?: Tokens.StringValueExpression) => {
       dispatch({
@@ -179,16 +157,6 @@ export function useDocument() {
       });
     },
     [dispatch]
-  );
-
-  /**
-   * Must be used when root node is {@link grida.program.nodes.TemplateInstanceNode} node
-   */
-  const changeRootProps = useCallback(
-    (key: string, value: any) => {
-      changeNodeProps(state.document.root_id!, key, value);
-    },
-    [changeNodeProps, state.document.root_id]
   );
 
   const clearSelection = useCallback(
@@ -400,9 +368,6 @@ export function useDocument() {
     return {
       state,
       selected_node_id,
-      rootProps,
-      rootDefault,
-      rootProperties,
       selectedNode,
       pointerMove,
       pointerDown,
@@ -411,20 +376,15 @@ export function useDocument() {
       pointerEnterNode,
       pointerLeaveNode,
       changeNodeProps,
-      changeRootProps,
       clearSelection,
       changeNodeComponent,
       changeNodeText,
-      // changeNodeAttribute,
       changeNodeStyle,
       changeNodeValue,
     };
   }, [
     state,
     selected_node_id,
-    rootProps,
-    rootDefault,
-    rootProperties,
     selectedNode,
     pointerMove,
     pointerDown,
@@ -433,14 +393,47 @@ export function useDocument() {
     pointerEnterNode,
     pointerLeaveNode,
     changeNodeProps,
-    changeRootProps,
     clearSelection,
     changeNodeComponent,
     changeNodeText,
-    // changeNodeAttribute,
     changeNodeStyle,
     changeNodeValue,
   ]);
+}
+
+/**
+ * Must be used when root node is {@link grida.program.nodes.TemplateInstanceNode} node
+ */
+export function useRootTemplateInstanceNode() {
+  const { state, changeNodeProps } = useDocument();
+
+  const { document, templates } = state;
+
+  const rootnode = document.nodes[document.root_id];
+
+  assert(rootnode.type === "template_instance", "root node must be template");
+  assert(templates && templates[rootnode.template_id], "template not found");
+
+  const rootProperties = rootnode.properties || {};
+  const rootProps = rootnode.props || {};
+  const rootDefault = state.templates![rootnode.template_id].default || {};
+
+  const changeRootProps = useCallback(
+    (key: string, value: any) => {
+      changeNodeProps(state.document.root_id, key, value);
+    },
+    [changeNodeProps, state.document.root_id]
+  );
+
+  return useMemo(
+    () => ({
+      rootProperties,
+      rootProps,
+      rootDefault,
+      changeRootProps,
+    }),
+    [rootProperties, rootProps, rootDefault, changeRootProps]
+  );
 }
 
 export function useNode(node_id: string) {
