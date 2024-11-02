@@ -12,6 +12,7 @@ export default {
       locked: false,
       expanded: true,
       opacity: 1,
+      zIndex: 0,
       style: {
         // width: 375,
         // height: 812,
@@ -28,6 +29,7 @@ export default {
       locked: false,
       expanded: true,
       opacity: 1,
+      zIndex: 0,
       style: {
         // position: "absolute",
         // top: 100,

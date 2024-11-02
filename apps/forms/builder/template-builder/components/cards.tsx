@@ -99,6 +99,7 @@ export const Card_001 = withTemplateDefinition(
         name: "Title",
         text: "Title",
         opacity: 1,
+        zIndex: 0,
         style: {},
       },
       ".p": {
@@ -109,6 +110,7 @@ export const Card_001 = withTemplateDefinition(
         name: "Description",
         text: "Description",
         opacity: 1,
+        zIndex: 0,
         style: {},
       },
       ".date1": {
@@ -119,6 +121,7 @@ export const Card_001 = withTemplateDefinition(
         name: "Date 1",
         text: "2021-01-01",
         opacity: 1,
+        zIndex: 0,
         style: {},
       },
       ".n": {
@@ -129,6 +132,7 @@ export const Card_001 = withTemplateDefinition(
         name: "Number",
         text: "0",
         opacity: 1,
+        zIndex: 0,
         style: {},
       },
       ".badge": {
@@ -139,6 +143,7 @@ export const Card_001 = withTemplateDefinition(
         name: "Badge",
         text: "New",
         opacity: 1,
+        zIndex: 0,
         style: {},
       },
       ".media": {
@@ -150,6 +155,7 @@ export const Card_001 = withTemplateDefinition(
         src: "",
         alt: "",
         opacity: 1,
+        zIndex: 0,
         style: {},
       },
       ".date2": {
@@ -160,6 +166,7 @@ export const Card_001 = withTemplateDefinition(
         name: "Date 2",
         text: "2021-01-01",
         opacity: 1,
+        zIndex: 0,
         style: {},
       },
       ".tags": {
@@ -170,6 +177,7 @@ export const Card_001 = withTemplateDefinition(
         name: "Tags",
         expanded: false,
         opacity: 1,
+        zIndex: 0,
         style: {},
       },
     },
@@ -241,6 +249,7 @@ export const Card_002 = withTemplateDefinition(
         name: "Title",
         text: "Title",
         opacity: 1,
+        zIndex: 0,
         style: {},
       },
       ".p": {
@@ -251,6 +260,7 @@ export const Card_002 = withTemplateDefinition(
         name: "Description",
         text: "Description",
         opacity: 1,
+        zIndex: 0,
         style: {},
       },
       ".date1": {
@@ -261,6 +271,7 @@ export const Card_002 = withTemplateDefinition(
         name: "Date 1",
         text: "2021-01-01",
         opacity: 1,
+        zIndex: 0,
         style: {},
       },
       ".n": {
@@ -271,6 +282,7 @@ export const Card_002 = withTemplateDefinition(
         name: "Number",
         text: "0",
         opacity: 1,
+        zIndex: 0,
         style: {},
       },
       ".badge": {
@@ -281,6 +293,7 @@ export const Card_002 = withTemplateDefinition(
         name: "Badge",
         text: "New",
         opacity: 1,
+        zIndex: 0,
         style: {},
       },
       ".media": {
@@ -292,6 +305,7 @@ export const Card_002 = withTemplateDefinition(
         src: "",
         alt: "",
         opacity: 1,
+        zIndex: 0,
         style: {},
       },
       ".date2": {
@@ -302,6 +316,7 @@ export const Card_002 = withTemplateDefinition(
         name: "Date 2",
         text: "2021-01-01",
         opacity: 1,
+        zIndex: 0,
         style: {},
       },
       ".tags": {
@@ -312,6 +327,7 @@ export const Card_002 = withTemplateDefinition(
         name: "Tags",
         expanded: false,
         opacity: 1,
+        zIndex: 0,
         style: {},
       },
     },
@@ -410,6 +426,7 @@ export const Card_003 = withTemplateDefinition(
         name: "Title",
         text: "Title",
         opacity: 1,
+        zIndex: 0,
         style: {},
       },
       ".p": {
@@ -420,6 +437,7 @@ export const Card_003 = withTemplateDefinition(
         name: "Description",
         text: "Description",
         opacity: 1,
+        zIndex: 0,
         style: {},
       },
       ".date1": {
@@ -430,6 +448,7 @@ export const Card_003 = withTemplateDefinition(
         name: "Date 1",
         text: "2021-01-01",
         opacity: 1,
+        zIndex: 0,
         style: {},
       },
       ".n": {
@@ -440,6 +459,7 @@ export const Card_003 = withTemplateDefinition(
         name: "Number",
         text: "0",
         opacity: 1,
+        zIndex: 0,
         style: {},
       },
       ".badge": {
@@ -450,6 +470,7 @@ export const Card_003 = withTemplateDefinition(
         name: "Badge",
         text: "New",
         opacity: 1,
+        zIndex: 0,
         style: {},
       },
       ".media": {
@@ -461,6 +482,7 @@ export const Card_003 = withTemplateDefinition(
         src: "",
         alt: "",
         opacity: 1,
+        zIndex: 0,
         style: {},
       },
       ".date2": {
@@ -471,6 +493,7 @@ export const Card_003 = withTemplateDefinition(
         name: "Date 2",
         text: "2021-01-01",
         opacity: 1,
+        zIndex: 0,
         style: {},
       },
       ".tags": {
@@ -481,6 +504,7 @@ export const Card_003 = withTemplateDefinition(
         name: "Tags",
         expanded: false,
         opacity: 1,
+        zIndex: 0,
         style: {},
       },
     },
@@ -549,6 +573,7 @@ export const Hero_001 = withTemplateDefinition(
         name: "Title",
         text: "Title",
         opacity: 1,
+        zIndex: 0,
         style: {},
       },
       ".p": {
@@ -559,6 +584,7 @@ export const Hero_001 = withTemplateDefinition(
         name: "Description",
         text: "Description",
         opacity: 1,
+        zIndex: 0,
         style: {},
       },
       ".media": {
@@ -570,6 +596,7 @@ export const Hero_001 = withTemplateDefinition(
         src: "",
         alt: "",
         opacity: 1,
+        zIndex: 0,
         style: {},
       },
     },
@@ -618,6 +645,7 @@ export const Hero_002 = withTemplateDefinition(
         name: "Title",
         text: "Title",
         opacity: 1,
+        zIndex: 0,
         style: {},
       },
       ".p": {
@@ -628,6 +656,7 @@ export const Hero_002 = withTemplateDefinition(
         name: "Description",
         text: "Description",
         opacity: 1,
+        zIndex: 0,
         style: {},
       },
       ".media": {
@@ -639,6 +668,7 @@ export const Hero_002 = withTemplateDefinition(
         src: "",
         alt: "",
         opacity: 1,
+        zIndex: 0,
         style: {},
       },
     },

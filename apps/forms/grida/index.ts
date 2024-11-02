@@ -314,14 +314,27 @@ export namespace grida {
        *
        * Common properties to avoid setting directly:
        * - `opacity`
+       * - `z-index`
+       * - `cursor`
+       * - `pointer-events`
+       * - `border-radius`
        *
        *
-       * TODO: Drop the React dependency and use css-types instead
+       * @deprecated Note: Do not modify this directly - it will progressively be replaced by a more robust and universal CSS property type system.
+       * If you wish to add a complex styled node, try using {@link document.template.TemplateDocumentDefinition}
        */
       export type ExplicitlySupportedCSSProperties = Pick<
+        // TODO: Drop the React dependency and use css-types instead
         React.CSSProperties,
+        // explicitly prohibited
+        // - "opacity"
+        // - "zIndex"
+        // - "cursor"
+        // - "pointerEvents"
+        // - "borderRadius"
         //
-        // | "opacity"
+        // position & dimension
+        // | 'width' | 'height' | 'minWidth' | 'minHeight' | 'maxWidth' | 'maxHeight' | 'position' | 'top' | 'right' | 'bottom' | 'left' | 'zIndex'
         //
         | "color"
         | "fontWeight"
@@ -430,6 +443,27 @@ export namespace grida {
           opacity: number;
         }
 
+        export interface IZIndex {
+          /**
+           * z-index of the node.
+           *
+           *
+           * Env:
+           * - on html backend, this value is passed the the style `z-index` property
+           * - on canvas backend, this value is used to determine the depth / z buffer
+           *
+           * Terms - Also knwon as:
+           * - Sorting Order
+           * - Depth
+           * - Z Buffer
+           * - Order in Layer
+           *
+           * @default 0
+           * @type {number} integer
+           */
+          zIndex: number;
+        }
+
         /**
          * Node that can be expanded in hierarchy
          */
@@ -447,7 +481,8 @@ export namespace grida {
 
         export interface IHtmlBackendCSSStylable
           extends IStylable<css.ExplicitlySupportedCSSProperties>,
-            IOpacity {
+            IOpacity,
+            IZIndex {
           style: css.ExplicitlySupportedCSSProperties;
         }
 

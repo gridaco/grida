@@ -113,6 +113,7 @@ _003.definition = {
       name: "Title",
       text: Factory.createPropertyAccessExpression(["props", "title"]),
       opacity: 1,
+      zIndex: 0,
       style: {},
     },
     "003.subtitle": {
@@ -123,6 +124,7 @@ _003.definition = {
       name: "Subtitle",
       text: Factory.createPropertyAccessExpression(["props", "subtitle"]),
       opacity: 1,
+      zIndex: 0,
       style: {},
     },
     "003.background": {
@@ -133,6 +135,7 @@ _003.definition = {
       name: "Background",
       src: Factory.createPropertyAccessExpression(["props", "background"]),
       opacity: 1,
+      zIndex: 0,
       style: {},
     },
   },
