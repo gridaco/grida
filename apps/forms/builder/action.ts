@@ -4,6 +4,9 @@ import { grida } from "@/grida";
 export type BuilderAction =
   | DocumentEditorCanvasEventTargetHtmlBackendPointerMove
   | DocumentEditorCanvasEventTargetHtmlBackendPointerDown
+  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayDrag
+  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayDragStart
+  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayDragEnd
   | DocumentEditorNodeSelectAction
   | DocumentEditorNodePointerEnterAction
   | DocumentEditorNodePointerLeaveAction
@@ -28,6 +31,22 @@ export type DocumentEditorCanvasEventTargetHtmlBackendPointerMove =
 export type DocumentEditorCanvasEventTargetHtmlBackendPointerDown =
   IHtmlBackendCanvasEventTargetPointerEvent & {
     type: "document/canvas/backend/html/event/on-pointer-down";
+  };
+
+export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayDrag =
+  INodeID & {
+    type: "document/canvas/backend/html/event/node-overlay/on-drag";
+    delta: [number, number];
+  };
+
+export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayDragStart =
+  INodeID & {
+    type: "document/canvas/backend/html/event/node-overlay/on-drag-start";
+  };
+
+export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayDragEnd =
+  INodeID & {
+    type: "document/canvas/backend/html/event/node-overlay/on-drag-end";
   };
 
 export interface DocumentEditorNodeSelectAction {

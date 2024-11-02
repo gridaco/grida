@@ -7,6 +7,7 @@ export type DocumentDispatcher = (action: BuilderAction) => void;
 export interface IDocumentEditorInteractionCursorState {
   selected_node_id?: string;
   hovered_node_id?: string;
+  is_node_transforming?: boolean;
 }
 
 export interface IDocumentEditorState

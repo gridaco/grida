@@ -5,6 +5,9 @@ import type {
   //
   DocumentEditorCanvasEventTargetHtmlBackendPointerMove,
   DocumentEditorCanvasEventTargetHtmlBackendPointerDown,
+  DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayDragStart,
+  DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayDragEnd,
+  DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayDrag,
   TemplateEditorSetTemplatePropsAction,
   DocumentEditorNodeSelectAction,
   DocumentEditorNodePointerEnterAction,
@@ -21,6 +24,7 @@ export default function reducer<S extends IDocumentEditorState>(
   action: BuilderAction
 ): S {
   switch (action.type) {
+    // #region [html backend] canvas event target
     case "document/canvas/backend/html/event/on-pointer-move": {
       const { node_ids_from_point } = <
         DocumentEditorCanvasEventTargetHtmlBackendPointerMove
@@ -38,6 +42,45 @@ export default function reducer<S extends IDocumentEditorState>(
         draft.selected_node_id = selected_node_id;
       });
     }
+    case "document/canvas/backend/html/event/node-overlay/on-drag-start": {
+      const { node_id } = <
+        DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayDragStart
+      >action;
+      return produce(state, (draft) => {
+        draft.is_node_transforming = true;
+        draft.selected_node_id = node_id;
+      });
+    }
+    case "document/canvas/backend/html/event/node-overlay/on-drag-end": {
+      return produce(state, (draft) => {
+        draft.is_node_transforming = false;
+      });
+    }
+    case "document/canvas/backend/html/event/node-overlay/on-drag": {
+      const { node_id, delta } = <
+        DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayDrag
+      >action;
+      return produce(state, (draft) => {
+        const node = draft.document.nodes[node_id];
+        if (
+          ((
+            node as grida.program.nodes.i.IHtmlBackendCSSStylable
+          ).style.position = "absolute")
+        ) {
+          const [dx, dy] = delta;
+          ((node as grida.program.nodes.i.IHtmlBackendCSSStylable).style
+            .left as number) += dx;
+          ((node as grida.program.nodes.i.IHtmlBackendCSSStylable).style
+            .top as number) += dy;
+        } else {
+          // ignore
+          reportError("node is not draggable");
+        }
+
+        //
+      });
+    }
+    // #endregion [html backend] canvas event target
     case "document/template/set/props": {
       const { data } = <TemplateEditorSetTemplatePropsAction>action;
 

@@ -335,6 +335,11 @@ export namespace grida {
         //
         // position & dimension
         // | 'width' | 'height' | 'minWidth' | 'minHeight' | 'maxWidth' | 'maxHeight' | 'position' | 'top' | 'right' | 'bottom' | 'left' | 'zIndex'
+        | "position"
+        | "width"
+        | "height"
+        | "top"
+        | "left"
         //
         | "color"
         | "fontWeight"

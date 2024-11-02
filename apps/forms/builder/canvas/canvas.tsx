@@ -7,7 +7,7 @@ import React, {
   useMemo,
   useRef,
 } from "react";
-import { useDocument } from "@/builder/provider";
+import { useEventTarget } from "@/builder";
 import { useGesture } from "@use-gesture/react";
 import { grida } from "@/grida";
 
@@ -39,12 +39,12 @@ export function CanvasEventTarget({
 
 export function CanvasOverlay() {
   const {
-    state: { hovered_node_id, selected_node_id },
+    hovered_node_id,
+    selected_node_id,
+    is_node_transforming,
     pointerMove,
     pointerDown,
-    pointerEnterNode,
-    pointerLeaveNode,
-  } = useDocument();
+  } = useEventTarget();
   const ref = useRef<HTMLDivElement>(null);
   const context = useContext(EventTargetContext);
 
@@ -63,6 +63,8 @@ export function CanvasOverlay() {
 
   const bind = useGesture({
     onPointerMove: ({ event }) => {
+      // for performance reasons, we don't want to update the overlay when transforming
+      if (is_node_transforming) return;
       pointerMove(event);
     },
     onPointerDown: ({ event }) => {
@@ -71,10 +73,22 @@ export function CanvasOverlay() {
   });
 
   return (
-    <div {...bind()} className="absolute inset-0 pointer-events-auto z-50">
+    <div
+      data-transforming={is_node_transforming}
+      {...bind()}
+      className="absolute inset-0 pointer-events-auto will-change-transform z-50 opacity-100 data-[transforming='true']:opacity-0 transition-colors "
+    >
       <div className="w-full h-full" id="canvas-overlay-portal" ref={ref}>
-        {selected_node_id && <NodeOverlay node_id={selected_node_id} />}
-        {hovered_node_id && <NodeOverlay node_id={hovered_node_id} />}
+        {selected_node_id && (
+          <NodeOverlay
+            node_id={selected_node_id}
+            // TODO: based on positioning model
+            readonly={false}
+          />
+        )}
+        {hovered_node_id && hovered_node_id !== selected_node_id && (
+          <NodeOverlay node_id={hovered_node_id} readonly />
+        )}
       </div>
     </div>
   );
@@ -82,7 +96,21 @@ export function CanvasOverlay() {
 
 const __rect_fallback = { top: 0, left: 0, width: 0, height: 0 };
 
-function NodeOverlay({ node_id }: { node_id: string }) {
+function NodeOverlay({
+  node_id,
+  readonly,
+}: {
+  node_id: string;
+  readonly: boolean;
+}) {
+  const {
+    hovered_node_id,
+    selected_node_id,
+    dragNodeOverlayStart,
+    dragNodeOverlayEnd,
+    dragNodeOverlay,
+  } = useEventTarget();
+
   const portal = useCanvasOverlayPortal();
   const node_element = useMemo(() => {
     return document.getElementById(node_id);
@@ -99,16 +127,23 @@ function NodeOverlay({ node_id }: { node_id: string }) {
   const height = node_element_rect.height;
 
   //
-  // const bind = useGesture({
-  //   onDrag: () => {
-  //     console.log("dragging");
-  //   },
-  // });
+  const bind = useGesture({
+    onDragStart: (e) => {
+      dragNodeOverlayStart(node_id);
+    },
+    onDragEnd: (e) => {
+      dragNodeOverlayEnd(node_id);
+    },
+    onDrag: (e) => {
+      console.log("dragging", e);
+      dragNodeOverlay(node_id, e.delta);
+    },
+  });
 
   return (
     <div
-      // {...bind()}
-      className="pointer-events-auto select-none z-10 border-2 border-workbench-accent-sky"
+      {...bind()}
+      className="pointer-events-auto select-none z-10 border-2 border-workbench-accent-sky relative"
       style={{
         position: "absolute",
         top: top,
@@ -116,7 +151,52 @@ function NodeOverlay({ node_id }: { node_id: string }) {
         width: width,
         height: height,
       }}
-    />
+    >
+      {!readonly && (
+        <>
+          {/* top left */}
+          <div
+            className="border bg-white border-workbench-accent-sky absolute top-0 left-0 z-10 pointer-events-auto"
+            style={{
+              width: 8,
+              height: 8,
+              transform: "translate(-50%, -50%)",
+              cursor: readonly ? "default" : "nwse-resize",
+            }}
+          />
+          {/* top right */}
+          <div
+            className="border bg-white border-workbench-accent-sky absolute top-0 right-0 z-10 pointer-events-auto"
+            style={{
+              width: 8,
+              height: 8,
+              transform: "translate(50%, -50%)",
+              cursor: readonly ? "default" : "nesw-resize",
+            }}
+          />
+          {/* bottom left */}
+          <div
+            className="border bg-white border-workbench-accent-sky absolute bottom-0 left-0 z-10 pointer-events-auto"
+            style={{
+              width: 8,
+              height: 8,
+              transform: "translate(-50%, 50%)",
+              cursor: readonly ? "default" : "nesw-resize",
+            }}
+          />
+          {/* bottom right */}
+          <div
+            className="border bg-white border-workbench-accent-sky absolute bottom-0 right-0 z-10 pointer-events-auto"
+            style={{
+              width: 8,
+              height: 8,
+              transform: "translate(50%, 50%)",
+              cursor: readonly ? "default" : "nwse-resize",
+            }}
+          />
+        </>
+      )}
+    </div>
   );
 }
 

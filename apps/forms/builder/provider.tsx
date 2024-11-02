@@ -74,7 +74,7 @@ function get_grida_node_elements_from_point(x: number, y: number) {
   return node_elements;
 }
 
-export function useDocument() {
+function useInternal() {
   const state = useContext(DocumentContext);
   if (!state) {
     throw new Error(
@@ -84,37 +84,13 @@ export function useDocument() {
 
   const dispatch = useContext(DocumentDispatcherContext);
 
+  return useMemo(() => [state, dispatch] as const, [state, dispatch]);
+}
+
+export function useDocument() {
+  const [state, dispatch] = useInternal();
+
   const { selected_node_id } = state;
-
-  const pointerMove = useCallback(
-    (event: PointerEvent) => {
-      const els = get_grida_node_elements_from_point(
-        event.clientX,
-        event.clientY
-      );
-
-      dispatch({
-        type: "document/canvas/backend/html/event/on-pointer-move",
-        node_ids_from_point: els.map((n) => n.id),
-      });
-    },
-    [dispatch]
-  );
-
-  const pointerDown = useCallback(
-    (event: PointerEvent) => {
-      const els = get_grida_node_elements_from_point(
-        event.clientX,
-        event.clientY
-      );
-
-      dispatch({
-        type: "document/canvas/backend/html/event/on-pointer-down",
-        node_ids_from_point: els.map((n) => n.id),
-      });
-    },
-    [dispatch]
-  );
 
   const selectNode = useCallback(
     (node_id: string) => {
@@ -386,8 +362,6 @@ export function useDocument() {
       state,
       selected_node_id,
       selectedNode,
-      pointerMove,
-      pointerDown,
       selectNode,
       changeNodeActive,
       pointerEnterNode,
@@ -403,8 +377,6 @@ export function useDocument() {
     state,
     selected_node_id,
     selectedNode,
-    pointerMove,
-    pointerDown,
     selectNode,
     changeNodeActive,
     pointerEnterNode,
@@ -415,6 +387,95 @@ export function useDocument() {
     changeNodeText,
     changeNodeStyle,
     changeNodeValue,
+  ]);
+}
+
+export function useEventTarget() {
+  const [state, dispatch] = useInternal();
+
+  const { is_node_transforming, hovered_node_id, selected_node_id } = state;
+
+  const pointerMove = useCallback(
+    (event: PointerEvent) => {
+      const els = get_grida_node_elements_from_point(
+        event.clientX,
+        event.clientY
+      );
+
+      dispatch({
+        type: "document/canvas/backend/html/event/on-pointer-move",
+        node_ids_from_point: els.map((n) => n.id),
+      });
+    },
+    [dispatch]
+  );
+
+  const pointerDown = useCallback(
+    (event: PointerEvent) => {
+      const els = get_grida_node_elements_from_point(
+        event.clientX,
+        event.clientY
+      );
+
+      dispatch({
+        type: "document/canvas/backend/html/event/on-pointer-down",
+        node_ids_from_point: els.map((n) => n.id),
+      });
+    },
+    [dispatch]
+  );
+
+  const dragNodeOverlayStart = useCallback(
+    (node_id: string) => {
+      dispatch({
+        type: "document/canvas/backend/html/event/node-overlay/on-drag-start",
+        node_id: node_id,
+      });
+    },
+    [dispatch]
+  );
+
+  const dragNodeOverlayEnd = useCallback(
+    (node_id: string) => {
+      dispatch({
+        type: "document/canvas/backend/html/event/node-overlay/on-drag-end",
+        node_id: node_id,
+      });
+    },
+    [dispatch]
+  );
+
+  const dragNodeOverlay = useCallback(
+    (node_id: string, delta: [number, number]) => {
+      dispatch({
+        type: "document/canvas/backend/html/event/node-overlay/on-drag",
+        node_id: node_id,
+        delta,
+      });
+    },
+    [dispatch]
+  );
+
+  return useMemo(() => {
+    return {
+      hovered_node_id,
+      selected_node_id,
+      is_node_transforming,
+      dragNodeOverlayStart,
+      dragNodeOverlayEnd,
+      dragNodeOverlay,
+      pointerMove,
+      pointerDown,
+    };
+  }, [
+    hovered_node_id,
+    selected_node_id,
+    is_node_transforming,
+    dragNodeOverlayStart,
+    dragNodeOverlayEnd,
+    dragNodeOverlay,
+    pointerMove,
+    pointerDown,
   ]);
 }
 

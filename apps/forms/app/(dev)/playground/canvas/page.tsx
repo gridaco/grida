@@ -29,10 +29,14 @@ export default function CanvasPlaygroundPage() {
               <NodeHierarchyList />
             </SidebarRoot>
           </aside>
-          <div className="bg-red-200 w-full h-full">
-            <CanvasEventTarget className="relative w-full no-scrollbar overflow-y-auto bg-transparent pointer-events-none">
+          <div className="w-full h-full">
+            <CanvasEventTarget className="relative w-full h-full no-scrollbar overflow-y-auto bg-transparent pointer-events-none">
               <CanvasOverlay />
-              <StandaloneDocumentEditorContent />
+              <div className="w-full h-full flex bg-background items-center justify-center">
+                <div className="shadow-lg rounded-xl border overflow-hidden">
+                  <StandaloneDocumentEditorContent />
+                </div>
+              </div>
             </CanvasEventTarget>
           </div>
           <aside className="h-full">

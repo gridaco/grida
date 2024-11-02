@@ -2,6 +2,7 @@ export {
   StandaloneDocumentEditor,
   useDocument,
   useNode,
+  useEventTarget,
   useComputedNode,
   useRootTemplateInstanceNode,
   useTemplateDefinition,
