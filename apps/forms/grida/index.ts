@@ -273,7 +273,7 @@ export namespace grida {
         export interface IUserDefinedTemplateNodeReactComponentRenderProps<P>
           extends nodes.i.IBaseNode,
             nodes.i.ISceneNode,
-            nodes.i.IStylable,
+            nodes.i.IHtmlBackendCSSStylable,
             nodes.i.IExpandable {
           props: P;
         }
@@ -303,6 +303,60 @@ export namespace grida {
       }
     }
 
+    export namespace css {
+      /**
+       * CSS properties that is supported via the standard editor
+       *
+       * (when using html backend, other css properties can also be dynamically applied, but not guaranteed)
+       *
+       * Note: some prorperties must not be set directly, e.g. `opacity` as it is a valid property for both html backend and canvas backend, we handle this in a higher level.
+       * When set explicitly, it will override the default behaviour, causing unexpected results.
+       *
+       * Common properties to avoid setting directly:
+       * - `opacity`
+       *
+       *
+       * TODO: Drop the React dependency and use css-types instead
+       */
+      export type ExplicitlySupportedCSSProperties = Pick<
+        React.CSSProperties,
+        //
+        // | "opacity"
+        //
+        | "color"
+        | "fontWeight"
+        | "fontFamily"
+        | "fontSize"
+        | "lineHeight"
+        | "textAlign"
+        | "textTransform"
+        //
+        | "boxShadow"
+        //
+        | "backgroundColor"
+        //
+        | "borderRadius"
+        | "borderWidth"
+        //
+        | "margin"
+        | "padding"
+        //
+        | "aspectRatio"
+        //
+        | "flexDirection"
+        | "flexWrap"
+        | "justifyContent"
+        | "alignItems"
+        | "gap"
+        //
+        | "cursor"
+        | "userSelect"
+        //
+        | "objectFit"
+        | "objectPosition"
+      >;
+    }
+
     export namespace nodes {
       export type NodeID = string;
       export type Node =
@@ -329,7 +383,7 @@ export namespace grida {
         readonly type: Node["type"];
       } & i.IBaseNode &
         i.ISceneNode &
-        i.IStylable;
+        i.IHtmlBackendCSSStylable;
 
       export namespace i {
         export interface IBaseNode {
@@ -363,6 +417,19 @@ export namespace grida {
           locked: boolean;
         }
 
+        export interface IOpacity {
+          /**
+           * opacity of the node.
+           *
+           * Env:
+           * - on html backend, this value is passed the the style `opacity` property
+           * - on canvas backend, this value is passed to the `opacity` property of the node
+           *
+           * @default 1
+           */
+          opacity: number;
+        }
+
         /**
          * Node that can be expanded in hierarchy
          */
@@ -374,8 +441,14 @@ export namespace grida {
           children?: NodeID[];
         }
 
-        export interface IStylable {
-          style: React.CSSProperties;
+        export interface IStylable<S extends Record<string, unknown>> {
+          style: S;
+        }
+
+        export interface IHtmlBackendCSSStylable
+          extends IStylable<css.ExplicitlySupportedCSSProperties>,
+            IOpacity {
+          style: css.ExplicitlySupportedCSSProperties;
         }
 
         export interface IHrefable {
@@ -383,10 +456,19 @@ export namespace grida {
           target?: "_self" | "_blank" | undefined;
         }
 
+        /**
+         * does not represent any specific rule or logic, just a data structure, depends on the context
+         */
         export interface IDimension {
           width: number;
           height: number;
         }
+
+        // export interface IPosition {
+        //   position: "static" | "absolute";
+        //   x: number;
+        //   y: number;
+        // }
 
         export interface ITextValue {
           /**
@@ -424,7 +506,7 @@ export namespace grida {
       export interface TextNode
         extends i.IBaseNode,
           i.ISceneNode,
-          i.IStylable,
+          i.IHtmlBackendCSSStylable,
           i.IHrefable,
           i.ITextValue {
         readonly type: "text";
@@ -433,7 +515,7 @@ export namespace grida {
       export interface ImageNode
         extends i.IBaseNode,
           i.ISceneNode,
-          i.IStylable,
+          i.IHtmlBackendCSSStylable,
           i.IHrefable {
         readonly type: "image";
         /**
@@ -448,7 +530,7 @@ export namespace grida {
       export interface ContainerNode
         extends i.IBaseNode,
           i.ISceneNode,
-          i.IStylable,
+          i.IHtmlBackendCSSStylable,
           i.IHrefable,
           i.IExpandable,
           i.IChildren {
@@ -503,7 +585,7 @@ export namespace grida {
       export interface InstanceNode
         extends i.IBaseNode,
           i.ISceneNode,
-          i.IStylable,
+          i.IHtmlBackendCSSStylable,
           i.IHrefable,
           i.IProperties,
           i.IProps {

@@ -39,6 +39,7 @@ import { ExportNodeWithHtmlToImage } from "./controls/export";
 
 import { useComputedNode, useDocument, useNode } from "@/builder";
 import assert from "assert";
+import { grida } from "@/grida";
 
 export function SelectedNodeProperties() {
   const { state: document, selectedNode } = useDocument();
@@ -49,7 +50,8 @@ export function SelectedNodeProperties() {
 
   const node = useNode(selected_node_id!);
   const computed = useComputedNode(selected_node_id!);
-  const { id, name, active, component_id, style, type, properties } = node;
+  const { id, name, active, component_id, style, type, properties, opacity } =
+    node;
 
   // const istemplate = type?.startsWith("templates/");
   const is_instance = type === "instance";
@@ -61,7 +63,6 @@ export function SelectedNodeProperties() {
   const is_stylable = type !== "template_instance";
 
   const {
-    opacity,
     fontWeight,
     fontSize,
     textAlign,
@@ -89,7 +90,7 @@ export function SelectedNodeProperties() {
   } = {
     // ...selected_node_default_style,
     ...(style || {}),
-  } satisfies React.CSSProperties;
+  } satisfies grida.program.css.ExplicitlySupportedCSSProperties;
 
   const border = {
     borderWidth,

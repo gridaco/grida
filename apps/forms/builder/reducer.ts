@@ -89,6 +89,7 @@ export default function reducer<S extends IDocumentEditorState>(
     case "node/change/target":
     case "node/change/src":
     case "node/change/props":
+    case "node/change/opacity":
     case "node/change/style":
     case "node/change/text": {
       const { node_id } = <NodeChangeAction>action;
@@ -162,13 +163,21 @@ function nodeReducer<N extends Partial<grida.program.nodes.Node>>(
         draft.props = Object.assign({}, draft.props, action.props);
         break;
       }
+      case "node/change/opacity": {
+        (
+          draft as Draft<grida.program.nodes.i.IHtmlBackendCSSStylable>
+        ).opacity = action.opacity;
+        break;
+      }
       case "node/change/style": {
         // assert(draft.type !== 'template_instance')
-        (draft as Draft<grida.program.nodes.i.IStylable>).style = Object.assign(
-          {},
-          (draft as Draft<grida.program.nodes.i.IStylable>).style,
-          action.style
-        );
+        (draft as Draft<grida.program.nodes.i.IHtmlBackendCSSStylable>).style =
+          Object.assign(
+            {},
+            (draft as Draft<grida.program.nodes.i.IHtmlBackendCSSStylable>)
+              .style,
+            action.style
+          );
         break;
       }
       case "node/change/text": {

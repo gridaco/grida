@@ -67,6 +67,10 @@ interface INodeChangeTextAction extends INodeID {
   text?: Tokens.StringValueExpression;
 }
 
+interface INodeChangeOpacityAction extends INodeID {
+  opacity: number;
+}
+
 interface INodeChangeStyleAction extends INodeID {
   style: Partial<React.CSSProperties>;
 }
@@ -92,6 +96,7 @@ export type NodeChangeAction =
   | ({ type: "node/change/active" } & INodeChangeActiveAction)
   | ({ type: "node/change/component" } & INodeChangeComponentAction)
   | ({ type: "node/change/text" } & INodeChangeTextAction)
+  | ({ type: "node/change/opacity" } & INodeChangeOpacityAction)
   | ({ type: "node/change/style" } & INodeChangeStyleAction)
   | ({ type: "node/change/src" } & INodeChangeSrcAction)
   | ({ type: "node/change/href" } & INodeChangeHrefAction)

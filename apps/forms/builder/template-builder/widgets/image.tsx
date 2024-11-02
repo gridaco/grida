@@ -28,8 +28,8 @@ export const ImageWidget = ({
 
   return (
     <div id={id} style={divStyles} {...data_attributes}>
-      {/* eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text */}
       {src && (
+        // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
         <img
           src={src as string}
           width={width}

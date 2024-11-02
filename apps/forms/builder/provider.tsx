@@ -264,6 +264,22 @@ export function useDocument() {
     [dispatch]
   );
 
+  const changeNodeOpacity = useCallback(
+    (node_id: string, opacity: number) => {
+      dispatch({
+        type: "document/template/override/change/*",
+        // TODO: non-safe casting
+        template_instance_node_id: state.document.root_id!,
+        action: {
+          type: "node/change/opacity",
+          node_id: node_id,
+          opacity,
+        },
+      });
+    },
+    [dispatch]
+  );
+
   const changeNodeStyle = useCallback(
     (node_id: string, key: string, value: any) => {
       dispatch({
@@ -320,9 +336,10 @@ export function useDocument() {
       target: (target?: grida.program.nodes.i.IHrefable["target"]) =>
         changeNodeTarget(selected_node_id!, target),
 
+      // stylable
+      opacity: (value: number) => changeNodeOpacity(selected_node_id!, value),
+
       // style
-      opacity: (value: number) =>
-        changeNodeStyle(selected_node_id!, "opacity", value),
       fontWeight: (value: number) =>
         changeNodeStyle(selected_node_id!, "fontWeight", value),
       fontSize: (value?: number) =>

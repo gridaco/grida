@@ -98,6 +98,7 @@ export const Card_001 = withTemplateDefinition(
         type: "text",
         name: "Title",
         text: "Title",
+        opacity: 1,
         style: {},
       },
       ".p": {
@@ -107,6 +108,7 @@ export const Card_001 = withTemplateDefinition(
         type: "text",
         name: "Description",
         text: "Description",
+        opacity: 1,
         style: {},
       },
       ".date1": {
@@ -116,6 +118,7 @@ export const Card_001 = withTemplateDefinition(
         type: "text",
         name: "Date 1",
         text: "2021-01-01",
+        opacity: 1,
         style: {},
       },
       ".n": {
@@ -125,6 +128,7 @@ export const Card_001 = withTemplateDefinition(
         type: "text",
         name: "Number",
         text: "0",
+        opacity: 1,
         style: {},
       },
       ".badge": {
@@ -134,6 +138,7 @@ export const Card_001 = withTemplateDefinition(
         type: "text",
         name: "Badge",
         text: "New",
+        opacity: 1,
         style: {},
       },
       ".media": {
@@ -144,6 +149,7 @@ export const Card_001 = withTemplateDefinition(
         name: "Media",
         src: "",
         alt: "",
+        opacity: 1,
         style: {},
       },
       ".date2": {
@@ -153,6 +159,7 @@ export const Card_001 = withTemplateDefinition(
         type: "text",
         name: "Date 2",
         text: "2021-01-01",
+        opacity: 1,
         style: {},
       },
       ".tags": {
@@ -162,6 +169,7 @@ export const Card_001 = withTemplateDefinition(
         type: "container",
         name: "Tags",
         expanded: false,
+        opacity: 1,
         style: {},
       },
     },
@@ -232,6 +240,7 @@ export const Card_002 = withTemplateDefinition(
         type: "text",
         name: "Title",
         text: "Title",
+        opacity: 1,
         style: {},
       },
       ".p": {
@@ -241,6 +250,7 @@ export const Card_002 = withTemplateDefinition(
         type: "text",
         name: "Description",
         text: "Description",
+        opacity: 1,
         style: {},
       },
       ".date1": {
@@ -250,6 +260,7 @@ export const Card_002 = withTemplateDefinition(
         type: "text",
         name: "Date 1",
         text: "2021-01-01",
+        opacity: 1,
         style: {},
       },
       ".n": {
@@ -259,6 +270,7 @@ export const Card_002 = withTemplateDefinition(
         type: "text",
         name: "Number",
         text: "0",
+        opacity: 1,
         style: {},
       },
       ".badge": {
@@ -268,6 +280,7 @@ export const Card_002 = withTemplateDefinition(
         type: "text",
         name: "Badge",
         text: "New",
+        opacity: 1,
         style: {},
       },
       ".media": {
@@ -278,6 +291,7 @@ export const Card_002 = withTemplateDefinition(
         name: "Media",
         src: "",
         alt: "",
+        opacity: 1,
         style: {},
       },
       ".date2": {
@@ -287,6 +301,7 @@ export const Card_002 = withTemplateDefinition(
         type: "text",
         name: "Date 2",
         text: "2021-01-01",
+        opacity: 1,
         style: {},
       },
       ".tags": {
@@ -296,6 +311,7 @@ export const Card_002 = withTemplateDefinition(
         type: "container",
         name: "Tags",
         expanded: false,
+        opacity: 1,
         style: {},
       },
     },
@@ -393,6 +409,7 @@ export const Card_003 = withTemplateDefinition(
         type: "text",
         name: "Title",
         text: "Title",
+        opacity: 1,
         style: {},
       },
       ".p": {
@@ -402,6 +419,7 @@ export const Card_003 = withTemplateDefinition(
         type: "text",
         name: "Description",
         text: "Description",
+        opacity: 1,
         style: {},
       },
       ".date1": {
@@ -411,6 +429,7 @@ export const Card_003 = withTemplateDefinition(
         type: "text",
         name: "Date 1",
         text: "2021-01-01",
+        opacity: 1,
         style: {},
       },
       ".n": {
@@ -420,6 +439,7 @@ export const Card_003 = withTemplateDefinition(
         type: "text",
         name: "Number",
         text: "0",
+        opacity: 1,
         style: {},
       },
       ".badge": {
@@ -429,6 +449,7 @@ export const Card_003 = withTemplateDefinition(
         type: "text",
         name: "Badge",
         text: "New",
+        opacity: 1,
         style: {},
       },
       ".media": {
@@ -439,6 +460,7 @@ export const Card_003 = withTemplateDefinition(
         name: "Media",
         src: "",
         alt: "",
+        opacity: 1,
         style: {},
       },
       ".date2": {
@@ -448,6 +470,7 @@ export const Card_003 = withTemplateDefinition(
         type: "text",
         name: "Date 2",
         text: "2021-01-01",
+        opacity: 1,
         style: {},
       },
       ".tags": {
@@ -457,6 +480,7 @@ export const Card_003 = withTemplateDefinition(
         type: "container",
         name: "Tags",
         expanded: false,
+        opacity: 1,
         style: {},
       },
     },
@@ -524,6 +548,7 @@ export const Hero_001 = withTemplateDefinition(
         type: "text",
         name: "Title",
         text: "Title",
+        opacity: 1,
         style: {},
       },
       ".p": {
@@ -533,6 +558,7 @@ export const Hero_001 = withTemplateDefinition(
         type: "text",
         name: "Description",
         text: "Description",
+        opacity: 1,
         style: {},
       },
       ".media": {
@@ -543,6 +569,7 @@ export const Hero_001 = withTemplateDefinition(
         name: "Media",
         src: "",
         alt: "",
+        opacity: 1,
         style: {},
       },
     },
@@ -590,6 +617,7 @@ export const Hero_002 = withTemplateDefinition(
         type: "text",
         name: "Title",
         text: "Title",
+        opacity: 1,
         style: {},
       },
       ".p": {
@@ -599,6 +627,7 @@ export const Hero_002 = withTemplateDefinition(
         type: "text",
         name: "Description",
         text: "Description",
+        opacity: 1,
         style: {},
       },
       ".media": {
@@ -609,6 +638,7 @@ export const Hero_002 = withTemplateDefinition(
         name: "Media",
         src: "",
         alt: "",
+        opacity: 1,
         style: {},
       },
     },
