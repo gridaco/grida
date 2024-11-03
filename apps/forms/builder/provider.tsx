@@ -147,14 +147,9 @@ export function useDocument() {
   const changeNodeComponent = useCallback(
     (node_id: string, component_id: string) => {
       dispatch({
-        type: "document/template/override/change/*",
-        // TODO: non-safe casting
-        template_instance_node_id: state.document.root_id!,
-        action: {
-          type: "node/change/component",
-          node_id: node_id,
-          component_id: component_id,
-        },
+        type: "node/change/component",
+        node_id: node_id,
+        component_id: component_id,
       });
     },
     [dispatch]
@@ -163,14 +158,9 @@ export function useDocument() {
   const changeNodeText = useCallback(
     (node_id: string, text?: Tokens.StringValueExpression) => {
       dispatch({
-        type: "document/template/override/change/*",
-        // TODO: non-safe casting
-        template_instance_node_id: state.document.root_id!,
-        action: {
-          type: "node/change/text",
-          node_id: node_id,
-          text,
-        },
+        type: "node/change/text",
+        node_id: node_id,
+        text,
       });
     },
     [dispatch]
@@ -179,14 +169,9 @@ export function useDocument() {
   const changeNodeActive = useCallback(
     (node_id: string, hidden: boolean) => {
       dispatch({
-        type: "document/template/override/change/*",
-        // TODO: non-safe casting
-        template_instance_node_id: state.document.root_id!,
-        action: {
-          type: "node/change/active",
-          node_id: node_id,
-          active: hidden,
-        },
+        type: "node/change/active",
+        node_id: node_id,
+        active: hidden,
       });
     },
     [dispatch]
@@ -195,14 +180,9 @@ export function useDocument() {
   const changeNodeSrc = useCallback(
     (node_id: string, src?: Tokens.StringValueExpression) => {
       dispatch({
-        type: "document/template/override/change/*",
-        // TODO: non-safe casting
-        template_instance_node_id: state.document.root_id!,
-        action: {
-          type: "node/change/src",
-          node_id: node_id,
-          src,
-        },
+        type: "node/change/src",
+        node_id: node_id,
+        src,
       });
     },
     [dispatch]
@@ -211,14 +191,9 @@ export function useDocument() {
   const changeNodeHref = useCallback(
     (node_id: string, href?: grida.program.nodes.i.IHrefable["href"]) => {
       dispatch({
-        type: "document/template/override/change/*",
-        // TODO: non-safe casting
-        template_instance_node_id: state.document.root_id!,
-        action: {
-          type: "node/change/href",
-          node_id: node_id,
-          href,
-        },
+        type: "node/change/href",
+        node_id: node_id,
+        href,
       });
     },
     [dispatch]
@@ -227,14 +202,9 @@ export function useDocument() {
   const changeNodeTarget = useCallback(
     (node_id: string, target?: grida.program.nodes.i.IHrefable["target"]) => {
       dispatch({
-        type: "document/template/override/change/*",
-        // TODO: non-safe casting
-        template_instance_node_id: state.document.root_id!,
-        action: {
-          type: "node/change/target",
-          node_id: node_id,
-          target,
-        },
+        type: "node/change/target",
+        node_id: node_id,
+        target,
       });
     },
     [dispatch]
@@ -243,14 +213,9 @@ export function useDocument() {
   const changeNodeOpacity = useCallback(
     (node_id: string, opacity: number) => {
       dispatch({
-        type: "document/template/override/change/*",
-        // TODO: non-safe casting
-        template_instance_node_id: state.document.root_id!,
-        action: {
-          type: "node/change/opacity",
-          node_id: node_id,
-          opacity,
-        },
+        type: "node/change/opacity",
+        node_id: node_id,
+        opacity,
       });
     },
     [dispatch]
@@ -259,15 +224,10 @@ export function useDocument() {
   const changeNodeStyle = useCallback(
     (node_id: string, key: string, value: any) => {
       dispatch({
-        type: "document/template/override/change/*",
-        // TODO: non-safe casting
-        template_instance_node_id: state.document.root_id!,
-        action: {
-          type: "node/change/style",
-          node_id: node_id,
-          style: {
-            [key]: value,
-          },
+        type: "node/change/style",
+        node_id: node_id,
+        style: {
+          [key]: value,
         },
       });
     },
@@ -277,15 +237,10 @@ export function useDocument() {
   const changeNodeValue = useCallback(
     (node_id: string, key: string, value: any) => {
       dispatch({
-        type: "document/template/override/change/*",
-        // TODO: non-safe casting
-        template_instance_node_id: state.document.root_id!,
-        action: {
-          type: "node/change/props",
-          node_id: node_id,
-          props: {
-            [key]: value,
-          },
+        type: "node/change/props",
+        node_id: node_id,
+        props: {
+          [key]: value,
         },
       });
     },
@@ -429,6 +384,15 @@ export function useEventTarget() {
     [dispatch]
   );
 
+  const pointerUp = useCallback(
+    (event: PointerEvent) => {
+      dispatch({
+        type: "document/canvas/backend/html/event/on-pointer-up",
+      });
+    },
+    [dispatch]
+  );
+
   const dragNodeOverlayStart = useCallback(
     (node_id: string) => {
       dispatch({
@@ -512,6 +476,7 @@ export function useEventTarget() {
       //
       pointerMove,
       pointerDown,
+      pointerUp,
     };
   }, [
     hovered_node_id,
@@ -527,6 +492,7 @@ export function useEventTarget() {
     //
     pointerMove,
     pointerDown,
+    pointerUp,
   ]);
 }
 

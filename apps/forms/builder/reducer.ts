@@ -42,6 +42,14 @@ export default function reducer<S extends IDocumentEditorState>(
         draft.selected_node_id = selected_node_id;
       });
     }
+    case "document/canvas/backend/html/event/on-pointer-up": {
+      return produce(state, (draft) => {
+        // clear all trasform state
+
+        draft.is_gesture_node_drag_move = false;
+        draft.is_gesture_node_drag_resize = false;
+      });
+    }
     //
     case "document/canvas/backend/html/event/node-overlay/on-drag-start": {
       const { node_id } = <

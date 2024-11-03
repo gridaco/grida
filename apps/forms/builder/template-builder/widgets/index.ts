@@ -21,7 +21,7 @@ export namespace TemplateBuilderWidgets {
   export const Layout = LayoutWidget;
   // export const Link = LinkWidget;
   // export const RichText = RichTextWidget;
-  // export const Svg = SvgWidget;
+  export const svg = SvgWidget;
   export const text = TextWidget;
   export const image = ImageWidget;
   // export const Theme = ThemeWidget;

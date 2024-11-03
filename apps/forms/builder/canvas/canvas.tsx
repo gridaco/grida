@@ -45,6 +45,7 @@ export function CanvasOverlay() {
     is_node_transforming,
     pointerMove,
     pointerDown,
+    pointerUp,
   } = useEventTarget();
   const ref = useRef<HTMLDivElement>(null);
   const context = useContext(EventTargetContext);
@@ -70,6 +71,9 @@ export function CanvasOverlay() {
     },
     onPointerDown: ({ event }) => {
       pointerDown(event);
+    },
+    onPointerUp: ({ event }) => {
+      pointerUp(event);
     },
   });
 

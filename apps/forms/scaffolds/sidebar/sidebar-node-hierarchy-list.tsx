@@ -8,6 +8,7 @@ import {
   ComponentInstanceIcon,
   ImageIcon,
   TextIcon,
+  TransformIcon,
 } from "@radix-ui/react-icons";
 import { grida } from "@/grida";
 
@@ -69,6 +70,8 @@ function NodeHierarchyItemIcon({
       return <TextIcon className={className} />;
     case "instance":
       return <ComponentInstanceIcon className={className} />;
+    case "svg":
+      return <TransformIcon className={className} />;
   }
   return <BoxIcon className={className} />;
 }

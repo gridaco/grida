@@ -11,7 +11,7 @@ import assert from "assert";
 interface NodeElementProps<P extends Record<string, any>> {
   node_id: string;
   component?: TemplateComponent;
-  style?: React.CSSProperties;
+  style?: grida.program.css.ExplicitlySupportedCSSProperties;
 }
 
 export function NodeElement<P extends Record<string, any>>({
@@ -41,7 +41,8 @@ export function NodeElement<P extends Record<string, any>>({
       }
       case "container":
       case "image":
-      case "text": {
+      case "text":
+      case "svg": {
         return TemplateBuilderWidgets[node.type];
       }
       default:
@@ -66,10 +67,13 @@ export function NodeElement<P extends Record<string, any>>({
     );
   }, [USER_CHILDREN, children]);
 
-  const computedprops = {
+  const renderprops = {
     text: computed.text,
     props: computed.props,
     src: computed.src,
+    svg: node.svg,
+    opacity: node.opacity,
+    zIndex: node.zIndex,
     style: {
       ...style,
       ...node.style,
@@ -80,6 +84,9 @@ export function NodeElement<P extends Record<string, any>>({
     | grida.program.nodes.AnyNode;
 
   if (!node.active) return <></>;
+
+  const { opacity, zIndex, style: styles, ...props } = renderprops;
+
   return (
     <HrefWrapper href={computed.href} target={node.target}>
       {React.createElement<any>(
@@ -88,7 +95,7 @@ export function NodeElement<P extends Record<string, any>>({
         renderer,
         {
           id: node_id,
-          ...computedprops,
+          ...props,
           ...({
             ["data-grida-node-id"]: node_id,
             ["data-grida-node-type"]: node.type,
@@ -96,7 +103,9 @@ export function NodeElement<P extends Record<string, any>>({
             ["data-dev-editor-hovered"]: hovered,
           } satisfies grida.program.document.INodeHtmlDocumentQueryDataAttributes),
           style: {
-            ...computedprops.style,
+            opacity: opacity,
+            zIndex: zIndex,
+            ...styles,
             userSelect: document.editable ? "none" : undefined,
           } satisfies React.CSSProperties,
         },

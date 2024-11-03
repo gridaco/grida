@@ -4,6 +4,7 @@ import { grida } from "@/grida";
 export type BuilderAction =
   | DocumentEditorCanvasEventTargetHtmlBackendPointerMove
   | DocumentEditorCanvasEventTargetHtmlBackendPointerDown
+  | DocumentEditorCanvasEventTargetHtmlBackendPointerUp
   | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayDrag
   | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayDragStart
   | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayDragEnd
@@ -36,33 +37,37 @@ export type DocumentEditorCanvasEventTargetHtmlBackendPointerDown =
     type: "document/canvas/backend/html/event/on-pointer-down";
   };
 
+export type DocumentEditorCanvasEventTargetHtmlBackendPointerUp = {
+  type: "document/canvas/backend/html/event/on-pointer-up";
+};
 
 interface ICanvasEventTargetPointerEventDelta {
   delta: [number, number];
 }
 
 interface ICanvasEventTargetResizeHandleEvent {
-  anchor: 'nw' | 'ne' | 'sw' | 'se'
+  anchor: "nw" | "ne" | "sw" | "se";
 }
 
 /**
  * Payload when current node size is unknown and should change to known
- * 
+ *
  * This payload is required when changing node sizing mode to auto => fixed
  */
 interface IHtmlCanvasEventTargetCalculatedNodeSize {
   /**
    * client width and height are required for non-numeric sized node.
-   * 
+   *
    * when resizing a node with `width: 100%`  resize delta
    */
   client_wh: grida.program.nodes.i.IDimension;
 }
 
 export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayDrag =
-  INodeID & ICanvasEventTargetPointerEventDelta & {
-    type: "document/canvas/backend/html/event/node-overlay/on-drag";
-  };
+  INodeID &
+    ICanvasEventTargetPointerEventDelta & {
+      type: "document/canvas/backend/html/event/node-overlay/on-drag";
+    };
 
 export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayDragStart =
   INodeID & {
@@ -75,9 +80,10 @@ export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayDragEnd =
   };
 
 export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayResizeHandleDragStart =
-  INodeID & IHtmlCanvasEventTargetCalculatedNodeSize & {
-    type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-start";
-  };
+  INodeID &
+    IHtmlCanvasEventTargetCalculatedNodeSize & {
+      type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-start";
+    };
 
 export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayResizeHandleDragEnd =
   INodeID & {
@@ -85,11 +91,11 @@ export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayResizeHandleDra
   };
 
 export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayResizeHandleDrag =
-  INodeID & ICanvasEventTargetPointerEventDelta & ICanvasEventTargetResizeHandleEvent & {
-    type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag";
-  };
-
-
+  INodeID &
+    ICanvasEventTargetPointerEventDelta &
+    ICanvasEventTargetResizeHandleEvent & {
+      type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag";
+    };
 
 export interface DocumentEditorNodeSelectAction {
   type: "document/node/select";

@@ -381,6 +381,7 @@ export namespace grida {
         | TextNode
         | ImageNode
         | ContainerNode
+        | SvgNode
         // | SvgRectNode
         // | SvgCircleNode
         // | SvgEllipseNode
@@ -392,6 +393,7 @@ export namespace grida {
        */
       export type AnyNode = Omit<
         Partial<TextNode> &
+          Partial<SvgNode> &
           Partial<ImageNode> &
           Partial<ContainerNode> &
           Partial<InstanceNode> &
@@ -578,14 +580,15 @@ export namespace grida {
         //
       }
 
-      // export interface SvgNode
-      //   extends i.IBaseNode,
-      //     i.ISceneNode,
-      //     i.IStylable,
-      //     i.IHrefable,
-      //     i.IDimension {
-      //   type: "svg";
-      // }
+      export interface SvgNode
+        extends i.IBaseNode,
+          i.ISceneNode,
+          i.IHtmlBackendCSSStylable,
+          i.IHrefable,
+          i.IDimension {
+        type: "svg";
+        svg: string;
+      }
 
       // export interface SvgRectNode
       //   extends i.IBaseNode,
