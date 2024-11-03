@@ -10,6 +10,7 @@ import React, {
 import { useEventTarget } from "@/builder";
 import { useGesture } from "@use-gesture/react";
 import { grida } from "@/grida";
+import { useNodeDomElement } from "../provider";
 
 interface CanvasEventTargetContext {
   portal?: HTMLDivElement | null;
@@ -112,9 +113,7 @@ function NodeOverlay({
   } = useEventTarget();
 
   const portal = useCanvasOverlayPortal();
-  const node_element = useMemo(() => {
-    return document.getElementById(node_id);
-  }, [node_id]);
+  const node_element = useNodeDomElement(node_id);
 
   const portal_rect = portal?.getBoundingClientRect() ?? __rect_fallback;
   const node_element_rect =
@@ -135,7 +134,6 @@ function NodeOverlay({
       dragNodeOverlayEnd(node_id);
     },
     onDrag: (e) => {
-      console.log("dragging", e);
       dragNodeOverlay(node_id, e.delta);
     },
   });
@@ -155,50 +153,88 @@ function NodeOverlay({
       {!readonly && (
         <>
           {/* top left */}
-          <div
-            className="border bg-white border-workbench-accent-sky absolute top-0 left-0 z-10 pointer-events-auto"
-            style={{
-              width: 8,
-              height: 8,
-              transform: "translate(-50%, -50%)",
-              cursor: readonly ? "default" : "nwse-resize",
-            }}
-          />
+          <ResizeHandle anchor="nw" readonly={readonly} node_id={node_id} />
           {/* top right */}
-          <div
-            className="border bg-white border-workbench-accent-sky absolute top-0 right-0 z-10 pointer-events-auto"
-            style={{
-              width: 8,
-              height: 8,
-              transform: "translate(50%, -50%)",
-              cursor: readonly ? "default" : "nesw-resize",
-            }}
-          />
+          <ResizeHandle anchor="ne" readonly={readonly} node_id={node_id} />
           {/* bottom left */}
-          <div
-            className="border bg-white border-workbench-accent-sky absolute bottom-0 left-0 z-10 pointer-events-auto"
-            style={{
-              width: 8,
-              height: 8,
-              transform: "translate(-50%, 50%)",
-              cursor: readonly ? "default" : "nesw-resize",
-            }}
-          />
+          <ResizeHandle anchor="sw" readonly={readonly} node_id={node_id} />
           {/* bottom right */}
-          <div
-            className="border bg-white border-workbench-accent-sky absolute bottom-0 right-0 z-10 pointer-events-auto"
-            style={{
-              width: 8,
-              height: 8,
-              transform: "translate(50%, 50%)",
-              cursor: readonly ? "default" : "nwse-resize",
-            }}
-          />
+          <ResizeHandle anchor="se" readonly={readonly} node_id={node_id} />
         </>
       )}
     </div>
   );
 }
+
+function ResizeHandle({
+  node_id,
+  anchor,
+  readonly,
+  size = 8,
+}: {
+  node_id: string;
+  anchor: "nw" | "ne" | "sw" | "se";
+  readonly: boolean;
+  size?: number;
+}) {
+  const { dragResizeHandleStart, dragResizeHandleEnd, dragResizeHandle } =
+    useEventTarget();
+
+  const node_element = useNodeDomElement(node_id);
+
+  const bind = useGesture(
+    {
+      onDragStart: (e) => {
+        e.event.stopPropagation();
+        if (!node_element) return;
+        const rect = node_element.getBoundingClientRect();
+
+        dragResizeHandleStart(node_id, {
+          width: rect.width,
+          height: rect.height,
+        });
+      },
+      onDragEnd: (e) => {
+        e.event.stopPropagation();
+        dragResizeHandleEnd(node_id);
+      },
+      onDrag: (e) => {
+        e.event.stopPropagation();
+        dragResizeHandle(node_id, anchor, e.delta);
+      },
+    },
+    {
+      eventOptions: {
+        passive: false,
+        capture: true,
+      },
+    }
+  );
+
+  return (
+    <div
+      {...bind()}
+      className="border bg-white border-workbench-accent-sky absolute z-10 pointer-events-auto"
+      style={{
+        top: anchor[0] === "n" ? 0 : "auto",
+        bottom: anchor[0] === "s" ? 0 : "auto",
+        left: anchor[1] === "w" ? 0 : "auto",
+        right: anchor[1] === "e" ? 0 : "auto",
+        width: size,
+        height: size,
+        transform: `translate(${anchor[1] === "w" ? "-50%" : "50%"}, ${anchor[0] === "n" ? "-50%" : "50%"})`,
+        cursor: readonly ? "default" : __resize_handle_cursor_map[anchor],
+      }}
+    />
+  );
+}
+
+const __resize_handle_cursor_map = {
+  nw: "nwse-resize",
+  ne: "nesw-resize",
+  sw: "nesw-resize",
+  se: "nwse-resize",
+};
 
 export function useCanvasOverlayPortal() {
   const context = useContext(EventTargetContext);

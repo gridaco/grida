@@ -28,7 +28,7 @@ export default function reducer<S extends IDocumentEditorState>(
     case "document/canvas/backend/html/event/on-pointer-move": {
       const { node_ids_from_point } = <
         DocumentEditorCanvasEventTargetHtmlBackendPointerMove
-        >action;
+      >action;
       return produce(state, (draft) => {
         draft.hovered_node_id = node_ids_from_point[0];
       });
@@ -36,30 +36,36 @@ export default function reducer<S extends IDocumentEditorState>(
     case "document/canvas/backend/html/event/on-pointer-down": {
       const { node_ids_from_point } = <
         DocumentEditorCanvasEventTargetHtmlBackendPointerDown
-        >action;
+      >action;
       return produce(state, (draft) => {
         const selected_node_id = node_ids_from_point[0];
         draft.selected_node_id = selected_node_id;
       });
     }
+    //
     case "document/canvas/backend/html/event/node-overlay/on-drag-start": {
       const { node_id } = <
         DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayDragStart
-        >action;
+      >action;
       return produce(state, (draft) => {
-        draft.is_node_transforming = true;
+        draft.is_gesture_node_drag_move = true;
+        draft.is_gesture_node_drag_resize = false;
         draft.selected_node_id = node_id;
       });
     }
     case "document/canvas/backend/html/event/node-overlay/on-drag-end": {
       return produce(state, (draft) => {
-        draft.is_node_transforming = false;
+        draft.is_gesture_node_drag_move = false;
       });
     }
     case "document/canvas/backend/html/event/node-overlay/on-drag": {
       const { node_id, delta } = <
         DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayDrag
-        >action;
+      >action;
+
+      // cancel if invalid state
+      if (!state.is_gesture_node_drag_move) return state;
+
       return produce(state, (draft) => {
         const node = draft.document.nodes[node_id];
         if (
@@ -81,41 +87,57 @@ export default function reducer<S extends IDocumentEditorState>(
       });
     }
     // #region resize handle event
-    case 'document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-start': {
+    case "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-start": {
       const { node_id, client_wh } = action;
-      // 
+      //
 
       return produce(state, (draft) => {
+        draft.is_gesture_node_drag_resize = true;
+        draft.is_gesture_node_drag_move = false;
+
         // need to assign a fixed size if width or height is a variable length
         const node = draft.document.nodes[node_id];
-        (node as grida.program.nodes.i.IHtmlBackendCSSStylable).style.width = client_wh.width;
-        (node as grida.program.nodes.i.IHtmlBackendCSSStylable).style.height = client_wh.height;
+        (node as grida.program.nodes.i.IHtmlBackendCSSStylable).style.width =
+          client_wh.width;
+        (node as grida.program.nodes.i.IHtmlBackendCSSStylable).style.height =
+          client_wh.height;
       });
     }
-    case 'document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-end': {
-      // 
-      break;
+    case "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-end": {
+      return produce(state, (draft) => {
+        draft.is_gesture_node_drag_resize = false;
+      });
     }
-    case 'document/canvas/backend/html/event/node-overlay/resize-handle/on-drag': {
+    case "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag": {
       const { node_id, anchor, delta } = action;
       const [dx, dy] = delta;
+
+      // cancel if invalid state
+      if (!state.is_gesture_node_drag_resize) return state;
+
       return produce(state, (draft) => {
         // once the node's measurement mode is set to fixed (from drag start), we may safely cast the width / height sa fixed number
         const node = draft.document.nodes[node_id];
 
-        // TODO: calculate the final delta based on anchor and movement delta 
+        // TODO: calculate the final delta based on anchor and movement delta
         switch (anchor) {
-          case 'ne': { }
-          case 'nw': { }
-          case 'se': { }
-          case 'sw': { }
+          case "ne": {
+          }
+          case "nw": {
+          }
+          case "se": {
+          }
+          case "sw": {
+          }
         }
 
-        ((node as grida.program.nodes.i.IHtmlBackendCSSStylable).style.width as number) += dx;
-        ((node as grida.program.nodes.i.IHtmlBackendCSSStylable).style.height as number) += dy;
+        ((node as grida.program.nodes.i.IHtmlBackendCSSStylable).style
+          .width as number) += dx;
+        ((node as grida.program.nodes.i.IHtmlBackendCSSStylable).style
+          .height as number) += dy;
       });
-      // 
-      // 
+      //
+      //
     }
     // #endregion resize handle event
 
@@ -184,7 +206,7 @@ export default function reducer<S extends IDocumentEditorState>(
     case "document/template/override/change/*": {
       const { template_instance_node_id, action: __action } = <
         TemplateNodeOverrideChangeAction
-        >action;
+      >action;
 
       return produce(state, (draft) => {
         const { node_id } = __action;
@@ -193,7 +215,7 @@ export default function reducer<S extends IDocumentEditorState>(
 
         assert(
           template_instance_node &&
-          template_instance_node.type === "template_instance"
+            template_instance_node.type === "template_instance"
         );
 
         const nodedata = template_instance_node.overrides[node_id] || {};

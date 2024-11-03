@@ -7,7 +7,20 @@ export type DocumentDispatcher = (action: BuilderAction) => void;
 export interface IDocumentEditorInteractionCursorState {
   selected_node_id?: string;
   hovered_node_id?: string;
-  is_node_transforming?: boolean;
+
+  /**
+   * @private - internal use only
+   *
+   * is gesture node-move and should hide the overlay ui
+   */
+  is_gesture_node_drag_move?: boolean;
+
+  /**
+   * @private - internal use only
+   *
+   * is gesture node-resize
+   */
+  is_gesture_node_drag_resize?: boolean;
 }
 
 export interface IDocumentEditorState

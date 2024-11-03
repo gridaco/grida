@@ -393,7 +393,11 @@ export function useDocument() {
 export function useEventTarget() {
   const [state, dispatch] = useInternal();
 
-  const { is_node_transforming, hovered_node_id, selected_node_id } = state;
+  const {
+    is_gesture_node_drag_move: is_node_transforming,
+    hovered_node_id,
+    selected_node_id,
+  } = state;
 
   const pointerMove = useCallback(
     (event: PointerEvent) => {
@@ -456,6 +460,43 @@ export function useEventTarget() {
     [dispatch]
   );
 
+  // #region drag resize handle
+  const dragResizeHandleStart = useCallback(
+    (node_id: string, client_wh: { width: number; height: number }) => {
+      dispatch({
+        type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-start",
+        node_id,
+        client_wh,
+      });
+    },
+    [dispatch]
+  );
+  const dragResizeHandleEnd = useCallback(
+    (node_id: string) => {
+      dispatch({
+        type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-end",
+        node_id,
+      });
+    },
+    [dispatch]
+  );
+  const dragResizeHandle = useCallback(
+    (
+      node_id: string,
+      anchor: "nw" | "ne" | "sw" | "se",
+      delta: [number, number]
+    ) => {
+      dispatch({
+        type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag",
+        node_id,
+        anchor,
+        delta,
+      });
+    },
+    [dispatch]
+  );
+  // #endregion drag resize handle
+
   return useMemo(() => {
     return {
       hovered_node_id,
@@ -464,6 +505,11 @@ export function useEventTarget() {
       dragNodeOverlayStart,
       dragNodeOverlayEnd,
       dragNodeOverlay,
+      //
+      dragResizeHandleStart,
+      dragResizeHandleEnd,
+      dragResizeHandle,
+      //
       pointerMove,
       pointerDown,
     };
@@ -474,6 +520,11 @@ export function useEventTarget() {
     dragNodeOverlayStart,
     dragNodeOverlayEnd,
     dragNodeOverlay,
+    //
+    dragResizeHandleStart,
+    dragResizeHandleEnd,
+    dragResizeHandle,
+    //
     pointerMove,
     pointerDown,
   ]);
@@ -598,4 +649,10 @@ export function useTemplateDefinition(template_id: string) {
   } = useDocument();
 
   return templates![template_id];
+}
+
+export function useNodeDomElement(node_id: string) {
+  return useMemo(() => {
+    return document.getElementById(node_id);
+  }, [node_id]);
 }
