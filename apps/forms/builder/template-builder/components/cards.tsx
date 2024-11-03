@@ -36,7 +36,7 @@ export const Card_001 = withTemplateDefinition(
     return (
       <Card
         className="group relative overflow-hidden rounded-lg shadow-lg transition-all hover:shadow-xl"
-        style={style}
+        style={grida.program.css.toReactCSSProperties(style)}
       >
         <div className="flex overflow-hidden rounded-t-lg">
           {badge && (
@@ -195,7 +195,7 @@ export const Card_002 = withTemplateDefinition(
     return (
       <Card
         className="relative overflow-hidden flex-1 flex flex-col justify-end gap-6 text-foreground w-auto aspect-[4/4]"
-        style={style}
+        style={grida.program.css.toReactCSSProperties(style)}
       >
         <Media
           type={media.type}
@@ -343,7 +343,10 @@ export const Card_003 = withTemplateDefinition(
     style,
   }: CardMasterProps) => {
     return (
-      <Card className="p-4" style={style}>
+      <Card
+        className="p-4"
+        style={grida.program.css.toReactCSSProperties(style)}
+      >
         <NodeElement
           node_id="root"
           style={{
@@ -382,14 +385,12 @@ export const Card_003 = withTemplateDefinition(
           </div>
           <NodeElement
             node_id="media-layout"
-            style={
-              {
-                width: 80,
-                height: 80,
-                borderRadius: 8,
-                overflow: "hidden",
-              } satisfies React.CSSProperties
-            }
+            style={{
+              width: 80,
+              height: 80,
+              borderRadius: 8,
+              // overflow: "hidden",
+            }}
           >
             <Media
               type={media.type}
@@ -530,7 +531,7 @@ type HeroCardMasterProps =
 export const Hero_001 = withTemplateDefinition(
   function Hero_001({ props: { h1, p, media }, style }: HeroCardMasterProps) {
     return (
-      <header style={style}>
+      <header style={grida.program.css.toReactCSSProperties(style)}>
         <div className="relative">
           <Media
             type={media.type}
@@ -609,7 +610,10 @@ export const Hero_001 = withTemplateDefinition(
 export const Hero_002 = withTemplateDefinition(
   function Hero_002({ props: { h1, p, media }, style }: HeroCardMasterProps) {
     return (
-      <header style={style} className="relative aspect-[3/4]">
+      <header
+        style={grida.program.css.toReactCSSProperties(style)}
+        className="relative aspect-[3/4]"
+      >
         {media && (
           <Media
             type={media.type}

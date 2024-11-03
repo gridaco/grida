@@ -40,6 +40,7 @@ import { ExportNodeWithHtmlToImage } from "./controls/export";
 import { useComputedNode, useDocument, useNode } from "@/builder";
 import assert from "assert";
 import { grida } from "@/grida";
+import { BackgroundColorControl } from "./controls/background-color";
 
 export function SelectedNodeProperties() {
   const { state: document, selectedNode } = useDocument();
@@ -66,6 +67,8 @@ export function SelectedNodeProperties() {
     fontWeight,
     fontSize,
     textAlign,
+    //
+    backgroundColor,
     //
     boxShadow,
     //
@@ -290,13 +293,15 @@ export function SelectedNodeProperties() {
               onValueChange={selectedNode.border}
             />
           </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Background</PropertyLineLabel>
-            <BackgroundControl
-            // value={}
-            // onValueChange={}
-            />
-          </PropertyLine>
+          {backgroundColor && (
+            <PropertyLine>
+              <PropertyLineLabel>Background Color</PropertyLineLabel>
+              <BackgroundColorControl
+                value={backgroundColor}
+                onValueChange={selectedNode.backgroundColor}
+              />
+            </PropertyLine>
+          )}
           <PropertyLine>
             <PropertyLineLabel>Shadow</PropertyLineLabel>
             <BoxShadowControl

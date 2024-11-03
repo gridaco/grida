@@ -83,7 +83,8 @@ function Consumer() {
           node_id="003.background"
           style={{
             position: "absolute",
-            inset: 0,
+            left: 0,
+            top: 0,
             objectFit: "cover",
             width: "100%",
             height: "100%",

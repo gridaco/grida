@@ -33,7 +33,7 @@ export default {
         position: "relative",
         width: 960,
         height: 540,
-        backgroundColor: "white",
+        backgroundColor: { r: 255, g: 255, b: 255, a: 1 },
         boxShadow: "0 0 10px rgba(0,0,0,0.1)",
       },
       children: ["h1", "p", "sticker_1", "sticker_2", "background"],

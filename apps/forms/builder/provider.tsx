@@ -222,7 +222,11 @@ export function useDocument() {
   );
 
   const changeNodeStyle = useCallback(
-    (node_id: string, key: string, value: any) => {
+    (
+      node_id: string,
+      key: keyof grida.program.css.ExplicitlySupportedCSSProperties,
+      value: any
+    ) => {
       dispatch({
         type: "node/change/style",
         node_id: node_id,
@@ -254,8 +258,10 @@ export function useDocument() {
         changeNodeComponent(selected_node_id!, component_id),
       text: (text?: Tokens.StringValueExpression) =>
         changeNodeText(selected_node_id!, text),
-      style: (key: string, value: any) =>
-        changeNodeStyle(selected_node_id!, key, value),
+      style: (
+        key: keyof grida.program.css.ExplicitlySupportedCSSProperties,
+        value: any
+      ) => changeNodeStyle(selected_node_id!, key, value),
       value: (key: string, value: any) =>
         changeNodeValue(selected_node_id!, key, value),
       // attributes
@@ -289,6 +295,8 @@ export function useDocument() {
         changeNodeStyle(selected_node_id!, "borderWidth", value.borderWidth),
       boxShadow: (value?: any) =>
         changeNodeStyle(selected_node_id!, "boxShadow", value.boxShadow),
+      backgroundColor: (value?: grida.program.css.RGBA) =>
+        changeNodeStyle(selected_node_id!, "backgroundColor", value),
       gap: (value?: number) => changeNodeStyle(selected_node_id!, "gap", value),
       flexDirection: (value?: string) =>
         changeNodeStyle(selected_node_id!, "flexDirection", value),

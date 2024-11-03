@@ -9,7 +9,7 @@ export const ImageWidget = ({
   height,
   style,
   ...props
-}: grida.program.document.INodeWithHtmlDocumentQueryDataAttributes<grida.program.nodes.ImageNode>) => {
+}: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.ImageNode>) => {
   const { objectFit, objectPosition, ...divStyles } = style || {};
   const data_attributes = {
     "data-grida-node-id": props["data-grida-node-id"],

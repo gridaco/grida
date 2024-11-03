@@ -9,14 +9,14 @@ export function Header_001({ logo }: { logo?: string }) {
       node_id="header"
       // component={TemplateBuilderWidgets.flex}
       style={{
-        backgroundColor: "transparent",
+        backgroundColor: { r: 0, g: 0, b: 0, a: 0 },
         top: 0,
         left: 0,
-        right: 0,
+        // right: 0,
         justifyContent: "center",
         alignItems: "center",
         padding: 16,
-        zIndex: 10,
+        // zIndex: 10,
       }}
     >
       <NodeElement

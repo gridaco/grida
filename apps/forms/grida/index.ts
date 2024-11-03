@@ -265,9 +265,17 @@ export namespace grida {
        *
        * grida canvas overlay will use these attributes to determine if the raycasted element is a valid node.
        */
-      export type INodeWithHtmlDocumentQueryDataAttributes<
-        N extends nodes.Node,
-      > = INodeHtmlDocumentQueryDataAttributes & N;
+      type INodeWithHtmlDocumentQueryDataAttributes<N extends nodes.Node> =
+        INodeHtmlDocumentQueryDataAttributes & N;
+
+      /**
+       * final props that matches the react rendering signature
+       */
+      export type IComputedNodeReactRenderProps<N extends nodes.Node> =
+        INodeWithHtmlDocumentQueryDataAttributes<N> & {
+          style: React.CSSProperties;
+          //
+        };
 
       export namespace template {
         export interface IUserDefinedTemplateNodeReactComponentRenderProps<P>
@@ -304,6 +312,8 @@ export namespace grida {
     }
 
     export namespace css {
+      export type RGBA = { r: number; g: number; b: number; a: number };
+
       /**
        * CSS properties that is supported via the standard editor
        *
@@ -351,8 +361,6 @@ export namespace grida {
         //
         | "boxShadow"
         //
-        | "backgroundColor"
-        //
         | "borderRadius"
         | "borderWidth"
         //
@@ -372,7 +380,21 @@ export namespace grida {
         //
         | "objectFit"
         | "objectPosition"
-      >;
+      > & {
+        backgroundColor?: css.RGBA;
+      };
+
+      export function toReactCSSProperties(
+        style: ExplicitlySupportedCSSProperties
+      ): React.CSSProperties {
+        const { backgroundColor, ...styles } = style;
+        return {
+          ...styles,
+          backgroundColor: backgroundColor
+            ? `rgba(${backgroundColor.r}, ${backgroundColor.g}, ${backgroundColor.b}, ${backgroundColor.a})`
+            : undefined,
+        };
+      }
     }
 
     export namespace nodes {

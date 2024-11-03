@@ -6,7 +6,7 @@ export function SvgWidget({
   height,
   style,
   ...props
-}: grida.program.nodes.SvgNode) {
+}: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.SvgNode>) {
   return (
     <svg
       {...props}

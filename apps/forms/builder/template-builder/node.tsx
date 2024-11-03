@@ -12,12 +12,14 @@ interface NodeElementProps<P extends Record<string, any>> {
   node_id: string;
   component?: TemplateComponent;
   style?: grida.program.css.ExplicitlySupportedCSSProperties;
+  zIndex?: number;
 }
 
 export function NodeElement<P extends Record<string, any>>({
   node_id,
   component: USER_COMPONENT,
   children: USER_CHILDREN,
+  zIndex: DEFAULT_ZINDEX,
   style,
 }: React.PropsWithChildren<NodeElementProps<P>>) {
   const { state: document, selected_node_id } = useDocument();
@@ -73,7 +75,7 @@ export function NodeElement<P extends Record<string, any>>({
     src: computed.src,
     svg: node.svg,
     opacity: node.opacity,
-    zIndex: node.zIndex,
+    zIndex: DEFAULT_ZINDEX ?? node.zIndex,
     style: {
       ...style,
       ...node.style,
@@ -105,10 +107,13 @@ export function NodeElement<P extends Record<string, any>>({
           style: {
             opacity: opacity,
             zIndex: zIndex,
-            ...styles,
+            ...grida.program.css.toReactCSSProperties({
+              ...styles,
+            }),
+            // hard override user-select
             userSelect: document.editable ? "none" : undefined,
-          } satisfies React.CSSProperties,
-        },
+          },
+        } satisfies grida.program.document.IComputedNodeReactRenderProps<any>,
         computedchildren
       )}
     </HrefWrapper>
