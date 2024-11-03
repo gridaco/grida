@@ -1,7 +1,12 @@
 "use client";
 
 import React, { useReducer, useState } from "react";
-import { SidebarRoot } from "@/components/sidebar";
+import {
+  SidebarRoot,
+  SidebarSection,
+  SidebarSectionHeaderItem,
+  SidebarSectionHeaderLabel,
+} from "@/components/sidebar";
 import { SelectedNodeProperties } from "@/scaffolds/sidecontrol/sidecontrol-selected-node";
 import { NodeHierarchyList } from "@/scaffolds/sidebar/sidebar-node-hierarchy-list";
 import {
@@ -13,6 +18,13 @@ import {
   type IDocumentEditorState,
 } from "@/builder";
 import documentjson from "./document";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function CanvasPlaygroundPage() {
   const [state, dispatch] = useReducer(standaloneDocumentReducer, {
@@ -26,7 +38,16 @@ export default function CanvasPlaygroundPage() {
         <div className="flex w-full h-full">
           <aside>
             <SidebarRoot>
-              <NodeHierarchyList />
+              <SidebarSection className="mt-4">
+                <ExampleSelection />
+              </SidebarSection>
+              <hr />
+              <SidebarSection>
+                <SidebarSectionHeaderItem>
+                  <SidebarSectionHeaderLabel>Layers</SidebarSectionHeaderLabel>
+                </SidebarSectionHeaderItem>
+                <NodeHierarchyList />
+              </SidebarSection>
             </SidebarRoot>
           </aside>
           <div className="w-full h-full">
@@ -47,5 +68,18 @@ export default function CanvasPlaygroundPage() {
         </div>
       </StandaloneDocumentEditor>
     </main>
+  );
+}
+
+function ExampleSelection() {
+  return (
+    <Select>
+      <SelectTrigger>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="1">1</SelectItem>
+      </SelectContent>
+    </Select>
   );
 }

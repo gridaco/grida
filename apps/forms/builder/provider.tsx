@@ -277,12 +277,16 @@ export function useDocument() {
       opacity: (value: number) => changeNodeOpacity(selected_node_id!, value),
 
       // style
+      fontFamily: (value: string) =>
+        changeNodeStyle(selected_node_id!, "fontFamily", value),
       fontWeight: (value: number) =>
         changeNodeStyle(selected_node_id!, "fontWeight", value),
       fontSize: (value?: number) =>
         changeNodeStyle(selected_node_id!, "fontSize", value),
       textAlign: (value: string) =>
         changeNodeStyle(selected_node_id!, "textAlign", value),
+      textColor: (value: grida.program.css.RGBA) =>
+        changeNodeStyle(selected_node_id!, "textColor", value),
       borderRadius: (value?: number) =>
         changeNodeStyle(selected_node_id!, "borderRadius", value),
       margin: (value?: number) =>

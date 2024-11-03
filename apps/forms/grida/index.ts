@@ -351,7 +351,6 @@ export namespace grida {
         | "top"
         | "left"
         //
-        | "color"
         | "fontWeight"
         | "fontFamily"
         | "fontSize"
@@ -382,6 +381,7 @@ export namespace grida {
         | "objectPosition"
       > & {
         backgroundColor?: css.RGBA;
+        textColor?: css.RGBA;
       };
 
       export function toReactCSSProperties(
@@ -392,6 +392,9 @@ export namespace grida {
           ...styles,
           backgroundColor: backgroundColor
             ? `rgba(${backgroundColor.r}, ${backgroundColor.g}, ${backgroundColor.b}, ${backgroundColor.a})`
+            : undefined,
+          color: style.textColor
+            ? `rgba(${style.textColor.r}, ${style.textColor.g}, ${style.textColor.b}, ${style.textColor.a})`
             : undefined,
         };
       }

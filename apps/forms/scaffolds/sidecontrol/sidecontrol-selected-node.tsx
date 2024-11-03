@@ -41,6 +41,8 @@ import { useComputedNode, useDocument, useNode } from "@/builder";
 import assert from "assert";
 import { grida } from "@/grida";
 import { BackgroundColorControl } from "./controls/background-color";
+import { FontFamilyControl } from "./controls/font-family";
+import { TextColorControl } from "./controls/text-color";
 
 export function SelectedNodeProperties() {
   const { state: document, selectedNode } = useDocument();
@@ -64,9 +66,11 @@ export function SelectedNodeProperties() {
   const is_stylable = type !== "template_instance";
 
   const {
+    fontFamily,
     fontWeight,
     fontSize,
     textAlign,
+    textColor,
     //
     backgroundColor,
     //
@@ -187,6 +191,13 @@ export function SelectedNodeProperties() {
             />
           </PropertyLine>
           <PropertyLine>
+            <PropertyLineLabel>Font</PropertyLineLabel>
+            <FontFamilyControl
+              value={fontFamily as any}
+              onValueChange={selectedNode.fontFamily}
+            />
+          </PropertyLine>
+          <PropertyLine>
             <PropertyLineLabel>Weight</PropertyLineLabel>
             <FontWeightControl
               value={fontWeight as any}
@@ -207,6 +218,15 @@ export function SelectedNodeProperties() {
               onValueChange={selectedNode.textAlign}
             />
           </PropertyLine>
+          {textColor && (
+            <PropertyLine>
+              <PropertyLineLabel>Color</PropertyLineLabel>
+              <TextColorControl
+                value={textColor}
+                onValueChange={selectedNode.textColor}
+              />
+            </PropertyLine>
+          )}
         </SidebarMenuSectionContent>
       </SidebarSection>
       <SidebarSection hidden={!is_image} className="border-b pb-4">

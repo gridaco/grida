@@ -145,13 +145,14 @@ function NodeOverlay({
   return (
     <div
       {...bind()}
-      className="pointer-events-auto select-none z-10 border-2 border-workbench-accent-sky relative"
+      className="pointer-events-auto select-none border-2 border-workbench-accent-sky relative"
       style={{
         position: "absolute",
         top: top,
         left: left,
         width: width,
         height: height,
+        zIndex: readonly ? 1 : 2,
       }}
     >
       {!readonly && (

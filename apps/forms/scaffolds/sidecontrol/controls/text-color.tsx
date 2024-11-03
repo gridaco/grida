@@ -1,6 +1,6 @@
 import { RGBAColorControl, RGBAColorControlProps } from "./color";
 
-export function BackgroundColorControl({
+export function TextColorControl({
   value,
   onValueChange,
 }: RGBAColorControlProps) {
