@@ -1,9 +1,5 @@
+import { GoogleFontsPreview } from "@/builder/components/google-fonts";
 import { fonts } from "@/builder/k/fonts.min";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -53,53 +49,12 @@ export function FontFamilyControl({
       <SelectContent>
         {list.map((font) => (
           <SelectItem key={font.name} value={font.name}>
-            <GoogleFontView fontFamily={font.name}>{font.name}</GoogleFontView>
+            <GoogleFontsPreview fontFamily={font.name}>
+              {font.name}
+            </GoogleFontsPreview>
           </SelectItem>
         ))}
       </SelectContent>
     </Select>
-  );
-}
-
-function GoogleFontView({
-  fontFamily,
-  fontWeight,
-  children = <>Ag</>,
-}: React.PropsWithChildren<{
-  fontFamily: React.CSSProperties["fontFamily"];
-  fontWeight?: React.CSSProperties["fontWeight"];
-}>) {
-  const [fontLoaded, setFontLoaded] = useState(false);
-
-  useEffect(() => {
-    // Load the font dynamically using the Google Fonts API
-    const link = document.createElement("link");
-    const href = `https://fonts.googleapis.com/css2?family=${fontFamily!.replace(
-      " ",
-      "+"
-    )}:wght@400&display=swap`;
-    // console.log(href);
-    link.href = href;
-    link.rel = "stylesheet";
-    document.head.appendChild(link);
-
-    link.onload = () => {
-      setFontLoaded(true);
-    };
-
-    return () => {
-      document.head.removeChild(link);
-    };
-  }, [fontFamily]);
-
-  return (
-    <span
-      style={{
-        fontFamily,
-        fontWeight,
-      }}
-    >
-      {children}
-    </span>
   );
 }
