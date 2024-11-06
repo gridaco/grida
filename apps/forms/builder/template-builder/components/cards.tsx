@@ -388,7 +388,7 @@ export const Card_003 = withTemplateDefinition(
             style={{
               width: 80,
               height: 80,
-              borderRadius: 8,
+              // borderRadius: 8,
               // overflow: "hidden",
             }}
           >

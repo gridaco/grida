@@ -47,4 +47,8 @@ export const fonts: FontFamilyInfo[] = [
     name: "Pretendard",
     provider: "fonts.google.com",
   },
+  {
+    name: "Nanum Myeongjo",
+    provider: "fonts.google.com",
+  },
 ];

@@ -281,7 +281,7 @@ export namespace grida {
         export interface IUserDefinedTemplateNodeReactComponentRenderProps<P>
           extends nodes.i.IBaseNode,
             nodes.i.ISceneNode,
-            nodes.i.IHtmlBackendCSSStylable,
+            nodes.i.ICSSStylable,
             nodes.i.IExpandable {
           props: P;
         }
@@ -308,6 +308,52 @@ export namespace grida {
           nodes.NodeID,
           Partial<nodes.Node> | undefined
         >;
+      }
+    }
+
+    export namespace svg {
+      export namespace d {
+        /**
+         * Generates an SVG path with rounded corners for a rectangle.
+         *
+         * since the `rx` and `ry` attributes of the `<rect>` element in SVG do not support individual corner radii, this function generates a path with individual corner radii.
+         *
+         * @param width - The width of the rectangle.
+         * @param height - The height of the rectangle.
+         * @param cornerRadius - The radius of each corner, either as a uniform number or an object specifying individual corner radii.
+         * @returns The SVG path data string (`d` attribute) representing a rectangle with rounded corners.
+         */
+        export function generateRoundedRectPath(
+          width: number,
+          height: number,
+          cornerRadius: nodes.i.IRectangleCorner["cornerRadius"]
+        ): string {
+          const {
+            topLeftRadius = 0,
+            topRightRadius = 0,
+            bottomLeftRadius = 0,
+            bottomRightRadius = 0,
+          } = typeof cornerRadius === "number"
+            ? {
+                topLeftRadius: cornerRadius,
+                topRightRadius: cornerRadius,
+                bottomLeftRadius: cornerRadius,
+                bottomRightRadius: cornerRadius,
+              }
+            : cornerRadius;
+
+          return `
+      M${topLeftRadius},0 
+      H${width - topRightRadius} 
+      Q${width},0 ${width},${topRightRadius} 
+      V${height - bottomRightRadius} 
+      Q${width},${height} ${width - bottomRightRadius},${height} 
+      H${bottomLeftRadius} 
+      Q0,${height} 0,${height - bottomLeftRadius} 
+      V${topLeftRadius} 
+      Q0,0 ${topLeftRadius},0
+    `;
+        }
       }
     }
 
@@ -360,7 +406,6 @@ export namespace grida {
         //
         | "boxShadow"
         //
-        | "borderRadius"
         | "borderWidth"
         //
         | "margin"
@@ -398,6 +443,58 @@ export namespace grida {
             : undefined,
         };
       }
+
+      export function toRGBAString(rgba: css.RGBA): string {
+        return `rgba(${rgba.r}, ${rgba.g}, ${rgba.b}, ${rgba.a})`;
+      }
+    }
+
+    /**
+     * Core Graphics
+     */
+    export namespace cg {
+      //
+      //
+
+      export type FilterEffects = FeDropShadow | FeGaussianBlur;
+
+      /**
+       *
+       *
+       * @see https://developer.mozilla.org/en-US/docs/Web/SVG/Element/feDropShadow
+       */
+      export type FeDropShadow = {
+        type: "drop_shadow";
+
+        /**
+         * offset-x
+         */
+        dx: number;
+
+        /**
+         * offset-y
+         */
+        dy: number;
+
+        /**
+         * blur radius
+         *
+         * a.k.a. stdDeviation in SVG <feDropShadow>
+         */
+        blur: number;
+        //
+      };
+
+      export type FeGaussianBlur = {
+        type: "blur";
+
+        /**
+         * blur radius
+         *
+         * a.k.a. stdDeviation in SVG <feGaussianBlur>
+         */
+        radius: number;
+      };
     }
 
     export namespace nodes {
@@ -407,9 +504,8 @@ export namespace grida {
         | ImageNode
         | ContainerNode
         | SvgNode
-        // | SvgRectNode
-        // | SvgCircleNode
-        // | SvgEllipseNode
+        | RectangleNode
+        | EllipseNode
         | InstanceNode
         | TemplateInstanceNode;
 
@@ -419,6 +515,7 @@ export namespace grida {
       export type AnyNode = Omit<
         Partial<TextNode> &
           Partial<SvgNode> &
+          Partial<RectangleNode> &
           Partial<ImageNode> &
           Partial<ContainerNode> &
           Partial<InstanceNode> &
@@ -428,7 +525,7 @@ export namespace grida {
         readonly type: Node["type"];
       } & i.IBaseNode &
         i.ISceneNode &
-        i.IHtmlBackendCSSStylable;
+        i.ICSSStylable;
 
       export namespace i {
         export interface IBaseNode {
@@ -503,15 +600,48 @@ export namespace grida {
           expanded: boolean;
         }
 
+        /**
+         * Node that can be exported
+         *
+         * @deprecated - not ready - do not use in production
+         */
+        export interface IExportable {}
+
+        /**
+         * Rectangle Corner
+         */
+        export interface IRectangleCorner {
+          cornerRadius:
+            | number
+            | {
+                topLeftRadius: number;
+                topRightRadius: number;
+                bottomLeftRadius: number;
+                bottomRightRadius: number;
+              };
+        }
+
         export interface IChildren {
           children?: NodeID[];
+        }
+
+        /**
+         * Node that can be filled with color - such as rectangle, ellipse, etc.
+         */
+        export interface IFill {
+          fill: css.RGBA;
+        }
+
+        export interface IEffects {
+          //
+          effects: Array<cg.FilterEffects>;
         }
 
         export interface IStylable<S extends Record<string, unknown>> {
           style: S;
         }
 
-        export interface IHtmlBackendCSSStylable
+        export interface ICSSStylable
           extends IStylable<css.ExplicitlySupportedCSSProperties>,
             IOpacity,
             IZIndex {
@@ -529,6 +659,14 @@ export namespace grida {
         export interface IDimension {
           width: number;
           height: number;
+        }
+
+        /**
+         * does not represent any specific rule or logic, just a data structure, depends on the context
+         */
+        export interface IPosition {
+          x: number;
+          y: number;
         }
 
         // export interface IPosition {
@@ -570,10 +708,21 @@ export namespace grida {
         }
       }
 
+      /**
+       * @deprecated - not ready - do not use in production
+       */
+      export interface GroupNode
+        extends i.IBaseNode,
+          i.ISceneNode,
+          i.IChildren,
+          i.IExpandable {
+        //
+      }
+
       export interface TextNode
         extends i.IBaseNode,
           i.ISceneNode,
-          i.IHtmlBackendCSSStylable,
+          i.ICSSStylable,
           i.IHrefable,
           i.ITextValue {
         readonly type: "text";
@@ -582,7 +731,7 @@ export namespace grida {
       export interface ImageNode
         extends i.IBaseNode,
           i.ISceneNode,
-          i.IHtmlBackendCSSStylable,
+          i.ICSSStylable,
           i.IHrefable {
         readonly type: "image";
         /**
@@ -597,7 +746,7 @@ export namespace grida {
       export interface ContainerNode
         extends i.IBaseNode,
           i.ISceneNode,
-          i.IHtmlBackendCSSStylable,
+          i.ICSSStylable,
           i.IHrefable,
           i.IExpandable,
           i.IChildren {
@@ -605,55 +754,68 @@ export namespace grida {
         //
       }
 
+      /**
+       * @deprecated - not ready - do not use in production
+       */
       export interface SvgNode
         extends i.IBaseNode,
           i.ISceneNode,
-          i.IHtmlBackendCSSStylable,
+          i.ICSSStylable,
           i.IHrefable,
           i.IDimension {
         type: "svg";
         svg: string;
       }
 
-      // export interface SvgRectNode
-      //   extends i.IBaseNode,
-      //     i.ISceneNode,
-      //     i.IHrefable,
-      //     i.IDimension {
-      //   type: "rect";
-      //   rx: number | null;
-      //   ry: number | null;
-      //   width: number;
-      //   height: number;
-      // }
+      /**
+       * Rect Node
+       *
+       * - [Env:HTML/SVG] on svg rendering, this will be rendered as `<rect>` with `x`, `y`, `width`, `height` attributes with unified corner radius.
+       * - [Env:HTML/SVG] on svg rendering, this will be rendered as `<path>` with `d` attribute with individual rounded corner path.
+       *
+       * @see {@link https://developer.mozilla.org/en-US/docs/Web/SVG/Element/rect}
+       * @see {@link https://developer.mozilla.org/en-US/docs/Web/SVG/Element/path}
+       * @see {@link https://api.skia.org/classSkRRect.html}
+       * @see {@link https://www.figma.com/plugin-docs/api/RectangleNode/}
+       *
+       */
+      export interface RectangleNode
+        extends i.IBaseNode,
+          i.ISceneNode,
+          i.IHrefable,
+          // i.IPosition,
+          i.IDimension,
+          i.IOpacity,
+          i.IZIndex,
+          i.IFill,
+          i.IEffects,
+          i.IRectangleCorner {
+        type: "rectangle";
+      }
 
-      // export interface SvgCircleNode
-      //   extends i.IBaseNode,
-      //     i.ISceneNode,
-      //     i.IHrefable,
-      //     i.IDimension {
-      //   type: "circle";
-      //   cx: number | null;
-      //   cy: number | null;
-      //   r: number;
-      // }
-
-      // export interface SvgEllipseNode
-      //   extends i.IBaseNode,
-      //     i.ISceneNode,
-      //     i.IHrefable,
-      //     i.IDimension {
-      //   type: "ellipse";
-      //   cx: number | null;
-      //   cy: number | null;
-      //   rx: number;
-      //   ry: number;
-      // }
+      /**
+       * Ellipse Node
+       *
+       * - For Drawing Arc, use ArcNode
+       * - [Env:SVG] on svg rendering, this will be rendered as `<ellipse>` with `cx`, `cy`, `rx`, `ry` attributes calculated from the `width`, `height` and `x`, `y` properties.
+       */
+      export interface EllipseNode
+        extends i.IBaseNode,
+          i.ISceneNode,
+          i.IHrefable,
+          // i.IPosition,
+          i.IDimension,
+          i.IOpacity,
+          i.IZIndex,
+          i.IFill,
+          i.IEffects {
+        type: "ellipse";
+      }
 
       export interface InstanceNode
         extends i.IBaseNode,
           i.ISceneNode,
-          i.IHtmlBackendCSSStylable,
+          i.ICSSStylable,
           i.IHrefable,
           i.IProperties,
           i.IProps {

@@ -138,6 +138,14 @@ interface INodeChangeOpacityAction extends INodeID {
   opacity: number;
 }
 
+interface INodeChangeCornerRadiusAction extends INodeID {
+  cornerRadius: number | grida.program.nodes.i.IRectangleCorner["cornerRadius"];
+}
+
+interface INodeChangeFillAction extends INodeID {
+  fill: grida.program.nodes.i.IFill["fill"];
+}
+
 interface INodeChangeStyleAction extends INodeID {
   style: Partial<React.CSSProperties>;
 }
@@ -164,6 +172,8 @@ export type NodeChangeAction =
   | ({ type: "node/change/component" } & INodeChangeComponentAction)
   | ({ type: "node/change/text" } & INodeChangeTextAction)
   | ({ type: "node/change/opacity" } & INodeChangeOpacityAction)
+  | ({ type: "node/change/cornerRadius" } & INodeChangeCornerRadiusAction)
+  | ({ type: "node/change/fill" } & INodeChangeFillAction)
   | ({ type: "node/change/style" } & INodeChangeStyleAction)
   | ({ type: "node/change/src" } & INodeChangeSrcAction)
   | ({ type: "node/change/href" } & INodeChangeHrefAction)

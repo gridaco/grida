@@ -158,11 +158,11 @@ function NodeOverlay({
       {!readonly && (
         <>
           {/* top left */}
-          <ResizeHandle anchor="nw" readonly={readonly} node_id={node_id} />
+          {/* <ResizeHandle anchor="nw" readonly={readonly} node_id={node_id} /> */}
           {/* top right */}
-          <ResizeHandle anchor="ne" readonly={readonly} node_id={node_id} />
+          {/* <ResizeHandle anchor="ne" readonly={readonly} node_id={node_id} /> */}
           {/* bottom left */}
-          <ResizeHandle anchor="sw" readonly={readonly} node_id={node_id} />
+          {/* <ResizeHandle anchor="sw" readonly={readonly} node_id={node_id} /> */}
           {/* bottom right */}
           <ResizeHandle anchor="se" readonly={readonly} node_id={node_id} />
         </>

@@ -15,7 +15,7 @@ import { FontWeightControl } from "./controls/font-weight";
 import { HiddenControl } from "./controls/hidden";
 import { OpacityControl } from "./controls/opacity";
 import { HrefControl } from "./controls/href";
-import { BorderRadiusControl } from "./controls/border-radius";
+import { CornerRadiusControl } from "./controls/corner-radius";
 import { BorderControl } from "./controls/border";
 import { BackgroundControl } from "./controls/background";
 import { StringValueControl } from "./controls/string-value";
@@ -53,8 +53,18 @@ export function SelectedNodeProperties() {
 
   const node = useNode(selected_node_id!);
   const computed = useComputedNode(selected_node_id!);
-  const { id, name, active, component_id, style, type, properties, opacity } =
-    node;
+  const {
+    id,
+    name,
+    active,
+    component_id,
+    style,
+    type,
+    properties,
+    opacity,
+    cornerRadius,
+    fill,
+  } = node;
 
   // const istemplate = type?.startsWith("templates/");
   const is_instance = type === "instance";
@@ -76,7 +86,6 @@ export function SelectedNodeProperties() {
     //
     boxShadow,
     //
-    borderRadius,
     borderWidth,
     //
     margin,
@@ -301,9 +310,9 @@ export function SelectedNodeProperties() {
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Radius</PropertyLineLabel>
-            <BorderRadiusControl
-              value={borderRadius as any}
-              onValueChange={selectedNode.borderRadius}
+            <CornerRadiusControl
+              value={cornerRadius}
+              onValueChange={selectedNode.cornerRadius}
             />
           </PropertyLine>
           <PropertyLine>
@@ -319,6 +328,15 @@ export function SelectedNodeProperties() {
               <BackgroundColorControl
                 value={backgroundColor}
                 onValueChange={selectedNode.backgroundColor}
+              />
+            </PropertyLine>
+          )}
+          {fill && (
+            <PropertyLine>
+              <PropertyLineLabel>Fill</PropertyLineLabel>
+              <BackgroundColorControl
+                value={fill}
+                onValueChange={selectedNode.fill}
               />
             </PropertyLine>
           )}

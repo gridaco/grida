@@ -44,7 +44,9 @@ export function NodeElement<P extends Record<string, any>>({
       case "container":
       case "image":
       case "text":
-      case "svg": {
+      case "svg":
+      case "rectangle":
+      case "ellipse": {
         return TemplateBuilderWidgets[node.type];
       }
       default:
@@ -80,6 +82,14 @@ export function NodeElement<P extends Record<string, any>>({
       ...style,
       ...node.style,
     },
+    // IPositionable (does not instrictly mean left and top)
+    // x: node.x,
+    // y: node.y,
+    // IDemension (does not instrictly mean width and height)
+    width: node.width,
+    height: node.height,
+    fill: node.fill,
+    cornerRadius: node.cornerRadius,
     // @ts-ignore
   } satisfies
     | grida.program.document.template.IUserDefinedTemplateNodeReactComponentRenderProps<P>

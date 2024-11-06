@@ -76,16 +76,16 @@ export default function reducer<S extends IDocumentEditorState>(
 
       return produce(state, (draft) => {
         const node = draft.document.nodes[node_id];
+        assert("style" in node, "node has no style property");
         if (
-          ((
-            node as grida.program.nodes.i.IHtmlBackendCSSStylable
-          ).style.position = "absolute")
+          ((node as grida.program.nodes.i.ICSSStylable).style.position =
+            "absolute")
         ) {
           const [dx, dy] = delta;
-          ((node as grida.program.nodes.i.IHtmlBackendCSSStylable).style
-            .left as number) += dx;
-          ((node as grida.program.nodes.i.IHtmlBackendCSSStylable).style
-            .top as number) += dy;
+          ((node as grida.program.nodes.i.ICSSStylable).style.left as number) +=
+            dx;
+          ((node as grida.program.nodes.i.ICSSStylable).style.top as number) +=
+            dy;
         } else {
           // ignore
           reportError("node is not draggable");
@@ -105,9 +105,9 @@ export default function reducer<S extends IDocumentEditorState>(
 
         // need to assign a fixed size if width or height is a variable length
         const node = draft.document.nodes[node_id];
-        (node as grida.program.nodes.i.IHtmlBackendCSSStylable).style.width =
+        (node as grida.program.nodes.i.ICSSStylable).style.width =
           client_wh.width;
-        (node as grida.program.nodes.i.IHtmlBackendCSSStylable).style.height =
+        (node as grida.program.nodes.i.ICSSStylable).style.height =
           client_wh.height;
       });
     }
@@ -139,10 +139,10 @@ export default function reducer<S extends IDocumentEditorState>(
           }
         }
 
-        ((node as grida.program.nodes.i.IHtmlBackendCSSStylable).style
-          .width as number) += dx;
-        ((node as grida.program.nodes.i.IHtmlBackendCSSStylable).style
-          .height as number) += dy;
+        ((node as grida.program.nodes.i.ICSSStylable).style.width as number) +=
+          dx;
+        ((node as grida.program.nodes.i.ICSSStylable).style.height as number) +=
+          dy;
       });
       //
       //
@@ -202,6 +202,8 @@ export default function reducer<S extends IDocumentEditorState>(
     case "node/change/src":
     case "node/change/props":
     case "node/change/opacity":
+    case "node/change/cornerRadius":
+    case "node/change/fill":
     case "node/change/style":
     case "node/change/text": {
       const { node_id } = <NodeChangeAction>action;
@@ -253,11 +255,11 @@ function nodeReducer<N extends Partial<grida.program.nodes.Node>>(
         break;
       }
       case "node/change/href": {
-        draft.href = action.href;
+        (draft as grida.program.nodes.i.IHrefable).href = action.href;
         break;
       }
       case "node/change/target": {
-        draft.target = action.target;
+        (draft as grida.program.nodes.i.IHrefable).target = action.target;
         break;
       }
       case "node/change/component": {
@@ -276,25 +278,33 @@ function nodeReducer<N extends Partial<grida.program.nodes.Node>>(
         break;
       }
       case "node/change/opacity": {
-        (
-          draft as Draft<grida.program.nodes.i.IHtmlBackendCSSStylable>
-        ).opacity = action.opacity;
+        (draft as Draft<grida.program.nodes.i.ICSSStylable>).opacity =
+          action.opacity;
+        break;
+      }
+      case "node/change/cornerRadius": {
+        assert(draft.type === "rectangle");
+        draft.cornerRadius = action.cornerRadius;
+        break;
+      }
+      case "node/change/fill": {
+        assert(draft.type === "rectangle" || draft.type === "ellipse");
+        draft.fill = action.fill;
         break;
       }
       case "node/change/style": {
         // assert(draft.type !== 'template_instance')
-        (draft as Draft<grida.program.nodes.i.IHtmlBackendCSSStylable>).style =
+        (draft as Draft<grida.program.nodes.i.ICSSStylable>).style =
           Object.assign(
             {},
-            (draft as Draft<grida.program.nodes.i.IHtmlBackendCSSStylable>)
-              .style,
+            (draft as Draft<grida.program.nodes.i.ICSSStylable>).style,
             action.style
           );
         break;
       }
       case "node/change/text": {
         assert(draft.type === "text");
-        draft.text = draft.text ?? null;
+        draft.text = action.text ?? null;
         break;
       }
     }

@@ -11,6 +11,8 @@ import { SvgWidget } from "./svg";
 import { TextWidget } from "./text";
 import { ThemeWidget } from "./theme";
 import { ImageWidget } from "./image";
+import { RectangleWidget } from "./rectangle";
+import { EllipseWidget } from "./ellipse";
 export namespace TemplateBuilderWidgets {
   export const container = ContainerWidget;
   // export const Component = ComponentWidget;
@@ -22,6 +24,8 @@ export namespace TemplateBuilderWidgets {
   // export const Link = LinkWidget;
   // export const RichText = RichTextWidget;
   export const svg = SvgWidget;
+  export const rectangle = RectangleWidget;
+  export const ellipse = EllipseWidget;
   export const text = TextWidget;
   export const image = ImageWidget;
   // export const Theme = ThemeWidget;

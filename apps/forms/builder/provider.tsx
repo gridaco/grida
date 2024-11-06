@@ -221,6 +221,31 @@ export function useDocument() {
     [dispatch]
   );
 
+  const changeNodeFill = useCallback(
+    (node_id: string, fill: grida.program.css.RGBA) => {
+      dispatch({
+        type: "node/change/fill",
+        node_id: node_id,
+        fill,
+      });
+    },
+    [dispatch]
+  );
+
+  const changeNodeCornerRadius = useCallback(
+    (
+      node_id: string,
+      cornerRadius: grida.program.nodes.i.IRectangleCorner["cornerRadius"]
+    ) => {
+      dispatch({
+        type: "node/change/cornerRadius",
+        node_id: node_id,
+        cornerRadius,
+      });
+    },
+    [dispatch]
+  );
+
   const changeNodeStyle = useCallback(
     (
       node_id: string,
@@ -273,6 +298,13 @@ export function useDocument() {
       target: (target?: grida.program.nodes.i.IHrefable["target"]) =>
         changeNodeTarget(selected_node_id!, target),
 
+      //
+      cornerRadius: (
+        value: grida.program.nodes.i.IRectangleCorner["cornerRadius"]
+      ) => changeNodeCornerRadius(selected_node_id!, value),
+      fill: (value: grida.program.css.RGBA) =>
+        changeNodeFill(selected_node_id!, value),
+
       // stylable
       opacity: (value: number) => changeNodeOpacity(selected_node_id!, value),
 
@@ -287,8 +319,6 @@ export function useDocument() {
         changeNodeStyle(selected_node_id!, "textAlign", value),
       textColor: (value: grida.program.css.RGBA) =>
         changeNodeStyle(selected_node_id!, "textColor", value),
-      borderRadius: (value?: number) =>
-        changeNodeStyle(selected_node_id!, "borderRadius", value),
       margin: (value?: number) =>
         changeNodeStyle(selected_node_id!, "margin", value),
       padding: (value?: number) =>

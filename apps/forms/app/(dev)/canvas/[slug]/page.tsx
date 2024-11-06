@@ -48,6 +48,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { GridaLogo } from "@/components/grida-logo";
+import { grida } from "@/grida";
 
 export default function CanvasPlaygroundPage({
   params,
@@ -136,14 +137,13 @@ function DemoPanel() {
 
   const generate = useGenerate();
 
-  const textNodes = useMemo(() => {
+  const textNodes: Array<grida.program.nodes.TextNode> = useMemo(() => {
     return Object.values(state.document.nodes).filter(
       (node) => node.type === "text"
-    );
+    ) as Array<grida.program.nodes.TextNode>;
   }, [state.document.nodes]);
 
   const generateTextContents = useCallback(() => {
-    // @
     const payload = textNodes.map((node) => {
       return {
         id: node.id,
