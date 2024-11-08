@@ -101,6 +101,7 @@ export const Card_001 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        position: "relative",
       },
       ".p": {
         id: ".p",
@@ -112,6 +113,7 @@ export const Card_001 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        position: "relative",
       },
       ".date1": {
         id: ".date1",
@@ -123,6 +125,7 @@ export const Card_001 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        position: "relative",
       },
       ".n": {
         id: ".n",
@@ -134,6 +137,7 @@ export const Card_001 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        position: "relative",
       },
       ".badge": {
         id: ".badge",
@@ -145,6 +149,7 @@ export const Card_001 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        position: "relative",
       },
       ".media": {
         id: ".media",
@@ -157,6 +162,7 @@ export const Card_001 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        position: "relative",
       },
       ".date2": {
         id: ".date2",
@@ -168,6 +174,7 @@ export const Card_001 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        position: "relative",
       },
       ".tags": {
         id: ".tags",
@@ -179,6 +186,7 @@ export const Card_001 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        position: "relative",
       },
     },
     type: "template",
@@ -251,6 +259,7 @@ export const Card_002 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        position: "relative",
       },
       ".p": {
         id: ".p",
@@ -262,6 +271,7 @@ export const Card_002 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        position: "relative",
       },
       ".date1": {
         id: ".date1",
@@ -273,6 +283,7 @@ export const Card_002 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        position: "relative",
       },
       ".n": {
         id: ".n",
@@ -284,6 +295,7 @@ export const Card_002 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        position: "relative",
       },
       ".badge": {
         id: ".badge",
@@ -295,6 +307,7 @@ export const Card_002 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        position: "relative",
       },
       ".media": {
         id: ".media",
@@ -307,6 +320,7 @@ export const Card_002 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        position: "relative",
       },
       ".date2": {
         id: ".date2",
@@ -318,6 +332,7 @@ export const Card_002 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        position: "relative",
       },
       ".tags": {
         id: ".tags",
@@ -329,6 +344,7 @@ export const Card_002 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        position: "relative",
       },
     },
     type: "template",
@@ -429,6 +445,7 @@ export const Card_003 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        position: "relative",
       },
       ".p": {
         id: ".p",
@@ -440,6 +457,7 @@ export const Card_003 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        position: "relative",
       },
       ".date1": {
         id: ".date1",
@@ -451,6 +469,7 @@ export const Card_003 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        position: "relative",
       },
       ".n": {
         id: ".n",
@@ -462,6 +481,7 @@ export const Card_003 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        position: "relative",
       },
       ".badge": {
         id: ".badge",
@@ -473,6 +493,7 @@ export const Card_003 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        position: "relative",
       },
       ".media": {
         id: ".media",
@@ -485,6 +506,7 @@ export const Card_003 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        position: "relative",
       },
       ".date2": {
         id: ".date2",
@@ -496,6 +518,7 @@ export const Card_003 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        position: "relative",
       },
       ".tags": {
         id: ".tags",
@@ -507,6 +530,7 @@ export const Card_003 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        position: "relative",
       },
     },
     type: "template",
@@ -576,6 +600,7 @@ export const Hero_001 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        position: "relative",
       },
       ".p": {
         id: ".p",
@@ -587,6 +612,7 @@ export const Hero_001 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        position: "relative",
       },
       ".media": {
         id: ".media",
@@ -599,6 +625,7 @@ export const Hero_001 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        position: "relative",
       },
     },
     type: "template",
@@ -651,6 +678,7 @@ export const Hero_002 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        position: "relative",
       },
       ".p": {
         id: ".p",
@@ -662,6 +690,7 @@ export const Hero_002 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        position: "relative",
       },
       ".media": {
         id: ".media",
@@ -674,6 +703,7 @@ export const Hero_002 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        position: "relative",
       },
     },
     type: "template",

@@ -385,17 +385,22 @@ export namespace grida {
         // explicitly prohibited
         // - "opacity"
         // - "zIndex"
+        // - "position"
+        // - "left"
+        // - "top"
+        // - "right"
+        // - "bottom"
         // - "cursor"
         // - "pointerEvents"
         // - "borderRadius"
         //
         // position & dimension
         // | 'width' | 'height' | 'minWidth' | 'minHeight' | 'maxWidth' | 'maxHeight' | 'position' | 'top' | 'right' | 'bottom' | 'left' | 'zIndex'
-        | "position"
+        // | "position"
         | "width"
         | "height"
-        | "top"
-        | "left"
+        // | "top"
+        // | "left"
         //
         | "fontWeight"
         | "fontFamily"
@@ -453,6 +458,21 @@ export namespace grida {
      * Core Graphics
      */
     export namespace cg {
+      export type Paint = SolidPaint | LinearGradientPaint;
+
+      export type SolidPaint = {
+        type: "solid";
+        color: css.RGBA;
+      };
+
+      export type LinearGradientPaint = {
+        type: "linear_gradient";
+        transform: unknown;
+        stops: Array<{
+          offset: number;
+          color: css.RGBA;
+        }>;
+      };
       //
       //
 
@@ -632,6 +652,15 @@ export namespace grida {
           fill: css.RGBA;
         }
 
+        /**
+         * Node that supports stroke with color - such as rectangle, ellipse, etc.
+         *
+         * - [Env:HTML] for html text, `-webkit-text-stroke` will be used
+         */
+        export interface IStroke {
+          stroke: css.RGBA;
+        }
+
         export interface IEffects {
           //
           effects: Array<cg.FilterEffects>;
@@ -643,6 +672,7 @@ export namespace grida {
 
         export interface ICSSStylable
           extends IStylable<css.ExplicitlySupportedCSSProperties>,
+            IPositioning,
             IOpacity,
             IZIndex {
           style: css.ExplicitlySupportedCSSProperties;
@@ -662,18 +692,19 @@ export namespace grida {
         }
 
         /**
-         * does not represent any specific rule or logic, just a data structure, depends on the context
+         * Relative DOM Positioning model
+         *
+         * by default, use position: relative, left: 0, top: 0 - to avoid unexpected layout issues
          */
-        export interface IPosition {
-          x: number;
-          y: number;
+        export interface IPositioning {
+          position: "absolute" | "relative";
+          left?: number | undefined;
+          top?: number | undefined;
+          // right: number;
+          // bottom: number;
+          // x: number;
+          // y: number;
         }
-
-        // export interface IPosition {
-        //   position: "static" | "absolute";
-        //   x: number;
-        //   y: number;
-        // }
 
         export interface ITextValue {
           /**
@@ -783,7 +814,7 @@ export namespace grida {
         extends i.IBaseNode,
           i.ISceneNode,
           i.IHrefable,
-          // i.IPosition,
+          i.IPositioning,
           i.IDimension,
           i.IOpacity,
           i.IZIndex,
@@ -803,7 +834,7 @@ export namespace grida {
         extends i.IBaseNode,
           i.ISceneNode,
           i.IHrefable,
-          // i.IPosition,
+          i.IPositioning,
           i.IDimension,
           i.IOpacity,
           i.IZIndex,
@@ -815,7 +846,8 @@ export namespace grida {
       export interface InstanceNode
         extends i.IBaseNode,
           i.ISceneNode,
-          i.ICSSStylable,
+          i.IPositioning,
+          // i.ICSSStylable,
           i.IHrefable,
           i.IProperties,
           i.IProps {

@@ -64,6 +64,9 @@ export function SelectedNodeProperties() {
     opacity,
     cornerRadius,
     fill,
+    position,
+    left,
+    top,
   } = node;
 
   // const istemplate = type?.startsWith("templates/");
@@ -126,6 +129,9 @@ export function SelectedNodeProperties() {
             <div>Node {selected_node_id}</div>
             <div>Type {type}</div>
             <div>Name {name}</div>
+            <div>Posi {position}</div>
+            <div>Left {left}</div>
+            <div>Top {top}</div>
           </pre>
         </SidebarMenuSectionContent>
       </SidebarSection>

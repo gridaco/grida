@@ -69,22 +69,18 @@ export default function reducer<S extends IDocumentEditorState>(
       // cancel if invalid state
       if (!state.is_gesture_node_drag_move) return state;
       if (!state.selected_node_id) return state;
+
+      const nid = state.selected_node_id;
+
       return produce(state, (draft) => {
-        const node = draft.document.nodes[draft.selected_node_id!];
-        assert("style" in node, "node has no style property");
-        if (
-          ((node as grida.program.nodes.i.ICSSStylable).style.position =
-            "absolute")
-        ) {
-          const [dx, dy] = delta;
-          ((node as grida.program.nodes.i.ICSSStylable).style.left as number) +=
-            dx;
-          ((node as grida.program.nodes.i.ICSSStylable).style.top as number) +=
-            dy;
-        } else {
-          // ignore
-          reportError("node is not draggable");
-        }
+        const node = draft.document.nodes[nid];
+
+        draft.document.nodes[nid] = nodeTransformReducer(node, {
+          type: "move",
+          dx: delta[0],
+          dy: delta[1],
+        });
+
         //
       });
     }
@@ -98,8 +94,9 @@ export default function reducer<S extends IDocumentEditorState>(
         draft.is_gesture_node_drag_resize = true;
         draft.is_gesture_node_drag_move = false;
 
-        // need to assign a fixed size if width or height is a variable length
         const node = draft.document.nodes[node_id];
+
+        // need to assign a fixed size if width or height is a variable length
         (node as grida.program.nodes.i.ICSSStylable).style.width =
           client_wh.width;
         (node as grida.program.nodes.i.ICSSStylable).style.height =
@@ -122,22 +119,12 @@ export default function reducer<S extends IDocumentEditorState>(
         // once the node's measurement mode is set to fixed (from drag start), we may safely cast the width / height sa fixed number
         const node = draft.document.nodes[node_id];
 
-        // TODO: calculate the final delta based on anchor and movement delta
-        switch (anchor) {
-          case "ne": {
-          }
-          case "nw": {
-          }
-          case "se": {
-          }
-          case "sw": {
-          }
-        }
-
-        ((node as grida.program.nodes.i.ICSSStylable).style.width as number) +=
-          dx;
-        ((node as grida.program.nodes.i.ICSSStylable).style.height as number) +=
-          dy;
+        draft.document.nodes[node_id] = nodeTransformReducer(node, {
+          type: "resize",
+          anchor,
+          dx: delta[0],
+          dy: delta[1],
+        });
       });
       //
       //
@@ -233,6 +220,70 @@ export default function reducer<S extends IDocumentEditorState>(
   }
 
   return state;
+}
+
+function nodeTransformReducer(
+  node: grida.program.nodes.Node,
+  action:
+    | {
+        type: "move";
+        dx: number;
+        dy: number;
+      }
+    | {
+        type: "resize";
+        anchor: "nw" | "ne" | "sw" | "se";
+        dx: number;
+        dy: number;
+      }
+) {
+  return produce(node, (draft) => {
+    assert(
+      draft.type !== "template_instance",
+      "template_instance cannot be transformed"
+    );
+
+    switch (action.type) {
+      case "move": {
+        const { dx, dy } = action;
+        if (draft.position == "absolute") {
+          if (dx) {
+            draft.left = (draft.left ?? 0) + dx;
+          }
+          if (dy) {
+            draft.top = (draft.top ?? 0) + dy;
+          }
+        } else {
+          // ignore
+          reportError("node is not draggable");
+        }
+
+        return;
+      }
+      case "resize": {
+        const { anchor, dx, dy } = action;
+        //
+        // TODO: calculate the final delta based on anchor and movement delta
+        switch (anchor) {
+          case "ne": {
+          }
+          case "nw": {
+          }
+          case "se": {
+          }
+          case "sw": {
+          }
+        }
+
+        ((node as grida.program.nodes.i.ICSSStylable).style.width as number) +=
+          dx;
+        ((node as grida.program.nodes.i.ICSSStylable).style.height as number) +=
+          dy;
+
+        return;
+      }
+    }
+  });
 }
 
 function nodeReducer<N extends Partial<grida.program.nodes.Node>>(

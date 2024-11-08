@@ -167,9 +167,62 @@ function NodeOverlay({
           {/* <ResizeHandle anchor="sw" readonly={readonly} node_id={node_id} /> */}
           {/* bottom right */}
           <ResizeHandle anchor="se" readonly={readonly} node_id={node_id} />
+          <CornerRadiusHandle anchor="se" node_id={node_id} radii={0} />
         </>
       )}
     </div>
+  );
+}
+
+function CornerRadiusHandle({
+  anchor,
+  size = 8,
+  margin = 16,
+  radii,
+}: {
+  node_id: string;
+  anchor: "nw" | "ne" | "sw" | "se";
+  margin?: number;
+  size?: number;
+  radii: number;
+}) {
+  const bind = useGesture(
+    {
+      onDragStart: (e) => {
+        e.event.stopPropagation();
+      },
+      onDragEnd: (e) => {
+        e.event.stopPropagation();
+      },
+      onDrag: (e) => {
+        e.event.stopPropagation();
+      },
+    },
+    {
+      eventOptions: {
+        passive: false,
+        capture: true,
+      },
+    }
+  );
+
+  const minmargin = Math.max(radii + size, margin);
+
+  return (
+    <div
+      {...bind()}
+      className="border rounded-full bg-white border-workbench-accent-sky absolute z-10 pointer-events-auto"
+      style={{
+        top: anchor[0] === "n" ? minmargin : "auto",
+        bottom: anchor[0] === "s" ? minmargin : "auto",
+        left: anchor[1] === "w" ? minmargin : "auto",
+        right: anchor[1] === "e" ? minmargin : "auto",
+        width: size,
+        height: size,
+        transform: `translate(${anchor[1] === "w" ? "-50%" : "50%"}, ${anchor[0] === "n" ? "-50%" : "50%"})`,
+        cursor: "pointer",
+      }}
+    />
   );
 }
 

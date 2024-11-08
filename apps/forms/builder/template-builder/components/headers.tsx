@@ -10,8 +10,6 @@ export function Header_001({ logo }: { logo?: string }) {
       // component={TemplateBuilderWidgets.flex}
       style={{
         backgroundColor: { r: 0, g: 0, b: 0, a: 0 },
-        top: 0,
-        left: 0,
         // right: 0,
         justifyContent: "center",
         alignItems: "center",

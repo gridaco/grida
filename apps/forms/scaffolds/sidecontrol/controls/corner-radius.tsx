@@ -9,7 +9,7 @@ export function CornerRadiusControl({
   value?: grida.program.nodes.i.IRectangleCorner["cornerRadius"];
   onValueChange?: (value: number) => void;
 }) {
-  if (typeof value !== "number") {
+  if (typeof value !== "undefined" && typeof value !== "number") {
     return <>mixed</>;
   }
   return (

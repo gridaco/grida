@@ -8,9 +8,15 @@ export type BuilderAction =
   | DocumentEditorCanvasEventTargetHtmlBackendDragStart
   | DocumentEditorCanvasEventTargetHtmlBackendDrag
   | DocumentEditorCanvasEventTargetHtmlBackendDragEnd
+  //
   | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayResizeHandleDragStart
   | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayResizeHandleDragEnd
   | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayResizeHandleDrag
+  //
+  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayCornerRadiusHandleDragStart
+  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayCornerRadiusHandleDragEnd
+  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayCornerRadiusHandleDrag
+  //
   | DocumentEditorNodeSelectAction
   | DocumentEditorNodePointerEnterAction
   | DocumentEditorNodePointerLeaveAction
@@ -92,6 +98,24 @@ export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayResizeHandleDra
     ICanvasEventTargetPointerEventDelta &
     ICanvasEventTargetResizeHandleEvent & {
       type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag";
+    };
+
+export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayCornerRadiusHandleDragStart =
+  INodeID &
+    IHtmlCanvasEventTargetCalculatedNodeSize & {
+      type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-start";
+    };
+
+export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayCornerRadiusHandleDragEnd =
+  INodeID & {
+    type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-end";
+  };
+
+export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayCornerRadiusHandleDrag =
+  INodeID &
+    ICanvasEventTargetPointerEventDelta &
+    ICanvasEventTargetResizeHandleEvent & {
+      type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag";
     };
 
 export interface DocumentEditorNodeSelectAction {

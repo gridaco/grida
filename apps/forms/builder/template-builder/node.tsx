@@ -13,6 +13,9 @@ interface NodeElementProps<P extends Record<string, any>> {
   component?: TemplateComponent;
   style?: grida.program.css.ExplicitlySupportedCSSProperties;
   zIndex?: number;
+  position?: "absolute" | "relative";
+  left?: number;
+  top?: number;
 }
 
 export function NodeElement<P extends Record<string, any>>({
@@ -20,6 +23,9 @@ export function NodeElement<P extends Record<string, any>>({
   component: USER_COMPONENT,
   children: USER_CHILDREN,
   zIndex: DEFAULT_ZINDEX,
+  position: DEFAULT_POSITION,
+  left: DEFAULT_LEFT,
+  top: DEFAULT_TOP,
   style,
 }: React.PropsWithChildren<NodeElementProps<P>>) {
   const { state: document, selected_node_id } = useDocument();
@@ -78,6 +84,10 @@ export function NodeElement<P extends Record<string, any>>({
     svg: node.svg,
     opacity: node.opacity,
     zIndex: DEFAULT_ZINDEX ?? node.zIndex,
+    position: DEFAULT_POSITION ?? node.position,
+    left: DEFAULT_LEFT ?? node.left,
+    top: DEFAULT_TOP ?? node.top,
+
     style: {
       ...style,
       ...node.style,
@@ -117,6 +127,9 @@ export function NodeElement<P extends Record<string, any>>({
           style: {
             opacity: opacity,
             zIndex: zIndex,
+            position: node.position,
+            top: node.top,
+            left: node.left,
             ...grida.program.css.toReactCSSProperties({
               ...styles,
             }),

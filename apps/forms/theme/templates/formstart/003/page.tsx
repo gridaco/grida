@@ -81,10 +81,10 @@ function Consumer() {
         </section>
         <NodeElement
           node_id="003.background"
+          position="absolute"
+          left={0}
+          top={0}
           style={{
-            position: "absolute",
-            left: 0,
-            top: 0,
             objectFit: "cover",
             width: "100%",
             height: "100%",
@@ -116,6 +116,7 @@ _003.definition = {
       opacity: 1,
       zIndex: 0,
       style: {},
+      position: "relative",
     },
     "003.subtitle": {
       id: "003.subtitle",
@@ -127,6 +128,7 @@ _003.definition = {
       opacity: 1,
       zIndex: 0,
       style: {},
+      position: "relative",
     },
     "003.background": {
       id: "003.background",
@@ -138,6 +140,7 @@ _003.definition = {
       opacity: 1,
       zIndex: 0,
       style: {},
+      position: "relative",
     },
   },
 } satisfies grida.program.document.template.TemplateDocumentDefinition;
