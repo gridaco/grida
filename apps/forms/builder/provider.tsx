@@ -506,6 +506,44 @@ export function useEventTarget() {
   );
   // #endregion drag resize handle
 
+  // #region drag resize handle
+  const dragCornerRadiusHandleStart = useCallback(
+    (node_id: string) => {
+      dispatch({
+        type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-start",
+        node_id,
+      });
+    },
+    [dispatch]
+  );
+  const dragCornerRadiusHandleEnd = useCallback(
+    (node_id: string) => {
+      dispatch({
+        type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-end",
+        node_id,
+      });
+    },
+    [dispatch]
+  );
+  const dragCornerRadiusHandleHandle = useCallback(
+    (
+      node_id: string,
+      anchor: "nw" | "ne" | "sw" | "se",
+      delta: [number, number]
+    ) => {
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag",
+          node_id,
+          anchor,
+          delta,
+        });
+      });
+    },
+    [dispatch]
+  );
+  // #endregion drag resize handle
+
   return useMemo(() => {
     return {
       hovered_node_id,
@@ -515,6 +553,10 @@ export function useEventTarget() {
       dragResizeHandleStart,
       dragResizeHandleEnd,
       dragResizeHandle,
+      //
+      dragCornerRadiusHandleStart,
+      dragCornerRadiusHandleEnd,
+      dragCornerRadiusHandleHandle,
       //
       pointerMove,
       pointerDown,
@@ -533,6 +575,10 @@ export function useEventTarget() {
     dragResizeHandleStart,
     dragResizeHandleEnd,
     dragResizeHandle,
+    //
+    dragCornerRadiusHandleStart,
+    dragCornerRadiusHandleEnd,
+    dragCornerRadiusHandleHandle,
     //
     pointerMove,
     pointerDown,

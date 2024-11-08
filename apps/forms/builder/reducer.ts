@@ -122,14 +122,53 @@ export default function reducer<S extends IDocumentEditorState>(
         draft.document.nodes[node_id] = nodeTransformReducer(node, {
           type: "resize",
           anchor,
-          dx: delta[0],
-          dy: delta[1],
+          dx: dx,
+          dy: dy,
         });
       });
       //
       //
     }
     // #endregion resize handle event
+
+    case "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-start": {
+      const { node_id } = action;
+
+      return produce(state, (draft) => {
+        draft.selected_node_id = node_id;
+        draft.is_gesture_node_drag_corner_radius = true;
+      });
+    }
+    case "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-end": {
+      return produce(state, (draft) => {
+        draft.is_gesture_node_drag_corner_radius = false;
+      });
+    }
+    case "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag": {
+      const { node_id, delta } = action;
+      const [dx, dy] = delta;
+      // cancel if invalid state
+      if (!state.is_gesture_node_drag_corner_radius) return state;
+
+      // const distance = Math.sqrt(dx * dx + dy * dy);
+      const d = -Math.round(dx);
+      return produce(state, (draft) => {
+        const node = draft.document.nodes[node_id];
+
+        if (!("cornerRadius" in node)) {
+          return;
+        }
+
+        draft.document.nodes[node_id] = nodeReducer(node, {
+          type: "node/change/cornerRadius",
+          // TODO: resolve by anchor
+          cornerRadius:
+            (typeof node.cornerRadius == "number" ? node.cornerRadius : 0) + d,
+          node_id,
+        });
+      });
+      //
+    }
 
     // #endregion [html backend] canvas event target
     case "document/template/set/props": {
@@ -330,7 +369,33 @@ function nodeReducer<N extends Partial<grida.program.nodes.Node>>(
       }
       case "node/change/cornerRadius": {
         assert(draft.type === "rectangle");
-        draft.cornerRadius = action.cornerRadius;
+
+        // TODO: make [cornerRadius < (Math.min(width, height) / 2)]
+
+        const each =
+          typeof action.cornerRadius == "number"
+            ? {
+                tl: Math.max(action.cornerRadius, 0),
+                tr: Math.max(action.cornerRadius, 0),
+                br: Math.max(action.cornerRadius, 0),
+                bl: Math.max(action.cornerRadius, 0),
+              }
+            : {
+                tl: Math.max(action.cornerRadius.topLeftRadius, 0),
+                tr: Math.max(action.cornerRadius.topRightRadius, 0),
+                br: Math.max(action.cornerRadius.bottomRightRadius, 0),
+                bl: Math.max(action.cornerRadius.bottomLeftRadius, 0),
+              };
+        if (each.tl === each.tr && each.tl === each.br && each.tl === each.bl) {
+          draft.cornerRadius = each.tl;
+        } else {
+          draft.cornerRadius = {
+            topLeftRadius: each.tl,
+            topRightRadius: each.tr,
+            bottomRightRadius: each.br,
+            bottomLeftRadius: each.bl,
+          };
+        }
         break;
       }
       case "node/change/fill": {

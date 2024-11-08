@@ -22,6 +22,13 @@ export interface IDocumentEditorInteractionCursorState {
    */
   is_gesture_node_drag_resize?: boolean;
 
+  /**
+   * @private - internal use only
+   *
+   * is gesture node-corner-radius
+   */
+  is_gesture_node_drag_corner_radius?: boolean;
+
   // selectedTextRange;
 }
 

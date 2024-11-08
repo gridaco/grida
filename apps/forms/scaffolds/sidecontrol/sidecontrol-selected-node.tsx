@@ -393,3 +393,15 @@ export function SelectedNodeProperties() {
     </div>
   );
 }
+
+// const i_map = {
+//   i_opacity: ["opacity"],
+//   i_positioning: ["position", "top", "left"],
+//   i_hrefable: ["href", "target"],
+//   i_css: ["style"],
+//   i_exportable: ["export"],
+// };
+
+// const properties_map = {
+//   rectangle: ["opacity", "cornerRadius", "fill", "cursor"],
+// } as const;

@@ -10,7 +10,7 @@ import React, {
 import { useEventTarget } from "@/builder";
 import { useGesture } from "@use-gesture/react";
 import { grida } from "@/grida";
-import { useNodeDomElement } from "../provider";
+import { useNode, useNodeDomElement } from "../provider";
 
 interface CanvasEventTargetContext {
   portal?: HTMLDivElement | null;
@@ -131,6 +131,7 @@ function NodeOverlay({
   node_id: string;
   readonly: boolean;
 }) {
+  const node = useNode(node_id);
   const portal = useCanvasOverlayPortal();
   const node_element = useNodeDomElement(node_id);
 
@@ -146,7 +147,7 @@ function NodeOverlay({
 
   return (
     <div
-      className="pointer-events-auto select-none border-2 border-workbench-accent-sky relative"
+      className="group pointer-events-auto select-none border-2 border-workbench-accent-sky relative"
       style={{
         position: "absolute",
         top: top,
@@ -167,7 +168,9 @@ function NodeOverlay({
           {/* <ResizeHandle anchor="sw" readonly={readonly} node_id={node_id} /> */}
           {/* bottom right */}
           <ResizeHandle anchor="se" readonly={readonly} node_id={node_id} />
-          <CornerRadiusHandle anchor="se" node_id={node_id} radii={0} />
+          {node.type === "rectangle" && (
+            <CornerRadiusHandle anchor="se" node_id={node_id} />
+          )}
         </>
       )}
     </div>
@@ -175,27 +178,35 @@ function NodeOverlay({
 }
 
 function CornerRadiusHandle({
+  node_id,
   anchor,
   size = 8,
   margin = 16,
-  radii,
 }: {
   node_id: string;
   anchor: "nw" | "ne" | "sw" | "se";
   margin?: number;
   size?: number;
-  radii: number;
 }) {
+  const {
+    dragCornerRadiusHandleStart,
+    dragCornerRadiusHandleEnd,
+    dragCornerRadiusHandleHandle,
+  } = useEventTarget();
+
   const bind = useGesture(
     {
       onDragStart: (e) => {
         e.event.stopPropagation();
+        dragCornerRadiusHandleStart(node_id);
       },
       onDragEnd: (e) => {
         e.event.stopPropagation();
+        dragCornerRadiusHandleEnd(node_id);
       },
       onDrag: (e) => {
         e.event.stopPropagation();
+        dragCornerRadiusHandleHandle(node_id, anchor, e.delta);
       },
     },
     {
@@ -206,12 +217,17 @@ function CornerRadiusHandle({
     }
   );
 
+  const node = useNode(node_id);
+
+  // TODO: resolve by anchor
+  const radii = typeof node.cornerRadius === "number" ? node.cornerRadius : 0;
+
   const minmargin = Math.max(radii + size, margin);
 
   return (
     <div
       {...bind()}
-      className="border rounded-full bg-white border-workbench-accent-sky absolute z-10 pointer-events-auto"
+      className="hidden group-hover:block border rounded-full bg-white border-workbench-accent-sky absolute z-10 pointer-events-auto"
       style={{
         top: anchor[0] === "n" ? minmargin : "auto",
         bottom: anchor[0] === "s" ? minmargin : "auto",

@@ -101,10 +101,9 @@ export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayResizeHandleDra
     };
 
 export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayCornerRadiusHandleDragStart =
-  INodeID &
-    IHtmlCanvasEventTargetCalculatedNodeSize & {
-      type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-start";
-    };
+  INodeID & {
+    type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-start";
+  };
 
 export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayCornerRadiusHandleDragEnd =
   INodeID & {
