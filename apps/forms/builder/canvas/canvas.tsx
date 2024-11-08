@@ -46,6 +46,9 @@ export function CanvasOverlay() {
     pointerMove,
     pointerDown,
     pointerUp,
+    drag,
+    dragStart,
+    dragEnd,
   } = useEventTarget();
   const ref = useRef<HTMLDivElement>(null);
   const context = useContext(EventTargetContext);
@@ -63,25 +66,45 @@ export function CanvasOverlay() {
     };
   }, [context]);
 
-  const bind = useGesture({
-    onPointerMove: ({ event }) => {
-      // for performance reasons, we don't want to update the overlay when transforming
-      if (is_node_transforming) return;
-      pointerMove(event);
+  const bind = useGesture(
+    {
+      onPointerMove: ({ event }) => {
+        // for performance reasons, we don't want to update the overlay when transforming
+        if (is_node_transforming) return;
+        pointerMove(event);
+      },
+      onPointerDown: ({ event }) => {
+        pointerDown(event);
+      },
+      onPointerUp: ({ event }) => {
+        pointerUp(event);
+      },
+
+      onDragStart: (e) => {
+        dragStart();
+      },
+      onDragEnd: (e) => {
+        dragEnd();
+      },
+      onDrag: (e) => {
+        drag(e.delta);
+      },
     },
-    onPointerDown: ({ event }) => {
-      pointerDown(event);
-    },
-    onPointerUp: ({ event }) => {
-      pointerUp(event);
-    },
-  });
+    {
+      drag: {
+        threshold: 1,
+      },
+    }
+  );
 
   return (
     <div
       data-transforming={is_node_transforming}
       {...bind()}
       className="absolute inset-0 pointer-events-auto will-change-transform z-50 opacity-100 data-[transforming='true']:opacity-0 transition-colors "
+      style={{
+        touchAction: "none",
+      }}
     >
       <div className="w-full h-full" id="canvas-overlay-portal" ref={ref}>
         {selected_node_id && (
@@ -108,14 +131,6 @@ function NodeOverlay({
   node_id: string;
   readonly: boolean;
 }) {
-  const {
-    hovered_node_id,
-    selected_node_id,
-    dragNodeOverlayStart,
-    dragNodeOverlayEnd,
-    dragNodeOverlay,
-  } = useEventTarget();
-
   const portal = useCanvasOverlayPortal();
   const node_element = useNodeDomElement(node_id);
 
@@ -129,22 +144,8 @@ function NodeOverlay({
   const width = node_element_rect.width;
   const height = node_element_rect.height;
 
-  //
-  const bind = useGesture({
-    onDragStart: (e) => {
-      dragNodeOverlayStart(node_id);
-    },
-    onDragEnd: (e) => {
-      dragNodeOverlayEnd(node_id);
-    },
-    onDrag: (e) => {
-      dragNodeOverlay(node_id, e.delta);
-    },
-  });
-
   return (
     <div
-      {...bind()}
       className="pointer-events-auto select-none border-2 border-workbench-accent-sky relative"
       style={{
         position: "absolute",
@@ -153,6 +154,7 @@ function NodeOverlay({
         width: width,
         height: height,
         zIndex: readonly ? 1 : 2,
+        touchAction: "none",
       }}
     >
       {!readonly && (

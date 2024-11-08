@@ -21,6 +21,8 @@ export interface IDocumentEditorInteractionCursorState {
    * is gesture node-resize
    */
   is_gesture_node_drag_resize?: boolean;
+
+  // selectedTextRange;
 }
 
 export interface IDocumentEditorState

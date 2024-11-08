@@ -5,9 +5,9 @@ export type BuilderAction =
   | DocumentEditorCanvasEventTargetHtmlBackendPointerMove
   | DocumentEditorCanvasEventTargetHtmlBackendPointerDown
   | DocumentEditorCanvasEventTargetHtmlBackendPointerUp
-  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayDrag
-  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayDragStart
-  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayDragEnd
+  | DocumentEditorCanvasEventTargetHtmlBackendDragStart
+  | DocumentEditorCanvasEventTargetHtmlBackendDrag
+  | DocumentEditorCanvasEventTargetHtmlBackendDragEnd
   | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayResizeHandleDragStart
   | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayResizeHandleDragEnd
   | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayResizeHandleDrag
@@ -27,6 +27,10 @@ interface IHtmlBackendCanvasEventTargetPointerEvent {
   node_ids_from_point: string[];
 }
 
+interface ICanvasEventTargetPointerEventDelta {
+  delta: [number, number];
+}
+
 export type DocumentEditorCanvasEventTargetHtmlBackendPointerMove =
   IHtmlBackendCanvasEventTargetPointerEvent & {
     type: "document/canvas/backend/html/event/on-pointer-move";
@@ -41,9 +45,18 @@ export type DocumentEditorCanvasEventTargetHtmlBackendPointerUp = {
   type: "document/canvas/backend/html/event/on-pointer-up";
 };
 
-interface ICanvasEventTargetPointerEventDelta {
-  delta: [number, number];
-}
+export type DocumentEditorCanvasEventTargetHtmlBackendDragStart = {
+  type: "document/canvas/backend/html/event/on-drag-start";
+};
+
+export type DocumentEditorCanvasEventTargetHtmlBackendDrag =
+  ICanvasEventTargetPointerEventDelta & {
+    type: "document/canvas/backend/html/event/on-drag";
+  };
+
+export type DocumentEditorCanvasEventTargetHtmlBackendDragEnd = {
+  type: "document/canvas/backend/html/event/on-drag-end";
+};
 
 interface ICanvasEventTargetResizeHandleEvent {
   anchor: "nw" | "ne" | "sw" | "se";
@@ -62,22 +75,6 @@ interface IHtmlCanvasEventTargetCalculatedNodeSize {
    */
   client_wh: grida.program.nodes.i.IDimension;
 }
-
-export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayDrag =
-  INodeID &
-    ICanvasEventTargetPointerEventDelta & {
-      type: "document/canvas/backend/html/event/node-overlay/on-drag";
-    };
-
-export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayDragStart =
-  INodeID & {
-    type: "document/canvas/backend/html/event/node-overlay/on-drag-start";
-  };
-
-export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayDragEnd =
-  INodeID & {
-    type: "document/canvas/backend/html/event/node-overlay/on-drag-end";
-  };
 
 export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayResizeHandleDragStart =
   INodeID &

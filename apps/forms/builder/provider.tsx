@@ -212,10 +212,12 @@ export function useDocument() {
 
   const changeNodeOpacity = useCallback(
     (node_id: string, opacity: number) => {
-      dispatch({
-        type: "node/change/opacity",
-        node_id: node_id,
-        opacity,
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/opacity",
+          node_id: node_id,
+          opacity,
+        });
       });
     },
     [dispatch]
@@ -223,10 +225,12 @@ export function useDocument() {
 
   const changeNodeFill = useCallback(
     (node_id: string, fill: grida.program.css.RGBA) => {
-      dispatch({
-        type: "node/change/fill",
-        node_id: node_id,
-        fill,
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/fill",
+          node_id: node_id,
+          fill,
+        });
       });
     },
     [dispatch]
@@ -237,10 +241,12 @@ export function useDocument() {
       node_id: string,
       cornerRadius: grida.program.nodes.i.IRectangleCorner["cornerRadius"]
     ) => {
-      dispatch({
-        type: "node/change/cornerRadius",
-        node_id: node_id,
-        cornerRadius,
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/cornerRadius",
+          node_id: node_id,
+          cornerRadius,
+        });
       });
     },
     [dispatch]
@@ -252,12 +258,14 @@ export function useDocument() {
       key: keyof grida.program.css.ExplicitlySupportedCSSProperties,
       value: any
     ) => {
-      dispatch({
-        type: "node/change/style",
-        node_id: node_id,
-        style: {
-          [key]: value,
-        },
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/style",
+          node_id: node_id,
+          style: {
+            [key]: value,
+          },
+        });
       });
     },
     [dispatch]
@@ -435,32 +443,25 @@ export function useEventTarget() {
     [dispatch]
   );
 
-  const dragNodeOverlayStart = useCallback(
-    (node_id: string) => {
-      dispatch({
-        type: "document/canvas/backend/html/event/node-overlay/on-drag-start",
-        node_id: node_id,
-      });
-    },
-    [dispatch]
-  );
+  const dragStart = useCallback(() => {
+    dispatch({
+      type: "document/canvas/backend/html/event/on-drag-start",
+    });
+  }, [dispatch]);
 
-  const dragNodeOverlayEnd = useCallback(
-    (node_id: string) => {
-      dispatch({
-        type: "document/canvas/backend/html/event/node-overlay/on-drag-end",
-        node_id: node_id,
-      });
-    },
-    [dispatch]
-  );
+  const dragEnd = useCallback(() => {
+    dispatch({
+      type: "document/canvas/backend/html/event/on-drag-end",
+    });
+  }, [dispatch]);
 
-  const dragNodeOverlay = useCallback(
-    (node_id: string, delta: [number, number]) => {
-      dispatch({
-        type: "document/canvas/backend/html/event/node-overlay/on-drag",
-        node_id: node_id,
-        delta,
+  const drag = useCallback(
+    (delta: [number, number]) => {
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "document/canvas/backend/html/event/on-drag",
+          delta,
+        });
       });
     },
     [dispatch]
@@ -492,11 +493,13 @@ export function useEventTarget() {
       anchor: "nw" | "ne" | "sw" | "se",
       delta: [number, number]
     ) => {
-      dispatch({
-        type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag",
-        node_id,
-        anchor,
-        delta,
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag",
+          node_id,
+          anchor,
+          delta,
+        });
       });
     },
     [dispatch]
@@ -508,9 +511,6 @@ export function useEventTarget() {
       hovered_node_id,
       selected_node_id,
       is_node_transforming,
-      dragNodeOverlayStart,
-      dragNodeOverlayEnd,
-      dragNodeOverlay,
       //
       dragResizeHandleStart,
       dragResizeHandleEnd,
@@ -519,14 +519,16 @@ export function useEventTarget() {
       pointerMove,
       pointerDown,
       pointerUp,
+      //
+      dragStart,
+      dragEnd,
+      drag,
+      //
     };
   }, [
     hovered_node_id,
     selected_node_id,
     is_node_transforming,
-    dragNodeOverlayStart,
-    dragNodeOverlayEnd,
-    dragNodeOverlay,
     //
     dragResizeHandleStart,
     dragResizeHandleEnd,
@@ -535,6 +537,11 @@ export function useEventTarget() {
     pointerMove,
     pointerDown,
     pointerUp,
+    //
+    dragStart,
+    dragEnd,
+    drag,
+    //
   ]);
 }
 

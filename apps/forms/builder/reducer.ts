@@ -5,9 +5,9 @@ import type {
   //
   DocumentEditorCanvasEventTargetHtmlBackendPointerMove,
   DocumentEditorCanvasEventTargetHtmlBackendPointerDown,
-  DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayDragStart,
-  DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayDragEnd,
-  DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayDrag,
+  DocumentEditorCanvasEventTargetHtmlBackendDrag,
+  DocumentEditorCanvasEventTargetHtmlBackendDragStart,
+  DocumentEditorCanvasEventTargetHtmlBackendDragEnd,
   TemplateEditorSetTemplatePropsAction,
   DocumentEditorNodeSelectAction,
   DocumentEditorNodePointerEnterAction,
@@ -50,32 +50,27 @@ export default function reducer<S extends IDocumentEditorState>(
         draft.is_gesture_node_drag_resize = false;
       });
     }
-    //
-    case "document/canvas/backend/html/event/node-overlay/on-drag-start": {
-      const { node_id } = <
-        DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayDragStart
-      >action;
+    // #region drag event
+    case "document/canvas/backend/html/event/on-drag-start": {
+      const {} = <DocumentEditorCanvasEventTargetHtmlBackendDragStart>action;
       return produce(state, (draft) => {
         draft.is_gesture_node_drag_move = true;
         draft.is_gesture_node_drag_resize = false;
-        draft.selected_node_id = node_id;
       });
     }
-    case "document/canvas/backend/html/event/node-overlay/on-drag-end": {
+    case "document/canvas/backend/html/event/on-drag-end": {
+      const {} = <DocumentEditorCanvasEventTargetHtmlBackendDragEnd>action;
       return produce(state, (draft) => {
         draft.is_gesture_node_drag_move = false;
       });
     }
-    case "document/canvas/backend/html/event/node-overlay/on-drag": {
-      const { node_id, delta } = <
-        DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayDrag
-      >action;
-
+    case "document/canvas/backend/html/event/on-drag": {
+      const { delta } = <DocumentEditorCanvasEventTargetHtmlBackendDrag>action;
       // cancel if invalid state
       if (!state.is_gesture_node_drag_move) return state;
-
+      if (!state.selected_node_id) return state;
       return produce(state, (draft) => {
-        const node = draft.document.nodes[node_id];
+        const node = draft.document.nodes[draft.selected_node_id!];
         assert("style" in node, "node has no style property");
         if (
           ((node as grida.program.nodes.i.ICSSStylable).style.position =
@@ -90,10 +85,10 @@ export default function reducer<S extends IDocumentEditorState>(
           // ignore
           reportError("node is not draggable");
         }
-
         //
       });
     }
+    // #endregion drag event
     // #region resize handle event
     case "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-start": {
       const { node_id, client_wh } = action;
