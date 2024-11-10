@@ -43,6 +43,10 @@ import { grida } from "@/grida";
 import { BackgroundColorControl } from "./controls/background-color";
 import { FontFamilyControl } from "./controls/font-family";
 import { TextColorControl } from "./controls/text-color";
+import {
+  PositioningConstraintsControl,
+  PositioningModeControl,
+} from "./controls/positioning";
 
 export function SelectedNodeProperties() {
   const { state: document, selectedNode } = useDocument();
@@ -65,8 +69,12 @@ export function SelectedNodeProperties() {
     cornerRadius,
     fill,
     position,
+    width,
+    height,
     left,
     top,
+    right,
+    bottom,
   } = node;
 
   // const istemplate = type?.startsWith("templates/");
@@ -129,9 +137,8 @@ export function SelectedNodeProperties() {
             <div>Node {selected_node_id}</div>
             <div>Type {type}</div>
             <div>Name {name}</div>
-            <div>Posi {position}</div>
-            <div>Left {left}</div>
-            <div>Top {top}</div>
+            <div>width {width}</div>
+            <div>height {height}</div>
           </pre>
         </SidebarMenuSectionContent>
       </SidebarSection>
@@ -143,6 +150,33 @@ export function SelectedNodeProperties() {
           <PropertyLine>
             <PropertyLineLabel>Active</PropertyLineLabel>
             <HiddenControl value={active} onValueChange={selectedNode.active} />
+          </PropertyLine>
+        </SidebarMenuSectionContent>
+      </SidebarSection>
+      <SidebarSection className="border-b pb-4">
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>Positioning</SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuSectionContent className="space-y-2">
+          <PropertyLine>
+            <PositioningConstraintsControl
+              value={{
+                position,
+                top,
+                left,
+                right,
+                bottom,
+              }}
+              onValueChange={selectedNode.positioning}
+            />
+          </PropertyLine>
+          <PropertyLine>
+            <PropertyLineLabel>Mode</PropertyLineLabel>
+            <PositioningModeControl
+              value={position}
+              //
+              onValueChange={selectedNode.positioningMode}
+            />
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>

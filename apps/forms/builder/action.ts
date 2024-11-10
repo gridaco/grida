@@ -24,6 +24,8 @@ export type BuilderAction =
   | TemplateNodeOverrideChangeAction
   | TemplateEditorSetTemplatePropsAction;
 
+type Vector2 = [number, number];
+
 interface IHtmlBackendCanvasEventTargetPointerEvent {
   /**
    * The node ids from the point.
@@ -33,8 +35,11 @@ interface IHtmlBackendCanvasEventTargetPointerEvent {
   node_ids_from_point: string[];
 }
 
-interface ICanvasEventTargetPointerEventDelta {
-  delta: [number, number];
+interface ICanvasEventTargetPointerEvent {
+  event: {
+    delta: Vector2;
+    distance: Vector2;
+  };
 }
 
 export type DocumentEditorCanvasEventTargetHtmlBackendPointerMove =
@@ -56,7 +61,7 @@ export type DocumentEditorCanvasEventTargetHtmlBackendDragStart = {
 };
 
 export type DocumentEditorCanvasEventTargetHtmlBackendDrag =
-  ICanvasEventTargetPointerEventDelta & {
+  ICanvasEventTargetPointerEvent & {
     type: "document/canvas/backend/html/event/on-drag";
   };
 
@@ -79,7 +84,7 @@ interface IHtmlCanvasEventTargetCalculatedNodeSize {
    *
    * when resizing a node with `width: 100%`  resize delta
    */
-  client_wh: grida.program.nodes.i.IDimension;
+  client_wh: grida.program.nodes.i.IFixedDimension;
 }
 
 export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayResizeHandleDragStart =
@@ -95,7 +100,7 @@ export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayResizeHandleDra
 
 export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayResizeHandleDrag =
   INodeID &
-    ICanvasEventTargetPointerEventDelta &
+    ICanvasEventTargetPointerEvent &
     ICanvasEventTargetResizeHandleEvent & {
       type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag";
     };
@@ -112,7 +117,7 @@ export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayCornerRadiusHan
 
 export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayCornerRadiusHandleDrag =
   INodeID &
-    ICanvasEventTargetPointerEventDelta &
+    ICanvasEventTargetPointerEvent &
     ICanvasEventTargetResizeHandleEvent & {
       type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag";
     };
@@ -144,6 +149,14 @@ interface INodeChangeNameAction extends INodeID {
 
 interface INodeChangeActiveAction extends INodeID {
   active: boolean;
+}
+
+interface INodeChangePositioningAction extends INodeID {
+  positioning: grida.program.nodes.i.IPositioning;
+}
+
+interface INodeChangePositioningModeAction extends INodeID {
+  position: grida.program.nodes.i.IPositioning["position"];
 }
 
 interface INodeChangeComponentAction extends INodeID {
@@ -189,6 +202,10 @@ interface INodeChangePropsAction extends INodeID {
 export type NodeChangeAction =
   | ({ type: "node/change/name" } & INodeChangeNameAction)
   | ({ type: "node/change/active" } & INodeChangeActiveAction)
+  | ({ type: "node/change/positioning" } & INodeChangePositioningAction)
+  | ({
+      type: "node/change/positioning-mode";
+    } & INodeChangePositioningModeAction)
   | ({ type: "node/change/component" } & INodeChangeComponentAction)
   | ({ type: "node/change/text" } & INodeChangeTextAction)
   | ({ type: "node/change/opacity" } & INodeChangeOpacityAction)

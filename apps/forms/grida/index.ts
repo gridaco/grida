@@ -358,6 +358,40 @@ export namespace grida {
     }
 
     export namespace css {
+      /**
+       * @see https://developer.mozilla.org/en-US/docs/Web/CSS/length
+       */
+      export type Length =
+        | number
+        | {
+            type: "length";
+            /**
+             * only supports the following units:
+             * - px
+             * - vw
+             * - vh
+             * - dvw
+             * - dvh
+             * - em
+             * - rem
+             */
+            unit: "px" | "vw" | "vh" | "dvw" | "dvh" | "em" | "rem";
+            value: number;
+          };
+
+      /**
+       * @see https://developer.mozilla.org/en-US/docs/Web/CSS/percentage
+       */
+      export type Percentage = {
+        type: "percentage";
+        value: number;
+      };
+
+      /**
+       * @see https://developer.mozilla.org/en-US/docs/Web/CSS/length-percentage
+       */
+      export type LengthPercentage = Length | Percentage;
+
       export type RGBA = { r: number; g: number; b: number; a: number };
 
       /**
@@ -372,6 +406,11 @@ export namespace grida {
        * - `opacity`
        * - `z-index`
        * - `cursor`
+       * - `position`
+       * - `width`
+       * - `height`
+       * - `top`
+       * - `left`
        * - `pointer-events`
        * - `border-radius`
        *
@@ -385,6 +424,8 @@ export namespace grida {
         // explicitly prohibited
         // - "opacity"
         // - "zIndex"
+        // - "width"
+        // - "height"
         // - "position"
         // - "left"
         // - "top"
@@ -397,8 +438,8 @@ export namespace grida {
         // position & dimension
         // | 'width' | 'height' | 'minWidth' | 'minHeight' | 'maxWidth' | 'maxHeight' | 'position' | 'top' | 'right' | 'bottom' | 'left' | 'zIndex'
         // | "position"
-        | "width"
-        | "height"
+        // | "width"
+        // | "height"
         // | "top"
         // | "left"
         //
@@ -451,6 +492,24 @@ export namespace grida {
 
       export function toRGBAString(rgba: css.RGBA): string {
         return `rgba(${rgba.r}, ${rgba.g}, ${rgba.b}, ${rgba.a})`;
+      }
+
+      export function toDimension(
+        value: css.LengthPercentage | "auto"
+      ): string {
+        if (value === "auto") return "auto";
+        if (typeof value === "number") {
+          return `${value}px`;
+        } else {
+          switch (value.type) {
+            case "length": {
+              return `${value.value}${value.unit}`;
+            }
+            case "percentage": {
+              return `${value.value}%`;
+            }
+          }
+        }
       }
     }
 
@@ -673,6 +732,7 @@ export namespace grida {
         export interface ICSSStylable
           extends IStylable<css.ExplicitlySupportedCSSProperties>,
             IPositioning,
+            ICSSDimension,
             IOpacity,
             IZIndex {
           style: css.ExplicitlySupportedCSSProperties;
@@ -686,9 +746,14 @@ export namespace grida {
         /**
          * does not represent any specific rule or logic, just a data structure, depends on the context
          */
-        export interface IDimension {
+        export interface IFixedDimension {
           width: number;
           height: number;
+        }
+
+        export interface ICSSDimension {
+          width: css.LengthPercentage | "auto";
+          height: css.LengthPercentage | "auto";
         }
 
         /**
@@ -700,8 +765,8 @@ export namespace grida {
           position: "absolute" | "relative";
           left?: number | undefined;
           top?: number | undefined;
-          // right: number;
-          // bottom: number;
+          right?: number | undefined;
+          bottom?: number | undefined;
           // x: number;
           // y: number;
         }
@@ -757,6 +822,7 @@ export namespace grida {
           i.IHrefable,
           i.ITextValue {
         readonly type: "text";
+        // textAutoResize: "none" | "width" | "height" | "auto";
       }
 
       export interface ImageNode
@@ -770,8 +836,6 @@ export namespace grida {
          */
         src?: Tokens.StringValueExpression;
         alt?: string;
-        width?: number;
-        height?: number;
       }
 
       export interface ContainerNode
@@ -792,8 +856,7 @@ export namespace grida {
         extends i.IBaseNode,
           i.ISceneNode,
           i.ICSSStylable,
-          i.IHrefable,
-          i.IDimension {
+          i.IHrefable {
         type: "svg";
         svg: string;
       }
@@ -815,7 +878,8 @@ export namespace grida {
           i.ISceneNode,
           i.IHrefable,
           i.IPositioning,
-          i.IDimension,
+          // i.ICSSDimension,
+          i.IFixedDimension,
           i.IOpacity,
           i.IZIndex,
           i.IFill,
@@ -835,7 +899,8 @@ export namespace grida {
           i.ISceneNode,
           i.IHrefable,
           i.IPositioning,
-          i.IDimension,
+          // i.ICSSDimension,
+          i.IFixedDimension,
           i.IOpacity,
           i.IZIndex,
           i.IFill,

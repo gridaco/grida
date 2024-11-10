@@ -15,6 +15,8 @@ import {
 } from "@/grida/react-runtime/data-context/context";
 import assert from "assert";
 
+type Vector2 = [number, number];
+
 const DocumentContext = createContext<IDocumentEditorState | null>(null);
 
 const __noop: DocumentDispatcher = () => void 0;
@@ -177,6 +179,31 @@ export function useDocument() {
     [dispatch]
   );
 
+  const changeNodePositioning = useCallback(
+    (node_id: string, positioning: grida.program.nodes.i.IPositioning) => {
+      dispatch({
+        type: "node/change/positioning",
+        node_id: node_id,
+        positioning,
+      });
+    },
+    [dispatch]
+  );
+
+  const changeNodePositioningMode = useCallback(
+    (
+      node_id: string,
+      position: grida.program.nodes.i.IPositioning["position"]
+    ) => {
+      dispatch({
+        type: "node/change/positioning-mode",
+        node_id: node_id,
+        position,
+      });
+    },
+    [dispatch]
+  );
+
   const changeNodeSrc = useCallback(
     (node_id: string, src?: Tokens.StringValueExpression) => {
       dispatch({
@@ -305,6 +332,11 @@ export function useDocument() {
         changeNodeHref(selected_node_id!, href),
       target: (target?: grida.program.nodes.i.IHrefable["target"]) =>
         changeNodeTarget(selected_node_id!, target),
+
+      positioning: (value: grida.program.nodes.i.IPositioning) =>
+        changeNodePositioning(selected_node_id!, value),
+      positioningMode: (value: "absolute" | "relative") =>
+        changeNodePositioningMode(selected_node_id!, value),
 
       //
       cornerRadius: (
@@ -456,11 +488,11 @@ export function useEventTarget() {
   }, [dispatch]);
 
   const drag = useCallback(
-    (delta: [number, number]) => {
+    (event: { delta: Vector2; distance: Vector2 }) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "document/canvas/backend/html/event/on-drag",
-          delta,
+          event,
         });
       });
     },
@@ -491,14 +523,14 @@ export function useEventTarget() {
     (
       node_id: string,
       anchor: "nw" | "ne" | "sw" | "se",
-      delta: [number, number]
+      event: { delta: Vector2; distance: Vector2 }
     ) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag",
           node_id,
           anchor,
-          delta,
+          event,
         });
       });
     },
@@ -529,14 +561,14 @@ export function useEventTarget() {
     (
       node_id: string,
       anchor: "nw" | "ne" | "sw" | "se",
-      delta: [number, number]
+      event: { delta: Vector2; distance: Vector2 }
     ) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag",
           node_id,
           anchor,
-          delta,
+          event,
         });
       });
     },

@@ -32,8 +32,8 @@ export const ImageWidget = ({
         // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
         <img
           src={src as string}
-          width={width}
-          height={height}
+          width={grida.program.css.toDimension(width)}
+          height={grida.program.css.toDimension(height)}
           alt={alt}
           {...img_element_props_without_data_attributes}
           style={{

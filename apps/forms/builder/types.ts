@@ -29,6 +29,22 @@ export interface IDocumentEditorInteractionCursorState {
    */
   is_gesture_node_drag_corner_radius?: boolean;
 
+  /**
+   * @private - internal use only
+   *
+   * @default {x: 0, y: 0}
+   */
+  cursor_position: {
+    x: number;
+    y: number;
+  };
+
+  /**
+   * @private - internal use only
+   *
+   * refresh key
+   */
+  __r: number;
   // selectedTextRange;
 }
 

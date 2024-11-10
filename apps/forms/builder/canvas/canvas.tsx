@@ -87,12 +87,16 @@ export function CanvasOverlay() {
         dragEnd();
       },
       onDrag: (e) => {
-        drag(e.delta);
+        // console.log("drag", e.delta, e.distance);
+        drag({ delta: e.delta, distance: e.distance });
       },
     },
     {
-      drag: {
+      move: {
         threshold: 1,
+      },
+      drag: {
+        threshold: 0.1,
       },
     }
   );
@@ -206,7 +210,10 @@ function CornerRadiusHandle({
       },
       onDrag: (e) => {
         e.event.stopPropagation();
-        dragCornerRadiusHandleHandle(node_id, anchor, e.delta);
+        dragCornerRadiusHandleHandle(node_id, anchor, {
+          delta: e.delta,
+          distance: e.distance,
+        });
       },
     },
     {
@@ -276,7 +283,10 @@ function ResizeHandle({
       },
       onDrag: (e) => {
         e.event.stopPropagation();
-        dragResizeHandle(node_id, anchor, e.delta);
+        dragResizeHandle(node_id, anchor, {
+          delta: e.delta,
+          distance: e.distance,
+        });
       },
     },
     {

@@ -101,6 +101,8 @@ export const Card_001 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        width: "auto",
+        height: "auto",
         position: "relative",
       },
       ".p": {
@@ -113,6 +115,8 @@ export const Card_001 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        width: "auto",
+        height: "auto",
         position: "relative",
       },
       ".date1": {
@@ -125,6 +129,8 @@ export const Card_001 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        width: "auto",
+        height: "auto",
         position: "relative",
       },
       ".n": {
@@ -137,6 +143,8 @@ export const Card_001 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        width: "auto",
+        height: "auto",
         position: "relative",
       },
       ".badge": {
@@ -149,6 +157,8 @@ export const Card_001 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        width: "auto",
+        height: "auto",
         position: "relative",
       },
       ".media": {
@@ -162,6 +172,8 @@ export const Card_001 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        width: "auto",
+        height: "auto",
         position: "relative",
       },
       ".date2": {
@@ -174,6 +186,8 @@ export const Card_001 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        width: "auto",
+        height: "auto",
         position: "relative",
       },
       ".tags": {
@@ -186,6 +200,8 @@ export const Card_001 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        width: "auto",
+        height: "auto",
         position: "relative",
       },
     },
@@ -259,6 +275,8 @@ export const Card_002 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        width: "auto",
+        height: "auto",
         position: "relative",
       },
       ".p": {
@@ -271,6 +289,8 @@ export const Card_002 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        width: "auto",
+        height: "auto",
         position: "relative",
       },
       ".date1": {
@@ -283,6 +303,8 @@ export const Card_002 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        width: "auto",
+        height: "auto",
         position: "relative",
       },
       ".n": {
@@ -295,6 +317,8 @@ export const Card_002 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        width: "auto",
+        height: "auto",
         position: "relative",
       },
       ".badge": {
@@ -307,6 +331,8 @@ export const Card_002 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        width: "auto",
+        height: "auto",
         position: "relative",
       },
       ".media": {
@@ -320,6 +346,8 @@ export const Card_002 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        width: "auto",
+        height: "auto",
         position: "relative",
       },
       ".date2": {
@@ -332,6 +360,8 @@ export const Card_002 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        width: "auto",
+        height: "auto",
         position: "relative",
       },
       ".tags": {
@@ -344,6 +374,8 @@ export const Card_002 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        width: "auto",
+        height: "auto",
         position: "relative",
       },
     },
@@ -401,12 +433,14 @@ export const Card_003 = withTemplateDefinition(
           </div>
           <NodeElement
             node_id="media-layout"
-            style={{
-              width: 80,
-              height: 80,
-              // borderRadius: 8,
-              // overflow: "hidden",
-            }}
+            width={80}
+            height={80}
+            style={
+              {
+                // borderRadius: 8,
+                // overflow: "hidden",
+              }
+            }
           >
             <Media
               type={media.type}
@@ -445,6 +479,8 @@ export const Card_003 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        width: "auto",
+        height: "auto",
         position: "relative",
       },
       ".p": {
@@ -457,6 +493,8 @@ export const Card_003 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        width: "auto",
+        height: "auto",
         position: "relative",
       },
       ".date1": {
@@ -469,6 +507,8 @@ export const Card_003 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        width: "auto",
+        height: "auto",
         position: "relative",
       },
       ".n": {
@@ -481,6 +521,8 @@ export const Card_003 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        width: "auto",
+        height: "auto",
         position: "relative",
       },
       ".badge": {
@@ -493,6 +535,8 @@ export const Card_003 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        width: "auto",
+        height: "auto",
         position: "relative",
       },
       ".media": {
@@ -506,6 +550,8 @@ export const Card_003 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        width: "auto",
+        height: "auto",
         position: "relative",
       },
       ".date2": {
@@ -518,6 +564,8 @@ export const Card_003 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        width: "auto",
+        height: "auto",
         position: "relative",
       },
       ".tags": {
@@ -530,6 +578,8 @@ export const Card_003 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        width: "auto",
+        height: "auto",
         position: "relative",
       },
     },
@@ -600,6 +650,8 @@ export const Hero_001 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        width: "auto",
+        height: "auto",
         position: "relative",
       },
       ".p": {
@@ -612,6 +664,8 @@ export const Hero_001 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        width: "auto",
+        height: "auto",
         position: "relative",
       },
       ".media": {
@@ -625,6 +679,8 @@ export const Hero_001 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        width: "auto",
+        height: "auto",
         position: "relative",
       },
     },
@@ -678,6 +734,8 @@ export const Hero_002 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        width: "auto",
+        height: "auto",
         position: "relative",
       },
       ".p": {
@@ -690,6 +748,8 @@ export const Hero_002 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        width: "auto",
+        height: "auto",
         position: "relative",
       },
       ".media": {
@@ -703,6 +763,8 @@ export const Hero_002 = withTemplateDefinition(
         opacity: 1,
         zIndex: 0,
         style: {},
+        width: "auto",
+        height: "auto",
         position: "relative",
       },
     },

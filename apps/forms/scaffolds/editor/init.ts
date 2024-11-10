@@ -281,6 +281,8 @@ function initialSiteEditorState(init: SiteDocumentEditorInit): EditorState {
     documents: {
       ["site/dev-collection"]: {
         editable: true,
+        cursor_position: { x: 0, y: 0 },
+        __r: 0,
         document: { nodes: {}, root_id: "root" },
         templates: {
           ["formcollection_sample_001_the_bundle"]: {
@@ -507,6 +509,8 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
         ? {
             template_id: init.start.template_id,
             editable: true,
+            cursor_position: { x: 0, y: 0 },
+            __r: 0,
             document: init.start,
             templates: {
               [init.start.template_id]: FormStartPage.getTemplate(

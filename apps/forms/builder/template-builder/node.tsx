@@ -16,6 +16,8 @@ interface NodeElementProps<P extends Record<string, any>> {
   position?: "absolute" | "relative";
   left?: number;
   top?: number;
+  width?: grida.program.nodes.i.ICSSDimension["width"];
+  height?: grida.program.nodes.i.ICSSDimension["height"];
 }
 
 export function NodeElement<P extends Record<string, any>>({
@@ -26,6 +28,8 @@ export function NodeElement<P extends Record<string, any>>({
   position: DEFAULT_POSITION,
   left: DEFAULT_LEFT,
   top: DEFAULT_TOP,
+  width: DEFAULT_WIDTH,
+  height: DEFAULT_HEIGHT,
   style,
 }: React.PropsWithChildren<NodeElementProps<P>>) {
   const { state: document, selected_node_id } = useDocument();
@@ -87,7 +91,8 @@ export function NodeElement<P extends Record<string, any>>({
     position: DEFAULT_POSITION ?? node.position,
     left: DEFAULT_LEFT ?? node.left,
     top: DEFAULT_TOP ?? node.top,
-
+    width: DEFAULT_WIDTH ?? node.width,
+    height: DEFAULT_HEIGHT ?? node.height,
     style: {
       ...style,
       ...node.style,
@@ -96,8 +101,8 @@ export function NodeElement<P extends Record<string, any>>({
     // x: node.x,
     // y: node.y,
     // IDemension (does not instrictly mean width and height)
-    width: node.width,
-    height: node.height,
+    // width: node.width,
+    // height: node.height,
     fill: node.fill,
     cornerRadius: node.cornerRadius,
     // @ts-ignore
@@ -130,6 +135,10 @@ export function NodeElement<P extends Record<string, any>>({
             position: node.position,
             top: node.top,
             left: node.left,
+            right: node.right,
+            bottom: node.bottom,
+            width: node.width,
+            height: node.height,
             ...grida.program.css.toReactCSSProperties({
               ...styles,
             }),

@@ -60,6 +60,7 @@ export default function CanvasPlaygroundPage({
     editable: true,
     // @ts-expect-error
     document: docs[slug].document,
+    cursor_position: { x: 0, y: 0 },
   });
 
   return (

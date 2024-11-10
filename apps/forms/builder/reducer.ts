@@ -65,20 +65,24 @@ export default function reducer<S extends IDocumentEditorState>(
       });
     }
     case "document/canvas/backend/html/event/on-drag": {
-      const { delta } = <DocumentEditorCanvasEventTargetHtmlBackendDrag>action;
+      const {
+        event: { delta, distance },
+      } = <DocumentEditorCanvasEventTargetHtmlBackendDrag>action;
       // cancel if invalid state
       if (!state.is_gesture_node_drag_move) return state;
       if (!state.selected_node_id) return state;
 
       const nid = state.selected_node_id;
 
+      const [dx, dy] = delta;
+
       return produce(state, (draft) => {
         const node = draft.document.nodes[nid];
 
         draft.document.nodes[nid] = nodeTransformReducer(node, {
           type: "move",
-          dx: delta[0],
-          dy: delta[1],
+          dx: dx,
+          dy: dy,
         });
 
         //
@@ -93,14 +97,15 @@ export default function reducer<S extends IDocumentEditorState>(
       return produce(state, (draft) => {
         draft.is_gesture_node_drag_resize = true;
         draft.is_gesture_node_drag_move = false;
+        draft.hovered_node_id = undefined;
 
         const node = draft.document.nodes[node_id];
 
         // need to assign a fixed size if width or height is a variable length
-        (node as grida.program.nodes.i.ICSSStylable).style.width =
-          client_wh.width;
-        (node as grida.program.nodes.i.ICSSStylable).style.height =
-          client_wh.height;
+        (node as grida.program.nodes.i.ICSSDimension).width = client_wh.width;
+        // (node as grida.program.nodes.i.ICSSStylable).style.width = client_wh.width;
+        (node as grida.program.nodes.i.ICSSDimension).height = client_wh.height;
+        // (node as grida.program.nodes.i.ICSSStylable).style.height = client_wh.height;
       });
     }
     case "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-end": {
@@ -109,7 +114,11 @@ export default function reducer<S extends IDocumentEditorState>(
       });
     }
     case "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag": {
-      const { node_id, anchor, delta } = action;
+      const {
+        node_id,
+        anchor,
+        event: { delta, distance },
+      } = action;
       const [dx, dy] = delta;
 
       // cancel if invalid state
@@ -145,7 +154,10 @@ export default function reducer<S extends IDocumentEditorState>(
       });
     }
     case "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag": {
-      const { node_id, delta } = action;
+      const {
+        node_id,
+        event: { delta, distance },
+      } = action;
       const [dx, dy] = delta;
       // cancel if invalid state
       if (!state.is_gesture_node_drag_corner_radius) return state;
@@ -217,6 +229,8 @@ export default function reducer<S extends IDocumentEditorState>(
 
     case "node/change/active":
     case "node/change/name":
+    case "node/change/positioning":
+    case "node/change/positioning-mode":
     case "node/change/component":
     case "node/change/href":
     case "node/change/target":
@@ -261,20 +275,34 @@ export default function reducer<S extends IDocumentEditorState>(
   return state;
 }
 
+type NodeTransformAction =
+  | {
+      type: "move";
+      /**
+       * distance or delta
+       */
+      dx: number;
+      /**
+       * distance or delta
+       */
+      dy: number;
+    }
+  | {
+      type: "resize";
+      anchor: "nw" | "ne" | "sw" | "se";
+      /**
+       * distance or delta
+       */
+      dx: number;
+      /**
+       * distance or delta
+       */
+      dy: number;
+    };
+
 function nodeTransformReducer(
   node: grida.program.nodes.Node,
-  action:
-    | {
-        type: "move";
-        dx: number;
-        dy: number;
-      }
-    | {
-        type: "resize";
-        anchor: "nw" | "ne" | "sw" | "se";
-        dx: number;
-        dy: number;
-      }
+  action: NodeTransformAction
 ) {
   return produce(node, (draft) => {
     assert(
@@ -287,10 +315,14 @@ function nodeTransformReducer(
         const { dx, dy } = action;
         if (draft.position == "absolute") {
           if (dx) {
-            draft.left = (draft.left ?? 0) + dx;
+            const new_l = (draft.left ?? 0) + dx;
+            draft.left = new_l;
+            // draft.left = Math.round(new_l);
           }
           if (dy) {
-            draft.top = (draft.top ?? 0) + dy;
+            const new_t = (draft.top ?? 0) + dy;
+            draft.top = new_t;
+            // draft.top = Math.round(new_t);
           }
         } else {
           // ignore
@@ -314,10 +346,12 @@ function nodeTransformReducer(
           }
         }
 
-        ((node as grida.program.nodes.i.ICSSStylable).style.width as number) +=
-          dx;
-        ((node as grida.program.nodes.i.ICSSStylable).style.height as number) +=
-          dy;
+        ((node as grida.program.nodes.i.ICSSDimension).width as number) += dx;
+        // ((node as grida.program.nodes.i.ICSSStylable).style.width as number) +=
+        //   dx;
+        ((node as grida.program.nodes.i.ICSSDimension).height as number) += dy;
+        // ((node as grida.program.nodes.i.ICSSStylable).style.height as number) +=
+        //   dy;
 
         return;
       }
@@ -337,6 +371,33 @@ function nodeReducer<N extends Partial<grida.program.nodes.Node>>(
       }
       case "node/change/name": {
         (draft as grida.program.nodes.i.IBaseNode).name = action.name;
+        break;
+      }
+      case "node/change/positioning": {
+        const { positioning } = action;
+        (draft as grida.program.nodes.i.IPositioning).left = positioning.left;
+        (draft as grida.program.nodes.i.IPositioning).top = positioning.top;
+        (draft as grida.program.nodes.i.IPositioning).right = positioning.right;
+        (draft as grida.program.nodes.i.IPositioning).bottom =
+          positioning.bottom;
+        (draft as grida.program.nodes.i.IPositioning).position =
+          positioning.position;
+        break;
+      }
+      case "node/change/positioning-mode": {
+        const { position } = action;
+        (draft as grida.program.nodes.i.IPositioning).position = position;
+        switch (position) {
+          case "absolute": {
+            break;
+          }
+          case "relative": {
+            (draft as grida.program.nodes.i.IPositioning).left = undefined;
+            (draft as grida.program.nodes.i.IPositioning).top = undefined;
+            (draft as grida.program.nodes.i.IPositioning).right = undefined;
+            (draft as grida.program.nodes.i.IPositioning).bottom = undefined;
+          }
+        }
         break;
       }
       case "node/change/href": {

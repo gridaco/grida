@@ -144,6 +144,8 @@ function FormStartPage({
     <StandaloneDocumentEditor
       state={{
         editable: false,
+        cursor_position: { x: 0, y: 0 },
+        __r: 0,
         document: start_page,
         templates: {
           [(

@@ -86,8 +86,8 @@ function Consumer() {
           top={0}
           style={{
             objectFit: "cover",
-            width: "100%",
-            height: "100%",
+            // width: "100%",
+            // height: "100%",
           }}
         />
       </ScreenCenter>
@@ -116,6 +116,8 @@ _003.definition = {
       opacity: 1,
       zIndex: 0,
       style: {},
+      width: "auto",
+      height: "auto",
       position: "relative",
     },
     "003.subtitle": {
@@ -128,6 +130,8 @@ _003.definition = {
       opacity: 1,
       zIndex: 0,
       style: {},
+      width: "auto",
+      height: "auto",
       position: "relative",
     },
     "003.background": {
@@ -140,6 +144,8 @@ _003.definition = {
       opacity: 1,
       zIndex: 0,
       style: {},
+      width: "auto",
+      height: "auto",
       position: "relative",
     },
   },
