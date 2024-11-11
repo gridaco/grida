@@ -47,7 +47,7 @@ export function PositioningConstraintsControl({
           type="number"
           value={value.top ?? ""}
           onChange={(e) => {
-            const v = parseInt(e.target.value);
+            const v = parseInt(e.target.value) || undefined;
             onValueChange?.({ ...value, top: v });
           }}
           className={cn(WorkbenchUI.inputVariants({ size: "sm" }), "w-16")}
@@ -59,7 +59,7 @@ export function PositioningConstraintsControl({
           type="number"
           value={value.left ?? ""}
           onChange={(e) => {
-            const v = parseInt(e.target.value);
+            const v = parseInt(e.target.value) || undefined;
             onValueChange?.({ ...value, left: v });
           }}
           className={cn(WorkbenchUI.inputVariants({ size: "sm" }), "w-16")}
@@ -83,7 +83,7 @@ export function PositioningConstraintsControl({
           type="number"
           value={value.right ?? ""}
           onChange={(e) => {
-            const v = parseInt(e.target.value);
+            const v = parseInt(e.target.value) || undefined;
             onValueChange?.({ ...value, right: v });
           }}
           className={cn(WorkbenchUI.inputVariants({ size: "sm" }), "w-16")}
@@ -95,7 +95,7 @@ export function PositioningConstraintsControl({
           type="number"
           value={value.bottom ?? ""}
           onChange={(e) => {
-            const v = parseInt(e.target.value);
+            const v = parseInt(e.target.value) || undefined;
             onValueChange?.({ ...value, bottom: v });
           }}
           className={cn(WorkbenchUI.inputVariants({ size: "sm" }), "w-16")}

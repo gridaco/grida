@@ -378,7 +378,6 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
         draft.documents["form/startpage"] = {
           template_id: template_id,
           editable: true,
-          __r: 0,
           cursor_position: { x: 0, y: 0 },
           document: {
             root_id: "page",

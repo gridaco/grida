@@ -315,14 +315,32 @@ function nodeTransformReducer(
         const { dx, dy } = action;
         if (draft.position == "absolute") {
           if (dx) {
-            const new_l = (draft.left ?? 0) + dx;
-            draft.left = new_l;
-            // draft.left = Math.round(new_l);
+            if (draft.left !== undefined || draft.right !== undefined) {
+              if (draft.left !== undefined) {
+                const new_l = draft.left + dx;
+                draft.left = new_l;
+              }
+              if (draft.right !== undefined) {
+                const new_r = draft.right - dx;
+                draft.right = new_r;
+              }
+            } else {
+              draft.left = dx;
+            }
           }
           if (dy) {
-            const new_t = (draft.top ?? 0) + dy;
-            draft.top = new_t;
-            // draft.top = Math.round(new_t);
+            if (draft.top !== undefined || draft.bottom !== undefined) {
+              if (draft.top !== undefined) {
+                const new_t = draft.top + dy;
+                draft.top = new_t;
+              }
+              if (draft.bottom !== undefined) {
+                const new_b = draft.bottom - dy;
+                draft.bottom = new_b;
+              }
+            } else {
+              draft.top = dy;
+            }
           }
         } else {
           // ignore
@@ -335,23 +353,39 @@ function nodeTransformReducer(
         const { anchor, dx, dy } = action;
         //
         // TODO: calculate the final delta based on anchor and movement delta
+        console.log(anchor);
         switch (anchor) {
-          case "ne": {
-          }
           case "nw": {
+            break;
           }
-          case "se": {
+          case "ne": {
+            break;
           }
           case "sw": {
+            break;
+          }
+          case "se": {
+            if (dx) {
+              ((draft as grida.program.nodes.i.ICSSDimension)
+                .width as number) += dx;
+
+              if (draft.right !== undefined) {
+                draft.right -= dx;
+              }
+            }
+
+            if (dy) {
+              ((draft as grida.program.nodes.i.ICSSDimension)
+                .height as number) += dy;
+
+              if (draft.bottom !== undefined) {
+                draft.bottom -= dy;
+              }
+            }
+
+            break;
           }
         }
-
-        ((node as grida.program.nodes.i.ICSSDimension).width as number) += dx;
-        // ((node as grida.program.nodes.i.ICSSStylable).style.width as number) +=
-        //   dx;
-        ((node as grida.program.nodes.i.ICSSDimension).height as number) += dy;
-        // ((node as grida.program.nodes.i.ICSSStylable).style.height as number) +=
-        //   dy;
 
         return;
       }

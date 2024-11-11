@@ -44,7 +44,7 @@ export interface IDocumentEditorInteractionCursorState {
    *
    * refresh key
    */
-  __r: number;
+  // __r: number;
   // selectedTextRange;
 }
 
