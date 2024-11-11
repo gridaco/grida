@@ -512,7 +512,12 @@ function nodeReducer<N extends Partial<grida.program.nodes.Node>>(
         break;
       }
       case "node/change/fill": {
-        assert(draft.type === "rectangle" || draft.type === "ellipse");
+        assert(
+          draft.type === "rectangle" ||
+            draft.type === "ellipse" ||
+            draft.type === "text" ||
+            draft.type === "container"
+        );
         switch (action.fill.type) {
           case "linear_gradient":
             draft.fill = { ...action.fill, id: `gradient-${v4()}` };

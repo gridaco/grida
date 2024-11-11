@@ -111,7 +111,7 @@ function GradientStopsSlider({
       <SliderPrimitive.Track
         className="relative h-2 w-full grow overflow-hidden rounded-full"
         style={{
-          background: `linear-gradient(to right, ${stops.map((stop) => `rgba(${stop.color.r}, ${stop.color.g}, ${stop.color.b}, ${stop.color.a}) ${stop.offset * 100}%`).join(", ")})`,
+          background: `linear-gradient(to right, ${stops.map((stop) => `${grida.program.css.toRGBAString(stop.color)} ${stop.offset * 100}%`).join(", ")})`,
         }}
       ></SliderPrimitive.Track>
       {stops.map((stop, index) => (

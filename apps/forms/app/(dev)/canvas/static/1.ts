@@ -32,8 +32,8 @@ export default {
       position: "relative",
       width: 960,
       height: 540,
+      fill: { type: "solid", color: { r: 255, g: 255, b: 255, a: 1 } },
       style: {
-        backgroundColor: { r: 255, g: 255, b: 255, a: 1 },
         boxShadow: "0 0 10px rgba(0,0,0,0.1)",
       },
       children: [
@@ -156,11 +156,11 @@ export default {
       left: 300,
       width: 360,
       height: "auto",
+      fill: { type: "solid", color: { r: 0, g: 0, b: 0, a: 1 } },
       style: {
         fontSize: 32,
         fontWeight: 500,
         textAlign: "center",
-        textColor: { r: 0, g: 0, b: 0, a: 1 },
       },
     },
     p: {
@@ -177,11 +177,11 @@ export default {
       left: 200,
       width: 560,
       height: "auto",
+      fill: { type: "solid", color: { r: 0, g: 0, b: 0, a: 0.8 } },
       style: {
         fontSize: 13,
         fontWeight: 400,
         textAlign: "center",
-        textColor: { r: 0, g: 0, b: 0, a: 0.8 },
       },
     },
   },

@@ -425,27 +425,121 @@ export namespace grida {
         //
         | "objectFit"
         | "objectPosition"
-      > & {
-        // fill: cg.Paint;
-        backgroundColor?: css.RGBA;
-        textColor?: css.RGBA;
-      };
+      >;
 
       export function toReactCSSProperties(
-        style: ExplicitlySupportedCSSProperties
+        styles: nodes.i.ICSSStylable & Partial<nodes.i.IRectangleCorner>,
+        config: {
+          fill: "color" | "background" | "fill" | "none";
+        }
       ): React.CSSProperties {
-        const { backgroundColor, textColor, ...styles } = style;
-        return {
-          ...styles,
-          backgroundColor: backgroundColor
-            ? toRGBAString(backgroundColor)
-            : undefined,
-          color: textColor ? toRGBAString(textColor) : undefined,
-        };
+        const {
+          position,
+          top,
+          left,
+          bottom,
+          right,
+          width,
+          height,
+          zIndex,
+          opacity,
+          fill,
+          cornerRadius: __,
+          style,
+        } = styles;
+        const without_fill = {
+          position: position,
+          width: toDimension(width),
+          height: toDimension(height),
+          top: top,
+          left: left,
+          right: right,
+          bottom: bottom,
+          zIndex: zIndex,
+          opacity: opacity,
+          ...style,
+        } satisfies React.CSSProperties;
+
+        switch (config.fill) {
+          case "color":
+            return {
+              ...without_fill,
+              color: fill ? toFillString(fill) : undefined,
+            };
+          case "background":
+            return {
+              ...without_fill,
+              background: fill ? toFillString(fill) : undefined,
+            };
+          case "fill":
+            return {
+              ...without_fill,
+              fill: fill ? toFillString(fill) : undefined,
+            };
+          case "none":
+            return without_fill;
+        }
+      }
+
+      export function toFillString(paint: cg.Paint): string {
+        switch (paint.type) {
+          case "solid":
+            return toRGBAString(paint.color);
+          case "linear_gradient":
+            return toLinearGradientString(paint);
+          case "radial_gradient":
+            return toRadialGradientString(paint);
+        }
       }
 
       export function toRGBAString(rgba: css.RGBA): string {
         return `rgba(${rgba.r}, ${rgba.g}, ${rgba.b}, ${rgba.a})`;
+      }
+
+      /**
+       *
+       * @example
+       * `linear-gradient(to right, red, blue)`
+       *
+       * @param paint
+       * @returns
+       * @see https://developer.mozilla.org/en-US/docs/Web/CSS/linear-gradient
+       */
+      export function toLinearGradientString(
+        paint: Omit<cg.LinearGradientPaint, "id">
+      ): string {
+        const { stops } = paint;
+
+        const gradientStops = stops
+          .map((stop) => {
+            return `${toRGBAString(stop.color)} ${stop.offset * 100}%`;
+          })
+          .join(", ");
+
+        return `linear-gradient(${gradientStops})`;
+      }
+
+      /**
+       *
+       * @example
+       * `radial-gradient(circle, red, blue)`
+       *
+       * @param paint
+       * @returns
+       * @see https://developer.mozilla.org/en-US/docs/Web/CSS/radial-gradient
+       */
+      export function toRadialGradientString(
+        paint: Omit<cg.RadialGradientPaint, "id">
+      ): string {
+        const { stops } = paint;
+
+        const gradientStops = stops
+          .map((stop) => {
+            return `${toRGBAString(stop.color)} ${stop.offset * 100}%`;
+          })
+          .join(", ");
+
+        return `radial-gradient(${gradientStops})`;
       }
 
       export function toDimension(
@@ -464,6 +558,17 @@ export namespace grida {
             }
           }
         }
+      }
+
+      /**
+       *
+       * @param color
+       * @returns hex color string without the leading `#`
+       * @example `rgba_to_hex({ r: 255, g: 255, b: 255, a: 1 })` returns `"ffffff"`
+       *
+       */
+      export function rgbaToHex(color: grida.program.css.RGBA): string {
+        return `${color.r.toString(16).padStart(2, "0")}${color.g.toString(16).padStart(2, "0")}${color.b.toString(16).padStart(2, "0")}`;
       }
     }
 
@@ -685,7 +790,7 @@ export namespace grida {
          * Node that can be filled with color - such as rectangle, ellipse, etc.
          */
         export interface IFill {
-          fill: cg.Paint;
+          fill?: cg.Paint;
         }
 
         /**
@@ -710,6 +815,7 @@ export namespace grida {
           extends IStylable<css.ExplicitlySupportedCSSProperties>,
             IPositioning,
             ICSSDimension,
+            IFill,
             IOpacity,
             IZIndex {
           style: css.ExplicitlySupportedCSSProperties;

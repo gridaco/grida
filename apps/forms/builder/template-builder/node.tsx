@@ -18,6 +18,7 @@ interface NodeElementProps<P extends Record<string, any>> {
   top?: number;
   width?: grida.program.nodes.i.ICSSDimension["width"];
   height?: grida.program.nodes.i.ICSSDimension["height"];
+  fill?: grida.program.cg.Paint;
 }
 
 export function NodeElement<P extends Record<string, any>>({
@@ -30,6 +31,7 @@ export function NodeElement<P extends Record<string, any>>({
   top: DEFAULT_TOP,
   width: DEFAULT_WIDTH,
   height: DEFAULT_HEIGHT,
+  fill: DEFAULT_FILL,
   style,
 }: React.PropsWithChildren<NodeElementProps<P>>) {
   const { state: document, selected_node_id } = useDocument();
@@ -93,6 +95,7 @@ export function NodeElement<P extends Record<string, any>>({
     top: DEFAULT_TOP ?? node.top,
     width: DEFAULT_WIDTH ?? node.width,
     height: DEFAULT_HEIGHT ?? node.height,
+    fill: DEFAULT_FILL ?? node.fill,
     style: {
       ...style,
       ...node.style,
@@ -103,7 +106,6 @@ export function NodeElement<P extends Record<string, any>>({
     // IDemension (does not instrictly mean width and height)
     // width: node.width,
     // height: node.height,
-    fill: node.fill,
     cornerRadius: node.cornerRadius,
     // @ts-ignore
   } satisfies
@@ -112,7 +114,7 @@ export function NodeElement<P extends Record<string, any>>({
 
   if (!node.active) return <></>;
 
-  const { opacity, zIndex, style: styles, ...props } = renderprops;
+  const { opacity, zIndex, ...props } = renderprops;
 
   return (
     <HrefWrapper href={computed.href} target={node.target}>
@@ -130,17 +132,8 @@ export function NodeElement<P extends Record<string, any>>({
             ["data-dev-editor-hovered"]: hovered,
           } satisfies grida.program.document.INodeHtmlDocumentQueryDataAttributes),
           style: {
-            opacity: opacity,
-            zIndex: zIndex,
-            position: node.position,
-            top: node.top,
-            left: node.left,
-            right: node.right,
-            bottom: node.bottom,
-            width: node.width,
-            height: node.height,
-            ...grida.program.css.toReactCSSProperties({
-              ...styles,
+            ...grida.program.css.toReactCSSProperties(node, {
+              fill: fillings[node.type],
             }),
             // hard override user-select
             userSelect: document.editable ? "none" : undefined,
@@ -151,6 +144,17 @@ export function NodeElement<P extends Record<string, any>>({
     </HrefWrapper>
   );
 }
+
+const fillings = {
+  text: "color",
+  container: "background",
+  image: "background",
+  svg: "none",
+  rectangle: "none",
+  ellipse: "none",
+  template_instance: "none",
+  instance: "none",
+} as const;
 
 function HrefWrapper({
   href,

@@ -17,7 +17,7 @@ import { OpacityControl } from "./controls/opacity";
 import { HrefControl } from "./controls/href";
 import { CornerRadiusControl } from "./controls/corner-radius";
 import { BorderControl } from "./controls/border";
-import { BackgroundControl } from "./controls/background";
+import { FillControl } from "./controls/fill";
 import { StringValueControl } from "./controls/string-value";
 import { MarginControl } from "./controls/margin";
 import { PaddingControl } from "./controls/padding";
@@ -40,7 +40,6 @@ import { ExportNodeWithHtmlToImage } from "./controls/export";
 import { useComputedNode, useDocument, useNode } from "@/builder";
 import assert from "assert";
 import { grida } from "@/grida";
-import { BackgroundColorControl } from "./controls/background-color";
 import { FontFamilyControl } from "./controls/font-family";
 import { TextColorControl } from "./controls/text-color";
 import {
@@ -92,9 +91,6 @@ export function SelectedNodeProperties() {
     fontWeight,
     fontSize,
     textAlign,
-    textColor,
-    //
-    backgroundColor,
     //
     boxShadow,
     //
@@ -259,15 +255,6 @@ export function SelectedNodeProperties() {
               onValueChange={selectedNode.textAlign}
             />
           </PropertyLine>
-          {textColor && (
-            <PropertyLine>
-              <PropertyLineLabel>Color</PropertyLineLabel>
-              <TextColorControl
-                value={textColor}
-                onValueChange={selectedNode.textColor}
-              />
-            </PropertyLine>
-          )}
         </SidebarMenuSectionContent>
       </SidebarSection>
       <SidebarSection hidden={!is_image} className="border-b pb-4">
@@ -354,22 +341,10 @@ export function SelectedNodeProperties() {
               onValueChange={selectedNode.border}
             />
           </PropertyLine>
-          {backgroundColor && (
-            <PropertyLine>
-              <PropertyLineLabel>Background Color</PropertyLineLabel>
-              <BackgroundColorControl
-                value={backgroundColor}
-                onValueChange={selectedNode.backgroundColor}
-              />
-            </PropertyLine>
-          )}
           {fill && (
             <PropertyLine>
               <PropertyLineLabel>Fill</PropertyLineLabel>
-              <BackgroundControl
-                value={fill}
-                onValueChange={selectedNode.fill}
-              />
+              <FillControl value={fill} onValueChange={selectedNode.fill} />
             </PropertyLine>
           )}
           <PropertyLine>

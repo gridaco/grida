@@ -11,7 +11,12 @@ export function RectangleWidget({
 }: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.RectangleNode>) {
   const isUniformRadius = typeof cornerRadius === "number";
 
-  const { defs, fill: fillDef } = svg.fill.fill_with_defs(fill);
+  const { defs, fill: fillDef } = fill
+    ? svg.fill.fill_with_defs(fill)
+    : {
+        defs: undefined,
+        fill: undefined,
+      };
 
   return (
     <svg {...props} width={width} height={height}>

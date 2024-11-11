@@ -90,26 +90,26 @@ export namespace svg {
      * );
      *
      */
-    export function fill_with_defs(fill: grida.program.cg.Paint) {
-      switch (fill.type) {
+    export function fill_with_defs(paint: grida.program.cg.Paint) {
+      switch (paint.type) {
         case "linear_gradient": {
-          const defs = `<defs>${gradient.stringifyLinearGradient(fill)}</defs>`;
+          const defs = `<defs>${gradient.stringifyLinearGradient(paint)}</defs>`;
 
           return {
             defs,
-            fill: `url(#${fill.id})`,
+            fill: `url(#${paint.id})`,
           };
         }
         case "radial_gradient": {
-          const defs = `<defs>${gradient.stringifyRadialGradient(fill)}</defs>`;
+          const defs = `<defs>${gradient.stringifyRadialGradient(paint)}</defs>`;
 
           return {
             defs,
-            fill: `url(#${fill.id})`,
+            fill: `url(#${paint.id})`,
           };
         }
         case "solid": {
-          const { color } = fill;
+          const { color } = paint;
           return {
             defs: undefined,
             fill: `rgba(${color.r}, ${color.g}, ${color.b}, ${color.a})`,

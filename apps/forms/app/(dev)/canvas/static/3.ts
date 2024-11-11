@@ -16,8 +16,8 @@ export default {
       position: "relative",
       width: 960,
       height: 540,
+      fill: { type: "solid", color: { r: 0, g: 0, b: 0, a: 1 } },
       style: {
-        backgroundColor: { r: 0, g: 0, b: 0, a: 1 },
         boxShadow: "0 0 10px rgba(0,0,0,0.1)",
       },
       children: ["card_1_bg", "card_2_bg", "card_3_bg"],
@@ -35,9 +35,8 @@ export default {
       left: 15,
       width: 300,
       height: 510,
-      style: {
-        backgroundColor: { r: 255, g: 255, b: 255, a: 0.1 },
-      },
+      fill: { type: "solid", color: { r: 255, g: 255, b: 255, a: 0.1 } },
+      style: {},
     },
     card_2_bg: {
       id: "card_2_bg",
@@ -52,9 +51,8 @@ export default {
       position: "absolute",
       top: 15,
       left: 330,
-      style: {
-        backgroundColor: { r: 255, g: 255, b: 255, a: 0.1 },
-      },
+      fill: { type: "solid", color: { r: 255, g: 255, b: 255, a: 0.1 } },
+      style: {},
     },
     card_3_bg: {
       id: "card_3_bg",
@@ -69,9 +67,8 @@ export default {
       position: "absolute",
       top: 15,
       left: 645,
-      style: {
-        backgroundColor: { r: 255, g: 255, b: 255, a: 0.1 },
-      },
+      fill: { type: "solid", color: { r: 255, g: 255, b: 255, a: 0.1 } },
+      style: {},
     },
   },
 } satisfies grida.program.document.IDocumentDefinition;

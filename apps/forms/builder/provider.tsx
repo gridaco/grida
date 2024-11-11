@@ -357,8 +357,8 @@ export function useDocument() {
         changeNodeStyle(selected_node_id!, "fontSize", value),
       textAlign: (value: string) =>
         changeNodeStyle(selected_node_id!, "textAlign", value),
-      textColor: (value: grida.program.css.RGBA) =>
-        changeNodeStyle(selected_node_id!, "textColor", value),
+      // textColor: (value: grida.program.css.RGBA) =>
+      // changeNodeStyle(selected_node_id!, "textColor", value),
       margin: (value?: number) =>
         changeNodeStyle(selected_node_id!, "margin", value),
       padding: (value?: number) =>
@@ -369,8 +369,8 @@ export function useDocument() {
         changeNodeStyle(selected_node_id!, "borderWidth", value.borderWidth),
       boxShadow: (value?: any) =>
         changeNodeStyle(selected_node_id!, "boxShadow", value.boxShadow),
-      backgroundColor: (value?: grida.program.css.RGBA) =>
-        changeNodeStyle(selected_node_id!, "backgroundColor", value),
+      // backgroundColor: (value?: grida.program.css.RGBA) =>
+      // changeNodeStyle(selected_node_id!, "backgroundColor", value),
       gap: (value?: number) => changeNodeStyle(selected_node_id!, "gap", value),
       flexDirection: (value?: string) =>
         changeNodeStyle(selected_node_id!, "flexDirection", value),
