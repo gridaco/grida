@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useMemo } from "react";
 
 import {
   SidebarMenuSectionContent,
@@ -47,6 +47,7 @@ import {
   PositioningConstraintsControl,
   PositioningModeControl,
 } from "./controls/positioning";
+import { useNodeDomElement } from "@/builder/provider";
 
 export function SelectedNodeProperties() {
   const { state: document, selectedNode } = useDocument();
@@ -125,23 +126,14 @@ export function SelectedNodeProperties() {
 
   return (
     <div key={selected_node_id}>
-      <SidebarSection
-        // hidden
-        className="border-b pb-4"
-      >
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Debug</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent>
-          <pre className="text-xs font-mono">
-            <div>Node {selected_node_id}</div>
-            <div>Type {type}</div>
-            <div>Name {name}</div>
-            <div>width {width}</div>
-            <div>height {height}</div>
-          </pre>
-        </SidebarMenuSectionContent>
-      </SidebarSection>
+      {process.env.NODE_ENV === "development" && (
+        <SidebarSection className="border-b pb-4">
+          <SidebarSectionHeaderItem>
+            <SidebarSectionHeaderLabel>Debug</SidebarSectionHeaderLabel>
+          </SidebarSectionHeaderItem>
+          <DebugControls />
+        </SidebarSection>
+      )}
       <SidebarSection className="border-b pb-4">
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Layer</SidebarSectionHeaderLabel>
@@ -439,3 +431,59 @@ export function SelectedNodeProperties() {
 // const properties_map = {
 //   rectangle: ["opacity", "cornerRadius", "fill", "cursor"],
 // } as const;
+
+function DebugControls() {
+  const { state: document, selectedNode } = useDocument();
+
+  const { selected_node_id } = document;
+
+  const node = useNode(selected_node_id!);
+  const {
+    id,
+    name,
+    active,
+    component_id,
+    style,
+    type,
+    properties,
+    opacity,
+    cornerRadius,
+    fill,
+    position,
+    width,
+    height,
+    left,
+    top,
+    right,
+    bottom,
+  } = node;
+
+  const nel = useNodeDomElement(selected_node_id!);
+
+  const clientRect = useMemo(() => {
+    return nel?.getBoundingClientRect();
+  }, [node]);
+
+  return (
+    <SidebarMenuSectionContent>
+      <pre className="text-xs font-mono">
+        <div>Node {selected_node_id}</div>
+        <div>Type {type}</div>
+        <div>Name {name}</div>
+        <div>width {width}</div>
+        <div>height {height}</div>
+        <hr className="my-4" />
+        <span className="font-bold">clientRect</span>
+        <div>x {clientRect?.x}</div>
+        <div>y {clientRect?.y}</div>
+        <div>top {clientRect?.top}</div>
+        <div>left {clientRect?.left}</div>
+        <div>right {clientRect?.right}</div>
+        <div>bottom {clientRect?.bottom}</div>
+        <div>width {clientRect?.width}</div>
+        <div>height {clientRect?.height}</div>
+        <hr className="my-4" />
+      </pre>
+    </SidebarMenuSectionContent>
+  );
+}

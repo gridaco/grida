@@ -1,5 +1,9 @@
+"use client";
+import React from "react";
 import { useDocument } from "./provider";
 import { NodeElement } from "./template-builder/node";
+
+// function useHTML5Backend() {}
 
 export function StandaloneDocumentEditorContent() {
   const {

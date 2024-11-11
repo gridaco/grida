@@ -326,6 +326,7 @@ function ResizeHandle({
         height: size,
         transform: `translate(${anchor[1] === "w" ? "-50%" : "50%"}, ${anchor[0] === "n" ? "-50%" : "50%"})`,
         cursor: readonly ? "default" : __resize_handle_cursor_map[anchor],
+        touchAction: "none",
       }}
     />
   );

@@ -367,6 +367,7 @@ export namespace grida {
        * - `left`
        * - `pointer-events`
        * - `border-radius`
+       * - `fill`
        *
        *
        * @deprecated Note: Do not modify this directly - it will progressively be replaced by a more robust and universal CSS property type system.
@@ -425,6 +426,7 @@ export namespace grida {
         | "objectFit"
         | "objectPosition"
       > & {
+        // fill: cg.Paint;
         backgroundColor?: css.RGBA;
         textColor?: css.RGBA;
       };
@@ -432,15 +434,13 @@ export namespace grida {
       export function toReactCSSProperties(
         style: ExplicitlySupportedCSSProperties
       ): React.CSSProperties {
-        const { backgroundColor, ...styles } = style;
+        const { backgroundColor, textColor, ...styles } = style;
         return {
           ...styles,
           backgroundColor: backgroundColor
-            ? `rgba(${backgroundColor.r}, ${backgroundColor.g}, ${backgroundColor.b}, ${backgroundColor.a})`
+            ? toRGBAString(backgroundColor)
             : undefined,
-          color: style.textColor
-            ? `rgba(${style.textColor.r}, ${style.textColor.g}, ${style.textColor.b}, ${style.textColor.a})`
-            : undefined,
+          color: textColor ? toRGBAString(textColor) : undefined,
         };
       }
 
