@@ -18,6 +18,7 @@ import type {
 import type { IDocumentEditorState } from "./types";
 import { grida } from "@/grida";
 import assert from "assert";
+import { v4 } from "uuid";
 
 export default function reducer<S extends IDocumentEditorState>(
   state: S,
@@ -353,7 +354,7 @@ function nodeTransformReducer(
         const { anchor, dx, dy } = action;
         //
         // TODO: calculate the final delta based on anchor and movement delta
-        console.log(anchor);
+
         switch (anchor) {
           case "nw": {
             break;
@@ -495,7 +496,17 @@ function nodeReducer<N extends Partial<grida.program.nodes.Node>>(
       }
       case "node/change/fill": {
         assert(draft.type === "rectangle" || draft.type === "ellipse");
-        draft.fill = action.fill;
+        switch (action.fill.type) {
+          case "linear_gradient":
+            draft.fill = { ...action.fill, id: `gradient-${v4()}` };
+            break;
+          case "radial_gradient":
+            draft.fill = { ...action.fill, id: `gradient-${v4()}` };
+            break;
+          case "solid":
+            draft.fill = action.fill;
+        }
+
         break;
       }
       case "node/change/style": {

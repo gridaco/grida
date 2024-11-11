@@ -15,7 +15,8 @@ export function EllipseWidget({
         cy={height / 2}
         rx={width / 2}
         ry={height / 2}
-        fill={grida.program.css.toRGBAString(fill)}
+        // TODO:
+        // fill={grida.program.css.toRGBAString(fill)}
       />
     </svg>
   );

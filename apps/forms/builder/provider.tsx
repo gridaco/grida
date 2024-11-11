@@ -251,7 +251,7 @@ export function useDocument() {
   );
 
   const changeNodeFill = useCallback(
-    (node_id: string, fill: grida.program.css.RGBA) => {
+    (node_id: string, fill: grida.program.cg.PaintWithoutID) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "node/change/fill",
@@ -342,7 +342,7 @@ export function useDocument() {
       cornerRadius: (
         value: grida.program.nodes.i.IRectangleCorner["cornerRadius"]
       ) => changeNodeCornerRadius(selected_node_id!, value),
-      fill: (value: grida.program.css.RGBA) =>
+      fill: (value: grida.program.cg.PaintWithoutID) =>
         changeNodeFill(selected_node_id!, value),
 
       // stylable

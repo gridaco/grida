@@ -20,7 +20,7 @@ export function RGBAColorControl({
   onValueChange,
 }: {
   value: RGBA;
-  onValueChange: (value: RGBA) => void;
+  onValueChange?: (value: RGBA) => void;
 }) {
   return (
     <div

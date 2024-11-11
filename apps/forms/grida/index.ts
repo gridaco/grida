@@ -311,52 +311,6 @@ export namespace grida {
       }
     }
 
-    export namespace svg {
-      export namespace d {
-        /**
-         * Generates an SVG path with rounded corners for a rectangle.
-         *
-         * since the `rx` and `ry` attributes of the `<rect>` element in SVG do not support individual corner radii, this function generates a path with individual corner radii.
-         *
-         * @param width - The width of the rectangle.
-         * @param height - The height of the rectangle.
-         * @param cornerRadius - The radius of each corner, either as a uniform number or an object specifying individual corner radii.
-         * @returns The SVG path data string (`d` attribute) representing a rectangle with rounded corners.
-         */
-        export function generateRoundedRectPath(
-          width: number,
-          height: number,
-          cornerRadius: nodes.i.IRectangleCorner["cornerRadius"]
-        ): string {
-          const {
-            topLeftRadius = 0,
-            topRightRadius = 0,
-            bottomLeftRadius = 0,
-            bottomRightRadius = 0,
-          } = typeof cornerRadius === "number"
-            ? {
-                topLeftRadius: cornerRadius,
-                topRightRadius: cornerRadius,
-                bottomLeftRadius: cornerRadius,
-                bottomRightRadius: cornerRadius,
-              }
-            : cornerRadius;
-
-          return `
-      M${topLeftRadius},0 
-      H${width - topRightRadius} 
-      Q${width},0 ${width},${topRightRadius} 
-      V${height - bottomRightRadius} 
-      Q${width},${height} ${width - bottomRightRadius},${height} 
-      H${bottomLeftRadius} 
-      Q0,${height} 0,${height - bottomLeftRadius} 
-      V${topLeftRadius} 
-      Q0,0 ${topLeftRadius},0
-    `;
-        }
-      }
-    }
-
     export namespace css {
       /**
        * @see https://developer.mozilla.org/en-US/docs/Web/CSS/length
@@ -517,7 +471,15 @@ export namespace grida {
      * Core Graphics
      */
     export namespace cg {
-      export type Paint = SolidPaint | LinearGradientPaint;
+      export type Paint =
+        | SolidPaint
+        | LinearGradientPaint
+        | RadialGradientPaint;
+
+      export type PaintWithoutID =
+        | SolidPaint
+        | Omit<LinearGradientPaint, "id">
+        | Omit<RadialGradientPaint, "id">;
 
       export type SolidPaint = {
         type: "solid";
@@ -526,11 +488,26 @@ export namespace grida {
 
       export type LinearGradientPaint = {
         type: "linear_gradient";
-        transform: unknown;
-        stops: Array<{
-          offset: number;
-          color: css.RGBA;
-        }>;
+        id: string;
+        // transform: unknown;
+        stops: Array<GradientStop>;
+      };
+
+      export type RadialGradientPaint = {
+        type: "radial_gradient";
+        id: string;
+        // transform: unknown;
+        stops: Array<GradientStop>;
+      };
+
+      export type GradientStop = {
+        /**
+         * 0-1
+         * 0 - start (0%)
+         * 1 - end (100%)
+         */
+        offset: number;
+        color: css.RGBA;
       };
       //
       //
@@ -708,7 +685,7 @@ export namespace grida {
          * Node that can be filled with color - such as rectangle, ellipse, etc.
          */
         export interface IFill {
-          fill: css.RGBA;
+          fill: cg.Paint;
         }
 
         /**

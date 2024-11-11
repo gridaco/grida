@@ -374,7 +374,7 @@ export function SelectedNodeProperties() {
           {fill && (
             <PropertyLine>
               <PropertyLineLabel>Fill</PropertyLineLabel>
-              <BackgroundColorControl
+              <BackgroundControl
                 value={fill}
                 onValueChange={selectedNode.fill}
               />

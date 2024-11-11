@@ -1,4 +1,6 @@
 import { grida } from "@/grida";
+import { svg } from "@/grida/svg";
+import { useMemo } from "react";
 
 export function RectangleWidget({
   width,
@@ -9,24 +11,24 @@ export function RectangleWidget({
 }: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.RectangleNode>) {
   const isUniformRadius = typeof cornerRadius === "number";
 
+  const { defs, fill: fillDef } = svg.fill.fill_with_defs(fill);
+
   return (
     <svg {...props} width={width} height={height}>
+      {defs && <g dangerouslySetInnerHTML={{ __html: defs }} />}
+
       {isUniformRadius ? (
         <rect
           width={width}
           height={height}
           rx={cornerRadius}
           ry={cornerRadius}
-          fill={grida.program.css.toRGBAString(fill)}
+          fill={fillDef}
         />
       ) : (
         <path
-          d={grida.program.svg.d.generateRoundedRectPath(
-            width,
-            height,
-            cornerRadius
-          )}
-          fill={grida.program.css.toRGBAString(fill)}
+          d={svg.d.generateRoundedRectPath(width, height, cornerRadius)}
+          fill={fillDef}
         />
       )}
     </svg>

@@ -109,7 +109,21 @@ export default {
       top: 50,
       left: 50,
       cornerRadius: 0,
-      fill: { r: 50, g: 50, b: 50, a: 1 },
+      // fill: { type: "solid", color: { r: 50, g: 50, b: 50, a: 1 } },
+      fill: {
+        id: "gradient_1",
+        type: "radial_gradient",
+        stops: [
+          {
+            offset: 0,
+            color: { r: 255, g: 0, b: 0, a: 1 },
+          },
+          {
+            offset: 1,
+            color: { r: 0, g: 0, b: 255, a: 1 },
+          },
+        ],
+      },
       effects: [],
     },
     ellipse_1: {
@@ -125,7 +139,7 @@ export default {
       position: "absolute",
       top: 100,
       left: 100,
-      fill: { r: 0, g: 255, b: 0, a: 1 },
+      fill: { type: "solid", color: { r: 0, g: 255, b: 0, a: 1 } },
       effects: [],
     },
     h1: {

@@ -176,7 +176,7 @@ interface INodeChangeCornerRadiusAction extends INodeID {
 }
 
 interface INodeChangeFillAction extends INodeID {
-  fill: grida.program.nodes.i.IFill["fill"];
+  fill: grida.program.cg.PaintWithoutID;
 }
 
 interface INodeChangeStyleAction extends INodeID {
