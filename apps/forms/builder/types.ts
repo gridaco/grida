@@ -32,6 +32,15 @@ export interface IDocumentEditorInteractionCursorState {
   /**
    * @private - internal use only
    *
+   * current content edit mode
+   *
+   * @default false
+   */
+  content_edit_mode?: false | "text" | "path";
+
+  /**
+   * @private - internal use only
+   *
    * @default {x: 0, y: 0}
    */
   cursor_position: {

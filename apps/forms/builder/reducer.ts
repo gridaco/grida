@@ -41,12 +41,14 @@ export default function reducer<S extends IDocumentEditorState>(
       return produce(state, (draft) => {
         const selected_node_id = node_ids_from_point[0];
         draft.selected_node_id = selected_node_id;
+        draft.content_edit_mode = false;
       });
     }
     case "document/canvas/backend/html/event/on-pointer-up": {
       return produce(state, (draft) => {
         // clear all trasform state
 
+        draft.content_edit_mode = false;
         draft.is_gesture_node_drag_move = false;
         draft.is_gesture_node_drag_resize = false;
       });
@@ -55,6 +57,7 @@ export default function reducer<S extends IDocumentEditorState>(
     case "document/canvas/backend/html/event/on-drag-start": {
       const {} = <DocumentEditorCanvasEventTargetHtmlBackendDragStart>action;
       return produce(state, (draft) => {
+        draft.content_edit_mode = false;
         draft.is_gesture_node_drag_move = true;
         draft.is_gesture_node_drag_resize = false;
       });
@@ -96,6 +99,7 @@ export default function reducer<S extends IDocumentEditorState>(
       //
 
       return produce(state, (draft) => {
+        draft.content_edit_mode = false;
         draft.is_gesture_node_drag_resize = true;
         draft.is_gesture_node_drag_move = false;
         draft.hovered_node_id = undefined;
@@ -184,6 +188,19 @@ export default function reducer<S extends IDocumentEditorState>(
     }
 
     // #endregion [html backend] canvas event target
+
+    // #region [universal backend] canvas event target
+    case "document/canvas/enter-content-edit-mode": {
+      if (!state.selected_node_id) return state;
+      const { type: nodeType } = state.document.nodes[state.selected_node_id];
+      if (nodeType !== "text") return state;
+
+      return produce(state, (draft) => {
+        draft.content_edit_mode = "text";
+      });
+      break;
+    }
+    // #endregion
     case "document/template/set/props": {
       const { data } = <TemplateEditorSetTemplatePropsAction>action;
 

@@ -6,11 +6,12 @@ import React, {
   useEffect,
   useMemo,
   useRef,
+  useState,
 } from "react";
 import { useEventTarget } from "@/builder";
 import { useGesture } from "@use-gesture/react";
 import { grida } from "@/grida";
-import { useNode, useNodeDomElement } from "../provider";
+import { useDocument, useNode, useNodeDomElement } from "../provider";
 
 interface CanvasEventTargetContext {
   portal?: HTMLDivElement | null;
@@ -43,12 +44,14 @@ export function CanvasOverlay() {
     hovered_node_id,
     selected_node_id,
     is_node_transforming,
+    content_edit_mode,
     pointerMove,
     pointerDown,
     pointerUp,
     drag,
     dragStart,
     dragEnd,
+    tryEnterContentEditMode,
   } = useEventTarget();
   const ref = useRef<HTMLDivElement>(null);
   const context = useContext(EventTargetContext);
@@ -79,7 +82,9 @@ export function CanvasOverlay() {
       onPointerUp: ({ event }) => {
         pointerUp(event);
       },
-
+      onDoubleClick: (e) => {
+        tryEnterContentEditMode();
+      },
       onDragStart: (e) => {
         dragStart();
       },
@@ -93,7 +98,7 @@ export function CanvasOverlay() {
     },
     {
       move: {
-        threshold: 1,
+        threshold: 2,
       },
       drag: {
         threshold: 0.1,
@@ -110,6 +115,7 @@ export function CanvasOverlay() {
         touchAction: "none",
       }}
     >
+      {content_edit_mode === "text" && <RichTextEditorSurface />}
       <div className="w-full h-full" id="canvas-overlay-portal" ref={ref}>
         {selected_node_id && (
           <NodeOverlay
@@ -124,6 +130,16 @@ export function CanvasOverlay() {
       </div>
     </div>
   );
+}
+
+export function useCanvasOverlayPortal() {
+  const context = useContext(EventTargetContext);
+  if (!context) {
+    throw new Error(
+      "useCanvasOverlay must be used within a CanvasEventTarget."
+    );
+  }
+  return context.portal;
 }
 
 const __rect_fallback = { top: 0, left: 0, width: 0, height: 0 };
@@ -322,12 +338,40 @@ const __resize_handle_cursor_map = {
   se: "nwse-resize",
 };
 
-export function useCanvasOverlayPortal() {
-  const context = useContext(EventTargetContext);
-  if (!context) {
-    throw new Error(
-      "useCanvasOverlay must be used within a CanvasEventTarget."
-    );
-  }
-  return context.portal;
+function RichTextEditorSurface() {
+  const { selectedNode, selected_node_id } = useDocument();
+  const node = useNode(selected_node_id!);
+
+  // const [content, setContent] = useState("Edit this text");
+
+  // const handleInput = (e: React.FormEvent<HTMLDivElement>) => {
+  //   console.log("text content", e);
+  //   // @ts-ignore
+  //   setContent(e.target.innerText);
+  // };
+
+  return (
+    <div
+      id="richtext-editor-surface"
+      className="absolute inset-0 z-10 bg-red-500/25"
+    >
+      <textarea
+        autoFocus
+        // TODO: only supports literal text value
+        value={node.text as string}
+        onChange={(e) => {
+          selectedNode?.text(e.target.value);
+        }}
+        className="appearance-none bg-transparent border-none outline-none"
+      />
+      {/* <div
+        autoFocus
+        // onInput={handleInput}
+        tabIndex={0}
+        contentEditable
+        suppressContentEditableWarning
+        className="outline-none border-none"
+      /> */}
+    </div>
+  );
 }

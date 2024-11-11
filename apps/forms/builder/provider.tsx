@@ -434,6 +434,7 @@ export function useEventTarget() {
     is_gesture_node_drag_move: is_node_transforming,
     hovered_node_id,
     selected_node_id,
+    content_edit_mode,
   } = state;
 
   const pointerMove = useCallback(
@@ -474,6 +475,17 @@ export function useEventTarget() {
     },
     [dispatch]
   );
+
+  /**
+   * Try to enter content edit mode - only works when the selected node is a text or vector node
+   *
+   * when triggered on such invalid context, it should be a no-op
+   */
+  const tryEnterContentEditMode = useCallback(() => {
+    dispatch({
+      type: "document/canvas/enter-content-edit-mode",
+    });
+  }, [dispatch]);
 
   const dragStart = useCallback(() => {
     dispatch({
@@ -581,6 +593,7 @@ export function useEventTarget() {
       hovered_node_id,
       selected_node_id,
       is_node_transforming,
+      content_edit_mode,
       //
       dragResizeHandleStart,
       dragResizeHandleEnd,
@@ -594,6 +607,8 @@ export function useEventTarget() {
       pointerDown,
       pointerUp,
       //
+      tryEnterContentEditMode,
+      //
       dragStart,
       dragEnd,
       drag,
@@ -603,6 +618,7 @@ export function useEventTarget() {
     hovered_node_id,
     selected_node_id,
     is_node_transforming,
+    content_edit_mode,
     //
     dragResizeHandleStart,
     dragResizeHandleEnd,
@@ -615,6 +631,8 @@ export function useEventTarget() {
     pointerMove,
     pointerDown,
     pointerUp,
+    //
+    tryEnterContentEditMode,
     //
     dragStart,
     dragEnd,

@@ -17,6 +17,8 @@ export type BuilderAction =
   | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayCornerRadiusHandleDragEnd
   | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayCornerRadiusHandleDrag
   //
+  | DocumentEditorEnterContentEditMode
+  //
   | DocumentEditorNodeSelectAction
   | DocumentEditorNodePointerEnterAction
   | DocumentEditorNodePointerLeaveAction
@@ -67,6 +69,10 @@ export type DocumentEditorCanvasEventTargetHtmlBackendDrag =
 
 export type DocumentEditorCanvasEventTargetHtmlBackendDragEnd = {
   type: "document/canvas/backend/html/event/on-drag-end";
+};
+
+export type DocumentEditorEnterContentEditMode = {
+  type: "document/canvas/enter-content-edit-mode";
 };
 
 interface ICanvasEventTargetResizeHandleEvent {
