@@ -104,7 +104,7 @@ function HierarchyView() {
               selected_page_id === "site/dev-collection") &&
               document && (
                 <StandaloneDocumentEditor
-                  state={document}
+                  initial={document}
                   dispatch={documentDispatch}
                 >
                   <NodeHierarchyList />

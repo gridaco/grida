@@ -234,6 +234,82 @@ export namespace grida {
         root_id: string;
       }
 
+      export namespace internal {
+        /**
+         * @internal
+         * Represents the current runtime state of the document hierarchy context.
+         *
+         * This interface is designed for **in-memory, runtime-only** use and should not be used for persisting data.
+         * It exists to provide efficient access to the parent and child relationships within the document tree without
+         * modifying the core node structure directly.
+         *
+         * ## Why We Use This Interface
+         * This interface allows for a structured, performant way to manage node hierarchy relationships without introducing
+         * a `parent_id` property on each `Node`. By using an in-memory context, we avoid potential issues with nullable `parent_id` fields,
+         * which could lead to unpredictable coding experiences. Additionally, maintaining these relationships within a dedicated
+         * context layer promotes separation of concerns, keeping core node definitions stable and interface-compatible.
+         *
+         * ## Functionality
+         * - **Get Parent Node by Child ID**: Efficiently map a node's ID (`NodeID`) to its parent node ID.
+         * - **Get Child Nodes by Parent ID**: Access a list of child node IDs for any given parent node.
+         *
+         * ## Management Notes
+         * - This interface should be populated and managed only during runtime.
+         * - It is recommended to initialize `ctx_nid_to_parent_id` and `ctx_nid_to_children_ids` during document tree loading or
+         *   initial rendering.
+         * - If the node hierarchy is updated (e.g., nodes are added or removed), this context should be refreshed to reflect the
+         *   current relationships.
+         *
+         */
+        export interface IDocumentDefinitionRuntimeHierarchyContext {
+          /**
+           * Maps each node ID to its respective parent node ID, facilitating upward traversal.
+           */
+          __ctx_nid_to_parent_id: Record<nodes.NodeID, nodes.NodeID>;
+
+          /**
+           * Maps each node ID to an array of its child node IDs, enabling efficient downward traversal.
+           */
+          __ctx_nid_to_children_ids: Record<nodes.NodeID, nodes.NodeID[]>;
+        }
+
+        /**
+         * Builds the runtime context for document hierarchy, providing mappings for
+         * parent-child relationships without modifying core node structure.
+         *
+         * @param document - The document definition containing all nodes.
+         * @returns {IDocumentDefinitionRuntimeHierarchyContext} The hierarchy context,
+         * containing mappings of each node's parent and children.
+         */
+        export function createDocumentDefinitionRuntimeHierarchyContext(
+          document: IDocumentDefinition
+        ): IDocumentDefinitionRuntimeHierarchyContext {
+          const { nodes } = document;
+          const ctx: IDocumentDefinitionRuntimeHierarchyContext = {
+            __ctx_nid_to_parent_id: {},
+            __ctx_nid_to_children_ids: {},
+          };
+
+          for (const node_id in nodes) {
+            const node = nodes[node_id];
+
+            // Ensure the parent has an array in __ctx_nid_to_children_ids
+            ctx.__ctx_nid_to_children_ids[node_id] =
+              ctx.__ctx_nid_to_children_ids[node_id] ?? [];
+
+            // If the node has children, map each child to its parent and add to the parent’s child array
+            if (Array.isArray((node as nodes.AnyNode).children)) {
+              for (const child_id of (node as nodes.i.IChildren).children!) {
+                ctx.__ctx_nid_to_parent_id[child_id] = node_id;
+                ctx.__ctx_nid_to_children_ids[node_id].push(child_id);
+              }
+            }
+          }
+
+          return ctx;
+        }
+      }
+
       export interface INodeHtmlDocumentQueryDataAttributes {
         [k.HTML_ELEMET_DATA_ATTRIBUTE_GRIDA_NODE_ID_KEY]: nodes.Node["id"];
         ["data-grida-node-type"]: nodes.Node["type"];

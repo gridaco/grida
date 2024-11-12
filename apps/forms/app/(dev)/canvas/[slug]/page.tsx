@@ -23,6 +23,8 @@ import {
   CanvasOverlay,
   standaloneDocumentReducer,
   type IDocumentEditorState,
+  type IDocumentEditorInit,
+  initDocumentEditorState,
   useDocument,
 } from "@/builder";
 import docs from "../static";
@@ -56,16 +58,18 @@ export default function CanvasPlaygroundPage({
   params: { slug: string };
 }) {
   const slug = params.slug;
-  const [state, dispatch] = useReducer(standaloneDocumentReducer, {
-    editable: true,
-    // @ts-expect-error
-    document: docs[slug].document,
-    cursor_position: { x: 0, y: 0 },
-  });
+  const [state, dispatch] = useReducer(
+    standaloneDocumentReducer,
+    initDocumentEditorState({
+      editable: true,
+      // @ts-expect-error
+      document: docs[slug].document,
+    })
+  );
 
   return (
     <main className="w-screen h-screen overflow-hidden">
-      <StandaloneDocumentEditor state={state} dispatch={dispatch}>
+      <StandaloneDocumentEditor initial={state} dispatch={dispatch}>
         <div className="flex w-full h-full">
           <aside>
             <SidebarRoot>

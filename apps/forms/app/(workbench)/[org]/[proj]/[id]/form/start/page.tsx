@@ -89,7 +89,7 @@ export default function FormStartEditPage() {
       <main className="h-full flex flex-1 w-full">
         {startpage ? (
           <StandaloneDocumentEditor
-            state={startpage}
+            initial={startpage}
             dispatch={startPageDocumentDispatch}
           >
             <CanvasEventTarget className="relative w-full no-scrollbar overflow-y-auto bg-transparent pointer-events-none">

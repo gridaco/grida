@@ -1,6 +1,6 @@
 import type { Tokens } from "@/ast";
 import type { BuilderAction } from "./action";
-import type { grida } from "@/grida";
+import { grida } from "@/grida";
 
 export type DocumentDispatcher = (action: BuilderAction) => void;
 
@@ -64,8 +64,7 @@ export interface IDocumentEditorInteractionCursorState {
   // selectedTextRange;
 }
 
-export interface IDocumentEditorState
-  extends IDocumentEditorInteractionCursorState {
+export interface IDocumentEditorInit {
   /**
    *
    * when editable is false, the document definition is not editable
@@ -82,4 +81,24 @@ export interface IDocumentEditorState
     string,
     grida.program.document.template.TemplateDocumentDefinition
   >;
+}
+
+export interface IDocumentEditorState
+  extends IDocumentEditorInit,
+    IDocumentEditorInteractionCursorState {
+  document: grida.program.document.IDocumentDefinition;
+  document_ctx: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext;
+}
+
+export function initDocumentEditorState(
+  init: IDocumentEditorInit
+): IDocumentEditorState {
+  return {
+    ...init,
+    cursor_position: { x: 0, y: 0 },
+    document_ctx:
+      grida.program.document.internal.createDocumentDefinitionRuntimeHierarchyContext(
+        init.document
+      ),
+  };
 }

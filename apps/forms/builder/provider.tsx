@@ -1,3 +1,5 @@
+"use client";
+
 import React, {
   createContext,
   useCallback,
@@ -5,7 +7,12 @@ import React, {
   useEffect,
   useMemo,
 } from "react";
-import type { DocumentDispatcher, IDocumentEditorState } from "./types";
+import {
+  type DocumentDispatcher,
+  type IDocumentEditorState,
+  type IDocumentEditorInit,
+  initDocumentEditorState,
+} from "./types";
 import type { Tokens } from "@/ast";
 import { grida } from "@/grida";
 import { useComputed } from "./template-builder/use-computed";
@@ -14,9 +21,6 @@ import {
   ProgramDataContextHost,
 } from "@/grida/react-runtime/data-context/context";
 import assert from "assert";
-import { useDebounceCallback } from "usehooks-ts";
-import { useThrottle } from "@uidotdev/usehooks";
-import { useThrottleFn } from "react-use";
 
 type Vector2 = [number, number];
 
@@ -26,28 +30,28 @@ const __noop: DocumentDispatcher = () => void 0;
 const DocumentDispatcherContext = createContext<DocumentDispatcher>(__noop);
 
 export function StandaloneDocumentEditor({
-  state,
+  initial,
   dispatch,
   children,
 }: React.PropsWithChildren<{
-  state: IDocumentEditorState;
+  initial: IDocumentEditorInit;
   dispatch?: DocumentDispatcher;
 }>) {
   useEffect(() => {
-    if (state.editable && !dispatch) {
+    if (initial.editable && !dispatch) {
       console.error(
         "DocumentEditor: dispatch is required when readonly is false"
       );
     }
-  }, [state.editable, dispatch]);
+  }, [initial.editable, dispatch]);
 
-  const __dispatch = state.editable ? dispatch ?? __noop : __noop;
+  const __dispatch = initial.editable ? dispatch ?? __noop : __noop;
 
-  const rootnode = state.document.nodes[state.document.root_id];
+  const rootnode = initial.document.nodes[initial.document.root_id];
   assert(rootnode, "root node is not found");
   const shallowRootProps = useMemo(() => {
     if (rootnode.type === "template_instance") {
-      const defaultProps = state.templates![rootnode.template_id].default;
+      const defaultProps = initial.templates![rootnode.template_id].default;
       return Object.assign({}, defaultProps, rootnode.props);
     } else {
       return {};
@@ -55,7 +59,7 @@ export function StandaloneDocumentEditor({
   }, [rootnode]);
 
   return (
-    <DocumentContext.Provider value={state}>
+    <DocumentContext.Provider value={initDocumentEditorState(initial)}>
       <DocumentDispatcherContext.Provider value={__dispatch}>
         <ProgramDataContextHost>
           <DataProvider data={{ props: shallowRootProps }}>
@@ -96,6 +100,39 @@ export function useDocument() {
   const [state, dispatch] = useInternal();
 
   const { selected_node_id } = state;
+
+  const getNodeAbsoluteRotation = useCallback(
+    (node_id: string) => {
+      const parent_ids = [];
+      let current_id = node_id;
+
+      // Traverse up the tree to collect parent IDs
+      while (state.document_ctx.__ctx_nid_to_parent_id[current_id]) {
+        const parent_id = state.document_ctx.__ctx_nid_to_parent_id[current_id];
+        parent_ids.push(parent_id);
+        current_id = parent_id;
+      }
+      parent_ids.reverse();
+
+      // Calculate the absolute rotation
+      let rotation = 0;
+      for (const parent_id of parent_ids) {
+        const parent_node = state.document.nodes[parent_id];
+        if ("rotation" in parent_node) {
+          rotation += parent_node.rotation ?? 0;
+        }
+      }
+
+      // finally, add the node's own rotation
+      const node = state.document.nodes[node_id];
+      if ("rotation" in node) {
+        rotation += node.rotation ?? 0;
+      }
+
+      return rotation;
+    },
+    [state]
+  );
 
   const selectNode = useCallback(
     (node_id: string) => {
@@ -416,6 +453,7 @@ export function useDocument() {
       state,
       selected_node_id,
       selectedNode,
+      getNodeAbsoluteRotation,
       selectNode,
       changeNodeActive,
       pointerEnterNode,
@@ -431,6 +469,7 @@ export function useDocument() {
     state,
     selected_node_id,
     selectedNode,
+    getNodeAbsoluteRotation,
     selectNode,
     changeNodeActive,
     pointerEnterNode,
@@ -478,6 +517,8 @@ export function useEventTarget() {
       dispatch({
         type: "document/canvas/backend/html/event/on-pointer-move",
         node_ids_from_point: els.map((n) => n.id),
+        clientX: event.clientX,
+        clientY: event.clientY,
       });
     }, 30),
     [dispatch]

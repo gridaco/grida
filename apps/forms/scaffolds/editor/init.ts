@@ -26,6 +26,7 @@ import { Data } from "@/lib/data";
 import * as samples from "@/theme/templates/formcollection/samples";
 import { grida } from "@/grida";
 import { FormStartPage } from "@/theme/templates/formstart";
+import { initDocumentEditorState } from "@/builder";
 
 export function initialEditorState(init: EditorInit): EditorState {
   switch (init.doctype) {
@@ -279,9 +280,8 @@ function initialSiteEditorState(init: SiteDocumentEditorInit): EditorState {
     }),
     selected_page_id: "site/dev-collection",
     documents: {
-      ["site/dev-collection"]: {
+      ["site/dev-collection"]: initDocumentEditorState({
         editable: true,
-        cursor_position: { x: 0, y: 0 },
         document: { nodes: {}, root_id: "root" },
         templates: {
           ["formcollection_sample_001_the_bundle"]: {
@@ -295,7 +295,7 @@ function initialSiteEditorState(init: SiteDocumentEditorInit): EditorState {
             nodes: {},
           },
         },
-      },
+      }),
     },
     sidebar: {
       mode: initial_sidebar_mode[init.doctype],
@@ -507,14 +507,15 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
       "form/startpage": init.start
         ? {
             template_id: init.start.template_id,
-            editable: true,
-            cursor_position: { x: 0, y: 0 },
-            document: init.start,
-            templates: {
-              [init.start.template_id]: FormStartPage.getTemplate(
-                init.start.template_id
-              ),
-            },
+            ...initDocumentEditorState({
+              editable: true,
+              document: init.start,
+              templates: {
+                [init.start.template_id]: FormStartPage.getTemplate(
+                  init.start.template_id
+                ),
+              },
+            }),
           }
         : undefined,
     },

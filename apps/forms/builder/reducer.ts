@@ -33,11 +33,16 @@ export default function reducer<S extends IDocumentEditorState>(
   switch (action.type) {
     // #region [html backend] canvas event target
     case "document/canvas/backend/html/event/on-pointer-move": {
-      const { node_ids_from_point } = <
+      const { node_ids_from_point, clientX, clientY } = <
         DocumentEditorCanvasEventTargetHtmlBackendPointerMove
       >action;
       return produce(state, (draft) => {
         draft.hovered_node_id = node_ids_from_point[0];
+        draft.cursor_position = {
+          // TODO: need to transform to canvas position
+          x: clientX,
+          y: clientY,
+        };
       });
     }
     case "document/canvas/backend/html/event/on-pointer-down": {
@@ -195,7 +200,9 @@ export default function reducer<S extends IDocumentEditorState>(
 
     //
     case "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag-start": {
-      const { node_id } = action;
+      const { node_id } = <
+        DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDragStart
+      >action;
 
       return produce(state, (draft) => {
         draft.selected_node_id = node_id;
@@ -203,6 +210,9 @@ export default function reducer<S extends IDocumentEditorState>(
       });
     }
     case "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag-end": {
+      const {} = <
+        DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDragEnd
+      >action;
       return produce(state, (draft) => {
         draft.is_gesture_node_drag_rotation = false;
       });
@@ -211,7 +221,10 @@ export default function reducer<S extends IDocumentEditorState>(
       const {
         node_id,
         event: { delta, distance },
-      } = action;
+      } = <
+        DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDrag
+      >action;
+
       const [dx, dy] = delta;
       // cancel if invalid state
       if (!state.is_gesture_node_drag_rotation) return state;

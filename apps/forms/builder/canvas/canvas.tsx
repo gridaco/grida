@@ -102,7 +102,7 @@ export function CanvasOverlay() {
         threshold: 2,
       },
       drag: {
-        threshold: 0.1,
+        threshold: 5,
       },
     }
   );
@@ -152,10 +152,11 @@ function NodeOverlay({
 }) {
   const __rect_fallback = useMemo(() => new DOMRect(0, 0, 0, 0), []);
 
+  const { getNodeAbsoluteRotation } = useDocument();
   const node = useNode(node_id);
   const portal = useCanvasOverlayPortal();
   const node_element = useNodeDomElement(node_id);
-  const { rotation } = node;
+  const { rotation: node_rotation } = node;
   const portal_rect = portal?.getBoundingClientRect() ?? __rect_fallback;
   const node_element_bounding_rect =
     node_element?.getBoundingClientRect() ?? __rect_fallback;
@@ -174,6 +175,9 @@ function NodeOverlay({
   const width = node_element?.clientWidth;
   const height = node_element?.clientHeight;
 
+  // absolute rotation => accumulated rotation to the root
+  const absolute_rotation = getNodeAbsoluteRotation(node_id);
+
   return (
     <div
       className="group pointer-events-auto select-none border-2 border-workbench-accent-sky relative"
@@ -181,7 +185,7 @@ function NodeOverlay({
         position: "absolute",
         top: centerY,
         left: centerX,
-        transform: `translate(-50%, -50%) rotate(${rotation ?? 0}deg)`,
+        transform: `translate(-50%, -50%) rotate(${absolute_rotation ?? 0}deg)`,
         width: width,
         height: height,
         zIndex: readonly ? 1 : 2,

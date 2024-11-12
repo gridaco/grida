@@ -51,6 +51,8 @@ interface ICanvasEventTargetPointerEvent {
 export type DocumentEditorCanvasEventTargetHtmlBackendPointerMove =
   IHtmlBackendCanvasEventTargetPointerEvent & {
     type: "document/canvas/backend/html/event/on-pointer-move";
+    clientX: number;
+    clientY: number;
   };
 
 export type DocumentEditorCanvasEventTargetHtmlBackendPointerDown =

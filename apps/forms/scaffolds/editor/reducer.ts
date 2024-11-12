@@ -44,7 +44,7 @@ import builderReducer from "@/builder/reducer";
 import assert from "assert";
 import React from "react";
 import { grida } from "@/grida";
-import { IDocumentEditorState } from "@/builder/types";
+import { IDocumentEditorState, initDocumentEditorState } from "@/builder/types";
 
 export function reducer(state: EditorState, action: EditorAction): EditorState {
   switch (action.type) {
@@ -377,21 +377,22 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
         const template_id = startpage.name;
         draft.documents["form/startpage"] = {
           template_id: template_id,
-          editable: true,
-          cursor_position: { x: 0, y: 0 },
-          document: {
-            root_id: "page",
-            nodes: {
-              ["page"]:
-                grida.program.nodes.createTemplateInstanceNodeFromTemplateDefinition(
-                  "page",
-                  startpage
-                ),
+          ...initDocumentEditorState({
+            editable: true,
+            document: {
+              root_id: "page",
+              nodes: {
+                ["page"]:
+                  grida.program.nodes.createTemplateInstanceNodeFromTemplateDefinition(
+                    "page",
+                    startpage
+                  ),
+              },
             },
-          },
-          templates: {
-            [template_id]: startpage,
-          },
+            templates: {
+              [template_id]: startpage,
+            },
+          }),
         };
       });
     }
