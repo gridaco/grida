@@ -1,5 +1,40 @@
 import { grida } from "@/grida";
 
+function randcolor(): grida.program.css.RGBA {
+  return {
+    r: Math.floor(Math.random() * 256),
+    g: Math.floor(Math.random() * 256),
+    b: Math.floor(Math.random() * 256),
+    a: 1,
+  } satisfies grida.program.css.RGBA;
+}
+
+function _1000_rects(): Array<grida.program.nodes.RectangleNode> {
+  const rects = [];
+  for (let i = 0; i < 1000; i++) {
+    rects.push({
+      id: `rect_${i}`,
+      name: `rect_${i}`,
+      type: "rectangle",
+      active: true,
+      locked: false,
+      opacity: 1,
+      zIndex: 0,
+      width: 200,
+      height: 200,
+      position: "absolute",
+      top: 0 + i * 1,
+      left: 0 + i * 1,
+      cornerRadius: 0,
+      fill: { type: "solid", color: randcolor() },
+      effects: [],
+    } satisfies grida.program.nodes.RectangleNode);
+  }
+  return rects;
+}
+
+const rects = _1000_rects();
+
 // eslint-disable-next-line import/no-anonymous-default-export
 export default {
   root_id: "playground",
@@ -20,55 +55,13 @@ export default {
       style: {
         boxShadow: "0 0 10px rgba(0,0,0,0.1)",
       },
-      children: ["card_1_bg", "card_2_bg", "card_3_bg"],
+      children: rects.map((rect) => rect.id),
     },
-    card_1_bg: {
-      id: "card_1_bg",
-      name: "card_1_bg",
-      type: "image",
-      active: true,
-      locked: false,
-      opacity: 1,
-      zIndex: -1,
-      position: "absolute",
-      top: 15,
-      left: 15,
-      width: 300,
-      height: 510,
-      fill: { type: "solid", color: { r: 255, g: 255, b: 255, a: 0.1 } },
-      style: {},
-    },
-    card_2_bg: {
-      id: "card_2_bg",
-      name: "card_2_bg",
-      type: "image",
-      active: true,
-      locked: false,
-      opacity: 1,
-      zIndex: -1,
-      width: 300,
-      height: 510,
-      position: "absolute",
-      top: 15,
-      left: 330,
-      fill: { type: "solid", color: { r: 255, g: 255, b: 255, a: 0.1 } },
-      style: {},
-    },
-    card_3_bg: {
-      id: "card_3_bg",
-      name: "card_3_bg",
-      type: "image",
-      active: true,
-      locked: false,
-      opacity: 1,
-      zIndex: -1,
-      width: 300,
-      height: 510,
-      position: "absolute",
-      top: 15,
-      left: 645,
-      fill: { type: "solid", color: { r: 255, g: 255, b: 255, a: 0.1 } },
-      style: {},
-    },
+    // recta
+    ...rects.reduce((acc, rect) => {
+      // @ts-ignore
+      acc[rect.id] = rect;
+      return acc;
+    }, {}),
   },
 } satisfies grida.program.document.IDocumentDefinition;

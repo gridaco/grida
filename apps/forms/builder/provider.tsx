@@ -14,6 +14,9 @@ import {
   ProgramDataContextHost,
 } from "@/grida/react-runtime/data-context/context";
 import assert from "assert";
+import { useDebounceCallback } from "usehooks-ts";
+import { useThrottle } from "@uidotdev/usehooks";
+import { useThrottleFn } from "react-use";
 
 type Vector2 = [number, number];
 
@@ -250,6 +253,19 @@ export function useDocument() {
     [dispatch]
   );
 
+  const changeNodeRotation = useCallback(
+    (node_id: string, rotation: number) => {
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/rotation",
+          node_id: node_id,
+          rotation,
+        });
+      });
+    },
+    [dispatch]
+  );
+
   const changeNodeFill = useCallback(
     (node_id: string, fill: grida.program.cg.PaintWithoutID) => {
       requestAnimationFrame(() => {
@@ -347,6 +363,7 @@ export function useDocument() {
 
       // stylable
       opacity: (value: number) => changeNodeOpacity(selected_node_id!, value),
+      rotation: (value: number) => changeNodeRotation(selected_node_id!, value),
 
       // style
       fontFamily: (value: string) =>
@@ -427,6 +444,20 @@ export function useDocument() {
   ]);
 }
 
+function throttle<T extends (...args: any[]) => void>(
+  func: T,
+  limit: number
+): T {
+  let inThrottle: boolean;
+  return function (this: any, ...args: Parameters<T>) {
+    if (!inThrottle) {
+      func.apply(this, args);
+      inThrottle = true;
+      setTimeout(() => (inThrottle = false), limit);
+    }
+  } as T;
+}
+
 export function useEventTarget() {
   const [state, dispatch] = useInternal();
 
@@ -438,7 +469,7 @@ export function useEventTarget() {
   } = state;
 
   const pointerMove = useCallback(
-    (event: PointerEvent) => {
+    throttle((event: PointerEvent) => {
       const els = get_grida_node_elements_from_point(
         event.clientX,
         event.clientY
@@ -448,7 +479,7 @@ export function useEventTarget() {
         type: "document/canvas/backend/html/event/on-pointer-move",
         node_ids_from_point: els.map((n) => n.id),
       });
-    },
+    }, 30),
     [dispatch]
   );
 
@@ -569,7 +600,7 @@ export function useEventTarget() {
     },
     [dispatch]
   );
-  const dragCornerRadiusHandleHandle = useCallback(
+  const dragCornerRadiusHandle = useCallback(
     (
       node_id: string,
       anchor: "nw" | "ne" | "sw" | "se",
@@ -588,6 +619,44 @@ export function useEventTarget() {
   );
   // #endregion drag resize handle
 
+  // #region drag rotate handle
+  const dragRotationHandleStart = useCallback(
+    (node_id: string) => {
+      dispatch({
+        type: "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag-start",
+        node_id,
+      });
+    },
+    [dispatch]
+  );
+  const dragRotationHandleEnd = useCallback(
+    (node_id: string) => {
+      dispatch({
+        type: "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag-end",
+        node_id,
+      });
+    },
+    [dispatch]
+  );
+  const dragRotationHandle = useCallback(
+    (
+      node_id: string,
+      anchor: "nw" | "ne" | "sw" | "se",
+      event: { delta: Vector2; distance: Vector2 }
+    ) => {
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag",
+          node_id,
+          anchor,
+          event,
+        });
+      });
+    },
+    [dispatch]
+  );
+  // #endregion drag rotate handle
+
   return useMemo(() => {
     return {
       hovered_node_id,
@@ -601,7 +670,11 @@ export function useEventTarget() {
       //
       dragCornerRadiusHandleStart,
       dragCornerRadiusHandleEnd,
-      dragCornerRadiusHandleHandle,
+      dragCornerRadiusHandle,
+      //
+      dragRotationHandleStart,
+      dragRotationHandleEnd,
+      dragRotationHandle,
       //
       pointerMove,
       pointerDown,
@@ -626,7 +699,11 @@ export function useEventTarget() {
     //
     dragCornerRadiusHandleStart,
     dragCornerRadiusHandleEnd,
-    dragCornerRadiusHandleHandle,
+    dragCornerRadiusHandle,
+    //
+    dragRotationHandleStart,
+    dragRotationHandleEnd,
+    dragRotationHandle,
     //
     pointerMove,
     pointerDown,

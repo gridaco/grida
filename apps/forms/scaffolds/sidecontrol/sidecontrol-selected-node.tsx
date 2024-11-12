@@ -47,6 +47,7 @@ import {
   PositioningModeControl,
 } from "./controls/positioning";
 import { useNodeDomElement } from "@/builder/provider";
+import { RotateControl } from "./controls/rotate";
 
 export function SelectedNodeProperties() {
   const { state: document, selectedNode } = useDocument();
@@ -67,6 +68,7 @@ export function SelectedNodeProperties() {
     properties,
     opacity,
     cornerRadius,
+    rotation,
     fill,
     position,
     width,
@@ -327,6 +329,14 @@ export function SelectedNodeProperties() {
               onValueChange={selectedNode.opacity}
             />
           </PropertyLine>
+          <PropertyLine>
+            <PropertyLineLabel>Rotate</PropertyLineLabel>
+            <RotateControl
+              value={rotation}
+              onValueChange={selectedNode.rotation}
+            />
+          </PropertyLine>
+
           <PropertyLine>
             <PropertyLineLabel>Radius</PropertyLineLabel>
             <CornerRadiusControl

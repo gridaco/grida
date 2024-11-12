@@ -12,6 +12,7 @@ import { useEventTarget } from "@/builder";
 import { useGesture } from "@use-gesture/react";
 import { grida } from "@/grida";
 import { useDocument, useNode, useNodeDomElement } from "../provider";
+import { RotationCursorIcon } from "../components/cursor";
 
 interface CanvasEventTargetContext {
   portal?: HTMLDivElement | null;
@@ -142,8 +143,6 @@ export function useCanvasOverlayPortal() {
   return context.portal;
 }
 
-const __rect_fallback = { top: 0, left: 0, width: 0, height: 0 };
-
 function NodeOverlay({
   node_id,
   readonly,
@@ -151,31 +150,43 @@ function NodeOverlay({
   node_id: string;
   readonly: boolean;
 }) {
+  const __rect_fallback = useMemo(() => new DOMRect(0, 0, 0, 0), []);
+
   const node = useNode(node_id);
   const portal = useCanvasOverlayPortal();
   const node_element = useNodeDomElement(node_id);
-
+  const { rotation } = node;
   const portal_rect = portal?.getBoundingClientRect() ?? __rect_fallback;
-  const node_element_rect =
+  const node_element_bounding_rect =
     node_element?.getBoundingClientRect() ?? __rect_fallback;
 
+  // Calculate the center position relative to the portal
+  const centerX =
+    node_element_bounding_rect.left +
+    node_element_bounding_rect.width / 2 -
+    portal_rect.left;
+  const centerY =
+    node_element_bounding_rect.top +
+    node_element_bounding_rect.height / 2 -
+    portal_rect.top;
+
   // Calculate the position of the target relative to the portal
-  const top = node_element_rect.top - portal_rect.top;
-  const left = node_element_rect.left - portal_rect.left;
-  const width = node_element_rect.width;
-  const height = node_element_rect.height;
+  const width = node_element?.clientWidth;
+  const height = node_element?.clientHeight;
 
   return (
     <div
       className="group pointer-events-auto select-none border-2 border-workbench-accent-sky relative"
       style={{
         position: "absolute",
-        top: top,
-        left: left,
+        top: centerY,
+        left: centerX,
+        transform: `translate(-50%, -50%) rotate(${rotation ?? 0}deg)`,
         width: width,
         height: height,
         zIndex: readonly ? 1 : 2,
         touchAction: "none",
+        willChange: "transform",
       }}
     >
       {!readonly && (
@@ -191,6 +202,7 @@ function NodeOverlay({
           {node.type === "rectangle" && (
             <CornerRadiusHandle anchor="se" node_id={node_id} />
           )}
+          <RotationHandle anchor="ne" node_id={node_id} />
         </>
       )}
     </div>
@@ -211,7 +223,7 @@ function CornerRadiusHandle({
   const {
     dragCornerRadiusHandleStart,
     dragCornerRadiusHandleEnd,
-    dragCornerRadiusHandleHandle,
+    dragCornerRadiusHandle,
   } = useEventTarget();
 
   const bind = useGesture(
@@ -226,7 +238,7 @@ function CornerRadiusHandle({
       },
       onDrag: (e) => {
         e.event.stopPropagation();
-        dragCornerRadiusHandleHandle(node_id, anchor, {
+        dragCornerRadiusHandle(node_id, anchor, {
           delta: e.delta,
           distance: e.distance,
         });
@@ -260,8 +272,71 @@ function CornerRadiusHandle({
         height: size,
         transform: `translate(${anchor[1] === "w" ? "-50%" : "50%"}, ${anchor[0] === "n" ? "-50%" : "50%"})`,
         cursor: "pointer",
+        touchAction: "none",
       }}
     />
+  );
+}
+
+function RotationHandle({
+  node_id,
+  anchor,
+  offset = 8,
+  size = 16,
+}: {
+  node_id: string;
+  anchor: "nw" | "ne" | "sw" | "se";
+  offset?: number;
+  size?: number;
+}) {
+  const { dragRotationHandleStart, dragRotationHandle, dragRotationHandleEnd } =
+    useEventTarget();
+
+  const bind = useGesture(
+    {
+      onDragStart: (e) => {
+        e.event.stopPropagation();
+        dragRotationHandleStart(node_id);
+      },
+      onDragEnd: (e) => {
+        e.event.stopPropagation();
+        dragRotationHandleEnd(node_id);
+      },
+      onDrag: (e) => {
+        e.event.stopPropagation();
+        dragRotationHandle(node_id, anchor, {
+          delta: e.delta,
+          distance: e.distance,
+        });
+      },
+    },
+    {
+      eventOptions: {
+        passive: false,
+        capture: true,
+      },
+    }
+  );
+
+  return (
+    <div
+      {...bind()}
+      className="bg-transparent flex items-center justify-center"
+      style={{
+        position: "absolute",
+        top: anchor[0] === "n" ? -offset : "auto",
+        bottom: anchor[0] === "s" ? -offset : "auto",
+        left: anchor[1] === "w" ? -offset : "auto",
+        right: anchor[1] === "e" ? -offset : "auto",
+        width: size,
+        height: size,
+        transform: `translate(${anchor[1] === "w" ? "-50%" : "50%"}, ${anchor[0] === "n" ? "-50%" : "50%"})`,
+        cursor: "pointer",
+        touchAction: "none",
+      }}
+    >
+      <RotationCursorIcon />
+    </div>
   );
 }
 

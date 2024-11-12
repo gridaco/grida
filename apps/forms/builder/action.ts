@@ -17,6 +17,10 @@ export type BuilderAction =
   | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayCornerRadiusHandleDragEnd
   | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayCornerRadiusHandleDrag
   //
+  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDragStart
+  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDragEnd
+  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDrag
+  //
   | DocumentEditorEnterContentEditMode
   //
   | DocumentEditorNodeSelectAction
@@ -111,6 +115,7 @@ export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayResizeHandleDra
       type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag";
     };
 
+//
 export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayCornerRadiusHandleDragStart =
   INodeID & {
     type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-start";
@@ -127,6 +132,26 @@ export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayCornerRadiusHan
     ICanvasEventTargetResizeHandleEvent & {
       type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag";
     };
+//
+
+export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDragStart =
+  INodeID & {
+    type: "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag-start";
+  };
+
+export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDragEnd =
+  INodeID & {
+    type: "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag-end";
+  };
+
+export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDrag =
+  INodeID &
+    ICanvasEventTargetPointerEvent &
+    ICanvasEventTargetResizeHandleEvent & {
+      type: "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag";
+    };
+
+//
 
 export interface DocumentEditorNodeSelectAction {
   type: "document/node/select";
@@ -177,6 +202,10 @@ interface INodeChangeOpacityAction extends INodeID {
   opacity: number;
 }
 
+interface INodeChangeRotationAction extends INodeID {
+  rotation: grida.program.nodes.i.IRotation["rotation"];
+}
+
 interface INodeChangeCornerRadiusAction extends INodeID {
   cornerRadius: number | grida.program.nodes.i.IRectangleCorner["cornerRadius"];
 }
@@ -215,6 +244,7 @@ export type NodeChangeAction =
   | ({ type: "node/change/component" } & INodeChangeComponentAction)
   | ({ type: "node/change/text" } & INodeChangeTextAction)
   | ({ type: "node/change/opacity" } & INodeChangeOpacityAction)
+  | ({ type: "node/change/rotation" } & INodeChangeRotationAction)
   | ({ type: "node/change/cornerRadius" } & INodeChangeCornerRadiusAction)
   | ({ type: "node/change/fill" } & INodeChangeFillAction)
   | ({ type: "node/change/style" } & INodeChangeStyleAction)

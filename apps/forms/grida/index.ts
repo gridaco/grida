@@ -443,6 +443,7 @@ export namespace grida {
           height,
           zIndex,
           opacity,
+          rotation,
           fill,
           cornerRadius: __,
           style,
@@ -457,6 +458,7 @@ export namespace grida {
           bottom: bottom,
           zIndex: zIndex,
           opacity: opacity,
+          rotate: rotation ? `${rotation}deg` : undefined,
           ...style,
         } satisfies React.CSSProperties;
 
@@ -817,6 +819,7 @@ export namespace grida {
             ICSSDimension,
             IFill,
             IOpacity,
+            IRotation,
             IZIndex {
           style: css.ExplicitlySupportedCSSProperties;
         }
@@ -852,6 +855,15 @@ export namespace grida {
           bottom?: number | undefined;
           // x: number;
           // y: number;
+        }
+
+        /**
+         * specifies node's x rotation in degrees
+         *
+         * @default 0
+         */
+        export interface IRotation {
+          rotation?: number;
         }
 
         export interface ITextValue {

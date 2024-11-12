@@ -32,6 +32,13 @@ export interface IDocumentEditorInteractionCursorState {
   /**
    * @private - internal use only
    *
+   * is gesture node-rotation
+   */
+  is_gesture_node_drag_rotation?: boolean;
+
+  /**
+   * @private - internal use only
+   *
    * current content edit mode
    *
    * @default false

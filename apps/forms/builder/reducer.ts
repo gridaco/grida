@@ -5,9 +5,15 @@ import type {
   //
   DocumentEditorCanvasEventTargetHtmlBackendPointerMove,
   DocumentEditorCanvasEventTargetHtmlBackendPointerDown,
+  //
   DocumentEditorCanvasEventTargetHtmlBackendDrag,
   DocumentEditorCanvasEventTargetHtmlBackendDragStart,
   DocumentEditorCanvasEventTargetHtmlBackendDragEnd,
+  //
+  DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDrag,
+  DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDragEnd,
+  DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDragStart,
+  //
   TemplateEditorSetTemplatePropsAction,
   DocumentEditorNodeSelectAction,
   DocumentEditorNodePointerEnterAction,
@@ -187,6 +193,43 @@ export default function reducer<S extends IDocumentEditorState>(
       //
     }
 
+    //
+    case "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag-start": {
+      const { node_id } = action;
+
+      return produce(state, (draft) => {
+        draft.selected_node_id = node_id;
+        draft.is_gesture_node_drag_rotation = true;
+      });
+    }
+    case "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag-end": {
+      return produce(state, (draft) => {
+        draft.is_gesture_node_drag_rotation = false;
+      });
+    }
+    case "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag": {
+      const {
+        node_id,
+        event: { delta, distance },
+      } = action;
+      const [dx, dy] = delta;
+      // cancel if invalid state
+      if (!state.is_gesture_node_drag_rotation) return state;
+
+      const d = Math.round(dx);
+      return produce(state, (draft) => {
+        const node = draft.document.nodes[node_id];
+
+        draft.document.nodes[node_id] = nodeReducer(node, {
+          type: "node/change/rotation",
+          rotation:
+            ((node as grida.program.nodes.i.IRotation).rotation ?? 0) + d,
+          node_id,
+        });
+      });
+      //
+    }
+
     // #endregion [html backend] canvas event target
 
     // #region [universal backend] canvas event target
@@ -255,6 +298,7 @@ export default function reducer<S extends IDocumentEditorState>(
     case "node/change/src":
     case "node/change/props":
     case "node/change/opacity":
+    case "node/change/rotation":
     case "node/change/cornerRadius":
     case "node/change/fill":
     case "node/change/style":
@@ -478,6 +522,11 @@ function nodeReducer<N extends Partial<grida.program.nodes.Node>>(
       case "node/change/opacity": {
         (draft as Draft<grida.program.nodes.i.ICSSStylable>).opacity =
           action.opacity;
+        break;
+      }
+      case "node/change/rotation": {
+        (draft as Draft<grida.program.nodes.i.ICSSStylable>).rotation =
+          action.rotation;
         break;
       }
       case "node/change/cornerRadius": {
