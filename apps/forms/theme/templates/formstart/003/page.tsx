@@ -79,17 +79,7 @@ function Consumer() {
             <Button>Start Now</Button>
           </div>
         </section>
-        <NodeElement
-          node_id="003.background"
-          position="absolute"
-          left={0}
-          top={0}
-          style={{
-            objectFit: "cover",
-            // width: "100%",
-            // height: "100%",
-          }}
-        />
+        <NodeElement node_id="003.background" style={{}} />
       </ScreenCenter>
     </ScreenRoot>
   );
@@ -143,10 +133,15 @@ _003.definition = {
       src: Factory.createPropertyAccessExpression(["props", "background"]),
       opacity: 1,
       zIndex: 0,
+      fit: "cover",
       style: {},
       width: "auto",
       height: "auto",
-      position: "relative",
+      position: "absolute",
+      top: 0,
+      left: 0,
+      bottom: 0,
+      right: 0,
     },
   },
 } satisfies grida.program.document.template.TemplateDocumentDefinition;

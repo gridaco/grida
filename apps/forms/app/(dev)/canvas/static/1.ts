@@ -61,6 +61,7 @@ export default {
       left: 0,
       width: 960,
       height: 540,
+      fit: "cover",
       style: {},
     },
     sticker_1: {

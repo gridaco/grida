@@ -216,6 +216,10 @@ interface INodeChangeFillAction extends INodeID {
   fill: grida.program.cg.PaintWithoutID;
 }
 
+interface INodeChangeFitAction extends INodeID {
+  fit: grida.program.cg.BoxFit;
+}
+
 interface INodeChangeStyleAction extends INodeID {
   style: Partial<React.CSSProperties>;
 }
@@ -249,6 +253,7 @@ export type NodeChangeAction =
   | ({ type: "node/change/rotation" } & INodeChangeRotationAction)
   | ({ type: "node/change/cornerRadius" } & INodeChangeCornerRadiusAction)
   | ({ type: "node/change/fill" } & INodeChangeFillAction)
+  | ({ type: "node/change/fit" } & INodeChangeFitAction)
   | ({ type: "node/change/style" } & INodeChangeStyleAction)
   | ({ type: "node/change/src" } & INodeChangeSrcAction)
   | ({ type: "node/change/href" } & INodeChangeHrefAction)

@@ -353,6 +353,19 @@ export namespace grida {
           //
         };
 
+      /**
+       * Definition:
+       *
+       * A Template is unser-written ReactComponent for complex and custom logics and styles, sub components, while allowing user to modify the exposed details by building the template with mixture of {@link nodes.Node} and JSX.
+       *
+       * - A template is a user-written ReactComponent
+       * - A template can have properties like component node, but the props are managed by the grida engine.
+       * - User may also have its own props that are independent from the engine, but needs to be passed via non-shared custom context.
+       * - A template can have its own children, either can be a normal JSX or a {@link nodes.Node}
+       * - {@link nodes.Node} children under a template are exposed and can be modified by the editor
+       * - A template can be used as document root.
+       * - A template cannot be nested under another template.
+       */
       export namespace template {
         export interface IUserDefinedTemplateNodeReactComponentRenderProps<P>
           extends nodes.i.IBaseNode,
@@ -444,10 +457,11 @@ export namespace grida {
        * - `pointer-events`
        * - `border-radius`
        * - `fill`
+       * - `objectFit`
        *
        *
        * @deprecated Note: Do not modify this directly - it will progressively be replaced by a more robust and universal CSS property type system.
-       * If you wish to add a complex styled node, try using {@link document.template.TemplateDocumentDefinition}
+       * If you wish to add a complex styled node, try using {@link template.TemplateDocumentDefinition}
        */
       export type ExplicitlySupportedCSSProperties = Pick<
         // TODO: Drop the React dependency and use css-types instead
@@ -497,14 +511,13 @@ export namespace grida {
         | "gap"
         //
         | "cursor"
-        | "userSelect"
         //
-        | "objectFit"
-        | "objectPosition"
       >;
 
       export function toReactCSSProperties(
-        styles: nodes.i.ICSSStylable & Partial<nodes.i.IRectangleCorner>,
+        styles: nodes.i.ICSSStylable &
+          Partial<nodes.i.IRectangleCorner> &
+          Partial<nodes.i.IBoxFit>,
         config: {
           fill: "color" | "background" | "fill" | "none";
         }
@@ -521,6 +534,7 @@ export namespace grida {
           opacity,
           rotation,
           fill,
+          fit,
           cornerRadius: __,
           style,
         } = styles;
@@ -534,6 +548,7 @@ export namespace grida {
           bottom: bottom,
           zIndex: zIndex,
           opacity: opacity,
+          objectFit: fit,
           rotate: rotation ? `${rotation}deg` : undefined,
           ...style,
         } satisfies React.CSSProperties;
@@ -654,6 +669,19 @@ export namespace grida {
      * Core Graphics
      */
     export namespace cg {
+      /**
+       *
+       * Supported fit modes
+       *
+       * Only `contain` and `cover`, `none` are supported in the current version.
+       *
+       * - `none` may have unexpected results by the environment
+       *
+       * @see https://api.flutter.dev/flutter/painting/BoxFit.html
+       * @see https://developer.mozilla.org/en-US/docs/Web/CSS/object-fit
+       */
+      export type BoxFit = "contain" | "cover" | "none";
+
       export type Paint =
         | SolidPaint
         | LinearGradientPaint
@@ -860,6 +888,13 @@ export namespace grida {
               };
         }
 
+        /**
+         * Node wih Box Fit `fit`, a.k.a. `object-fit`
+         */
+        export interface IBoxFit {
+          fit: cg.BoxFit;
+        }
+
         export interface IChildren {
           children?: NodeID[];
         }
@@ -889,6 +924,9 @@ export namespace grida {
           style: S;
         }
 
+        /**
+         * @deprecated
+         */
         export interface ICSSStylable
           extends IStylable<css.ExplicitlySupportedCSSProperties>,
             IPositioning,
@@ -1000,6 +1038,7 @@ export namespace grida {
         extends i.IBaseNode,
           i.ISceneNode,
           i.ICSSStylable,
+          i.IBoxFit,
           i.IHrefable {
         readonly type: "image";
         /**

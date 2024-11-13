@@ -92,7 +92,7 @@ export default function reducer<S extends IDocumentEditorState>(
       const [dx, dy] = delta;
 
       return produce(state, (draft) => {
-        const node = draft.document.nodes[nid];
+        const node = __getNodeById(draft, nid);
 
         draft.document.nodes[nid] = nodeTransformReducer(node, {
           type: "move",
@@ -115,7 +115,7 @@ export default function reducer<S extends IDocumentEditorState>(
         draft.is_gesture_node_drag_move = false;
         draft.hovered_node_id = undefined;
 
-        const node = draft.document.nodes[node_id];
+        const node = __getNodeById(draft, node_id);
 
         // need to assign a fixed size if width or height is a variable length
         (node as grida.program.nodes.i.ICSSDimension).width = client_wh.width;
@@ -142,7 +142,7 @@ export default function reducer<S extends IDocumentEditorState>(
 
       return produce(state, (draft) => {
         // once the node's measurement mode is set to fixed (from drag start), we may safely cast the width / height sa fixed number
-        const node = draft.document.nodes[node_id];
+        const node = __getNodeById(draft, node_id);
 
         draft.document.nodes[node_id] = nodeTransformReducer(node, {
           type: "resize",
@@ -181,7 +181,7 @@ export default function reducer<S extends IDocumentEditorState>(
       // const distance = Math.sqrt(dx * dx + dy * dy);
       const d = -Math.round(dx);
       return produce(state, (draft) => {
-        const node = draft.document.nodes[node_id];
+        const node = __getNodeById(draft, node_id);
 
         if (!("cornerRadius" in node)) {
           return;
@@ -231,7 +231,7 @@ export default function reducer<S extends IDocumentEditorState>(
 
       const d = Math.round(dx);
       return produce(state, (draft) => {
-        const node = draft.document.nodes[node_id];
+        const node = __getNodeById(draft, node_id);
 
         draft.document.nodes[node_id] = nodeReducer(node, {
           type: "node/change/rotation",
@@ -248,7 +248,7 @@ export default function reducer<S extends IDocumentEditorState>(
     // #region [universal backend] canvas event target
     case "document/canvas/enter-content-edit-mode": {
       if (!state.selected_node_id) return state;
-      const { type: nodeType } = state.document.nodes[state.selected_node_id];
+      const { type: nodeType } = __getNodeById(state, state.selected_node_id);
       if (nodeType !== "text") return state;
 
       return produce(state, (draft) => {
@@ -261,8 +261,10 @@ export default function reducer<S extends IDocumentEditorState>(
       const { data } = <TemplateEditorSetTemplatePropsAction>action;
 
       return produce(state, (draft) => {
-        const root_template_instance =
-          draft.document.nodes[draft.document.root_id!];
+        const root_template_instance = __getNodeById(
+          draft,
+          draft.document.root_id!
+        );
         assert(root_template_instance.type === "template_instance");
         root_template_instance.props = data;
       });
@@ -314,11 +316,12 @@ export default function reducer<S extends IDocumentEditorState>(
     case "node/change/rotation":
     case "node/change/cornerRadius":
     case "node/change/fill":
+    case "node/change/fit":
     case "node/change/style":
     case "node/change/text": {
       const { node_id } = <NodeChangeAction>action;
       return produce(state, (draft) => {
-        const node = draft.document.nodes[node_id];
+        const node = __getNodeById(draft, node_id);
         assert(node, `node not found with node_id: "${node_id}"`);
         draft.document.nodes[node_id] = nodeReducer(node, action);
       });
@@ -330,8 +333,10 @@ export default function reducer<S extends IDocumentEditorState>(
 
       return produce(state, (draft) => {
         const { node_id } = __action;
-        const template_instance_node =
-          draft.document.nodes[template_instance_node_id];
+        const template_instance_node = __getNodeById(
+          draft,
+          template_instance_node_id
+        );
 
         assert(
           template_instance_node &&
@@ -344,6 +349,11 @@ export default function reducer<S extends IDocumentEditorState>(
           __action
         );
       });
+    }
+    default: {
+      throw new Error(
+        `unknown action type: "${(action as BuilderAction).type}"`
+      );
     }
   }
 
@@ -466,6 +476,21 @@ function nodeTransformReducer(
       }
     }
   });
+}
+
+/**
+ * @internal
+ * @param state - state or draft
+ * @param node_id
+ * @returns
+ */
+function __getNodeById<S extends IDocumentEditorState>(
+  state: S,
+  node_id: string
+): S["document"]["nodes"][string] {
+  const node = state.document.nodes[node_id];
+  if (node) return node as S["document"]["nodes"][string];
+  throw new Error(`node not found with node_id: "${node_id}"`);
 }
 
 function nodeReducer<N extends Partial<grida.program.nodes.Node>>(
@@ -591,6 +616,11 @@ function nodeReducer<N extends Partial<grida.program.nodes.Node>>(
             draft.fill = action.fill;
         }
 
+        break;
+      }
+      case "node/change/fit": {
+        assert(draft.type === "image");
+        draft.fit = action.fit;
         break;
       }
       case "node/change/style": {

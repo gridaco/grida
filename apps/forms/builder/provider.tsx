@@ -101,6 +101,13 @@ export function useDocument() {
 
   const { selected_node_id } = state;
 
+  const getNodeById = useCallback(
+    (node_id: string): grida.program.nodes.Node | null => {
+      return state.document.nodes[node_id] ?? null;
+    },
+    [state.document.nodes]
+  );
+
   const getNodeAbsoluteRotation = useCallback(
     (node_id: string) => {
       const parent_ids = [];
@@ -116,22 +123,28 @@ export function useDocument() {
 
       // Calculate the absolute rotation
       let rotation = 0;
-      for (const parent_id of parent_ids) {
-        const parent_node = state.document.nodes[parent_id];
-        if ("rotation" in parent_node) {
-          rotation += parent_node.rotation ?? 0;
+      try {
+        for (const parent_id of parent_ids) {
+          const parent_node = getNodeById(parent_id);
+          assert(parent_node, `parent node not found: ${parent_id}`);
+          if ("rotation" in parent_node) {
+            rotation += parent_node.rotation ?? 0;
+          }
         }
-      }
 
-      // finally, add the node's own rotation
-      const node = state.document.nodes[node_id];
-      if ("rotation" in node) {
-        rotation += node.rotation ?? 0;
+        // finally, add the node's own rotation
+        const node = getNodeById(node_id);
+        assert(node, `node not found: ${node_id}`);
+        if ("rotation" in node) {
+          rotation += node.rotation ?? 0;
+        }
+      } catch (e) {
+        reportError(e);
       }
 
       return rotation;
     },
-    [state]
+    [state.document_ctx, getNodeById]
   );
 
   const selectNode = useCallback(
@@ -316,6 +329,19 @@ export function useDocument() {
     [dispatch]
   );
 
+  const changeNodeFit = useCallback(
+    (node_id: string, fit: grida.program.cg.BoxFit) => {
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/fit",
+          node_id: node_id,
+          fit,
+        });
+      });
+    },
+    [dispatch]
+  );
+
   const changeNodeCornerRadius = useCallback(
     (
       node_id: string,
@@ -397,7 +423,8 @@ export function useDocument() {
       ) => changeNodeCornerRadius(selected_node_id!, value),
       fill: (value: grida.program.cg.PaintWithoutID) =>
         changeNodeFill(selected_node_id!, value),
-
+      fit: (value: grida.program.cg.BoxFit) =>
+        changeNodeFit(selected_node_id!, value),
       // stylable
       opacity: (value: number) => changeNodeOpacity(selected_node_id!, value),
       rotation: (value: number) => changeNodeRotation(selected_node_id!, value),
@@ -436,8 +463,6 @@ export function useDocument() {
         changeNodeStyle(selected_node_id!, "alignItems", value),
       cursor: (value?: string) =>
         changeNodeStyle(selected_node_id!, "cursor", value),
-      objectFit: (value?: string) =>
-        changeNodeStyle(selected_node_id!, "objectFit", value),
     };
   }, [
     selected_node_id,

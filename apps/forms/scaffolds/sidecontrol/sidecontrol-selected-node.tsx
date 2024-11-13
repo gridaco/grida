@@ -32,7 +32,7 @@ import { TemplateControl } from "./controls/template";
 import { CursorControl } from "./controls/cursor";
 import { PropertyLine, PropertyLineLabel } from "./ui";
 import { SrcControl } from "./controls/src";
-import { ObjectFitControl } from "./controls/object-fit";
+import { BoxFitControl } from "./controls/box-fit";
 import { PropsControl } from "./controls/props";
 import { TargetBlankControl } from "./controls/target";
 import { ExportNodeWithHtmlToImage } from "./controls/export";
@@ -77,6 +77,7 @@ export function SelectedNodeProperties() {
     top,
     right,
     bottom,
+    fit,
   } = node;
 
   // const istemplate = type?.startsWith("templates/");
@@ -111,7 +112,6 @@ export function SelectedNodeProperties() {
     //
     cursor,
     //
-    objectFit,
     //
   } = {
     // ...selected_node_default_style,
@@ -270,10 +270,7 @@ export function SelectedNodeProperties() {
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Fit</PropertyLineLabel>
-            <ObjectFitControl
-              value={objectFit as any}
-              onValueChange={selectedNode.objectFit}
-            />
+            <BoxFitControl value={fit} onValueChange={selectedNode.fit} />
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>

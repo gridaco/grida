@@ -174,6 +174,7 @@ export const Card_001 = withTemplateDefinition(
         style: {},
         width: "auto",
         height: "auto",
+        fit: "cover",
         position: "relative",
       },
       ".date2": {
@@ -348,6 +349,7 @@ export const Card_002 = withTemplateDefinition(
         style: {},
         width: "auto",
         height: "auto",
+        fit: "cover",
         position: "relative",
       },
       ".date2": {
@@ -549,6 +551,7 @@ export const Card_003 = withTemplateDefinition(
         style: {},
         width: "auto",
         height: "auto",
+        fit: "cover",
         position: "relative",
       },
       ".date2": {
@@ -678,6 +681,7 @@ export const Hero_001 = withTemplateDefinition(
         style: {},
         width: "auto",
         height: "auto",
+        fit: "cover",
         position: "relative",
       },
     },
@@ -759,6 +763,7 @@ export const Hero_002 = withTemplateDefinition(
         style: {},
         width: "auto",
         height: "auto",
+        fit: "cover",
         position: "relative",
       },
     },
