@@ -47,6 +47,7 @@ export function FontFamilyControl({
         <SelectValue className="overflow-hidden text-ellipsis" />
       </SelectTrigger>
       <SelectContent>
+        <SelectItem value="inherit">Default</SelectItem>
         {list.map((font) => (
           <SelectItem key={font.name} value={font.name}>
             <GoogleFontsPreview fontFamily={font.name}>

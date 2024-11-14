@@ -10,6 +10,15 @@ import { WorkbenchUI } from "@/components/workbench";
 import { grida } from "@/grida";
 import { cn } from "@/utils";
 
+function parseIntFallback(
+  value: string,
+  fallback: number | undefined = undefined
+): number | undefined {
+  const i = parseInt(value);
+  const v = Number.isNaN(i) ? fallback : i;
+  return v;
+}
+
 export function PositioningModeControl({
   value,
   onValueChange,
@@ -47,8 +56,10 @@ export function PositioningConstraintsControl({
           type="number"
           value={value.top ?? ""}
           onChange={(e) => {
-            const v = parseInt(e.target.value) || undefined;
-            onValueChange?.({ ...value, top: v });
+            onValueChange?.({
+              ...value,
+              top: parseIntFallback(e.target.value),
+            });
           }}
           className={cn(WorkbenchUI.inputVariants({ size: "sm" }), "w-16")}
         />
@@ -59,8 +70,10 @@ export function PositioningConstraintsControl({
           type="number"
           value={value.left ?? ""}
           onChange={(e) => {
-            const v = parseInt(e.target.value) || undefined;
-            onValueChange?.({ ...value, left: v });
+            onValueChange?.({
+              ...value,
+              left: parseIntFallback(e.target.value),
+            });
           }}
           className={cn(WorkbenchUI.inputVariants({ size: "sm" }), "w-16")}
         />
@@ -83,8 +96,10 @@ export function PositioningConstraintsControl({
           type="number"
           value={value.right ?? ""}
           onChange={(e) => {
-            const v = parseInt(e.target.value) || undefined;
-            onValueChange?.({ ...value, right: v });
+            onValueChange?.({
+              ...value,
+              right: parseIntFallback(e.target.value),
+            });
           }}
           className={cn(WorkbenchUI.inputVariants({ size: "sm" }), "w-16")}
         />
@@ -95,8 +110,10 @@ export function PositioningConstraintsControl({
           type="number"
           value={value.bottom ?? ""}
           onChange={(e) => {
-            const v = parseInt(e.target.value) || undefined;
-            onValueChange?.({ ...value, bottom: v });
+            onValueChange?.({
+              ...value,
+              bottom: parseIntFallback(e.target.value),
+            });
           }}
           className={cn(WorkbenchUI.inputVariants({ size: "sm" }), "w-16")}
         />

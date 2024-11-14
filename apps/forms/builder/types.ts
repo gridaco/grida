@@ -64,26 +64,30 @@ export interface IDocumentEditorInteractionCursorState {
   // selectedTextRange;
 }
 
-export interface IDocumentEditorInit
-  extends grida.program.document.IDocumentTemplatesRepository {
+interface IDocumentEditorConfig {
   /**
    *
    * when editable is false, the document definition is not editable
    * set editable false on production context - end-user-facing context
    */
   editable: boolean;
+}
 
+export interface IDocumentEditorInit
+  extends IDocumentEditorConfig,
+    grida.program.document.IDocumentTemplatesRepository {
   document: grida.program.document.IDocumentDefinition;
 }
 
 export interface IDocumentEditorState
-  extends IDocumentEditorInit,
+  extends IDocumentEditorConfig,
     IDocumentEditorInteractionCursorState,
+    grida.program.document.IDocumentTemplatesRepository,
     grida.program.document.internal.IDocumentEditorState {}
 
-export function initDocumentEditorState(
-  init: IDocumentEditorInit
-): IDocumentEditorState {
+export function initDocumentEditorState({
+  ...init
+}: IDocumentEditorInit): IDocumentEditorState {
   return {
     ...init,
     cursor_position: { x: 0, y: 0 },

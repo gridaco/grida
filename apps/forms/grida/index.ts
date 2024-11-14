@@ -89,6 +89,9 @@ export namespace grida {
       // function is_equal(a, b, keys){}
     }
 
+    /**
+     * common object types
+     */
     export namespace objects {
       export type ObjectType = Object["type"];
       export type ObjectTypeMap = {
@@ -168,6 +171,13 @@ export namespace grida {
          * user registered templates
          */
         templates?: Record<string, template.TemplateDocumentDefinition>;
+      }
+
+      export interface IDocumentOverridesRepository {
+        /**
+         * instance's exposed child node overrides
+         */
+        overrides: Record<nodes.NodeID, nodes.NodeChange>;
       }
 
       /**
@@ -402,19 +412,12 @@ export namespace grida {
           properties: P;
           default: Record<string, schema.Value>;
         }
-
-        /**
-         * Type for containing template instance's node changes data relative to master template definition
-         *
-         * {@link nodes.TemplateInstanceNode.overrides}
-         */
-        export type NodeChanges = Record<
-          nodes.NodeID,
-          Partial<nodes.Node> | undefined
-        >;
       }
     }
 
+    /**
+     * Supported CSS properties and types
+     */
     export namespace css {
       /**
        * @see https://developer.mozilla.org/en-US/docs/Web/CSS/length
@@ -792,6 +795,11 @@ export namespace grida {
         | TemplateInstanceNode;
 
       /**
+       * Type for containing instance's node changes data relative to master node
+       */
+      export type NodeChange = Partial<nodes.Node> | undefined;
+
+      /**
        * Any node utility type - use within the correct context
        */
       export type AnyNode = Omit<
@@ -1151,7 +1159,9 @@ export namespace grida {
       /**
        * [Template Instance Node] Template node is a static, hand crafted template that does not have a intrinsic tree, only a root properties [data] and [overrides] to each customizable node
        *
-       * Template Node cannot be used as a child node.
+       * Limitations ATM:
+       * - Template Node cannot be used as a child node.
+       * - There can be only one, root template node in a document.
        *
        * This is useful when you have a complex structure with custom loggics and state management, use this node and expose only customizable nodes and properties.
        */
@@ -1160,18 +1170,15 @@ export namespace grida {
           i.IHrefable,
           i.ISceneNode,
           i.IProperties,
-          i.IProps {
+          i.IProps,
+          // TODO: migration required - remove me - use global override table instead
+          document.IDocumentOverridesRepository {
         readonly type: "template_instance";
 
         /**
          * ID of template definition that this instance came from, refers to user defined templates table
          */
         template_id: string;
-
-        /**
-         * template definition exposed child node overrides
-         */
-        overrides: document.template.NodeChanges;
       }
 
       /**

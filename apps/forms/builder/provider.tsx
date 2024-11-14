@@ -21,6 +21,7 @@ import {
   ProgramDataContextHost,
 } from "@/grida/react-runtime/data-context/context";
 import assert from "assert";
+import { documentquery } from "./document-query";
 
 type Vector2 = [number, number];
 
@@ -102,8 +103,8 @@ export function useDocument() {
   const { selected_node_id } = state;
 
   const getNodeById = useCallback(
-    (node_id: string): grida.program.nodes.Node | null => {
-      return state.document.nodes[node_id] ?? null;
+    (node_id: string): grida.program.nodes.Node => {
+      return documentquery.__getNodeById(state, node_id);
     },
     [state.document.nodes]
   );
@@ -828,12 +829,10 @@ export function useNode(node_id: string) {
   } = useDocument();
 
   let node_definition: grida.program.nodes.Node | undefined = undefined;
-  let node_overrides:
-    | grida.program.document.template.NodeChanges[string]
-    | undefined = undefined;
+  let node_change: grida.program.nodes.NodeChange = undefined;
 
   if (nodes[node_id]) {
-    node_overrides = undefined;
+    node_change = undefined;
     node_definition = nodes[node_id];
   } else {
     assert(
@@ -869,7 +868,7 @@ export function useNode(node_id: string) {
       ] as grida.program.nodes.TemplateInstanceNode
     ).overrides;
 
-    node_overrides = overrides[node_id];
+    node_change = overrides[node_id];
     node_definition = templates[template_id].nodes[node_id];
   }
 
@@ -877,9 +876,9 @@ export function useNode(node_id: string) {
     return Object.assign(
       {},
       node_definition,
-      node_overrides || {}
+      node_change || {}
     ) as grida.program.nodes.AnyNode;
-  }, [node_definition, node_overrides]);
+  }, [node_definition, node_change]);
 
   return node;
 }
