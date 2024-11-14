@@ -65,7 +65,8 @@ export type EditorAction =
   | EditorThemeBackgroundAction
   | FormCampaignPreferencesAction
   | FormEndingPreferencesAction
-  | FormStartPageInitAction;
+  | FormStartPageInitAction
+  | FormStartPageRemoveAction;
 
 export interface InitAssetAction extends Partial<EditorState["assets"]> {
   type: "editor/assets/init";
@@ -443,6 +444,10 @@ export interface FormEndingPreferencesAction
 export interface FormStartPageInitAction {
   type: "editor/form/startpage/init";
   template: grida.program.document.template.TemplateDocumentDefinition;
+}
+
+export interface FormStartPageRemoveAction {
+  type: "editor/form/startpage/remove";
 }
 
 export interface EditorDocumentAction {

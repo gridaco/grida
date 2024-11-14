@@ -396,6 +396,11 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
         };
       });
     }
+    case "editor/form/startpage/remove": {
+      return produce(state, (draft) => {
+        delete draft.documents["form/startpage"];
+      });
+    }
     //
 
     default:

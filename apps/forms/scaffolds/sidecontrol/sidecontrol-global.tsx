@@ -79,6 +79,16 @@ import {
   useNode,
   useTemplateDefinition,
 } from "@/builder/provider";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const { default: all, ...variants } = _variants;
 
@@ -191,7 +201,8 @@ function FormStartPageControl() {
 function FormStartPageTemplateControl() {
   const [state, dispatch] = useEditorState();
 
-  const dialog = useDialogState("switch-template-dialog");
+  const switchTemplateDialog = useDialogState("switch-template-dialog");
+  const removeConfirmDialog = useDialogState("remove-confirm-dialog");
 
   const setupStartPage = useCallback(
     (name: string) => {
@@ -205,14 +216,47 @@ function FormStartPageTemplateControl() {
     [dispatch]
   );
 
+  const removeStartPage = useCallback(() => {
+    dispatch({
+      type: "editor/form/startpage/remove",
+    });
+  }, [dispatch]);
+
   return (
     <>
       <BrowseStartPageTemplatesDialog
-        {...dialog}
+        {...switchTemplateDialog}
         defaultValue={state.documents["form/startpage"]?.template_id}
         onValueCommit={setupStartPage}
       />
-      <Button onClick={dialog.openDialog}>Switch Template</Button>
+      <AlertDialog {...removeConfirmDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Are you sure you want to remove the cover page?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This action is irreversible.
+            </AlertDialogDescription>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction asChild>
+                <Button variant="destructive" onClick={removeStartPage}>
+                  Delete
+                </Button>
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogHeader>
+        </AlertDialogContent>
+      </AlertDialog>
+      <div className="w-full flex flex-col gap-2">
+        <Button onClick={switchTemplateDialog.openDialog}>
+          Switch Template
+        </Button>
+        <Button variant="destructive" onClick={removeConfirmDialog.openDialog}>
+          Remove Cover Page
+        </Button>
+      </div>
     </>
   );
 }

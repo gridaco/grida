@@ -61,6 +61,7 @@ import {
 import { composeEditorDocumentAction } from "@/scaffolds/editor/action";
 import { BuilderAction } from "@/builder/action";
 import { DevtoolsPanel } from "@/builder/devtools";
+import { Badge } from "@/components/ui/badge";
 
 export default function FormStartEditPage() {
   const [state, dispatch] = useEditorState();
@@ -140,10 +141,12 @@ function SetupStartPage() {
           setupStartPage(template_id);
         }}
       />
-
       <div className="w-full h-full flex items-center justify-center">
         <Card className="max-w-sm">
           <CardHeader>
+            <Badge className="w-min mb-4" variant="outline">
+              BETA
+            </Badge>
             <CardTitle>Add a cover page for your campaign</CardTitle>
             <CardDescription>
               You can add a engaging cover (start) page for this campaign. By
