@@ -19,18 +19,13 @@ export namespace FormStartPage {
 
   export const templates: ClientTemplateDefinition[] = [
     // {
-    //   id: "000",
-    //   name: "000",
+    //   ...FormStartPage000.definition,
     //   component: FormStartPage000,
     // },
-    // {
-    //   type: "template",
-    //   name: "001",
-    //   version: "0.0.0",
-    //   default: {},
-    //   properties: FormStartPage001.properties,
-    //   component: FormStartPage001,
-    // },
+    {
+      ...FormStartPage001.definition,
+      component: FormStartPage001,
+    },
     // {
     //   type: "template",
     //   name: "002",
@@ -51,14 +46,10 @@ export namespace FormStartPage {
     //   properties: FormStartPage004.properties,
     //   component: FormStartPage004,
     // },
-    // {
-    //   type: "template",
-    //   name: "005",
-    //   version: "0.0.0",
-    //   default: {},
-    //   properties: FormStartPage005.properties,
-    //   component: FormStartPage005,
-    // },
+    {
+      ...FormStartPage005.definition,
+      component: FormStartPage005,
+    },
     // {
     //   type: "template",
     //   name: "006",

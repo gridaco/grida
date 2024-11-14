@@ -24,16 +24,20 @@ const EventTargetContext = createContext<CanvasEventTargetContext | null>(null);
 export function CanvasEventTarget({
   className,
   children,
-}: React.PropsWithChildren<{
-  className?: string;
-}>) {
+  ...props
+}: Omit<React.HTMLAttributes<HTMLDivElement>, "id" | "style">) {
   const [overlay, setOverlayRef] = React.useState<HTMLDivElement | null>(null);
 
   return (
     <EventTargetContext.Provider
       value={{ portal: overlay, setPortalRef: setOverlayRef }}
     >
-      <div className={className} style={{ pointerEvents: "auto" }}>
+      <div
+        {...props}
+        id="canvas-event-target"
+        className={className}
+        style={{ pointerEvents: "auto" }}
+      >
         {children}
       </div>
     </EventTargetContext.Provider>
@@ -83,9 +87,9 @@ export function CanvasOverlay() {
       onPointerUp: ({ event }) => {
         pointerUp(event);
       },
-      onDoubleClick: (e) => {
-        tryEnterContentEditMode();
-      },
+      // onDoubleClick: (e) => {
+      //   tryEnterContentEditMode();
+      // },
       onDragStart: (e) => {
         dragStart();
       },

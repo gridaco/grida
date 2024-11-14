@@ -16,6 +16,8 @@ import { Button } from "@/components/ui/button";
 import { useStep } from "usehooks-ts";
 import { FormStartPage } from "@/theme/templates/formstart";
 import { SandboxWrapper } from "./sandbox";
+import { StandaloneDocumentEditor } from "@/builder";
+import { grida } from "@/grida";
 
 export function BrowseStartPageTemplatesDialog({
   defaultValue,
@@ -101,13 +103,32 @@ export function BrowseStartPageTemplatesDialog({
                   onValueCommit?.(template.name);
                 }}
               >
-                <template.component
-                  // props={{
-                  //   title: "",
-                  // }}
-                  meta={campaign}
-                  lang={lang}
-                />
+                <StandaloneDocumentEditor
+                  initial={{
+                    editable: false,
+                    templates: {
+                      [template.name]: FormStartPage.getTemplate(template.name),
+                    },
+                    document: {
+                      nodes: {
+                        preview:
+                          grida.program.nodes.createTemplateInstanceNodeFromTemplateDefinition(
+                            "preview",
+                            template
+                          ),
+                      },
+                      root_id: "preview",
+                    },
+                  }}
+                >
+                  <template.component
+                    // props={{
+                    //   title: "",
+                    // }}
+                    meta={campaign}
+                    lang={lang}
+                  />
+                </StandaloneDocumentEditor>
               </SandboxWrapper>
             </motion.div>
           )}

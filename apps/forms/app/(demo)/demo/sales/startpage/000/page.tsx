@@ -1,4 +1,4 @@
-import FormStartPage from "@/theme/templates/formstart/default/page";
+import _000 from "@/theme/templates/formstart/default/page";
 import { ScreenWindowRoot } from "@/theme/templates/kit/components";
 
 export default function CampaignStartPageDev() {

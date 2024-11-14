@@ -20,6 +20,7 @@ import {
 import { TemplateBuilderWidgets } from "@/builder/template-builder/widgets";
 import { NodeElement } from "@/builder/template-builder/node";
 import { Factory } from "@/ast";
+import { useCTAContext } from "../../kit/contexts/cta.context";
 
 const userprops = {
   title: { type: "string" },
@@ -60,6 +61,8 @@ export default function _003({
 }
 
 function Consumer() {
+  const { onClick } = useCTAContext();
+
   return (
     <ScreenRoot>
       <ScreenCenter>
@@ -67,19 +70,21 @@ function Consumer() {
           <TextAlign align="center">
             <div className="flex flex-col justify-center items-center gap-4">
               <h1 className="text-6xl font-bold w-4/5">
-                <NodeElement node_id="003.title" style={{}} />
+                <NodeElement node_id="003.title" />
               </h1>
               <p className="text-lg text-foreground/80 w-4/5">
-                <NodeElement node_id="003.subtitle" style={{}} />
+                <NodeElement node_id="003.subtitle" />
                 {/* {data.subtitle} */}
               </p>
             </div>
           </TextAlign>
           <div className="flex justify-center items-center p-4 py-10">
-            <Button>Start Now</Button>
+            <Button disabled={closed} onClick={onClick}>
+              Start Now
+            </Button>
           </div>
         </section>
-        <NodeElement node_id="003.background" style={{}} />
+        <NodeElement node_id="003.background" />
       </ScreenCenter>
     </ScreenRoot>
   );

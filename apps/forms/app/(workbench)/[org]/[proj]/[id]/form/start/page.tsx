@@ -95,12 +95,7 @@ export default function FormStartEditPage() {
             dispatch={startPageDocumentDispatch}
           >
             <div className="w-full h-full flex flex-col">
-              <CanvasEventTarget className="relative w-full no-scrollbar overflow-y-auto bg-transparent pointer-events-none">
-                <CanvasOverlay />
-                <AgentThemeProvider>
-                  <StartPageEditor />
-                </AgentThemeProvider>
-              </CanvasEventTarget>
+              <StartPageEditor />
               {process.env.NODE_ENV === "development" && <DevtoolsPanel />}
             </div>
             <aside className="hidden lg:flex h-full">
@@ -181,32 +176,37 @@ function StartPageEditor() {
         <PropertiesEditSheet open={edit} onOpenChange={setEdit} />
       </ErrorBoundary>
 
-      <div className="w-full px-10 overflow-scroll">
-        <div className="w-full mx-auto my-20 max-w-sm xl:max-w-4xl z-[-999]">
-          <SandboxWrapper
-            // hover:outline hover:outline-2 hover:outline-workbench-accent-sky
-            className={"rounded-2xl shadow-2xl border overflow-hidden"}
-            onDoubleClick={() => {
-              setEdit(true);
-            }}
-          >
-            <div className="w-full min-h-[852px] h-[80dvh]">
-              <FormStartPage.TemplateRenderer
-                // TODO: with dynamic renderer
-                name={
-                  (
-                    state.document.nodes[
-                      state.document.root_id!
-                    ] as grida.program.nodes.TemplateInstanceNode
-                  ).template_id
-                }
-                meta={campaign}
-                lang={lang}
-              />
+      <CanvasEventTarget
+        onDoubleClick={() => {
+          console.log("dblclick");
+          setEdit(true);
+        }}
+        className="relative w-full no-scrollbar overflow-y-auto bg-transparent"
+      >
+        <CanvasOverlay />
+        <AgentThemeProvider>
+          <div className="w-full px-10 overflow-scroll">
+            <div className="w-full mx-auto my-20 max-w-sm xl:max-w-4xl z-[-999]">
+              <SandboxWrapper className="pointer-events-auto rounded-2xl shadow-2xl border overflow-hidden hover:outline hover:outline-2 hover:outline-workbench-accent-sky">
+                <div className="w-full min-h-[852px] h-[80dvh]">
+                  <FormStartPage.TemplateRenderer
+                    // TODO: with dynamic renderer
+                    name={
+                      (
+                        state.document.nodes[
+                          state.document.root_id!
+                        ] as grida.program.nodes.TemplateInstanceNode
+                      ).template_id
+                    }
+                    meta={campaign}
+                    lang={lang}
+                  />
+                </div>
+              </SandboxWrapper>
             </div>
-          </SandboxWrapper>
-        </div>
-      </div>
+          </div>
+        </AgentThemeProvider>
+      </CanvasEventTarget>
     </>
   );
 }

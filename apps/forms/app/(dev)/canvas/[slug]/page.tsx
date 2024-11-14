@@ -71,7 +71,7 @@ export default function CanvasPlaygroundPage({
             </SidebarRoot>
           </aside>
           <div className="w-full h-full flex flex-col">
-            <CanvasEventTarget className="relative w-full h-full no-scrollbar overflow-y-auto bg-transparent pointer-events-none">
+            <CanvasEventTarget className="relative w-full h-full no-scrollbar overflow-y-auto bg-transparent">
               <CanvasOverlay />
               <div className="w-full h-full flex bg-background items-center justify-center">
                 <div className="shadow-lg rounded-xl border overflow-hidden">

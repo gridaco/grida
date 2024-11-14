@@ -289,4 +289,15 @@ function NextEventState({ className }: { className?: string }) {
   return <></>;
 }
 
-_005.properties = userprops;
+_005.definition = {
+  type: "template",
+  name: "005",
+  properties: userprops,
+  version: "1.0.0",
+  default: {
+    title: "Enter Title",
+    subtitle: "Enter Subtitle",
+    background: "/images/abstract-placeholder.jpg",
+  },
+  nodes: {},
+} satisfies grida.program.document.template.TemplateDocumentDefinition;

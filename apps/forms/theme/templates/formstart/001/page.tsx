@@ -217,4 +217,15 @@ function ContentCard({
   );
 }
 
-_001.properties = userprops;
+_001.definition = {
+  type: "template",
+  name: "001",
+  properties: userprops,
+  version: "1.0.0",
+  default: {
+    title: "Enter Title",
+    subtitle: "Enter Subtitle",
+    background: "/images/abstract-placeholder.jpg",
+  },
+  nodes: {},
+} satisfies grida.program.document.template.TemplateDocumentDefinition;
