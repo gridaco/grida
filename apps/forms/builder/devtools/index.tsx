@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/collapsible";
 import { grida } from "@/grida";
 import { generate } from "@/app/(dev)/canvas/actions";
+import { Editor as MonacoEditor } from "@monaco-editor/react";
 
 export function DevtoolsPanel() {
   const [userprompt, setUserPrompt] = useState("");
@@ -78,8 +79,8 @@ ${userprompt}
           </CollapsibleTrigger>
         </div>
 
-        <CollapsibleContent>
-          <TabsContent value="ai" className="h-64 p-2">
+        <CollapsibleContent className="h-96">
+          <TabsContent value="ai" className="p-2">
             <div className="flex flex-col gap-4">
               <div className="flex gap-4">
                 <Input
@@ -98,22 +99,44 @@ ${userprompt}
               </div>
             </div>
             <div className="overflow-scroll prose prose-sm w-full">
-              {delta && (
-                <pre className="">{JSON.stringify(delta, null, 2)}</pre>
-              )}
+              <div className="flex w-full gap-4">
+                {delta && (
+                  <pre className="">{JSON.stringify(delta, null, 2)}</pre>
+                )}
+                <pre className="w-full">
+                  {JSON.stringify(textNodes, null, 2)}
+                </pre>
+              </div>
             </div>
           </TabsContent>
           <TabsContent
             value="document"
-            className="h-64 p-2 overflow-scroll w-full"
+            className="p-2 overflow-scroll w-full h-full"
           >
-            <div className="prose prose-sm w-full">
-              <pre className="w-full">{JSON.stringify(textNodes, null, 2)}</pre>
-            </div>
+            <DocumentTabContent />
           </TabsContent>
         </CollapsibleContent>
       </Tabs>
     </Collapsible>
+  );
+}
+
+function DocumentTabContent() {
+  const { state } = useDocument();
+
+  return (
+    <div className="w-full h-full">
+      <MonacoEditor
+        height="100%"
+        width="100%"
+        defaultLanguage="json"
+        value={JSON.stringify(state, null, 2)}
+        options={{
+          minimap: { enabled: false },
+          readOnly: true,
+        }}
+      />
+    </div>
   );
 }
 

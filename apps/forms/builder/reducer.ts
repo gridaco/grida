@@ -38,11 +38,9 @@ export default function reducer<S extends IDocumentEditorState>(
       >action;
       return produce(state, (draft) => {
         draft.hovered_node_id = node_ids_from_point[0];
-        draft.cursor_position = {
-          // TODO: need to transform to canvas position
-          x: clientX,
-          y: clientY,
-        };
+        // TODO: need to transform to canvas position
+        draft.cursor_position.x = clientX;
+        draft.cursor_position.y = clientY;
       });
     }
     case "document/canvas/backend/html/event/on-pointer-down": {

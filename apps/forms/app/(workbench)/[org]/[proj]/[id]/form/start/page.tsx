@@ -60,6 +60,7 @@ import {
 } from "@/builder";
 import { composeEditorDocumentAction } from "@/scaffolds/editor/action";
 import { BuilderAction } from "@/builder/action";
+import { DevtoolsPanel } from "@/builder/devtools";
 
 export default function FormStartEditPage() {
   const [state, dispatch] = useEditorState();
@@ -92,12 +93,15 @@ export default function FormStartEditPage() {
             initial={startpage}
             dispatch={startPageDocumentDispatch}
           >
-            <CanvasEventTarget className="relative w-full no-scrollbar overflow-y-auto bg-transparent pointer-events-none">
-              <CanvasOverlay />
-              <AgentThemeProvider>
-                <StartPageEditor />
-              </AgentThemeProvider>
-            </CanvasEventTarget>
+            <div className="w-full h-full flex flex-col">
+              <CanvasEventTarget className="relative w-full no-scrollbar overflow-y-auto bg-transparent pointer-events-none">
+                <CanvasOverlay />
+                <AgentThemeProvider>
+                  <StartPageEditor />
+                </AgentThemeProvider>
+              </CanvasEventTarget>
+              {process.env.NODE_ENV === "development" && <DevtoolsPanel />}
+            </div>
             <aside className="hidden lg:flex h-full">
               <SideControl />
             </aside>

@@ -64,7 +64,8 @@ export interface IDocumentEditorInteractionCursorState {
   // selectedTextRange;
 }
 
-export interface IDocumentEditorInit {
+export interface IDocumentEditorInit
+  extends grida.program.document.IDocumentTemplatesRepository {
   /**
    *
    * when editable is false, the document definition is not editable
@@ -73,22 +74,12 @@ export interface IDocumentEditorInit {
   editable: boolean;
 
   document: grida.program.document.IDocumentDefinition;
-
-  /**
-   * user registered templates
-   */
-  templates?: Record<
-    string,
-    grida.program.document.template.TemplateDocumentDefinition
-  >;
 }
 
 export interface IDocumentEditorState
   extends IDocumentEditorInit,
-    IDocumentEditorInteractionCursorState {
-  document: grida.program.document.IDocumentDefinition;
-  document_ctx: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext;
-}
+    IDocumentEditorInteractionCursorState,
+    grida.program.document.internal.IDocumentEditorState {}
 
 export function initDocumentEditorState(
   init: IDocumentEditorInit

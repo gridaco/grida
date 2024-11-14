@@ -161,6 +161,16 @@ export namespace grida {
       }
 
       /**
+       * contains all original template definition under this defined document in k:v pair
+       */
+      export interface IDocumentTemplatesRepository {
+        /**
+         * user registered templates
+         */
+        templates?: Record<string, template.TemplateDocumentDefinition>;
+      }
+
+      /**
        * Represents a normalized document structure where all nodes are stored in a flat map
        * with a single `root_id` as the entry point for traversal.
        *
@@ -235,6 +245,11 @@ export namespace grida {
       }
 
       export namespace internal {
+        export interface IDocumentEditorState {
+          document: IDocumentDefinition;
+          document_ctx: IDocumentDefinitionRuntimeHierarchyContext;
+        }
+
         /**
          * @internal
          * Represents the current runtime state of the document hierarchy context.
