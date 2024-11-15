@@ -228,6 +228,7 @@ function FormPage({
           })
         );
       case "FORM_FORCE_CLOSED":
+      case "FORM_SCHEDULE_NOT_IN_RANGE":
       case "FORM_RESPONSE_LIMIT_REACHED":
         return redirect(`./${form_id}/formclosed`);
       case "FORM_SOLD_OUT":

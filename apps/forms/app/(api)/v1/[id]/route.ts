@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   FORM_FORCE_CLOSED,
+  FORM_SCHEDULE_NOT_IN_RANGE,
   FORM_OPTION_UNAVAILABLE,
   FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED,
   FORM_RESPONSE_LIMIT_REACHED,
@@ -110,6 +111,7 @@ export type FormClientFetchResponseError =
         | typeof POSSIBLE_CUSTOMER_IDENTITY_FORGE.code
         | typeof FORM_RESPONSE_LIMIT_REACHED.code
         | typeof FORM_FORCE_CLOSED.code
+        | typeof FORM_SCHEDULE_NOT_IN_RANGE.code
         | typeof FORM_SOLD_OUT.code
         | typeof FORM_OPTION_UNAVAILABLE.code;
       message: string;
@@ -473,8 +475,12 @@ export async function GET(
     });
 
     if (!isopen) {
-      // TODO: need a better error message
-      response.error = FORM_FORCE_CLOSED;
+      if (!start_page) {
+        // TODO: need a better error message
+        response.error = FORM_SCHEDULE_NOT_IN_RANGE;
+      } else {
+        // if not open, but with startpage, emmit no error.
+      }
     }
   }
 
