@@ -58,10 +58,20 @@
     "@supabase/postgrest-js": "^1.15.5",
     "@supabase/ssr": "^0.1.0",
     "@supabase/supabase-js": "^2.43.5",
-    "@tiptap/extension-mention": "^2.8.0",
-    "@tiptap/pm": "^2.8.0",
-    "@tiptap/react": "^2.8.0",
-    "@tiptap/starter-kit": "^2.8.0",
+    "@tiptap/core": "^2.9.1",
+    "@tiptap/extension-color": "^2.9.1",
+    "@tiptap/extension-heading": "^2.9.1",
+    "@tiptap/extension-horizontal-rule": "^2.9.1",
+    "@tiptap/extension-image": "^2.9.1",
+    "@tiptap/extension-link": "^2.9.1",
+    "@tiptap/extension-mention": "^2.9.1",
+    "@tiptap/extension-placeholder": "^2.9.1",
+    "@tiptap/extension-text-style": "^2.9.1",
+    "@tiptap/extension-typography": "^2.9.1",
+    "@tiptap/extension-underline": "^2.9.1",
+    "@tiptap/pm": "^2.9.1",
+    "@tiptap/react": "^2.9.1",
+    "@tiptap/starter-kit": "^2.9.1",
     "@tosspayments/payment-widget-sdk": "^0.10.2",
     "@types/mdx": "^2.0.11",
     "@uidotdev/usehooks": "^2.4.1",
@@ -128,6 +138,7 @@
     "react-hot-toast": "^2.4.0",
     "react-i18next": "^13.5.0",
     "react-map-gl": "^7.1.7",
+    "react-medium-image-zoom": "^5.2.11",
     "react-pdf": "^7.7.1",
     "react-phone-number-input": "^3.4.3",
     "react-player": "^2.14.1",
@@ -185,5 +196,13 @@
     "tailwindcss": "^3.3.0",
     "tailwindcss-animate": "^1.0.7",
     "typescript": "^5"
+  },
+  "pnpm": {
+    "overrides": {
+      "@blocknote/core>prosemirror-model": "1.23.0",
+      "@blocknote/core>prosemirror-view": "1.36.0",
+      "@tiptap/pm>prosemirror-model": "1.23.0",
+      "@tiptap/pm>prosemirror-view": "1.36.0"
+    }
   }
 }
