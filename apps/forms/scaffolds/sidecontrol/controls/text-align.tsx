@@ -6,10 +6,10 @@ import {
 } from "@radix-ui/react-icons";
 
 export function TextAlignControl({
-  value = "left",
+  value = "inherit",
   onValueChange,
 }: {
-  value?: "left" | "center" | "right";
+  value?: "left" | "center" | "right" | "inherit";
   onValueChange?: (value: "left" | "center" | "right") => void;
 }) {
   return (

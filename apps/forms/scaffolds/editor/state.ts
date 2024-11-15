@@ -15,16 +15,17 @@ import type {
   FormResponseField,
   FormResponseSession,
   FormResponseUnknownFieldHandlingStrategyType,
+  FormStartPageSchema,
   FormStyleSheetV1Schema,
   FormsPageLanguage,
   GDocumentType,
   GridaXSupabase,
 } from "@/types";
-import { SYM_LOCALTZ, EditorSymbols } from "./symbols";
-import { ZodObject } from "zod";
-import { Tokens } from "@/ast";
-import { ResourceTypeIconName } from "@/components/resource-type-icon";
+import type { ResourceTypeIconName } from "@/components/resource-type-icon";
 import type { Data } from "@/lib/data";
+import type { IDocumentEditorState } from "@/builder/types";
+import { SYM_LOCALTZ, EditorSymbols } from "./symbols";
+import { grida } from "@/grida";
 
 export type GDocEditorRouteParams = {
   org: string;
@@ -84,6 +85,9 @@ export interface FormDocumentEditorInit extends BaseDocumentEditorInit {
   form_id: string;
   campaign: EditorState["form"]["campaign"];
   form_security: EditorState["form"]["form_security"];
+  start:
+    | (grida.program.document.IDocumentDefinition & { template_id: string })
+    | null;
   ending: EditorState["form"]["ending"];
   connections?: {
     store_id?: number | null;
@@ -368,10 +372,20 @@ interface IInsertionMenuState {
 
 export type NodePos = { type: "cell"; pos: DataGridCellPositionQuery };
 
+interface IEditorPagesState {
+  pages: MenuItem<string>[];
+  selected_page_id?:
+    | "form"
+    | "form/startpage"
+    | "site/dev-collection"
+    | (string & {});
+}
+
 export interface BaseDocumentEditorState
   extends IEditorGlobalSavingState,
     IEditorDateContextState,
     IEditorAssetsState,
+    IEditorPagesState,
     IInsertionMenuState,
     IFieldEditorState,
     ICustomerEditorState,
@@ -390,30 +404,10 @@ export interface BaseDocumentEditorState
   document_id: string;
   document_title: string;
   doctype: GDocumentType;
-  document: {
-    pages: MenuItem<string>[];
-    selected_page_id?: string;
-    nodes: any[];
-    templatesample?: string;
-    templatedata: {
-      [key: string]: {
-        text?: Tokens.StringValueExpression;
-        template_id: string;
-        attributes?: Omit<
-          React.HtmlHTMLAttributes<HTMLDivElement>,
-          "style" | "className"
-        >;
-        properties?: { [key: string]: Tokens.StringValueExpression };
-        style?: React.CSSProperties;
-      };
-    };
-    selected_node_id?: string;
-    selected_node_type?: string;
-    selected_node_schema?: ZodObject<any> | null;
-    selected_node_default_properties?: Record<string, any>;
-    selected_node_default_style?: React.CSSProperties;
-    selected_node_default_text?: Tokens.StringValueExpression;
-    selected_node_context?: Record<string, any>;
+  documents: {
+    ["site/dev-collection"]?: IDocumentEditorState;
+    ["form/startpage"]?: IDocumentEditorState & { template_id: string };
+    // [key: string]: ITemplateEditorState;
   };
   theme: {
     is_powered_by_branding_enabled: boolean;

@@ -1,6 +1,11 @@
 "use client";
 
-import { GridBlock, GridContext, GridEditor, useGrid } from "@/builder/grid-builder";
+import {
+  GridBlock,
+  GridContext,
+  GridEditor,
+  useGrid,
+} from "@/builder/grid-builder";
 import {
   GridaBlock,
   GridaBlockRenderer,
@@ -21,7 +26,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { MediaPicker } from "@/scaffolds/mediapicker";
-import { useFormPlaygroundMediaUploader } from "@/scaffolds/mediapicker/form-media-uploader";
+import { useDummyPublicUpload } from "@/scaffolds/asset";
 import {
   Select,
   SelectContent,
@@ -222,7 +227,7 @@ const typography = ["h1", "h2", "h3", "h4", "h5", "h6", "p", "small"];
 function PropertyBody() {
   const [state, dispatch] = useBuilderState();
   const [id, selection] = useSelection();
-  const playgroundUploader = useFormPlaygroundMediaUploader();
+  const playgroundUploader = useDummyPublicUpload();
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
 
   switch (selection?.type) {

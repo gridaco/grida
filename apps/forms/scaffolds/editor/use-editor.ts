@@ -10,7 +10,9 @@ export const useEditorState = (): [EditorState, FlatDispatcher] => {
   const state = useContext(Context);
 
   if (!state) {
-    throw new Error(`No StateProvider: this is a logical error.`);
+    throw new Error(
+      `[useEditorState]: No StateProvider: this is a logical error.`
+    );
   }
 
   const dispatch = useDispatch();

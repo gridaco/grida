@@ -1,5 +1,4 @@
 import React from "react";
-import { z } from "zod";
 
 export function Media({
   type,
@@ -42,10 +41,3 @@ export function Media({
       );
   }
 }
-
-export const MediaSchema = z.object({
-  $id: z.literal("media"),
-  type: z.union([z.literal("image"), z.literal("video")]),
-  src: z.string(),
-  alt: z.string().optional(),
-});

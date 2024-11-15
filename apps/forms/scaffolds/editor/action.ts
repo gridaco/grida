@@ -20,9 +20,10 @@ import type {
   TableXSBMainTableConnection,
 } from "./state";
 import type { Tokens } from "@/ast";
-import { SYM_LOCALTZ } from "./symbols";
-import { ZodObject } from "zod";
-import { DataQueryAction } from "../data-query";
+import type { DataQueryAction } from "../data-query";
+import type { BuilderAction } from "@/builder/action";
+import type { SYM_LOCALTZ } from "./symbols";
+import { grida } from "@/grida";
 
 export type EditorAction =
   //
@@ -32,10 +33,11 @@ export type EditorAction =
   //
   | InitAssetAction
   //
-  | DocumentAction
+  | EditorDocumentAction
   //
   | GlobalSavingAction
   | EditorSidebarModeAction
+  | EditorSelectPageAction
   | OpenFieldEditPanelAction
   | OpenRecordEditPanelAction
   | OpenCustomerDetailsPanelAction
@@ -62,10 +64,17 @@ export type EditorAction =
   | EditorThemeCustomCSSAction
   | EditorThemeBackgroundAction
   | FormCampaignPreferencesAction
-  | FormEndingPreferencesAction;
+  | FormEndingPreferencesAction
+  | FormStartPageInitAction
+  | FormStartPageRemoveAction;
 
 export interface InitAssetAction extends Partial<EditorState["assets"]> {
   type: "editor/assets/init";
+}
+
+export interface EditorSelectPageAction {
+  type: "editor/select-page";
+  page_id: EditorState["selected_page_id"];
 }
 
 // #region block
@@ -432,64 +441,28 @@ export interface FormEndingPreferencesAction
   type: "editor/form/ending/preferences";
 }
 
-export type DocumentAction =
-  | DocumentSelectPageAction
-  | DocumentTemplateSampleDataAction
-  | DocumentSelectNodeAction
-  | DocumentNodeChangeTemplateAction
-  | DocumentNodeChangeTextAction
-  | DocumentNodeUpdateStyleAction
-  | DocumentNodeUpdateAttributeAction
-  | DocumentNodeUpdatePropertyAction;
-
-export interface DocumentSelectPageAction {
-  type: "editor/document/select-page";
-  page_id: string;
+export interface FormStartPageInitAction {
+  type: "editor/form/startpage/init";
+  template: grida.program.document.template.TemplateDocumentDefinition;
 }
 
-// TODO: consider removing this
-export interface DocumentTemplateSampleDataAction {
-  type: "editor/document/sampledata";
-  sampledata: string;
+export interface FormStartPageRemoveAction {
+  type: "editor/form/startpage/remove";
 }
 
-export interface DocumentSelectNodeAction {
-  type: "editor/document/node/select";
-  node_id?: string;
-  node_type?: string;
-  schema?: ZodObject<any>;
-  context?: any;
-  default_properties?: Record<string, any>;
-  default_style?: React.CSSProperties;
-  default_text?: Tokens.StringValueExpression;
+export interface EditorDocumentAction {
+  type: "editor/document";
+  key: "site/dev-collection" | "form/startpage";
+  action: BuilderAction;
 }
 
-export interface DocumentNodeChangeTemplateAction {
-  type: "editor/document/node/template";
-  node_id: string;
-  template_id: string;
-}
-
-export interface DocumentNodeChangeTextAction {
-  type: "editor/document/node/text";
-  node_id: string;
-  text?: Tokens.StringValueExpression;
-}
-
-export interface DocumentNodeUpdateStyleAction {
-  type: "editor/document/node/style";
-  node_id: string;
-  data: { [key: string]: any };
-}
-
-export interface DocumentNodeUpdateAttributeAction {
-  type: "editor/document/node/attribute";
-  node_id: string;
-  data: { [key: string]: any };
-}
-
-export interface DocumentNodeUpdatePropertyAction {
-  type: "editor/document/node/property";
-  node_id: string;
-  data: { [key: string]: any };
+export function composeEditorDocumentAction(
+  document_key: "site/dev-collection" | "form/startpage",
+  action: BuilderAction
+): EditorDocumentAction {
+  return {
+    type: "editor/document",
+    key: document_key,
+    action,
+  };
 }

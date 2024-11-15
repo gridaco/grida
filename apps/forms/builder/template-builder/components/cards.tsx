@@ -2,32 +2,37 @@ import React from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { HalfHeightGradient } from "./gradient-overlay";
-import { z } from "zod";
 import { SlashIcon } from "@radix-ui/react-icons";
-import {
-  PropsWithStyle,
-  withTemplate,
-  ZTemplateSchema,
-} from "@/builder/template-builder/with-template";
-import { SlotNode } from "@/builder/template-builder/node";
-import { Media, MediaSchema } from "./media";
+import { withTemplateDefinition } from "@/builder/template-builder/with-template";
+import { NodeElement } from "@/builder/template-builder/node";
+import { Media } from "./media";
 import { TemplateBuilderWidgets } from "../widgets";
+import { grida } from "@/grida";
 
-const CardSchema = z.object({
-  properties: z.object({
-    badge: z.string(),
-    tags: z.array(z.string()).optional(),
-    h1: z.string(),
-    p: z.string(),
-    date1: z.string(),
-    date2: z.string(),
-    n: z.number(),
-    media: MediaSchema,
-  }),
-}) satisfies ZTemplateSchema<any>;
+const card_properties_definition = {
+  badge: { type: "string" },
+  tags: { type: "array", items: { type: "string" } },
+  h1: { type: "string" },
+  p: { type: "string" },
+  date1: { type: "string" },
+  date2: { type: "string" },
+  n: { type: "number" },
+  media: { type: "image" },
+  // media: MediaSchema,
+} satisfies grida.program.document.template.TemplateDocumentDefinition["properties"];
 
-export const Card_001 = withTemplate(
-  ({ properties: { h1, p, date1, n, badge, media, date2, tags }, style }) => {
+type CardUserProps = grida.program.schema.TInferredPropTypes<
+  typeof card_properties_definition
+>;
+
+type CardMasterProps =
+  grida.program.document.template.IUserDefinedTemplateNodeReactComponentRenderProps<CardUserProps>;
+
+export const Card_001 = withTemplateDefinition(
+  ({
+    props: { h1, p, date1, n, badge, media, date2, tags },
+    style,
+  }: CardMasterProps) => {
     return (
       <Card
         className="group relative overflow-hidden rounded-lg shadow-lg transition-all hover:shadow-xl"
@@ -42,16 +47,15 @@ export const Card_001 = withTemplate(
           <Media
             type={media.type}
             src={media.src}
-            alt={media.alt}
+            alt={""}
             width={800}
             height={400}
             className="h-full w-full aspect-[4/3] object-cover transition-transform duration-300 ease-in-out group-hover:scale-105"
           />
         </div>
         <div className="space-y-2 bg-background p-4">
-          <SlotNode
-            component={TemplateBuilderWidgets.Text}
-            defaultText={h1}
+          <NodeElement
+            // text={h1}
             node_id={".h1"}
           />
           {/* <h3 className="text-lg font-semibold text-foreground">{h1}</h3> */}
@@ -61,24 +65,158 @@ export const Card_001 = withTemplate(
             <span>{date2}</span>
           </div>
           <div className="text-sm text-muted-foreground">{p}</div>
-          <SlotNode
+          <NodeElement
             node_id="tags-layout"
-            component={TemplateBuilderWidgets.Flex}
-            defaultStyle={{
+            style={{
               gap: 4,
             }}
           >
             {tags?.map((t, i) => <Badge key={i}>{t}</Badge>)}
-          </SlotNode>
+          </NodeElement>
         </div>
       </Card>
     );
   },
   "templates/components/cards/card-001",
-  CardSchema
+  {
+    name: "templates/components/cards/card-001",
+    default: {
+      h1: "Title",
+      p: "Description",
+      date1: "2021-01-01",
+      n: 0,
+      badge: "New",
+      media: { type: "image", src: "" },
+      date2: "2021-01-01",
+      tags: ["tag1", "tag2"],
+    },
+    nodes: {
+      ".h1": {
+        id: ".h1",
+        active: true,
+        locked: false,
+        type: "text",
+        name: "Title",
+        text: "Title",
+        opacity: 1,
+        zIndex: 0,
+        style: {},
+        width: "auto",
+        height: "auto",
+        position: "relative",
+      },
+      ".p": {
+        id: ".p",
+        active: true,
+        locked: false,
+        type: "text",
+        name: "Description",
+        text: "Description",
+        opacity: 1,
+        zIndex: 0,
+        style: {},
+        width: "auto",
+        height: "auto",
+        position: "relative",
+      },
+      ".date1": {
+        id: ".date1",
+        active: true,
+        locked: false,
+        type: "text",
+        name: "Date 1",
+        text: "2021-01-01",
+        opacity: 1,
+        zIndex: 0,
+        style: {},
+        width: "auto",
+        height: "auto",
+        position: "relative",
+      },
+      ".n": {
+        id: ".n",
+        active: true,
+        locked: false,
+        type: "text",
+        name: "Number",
+        text: "0",
+        opacity: 1,
+        zIndex: 0,
+        style: {},
+        width: "auto",
+        height: "auto",
+        position: "relative",
+      },
+      ".badge": {
+        id: ".badge",
+        active: true,
+        locked: false,
+        type: "text",
+        name: "Badge",
+        text: "New",
+        opacity: 1,
+        zIndex: 0,
+        style: {},
+        width: "auto",
+        height: "auto",
+        position: "relative",
+      },
+      ".media": {
+        id: ".media",
+        active: true,
+        locked: false,
+        type: "image",
+        name: "Media",
+        src: "",
+        alt: "",
+        opacity: 1,
+        zIndex: 0,
+        style: {},
+        width: "auto",
+        height: "auto",
+        fit: "cover",
+        position: "relative",
+      },
+      ".date2": {
+        id: ".date2",
+        active: true,
+        locked: false,
+        type: "text",
+        name: "Date 2",
+        text: "2021-01-01",
+        opacity: 1,
+        zIndex: 0,
+        style: {},
+        width: "auto",
+        height: "auto",
+        position: "relative",
+      },
+      ".tags": {
+        id: ".tags",
+        active: true,
+        locked: false,
+        type: "container",
+        name: "Tags",
+        expanded: false,
+        opacity: 1,
+        zIndex: 0,
+        style: {},
+        width: "auto",
+        height: "auto",
+        position: "relative",
+      },
+    },
+    type: "template",
+    properties: card_properties_definition,
+    version: "0.0.0",
+  }
 );
-export const Card_002 = withTemplate(
-  ({ properties: { h1, p, date1, date2, n, badge, media, tags }, style }) => {
+
+export const Card_002 = withTemplateDefinition(
+  ({
+    props: { h1, p, date1, n, badge, media, date2, tags },
+    style,
+  }: CardMasterProps) => {
     return (
       <Card
         className="relative overflow-hidden flex-1 flex flex-col justify-end gap-6 text-foreground w-auto aspect-[4/4]"
@@ -87,7 +225,7 @@ export const Card_002 = withTemplate(
         <Media
           type={media.type}
           src={media.src}
-          alt={media.alt}
+          // alt={media.alt}
           width={800}
           height={800}
           className="absolute top-0 left-0 w-full h-full object-cover z-0"
@@ -115,27 +253,159 @@ export const Card_002 = withTemplate(
     );
   },
   "templates/components/cards/card-002",
-  CardSchema
+  {
+    name: "templates/components/cards/card-002",
+    default: {
+      h1: "Title",
+      p: "Description",
+      date1: "2021-01-01",
+      n: 0,
+      badge: "New",
+      media: { type: "image", src: "" },
+      date2: "2021-01-01",
+      tags: ["tag1", "tag2"],
+    },
+    nodes: {
+      ".h1": {
+        id: ".h1",
+        active: true,
+        locked: false,
+        type: "text",
+        name: "Title",
+        text: "Title",
+        opacity: 1,
+        zIndex: 0,
+        style: {},
+        width: "auto",
+        height: "auto",
+        position: "relative",
+      },
+      ".p": {
+        id: ".p",
+        active: true,
+        locked: false,
+        type: "text",
+        name: "Description",
+        text: "Description",
+        opacity: 1,
+        zIndex: 0,
+        style: {},
+        width: "auto",
+        height: "auto",
+        position: "relative",
+      },
+      ".date1": {
+        id: ".date1",
+        active: true,
+        locked: false,
+        type: "text",
+        name: "Date 1",
+        text: "2021-01-01",
+        opacity: 1,
+        zIndex: 0,
+        style: {},
+        width: "auto",
+        height: "auto",
+        position: "relative",
+      },
+      ".n": {
+        id: ".n",
+        active: true,
+        locked: false,
+        type: "text",
+        name: "Number",
+        text: "0",
+        opacity: 1,
+        zIndex: 0,
+        style: {},
+        width: "auto",
+        height: "auto",
+        position: "relative",
+      },
+      ".badge": {
+        id: ".badge",
+        active: true,
+        locked: false,
+        type: "text",
+        name: "Badge",
+        text: "New",
+        opacity: 1,
+        zIndex: 0,
+        style: {},
+        width: "auto",
+        height: "auto",
+        position: "relative",
+      },
+      ".media": {
+        id: ".media",
+        active: true,
+        locked: false,
+        type: "image",
+        name: "Media",
+        src: "",
+        alt: "",
+        opacity: 1,
+        zIndex: 0,
+        style: {},
+        width: "auto",
+        height: "auto",
+        fit: "cover",
+        position: "relative",
+      },
+      ".date2": {
+        id: ".date2",
+        active: true,
+        locked: false,
+        type: "text",
+        name: "Date 2",
+        text: "2021-01-01",
+        opacity: 1,
+        zIndex: 0,
+        style: {},
+        width: "auto",
+        height: "auto",
+        position: "relative",
+      },
+      ".tags": {
+        id: ".tags",
+        active: true,
+        locked: false,
+        type: "container",
+        name: "Tags",
+        expanded: false,
+        opacity: 1,
+        zIndex: 0,
+        style: {},
+        width: "auto",
+        height: "auto",
+        position: "relative",
+      },
+    },
+    type: "template",
+    properties: card_properties_definition,
+    version: "0.0.0",
+  }
 );
 
-export const Card_003 = withTemplate(
-  ({ properties: { h1, p, date1, date2, n, badge, media, tags }, style }) => {
+export const Card_003 = withTemplateDefinition(
+  ({
+    props: { h1, p, date1, n, badge, media, date2, tags },
+    style,
+  }: CardMasterProps) => {
     return (
       <Card className="p-4" style={style}>
-        <SlotNode
-          component={TemplateBuilderWidgets.Flex}
+        <NodeElement
           node_id="root"
-          defaultStyle={{
+          style={{
             gap: 4,
             flexDirection: "row",
             justifyContent: "space-between",
           }}
         >
           <div className="flex-1 flex flex-col gap-1 z-20">
-            <SlotNode
+            <NodeElement
               node_id="header-layout"
-              component={TemplateBuilderWidgets.Flex}
-              defaultStyle={{
+              style={{
                 gap: 4,
                 flexDirection: "column",
               }}
@@ -149,69 +419,198 @@ export const Card_003 = withTemplate(
                 </span>
               </div>
               <h1 className="text-lg font-bold break-keep">{h1}</h1>
-            </SlotNode>
+            </NodeElement>
             <p className="text-xs font-regular opacity-80">{p}</p>
-            <SlotNode
+            <NodeElement
               node_id="tags-layout"
-              component={TemplateBuilderWidgets.Flex}
-              defaultStyle={{
+              style={{
                 gap: 4,
               }}
             >
               {tags?.map((t, i) => <Badge key={i}>{t}</Badge>)}
-            </SlotNode>
+            </NodeElement>
           </div>
-          <SlotNode
+          <NodeElement
             node_id="media-layout"
-            component={TemplateBuilderWidgets.Container}
-            defaultStyle={
+            width={80}
+            height={80}
+            style={
               {
-                width: 80,
-                height: 80,
-                borderRadius: 8,
-                overflow: "hidden",
-              } satisfies React.CSSProperties
+                // borderRadius: 8,
+                // overflow: "hidden",
+              }
             }
           >
             <Media
               type={media.type}
               src={media.src}
-              alt={media.alt}
+              // alt={media.alt}
               width={400}
               height={400}
               className="object-cover w-full h-full"
             />
-          </SlotNode>
-        </SlotNode>
+          </NodeElement>
+        </NodeElement>
       </Card>
     );
   },
   "templates/components/cards/card-003",
-  CardSchema
+  {
+    name: "templates/components/cards/card-003",
+    default: {
+      h1: "Title",
+      p: "Description",
+      date1: "2021-01-01",
+      n: 0,
+      badge: "New",
+      media: { type: "image", src: "" },
+      date2: "2021-01-01",
+      tags: ["tag1", "tag2"],
+    },
+    nodes: {
+      ".h1": {
+        id: ".h1",
+        active: true,
+        locked: false,
+        type: "text",
+        name: "Title",
+        text: "Title",
+        opacity: 1,
+        zIndex: 0,
+        style: {},
+        width: "auto",
+        height: "auto",
+        position: "relative",
+      },
+      ".p": {
+        id: ".p",
+        active: true,
+        locked: false,
+        type: "text",
+        name: "Description",
+        text: "Description",
+        opacity: 1,
+        zIndex: 0,
+        style: {},
+        width: "auto",
+        height: "auto",
+        position: "relative",
+      },
+      ".date1": {
+        id: ".date1",
+        active: true,
+        locked: false,
+        type: "text",
+        name: "Date 1",
+        text: "2021-01-01",
+        opacity: 1,
+        zIndex: 0,
+        style: {},
+        width: "auto",
+        height: "auto",
+        position: "relative",
+      },
+      ".n": {
+        id: ".n",
+        active: true,
+        locked: false,
+        type: "text",
+        name: "Number",
+        text: "0",
+        opacity: 1,
+        zIndex: 0,
+        style: {},
+        width: "auto",
+        height: "auto",
+        position: "relative",
+      },
+      ".badge": {
+        id: ".badge",
+        active: true,
+        locked: false,
+        type: "text",
+        name: "Badge",
+        text: "New",
+        opacity: 1,
+        zIndex: 0,
+        style: {},
+        width: "auto",
+        height: "auto",
+        position: "relative",
+      },
+      ".media": {
+        id: ".media",
+        active: true,
+        locked: false,
+        type: "image",
+        name: "Media",
+        src: "",
+        alt: "",
+        opacity: 1,
+        zIndex: 0,
+        style: {},
+        width: "auto",
+        height: "auto",
+        fit: "cover",
+        position: "relative",
+      },
+      ".date2": {
+        id: ".date2",
+        active: true,
+        locked: false,
+        type: "text",
+        name: "Date 2",
+        text: "2021-01-01",
+        opacity: 1,
+        zIndex: 0,
+        style: {},
+        width: "auto",
+        height: "auto",
+        position: "relative",
+      },
+      ".tags": {
+        id: ".tags",
+        active: true,
+        locked: false,
+        type: "container",
+        name: "Tags",
+        expanded: false,
+        opacity: 1,
+        zIndex: 0,
+        style: {},
+        width: "auto",
+        height: "auto",
+        position: "relative",
+      },
+    },
+    type: "template",
+    properties: card_properties_definition,
+    version: "0.0.0",
+  }
 );
 
-const HeroCardSchema = z.object({
-  properties: z.object({
-    media: MediaSchema,
-    h1: z.string(),
-    p: z.string(),
-  }),
-}) satisfies ZTemplateSchema<any>;
+const hero_card_properties_definition = {
+  media: { type: "image" },
+  h1: { type: "string" },
+  p: { type: "string" },
+} satisfies grida.program.document.template.TemplateDocumentDefinition["properties"];
 
-type HeroCardProps = z.infer<typeof HeroCardSchema>["properties"];
+type HeroCardProps = grida.program.schema.TInferredPropTypes<
+  typeof hero_card_properties_definition
+>;
 
-export const Hero_001 = withTemplate(
-  function Hero_001({
-    properties: { media, h1, p },
-    style,
-  }: PropsWithStyle<HeroCardProps>) {
+type HeroCardMasterProps =
+  grida.program.document.template.IUserDefinedTemplateNodeReactComponentRenderProps<HeroCardProps>;
+
+export const Hero_001 = withTemplateDefinition(
+  function Hero_001({ props: { h1, p, media }, style }: HeroCardMasterProps) {
     return (
       <header style={style}>
         <div className="relative">
           <Media
             type={media.type}
             src={media.src}
-            alt={media.alt}
+            // alt={media.alt}
             width={800}
             height={400}
             className="w-full aspect-[3/4] @5xl/preview:aspect-video object-cover -z-10"
@@ -233,22 +632,74 @@ export const Hero_001 = withTemplate(
     );
   },
   "templates/components/cards/hero-001",
-  HeroCardSchema
+  {
+    name: "templates/components/cards/hero-001",
+    default: {
+      h1: "Title",
+      p: "Description",
+      media: { type: "image", src: "" },
+    },
+    nodes: {
+      ".h1": {
+        id: ".h1",
+        active: true,
+        locked: false,
+        type: "text",
+        name: "Title",
+        text: "Title",
+        opacity: 1,
+        zIndex: 0,
+        style: {},
+        width: "auto",
+        height: "auto",
+        position: "relative",
+      },
+      ".p": {
+        id: ".p",
+        active: true,
+        locked: false,
+        type: "text",
+        name: "Description",
+        text: "Description",
+        opacity: 1,
+        zIndex: 0,
+        style: {},
+        width: "auto",
+        height: "auto",
+        position: "relative",
+      },
+      ".media": {
+        id: ".media",
+        active: true,
+        locked: false,
+        type: "image",
+        name: "Media",
+        src: "",
+        alt: "",
+        opacity: 1,
+        zIndex: 0,
+        style: {},
+        width: "auto",
+        height: "auto",
+        fit: "cover",
+        position: "relative",
+      },
+    },
+    type: "template",
+    properties: hero_card_properties_definition,
+    version: "0.0.0",
+  }
 );
 
-export const Hero_002 = withTemplate(
-  function Hero_002({
-    properties: { media, h1, p },
-    style,
-    ...props
-  }: PropsWithStyle<HeroCardProps>) {
+export const Hero_002 = withTemplateDefinition(
+  function Hero_002({ props: { h1, p, media }, style }: HeroCardMasterProps) {
     return (
       <header style={style} className="relative aspect-[3/4]">
         {media && (
           <Media
             type={media.type}
             src={media.src}
-            alt={media.alt}
+            // alt={media.alt}
             width={800}
             height={400}
             className="w-full h-full object-cover -z-10"
@@ -263,5 +714,61 @@ export const Hero_002 = withTemplate(
     );
   },
   "templates/components/cards/hero-002",
-  HeroCardSchema
+  {
+    name: "templates/components/cards/hero-002",
+    default: {
+      h1: "Title",
+      p: "Description",
+      media: { type: "image", src: "" },
+    },
+    nodes: {
+      ".h1": {
+        id: ".h1",
+        active: true,
+        locked: false,
+        type: "text",
+        name: "Title",
+        text: "Title",
+        opacity: 1,
+        zIndex: 0,
+        style: {},
+        width: "auto",
+        height: "auto",
+        position: "relative",
+      },
+      ".p": {
+        id: ".p",
+        active: true,
+        locked: false,
+        type: "text",
+        name: "Description",
+        text: "Description",
+        opacity: 1,
+        zIndex: 0,
+        style: {},
+        width: "auto",
+        height: "auto",
+        position: "relative",
+      },
+      ".media": {
+        id: ".media",
+        active: true,
+        locked: false,
+        type: "image",
+        name: "Media",
+        src: "",
+        alt: "",
+        opacity: 1,
+        zIndex: 0,
+        style: {},
+        width: "auto",
+        height: "auto",
+        fit: "cover",
+        position: "relative",
+      },
+    },
+    type: "template",
+    properties: hero_card_properties_definition,
+    version: "0.0.0",
+  }
 );

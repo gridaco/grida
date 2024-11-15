@@ -13,7 +13,7 @@ import {
 } from "@/scaffolds/grid-editor/components";
 import * as GridLayout from "@/scaffolds/grid-editor/components/layout";
 import { useEffect, useMemo, useState } from "react";
-import { CurrentTable } from "@/scaffolds/editor/utils/switch-table";
+import { CurrentTable } from "@/scaffolds/editor/utils/current-table";
 import { XSBAuthUsersGridData } from "@/scaffolds/grid/wellknown/xsb-auth.users-grid-data";
 import { EditorSymbols } from "@/scaffolds/editor/symbols";
 import {

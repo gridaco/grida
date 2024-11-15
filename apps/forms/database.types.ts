@@ -457,15 +457,7 @@ export type Database = {
           name?: string
           project_id?: number
         }
-        Relationships: [
-          {
-            foreignKeyName: "store_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "project"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
     }
     Views: {
@@ -699,7 +691,7 @@ export type Database = {
         Row: {
           accept: string | null
           autocomplete:
-            | Database["grida_forms"]["Enums"]["form_field_autocomplete_type"][]
+            | Database["grida_forms"]["Enums"]["input_autocomplete_type"][]
             | null
           created_at: string
           data: Json | null
@@ -730,7 +722,7 @@ export type Database = {
         Insert: {
           accept?: string | null
           autocomplete?:
-            | Database["grida_forms"]["Enums"]["form_field_autocomplete_type"][]
+            | Database["grida_forms"]["Enums"]["input_autocomplete_type"][]
             | null
           created_at?: string
           data?: Json | null
@@ -761,7 +753,7 @@ export type Database = {
         Update: {
           accept?: string | null
           autocomplete?:
-            | Database["grida_forms"]["Enums"]["form_field_autocomplete_type"][]
+            | Database["grida_forms"]["Enums"]["input_autocomplete_type"][]
             | null
           created_at?: string
           data?: Json | null
@@ -823,24 +815,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "connection_commerce_store_store_id_fkey"
-            columns: ["store_id"]
-            isOneToOne: false
-            referencedRelation: "store"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "form_connection_store_form_id_fkey"
             columns: ["form_id"]
             isOneToOne: true
             referencedRelation: "form"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "form_connection_store_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "project"
             referencedColumns: ["id"]
           },
         ]
@@ -873,20 +851,6 @@ export type Database = {
             columns: ["form_id"]
             isOneToOne: true
             referencedRelation: "form"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "connection_supabase_project_main_supabase_table_id_fkey"
-            columns: ["main_supabase_table_id"]
-            isOneToOne: false
-            referencedRelation: "supabase_table"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "connection_supabase_supabase_project_id_fkey"
-            columns: ["supabase_project_id"]
-            isOneToOne: false
-            referencedRelation: "supabase_project"
             referencedColumns: ["id"]
           },
         ]
@@ -968,13 +932,6 @@ export type Database = {
             columns: ["default_form_page_id"]
             isOneToOne: false
             referencedRelation: "form_document"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "grida_forms_form_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "project"
             referencedColumns: ["id"]
           },
         ]
@@ -1079,6 +1036,7 @@ export type Database = {
           method: Database["grida_forms"]["Enums"]["form_method"]
           project_id: number
           redirect_after_response_uri: string | null
+          start_page: Json | null
           stylesheet: Json | null
         }
         Insert: {
@@ -1097,6 +1055,7 @@ export type Database = {
           method?: Database["grida_forms"]["Enums"]["form_method"]
           project_id: number
           redirect_after_response_uri?: string | null
+          start_page?: Json | null
           stylesheet?: Json | null
         }
         Update: {
@@ -1115,30 +1074,10 @@ export type Database = {
           method?: Database["grida_forms"]["Enums"]["form_method"]
           project_id?: number
           redirect_after_response_uri?: string | null
+          start_page?: Json | null
           stylesheet?: Json | null
         }
         Relationships: [
-          {
-            foreignKeyName: "form_document_g11n_manifest_id_fkey"
-            columns: ["g11n_manifest_id"]
-            isOneToOne: false
-            referencedRelation: "manifest"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "form_document_id_fkey"
-            columns: ["id"]
-            isOneToOne: true
-            referencedRelation: "document"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "form_document_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "project"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "grida_forms_form_page_form_id_fkey"
             columns: ["form_id"]
@@ -1217,15 +1156,7 @@ export type Database = {
           title?: string | null
           user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "playground_gist_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       optgroup: {
         Row: {
@@ -1333,6 +1264,32 @@ export type Database = {
           },
         ]
       }
+      relation_view: {
+        Row: {
+          created_at: string
+          id: number
+          relation_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          relation_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          relation_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schema_table_view_schema_table_id_fkey"
+            columns: ["relation_id"]
+            isOneToOne: false
+            referencedRelation: "form"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       response: {
         Row: {
           browser: string | null
@@ -1395,13 +1352,6 @@ export type Database = {
           x_useragent?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "grida_forms_response_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "customer"
-            referencedColumns: ["uid"]
-          },
           {
             foreignKeyName: "grida_forms_response_form_id_fkey"
             columns: ["form_id"]
@@ -1546,24 +1496,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "response_session_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "customer"
-            referencedColumns: ["uid"]
-          },
-          {
             foreignKeyName: "response_session_form_id_fkey"
             columns: ["form_id"]
             isOneToOne: false
             referencedRelation: "form"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "response_session_visitor_id_fkey"
-            columns: ["visitor_id"]
-            isOneToOne: true
-            referencedRelation: "visitor"
             referencedColumns: ["id"]
           },
         ]
@@ -1584,22 +1520,7 @@ export type Database = {
           name?: string
           project_id?: number
         }
-        Relationships: [
-          {
-            foreignKeyName: "schema_document_id_fkey"
-            columns: ["id"]
-            isOneToOne: true
-            referencedRelation: "document"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "schema_document_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "project"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
     }
     Views: {
@@ -1638,7 +1559,46 @@ export type Database = {
         | "divider"
         | "header"
         | "pdf"
-      form_field_autocomplete_type:
+      form_field_type:
+        | "text"
+        | "textarea"
+        | "richtext"
+        | "tel"
+        | "url"
+        | "checkbox"
+        | "checkboxes"
+        | "switch"
+        | "toggle"
+        | "toggle-group"
+        | "date"
+        | "month"
+        | "week"
+        | "email"
+        | "file"
+        | "image"
+        | "select"
+        | "latlng"
+        | "password"
+        | "color"
+        | "radio"
+        | "country"
+        | "payment"
+        | "hidden"
+        | "signature"
+        | "number"
+        | "time"
+        | "datetime-local"
+        | "range"
+        | "search"
+        | "audio"
+        | "video"
+        | "json"
+      form_method: "post" | "get" | "dialog"
+      form_response_unknown_field_handling_strategy_type:
+        | "ignore"
+        | "accept"
+        | "reject"
+      input_autocomplete_type:
         | "off"
         | "on"
         | "name"
@@ -1696,45 +1656,6 @@ export type Database = {
         | "url"
         | "photo"
         | "webauthn"
-      form_field_type:
-        | "text"
-        | "textarea"
-        | "richtext"
-        | "tel"
-        | "url"
-        | "checkbox"
-        | "checkboxes"
-        | "switch"
-        | "toggle"
-        | "toggle-group"
-        | "date"
-        | "month"
-        | "week"
-        | "email"
-        | "file"
-        | "image"
-        | "select"
-        | "latlng"
-        | "password"
-        | "color"
-        | "radio"
-        | "country"
-        | "payment"
-        | "hidden"
-        | "signature"
-        | "number"
-        | "time"
-        | "datetime-local"
-        | "range"
-        | "search"
-        | "audio"
-        | "video"
-        | "json"
-      form_method: "post" | "get" | "dialog"
-      form_response_unknown_field_handling_strategy_type:
-        | "ignore"
-        | "accept"
-        | "reject"
       response_platform_powered_by:
         | "api"
         | "grida_forms"
@@ -1873,13 +1794,6 @@ export type Database = {
             referencedRelation: "locale"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "manifest_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "project"
-            referencedColumns: ["id"]
-          },
         ]
       }
       resource: {
@@ -1966,15 +1880,7 @@ export type Database = {
           data?: Json
           id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "site_document_id_fkey"
-            columns: ["id"]
-            isOneToOne: true
-            referencedRelation: "document"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
     }
     Views: {
@@ -2035,29 +1941,7 @@ export type Database = {
           sb_service_key_id?: string | null
           updated_at?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "connection_supabase_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: true
-            referencedRelation: "project"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "supabase_project_sb_service_key_id_fkey"
-            columns: ["sb_service_key_id"]
-            isOneToOne: false
-            referencedRelation: "decrypted_secrets"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "supabase_project_sb_service_key_id_fkey"
-            columns: ["sb_service_key_id"]
-            isOneToOne: false
-            referencedRelation: "secrets"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       supabase_table: {
         Row: {
@@ -2116,6 +2000,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      asset: {
+        Row: {
+          created_at: string | null
+          document_id: string
+          id: string
+          is_public: boolean
+          name: string
+          object_id: string | null
+          size: number
+          type: string
+        }
+        Insert: {
+          created_at?: string | null
+          document_id: string
+          id?: string
+          is_public: boolean
+          name: string
+          object_id?: string | null
+          size: number
+          type: string
+        }
+        Update: {
+          created_at?: string | null
+          document_id?: string
+          id?: string
+          is_public?: boolean
+          name?: string
+          object_id?: string | null
+          size?: number
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "document"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer: {
         Row: {
           _fp_fingerprintjs_visitorid: string | null
@@ -2272,15 +2197,7 @@ export type Database = {
           user_id?: string | null
           varchar?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "dummy_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       organization: {
         Row: {
@@ -2316,15 +2233,7 @@ export type Database = {
           name?: string
           owner_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "public_organization_owner_id_fkey"
-            columns: ["owner_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       organization_member: {
         Row: {
@@ -2351,13 +2260,6 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organization"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "public_organization_member_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -2413,15 +2315,7 @@ export type Database = {
           display_name?: string
           uid?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "user_profile_uid_fkey"
-            columns: ["uid"]
-            isOneToOne: true
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       user_project_access_state: {
         Row: {
@@ -2445,13 +2339,6 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "project"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "user_project_access_state_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: true
-            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -2512,15 +2399,7 @@ export type Database = {
           user_id: string | null
           varchar: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "dummy_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
     }
     Functions: {
@@ -2551,6 +2430,18 @@ export type Database = {
           user_id: string
         }
         Returns: number[]
+      }
+      rls_asset: {
+        Args: {
+          p_asset_id: string
+        }
+        Returns: boolean
+      }
+      rls_document: {
+        Args: {
+          p_document_id: string
+        }
+        Returns: boolean
       }
       rls_manifest: {
         Args: {
@@ -2692,4 +2583,19 @@ export type Enums<
   ? Database[PublicEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : PublicEnumNameOrOptions extends keyof PublicSchema["Enums"]
     ? PublicSchema["Enums"][PublicEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof PublicSchema["CompositeTypes"]
+    | { schema: keyof Database },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof Database
+  }
+    ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
+    ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never

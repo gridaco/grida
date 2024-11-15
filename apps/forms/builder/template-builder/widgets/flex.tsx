@@ -1,7 +1,6 @@
 import React from "react";
-import { withTemplate } from "../with-template";
 
-export const FlexWidget = withTemplate(function FlexWidget({
+export function FlexWidget({
   children,
   style,
 }: React.PropsWithChildren<{
@@ -18,4 +17,6 @@ export const FlexWidget = withTemplate(function FlexWidget({
       {children}
     </div>
   );
-}, "flex");
+}
+
+FlexWidget.type = "flex";

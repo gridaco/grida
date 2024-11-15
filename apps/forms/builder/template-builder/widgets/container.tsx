@@ -1,20 +1,18 @@
-import { z } from "zod";
-import { withTemplate, ZTemplateSchema } from "../with-template";
 import React from "react";
+import { grida } from "@/grida";
 
-export const ContainerWidget = withTemplate(
-  ({
-    style,
-    children,
-    ...props
-  }: React.PropsWithChildren<{
-    style?: React.CSSProperties;
-  }>) => {
-    return (
-      <div {...props} style={style}>
-        {children}
-      </div>
-    );
-  },
-  "container"
-);
+export const ContainerWidget = ({
+  style,
+  children,
+  ...props
+}: React.PropsWithChildren<
+  grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.ContainerNode>
+>) => {
+  return (
+    <div {...props} style={style}>
+      {children}
+    </div>
+  );
+};
+
+ContainerWidget.type = "container";

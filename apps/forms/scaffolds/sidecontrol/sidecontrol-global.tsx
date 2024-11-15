@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import {
   SidebarMenuSectionContent,
@@ -70,10 +70,33 @@ import {
 } from "@/k/supported_languages";
 import { Switch } from "@/components/ui/switch";
 import { PoweredByGridaWaterMark } from "@/components/powered-by-branding";
+import { BrowseStartPageTemplatesDialog } from "../form-templates/startpage-templates-dialog";
+import { useDialogState } from "@/components/hooks/use-dialog-state";
+import { FormStartPage } from "@/theme/templates/formstart";
+import { PropsControl } from "./controls/props";
+import {
+  useDocument,
+  useNode,
+  useTemplateDefinition,
+} from "@/builder/provider";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const { default: all, ...variants } = _variants;
 
 export function SideControlGlobal() {
+  const [state, dispatch] = useEditorState();
+
+  const { selected_page_id } = state;
+
   return (
     <>
       <SidebarSection className="border-b pb-4">
@@ -92,22 +115,27 @@ export function SideControlGlobal() {
           <AppearanceControl />
         </SidebarMenuSectionContent>
       </SidebarSection>
-      <SidebarSection className="border-b pb-4">
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Background</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent>
-          <Background />
-        </SidebarMenuSectionContent>
-      </SidebarSection>
-      <SidebarSection className="border-b pb-4">
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Section Style</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent>
-          <SectionStyle />
-        </SidebarMenuSectionContent>
-      </SidebarSection>
+      {selected_page_id === "form/startpage" && <FormStartPageControl />}
+      {selected_page_id === "form" && (
+        <SidebarSection className="border-b pb-4">
+          <SidebarSectionHeaderItem>
+            <SidebarSectionHeaderLabel>Background</SidebarSectionHeaderLabel>
+          </SidebarSectionHeaderItem>
+          <SidebarMenuSectionContent>
+            <Background />
+          </SidebarMenuSectionContent>
+        </SidebarSection>
+      )}
+      {selected_page_id === "form" && (
+        <SidebarSection className="border-b pb-4">
+          <SidebarSectionHeaderItem>
+            <SidebarSectionHeaderLabel>Section Style</SidebarSectionHeaderLabel>
+          </SidebarSectionHeaderItem>
+          <SidebarMenuSectionContent>
+            <SectionStyle />
+          </SidebarMenuSectionContent>
+        </SidebarSection>
+      )}
       <SidebarSection className="border-b pb-4">
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Custom CSS</SidebarSectionHeaderLabel>
@@ -124,6 +152,111 @@ export function SideControlGlobal() {
           <Settings />
         </SidebarMenuSectionContent>
       </SidebarSection>
+    </>
+  );
+}
+
+function FormStartPageControl() {
+  const {
+    state: { document },
+    changeNodeProps,
+  } = useDocument();
+
+  const { props, template_id, properties } = useNode(document.root_id);
+  const { default: defaultProps } = useTemplateDefinition(template_id!);
+
+  const shallowProps = useMemo(
+    () => Object.assign({}, defaultProps, props),
+    [defaultProps, props]
+  );
+
+  return (
+    <>
+      <SidebarSection className="border-b pb-4">
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>Template</SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuSectionContent>
+          <FormStartPageTemplateControl />
+        </SidebarMenuSectionContent>
+      </SidebarSection>
+      <SidebarSection className="border-b pb-4">
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>Template Props</SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuSectionContent className="space-y-2">
+          <PropsControl
+            properties={properties!}
+            props={shallowProps}
+            onValueChange={(k, v) => {
+              changeNodeProps(document.root_id, k, v);
+            }}
+          />
+        </SidebarMenuSectionContent>
+      </SidebarSection>
+    </>
+  );
+}
+
+function FormStartPageTemplateControl() {
+  const [state, dispatch] = useEditorState();
+
+  const switchTemplateDialog = useDialogState("switch-template-dialog");
+  const removeConfirmDialog = useDialogState("remove-confirm-dialog");
+
+  const setupStartPage = useCallback(
+    (name: string) => {
+      // TODO: exclude .component
+      const __template = FormStartPage.getTemplate(name);
+      dispatch({
+        type: "editor/form/startpage/init",
+        template: __template,
+      });
+    },
+    [dispatch]
+  );
+
+  const removeStartPage = useCallback(() => {
+    dispatch({
+      type: "editor/form/startpage/remove",
+    });
+  }, [dispatch]);
+
+  return (
+    <>
+      <BrowseStartPageTemplatesDialog
+        {...switchTemplateDialog}
+        defaultValue={state.documents["form/startpage"]?.template_id}
+        onValueCommit={setupStartPage}
+      />
+      <AlertDialog {...removeConfirmDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Are you sure you want to remove the cover page?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This action is irreversible.
+            </AlertDialogDescription>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction asChild>
+                <Button variant="destructive" onClick={removeStartPage}>
+                  Delete
+                </Button>
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogHeader>
+        </AlertDialogContent>
+      </AlertDialog>
+      <div className="w-full flex flex-col gap-2">
+        <Button onClick={switchTemplateDialog.openDialog}>
+          Switch Template
+        </Button>
+        <Button variant="destructive" onClick={removeConfirmDialog.openDialog}>
+          Remove Cover Page
+        </Button>
+      </div>
     </>
   );
 }

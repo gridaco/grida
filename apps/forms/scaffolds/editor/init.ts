@@ -23,6 +23,10 @@ import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { nanoid } from "nanoid";
 import { DataGridLocalPreferencesStorage } from "./storage/datagrid.storage";
 import { Data } from "@/lib/data";
+import * as samples from "@/theme/templates/formcollection/samples";
+import { grida } from "@/grida";
+import { FormStartPage } from "@/theme/templates/formstart";
+import { initDocumentEditorState } from "@/builder";
 
 export function initialEditorState(init: EditorInit): EditorState {
   switch (init.doctype) {
@@ -45,7 +49,7 @@ const initial_sidebar_mode = {
 
 function initialBaseDocumentEditorState(
   init: BaseDocumentEditorInit
-): Omit<BaseDocumentEditorState, "document"> {
+): Omit<BaseDocumentEditorState, "documents" | "pages" | "selected_page_id"> {
   const basepath = editorbasepath({
     org: init.organization.name,
     proj: init.project.name,
@@ -196,11 +200,8 @@ function initialDatabaseEditorState(
     ...base,
     supabase_project: init.supabase_project,
     connections: {},
-    document: {
-      pages: [],
-      nodes: [],
-      templatedata: {},
-    },
+    pages: [],
+    documents: {},
     sidebar: {
       mode: initial_sidebar_mode[init.doctype],
       mode_data: {
@@ -273,15 +274,28 @@ function initialSiteEditorState(init: SiteDocumentEditorInit): EditorState {
   // @ts-ignore
   return {
     ...base,
-    document: {
-      pages: sitedocumentpagesinit({
-        basepath: base.basepath,
-        document_id: init.document_id,
+    pages: sitedocumentpagesinit({
+      basepath: base.basepath,
+      document_id: init.document_id,
+    }),
+    selected_page_id: "site/dev-collection",
+    documents: {
+      ["site/dev-collection"]: initDocumentEditorState({
+        editable: true,
+        document: { nodes: {}, root_id: "root" },
+        templates: {
+          ["formcollection_sample_001_the_bundle"]: {
+            name: "formcollection_sample_001_the_bundle",
+            type: "template",
+            properties: {},
+            default: {},
+            // props: samples["formcollection_sample_001_the_bundle"] as any,
+            // overrides: {},
+            version: "0.0.0",
+            nodes: {},
+          },
+        },
       }),
-      selected_page_id: "collection",
-      nodes: [],
-      templatesample: "formcollection_sample_001_the_bundle",
-      templatedata: {},
     },
     sidebar: {
       mode: initial_sidebar_mode[init.doctype],
@@ -484,14 +498,26 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
     tables: values,
 
     blocks: blockstreeflat(init.blocks),
-    document: {
-      pages: formdocumentpagesinit({
-        basepath: base.basepath,
-        document_id: init.document_id,
-      }),
-      selected_page_id: "", // "form",
-      nodes: [],
-      templatedata: {},
+    pages: formdocumentpagesinit({
+      basepath: base.basepath,
+      document_id: init.document_id,
+    }),
+    selected_page_id: "form",
+    documents: {
+      "form/startpage": init.start
+        ? {
+            template_id: init.start.template_id,
+            ...initDocumentEditorState({
+              editable: true,
+              document: init.start,
+              templates: {
+                [init.start.template_id]: FormStartPage.getTemplate(
+                  init.start.template_id
+                ),
+              },
+            }),
+          }
+        : undefined,
     },
     form: {
       form_id: init.form_id,
@@ -549,7 +575,7 @@ function sitedocumentpagesinit({
   return [
     {
       section: "Pages",
-      id: "collection",
+      id: "site/dev-collection",
       label: "home",
       href: `/${basepath}/${document_id}/design`,
       icon: "file",
@@ -575,15 +601,15 @@ function formdocumentpagesinit({
       data: {},
     },
     // TODO: not ready
-    // {
-    //   section: "Design",
-    //   id: "start",
-    //   label: "Cover",
-    //   href: `/${basepath}/${document_id}/form/start`,
-    //   icon: "file",
-    //   level: 1,
-    //   data: {},
-    // },
+    {
+      section: "Design",
+      id: "form/startpage",
+      label: "Cover",
+      href: `/${basepath}/${document_id}/form/start`,
+      icon: "file",
+      level: 1,
+      data: {},
+    },
     {
       section: "Design",
       id: "form",

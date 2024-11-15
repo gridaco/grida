@@ -1,6 +1,10 @@
 "use client";
 
-import { ThemedRichTextEditorContent } from "@/components/richtext";
+import {
+  RichTextContent,
+  schema,
+  safeInitialContent,
+} from "@/components/richtext";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -11,7 +15,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { BlockNoteSchema, defaultBlockSpecs } from "@blocknote/core";
 import { useCreateBlockNote } from "@blocknote/react";
 import { useDatabaseTableId } from "@/scaffolds/editor";
 import { SupabaseStorageExtensions } from "@/lib/supabase/storage-ext";
@@ -19,30 +22,15 @@ import { PrivateEditorApi } from "@/lib/private";
 import { filemeta } from "@/utils/file";
 import { useCallback } from "react";
 
-const { table: _noop1, ...remainingSpecs } = defaultBlockSpecs;
-const schema = BlockNoteSchema.create({
-  blockSpecs: remainingSpecs,
-});
-
-function safevalue(value: any) {
-  if (Array.isArray(value) && value.length > 0) {
-    return value;
-  }
-  return undefined;
-}
-
-export function RichTextEditCell({
-  row_id,
+function useUploader({
+  db_table_id,
   field_id,
-  defaultValue,
-  onValueCommit,
+  row_id,
 }: {
-  row_id: string;
+  db_table_id: string | null;
   field_id: string;
-  defaultValue?: any;
-  onValueCommit?: (value: any) => void;
+  row_id: string;
 }) {
-  const db_table_id = useDatabaseTableId();
   const uploader = useCallback(
     async (file: File) => {
       if (!db_table_id) {
@@ -89,10 +77,28 @@ export function RichTextEditCell({
     [db_table_id, field_id, row_id]
   );
 
+  return uploader;
+}
+
+export function RichTextEditCell({
+  row_id,
+  field_id,
+  defaultValue,
+  onValueCommit,
+}: {
+  row_id: string;
+  field_id: string;
+  defaultValue?: any;
+  onValueCommit?: (value: any) => void;
+}) {
+  const db_table_id = useDatabaseTableId();
+  const uploader = useUploader({ db_table_id, field_id, row_id });
+
   const editor = useCreateBlockNote({
     schema: schema,
-    initialContent: safevalue(defaultValue),
+    initialContent: safeInitialContent(defaultValue),
     uploadFile: uploader,
+    animations: false,
   });
 
   const onSaveClick = () => {
@@ -108,7 +114,7 @@ export function RichTextEditCell({
         </DialogHeader>
         <ScrollArea className="flex-1" onClick={() => editor.focus()}>
           <div className="prose dark:prose-invert mx-auto w-full">
-            <ThemedRichTextEditorContent
+            <RichTextContent
               onKeyDown={(e) => {
                 // this is required for preventing exit on enter pressed
                 e.stopPropagation();

@@ -22,7 +22,7 @@ import {
   CardBackgroundGradient,
   ScreenGridArea,
 } from "@/theme/templates/kit/components";
-import data from "../data/03.dummy.json";
+import data from "./messages.json";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { KakaoTalkLogo, PolestarTypeLogo } from "@/components/logos";
@@ -40,6 +40,12 @@ import {
 } from "@/components/ui/drawer";
 import { PhoneIcon } from "lucide-react";
 import Link from "next/link";
+import type { grida } from "@/grida";
+
+const userprops =
+  {} satisfies grida.program.document.template.TemplateDocumentDefinition["properties"];
+
+type UserProps = grida.program.schema.TInferredPropTypes<typeof userprops>;
 
 // https://www.polestar.com/dato-assets/11286/1709559099-02-polestar-3-overview-stats-t.mp4
 
@@ -69,7 +75,7 @@ export default function StartPage_002() {
                 <div className="flex flex-col gap-4 p-4">
                   <article className="prose prose-sm dark:prose-invert">
                     <h2 className="w-2/3">{data.title}</h2>
-                    <p className="w-full max-w-sm">{data.excerpt}</p>
+                    <p className="w-full max-w-sm">{data.subtitle}</p>
                   </article>
                   <div className="flex justify-between items-center gap-4">
                     <div>
@@ -180,8 +186,8 @@ export default function StartPage_002() {
         </motion.div>
       </ScreenMobileFrame>
       <ScreenRootBackground>
-        <Image
-          src="/templates/sample-images/licensed/winter-dev-only.png"
+        <img
+          src="https://sdl-assets.ams3.cdn.digitaloceanspaces.com/sdl/2021/08/sdl-polestar-interior-steering-2000x1333.jpg"
           alt=""
           width={1080}
           height={1920}
@@ -246,3 +252,5 @@ function ModeratorDrawer({ children }: React.PropsWithChildren<{}>) {
     </Drawer>
   );
 }
+
+StartPage_002.properties = userprops;

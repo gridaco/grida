@@ -13,8 +13,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/utils";
 import {
   DataProvider,
-  RootDataContextProvider,
-} from "@/builder/core/data-context";
+  ProgramDataContextHost,
+} from "@/grida/react-runtime/data-context";
 
 export function TemplateControl({
   value,
@@ -42,7 +42,7 @@ export function TemplateControl({
       >
         {value ? value : "Select a template"}
       </Button>
-      <RootDataContextProvider>
+      <ProgramDataContextHost>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogContent className="max-w-screen-xl p-0">
             <DialogHeader className="p-4">
@@ -66,7 +66,7 @@ export function TemplateControl({
                           setOpen(false);
                         }}
                       >
-                        <DataProvider namespace="dummy" initialData={{}}>
+                        <DataProvider namespace="dummy" data={{}}>
                           {React.createElement(
                             TemplateComponents.components[key],
                             {
@@ -110,7 +110,7 @@ export function TemplateControl({
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </RootDataContextProvider>
+      </ProgramDataContextHost>
     </>
   );
 }

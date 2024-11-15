@@ -1,6 +1,7 @@
+import React from "react";
 import { cn } from "@/utils";
 import { PlusIcon } from "@radix-ui/react-icons";
-import { motion } from "framer-motion";
+import { Rotate } from "./motion";
 
 export function CameraCrossDecoration({
   crossSize,
@@ -73,28 +74,5 @@ export function LinearBoxScaleDecoration({
         />
       ))}
     </div>
-  );
-}
-
-function Rotate({
-  children,
-  ...props
-}: React.PropsWithChildren<{
-  className?: string;
-  style?: React.CSSProperties;
-}>) {
-  return (
-    <motion.div
-      animate={{ rotate: 360 }}
-      transition={{
-        repeatDelay: 3,
-        duration: 1,
-        repeat: Infinity,
-        repeatType: "loop",
-      }}
-      {...props}
-    >
-      {children}
-    </motion.div>
   );
 }

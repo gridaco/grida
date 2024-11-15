@@ -6,6 +6,7 @@ import { CalendarBoxIcon, LocationBoxIcon } from "../../kit/components/icons";
 import { MapGL } from "@/components/mapgl";
 import { TwitterLogoIcon } from "@radix-ui/react-icons";
 import { YoutubeIcon } from "lucide-react";
+import { grida } from "@/grida";
 
 interface Props {
   data: {
@@ -33,7 +34,7 @@ interface Props {
   };
 }
 
-export default function FormStartPage({ data }: Props) {
+export default function _000({ data }: Props) {
   return (
     <main className="@container/preview">
       <header className="p-4">
@@ -136,3 +137,68 @@ function Footer() {
     </footer>
   );
 }
+
+_000.definition = {
+  type: "template",
+  name: "003",
+  // properties: userprops,
+  properties: {},
+  version: "1.0.0",
+  default: {
+    title: "Enter Title",
+    subtitle: "Enter Subtitle",
+    background: "/images/abstract-placeholder.jpg",
+  },
+  nodes: {
+    "003.title": {
+      id: "003.title",
+      active: true,
+      locked: false,
+      type: "text",
+      name: "Title",
+      text: "AA",
+      // text: Factory.createPropertyAccessExpression(["props", "title"]),
+      opacity: 1,
+      zIndex: 0,
+      style: {},
+      width: "auto",
+      height: "auto",
+      position: "relative",
+    },
+    "003.subtitle": {
+      id: "003.subtitle",
+      active: true,
+      locked: false,
+      type: "text",
+      name: "Subtitle",
+      text: "BB",
+      // text: Factory.createPropertyAccessExpression(["props", "subtitle"]),
+      opacity: 1,
+      zIndex: 0,
+      style: {},
+      width: "auto",
+      height: "auto",
+      position: "relative",
+    },
+    "003.background": {
+      id: "003.background",
+      active: true,
+      locked: false,
+      type: "image",
+      name: "Background",
+      src: undefined,
+      // src: Factory.createPropertyAccessExpression(["props", "background"]),
+      opacity: 1,
+      zIndex: 0,
+      fit: "cover",
+      style: {},
+      width: "auto",
+      height: "auto",
+      position: "absolute",
+      top: 0,
+      left: 0,
+      bottom: 0,
+      right: 0,
+    },
+  },
+} satisfies grida.program.document.template.TemplateDocumentDefinition;

@@ -6,20 +6,30 @@ import { useEditorState } from "@/scaffolds/editor";
 import { SideControl } from "@/scaffolds/sidecontrol";
 import BlocksEditor from "@/scaffolds/blocks-editor";
 import { Spinner } from "@/components/spinner";
+import { CurrentPage } from "@/scaffolds/editor/utils/current-page";
 
 export default function EditFormPage() {
   return (
-    <main className="h-full flex flex-1 w-full">
-      <CanvasEventTarget className="relative w-full no-scrollbar overflow-y-auto bg-transparent">
-        <CanvasOverlay />
-        <AgentThemeProvider>
-          <CurrentPageCanvas />
-        </AgentThemeProvider>
-      </CanvasEventTarget>
-      <aside className="hidden lg:flex h-full">
-        <SideControl />
-      </aside>
-    </main>
+    <CurrentPage
+      page="form"
+      fallback={
+        <div className="h-full w-full flex items-center justify-center">
+          <Spinner />
+        </div>
+      }
+    >
+      <main className="h-full flex flex-1 w-full">
+        <CanvasEventTarget className="relative w-full no-scrollbar overflow-y-auto bg-transparent">
+          <CanvasOverlay />
+          <AgentThemeProvider>
+            <CurrentPageCanvas />
+          </AgentThemeProvider>
+        </CanvasEventTarget>
+        <aside className="hidden lg:flex h-full">
+          <SideControl />
+        </aside>
+      </main>
+    </CurrentPage>
   );
 }
 
@@ -31,8 +41,7 @@ function CanvasEventTarget({
 }>) {
   const [state, dispatch] = useEditorState();
 
-  const clearselection = () =>
-    dispatch({ type: "editor/document/node/select" });
+  const clearselection = () => dispatch({ type: "blocks/blur" });
 
   return (
     <div className={className} onPointerDown={clearselection}>
@@ -54,24 +63,12 @@ function CurrentPageCanvas() {
 
   const {
     theme: { lang },
-    document: { selected_page_id },
+    selected_page_id,
   } = state;
 
   switch (selected_page_id) {
     case "form":
       return <BlocksEditor />;
-    // case "collection":
-    //   return (
-    //     <>
-    //       {/* // 430 932 max-h-[932px] no-scrollbar overflow-y-scroll */}
-    //       <div className="mx-auto my-20 max-w-[430px] border rounded-2xl shadow-2xl bg-background select-none">
-    //         <FormCollectionPage />
-    //       </div>
-    //       <div className="fixed bottom-5 left-0 right-0 flex items-center justify-center z-50">
-    //         <CanvasFloatingToolbar />
-    //       </div>
-    //     </>
-    //   );
 
     default:
       return (

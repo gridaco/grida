@@ -3,8 +3,7 @@
 import React from "react";
 import { PoweredByGridaFooter } from "@/scaffolds/e/form/powered-by-brand-footer";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { useEditorState } from "@/scaffolds/editor";
-import { SlotNode } from "@/builder/template-builder/node";
+import { NodeElement } from "@/builder/template-builder/node";
 import {
   Card_002,
   Card_003,
@@ -15,97 +14,114 @@ import { TemplateBuilderWidgets } from "@/builder/template-builder/widgets";
 import { Header_001 } from "@/builder/template-builder/components/headers";
 import * as samples from "./samples";
 import {
-  RootDataContextProvider,
+  ProgramDataContextHost,
   DataProvider,
-  ScopedVariableProvider,
-} from "@/builder/core/data-context";
+} from "@/grida/react-runtime/data-context";
 import { Factory } from "@/ast/factory";
-import ArrayMap from "@/builder/core/data-context/array";
+import ArrayMap from "@/grida/react-runtime/data-context/array";
+import { useDocument } from "@/builder/provider";
+import assert from "assert";
+
+type ISample = (typeof samples)[keyof typeof samples];
 
 export default function FormCollectionPage() {
-  const [state] = useEditorState();
-  const data = samples[state.document.templatesample as keyof typeof samples];
+  const {
+    state: { document, templates },
+  } = useDocument();
+
+  const root = document.nodes[document.root_id];
+  assert(root.type === "template_instance");
+  const { props: props } = root;
+
   return (
-    <RootDataContextProvider>
-      <DataProvider namespace="dummy" initialData={data}>
+    <ProgramDataContextHost>
+      <DataProvider namespace="dummy" data={props}>
         <div className="@container/preview">
-          <Header_001 logo={data.brand.logo} />
-          <SlotNode
+          <Header_001
+            logo={
+              // @ts-expect-error
+              props["brand"]?.["logo"] as string
+            }
+          />
+          <NodeElement
             node_id="hero"
+            // name="Hero"
             component={Hero_002}
-            defaultProperties={{
-              h1: Factory.createPropertyAccessExpression<typeof data>([
-                "featured",
-                "h1",
-              ]),
-              media: Factory.createPropertyAccessExpression<typeof data>([
-                "featured",
-                "media",
-              ]),
-              p: Factory.createPropertyAccessExpression<typeof data>([
-                "featured",
-                "p",
-              ]),
-            }}
+            // defaultProperties={{
+            //   h1: Factory.createPropertyAccessExpression<ISample>([
+            //     "featured",
+            //     "h1",
+            //   ]),
+            //   media: Factory.createPropertyAccessExpression<ISample>([
+            //     "featured",
+            //     "media",
+            //   ]),
+            //   p: Factory.createPropertyAccessExpression<ISample>([
+            //     "featured",
+            //     "p",
+            //   ]),
+            // }}
           />
           <main className="container">
             <section>
               <header className="py-10">
-                <SlotNode
+                <NodeElement
                   node_id="list-header-title"
-                  component={TemplateBuilderWidgets.Text}
-                  defaultText={Factory.createPropertyAccessExpression<
-                    typeof data
-                  >(["listheader", "text"])}
-                  defaultStyle={{
+                  // name="List Header Title"
+                  // text={Factory.createPropertyAccessExpression<ISample>([
+                  //   "listheader",
+                  //   "text",
+                  // ])}
+                  style={{
                     fontSize: 24,
                     fontWeight: 700,
                   }}
                 />
                 <div className="py-2">
-                  <Filter tags={data.tags as any as string[]} />
+                  <Filter tags={props.tags as any as string[]} />
                 </div>
               </header>
               <div className="grid gap-6 grid-cols-1 @3xl/preview:grid-cols-2 @5xl/preview:grid-cols-3 @7xl/preview:grid-cols-4">
                 <ArrayMap identifier="event" expression={["events"]}>
                   {(data) => (
-                    <SlotNode
+                    <NodeElement
                       node_id={"event-card"}
+                      // name="Event Card"
                       component={Card_002}
-                      defaultProperties={{
-                        media: Factory.createPropertyAccessExpression([
-                          "event",
-                          "media",
-                        ]),
-                        h1: Factory.createPropertyAccessExpression([
-                          "event",
-                          "title",
-                        ]),
-                        badge: Factory.createPropertyAccessExpression([
-                          "event",
-                          "status",
-                        ]),
-                        tags: Factory.createPropertyAccessExpression([
-                          "event",
-                          "tags",
-                        ]),
-                        p: Factory.createPropertyAccessExpression([
-                          "event",
-                          "cta",
-                        ]),
-                        n: Factory.createPropertyAccessExpression([
-                          "event",
-                          "attendees",
-                        ]),
-                        date1: Factory.createPropertyAccessExpression([
-                          "event",
-                          "date",
-                        ]),
-                        date2: Factory.createPropertyAccessExpression([
-                          "event",
-                          "date",
-                        ]),
-                      }}
+                      // defaultProperties={{
+                      //   media: Factory.createPropertyAccessExpression([
+                      //     "event",
+                      //     "media",
+                      //   ]),
+                      //   h1: Factory.createPropertyAccessExpression([
+                      //     "event",
+                      //     "title",
+                      //   ]),
+                      //   badge: Factory.createPropertyAccessExpression([
+                      //     "event",
+                      //     "status",
+                      //   ]),
+                      //   tags: Factory.createPropertyAccessExpression([
+                      //     "event",
+                      //     "tags",
+                      //   ]),
+                      //   p: Factory.createPropertyAccessExpression([
+                      //     "event",
+                      //     "cta",
+                      //   ]),
+                      //   n: Factory.createPropertyAccessExpression([
+                      //     "event",
+                      //     "attendees",
+                      //   ]),
+                      //   date1: Factory.createPropertyAccessExpression([
+                      //     "event",
+                      //     "date",
+                      //   ]),
+                      //   date2: Factory.createPropertyAccessExpression([
+                      //     "event",
+                      //     "date",
+                      //   ]),
+                      // }}
                     />
                   )}
                 </ArrayMap>
@@ -118,7 +134,7 @@ export default function FormCollectionPage() {
           </footer>
         </div>
       </DataProvider>
-    </RootDataContextProvider>
+    </ProgramDataContextHost>
   );
 }
 

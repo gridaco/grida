@@ -3,6 +3,12 @@ import { NextResponse } from "next/server";
 import { get } from "@vercel/edge-config";
 import type { NextRequest } from "next/server";
 
+
+if (!process.env.NEXT_PUBLIC_SUPABASE_URL){
+  console.warn('[CONTRIBUTER MODE]: Supabase Backedn is not configured - some feature may restricted')
+}
+
+
 export async function middleware(req: NextRequest) {
   // #region maintenance mode
   if (process.env.NODE_ENV === "production") {
@@ -33,6 +39,12 @@ export async function middleware(req: NextRequest) {
     process.env.NODE_ENV !== "development"
   ) {
     return new NextResponse("Not Found", { status: 404 });
+  }
+
+
+  // check if dev env (contributor env)
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL){
+    return res;
   }
 
   // Create a Supabase client configured to use cookies

@@ -16,18 +16,45 @@ import {
 import { useEditorState, useFormFields } from "@/scaffolds/editor";
 import { MixIcon } from "@radix-ui/react-icons";
 import { Tokens } from "@/ast";
-import { KeyIcon } from "lucide-react";
 import toast from "react-hot-toast";
 import { FormExpression } from "@/lib/forms/expression";
 import { PropertyLine, PropertyLineLabel } from "./ui";
 import { EditBinaryExpression } from "../panels/extensions/v-edit";
 import { PopoverClose } from "@radix-ui/react-popover";
+import { SelectedNodeProperties } from "./sidecontrol-selected-node";
+import { useDocument } from "@/builder/provider";
 
 export function SideControlDoctypeForm() {
-  const [state, dispatch] = useEditorState();
+  const [state] = useEditorState();
+
+  const { selected_page_id } = state;
+
+  switch (selected_page_id) {
+    case "form": {
+      return <SelectedPageForm />;
+    }
+    case "form/startpage": {
+      return <SelectedPageFormStart />;
+    }
+    case "site/dev-collection":
+      throw new Error("invalid page");
+  }
+}
+
+function SelectedPageForm() {
+  const [state] = useEditorState();
 
   if (state.focus_block_id) {
     return <SelectedFormBlockProperties />;
+  } else {
+    return <SideControlGlobal />;
+  }
+}
+
+function SelectedPageFormStart() {
+  const { selectedNode } = useDocument();
+  if (selectedNode) {
+    return <SelectedNodeProperties />;
   } else {
     return <SideControlGlobal />;
   }

@@ -18,7 +18,7 @@ import {
   GDocTableID,
 } from "@/scaffolds/editor/state";
 import { EditorSymbols } from "@/scaffolds/editor/symbols";
-import { CurrentTable } from "@/scaffolds/editor/utils/switch-table";
+import { CurrentTable } from "@/scaffolds/editor/utils/current-table";
 import { GridEditor } from "@/scaffolds/grid-editor";
 import { GridData } from "@/scaffolds/grid-editor/grid-data";
 import { DGResponseRow } from "@/scaffolds/grid/types";

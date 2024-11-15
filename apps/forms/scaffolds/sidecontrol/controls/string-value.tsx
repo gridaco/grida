@@ -20,45 +20,42 @@ import {
 import { Tokens } from "@/ast";
 import { Badge } from "@/components/ui/badge";
 import { Factory } from "@/ast/factory";
-import { useEditorState } from "@/scaffolds/editor";
 import PropertyAccessDropdownMenu from "./context/variable";
 import PropertyTypeIcon from "@/components/property-type-icon";
-import { useMemo } from "react";
-import { inferSchemaFromData } from "@/lib/spock";
 
 export function StringValueControl({
   value,
   onValueChange,
   placeholder = "Value",
+  disabled,
 }: {
-  value?: Tokens.StringValueExpression;
+  value?: Tokens.StringValueExpression | null;
   onValueChange?: (value?: Tokens.StringValueExpression) => void;
   placeholder?: string;
+  disabled?: boolean;
 }) {
-  const [state] = useEditorState();
-
-  const {
-    document: { selected_node_context },
-  } = state;
-
-  const schema = useMemo(
-    () =>
-      selected_node_context
-        ? inferSchemaFromData(selected_node_context)
-        : undefined,
-    [selected_node_context]
-  );
+  // const schema = useMemo(
+  //   () =>
+  //     selected_node_context
+  //       ? inferSchemaFromData(selected_node_context)
+  //       : undefined,
+  //   [selected_node_context]
+  // );
 
   return (
     <div className="relative group w-full">
       <Control
-        value={value}
+        value={value ?? undefined}
         onValueChange={onValueChange}
         placeholder={placeholder}
+        disabled={disabled}
       />
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button className="absolute opacity-0 group-hover:opacity-100 right-0 top-0 bottom-0 p-2 m-0.5 rounded flex items-center justify-center z-10">
+        <DropdownMenuTrigger disabled={disabled} asChild>
+          <button
+            disabled={disabled}
+            className="absolute opacity-0 group-hover:opacity-100 right-0 top-0 bottom-0 p-2 m-0.5 rounded flex items-center justify-center z-10 disabled:cursor-not-allowed disabled:opacity-50"
+          >
             <BoltIcon className="w-3.5 h-3.5 text-muted-foreground" />
           </button>
         </DropdownMenuTrigger>
@@ -67,9 +64,10 @@ export function StringValueControl({
           side="bottom"
           className="max-w-sm overflow-hidden min-w-96"
         >
+          {/* TODO: */}
           <PropertyAccessDropdownMenu
             asSubmenu
-            schema={schema}
+            // schema={schema}
             onSelect={(path) => {
               onValueChange?.(Factory.createPropertyAccessExpression(path));
             }}
@@ -164,10 +162,12 @@ function Control({
   value,
   onValueChange,
   placeholder,
+  disabled,
 }: {
   value?: Tokens.StringValueExpression;
   onValueChange?: (value: Tokens.StringValueExpression) => void;
   placeholder?: string;
+  disabled?: boolean;
 }) {
   if (Tokens.is.templateExpression(value)) {
     return <TemplateExpressionControl value={value} />;
@@ -180,6 +180,7 @@ function Control({
       value={value as string}
       onValueChange={onValueChange}
       placeholder={placeholder}
+      disabled={disabled}
     />
   );
 }
@@ -188,16 +189,19 @@ function StringLiteralControl({
   value,
   onValueChange,
   placeholder,
+  disabled,
 }: {
   value?: string;
   onValueChange?: (value: string) => void;
   placeholder?: string;
+  disabled?: boolean;
 }) {
   return (
     <Input
       type="text"
       value={(value as string) || ""}
       placeholder={placeholder}
+      disabled={disabled}
       onChange={(e) => onValueChange?.(e.target.value)}
       className={WorkbenchUI.inputVariants({ size: "sm" })}
     />

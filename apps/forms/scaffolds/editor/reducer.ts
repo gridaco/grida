@@ -14,6 +14,7 @@ import type {
   DataGridDateTZAction,
   DataGridLocalFilterAction,
   DataTableLoadingAction,
+  EditorDocumentAction,
   EditorThemeLangAction,
   EditorThemePaletteAction,
   EditorThemeFontFamilyAction,
@@ -29,6 +30,8 @@ import type {
   // DataGridViewAction,
   DataGridTableViewAction,
   DataGridSelectCellAction,
+  EditorSelectPageAction,
+  FormStartPageInitAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { EditorSymbols } from "./symbols";
@@ -36,8 +39,12 @@ import { initialDatagridState } from "./init";
 import { DataGridLocalPreferencesStorage } from "./storage/datagrid.storage";
 import databaseRecucer from "./reducers/database.reducer";
 import blockReducer from "./reducers/block.reducer";
-import documentReducer from "./reducers/document.reducer";
 import datagridQueryReducer from "../data-query/data-query.reducer";
+import builderReducer from "@/builder/reducer";
+import assert from "assert";
+import React from "react";
+import { grida } from "@/grida";
+import { IDocumentEditorState, initDocumentEditorState } from "@/builder/types";
 
 export function reducer(state: EditorState, action: EditorAction): EditorState {
   switch (action.type) {
@@ -98,20 +105,31 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
     case "blocks/blur":
       return blockReducer(state, action);
 
-    case "editor/document/select-page":
-    case "editor/document/sampledata":
-    case "editor/document/node/select":
-    case "editor/document/node/template":
-    case "editor/document/node/text":
-    case "editor/document/node/style":
-    case "editor/document/node/attribute":
-    case "editor/document/node/property":
-      return documentReducer(state, action);
+    case "editor/document": {
+      const { key, action: _action } = <EditorDocumentAction>action;
+      return produce(state, (draft) => {
+        assert(draft.documents, "draft.documents is required");
+        const document = draft.documents[key];
+        assert(document, "document is required");
+        draft.documents[key] = builderReducer(
+          state.documents[key]!,
+          _action
+        ) as IDocumentEditorState & { template_id: string };
+      });
+    }
 
     case "saving": {
       const { saving } = <GlobalSavingAction>action;
       return produce(state, (draft) => {
         draft.saving = saving;
+      });
+    }
+
+    case "editor/select-page": {
+      const { page_id } = <EditorSelectPageAction>action;
+
+      return produce(state, (draft) => {
+        draft.selected_page_id = page_id;
       });
     }
 
@@ -320,6 +338,21 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
         draft.theme.background = background;
       });
     }
+    case "editor/theme/section": {
+      const { section } = <EditorThemeSectionStyleAction>action;
+      return produce(state, (draft) => {
+        draft.theme.section = section || undefined;
+      });
+    }
+    case "editor/theme/custom-css": {
+      const { custom } = <EditorThemeCustomCSSAction>action;
+      return produce(state, (draft) => {
+        draft.theme.customCSS = custom;
+      });
+    }
+    //
+
+    //
     case "editor/form/campaign/preferences": {
       const { type, ...pref } = <FormCampaignPreferencesAction>action;
       return produce(state, (draft) => {
@@ -338,22 +371,45 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
         };
       });
     }
-    case "editor/theme/section": {
-      const { section } = <EditorThemeSectionStyleAction>action;
+    case "editor/form/startpage/init": {
+      const { template: startpage } = <FormStartPageInitAction>action;
       return produce(state, (draft) => {
-        draft.theme.section = section || undefined;
+        const template_id = startpage.name;
+        draft.documents["form/startpage"] = {
+          template_id: template_id,
+          ...initDocumentEditorState({
+            editable: true,
+            document: {
+              root_id: "page",
+              nodes: {
+                ["page"]:
+                  grida.program.nodes.createTemplateInstanceNodeFromTemplateDefinition(
+                    "page",
+                    startpage
+                  ),
+              },
+            },
+            templates: {
+              [template_id]: startpage,
+            },
+          }),
+        };
       });
     }
-    case "editor/theme/custom-css": {
-      const { custom } = <EditorThemeCustomCSSAction>action;
+    case "editor/form/startpage/remove": {
       return produce(state, (draft) => {
-        draft.theme.customCSS = custom;
+        delete draft.documents["form/startpage"];
       });
     }
     //
 
     default:
       console.error("unhandled action by main editor reducer", action);
+      if (process.env.NODE_ENV === "development") {
+        throw new Error(
+          "unhandled action by main editor reducer. see console for details"
+        );
+      }
       return state;
   }
 }

@@ -1,12 +1,38 @@
+export function ScreenWindowRoot({ children }: React.PropsWithChildren<{}>) {
+  return (
+    <div className="relative h-dvh w-dvw max-w-screen-2xl mx-auto overflow-hidden">
+      {children}
+    </div>
+  );
+}
+
 export function ScreenRoot({ children }: React.PropsWithChildren<{}>) {
-  return <div className="h-dvh w-dvw overflow-hidden md:p-4">{children}</div>;
+  return (
+    <div className="@container/screen relative w-full h-full">
+      <div className="relative w-full h-full @lg/screen:p-4">{children}</div>
+    </div>
+  );
+}
+
+export function ScreenCenter({ children }: React.PropsWithChildren<{}>) {
+  return (
+    <div className="relative flex justify-center items-center h-full w-full md:rounded-md md:shadow-md overflow-hidden">
+      {children}
+    </div>
+  );
 }
 
 export function ScreenMobileFrame({ children }: React.PropsWithChildren<{}>) {
   return (
-    <main className="relative overflow-hidden md:container w-full h-full md:max-w-md mx-auto md:rounded-lg md:shadow-lg !p-0">
+    <main className="relative overflow-hidden @lg/screen:container w-full h-full @lg/screen:max-w-md mx-auto @lg/screen:rounded-lg @lg/screen:shadow-lg @lg/screen:border !p-0">
       {children}
     </main>
+  );
+}
+
+export function ScreenScrollable({ children }: React.PropsWithChildren<{}>) {
+  return (
+    <div className="relative overflow-y-scroll w-full h-full">{children}</div>
   );
 }
 
@@ -14,17 +40,34 @@ export function ScreenRootBackground({
   children,
 }: React.PropsWithChildren<{}>) {
   return (
-    <div className="fixed inset-0 w-full h-full -z-50 pointer-events-none select-none">
+    <div className="absolute inset-0 w-full h-full -z-50 pointer-events-none select-none">
       {children}
     </div>
   );
 }
 
-export function ScreenBackground({ children }: React.PropsWithChildren<{}>) {
+export function ScreenBackground({
+  children,
+  overlay,
+}: React.PropsWithChildren<{
+  overlay?: {
+    opacity?: number;
+  };
+}>) {
   return (
-    <div className="relative inset-0 w-full h-full -z-40 select-none">
-      {children}
-    </div>
+    <>
+      {overlay && (
+        <div
+          className="absolute inset-0 w-full h-full bg-background pointer-events-none select-none"
+          style={{
+            opacity: overlay.opacity,
+          }}
+        />
+      )}
+      <div className="absolute inset-0 w-full h-full -z-40 select-none pointer-events-none">
+        {children}
+      </div>
+    </>
   );
 }
 
@@ -73,11 +116,13 @@ export function ScreenGridPosition({
 export function ScreenGridArea({
   children,
   area,
+  zIndex,
 }: React.PropsWithChildren<{
   /**
    * [startRow, startCol, endRow, endCol]
    */
   area: [number, number, number, number];
+  zIndex?: number;
 }>) {
   const [startRow, startCol, endRow, endCol] = area;
   return (
@@ -86,6 +131,7 @@ export function ScreenGridArea({
       style={{
         gridColumn: `${startCol} / ${endCol}`,
         gridRow: `${startRow} / ${endRow}`,
+        zIndex: zIndex,
       }}
     >
       {children}

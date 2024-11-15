@@ -1,174 +1,180 @@
 "use client";
 
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import ReactDOM from "react-dom";
-import { cn } from "@/utils";
-import { useGesture } from "@use-gesture/react";
-import { useEditorState } from "@/scaffolds/editor";
+import React, { ReactNode, useMemo } from "react";
 import { TemplateComponents } from "@/builder/template-builder";
-import type {
-  TemplateValueProperties,
-  TemplateComponent,
-} from "./with-template";
-import type { Tokens } from "@/ast";
-import { useComputed } from "./use-computed";
-import { useValue } from "../core/data-context";
+import type { TemplateComponent } from "./with-template";
+import { grida } from "@/grida";
+import { TemplateBuilderWidgets } from "./widgets";
+import { useComputedNode, useDocument, useNode } from "../provider";
+import assert from "assert";
 
-interface SlotProps<P extends Record<string, any>> {
+interface NodeElementProps<P extends Record<string, any>> {
   node_id: string;
-  // templatePath
-  component: TemplateComponent<P>;
-  className?: string;
-  defaultText?: Tokens.StringValueExpression;
-  defaultProperties?: TemplateValueProperties<P, Tokens.StringValueExpression>;
-  defaultStyle?: React.CSSProperties;
+  component?: TemplateComponent;
+  style?: grida.program.css.ExplicitlySupportedCSSProperties;
+  zIndex?: number;
+  position?: "absolute" | "relative";
+  left?: number;
+  top?: number;
+  width?: grida.program.nodes.i.ICSSDimension["width"];
+  height?: grida.program.nodes.i.ICSSDimension["height"];
+  fill?: grida.program.cg.Paint;
 }
 
-export function SlotNode<P extends Record<string, any>>({
+export function NodeElement<P extends Record<string, any>>({
   node_id,
-  component,
-  defaultText,
-  defaultProperties,
-  defaultStyle,
-  className,
-  children,
-}: React.PropsWithChildren<SlotProps<P>>) {
-  const [state, dispatch] = useEditorState();
-  const [hovered, setHovered] = useState(false);
-  const overlayRef = useRef<HTMLDivElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  component: USER_COMPONENT,
+  children: USER_CHILDREN,
+  zIndex: DEFAULT_ZINDEX,
+  position: DEFAULT_POSITION,
+  left: DEFAULT_LEFT,
+  top: DEFAULT_TOP,
+  width: DEFAULT_WIDTH,
+  height: DEFAULT_HEIGHT,
+  fill: DEFAULT_FILL,
+  style,
+}: React.PropsWithChildren<NodeElementProps<P>>) {
+  const { state: document, selected_node_id } = useDocument();
 
-  const portal = document.getElementById("canvas-overlay-portal")!;
+  const node = useNode(node_id);
+  const computed = useComputedNode(node_id);
+  const selected = node_id === selected_node_id;
+  const hovered = node_id === document.hovered_node_id;
 
-  const {
-    document: { selected_node_id },
-  } = state;
+  const { component_id, children } = node;
 
-  const selected = !!selected_node_id && selected_node_id === node_id;
-
-  const { template_id, properties, style, attributes, text } =
-    state.document.templatedata[node_id] || {};
-
-  const renderer = template_id
-    ? TemplateComponents.components[template_id]
-    : component;
-
-  const componentschema = component.schema;
-
-  const context = useValue();
-  const computedProperties = useComputed({
-    ...defaultProperties,
-    ...properties,
-  });
-  const computedText = useComputed({ text: text ?? defaultText });
-
-  const props = {
-    text: computedText.text,
-    properties: computedProperties,
-    style: {
-      ...defaultStyle,
-      ...style,
-    },
-  };
-
-  const onSelect = useCallback(() => {
-    dispatch({
-      type: "editor/document/node/select",
-      node_id: node_id,
-      node_type: component.type,
-      // @ts-ignore TODO:
-      schema: componentschema,
-      default_properties: defaultProperties,
-      default_style: defaultStyle,
-      default_text: defaultText,
-      context,
-    });
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dispatch, node_id]);
-
-  // const child = React.Children.only(children);
-  // const childProps = (child as React.ReactElement).props;
-  // console.log("meta in Node", childProps.__type, childProps, children);
-
-  // console.log(component.schema);
-
-  const bind = useGesture(
-    {
-      onMouseEnter: ({ event }) => {
-        setHovered(true);
-      },
-      onMouseLeave: ({ event }) => {
-        setHovered(false);
-      },
-      onPointerDown: ({ event }) => {
-        event.stopPropagation();
-        onSelect();
-      },
-    },
-    {
-      eventOptions: {
-        capture: true,
-      },
+  const renderer = useMemo(() => {
+    switch (node.type) {
+      case "instance": {
+        return component_id
+          ? TemplateComponents.components[component_id]
+          : USER_COMPONENT;
+      }
+      case "template_instance": {
+        return USER_COMPONENT;
+      }
+      case "container":
+      case "image":
+      case "text":
+      case "svg":
+      case "rectangle":
+      case "ellipse": {
+        return TemplateBuilderWidgets[node.type];
+      }
+      default:
+        throw new Error(`Unknown node type: ${node.type}`);
     }
+
+    //
+  }, [USER_COMPONENT, component_id, node.type]);
+
+  assert(
+    !(children && USER_CHILDREN),
+    "NodeElement: children should not be provided when node has children"
   );
 
-  useEffect(() => {
-    if ((hovered || selected) && containerRef.current && overlayRef.current) {
-      const containerRect = containerRef.current.getBoundingClientRect();
-      const portalRect = portal.getBoundingClientRect();
-      const overlay = overlayRef.current;
+  const computedchildren: ReactNode | undefined = useMemo(() => {
+    return (
+      USER_CHILDREN ||
+      children?.map((child_id) => {
+        return <NodeElement key={child_id} node_id={child_id} />;
+      }) ||
+      undefined
+    );
+  }, [USER_CHILDREN, children]);
 
-      // Calculate the position of the target relative to the portal
-      const top = containerRect.top - portalRect.top;
-      const left = containerRect.left - portalRect.left;
-      const width = containerRect.width;
-      const height = containerRect.height;
+  const renderprops = {
+    text: computed.text,
+    props: computed.props,
+    src: computed.src,
+    svg: node.svg,
+    opacity: node.opacity,
+    zIndex: DEFAULT_ZINDEX ?? node.zIndex,
+    position: DEFAULT_POSITION ?? node.position,
+    left: DEFAULT_LEFT ?? node.left,
+    top: DEFAULT_TOP ?? node.top,
+    width: DEFAULT_WIDTH ?? node.width,
+    height: DEFAULT_HEIGHT ?? node.height,
+    fill: DEFAULT_FILL ?? node.fill,
+    style: {
+      ...style,
+      ...node.style,
+    },
+    // IPositionable (does not instrictly mean left and top)
+    // x: node.x,
+    // y: node.y,
+    // IDemension (does not instrictly mean width and height)
+    // width: node.width,
+    // height: node.height,
+    cornerRadius: node.cornerRadius,
+    // @ts-ignore
+  } satisfies
+    | grida.program.document.template.IUserDefinedTemplateNodeReactComponentRenderProps<P>
+    | grida.program.nodes.AnyNode;
 
-      overlay.style.position = "absolute";
-      overlay.style.top = `${top}px`;
-      overlay.style.left = `${left}px`;
-      overlay.style.width = `${width}px`;
-      overlay.style.height = `${height}px`;
-    }
-  }, [hovered, portal, selected]);
+  if (!node.active) return <></>;
+
+  const { opacity, zIndex, ...props } = renderprops;
 
   return (
-    <>
-      <div ref={containerRef} {...bind()}>
-        <div
-          {...(attributes || {})}
-          style={{
-            opacity: props.style?.opacity,
-          }}
-          className={cn(className)}
-        >
-          {/*  */}
-          {React.createElement(renderer, props, children)}
-        </div>
-      </div>
-      {(hovered || selected) && (
-        <>
-          {ReactDOM.createPortal(
-            <div
-              data-node-id={node_id}
-              data-selected={selected}
-              data-hovered={hovered}
-              ref={overlayRef}
-              className={cn(
-                "pointer-events-none select-none z-10 border-2 border-blue-500"
-              )}
-            />,
-            portal
-          )}
-        </>
+    <HrefWrapper href={computed.href} target={node.target}>
+      {React.createElement<any>(
+        // TODO: double check
+        // @ts-expect-error
+        renderer,
+        {
+          id: node_id,
+          ...props,
+          ...({
+            ["data-grida-node-id"]: node_id,
+            ["data-grida-node-type"]: node.type,
+            ["data-dev-editor-selected"]: selected,
+            ["data-dev-editor-hovered"]: hovered,
+          } satisfies grida.program.document.INodeHtmlDocumentQueryDataAttributes),
+          style: {
+            ...grida.program.css.toReactCSSProperties(node, {
+              fill: fillings[node.type],
+            }),
+            // hard override user-select
+            userSelect: document.editable ? "none" : undefined,
+          },
+        } satisfies grida.program.document.IComputedNodeReactRenderProps<any>,
+        computedchildren
       )}
-    </>
+    </HrefWrapper>
   );
+}
+
+const fillings = {
+  text: "color",
+  container: "background",
+  image: "background",
+  svg: "none",
+  rectangle: "none",
+  ellipse: "none",
+  template_instance: "none",
+  instance: "none",
+} as const;
+
+function HrefWrapper({
+  href,
+  target,
+  children,
+}: React.PropsWithChildren<{
+  href?: string;
+  target?: string;
+}>) {
+  const {
+    state: { editable },
+  } = useDocument();
+
+  // only render a tag on viewer mode
+  if (!editable && href) {
+    return (
+      <a href={href} target={target}>
+        {children}
+      </a>
+    );
+  }
+  return <>{children}</>;
 }

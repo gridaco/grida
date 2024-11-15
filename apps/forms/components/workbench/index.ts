@@ -4,7 +4,7 @@ export namespace WorkbenchUI {
   export const inputVariants = cva("rounded w-full", {
     variants: {
       variant: {
-        input: "shadow-sm",
+        input: "shadow-sm border border-input",
         container: "px-0 flex items-center gap-2",
       },
       size: {
