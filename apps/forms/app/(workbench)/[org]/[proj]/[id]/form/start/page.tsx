@@ -62,6 +62,7 @@ import { composeEditorDocumentAction } from "@/scaffolds/editor/action";
 import { BuilderAction } from "@/builder/action";
 import { DevtoolsPanel } from "@/builder/devtools";
 import { Badge } from "@/components/ui/badge";
+import { ArrowRightIcon } from "@radix-ui/react-icons";
 
 export default function FormStartEditPage() {
   const [state, dispatch] = useEditorState();
@@ -235,7 +236,7 @@ function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
 
   return (
     <Sheet {...props}>
-      <SheetContent className="flex flex-col xl:w-[800px] xl:max-w-none sm:w-[500px] sm:max-w-none w-screen max-w-none p-0">
+      <SheetContent className="flex flex-col xl:w-[600px] xl:max-w-none sm:w-[500px] sm:max-w-none w-screen max-w-none p-0">
         <SheetHeader className="p-4">
           <SheetTitle>Page Content</SheetTitle>
           <SheetDescription>
@@ -247,71 +248,80 @@ function PropertiesEditSheet({ ...props }: React.ComponentProps<typeof Sheet>) {
           <ScrollBar />
           <div className="px-4 grid gap-4">
             <div className="grid gap-2">
-              <Collapsible>
-                <CollapsibleTrigger>
-                  <Label>About This Campaign</Label>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Value</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      <TableRow>
-                        <TableCell>Scheduling</TableCell>
-                        <TableCell>
-                          {campaign.is_scheduling_enabled ? "ON" : "OFF"}
-                        </TableCell>
-                      </TableRow>
-                      {campaign.is_scheduling_enabled && (
-                        <>
+              <Card>
+                <Collapsible>
+                  <CollapsibleTrigger>
+                    <CardHeader>
+                      <Label>
+                        About This Campaign
+                        <ArrowRightIcon className="inline ms-2" />
+                      </Label>
+                    </CardHeader>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <CardContent>
+                      <Table>
+                        <TableHeader>
                           <TableRow>
-                            <TableCell>Scheduling Time Zone</TableCell>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Value</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          <TableRow>
+                            <TableCell>Scheduling</TableCell>
                             <TableCell>
-                              {campaign.scheduling_tz ?? "-"}
+                              {campaign.is_scheduling_enabled ? "ON" : "OFF"}
                             </TableCell>
                           </TableRow>
+                          {campaign.is_scheduling_enabled && (
+                            <>
+                              <TableRow>
+                                <TableCell>Scheduling Time Zone</TableCell>
+                                <TableCell>
+                                  {campaign.scheduling_tz ?? "-"}
+                                </TableCell>
+                              </TableRow>
+                              <TableRow>
+                                <TableCell>Scheduling Open At</TableCell>
+                                <TableCell>
+                                  {campaign.scheduling_open_at
+                                    ? new Date(
+                                        campaign.scheduling_open_at
+                                      ).toLocaleString()
+                                    : "-"}
+                                </TableCell>
+                              </TableRow>
+                              <TableRow>
+                                <TableCell>Scheduling Close At</TableCell>
+                                <TableCell>
+                                  {campaign.scheduling_close_at
+                                    ? new Date(
+                                        campaign.scheduling_close_at
+                                      ).toLocaleString()
+                                    : "-"}
+                                </TableCell>
+                              </TableRow>
+                              <TableRow>
+                                <TableCell>Max Responses in total</TableCell>
+                                <TableCell>
+                                  {campaign.max_form_responses_in_total ?? "∞"}
+                                </TableCell>
+                              </TableRow>
+                            </>
+                          )}
                           <TableRow>
-                            <TableCell>Scheduling Open At</TableCell>
+                            <TableCell>Max Responses by customer</TableCell>
                             <TableCell>
-                              {campaign.scheduling_open_at
-                                ? new Date(
-                                    campaign.scheduling_open_at
-                                  ).toLocaleString()
-                                : "-"}
+                              {campaign.max_form_responses_by_customer ?? "∞"}
                             </TableCell>
                           </TableRow>
-                          <TableRow>
-                            <TableCell>Scheduling Close At</TableCell>
-                            <TableCell>
-                              {campaign.scheduling_close_at
-                                ? new Date(
-                                    campaign.scheduling_close_at
-                                  ).toLocaleString()
-                                : "-"}
-                            </TableCell>
-                          </TableRow>
-                          <TableRow>
-                            <TableCell>Max Responses in total</TableCell>
-                            <TableCell>
-                              {campaign.max_form_responses_in_total ?? "∞"}
-                            </TableCell>
-                          </TableRow>
-                        </>
-                      )}
-                      <TableRow>
-                        <TableCell>Max Responses by customer</TableCell>
-                        <TableCell>
-                          {campaign.max_form_responses_by_customer ?? "∞"}
-                        </TableCell>
-                      </TableRow>
-                    </TableBody>
-                  </Table>
-                </CollapsibleContent>
-              </Collapsible>
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </CollapsibleContent>
+                </Collapsible>
+              </Card>
             </div>
             <div className="w-full grid gap-4">
               {keys.map((key) => {
@@ -378,6 +388,17 @@ function PropertyField({
   const { uploadPublic } = useDocumentAssetUpload();
 
   switch (definition.type) {
+    case "richtext": {
+      return (
+        <CMSRichText
+          value={value}
+          onValueChange={onValueChange}
+          placeholder={"Enter text here"}
+          autofocus={true}
+          disabled={false}
+        />
+      );
+    }
     case "string":
       return (
         <Input
@@ -394,10 +415,12 @@ function PropertyField({
       return (
         <CMSImageAssetField
           uploader={uploadPublic}
+          // TODO: currently, video and image fields accepts array value
           value={value as any}
-          onValueChange={(asset) => {
+          // TODO: currently, video and image fields accepts array value
+          onValueChange={(assets) => {
             // FIXME: match signature
-            onValueChange(asset);
+            onValueChange(assets);
           }}
         />
       );
@@ -405,12 +428,58 @@ function PropertyField({
       return (
         <CMSVideoAssetField
           uploader={uploadPublic}
+          // TODO: currently, video and image fields accepts array value
           value={value as any}
+          // TODO: currently, video and image fields accepts array value
           onValueChange={(asset) => {
             // FIXME: match signature
             onValueChange(asset);
           }}
         />
+      );
+    case "array": {
+      // TODO: we don't support array yet, it only supports 1 item
+      const t = definition.items.type;
+
+      if (t === "video" || t === "image") {
+        return (
+          <PropertyField
+            name={name}
+            definition={
+              {
+                ...definition,
+                type: t,
+              } as grida.program.schema.PropertyDefinition
+            }
+            // TODO: currently, video and image fields accepts array value
+            value={value}
+            // TODO: currently, video and image fields accepts array value
+            onValueChange={(v) => {
+              onValueChange(v);
+            }}
+          />
+        );
+      } else {
+        return (
+          <PropertyField
+            name={name}
+            definition={
+              {
+                ...definition,
+                type: t,
+              } as grida.program.schema.PropertyDefinition
+            }
+            value={value?.[0]}
+            onValueChange={(v) => {
+              onValueChange([v]);
+            }}
+          />
+        );
+      }
+    }
+    default:
+      return (
+        <Input disabled placeholder={`Unsupported type: ${definition.type}`} />
       );
   }
 }

@@ -4,7 +4,7 @@ import { ScreenWindowRoot } from "@/theme/templates/kit/components";
 export default function Page() {
   return (
     <ScreenWindowRoot>
-      <_005
+      {/* <_005
         meta={{
           max_form_responses_by_customer: 100,
           is_max_form_responses_by_customer_enabled: true,
@@ -17,7 +17,7 @@ export default function Page() {
         }}
         resources={_messages}
         lang={"ko"}
-      />
+      /> */}
     </ScreenWindowRoot>
   );
 }

@@ -1,21 +1,22 @@
 "use client";
 
-import React, { useCallback, useEffect } from "react";
-import { Block, BlockNoteEditor } from "@blocknote/core";
+import React, { useCallback } from "react";
 import { useDocumentAssetUpload } from "@/scaffolds/asset";
-import { useCreateBlockNote } from "@blocknote/react";
-import {
-  RichTextContent,
-  safeInitialContent,
-  schema,
-} from "@/components/richtext";
+import { MinimalTiptapEditor } from "@/kits/minimal-tiptap";
+import type { Content } from "@tiptap/react";
 
 export function CMSRichText({
-  defaultValue,
-  onContentChange,
+  value,
+  onValueChange,
+  placeholder,
+  autofocus,
+  disabled,
 }: {
-  defaultValue: any;
-  onContentChange: (editor: BlockNoteEditor<any>, content: Block[]) => void;
+  value: Content;
+  onValueChange?: (value: Content) => void;
+  placeholder?: string;
+  autofocus?: boolean;
+  disabled?: boolean;
 }) {
   const { uploadPublic } = useDocumentAssetUpload();
 
@@ -26,26 +27,22 @@ export function CMSRichText({
     [uploadPublic]
   );
 
-  const editor = useCreateBlockNote({
-    schema: schema,
-    initialContent: safeInitialContent(defaultValue),
-    uploadFile: uploadFile,
-    animations: false,
-  });
-
-  useEffect(() => {
-    const fn = () => {
-      const content = editor.document;
-      try {
-        onContentChange?.(editor, content);
-      } catch (e) {}
-    };
-    editor.onEditorContentChange(fn);
-  }, [editor, onContentChange]);
-
   return (
-    <div className="bg-card shadow-card rounded border">
-      <RichTextContent editor={editor} className="pt-10 pb-4" />
+    <div className="w-full max-w-full">
+      <MinimalTiptapEditor
+        value={value}
+        onChange={onValueChange}
+        className="w-full"
+        editorContentClassName="p-5"
+        output="html"
+        placeholder={placeholder}
+        shouldRerenderOnTransaction={false}
+        immediatelyRender={false}
+        autofocus={autofocus}
+        editable={!disabled}
+        uploader={uploadFile}
+        editorClassName="focus:outline-none prose"
+      />
     </div>
   );
 }

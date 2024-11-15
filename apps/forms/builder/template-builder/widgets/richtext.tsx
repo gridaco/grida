@@ -1,3 +1,8 @@
 export function RichTextWidget() {
-  return;
+  const __html = "";
+  return (
+    <article className="prose">
+      <div dangerouslySetInnerHTML={{ __html }} />
+    </article>
+  );
 }

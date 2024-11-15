@@ -32,12 +32,18 @@ import { DataProvider, useData } from "../../kit/contexts/data.context";
 import { useCTAContext } from "../../kit/contexts/cta.context";
 import { FileIO } from "@/lib/file";
 import type { grida } from "@/grida";
+import { Factory } from "@/ast";
+import { NodeElement } from "@/builder/template-builder/node";
+import { useComputed } from "@/builder/template-builder/use-computed";
 
 type Messages = typeof _messages;
 
 const userprops = {
   title: { type: "string", default: "[Your Title Goes Here.]" },
-  body_html: { type: "string", default: "" },
+  body: {
+    type: "richtext",
+    default: undefined,
+  },
   media: { type: "array", items: { type: "image" }, default: [] },
 } satisfies grida.program.document.template.TemplateDocumentDefinition["properties"];
 
@@ -90,20 +96,22 @@ function Consumer() {
         <ScreenScrollable>
           <div className="min-h-full">
             <div>
-              <Media assets={data.media} />
+              <Media />
             </div>
             <div className="pt-5">
               <header className="flex flex-col items-center gap-4 px-4">
                 <div className="w-full text-start">
                   <h1 className="text-2xl font-bold w-4/5">
-                    {data.title || t("title")}
+                    <NodeElement node_id="005.title" />
+                    {/* {data.title || t("title")} */}
                   </h1>
                 </div>
                 <NextEventState className="py-4" />
               </header>
-              <article className="py-10 px-4 prose prose-sm dark:prose-invert prose-img:w-screen">
+              <Article />
+              {/* <article className="py-10 px-4 prose prose-sm dark:prose-invert prose-img:w-screen">
                 <div dangerouslySetInnerHTML={bodyHtml} />
-              </article>
+              </article> */}
             </div>
           </div>
           <CTAFooter />
@@ -113,22 +121,49 @@ function Consumer() {
   );
 }
 
-function Media({ assets }: { assets: FileIO.GridaAsset[] }) {
+function Article() {
+  const props = useComputed({
+    __html: Factory.createPropertyAccessExpression(["props", "body"]),
+  });
+
+  const { __html } = props;
+
+  return (
+    <article className="py-10 px-4 prose prose-sm dark:prose-invert prose-img:w-screen">
+      <div dangerouslySetInnerHTML={{ __html }} />
+    </article>
+  );
+}
+
+function Media() {
+  const props = useComputed({
+    media: Factory.createPropertyAccessExpression(["props", "media"]),
+  });
+
+  // TODO: fixme - wrong type
+  const media = props.media as any as FileIO.GridaAsset[];
+  // grida.program.objects.ImageSource
+
+  console.log("media", media);
+
   return (
     <Carousel opts={{ loop: true }} plugins={[Autoplay()]}>
       <CarouselContent className="m-0">
-        {assets?.length > 0 &&
-          assets?.map((it, index) => (
-            <CarouselItem key={index} className="p-0">
-              <img
-                src={it.publicUrl}
-                alt=""
-                width={300}
-                height={300}
-                className="w-full h-full aspect-square object-cover"
-              />
-            </CarouselItem>
-          ))}
+        {media?.length > 0 &&
+          media?.map((it, index) => {
+            console.log("it", it);
+            return (
+              <CarouselItem key={index} className="p-0">
+                <img
+                  src={it.publicUrl}
+                  alt=""
+                  width={300}
+                  height={300}
+                  className="w-full h-full aspect-square object-cover"
+                />
+              </CarouselItem>
+            );
+          })}
       </CarouselContent>
     </Carousel>
   );
@@ -294,10 +329,39 @@ _005.definition = {
   name: "005",
   properties: userprops,
   version: "1.0.0",
-  default: {
-    title: "Enter Title",
-    subtitle: "Enter Subtitle",
-    background: "/images/abstract-placeholder.jpg",
+  default: {},
+  nodes: {
+    "005.title": {
+      type: "text",
+      id: "005.title",
+      name: "Title",
+      active: true,
+      locked: false,
+      opacity: 1,
+      position: "relative",
+      style: {},
+      width: "auto",
+      height: "auto",
+      text: Factory.createPropertyAccessExpression(["props", "title"]),
+      zIndex: 0,
+    },
+    "005.body": {
+      id: "005.body",
+      type: "text",
+      active: true,
+      locked: false,
+      name: "Body",
+      opacity: 1,
+      position: "relative",
+      style: {},
+      width: "auto",
+      height: "auto",
+      text: Factory.createPropertyAccessExpression(["props", "body"]),
+      zIndex: 0,
+    },
+    // "005.media": {
+    //   id: "005.media",
+    //   active: true,
+    // },
   },
-  nodes: {},
 } satisfies grida.program.document.template.TemplateDocumentDefinition;

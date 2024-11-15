@@ -95,6 +95,7 @@ export namespace grida {
     export namespace objects {
       export type ObjectType = Object["type"];
       export type ObjectTypeMap = {
+        richtext: Richtext;
         video: VideoSource;
         audio: AudioSource;
         image: ImageSource;
@@ -103,7 +104,12 @@ export namespace grida {
         facebook: FacebookVideoSource;
       };
 
-      export type Object = Source | VideoPlayerSource;
+      export type Object = Richtext | Source | VideoPlayerSource;
+
+      export type Richtext = {
+        type: "richtext";
+        html: string;
+      };
 
       export type Source = ImageSource | VideoSource | AudioSource;
 
