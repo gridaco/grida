@@ -220,6 +220,20 @@ interface INodeChangeFitAction extends INodeID {
   fit: grida.program.cg.BoxFit;
 }
 
+interface ITextNodeChangeFontFamilyAction extends INodeID {
+  fontFamily: string | undefined;
+}
+
+interface ITextNodeChangeFontWeightAction extends INodeID {
+  fontWeight: grida.program.cg.NFontWeight;
+}
+interface ITextNodeChangeFontSizeAction extends INodeID {
+  fontSize: number;
+}
+interface ITextNodeChangeTextAlignAction extends INodeID {
+  textAlign: grida.program.cg.TextAign;
+}
+
 interface INodeChangeStyleAction extends INodeID {
   style: Partial<React.CSSProperties>;
 }
@@ -254,6 +268,12 @@ export type NodeChangeAction =
   | ({ type: "node/change/cornerRadius" } & INodeChangeCornerRadiusAction)
   | ({ type: "node/change/fill" } & INodeChangeFillAction)
   | ({ type: "node/change/fit" } & INodeChangeFitAction)
+  //
+  | ({ type: "node/change/fontFamily" } & ITextNodeChangeFontFamilyAction)
+  | ({ type: "node/change/fontWeight" } & ITextNodeChangeFontWeightAction)
+  | ({ type: "node/change/fontSize" } & ITextNodeChangeFontSizeAction)
+  | ({ type: "node/change/textAlign" } & ITextNodeChangeTextAlignAction)
+  //
   | ({ type: "node/change/style" } & INodeChangeStyleAction)
   | ({ type: "node/change/src" } & INodeChangeSrcAction)
   | ({ type: "node/change/href" } & INodeChangeHrefAction)

@@ -13,7 +13,7 @@ export function FontSizeControl({
   onValueChange,
 }: {
   value?: number;
-  onValueChange?: (value?: number) => void;
+  onValueChange?: (value: number) => void;
 }) {
   return (
     <Input
@@ -24,7 +24,7 @@ export function FontSizeControl({
       step={1}
       className={WorkbenchUI.inputVariants({ size: "sm" })}
       onChange={(e) => {
-        onValueChange?.(parseInt(e.target.value) || undefined);
+        onValueChange?.(parseInt(e.target.value) || 1);
       }}
     />
     // <Select>

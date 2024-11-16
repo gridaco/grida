@@ -512,12 +512,12 @@ export namespace grida {
         // | "top"
         // | "left"
         //
-        | "fontWeight"
-        | "fontFamily"
-        | "fontSize"
-        | "lineHeight"
-        | "textAlign"
-        | "textTransform"
+        // | "fontWeight"
+        // | "fontFamily"
+        // | "fontSize"
+        // | "lineHeight"
+        // | "textAlign"
+        // | "textTransform"
         //
         | "boxShadow"
         //
@@ -541,7 +541,8 @@ export namespace grida {
       export function toReactCSSProperties(
         styles: nodes.i.ICSSStylable &
           Partial<nodes.i.IRectangleCorner> &
-          Partial<nodes.i.IBoxFit>,
+          Partial<nodes.i.IBoxFit> &
+          Partial<nodes.i.ITextNodeStyle>,
         config: {
           fill: "color" | "background" | "fill" | "none";
         }
@@ -560,6 +561,13 @@ export namespace grida {
           fill,
           fit,
           cornerRadius: __,
+          //
+          textAlign,
+          textDecoration,
+          fontFamily,
+          fontSize,
+          fontWeight,
+          //
           style,
         } = styles;
         const without_fill = {
@@ -574,6 +582,13 @@ export namespace grida {
           opacity: opacity,
           objectFit: fit,
           rotate: rotation ? `${rotation}deg` : undefined,
+          //
+          textAlign: textAlign,
+          textDecoration: textDecoration,
+          fontFamily: fontFamily,
+          fontSize: fontSize,
+          fontWeight: fontWeight,
+          //
           ...style,
         } satisfies React.CSSProperties;
 
@@ -705,6 +720,44 @@ export namespace grida {
        * @see https://developer.mozilla.org/en-US/docs/Web/CSS/object-fit
        */
       export type BoxFit = "contain" | "cover" | "none";
+
+      /**
+       *
+       * Supported text decoration modes
+       *
+       * Only `underline` and `none` are supported in the current version.
+       *
+       * @see https://api.flutter.dev/flutter/dart-ui/TextDecoration-class.html
+       * @see https://developer.mozilla.org/en-US/docs/Web/CSS/text-decoration
+       */
+      export type TextDecoration = "none" | "underline";
+
+      /**
+       * Supported text align modes
+       *
+       * Does not support `start` and `end` as they are not supported in the current version.
+       *
+       * @see https://developer.mozilla.org/en-US/docs/Web/CSS/text-align
+       * @see https://api.flutter.dev/flutter/dart-ui/TextAlign.html
+       */
+      export type TextAign = "left" | "right" | "center" | "justify";
+
+      /**
+       * Supported font weights in numeric values
+       * @see https://developer.mozilla.org/en-US/docs/Web/CSS/font-weight
+       * @see https://api.flutter.dev/flutter/dart-ui/FontWeight-class.html
+       * @see https://learn.microsoft.com/en-us/typography/opentype/spec/os2#usweightclass
+       */
+      export type NFontWeight =
+        | 100
+        | 200
+        | 300
+        | 400
+        | 500
+        | 600
+        | 700
+        | 800
+        | 900;
 
       export type Paint =
         | SolidPaint
@@ -1009,6 +1062,27 @@ export namespace grida {
           rotation?: number;
         }
 
+        /**
+         * Text Style
+         *
+         * a set of properties that can be either applied to a text or textspan
+         */
+        export interface ITextStyle {
+          textDecoration: cg.TextDecoration;
+          fontFamily?: string;
+          fontSize: number;
+          fontWeight: cg.NFontWeight;
+        }
+
+        /**
+         * Text Node Style
+         *
+         * a set of properties that can be applied to a text node, but not to a textspan
+         */
+        export interface ITextNodeStyle extends ITextStyle {
+          textAlign: cg.TextAign;
+        }
+
         export interface ITextValue {
           /**
            * text value
@@ -1058,6 +1132,7 @@ export namespace grida {
           i.ISceneNode,
           i.ICSSStylable,
           i.IHrefable,
+          i.ITextNodeStyle,
           i.ITextValue {
         readonly type: "text";
         // textAutoResize: "none" | "width" | "height" | "auto";

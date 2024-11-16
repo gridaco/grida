@@ -2,6 +2,10 @@
 import React, { useEffect, useState } from "react";
 import { fonts as defaultFonts, GoogleFontsFontInfo } from "./data.min";
 
+/**
+ * @see https://developers.google.com/fonts/docs/getting_started
+ * @returns
+ */
 function csslink({ fontFamily }: { fontFamily: string }) {
   return `https://fonts.googleapis.com/css2?family=${fontFamily!.replace(
     " ",
@@ -32,9 +36,14 @@ function csslink({ fontFamily }: { fontFamily: string }) {
 //   const { fonts } = React.useContext(GoogleFontsProviderContext);
 // }
 
-function injectGoogleFontsLink(fontFamily: string) {
+function injectGoogleFontsLink(fontFamily: string): HTMLLinkElement {
+  const fontId = `gfm-${fontFamily.replace(/\s+/g, "-")}`;
+  const existing = document.getElementById(fontId);
+  if (existing) return existing as HTMLLinkElement;
+
   // Load the font dynamically using the Google Fonts API
   const link = document.createElement("link");
+  link.id = fontId;
   link.href = csslink({ fontFamily });
   link.rel = "stylesheet";
   document.head.appendChild(link);

@@ -72,10 +72,12 @@ export default function FormCollectionPage() {
                   //   "listheader",
                   //   "text",
                   // ])}
-                  style={{
-                    fontSize: 24,
-                    fontWeight: 700,
-                  }}
+                  style={
+                    {
+                      // fontSize: 24,
+                      // fontWeight: 700,
+                    }
+                  }
                 />
                 <div className="py-2">
                   <Filter tags={props.tags as any as string[]} />

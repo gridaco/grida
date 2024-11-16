@@ -44,7 +44,10 @@ export function FontFamilyControl({
   return (
     <Select value={value} onValueChange={onValueChange}>
       <SelectTrigger className={WorkbenchUI.inputVariants({ size: "sm" })}>
-        <SelectValue className="overflow-hidden text-ellipsis" />
+        <SelectValue
+          placeholder="Select"
+          className="overflow-hidden text-ellipsis"
+        />
       </SelectTrigger>
       <SelectContent>
         <SelectItem value="inherit">Default</SelectItem>
