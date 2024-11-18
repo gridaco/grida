@@ -320,12 +320,27 @@ export default function reducer<S extends IDocumentEditorState>(
     case "node/change/fill":
     case "node/change/fit":
     case "node/change/style":
+    case "node/change/fontSize":
+    case "node/change/fontWeight":
+    case "node/change/textAlign":
     case "node/change/text": {
       const { node_id } = <NodeChangeAction>action;
       return produce(state, (draft) => {
         const node = documentquery.__getNodeById(draft, node_id);
         assert(node, `node not found with node_id: "${node_id}"`);
         draft.document.nodes[node_id] = nodeReducer(node, action);
+      });
+    }
+    case "node/change/fontFamily": {
+      const { node_id } = <NodeChangeAction>action;
+      return produce(state, (draft) => {
+        const node = documentquery.__getNodeById(draft, node_id);
+        assert(node, `node not found with node_id: "${node_id}"`);
+        draft.document.nodes[node_id] = nodeReducer(node, action);
+
+        if (action.fontFamily) {
+          draft.googlefonts.push({ family: action.fontFamily });
+        }
       });
     }
     case "document/template/override/change/*": {
@@ -624,6 +639,32 @@ function nodeReducer<N extends Partial<grida.program.nodes.Node>>(
         assert(draft.type === "text");
         draft.text = action.text ?? null;
         break;
+      }
+      case "node/change/fontFamily": {
+        assert(draft.type === "text");
+        draft.fontFamily = action.fontFamily;
+        break;
+      }
+      case "node/change/fontSize": {
+        assert(draft.type === "text");
+        draft.fontSize = action.fontSize;
+        break;
+      }
+      case "node/change/fontWeight": {
+        assert(draft.type === "text");
+        draft.fontWeight = action.fontWeight;
+        break;
+      }
+      case "node/change/textAlign": {
+        assert(draft.type === "text");
+        draft.textAlign = action.textAlign;
+        break;
+      }
+
+      default: {
+        throw new Error(
+          `unknown action type: "${(action as NodeChangeAction).type as string}"`
+        );
       }
     }
   });

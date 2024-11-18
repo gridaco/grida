@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useReducer } from "react";
+import React, { useEffect, useReducer } from "react";
 import {
   SidebarRoot,
   SidebarSection,
@@ -28,12 +28,15 @@ import {
 import { useRouter } from "next/navigation";
 import { GridaLogo } from "@/components/grida-logo";
 import { DevtoolsPanel } from "@/builder/devtools";
+import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
+import { useGoogleFontsList } from "@/builder/google.fonts";
 
 export default function CanvasPlaygroundPage({
   params,
 }: {
   params: { slug: string };
 }) {
+  const fonts = useGoogleFontsList();
   const slug = params.slug;
   const [state, dispatch] = useReducer(
     standaloneDocumentReducer,
@@ -83,7 +86,9 @@ export default function CanvasPlaygroundPage({
           </div>
           <aside className="h-full">
             <SidebarRoot side="right">
-              {state.selected_node_id && <SelectedNodeProperties />}
+              <FontFamilyListProvider fonts={fonts}>
+                {state.selected_node_id && <SelectedNodeProperties />}
+              </FontFamilyListProvider>
             </SidebarRoot>
           </aside>
         </div>

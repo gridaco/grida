@@ -1,5 +1,5 @@
 interface FontFamilyInfo {
-  name: string;
+  family: string;
   provider: "fonts.google.com";
 }
 
@@ -8,47 +8,47 @@ interface FontFamilyInfo {
  */
 export const fonts: FontFamilyInfo[] = [
   {
-    name: "Inter",
+    family: "Inter",
     provider: "fonts.google.com",
   },
   {
-    name: "Lora",
+    family: "Lora",
     provider: "fonts.google.com",
   },
   {
-    name: "Inconsolata",
+    family: "Inconsolata",
     provider: "fonts.google.com",
   },
   {
-    name: "Roboto",
+    family: "Roboto",
     provider: "fonts.google.com",
   },
   {
-    name: "Geologica",
+    family: "Geologica",
     provider: "fonts.google.com",
   },
   {
-    name: "Instrument Sans",
+    family: "Instrument Sans",
     provider: "fonts.google.com",
   },
   {
-    name: "Caprasimo",
+    family: "Caprasimo",
     provider: "fonts.google.com",
   },
   {
-    name: "Sansita One",
+    family: "Sansita One",
     provider: "fonts.google.com",
   },
   {
-    name: "Krona One",
+    family: "Krona One",
     provider: "fonts.google.com",
   },
   {
-    name: "Pretendard",
+    family: "Pretendard",
     provider: "fonts.google.com",
   },
   {
-    name: "Nanum Myeongjo",
+    family: "Nanum Myeongjo",
     provider: "fonts.google.com",
   },
 ];

@@ -22,6 +22,7 @@ import {
 } from "@/grida/react-runtime/data-context/context";
 import assert from "assert";
 import { documentquery } from "./document-query";
+import { GoogleFontsManager } from "./components/google-fonts";
 
 type Vector2 = [number, number];
 
@@ -64,11 +65,26 @@ export function StandaloneDocumentEditor({
       <DocumentDispatcherContext.Provider value={__dispatch}>
         <ProgramDataContextHost>
           <DataProvider data={{ props: shallowRootProps }}>
-            {children}
+            <EditorGoogleFontsManager>
+              {/*  */}
+              {children}
+            </EditorGoogleFontsManager>
           </DataProvider>
         </ProgramDataContextHost>
       </DocumentDispatcherContext.Provider>
     </DocumentContext.Provider>
+  );
+}
+
+function EditorGoogleFontsManager({ children }: React.PropsWithChildren<{}>) {
+  const { state } = useDocument();
+
+  const fonts = state.googlefonts;
+
+  return (
+    <GoogleFontsManager stylesheets fonts={fonts}>
+      {children}
+    </GoogleFontsManager>
   );
 }
 
@@ -359,6 +375,61 @@ export function useDocument() {
     [dispatch]
   );
 
+  // text style
+  const changeTextNodeFontFamily = useCallback(
+    (node_id: string, fontFamily: string | undefined) => {
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/fontFamily",
+          node_id: node_id,
+          fontFamily,
+        });
+      });
+    },
+    [dispatch]
+  );
+
+  const changeTextNodeFontWeight = useCallback(
+    (node_id: string, fontWeight: grida.program.cg.NFontWeight) => {
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/fontWeight",
+          node_id: node_id,
+          fontWeight,
+        });
+      });
+    },
+    [dispatch]
+  );
+
+  const changeTextNodeFontSize = useCallback(
+    (node_id: string, fontSize: number) => {
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/fontSize",
+          node_id: node_id,
+          fontSize,
+        });
+      });
+    },
+    [dispatch]
+  );
+
+  const changeTextNodeTextAlign = useCallback(
+    (node_id: string, textAlign: grida.program.cg.TextAign) => {
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/textAlign",
+          node_id: node_id,
+          textAlign,
+        });
+      });
+    },
+    [dispatch]
+  );
+
+  //
+
   const changeNodeStyle = useCallback(
     (
       node_id: string,
@@ -430,17 +501,19 @@ export function useDocument() {
       opacity: (value: number) => changeNodeOpacity(selected_node_id!, value),
       rotation: (value: number) => changeNodeRotation(selected_node_id!, value),
 
-      // style
+      // text style
       fontFamily: (value: string) =>
-        changeNodeStyle(selected_node_id!, "fontFamily", value),
-      fontWeight: (value: number) =>
-        changeNodeStyle(selected_node_id!, "fontWeight", value),
-      fontSize: (value?: number) =>
-        changeNodeStyle(selected_node_id!, "fontSize", value),
-      textAlign: (value: string) =>
-        changeNodeStyle(selected_node_id!, "textAlign", value),
+        changeTextNodeFontFamily(selected_node_id!, value),
+      fontWeight: (value: grida.program.cg.NFontWeight) =>
+        changeTextNodeFontWeight(selected_node_id!, value),
+      fontSize: (value: number) =>
+        changeTextNodeFontSize(selected_node_id!, value),
+      textAlign: (value: grida.program.cg.TextAign) =>
+        changeTextNodeTextAlign(selected_node_id!, value),
       // textColor: (value: grida.program.css.RGBA) =>
       // changeNodeStyle(selected_node_id!, "textColor", value),
+
+      // css style
       margin: (value?: number) =>
         changeNodeStyle(selected_node_id!, "margin", value),
       padding: (value?: number) =>

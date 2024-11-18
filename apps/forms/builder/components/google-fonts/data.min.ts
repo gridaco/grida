@@ -1,39 +1,39 @@
 export interface GoogleFontsFontInfo {
-  name: string;
+  family: string;
 }
 
 export const fonts: GoogleFontsFontInfo[] = [
   {
-    name: "Inter",
+    family: "Inter",
   },
   {
-    name: "Lora",
+    family: "Lora",
   },
   {
-    name: "Inconsolata",
+    family: "Inconsolata",
   },
   {
-    name: "Roboto",
+    family: "Roboto",
   },
   {
-    name: "Geologica",
+    family: "Geologica",
   },
   {
-    name: "Instrument Sans",
+    family: "Instrument Sans",
   },
   {
-    name: "Caprasimo",
+    family: "Caprasimo",
   },
   {
-    name: "Sansita One",
+    family: "Sansita One",
   },
   {
-    name: "Krona One",
+    family: "Krona One",
   },
   {
-    name: "Pretendard",
+    family: "Pretendard",
   },
   {
-    name: "Nanum Myeongjo",
+    family: "Nanum Myeongjo",
   },
 ];

@@ -237,11 +237,11 @@ export default {
       width: 360,
       height: "auto",
       fill: { type: "solid", color: { r: 0, g: 0, b: 0, a: 1 } },
-      style: {
-        fontSize: 32,
-        fontWeight: 500,
-        textAlign: "center",
-      },
+      fontSize: 32,
+      fontWeight: 500,
+      textAlign: "center",
+      textDecoration: "none",
+      style: {},
     },
     p: {
       id: "p",
@@ -258,11 +258,11 @@ export default {
       width: 560,
       height: "auto",
       fill: { type: "solid", color: { r: 0, g: 0, b: 0, a: 0.8 } },
-      style: {
-        fontSize: 13,
-        fontWeight: 400,
-        textAlign: "center",
-      },
+      fontSize: 13,
+      fontWeight: 400,
+      textAlign: "center",
+      textDecoration: "none",
+      style: {},
     },
   },
 } satisfies grida.program.document.IDocumentDefinition;

@@ -78,6 +78,10 @@ export function SelectedNodeProperties() {
     right,
     bottom,
     fit,
+    fontFamily,
+    fontWeight,
+    fontSize,
+    textAlign,
   } = node;
 
   // const istemplate = type?.startsWith("templates/");
@@ -90,10 +94,6 @@ export function SelectedNodeProperties() {
   const is_stylable = type !== "template_instance";
 
   const {
-    fontFamily,
-    fontWeight,
-    fontSize,
-    textAlign,
     //
     boxShadow,
     //
