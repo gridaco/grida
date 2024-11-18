@@ -73,6 +73,10 @@ interface IDocumentEditorConfig {
   editable: boolean;
 }
 
+interface IDocumentGoogleFontsState {
+  googlefonts: { family: string }[];
+}
+
 export interface IDocumentEditorInit
   extends IDocumentEditorConfig,
     grida.program.document.IDocumentTemplatesRepository {
@@ -82,18 +86,46 @@ export interface IDocumentEditorInit
 export interface IDocumentEditorState
   extends IDocumentEditorConfig,
     IDocumentEditorInteractionCursorState,
+    IDocumentGoogleFontsState,
     grida.program.document.IDocumentTemplatesRepository,
     grida.program.document.internal.IDocumentEditorState {}
 
 export function initDocumentEditorState({
   ...init
 }: IDocumentEditorInit): IDocumentEditorState {
+  const s = new DocumentState(init);
+
   return {
-    ...init,
     cursor_position: { x: 0, y: 0 },
     document_ctx:
       grida.program.document.internal.createDocumentDefinitionRuntimeHierarchyContext(
         init.document
       ),
+    googlefonts: s.fonts().map((family) => ({ family })),
+    ...init,
   };
+}
+
+class DocumentState {
+  constructor(private readonly init: IDocumentEditorInit) {}
+
+  private get nodes(): grida.program.document.IDocumentNodesRepository["nodes"] {
+    return this.init.document.nodes;
+  }
+
+  private get nodeids(): Array<string> {
+    return Object.keys(this.nodes);
+  }
+
+  textnodes(): Array<grida.program.nodes.TextNode> {
+    return this.nodeids
+      .map((id) => this.nodes[id])
+      .filter((node) => node.type === "text") as grida.program.nodes.TextNode[];
+  }
+
+  fonts(): Array<string> {
+    return this.textnodes()
+      .map((node) => node.fontFamily)
+      .filter(Boolean) as Array<string>;
+  }
 }

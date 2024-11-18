@@ -1,17 +1,16 @@
 import { GoogleFontsPreview } from "@/builder/components/google-fonts";
 import { fonts } from "@/builder/k/fonts.min";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  ItemRendererProps,
+  VirtualizedCombobox,
+} from "@/components/ui/virtualized-combobox";
 import { WorkbenchUI } from "@/components/workbench";
-import React, { createContext, useEffect, useState } from "react";
+import { cn } from "@/utils";
+import { CheckIcon } from "@radix-ui/react-icons";
+import React, { createContext } from "react";
 
 interface FontFamilyInfo {
-  name: string;
+  family: string;
   provider: "fonts.google.com";
 }
 
@@ -32,6 +31,20 @@ function useFontFamilyList() {
   return React.useContext(FontFamilyListContext);
 }
 
+function Item({ option, selected }: ItemRendererProps) {
+  return (
+    <>
+      <CheckIcon
+        className={cn(
+          "mr-2 h-4 w-4 min-w-4",
+          selected ? "opacity-100" : "opacity-0"
+        )}
+      />
+      <GoogleFontsPreview fontFamily={option.value} className="h-3" />
+    </>
+  );
+}
+
 export function FontFamilyControl({
   value,
   onValueChange,
@@ -42,23 +55,18 @@ export function FontFamilyControl({
   const list = useFontFamilyList();
 
   return (
-    <Select value={value} onValueChange={onValueChange}>
-      <SelectTrigger className={WorkbenchUI.inputVariants({ size: "sm" })}>
-        <SelectValue
-          placeholder="Select"
-          className="overflow-hidden text-ellipsis"
-        />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="inherit">Default</SelectItem>
-        {list.map((font) => (
-          <SelectItem key={font.name} value={font.name}>
-            <GoogleFontsPreview fontFamily={font.name}>
-              {font.name}
-            </GoogleFontsPreview>
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <VirtualizedCombobox
+      value={value}
+      onValueChange={onValueChange}
+      renderer={Item}
+      options={list.map((i) => i.family)}
+      width={320}
+      side="right"
+      align="start"
+      className={cn(
+        "overflow-hidden",
+        WorkbenchUI.inputVariants({ size: "sm" })
+      )}
+    />
   );
 }

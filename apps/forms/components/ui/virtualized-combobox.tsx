@@ -46,7 +46,10 @@ function DefaultRenderer({
   return (
     <>
       <CheckIcon
-        className={cn("mr-2 h-4 w-4", selected ? "opacity-100" : "opacity-0")}
+        className={cn(
+          "mr-2 h-4 w-4 min-w-4",
+          selected ? "opacity-100" : "opacity-0"
+        )}
       />
       {option.label}
     </>

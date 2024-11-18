@@ -22,6 +22,7 @@ import {
 } from "@/grida/react-runtime/data-context/context";
 import assert from "assert";
 import { documentquery } from "./document-query";
+import { GoogleFontsManager } from "./components/google-fonts";
 
 type Vector2 = [number, number];
 
@@ -64,11 +65,26 @@ export function StandaloneDocumentEditor({
       <DocumentDispatcherContext.Provider value={__dispatch}>
         <ProgramDataContextHost>
           <DataProvider data={{ props: shallowRootProps }}>
-            {children}
+            <EditorGoogleFontsManager>
+              {/*  */}
+              {children}
+            </EditorGoogleFontsManager>
           </DataProvider>
         </ProgramDataContextHost>
       </DocumentDispatcherContext.Provider>
     </DocumentContext.Provider>
+  );
+}
+
+function EditorGoogleFontsManager({ children }: React.PropsWithChildren<{}>) {
+  const { state } = useDocument();
+
+  const fonts = state.googlefonts;
+
+  return (
+    <GoogleFontsManager stylesheets fonts={fonts}>
+      {children}
+    </GoogleFontsManager>
   );
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useReducer } from "react";
+import React, { useEffect, useReducer } from "react";
 import {
   SidebarRoot,
   SidebarSection,
@@ -28,12 +28,42 @@ import {
 import { useRouter } from "next/navigation";
 import { GridaLogo } from "@/components/grida-logo";
 import { DevtoolsPanel } from "@/builder/devtools";
+import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
+
+type GoogleFontsV2Response = {
+  [key: string]: {
+    family: string;
+    weights: number[];
+    styles: string[];
+  };
+};
+
+function useGoogleFontsList() {
+  const [fonts, setFonts] = React.useState<any[]>([]);
+  useEffect(() => {
+    fetch(
+      "https://s3.us-west-1.amazonaws.com/google.fonts/google-fonts-v2.min.json"
+    )
+      .then((r) => r.json() as Promise<GoogleFontsV2Response>)
+      .then((d) => {
+        d &&
+          setFonts(
+            Object.values(d)
+            // load only the first 100 fonts
+            // Object.values(d).slice(0, 100)
+          );
+      });
+  }, []);
+
+  return fonts;
+}
 
 export default function CanvasPlaygroundPage({
   params,
 }: {
   params: { slug: string };
 }) {
+  const fonts = useGoogleFontsList();
   const slug = params.slug;
   const [state, dispatch] = useReducer(
     standaloneDocumentReducer,
@@ -83,7 +113,9 @@ export default function CanvasPlaygroundPage({
           </div>
           <aside className="h-full">
             <SidebarRoot side="right">
-              {state.selected_node_id && <SelectedNodeProperties />}
+              <FontFamilyListProvider fonts={fonts}>
+                {state.selected_node_id && <SelectedNodeProperties />}
+              </FontFamilyListProvider>
             </SidebarRoot>
           </aside>
         </div>
