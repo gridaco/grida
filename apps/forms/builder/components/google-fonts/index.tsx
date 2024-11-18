@@ -2,35 +2,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { GoogleFontsFontInfo } from "./data.min";
 import { cn } from "@/utils";
-
-/**
- * converts google font family to id
- *
- * @example
- * - fontFamilyToId("Roboto") // "roboto"
- * - fontFamilyToId("Open Sans") // "open-sans"
- *
- * @param fontFamily
- * @returns
- */
-function fontFamilyToId(fontFamily: string) {
-  return fontFamily.toLowerCase().replace(/\s+/g, "-");
-}
-
-/**
- * @see https://developers.google.com/fonts/docs/getting_started
- * @returns
- */
-function csslink({ fontFamily }: { fontFamily: string }) {
-  return `https://fonts.googleapis.com/css2?family=${fontFamily!.replace(
-    " ",
-    "+"
-  )}&display=swap`;
-}
-
-function svglink(id: string) {
-  return `https://s3.us-west-1.amazonaws.com/google.fonts/${id}.svg`;
-}
+import { csslink, fontFamilyToId, svglink } from "@/builder/google.fonts";
 
 const GoogleFontsManagerProviderContext = React.createContext<{
   fonts: GoogleFontsFontInfo[];

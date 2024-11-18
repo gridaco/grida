@@ -29,34 +29,7 @@ import { useRouter } from "next/navigation";
 import { GridaLogo } from "@/components/grida-logo";
 import { DevtoolsPanel } from "@/builder/devtools";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
-
-type GoogleFontsV2Response = {
-  [key: string]: {
-    family: string;
-    weights: number[];
-    styles: string[];
-  };
-};
-
-function useGoogleFontsList() {
-  const [fonts, setFonts] = React.useState<any[]>([]);
-  useEffect(() => {
-    fetch(
-      "https://s3.us-west-1.amazonaws.com/google.fonts/google-fonts-v2.min.json"
-    )
-      .then((r) => r.json() as Promise<GoogleFontsV2Response>)
-      .then((d) => {
-        d &&
-          setFonts(
-            Object.values(d)
-            // load only the first 100 fonts
-            // Object.values(d).slice(0, 100)
-          );
-      });
-  }, []);
-
-  return fonts;
-}
+import { useGoogleFontsList } from "@/builder/google.fonts";
 
 export default function CanvasPlaygroundPage({
   params,

@@ -8,9 +8,10 @@ import { SideControlDoctypeSite } from "./sidecontrol-doctype-site";
 import { SrcUploaderProvider } from "./controls/src";
 import { FontFamilyListProvider } from "./controls/font-family";
 import { useDocumentAssetUpload } from "../asset";
-import { fonts } from "@/builder/k/fonts.min";
+import { useGoogleFontsList } from "@/builder/google.fonts";
 
 export function SideControl() {
+  const fonts = useGoogleFontsList();
   const [state] = useEditorState();
   const { doctype } = state;
   const { uploadPublic } = useDocumentAssetUpload();
