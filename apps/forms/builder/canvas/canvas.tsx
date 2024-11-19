@@ -51,6 +51,7 @@ export function CanvasOverlay() {
     selected_node_id,
     is_node_transforming,
     content_edit_mode,
+    keyDown,
     pointerMove,
     pointerDown,
     pointerUp,
@@ -112,13 +113,41 @@ export function CanvasOverlay() {
     }
   );
 
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Prevent conflicts with other input elements
+      if (
+        event.target instanceof HTMLInputElement ||
+        event.target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+
+      console.log("keydown", event.key);
+
+      keyDown(event);
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [keyDown]);
+
   return (
     <div
       data-transforming={is_node_transforming}
       {...bind()}
+      // onKeyDownCapture={(e) => {
+      //   console.log(e);
+      //   keyDown(e);
+      // }}
+      tabIndex={0}
       className="absolute inset-0 pointer-events-auto will-change-transform z-50 opacity-100 data-[transforming='true']:opacity-0 transition-colors "
       style={{
         touchAction: "none",
+        outline: "none",
         cursor: cursor,
       }}
     >

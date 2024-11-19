@@ -2,6 +2,7 @@ import { produce, type Draft } from "immer";
 
 import type {
   BuilderAction,
+  DocumentEditorCanvasEventTargetHtmlBackendKeyDown,
   //
   DocumentEditorCanvasEventTargetHtmlBackendPointerMove,
   DocumentEditorCanvasEventTargetHtmlBackendPointerDown,
@@ -27,12 +28,50 @@ import assert from "assert";
 import { v4 } from "uuid";
 import { documentquery } from "./document-query";
 
+const keyboard_key_bindings = {
+  r: "rectangle",
+  t: "text",
+  o: "ellipse",
+  f: "container",
+  a: "container",
+} as const;
+
 export default function reducer<S extends IDocumentEditorState>(
   state: S,
   action: BuilderAction
 ): S {
   switch (action.type) {
     // #region [html backend] canvas event target
+    case "document/canvas/backend/html/event/on-key-down": {
+      const { key, altKey, metaKey, shiftKey } = <
+        DocumentEditorCanvasEventTargetHtmlBackendKeyDown
+      >action;
+      return produce(state, (draft) => {
+        switch (key) {
+          case "v": {
+            draft.cursor_mode = { type: "cursor" };
+            break;
+          }
+          case "r":
+          case "t":
+          case "o":
+          case "f":
+          case "a": {
+            draft.cursor_mode = {
+              type: "insert",
+              node: keyboard_key_bindings[key],
+            };
+            break;
+          }
+          case "Backspace": {
+            if (draft.selected_node_id) {
+              deleteNode(draft, draft.selected_node_id);
+            }
+            break;
+          }
+        }
+      });
+    }
     case "document/canvas/backend/html/event/on-pointer-move": {
       const { node_ids_from_point, clientX, clientY } = <
         DocumentEditorCanvasEventTargetHtmlBackendPointerMove
@@ -55,13 +94,8 @@ export default function reducer<S extends IDocumentEditorState>(
           draft.content_edit_mode = false;
         } else if (draft.cursor_mode.type === "insert") {
           const { node: nodetype } = draft.cursor_mode;
-          const nnid = v4();
-          draft.document.nodes[nnid] = initialNode(nodetype);
-          (
-            draft.document.nodes[
-              draft.document.root_id
-            ] as grida.program.nodes.i.IChildren
-          ).children?.push(nnid);
+          const nnode = initialNode(nodetype);
+          insertNode(draft, nnode.id, nnode);
         }
       });
     }
@@ -685,6 +719,42 @@ function nodeReducer<N extends Partial<grida.program.nodes.Node>>(
       }
     }
   });
+}
+
+function insertNode<S extends IDocumentEditorState>(
+  draft: Draft<S>,
+  node_id: string,
+  node: grida.program.nodes.Node
+) {
+  draft.document.nodes[node_id] = node;
+  const parent_id = draft.document.root_id;
+  (
+    draft.document.nodes[parent_id] as grida.program.nodes.i.IChildren
+  ).children?.push(node_id);
+  draft.document_ctx.__ctx_nid_to_parent_id[node_id] = parent_id;
+  draft.cursor_mode = { type: "cursor" };
+  //
+}
+
+function deleteNode<S extends IDocumentEditorState>(
+  draft: Draft<S>,
+  node_id: string
+) {
+  draft.selected_node_id = undefined;
+  draft.hovered_node_id = undefined;
+  delete draft.document.nodes[node_id];
+  const parent_id = draft.document_ctx.__ctx_nid_to_parent_id[node_id];
+  if (parent_id) {
+    const index = (
+      draft.document.nodes[parent_id] as grida.program.nodes.i.IChildren
+    ).children!.indexOf(node_id);
+    if (index > -1) {
+      // only splice array when item is found
+      (
+        draft.document.nodes[parent_id] as grida.program.nodes.i.IChildren
+      ).children!.splice(index, 1);
+    }
+  }
 }
 
 function initialNode(

@@ -3,6 +3,8 @@ import { grida } from "@/grida";
 import { CursorMode } from "./types";
 
 export type BuilderAction =
+  | DocumentEditorCanvasEventTargetHtmlBackendKeyDown
+  //
   | DocumentEditorCanvasEventTargetHtmlBackendPointerMove
   | DocumentEditorCanvasEventTargetHtmlBackendPointerDown
   | DocumentEditorCanvasEventTargetHtmlBackendPointerUp
@@ -50,6 +52,14 @@ interface ICanvasEventTargetPointerEvent {
     distance: Vector2;
   };
 }
+
+export type DocumentEditorCanvasEventTargetHtmlBackendKeyDown = {
+  type: "document/canvas/backend/html/event/on-key-down";
+  key: string;
+  altKey: boolean;
+  metaKey: boolean;
+  shiftKey: boolean;
+};
 
 export type DocumentEditorCanvasEventTargetHtmlBackendPointerMove =
   IHtmlBackendCanvasEventTargetPointerEvent & {

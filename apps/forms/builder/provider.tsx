@@ -637,6 +637,19 @@ export function useEventTarget() {
     [dispatch]
   );
 
+  const keyDown = useCallback(
+    (event: KeyboardEvent) => {
+      dispatch({
+        type: "document/canvas/backend/html/event/on-key-down",
+        key: event.key,
+        altKey: event.altKey,
+        metaKey: event.metaKey,
+        shiftKey: event.shiftKey,
+      });
+    },
+    [dispatch]
+  );
+
   const pointerMove = useCallback(
     throttle((event: PointerEvent) => {
       const els = get_grida_node_elements_from_point(
@@ -839,6 +852,8 @@ export function useEventTarget() {
       is_node_transforming,
       content_edit_mode,
       //
+      keyDown,
+      //
       dragResizeHandleStart,
       dragResizeHandleEnd,
       dragResizeHandle,
@@ -871,6 +886,8 @@ export function useEventTarget() {
     selected_node_id,
     is_node_transforming,
     content_edit_mode,
+    //
+    keyDown,
     //
     dragResizeHandleStart,
     dragResizeHandleEnd,
