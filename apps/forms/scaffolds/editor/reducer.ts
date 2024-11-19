@@ -40,7 +40,7 @@ import { DataGridLocalPreferencesStorage } from "./storage/datagrid.storage";
 import databaseRecucer from "./reducers/database.reducer";
 import blockReducer from "./reducers/block.reducer";
 import datagridQueryReducer from "../data-query/data-query.reducer";
-import builderReducer from "@/builder/reducer";
+import builderReducer from "@/builder/reducers";
 import assert from "assert";
 import React from "react";
 import { grida } from "@/grida";

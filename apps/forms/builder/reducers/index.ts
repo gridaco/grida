@@ -22,12 +22,12 @@ import type {
   DocumentEditorNodePointerLeaveAction,
   NodeChangeAction,
   TemplateNodeOverrideChangeAction,
-} from "./action";
-import type { IDocumentEditorState } from "./types";
+} from "../action";
+import type { IDocumentEditorState } from "../types";
 import { grida } from "@/grida";
 import assert from "assert";
 import { v4 } from "uuid";
-import { documentquery } from "./document-query";
+import { documentquery } from "../document-query";
 
 const keyboard_key_bindings = {
   r: "rectangle",
