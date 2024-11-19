@@ -40,6 +40,7 @@ export default function reducer<S extends IDocumentEditorState>(
   state: S,
   action: BuilderAction
 ): S {
+  if (!state.editable) return state;
   switch (action.type) {
     // #region [html backend] canvas event target
     case "document/canvas/backend/html/event/on-key-down": {
@@ -47,6 +48,39 @@ export default function reducer<S extends IDocumentEditorState>(
         DocumentEditorCanvasEventTargetHtmlBackendKeyDown
       >action;
       return produce(state, (draft) => {
+        if (metaKey && key === "c") {
+          // Copy logic
+          if (draft.selected_node_id) {
+            const selectedNode = documentquery.__getNodeById(
+              draft,
+              draft.selected_node_id
+            );
+            draft.clipboard = JSON.parse(JSON.stringify(selectedNode)); // Deep copy the node
+          }
+        }
+        // else if (metaKey && key === "x") {
+        //   // Cut logic
+        //   if (draft.selected_node_id) {
+        //     const selectedNode = documentquery.__getNodeById(
+        //       draft,
+        //       draft.selected_node_id
+        //     );
+        //     draft.clipboard = JSON.parse(JSON.stringify(selectedNode)); // Deep copy the node
+        //   }
+        // }
+        else if (metaKey && key === "v") {
+          // Paste logic
+          if (draft.clipboard) {
+            const newNode = JSON.parse(JSON.stringify(draft.clipboard));
+            newNode.id = v4(); // Assign a new unique ID
+            const offset = 10; // Offset to avoid overlapping
+            if (newNode.left !== undefined) newNode.left += offset;
+            if (newNode.top !== undefined) newNode.top += offset;
+            insertNode(draft, newNode.id, newNode);
+            draft.selected_node_id = newNode.id; // Select the newly pasted node
+          }
+        }
+
         switch (key) {
           case "v": {
             draft.cursor_mode = { type: "cursor" };
@@ -65,7 +99,9 @@ export default function reducer<S extends IDocumentEditorState>(
           }
           case "Backspace": {
             if (draft.selected_node_id) {
-              deleteNode(draft, draft.selected_node_id);
+              if (draft.document.root_id !== draft.selected_node_id) {
+                deleteNode(draft, draft.selected_node_id);
+              }
             }
             break;
           }
@@ -732,7 +768,10 @@ function insertNode<S extends IDocumentEditorState>(
     draft.document.nodes[parent_id] as grida.program.nodes.i.IChildren
   ).children?.push(node_id);
   draft.document_ctx.__ctx_nid_to_parent_id[node_id] = parent_id;
+
+  // after
   draft.cursor_mode = { type: "cursor" };
+  draft.selected_node_id = node_id;
   //
 }
 

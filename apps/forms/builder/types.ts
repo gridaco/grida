@@ -79,6 +79,8 @@ export interface IDocumentEditorInteractionCursorState {
    * @default {type: "cursor"}
    */
   cursor_mode: CursorMode;
+
+  clipboard?: grida.program.nodes.Node;
 }
 
 interface IDocumentEditorConfig {
