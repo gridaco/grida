@@ -46,6 +46,7 @@ export function CanvasEventTarget({
 
 export function CanvasOverlay() {
   const {
+    cursor,
     hovered_node_id,
     selected_node_id,
     is_node_transforming,
@@ -118,6 +119,7 @@ export function CanvasOverlay() {
       className="absolute inset-0 pointer-events-auto will-change-transform z-50 opacity-100 data-[transforming='true']:opacity-0 transition-colors "
       style={{
         touchAction: "none",
+        cursor: cursor,
       }}
     >
       {content_edit_mode === "text" && <RichTextEditorSurface />}

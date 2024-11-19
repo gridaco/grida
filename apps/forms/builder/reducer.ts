@@ -49,9 +49,20 @@ export default function reducer<S extends IDocumentEditorState>(
         DocumentEditorCanvasEventTargetHtmlBackendPointerDown
       >action;
       return produce(state, (draft) => {
-        const selected_node_id = node_ids_from_point[0];
-        draft.selected_node_id = selected_node_id;
-        draft.content_edit_mode = false;
+        if (draft.cursor_mode.type === "cursor") {
+          const selected_node_id = node_ids_from_point[0];
+          draft.selected_node_id = selected_node_id;
+          draft.content_edit_mode = false;
+        } else if (draft.cursor_mode.type === "insert") {
+          const { node: nodetype } = draft.cursor_mode;
+          const nnid = v4();
+          draft.document.nodes[nnid] = initialNode(nodetype);
+          (
+            draft.document.nodes[
+              draft.document.root_id
+            ] as grida.program.nodes.i.IChildren
+          ).children?.push(nnid);
+        }
       });
     }
     case "document/canvas/backend/html/event/on-pointer-up": {
@@ -257,6 +268,12 @@ export default function reducer<S extends IDocumentEditorState>(
         draft.content_edit_mode = "text";
       });
       break;
+    }
+    case "document/canvas/cursor-mode": {
+      const { cursor_mode } = action;
+      return produce(state, (draft) => {
+        draft.cursor_mode = cursor_mode;
+      });
     }
     // #endregion
     case "document/template/set/props": {
@@ -668,4 +685,117 @@ function nodeReducer<N extends Partial<grida.program.nodes.Node>>(
       }
     }
   });
+}
+
+function initialNode(
+  type: grida.program.nodes.Node["type"]
+): grida.program.nodes.Node {
+  const gray: grida.program.cg.Paint = {
+    type: "solid",
+    color: { r: 217, g: 217, b: 217, a: 1 },
+  };
+
+  const black: grida.program.cg.Paint = {
+    type: "solid",
+    color: { r: 0, g: 0, b: 0, a: 1 },
+  };
+
+  const id = v4();
+  const base: grida.program.nodes.i.IBaseNode &
+    grida.program.nodes.i.ISceneNode = {
+    id: id,
+    name: type,
+    //
+    locked: false,
+    active: true,
+  };
+
+  const position: grida.program.nodes.i.IPositioning = {
+    position: "absolute",
+    top: 0,
+    left: 0,
+  };
+
+  const styles: grida.program.nodes.i.ICSSStylable = {
+    opacity: 1,
+    zIndex: 0,
+    rotation: 0,
+    fill: gray,
+    width: 100,
+    height: 100,
+    position: "absolute",
+    style: {},
+  };
+
+  switch (type) {
+    case "text": {
+      return {
+        ...base,
+        ...position,
+        ...styles,
+        type: "text",
+        textAlign: "left",
+        textDecoration: "none",
+        fontWeight: 400,
+        fontSize: 14,
+        fill: black,
+        width: "auto",
+        height: "auto",
+        text: "Text",
+      } satisfies grida.program.nodes.TextNode;
+    }
+    case "container": {
+      return {
+        ...base,
+        ...position,
+        ...styles,
+        type: "container",
+        expanded: false,
+        cornerRadius: 0,
+      } satisfies grida.program.nodes.ContainerNode;
+    }
+    case "ellipse": {
+      return {
+        ...base,
+        ...position,
+        ...styles,
+        type: "ellipse",
+        width: 100,
+        height: 100,
+        effects: [],
+      } satisfies grida.program.nodes.EllipseNode;
+    }
+    case "rectangle": {
+      return {
+        ...base,
+        ...position,
+        ...styles,
+        type: "rectangle",
+        cornerRadius: 0,
+        width: 100,
+        height: 100,
+        effects: [],
+      } satisfies grida.program.nodes.RectangleNode;
+    }
+    case "image": {
+      return {
+        ...base,
+        ...position,
+        ...styles,
+        type: "image",
+        cornerRadius: 0,
+        width: 100,
+        height: 100,
+        fit: "cover",
+        fill: undefined,
+        // TODO: replace with static url
+        src: "/assets/image.png",
+      } satisfies grida.program.nodes.ImageNode;
+    }
+    case "svg":
+    case "instance":
+    case "template_instance": {
+      throw new Error(`${type} insertion not supported`);
+    }
+  }
 }

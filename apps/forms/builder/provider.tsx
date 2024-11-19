@@ -12,6 +12,7 @@ import {
   type IDocumentEditorState,
   type IDocumentEditorInit,
   initDocumentEditorState,
+  CursorMode,
 } from "./types";
 import type { Tokens } from "@/ast";
 import { grida } from "@/grida";
@@ -604,7 +605,37 @@ export function useEventTarget() {
     hovered_node_id,
     selected_node_id,
     content_edit_mode,
+    cursor_mode,
   } = state;
+
+  const cursor = useMemo(() => {
+    switch (cursor_mode.type) {
+      case "cursor": {
+        return "default";
+      }
+      case "insert": {
+        switch (cursor_mode.node) {
+          case "text":
+            return "text";
+          case "rectangle":
+          case "ellipse":
+          case "container":
+          case "image":
+            return "crosshair";
+        }
+      }
+    }
+  }, [cursor_mode]);
+
+  const setCursorMode = useCallback(
+    (cursor_mode: CursorMode) => {
+      dispatch({
+        type: "document/canvas/cursor-mode",
+        cursor_mode,
+      });
+    },
+    [dispatch]
+  );
 
   const pointerMove = useCallback(
     throttle((event: PointerEvent) => {
@@ -799,6 +830,10 @@ export function useEventTarget() {
 
   return useMemo(() => {
     return {
+      cursor,
+      cursor_mode,
+      setCursorMode,
+      //
       hovered_node_id,
       selected_node_id,
       is_node_transforming,
@@ -828,6 +863,10 @@ export function useEventTarget() {
       //
     };
   }, [
+    cursor,
+    cursor_mode,
+    setCursorMode,
+    //
     hovered_node_id,
     selected_node_id,
     is_node_transforming,

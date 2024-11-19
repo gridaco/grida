@@ -459,7 +459,15 @@ export namespace grida {
        */
       export type LengthPercentage = Length | Percentage;
 
-      export type RGBA = { r: number; g: number; b: number; a: number };
+      export type RGBA = {
+        r: number;
+        g: number;
+        b: number;
+        /**
+         * 0~1
+         */
+        a: number;
+      };
 
       /**
        * CSS properties that is supported via the standard editor
@@ -1143,7 +1151,8 @@ export namespace grida {
           i.ISceneNode,
           i.ICSSStylable,
           i.IBoxFit,
-          i.IHrefable {
+          i.IHrefable,
+          i.IRectangleCorner {
         readonly type: "image";
         /**
          * required - when falsy, the image will not be rendered
@@ -1158,7 +1167,8 @@ export namespace grida {
           i.ICSSStylable,
           i.IHrefable,
           i.IExpandable,
-          i.IChildren {
+          i.IChildren,
+          i.IRectangleCorner {
         readonly type: "container";
         //
       }

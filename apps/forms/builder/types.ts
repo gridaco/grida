@@ -1,8 +1,16 @@
-import type { Tokens } from "@/ast";
 import type { BuilderAction } from "./action";
 import { grida } from "@/grida";
 
 export type DocumentDispatcher = (action: BuilderAction) => void;
+
+export type CursorMode =
+  | {
+      type: "cursor";
+    }
+  | {
+      type: "insert";
+      node: "text" | "image" | "container" | "rectangle" | "ellipse";
+    };
 
 export interface IDocumentEditorInteractionCursorState {
   selected_node_id?: string;
@@ -62,6 +70,15 @@ export interface IDocumentEditorInteractionCursorState {
    */
   // __r: number;
   // selectedTextRange;
+
+  /**
+   * @private - internal use only
+   *
+   * cursor mode
+   *
+   * @default {type: "cursor"}
+   */
+  cursor_mode: CursorMode;
 }
 
 interface IDocumentEditorConfig {
@@ -102,6 +119,7 @@ export function initDocumentEditorState({
         init.document
       ),
     googlefonts: s.fonts().map((family) => ({ family })),
+    cursor_mode: { type: "cursor" },
     ...init,
   };
 }

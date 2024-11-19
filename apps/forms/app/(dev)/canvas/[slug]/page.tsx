@@ -16,6 +16,8 @@ import {
   CanvasOverlay,
   standaloneDocumentReducer,
   initDocumentEditorState,
+  useEventTarget,
+  CursorMode,
 } from "@/builder";
 import docs from "../static";
 import {
@@ -30,6 +32,16 @@ import { GridaLogo } from "@/components/grida-logo";
 import { DevtoolsPanel } from "@/builder/devtools";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
 import { useGoogleFontsList } from "@/builder/google.fonts";
+import { Toggle } from "@/components/ui/toggle";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+  BoxIcon,
+  CircleIcon,
+  CursorArrowIcon,
+  FrameIcon,
+  ImageIcon,
+  TextIcon,
+} from "@radix-ui/react-icons";
 
 export default function CanvasPlaygroundPage({
   params,
@@ -73,13 +85,16 @@ export default function CanvasPlaygroundPage({
               </SidebarSection>
             </SidebarRoot>
           </aside>
-          <div className="w-full h-full flex flex-col">
+          <div className="w-full h-full flex flex-col relative">
             <CanvasEventTarget className="relative w-full h-full no-scrollbar overflow-y-auto bg-transparent">
               <CanvasOverlay />
               <div className="w-full h-full flex bg-background items-center justify-center">
                 <div className="shadow-lg rounded-xl border overflow-hidden">
                   <StandaloneDocumentEditorContent />
                 </div>
+              </div>
+              <div className="absolute bottom-20 left-0 right-0 flex items-center justify-center z-50">
+                <Toolbar />
               </div>
             </CanvasEventTarget>
             <DevtoolsPanel />
@@ -115,4 +130,70 @@ function ExampleSelection({ value }: { value: string }) {
       </SelectContent>
     </Select>
   );
+}
+
+function Toolbar() {
+  const { setCursorMode, cursor_mode } = useEventTarget();
+
+  return (
+    <div className="rounded-full flex gap-4 border bg-background shadow px-4 py-2">
+      <ToggleGroup
+        onValueChange={(v) => {
+          setCursorMode(
+            v
+              ? toolbar_value_to_cursormode(v as ToolbarToolType)
+              : { type: "cursor" }
+          );
+        }}
+        value={cursormode_to_toolbar_value(cursor_mode)}
+        defaultValue="cursor"
+        type="single"
+      >
+        <ToggleGroupItem value="cursor">
+          <CursorArrowIcon />
+        </ToggleGroupItem>
+        <ToggleGroupItem value="rectangle">
+          <BoxIcon />
+        </ToggleGroupItem>
+        <ToggleGroupItem value="ellipse">
+          <CircleIcon />
+        </ToggleGroupItem>
+        <ToggleGroupItem value="text">
+          <TextIcon />
+        </ToggleGroupItem>
+        <ToggleGroupItem value="container">
+          <FrameIcon />
+        </ToggleGroupItem>
+        <ToggleGroupItem value="image">
+          <ImageIcon />
+        </ToggleGroupItem>
+      </ToggleGroup>
+    </div>
+  );
+}
+
+type ToolbarToolType =
+  | "cursor"
+  | "rectangle"
+  | "ellipse"
+  | "text"
+  | "container"
+  | "image";
+
+function cursormode_to_toolbar_value(cm: CursorMode): ToolbarToolType {
+  switch (cm.type) {
+    case "cursor":
+      return "cursor";
+    case "insert":
+      return cm.node;
+  }
+}
+
+function toolbar_value_to_cursormode(tt: ToolbarToolType): CursorMode {
+  switch (tt) {
+    case "cursor":
+      return { type: "cursor" };
+    default:
+      return { type: "insert", node: tt };
+  }
 }

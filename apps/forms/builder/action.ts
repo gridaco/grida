@@ -1,5 +1,6 @@
 import type { Tokens } from "@/ast";
 import { grida } from "@/grida";
+import { CursorMode } from "./types";
 
 export type BuilderAction =
   | DocumentEditorCanvasEventTargetHtmlBackendPointerMove
@@ -22,6 +23,8 @@ export type BuilderAction =
   | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDrag
   //
   | DocumentEditorEnterContentEditMode
+  //
+  | DocumentEditorCursorMode
   //
   | DocumentEditorNodeSelectAction
   | DocumentEditorNodePointerEnterAction
@@ -79,6 +82,11 @@ export type DocumentEditorCanvasEventTargetHtmlBackendDragEnd = {
 
 export type DocumentEditorEnterContentEditMode = {
   type: "document/canvas/enter-content-edit-mode";
+};
+
+export type DocumentEditorCursorMode = {
+  type: "document/canvas/cursor-mode";
+  cursor_mode: CursorMode;
 };
 
 interface ICanvasEventTargetResizeHandleEvent {
