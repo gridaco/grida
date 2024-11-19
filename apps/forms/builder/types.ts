@@ -12,6 +12,13 @@ export type CursorMode =
       node: "text" | "image" | "container" | "rectangle" | "ellipse";
     };
 
+export type Marquee = {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+};
+
 export interface IDocumentEditorInteractionCursorState {
   selected_node_id?: string;
   hovered_node_id?: string;
@@ -56,6 +63,8 @@ export interface IDocumentEditorInteractionCursorState {
   /**
    * @private - internal use only
    *
+   * relative cursor position to the event target
+   *
    * @default {x: 0, y: 0}
    */
   cursor_position: {
@@ -81,6 +90,8 @@ export interface IDocumentEditorInteractionCursorState {
   cursor_mode: CursorMode;
 
   clipboard?: grida.program.nodes.Node;
+
+  marquee?: Marquee;
 }
 
 interface IDocumentEditorConfig {

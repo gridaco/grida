@@ -5,6 +5,7 @@ import type {
   DocumentEditorCanvasEventTargetHtmlBackendKeyDown,
   //
   DocumentEditorCanvasEventTargetHtmlBackendPointerMove,
+  DocumentEditorCanvasEventTargetHtmlBackendPointerMoveRaycast,
   DocumentEditorCanvasEventTargetHtmlBackendPointerDown,
   //
   DocumentEditorCanvasEventTargetHtmlBackendDrag,
@@ -57,18 +58,17 @@ export default function reducer<S extends IDocumentEditorState>(
             );
             draft.clipboard = JSON.parse(JSON.stringify(selectedNode)); // Deep copy the node
           }
-        }
-        // else if (metaKey && key === "x") {
-        //   // Cut logic
-        //   if (draft.selected_node_id) {
-        //     const selectedNode = documentquery.__getNodeById(
-        //       draft,
-        //       draft.selected_node_id
-        //     );
-        //     draft.clipboard = JSON.parse(JSON.stringify(selectedNode)); // Deep copy the node
-        //   }
-        // }
-        else if (metaKey && key === "v") {
+        } else if (metaKey && key === "x") {
+          // Cut logic
+          if (draft.selected_node_id) {
+            const selectedNode = documentquery.__getNodeById(
+              draft,
+              draft.selected_node_id
+            );
+            draft.clipboard = JSON.parse(JSON.stringify(selectedNode)); // Deep copy the node
+            deleteNode(draft, draft.selected_node_id);
+          }
+        } else if (metaKey && key === "v") {
           // Paste logic
           if (draft.clipboard) {
             const newNode = JSON.parse(JSON.stringify(draft.clipboard));
@@ -109,14 +109,20 @@ export default function reducer<S extends IDocumentEditorState>(
       });
     }
     case "document/canvas/backend/html/event/on-pointer-move": {
-      const { node_ids_from_point, clientX, clientY } = <
-        DocumentEditorCanvasEventTargetHtmlBackendPointerMove
+      const {
+        position: { x, y },
+      } = <DocumentEditorCanvasEventTargetHtmlBackendPointerMove>action;
+      return produce(state, (draft) => {
+        draft.cursor_position.x = x;
+        draft.cursor_position.y = y;
+      });
+    }
+    case "document/canvas/backend/html/event/on-pointer-move-raycast": {
+      const { node_ids_from_point } = <
+        DocumentEditorCanvasEventTargetHtmlBackendPointerMoveRaycast
       >action;
       return produce(state, (draft) => {
         draft.hovered_node_id = node_ids_from_point[0];
-        // TODO: need to transform to canvas position
-        draft.cursor_position.x = clientX;
-        draft.cursor_position.y = clientY;
       });
     }
     case "document/canvas/backend/html/event/on-pointer-down": {
@@ -130,7 +136,11 @@ export default function reducer<S extends IDocumentEditorState>(
           draft.content_edit_mode = false;
         } else if (draft.cursor_mode.type === "insert") {
           const { node: nodetype } = draft.cursor_mode;
-          const nnode = initialNode(nodetype);
+          const nnode = initialNode(nodetype, {
+            // TODO: need to transform to a relative position (to root renderer or parent node)
+            left: draft.cursor_position.x,
+            top: draft.cursor_position.y,
+          });
           insertNode(draft, nnode.id, nnode);
         }
       });
@@ -149,39 +159,59 @@ export default function reducer<S extends IDocumentEditorState>(
       const {} = <DocumentEditorCanvasEventTargetHtmlBackendDragStart>action;
       return produce(state, (draft) => {
         draft.content_edit_mode = false;
-        draft.is_gesture_node_drag_move = true;
         draft.is_gesture_node_drag_resize = false;
+        //
+        if (!draft.selected_node_id) {
+          // marquee selection
+          draft.marquee = {
+            x1: draft.cursor_position.x,
+            y1: draft.cursor_position.y,
+            x2: draft.cursor_position.x,
+            y2: draft.cursor_position.y,
+          };
+        } else {
+          draft.is_gesture_node_drag_move = true;
+        }
       });
     }
     case "document/canvas/backend/html/event/on-drag-end": {
       const {} = <DocumentEditorCanvasEventTargetHtmlBackendDragEnd>action;
       return produce(state, (draft) => {
         draft.is_gesture_node_drag_move = false;
+        draft.marquee = undefined;
       });
     }
     case "document/canvas/backend/html/event/on-drag": {
       const {
         event: { delta, distance },
       } = <DocumentEditorCanvasEventTargetHtmlBackendDrag>action;
-      // cancel if invalid state
-      if (!state.is_gesture_node_drag_move) return state;
-      if (!state.selected_node_id) return state;
-
-      const nid = state.selected_node_id;
-
-      const [dx, dy] = delta;
-
-      return produce(state, (draft) => {
-        const node = documentquery.__getNodeById(draft, nid);
-
-        draft.document.nodes[nid] = nodeTransformReducer(node, {
-          type: "move",
-          dx: dx,
-          dy: dy,
+      if (state.marquee) {
+        return produce(state, (draft) => {
+          draft.marquee!.x2 = draft.cursor_position.x;
+          draft.marquee!.y2 = draft.cursor_position.y;
         });
+      } else {
+        if (!state.is_gesture_node_drag_move)
+          // cancel if invalid state
+          return state;
+        if (!state.selected_node_id) return state;
 
-        //
-      });
+        const nid = state.selected_node_id;
+
+        const [dx, dy] = delta;
+
+        return produce(state, (draft) => {
+          const node = documentquery.__getNodeById(draft, nid);
+
+          draft.document.nodes[nid] = nodeTransformReducer(node, {
+            type: "move",
+            dx: dx,
+            dy: dy,
+          });
+
+          //
+        });
+      }
     }
     // #endregion drag event
     // #region resize handle event
@@ -393,6 +423,7 @@ export default function reducer<S extends IDocumentEditorState>(
     // }
 
     case "node/change/active":
+    case "node/change/locked":
     case "node/change/name":
     case "node/change/positioning":
     case "node/change/positioning-mode":
@@ -590,6 +621,10 @@ function nodeReducer<N extends Partial<grida.program.nodes.Node>>(
     switch (action.type) {
       case "node/change/active": {
         draft.active = action.active;
+        break;
+      }
+      case "node/change/locked": {
+        draft.locked = action.locked;
         break;
       }
       case "node/change/name": {
@@ -797,7 +832,8 @@ function deleteNode<S extends IDocumentEditorState>(
 }
 
 function initialNode(
-  type: grida.program.nodes.Node["type"]
+  type: grida.program.nodes.Node["type"],
+  seed: Partial<Omit<grida.program.nodes.AnyNode, "type">> = {}
 ): grida.program.nodes.Node {
   const gray: grida.program.cg.Paint = {
     type: "solid",
@@ -851,6 +887,7 @@ function initialNode(
         width: "auto",
         height: "auto",
         text: "Text",
+        ...seed,
       } satisfies grida.program.nodes.TextNode;
     }
     case "container": {
@@ -861,6 +898,7 @@ function initialNode(
         type: "container",
         expanded: false,
         cornerRadius: 0,
+        ...seed,
       } satisfies grida.program.nodes.ContainerNode;
     }
     case "ellipse": {
@@ -872,6 +910,7 @@ function initialNode(
         width: 100,
         height: 100,
         effects: [],
+        ...seed,
       } satisfies grida.program.nodes.EllipseNode;
     }
     case "rectangle": {
@@ -884,6 +923,7 @@ function initialNode(
         width: 100,
         height: 100,
         effects: [],
+        ...seed,
       } satisfies grida.program.nodes.RectangleNode;
     }
     case "image": {
@@ -899,6 +939,7 @@ function initialNode(
         fill: undefined,
         // TODO: replace with static url
         src: "/assets/image.png",
+        ...seed,
       } satisfies grida.program.nodes.ImageNode;
     }
     case "svg":

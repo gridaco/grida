@@ -6,6 +6,7 @@ export type BuilderAction =
   | DocumentEditorCanvasEventTargetHtmlBackendKeyDown
   //
   | DocumentEditorCanvasEventTargetHtmlBackendPointerMove
+  | DocumentEditorCanvasEventTargetHtmlBackendPointerMoveRaycast
   | DocumentEditorCanvasEventTargetHtmlBackendPointerDown
   | DocumentEditorCanvasEventTargetHtmlBackendPointerUp
   | DocumentEditorCanvasEventTargetHtmlBackendDragStart
@@ -61,11 +62,27 @@ export type DocumentEditorCanvasEventTargetHtmlBackendKeyDown = {
   shiftKey: boolean;
 };
 
-export type DocumentEditorCanvasEventTargetHtmlBackendPointerMove =
+export type DocumentEditorCanvasEventTargetHtmlBackendPointerMove = {
+  type: "document/canvas/backend/html/event/on-pointer-move";
+  /**
+   * position in canvas space - need to pass a resolved value
+   */
+  position: {
+    x: number;
+    y: number;
+  };
+};
+
+export type DocumentEditorCanvasEventTargetHtmlBackendPointerMoveRaycast =
   IHtmlBackendCanvasEventTargetPointerEvent & {
-    type: "document/canvas/backend/html/event/on-pointer-move";
-    clientX: number;
-    clientY: number;
+    type: "document/canvas/backend/html/event/on-pointer-move-raycast";
+    /**
+     * position in canvas space - need to pass a resolved value
+     */
+    position: {
+      x: number;
+      y: number;
+    };
   };
 
 export type DocumentEditorCanvasEventTargetHtmlBackendPointerDown =
@@ -202,6 +219,10 @@ interface INodeChangeActiveAction extends INodeID {
   active: boolean;
 }
 
+interface INodeChangeLockedAction extends INodeID {
+  locked: boolean;
+}
+
 interface INodeChangePositioningAction extends INodeID {
   positioning: grida.program.nodes.i.IPositioning;
 }
@@ -275,6 +296,7 @@ interface INodeChangePropsAction extends INodeID {
 export type NodeChangeAction =
   | ({ type: "node/change/name" } & INodeChangeNameAction)
   | ({ type: "node/change/active" } & INodeChangeActiveAction)
+  | ({ type: "node/change/locked" } & INodeChangeLockedAction)
   | ({ type: "node/change/positioning" } & INodeChangePositioningAction)
   | ({
       type: "node/change/positioning-mode";

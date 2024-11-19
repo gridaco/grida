@@ -24,6 +24,7 @@ import {
 import assert from "assert";
 import { documentquery } from "./document-query";
 import { GoogleFontsManager } from "./components/google-fonts";
+import { CANVAS_EVENT_TARGET_ID } from "./k/id";
 
 type Vector2 = [number, number];
 
@@ -89,13 +90,29 @@ function EditorGoogleFontsManager({ children }: React.PropsWithChildren<{}>) {
   );
 }
 
+function get_canvas_rect() {
+  const el = window.document.getElementById(CANVAS_EVENT_TARGET_ID);
+  return el!.getBoundingClientRect();
+}
+
+/**
+ *
+ * @param x clientX
+ * @param y clientY
+ * @returns
+ */
 function get_grida_node_elements_from_point(x: number, y: number) {
   const hits = window.document.elementsFromPoint(x, y);
 
-  const node_elements = hits.filter((h) =>
-    h.attributes.getNamedItem(
-      grida.program.document.k.HTML_ELEMET_DATA_ATTRIBUTE_GRIDA_NODE_ID_KEY
-    )
+  const node_elements = hits.filter(
+    (h) =>
+      h.attributes.getNamedItem(
+        grida.program.document.k.HTML_ELEMET_DATA_ATTRIBUTE_GRIDA_NODE_ID_KEY
+      ) &&
+      h.attributes.getNamedItem(
+        grida.program.document.k
+          .HTML_ELEMET_DATA_ATTRIBUTE_GRIDA_NODE_LOCKED_KEY
+      )?.value !== "true"
   );
 
   return node_elements;
@@ -240,11 +257,22 @@ export function useDocument() {
   );
 
   const changeNodeActive = useCallback(
-    (node_id: string, hidden: boolean) => {
+    (node_id: string, active: boolean) => {
       dispatch({
         type: "node/change/active",
         node_id: node_id,
-        active: hidden,
+        active: active,
+      });
+    },
+    [dispatch]
+  );
+
+  const changeNodeLocked = useCallback(
+    (node_id: string, locked: boolean) => {
+      dispatch({
+        type: "node/change/locked",
+        node_id: node_id,
+        locked: locked,
       });
     },
     [dispatch]
@@ -478,6 +506,7 @@ export function useDocument() {
         changeNodeValue(selected_node_id!, key, value),
       // attributes
       active: (active: boolean) => changeNodeActive(selected_node_id!, active),
+      locked: (locked: boolean) => changeNodeLocked(selected_node_id!, locked),
       src: (src?: Tokens.StringValueExpression) =>
         changeNodeSrc(selected_node_id!, src),
       href: (href?: grida.program.nodes.i.IHrefable["href"]) =>
@@ -541,11 +570,26 @@ export function useDocument() {
     };
   }, [
     selected_node_id,
+    changeNodeActive,
+    changeNodeLocked,
     changeNodeComponent,
     changeNodeText,
-    // changeNodeAttribute,
     changeNodeStyle,
     changeNodeValue,
+    changeNodeSrc,
+    changeNodeHref,
+    changeNodeTarget,
+    changeNodePositioning,
+    changeNodePositioningMode,
+    changeNodeCornerRadius,
+    changeNodeFill,
+    changeNodeFit,
+    changeNodeOpacity,
+    changeNodeRotation,
+    changeTextNodeFontFamily,
+    changeTextNodeFontWeight,
+    changeTextNodeFontSize,
+    changeTextNodeTextAlign,
   ]);
 
   return useMemo(() => {
@@ -556,6 +600,7 @@ export function useDocument() {
       getNodeAbsoluteRotation,
       selectNode,
       changeNodeActive,
+      changeNodeLocked,
       pointerEnterNode,
       pointerLeaveNode,
       changeNodeProps,
@@ -572,6 +617,7 @@ export function useDocument() {
     getNodeAbsoluteRotation,
     selectNode,
     changeNodeActive,
+    changeNodeLocked,
     pointerEnterNode,
     pointerLeaveNode,
     changeNodeProps,
@@ -606,6 +652,7 @@ export function useEventTarget() {
     selected_node_id,
     content_edit_mode,
     cursor_mode,
+    marquee,
   } = state;
 
   const cursor = useMemo(() => {
@@ -650,21 +697,38 @@ export function useEventTarget() {
     [dispatch]
   );
 
-  const pointerMove = useCallback(
-    throttle((event: PointerEvent) => {
-      const els = get_grida_node_elements_from_point(
-        event.clientX,
-        event.clientY
-      );
+  const _throttled_pointer_move_with_raycast = useCallback(
+    throttle((clientX, clientY, position) => {
+      // this is throttled - as it is expensive
+      const els = get_grida_node_elements_from_point(clientX, clientY);
 
       dispatch({
-        type: "document/canvas/backend/html/event/on-pointer-move",
+        type: "document/canvas/backend/html/event/on-pointer-move-raycast",
         node_ids_from_point: els.map((n) => n.id),
-        clientX: event.clientX,
-        clientY: event.clientY,
+        position,
       });
     }, 30),
     [dispatch]
+  );
+
+  const pointerMove = useCallback(
+    (event: PointerEvent) => {
+      const { clientX, clientY } = event;
+
+      const canvas_rect = get_canvas_rect();
+      const position = {
+        x: clientX - canvas_rect.left,
+        y: clientY - canvas_rect.top,
+      };
+
+      dispatch({
+        type: "document/canvas/backend/html/event/on-pointer-move",
+        position: position,
+      });
+
+      _throttled_pointer_move_with_raycast(clientX, clientY, position);
+    },
+    [dispatch, _throttled_pointer_move_with_raycast]
   );
 
   const pointerDown = useCallback(
@@ -843,6 +907,7 @@ export function useEventTarget() {
 
   return useMemo(() => {
     return {
+      marquee,
       cursor,
       cursor_mode,
       setCursorMode,
@@ -878,6 +943,7 @@ export function useEventTarget() {
       //
     };
   }, [
+    marquee,
     cursor,
     cursor_mode,
     setCursorMode,

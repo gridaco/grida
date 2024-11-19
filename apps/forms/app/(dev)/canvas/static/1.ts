@@ -25,7 +25,7 @@ export default {
       name: "playground",
       type: "container",
       active: true,
-      locked: false,
+      locked: true,
       expanded: true,
       opacity: 1,
       zIndex: 0,
@@ -33,6 +33,7 @@ export default {
       width: 960,
       height: 540,
       fill: { type: "solid", color: { r: 255, g: 255, b: 255, a: 1 } },
+      cornerRadius: 0,
       style: {
         boxShadow: "0 0 10px rgba(0,0,0,0.1)",
       },
@@ -62,6 +63,7 @@ export default {
       width: 960,
       height: 540,
       fit: "cover",
+      cornerRadius: 0,
       style: {},
     },
     sticker_1: {
@@ -113,6 +115,7 @@ export default {
       expanded: false,
       fill: { type: "solid", color: { r: 255, g: 255, b: 255, a: 1 } },
       style: {},
+      cornerRadius: 0,
       children: ["child_rect_1", "child_rect_2"],
     },
     child_rect_1: {

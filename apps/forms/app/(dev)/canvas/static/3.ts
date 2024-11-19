@@ -52,6 +52,7 @@ export default {
       width: 960,
       height: 540,
       fill: { type: "solid", color: { r: 0, g: 0, b: 0, a: 1 } },
+      cornerRadius: 0,
       style: {
         boxShadow: "0 0 10px rgba(0,0,0,0.1)",
       },

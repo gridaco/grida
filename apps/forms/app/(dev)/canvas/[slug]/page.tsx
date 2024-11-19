@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useReducer } from "react";
+import React, { useEffect, useReducer, useState } from "react";
 import {
   SidebarRoot,
   SidebarSection,
@@ -42,6 +42,7 @@ import {
   ImageIcon,
   TextIcon,
 } from "@radix-ui/react-icons";
+import KeyboardInputOverlay from "@/builder/devtools/keyboard-input-overlay";
 
 export default function CanvasPlaygroundPage({
   params,
@@ -93,8 +94,11 @@ export default function CanvasPlaygroundPage({
                   <StandaloneDocumentEditorContent />
                 </div>
               </div>
-              <div className="absolute bottom-20 left-0 right-0 flex items-center justify-center z-50">
+              <div className="absolute bottom-20 left-0 right-0 flex items-center justify-center z-50 pointer-events-none">
                 <Toolbar />
+              </div>
+              <div className="fixed bottom-20 left-10 flex items-center justify-center z-50 pointer-events-none">
+                <KeyboardInputOverlay />
               </div>
             </CanvasEventTarget>
             <DevtoolsPanel />
@@ -136,7 +140,7 @@ function Toolbar() {
   const { setCursorMode, cursor_mode } = useEventTarget();
 
   return (
-    <div className="rounded-full flex gap-4 border bg-background shadow px-4 py-2">
+    <div className="rounded-full flex gap-4 border bg-background shadow px-4 py-2 pointer-events-auto">
       <ToggleGroup
         onValueChange={(v) => {
           setCursorMode(

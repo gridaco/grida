@@ -127,6 +127,7 @@ export function NodeElement<P extends Record<string, any>>({
           ...props,
           ...({
             ["data-grida-node-id"]: node_id,
+            ["data-grida-node-locked"]: node.locked,
             ["data-grida-node-type"]: node.type,
             ["data-dev-editor-selected"]: selected,
             ["data-dev-editor-hovered"]: hovered,

@@ -48,6 +48,7 @@ import {
 } from "./controls/positioning";
 import { useNodeDomElement } from "@/builder/provider";
 import { RotateControl } from "./controls/rotate";
+import { LockClosedIcon } from "@radix-ui/react-icons";
 
 export function SelectedNodeProperties() {
   const { state: document, selectedNode } = useDocument();
@@ -62,6 +63,7 @@ export function SelectedNodeProperties() {
     id,
     name,
     active,
+    locked,
     component_id,
     style,
     type,
@@ -137,9 +139,15 @@ export function SelectedNodeProperties() {
           <SidebarSectionHeaderLabel>Layer</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine>
+          <PropertyLine className="items-center">
             <PropertyLineLabel>Active</PropertyLineLabel>
             <HiddenControl value={active} onValueChange={selectedNode.active} />
+          </PropertyLine>
+          <PropertyLine className="items-center">
+            <PropertyLineLabel>
+              <LockClosedIcon />
+            </PropertyLineLabel>
+            <HiddenControl value={locked} onValueChange={selectedNode.locked} />
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>

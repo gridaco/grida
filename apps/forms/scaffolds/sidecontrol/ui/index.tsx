@@ -1,8 +1,16 @@
 import { Label } from "@/components/ui/label";
+import { cn } from "@/utils";
 
-export function PropertyLine({ children }: React.PropsWithChildren<{}>) {
+export function PropertyLine({
+  children,
+  className,
+}: React.PropsWithChildren<{
+  className?: string;
+}>) {
   return (
-    <div className="flex items-start justify-between max-w-full">
+    <div
+      className={cn("flex items-start justify-between max-w-full", className)}
+    >
       {children}
     </div>
   );

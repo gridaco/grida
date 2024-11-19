@@ -158,6 +158,14 @@ export namespace grida {
          */
         export const HTML_ELEMET_DATA_ATTRIBUTE_GRIDA_NODE_ID_KEY =
           "data-grida-node-id";
+
+        /**
+         * Key for the data attribute that stores the node {@link nodes.Node.locked} in the HTML document.
+         *
+         * @see {@link INodeHtmlDocumentQueryDataAttributes}
+         */
+        export const HTML_ELEMET_DATA_ATTRIBUTE_GRIDA_NODE_LOCKED_KEY =
+          "data-grida-node-locked";
       }
 
       /**
@@ -343,6 +351,7 @@ export namespace grida {
 
       export interface INodeHtmlDocumentQueryDataAttributes {
         [k.HTML_ELEMET_DATA_ATTRIBUTE_GRIDA_NODE_ID_KEY]: nodes.Node["id"];
+        [k.HTML_ELEMET_DATA_ATTRIBUTE_GRIDA_NODE_LOCKED_KEY]: nodes.Node["locked"];
         ["data-grida-node-type"]: nodes.Node["type"];
         // #region dev properties
 
@@ -912,6 +921,7 @@ export namespace grida {
            *
            * @default false
            * @example when true, pointer-events:none
+           * @internal
            */
           locked: boolean;
         }

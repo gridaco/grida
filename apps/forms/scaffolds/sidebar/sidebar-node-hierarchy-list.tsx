@@ -1,7 +1,12 @@
 "use client";
 
 import { useDocument } from "@/builder";
-import { SidebarMenuItem, SidebarMenuItemLabel } from "@/components/sidebar";
+import {
+  SidebarMenuItem,
+  SidebarMenuItemAction,
+  SidebarMenuItemActions,
+  SidebarMenuItemLabel,
+} from "@/components/sidebar";
 import {
   FrameIcon,
   BoxIcon,
@@ -10,6 +15,11 @@ import {
   TextIcon,
   TransformIcon,
   CircleIcon,
+  LockOpen2Icon,
+  LockClosedIcon,
+  EyeOpenIcon,
+  EyeClosedIcon,
+  LockOpen1Icon,
 } from "@radix-ui/react-icons";
 import { grida } from "@/grida";
 
@@ -18,6 +28,8 @@ export function NodeHierarchyList() {
     state: { document, selected_node_id, hovered_node_id },
     selectNode,
     pointerEnterNode,
+    changeNodeActive,
+    changeNodeLocked,
   } = useDocument();
 
   // TODO: need nested nodes for templates
@@ -48,6 +60,22 @@ export function NodeHierarchyList() {
             }}
           >
             <SidebarMenuItemLabel>{n.name}</SidebarMenuItemLabel>
+            <SidebarMenuItemActions>
+              <SidebarMenuItemAction
+                onClick={() => {
+                  changeNodeLocked(n.id, !n.locked);
+                }}
+              >
+                {n.locked ? <LockClosedIcon /> : <LockOpen1Icon />}
+              </SidebarMenuItemAction>
+              <SidebarMenuItemAction
+                onClick={() => {
+                  changeNodeActive(n.id, !n.active);
+                }}
+              >
+                {n.active ? <EyeOpenIcon /> : <EyeClosedIcon />}
+              </SidebarMenuItemAction>
+            </SidebarMenuItemActions>
           </SidebarMenuItem>
         );
       })}

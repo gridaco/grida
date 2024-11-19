@@ -10,9 +10,9 @@ import React, {
 } from "react";
 import { useEventTarget } from "@/builder";
 import { useGesture } from "@use-gesture/react";
-import { grida } from "@/grida";
 import { useDocument, useNode, useNodeDomElement } from "../provider";
 import { RotationCursorIcon } from "../components/cursor";
+import { CANVAS_EVENT_TARGET_ID } from "../k/id";
 
 interface CanvasEventTargetContext {
   portal?: HTMLDivElement | null;
@@ -34,7 +34,7 @@ export function CanvasEventTarget({
     >
       <div
         {...props}
-        id="canvas-event-target"
+        id={CANVAS_EVENT_TARGET_ID}
         className={className}
         style={{ pointerEvents: "auto" }}
       >
@@ -46,6 +46,7 @@ export function CanvasEventTarget({
 
 export function CanvasOverlay() {
   const {
+    marquee,
     cursor,
     hovered_node_id,
     selected_node_id,
@@ -123,7 +124,7 @@ export function CanvasOverlay() {
         return;
       }
 
-      console.log("keydown", event.key);
+      // console.log("keydown", event.key);
 
       keyDown(event);
     };
@@ -139,13 +140,10 @@ export function CanvasOverlay() {
     <div
       data-transforming={is_node_transforming}
       {...bind()}
-      // onKeyDownCapture={(e) => {
-      //   console.log(e);
-      //   keyDown(e);
-      // }}
       tabIndex={0}
       className="absolute inset-0 pointer-events-auto will-change-transform z-50 opacity-100 data-[transforming='true']:opacity-0 transition-colors "
       style={{
+        userSelect: "none",
         touchAction: "none",
         outline: "none",
         cursor: cursor,
@@ -163,6 +161,16 @@ export function CanvasOverlay() {
         {hovered_node_id && hovered_node_id !== selected_node_id && (
           <NodeOverlay node_id={hovered_node_id} readonly />
         )}
+        <div id="marquee-container" className="absolute top-0 left-0 w-0 h-0">
+          {marquee && (
+            <Marquee
+              x1={marquee.x1}
+              y1={marquee.y1}
+              x2={marquee.x2}
+              y2={marquee.y2}
+            />
+          )}
+        </div>
       </div>
     </div>
   );
@@ -176,6 +184,30 @@ export function useCanvasOverlayPortal() {
     );
   }
   return context.portal;
+}
+
+function Marquee({
+  x1,
+  y1,
+  x2,
+  y2,
+}: {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}) {
+  return (
+    <div
+      className="absolute border border-workbench-accent-sky bg-workbench-accent-sky/20 pointer-events-none"
+      style={{
+        left: Math.min(x1, x2),
+        top: Math.min(y1, y2),
+        width: Math.abs(x2 - x1),
+        height: Math.abs(y2 - y1),
+      }}
+    />
+  );
 }
 
 function NodeOverlay({
