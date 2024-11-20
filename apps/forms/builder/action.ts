@@ -1,8 +1,10 @@
 import type { Tokens } from "@/ast";
 import { grida } from "@/grida";
-import { CursorMode } from "./types";
+import { CursorMode, IDocumentEditorState } from "./types";
 
 export type BuilderAction =
+  | DocumentEditorResetWithStateAction
+  //
   | DocumentEditorCanvasEventTargetHtmlBackendKeyDown
   //
   | DocumentEditorCanvasEventTargetHtmlBackendPointerMove
@@ -189,6 +191,10 @@ export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleD
     };
 
 //
+export interface DocumentEditorResetWithStateAction {
+  type: "document/reset";
+  state: IDocumentEditorState;
+}
 
 export interface DocumentEditorNodeSelectAction {
   type: "document/node/select";

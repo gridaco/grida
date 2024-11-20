@@ -96,37 +96,44 @@ export namespace iofigma {
       export function document(
         node: SubcanvasNode
       ): grida.program.document.IDocumentDefinition {
-        const nodes: grida.program.nodes.Node[] = [];
-        if ("children" in node) {
-          for (const child of node.children) {
-            const n = node_without_children(child);
-            if (n) {
-              nodes.push(n);
-            }
-          }
-        }
-        const root: grida.program.nodes.ContainerNode = node_without_children(
-          node
-        )! as grida.program.nodes.ContainerNode;
-        root.position = "relative";
-        root.left = 0;
-        root.top = 0;
+        const nodes: Record<string, grida.program.nodes.Node> = {};
 
-        if (nodes.length > 0) {
-          (root as grida.program.nodes.i.IChildren).children = nodes.map(
-            (n) => n.id
-          );
+        function processNode(
+          currentNode: SubcanvasNode
+        ): grida.program.nodes.Node | undefined {
+          const processedNode = node_without_children(currentNode);
+
+          if (!processedNode) {
+            return undefined;
+          }
+
+          // Add the node to the flat structure
+          nodes[processedNode.id] = processedNode;
+
+          // If the node has children, process them recursively
+          if ("children" in currentNode && currentNode.children?.length) {
+            (processedNode as grida.program.nodes.i.IChildren).children =
+              currentNode.children
+                .map(processNode) // Process each child
+                .filter((child) => child !== undefined) // Remove undefined nodes
+                .map((child) => child!.id); // Map to IDs
+          }
+
+          return processedNode;
+        }
+
+        const rootNode = processNode(node) as grida.program.nodes.ContainerNode;
+        rootNode.position = "relative";
+        rootNode.left = 0;
+        rootNode.top = 0;
+
+        if (!rootNode) {
+          throw new Error("Failed to process root node");
         }
 
         return {
-          nodes: {
-            [root.id]: root,
-            ...nodes.reduce((acc: any, node) => {
-              acc[node.id] = node;
-              return acc;
-            }, {}),
-          },
-          root_id: root.id,
+          nodes,
+          root_id: rootNode.id,
         };
       }
 
@@ -138,11 +145,15 @@ export namespace iofigma {
             throw new Error(`Unsupported node type: ${node.type}`);
           }
           //
+          case "INSTANCE":
           case "FRAME": {
             const {
               clipsContent,
               itemSpacing,
               paddingLeft,
+              paddingRight,
+              paddingTop,
+              paddingBottom,
               layoutWrap,
               fills,
             } = node;
@@ -168,7 +179,8 @@ export namespace iofigma {
 
               fill: first_visible_fill ? paint(first_visible_fill) : undefined,
               style: {
-                //     // padding:
+                overflow: clipsContent ? "clip" : undefined,
+                padding: `${paddingTop ?? 0}px ${paddingRight ?? 0}px ${paddingBottom ?? 0}px ${paddingLeft ?? 0}px`,
               },
               cornerRadius: node.cornerRadius
                 ? node.cornerRadius
@@ -217,6 +229,7 @@ export namespace iofigma {
               textDecoration: node.style.textDecoration
                 ? textDecorationMap[node.style.textDecoration] ?? "none"
                 : "none",
+              // lineHeight: node.style.lineHeightPx,
               fontSize: node.style.fontSize ?? 0,
               fontFamily: node.style.fontFamily,
               fontWeight:
@@ -260,19 +273,47 @@ export namespace iofigma {
           }
           case "BOOLEAN_OPERATION":
           case "ELLIPSE":
-          case "INSTANCE":
           case "LINE":
           case "REGULAR_POLYGON":
           case "SLICE":
-          case "STAR":
+          case "STAR": {
+            return;
+            // throw new Error(`Unsupported node type: ${node.type}`);
+          }
           case "VECTOR": {
-            throw new Error(`Unsupported node type: ${node.type}`);
-            // return {
-            //   id: node.id,
-            //   active: node.visible ?? true,
-            //   locked: node.locked ?? false,
-            //   rotation: node.rotation ?? 0,
-            // };
+            // TODO: fallbacks to rectangle
+            const { fills } = node;
+
+            const first_visible_fill = first_visible(fills);
+
+            return {
+              id: node.id,
+              name: node.name,
+              active: node.visible ?? true,
+              locked: node.locked ?? false,
+              rotation: node.rotation ?? 0,
+              opacity: node.opacity ?? 1,
+              zIndex: 0,
+              type: "rectangle",
+              //
+              position: "absolute",
+              left: node.relativeTransform![0][2],
+              top: node.relativeTransform![1][2],
+              width: node.size!.x,
+              height: node.size!.y,
+              fill: first_visible_fill ? paint(first_visible_fill) : undefined,
+              effects: [], // TODO:
+              cornerRadius: node.cornerRadius
+                ? node.cornerRadius
+                : node.rectangleCornerRadii
+                  ? {
+                      topLeftRadius: node.rectangleCornerRadii[0],
+                      topRightRadius: node.rectangleCornerRadii[1],
+                      bottomRightRadius: node.rectangleCornerRadii[2],
+                      bottomLeftRadius: node.rectangleCornerRadii[3],
+                    }
+                  : 0,
+            } satisfies grida.program.nodes.RectangleNode;
           }
 
           // components

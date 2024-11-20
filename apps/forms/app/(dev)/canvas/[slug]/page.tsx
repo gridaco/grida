@@ -50,12 +50,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useDialogState } from "@/components/hooks/use-dialog-state";
+import { ImportFromFigmaDialog } from "../import-from-figma";
+import { iofigma } from "@/grida/io-figma";
 
 export default function CanvasPlaygroundPage({
   params,
 }: {
   params: { slug: string };
 }) {
+  const importFromFigmaDialog = useDialogState("import-from-figma");
   const fonts = useGoogleFontsList();
   const slug = params.slug;
   const [state, dispatch] = useReducer(
@@ -69,6 +73,18 @@ export default function CanvasPlaygroundPage({
 
   return (
     <main className="w-screen h-screen overflow-hidden">
+      <ImportFromFigmaDialog
+        {...importFromFigmaDialog}
+        onImport={(node) => {
+          dispatch({
+            type: "document/reset",
+            state: initDocumentEditorState({
+              editable: true,
+              document: iofigma.restful.map.document(node as any),
+            }),
+          });
+        }}
+      />
       <StandaloneDocumentEditor initial={state} dispatch={dispatch}>
         <div className="flex w-full h-full">
           <aside>
@@ -80,7 +96,9 @@ export default function CanvasPlaygroundPage({
                       <GridaLogo className="inline-block w-4 h-4 me-2" />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start">
-                      <DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={importFromFigmaDialog.openDialog}
+                      >
                         <FigmaLogoIcon className="me-2 inline-block" />
                         Import from Figma
                       </DropdownMenuItem>

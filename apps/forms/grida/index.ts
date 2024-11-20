@@ -577,6 +577,8 @@ export namespace grida {
         //
         | "aspectRatio"
         //
+        | "overflow"
+        //
         | "flexDirection"
         | "flexWrap"
         | "justifyContent"
@@ -617,6 +619,7 @@ export namespace grida {
           fontFamily,
           fontSize,
           fontWeight,
+          // lineHeight,
           //
           style,
         } = styles;
@@ -639,6 +642,7 @@ export namespace grida {
             : undefined,
           textDecoration: textDecoration,
           fontFamily: fontFamily,
+          // lineHeight: lineHeight,
           fontSize: fontSize,
           fontWeight: fontWeight,
           //
@@ -1196,6 +1200,10 @@ export namespace grida {
           fontFamily?: string;
           fontSize: number;
           fontWeight: cg.NFontWeight;
+          /**
+           * @deprecated
+           */
+          // lineHeight?: number;
         }
 
         /**
