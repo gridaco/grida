@@ -101,7 +101,7 @@ export function SelectedNodeProperties() {
     //
     boxShadow,
     //
-    borderWidth,
+    // borderWidth,
     //
     margin,
     padding,
@@ -122,9 +122,9 @@ export function SelectedNodeProperties() {
     ...(style || {}),
   } satisfies grida.program.css.ExplicitlySupportedCSSProperties;
 
-  const border = {
-    borderWidth,
-  };
+  // const border = {
+  //   borderWidth,
+  // };
 
   return (
     <div key={selected_node_id}>
@@ -358,13 +358,13 @@ export function SelectedNodeProperties() {
               onValueChange={selectedNode.cornerRadius}
             />
           </PropertyLine>
-          <PropertyLine>
+          {/* <PropertyLine>
             <PropertyLineLabel>Border</PropertyLineLabel>
             <BorderControl
               value={border as any}
               onValueChange={selectedNode.border}
             />
-          </PropertyLine>
+          </PropertyLine> */}
           {fill && (
             <PropertyLine>
               <PropertyLineLabel>Fill</PropertyLineLabel>

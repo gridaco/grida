@@ -565,8 +565,8 @@ export function useDocument() {
         changeNodeStyle(selected_node_id!, "padding", value),
       aspectRatio: (value?: number) =>
         changeNodeStyle(selected_node_id!, "aspectRatio", value),
-      border: (value?: any) =>
-        changeNodeStyle(selected_node_id!, "borderWidth", value.borderWidth),
+      // border: (value?: any) =>
+      //   changeNodeStyle(selected_node_id!, "borderWidth", value.borderWidth),
       boxShadow: (value?: any) =>
         changeNodeStyle(selected_node_id!, "boxShadow", value.boxShadow),
       // backgroundColor: (value?: grida.program.css.RGBA) =>

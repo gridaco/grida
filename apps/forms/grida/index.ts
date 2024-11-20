@@ -557,7 +557,7 @@ export namespace grida {
         //
         | "boxShadow"
         //
-        | "borderWidth"
+        // | "borderWidth"
         //
         | "margin"
         | "padding"
@@ -596,7 +596,7 @@ export namespace grida {
           rotation,
           fill,
           fit,
-          cornerRadius: __,
+          cornerRadius,
           //
           textAlign,
           textAlignVertical,
@@ -628,6 +628,10 @@ export namespace grida {
           fontFamily: fontFamily,
           fontSize: fontSize,
           fontWeight: fontWeight,
+          //
+          borderRadius: cornerRadius
+            ? cornerRadiusToBorderRadius(cornerRadius)
+            : undefined,
           //
           ...style,
         } satisfies React.CSSProperties;
@@ -741,6 +745,17 @@ export namespace grida {
        */
       export function rgbaToHex(color: grida.program.css.RGBA): string {
         return `${color.r.toString(16).padStart(2, "0")}${color.g.toString(16).padStart(2, "0")}${color.b.toString(16).padStart(2, "0")}`;
+      }
+
+      export function cornerRadiusToBorderRadius(
+        cr: nodes.i.IRectangleCorner["cornerRadius"]
+      ): string {
+        if (!cr) return "0";
+        if (typeof cr === "number") {
+          return `${cr}px`;
+        } else {
+          return `${cr.topLeftRadius}px ${cr.topRightRadius}px ${cr.bottomRightRadius}px ${cr.bottomLeftRadius}px`;
+        }
       }
     }
 
@@ -994,6 +1009,15 @@ export namespace grida {
         }
 
         /**
+         * specifies node's x rotation in degrees
+         *
+         * @default 0
+         */
+        export interface IRotation {
+          rotation?: number;
+        }
+
+        /**
          * Node that can be expanded in hierarchy
          */
         export interface IExpandable {
@@ -1105,15 +1129,6 @@ export namespace grida {
         }
 
         /**
-         * specifies node's x rotation in degrees
-         *
-         * @default 0
-         */
-        export interface IRotation {
-          rotation?: number;
-        }
-
-        /**
          * Text Style
          *
          * a set of properties that can be either applied to a text or textspan
@@ -1172,6 +1187,87 @@ export namespace grida {
            */
           props: Record<string, schema.Value>;
         }
+      }
+
+      export namespace properties {
+        export const ibase: ReadonlyArray<keyof i.IBaseNode> = ["id", "name"];
+        export const iscene: ReadonlyArray<keyof i.ISceneNode> = [
+          "active",
+          "locked",
+        ];
+        export const iexpandable: ReadonlyArray<keyof i.IExpandable> = [
+          "expanded",
+        ];
+        export const iexportable: ReadonlyArray<keyof i.IExportable> = [];
+        export const iopacity: ReadonlyArray<keyof i.IOpacity> = ["opacity"];
+        export const izindex: ReadonlyArray<keyof i.IZIndex> = ["zIndex"];
+        export const ihrefable: ReadonlyArray<keyof i.IHrefable> = [
+          "href",
+          "target",
+        ];
+        export const irectanglecorner: ReadonlyArray<keyof i.IRectangleCorner> =
+          ["cornerRadius"];
+        export const ifill: ReadonlyArray<keyof i.IFill> = ["fill"];
+        export const istroke: ReadonlyArray<keyof i.IStroke> = ["stroke"];
+        export const ieffects: ReadonlyArray<keyof i.IEffects> = ["effects"];
+        export const icssstylable: ReadonlyArray<keyof i.ICSSStylable> = [
+          "style",
+        ];
+
+        // nodes
+        export const image: ReadonlyArray<keyof ImageNode> = [
+          ...ibase,
+          ...iscene,
+          ...iopacity,
+          ...izindex,
+          ...ihrefable,
+          ...ifill,
+          "src",
+          "alt",
+        ];
+        export const rectangle: ReadonlyArray<keyof RectangleNode> = [
+          ...ibase,
+          ...iscene,
+          ...iopacity,
+          ...izindex,
+          ...ihrefable,
+          ...ifill,
+          ...ieffects,
+          ...irectanglecorner,
+          "width",
+          "height",
+        ];
+        export const ellipse: ReadonlyArray<keyof EllipseNode> = [
+          ...ibase,
+          ...iscene,
+          ...iopacity,
+          ...izindex,
+          ...ihrefable,
+          ...ifill,
+          ...ieffects,
+          "width",
+          "height",
+        ];
+
+        export const text: ReadonlyArray<keyof TextNode> = [
+          ...ibase,
+          ...iscene,
+          ...iopacity,
+          ...izindex,
+          ...ihrefable,
+          ...ifill,
+          "text",
+        ];
+
+        export const container: ReadonlyArray<keyof ContainerNode> = [
+          ...ibase,
+          ...iscene,
+          ...iopacity,
+          ...izindex,
+          ...ihrefable,
+          ...ifill,
+          ...irectanglecorner,
+        ];
       }
 
       /**

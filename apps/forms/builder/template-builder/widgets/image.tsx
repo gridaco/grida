@@ -28,7 +28,11 @@ export const ImageWidget = ({
   };
 
   return (
-    <div id={id} style={divStyles} {...data_attributes}>
+    <div
+      id={id}
+      style={{ ...divStyles, overflow: "hidden" }}
+      {...data_attributes}
+    >
       {src && (
         // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
         <img

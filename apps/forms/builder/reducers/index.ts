@@ -693,7 +693,12 @@ function nodeReducer<N extends Partial<grida.program.nodes.Node>>(
         break;
       }
       case "node/change/cornerRadius": {
-        assert(draft.type === "rectangle");
+        assert(
+          draft.type === "rectangle" ||
+            draft.type === "container" ||
+            draft.type === "image",
+          "node type does not support cornerRadius"
+        );
 
         // TODO: make [cornerRadius < (Math.min(width, height) / 2)]
 
