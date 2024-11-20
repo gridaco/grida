@@ -30,6 +30,7 @@ export function NodeHierarchyList() {
     pointerEnterNode,
     changeNodeActive,
     changeNodeLocked,
+    getNodeDepth,
   } = useDocument();
 
   // TODO: need nested nodes for templates
@@ -41,12 +42,13 @@ export function NodeHierarchyList() {
         const n = document.nodes[id];
         const selected = selected_node_id === n.id;
         const hovered = hovered_node_id === n.id;
+        const depth = getNodeDepth(n.id);
         return (
           <SidebarMenuItem
             key={n.id}
             muted
             hovered={hovered}
-            level={1}
+            level={depth}
             selected={selected}
             onSelect={() => {
               selectNode(n.id);

@@ -106,6 +106,7 @@
     "embla-carousel-autoplay": "^8.3.0",
     "embla-carousel-react": "^8.3.0",
     "fast-xml-parser": "^4.4.0",
+    "figma-api": "2.0.1-beta",
     "file-saver": "^2.0.5",
     "flat": "^6.0.1",
     "framer-motion": "^11.1.9",
@@ -163,6 +164,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@figma/rest-api-spec": "^0.21.0",
     "@next/font": "^14.2.4",
     "@supabase/storage-js": "^2.6.0",
     "@tailwindcss/container-queries": "^0.1.1",

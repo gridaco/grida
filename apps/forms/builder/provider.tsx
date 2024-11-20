@@ -143,6 +143,23 @@ export function useDocument() {
     [state.document.nodes]
   );
 
+  const getNodeDepth = useCallback(
+    (node_id: string) => {
+      const parent_ids = [];
+      let current_id = node_id;
+
+      // Traverse up the tree to collect parent IDs
+      while (state.document_ctx.__ctx_nid_to_parent_id[current_id]) {
+        const parent_id = state.document_ctx.__ctx_nid_to_parent_id[current_id];
+        parent_ids.push(parent_id);
+        current_id = parent_id;
+      }
+
+      return parent_ids.length;
+    },
+    [state.document_ctx]
+  );
+
   const getNodeAbsoluteRotation = useCallback(
     (node_id: string) => {
       const parent_ids = [];
@@ -445,7 +462,7 @@ export function useDocument() {
   );
 
   const changeTextNodeTextAlign = useCallback(
-    (node_id: string, textAlign: grida.program.cg.TextAign) => {
+    (node_id: string, textAlign: grida.program.cg.TextAlign) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "node/change/textAlign",
@@ -458,7 +475,10 @@ export function useDocument() {
   );
 
   const changeTextNodeTextAlignVertical = useCallback(
-    (node_id: string, textAlignVertical: grida.program.cg.TextAignVertical) => {
+    (
+      node_id: string,
+      textAlignVertical: grida.program.cg.TextAlignVertical
+    ) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "node/change/textAlignVertical",
@@ -551,9 +571,9 @@ export function useDocument() {
         changeTextNodeFontWeight(selected_node_id!, value),
       fontSize: (value: number) =>
         changeTextNodeFontSize(selected_node_id!, value),
-      textAlign: (value: grida.program.cg.TextAign) =>
+      textAlign: (value: grida.program.cg.TextAlign) =>
         changeTextNodeTextAlign(selected_node_id!, value),
-      textAlignVertical: (value: grida.program.cg.TextAignVertical) =>
+      textAlignVertical: (value: grida.program.cg.TextAlignVertical) =>
         changeTextNodeTextAlignVertical(selected_node_id!, value),
       // textColor: (value: grida.program.css.RGBA) =>
       // changeNodeStyle(selected_node_id!, "textColor", value),
@@ -612,6 +632,7 @@ export function useDocument() {
       state,
       selected_node_id,
       selectedNode,
+      getNodeDepth,
       getNodeAbsoluteRotation,
       selectNode,
       changeNodeActive,
@@ -629,6 +650,7 @@ export function useDocument() {
     state,
     selected_node_id,
     selectedNode,
+    getNodeDepth,
     getNodeAbsoluteRotation,
     selectNode,
     changeNodeActive,

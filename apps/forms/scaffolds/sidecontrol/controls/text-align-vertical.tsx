@@ -10,8 +10,8 @@ export function TextAlignVerticalControl({
   value,
   onValueChange,
 }: {
-  value?: grida.program.cg.TextAignVertical;
-  onValueChange?: (value: grida.program.cg.TextAignVertical) => void;
+  value?: grida.program.cg.TextAlignVertical;
+  onValueChange?: (value: grida.program.cg.TextAlignVertical) => void;
 }) {
   return (
     <ToggleGroup
@@ -21,17 +21,17 @@ export function TextAlignVerticalControl({
       onValueChange={onValueChange}
     >
       <ToggleGroupItem
-        value={"top" satisfies grida.program.cg.TextAignVertical}
+        value={"top" satisfies grida.program.cg.TextAlignVertical}
       >
         <TextAlignTopIcon />
       </ToggleGroupItem>
       <ToggleGroupItem
-        value={"center" satisfies grida.program.cg.TextAignVertical}
+        value={"center" satisfies grida.program.cg.TextAlignVertical}
       >
         <TextAlignMiddleIcon />
       </ToggleGroupItem>
       <ToggleGroupItem
-        value={"bottom" satisfies grida.program.cg.TextAignVertical}
+        value={"bottom" satisfies grida.program.cg.TextAlignVertical}
       >
         <TextAlignBottomIcon />
       </ToggleGroupItem>

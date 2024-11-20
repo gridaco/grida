@@ -12,7 +12,7 @@ export function PaintChip({ paint }: { paint: grida.program.cg.Paint }) {
   }
 }
 
-export function RGBAChip({ rgba }: { rgba: grida.program.css.RGBA }) {
+export function RGBAChip({ rgba }: { rgba: grida.program.css.RGBA8888 }) {
   return (
     <div className="relative w-6 h-6 rounded-sm border border-gray-300 overflow-hidden">
       <div

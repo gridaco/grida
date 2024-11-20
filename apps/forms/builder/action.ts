@@ -270,11 +270,11 @@ interface ITextNodeChangeFontSizeAction extends INodeID {
   fontSize: number;
 }
 interface ITextNodeChangeTextAlignAction extends INodeID {
-  textAlign: grida.program.cg.TextAign;
+  textAlign: grida.program.cg.TextAlign;
 }
 
 interface ITextNodeChangeTextAlignVerticalAction extends INodeID {
-  textAlignVertical: grida.program.cg.TextAignVertical;
+  textAlignVertical: grida.program.cg.TextAlignVertical;
 }
 
 interface INodeChangeStyleAction extends INodeID {

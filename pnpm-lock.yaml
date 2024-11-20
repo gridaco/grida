@@ -547,6 +547,9 @@ importers:
       fast-xml-parser:
         specifier: ^4.4.0
         version: 4.4.0
+      figma-api:
+        specifier: 2.0.1-beta
+        version: 2.0.1-beta
       file-saver:
         specifier: ^2.0.5
         version: 2.0.5
@@ -713,6 +716,9 @@ importers:
         specifier: ^3.23.8
         version: 3.23.8
     devDependencies:
+      '@figma/rest-api-spec':
+        specifier: ^0.21.0
+        version: 0.21.0
       '@next/font':
         specifier: ^14.2.4
         version: 14.2.4(next@14.2.5)
@@ -11961,6 +11967,10 @@ packages:
       axios: 1.6.7(debug@4.3.1)
       mime-types: 2.1.35
     dev: false
+
+  /@figma/rest-api-spec@0.21.0:
+    resolution: {integrity: sha512-dOXROcTB/veCsyPJI9GyL1pFl5RTPkutD1A5PFuZtXPoVpOKengOIn+CY3goVrrxpjSAH7PczmqcEij8OHuiRw==}
+    dev: true
 
   /@fingerprintjs/fingerprintjs@4.3.0:
     resolution: {integrity: sha512-eZYh6XVvMp5iyoT9y+/llGxqoACr01JeBTfy6NAMaQ6K2a3nZmyPKoYv5V89QNN8jUqzgXeTOICClEUtktLdtw==}
@@ -23438,6 +23448,12 @@ packages:
     dependencies:
       undici-types: 5.26.5
 
+  /@types/node@22.9.1:
+    resolution: {integrity: sha512-p8Yy/8sw1caA8CdRIQBG5tiLHmxtQKObCijiAa9Ez+d4+PRffM4054xbju0msf+cvhJpnFEeNjxmVT/0ipktrg==}
+    dependencies:
+      undici-types: 6.19.8
+    dev: false
+
   /@types/normalize-package-data@2.4.4:
     resolution: {integrity: sha512-37i+OaWTh9qeK4LSHPsyRC7NahnGotNuZvjLSgcPzblpHB3rrCJxAOgI5gCdKm7coonsaX1Of0ILiTcnZjbfxA==}
     dev: true
@@ -31373,6 +31389,15 @@ packages:
     resolution: {integrity: sha512-0btnI/H8f2pavGMN8w40mlSKOfTK2SVJmBfBeVIj3kNw0swwgzyRq0d5TJVOwodFmtvpPeWPN/MCcfuWF0Ezbw==}
     deprecated: This module is no longer supported.
     dev: true
+
+  /figma-api@2.0.1-beta:
+    resolution: {integrity: sha512-Hegr8g5UGIr3T5yRGUQsMy43OkQgx25zL1w7k5KRf6ady11mXIDq0k9DOpgWRyUltcd4GI001wOZz37J6osOkg==}
+    dependencies:
+      '@types/node': 22.9.1
+      axios: 1.6.7(debug@4.3.1)
+    transitivePeerDependencies:
+      - debug
+    dev: false
 
   /figures@1.7.0:
     resolution: {integrity: sha512-UxKlfCRuCBxSXU4C6t9scbDyWZ4VlaFFdojKtzJuSkuOBQ5CNFum+zZXFwHjo+CxBC1t6zlYPgHIgFjL8ggoEQ==}
@@ -47129,6 +47154,10 @@ packages:
 
   /undici-types@5.26.5:
     resolution: {integrity: sha512-JlCMO+ehdEIKqlFxk6IfVoAUVmgz7cU7zD/h9XZ0qzeosSHmUJVOzSQvvYSYWXkFXC+IfLKSIffhv0sVZup6pA==}
+
+  /undici-types@6.19.8:
+    resolution: {integrity: sha512-ve2KP6f/JnbPBFyobGHuerC9g1FYGn/F8n1LWTwNxCEzd6IfqTwUQcNXgEtmmQ6DlRrC1hrSrBnCZPokRrDHjw==}
+    dev: false
 
   /undici@5.28.4:
     resolution: {integrity: sha512-72RFADWFqKmUb2hmmvNODKL3p9hcB6Gt2DOQMis1SEBaV6a4MH8soBvzg+95CYhCKPFedut2JY9bMfrDl9D23g==}

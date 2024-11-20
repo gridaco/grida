@@ -174,7 +174,7 @@ export namespace grida {
        * @see {@link IDocumentDefinition}
        */
       export interface IDocumentNodesRepository {
-        nodes: Record<string, nodes.Node>;
+        nodes: Record<nodes.NodeID, nodes.Node>;
       }
 
       /**
@@ -479,7 +479,7 @@ export namespace grida {
        * @see https://developer.mozilla.org/en-US/docs/Web/CSS/align-content
        */
       export const text_align_vertical_to_css_align_content: Record<
-        cg.TextAignVertical,
+        cg.TextAlignVertical,
         React.CSSProperties["alignContent"]
       > = {
         top: "start",
@@ -487,12 +487,25 @@ export namespace grida {
         bottom: "end",
       };
 
-      export type RGBA = {
+      /**
+       * 8-bit Integer RGBA (Standard RGBA)
+       * Used in web and raster graphics, including CSS and images.
+       */
+      export type RGBA8888 = {
+        /**
+         * Red channel value, between 0 and 255.
+         */
         r: number;
+        /**
+         * Green channel value, between 0 and 255.
+         */
         g: number;
+        /**
+         * Blue channel value, between 0 and 255.
+         */
         b: number;
         /**
-         * 0~1
+         * Alpha channel value, between 0 and 1.
          */
         a: number;
       };
@@ -668,7 +681,7 @@ export namespace grida {
         }
       }
 
-      export function toRGBAString(rgba: css.RGBA): string {
+      export function toRGBAString(rgba: css.RGBA8888): string {
         return `rgba(${rgba.r}, ${rgba.g}, ${rgba.b}, ${rgba.a})`;
       }
 
@@ -743,7 +756,7 @@ export namespace grida {
        * @example `rgba_to_hex({ r: 255, g: 255, b: 255, a: 1 })` returns `"ffffff"`
        *
        */
-      export function rgbaToHex(color: grida.program.css.RGBA): string {
+      export function rgbaToHex(color: grida.program.css.RGBA8888): string {
         return `${color.r.toString(16).padStart(2, "0")}${color.g.toString(16).padStart(2, "0")}${color.b.toString(16).padStart(2, "0")}`;
       }
 
@@ -763,6 +776,51 @@ export namespace grida {
      * Core Graphics
      */
     export namespace cg {
+      /**
+       * Floating-Point RGBA (Normalized RGBA)
+       * Used in computer graphics pipelines, shading, and rendering.
+       */
+      export type RGBAf = {
+        /**
+         * Red channel value, between 0 and 1.
+         */
+        r: number;
+        /**
+         * Green channel value, between 0 and 1.
+         */
+        g: number;
+        /**
+         * Blue channel value, between 0 and 1.
+         */
+        b: number;
+        /**
+         * Alpha channel value, between 0 and 1.
+         */
+        a: number;
+      };
+
+      /**
+       * Converts a normalized RGBA color to an 8-bit integer RGBA color.
+       * @param rgba - The normalized RGBA color to convert.
+       * @returns The 8-bit integer RGBA color.
+       * @see {@link RGBAf}
+       * @see {@link RGBA8888}
+       * @example
+       * ```typescript
+       * const rgba: RGBAf = { r: 1, g: 0.5, b: 0, a: 0.75 };
+       * const rgba8888: RGBA8888 = rgbaf_to_rgba8888(rgba);
+       * console.log(rgba8888); // { r: 255, g: 128, b: 0, a: 0.75 }
+       * ```
+       */
+      export function rgbaf_to_rgba8888(rgba: RGBAf) {
+        return {
+          r: Math.round(rgba.r * 255),
+          g: Math.round(rgba.g * 255),
+          b: Math.round(rgba.b * 255),
+          a: rgba.a,
+        };
+      }
+
       /**
        *
        * Supported fit modes
@@ -795,7 +853,7 @@ export namespace grida {
        * @see https://developer.mozilla.org/en-US/docs/Web/CSS/text-align
        * @see https://api.flutter.dev/flutter/dart-ui/TextAlign.html
        */
-      export type TextAign = "left" | "right" | "center" | "justify";
+      export type TextAlign = "left" | "right" | "center" | "justify";
 
       /**
        * Vertical text align modes
@@ -805,7 +863,7 @@ export namespace grida {
        * @see https://developer.mozilla.org/en-US/docs/Web/CSS/align-content
        * @see https://konvajs.org/api/Konva.Text.html#verticalAlign
        */
-      export type TextAignVertical = "top" | "center" | "bottom";
+      export type TextAlignVertical = "top" | "center" | "bottom";
 
       /**
        * Supported font weights in numeric values
@@ -836,7 +894,7 @@ export namespace grida {
 
       export type SolidPaint = {
         type: "solid";
-        color: css.RGBA;
+        color: css.RGBA8888;
       };
 
       export type LinearGradientPaint = {
@@ -860,7 +918,7 @@ export namespace grida {
          * 1 - end (100%)
          */
         offset: number;
-        color: css.RGBA;
+        color: css.RGBA8888;
       };
       //
       //
@@ -1069,7 +1127,7 @@ export namespace grida {
          * - [Env:HTML] for html text, `-webkit-text-stroke` will be used
          */
         export interface IStroke {
-          stroke: css.RGBA;
+          stroke: css.RGBA8888;
         }
 
         export interface IEffects {
@@ -1149,11 +1207,11 @@ export namespace grida {
           /**
            * @default "left"
            */
-          textAlign: cg.TextAign;
+          textAlign: cg.TextAlign;
           /**
            * @default "top"
            */
-          textAlignVertical: cg.TextAignVertical;
+          textAlignVertical: cg.TextAlignVertical;
         }
 
         export interface ITextValue {
@@ -1352,6 +1410,7 @@ export namespace grida {
           i.IFixedDimension,
           i.IOpacity,
           i.IZIndex,
+          i.IRotation,
           i.IFill,
           i.IEffects,
           i.IRectangleCorner {
@@ -1373,6 +1432,7 @@ export namespace grida {
           i.IFixedDimension,
           i.IOpacity,
           i.IZIndex,
+          i.IRotation,
           i.IFill,
           i.IEffects {
         type: "ellipse";

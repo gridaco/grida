@@ -10,8 +10,8 @@ export function TextAlignControl({
   value,
   onValueChange,
 }: {
-  value?: grida.program.cg.TextAign;
-  onValueChange?: (value: grida.program.cg.TextAign) => void;
+  value?: grida.program.cg.TextAlign;
+  onValueChange?: (value: grida.program.cg.TextAlign) => void;
 }) {
   return (
     <ToggleGroup
@@ -20,13 +20,13 @@ export function TextAlignControl({
       value={value}
       onValueChange={onValueChange}
     >
-      <ToggleGroupItem value={"left" satisfies grida.program.cg.TextAign}>
+      <ToggleGroupItem value={"left" satisfies grida.program.cg.TextAlign}>
         <TextAlignLeftIcon />
       </ToggleGroupItem>
-      <ToggleGroupItem value={"center" satisfies grida.program.cg.TextAign}>
+      <ToggleGroupItem value={"center" satisfies grida.program.cg.TextAlign}>
         <TextAlignCenterIcon />
       </ToggleGroupItem>
-      <ToggleGroupItem value={"right" satisfies grida.program.cg.TextAign}>
+      <ToggleGroupItem value={"right" satisfies grida.program.cg.TextAlign}>
         <TextAlignRightIcon />
       </ToggleGroupItem>
     </ToggleGroup>

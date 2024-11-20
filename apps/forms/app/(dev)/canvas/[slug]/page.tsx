@@ -38,11 +38,18 @@ import {
   BoxIcon,
   CircleIcon,
   CursorArrowIcon,
+  FigmaLogoIcon,
   FrameIcon,
   ImageIcon,
   TextIcon,
 } from "@radix-ui/react-icons";
 import KeyboardInputOverlay from "@/builder/devtools/keyboard-input-overlay";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export default function CanvasPlaygroundPage({
   params,
@@ -68,10 +75,18 @@ export default function CanvasPlaygroundPage({
             <SidebarRoot>
               <SidebarSection className="mt-4">
                 <span>
-                  <GridaLogo className="inline-block w-4 h-4 me-2" />
-                  <span className="font-bold text-xs">
-                    Grida Canvas SDK Playground
-                  </span>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger>
+                      <GridaLogo className="inline-block w-4 h-4 me-2" />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start">
+                      <DropdownMenuItem>
+                        <FigmaLogoIcon className="me-2 inline-block" />
+                        Import from Figma
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  <span className="font-bold text-xs">Canvas Playground</span>
                 </span>
               </SidebarSection>
               <SidebarSection className="mt-4">
