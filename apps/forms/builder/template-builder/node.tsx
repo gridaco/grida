@@ -56,7 +56,7 @@ export function NodeElement<P extends Record<string, any>>({
       case "container":
       case "image":
       case "text":
-      case "svg":
+      case "vector":
       case "rectangle":
       case "ellipse": {
         return TemplateBuilderWidgets[node.type];
@@ -87,7 +87,7 @@ export function NodeElement<P extends Record<string, any>>({
     text: computed.text,
     props: computed.props,
     src: computed.src,
-    svg: node.svg,
+    path: node.path,
     opacity: node.opacity,
     zIndex: DEFAULT_ZINDEX ?? node.zIndex,
     position: DEFAULT_POSITION ?? node.position,
@@ -150,7 +150,7 @@ const fillings = {
   text: "color",
   container: "background",
   image: "background",
-  svg: "none",
+  vector: "none",
   rectangle: "none",
   ellipse: "none",
   template_instance: "none",

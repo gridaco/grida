@@ -105,7 +105,7 @@ function NodeHierarchyItemIcon({
       return <BoxIcon className={className} />;
     case "ellipse":
       return <CircleIcon className={className} />;
-    case "svg":
+    case "vector":
       return <TransformIcon className={className} />;
   }
   return <BoxIcon className={className} />;

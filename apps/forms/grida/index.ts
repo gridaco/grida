@@ -781,6 +781,16 @@ export namespace grida {
      */
     export namespace cg {
       /**
+       * the RGBA structure itself. the rgb value may differ as it could both represent 0-1 or 0-255 by the context.
+       */
+      export type TRGBA = {
+        r: number;
+        g: number;
+        b: number;
+        a: number;
+      };
+
+      /**
        * Floating-Point RGBA (Normalized RGBA)
        * Used in computer graphics pipelines, shading, and rendering.
        */
@@ -824,6 +834,21 @@ export namespace grida {
           a: rgba.a,
         };
       }
+
+      export function rgbaf_multiply_alpha(color: TRGBA, alpha: number): TRGBA {
+        return {
+          r: color.r,
+          g: color.g,
+          b: color.b,
+          a: color.a * alpha,
+        };
+      }
+
+      /**
+       * @see https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/fill-rule
+       * @see https://www.figma.com/plugin-docs/api/properties/VectorPath-windingrule/
+       */
+      export type FillRule = "nonzero" | "evenodd";
 
       /**
        *
@@ -974,7 +999,7 @@ export namespace grida {
         | TextNode
         | ImageNode
         | ContainerNode
-        | SvgNode
+        | VectorNode
         | RectangleNode
         | EllipseNode
         | InstanceNode
@@ -990,7 +1015,7 @@ export namespace grida {
        */
       export type AnyNode = Omit<
         Partial<TextNode> &
-          Partial<SvgNode> &
+          Partial<VectorNode> &
           Partial<RectangleNode> &
           Partial<ImageNode> &
           Partial<ContainerNode> &
@@ -1388,13 +1413,16 @@ export namespace grida {
       /**
        * @deprecated - not ready - do not use in production
        */
-      export interface SvgNode
+      export interface VectorNode
         extends i.IBaseNode,
           i.ISceneNode,
-          i.ICSSStylable,
-          i.IHrefable {
-        type: "svg";
-        svg: string;
+          i.IHrefable,
+          i.IPositioning,
+          // i.ICSSDimension,
+          i.IFixedDimension {
+        type: "vector";
+        path: string;
+        fillRule: "nonzero" | "evenodd";
       }
 
       /**

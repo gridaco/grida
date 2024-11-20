@@ -958,7 +958,7 @@ function initialNode(
         ...seed,
       } satisfies grida.program.nodes.ImageNode;
     }
-    case "svg":
+    case "vector":
     case "instance":
     case "template_instance": {
       throw new Error(`${type} insertion not supported`);

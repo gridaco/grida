@@ -5,6 +5,7 @@ import type {
   Node,
   Paint,
   TypeStyle,
+  Path,
 } from "@figma/rest-api-spec";
 
 export namespace iofigma {
@@ -38,16 +39,23 @@ export namespace iofigma {
         UNDERLINE: "underline",
       };
 
+      export const windingRuleMap: Record<
+        Path["windingRule"],
+        grida.program.cg.FillRule
+      > = {
+        EVENODD: "evenodd",
+        NONZERO: "nonzero",
+      };
+
       export function paint(paint: Paint): grida.program.cg.Paint | undefined {
         switch (paint.type) {
           case "SOLID": {
             return {
               type: "solid",
-              color: grida.program.cg.rgbaf_to_rgba8888(
+              color: grida.program.cg.rgbaf_multiply_alpha(
+                grida.program.cg.rgbaf_to_rgba8888(paint.color),
                 // opacity is present only when it is not 1
-                paint.opacity !== undefined
-                  ? { ...paint.color, a: paint.opacity }
-                  : paint.color
+                paint.opacity ?? 1
               ),
             };
           }
@@ -63,7 +71,11 @@ export namespace iofigma {
               stops: paint.gradientStops.map((stop) => {
                 return {
                   offset: stop.position,
-                  color: grida.program.cg.rgbaf_to_rgba8888(stop.color),
+                  color: grida.program.cg.rgbaf_multiply_alpha(
+                    grida.program.cg.rgbaf_to_rgba8888(stop.color),
+                    // opacity is present only when it is not 1
+                    paint.opacity ?? 1
+                  ),
                 };
               }),
             };
@@ -271,8 +283,31 @@ export namespace iofigma {
                   : 0,
             } satisfies grida.program.nodes.RectangleNode;
           }
+          case "ELLIPSE": {
+            const { fills } = node;
+
+            const first_visible_fill = first_visible(fills);
+
+            return {
+              id: node.id,
+              name: node.name,
+              active: node.visible ?? true,
+              locked: node.locked ?? false,
+              rotation: node.rotation ?? 0,
+              opacity: node.opacity ?? 1,
+              zIndex: 0,
+              type: "ellipse",
+              //
+              position: "absolute",
+              left: node.relativeTransform![0][2],
+              top: node.relativeTransform![1][2],
+              width: node.size!.x,
+              height: node.size!.y,
+              fill: first_visible_fill ? paint(first_visible_fill) : undefined,
+              effects: [], // TODO:
+            } satisfies grida.program.nodes.EllipseNode;
+          }
           case "BOOLEAN_OPERATION":
-          case "ELLIPSE":
           case "LINE":
           case "REGULAR_POLYGON":
           case "SLICE":
@@ -291,29 +326,33 @@ export namespace iofigma {
               name: node.name,
               active: node.visible ?? true,
               locked: node.locked ?? false,
-              rotation: node.rotation ?? 0,
-              opacity: node.opacity ?? 1,
-              zIndex: 0,
-              type: "rectangle",
+              // rotation: node.rotation ?? 0,
+              // opacity: node.opacity ?? 1,
+              // zIndex: 0,
+              type: "vector",
               //
               position: "absolute",
               left: node.relativeTransform![0][2],
               top: node.relativeTransform![1][2],
               width: node.size!.x,
               height: node.size!.y,
-              fill: first_visible_fill ? paint(first_visible_fill) : undefined,
-              effects: [], // TODO:
-              cornerRadius: node.cornerRadius
-                ? node.cornerRadius
-                : node.rectangleCornerRadii
-                  ? {
-                      topLeftRadius: node.rectangleCornerRadii[0],
-                      topRightRadius: node.rectangleCornerRadii[1],
-                      bottomRightRadius: node.rectangleCornerRadii[2],
-                      bottomLeftRadius: node.rectangleCornerRadii[3],
-                    }
-                  : 0,
-            } satisfies grida.program.nodes.RectangleNode;
+              // fill: first_visible_fill ? paint(first_visible_fill) : undefined,
+              // effects: [], // TODO:
+              // cornerRadius: node.cornerRadius
+              //   ? node.cornerRadius
+              //   : node.rectangleCornerRadii
+              //     ? {
+              //         topLeftRadius: node.rectangleCornerRadii[0],
+              //         topRightRadius: node.rectangleCornerRadii[1],
+              //         bottomRightRadius: node.rectangleCornerRadii[2],
+              //         bottomLeftRadius: node.rectangleCornerRadii[3],
+              //       }
+              //     : 0,
+              path: node.fillGeometry?.[0]?.path ?? "",
+              fillRule: node.fillGeometry?.[0]?.windingRule
+                ? windingRuleMap[node.fillGeometry?.[0]?.windingRule]
+                : "nonzero",
+            } satisfies grida.program.nodes.VectorNode;
           }
 
           // components

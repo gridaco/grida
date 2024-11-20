@@ -7,7 +7,7 @@ import { LayerkWidget } from "./layer";
 import { LayoutWidget } from "./layout";
 import { LinkWidget } from "./link";
 import { RichTextWidget } from "./richtext";
-import { SvgWidget } from "./svg";
+import { VectorWidget } from "./vector";
 import { TextWidget } from "./text";
 import { ThemeWidget } from "./theme";
 import { ImageWidget } from "./image";
@@ -23,7 +23,7 @@ export namespace TemplateBuilderWidgets {
   export const Layout = LayoutWidget;
   // export const Link = LinkWidget;
   // export const RichText = RichTextWidget;
-  export const svg = SvgWidget;
+  export const vector = VectorWidget;
   export const rectangle = RectangleWidget;
   export const ellipse = EllipseWidget;
   export const text = TextWidget;
