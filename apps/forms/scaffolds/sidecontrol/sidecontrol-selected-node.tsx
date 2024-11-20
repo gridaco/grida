@@ -49,6 +49,7 @@ import {
 import { useNodeDomElement } from "@/builder/provider";
 import { RotateControl } from "./controls/rotate";
 import { LockClosedIcon } from "@radix-ui/react-icons";
+import { TextAlignVerticalControl } from "./controls/text-align-vertical";
 
 export function SelectedNodeProperties() {
   const { state: document, selectedNode } = useDocument();
@@ -84,6 +85,7 @@ export function SelectedNodeProperties() {
     fontWeight,
     fontSize,
     textAlign,
+    textAlignVertical,
   } = node;
 
   // const istemplate = type?.startsWith("templates/");
@@ -261,8 +263,15 @@ export function SelectedNodeProperties() {
           <PropertyLine>
             <PropertyLineLabel>Align</PropertyLineLabel>
             <TextAlignControl
-              value={textAlign as any}
+              value={textAlign}
               onValueChange={selectedNode.textAlign}
+            />
+          </PropertyLine>
+          <PropertyLine>
+            <PropertyLineLabel></PropertyLineLabel>
+            <TextAlignVerticalControl
+              value={textAlignVertical}
+              onValueChange={selectedNode.textAlignVertical}
             />
           </PropertyLine>
         </SidebarMenuSectionContent>

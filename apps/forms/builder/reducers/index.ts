@@ -441,6 +441,7 @@ export default function reducer<S extends IDocumentEditorState>(
     case "node/change/fontSize":
     case "node/change/fontWeight":
     case "node/change/textAlign":
+    case "node/change/textAlignVertical":
     case "node/change/text": {
       const { node_id } = <NodeChangeAction>action;
       return produce(state, (draft) => {
@@ -782,6 +783,11 @@ function nodeReducer<N extends Partial<grida.program.nodes.Node>>(
         draft.textAlign = action.textAlign;
         break;
       }
+      case "node/change/textAlignVertical": {
+        assert(draft.type === "text");
+        draft.textAlignVertical = action.textAlignVertical;
+        break;
+      }
 
       default: {
         throw new Error(
@@ -880,6 +886,7 @@ function initialNode(
         ...styles,
         type: "text",
         textAlign: "left",
+        textAlignVertical: "top",
         textDecoration: "none",
         fontWeight: 400,
         fontSize: 14,

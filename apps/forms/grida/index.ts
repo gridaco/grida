@@ -468,6 +468,25 @@ export namespace grida {
        */
       export type LengthPercentage = Length | Percentage;
 
+      /**
+       *
+       * {@link cg.textAlignVertical} to CSS `align-content` mapping
+       *
+       * - `top`:`start`
+       * - `center`:`center`
+       * - `bottom`:`end`
+       *
+       * @see https://developer.mozilla.org/en-US/docs/Web/CSS/align-content
+       */
+      export const text_align_vertical_to_css_align_content: Record<
+        cg.TextAignVertical,
+        React.CSSProperties["alignContent"]
+      > = {
+        top: "start",
+        center: "center",
+        bottom: "end",
+      };
+
       export type RGBA = {
         r: number;
         g: number;
@@ -580,6 +599,7 @@ export namespace grida {
           cornerRadius: __,
           //
           textAlign,
+          textAlignVertical,
           textDecoration,
           fontFamily,
           fontSize,
@@ -601,6 +621,9 @@ export namespace grida {
           rotate: rotation ? `${rotation}deg` : undefined,
           //
           textAlign: textAlign,
+          alignContent: textAlignVertical
+            ? css.text_align_vertical_to_css_align_content[textAlignVertical]
+            : undefined,
           textDecoration: textDecoration,
           fontFamily: fontFamily,
           fontSize: fontSize,
@@ -758,6 +781,16 @@ export namespace grida {
        * @see https://api.flutter.dev/flutter/dart-ui/TextAlign.html
        */
       export type TextAign = "left" | "right" | "center" | "justify";
+
+      /**
+       * Vertical text align modes
+       *
+       * - [Env:css] in css, uses `align-content` {@link css.text_align_vertical_to_css_align_content}
+       *
+       * @see https://developer.mozilla.org/en-US/docs/Web/CSS/align-content
+       * @see https://konvajs.org/api/Konva.Text.html#verticalAlign
+       */
+      export type TextAignVertical = "top" | "center" | "bottom";
 
       /**
        * Supported font weights in numeric values
@@ -1098,7 +1131,14 @@ export namespace grida {
          * a set of properties that can be applied to a text node, but not to a textspan
          */
         export interface ITextNodeStyle extends ITextStyle {
+          /**
+           * @default "left"
+           */
           textAlign: cg.TextAign;
+          /**
+           * @default "top"
+           */
+          textAlignVertical: cg.TextAignVertical;
         }
 
         export interface ITextValue {

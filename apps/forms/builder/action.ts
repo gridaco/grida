@@ -273,6 +273,10 @@ interface ITextNodeChangeTextAlignAction extends INodeID {
   textAlign: grida.program.cg.TextAign;
 }
 
+interface ITextNodeChangeTextAlignVerticalAction extends INodeID {
+  textAlignVertical: grida.program.cg.TextAignVertical;
+}
+
 interface INodeChangeStyleAction extends INodeID {
   style: Partial<React.CSSProperties>;
 }
@@ -313,6 +317,9 @@ export type NodeChangeAction =
   | ({ type: "node/change/fontWeight" } & ITextNodeChangeFontWeightAction)
   | ({ type: "node/change/fontSize" } & ITextNodeChangeFontSizeAction)
   | ({ type: "node/change/textAlign" } & ITextNodeChangeTextAlignAction)
+  | ({
+      type: "node/change/textAlignVertical";
+    } & ITextNodeChangeTextAlignVerticalAction)
   //
   | ({ type: "node/change/style" } & INodeChangeStyleAction)
   | ({ type: "node/change/src" } & INodeChangeSrcAction)

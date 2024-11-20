@@ -457,6 +457,19 @@ export function useDocument() {
     [dispatch]
   );
 
+  const changeTextNodeTextAlignVertical = useCallback(
+    (node_id: string, textAlignVertical: grida.program.cg.TextAignVertical) => {
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/textAlignVertical",
+          node_id: node_id,
+          textAlignVertical,
+        });
+      });
+    },
+    [dispatch]
+  );
+
   //
 
   const changeNodeStyle = useCallback(
@@ -540,6 +553,8 @@ export function useDocument() {
         changeTextNodeFontSize(selected_node_id!, value),
       textAlign: (value: grida.program.cg.TextAign) =>
         changeTextNodeTextAlign(selected_node_id!, value),
+      textAlignVertical: (value: grida.program.cg.TextAignVertical) =>
+        changeTextNodeTextAlignVertical(selected_node_id!, value),
       // textColor: (value: grida.program.css.RGBA) =>
       // changeNodeStyle(selected_node_id!, "textColor", value),
 
