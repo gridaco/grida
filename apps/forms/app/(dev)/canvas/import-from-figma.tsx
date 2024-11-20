@@ -12,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import React, { useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import toast from "react-hot-toast";
 
@@ -39,10 +39,13 @@ function normalize_node_id(nodeid: string) {
 }
 
 function useSessionStorage(key: string) {
-  const [state, setState] = React.useState(() => {
+  const [state, setState] = React.useState<string | null>(null);
+
+  useEffect(() => {
     const value = sessionStorage.getItem(key);
-    return value ? value : null;
-  });
+    setState(value);
+  }, [key]);
+
   const set = React.useCallback(
     (value: any) => {
       setState(value);
