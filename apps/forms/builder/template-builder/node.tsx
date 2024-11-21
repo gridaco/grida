@@ -87,7 +87,7 @@ export function NodeElement<P extends Record<string, any>>({
     text: computed.text,
     props: computed.props,
     src: computed.src,
-    path: node.path,
+    paths: node.paths,
     opacity: node.opacity,
     zIndex: DEFAULT_ZINDEX ?? node.zIndex,
     position: DEFAULT_POSITION ?? node.position,

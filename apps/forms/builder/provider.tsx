@@ -490,6 +490,38 @@ export function useDocument() {
     [dispatch]
   );
 
+  const changeTextNodeLineHeight = useCallback(
+    (
+      node_id: string,
+      lineHeight: grida.program.nodes.TextNode["lineHeight"]
+    ) => {
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/lineHeight",
+          node_id: node_id,
+          lineHeight,
+        });
+      });
+    },
+    [dispatch]
+  );
+
+  const changeTextNodeLetterSpacing = useCallback(
+    (
+      node_id: string,
+      letterSpacing: grida.program.nodes.TextNode["letterSpacing"]
+    ) => {
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/letterSpacing",
+          node_id: node_id,
+          letterSpacing,
+        });
+      });
+    },
+    [dispatch]
+  );
+
   //
 
   const changeNodeStyle = useCallback(
@@ -575,6 +607,11 @@ export function useDocument() {
         changeTextNodeTextAlign(selected_node_id!, value),
       textAlignVertical: (value: grida.program.cg.TextAlignVertical) =>
         changeTextNodeTextAlignVertical(selected_node_id!, value),
+      lineHeight: (value: grida.program.nodes.TextNode["lineHeight"]) =>
+        changeTextNodeLineHeight(selected_node_id!, value),
+      letterSpacing: (value: grida.program.nodes.TextNode["letterSpacing"]) =>
+        changeTextNodeLetterSpacing(selected_node_id!, value),
+
       // textColor: (value: grida.program.css.RGBA) =>
       // changeNodeStyle(selected_node_id!, "textColor", value),
 
@@ -605,12 +642,12 @@ export function useDocument() {
     };
   }, [
     selected_node_id,
-    changeNodeActive,
-    changeNodeLocked,
     changeNodeComponent,
     changeNodeText,
     changeNodeStyle,
     changeNodeValue,
+    changeNodeActive,
+    changeNodeLocked,
     changeNodeSrc,
     changeNodeHref,
     changeNodeTarget,
@@ -625,6 +662,9 @@ export function useDocument() {
     changeTextNodeFontWeight,
     changeTextNodeFontSize,
     changeTextNodeTextAlign,
+    changeTextNodeTextAlignVertical,
+    changeTextNodeLineHeight,
+    changeTextNodeLetterSpacing,
   ]);
 
   return useMemo(() => {
@@ -735,14 +775,18 @@ export function useEventTarget() {
   );
 
   const _throttled_pointer_move_with_raycast = useCallback(
-    throttle((clientX, clientY, position) => {
+    throttle((event: PointerEvent, position) => {
       // this is throttled - as it is expensive
-      const els = get_grida_node_elements_from_point(clientX, clientY);
+      const els = get_grida_node_elements_from_point(
+        event.clientX,
+        event.clientY
+      );
 
       dispatch({
         type: "document/canvas/backend/html/event/on-pointer-move-raycast",
         node_ids_from_point: els.map((n) => n.id),
         position,
+        metaKey: event.metaKey,
       });
     }, 30),
     [dispatch]
@@ -763,7 +807,7 @@ export function useEventTarget() {
         position: position,
       });
 
-      _throttled_pointer_move_with_raycast(clientX, clientY, position);
+      _throttled_pointer_move_with_raycast(event, position);
     },
     [dispatch, _throttled_pointer_move_with_raycast]
   );

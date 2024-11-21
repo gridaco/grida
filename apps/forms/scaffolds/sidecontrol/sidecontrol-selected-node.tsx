@@ -50,6 +50,8 @@ import { useNodeDomElement } from "@/builder/provider";
 import { RotateControl } from "./controls/rotate";
 import { LockClosedIcon } from "@radix-ui/react-icons";
 import { TextAlignVerticalControl } from "./controls/text-align-vertical";
+import { LetterSpacingControl } from "./controls/letter-spacing";
+import { LineHeightControl } from "./controls/line-height";
 
 export function SelectedNodeProperties() {
   const { state: document, selectedNode } = useDocument();
@@ -84,6 +86,8 @@ export function SelectedNodeProperties() {
     fontFamily,
     fontWeight,
     fontSize,
+    lineHeight,
+    letterSpacing,
     textAlign,
     textAlignVertical,
   } = node;
@@ -258,6 +262,20 @@ export function SelectedNodeProperties() {
             <FontSizeControl
               value={fontSize as any}
               onValueChange={selectedNode.fontSize}
+            />
+          </PropertyLine>
+          <PropertyLine>
+            <PropertyLineLabel>Line</PropertyLineLabel>
+            <LineHeightControl
+              value={lineHeight as any}
+              onValueChange={selectedNode.lineHeight}
+            />
+          </PropertyLine>
+          <PropertyLine>
+            <PropertyLineLabel>Letter</PropertyLineLabel>
+            <LetterSpacingControl
+              value={letterSpacing as any}
+              onValueChange={selectedNode.letterSpacing}
             />
           </PropertyLine>
           <PropertyLine>

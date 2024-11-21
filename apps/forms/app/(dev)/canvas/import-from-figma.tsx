@@ -26,13 +26,17 @@ async function fetchnode({
   personalAccessToken: string;
 }) {
   const client = new Figma.Api({ personalAccessToken: personalAccessToken });
+  const imagesres = await client.getImageFills({ file_key: filekey });
+  const images = imagesres.meta.images;
   const result = await client.getFileNodes(
     { file_key: filekey },
     { ids: id, geometry: "paths" }
   );
   const nodepartialdoc = result.nodes[id];
-  return nodepartialdoc;
+  return { ...nodepartialdoc, images };
 }
+
+type FetchNodeResult = Awaited<ReturnType<typeof fetchnode>>;
 
 function normalize_node_id(nodeid: string) {
   return nodeid.replace("-", ":");
@@ -60,7 +64,7 @@ export function ImportFromFigmaDialog({
   onImport,
   ...props
 }: React.ComponentProps<typeof Dialog> & {
-  onImport?: (node: Node) => void;
+  onImport?: (node: FetchNodeResult) => void;
 }) {
   const form = useRef<HTMLFormElement>(null);
 
@@ -79,7 +83,7 @@ export function ImportFromFigmaDialog({
       personalAccessToken: token,
     })
       .then((r) => {
-        onImport?.(r.document);
+        onImport?.(r);
       })
       .catch((e) => {
         console.error(e);

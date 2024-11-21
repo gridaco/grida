@@ -106,14 +106,15 @@ export namespace iofigma {
       }
 
       export function document(
-        node: SubcanvasNode
+        node: SubcanvasNode,
+        images: { [key: string]: string }
       ): grida.program.document.IDocumentDefinition {
         const nodes: Record<string, grida.program.nodes.Node> = {};
 
         function processNode(
           currentNode: SubcanvasNode
         ): grida.program.nodes.Node | undefined {
-          const processedNode = node_without_children(currentNode);
+          const processedNode = node_without_children(currentNode, images);
 
           if (!processedNode) {
             return undefined;
@@ -150,7 +151,8 @@ export namespace iofigma {
       }
 
       export function node_without_children(
-        node: SubcanvasNode
+        node: SubcanvasNode,
+        images: { [key: string]: string }
       ): grida.program.nodes.Node | undefined {
         switch (node.type) {
           case "SECTION": {
@@ -214,6 +216,7 @@ export namespace iofigma {
             const { fills } = node;
 
             const first_visible_fill = first_visible(fills);
+            const figma_text_resizing_model = node.style.textAutoResize;
 
             return {
               id: node.id,
@@ -241,7 +244,12 @@ export namespace iofigma {
               textDecoration: node.style.textDecoration
                 ? textDecorationMap[node.style.textDecoration] ?? "none"
                 : "none",
-              // lineHeight: node.style.lineHeightPx,
+              lineHeight: node.style.lineHeightPercentFontSize
+                ? node.style.lineHeightPercentFontSize / 100
+                : // normal = 1.2
+                  1.2,
+
+              letterSpacing: node.style.letterSpacing,
               fontSize: node.style.fontSize ?? 0,
               fontFamily: node.style.fontFamily,
               fontWeight:
@@ -253,6 +261,39 @@ export namespace iofigma {
             const { fills } = node;
 
             const first_visible_fill = first_visible(fills);
+
+            const cornerRadius = node.cornerRadius
+              ? node.cornerRadius
+              : node.rectangleCornerRadii
+                ? {
+                    topLeftRadius: node.rectangleCornerRadii[0],
+                    topRightRadius: node.rectangleCornerRadii[1],
+                    bottomRightRadius: node.rectangleCornerRadii[2],
+                    bottomLeftRadius: node.rectangleCornerRadii[3],
+                  }
+                : 0;
+
+            if (first_visible_fill?.type === "IMAGE") {
+              return {
+                id: node.id,
+                name: node.name,
+                active: node.visible ?? true,
+                locked: node.locked ?? false,
+                rotation: node.rotation ?? 0,
+                opacity: node.opacity ?? 1,
+                zIndex: 0,
+                type: "image",
+                src: images[first_visible_fill.imageRef!],
+                position: "absolute",
+                left: node.relativeTransform![0][2],
+                top: node.relativeTransform![1][2],
+                width: node.size!.x,
+                height: node.size!.y,
+                cornerRadius,
+                fit: "cover",
+                style: {},
+              } satisfies grida.program.nodes.ImageNode;
+            }
 
             return {
               id: node.id,
@@ -271,16 +312,7 @@ export namespace iofigma {
               height: node.size!.y,
               fill: first_visible_fill ? paint(first_visible_fill) : undefined,
               effects: [], // TODO:
-              cornerRadius: node.cornerRadius
-                ? node.cornerRadius
-                : node.rectangleCornerRadii
-                  ? {
-                      topLeftRadius: node.rectangleCornerRadii[0],
-                      topRightRadius: node.rectangleCornerRadii[1],
-                      bottomRightRadius: node.rectangleCornerRadii[2],
-                      bottomLeftRadius: node.rectangleCornerRadii[3],
-                    }
-                  : 0,
+              cornerRadius: cornerRadius,
             } satisfies grida.program.nodes.RectangleNode;
           }
           case "ELLIPSE": {
@@ -307,14 +339,15 @@ export namespace iofigma {
               effects: [], // TODO:
             } satisfies grida.program.nodes.EllipseNode;
           }
-          case "BOOLEAN_OPERATION":
-          case "LINE":
-          case "REGULAR_POLYGON":
-          case "SLICE":
-          case "STAR": {
-            return;
-            // throw new Error(`Unsupported node type: ${node.type}`);
+          case "BOOLEAN_OPERATION": {
           }
+          case "LINE": {
+          }
+          case "SLICE": {
+            return;
+          }
+          case "REGULAR_POLYGON":
+          case "STAR":
           case "VECTOR": {
             // TODO: fallbacks to rectangle
             const { fills } = node;
@@ -326,9 +359,9 @@ export namespace iofigma {
               name: node.name,
               active: node.visible ?? true,
               locked: node.locked ?? false,
-              // rotation: node.rotation ?? 0,
-              // opacity: node.opacity ?? 1,
-              // zIndex: 0,
+              rotation: node.rotation ?? 0,
+              opacity: node.opacity ?? 1,
+              zIndex: 0,
               type: "vector",
               //
               position: "absolute",
@@ -336,7 +369,7 @@ export namespace iofigma {
               top: node.relativeTransform![1][2],
               width: node.size!.x,
               height: node.size!.y,
-              // fill: first_visible_fill ? paint(first_visible_fill) : undefined,
+              fill: first_visible_fill ? paint(first_visible_fill) : undefined,
               // effects: [], // TODO:
               // cornerRadius: node.cornerRadius
               //   ? node.cornerRadius
@@ -348,10 +381,11 @@ export namespace iofigma {
               //         bottomLeftRadius: node.rectangleCornerRadii[3],
               //       }
               //     : 0,
-              path: node.fillGeometry?.[0]?.path ?? "",
-              fillRule: node.fillGeometry?.[0]?.windingRule
-                ? windingRuleMap[node.fillGeometry?.[0]?.windingRule]
-                : "nonzero",
+              paths:
+                node.fillGeometry?.map((p) => ({
+                  d: p.path ?? "",
+                  fillRile: windingRuleMap[p.windingRule],
+                })) ?? [],
             } satisfies grida.program.nodes.VectorNode;
           }
 

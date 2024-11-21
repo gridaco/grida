@@ -619,7 +619,8 @@ export namespace grida {
           fontFamily,
           fontSize,
           fontWeight,
-          // lineHeight,
+          letterSpacing,
+          lineHeight,
           //
           style,
         } = styles;
@@ -642,7 +643,8 @@ export namespace grida {
             : undefined,
           textDecoration: textDecoration,
           fontFamily: fontFamily,
-          // lineHeight: lineHeight,
+          lineHeight: lineHeight ?? "normal",
+          letterSpacing: letterSpacing,
           fontSize: fontSize,
           fontWeight: fontWeight,
           //
@@ -843,6 +845,23 @@ export namespace grida {
           a: color.a * alpha,
         };
       }
+
+      /**
+       * Defines a single path
+       *
+       * @see https://developer.mozilla.org/en-US/docs/Web/SVG/Element/path
+       */
+      export type Path = {
+        /**
+         * This attribute defines the shape of the path.
+         */
+        d: string;
+
+        /**
+         * @see https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/fill-rule
+         */
+        fillRile: FillRule;
+      };
 
       /**
        * @see https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/fill-rule
@@ -1226,9 +1245,13 @@ export namespace grida {
           fontSize: number;
           fontWeight: cg.NFontWeight;
           /**
+           * @default 0
+           */
+          letterSpacing?: number;
+          /**
            * @deprecated
            */
-          // lineHeight?: number;
+          lineHeight?: number;
         }
 
         /**
@@ -1419,10 +1442,13 @@ export namespace grida {
           i.IHrefable,
           i.IPositioning,
           // i.ICSSDimension,
-          i.IFixedDimension {
+          i.IFixedDimension,
+          i.IOpacity,
+          i.IZIndex,
+          i.IRotation,
+          i.IFill {
         type: "vector";
-        path: string;
-        fillRule: "nonzero" | "evenodd";
+        paths: cg.Path[];
       }
 
       /**

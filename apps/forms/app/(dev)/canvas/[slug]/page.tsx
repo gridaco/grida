@@ -75,12 +75,15 @@ export default function CanvasPlaygroundPage({
     <main className="w-screen h-screen overflow-hidden">
       <ImportFromFigmaDialog
         {...importFromFigmaDialog}
-        onImport={(node) => {
+        onImport={(res) => {
           dispatch({
             type: "document/reset",
             state: initDocumentEditorState({
               editable: true,
-              document: iofigma.restful.map.document(node as any),
+              document: iofigma.restful.map.document(
+                res.document as any,
+                res.images
+              ),
             }),
           });
         }}

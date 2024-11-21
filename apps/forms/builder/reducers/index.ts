@@ -122,11 +122,14 @@ export default function reducer<S extends IDocumentEditorState>(
       });
     }
     case "document/canvas/backend/html/event/on-pointer-move-raycast": {
-      const { node_ids_from_point } = <
+      const { node_ids_from_point, metaKey } = <
         DocumentEditorCanvasEventTargetHtmlBackendPointerMoveRaycast
       >action;
       return produce(state, (draft) => {
-        draft.hovered_node_id = node_ids_from_point[0];
+        const target_node_id =
+          node_ids_from_point[metaKey ? 0 : node_ids_from_point.length - 2];
+
+        draft.hovered_node_id = target_node_id;
       });
     }
     case "document/canvas/backend/html/event/on-pointer-down": {
@@ -135,8 +138,10 @@ export default function reducer<S extends IDocumentEditorState>(
       >action;
       return produce(state, (draft) => {
         if (draft.cursor_mode.type === "cursor") {
-          const selected_node_id = node_ids_from_point[0];
-          draft.selected_node_id = selected_node_id;
+          const target_node_id = draft.hovered_node_id;
+          // const target_node_id =
+          //   node_ids_from_point[node_ids_from_point.length - 2];
+          draft.selected_node_id = target_node_id;
           draft.content_edit_mode = false;
         } else if (draft.cursor_mode.type === "insert") {
           const { node: nodetype } = draft.cursor_mode;
@@ -444,6 +449,8 @@ export default function reducer<S extends IDocumentEditorState>(
     case "node/change/style":
     case "node/change/fontSize":
     case "node/change/fontWeight":
+    case "node/change/letterSpacing":
+    case "node/change/lineHeight":
     case "node/change/textAlign":
     case "node/change/textAlignVertical":
     case "node/change/text": {
@@ -734,7 +741,8 @@ function nodeReducer<N extends Partial<grida.program.nodes.Node>>(
       }
       case "node/change/fill": {
         assert(
-          draft.type === "rectangle" ||
+          draft.type === "vector" ||
+            draft.type === "rectangle" ||
             draft.type === "ellipse" ||
             draft.type === "text" ||
             draft.type === "container"
@@ -787,6 +795,16 @@ function nodeReducer<N extends Partial<grida.program.nodes.Node>>(
         draft.fontWeight = action.fontWeight;
         break;
       }
+      case "node/change/letterSpacing": {
+        assert(draft.type === "text");
+        draft.letterSpacing = action.letterSpacing;
+        break;
+      }
+      case "node/change/lineHeight": {
+        assert(draft.type === "text");
+        draft.lineHeight = action.lineHeight;
+        break;
+      }
       case "node/change/textAlign": {
         assert(draft.type === "text");
         draft.textAlign = action.textAlign;
@@ -831,7 +849,14 @@ function deleteNode<S extends IDocumentEditorState>(
 ) {
   draft.selected_node_id = undefined;
   draft.hovered_node_id = undefined;
+  const children =
+    "children" in draft.document.nodes[node_id]
+      ? draft.document.nodes[node_id].children
+      : undefined;
   delete draft.document.nodes[node_id];
+  for (const child_id of children || []) {
+    delete draft.document.nodes[child_id];
+  }
   const parent_id = draft.document_ctx.__ctx_nid_to_parent_id[node_id];
   if (parent_id) {
     const index = (

@@ -85,6 +85,7 @@ export type DocumentEditorCanvasEventTargetHtmlBackendPointerMoveRaycast =
       x: number;
       y: number;
     };
+    metaKey: boolean;
   };
 
 export type DocumentEditorCanvasEventTargetHtmlBackendPointerDown =
@@ -283,6 +284,14 @@ interface ITextNodeChangeTextAlignVerticalAction extends INodeID {
   textAlignVertical: grida.program.cg.TextAlignVertical;
 }
 
+interface ITextNodeChangeLineHeightAction extends INodeID {
+  lineHeight: grida.program.nodes.TextNode["lineHeight"];
+}
+
+interface ITextNodeChangeLetterSpacingAction extends INodeID {
+  letterSpacing: grida.program.nodes.TextNode["letterSpacing"];
+}
+
 interface INodeChangeStyleAction extends INodeID {
   style: Partial<React.CSSProperties>;
 }
@@ -326,6 +335,8 @@ export type NodeChangeAction =
   | ({
       type: "node/change/textAlignVertical";
     } & ITextNodeChangeTextAlignVerticalAction)
+  | ({ type: "node/change/lineHeight" } & ITextNodeChangeLineHeightAction)
+  | ({ type: "node/change/letterSpacing" } & ITextNodeChangeLetterSpacingAction)
   //
   | ({ type: "node/change/style" } & INodeChangeStyleAction)
   | ({ type: "node/change/src" } & INodeChangeSrcAction)

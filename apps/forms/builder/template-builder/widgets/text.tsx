@@ -1,3 +1,4 @@
+import React from "react";
 import { grida } from "@/grida";
 
 export const TextWidget = ({
@@ -9,7 +10,12 @@ export const TextWidget = ({
 
   return (
     <div {...props} style={style}>
-      {children}
+      {children?.split("\n").map((line, index) => (
+        <React.Fragment key={index}>
+          {line}
+          <br />
+        </React.Fragment>
+      ))}
     </div>
   );
 };
