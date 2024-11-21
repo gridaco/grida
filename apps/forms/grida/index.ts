@@ -626,8 +626,8 @@ export namespace grida {
         } = styles;
         const without_fill = {
           position: position,
-          width: toDimension(width),
-          height: toDimension(height),
+          width: width === "auto" ? "max-content" : toDimension(width),
+          height: height === "auto" ? "max-content" : toDimension(height),
           top: top,
           left: left,
           right: right,

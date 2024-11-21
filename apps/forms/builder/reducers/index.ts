@@ -849,10 +849,8 @@ function deleteNode<S extends IDocumentEditorState>(
 ) {
   draft.selected_node_id = undefined;
   draft.hovered_node_id = undefined;
-  const children =
-    "children" in draft.document.nodes[node_id]
-      ? draft.document.nodes[node_id].children
-      : undefined;
+  const node = draft.document.nodes[node_id];
+  const children = "children" in node ? node.children : undefined;
   delete draft.document.nodes[node_id];
   for (const child_id of children || []) {
     delete draft.document.nodes[child_id];

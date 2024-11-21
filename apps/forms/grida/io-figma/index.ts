@@ -6,6 +6,10 @@ import type {
   Paint,
   TypeStyle,
   Path,
+  BooleanOperationNode,
+  InstanceNode,
+  GroupNode,
+  FrameNode,
 } from "@figma/rest-api-spec";
 
 export namespace iofigma {
@@ -105,6 +109,12 @@ export namespace iofigma {
         return arr.filter((f) => f.visible !== false)[0];
       }
 
+      type FigmaParentNode =
+        | BooleanOperationNode
+        | InstanceNode
+        | FrameNode
+        | GroupNode;
+
       export function document(
         node: SubcanvasNode,
         images: { [key: string]: string }
@@ -112,9 +122,14 @@ export namespace iofigma {
         const nodes: Record<string, grida.program.nodes.Node> = {};
 
         function processNode(
-          currentNode: SubcanvasNode
+          currentNode: SubcanvasNode,
+          parent?: FigmaParentNode
         ): grida.program.nodes.Node | undefined {
-          const processedNode = node_without_children(currentNode, images);
+          const processedNode = node_without_children(
+            currentNode,
+            images,
+            parent
+          );
 
           if (!processedNode) {
             return undefined;
@@ -127,7 +142,9 @@ export namespace iofigma {
           if ("children" in currentNode && currentNode.children?.length) {
             (processedNode as grida.program.nodes.i.IChildren).children =
               currentNode.children
-                .map(processNode) // Process each child
+                .map((c) => {
+                  return processNode(c, currentNode as FigmaParentNode);
+                }) // Process each child
                 .filter((child) => child !== undefined) // Remove undefined nodes
                 .map((child) => child!.id); // Map to IDs
           }
@@ -152,7 +169,8 @@ export namespace iofigma {
 
       export function node_without_children(
         node: SubcanvasNode,
-        images: { [key: string]: string }
+        images: { [key: string]: string },
+        parent?: FigmaParentNode
       ): grida.program.nodes.Node | undefined {
         switch (node.type) {
           case "SECTION": {
@@ -217,6 +235,35 @@ export namespace iofigma {
 
             const first_visible_fill = first_visible(fills);
             const figma_text_resizing_model = node.style.textAutoResize;
+            const figma_constraints_horizontal = node.constraints?.horizontal;
+            const figma_constraints_vertical = node.constraints?.vertical;
+
+            const fixedwidth = node.size!.x;
+            const fixedheight = node.size!.y;
+
+            const fixedleft = node.relativeTransform![0][2];
+            const fixedtop = node.relativeTransform![1][2];
+            const fixedright = parent?.size
+              ? parent.size.x - fixedleft - fixedwidth
+              : undefined;
+            const fixedbottom = parent?.size
+              ? parent.size.y - fixedtop - fixedheight
+              : undefined;
+
+            const constraints = {
+              left:
+                figma_constraints_horizontal !== "RIGHT"
+                  ? fixedleft
+                  : undefined,
+              right:
+                figma_constraints_horizontal !== "LEFT"
+                  ? fixedright
+                  : undefined,
+              top:
+                figma_constraints_vertical !== "BOTTOM" ? fixedtop : undefined,
+              bottom:
+                figma_constraints_vertical !== "TOP" ? fixedbottom : undefined,
+            };
 
             return {
               id: node.id,
@@ -229,10 +276,21 @@ export namespace iofigma {
               type: "text",
               text: node.characters,
               position: "absolute",
-              left: node.relativeTransform![0][2],
-              top: node.relativeTransform![1][2],
-              width: node.size!.x,
-              height: node.size!.y,
+              left: constraints.left,
+              top: constraints.top,
+              right: constraints.right,
+              bottom: constraints.bottom,
+              // left: fixedleft,
+              // top: fixedtop,
+              width:
+                figma_text_resizing_model === "WIDTH_AND_HEIGHT"
+                  ? "auto"
+                  : fixedwidth,
+              height:
+                figma_text_resizing_model === "WIDTH_AND_HEIGHT" ||
+                figma_text_resizing_model === "HEIGHT"
+                  ? "auto"
+                  : fixedheight,
               fill: first_visible_fill ? paint(first_visible_fill) : undefined,
               style: {},
               textAlign: node.style.textAlignHorizontal

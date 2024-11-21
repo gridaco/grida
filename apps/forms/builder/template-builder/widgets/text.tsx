@@ -12,7 +12,8 @@ export const TextWidget = ({
     <div {...props} style={style}>
       {children?.split("\n").map((line, index) => (
         <React.Fragment key={index}>
-          {line}
+          {/* to keep white space wrap behaviour, replace starting from 2 sequence */}
+          {line.replace(/ {2,}/g, (match) => match.replace(/ /g, "\u00a0"))}
           <br />
         </React.Fragment>
       ))}
