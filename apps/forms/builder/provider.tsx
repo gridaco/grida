@@ -523,6 +523,20 @@ export function useDocument() {
   );
 
   //
+  const changeNodeBorder = useCallback(
+    (node_id: string, border?: grida.program.nodes.i.ICSSBorder) => {
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/border",
+          node_id: node_id,
+          border: border ?? "none",
+        });
+      });
+    },
+    [dispatch]
+  );
+
+  //
 
   const changeNodeStyle = useCallback(
     (
@@ -612,8 +626,9 @@ export function useDocument() {
       letterSpacing: (value: grida.program.nodes.TextNode["letterSpacing"]) =>
         changeTextNodeLetterSpacing(selected_node_id!, value),
 
-      // textColor: (value: grida.program.css.RGBA) =>
-      // changeNodeStyle(selected_node_id!, "textColor", value),
+      // border
+      border: (value?: grida.program.nodes.i.ICSSBorder) =>
+        changeNodeBorder(selected_node_id!, value),
 
       // css style
       margin: (value?: number) =>
@@ -622,12 +637,8 @@ export function useDocument() {
         changeNodeStyle(selected_node_id!, "padding", value),
       aspectRatio: (value?: number) =>
         changeNodeStyle(selected_node_id!, "aspectRatio", value),
-      // border: (value?: any) =>
-      //   changeNodeStyle(selected_node_id!, "borderWidth", value.borderWidth),
       boxShadow: (value?: any) =>
         changeNodeStyle(selected_node_id!, "boxShadow", value.boxShadow),
-      // backgroundColor: (value?: grida.program.css.RGBA) =>
-      // changeNodeStyle(selected_node_id!, "backgroundColor", value),
       gap: (value?: number) => changeNodeStyle(selected_node_id!, "gap", value),
       flexDirection: (value?: string) =>
         changeNodeStyle(selected_node_id!, "flexDirection", value),

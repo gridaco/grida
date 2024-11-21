@@ -188,9 +188,21 @@ export namespace iofigma {
               paddingBottom,
               layoutWrap,
               fills,
+              strokes,
+              // strokeAlign, // ignored
+              strokeWeight,
+              strokeCap,
+              strokeDashes, // only checks if dashed or not
+              // strokeGeometry,
+              // strokeJoin, // ignored
+              // strokeMiterAngle,  // ignored
+              // strokesIncludedInLayout // ignored
             } = node;
 
             const first_visible_fill = first_visible(fills);
+            const first_visible_stroke = strokes
+              ? first_visible(strokes)
+              : undefined;
 
             return {
               id: node.id,
@@ -210,6 +222,23 @@ export namespace iofigma {
               height: node.size!.y,
 
               fill: first_visible_fill ? paint(first_visible_fill) : undefined,
+              //
+              borderColor:
+                first_visible_stroke?.type === "SOLID"
+                  ? grida.program.cg.rgbaf_multiply_alpha(
+                      grida.program.cg.rgbaf_to_rgba8888(
+                        first_visible_stroke.color
+                      ),
+                      first_visible_stroke.opacity ?? 1
+                    )
+                  : undefined,
+              borderStyle: first_visible_stroke
+                ? strokeDashes
+                  ? "dashed"
+                  : "solid"
+                : "none",
+              borderWidth: strokeWeight ?? 0,
+              //
               style: {
                 overflow: clipsContent ? "clip" : undefined,
                 padding: `${paddingTop ?? 0}px ${paddingRight ?? 0}px ${paddingBottom ?? 0}px ${paddingLeft ?? 0}px`,
@@ -227,13 +256,41 @@ export namespace iofigma {
             } satisfies grida.program.nodes.ContainerNode;
           }
           case "GROUP": {
-            return;
+            return {
+              id: node.id,
+              name: node.name,
+              active: node.visible ?? true,
+              locked: node.locked ?? false,
+              rotation: node.rotation ?? 0,
+              opacity: node.opacity ?? 1,
+              zIndex: 0,
+              type: "container",
+              expanded: false,
+              //
+              position: "absolute",
+              left: node.relativeTransform![0][2],
+              top: node.relativeTransform![1][2],
+              width: node.size!.x,
+              height: node.size!.y,
+
+              fill: undefined,
+              borderColor: undefined,
+              borderStyle: "none",
+              borderWidth: 0,
+              //
+              style: {},
+              cornerRadius: 0,
+            } satisfies grida.program.nodes.ContainerNode;
             // throw new Error(`Unsupported node type: ${node.type}`);
           }
           case "TEXT": {
-            const { fills } = node;
+            const { fills, strokes, strokeWeight, strokeDashes } = node;
 
             const first_visible_fill = first_visible(fills);
+            const first_visible_stroke = strokes
+              ? first_visible(strokes)
+              : undefined;
+
             const figma_text_resizing_model = node.style.textAutoResize;
             const figma_constraints_horizontal = node.constraints?.horizontal;
             const figma_constraints_vertical = node.constraints?.vertical;
@@ -292,6 +349,23 @@ export namespace iofigma {
                   ? "auto"
                   : fixedheight,
               fill: first_visible_fill ? paint(first_visible_fill) : undefined,
+              //
+              borderColor:
+                first_visible_stroke?.type === "SOLID"
+                  ? grida.program.cg.rgbaf_multiply_alpha(
+                      grida.program.cg.rgbaf_to_rgba8888(
+                        first_visible_stroke.color
+                      ),
+                      first_visible_stroke.opacity ?? 1
+                    )
+                  : undefined,
+              borderStyle: first_visible_stroke
+                ? strokeDashes
+                  ? "dashed"
+                  : "solid"
+                : "none",
+              borderWidth: strokeWeight ?? 0,
+              //
               style: {},
               textAlign: node.style.textAlignHorizontal
                 ? textAlignMap[node.style.textAlignHorizontal] ?? "left"
@@ -316,9 +390,12 @@ export namespace iofigma {
             };
           }
           case "RECTANGLE": {
-            const { fills } = node;
+            const { fills, strokes, strokeDashes, strokeWeight } = node;
 
             const first_visible_fill = first_visible(fills);
+            const first_visible_stroke = strokes
+              ? first_visible(strokes)
+              : undefined;
 
             const cornerRadius = node.cornerRadius
               ? node.cornerRadius
@@ -349,6 +426,23 @@ export namespace iofigma {
                 height: node.size!.y,
                 cornerRadius,
                 fit: "cover",
+                //
+                borderColor:
+                  first_visible_stroke?.type === "SOLID"
+                    ? grida.program.cg.rgbaf_multiply_alpha(
+                        grida.program.cg.rgbaf_to_rgba8888(
+                          first_visible_stroke.color
+                        ),
+                        first_visible_stroke.opacity ?? 1
+                      )
+                    : undefined,
+                borderStyle: first_visible_stroke
+                  ? strokeDashes
+                    ? "dashed"
+                    : "solid"
+                  : "none",
+                borderWidth: strokeWeight ?? 0,
+                //
                 style: {},
               } satisfies grida.program.nodes.ImageNode;
             }

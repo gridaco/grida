@@ -445,6 +445,7 @@ export default function reducer<S extends IDocumentEditorState>(
     case "node/change/rotation":
     case "node/change/cornerRadius":
     case "node/change/fill":
+    case "node/change/border":
     case "node/change/fit":
     case "node/change/style":
     case "node/change/fontSize":
@@ -760,6 +761,26 @@ function nodeReducer<N extends Partial<grida.program.nodes.Node>>(
 
         break;
       }
+      case "node/change/border": {
+        assert(
+          // draft.type === "vector" ||
+          // draft.type === "rectangle" ||
+          // draft.type === "ellipse" ||
+          // draft.type === "text" ||
+          draft.type === "container"
+        );
+        if (action.border === "none") {
+          draft.borderColor = undefined;
+          draft.borderStyle = "none";
+          draft.borderWidth = 0;
+        } else {
+          const { borderStyle, borderWidth, borderColor } = action.border;
+          draft.borderColor = borderColor;
+          draft.borderStyle = borderStyle;
+          draft.borderWidth = borderWidth;
+        }
+        break;
+      }
       case "node/change/fit": {
         assert(draft.type === "image");
         draft.fit = action.fit;
@@ -907,6 +928,8 @@ function initialNode(
     width: 100,
     height: 100,
     position: "absolute",
+    borderStyle: "none",
+    borderWidth: 0,
     style: {},
   };
 

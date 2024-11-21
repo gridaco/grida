@@ -622,6 +622,10 @@ export namespace grida {
           letterSpacing,
           lineHeight,
           //
+          borderStyle,
+          borderWidth,
+          borderColor,
+          //
           style,
         } = styles;
         const without_fill = {
@@ -650,6 +654,14 @@ export namespace grida {
           //
           borderRadius: cornerRadius
             ? cornerRadiusToBorderRadius(cornerRadius)
+            : undefined,
+          //
+          borderStyle: borderStyle,
+          borderColor: borderColor ? toRGBAString(borderColor) : undefined,
+          borderWidth: borderWidth
+            ? typeof borderWidth === "number"
+              ? borderWidth
+              : `${borderWidth.top}px ${borderWidth.right}px ${borderWidth.bottom}px ${borderWidth.left}px`
             : undefined,
           //
           ...style,
@@ -1173,9 +1185,38 @@ export namespace grida {
          * Node that supports stroke with color - such as rectangle, ellipse, etc.
          *
          * - [Env:HTML] for html text, `-webkit-text-stroke` will be used
+         *
+         * @deprecated [NOT USED]
          */
         export interface IStroke {
           stroke: css.RGBA8888;
+        }
+
+        /**
+         * Partially supported CSS border model.
+         * - each border can have different width
+         * - color is shared
+         * - only `solid` `dashed` border is supported
+         */
+        export interface ICSSBorder {
+          borderStyle: "none" | "solid" | "dashed";
+          borderColor?: css.RGBA8888;
+          /**
+           * @example
+           * ```css
+           * border-width: <length>
+           * border-width: top | right | bottom | left
+           * ```
+           *
+           */
+          borderWidth:
+            | number
+            | {
+                top: number;
+                right: number;
+                bottom: number;
+                left: number;
+              };
         }
 
         export interface IEffects {
@@ -1197,7 +1238,8 @@ export namespace grida {
             IFill,
             IOpacity,
             IRotation,
-            IZIndex {
+            IZIndex,
+            ICSSBorder {
           style: css.ExplicitlySupportedCSSProperties;
         }
 
@@ -1322,7 +1364,6 @@ export namespace grida {
         export const irectanglecorner: ReadonlyArray<keyof i.IRectangleCorner> =
           ["cornerRadius"];
         export const ifill: ReadonlyArray<keyof i.IFill> = ["fill"];
-        export const istroke: ReadonlyArray<keyof i.IStroke> = ["stroke"];
         export const ieffects: ReadonlyArray<keyof i.IEffects> = ["effects"];
         export const icssstylable: ReadonlyArray<keyof i.ICSSStylable> = [
           "style",

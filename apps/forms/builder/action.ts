@@ -262,6 +262,10 @@ interface INodeChangeFillAction extends INodeID {
   fill: grida.program.cg.PaintWithoutID;
 }
 
+interface INodeChangeBorderAction extends INodeID {
+  border: grida.program.nodes.i.ICSSBorder | "none";
+}
+
 interface INodeChangeFitAction extends INodeID {
   fit: grida.program.cg.BoxFit;
 }
@@ -326,6 +330,7 @@ export type NodeChangeAction =
   | ({ type: "node/change/rotation" } & INodeChangeRotationAction)
   | ({ type: "node/change/cornerRadius" } & INodeChangeCornerRadiusAction)
   | ({ type: "node/change/fill" } & INodeChangeFillAction)
+  | ({ type: "node/change/border" } & INodeChangeBorderAction)
   | ({ type: "node/change/fit" } & INodeChangeFitAction)
   //
   | ({ type: "node/change/fontFamily" } & ITextNodeChangeFontFamilyAction)
