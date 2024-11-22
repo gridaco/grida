@@ -115,31 +115,32 @@ export function ImportFromFigmaDialog({
             </code>
           </DialogDescription>
         </DialogHeader>
-        <div>
-          <Label>Import from Node URL</Label>
-          <Input
-            type="url"
-            placeholder="https://www.figma.com/design/xxxxx/xxxx?node-id=123-456"
-            onChange={(e) => {
-              try {
-                const url = new URL(e.target.value);
-                const filekey = url.pathname.split("/")[2];
-                const nodeid = normalize_node_id(
-                  url.searchParams.get("node-id") as string
-                );
-                form.current!.filekey.value = filekey;
-                form.current!.nodeid.value = nodeid;
-              } catch (e) {}
-            }}
-          />
-        </div>
-        <hr />
+
         <form
           ref={form}
           id="import"
           onSubmit={onSubmit}
           className="flex flex-col gap-4"
         >
+          <div className="grid gap-0">
+            <Label>Import from Node URL</Label>
+            <Input
+              type="url"
+              placeholder="https://www.figma.com/design/xxxxx/xxxx?node-id=123-456"
+              onChange={(e) => {
+                try {
+                  const url = new URL(e.target.value);
+                  const filekey = url.pathname.split("/")[2];
+                  const nodeid = normalize_node_id(
+                    url.searchParams.get("node-id") as string
+                  );
+                  form.current!.filekey.value = filekey;
+                  form.current!.nodeid.value = nodeid;
+                } catch (e) {}
+              }}
+            />
+          </div>
+          <hr />
           <div className="grid gap-2">
             <Label>File Key</Label>
             <Input
