@@ -52,6 +52,8 @@ import { LockClosedIcon } from "@radix-ui/react-icons";
 import { TextAlignVerticalControl } from "./controls/text-align-vertical";
 import { LetterSpacingControl } from "./controls/letter-spacing";
 import { LineHeightControl } from "./controls/line-height";
+import { NameControl } from "./controls/name";
+import { UserDataControl } from "./controls/x-userdata";
 
 export function SelectedNodeProperties() {
   const { state: document, selectedNode } = useDocument();
@@ -93,6 +95,8 @@ export function SelectedNodeProperties() {
 
     //
     border,
+    // x
+    userdata,
   } = node;
 
   // const istemplate = type?.startsWith("templates/");
@@ -142,6 +146,10 @@ export function SelectedNodeProperties() {
           <SidebarSectionHeaderLabel>Layer</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuSectionContent className="space-y-2">
+          <PropertyLine className="items-center">
+            <PropertyLineLabel>Name</PropertyLineLabel>
+            <NameControl value={name} onValueChange={selectedNode.name} />
+          </PropertyLine>
           <PropertyLine className="items-center">
             <PropertyLineLabel>Active</PropertyLineLabel>
             <HiddenControl value={active} onValueChange={selectedNode.active} />
@@ -414,6 +422,20 @@ export function SelectedNodeProperties() {
           <PropertyLine>
             <PropertyLineLabel>Cursor</PropertyLineLabel>
             <CursorControl value={cursor} onValueChange={selectedNode.cursor} />
+          </PropertyLine>
+        </SidebarMenuSectionContent>
+      </SidebarSection>
+      <SidebarSection className="border-b pb-4">
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>Developer</SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuSectionContent className="space-y-2">
+          <PropertyLine>
+            <UserDataControl
+              node_id={id}
+              value={userdata}
+              onValueCommit={selectedNode.userdata}
+            />
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>

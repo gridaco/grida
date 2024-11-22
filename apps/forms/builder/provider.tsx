@@ -273,6 +273,28 @@ export function useDocument() {
     [dispatch]
   );
 
+  const changeNodeName = useCallback(
+    (node_id: string, name: string) => {
+      dispatch({
+        type: "node/change/name",
+        node_id: node_id,
+        name: name,
+      });
+    },
+    [dispatch]
+  );
+
+  const changeNodeUserData = useCallback(
+    (node_id: string, userdata: unknown) => {
+      dispatch({
+        type: "node/change/userdata",
+        node_id: node_id,
+        userdata: userdata as any,
+      });
+    },
+    [dispatch]
+  );
+
   const changeNodeActive = useCallback(
     (node_id: string, active: boolean) => {
       dispatch({
@@ -584,6 +606,8 @@ export function useDocument() {
       value: (key: string, value: any) =>
         changeNodeValue(selected_node_id!, key, value),
       // attributes
+      userdata: (value: any) => changeNodeUserData(selected_node_id!, value),
+      name: (name: string) => changeNodeName(selected_node_id!, name),
       active: (active: boolean) => changeNodeActive(selected_node_id!, active),
       locked: (locked: boolean) => changeNodeLocked(selected_node_id!, locked),
       src: (src?: Tokens.StringValueExpression) =>

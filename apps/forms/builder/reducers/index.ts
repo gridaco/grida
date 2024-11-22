@@ -434,6 +434,7 @@ export default function reducer<S extends IDocumentEditorState>(
     case "node/change/active":
     case "node/change/locked":
     case "node/change/name":
+    case "node/change/userdata":
     case "node/change/positioning":
     case "node/change/positioning-mode":
     case "node/change/component":
@@ -636,12 +637,25 @@ function nodeReducer<N extends Partial<grida.program.nodes.Node>>(
         draft.active = action.active;
         break;
       }
+      case "node/change/userdata": {
+        const { userdata } = action;
+        // double check if the userdata is serializable and k:v structure
+        assert(
+          userdata === undefined ||
+            userdata === null ||
+            (typeof userdata === "object" && !Array.isArray(userdata)),
+          "userdata must be an k:v object"
+        );
+        draft.userdata = userdata;
+        break;
+      }
       case "node/change/locked": {
         draft.locked = action.locked;
         break;
       }
       case "node/change/name": {
-        (draft as grida.program.nodes.i.IBaseNode).name = action.name;
+        (draft as grida.program.nodes.i.IBaseNode).name =
+          action.name || (node.type as string);
         break;
       }
       case "node/change/positioning": {
@@ -900,6 +914,7 @@ function initialNode(
     grida.program.nodes.i.ISceneNode = {
     id: id,
     name: type,
+    userdata: undefined,
     //
     locked: false,
     active: true,

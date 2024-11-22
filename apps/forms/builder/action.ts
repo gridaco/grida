@@ -222,6 +222,10 @@ interface INodeChangeNameAction extends INodeID {
   name: string;
 }
 
+interface INodeChangeUserDataAction extends INodeID {
+  userdata: grida.program.nodes.i.IBaseNode["userdata"];
+}
+
 interface INodeChangeActiveAction extends INodeID {
   active: boolean;
 }
@@ -318,6 +322,7 @@ interface INodeChangePropsAction extends INodeID {
 
 export type NodeChangeAction =
   | ({ type: "node/change/name" } & INodeChangeNameAction)
+  | ({ type: "node/change/userdata" } & INodeChangeUserDataAction)
   | ({ type: "node/change/active" } & INodeChangeActiveAction)
   | ({ type: "node/change/locked" } & INodeChangeLockedAction)
   | ({ type: "node/change/positioning" } & INodeChangePositioningAction)
