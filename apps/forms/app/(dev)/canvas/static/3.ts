@@ -1,12 +1,12 @@
 import { grida } from "@/grida";
 
-function randcolor(): grida.program.css.RGBA8888 {
+function randcolor(): grida.program.cg.RGBA8888 {
   return {
     r: Math.floor(Math.random() * 256),
     g: Math.floor(Math.random() * 256),
     b: Math.floor(Math.random() * 256),
     a: 1,
-  } satisfies grida.program.css.RGBA8888;
+  } satisfies grida.program.cg.RGBA8888;
 }
 
 function _1000_rects(): Array<grida.program.nodes.RectangleNode> {

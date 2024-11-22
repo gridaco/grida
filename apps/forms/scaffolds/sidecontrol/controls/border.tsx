@@ -23,12 +23,12 @@ export function BorderControl({
   value,
   onValueChange,
 }: {
-  value: grida.program.nodes.i.ICSSBorder;
-  onValueChange?: (value?: grida.program.nodes.i.ICSSBorder) => void;
+  value?: grida.program.css.Border;
+  onValueChange?: (value?: grida.program.css.Border) => void;
 }) {
   const onBorderWidthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onValueChange?.({
-      ...(value || {}),
+      ...value!,
       borderWidth: parseInt(e.target.value),
     });
   };
@@ -44,7 +44,18 @@ export function BorderControl({
   return (
     <Popover>
       <PopoverTrigger className="w-full">
-        {value.borderStyle === "none" ? (
+        {value ? (
+          <div
+            className={cn(
+              "flex items-center gap-2 border cursor-default",
+              WorkbenchUI.inputVariants({ size: "sm" })
+            )}
+          >
+            <RGBAChip rgba={value?.borderColor ?? { r: 0, g: 0, b: 0, a: 0 }} />
+            {value?.borderStyle === "solid" && <>Solid</>}
+            {value?.borderStyle === "dashed" && <>Dashed</>}
+          </div>
+        ) : (
           <div
             className={cn(
               "flex items-center gap-2 border cursor-default",
@@ -61,17 +72,6 @@ export function BorderControl({
               }}
             />
             Add
-          </div>
-        ) : (
-          <div
-            className={cn(
-              "flex items-center gap-2 border cursor-default",
-              WorkbenchUI.inputVariants({ size: "sm" })
-            )}
-          >
-            <RGBAChip rgba={value?.borderColor ?? { r: 0, g: 0, b: 0, a: 0 }} />
-            {value?.borderStyle === "solid" && <>Solid</>}
-            {value?.borderStyle === "dashed" && <>Dashed</>}
           </div>
         )}
       </PopoverTrigger>
@@ -111,9 +111,7 @@ export function BorderControl({
               <PropertyLineLabel>Style</PropertyLineLabel>
               <Select
                 defaultValue={value.borderStyle}
-                onValueChange={(
-                  v: grida.program.nodes.i.ICSSBorder["borderStyle"]
-                ) => {
+                onValueChange={(v: grida.program.css.Border["borderStyle"]) => {
                   onValueChange?.({
                     ...(value || {}),
                     borderStyle: v,
@@ -126,14 +124,14 @@ export function BorderControl({
                 <SelectContent>
                   <SelectItem
                     value={
-                      "solid" satisfies grida.program.nodes.i.ICSSBorder["borderStyle"]
+                      "solid" satisfies grida.program.css.Border["borderStyle"]
                     }
                   >
                     Solid
                   </SelectItem>
                   <SelectItem
                     value={
-                      "dashed" satisfies grida.program.nodes.i.ICSSBorder["borderStyle"]
+                      "dashed" satisfies grida.program.css.Border["borderStyle"]
                     }
                   >
                     Dashed

@@ -263,7 +263,7 @@ interface INodeChangeFillAction extends INodeID {
 }
 
 interface INodeChangeBorderAction extends INodeID {
-  border: grida.program.nodes.i.ICSSBorder | "none";
+  border: grida.program.css.Border | undefined;
 }
 
 interface INodeChangeFitAction extends INodeID {

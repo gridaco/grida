@@ -469,6 +469,54 @@ export namespace grida {
       export type LengthPercentage = Length | Percentage;
 
       /**
+       * @see https://developer.mozilla.org/en-US/docs/Web/CSS/blend-mode
+       */
+      export type BlendMode =
+        | "normal"
+        | "multiply"
+        | "screen"
+        | "overlay"
+        | "darken"
+        | "lighten"
+        | "color-dodge"
+        | "color-burn"
+        | "hard-light"
+        | "soft-light"
+        | "difference"
+        | "exclusion"
+        | "hue"
+        | "saturation"
+        | "color"
+        | "luminosity";
+
+      /**
+       * Partially supported CSS border model.
+       * - each border can have different width
+       * - color is shared
+       * - only `solid` `dashed` border is supported
+       */
+      export type Border = {
+        borderStyle: "none" | "solid" | "dashed";
+        borderColor: cg.RGBA8888;
+        /**
+         * @example
+         * ```css
+         * border-width: <length>
+         * border-width: top | right | bottom | left
+         * ```
+         *
+         */
+        borderWidth:
+          | number
+          | {
+              top: number;
+              right: number;
+              bottom: number;
+              left: number;
+            };
+      };
+
+      /**
        *
        * {@link cg.textAlignVertical} to CSS `align-content` mapping
        *
@@ -485,29 +533,6 @@ export namespace grida {
         top: "start",
         center: "center",
         bottom: "end",
-      };
-
-      /**
-       * 8-bit Integer RGBA (Standard RGBA)
-       * Used in web and raster graphics, including CSS and images.
-       */
-      export type RGBA8888 = {
-        /**
-         * Red channel value, between 0 and 255.
-         */
-        r: number;
-        /**
-         * Green channel value, between 0 and 255.
-         */
-        g: number;
-        /**
-         * Blue channel value, between 0 and 255.
-         */
-        b: number;
-        /**
-         * Alpha channel value, between 0 and 1.
-         */
-        a: number;
       };
 
       /**
@@ -622,9 +647,7 @@ export namespace grida {
           letterSpacing,
           lineHeight,
           //
-          borderStyle,
-          borderWidth,
-          borderColor,
+          border,
           //
           style,
         } = styles;
@@ -656,13 +679,7 @@ export namespace grida {
             ? cornerRadiusToBorderRadius(cornerRadius)
             : undefined,
           //
-          borderStyle: borderStyle,
-          borderColor: borderColor ? toRGBAString(borderColor) : undefined,
-          borderWidth: borderWidth
-            ? typeof borderWidth === "number"
-              ? borderWidth
-              : `${borderWidth.top}px ${borderWidth.right}px ${borderWidth.bottom}px ${borderWidth.left}px`
-            : undefined,
+          ...(border ? toReactCSSBorder(border) : {}),
           //
           ...style,
         } satisfies React.CSSProperties;
@@ -699,7 +716,22 @@ export namespace grida {
         }
       }
 
-      export function toRGBAString(rgba: css.RGBA8888): string {
+      export function toReactCSSBorder(border: Border): {
+        borderStyle: React.CSSProperties["borderStyle"];
+        borderColor: React.CSSProperties["borderColor"];
+        borderWidth: React.CSSProperties["borderWidth"];
+      } {
+        return {
+          borderStyle: border.borderStyle,
+          borderColor: toRGBAString(border.borderColor),
+          borderWidth:
+            typeof border.borderWidth === "number"
+              ? border.borderWidth
+              : `${border.borderWidth.top}px ${border.borderWidth.right}px ${border.borderWidth.bottom}px ${border.borderWidth.left}px`,
+        };
+      }
+
+      export function toRGBAString(rgba: cg.RGBA8888): string {
         return `rgba(${rgba.r}, ${rgba.g}, ${rgba.b}, ${rgba.a})`;
       }
 
@@ -774,7 +806,7 @@ export namespace grida {
        * @example `rgba_to_hex({ r: 255, g: 255, b: 255, a: 1 })` returns `"ffffff"`
        *
        */
-      export function rgbaToHex(color: grida.program.css.RGBA8888): string {
+      export function rgbaToHex(color: grida.program.cg.RGBA8888): string {
         return `${color.r.toString(16).padStart(2, "0")}${color.g.toString(16).padStart(2, "0")}${color.b.toString(16).padStart(2, "0")}`;
       }
 
@@ -828,6 +860,29 @@ export namespace grida {
       };
 
       /**
+       * 8-bit Integer RGBA (Standard RGBA)
+       * Used in web and raster graphics, including CSS and images.
+       */
+      export type RGBA8888 = {
+        /**
+         * Red channel value, between 0 and 255.
+         */
+        r: number;
+        /**
+         * Green channel value, between 0 and 255.
+         */
+        g: number;
+        /**
+         * Blue channel value, between 0 and 255.
+         */
+        b: number;
+        /**
+         * Alpha channel value, between 0 and 1.
+         */
+        a: number;
+      };
+
+      /**
        * Converts a normalized RGBA color to an 8-bit integer RGBA color.
        * @param rgba - The normalized RGBA color to convert.
        * @returns The 8-bit integer RGBA color.
@@ -840,7 +895,7 @@ export namespace grida {
        * console.log(rgba8888); // { r: 255, g: 128, b: 0, a: 0.75 }
        * ```
        */
-      export function rgbaf_to_rgba8888(rgba: RGBAf) {
+      export function rgbaf_to_rgba8888(rgba: RGBAf): RGBA8888 {
         return {
           r: Math.round(rgba.r * 255),
           g: Math.round(rgba.g * 255),
@@ -954,7 +1009,7 @@ export namespace grida {
 
       export type SolidPaint = {
         type: "solid";
-        color: css.RGBA8888;
+        color: cg.RGBA8888;
       };
 
       export type LinearGradientPaint = {
@@ -978,7 +1033,7 @@ export namespace grida {
          * 1 - end (100%)
          */
         offset: number;
-        color: css.RGBA8888;
+        color: cg.RGBA8888;
       };
       //
       //
@@ -1189,34 +1244,11 @@ export namespace grida {
          * @deprecated [NOT USED]
          */
         export interface IStroke {
-          stroke: css.RGBA8888;
+          stroke: cg.RGBA8888;
         }
 
-        /**
-         * Partially supported CSS border model.
-         * - each border can have different width
-         * - color is shared
-         * - only `solid` `dashed` border is supported
-         */
         export interface ICSSBorder {
-          borderStyle: "none" | "solid" | "dashed";
-          borderColor?: css.RGBA8888;
-          /**
-           * @example
-           * ```css
-           * border-width: <length>
-           * border-width: top | right | bottom | left
-           * ```
-           *
-           */
-          borderWidth:
-            | number
-            | {
-                top: number;
-                right: number;
-                bottom: number;
-                left: number;
-              };
+          border?: css.Border | undefined;
         }
 
         export interface IEffects {

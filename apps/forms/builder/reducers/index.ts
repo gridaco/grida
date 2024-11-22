@@ -769,16 +769,7 @@ function nodeReducer<N extends Partial<grida.program.nodes.Node>>(
           // draft.type === "text" ||
           draft.type === "container"
         );
-        if (action.border === "none") {
-          draft.borderColor = undefined;
-          draft.borderStyle = "none";
-          draft.borderWidth = 0;
-        } else {
-          const { borderStyle, borderWidth, borderColor } = action.border;
-          draft.borderColor = borderColor;
-          draft.borderStyle = borderStyle;
-          draft.borderWidth = borderWidth;
-        }
+        draft.border = action.border;
         break;
       }
       case "node/change/fit": {
@@ -928,8 +919,7 @@ function initialNode(
     width: 100,
     height: 100,
     position: "absolute",
-    borderStyle: "none",
-    borderWidth: 0,
+    border: undefined,
     style: {},
   };
 

@@ -92,9 +92,7 @@ export function SelectedNodeProperties() {
     textAlignVertical,
 
     //
-    borderWidth,
-    borderStyle,
-    borderColor,
+    border,
   } = node;
 
   // const istemplate = type?.startsWith("templates/");
@@ -128,12 +126,6 @@ export function SelectedNodeProperties() {
     // ...selected_node_default_style,
     ...(style || {}),
   } satisfies grida.program.css.ExplicitlySupportedCSSProperties;
-
-  const border = {
-    borderWidth,
-    borderStyle,
-    borderColor,
-  };
 
   return (
     <div key={selected_node_id}>

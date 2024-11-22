@@ -524,12 +524,12 @@ export function useDocument() {
 
   //
   const changeNodeBorder = useCallback(
-    (node_id: string, border?: grida.program.nodes.i.ICSSBorder) => {
+    (node_id: string, border: grida.program.css.Border | undefined) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "node/change/border",
           node_id: node_id,
-          border: border ?? "none",
+          border: border,
         });
       });
     },
@@ -627,7 +627,7 @@ export function useDocument() {
         changeTextNodeLetterSpacing(selected_node_id!, value),
 
       // border
-      border: (value?: grida.program.nodes.i.ICSSBorder) =>
+      border: (value: grida.program.css.Border | undefined) =>
         changeNodeBorder(selected_node_id!, value),
 
       // css style

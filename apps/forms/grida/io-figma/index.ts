@@ -10,6 +10,7 @@ import type {
   InstanceNode,
   GroupNode,
   FrameNode,
+  BlendMode,
 } from "@figma/rest-api-spec";
 
 export namespace iofigma {
@@ -49,6 +50,31 @@ export namespace iofigma {
       > = {
         EVENODD: "evenodd",
         NONZERO: "nonzero",
+      };
+
+      export const blendModeMap: Record<
+        BlendMode,
+        grida.program.css.BlendMode
+      > = {
+        PASS_THROUGH: "normal", // No blending, default behavior.
+        NORMAL: "normal", // Matches the default blend mode.
+        DARKEN: "darken",
+        MULTIPLY: "multiply",
+        LINEAR_BURN: "darken", // No direct equivalent, closest is "darken".
+        COLOR_BURN: "color-burn",
+        LIGHTEN: "lighten",
+        SCREEN: "screen",
+        LINEAR_DODGE: "lighten", // No direct equivalent, closest is "lighten".
+        COLOR_DODGE: "color-dodge",
+        OVERLAY: "overlay",
+        SOFT_LIGHT: "soft-light",
+        HARD_LIGHT: "hard-light",
+        DIFFERENCE: "difference",
+        EXCLUSION: "exclusion",
+        HUE: "hue",
+        SATURATION: "saturation",
+        COLOR: "color",
+        LUMINOSITY: "luminosity",
       };
 
       export function paint(paint: Paint): grida.program.cg.Paint | undefined {
@@ -223,21 +249,20 @@ export namespace iofigma {
 
               fill: first_visible_fill ? paint(first_visible_fill) : undefined,
               //
-              borderColor:
+              border:
                 first_visible_stroke?.type === "SOLID"
-                  ? grida.program.cg.rgbaf_multiply_alpha(
-                      grida.program.cg.rgbaf_to_rgba8888(
-                        first_visible_stroke.color
+                  ? {
+                      borderWidth: strokeWeight ?? 0,
+                      borderColor: grida.program.cg.rgbaf_multiply_alpha(
+                        grida.program.cg.rgbaf_to_rgba8888(
+                          first_visible_stroke.color
+                        ),
+                        first_visible_stroke.opacity ?? 1
                       ),
-                      first_visible_stroke.opacity ?? 1
-                    )
+                      borderStyle: strokeDashes ? "dashed" : "solid",
+                    }
                   : undefined,
-              borderStyle: first_visible_stroke
-                ? strokeDashes
-                  ? "dashed"
-                  : "solid"
-                : "none",
-              borderWidth: strokeWeight ?? 0,
+
               //
               style: {
                 overflow: clipsContent ? "clip" : undefined,
@@ -256,6 +281,9 @@ export namespace iofigma {
             } satisfies grida.program.nodes.ContainerNode;
           }
           case "GROUP": {
+            // Note:
+            // Group -> Container is not a accurate transformation.
+            // Since children of group has constraints relative to the parent of the group, nesting children of group to container will break some constraints.
             return {
               id: node.id,
               name: node.name,
@@ -274,9 +302,7 @@ export namespace iofigma {
               height: node.size!.y,
 
               fill: undefined,
-              borderColor: undefined,
-              borderStyle: "none",
-              borderWidth: 0,
+              border: undefined,
               //
               style: {},
               cornerRadius: 0,
@@ -350,21 +376,19 @@ export namespace iofigma {
                   : fixedheight,
               fill: first_visible_fill ? paint(first_visible_fill) : undefined,
               //
-              borderColor:
+              border:
                 first_visible_stroke?.type === "SOLID"
-                  ? grida.program.cg.rgbaf_multiply_alpha(
-                      grida.program.cg.rgbaf_to_rgba8888(
-                        first_visible_stroke.color
+                  ? {
+                      borderWidth: strokeWeight ?? 0,
+                      borderColor: grida.program.cg.rgbaf_multiply_alpha(
+                        grida.program.cg.rgbaf_to_rgba8888(
+                          first_visible_stroke.color
+                        ),
+                        first_visible_stroke.opacity ?? 1
                       ),
-                      first_visible_stroke.opacity ?? 1
-                    )
+                      borderStyle: strokeDashes ? "dashed" : "solid",
+                    }
                   : undefined,
-              borderStyle: first_visible_stroke
-                ? strokeDashes
-                  ? "dashed"
-                  : "solid"
-                : "none",
-              borderWidth: strokeWeight ?? 0,
               //
               style: {},
               textAlign: node.style.textAlignHorizontal
@@ -427,21 +451,19 @@ export namespace iofigma {
                 cornerRadius,
                 fit: "cover",
                 //
-                borderColor:
+                border:
                   first_visible_stroke?.type === "SOLID"
-                    ? grida.program.cg.rgbaf_multiply_alpha(
-                        grida.program.cg.rgbaf_to_rgba8888(
-                          first_visible_stroke.color
+                    ? {
+                        borderWidth: strokeWeight ?? 0,
+                        borderColor: grida.program.cg.rgbaf_multiply_alpha(
+                          grida.program.cg.rgbaf_to_rgba8888(
+                            first_visible_stroke.color
+                          ),
+                          first_visible_stroke.opacity ?? 1
                         ),
-                        first_visible_stroke.opacity ?? 1
-                      )
+                        borderStyle: strokeDashes ? "dashed" : "solid",
+                      }
                     : undefined,
-                borderStyle: first_visible_stroke
-                  ? strokeDashes
-                    ? "dashed"
-                    : "solid"
-                  : "none",
-                borderWidth: strokeWeight ?? 0,
                 //
                 style: {},
               } satisfies grida.program.nodes.ImageNode;
