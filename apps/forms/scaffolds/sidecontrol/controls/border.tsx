@@ -7,7 +7,7 @@ import {
 import { WorkbenchUI } from "@/components/workbench";
 import { grida } from "@/grida";
 import { cn } from "@/utils";
-import { PaintChip, RGBAChip } from "./utils/paint-chip";
+import { RGBAChip } from "./utils/paint-chip";
 import { RGBAColorControl } from "./color";
 import { PropertyLine, PropertyLineLabel } from "../ui";
 import {

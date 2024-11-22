@@ -651,6 +651,7 @@ export namespace grida {
           //
           style,
         } = styles;
+
         const without_fill = {
           position: position,
           width: width === "auto" ? "max-content" : toDimension(width),
