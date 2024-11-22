@@ -1130,6 +1130,11 @@ export namespace grida {
         export interface IBaseNode {
           readonly id: NodeID;
           name: string;
+
+          /**
+           * user-injected custom data
+           */
+          userdata?: Record<string, unknown> | undefined | null;
         }
 
         export interface ISceneNode {
@@ -1643,6 +1648,7 @@ export namespace grida {
           locked: false,
           properties,
           props: {},
+          userdata: {},
           overrides: cloneWithUndefinedValues(nodes),
           template_id: def.name,
           ...seed,

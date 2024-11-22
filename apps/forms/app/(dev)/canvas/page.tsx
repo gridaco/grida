@@ -19,7 +19,6 @@ import {
   useEventTarget,
   CursorMode,
 } from "@/builder";
-import docs from "../static";
 import {
   Select,
   SelectContent,
@@ -53,32 +52,61 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
-import { ImportFromFigmaDialog } from "../import-from-figma";
+import { ImportFromFigmaDialog } from "./import-from-figma";
 import { iofigma } from "@/grida/io-figma";
 import { saveAs } from "file-saver";
-import { ImportFromGridaFileJsonDialog } from "../import-from-grida-file";
+import { ImportFromGridaFileJsonDialog } from "./import-from-grida-file";
 import { v4 } from "uuid";
 import { grida } from "@/grida";
 
-export default function CanvasPlaygroundPage({
-  params,
-}: {
-  params: { slug: string };
-}) {
+export default function CanvasPlaygroundPage() {
+  const [exampleid, setExampleId] = useState<string>("helloworld.grida");
   const importFromFigmaDialog = useDialogState("import-from-figma");
   const importFromJson = useDialogState("import-from-json", {
     refreshkey: true,
   });
   const fonts = useGoogleFontsList();
-  const slug = params.slug;
   const [state, dispatch] = useReducer(
     standaloneDocumentReducer,
     initDocumentEditorState({
       editable: true,
-      // @ts-expect-error
-      document: docs[slug].document,
+      document: {
+        nodes: {
+          root: {
+            id: "root",
+            name: "root",
+            active: true,
+            locked: false,
+            type: "container",
+            children: [],
+            width: 800,
+            height: 600,
+            position: "relative",
+            style: {},
+            opacity: 1,
+            zIndex: 0,
+            expanded: false,
+            cornerRadius: 0,
+          },
+        },
+        root_id: "root",
+      },
     })
   );
+
+  useEffect(() => {
+    fetch(`/examples/canvas/${exampleid}`).then((res) => {
+      res.json().then((file) => {
+        dispatch({
+          type: "document/reset",
+          state: initDocumentEditorState({
+            editable: true,
+            document: file.document,
+          }),
+        });
+      });
+    });
+  }, [exampleid]);
 
   const onExport = () => {
     const documentData = {
@@ -154,7 +182,7 @@ export default function CanvasPlaygroundPage({
                 </span>
               </SidebarSection>
               <SidebarSection className="mt-4">
-                <ExampleSelection value={slug} />
+                <ExampleSwitch value={exampleid} onValueChange={setExampleId} />
               </SidebarSection>
               <hr />
               <SidebarSection>
@@ -195,21 +223,30 @@ export default function CanvasPlaygroundPage({
   );
 }
 
-function ExampleSelection({ value }: { value: string }) {
-  const router = useRouter();
+function ExampleSwitch({
+  value,
+  onValueChange,
+}: {
+  value?: string;
+  onValueChange: (v: string) => void;
+}) {
+  const examples = [
+    "blank.grida",
+    "helloworld.grida",
+    "slide-01.grida",
+    "slide-02.grida",
+  ];
   return (
-    <Select
-      defaultValue={value}
-      onValueChange={(v) => {
-        router.push(`/canvas/${v}`);
-      }}
-    >
+    <Select defaultValue={value} onValueChange={onValueChange}>
       <SelectTrigger>
-        <SelectValue />
+        <SelectValue placeholder="Examples" />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="1">1</SelectItem>
-        <SelectItem value="2">2</SelectItem>
+        {examples.map((example) => (
+          <SelectItem key={example} value={example}>
+            {example.split(".")[0]}
+          </SelectItem>
+        ))}
       </SelectContent>
     </Select>
   );
