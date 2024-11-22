@@ -38,7 +38,9 @@ import {
   BoxIcon,
   CircleIcon,
   CursorArrowIcon,
+  DownloadIcon,
   FigmaLogoIcon,
+  FileIcon,
   FrameIcon,
   ImageIcon,
   TextIcon,
@@ -53,6 +55,9 @@ import {
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { ImportFromFigmaDialog } from "../import-from-figma";
 import { iofigma } from "@/grida/io-figma";
+import { saveAs } from "file-saver";
+import { ImportFromGridaFileJsonDialog } from "../import-from-grida-file";
+import { v4 } from "uuid";
 
 export default function CanvasPlaygroundPage({
   params,
@@ -60,6 +65,9 @@ export default function CanvasPlaygroundPage({
   params: { slug: string };
 }) {
   const importFromFigmaDialog = useDialogState("import-from-figma");
+  const importFromJson = useDialogState("import-from-json", {
+    refreshkey: true,
+  });
   const fonts = useGoogleFontsList();
   const slug = params.slug;
   const [state, dispatch] = useReducer(
@@ -71,8 +79,33 @@ export default function CanvasPlaygroundPage({
     })
   );
 
+  const onExport = () => {
+    const documentData = {
+      document: state.document,
+    };
+
+    const blob = new Blob([JSON.stringify(documentData, null, 2)], {
+      type: "application/json",
+    });
+
+    saveAs(blob, `${v4()}.grida`);
+  };
+
   return (
     <main className="w-screen h-screen overflow-hidden">
+      <ImportFromGridaFileJsonDialog
+        key={importFromJson.refreshkey}
+        {...importFromJson}
+        onImport={(res) => {
+          dispatch({
+            type: "document/reset",
+            state: initDocumentEditorState({
+              editable: true,
+              document: res,
+            }),
+          });
+        }}
+      />
       <ImportFromFigmaDialog
         {...importFromFigmaDialog}
         onImport={(res) => {
@@ -102,8 +135,16 @@ export default function CanvasPlaygroundPage({
                       <DropdownMenuItem
                         onClick={importFromFigmaDialog.openDialog}
                       >
-                        <FigmaLogoIcon className="me-2 inline-block" />
+                        <FigmaLogoIcon className="w-3.5 h-3.5 me-2 inline-block" />
                         Import from Figma
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={importFromJson.openDialog}>
+                        <FileIcon className="w-3.5 h-3.5 me-2 inline-block" />
+                        Import from .grida
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={onExport}>
+                        <DownloadIcon className="w-3.5 h-3.5 me-2 inline-block" />
+                        Save as .grida
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
