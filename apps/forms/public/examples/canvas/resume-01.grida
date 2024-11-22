@@ -1,0 +1,2138 @@
+{
+  "doctype": "v0_document",
+  "document": {
+    "nodes": {
+      "1:475": {
+        "id": "1:475",
+        "name": "R-4",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "relative",
+        "left": 0,
+        "top": 0,
+        "width": 698,
+        "height": 923,
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 0,
+            "g": 0,
+            "b": 0,
+            "a": 1
+          }
+        },
+        "style": {
+          "overflow": "clip",
+          "padding": "32px 33px 32px 33px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "1:476"
+        ]
+      },
+      "1:476": {
+        "id": "1:476",
+        "name": "Frame 79",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 33,
+        "top": 32,
+        "width": 632,
+        "height": 859,
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "1:477",
+          "1:485",
+          "1:536"
+        ]
+      },
+      "1:477": {
+        "id": "1:477",
+        "name": "Frame 68",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": 433,
+        "height": 51,
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "1:478",
+          "1:481"
+        ]
+      },
+      "1:478": {
+        "id": "1:478",
+        "name": "Frame 67",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": 139,
+        "height": 44,
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "1:479",
+          "1:480"
+        ]
+      },
+      "1:479": {
+        "id": "1:479",
+        "name": "Madhu sudhan",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "Madhu sudhan",
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 255,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.2,
+        "letterSpacing": -0.42,
+        "fontSize": 21,
+        "fontFamily": "General Sans",
+        "fontWeight": 500
+      },
+      "1:480": {
+        "id": "1:480",
+        "name": "Product Designer",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "Product Designer",
+        "position": "absolute",
+        "left": 0,
+        "top": 28,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 174,
+            "g": 174,
+            "b": 174,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.2,
+        "letterSpacing": -0.24,
+        "fontSize": 12,
+        "fontFamily": "General Sans",
+        "fontWeight": 500
+      },
+      "1:481": {
+        "id": "1:481",
+        "name": "Frame 66",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 340,
+        "top": 0,
+        "width": 93,
+        "height": 51,
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "1:482",
+          "1:483",
+          "1:484"
+        ]
+      },
+      "1:482": {
+        "id": "1:482",
+        "name": "yourwebsite.com",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "yourwebsite.com",
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 174,
+            "g": 174,
+            "b": 174,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.2,
+        "letterSpacing": -0.24,
+        "fontSize": 12,
+        "fontFamily": "Inter",
+        "fontWeight": 300
+      },
+      "1:483": {
+        "id": "1:483",
+        "name": "your@gmail.com",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "your@gmail.com",
+        "position": "absolute",
+        "left": 0,
+        "top": 18,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 174,
+            "g": 174,
+            "b": 174,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.2,
+        "letterSpacing": -0.24,
+        "fontSize": 12,
+        "fontFamily": "Inter",
+        "fontWeight": 300
+      },
+      "1:484": {
+        "id": "1:484",
+        "name": "LinkedIn : @id",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "LinkedIn : @id",
+        "position": "absolute",
+        "left": 0,
+        "top": 36,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 174,
+            "g": 174,
+            "b": 174,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.2,
+        "letterSpacing": -0.24,
+        "fontSize": 12,
+        "fontFamily": "Inter",
+        "fontWeight": 300
+      },
+      "1:485": {
+        "id": "1:485",
+        "name": "Frame 78",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 0,
+        "top": 93,
+        "width": 632,
+        "height": 555,
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "1:486",
+          "1:487"
+        ]
+      },
+      "1:486": {
+        "id": "1:486",
+        "name": "Vector 3",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "vector",
+        "position": "absolute",
+        "left": 2,
+        "top": 0,
+        "width": 630,
+        "height": 0,
+        "paths": []
+      },
+      "1:487": {
+        "id": "1:487",
+        "name": "Frame 76",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 0,
+        "top": 24,
+        "width": 632,
+        "height": 531,
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "1:488",
+          "1:501"
+        ]
+      },
+      "1:488": {
+        "id": "1:488",
+        "name": "Frame 75",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": 244,
+        "height": 239,
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "1:489",
+          "1:490"
+        ]
+      },
+      "1:489": {
+        "id": "1:489",
+        "name": "Education",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "Education",
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 255,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.2,
+        "letterSpacing": -0.36,
+        "fontSize": 18,
+        "fontFamily": "General Sans",
+        "fontWeight": 500
+      },
+      "1:490": {
+        "id": "1:490",
+        "name": "Frame 59",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 0,
+        "top": 44,
+        "width": 244,
+        "height": 195,
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "1:491",
+          "1:496"
+        ]
+      },
+      "1:491": {
+        "id": "1:491",
+        "name": "Frame 51",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": 244,
+        "height": 90,
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "1:492",
+          "1:495"
+        ]
+      },
+      "1:492": {
+        "id": "1:492",
+        "name": "Frame 50",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": 115,
+        "height": 36,
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "1:493",
+          "1:494"
+        ]
+      },
+      "1:493": {
+        "id": "1:493",
+        "name": "University",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "University",
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 255,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.4202273559570313,
+        "letterSpacing": -0.3,
+        "fontSize": 15,
+        "fontFamily": "Inter",
+        "fontWeight": 500
+      },
+      "1:494": {
+        "id": "1:494",
+        "name": "Aug 2022 | Location",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "Aug 2022 | Location",
+        "position": "absolute",
+        "left": 0,
+        "top": 21,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 174,
+            "g": 174,
+            "b": 174,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.2,
+        "letterSpacing": 0,
+        "fontSize": 12,
+        "fontFamily": "Inter",
+        "fontWeight": 400
+      },
+      "1:495": {
+        "id": "1:495",
+        "name": "Collaborated with cross-functional teams including product managers and developers to create user-friendly interfaces",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "Collaborated with cross-functional teams including product managers and developers to create user-friendly interfaces ",
+        "position": "absolute",
+        "left": 0,
+        "top": 42,
+        "width": 244,
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 174,
+            "g": 174,
+            "b": 174,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.4202273559570313,
+        "letterSpacing": -0.22,
+        "fontSize": 11,
+        "fontFamily": "Inter",
+        "fontWeight": 400
+      },
+      "1:496": {
+        "id": "1:496",
+        "name": "Frame 52",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 0,
+        "top": 105,
+        "width": 244,
+        "height": 90,
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "1:497",
+          "1:500"
+        ]
+      },
+      "1:497": {
+        "id": "1:497",
+        "name": "Frame 50",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": 115,
+        "height": 36,
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "1:498",
+          "1:499"
+        ]
+      },
+      "1:498": {
+        "id": "1:498",
+        "name": "College",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "College",
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 255,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.4202273559570313,
+        "letterSpacing": -0.3,
+        "fontSize": 15,
+        "fontFamily": "Inter",
+        "fontWeight": 500
+      },
+      "1:499": {
+        "id": "1:499",
+        "name": "Aug 2022 | Location",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "Aug 2022 | Location",
+        "position": "absolute",
+        "left": 0,
+        "top": 21,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 174,
+            "g": 174,
+            "b": 174,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.2,
+        "letterSpacing": 0,
+        "fontSize": 12,
+        "fontFamily": "Inter",
+        "fontWeight": 400
+      },
+      "1:500": {
+        "id": "1:500",
+        "name": "Collaborated with cross-functional teams including product managers and developers to create user-friendly interfaces",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "Collaborated with cross-functional teams including product managers and developers to create user-friendly interfaces ",
+        "position": "absolute",
+        "left": 0,
+        "top": 42,
+        "width": 244,
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 174,
+            "g": 174,
+            "b": 174,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.4202273559570313,
+        "letterSpacing": -0.22,
+        "fontSize": 11,
+        "fontFamily": "Inter",
+        "fontWeight": 400
+      },
+      "1:501": {
+        "id": "1:501",
+        "name": "Frame 74",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 334,
+        "top": 0,
+        "width": 298,
+        "height": 531,
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "1:502",
+          "1:503"
+        ]
+      },
+      "1:502": {
+        "id": "1:502",
+        "name": "Experience",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "Experience",
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 255,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.2,
+        "letterSpacing": -0.36,
+        "fontSize": 18,
+        "fontFamily": "General Sans",
+        "fontWeight": 500
+      },
+      "1:503": {
+        "id": "1:503",
+        "name": "Frame 72",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 0,
+        "top": 41,
+        "width": 298,
+        "height": 490,
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "1:504",
+          "1:512",
+          "1:520",
+          "1:528"
+        ]
+      },
+      "1:504": {
+        "id": "1:504",
+        "name": "Frame 50",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": 298,
+        "height": 106,
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "1:505",
+          "1:511"
+        ]
+      },
+      "1:505": {
+        "id": "1:505",
+        "name": "Frame 44",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": 188,
+        "height": 37,
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "1:506",
+          "1:510"
+        ]
+      },
+      "1:506": {
+        "id": "1:506",
+        "name": "Frame 43",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": 188,
+        "height": 20,
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "1:507",
+          "1:508",
+          "1:509"
+        ]
+      },
+      "1:507": {
+        "id": "1:507",
+        "name": "Company",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "Company",
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 255,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.4202273559570313,
+        "letterSpacing": -0.28,
+        "fontSize": 14,
+        "fontFamily": "Inter",
+        "fontWeight": 500
+      },
+      "1:508": {
+        "id": "1:508",
+        "name": "Vector 2",
+        "active": true,
+        "locked": false,
+        "rotation": 4.3711384734024224e-8,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "vector",
+        "position": "absolute",
+        "left": 69,
+        "top": 1.5,
+        "width": 0,
+        "height": 17,
+        "paths": []
+      },
+      "1:509": {
+        "id": "1:509",
+        "name": "Product Designer",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "Product Designer",
+        "position": "absolute",
+        "left": 75,
+        "top": 0,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 255,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.4202273559570313,
+        "letterSpacing": -0.28,
+        "fontSize": 14,
+        "fontFamily": "Inter",
+        "fontWeight": 500
+      },
+      "1:510": {
+        "id": "1:510",
+        "name": "Aug 2022 - Present",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "Aug 2022 - Present",
+        "position": "absolute",
+        "left": 0,
+        "top": 22,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 174,
+            "g": 174,
+            "b": 174,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.2,
+        "letterSpacing": 0,
+        "fontSize": 12,
+        "fontFamily": "Inter",
+        "fontWeight": 400
+      },
+      "1:511": {
+        "id": "1:511",
+        "name": "Collaborated with cross-functional teams including product managers and developers to create user-friendly interfaces for web applications, and developers to create user-friendly interfaces for web applications.",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "Collaborated with cross-functional teams including product managers and developers to create user-friendly interfaces for web applications, and developers to create user-friendly interfaces for web applications.",
+        "position": "absolute",
+        "left": 0,
+        "top": 42,
+        "width": 298,
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 174,
+            "g": 174,
+            "b": 174,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.4202273559570313,
+        "letterSpacing": -0.22,
+        "fontSize": 11,
+        "fontFamily": "Inter",
+        "fontWeight": 400
+      },
+      "1:512": {
+        "id": "1:512",
+        "name": "Frame 69",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 0,
+        "top": 128,
+        "width": 298,
+        "height": 106,
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "1:513",
+          "1:519"
+        ]
+      },
+      "1:513": {
+        "id": "1:513",
+        "name": "Frame 44",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": 188,
+        "height": 37,
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "1:514",
+          "1:518"
+        ]
+      },
+      "1:514": {
+        "id": "1:514",
+        "name": "Frame 43",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": 188,
+        "height": 20,
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "1:515",
+          "1:516",
+          "1:517"
+        ]
+      },
+      "1:515": {
+        "id": "1:515",
+        "name": "Company",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "Company",
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 255,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.4202273559570313,
+        "letterSpacing": -0.28,
+        "fontSize": 14,
+        "fontFamily": "Inter",
+        "fontWeight": 500
+      },
+      "1:516": {
+        "id": "1:516",
+        "name": "Vector 2",
+        "active": true,
+        "locked": false,
+        "rotation": 4.3711384734024224e-8,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "vector",
+        "position": "absolute",
+        "left": 69,
+        "top": 1.5,
+        "width": 0,
+        "height": 17,
+        "paths": []
+      },
+      "1:517": {
+        "id": "1:517",
+        "name": "Product Designer",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "Product Designer",
+        "position": "absolute",
+        "left": 75,
+        "top": 0,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 255,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.4202273559570313,
+        "letterSpacing": -0.28,
+        "fontSize": 14,
+        "fontFamily": "Inter",
+        "fontWeight": 500
+      },
+      "1:518": {
+        "id": "1:518",
+        "name": "Aug 2022 - Present",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "Aug 2022 - Present",
+        "position": "absolute",
+        "left": 0,
+        "top": 22,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 174,
+            "g": 174,
+            "b": 174,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.2,
+        "letterSpacing": 0,
+        "fontSize": 12,
+        "fontFamily": "Inter",
+        "fontWeight": 400
+      },
+      "1:519": {
+        "id": "1:519",
+        "name": "Collaborated with cross-functional teams including product managers and developers to create user-friendly interfaces for web applications, and developers to create user-friendly interfaces for web applications.",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "Collaborated with cross-functional teams including product managers and developers to create user-friendly interfaces for web applications, and developers to create user-friendly interfaces for web applications.",
+        "position": "absolute",
+        "left": 0,
+        "top": 42,
+        "width": 298,
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 174,
+            "g": 174,
+            "b": 174,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.4202273559570313,
+        "letterSpacing": -0.22,
+        "fontSize": 11,
+        "fontFamily": "Inter",
+        "fontWeight": 400
+      },
+      "1:520": {
+        "id": "1:520",
+        "name": "Frame 70",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 0,
+        "top": 256,
+        "width": 298,
+        "height": 106,
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "1:521",
+          "1:527"
+        ]
+      },
+      "1:521": {
+        "id": "1:521",
+        "name": "Frame 44",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": 188,
+        "height": 37,
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "1:522",
+          "1:526"
+        ]
+      },
+      "1:522": {
+        "id": "1:522",
+        "name": "Frame 43",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": 188,
+        "height": 20,
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "1:523",
+          "1:524",
+          "1:525"
+        ]
+      },
+      "1:523": {
+        "id": "1:523",
+        "name": "Company",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "Company",
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 255,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.4202273559570313,
+        "letterSpacing": -0.28,
+        "fontSize": 14,
+        "fontFamily": "Inter",
+        "fontWeight": 500
+      },
+      "1:524": {
+        "id": "1:524",
+        "name": "Vector 2",
+        "active": true,
+        "locked": false,
+        "rotation": 4.3711384734024224e-8,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "vector",
+        "position": "absolute",
+        "left": 69,
+        "top": 1.5,
+        "width": 0,
+        "height": 17,
+        "paths": []
+      },
+      "1:525": {
+        "id": "1:525",
+        "name": "Product Designer",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "Product Designer",
+        "position": "absolute",
+        "left": 75,
+        "top": 0,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 255,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.4202273559570313,
+        "letterSpacing": -0.28,
+        "fontSize": 14,
+        "fontFamily": "Inter",
+        "fontWeight": 500
+      },
+      "1:526": {
+        "id": "1:526",
+        "name": "Aug 2022 - Present",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "Aug 2022 - Present",
+        "position": "absolute",
+        "left": 0,
+        "top": 22,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 174,
+            "g": 174,
+            "b": 174,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.2,
+        "letterSpacing": 0,
+        "fontSize": 12,
+        "fontFamily": "Inter",
+        "fontWeight": 400
+      },
+      "1:527": {
+        "id": "1:527",
+        "name": "Collaborated with cross-functional teams including product managers and developers to create user-friendly interfaces for web applications, and developers to create user-friendly interfaces for web applications.",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "Collaborated with cross-functional teams including product managers and developers to create user-friendly interfaces for web applications, and developers to create user-friendly interfaces for web applications.",
+        "position": "absolute",
+        "left": 0,
+        "top": 42,
+        "width": 298,
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 174,
+            "g": 174,
+            "b": 174,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.4202273559570313,
+        "letterSpacing": -0.22,
+        "fontSize": 11,
+        "fontFamily": "Inter",
+        "fontWeight": 400
+      },
+      "1:528": {
+        "id": "1:528",
+        "name": "Frame 71",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 0,
+        "top": 384,
+        "width": 298,
+        "height": 106,
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "1:529",
+          "1:535"
+        ]
+      },
+      "1:529": {
+        "id": "1:529",
+        "name": "Frame 44",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": 188,
+        "height": 37,
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "1:530",
+          "1:534"
+        ]
+      },
+      "1:530": {
+        "id": "1:530",
+        "name": "Frame 43",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": 188,
+        "height": 20,
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "1:531",
+          "1:532",
+          "1:533"
+        ]
+      },
+      "1:531": {
+        "id": "1:531",
+        "name": "Company",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "Company",
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 255,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.4202273559570313,
+        "letterSpacing": -0.28,
+        "fontSize": 14,
+        "fontFamily": "Inter",
+        "fontWeight": 500
+      },
+      "1:532": {
+        "id": "1:532",
+        "name": "Vector 2",
+        "active": true,
+        "locked": false,
+        "rotation": 4.3711384734024224e-8,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "vector",
+        "position": "absolute",
+        "left": 69,
+        "top": 1.5,
+        "width": 0,
+        "height": 17,
+        "paths": []
+      },
+      "1:533": {
+        "id": "1:533",
+        "name": "Product Designer",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "Product Designer",
+        "position": "absolute",
+        "left": 75,
+        "top": 0,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 255,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.4202273559570313,
+        "letterSpacing": -0.28,
+        "fontSize": 14,
+        "fontFamily": "Inter",
+        "fontWeight": 500
+      },
+      "1:534": {
+        "id": "1:534",
+        "name": "Aug 2022 - Present",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "Aug 2022 - Present",
+        "position": "absolute",
+        "left": 0,
+        "top": 22,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 174,
+            "g": 174,
+            "b": 174,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.2,
+        "letterSpacing": 0,
+        "fontSize": 12,
+        "fontFamily": "Inter",
+        "fontWeight": 400
+      },
+      "1:535": {
+        "id": "1:535",
+        "name": "Collaborated with cross-functional teams including product managers and developers to create user-friendly interfaces for web applications, and developers to create user-friendly interfaces for web applications.",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "Collaborated with cross-functional teams including product managers and developers to create user-friendly interfaces for web applications, and developers to create user-friendly interfaces for web applications.",
+        "position": "absolute",
+        "left": 0,
+        "top": 42,
+        "width": 298,
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 174,
+            "g": 174,
+            "b": 174,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.4202273559570313,
+        "letterSpacing": -0.22,
+        "fontSize": 11,
+        "fontFamily": "Inter",
+        "fontWeight": 400
+      },
+      "1:536": {
+        "id": "1:536",
+        "name": "Frame 77",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 0,
+        "top": 690,
+        "width": 631,
+        "height": 169,
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "1:537",
+          "1:538"
+        ]
+      },
+      "1:537": {
+        "id": "1:537",
+        "name": "Vector 4",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "vector",
+        "position": "absolute",
+        "left": 1,
+        "top": 0,
+        "width": 630,
+        "height": 0,
+        "paths": []
+      },
+      "1:538": {
+        "id": "1:538",
+        "name": "Frame 73",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 0,
+        "top": 31,
+        "width": 631,
+        "height": 138,
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "1:539",
+          "1:540"
+        ]
+      },
+      "1:539": {
+        "id": "1:539",
+        "name": "Skills",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "Skills",
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 255,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.2,
+        "letterSpacing": -0.36,
+        "fontSize": 18,
+        "fontFamily": "General Sans",
+        "fontWeight": 500
+      },
+      "1:540": {
+        "id": "1:540",
+        "name": "Frame 36",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 281,
+        "top": 0,
+        "width": 350,
+        "height": 138,
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "1:541",
+          "1:544",
+          "1:547"
+        ]
+      },
+      "1:541": {
+        "id": "1:541",
+        "name": "Frame 32",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": 121,
+        "height": 138,
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "1:542",
+          "1:543"
+        ]
+      },
+      "1:542": {
+        "id": "1:542",
+        "name": "Design",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "Design",
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 255,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.4202273559570313,
+        "letterSpacing": -0.3,
+        "fontSize": 15,
+        "fontFamily": "Inter",
+        "fontWeight": 500
+      },
+      "1:543": {
+        "id": "1:543",
+        "name": "User Interviews Affinity Diagramming Card Sorting Information Architecture A/B Testing Design Handoff",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "User Interviews\nAffinity Diagramming\nCard Sorting\nInformation Architecture\nA/B Testing\nDesign  Handoff",
+        "position": "absolute",
+        "left": 0,
+        "top": 32,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 174,
+            "g": 174,
+            "b": 174,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.4202273559570313,
+        "letterSpacing": -0.22,
+        "fontSize": 11,
+        "fontFamily": "Inter",
+        "fontWeight": 400
+      },
+      "1:544": {
+        "id": "1:544",
+        "name": "Frame 33",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 168,
+        "top": 0,
+        "width": 58,
+        "height": 128,
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "1:545",
+          "1:546"
+        ]
+      },
+      "1:545": {
+        "id": "1:545",
+        "name": "Tools",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "Tools",
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 255,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.4202273559570313,
+        "letterSpacing": -0.3,
+        "fontSize": 15,
+        "fontFamily": "Inter",
+        "fontWeight": 500
+      },
+      "1:546": {
+        "id": "1:546",
+        "name": "Framer Webflow Sketch Adobe XD HTML/CSS Zeplin",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "Framer\nWebflow\nSketch\nAdobe XD\nHTML/CSS\nZeplin",
+        "position": "absolute",
+        "left": 0,
+        "top": 32,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 174,
+            "g": 174,
+            "b": 174,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.465,
+        "letterSpacing": 0,
+        "fontSize": 11,
+        "fontFamily": "Inter",
+        "fontWeight": 400
+      },
+      "1:547": {
+        "id": "1:547",
+        "name": "Frame 34",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "absolute",
+        "left": 273,
+        "top": 0,
+        "width": 77,
+        "height": 80,
+        "style": {
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "1:548",
+          "1:549"
+        ]
+      },
+      "1:548": {
+        "id": "1:548",
+        "name": "Languages",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "Languages",
+        "position": "absolute",
+        "left": 0,
+        "top": 0,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 255,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.4202273559570313,
+        "letterSpacing": -0.3,
+        "fontSize": 15,
+        "fontFamily": "Inter",
+        "fontWeight": 500
+      },
+      "1:549": {
+        "id": "1:549",
+        "name": "English Telugu Hindi",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "English\nTelugu\nHindi",
+        "position": "absolute",
+        "left": 0,
+        "top": 32,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 174,
+            "g": 174,
+            "b": 174,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.465,
+        "letterSpacing": 0,
+        "fontSize": 11,
+        "fontFamily": "Inter",
+        "fontWeight": 400
+      }
+    },
+    "root_id": "1:475"
+  }
+}

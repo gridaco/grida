@@ -22,7 +22,9 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -235,6 +237,10 @@ function ExampleSwitch({
     "helloworld.grida",
     "slide-01.grida",
     "slide-02.grida",
+    "instagram-post-01.grida",
+    "poster-01.grida",
+    "resume-01.grida",
+    "event-page-01.grida",
   ];
   return (
     <Select defaultValue={value} onValueChange={onValueChange}>
@@ -242,11 +248,16 @@ function ExampleSwitch({
         <SelectValue placeholder="Examples" />
       </SelectTrigger>
       <SelectContent>
-        {examples.map((example) => (
-          <SelectItem key={example} value={example}>
-            {example.split(".")[0]}
-          </SelectItem>
-        ))}
+        <SelectGroup>
+          <SelectLabel>Examples</SelectLabel>
+          {examples.map((example) => (
+            <SelectItem key={example} value={example}>
+              <span className="capitalize">
+                {example.split(".")[0].split("-").join(" ")}
+              </span>
+            </SelectItem>
+          ))}
+        </SelectGroup>
       </SelectContent>
     </Select>
   );
