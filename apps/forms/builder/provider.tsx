@@ -401,6 +401,24 @@ export function useDocument() {
     [dispatch]
   );
 
+  const changeNodeSize = useCallback(
+    (
+      node_id: string,
+      axis: "width" | "height",
+      length: grida.program.css.Length | "auto"
+    ) => {
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/size",
+          node_id: node_id,
+          axis,
+          length,
+        });
+      });
+    },
+    [dispatch]
+  );
+
   const changeNodeFill = useCallback(
     (node_id: string, fill: grida.program.cg.PaintWithoutID) => {
       requestAnimationFrame(() => {
@@ -633,6 +651,10 @@ export function useDocument() {
       // stylable
       opacity: (value: number) => changeNodeOpacity(selected_node_id!, value),
       rotation: (value: number) => changeNodeRotation(selected_node_id!, value),
+      width: (value: grida.program.css.Length | "auto") =>
+        changeNodeSize(selected_node_id!, "width", value),
+      height: (value: grida.program.css.Length | "auto") =>
+        changeNodeSize(selected_node_id!, "height", value),
 
       // text style
       fontFamily: (value: string) =>

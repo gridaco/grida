@@ -54,6 +54,7 @@ import { LetterSpacingControl } from "./controls/letter-spacing";
 import { LineHeightControl } from "./controls/line-height";
 import { NameControl } from "./controls/name";
 import { UserDataControl } from "./controls/x-userdata";
+import { LengthControl } from "./controls/length";
 
 export function SelectedNodeProperties() {
   const { state: document, selectedNode } = useDocument();
@@ -133,14 +134,23 @@ export function SelectedNodeProperties() {
 
   return (
     <div key={selected_node_id}>
-      {process.env.NODE_ENV === "development" && (
+      {/* {process.env.NODE_ENV === "development" && (
         <SidebarSection className="border-b pb-4">
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Debug</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
           <DebugControls />
         </SidebarSection>
-      )}
+      )} */}
+      <div className="h-10" />
+      <SidebarSection className="border-b">
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel className="w-full flex justify-between items-center">
+            <div className="capitalize">{type}</div>
+            <small className="font-mono">{id}</small>
+          </SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+      </SidebarSection>
       <SidebarSection className="border-b pb-4">
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Layer</SidebarSectionHeaderLabel>
@@ -164,7 +174,7 @@ export function SelectedNodeProperties() {
       </SidebarSection>
       <SidebarSection className="border-b pb-4">
         <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Positioning</SidebarSectionHeaderLabel>
+          <SidebarSectionHeaderLabel>Position</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuSectionContent className="space-y-2">
           <PropertyLine>
@@ -186,6 +196,28 @@ export function SelectedNodeProperties() {
               //
               onValueChange={selectedNode.positioningMode}
             />
+          </PropertyLine>
+          <PropertyLine>
+            <PropertyLineLabel>Rotate</PropertyLineLabel>
+            <RotateControl
+              value={rotation}
+              onValueChange={selectedNode.rotation}
+            />
+          </PropertyLine>
+        </SidebarMenuSectionContent>
+      </SidebarSection>
+      <SidebarSection className="border-b pb-4">
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>Size</SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuSectionContent className="space-y-2">
+          <PropertyLine>
+            <PropertyLineLabel>Width</PropertyLineLabel>
+            <LengthControl value={width} onValueChange={selectedNode.width} />
+          </PropertyLine>
+          <PropertyLine>
+            <PropertyLineLabel>Height</PropertyLineLabel>
+            <LengthControl value={height} onValueChange={selectedNode.height} />
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>
@@ -367,14 +399,6 @@ export function SelectedNodeProperties() {
             />
           </PropertyLine>
           <PropertyLine>
-            <PropertyLineLabel>Rotate</PropertyLineLabel>
-            <RotateControl
-              value={rotation}
-              onValueChange={selectedNode.rotation}
-            />
-          </PropertyLine>
-
-          <PropertyLine>
             <PropertyLineLabel>Radius</PropertyLineLabel>
             <CornerRadiusControl
               value={cornerRadius}
@@ -501,8 +525,8 @@ function DebugControls() {
     <SidebarMenuSectionContent>
       <pre className="text-xs font-mono">
         <div>Node {selected_node_id}</div>
-        <div>Type {type}</div>
-        <div>Name {name}</div>
+        {/* <div>Type {type}</div> */}
+        {/* <div>Name {name}</div> */}
         <div>width {width}</div>
         <div>height {height}</div>
         <hr className="my-4" />

@@ -256,9 +256,15 @@ export function SidebarSectionHeaderItem({
 
 export function SidebarSectionHeaderLabel({
   children,
-}: React.PropsWithChildren<{}>) {
+  className,
+}: React.PropsWithChildren<{ className?: string }>) {
   return (
-    <span className="text-xs font-normal text-muted-foreground group-hover:text-accent-foreground">
+    <span
+      className={cn(
+        "text-xs font-normal text-muted-foreground group-hover:text-accent-foreground",
+        className
+      )}
+    >
       {children}
     </span>
   );

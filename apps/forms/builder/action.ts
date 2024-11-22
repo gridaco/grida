@@ -254,6 +254,11 @@ interface INodeChangeOpacityAction extends INodeID {
   opacity: number;
 }
 
+interface INodeChangeSizeAction extends INodeID {
+  axis: "width" | "height";
+  length: grida.program.css.Length | "auto";
+}
+
 interface INodeChangeRotationAction extends INodeID {
   rotation: grida.program.nodes.i.IRotation["rotation"];
 }
@@ -333,6 +338,7 @@ export type NodeChangeAction =
   | ({ type: "node/change/text" } & INodeChangeTextAction)
   | ({ type: "node/change/opacity" } & INodeChangeOpacityAction)
   | ({ type: "node/change/rotation" } & INodeChangeRotationAction)
+  | ({ type: "node/change/size" } & INodeChangeSizeAction)
   | ({ type: "node/change/cornerRadius" } & INodeChangeCornerRadiusAction)
   | ({ type: "node/change/fill" } & INodeChangeFillAction)
   | ({ type: "node/change/border" } & INodeChangeBorderAction)

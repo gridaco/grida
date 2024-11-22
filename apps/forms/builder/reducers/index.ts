@@ -437,6 +437,7 @@ export default function reducer<S extends IDocumentEditorState>(
     case "node/change/userdata":
     case "node/change/positioning":
     case "node/change/positioning-mode":
+    case "node/change/size":
     case "node/change/component":
     case "node/change/href":
     case "node/change/target":
@@ -683,6 +684,12 @@ function nodeReducer<N extends Partial<grida.program.nodes.Node>>(
             (draft as grida.program.nodes.i.IPositioning).bottom = undefined;
           }
         }
+        break;
+      }
+      case "node/change/size": {
+        const { axis, length } = action;
+        // TODO: check the sizing model (fixed or css)
+        (draft as grida.program.nodes.i.ICSSDimension)[axis] = length;
         break;
       }
       case "node/change/href": {
