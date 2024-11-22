@@ -58,6 +58,7 @@ import { iofigma } from "@/grida/io-figma";
 import { saveAs } from "file-saver";
 import { ImportFromGridaFileJsonDialog } from "../import-from-grida-file";
 import { v4 } from "uuid";
+import { grida } from "@/grida";
 
 export default function CanvasPlaygroundPage({
   params,
@@ -81,8 +82,9 @@ export default function CanvasPlaygroundPage({
 
   const onExport = () => {
     const documentData = {
+      doctype: "v0_document",
       document: state.document,
-    };
+    } satisfies grida.io.DocumentFileModel;
 
     const blob = new Blob([JSON.stringify(documentData, null, 2)], {
       type: "application/json",
@@ -96,12 +98,12 @@ export default function CanvasPlaygroundPage({
       <ImportFromGridaFileJsonDialog
         key={importFromJson.refreshkey}
         {...importFromJson}
-        onImport={(res) => {
+        onImport={(file) => {
           dispatch({
             type: "document/reset",
             state: initDocumentEditorState({
               editable: true,
-              document: res,
+              document: file.document,
             }),
           });
         }}

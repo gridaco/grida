@@ -19,7 +19,7 @@ export function ImportFromGridaFileJsonDialog({
   onImport,
   ...props
 }: React.ComponentProps<typeof Dialog> & {
-  onImport?: (document: grida.program.document.IDocumentDefinition) => void;
+  onImport?: (document: grida.io.DocumentFileModel) => void;
 }) {
   const { openFilePicker, filesContent, loading, plainFiles } = useFilePicker({
     accept: ".grida,.json",
@@ -31,7 +31,7 @@ export function ImportFromGridaFileJsonDialog({
       try {
         const fileContent = filesContent[0].content;
         const parsedDocument = JSON.parse(fileContent);
-        onImport?.(parsedDocument.document);
+        onImport?.(parsedDocument);
         toast.success("File successfully imported!");
         props.onOpenChange?.(false); // Close the dialog
       } catch (error) {
@@ -56,8 +56,13 @@ export function ImportFromGridaFileJsonDialog({
         </DialogHeader>
         <div className="space-y-4">
           <Label>Select a .grida file</Label>
-          <Card className="p-10 flex items-center justify-center">
-            <Button onClick={openFilePicker} disabled={loading} variant="ghost">
+          <Card className="flex items-center justify-center">
+            <Button
+              onClick={openFilePicker}
+              disabled={loading}
+              variant="ghost"
+              className="w-full h-full p-10 "
+            >
               {loading ? "Loading..." : "Select File"}
             </Button>
           </Card>

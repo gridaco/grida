@@ -1,6 +1,17 @@
 import type { Tokens } from "@/ast";
 
 export namespace grida {
+  export namespace io {
+    /**
+     * Grida Document File model
+     * .grida file is a JSON file that contains the document structure and metadata.
+     */
+    export interface DocumentFileModel {
+      doctype: "v0_document";
+      document: grida.program.document.IDocumentDefinition;
+    }
+  }
+
   export namespace program {
     export namespace schema {
       /**
