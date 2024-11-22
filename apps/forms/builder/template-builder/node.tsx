@@ -57,6 +57,7 @@ export function NodeElement<P extends Record<string, any>>({
       case "image":
       case "text":
       case "vector":
+      case "line":
       case "rectangle":
       case "ellipse": {
         return TemplateBuilderWidgets[node.type];
@@ -155,6 +156,7 @@ const fillings = {
   ellipse: "none",
   template_instance: "none",
   instance: "none",
+  line: "none",
 } as const;
 
 function HrefWrapper({

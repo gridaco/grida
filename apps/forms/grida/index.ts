@@ -939,7 +939,7 @@ export namespace grida {
         /**
          * @see https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/fill-rule
          */
-        fillRile: FillRule;
+        fillRule: FillRule;
       };
 
       /**
@@ -1098,6 +1098,7 @@ export namespace grida {
         | ImageNode
         | ContainerNode
         | VectorNode
+        | LineNode
         | RectangleNode
         | EllipseNode
         | InstanceNode
@@ -1114,6 +1115,7 @@ export namespace grida {
       export type AnyNode = Omit<
         Partial<TextNode> &
           Partial<VectorNode> &
+          Partial<LineNode> &
           Partial<RectangleNode> &
           Partial<ImageNode> &
           Partial<ContainerNode> &
@@ -1538,7 +1540,42 @@ export namespace grida {
           i.IRotation,
           i.IFill {
         type: "vector";
-        paths: cg.Path[];
+        paths: (cg.Path & {
+          /**
+           * specifies which property to use to fill the path
+           * this is to support compatibility with figma rest api, where it returns a vector stroke as a path individually
+           *
+           * @default "fill"
+           */
+          fill: "fill" | "stroke";
+        })[];
+      }
+
+      /**
+       * Line Node
+       *
+       * Note: this does not represent a polyline or a path, it only represents a straight line with two points.
+       *
+       * - [Env:HTML/SVG] on svg rendering, this will be rendered as `<line>` with `x1`, `y1`, `x2`, `y2` attributes.
+       *
+       * @see {@link https://developer.mozilla.org/en-US/docs/Web/SVG/Element/line}
+       * @see {@link https://api.skia.org/classSkSVGLine.html}
+       * @see {@link https://www.figma.com/plugin-docs/api/LineNode/}
+       * @see {@link https://konvajs.org/api/Konva.Line.html}
+       *
+       */
+      export interface LineNode
+        extends i.IBaseNode,
+          i.ISceneNode,
+          i.IHrefable,
+          i.IPositioning,
+          // i.ICSSDimension,
+          i.IFixedDimension,
+          i.IOpacity,
+          i.IZIndex,
+          i.IRotation {
+        type: "line";
+        height: 0;
       }
 
       /**

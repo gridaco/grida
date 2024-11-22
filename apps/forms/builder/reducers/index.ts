@@ -1016,6 +1016,7 @@ function initialNode(
         ...seed,
       } satisfies grida.program.nodes.ImageNode;
     }
+    case "line":
     case "vector":
     case "instance":
     case "template_instance": {

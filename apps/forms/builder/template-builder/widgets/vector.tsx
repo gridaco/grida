@@ -10,6 +10,7 @@ export function VectorWidget({
   width,
   height,
   fill,
+  style,
   ...props
 }: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.VectorNode>) {
   const { defs, fill: fillDef } = fill
@@ -19,14 +20,41 @@ export function VectorWidget({
         fill: "none",
       };
 
+  const style_without_size = {
+    ...style,
+    width: undefined,
+    height: undefined,
+  };
+
+  const fillpaths = paths.filter((p) => p.fill === "fill");
+  const strokepaths = paths.filter((p) => p.fill === "stroke");
   // Combine all paths into a single composite shape
-  const combinedPathD = paths.map(({ d }) => d).join(" ");
-  const fillrule = paths[0]?.fillRile;
+  const fp_combinedPathD = fillpaths.map(({ d }) => d).join(" ");
+  const fp_fillrule = fillpaths[0]?.fillRule;
 
   return (
-    <svg {...props} width={width} height={height}>
+    <svg
+      {...props}
+      style={style_without_size}
+      width={width}
+      height={height || 1}
+    >
       {defs && <g dangerouslySetInnerHTML={{ __html: defs }} />}
-      <path d={combinedPathD} fill={fillDef} fillRule={fillrule} />
+      {/* fill paths */}
+      {fp_combinedPathD && (
+        <path d={fp_combinedPathD} fill={fillDef} fillRule={fp_fillrule} />
+      )}
+
+      {/* stroke paths */}
+      {strokepaths.map(({ d, fillRule }, i) => (
+        <path
+          kernelMatrix={i}
+          d={d}
+          // TODO:
+          fill="red"
+          fillRule={fillRule}
+        />
+      ))}
     </svg>
   );
 }
