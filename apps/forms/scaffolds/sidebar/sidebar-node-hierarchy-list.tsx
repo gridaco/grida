@@ -61,7 +61,9 @@ export function NodeHierarchyList() {
               pointerEnterNode(n.id);
             }}
           >
-            <SidebarMenuItemLabel>{n.name}</SidebarMenuItemLabel>
+            <SidebarMenuItemLabel className="font-normal text-sm">
+              {n.name}
+            </SidebarMenuItemLabel>
             <SidebarMenuItemActions>
               <SidebarMenuItemAction
                 onClick={() => {

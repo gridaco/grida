@@ -212,9 +212,12 @@ export const SidebarMenuItem = React.forwardRef(function SidebarMenuItem(
 
 export function SidebarMenuItemLabel({
   children,
-}: React.PropsWithChildren<{}>) {
+  className,
+}: React.PropsWithChildren<{ className?: string }>) {
   return (
-    <span className="text-ellipsis overflow-hidden cursor-default">
+    <span
+      className={cn("text-ellipsis overflow-hidden cursor-default", className)}
+    >
       {children}
     </span>
   );
