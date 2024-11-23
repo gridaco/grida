@@ -1,7 +1,13 @@
-import { toPng } from "html-to-image";
+import { toPng, toSvg } from "html-to-image";
 import { saveAs } from "file-saver";
 import { Button } from "@/components/ui/button";
 import toast from "react-hot-toast";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 
 export function ExportNodeWithHtmlToImage({
   node_id,
@@ -10,28 +16,53 @@ export function ExportNodeWithHtmlToImage({
   node_id: string;
   name: string;
 }) {
-  const format = "png";
-  const filename = `${name}.${format}`;
-
-  const onClick = () => {
+  const onExport = (format: "svg" | "png") => {
+    const filename = `${name}.${format}`;
     const domnode = document.getElementById(node_id);
     if (!domnode) {
       toast.error("Node not found");
       return;
     }
     //
-    toPng(domnode).then((dataUrl) => {
-      // Convert data URL to Blob
-      fetch(dataUrl)
-        .then((res) => res.blob())
-        .then((blob) => saveAs(blob, filename))
-        .catch(() => toast.error("Failed to save image"));
-    });
+    switch (format) {
+      case "png": {
+        toPng(domnode).then((dataUrl) => {
+          // Convert data URL to Blob
+          fetch(dataUrl)
+            .then((res) => res.blob())
+            .then((blob) => saveAs(blob, filename))
+            .catch(() => toast.error("Failed to save image"));
+        });
+        break;
+      }
+      case "svg": {
+        toSvg(domnode).then((dataUrl) => {
+          // Convert data URL to Blob
+          fetch(dataUrl)
+            .then((res) => res.blob())
+            .then((blob) => saveAs(blob, filename))
+            .catch(() => toast.error("Failed to save image"));
+        });
+        break;
+      }
+    }
   };
 
   return (
-    <Button variant="outline" size="xs" onClick={onClick} className="w-full">
-      Export {filename}
-    </Button>
+    <DropdownMenu>
+      <DropdownMenuTrigger>
+        <Button variant="outline" size="xs" className="w-full overflow-hidden">
+          <span className="text-ellipsis overflow-hidden">Export as ...</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent>
+        <DropdownMenuItem onSelect={() => onExport("png")}>
+          PNG
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => onExport("svg")}>
+          SVG
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
