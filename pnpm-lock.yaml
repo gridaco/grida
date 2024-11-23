@@ -685,6 +685,9 @@ importers:
       stylis:
         specifier: ^4.3.2
         version: 4.3.2
+      svg-pathdata:
+        specifier: ^7.1.0
+        version: 7.1.0
       swr:
         specifier: ^2.2.5
         version: 2.2.5(react@18.3.1)
@@ -45998,6 +46001,13 @@ packages:
     resolution: {integrity: sha512-e4hG1hRwoOdRb37cIMSgzNsxyzKfayW6VOflrwvR+/bzrkyxY/31WkbgnQpgtrNp1SdpJvpUAGTa/ZoiPNDuRQ==}
     dev: false
 
+  /svg-pathdata@7.1.0:
+    resolution: {integrity: sha512-wrvKHXZSYZyODOj5E1l1bMTIo8sR7YCH0E4SA8IgLgMsZq4RypslpYvNSsrdg4ThD6du2KWPyVeKinkqUelGhg==}
+    engines: {node: '>=20.11.1'}
+    dependencies:
+      yerror: 8.0.0
+    dev: false
+
   /svg-tags@1.0.0:
     resolution: {integrity: sha512-ovssysQTa+luh7A5Weu3Rta6FJlFBBbInjOh722LIt6klpU2/HtdUbszju/G4devcvk8PGt7FCLv5wftu3THUA==}
     dev: true
@@ -49096,6 +49106,11 @@ packages:
       cross-spawn: 6.0.5
       pkg-dir: 4.2.0
     dev: true
+
+  /yerror@8.0.0:
+    resolution: {integrity: sha512-FemWD5/UqNm8ffj8oZIbjWXIF2KE0mZssggYpdaQkWDDgXBQ/35PNIxEuz6/YLn9o0kOxDBNJe8x8k9ljD7k/g==}
+    engines: {node: '>=18.16.0'}
+    dev: false
 
   /yjs@13.6.15:
     resolution: {integrity: sha512-moFv4uNYhp8BFxIk3AkpoAnnjts7gwdpiG8RtyFiKbMtxKCS0zVZ5wPaaGpwC3V2N/K8TK8MwtSI3+WO9CHWjQ==}

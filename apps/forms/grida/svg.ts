@@ -1,4 +1,5 @@
 import { v4 } from "uuid";
+import { SVGPathData } from "svg-pathdata";
 import type { grida } from "./index";
 
 export namespace svg {

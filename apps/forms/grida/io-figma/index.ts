@@ -516,6 +516,21 @@ export namespace iofigma {
           case "BOOLEAN_OPERATION": {
           }
           case "LINE": {
+            return {
+              id: node.id,
+              name: node.name,
+              active: node.visible ?? true,
+              locked: node.locked ?? false,
+              rotation: node.rotation ?? 0,
+              opacity: node.opacity ?? 1,
+              zIndex: 0,
+              type: "line",
+              position: "absolute",
+              left: node.relativeTransform![0][2],
+              top: node.relativeTransform![1][2],
+              width: node.size!.x,
+              height: 0,
+            } satisfies grida.program.nodes.LineNode;
           }
           case "SLICE": {
             return;
@@ -523,8 +538,33 @@ export namespace iofigma {
           case "REGULAR_POLYGON":
           case "STAR":
           case "VECTOR": {
-            // TODO: fallbacks to rectangle
-            const { fills } = node;
+            const { fills, fillGeometry, strokeGeometry } = node;
+
+            // check if vector can be converted to line
+            // if (
+            //   (fillGeometry?.length ?? 0) === 0 &&
+            //   strokeGeometry?.length === 1
+            // ) {
+            //   const path = strokeGeometry[0].path;
+
+            //   if (linedata) {
+            //     return {
+            //       id: node.id,
+            //       name: node.name,
+            //       active: node.visible ?? true,
+            //       locked: node.locked ?? false,
+            //       rotation: node.rotation ?? 0,
+            //       opacity: node.opacity ?? 1,
+            //       zIndex: 0,
+            //       type: "line",
+            //       position: "absolute",
+            //       left: node.relativeTransform![0][2],
+            //       top: node.relativeTransform![1][2],
+            //       width: linedata.x2 - linedata.x1,
+            //       height: 0,
+            //     } satisfies grida.program.nodes.LineNode;
+            //   }
+            // }
 
             const first_visible_fill = first_visible(fills);
 
@@ -555,11 +595,18 @@ export namespace iofigma {
               //         bottomLeftRadius: node.rectangleCornerRadii[3],
               //       }
               //     : 0,
-              paths:
-                node.fillGeometry?.map((p) => ({
+              paths: [
+                ...(node.fillGeometry?.map((p) => ({
                   d: p.path ?? "",
-                  fillRile: windingRuleMap[p.windingRule],
-                })) ?? [],
+                  fillRule: windingRuleMap[p.windingRule],
+                  fill: "fill" as const,
+                })) ?? []),
+                ...(node.strokeGeometry?.map((p) => ({
+                  d: p.path ?? "",
+                  fillRule: windingRuleMap[p.windingRule],
+                  fill: "stroke" as const,
+                })) ?? []),
+              ],
             } satisfies grida.program.nodes.VectorNode;
           }
 
