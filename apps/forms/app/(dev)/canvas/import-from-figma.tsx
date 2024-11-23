@@ -122,7 +122,7 @@ export function ImportFromFigmaDialog({
           onSubmit={onSubmit}
           className="flex flex-col gap-4"
         >
-          <div className="grid gap-0">
+          <div className="grid gap-2">
             <Label>Import from Node URL</Label>
             <Input
               type="url"

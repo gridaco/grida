@@ -6,6 +6,7 @@ export type BuilderAction =
   | DocumentEditorResetWithStateAction
   //
   | DocumentEditorCanvasEventTargetHtmlBackendKeyDown
+  | DocumentEditorCanvasEventTargetHtmlBackendKeyUp
   //
   | DocumentEditorCanvasEventTargetHtmlBackendPointerMove
   | DocumentEditorCanvasEventTargetHtmlBackendPointerMoveRaycast
@@ -58,11 +59,11 @@ interface ICanvasEventTargetPointerEvent {
 
 export type DocumentEditorCanvasEventTargetHtmlBackendKeyDown = {
   type: "document/canvas/backend/html/event/on-key-down";
-  key: string;
-  altKey: boolean;
-  metaKey: boolean;
-  shiftKey: boolean;
-};
+} & Pick<KeyboardEvent, "key" | "altKey" | "ctrlKey" | "metaKey" | "shiftKey">;
+
+export type DocumentEditorCanvasEventTargetHtmlBackendKeyUp = {
+  type: "document/canvas/backend/html/event/on-key-up";
+} & Pick<KeyboardEvent, "key" | "altKey" | "ctrlKey" | "metaKey" | "shiftKey">;
 
 export type DocumentEditorCanvasEventTargetHtmlBackendPointerMove = {
   type: "document/canvas/backend/html/event/on-pointer-move";
@@ -85,7 +86,6 @@ export type DocumentEditorCanvasEventTargetHtmlBackendPointerMoveRaycast =
       x: number;
       y: number;
     };
-    metaKey: boolean;
   };
 
 export type DocumentEditorCanvasEventTargetHtmlBackendPointerDown =

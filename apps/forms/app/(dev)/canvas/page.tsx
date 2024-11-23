@@ -28,12 +28,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useRouter } from "next/navigation";
 import { GridaLogo } from "@/components/grida-logo";
 import { DevtoolsPanel } from "@/builder/devtools";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
 import { useGoogleFontsList } from "@/builder/google.fonts";
-import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   BorderSolidIcon,
@@ -61,6 +59,7 @@ import { saveAs } from "file-saver";
 import { ImportFromGridaFileJsonDialog } from "./import-from-grida-file";
 import { v4 } from "uuid";
 import { grida } from "@/grida";
+import { HelpFab } from "@/scaffolds/help/editor-help-fab";
 
 export default function CanvasPlaygroundPage() {
   const [exampleid, setExampleId] = useState<string>("helloworld.grida");
@@ -159,7 +158,7 @@ export default function CanvasPlaygroundPage() {
           <aside>
             <SidebarRoot>
               <SidebarSection className="mt-4">
-                <span>
+                <span className="px-2">
                   <DropdownMenu>
                     <DropdownMenuTrigger>
                       <GridaLogo className="inline-block w-4 h-4 me-2" />
@@ -222,6 +221,7 @@ export default function CanvasPlaygroundPage() {
           </aside>
         </div>
       </StandaloneDocumentEditor>
+      <HelpFab />
     </main>
   );
 }

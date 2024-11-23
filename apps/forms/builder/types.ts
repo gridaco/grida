@@ -19,6 +19,34 @@ export type Marquee = {
   y2: number;
 };
 
+const DEFAULT_RAY_TARGETING: SurfaceRaycastTargeting = {
+  target: "next",
+  ignores_root: true,
+  ignores_locked: true,
+};
+
+export type SurfaceRaycastTargeting = {
+  /**
+   * Determines how the target node is selected:
+   * - `deepest` => Selects the deepest (nested) node.
+   * - `shallowest` => Selects the shallowest (root) node.
+   * - `next` => Selects the next non-ignored shallowest node. (if the shallowest node is ignored and next is available)
+   *
+   * @default "next"
+   */
+  target: "deepest" | "shallowest" | "next";
+
+  /**
+   * @default true
+   */
+  ignores_root: boolean;
+
+  /**
+   * @default true
+   */
+  ignores_locked: boolean;
+};
+
 export interface IDocumentEditorInteractionCursorState {
   selected_node_id?: string;
   hovered_node_id?: string;
@@ -59,6 +87,18 @@ export interface IDocumentEditorInteractionCursorState {
    * @default false
    */
   surface_content_edit_mode?: false | "text" | "path";
+
+  /**
+   * the config of how the surface raycast targeting should be
+   */
+  surface_raycast_targeting: SurfaceRaycastTargeting;
+
+  /**
+   * @private - internal use only
+   *
+   * All node ids detected by the raycast (internally) - does not get affected by the targeting config
+   */
+  surface_raycast_detected_node_ids: string[];
 
   /**
    * @private - internal use only
@@ -131,6 +171,8 @@ export function initDocumentEditorState({
       grida.program.document.internal.createDocumentDefinitionRuntimeHierarchyContext(
         init.document
       ),
+    surface_raycast_targeting: DEFAULT_RAY_TARGETING,
+    surface_raycast_detected_node_ids: [],
     googlefonts: s.fonts().map((family) => ({ family })),
     cursor_mode: { type: "cursor" },
     ...init,

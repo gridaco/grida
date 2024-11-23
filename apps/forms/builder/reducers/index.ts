@@ -3,6 +3,7 @@ import { produce, type Draft } from "immer";
 import type {
   BuilderAction,
   DocumentEditorCanvasEventTargetHtmlBackendKeyDown,
+  DocumentEditorCanvasEventTargetHtmlBackendKeyUp,
   //
   DocumentEditorCanvasEventTargetHtmlBackendPointerMove,
   DocumentEditorCanvasEventTargetHtmlBackendPointerMoveRaycast,
@@ -23,7 +24,7 @@ import type {
   NodeChangeAction,
   TemplateNodeOverrideChangeAction,
 } from "../action";
-import type { IDocumentEditorState } from "../types";
+import type { IDocumentEditorState, SurfaceRaycastTargeting } from "../types";
 import { grida } from "@/grida";
 import assert from "assert";
 import { v4 } from "uuid";
@@ -53,6 +54,16 @@ export default function reducer<S extends IDocumentEditorState>(
         DocumentEditorCanvasEventTargetHtmlBackendKeyDown
       >action;
       return produce(state, (draft) => {
+        // Meta key (meta only)
+        if (
+          metaKey && // Meta key is pressed
+          !altKey && // Alt key is not pressed
+          !shiftKey && // Shift key is not pressed
+          key === "Meta"
+        ) {
+          draft.surface_raycast_targeting.target = "deepest";
+          self_updateSurfaceHoverState(draft);
+        }
         if (metaKey && key === "c") {
           // Copy logic
           if (draft.selected_node_id) {
@@ -70,7 +81,7 @@ export default function reducer<S extends IDocumentEditorState>(
               draft.selected_node_id
             );
             draft.clipboard = JSON.parse(JSON.stringify(selectedNode)); // Deep copy the node
-            deleteNode(draft, draft.selected_node_id);
+            self_deleteNode(draft, draft.selected_node_id);
           }
         } else if (metaKey && key === "v") {
           // Paste logic
@@ -80,7 +91,7 @@ export default function reducer<S extends IDocumentEditorState>(
             const offset = 10; // Offset to avoid overlapping
             if (newNode.left !== undefined) newNode.left += offset;
             if (newNode.top !== undefined) newNode.top += offset;
-            insertNode(draft, newNode.id, newNode);
+            self_insertNode(draft, newNode.id, newNode);
             draft.selected_node_id = newNode.id; // Select the newly pasted node
           }
         }
@@ -104,11 +115,22 @@ export default function reducer<S extends IDocumentEditorState>(
           case "Backspace": {
             if (draft.selected_node_id) {
               if (draft.document.root_id !== draft.selected_node_id) {
-                deleteNode(draft, draft.selected_node_id);
+                self_deleteNode(draft, draft.selected_node_id);
               }
             }
             break;
           }
+        }
+      });
+    }
+    case "document/canvas/backend/html/event/on-key-up": {
+      const { key, altKey, metaKey, shiftKey } = <
+        DocumentEditorCanvasEventTargetHtmlBackendKeyUp
+      >action;
+      return produce(state, (draft) => {
+        if (key === "Meta") {
+          draft.surface_raycast_targeting.target = "shallowest";
+          self_updateSurfaceHoverState(draft);
         }
       });
     }
@@ -122,14 +144,12 @@ export default function reducer<S extends IDocumentEditorState>(
       });
     }
     case "document/canvas/backend/html/event/on-pointer-move-raycast": {
-      const { node_ids_from_point, metaKey } = <
+      const { node_ids_from_point } = <
         DocumentEditorCanvasEventTargetHtmlBackendPointerMoveRaycast
       >action;
       return produce(state, (draft) => {
-        const target_node_id =
-          node_ids_from_point[metaKey ? 0 : node_ids_from_point.length - 2];
-
-        draft.hovered_node_id = target_node_id;
+        draft.surface_raycast_detected_node_ids = node_ids_from_point;
+        self_updateSurfaceHoverState(draft);
       });
     }
     case "document/canvas/backend/html/event/on-pointer-down": {
@@ -138,11 +158,9 @@ export default function reducer<S extends IDocumentEditorState>(
       >action;
       return produce(state, (draft) => {
         if (draft.cursor_mode.type === "cursor") {
-          const target_node_id = draft.hovered_node_id;
-          // const target_node_id =
-          //   node_ids_from_point[node_ids_from_point.length - 2];
-          draft.selected_node_id = target_node_id;
-          draft.surface_content_edit_mode = false;
+          draft.surface_raycast_detected_node_ids = node_ids_from_point;
+          const { hovered_node_id } = self_updateSurfaceHoverState(draft);
+          draft.selected_node_id = hovered_node_id;
         } else if (draft.cursor_mode.type === "insert") {
           const { node: nodetype } = draft.cursor_mode;
           const nnode = initialNode(nodetype, {
@@ -150,7 +168,7 @@ export default function reducer<S extends IDocumentEditorState>(
             left: draft.cursor_position.x,
             top: draft.cursor_position.y,
           });
-          insertNode(draft, nnode.id, nnode);
+          self_insertNode(draft, nnode.id, nnode);
         }
       });
     }
@@ -510,6 +528,79 @@ export default function reducer<S extends IDocumentEditorState>(
   return state;
 }
 
+function self_updateSurfaceHoverState<S extends IDocumentEditorState>(
+  draft: Draft<S>
+) {
+  const target = getSurfaceRayTarget(draft.surface_raycast_detected_node_ids, {
+    config: draft.surface_raycast_targeting,
+    context: draft,
+  });
+  draft.hovered_node_id = target;
+  return draft;
+}
+
+function getSurfaceRayTarget(
+  node_ids_from_point: string[],
+  {
+    config,
+    context,
+  }: {
+    config: SurfaceRaycastTargeting;
+    context: IDocumentEditorState;
+  }
+): string | undefined {
+  const {
+    document: { root_id, nodes },
+  } = context;
+
+  // Filter the nodes based on the configuration
+  const filteredNodes = node_ids_from_point.filter((node_id) => {
+    if (config.ignores_root && node_id === root_id) {
+      return false; // Ignore the root node if configured
+    }
+
+    const node = nodes[node_id];
+    if (config.ignores_locked && node?.locked) {
+      return false; // Ignore locked nodes if configured
+    }
+
+    return true; // Include this node
+  });
+
+  // Select the target based on the configuration
+  if (config.target === "deepest") {
+    return filteredNodes[0]; // Deepest node (first in the array)
+  }
+
+  if (config.target === "shallowest") {
+    return filteredNodes[filteredNodes.length - 1]; // Shallowest node (last in the array)
+  }
+
+  if (config.target === "next") {
+    // "Next" logic: find the shallowest node above the deepest one
+    const deepestNode = filteredNodes[0];
+    if (!deepestNode) return undefined;
+
+    // Get the parent of the deepest node
+    const parentNodeId = documentquery.getAncestors(
+      context.document_ctx,
+      deepestNode
+    )[1];
+    if (!parentNodeId) return deepestNode; // If no parent, fallback to the deepest node
+
+    // Ensure the parent is part of the filtered nodes
+    if (filteredNodes.includes(parentNodeId)) {
+      return parentNodeId;
+    }
+
+    // Fallback to the deepest node if no valid parent is found
+    return deepestNode;
+  }
+
+  // If no valid node is found, return undefined
+  return undefined;
+}
+
 type NodeTransformAction =
   | {
       type: "move";
@@ -863,7 +954,7 @@ function nodeReducer<N extends Partial<grida.program.nodes.Node>>(
   });
 }
 
-function insertNode<S extends IDocumentEditorState>(
+function self_insertNode<S extends IDocumentEditorState>(
   draft: Draft<S>,
   node_id: string,
   node: grida.program.nodes.Node
@@ -881,7 +972,7 @@ function insertNode<S extends IDocumentEditorState>(
   //
 }
 
-function deleteNode<S extends IDocumentEditorState>(
+function self_deleteNode<S extends IDocumentEditorState>(
   draft: Draft<S>,
   node_id: string
 ) {

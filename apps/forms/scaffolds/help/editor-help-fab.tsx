@@ -82,10 +82,7 @@ function AnimatedAvatar() {
   );
 }
 
-export function EditorHelpFab() {
-  // this is a good place to track authenticated user id - as its global by workspace and unique.
-  useGAAuthenticatedUserIDTelemetry();
-
+export function HelpFab() {
   return (
     <div className="fixed right-4 bottom-4 z-30">
       <DropdownMenu>
@@ -163,4 +160,11 @@ export function EditorHelpFab() {
       </DropdownMenu>
     </div>
   );
+}
+
+export function EditorHelpFab() {
+  // this is a good place to track authenticated user id - as its global by workspace and unique.
+  useGAAuthenticatedUserIDTelemetry();
+
+  return <HelpFab />;
 }

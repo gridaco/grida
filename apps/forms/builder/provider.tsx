@@ -104,15 +104,10 @@ function get_canvas_rect() {
 function get_grida_node_elements_from_point(x: number, y: number) {
   const hits = window.document.elementsFromPoint(x, y);
 
-  const node_elements = hits.filter(
-    (h) =>
-      h.attributes.getNamedItem(
-        grida.program.document.k.HTML_ELEMET_DATA_ATTRIBUTE_GRIDA_NODE_ID_KEY
-      ) &&
-      h.attributes.getNamedItem(
-        grida.program.document.k
-          .HTML_ELEMET_DATA_ATTRIBUTE_GRIDA_NODE_LOCKED_KEY
-      )?.value !== "true"
+  const node_elements = hits.filter((h) =>
+    h.attributes.getNamedItem(
+      grida.program.document.k.HTML_ELEMET_DATA_ATTRIBUTE_GRIDA_NODE_ID_KEY
+    )
   );
 
   return node_elements;
@@ -838,6 +833,19 @@ export function useEventTarget() {
     [dispatch]
   );
 
+  const keyUp = useCallback(
+    (event: KeyboardEvent) => {
+      dispatch({
+        type: "document/canvas/backend/html/event/on-key-up",
+        key: event.key,
+        altKey: event.altKey,
+        metaKey: event.metaKey,
+        shiftKey: event.shiftKey,
+      });
+    },
+    [dispatch]
+  );
+
   const _throttled_pointer_move_with_raycast = useCallback(
     throttle((event: PointerEvent, position) => {
       // this is throttled - as it is expensive
@@ -850,7 +858,6 @@ export function useEventTarget() {
         type: "document/canvas/backend/html/event/on-pointer-move-raycast",
         node_ids_from_point: els.map((n) => n.id),
         position,
-        metaKey: event.metaKey,
       });
     }, 30),
     [dispatch]
@@ -1062,6 +1069,7 @@ export function useEventTarget() {
       content_edit_mode,
       //
       keyDown,
+      keyUp,
       //
       dragResizeHandleStart,
       dragResizeHandleEnd,
@@ -1097,6 +1105,7 @@ export function useEventTarget() {
     content_edit_mode,
     //
     keyDown,
+    keyUp,
     //
     dragResizeHandleStart,
     dragResizeHandleEnd,

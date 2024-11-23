@@ -59,6 +59,7 @@ export function CanvasOverlay() {
     is_node_transforming,
     content_edit_mode,
     keyDown,
+    keyUp,
     pointerMove,
     pointerDown,
     pointerUp,
@@ -122,24 +123,42 @@ export function CanvasOverlay() {
   );
 
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
+    const shouldIgnore = (event: KeyboardEvent) => {
       // Prevent conflicts with other input elements
       if (
         event.target instanceof HTMLInputElement ||
         event.target instanceof HTMLTextAreaElement ||
         (event.target instanceof HTMLElement && event.target.isContentEditable)
       ) {
+        return true;
+      }
+      return false;
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Prevent conflicts with other input elements
+      if (shouldIgnore(event)) {
         return;
       }
       // console.log("keydown", event.key);
-      event.preventDefault();
       keyDown(event);
     };
 
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (shouldIgnore(event)) {
+        return;
+      }
+
+      keyUp(event);
+      // console.log("keyup", event.key);
+    };
+
     window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
 
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
     };
   }, [keyDown]);
 
@@ -156,7 +175,9 @@ export function CanvasOverlay() {
         cursor: cursor,
       }}
     >
-      {content_edit_mode === "text" && <RichTextEditorSurface />}
+      {content_edit_mode === "text" && selected_node_id && (
+        <RichTextEditorSurface node_id={selected_node_id} />
+      )}
       <div className="w-full h-full" id="canvas-overlay-portal" ref={ref}>
         {selected_node_id && (
           <NodeOverlay
@@ -501,12 +522,11 @@ const __resize_handle_cursor_map = {
   se: "nwse-resize",
 };
 
-function RichTextEditorSurface() {
+function RichTextEditorSurface({ node_id }: { node_id: string }) {
   const inputref = useRef<HTMLTextAreaElement>(null);
-  const { selectedNode, selected_node_id } = useDocument();
-  assert(selected_node_id, "selected_node_id should be defined");
-  const transform = useNodeSurfaceTransfrom(selected_node_id);
-  const node = useNode(selected_node_id!);
+  const { changeNodeText } = useDocument();
+  const transform = useNodeSurfaceTransfrom(node_id);
+  const node = useNode(node_id!);
 
   useEffect(() => {
     // select all text
@@ -514,6 +534,10 @@ function RichTextEditorSurface() {
       inputref.current.select();
     }
   }, [inputref.current]);
+
+  const stopPropagation = (e: React.BaseSyntheticEvent) => {
+    e.stopPropagation();
+  };
 
   return (
     <div
@@ -542,12 +566,11 @@ function RichTextEditorSurface() {
           ref={inputref}
           autoFocus
           // TODO: only supports literal text value
-          onPointerDown={(e) => {
-            e.stopPropagation();
-          }}
+          onPointerDown={stopPropagation}
+          onKeyDown={stopPropagation}
           value={node.text as string}
           onChange={(e) => {
-            selectedNode?.text(e.target.value);
+            changeNodeText(node_id, e.target.value);
           }}
           className="m-0 p-0 border-none outline-none appearance-none bg-transparent w-full h-full overflow-hidden whitespace-nowrap"
           style={grida.program.css.toReactTextStyle(
