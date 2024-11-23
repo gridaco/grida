@@ -6,6 +6,7 @@ import "@editor-ui/theme";
 import { FileModuleIcon } from "components/icons";
 
 export const IconContainer = styled.span(({ theme }) => ({
+  /* @ts-ignore */
   color: theme.colors.mask,
   flex: "0 0 auto",
   display: "flex",
@@ -27,8 +28,8 @@ export const FileIcon = memo(function FileIcon({
     variant && !selected
       ? colors[variant]
       : selected
-      ? colors.iconSelected
-      : colors.icon;
+        ? colors.iconSelected
+        : colors.icon;
 
   return <FileModuleIcon type={type} color={color} />;
 });

@@ -14,6 +14,7 @@ import { DotsHorizontalIcon, FileIcon } from "@radix-ui/react-icons";
 import "@editor-ui/theme";
 
 export const IconContainer = styled.span(({ theme }) => ({
+  /* @ts-ignore */
   color: theme.colors.mask,
   flex: "0 0 auto",
   display: "flex",
@@ -35,8 +36,8 @@ export const PageIcon = memo(function LayerIcon({
     variant && !selected
       ? colors[variant]
       : selected
-      ? colors.iconSelected
-      : colors.icon;
+        ? colors.iconSelected
+        : colors.icon;
 
   switch (type) {
     case "page":

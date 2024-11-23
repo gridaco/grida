@@ -7,9 +7,10 @@ import { useTheme } from "@emotion/react";
 import "@editor-ui/theme";
 import { ReflectSceneNodeType } from "@design-sdk/figma-node";
 import { SceneNodeIcon } from "@code-editor/node-icons";
+import type { Theme } from "@editor-ui/theme";
 
 export const IconContainer = styled.span(({ theme }) => ({
-  color: theme.colors.mask,
+  color: (theme as Theme).colors.mask,
   flex: "0 0 auto",
   display: "flex",
   alignItems: "center",
@@ -30,8 +31,8 @@ export const LayerIcon = memo(function LayerIcon({
     variant && !selected
       ? colors[variant]
       : selected
-      ? colors.iconSelected
-      : colors.icon;
+        ? colors.iconSelected
+        : colors.icon;
 
   return <SceneNodeIcon type={type} color={color} />;
 });
