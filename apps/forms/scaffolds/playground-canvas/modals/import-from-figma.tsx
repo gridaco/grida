@@ -36,7 +36,7 @@ async function fetchnode({
   return { ...nodepartialdoc, images };
 }
 
-type FetchNodeResult = Awaited<ReturnType<typeof fetchnode>>;
+export type FetchNodeResult = Awaited<ReturnType<typeof fetchnode>>;
 
 function normalize_node_id(nodeid: string) {
   return nodeid.replace("-", ":");

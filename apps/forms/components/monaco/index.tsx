@@ -1,6 +1,7 @@
 "use client";
 
-import { useMonaco } from "@monaco-editor/react";
+import Editor, { useMonaco } from "@monaco-editor/react";
+import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 
 export function useMonacoTheme(
@@ -26,4 +27,13 @@ export function useMonacoTheme(
     if (!monaco) return;
     monaco.editor.setTheme(theme === "dark" ? "dark" : "light");
   }, [monaco, theme, themeloaded]);
+}
+
+export function ThemedMonacoEditor(props: React.ComponentProps<typeof Editor>) {
+  const { resolvedTheme } = useTheme();
+
+  const monaco = useMonaco();
+  useMonacoTheme(monaco, resolvedTheme ?? "light");
+
+  return <Editor {...props} />;
 }

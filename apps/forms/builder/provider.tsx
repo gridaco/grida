@@ -827,6 +827,7 @@ export function useEventTarget() {
         key: event.key,
         altKey: event.altKey,
         metaKey: event.metaKey,
+        ctrlKey: event.ctrlKey,
         shiftKey: event.shiftKey,
       });
     },
@@ -840,6 +841,7 @@ export function useEventTarget() {
         key: event.key,
         altKey: event.altKey,
         metaKey: event.metaKey,
+        ctrlKey: event.ctrlKey,
         shiftKey: event.shiftKey,
       });
     },

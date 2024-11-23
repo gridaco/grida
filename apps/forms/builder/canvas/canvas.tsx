@@ -43,7 +43,7 @@ export function CanvasEventTarget({
         {...props}
         id={CANVAS_EVENT_TARGET_ID}
         className={className}
-        style={{ pointerEvents: "auto" }}
+        style={{ pointerEvents: "auto", overflow: "hidden" }}
       >
         {children}
       </div>
@@ -88,26 +88,33 @@ export function CanvasOverlay() {
   const bind = useGesture(
     {
       onPointerMove: ({ event }) => {
+        if (event.defaultPrevented) return;
         // for performance reasons, we don't want to update the overlay when transforming
         if (is_node_transforming) return;
         pointerMove(event);
       },
       onPointerDown: ({ event }) => {
+        if (event.defaultPrevented) return;
         pointerDown(event);
       },
       onPointerUp: ({ event }) => {
+        if (event.defaultPrevented) return;
         pointerUp(event);
       },
-      onDoubleClick: (e) => {
+      onDoubleClick: ({ event }) => {
+        if (event.defaultPrevented) return;
         tryEnterContentEditMode();
       },
-      onDragStart: (e) => {
+      onDragStart: ({ event }) => {
+        if (event.defaultPrevented) return;
         dragStart();
       },
-      onDragEnd: (e) => {
+      onDragEnd: ({ event }) => {
+        if (event.defaultPrevented) return;
         dragEnd();
       },
       onDrag: (e) => {
+        if (e.event.defaultPrevented) return;
         // console.log("drag", e.delta, e.distance);
         drag({ delta: e.delta, distance: e.distance });
       },

@@ -21,10 +21,8 @@ import {
   FormFieldInit,
   FormResponseField,
 } from "@/types";
-import { Editor, useMonaco } from "@monaco-editor/react";
 import { fmt_local_index } from "@/utils/fmt";
-import { useTheme } from "next-themes";
-import { useMonacoTheme } from "@/components/monaco";
+import { ThemedMonacoEditor } from "@/components/monaco";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -325,17 +323,12 @@ function SectionResponseCustomerDetails({
 }
 
 function SectionResponseMetadataJson({ json }: { json: Record<string, any> }) {
-  const { resolvedTheme } = useTheme();
-
-  const monaco = useMonaco();
-  useMonacoTheme(monaco, resolvedTheme ?? "light");
-
   return (
     <PanelPropertySection>
       <PanelPropertySectionTitle>RAW</PanelPropertySectionTitle>
       <PanelPropertyFields>
         <PanelPropertyField label={"raw.json (readonly)"}>
-          <Editor
+          <ThemedMonacoEditor
             className="rounded overflow-hidden shadow-sm border"
             height={400}
             defaultLanguage="json"
