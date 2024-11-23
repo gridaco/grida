@@ -36,6 +36,7 @@ import { useGoogleFontsList } from "@/builder/google.fonts";
 import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
+  BorderSolidIcon,
   BoxIcon,
   CircleIcon,
   CursorArrowIcon,
@@ -280,22 +281,25 @@ function Toolbar() {
         defaultValue="cursor"
         type="single"
       >
-        <ToggleGroupItem value="cursor">
+        <ToggleGroupItem value={"cursor" satisfies ToolbarToolType}>
           <CursorArrowIcon />
         </ToggleGroupItem>
-        <ToggleGroupItem value="rectangle">
-          <BoxIcon />
-        </ToggleGroupItem>
-        <ToggleGroupItem value="ellipse">
-          <CircleIcon />
-        </ToggleGroupItem>
-        <ToggleGroupItem value="text">
-          <TextIcon />
-        </ToggleGroupItem>
-        <ToggleGroupItem value="container">
+        <ToggleGroupItem value={"container" satisfies ToolbarToolType}>
           <FrameIcon />
         </ToggleGroupItem>
-        <ToggleGroupItem value="image">
+        <ToggleGroupItem value={"text" satisfies ToolbarToolType}>
+          <TextIcon />
+        </ToggleGroupItem>
+        <ToggleGroupItem value={"rectangle" satisfies ToolbarToolType}>
+          <BoxIcon />
+        </ToggleGroupItem>
+        <ToggleGroupItem value={"ellipse" satisfies ToolbarToolType}>
+          <CircleIcon />
+        </ToggleGroupItem>
+        <ToggleGroupItem value={"line" satisfies ToolbarToolType}>
+          <BorderSolidIcon />
+        </ToggleGroupItem>
+        <ToggleGroupItem value={"image" satisfies ToolbarToolType}>
           <ImageIcon />
         </ToggleGroupItem>
       </ToggleGroup>
@@ -309,7 +313,8 @@ type ToolbarToolType =
   | "ellipse"
   | "text"
   | "container"
-  | "image";
+  | "image"
+  | "line";
 
 function cursormode_to_toolbar_value(cm: CursorMode): ToolbarToolType {
   switch (cm.type) {

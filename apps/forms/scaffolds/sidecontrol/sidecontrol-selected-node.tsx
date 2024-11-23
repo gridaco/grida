@@ -146,8 +146,11 @@ export function SelectedNodeProperties() {
       <SidebarSection className="border-b">
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel className="w-full flex justify-between items-center">
-            <div className="capitalize">{type}</div>
-            <small className="font-mono">{id}</small>
+            <div>
+              <div className="capitalize">{type}</div>
+              <br />
+              <small className="font-mono">{id}</small>
+            </div>
           </SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
       </SidebarSection>

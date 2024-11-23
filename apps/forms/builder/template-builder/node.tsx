@@ -136,10 +136,17 @@ export function NodeElement<P extends Record<string, any>>({
           style: {
             ...grida.program.css.toReactCSSProperties(node, {
               fill: fillings[node.type],
+              hasTextStyle: node.type === "text",
             }),
             // hard override user-select
             userSelect: document.editable ? "none" : undefined,
-          },
+            // hide this node when in surface edit mode
+            visibility: selected
+              ? document.surface_content_edit_mode
+                ? "hidden"
+                : undefined
+              : undefined,
+          } satisfies React.CSSProperties,
         } satisfies grida.program.document.IComputedNodeReactRenderProps<any>,
         computedchildren
       )}

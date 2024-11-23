@@ -777,19 +777,12 @@ function throttle<T extends (...args: any[]) => void>(
   } as T;
 }
 
-export function useEventTarget() {
-  const [state, dispatch] = useInternal();
+export function useEventTargetCSSCursor() {
+  const [state] = useInternal();
 
-  const {
-    is_gesture_node_drag_move: is_node_transforming,
-    hovered_node_id,
-    selected_node_id,
-    content_edit_mode,
-    cursor_mode,
-    marquee,
-  } = state;
+  const { cursor_mode } = state;
 
-  const cursor = useMemo(() => {
+  return useMemo(() => {
     switch (cursor_mode.type) {
       case "cursor": {
         return "default";
@@ -802,11 +795,25 @@ export function useEventTarget() {
           case "ellipse":
           case "container":
           case "image":
+          case "line":
             return "crosshair";
         }
       }
     }
   }, [cursor_mode]);
+}
+
+export function useEventTarget() {
+  const [state, dispatch] = useInternal();
+
+  const {
+    is_gesture_node_drag_move: is_node_transforming,
+    hovered_node_id,
+    selected_node_id,
+    surface_content_edit_mode: content_edit_mode,
+    cursor_mode,
+    marquee,
+  } = state;
 
   const setCursorMode = useCallback(
     (cursor_mode: CursorMode) => {
@@ -1046,7 +1053,6 @@ export function useEventTarget() {
   return useMemo(() => {
     return {
       marquee,
-      cursor,
       cursor_mode,
       setCursorMode,
       //
@@ -1082,7 +1088,6 @@ export function useEventTarget() {
     };
   }, [
     marquee,
-    cursor,
     cursor_mode,
     setCursorMode,
     //

@@ -142,7 +142,7 @@ export default function reducer<S extends IDocumentEditorState>(
           // const target_node_id =
           //   node_ids_from_point[node_ids_from_point.length - 2];
           draft.selected_node_id = target_node_id;
-          draft.content_edit_mode = false;
+          draft.surface_content_edit_mode = false;
         } else if (draft.cursor_mode.type === "insert") {
           const { node: nodetype } = draft.cursor_mode;
           const nnode = initialNode(nodetype, {
@@ -158,7 +158,7 @@ export default function reducer<S extends IDocumentEditorState>(
       return produce(state, (draft) => {
         // clear all trasform state
 
-        draft.content_edit_mode = false;
+        draft.surface_content_edit_mode = false;
         draft.is_gesture_node_drag_move = false;
         draft.is_gesture_node_drag_resize = false;
       });
@@ -167,7 +167,7 @@ export default function reducer<S extends IDocumentEditorState>(
     case "document/canvas/backend/html/event/on-drag-start": {
       const {} = <DocumentEditorCanvasEventTargetHtmlBackendDragStart>action;
       return produce(state, (draft) => {
-        draft.content_edit_mode = false;
+        draft.surface_content_edit_mode = false;
         draft.is_gesture_node_drag_resize = false;
         //
         if (!draft.selected_node_id) {
@@ -229,7 +229,7 @@ export default function reducer<S extends IDocumentEditorState>(
       //
 
       return produce(state, (draft) => {
-        draft.content_edit_mode = false;
+        draft.surface_content_edit_mode = false;
         draft.is_gesture_node_drag_resize = true;
         draft.is_gesture_node_drag_move = false;
         draft.hovered_node_id = undefined;
@@ -374,7 +374,7 @@ export default function reducer<S extends IDocumentEditorState>(
       if (nodeType !== "text") return state;
 
       return produce(state, (draft) => {
-        draft.content_edit_mode = "text";
+        draft.surface_content_edit_mode = "text";
       });
       break;
     }
@@ -610,6 +610,11 @@ function nodeTransformReducer(
             }
 
             if (dy) {
+              if (draft.type === "line") {
+                // line cannot be resized in height
+                draft.height = 0;
+                break;
+              }
               ((draft as grida.program.nodes.i.ICSSDimension)
                 .height as number) += dy;
 
@@ -1016,7 +1021,17 @@ function initialNode(
         ...seed,
       } satisfies grida.program.nodes.ImageNode;
     }
-    case "line":
+    case "line": {
+      return {
+        ...base,
+        ...position,
+        ...styles,
+        type: "line",
+        width: 100,
+        height: 0,
+        ...seed,
+      } satisfies grida.program.nodes.LineNode;
+    }
     case "vector":
     case "instance":
     case "template_instance": {

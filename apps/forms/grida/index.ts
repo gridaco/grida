@@ -631,6 +631,7 @@ export namespace grida {
           Partial<nodes.i.IBoxFit> &
           Partial<nodes.i.ITextNodeStyle>,
         config: {
+          hasTextStyle: boolean;
           fill: "color" | "background" | "fill" | "none";
         }
       ): React.CSSProperties {
@@ -649,22 +650,15 @@ export namespace grida {
           fit,
           cornerRadius,
           //
-          textAlign,
-          textAlignVertical,
-          textDecoration,
-          fontFamily,
-          fontSize,
-          fontWeight,
-          letterSpacing,
-          lineHeight,
-          //
           border,
           //
           style,
         } = styles;
 
-        const without_fill = {
+        let result: React.CSSProperties = {
           position: position,
+          // FIXME: support both auto - max-content
+          // for texts, when auto, it will automatically break the line (to prevent this, we can use max-content) BUT, when max-content it will not respect the right: xxx (which in this case, it should break line)
           width: width === "auto" ? "max-content" : toDimension(width),
           height: height === "auto" ? "max-content" : toDimension(height),
           top: top,
@@ -675,17 +669,6 @@ export namespace grida {
           opacity: opacity,
           objectFit: fit,
           rotate: rotation ? `${rotation}deg` : undefined,
-          //
-          textAlign: textAlign,
-          alignContent: textAlignVertical
-            ? css.text_align_vertical_to_css_align_content[textAlignVertical]
-            : undefined,
-          textDecoration: textDecoration,
-          fontFamily: fontFamily,
-          lineHeight: lineHeight ?? "normal",
-          letterSpacing: letterSpacing,
-          fontSize: fontSize,
-          fontWeight: fontWeight,
           //
           borderRadius: cornerRadius
             ? cornerRadiusToBorderRadius(cornerRadius)
@@ -698,23 +681,102 @@ export namespace grida {
 
         switch (config.fill) {
           case "color":
-            return {
-              ...without_fill,
-              color: fill ? toFillString(fill) : undefined,
-            };
+            result["color"] = fill ? toFillString(fill) : undefined;
+            break;
           case "background":
-            return {
-              ...without_fill,
-              background: fill ? toFillString(fill) : undefined,
-            };
+            result["background"] = fill ? toFillString(fill) : undefined;
+            break;
           case "fill":
-            return {
-              ...without_fill,
-              fill: fill ? toFillString(fill) : undefined,
-            };
+            result["fill"] = fill ? toFillString(fill) : undefined;
+            break;
           case "none":
-            return without_fill;
+            break;
         }
+
+        if (config.hasTextStyle) {
+          const { textAlign, textAlignVertical } =
+            styles as Partial<nodes.i.ITextNodeStyle>;
+          const {
+            textDecoration,
+            fontFamily,
+            fontSize,
+            fontWeight,
+            letterSpacing,
+            lineHeight,
+          } = styles as nodes.i.ITextStyle;
+
+          result = {
+            ...result,
+            ...toReactTextStyle({
+              // text node style - can be undefined (need a better way to handle this - not pass it at all)
+              textAlign: textAlign ?? "left",
+              textAlignVertical: textAlignVertical ?? "top",
+              // text span style
+              textDecoration,
+              fontFamily,
+              fontSize,
+              fontWeight,
+              letterSpacing,
+              lineHeight,
+            }),
+          };
+        }
+
+        return result;
+      }
+
+      export function toReactCSSBorder(
+        border: Border
+      ): Pick<
+        React.CSSProperties,
+        "borderStyle" | "borderColor" | "borderWidth"
+      > {
+        return {
+          borderStyle: border.borderStyle,
+          borderColor: toRGBAString(border.borderColor),
+          borderWidth:
+            typeof border.borderWidth === "number"
+              ? border.borderWidth
+              : `${border.borderWidth.top}px ${border.borderWidth.right}px ${border.borderWidth.bottom}px ${border.borderWidth.left}px`,
+        };
+      }
+
+      export function toReactTextStyle(
+        style: grida.program.nodes.i.ITextNodeStyle
+      ): Pick<
+        React.CSSProperties,
+        | "textAlign"
+        | "alignContent"
+        | "textDecoration"
+        | "fontFamily"
+        | "fontSize"
+        | "fontWeight"
+        | "letterSpacing"
+        | "lineHeight"
+      > {
+        const {
+          textAlign,
+          textAlignVertical,
+          textDecoration,
+          fontFamily,
+          fontSize,
+          fontWeight,
+          letterSpacing,
+          lineHeight,
+        } = style;
+
+        return {
+          textAlign: textAlign,
+          alignContent: textAlignVertical
+            ? css.text_align_vertical_to_css_align_content[textAlignVertical]
+            : undefined,
+          textDecoration: textDecoration,
+          fontFamily: fontFamily,
+          lineHeight: lineHeight ?? "normal",
+          letterSpacing: letterSpacing,
+          fontSize: fontSize,
+          fontWeight: fontWeight,
+        };
       }
 
       export function toFillString(paint: cg.Paint): string {
@@ -726,21 +788,6 @@ export namespace grida {
           case "radial_gradient":
             return toRadialGradientString(paint);
         }
-      }
-
-      export function toReactCSSBorder(border: Border): {
-        borderStyle: React.CSSProperties["borderStyle"];
-        borderColor: React.CSSProperties["borderColor"];
-        borderWidth: React.CSSProperties["borderWidth"];
-      } {
-        return {
-          borderStyle: border.borderStyle,
-          borderColor: toRGBAString(border.borderColor),
-          borderWidth:
-            typeof border.borderWidth === "number"
-              ? border.borderWidth
-              : `${border.borderWidth.top}px ${border.borderWidth.right}px ${border.borderWidth.bottom}px ${border.borderWidth.left}px`,
-        };
       }
 
       export function toRGBAString(rgba: cg.RGBA8888): string {

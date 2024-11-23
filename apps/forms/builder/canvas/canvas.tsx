@@ -10,9 +10,16 @@ import React, {
 } from "react";
 import { useEventTarget } from "@/builder";
 import { useGesture } from "@use-gesture/react";
-import { useDocument, useNode, useNodeDomElement } from "../provider";
+import {
+  useDocument,
+  useEventTargetCSSCursor,
+  useNode,
+  useNodeDomElement,
+} from "../provider";
 import { RotationCursorIcon } from "../components/cursor";
 import { CANVAS_EVENT_TARGET_ID } from "../k/id";
+import { grida } from "@/grida";
+import assert from "assert";
 
 interface CanvasEventTargetContext {
   portal?: HTMLDivElement | null;
@@ -47,7 +54,6 @@ export function CanvasEventTarget({
 export function CanvasOverlay() {
   const {
     marquee,
-    cursor,
     hovered_node_id,
     selected_node_id,
     is_node_transforming,
@@ -61,6 +67,7 @@ export function CanvasOverlay() {
     dragEnd,
     tryEnterContentEditMode,
   } = useEventTarget();
+  const cursor = useEventTargetCSSCursor();
   const ref = useRef<HTMLDivElement>(null);
   const context = useContext(EventTargetContext);
 
@@ -90,9 +97,9 @@ export function CanvasOverlay() {
       onPointerUp: ({ event }) => {
         pointerUp(event);
       },
-      // onDoubleClick: (e) => {
-      //   tryEnterContentEditMode();
-      // },
+      onDoubleClick: (e) => {
+        tryEnterContentEditMode();
+      },
       onDragStart: (e) => {
         dragStart();
       },
@@ -119,13 +126,13 @@ export function CanvasOverlay() {
       // Prevent conflicts with other input elements
       if (
         event.target instanceof HTMLInputElement ||
-        event.target instanceof HTMLTextAreaElement
+        event.target instanceof HTMLTextAreaElement ||
+        (event.target instanceof HTMLElement && event.target.isContentEditable)
       ) {
         return;
       }
-
       // console.log("keydown", event.key);
-
+      event.preventDefault();
       keyDown(event);
     };
 
@@ -210,20 +217,14 @@ function Marquee({
   );
 }
 
-function NodeOverlay({
-  node_id,
-  readonly,
-}: {
-  node_id: string;
-  readonly: boolean;
-}) {
+/**
+ * returns the relative transform of the node surface relative to the portal
+ */
+function useNodeSurfaceTransfrom(node_id: string) {
   const __rect_fallback = useMemo(() => new DOMRect(0, 0, 0, 0), []);
-
   const { getNodeAbsoluteRotation } = useDocument();
-  const node = useNode(node_id);
   const portal = useCanvasOverlayPortal();
   const node_element = useNodeDomElement(node_id);
-  const { rotation: node_rotation } = node;
   const portal_rect = portal?.getBoundingClientRect() ?? __rect_fallback;
   const node_element_bounding_rect =
     node_element?.getBoundingClientRect() ?? __rect_fallback;
@@ -245,16 +246,31 @@ function NodeOverlay({
   // absolute rotation => accumulated rotation to the root
   const absolute_rotation = getNodeAbsoluteRotation(node_id);
 
+  return {
+    top: centerY,
+    left: centerX,
+    transform: `translate(-50%, -50%) rotate(${absolute_rotation ?? 0}deg)`,
+    width: width,
+    height: height,
+  };
+}
+
+function NodeOverlay({
+  node_id,
+  readonly,
+}: {
+  node_id: string;
+  readonly: boolean;
+}) {
+  const transform = useNodeSurfaceTransfrom(node_id);
+  const node = useNode(node_id);
+
   return (
     <div
       className="group pointer-events-auto select-none border-2 border-workbench-accent-sky relative"
       style={{
         position: "absolute",
-        top: centerY,
-        left: centerX,
-        transform: `translate(-50%, -50%) rotate(${absolute_rotation ?? 0}deg)`,
-        width: width,
-        height: height,
+        ...transform,
         zIndex: readonly ? 1 : 2,
         touchAction: "none",
         willChange: "transform",
@@ -486,39 +502,59 @@ const __resize_handle_cursor_map = {
 };
 
 function RichTextEditorSurface() {
+  const inputref = useRef<HTMLTextAreaElement>(null);
   const { selectedNode, selected_node_id } = useDocument();
+  assert(selected_node_id, "selected_node_id should be defined");
+  const transform = useNodeSurfaceTransfrom(selected_node_id);
   const node = useNode(selected_node_id!);
 
-  // const [content, setContent] = useState("Edit this text");
-
-  // const handleInput = (e: React.FormEvent<HTMLDivElement>) => {
-  //   console.log("text content", e);
-  //   // @ts-ignore
-  //   setContent(e.target.innerText);
-  // };
+  useEffect(() => {
+    // select all text
+    if (inputref.current) {
+      inputref.current.select();
+    }
+  }, [inputref.current]);
 
   return (
     <div
       id="richtext-editor-surface"
-      className="absolute inset-0 z-10 bg-red-500/25"
+      className="fixed left-0 top-0 w-0 h-0 z-10"
     >
-      <textarea
-        autoFocus
-        // TODO: only supports literal text value
-        value={node.text as string}
-        onChange={(e) => {
-          selectedNode?.text(e.target.value);
+      <div
+        style={{
+          position: "absolute",
+          ...transform,
+          willChange: "transform",
+          overflow: "hidden",
+          resize: "none",
+          zIndex: 1,
         }}
-        className="appearance-none bg-transparent border-none outline-none"
-      />
-      {/* <div
-        autoFocus
-        // onInput={handleInput}
-        tabIndex={0}
-        contentEditable
-        suppressContentEditableWarning
-        className="outline-none border-none"
-      /> */}
+      >
+        {/* <div
+          autoFocus
+          // onInput={handleInput}
+          tabIndex={0}
+          contentEditable
+          suppressContentEditableWarning
+          className="appearance-none bg-transparent border-none outline-none p-0 m-0"
+        /> */}
+        <textarea
+          ref={inputref}
+          autoFocus
+          // TODO: only supports literal text value
+          onPointerDown={(e) => {
+            e.stopPropagation();
+          }}
+          value={node.text as string}
+          onChange={(e) => {
+            selectedNode?.text(e.target.value);
+          }}
+          className="m-0 p-0 border-none outline-none appearance-none bg-transparent w-full h-full overflow-hidden whitespace-nowrap"
+          style={grida.program.css.toReactTextStyle(
+            node as grida.program.nodes.TextNode
+          )}
+        />
+      </div>
     </div>
   );
 }

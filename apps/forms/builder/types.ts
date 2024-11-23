@@ -9,7 +9,7 @@ export type CursorMode =
     }
   | {
       type: "insert";
-      node: "text" | "image" | "container" | "rectangle" | "ellipse";
+      node: "text" | "image" | "container" | "rectangle" | "ellipse" | "line";
     };
 
 export type Marquee = {
@@ -58,7 +58,7 @@ export interface IDocumentEditorInteractionCursorState {
    *
    * @default false
    */
-  content_edit_mode?: false | "text" | "path";
+  surface_content_edit_mode?: false | "text" | "path";
 
   /**
    * @private - internal use only
