@@ -28,6 +28,7 @@ export default {
       width: 960,
       height: 540,
       fill: { type: "solid", color: { r: 255, g: 255, b: 255, a: 1 } },
+      padding: 0,
       cornerRadius: 0,
       style: {
         boxShadow: "0 0 10px rgba(0,0,0,0.1)",
@@ -43,6 +44,10 @@ export default {
         // "ellipse_1",
         "background",
       ],
+      layout: "flow",
+      direction: "horizontal",
+      mainAxisAlignment: "start",
+      crossAxisAlignment: "start",
     },
     background: {
       id: "background",
@@ -120,7 +125,12 @@ export default {
       fill: { type: "solid", color: { r: 255, g: 255, b: 255, a: 1 } },
       style: {},
       cornerRadius: 0,
+      padding: 0,
       children: ["child_rect_1", "child_rect_2"],
+      layout: "flow",
+      direction: "horizontal",
+      mainAxisAlignment: "start",
+      crossAxisAlignment: "start",
     },
     child_rect_1: {
       id: "child_rect_1",

@@ -66,7 +66,7 @@ export const Card_001 = withTemplateDefinition(
           </div>
           <div className="text-sm text-muted-foreground">{p}</div>
           <NodeElement
-            node_id="tags-layout"
+            node_id=".tags"
             style={{
               gap: 4,
             }}
@@ -236,6 +236,10 @@ export const Card_001 = withTemplateDefinition(
         height: "auto",
         cornerRadius: 0,
         position: "relative",
+        layout: "flex",
+        direction: "horizontal",
+        mainAxisAlignment: "start",
+        crossAxisAlignment: "center",
       },
     },
     type: "template",
@@ -429,21 +433,6 @@ export const Card_002 = withTemplateDefinition(
         fontWeight: 400,
         position: "relative",
       },
-      ".tags": {
-        id: ".tags",
-        active: true,
-        locked: false,
-        type: "container",
-        name: "Tags",
-        expanded: false,
-        opacity: 1,
-        zIndex: 0,
-        style: {},
-        width: "auto",
-        height: "auto",
-        cornerRadius: 0,
-        position: "relative",
-      },
     },
     type: "template",
     properties: card_properties_definition,
@@ -462,8 +451,8 @@ export const Card_003 = withTemplateDefinition(
           node_id="root"
           style={{
             gap: 4,
-            flexDirection: "row",
-            justifyContent: "space-between",
+            // flexDirection: "row",
+            // justifyContent: "space-between",
           }}
         >
           <div className="flex-1 flex flex-col gap-1 z-20">
@@ -471,7 +460,7 @@ export const Card_003 = withTemplateDefinition(
               node_id="header-layout"
               style={{
                 gap: 4,
-                flexDirection: "column",
+                // flexDirection: "column",
               }}
             >
               <div className="flex flex-row items-center gap-2">
@@ -486,7 +475,7 @@ export const Card_003 = withTemplateDefinition(
             </NodeElement>
             <p className="text-xs font-regular opacity-80">{p}</p>
             <NodeElement
-              node_id="tags-layout"
+              node_id=".tags"
               style={{
                 gap: 4,
               }}
@@ -677,6 +666,10 @@ export const Card_003 = withTemplateDefinition(
         height: "auto",
         cornerRadius: 0,
         position: "relative",
+        layout: "flex",
+        direction: "horizontal",
+        mainAxisAlignment: "start",
+        crossAxisAlignment: "center",
       },
     },
     type: "template",

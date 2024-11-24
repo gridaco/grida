@@ -305,6 +305,24 @@ interface ITextNodeChangeLetterSpacingAction extends INodeID {
   letterSpacing: grida.program.nodes.TextNode["letterSpacing"];
 }
 
+// #region layout
+interface INodeChangeLayoutAction extends INodeID {
+  layout: grida.program.nodes.i.IFlexContainer["layout"];
+}
+
+interface IFlexContainerNodeChangeDirectionAction extends INodeID {
+  direction: grida.program.nodes.i.IFlexContainer["direction"];
+}
+
+interface IFlexContainerNodeChangeMainAxisAlignmentAction extends INodeID {
+  mainAxisAlignment: grida.program.nodes.i.IFlexContainer["mainAxisAlignment"];
+}
+
+interface IFlexContainerNodeChangeCrossAxisAlignmentAction extends INodeID {
+  crossAxisAlignment: grida.program.nodes.i.IFlexContainer["crossAxisAlignment"];
+}
+// #endregion layout
+
 interface INodeChangeStyleAction extends INodeID {
   style: Partial<React.CSSProperties>;
 }
@@ -353,6 +371,19 @@ export type NodeChangeAction =
     } & ITextNodeChangeTextAlignVerticalAction)
   | ({ type: "node/change/lineHeight" } & ITextNodeChangeLineHeightAction)
   | ({ type: "node/change/letterSpacing" } & ITextNodeChangeLetterSpacingAction)
+  //
+  | ({
+      type: "node/change/layout";
+    } & INodeChangeLayoutAction)
+  | ({
+      type: "node/change/direction";
+    } & IFlexContainerNodeChangeDirectionAction)
+  | ({
+      type: "node/change/mainAxisAlignment";
+    } & IFlexContainerNodeChangeMainAxisAlignmentAction)
+  | ({
+      type: "node/change/crossAxisAlignment";
+    } & IFlexContainerNodeChangeCrossAxisAlignmentAction)
   //
   | ({ type: "node/change/style" } & INodeChangeStyleAction)
   | ({ type: "node/change/src" } & INodeChangeSrcAction)

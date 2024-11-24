@@ -467,6 +467,10 @@ export default function reducer<S extends IDocumentEditorState>(
     case "node/change/fill":
     case "node/change/border":
     case "node/change/fit":
+    case "node/change/layout":
+    case "node/change/direction":
+    case "node/change/mainAxisAlignment":
+    case "node/change/crossAxisAlignment":
     case "node/change/style":
     case "node/change/fontSize":
     case "node/change/fontWeight":
@@ -894,6 +898,37 @@ function nodeReducer<N extends Partial<grida.program.nodes.Node>>(
         draft.fit = action.fit;
         break;
       }
+      case "node/change/layout": {
+        assert(draft.type === "container");
+        assert(action.layout, "layout is required");
+        draft.layout = action.layout;
+        if (action.layout === "flex") {
+          // initialize flex layout
+          // each property cannot be undefined, but for older version compatibility, we need to set default value (only when not set)
+          if (!draft.direction) draft.direction = "horizontal";
+          if (!draft.mainAxisAlignment) draft.mainAxisAlignment = "start";
+          if (!draft.crossAxisAlignment) draft.crossAxisAlignment = "start";
+        }
+        break;
+      }
+      case "node/change/direction": {
+        assert(draft.type === "container");
+        assert(action.direction, "direction is required");
+        draft.direction = action.direction;
+        break;
+      }
+      case "node/change/mainAxisAlignment": {
+        assert(draft.type === "container");
+        assert(action.mainAxisAlignment, "mainAxisAlignment is required");
+        draft.mainAxisAlignment = action.mainAxisAlignment;
+        break;
+      }
+      case "node/change/crossAxisAlignment": {
+        assert(draft.type === "container");
+        assert(action.crossAxisAlignment, "crossAxisAlignment is required");
+        draft.crossAxisAlignment = action.crossAxisAlignment;
+        break;
+      }
       case "node/change/style": {
         // assert(draft.type !== 'template_instance')
         (draft as Draft<grida.program.nodes.i.ICSSStylable>).style =
@@ -961,10 +996,17 @@ function self_insertNode<S extends IDocumentEditorState>(
 ) {
   draft.document.nodes[node_id] = node;
   const parent_id = draft.document.root_id;
-  (
-    draft.document.nodes[parent_id] as grida.program.nodes.i.IChildren
-  ).children?.push(node_id);
+  const parent_node = draft.document.nodes[parent_id];
+
+  if (!("children" in parent_node)) {
+    // if not 'children' property, validate and initialize.
+    assert(parent_node.type === "container");
+    parent_node.children = [];
+  }
+
+  parent_node.children!.push(node_id);
   draft.document_ctx.__ctx_nid_to_parent_id[node_id] = parent_id;
+  draft.document_ctx.__ctx_nid_to_children_ids[parent_id].push(node_id);
 
   // after
   draft.cursor_mode = { type: "cursor" };
@@ -998,20 +1040,25 @@ function self_deleteNode<S extends IDocumentEditorState>(
   }
 }
 
+export const gray: grida.program.cg.Paint = {
+  type: "solid",
+  color: { r: 217, g: 217, b: 217, a: 1 },
+};
+
+export const white: grida.program.cg.Paint = {
+  type: "solid",
+  color: { r: 255, g: 255, b: 255, a: 1 },
+};
+
+export const black: grida.program.cg.Paint = {
+  type: "solid",
+  color: { r: 0, g: 0, b: 0, a: 1 },
+};
+
 function initialNode(
   type: grida.program.nodes.Node["type"],
   seed: Partial<Omit<grida.program.nodes.AnyNode, "type">> = {}
 ): grida.program.nodes.Node {
-  const gray: grida.program.cg.Paint = {
-    type: "solid",
-    color: { r: 217, g: 217, b: 217, a: 1 },
-  };
-
-  const black: grida.program.cg.Paint = {
-    type: "solid",
-    color: { r: 0, g: 0, b: 0, a: 1 },
-  };
-
   const id = v4();
   const base: grida.program.nodes.i.IBaseNode &
     grida.program.nodes.i.ISceneNode = {
@@ -1065,9 +1112,15 @@ function initialNode(
         ...base,
         ...position,
         ...styles,
+        fill: white,
         type: "container",
         expanded: false,
         cornerRadius: 0,
+        padding: 0,
+        layout: "flow",
+        direction: "horizontal",
+        mainAxisAlignment: "start",
+        crossAxisAlignment: "start",
         ...seed,
       } satisfies grida.program.nodes.ContainerNode;
     }

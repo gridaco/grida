@@ -24,10 +24,10 @@ import { PaddingControl } from "./controls/padding";
 import { AspectRatioControl } from "./controls/aspect-ratio";
 import { BoxShadowControl } from "./controls/box-shadow";
 import { GapControl } from "./controls/gap";
-import { AlignItemsControl } from "./controls/align-items";
+import { CrossAxisAlignmentControl } from "./controls/cross-axis-alignment";
 import { FlexWrapControl } from "./controls/flex-wrap";
 import { FlexDirectionControl } from "./controls/flex-direction";
-import { JustifyContentControl } from "./controls/justify-content";
+import { MainAxisAlignmentControl } from "./controls/main-axis-alignment";
 import { TemplateControl } from "./controls/template";
 import { CursorControl } from "./controls/cursor";
 import { PropertyLine, PropertyLineLabel } from "./ui";
@@ -55,6 +55,8 @@ import { LineHeightControl } from "./controls/line-height";
 import { NameControl } from "./controls/name";
 import { UserDataControl } from "./controls/x-userdata";
 import { LengthControl } from "./controls/length";
+import { LayoutControl } from "./controls/layout";
+import { AxisControl } from "./controls/axis";
 
 export function SelectedNodeProperties() {
   const { state: document, selectedNode } = useDocument();
@@ -96,6 +98,13 @@ export function SelectedNodeProperties() {
 
     //
     border,
+
+    //
+    layout,
+    direction,
+    mainAxisAlignment,
+    crossAxisAlignment,
+
     // x
     userdata,
   } = node;
@@ -106,7 +115,7 @@ export function SelectedNodeProperties() {
   const is_text = type === "text";
   const is_image = type === "image";
   const is_container = type === "container";
-  const is_layout = is_container;
+  const is_flex_container = is_container && layout === "flex";
   const is_stylable = type !== "template_instance";
 
   const {
@@ -118,11 +127,8 @@ export function SelectedNodeProperties() {
     //
     aspectRatio,
     //
-    flexDirection,
-    flexWrap,
-    justifyContent,
-    alignItems,
-    gap,
+    // flexWrap,
+    // gap,
     //
     cursor,
     //
@@ -349,46 +355,59 @@ export function SelectedNodeProperties() {
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>
-      <SidebarSection hidden={!is_layout} className="border-b pb-4">
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Layout</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine>
-            <PropertyLineLabel>Direction</PropertyLineLabel>
-            <FlexDirectionControl
-              value={flexDirection as any}
-              onValueChange={selectedNode.flexDirection}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Wrap</PropertyLineLabel>
-            <FlexWrapControl
-              value={flexWrap as any}
-              onValueChange={selectedNode.flexWrap}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Distribute</PropertyLineLabel>
-            <JustifyContentControl
-              value={justifyContent as any}
-              onValueChange={selectedNode.justifyContent}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Align</PropertyLineLabel>
-            <AlignItemsControl
-              value={alignItems as any}
-              flexDirection={flexDirection as any}
-              onValueChange={selectedNode.alignItems}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Gap</PropertyLineLabel>
-            <GapControl value={gap as any} onValueChange={selectedNode.gap} />
-          </PropertyLine>
-        </SidebarMenuSectionContent>
-      </SidebarSection>
+      {is_container && (
+        <SidebarSection className="border-b pb-4">
+          <SidebarSectionHeaderItem>
+            <SidebarSectionHeaderLabel>Layout</SidebarSectionHeaderLabel>
+          </SidebarSectionHeaderItem>
+          <SidebarMenuSectionContent className="space-y-2">
+            <PropertyLine>
+              <PropertyLineLabel>Type</PropertyLineLabel>
+              <LayoutControl
+                value={layout!}
+                onValueChange={selectedNode.layout}
+              />
+            </PropertyLine>
+            {is_flex_container && (
+              <>
+                <PropertyLine>
+                  <PropertyLineLabel>Direction</PropertyLineLabel>
+                  <AxisControl
+                    value={direction!}
+                    onValueChange={selectedNode.direction}
+                  />
+                </PropertyLine>
+                {/* <PropertyLine>
+              <PropertyLineLabel>Wrap</PropertyLineLabel>
+              <FlexWrapControl
+                value={flexWrap as any}
+                onValueChange={selectedNode.flexWrap}
+              />
+            </PropertyLine> */}
+                <PropertyLine>
+                  <PropertyLineLabel>Distribute</PropertyLineLabel>
+                  <MainAxisAlignmentControl
+                    value={mainAxisAlignment!}
+                    onValueChange={selectedNode.mainAxisAlignment}
+                  />
+                </PropertyLine>
+                <PropertyLine>
+                  <PropertyLineLabel>Align</PropertyLineLabel>
+                  <CrossAxisAlignmentControl
+                    value={crossAxisAlignment!}
+                    direction={direction}
+                    onValueChange={selectedNode.crossAxisAlignment}
+                  />
+                </PropertyLine>
+                {/* <PropertyLine>
+              <PropertyLineLabel>Gap</PropertyLineLabel>
+              <GapControl value={gap as any} onValueChange={selectedNode.gap} />
+            </PropertyLine> */}
+              </>
+            )}
+          </SidebarMenuSectionContent>
+        </SidebarSection>
+      )}
       <SidebarSection hidden={!is_stylable} className="border-b pb-4">
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Styles</SidebarSectionHeaderLabel>

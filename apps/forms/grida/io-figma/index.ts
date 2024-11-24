@@ -266,7 +266,6 @@ export namespace iofigma {
               //
               style: {
                 overflow: clipsContent ? "clip" : undefined,
-                padding: `${paddingTop ?? 0}px ${paddingRight ?? 0}px ${paddingBottom ?? 0}px ${paddingLeft ?? 0}px`,
               },
               cornerRadius: node.cornerRadius
                 ? node.cornerRadius
@@ -278,6 +277,22 @@ export namespace iofigma {
                       bottomLeftRadius: node.rectangleCornerRadii[3],
                     }
                   : 0,
+              padding:
+                paddingTop === paddingRight &&
+                paddingTop === paddingBottom &&
+                paddingTop === paddingLeft
+                  ? paddingTop ?? 0
+                  : {
+                      paddingTop: paddingTop ?? 0,
+                      paddingRight: paddingRight ?? 0,
+                      paddingBottom: paddingBottom ?? 0,
+                      paddingLeft: paddingLeft ?? 0,
+                    },
+              // TODO:
+              layout: "flow",
+              direction: "horizontal",
+              mainAxisAlignment: "start",
+              crossAxisAlignment: "start",
             } satisfies grida.program.nodes.ContainerNode;
           }
           case "GROUP": {
@@ -306,6 +321,11 @@ export namespace iofigma {
               //
               style: {},
               cornerRadius: 0,
+              padding: 0,
+              layout: "flow",
+              direction: "horizontal",
+              mainAxisAlignment: "start",
+              crossAxisAlignment: "start",
             } satisfies grida.program.nodes.ContainerNode;
             // throw new Error(`Unsupported node type: ${node.type}`);
           }

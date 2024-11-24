@@ -573,6 +573,68 @@ export function useDocument() {
 
   //
 
+  const changeNodeLayout = useCallback(
+    (
+      node_id: string,
+      layout: grida.program.nodes.i.IFlexContainer["layout"]
+    ) => {
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/layout",
+          node_id: node_id,
+          layout,
+        });
+      });
+    },
+    [dispatch]
+  );
+
+  const changeFlexContainerNodeDirection = useCallback(
+    (node_id: string, direction: grida.program.cg.Axis) => {
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/direction",
+          node_id: node_id,
+          direction,
+        });
+      });
+    },
+    [dispatch]
+  );
+
+  const changeFlexContainerNodeMainAxisAlignment = useCallback(
+    (
+      node_id: string,
+      mainAxisAlignment: grida.program.cg.MainAxisAlignment
+    ) => {
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/mainAxisAlignment",
+          node_id: node_id,
+          mainAxisAlignment,
+        });
+      });
+    },
+    [dispatch]
+  );
+
+  const changeFlexContainerNodeCrossAxisAlignment = useCallback(
+    (
+      node_id: string,
+      crossAxisAlignment: grida.program.cg.CrossAxisAlignment
+    ) => {
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/crossAxisAlignment",
+          node_id: node_id,
+          crossAxisAlignment,
+        });
+      });
+    },
+    [dispatch]
+  );
+  //
+
   const changeNodeStyle = useCallback(
     (
       node_id: string,
@@ -671,6 +733,19 @@ export function useDocument() {
       border: (value: grida.program.css.Border | undefined) =>
         changeNodeBorder(selected_node_id!, value),
 
+      // layout
+      layout: (value: grida.program.nodes.i.IFlexContainer["layout"]) =>
+        changeNodeLayout(selected_node_id!, value),
+      direction: (value: grida.program.cg.Axis) =>
+        changeFlexContainerNodeDirection(selected_node_id!, value),
+      // gap: (value?: number) => changeNodeStyle(selected_node_id!, "gap", value),
+      // flexWrap: (value?: string) =>
+      //   changeNodeStyle(selected_node_id!, "flexWrap", value),
+      mainAxisAlignment: (value: grida.program.cg.MainAxisAlignment) =>
+        changeFlexContainerNodeMainAxisAlignment(selected_node_id!, value),
+      crossAxisAlignment: (value: grida.program.cg.CrossAxisAlignment) =>
+        changeFlexContainerNodeCrossAxisAlignment(selected_node_id!, value),
+
       // css style
       margin: (value?: number) =>
         changeNodeStyle(selected_node_id!, "margin", value),
@@ -680,15 +755,6 @@ export function useDocument() {
         changeNodeStyle(selected_node_id!, "aspectRatio", value),
       boxShadow: (value?: any) =>
         changeNodeStyle(selected_node_id!, "boxShadow", value.boxShadow),
-      gap: (value?: number) => changeNodeStyle(selected_node_id!, "gap", value),
-      flexDirection: (value?: string) =>
-        changeNodeStyle(selected_node_id!, "flexDirection", value),
-      flexWrap: (value?: string) =>
-        changeNodeStyle(selected_node_id!, "flexWrap", value),
-      justifyContent: (value?: string) =>
-        changeNodeStyle(selected_node_id!, "justifyContent", value),
-      alignItems: (value?: string) =>
-        changeNodeStyle(selected_node_id!, "alignItems", value),
       cursor: (value?: string) =>
         changeNodeStyle(selected_node_id!, "cursor", value),
     };

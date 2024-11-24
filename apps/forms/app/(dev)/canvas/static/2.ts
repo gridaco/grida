@@ -18,10 +18,15 @@ export default {
       height: 540,
       fill: { type: "solid", color: { r: 0, g: 0, b: 0, a: 1 } },
       cornerRadius: 0,
+      padding: 0,
       style: {
         boxShadow: "0 0 10px rgba(0,0,0,0.1)",
       },
       children: ["card_1_bg", "card_2_bg", "card_3_bg"],
+      layout: "flow",
+      direction: "horizontal",
+      mainAxisAlignment: "start",
+      crossAxisAlignment: "start",
     },
     card_1_bg: {
       id: "card_1_bg",

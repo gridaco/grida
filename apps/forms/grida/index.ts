@@ -608,17 +608,17 @@ export namespace grida {
         //
         // | "borderWidth"
         //
-        | "margin"
-        | "padding"
         //
         | "aspectRatio"
         //
         | "overflow"
         //
-        | "flexDirection"
+        // | "margin"
+        // | "padding"
+        // | "flexDirection"
         | "flexWrap"
-        | "justifyContent"
-        | "alignItems"
+        // | "justifyContent"
+        // | "alignItems"
         | "gap"
         //
         | "cursor"
@@ -629,7 +629,8 @@ export namespace grida {
         styles: nodes.i.ICSSStylable &
           Partial<nodes.i.IRectangleCorner> &
           Partial<nodes.i.IBoxFit> &
-          Partial<nodes.i.ITextNodeStyle>,
+          Partial<nodes.i.ITextNodeStyle> &
+          Partial<nodes.i.IFlexContainer>,
         config: {
           hasTextStyle: boolean;
           fill: "color" | "background" | "fill" | "none";
@@ -651,6 +652,11 @@ export namespace grida {
           cornerRadius,
           //
           border,
+          //
+          layout,
+          direction,
+          mainAxisAlignment,
+          crossAxisAlignment,
           //
           style,
         } = styles;
@@ -678,6 +684,13 @@ export namespace grida {
           //
           ...style,
         } satisfies React.CSSProperties;
+
+        if (layout === "flex") {
+          result["display"] = "flex";
+          result["flexDirection"] = axisToFlexDirection(direction!);
+          result["justifyContent"] = mainAxisAlignment;
+          result["alignItems"] = crossAxisAlignment;
+        }
 
         switch (config.fill) {
           case "color":
@@ -879,6 +892,15 @@ export namespace grida {
           return `${cr.topLeftRadius}px ${cr.topRightRadius}px ${cr.bottomRightRadius}px ${cr.bottomLeftRadius}px`;
         }
       }
+
+      export function axisToFlexDirection(axis: cg.Axis): "row" | "column" {
+        switch (axis) {
+          case "horizontal":
+            return "row";
+          case "vertical":
+            return "column";
+        }
+      }
     }
 
     /**
@@ -1055,6 +1077,32 @@ export namespace grida {
         | 700
         | 800
         | 900;
+
+      /**
+       * @see https://api.flutter.dev/flutter/painting/Axis.html
+       */
+      export type Axis = "horizontal" | "vertical";
+
+      /**
+       * @see https://developer.mozilla.org/en-US/docs/Web/CSS/justify-content
+       * @see https://developer.mozilla.org/en-US/docs/Glossary/Main_Axis
+       * @see https://api.flutter.dev/flutter/rendering/MainAxisAlignment.html
+       */
+      export type MainAxisAlignment =
+        | "start"
+        | "end"
+        | "center"
+        | "space-between"
+        | "space-around"
+        | "space-evenly"
+        | "stretch";
+
+      /**
+       * @see https://developer.mozilla.org/en-US/docs/Web/CSS/align-items
+       * @see https://developer.mozilla.org/en-US/docs/Glossary/Cross_Axis
+       * @see https://api.flutter.dev/flutter/rendering/CrossAxisAlignment.html
+       */
+      export type CrossAxisAlignment = "start" | "end" | "center" | "stretch";
 
       export type Paint =
         | SolidPaint
@@ -1282,6 +1330,59 @@ export namespace grida {
                 bottomLeftRadius: number;
                 bottomRightRadius: number;
               };
+        }
+
+        /**
+         * padding
+         */
+        export interface IPadding {
+          padding:
+            | number
+            | {
+                paddingTop: number;
+                paddingRight: number;
+                paddingBottom: number;
+                paddingLeft: number;
+              };
+        }
+
+        /**
+         *
+         * Defines the layout behavior of the container.
+         * - `flex`: Enables Flexbox-like behavior.
+         * - `flow`: Equivalent to "block" in CSS, where elements are arranged in normal document flow.
+         * @see https://developer.mozilla.org/en-US/docs/Glossary/Flex_Container
+         * @see https://api.flutter.dev/flutter/widgets/Flex-class.html
+         */
+        export interface IFlexContainer {
+          /**
+           * the flex container only takes effect when layout is set to `flex`
+           */
+          layout: "flex" | "flow";
+
+          /**
+           *
+           * the flex model direction - takes effect when layout is set to `flex`
+           *
+           * @default "horizontal"
+           */
+          direction: cg.Axis;
+
+          /**
+           *
+           * the flex model main axis alignment - takes effect when layout is set to `flex`
+           *
+           * @default "start"
+           */
+          mainAxisAlignment: cg.MainAxisAlignment;
+
+          /**
+           *
+           * the flex model cross axis alignment - takes effect when layout is set to `flex`
+           *
+           * @default "start"
+           */
+          crossAxisAlignment: cg.CrossAxisAlignment;
         }
 
         /**
@@ -1567,7 +1668,9 @@ export namespace grida {
           i.IHrefable,
           i.IExpandable,
           i.IChildren,
-          i.IRectangleCorner {
+          i.IRectangleCorner,
+          i.IPadding,
+          i.IFlexContainer {
         readonly type: "container";
         //
       }
