@@ -126,74 +126,9 @@ function useInternal() {
   return useMemo(() => [state, dispatch] as const, [state, dispatch]);
 }
 
-export function useDocument() {
-  const [state, dispatch] = useInternal();
-
-  const { selected_node_id } = state;
-
-  const getNodeById = useCallback(
-    (node_id: string): grida.program.nodes.Node => {
-      return documentquery.__getNodeById(state, node_id);
-    },
-    [state.document.nodes]
-  );
-
-  const getNodeDepth = useCallback(
-    (node_id: string) => {
-      const parent_ids = [];
-      let current_id = node_id;
-
-      // Traverse up the tree to collect parent IDs
-      while (state.document_ctx.__ctx_nid_to_parent_id[current_id]) {
-        const parent_id = state.document_ctx.__ctx_nid_to_parent_id[current_id];
-        parent_ids.push(parent_id);
-        current_id = parent_id;
-      }
-
-      return parent_ids.length;
-    },
-    [state.document_ctx]
-  );
-
-  const getNodeAbsoluteRotation = useCallback(
-    (node_id: string) => {
-      const parent_ids = [];
-      let current_id = node_id;
-
-      // Traverse up the tree to collect parent IDs
-      while (state.document_ctx.__ctx_nid_to_parent_id[current_id]) {
-        const parent_id = state.document_ctx.__ctx_nid_to_parent_id[current_id];
-        parent_ids.push(parent_id);
-        current_id = parent_id;
-      }
-      parent_ids.reverse();
-
-      // Calculate the absolute rotation
-      let rotation = 0;
-      try {
-        for (const parent_id of parent_ids) {
-          const parent_node = getNodeById(parent_id);
-          assert(parent_node, `parent node not found: ${parent_id}`);
-          if ("rotation" in parent_node) {
-            rotation += parent_node.rotation ?? 0;
-          }
-        }
-
-        // finally, add the node's own rotation
-        const node = getNodeById(node_id);
-        assert(node, `node not found: ${node_id}`);
-        if ("rotation" in node) {
-          rotation += node.rotation ?? 0;
-        }
-      } catch (e) {
-        reportError(e);
-      }
-
-      return rotation;
-    },
-    [state.document_ctx, getNodeById]
-  );
-
+function __useNodeActions(dispatch: DocumentDispatcher) {
+  //
+  //
   const selectNode = useCallback(
     (node_id: string) => {
       dispatch({
@@ -234,15 +169,6 @@ export function useDocument() {
         },
       });
     },
-    [dispatch]
-  );
-
-  const clearSelection = useCallback(
-    () =>
-      dispatch({
-        type: "document/node/select",
-        node_id: undefined,
-      }),
     [dispatch]
   );
 
@@ -683,175 +609,252 @@ export function useDocument() {
     [dispatch]
   );
 
-  const changeNodeValue = useCallback(
-    (node_id: string, key: string, value: any) => {
-      dispatch({
-        type: "node/change/props",
-        node_id: node_id,
-        props: {
-          [key]: value,
-        },
-      });
-    },
+  return useMemo(
+    () => ({
+      selectNode,
+      pointerEnterNode,
+      pointerLeaveNode,
+      changeNodeActive,
+      changeNodeLocked,
+      changeNodeName,
+      changeNodeUserData,
+      changeNodeSize,
+      changeNodeBorder,
+      changeNodeProps,
+      changeNodeComponent,
+      changeNodeText,
+      changeNodeStyle,
+      changeNodeSrc,
+      changeNodeHref,
+      changeNodeTarget,
+      changeNodePositioning,
+      changeNodePositioningMode,
+      changeNodeCornerRadius,
+      changeNodeFill,
+      changeNodeFit,
+      changeNodeOpacity,
+      changeNodeRotation,
+      changeTextNodeFontFamily,
+      changeTextNodeFontWeight,
+      changeTextNodeFontSize,
+      changeTextNodeTextAlign,
+      changeTextNodeTextAlignVertical,
+      changeTextNodeLineHeight,
+      changeTextNodeLetterSpacing,
+      changeContainerNodePadding,
+      changeContainerNodeLayout,
+      changeFlexContainerNodeDirection,
+      changeFlexContainerNodeMainAxisAlignment,
+      changeFlexContainerNodeCrossAxisAlignment,
+      changeFlexContainerNodeGap,
+    }),
     [dispatch]
   );
+}
 
-  const selectedNode = useMemo(() => {
-    if (!selected_node_id) return;
+export function useNodeAction(node_id: string | undefined) {
+  const [_, dispatch] = useInternal();
+  const nodeActions = __useNodeActions(dispatch);
+
+  return useMemo(() => {
+    if (!node_id) return;
     return {
       component: (component_id: string) =>
-        changeNodeComponent(selected_node_id!, component_id),
+        nodeActions.changeNodeComponent(node_id, component_id),
       text: (text?: Tokens.StringValueExpression) =>
-        changeNodeText(selected_node_id!, text),
+        nodeActions.changeNodeText(node_id, text),
       style: (
         key: keyof grida.program.css.ExplicitlySupportedCSSProperties,
         value: any
-      ) => changeNodeStyle(selected_node_id!, key, value),
+      ) => nodeActions.changeNodeStyle(node_id, key, value),
       value: (key: string, value: any) =>
-        changeNodeValue(selected_node_id!, key, value),
+        nodeActions.changeNodeProps(node_id, key, value),
       // attributes
-      userdata: (value: any) => changeNodeUserData(selected_node_id!, value),
-      name: (name: string) => changeNodeName(selected_node_id!, name),
-      active: (active: boolean) => changeNodeActive(selected_node_id!, active),
-      locked: (locked: boolean) => changeNodeLocked(selected_node_id!, locked),
+      userdata: (value: any) => nodeActions.changeNodeUserData(node_id, value),
+      name: (name: string) => nodeActions.changeNodeName(node_id, name),
+      active: (active: boolean) =>
+        nodeActions.changeNodeActive(node_id, active),
+      locked: (locked: boolean) =>
+        nodeActions.changeNodeLocked(node_id, locked),
       src: (src?: Tokens.StringValueExpression) =>
-        changeNodeSrc(selected_node_id!, src),
+        nodeActions.changeNodeSrc(node_id, src),
       href: (href?: grida.program.nodes.i.IHrefable["href"]) =>
-        changeNodeHref(selected_node_id!, href),
+        nodeActions.changeNodeHref(node_id, href),
       target: (target?: grida.program.nodes.i.IHrefable["target"]) =>
-        changeNodeTarget(selected_node_id!, target),
+        nodeActions.changeNodeTarget(node_id, target),
 
       positioning: (value: grida.program.nodes.i.IPositioning) =>
-        changeNodePositioning(selected_node_id!, value),
+        nodeActions.changeNodePositioning(node_id, value),
       positioningMode: (value: "absolute" | "relative") =>
-        changeNodePositioningMode(selected_node_id!, value),
+        nodeActions.changeNodePositioningMode(node_id, value),
 
       //
       cornerRadius: (
         value: grida.program.nodes.i.IRectangleCorner["cornerRadius"]
-      ) => changeNodeCornerRadius(selected_node_id!, value),
+      ) => nodeActions.changeNodeCornerRadius(node_id, value),
       fill: (value: grida.program.cg.PaintWithoutID) =>
-        changeNodeFill(selected_node_id!, value),
+        nodeActions.changeNodeFill(node_id, value),
       fit: (value: grida.program.cg.BoxFit) =>
-        changeNodeFit(selected_node_id!, value),
+        nodeActions.changeNodeFit(node_id, value),
       // stylable
-      opacity: (value: number) => changeNodeOpacity(selected_node_id!, value),
-      rotation: (value: number) => changeNodeRotation(selected_node_id!, value),
+      opacity: (value: number) => nodeActions.changeNodeOpacity(node_id, value),
+      rotation: (value: number) =>
+        nodeActions.changeNodeRotation(node_id, value),
       width: (value: grida.program.css.Length | "auto") =>
-        changeNodeSize(selected_node_id!, "width", value),
+        nodeActions.changeNodeSize(node_id, "width", value),
       height: (value: grida.program.css.Length | "auto") =>
-        changeNodeSize(selected_node_id!, "height", value),
+        nodeActions.changeNodeSize(node_id, "height", value),
 
       // text style
       fontFamily: (value: string) =>
-        changeTextNodeFontFamily(selected_node_id!, value),
+        nodeActions.changeTextNodeFontFamily(node_id, value),
       fontWeight: (value: grida.program.cg.NFontWeight) =>
-        changeTextNodeFontWeight(selected_node_id!, value),
+        nodeActions.changeTextNodeFontWeight(node_id, value),
       fontSize: (value: number) =>
-        changeTextNodeFontSize(selected_node_id!, value),
+        nodeActions.changeTextNodeFontSize(node_id, value),
       textAlign: (value: grida.program.cg.TextAlign) =>
-        changeTextNodeTextAlign(selected_node_id!, value),
+        nodeActions.changeTextNodeTextAlign(node_id, value),
       textAlignVertical: (value: grida.program.cg.TextAlignVertical) =>
-        changeTextNodeTextAlignVertical(selected_node_id!, value),
+        nodeActions.changeTextNodeTextAlignVertical(node_id, value),
       lineHeight: (value: grida.program.nodes.TextNode["lineHeight"]) =>
-        changeTextNodeLineHeight(selected_node_id!, value),
+        nodeActions.changeTextNodeLineHeight(node_id, value),
       letterSpacing: (value: grida.program.nodes.TextNode["letterSpacing"]) =>
-        changeTextNodeLetterSpacing(selected_node_id!, value),
+        nodeActions.changeTextNodeLetterSpacing(node_id, value),
 
       // border
       border: (value: grida.program.css.Border | undefined) =>
-        changeNodeBorder(selected_node_id!, value),
+        nodeActions.changeNodeBorder(node_id, value),
 
       padding: (value: grida.program.nodes.i.IPadding["padding"]) =>
-        changeContainerNodePadding(selected_node_id!, value),
+        nodeActions.changeContainerNodePadding(node_id, value),
       // margin: (value?: number) =>
-      //   changeNodeStyle(selected_node_id!, "margin", value),
+      //   changeNodeStyle(node_id, "margin", value),
 
       // layout
       layout: (value: grida.program.nodes.i.IFlexContainer["layout"]) =>
-        changeContainerNodeLayout(selected_node_id!, value),
+        nodeActions.changeContainerNodeLayout(node_id, value),
       direction: (value: grida.program.cg.Axis) =>
-        changeFlexContainerNodeDirection(selected_node_id!, value),
+        nodeActions.changeFlexContainerNodeDirection(node_id, value),
       // flexWrap: (value?: string) =>
-      //   changeNodeStyle(selected_node_id!, "flexWrap", value),
+      //   changeNodeStyle(node_id, "flexWrap", value),
       mainAxisAlignment: (value: grida.program.cg.MainAxisAlignment) =>
-        changeFlexContainerNodeMainAxisAlignment(selected_node_id!, value),
+        nodeActions.changeFlexContainerNodeMainAxisAlignment(node_id, value),
       crossAxisAlignment: (value: grida.program.cg.CrossAxisAlignment) =>
-        changeFlexContainerNodeCrossAxisAlignment(selected_node_id!, value),
+        nodeActions.changeFlexContainerNodeCrossAxisAlignment(node_id, value),
       gap: (value: number | { mainAxisGap: number; crossAxisGap: number }) =>
-        changeFlexContainerNodeGap(selected_node_id!, value),
+        nodeActions.changeFlexContainerNodeGap(node_id, value),
 
       // css style
       aspectRatio: (value?: number) =>
-        changeNodeStyle(selected_node_id!, "aspectRatio", value),
+        nodeActions.changeNodeStyle(node_id, "aspectRatio", value),
       boxShadow: (value?: any) =>
-        changeNodeStyle(selected_node_id!, "boxShadow", value.boxShadow),
+        nodeActions.changeNodeStyle(node_id, "boxShadow", value.boxShadow),
       cursor: (value?: string) =>
-        changeNodeStyle(selected_node_id!, "cursor", value),
+        nodeActions.changeNodeStyle(node_id, "cursor", value),
     };
-  }, [
-    selected_node_id,
-    changeNodeComponent,
-    changeNodeText,
-    changeNodeStyle,
-    changeNodeValue,
-    changeNodeActive,
-    changeNodeLocked,
-    changeNodeSrc,
-    changeNodeHref,
-    changeNodeTarget,
-    changeNodePositioning,
-    changeNodePositioningMode,
-    changeNodeCornerRadius,
-    changeNodeFill,
-    changeNodeFit,
-    changeNodeOpacity,
-    changeNodeRotation,
-    changeTextNodeFontFamily,
-    changeTextNodeFontWeight,
-    changeTextNodeFontSize,
-    changeTextNodeTextAlign,
-    changeTextNodeTextAlignVertical,
-    changeTextNodeLineHeight,
-    changeTextNodeLetterSpacing,
-  ]);
+  }, [node_id, nodeActions]);
+}
+
+export function useDocument() {
+  const [state, dispatch] = useInternal();
+
+  const { selected_node_id } = state;
+
+  const nodeActions = __useNodeActions(dispatch);
+
+  const clearSelection = useCallback(
+    () =>
+      dispatch({
+        type: "document/node/select",
+        node_id: undefined,
+      }),
+    [dispatch]
+  );
+
+  const getNodeById = useCallback(
+    (node_id: string): grida.program.nodes.Node => {
+      return documentquery.__getNodeById(state, node_id);
+    },
+    [state.document.nodes]
+  );
+
+  const getNodeDepth = useCallback(
+    (node_id: string) => {
+      const parent_ids = [];
+      let current_id = node_id;
+
+      // Traverse up the tree to collect parent IDs
+      while (state.document_ctx.__ctx_nid_to_parent_id[current_id]) {
+        const parent_id = state.document_ctx.__ctx_nid_to_parent_id[current_id];
+        parent_ids.push(parent_id);
+        current_id = parent_id;
+      }
+
+      return parent_ids.length;
+    },
+    [state.document_ctx]
+  );
+
+  const getNodeAbsoluteRotation = useCallback(
+    (node_id: string) => {
+      const parent_ids = [];
+      let current_id = node_id;
+
+      // Traverse up the tree to collect parent IDs
+      while (state.document_ctx.__ctx_nid_to_parent_id[current_id]) {
+        const parent_id = state.document_ctx.__ctx_nid_to_parent_id[current_id];
+        parent_ids.push(parent_id);
+        current_id = parent_id;
+      }
+      parent_ids.reverse();
+
+      // Calculate the absolute rotation
+      let rotation = 0;
+      try {
+        for (const parent_id of parent_ids) {
+          const parent_node = getNodeById(parent_id);
+          assert(parent_node, `parent node not found: ${parent_id}`);
+          if ("rotation" in parent_node) {
+            rotation += parent_node.rotation ?? 0;
+          }
+        }
+
+        // finally, add the node's own rotation
+        const node = getNodeById(node_id);
+        assert(node, `node not found: ${node_id}`);
+        if ("rotation" in node) {
+          rotation += node.rotation ?? 0;
+        }
+      } catch (e) {
+        reportError(e);
+      }
+
+      return rotation;
+    },
+    [state.document_ctx, getNodeById]
+  );
+
+  const selectedNodeActions = useNodeAction(selected_node_id);
+  const selectedNode = selected_node_id ? selectedNodeActions : undefined;
 
   return useMemo(() => {
     return {
       state,
       selected_node_id,
       selectedNode,
+      clearSelection,
       getNodeDepth,
       getNodeAbsoluteRotation,
-      selectNode,
-      changeNodeActive,
-      changeNodeLocked,
-      pointerEnterNode,
-      pointerLeaveNode,
-      changeNodeProps,
-      clearSelection,
-      changeNodeComponent,
-      changeNodeText,
-      changeNodeStyle,
-      changeNodeValue,
+      ...nodeActions,
     };
   }, [
     state,
     selected_node_id,
     selectedNode,
+    clearSelection,
     getNodeDepth,
     getNodeAbsoluteRotation,
-    selectNode,
-    changeNodeActive,
-    changeNodeLocked,
-    pointerEnterNode,
-    pointerLeaveNode,
-    changeNodeProps,
-    clearSelection,
-    changeNodeComponent,
-    changeNodeText,
-    changeNodeStyle,
-    changeNodeValue,
+    nodeActions,
   ]);
 }
 

@@ -1,9 +1,10 @@
 {
+  "doctype": "v0_document",
   "document": {
     "nodes": {
       "422:1966": {
         "id": "422:1966",
-        "name": "02-화려한-T60-cover",
+        "name": "root",
         "active": true,
         "locked": false,
         "rotation": 0,
@@ -45,7 +46,7 @@
       },
       "422:1967": {
         "id": "422:1967",
-        "name": "Texture 19",
+        "name": "texture",
         "active": true,
         "locked": true,
         "rotation": 0,
@@ -64,7 +65,7 @@
       },
       "422:1968": {
         "id": "422:1968",
-        "name": "XYZ 스타트업 제품 론칭 디지털 캠페인",
+        "name": "title",
         "active": true,
         "locked": false,
         "rotation": 0,
@@ -100,7 +101,7 @@
       },
       "422:1969": {
         "id": "422:1969",
-        "name": "2022.01 - 2022.06",
+        "name": "date",
         "active": true,
         "locked": false,
         "rotation": 0,
@@ -136,7 +137,7 @@
       },
       "422:1970": {
         "id": "422:1970",
-        "name": "Frame 292",
+        "name": "badge",
         "active": true,
         "locked": false,
         "rotation": 0,
@@ -168,7 +169,7 @@
       },
       "422:1971": {
         "id": "422:1971",
-        "name": "CASE 2",
+        "name": "label",
         "active": true,
         "locked": false,
         "rotation": 0,
@@ -202,7 +203,7 @@
       },
       "422:1972": {
         "id": "422:1972",
-        "name": "XYZ 스타트업은 신제품인 기능성 음료를 출시하며 초기 고객층 확보를 목표로 디지털 캠페인을 기획했습니다. 기존 브랜드 인지도가 낮아 초기 고객 유치가 중요한 과제였으며, 제품의 기능성 및 트렌디함을 강조해야 했습니다.",
+        "name": "header-description",
         "active": true,
         "locked": false,
         "rotation": 0,
@@ -211,10 +212,8 @@
         "type": "text",
         "text": "XYZ 스타트업은 신제품인 기능성 음료를 출시하며 초기 고객층 확보를 목표로 디지털 캠페인을 기획했습니다. 기존 브랜드 인지도가 낮아 초기 고객 유치가 중요한 과제였으며, 제품의 기능성 및 트렌디함을 강조해야 했습니다.",
         "position": "absolute",
-        "left": 629.5,
         "top": 40,
         "right": 50,
-        "bottom": 434,
         "width": 280.5,
         "height": "auto",
         "fill": {
@@ -238,7 +237,7 @@
       },
       "422:1973": {
         "id": "422:1973",
-        "name": "Frame 337",
+        "name": "picture",
         "active": true,
         "locked": false,
         "rotation": 0,
@@ -247,7 +246,6 @@
         "type": "container",
         "expanded": false,
         "position": "absolute",
-        "left": 629.5,
         "top": 166,
         "width": 280.5,
         "height": 324,
@@ -267,11 +265,12 @@
         "cornerRadius": 0,
         "children": [
           "422:2015"
-        ]
+        ],
+        "right": 50.8046875
       },
       "422:2015": {
         "id": "422:2015",
-        "name": "black LG monitor and white keyboard",
+        "name": "img",
         "active": true,
         "locked": false,
         "rotation": 0,
@@ -290,7 +289,7 @@
       },
       "422:1974": {
         "id": "422:1974",
-        "name": "Frame 338",
+        "name": "card-1",
         "active": true,
         "locked": false,
         "rotation": 0,
@@ -325,7 +324,7 @@
       },
       "422:1975": {
         "id": "422:1975",
-        "name": "트렌드 분석과 주요 경쟁사 분석을 통해 젊은 소비자들이 어떤 브랜드 이미지를 선호하는지 파악했습니다. 설문조사와 포커스 그룹 인터뷰를 통해 타겟 고객의 니즈를 확인했습니다.",
+        "name": "content",
         "active": true,
         "locked": false,
         "rotation": 0,
@@ -361,7 +360,7 @@
       },
       "422:1976": {
         "id": "422:1976",
-        "name": "Frame 339",
+        "name": "badge",
         "active": true,
         "locked": false,
         "rotation": 0,
@@ -393,7 +392,7 @@
       },
       "422:1977": {
         "id": "422:1977",
-        "name": "STRATEGY 1",
+        "name": "label",
         "active": true,
         "locked": false,
         "rotation": 0,
@@ -427,7 +426,7 @@
       },
       "422:1978": {
         "id": "422:1978",
-        "name": "Frame 341",
+        "name": "card-2",
         "active": true,
         "locked": false,
         "rotation": 0,
@@ -462,7 +461,7 @@
       },
       "422:1979": {
         "id": "422:1979",
-        "name": "로고 및 패키지 디자인을 현대적이고 미니멀한 스타일로 재구성하여 트렌디한 이미지로 변화시키고, 이를 SNS에 노출했습니다.",
+        "name": "content",
         "active": true,
         "locked": false,
         "rotation": 0,
@@ -498,7 +497,7 @@
       },
       "422:1980": {
         "id": "422:1980",
-        "name": "Frame 340",
+        "name": "badge",
         "active": true,
         "locked": false,
         "rotation": 0,
@@ -530,7 +529,7 @@
       },
       "422:1981": {
         "id": "422:1981",
-        "name": "STRATEGY 2",
+        "name": "label",
         "active": true,
         "locked": false,
         "rotation": 0,
@@ -564,7 +563,7 @@
       },
       "422:1982": {
         "id": "422:1982",
-        "name": "Group",
+        "name": "icon",
         "active": true,
         "locked": false,
         "rotation": 1.5707963705062848,
@@ -615,7 +614,7 @@
       },
       "422:1984": {
         "id": "422:1984",
-        "name": "Frame 342",
+        "name": "card-3",
         "active": true,
         "locked": false,
         "rotation": 0,
@@ -649,7 +648,7 @@
       },
       "422:1985": {
         "id": "422:1985",
-        "name": "리브랜딩 방향을 설정하고, 데이터 기반의 시장 조사를 통해 핵심 메시지를 도출했습니다. 인스타그램 광고 캠페인을 설계하여 광고의 타겟팅과 고객 도달율을 최적화하는 역할을 맡았습니다.",
+        "name": "content",
         "active": true,
         "locked": false,
         "rotation": 0,
@@ -685,7 +684,7 @@
       },
       "422:1986": {
         "id": "422:1986",
-        "name": "Frame 343",
+        "name": "badge",
         "active": true,
         "locked": false,
         "rotation": 0,
@@ -717,7 +716,7 @@
       },
       "422:1987": {
         "id": "422:1987",
-        "name": "PERFORMANCE",
+        "name": "label",
         "active": true,
         "locked": false,
         "rotation": 0,

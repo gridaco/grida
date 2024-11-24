@@ -14,6 +14,7 @@ import {
   useDocument,
   useEventTargetCSSCursor,
   useNode,
+  useNodeAction,
   useNodeDomElement,
 } from "../provider";
 import { RotationCursorIcon } from "../components/cursor";
@@ -531,7 +532,7 @@ const __resize_handle_cursor_map = {
 
 function RichTextEditorSurface({ node_id }: { node_id: string }) {
   const inputref = useRef<HTMLTextAreaElement>(null);
-  const { changeNodeText } = useDocument();
+  const change = useNodeAction(node_id)!;
   const transform = useNodeSurfaceTransfrom(node_id);
   const node = useNode(node_id!);
 
@@ -577,7 +578,7 @@ function RichTextEditorSurface({ node_id }: { node_id: string }) {
           onKeyDown={stopPropagation}
           value={node.text as string}
           onChange={(e) => {
-            changeNodeText(node_id, e.target.value);
+            change.text(e.target.value);
           }}
           className="m-0 p-0 border-none outline-none appearance-none bg-transparent w-full h-full overflow-hidden whitespace-nowrap"
           style={grida.program.css.toReactTextStyle(
