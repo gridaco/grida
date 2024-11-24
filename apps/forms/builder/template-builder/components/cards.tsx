@@ -65,12 +65,7 @@ export const Card_001 = withTemplateDefinition(
             <span>{date2}</span>
           </div>
           <div className="text-sm text-muted-foreground">{p}</div>
-          <NodeElement
-            node_id=".tags"
-            style={{
-              gap: 4,
-            }}
-          >
+          <NodeElement node_id=".tags" style={{}}>
             {tags?.map((t, i) => <Badge key={i}>{t}</Badge>)}
           </NodeElement>
         </div>
@@ -235,11 +230,14 @@ export const Card_001 = withTemplateDefinition(
         width: "auto",
         height: "auto",
         cornerRadius: 0,
+        padding: 0,
         position: "relative",
         layout: "flex",
         direction: "horizontal",
         mainAxisAlignment: "start",
         crossAxisAlignment: "center",
+        mainAxisGap: 4,
+        crossAxisGap: 4,
       },
     },
     type: "template",
@@ -449,19 +447,23 @@ export const Card_003 = withTemplateDefinition(
       <Card className="p-4" style={style}>
         <NodeElement
           node_id="root"
-          style={{
-            gap: 4,
-            // flexDirection: "row",
-            // justifyContent: "space-between",
-          }}
+          style={
+            {
+              // gap: 4,
+              // flexDirection: "row",
+              // justifyContent: "space-between",
+            }
+          }
         >
           <div className="flex-1 flex flex-col gap-1 z-20">
             <NodeElement
               node_id="header-layout"
-              style={{
-                gap: 4,
-                // flexDirection: "column",
-              }}
+              style={
+                {
+                  // gap: 4,
+                  // flexDirection: "column",
+                }
+              }
             >
               <div className="flex flex-row items-center gap-2">
                 <div className="flex gap-2 items-center justify-between">
@@ -474,12 +476,7 @@ export const Card_003 = withTemplateDefinition(
               <h1 className="text-lg font-bold break-keep">{h1}</h1>
             </NodeElement>
             <p className="text-xs font-regular opacity-80">{p}</p>
-            <NodeElement
-              node_id=".tags"
-              style={{
-                gap: 4,
-              }}
-            >
+            <NodeElement node_id=".tags" style={{}}>
               {tags?.map((t, i) => <Badge key={i}>{t}</Badge>)}
             </NodeElement>
           </div>
@@ -665,11 +662,14 @@ export const Card_003 = withTemplateDefinition(
         width: "auto",
         height: "auto",
         cornerRadius: 0,
+        padding: 0,
         position: "relative",
         layout: "flex",
         direction: "horizontal",
         mainAxisAlignment: "start",
         crossAxisAlignment: "center",
+        mainAxisGap: 4,
+        crossAxisGap: 4,
       },
     },
     type: "template",

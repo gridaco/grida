@@ -4,7 +4,7 @@
     "nodes": {
       "1:475": {
         "id": "1:475",
-        "name": "R-4",
+        "name": "root",
         "active": true,
         "locked": false,
         "rotation": 0,
@@ -33,11 +33,18 @@
         "cornerRadius": 0,
         "children": [
           "1:476"
-        ]
+        ],
+        "layout": "flex",
+        "direction": "horizontal",
+        "mainAxisAlignment": "center",
+        "crossAxisAlignment": "center",
+        "mainAxisGap": 0,
+        "crossAxisGap": 0,
+        "padding": 32
       },
       "1:476": {
         "id": "1:476",
-        "name": "Frame 79",
+        "name": "body",
         "active": true,
         "locked": false,
         "rotation": 0,
@@ -45,9 +52,7 @@
         "zIndex": 0,
         "type": "container",
         "expanded": false,
-        "position": "absolute",
-        "left": 33,
-        "top": 32,
+        "position": "relative",
         "width": 632,
         "height": 859,
         "style": {
@@ -62,7 +67,7 @@
       },
       "1:477": {
         "id": "1:477",
-        "name": "Frame 68",
+        "name": "header",
         "active": true,
         "locked": false,
         "rotation": 0,
@@ -98,7 +103,7 @@
         "left": 0,
         "top": 0,
         "width": 139,
-        "height": 44,
+        "height": "auto",
         "style": {
           "padding": "0px 0px 0px 0px"
         },
@@ -110,7 +115,9 @@
         "layout": "flex",
         "direction": "vertical",
         "mainAxisAlignment": "start",
-        "crossAxisAlignment": "start"
+        "crossAxisAlignment": "start",
+        "mainAxisGap": 4,
+        "crossAxisGap": 4
       },
       "1:479": {
         "id": "1:479",
@@ -178,7 +185,7 @@
       },
       "1:481": {
         "id": "1:481",
-        "name": "Frame 66",
+        "name": "contacts",
         "active": true,
         "locked": false,
         "rotation": 0,
@@ -190,7 +197,7 @@
         "left": 340,
         "top": 0,
         "width": 93,
-        "height": 51,
+        "height": "auto",
         "style": {
           "padding": "0px 0px 0px 0px"
         },
@@ -199,7 +206,13 @@
           "1:482",
           "1:483",
           "1:484"
-        ]
+        ],
+        "layout": "flex",
+        "direction": "vertical",
+        "mainAxisAlignment": "start",
+        "crossAxisAlignment": "start",
+        "mainAxisGap": 4,
+        "crossAxisGap": 4
       },
       "1:482": {
         "id": "1:482",
@@ -211,9 +224,7 @@
         "zIndex": 0,
         "type": "text",
         "text": "yourwebsite.com",
-        "position": "absolute",
-        "left": 0,
-        "top": 0,
+        "position": "relative",
         "width": "auto",
         "height": "auto",
         "fill": {
@@ -245,9 +256,7 @@
         "zIndex": 0,
         "type": "text",
         "text": "your@gmail.com",
-        "position": "absolute",
-        "left": 0,
-        "top": 18,
+        "position": "relative",
         "width": "auto",
         "height": "auto",
         "fill": {
@@ -279,9 +288,7 @@
         "zIndex": 0,
         "type": "text",
         "text": "LinkedIn : @id",
-        "position": "absolute",
-        "left": 0,
-        "top": 36,
+        "position": "relative",
         "width": "auto",
         "height": "auto",
         "fill": {

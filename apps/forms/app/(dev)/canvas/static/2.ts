@@ -27,6 +27,8 @@ export default {
       direction: "horizontal",
       mainAxisAlignment: "start",
       crossAxisAlignment: "start",
+      mainAxisGap: 0,
+      crossAxisGap: 0,
     },
     card_1_bg: {
       id: "card_1_bg",

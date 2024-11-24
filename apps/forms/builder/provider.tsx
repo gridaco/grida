@@ -646,6 +646,22 @@ export function useDocument() {
     },
     [dispatch]
   );
+
+  const changeFlexContainerNodeGap = useCallback(
+    (
+      node_id: string,
+      gap: number | { mainAxisGap: number; crossAxisGap: number }
+    ) => {
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/gap",
+          node_id: node_id,
+          gap,
+        });
+      });
+    },
+    [dispatch]
+  );
   //
 
   const changeNodeStyle = useCallback(
@@ -756,13 +772,14 @@ export function useDocument() {
         changeContainerNodeLayout(selected_node_id!, value),
       direction: (value: grida.program.cg.Axis) =>
         changeFlexContainerNodeDirection(selected_node_id!, value),
-      // gap: (value?: number) => changeNodeStyle(selected_node_id!, "gap", value),
       // flexWrap: (value?: string) =>
       //   changeNodeStyle(selected_node_id!, "flexWrap", value),
       mainAxisAlignment: (value: grida.program.cg.MainAxisAlignment) =>
         changeFlexContainerNodeMainAxisAlignment(selected_node_id!, value),
       crossAxisAlignment: (value: grida.program.cg.CrossAxisAlignment) =>
         changeFlexContainerNodeCrossAxisAlignment(selected_node_id!, value),
+      gap: (value: number | { mainAxisGap: number; crossAxisGap: number }) =>
+        changeFlexContainerNodeGap(selected_node_id!, value),
 
       // css style
       aspectRatio: (value?: number) =>

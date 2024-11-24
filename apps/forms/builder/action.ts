@@ -326,7 +326,18 @@ interface IFlexContainerNodeChangeMainAxisAlignmentAction extends INodeID {
 interface IFlexContainerNodeChangeCrossAxisAlignmentAction extends INodeID {
   crossAxisAlignment: grida.program.nodes.i.IFlexContainer["crossAxisAlignment"];
 }
-// #endregion layout
+
+interface IFlexContainerNodeChangeGapAction extends INodeID {
+  gap: number | { mainAxisGap: number; crossAxisGap: number };
+}
+
+interface IFlexContainerNodeChangeMainAxisGapAction extends INodeID {
+  mainAxisGap: grida.program.nodes.i.IFlexContainer["mainAxisGap"];
+}
+
+interface IFlexContainerNodeChangeCrossAxisGapAction extends INodeID {
+  crossAxisGap: grida.program.nodes.i.IFlexContainer["crossAxisGap"];
+}
 
 interface INodeChangeStyleAction extends INodeID {
   style: Partial<React.CSSProperties>;
@@ -393,6 +404,15 @@ export type NodeChangeAction =
   | ({
       type: "node/change/crossAxisAlignment";
     } & IFlexContainerNodeChangeCrossAxisAlignmentAction)
+  | ({
+      type: "node/change/gap";
+    } & IFlexContainerNodeChangeGapAction)
+  | ({
+      type: "node/change/mainAxisGap";
+    } & IFlexContainerNodeChangeMainAxisGapAction)
+  | ({
+      type: "node/change/crossAxisGap";
+    } & IFlexContainerNodeChangeCrossAxisGapAction)
   //
   | ({ type: "node/change/style" } & INodeChangeStyleAction)
   | ({ type: "node/change/src" } & INodeChangeSrcAction)

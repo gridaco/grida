@@ -472,6 +472,9 @@ export default function reducer<S extends IDocumentEditorState>(
     case "node/change/direction":
     case "node/change/mainAxisAlignment":
     case "node/change/crossAxisAlignment":
+    case "node/change/gap":
+    case "node/change/mainAxisGap":
+    case "node/change/crossAxisGap":
     case "node/change/style":
     case "node/change/fontSize":
     case "node/change/fontWeight":
@@ -914,6 +917,8 @@ function nodeReducer<N extends Partial<grida.program.nodes.Node>>(
           if (!draft.direction) draft.direction = "horizontal";
           if (!draft.mainAxisAlignment) draft.mainAxisAlignment = "start";
           if (!draft.crossAxisAlignment) draft.crossAxisAlignment = "start";
+          if (!draft.mainAxisGap) draft.mainAxisGap = 0;
+          if (!draft.crossAxisGap) draft.crossAxisGap = 0;
         }
         break;
       }
@@ -933,6 +938,34 @@ function nodeReducer<N extends Partial<grida.program.nodes.Node>>(
         assert(draft.type === "container");
         assert(action.crossAxisAlignment, "crossAxisAlignment is required");
         draft.crossAxisAlignment = action.crossAxisAlignment;
+        break;
+      }
+      case "node/change/gap": {
+        assert(draft.type === "container");
+        assert(
+          typeof action.gap === "number" ||
+            typeof action.gap.mainAxisGap === "number",
+          "invalid gap value"
+        );
+        if (typeof action.gap === "number") {
+          draft.mainAxisGap = action.gap;
+          draft.crossAxisGap = action.gap;
+        } else {
+          draft.mainAxisGap = action.gap.mainAxisGap;
+          draft.crossAxisGap = action.gap.crossAxisGap;
+        }
+        break;
+      }
+      case "node/change/mainAxisGap": {
+        assert(draft.type === "container");
+        assert(typeof action.mainAxisGap === "number", "invalid gap value");
+        draft.mainAxisGap = action.mainAxisGap;
+        break;
+      }
+      case "node/change/crossAxisGap": {
+        assert(draft.type === "container");
+        assert(typeof action.crossAxisGap === "number", "invalid gap value");
+        draft.crossAxisGap = action.crossAxisGap;
         break;
       }
       case "node/change/style": {
@@ -1127,6 +1160,8 @@ function initialNode(
         direction: "horizontal",
         mainAxisAlignment: "start",
         crossAxisAlignment: "start",
+        mainAxisGap: 0,
+        crossAxisGap: 0,
         ...seed,
       } satisfies grida.program.nodes.ContainerNode;
     }

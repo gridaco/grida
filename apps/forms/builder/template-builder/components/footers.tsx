@@ -14,7 +14,7 @@ export function Footer_001() {
         flexWrap: "wrap",
         // justifyContent: "center",
         // alignItems: "center",
-        gap: 2,
+        // gap: 2,
       }}
     >
       <Link href="#">

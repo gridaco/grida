@@ -62,6 +62,8 @@ export default {
       direction: "horizontal",
       mainAxisAlignment: "start",
       crossAxisAlignment: "start",
+      mainAxisGap: 0,
+      crossAxisGap: 0,
     },
     // recta
     ...rects.reduce((acc, rect) => {

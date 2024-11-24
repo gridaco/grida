@@ -48,6 +48,8 @@ export default {
       direction: "horizontal",
       mainAxisAlignment: "start",
       crossAxisAlignment: "start",
+      mainAxisGap: 0,
+      crossAxisGap: 0,
     },
     background: {
       id: "background",
@@ -131,6 +133,8 @@ export default {
       direction: "horizontal",
       mainAxisAlignment: "start",
       crossAxisAlignment: "start",
+      mainAxisGap: 0,
+      crossAxisGap: 0,
     },
     child_rect_1: {
       id: "child_rect_1",

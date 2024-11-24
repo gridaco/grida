@@ -106,6 +106,8 @@ export function SelectedNodeProperties() {
     direction,
     mainAxisAlignment,
     crossAxisAlignment,
+    mainAxisGap,
+    crossAxisGap,
 
     // x
     userdata,
@@ -401,10 +403,16 @@ export function SelectedNodeProperties() {
                     onValueChange={selectedNode.crossAxisAlignment}
                   />
                 </PropertyLine>
-                {/* <PropertyLine>
-              <PropertyLineLabel>Gap</PropertyLineLabel>
-              <GapControl value={gap as any} onValueChange={selectedNode.gap} />
-            </PropertyLine> */}
+                <PropertyLine>
+                  <PropertyLineLabel>Gap</PropertyLineLabel>
+                  <GapControl
+                    value={{
+                      mainAxisGap: mainAxisGap!,
+                      crossAxisGap: crossAxisGap!,
+                    }}
+                    onValueChange={selectedNode.gap}
+                  />
+                </PropertyLine>
               </>
             )}
             {/* <PropertyLine>

@@ -82,6 +82,8 @@ export default function CanvasPlayground() {
             direction: "horizontal",
             mainAxisAlignment: "start",
             crossAxisAlignment: "start",
+            mainAxisGap: 0,
+            crossAxisGap: 0,
           },
         },
         root_id: "root",

@@ -208,6 +208,7 @@ export namespace iofigma {
             const {
               clipsContent,
               itemSpacing,
+              counterAxisSpacing,
               paddingLeft,
               paddingRight,
               paddingTop,
@@ -293,6 +294,8 @@ export namespace iofigma {
               direction: "horizontal",
               mainAxisAlignment: "start",
               crossAxisAlignment: "start",
+              mainAxisGap: itemSpacing ?? 0,
+              crossAxisGap: counterAxisSpacing ?? itemSpacing ?? 0,
             } satisfies grida.program.nodes.ContainerNode;
           }
           case "GROUP": {
@@ -326,6 +329,8 @@ export namespace iofigma {
               direction: "horizontal",
               mainAxisAlignment: "start",
               crossAxisAlignment: "start",
+              mainAxisGap: 0,
+              crossAxisGap: 0,
             } satisfies grida.program.nodes.ContainerNode;
             // throw new Error(`Unsupported node type: ${node.type}`);
           }

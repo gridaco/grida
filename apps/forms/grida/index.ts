@@ -597,29 +597,16 @@ export namespace grida {
         // | "top"
         // | "left"
         //
-        // | "fontWeight"
-        // | "fontFamily"
-        // | "fontSize"
-        // | "lineHeight"
-        // | "textAlign"
         // | "textTransform"
         //
         | "boxShadow"
-        //
-        // | "borderWidth"
-        //
         //
         | "aspectRatio"
         //
         | "overflow"
         //
         // | "margin"
-        // | "padding"
-        // | "flexDirection"
         | "flexWrap"
-        // | "justifyContent"
-        // | "alignItems"
-        | "gap"
         //
         | "cursor"
         //
@@ -660,6 +647,8 @@ export namespace grida {
           direction,
           mainAxisAlignment,
           crossAxisAlignment,
+          mainAxisGap,
+          crossAxisGap,
           //
           style,
         } = styles;
@@ -696,6 +685,10 @@ export namespace grida {
           result["flexDirection"] = axisToFlexDirection(direction!);
           result["justifyContent"] = mainAxisAlignment;
           result["alignItems"] = crossAxisAlignment;
+          result["gap"] =
+            direction === "horizontal"
+              ? `${mainAxisGap}px ${crossAxisGap}px`
+              : `${crossAxisGap}px ${mainAxisGap}px`;
         }
 
         switch (config.fill) {
@@ -1401,6 +1394,24 @@ export namespace grida {
            * @default "start"
            */
           crossAxisAlignment: cg.CrossAxisAlignment;
+
+          /**
+           * the gap between the children in main axis - takes effect when layout is set to `flex`
+           *
+           * commonly refered as `row-gap` (in row direction) or `column-gap` (in column direction)
+           *
+           * @default 0
+           */
+          mainAxisGap: number;
+
+          /**
+           * the gap between the children in cross axis - takes effect when layout is set to `flex`
+           *
+           * commonly refered as `column-gap` (in row direction) or `row-gap` (in column direction)
+           *
+           * @default 0
+           */
+          crossAxisGap: number;
         }
 
         /**
