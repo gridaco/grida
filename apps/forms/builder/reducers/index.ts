@@ -467,6 +467,7 @@ export default function reducer<S extends IDocumentEditorState>(
     case "node/change/fill":
     case "node/change/border":
     case "node/change/fit":
+    case "node/change/padding":
     case "node/change/layout":
     case "node/change/direction":
     case "node/change/mainAxisAlignment":
@@ -896,6 +897,11 @@ function nodeReducer<N extends Partial<grida.program.nodes.Node>>(
       case "node/change/fit": {
         assert(draft.type === "image");
         draft.fit = action.fit;
+        break;
+      }
+      case "node/change/padding": {
+        assert(draft.type === "container");
+        draft.padding = action.padding;
         break;
       }
       case "node/change/layout": {

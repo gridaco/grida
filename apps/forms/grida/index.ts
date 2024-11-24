@@ -630,6 +630,7 @@ export namespace grida {
           Partial<nodes.i.IRectangleCorner> &
           Partial<nodes.i.IBoxFit> &
           Partial<nodes.i.ITextNodeStyle> &
+          Partial<nodes.i.IPadding> &
           Partial<nodes.i.IFlexContainer>,
         config: {
           hasTextStyle: boolean;
@@ -653,6 +654,8 @@ export namespace grida {
           //
           border,
           //
+          padding,
+          //
           layout,
           direction,
           mainAxisAlignment,
@@ -662,6 +665,9 @@ export namespace grida {
         } = styles;
 
         let result: React.CSSProperties = {
+          //
+          ...style,
+          //
           position: position,
           // FIXME: support both auto - max-content
           // for texts, when auto, it will automatically break the line (to prevent this, we can use max-content) BUT, when max-content it will not respect the right: xxx (which in this case, it should break line)
@@ -677,12 +683,12 @@ export namespace grida {
           rotate: rotation ? `${rotation}deg` : undefined,
           //
           borderRadius: cornerRadius
-            ? cornerRadiusToBorderRadius(cornerRadius)
+            ? cornerRadiusToBorderRadiusCSS(cornerRadius)
             : undefined,
           //
-          ...(border ? toReactCSSBorder(border) : {}),
+          padding: padding ? paddingToPaddingCSS(padding) : undefined,
           //
-          ...style,
+          ...(border ? toReactCSSBorder(border) : {}),
         } satisfies React.CSSProperties;
 
         if (layout === "flex") {
@@ -882,7 +888,7 @@ export namespace grida {
         return `${color.r.toString(16).padStart(2, "0")}${color.g.toString(16).padStart(2, "0")}${color.b.toString(16).padStart(2, "0")}`;
       }
 
-      export function cornerRadiusToBorderRadius(
+      export function cornerRadiusToBorderRadiusCSS(
         cr: nodes.i.IRectangleCorner["cornerRadius"]
       ): string {
         if (!cr) return "0";
@@ -890,6 +896,18 @@ export namespace grida {
           return `${cr}px`;
         } else {
           return `${cr.topLeftRadius}px ${cr.topRightRadius}px ${cr.bottomRightRadius}px ${cr.bottomLeftRadius}px`;
+        }
+      }
+
+      export function paddingToPaddingCSS(
+        padding: nodes.i.IPadding["padding"]
+      ): string {
+        console.log(padding);
+        if (!padding) return "0";
+        if (typeof padding === "number") {
+          return `${padding}px`;
+        } else {
+          return `${padding.paddingTop}px ${padding.paddingRight}px ${padding.paddingBottom}px ${padding.paddingLeft}px`;
         }
       }
 

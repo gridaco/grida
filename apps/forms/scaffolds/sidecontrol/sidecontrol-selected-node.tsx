@@ -98,6 +98,8 @@ export function SelectedNodeProperties() {
 
     //
     border,
+    //
+    padding,
 
     //
     layout,
@@ -122,8 +124,8 @@ export function SelectedNodeProperties() {
     //
     boxShadow,
     //
-    margin,
-    padding,
+    // margin,
+    // padding,
     //
     aspectRatio,
     //
@@ -405,6 +407,20 @@ export function SelectedNodeProperties() {
             </PropertyLine> */}
               </>
             )}
+            {/* <PropertyLine>
+              <PropertyLineLabel>Margin</PropertyLineLabel>
+              <MarginControl
+                value={margin as any}
+                onValueChange={selectedNode.margin}
+              />
+            </PropertyLine> */}
+            <PropertyLine>
+              <PropertyLineLabel>Padding</PropertyLineLabel>
+              <PaddingControl
+                value={padding!}
+                onValueChange={selectedNode.padding}
+              />
+            </PropertyLine>
           </SidebarMenuSectionContent>
         </SidebarSection>
       )}
@@ -442,20 +458,6 @@ export function SelectedNodeProperties() {
             <BoxShadowControl
               value={{ boxShadow }}
               onValueChange={selectedNode.boxShadow}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Margin</PropertyLineLabel>
-            <MarginControl
-              value={margin as any}
-              onValueChange={selectedNode.margin}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Padding</PropertyLineLabel>
-            <PaddingControl
-              value={padding as any}
-              onValueChange={selectedNode.padding}
             />
           </PropertyLine>
           <PropertyLine>

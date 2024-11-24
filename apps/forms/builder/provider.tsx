@@ -573,7 +573,20 @@ export function useDocument() {
 
   //
 
-  const changeNodeLayout = useCallback(
+  const changeContainerNodePadding = useCallback(
+    (node_id: string, padding: grida.program.nodes.i.IPadding["padding"]) => {
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/padding",
+          node_id: node_id,
+          padding,
+        });
+      });
+    },
+    [dispatch]
+  );
+
+  const changeContainerNodeLayout = useCallback(
     (
       node_id: string,
       layout: grida.program.nodes.i.IFlexContainer["layout"]
@@ -733,9 +746,14 @@ export function useDocument() {
       border: (value: grida.program.css.Border | undefined) =>
         changeNodeBorder(selected_node_id!, value),
 
+      padding: (value: grida.program.nodes.i.IPadding["padding"]) =>
+        changeContainerNodePadding(selected_node_id!, value),
+      // margin: (value?: number) =>
+      //   changeNodeStyle(selected_node_id!, "margin", value),
+
       // layout
       layout: (value: grida.program.nodes.i.IFlexContainer["layout"]) =>
-        changeNodeLayout(selected_node_id!, value),
+        changeContainerNodeLayout(selected_node_id!, value),
       direction: (value: grida.program.cg.Axis) =>
         changeFlexContainerNodeDirection(selected_node_id!, value),
       // gap: (value?: number) => changeNodeStyle(selected_node_id!, "gap", value),
@@ -747,10 +765,6 @@ export function useDocument() {
         changeFlexContainerNodeCrossAxisAlignment(selected_node_id!, value),
 
       // css style
-      margin: (value?: number) =>
-        changeNodeStyle(selected_node_id!, "margin", value),
-      padding: (value?: number) =>
-        changeNodeStyle(selected_node_id!, "padding", value),
       aspectRatio: (value?: number) =>
         changeNodeStyle(selected_node_id!, "aspectRatio", value),
       boxShadow: (value?: any) =>

@@ -305,6 +305,11 @@ interface ITextNodeChangeLetterSpacingAction extends INodeID {
   letterSpacing: grida.program.nodes.TextNode["letterSpacing"];
 }
 
+//
+interface INodeChangePaddingAction extends INodeID {
+  padding: grida.program.nodes.i.IPadding["padding"];
+}
+
 // #region layout
 interface INodeChangeLayoutAction extends INodeID {
   layout: grida.program.nodes.i.IFlexContainer["layout"];
@@ -371,6 +376,10 @@ export type NodeChangeAction =
     } & ITextNodeChangeTextAlignVerticalAction)
   | ({ type: "node/change/lineHeight" } & ITextNodeChangeLineHeightAction)
   | ({ type: "node/change/letterSpacing" } & ITextNodeChangeLetterSpacingAction)
+  //
+  | ({
+      type: "node/change/padding";
+    } & INodeChangePaddingAction)
   //
   | ({
       type: "node/change/layout";
