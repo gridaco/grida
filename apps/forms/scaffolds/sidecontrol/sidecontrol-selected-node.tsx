@@ -143,7 +143,7 @@ export function SelectedNodeProperties() {
   } satisfies grida.program.css.ExplicitlySupportedCSSProperties;
 
   return (
-    <div key={selected_node_id}>
+    <div key={selected_node_id} className="mt-4 mb-10">
       {/* {process.env.NODE_ENV === "development" && (
         <SidebarSection className="border-b pb-4">
           <SidebarSectionHeaderItem>
@@ -152,7 +152,6 @@ export function SelectedNodeProperties() {
           <DebugControls />
         </SidebarSection>
       )} */}
-      <div className="h-10" />
       <SidebarSection className="border-b">
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel className="w-full flex justify-between items-center">

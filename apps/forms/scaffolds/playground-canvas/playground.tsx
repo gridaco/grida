@@ -30,12 +30,20 @@ import { GridaLogo } from "@/components/grida-logo";
 import { DevtoolsPanel } from "@/builder/devtools";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
 import { useGoogleFontsList } from "@/builder/google.fonts";
-import { DownloadIcon, FigmaLogoIcon, FileIcon } from "@radix-ui/react-icons";
+import {
+  DownloadIcon,
+  FigmaLogoIcon,
+  FileIcon,
+  OpenInNewWindowIcon,
+} from "@radix-ui/react-icons";
 import KeyboardInputOverlay from "@/builder/devtools/keyboard-input-overlay";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
@@ -48,6 +56,7 @@ import { grida } from "@/grida";
 import { HelpFab } from "@/scaffolds/help/editor-help-fab";
 import { Badge } from "@/components/ui/badge";
 import { PlaygroundToolbar } from "./toolbar";
+import Link from "next/link";
 
 export default function CanvasPlayground() {
   const [exampleid, setExampleId] = useState<string>("helloworld.grida");
@@ -173,6 +182,20 @@ export default function CanvasPlayground() {
                         <DownloadIcon className="w-3.5 h-3.5 me-2 inline-block" />
                         Save as .grida
                       </DropdownMenuItem>
+                      <DropdownMenuSub>
+                        <DropdownMenuSubTrigger>
+                          <OpenInNewWindowIcon className="me-2" />
+                          Tools
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent>
+                          <Link href="/canvas/tools/io-figma" target="_blank">
+                            <DropdownMenuItem>
+                              <OpenInNewWindowIcon className="me-2" />
+                              IO Figma
+                            </DropdownMenuItem>
+                          </Link>
+                        </DropdownMenuSubContent>
+                      </DropdownMenuSub>
                     </DropdownMenuContent>
                   </DropdownMenu>
                   <span className="font-bold text-xs">

@@ -50,12 +50,12 @@ export function ExportNodeWithHtmlToImage({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger>
+      <DropdownMenuTrigger asChild>
         <Button variant="outline" size="xs" className="w-full overflow-hidden">
           <span className="text-ellipsis overflow-hidden">Export as ...</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent>
+      <DropdownMenuContent side="left" align="start">
         <DropdownMenuItem onSelect={() => onExport("png")}>
           PNG
         </DropdownMenuItem>
