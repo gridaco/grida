@@ -21,6 +21,7 @@ import { RotationCursorIcon } from "../components/cursor";
 import { CANVAS_EVENT_TARGET_ID } from "../k/id";
 import { grida } from "@/grida";
 import assert from "assert";
+import { useIsWindowResizing } from "./hooks/window-resizing";
 
 interface CanvasEventTargetContext {
   portal?: HTMLDivElement | null;
@@ -53,6 +54,7 @@ export function CanvasEventTarget({
 }
 
 export function CanvasOverlay() {
+  const isWindowResizing = useIsWindowResizing();
   const {
     marquee,
     hovered_node_id,
@@ -172,7 +174,7 @@ export function CanvasOverlay() {
 
   return (
     <div
-      data-transforming={is_node_transforming}
+      data-transforming={is_node_transforming || isWindowResizing}
       {...bind()}
       tabIndex={0}
       className="absolute inset-0 pointer-events-auto will-change-transform z-50 opacity-100 data-[transforming='true']:opacity-0 transition-colors "
