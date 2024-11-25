@@ -38,7 +38,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 
-export function exportAs(
+export function exportAsImage(
   node_id: string,
   format: "svg" | "png",
   {
@@ -87,6 +87,8 @@ export function exportAs(
   // Prepare the options for html-to-image
   const options: Options = {
     ...htmlToImageOptions,
+    skipFonts: true,
+    preferredFontFormat: "woff2",
     filter,
   };
 
@@ -108,6 +110,54 @@ export function exportAs(
   });
 }
 
+/**
+ * exports node as archive - used for testing and custom rendering. e.g. PDF, PPTX.
+ * TODO:
+ */
+export function exportAsArchive(node_id: string) {
+  const domnode = document.getElementById(node_id);
+
+  // recursively collect all the nodes with position and size
+  // Recursive function to collect node data
+  function collectNodeData(node: HTMLElement): any {
+    const boundingRect = node.getBoundingClientRect();
+
+    return {
+      id: node.getAttribute("id") || null,
+      tag: node.tagName.toLowerCase(),
+      styles: getComputedStyle(node),
+      attributes: Array.from(node.attributes).reduce(
+        (acc, attr) => {
+          acc[attr.name] = attr.value;
+          return acc;
+        },
+        {} as Record<string, string>
+      ),
+      position: {
+        x: boundingRect.left,
+        y: boundingRect.top,
+      },
+      size: {
+        width: boundingRect.width,
+        height: boundingRect.height,
+      },
+      children: Array.from(node.children)
+        .filter((child) => child instanceof HTMLElement)
+        .map((child) => collectNodeData(child as HTMLElement)),
+    };
+  }
+
+  // Collect all data starting from the root node
+  const nodeData = collectNodeData(domnode!);
+  //
+
+  saveAs(
+    new Blob([JSON.stringify(nodeData, null, 2)], { type: "application/json" }),
+    "node-data.json"
+  );
+  //
+}
+
 export function ExportNodeWithHtmlToImage({
   node_id,
   name,
@@ -120,7 +170,7 @@ export function ExportNodeWithHtmlToImage({
   });
 
   const onExport = (format: "svg" | "png") => {
-    exportAs(node_id, format, { filename: `${name}.${format}` });
+    exportAsImage(node_id, format, { filename: `${name}.${format}` });
   };
 
   return (
@@ -167,14 +217,23 @@ function AdvancedExportDialog({
   node_id: string;
   defaultName: string;
 }) {
-  const [format, setFormat] = React.useState<"png" | "svg">("png");
-  const [filename, setName] = React.useState<string>(
-    defaultName + "." + format
-  );
+  const [format, setFormat] = React.useState<"png" | "svg" | "archive">("png");
+  const [name, setName] = React.useState<string>(defaultName);
   const [xpath, setXPath] = React.useState<string>("");
 
   const onExport = () => {
-    exportAs(node_id, format, { filename: filename, xpath });
+    switch (format) {
+      case "png":
+      case "svg":
+        exportAsImage(node_id, format, {
+          filename: name + "." + format,
+          xpath,
+        });
+        break;
+      case "archive":
+        exportAsArchive(node_id);
+        break;
+    }
   };
 
   return (
@@ -192,7 +251,7 @@ function AdvancedExportDialog({
             <Label>Name</Label>
             <Input
               placeholder="filename"
-              value={filename}
+              value={name}
               onChange={(e) => setName(e.target.value)}
             />
           </div>
@@ -203,8 +262,11 @@ function AdvancedExportDialog({
                 <SelectValue placeholder="format" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="png">png</SelectItem>
-                <SelectItem value="svg">svg</SelectItem>
+                <SelectItem value="png">PNG</SelectItem>
+                <SelectItem value="svg">SVG</SelectItem>
+                <SelectItem value="archive">
+                  Archive - for testing & custom rendering
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
