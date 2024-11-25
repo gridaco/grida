@@ -4,12 +4,18 @@ import { cn } from "@/utils";
 export function PropertyLine({
   children,
   className,
+  hidden,
 }: React.PropsWithChildren<{
   className?: string;
+  hidden?: boolean;
 }>) {
   return (
     <div
-      className={cn("flex items-start justify-between max-w-full", className)}
+      data-hidden={hidden}
+      className={cn(
+        "flex items-start justify-between max-w-full data-[hidden='true']:hidden",
+        className
+      )}
     >
       {children}
     </div>

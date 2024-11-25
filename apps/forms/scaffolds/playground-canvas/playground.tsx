@@ -34,6 +34,7 @@ import {
   DownloadIcon,
   FigmaLogoIcon,
   FileIcon,
+  GearIcon,
   OpenInNewWindowIcon,
   PlayIcon,
 } from "@radix-ui/react-icons";
@@ -42,6 +43,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
@@ -59,13 +61,22 @@ import { Badge } from "@/components/ui/badge";
 import { PlaygroundToolbar } from "./toolbar";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ThemedMonacoEditor } from "@/components/monaco";
 
 export default function CanvasPlayground() {
   const [exampleid, setExampleId] = useState<string>("helloworld.grida");
   const playDialog = useDialogState("play", {
     refreshkey: true,
   });
+  const settingsDialog = useDialogState("settings");
   const importFromFigmaDialog = useDialogState("import-from-figma");
   const importFromJson = useDialogState("import-from-json", {
     refreshkey: true,
@@ -135,6 +146,7 @@ export default function CanvasPlayground() {
 
   return (
     <main className="w-screen h-screen overflow-hidden">
+      <SettingsDialog {...settingsDialog} />
       <ImportFromGridaFileJsonDialog
         key={importFromJson.refreshkey}
         {...importFromJson}
@@ -199,6 +211,13 @@ export default function CanvasPlayground() {
                         <DownloadIcon className="w-3.5 h-3.5 me-2 inline-block" />
                         Save as .grida
                       </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={settingsDialog.openDialog}>
+                        <GearIcon className="me-2" />
+                        Settings
+                      </DropdownMenuItem>
+
+                      <DropdownMenuSeparator />
                       <DropdownMenuSub>
                         <DropdownMenuSubTrigger>
                           <OpenInNewWindowIcon className="me-2" />
@@ -254,11 +273,14 @@ export default function CanvasPlayground() {
           </div>
           <aside className="h-full">
             <SidebarRoot side="right">
-              <div className="h-10">
-                <Button variant="ghost" onClick={playDialog.openDialog}>
-                  <PlayIcon />
-                </Button>
+              <div className="p-2">
+                <div className="flex justify-end">
+                  <Button variant="ghost" onClick={playDialog.openDialog}>
+                    <PlayIcon />
+                  </Button>
+                </div>
               </div>
+              <hr />
               <FontFamilyListProvider fonts={fonts}>
                 {state.selected_node_id && <SelectedNodeProperties />}
               </FontFamilyListProvider>
@@ -306,5 +328,30 @@ function ExampleSwitch({
         </SelectGroup>
       </SelectContent>
     </Select>
+  );
+}
+
+function SettingsDialog(props: React.ComponentProps<typeof Dialog>) {
+  return (
+    <Dialog {...props}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Playground Settings</DialogTitle>
+        </DialogHeader>
+        <hr />
+        <div>
+          <ThemedMonacoEditor width="100%" height={400} />
+        </div>
+        <hr />
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="outline">Close</Button>
+          </DialogClose>
+          <DialogClose asChild>
+            <Button>Save</Button>
+          </DialogClose>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

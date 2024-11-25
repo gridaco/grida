@@ -64,7 +64,10 @@ export function SelectedNodeProperties() {
   assert(selectedNode);
 
   // - color - variables
-  const { selected_node_id } = document;
+  const {
+    selected_node_id,
+    document: { root_id },
+  } = document;
 
   const node = useNode(selected_node_id!);
   const computed = useComputedNode(selected_node_id!);
@@ -121,6 +124,7 @@ export function SelectedNodeProperties() {
   const is_text = type === "text";
   const is_image = type === "image";
   const is_container = type === "container";
+  const is_root = selected_node_id === root_id;
   const is_flex_container = is_container && layout === "flex";
   const is_stylable = type !== "template_instance";
 
@@ -186,7 +190,7 @@ export function SelectedNodeProperties() {
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>
-      <SidebarSection className="border-b pb-4">
+      <SidebarSection hidden={is_root} className="border-b pb-4">
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Position</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
@@ -382,57 +386,53 @@ export function SelectedNodeProperties() {
                 onValueChange={selectedNode.layout}
               />
             </PropertyLine>
-            {is_flex_container && (
-              <>
-                <PropertyLine>
-                  <PropertyLineLabel>Direction</PropertyLineLabel>
-                  <AxisControl
-                    value={direction!}
-                    onValueChange={selectedNode.direction}
-                  />
-                </PropertyLine>
-                {/* <PropertyLine>
+            <PropertyLine hidden={!is_flex_container}>
+              <PropertyLineLabel>Direction</PropertyLineLabel>
+              <AxisControl
+                value={direction!}
+                onValueChange={selectedNode.direction}
+              />
+            </PropertyLine>
+            {/* <PropertyLine>
               <PropertyLineLabel>Wrap</PropertyLineLabel>
               <FlexWrapControl
                 value={flexWrap as any}
                 onValueChange={selectedNode.flexWrap}
               />
             </PropertyLine> */}
-                <PropertyLine>
-                  <PropertyLineLabel>Distribute</PropertyLineLabel>
-                  <MainAxisAlignmentControl
-                    value={mainAxisAlignment!}
-                    onValueChange={selectedNode.mainAxisAlignment}
-                  />
-                </PropertyLine>
-                <PropertyLine>
-                  <PropertyLineLabel>Align</PropertyLineLabel>
-                  <CrossAxisAlignmentControl
-                    value={crossAxisAlignment!}
-                    direction={direction}
-                    onValueChange={selectedNode.crossAxisAlignment}
-                  />
-                </PropertyLine>
-                <PropertyLine>
-                  <PropertyLineLabel>Gap</PropertyLineLabel>
-                  <GapControl
-                    value={{
-                      mainAxisGap: mainAxisGap!,
-                      crossAxisGap: crossAxisGap!,
-                    }}
-                    onValueChange={selectedNode.gap}
-                  />
-                </PropertyLine>
-              </>
-            )}
-            {/* <PropertyLine>
+            <PropertyLine hidden={!is_flex_container}>
+              <PropertyLineLabel>Distribute</PropertyLineLabel>
+              <MainAxisAlignmentControl
+                value={mainAxisAlignment!}
+                onValueChange={selectedNode.mainAxisAlignment}
+              />
+            </PropertyLine>
+            <PropertyLine hidden={!is_flex_container}>
+              <PropertyLineLabel>Align</PropertyLineLabel>
+              <CrossAxisAlignmentControl
+                value={crossAxisAlignment!}
+                direction={direction}
+                onValueChange={selectedNode.crossAxisAlignment}
+              />
+            </PropertyLine>
+            <PropertyLine hidden={!is_flex_container}>
+              <PropertyLineLabel>Gap</PropertyLineLabel>
+              <GapControl
+                value={{
+                  mainAxisGap: mainAxisGap!,
+                  crossAxisGap: crossAxisGap!,
+                }}
+                onValueChange={selectedNode.gap}
+              />
+            </PropertyLine>
+            {/* <PropertyLine hidden={!is_flex_container}>
               <PropertyLineLabel>Margin</PropertyLineLabel>
               <MarginControl
                 value={margin as any}
                 onValueChange={selectedNode.margin}
               />
             </PropertyLine> */}
-            <PropertyLine>
+            <PropertyLine hidden={!is_flex_container}>
               <PropertyLineLabel>Padding</PropertyLineLabel>
               <PaddingControl
                 value={padding!}
