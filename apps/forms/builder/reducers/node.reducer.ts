@@ -289,6 +289,11 @@ export default function nodeReducer<
         draft.textAlignVertical = action.textAlignVertical;
         break;
       }
+      case "node/change/maxlength": {
+        assert(draft.type === "text");
+        draft.maxLength = action.maxlength;
+        break;
+      }
 
       default: {
         throw new Error(

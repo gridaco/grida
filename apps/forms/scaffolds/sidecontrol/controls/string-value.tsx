@@ -27,11 +27,13 @@ export function StringValueControl({
   value,
   onValueChange,
   placeholder = "Value",
+  maxlength,
   disabled,
 }: {
   value?: Tokens.StringValueExpression | null;
   onValueChange?: (value?: Tokens.StringValueExpression) => void;
   placeholder?: string;
+  maxlength?: number;
   disabled?: boolean;
 }) {
   // const schema = useMemo(
@@ -48,6 +50,7 @@ export function StringValueControl({
         value={value ?? undefined}
         onValueChange={onValueChange}
         placeholder={placeholder}
+        maxLength={maxlength}
         disabled={disabled}
       />
       <DropdownMenu>
@@ -162,11 +165,13 @@ function Control({
   value,
   onValueChange,
   placeholder,
+  maxLength,
   disabled,
 }: {
   value?: Tokens.StringValueExpression;
   onValueChange?: (value: Tokens.StringValueExpression) => void;
   placeholder?: string;
+  maxLength?: number;
   disabled?: boolean;
 }) {
   if (Tokens.is.templateExpression(value)) {
@@ -180,6 +185,7 @@ function Control({
       value={value as string}
       onValueChange={onValueChange}
       placeholder={placeholder}
+      maxLength={maxLength}
       disabled={disabled}
     />
   );
@@ -189,11 +195,13 @@ function StringLiteralControl({
   value,
   onValueChange,
   placeholder,
+  maxLength,
   disabled,
 }: {
   value?: string;
   onValueChange?: (value: string) => void;
   placeholder?: string;
+  maxLength?: number;
   disabled?: boolean;
 }) {
   return (
@@ -202,6 +210,7 @@ function StringLiteralControl({
       value={(value as string) || ""}
       placeholder={placeholder}
       disabled={disabled}
+      maxLength={maxLength}
       onChange={(e) => onValueChange?.(e.target.value)}
       className={WorkbenchUI.inputVariants({ size: "sm" })}
     />

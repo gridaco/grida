@@ -57,6 +57,7 @@ import { UserDataControl } from "./controls/x-userdata";
 import { LengthControl } from "./controls/length";
 import { LayoutControl } from "./controls/layout";
 import { AxisControl } from "./controls/axis";
+import { MaxlengthControl } from "./controls/maxlength";
 
 export function SelectedNodeProperties() {
   const { state: document, selectedNode } = useDocument();
@@ -95,6 +96,7 @@ export function SelectedNodeProperties() {
     letterSpacing,
     textAlign,
     textAlignVertical,
+    maxLength,
 
     //
     border,
@@ -289,6 +291,7 @@ export function SelectedNodeProperties() {
             <PropertyLineLabel>Value</PropertyLineLabel>
             <StringValueControl
               value={node.text}
+              maxlength={maxLength}
               onValueChange={selectedNode.text}
             />
           </PropertyLine>
@@ -339,6 +342,14 @@ export function SelectedNodeProperties() {
             <TextAlignVerticalControl
               value={textAlignVertical}
               onValueChange={selectedNode.textAlignVertical}
+            />
+          </PropertyLine>
+          <PropertyLine>
+            <PropertyLineLabel>Max Length</PropertyLineLabel>
+            <MaxlengthControl
+              value={maxLength}
+              placeholder={(computed.text as any as string)?.length?.toString()}
+              onValueChange={selectedNode.maxLength}
             />
           </PropertyLine>
         </SidebarMenuSectionContent>

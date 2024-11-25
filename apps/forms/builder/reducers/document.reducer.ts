@@ -488,6 +488,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
     case "node/change/lineHeight":
     case "node/change/textAlign":
     case "node/change/textAlignVertical":
+    case "node/change/maxlength":
     case "node/change/text": {
       const { node_id } = <NodeChangeAction>action;
       return produce(state, (draft) => {

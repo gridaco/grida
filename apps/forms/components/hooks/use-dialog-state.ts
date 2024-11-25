@@ -13,12 +13,14 @@ export function useDialogState<T = any>(
     if (config?.refreshkey) setKey((prev) => prev + 1);
   };
   const closeDialog = () => setOpen(false);
+  const toggleOpen = () => setOpen((prev) => !prev);
 
   return {
     refreshkey: name + key,
     open,
     setOpen,
     onOpenChange: setOpen,
+    toggleOpen,
     openDialog,
     closeDialog,
     data,

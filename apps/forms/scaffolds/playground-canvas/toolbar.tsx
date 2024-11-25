@@ -54,19 +54,21 @@ function useTextRewriteDemo() {
 
   const generate = useGenerate();
 
-  const textNodes: Array<grida.program.nodes.TextNode> = useMemo(() => {
+  const editableTextNodes: Array<grida.program.nodes.TextNode> = useMemo(() => {
     return Object.values(state.document.nodes).filter(
-      (node) => node.type === "text"
+      (node) => node.type === "text" && node.locked === false
     ) as Array<grida.program.nodes.TextNode>;
   }, [state.document.nodes]);
 
   const action = useCallback(
     (userprompt: string) => {
       setLoading(true);
-      const payload = textNodes.map((node) => {
+      const payload = editableTextNodes.map((node) => {
         return {
           id: node.id,
           text: node.text,
+          maxLength: node.maxLength,
+          usermetadata: node.userdata,
         };
       });
 
@@ -100,7 +102,7 @@ ${userprompt}
         }
       );
     },
-    [changeNodeText, generate, textNodes]
+    [changeNodeText, generate, editableTextNodes]
   );
 
   return { action, delta, loading };

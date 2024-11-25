@@ -577,13 +577,17 @@ function RichTextEditorSurface({ node_id }: { node_id: string }) {
           onPointerDown={stopPropagation}
           onKeyDown={stopPropagation}
           value={node.text as string}
+          maxLength={node.maxLength}
           onChange={(e) => {
             change.text(e.target.value);
           }}
-          className="m-0 p-0 border-none outline-none appearance-none bg-transparent w-full h-full overflow-hidden whitespace-nowrap"
-          style={grida.program.css.toReactTextStyle(
-            node as grida.program.nodes.TextNode
-          )}
+          className="m-0 p-0 border-none outline-none appearance-none bg-transparent h-full overflow-hidden"
+          style={{
+            width: "calc(100% + 1px)",
+            ...grida.program.css.toReactTextStyle(
+              node as grida.program.nodes.TextNode
+            ),
+          }}
         />
       </div>
     </div>

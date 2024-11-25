@@ -732,6 +732,7 @@ export namespace grida {
               fontWeight,
               letterSpacing,
               lineHeight,
+              fill: fill,
             }),
           };
         }
@@ -767,6 +768,7 @@ export namespace grida {
         | "fontWeight"
         | "letterSpacing"
         | "lineHeight"
+        | "color"
       > {
         const {
           textAlign,
@@ -777,6 +779,7 @@ export namespace grida {
           fontWeight,
           letterSpacing,
           lineHeight,
+          fill,
         } = style;
 
         return {
@@ -790,6 +793,7 @@ export namespace grida {
           letterSpacing: letterSpacing,
           fontSize: fontSize,
           fontWeight: fontWeight,
+          color: fill ? toFillString(fill) : undefined,
         };
       }
 
@@ -1539,6 +1543,8 @@ export namespace grida {
            * @default "top"
            */
           textAlignVertical: cg.TextAlignVertical;
+
+          fill?: cg.Paint;
         }
 
         export interface ITextValue {
@@ -1556,6 +1562,14 @@ export namespace grida {
            * - by the standard implementation, within the visual editor context, when user attempts to updates the literal value (where it is a `props.[x]` and `props.[x] is literal`), it should actually update the `props.[x]` value, not this `text` literal value.
            */
           text: Tokens.StringValueExpression | null;
+
+          /**
+           * set max length of the text value
+           * - Note: max length is ignored when set programmatically
+           * - Note: this is a experimental feature and its behaviour is not strictly defined
+           * @see https://json-schema.org/understanding-json-schema/reference/string#length
+           */
+          maxLength?: number;
         }
 
         export interface IProperties {

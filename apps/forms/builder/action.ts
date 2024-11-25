@@ -307,6 +307,10 @@ interface ITextNodeChangeLetterSpacingAction extends INodeID {
   letterSpacing: grida.program.nodes.TextNode["letterSpacing"];
 }
 
+interface ITextNodeChangeMaxlengthAction extends INodeID {
+  maxlength: number | undefined;
+}
+
 //
 interface INodeChangePaddingAction extends INodeID {
   padding: grida.program.nodes.i.IPadding["padding"];
@@ -389,6 +393,7 @@ export type NodeChangeAction =
     } & ITextNodeChangeTextAlignVerticalAction)
   | ({ type: "node/change/lineHeight" } & ITextNodeChangeLineHeightAction)
   | ({ type: "node/change/letterSpacing" } & ITextNodeChangeLetterSpacingAction)
+  | ({ type: "node/change/maxlength" } & ITextNodeChangeMaxlengthAction)
   //
   | ({
       type: "node/change/padding";

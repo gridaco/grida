@@ -527,6 +527,19 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
     [dispatch]
   );
 
+  const changeTextNodeMaxlength = useCallback(
+    (node_id: string, maxlength: number | undefined) => {
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/maxlength",
+          node_id: node_id,
+          maxlength,
+        });
+      });
+    },
+    [dispatch]
+  );
+
   //
   const changeNodeBorder = useCallback(
     (node_id: string, border: grida.program.css.Border | undefined) => {
@@ -689,6 +702,7 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
       changeTextNodeTextAlignVertical,
       changeTextNodeLineHeight,
       changeTextNodeLetterSpacing,
+      changeTextNodeMaxlength,
       changeContainerNodePadding,
       changeContainerNodeLayout,
       changeFlexContainerNodeDirection,
@@ -772,6 +786,8 @@ export function useNodeAction(node_id: string | undefined) {
         nodeActions.changeTextNodeLineHeight(node_id, value),
       letterSpacing: (value: grida.program.nodes.TextNode["letterSpacing"]) =>
         nodeActions.changeTextNodeLetterSpacing(node_id, value),
+      maxLength: (value: number | undefined) =>
+        nodeActions.changeTextNodeMaxlength(node_id, value),
 
       // border
       border: (value: grida.program.css.Border | undefined) =>
