@@ -230,6 +230,12 @@ export default function CanvasPlayground() {
                               IO Figma
                             </DropdownMenuItem>
                           </Link>
+                          <Link href="/canvas/tools/io-pdf" target="_blank">
+                            <DropdownMenuItem>
+                              <OpenInNewWindowIcon className="me-2" />
+                              IO PDF
+                            </DropdownMenuItem>
+                          </Link>
                         </DropdownMenuSubContent>
                       </DropdownMenuSub>
                     </DropdownMenuContent>
