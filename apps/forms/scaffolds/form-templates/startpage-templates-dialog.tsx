@@ -104,8 +104,8 @@ export function BrowseStartPageTemplatesDialog({
                 }}
               >
                 <StandaloneDocumentEditor
+                  editable={false}
                   initial={{
-                    editable: false,
                     templates: {
                       [template.name]: FormStartPage.getTemplate(template.name),
                     },

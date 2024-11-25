@@ -35,6 +35,7 @@ import {
   FigmaLogoIcon,
   FileIcon,
   OpenInNewWindowIcon,
+  PlayIcon,
 } from "@radix-ui/react-icons";
 import KeyboardInputOverlay from "@/builder/devtools/keyboard-input-overlay";
 import {
@@ -57,9 +58,14 @@ import { HelpFab } from "@/scaffolds/help/editor-help-fab";
 import { Badge } from "@/components/ui/badge";
 import { PlaygroundToolbar } from "./toolbar";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 export default function CanvasPlayground() {
   const [exampleid, setExampleId] = useState<string>("helloworld.grida");
+  const playDialog = useDialogState("play", {
+    refreshkey: true,
+  });
   const importFromFigmaDialog = useDialogState("import-from-figma");
   const importFromJson = useDialogState("import-from-json", {
     refreshkey: true,
@@ -157,7 +163,18 @@ export default function CanvasPlayground() {
           });
         }}
       />
-      <StandaloneDocumentEditor initial={state} dispatch={dispatch}>
+      <Dialog {...playDialog} key={playDialog.refreshkey}>
+        <DialogContent className="max-w-screen h-screen">
+          <StandaloneDocumentEditor editable={false} initial={state}>
+            <div className="w-full h-full flex items-center justify-center overflow-hidden">
+              <div className="rounded shadow-lg border overflow-hidden select-none">
+                <StandaloneDocumentEditorContent />
+              </div>
+            </div>
+          </StandaloneDocumentEditor>
+        </DialogContent>
+      </Dialog>
+      <StandaloneDocumentEditor editable initial={state} dispatch={dispatch}>
         <div className="flex w-full h-full">
           <aside>
             <SidebarRoot>
@@ -237,6 +254,11 @@ export default function CanvasPlayground() {
           </div>
           <aside className="h-full">
             <SidebarRoot side="right">
+              <div className="h-10">
+                <Button variant="ghost" onClick={playDialog.openDialog}>
+                  <PlayIcon />
+                </Button>
+              </div>
               <FontFamilyListProvider fonts={fonts}>
                 {state.selected_node_id && <SelectedNodeProperties />}
               </FontFamilyListProvider>

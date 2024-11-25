@@ -51,6 +51,7 @@ function CurrentPageCanvas() {
     case "site/dev-collection":
       return (
         <StandaloneDocumentEditor
+          editable
           initial={document}
           dispatch={documentDispatch}
         >

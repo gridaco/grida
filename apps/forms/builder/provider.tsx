@@ -35,21 +35,23 @@ const DocumentDispatcherContext = createContext<DocumentDispatcher>(__noop);
 
 export function StandaloneDocumentEditor({
   initial,
+  editable,
   dispatch,
   children,
 }: React.PropsWithChildren<{
-  initial: IDocumentEditorInit;
+  editable: boolean;
+  initial: Omit<IDocumentEditorInit, "editable">;
   dispatch?: DocumentDispatcher;
 }>) {
   useEffect(() => {
-    if (initial.editable && !dispatch) {
+    if (editable && !dispatch) {
       console.error(
         "DocumentEditor: dispatch is required when readonly is false"
       );
     }
-  }, [initial.editable, dispatch]);
+  }, [editable, dispatch]);
 
-  const __dispatch = initial.editable ? dispatch ?? __noop : __noop;
+  const __dispatch = editable ? dispatch ?? __noop : __noop;
 
   const rootnode = initial.document.nodes[initial.document.root_id];
   assert(rootnode, "root node is not found");
@@ -63,7 +65,9 @@ export function StandaloneDocumentEditor({
   }, [rootnode]);
 
   return (
-    <DocumentContext.Provider value={initDocumentEditorState(initial)}>
+    <DocumentContext.Provider
+      value={initDocumentEditorState({ ...initial, editable })}
+    >
       <DocumentDispatcherContext.Provider value={__dispatch}>
         <ProgramDataContextHost>
           <DataProvider data={{ props: shallowRootProps }}>
