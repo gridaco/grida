@@ -22,6 +22,8 @@ import type {
   DocumentEditorNodePointerEnterAction,
   DocumentEditorNodePointerLeaveAction,
   NodeChangeAction,
+  NodeOrderAction,
+  NodeToggleAction,
   TemplateNodeOverrideChangeAction,
 } from "../action";
 import type { IDocumentEditorState, SurfaceRaycastTargeting } from "../types";
@@ -478,6 +480,7 @@ export default function reducer<S extends IDocumentEditorState>(
     case "node/change/style":
     case "node/change/fontSize":
     case "node/change/fontWeight":
+    case "node/change/fontFamily":
     case "node/change/letterSpacing":
     case "node/change/lineHeight":
     case "node/change/textAlign":
@@ -488,20 +491,68 @@ export default function reducer<S extends IDocumentEditorState>(
         const node = documentquery.__getNodeById(draft, node_id);
         assert(node, `node not found with node_id: "${node_id}"`);
         draft.document.nodes[node_id] = nodeReducer(node, action);
-      });
-    }
-    case "node/change/fontFamily": {
-      const { node_id } = <NodeChangeAction>action;
-      return produce(state, (draft) => {
-        const node = documentquery.__getNodeById(draft, node_id);
-        assert(node, `node not found with node_id: "${node_id}"`);
-        draft.document.nodes[node_id] = nodeReducer(node, action);
 
-        if (action.fontFamily) {
-          draft.googlefonts.push({ family: action.fontFamily });
+        // font family specific hook
+        if (action.type === "node/change/fontFamily") {
+          if (action.fontFamily) {
+            draft.googlefonts.push({ family: action.fontFamily });
+          }
         }
       });
     }
+    //
+    case "node/order/back":
+    case "node/order/front": {
+      const { node_id } = <NodeOrderAction>action;
+      return produce(state, (draft) => {
+        const parent_id = documentquery.getParentId(
+          draft.document_ctx,
+          node_id
+        );
+        if (!parent_id) return; // root node case
+        const parent_node: Draft<grida.program.nodes.i.IChildren> =
+          documentquery.__getNodeById(
+            draft,
+            parent_id
+          ) as grida.program.nodes.i.IChildren;
+
+        const childIndex = parent_node.children!.indexOf(node_id);
+        assert(childIndex !== -1, "node not found in children");
+
+        switch (action.type) {
+          case "node/order/back": {
+            // change the children id order - move the node_id to the first (first is the back)
+            parent_node.children!.splice(childIndex, 1);
+            parent_node.children!.unshift(node_id);
+            break;
+          }
+          case "node/order/front": {
+            // change the children id order - move the node_id to the last (last is the front)
+            parent_node.children!.splice(childIndex, 1);
+            parent_node.children!.push(node_id);
+            break;
+          }
+        }
+      });
+    }
+    //
+    case "node/toggle/locked": {
+      return produce(state, (draft) => {
+        const { node_id } = <NodeToggleAction>action;
+        const node = documentquery.__getNodeById(draft, node_id);
+        assert(node, `node not found with node_id: "${node_id}"`);
+        node.locked = !node.locked;
+      });
+    }
+    case "node/toggle/active": {
+      return produce(state, (draft) => {
+        const { node_id } = <NodeToggleAction>action;
+        const node = documentquery.__getNodeById(draft, node_id);
+        assert(node, `node not found with node_id: "${node_id}"`);
+        node.active = !node.active;
+      });
+    }
+    //
     case "document/template/override/change/*": {
       const { template_instance_node_id, action: __action } = <
         TemplateNodeOverrideChangeAction

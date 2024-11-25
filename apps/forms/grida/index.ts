@@ -319,6 +319,8 @@ export namespace grida {
 
           /**
            * Maps each node ID to an array of its child node IDs, enabling efficient downward traversal.
+           *
+           * This does NOT ensure the order of the children. when to reorder, use the `children` property in the node.
            */
           __ctx_nid_to_children_ids: Record<nodes.NodeID, nodes.NodeID[]>;
         }

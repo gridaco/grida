@@ -54,6 +54,13 @@ export namespace documentquery {
     return ancestors;
   }
 
+  export function getParentId(
+    context: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext,
+    node_id: string
+  ): string | null {
+    return context.__ctx_nid_to_parent_id[node_id] || null;
+  }
+
   /**
    * @internal
    * @param state - state or draft

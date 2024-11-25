@@ -36,6 +36,8 @@ export type BuilderAction =
   | DocumentEditorNodePointerEnterAction
   | DocumentEditorNodePointerLeaveAction
   | NodeChangeAction
+  | NodeOrderAction
+  | NodeToggleAction
   | TemplateNodeOverrideChangeAction
   | TemplateEditorSetTemplatePropsAction;
 
@@ -419,6 +421,15 @@ export type NodeChangeAction =
   | ({ type: "node/change/href" } & INodeChangeHrefAction)
   | ({ type: "node/change/target" } & INodeChangeTargetAction)
   | ({ type: "node/change/props" } & INodeChangePropsAction);
+
+export type NodeOrderAction =
+  // | ({ type: "node/order/reorder" } & INodeID &)
+  | ({ type: "node/order/back" } & INodeID)
+  | ({ type: "node/order/front" } & INodeID);
+
+export type NodeToggleAction =
+  | ({ type: "node/toggle/active" } & INodeID)
+  | ({ type: "node/toggle/locked" } & INodeID);
 
 export type TemplateNodeOverrideChangeAction = ITemplateInstanceNodeID & {
   type: "document/template/override/change/*";

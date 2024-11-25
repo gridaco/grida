@@ -139,6 +139,46 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
     [dispatch]
   );
 
+  const orderPushBack = useCallback(
+    (node_id: string) => {
+      dispatch({
+        type: "node/order/back",
+        node_id,
+      });
+    },
+    [dispatch]
+  );
+
+  const orderBringFront = useCallback(
+    (node_id: string) => {
+      dispatch({
+        type: "node/order/front",
+        node_id,
+      });
+    },
+    [dispatch]
+  );
+
+  const toggleNodeActive = useCallback(
+    (node_id: string) => {
+      dispatch({
+        type: "node/toggle/active",
+        node_id: node_id,
+      });
+    },
+    [dispatch]
+  );
+
+  const toggleNodeLocked = useCallback(
+    (node_id: string) => {
+      dispatch({
+        type: "node/toggle/locked",
+        node_id: node_id,
+      });
+    },
+    [dispatch]
+  );
+
   const pointerEnterNode = useCallback(
     (node_id: string) => {
       dispatch({
@@ -612,8 +652,12 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   return useMemo(
     () => ({
       selectNode,
+      orderPushBack,
+      orderBringFront,
       pointerEnterNode,
       pointerLeaveNode,
+      toggleNodeActive,
+      toggleNodeLocked,
       changeNodeActive,
       changeNodeLocked,
       changeNodeName,
@@ -659,6 +703,10 @@ export function useNodeAction(node_id: string | undefined) {
   return useMemo(() => {
     if (!node_id) return;
     return {
+      pushBack: () => nodeActions.orderPushBack(node_id),
+      bringFront: () => nodeActions.orderBringFront(node_id),
+      toggleLocked: () => nodeActions.toggleNodeLocked(node_id),
+      toggleActive: () => nodeActions.toggleNodeActive(node_id),
       component: (component_id: string) =>
         nodeActions.changeNodeComponent(node_id, component_id),
       text: (text?: Tokens.StringValueExpression) =>

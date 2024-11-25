@@ -8,6 +8,12 @@ import {
   SidebarMenuItemLabel,
 } from "@/components/sidebar";
 import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import {
   FrameIcon,
   BoxIcon,
   ComponentInstanceIcon,
@@ -22,14 +28,56 @@ import {
   LockOpen1Icon,
 } from "@radix-ui/react-icons";
 import { grida } from "@/grida";
+import React from "react";
+import { useNodeAction } from "@/builder/provider";
+
+function NodeHierarchyItemContextMenuWrapper({
+  node_id,
+  children,
+}: React.PropsWithChildren<{
+  node_id: string;
+}>) {
+  const change = useNodeAction(node_id)!;
+
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger>{children}</ContextMenuTrigger>
+      <ContextMenuContent>
+        {/* <ContextMenuItem onSelect={() => {}}>Copy</ContextMenuItem> */}
+        {/* <ContextMenuItem>Paste here</ContextMenuItem> */}
+        <ContextMenuItem onSelect={change.bringFront}>
+          Bring to front
+        </ContextMenuItem>
+        <ContextMenuItem onSelect={change.pushBack}>
+          Send to back
+        </ContextMenuItem>
+        <ContextMenuItem
+          onSelect={() => {
+            const n = prompt("Rename");
+            if (n) change.name(n);
+          }}
+        >
+          Rename
+        </ContextMenuItem>
+        {/* <ContextMenuItem>Add Container</ContextMenuItem> */}
+        <ContextMenuItem onSelect={change.toggleActive}>
+          Set Active/Inactive
+        </ContextMenuItem>
+        <ContextMenuItem onSelect={change.toggleLocked}>
+          Lock/Unlock
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
+  );
+}
 
 export function NodeHierarchyList() {
   const {
     state: { document, selected_node_id, hovered_node_id },
     selectNode,
     pointerEnterNode,
-    changeNodeActive,
-    changeNodeLocked,
+    toggleNodeLocked,
+    toggleNodeActive,
     getNodeDepth,
   } = useDocument();
 
@@ -44,43 +92,44 @@ export function NodeHierarchyList() {
         const hovered = hovered_node_id === n.id;
         const depth = getNodeDepth(n.id);
         return (
-          <SidebarMenuItem
-            key={n.id}
-            muted
-            hovered={hovered}
-            level={depth}
-            selected={selected}
-            onSelect={() => {
-              selectNode(n.id);
-            }}
-            icon={<NodeHierarchyItemIcon type={n.type} className="w-4 h-4" />}
-            onPointerEnter={() => {
-              pointerEnterNode(n.id);
-            }}
-            onPointerLeave={() => {
-              pointerEnterNode(n.id);
-            }}
-          >
-            <SidebarMenuItemLabel className="font-normal text-sm">
-              {n.name}
-            </SidebarMenuItemLabel>
-            <SidebarMenuItemActions>
-              <SidebarMenuItemAction
-                onClick={() => {
-                  changeNodeLocked(n.id, !n.locked);
-                }}
-              >
-                {n.locked ? <LockClosedIcon /> : <LockOpen1Icon />}
-              </SidebarMenuItemAction>
-              <SidebarMenuItemAction
-                onClick={() => {
-                  changeNodeActive(n.id, !n.active);
-                }}
-              >
-                {n.active ? <EyeOpenIcon /> : <EyeClosedIcon />}
-              </SidebarMenuItemAction>
-            </SidebarMenuItemActions>
-          </SidebarMenuItem>
+          <NodeHierarchyItemContextMenuWrapper key={n.id} node_id={n.id}>
+            <SidebarMenuItem
+              muted
+              hovered={hovered}
+              level={depth}
+              selected={selected}
+              onSelect={() => {
+                selectNode(n.id);
+              }}
+              icon={<NodeHierarchyItemIcon type={n.type} className="w-4 h-4" />}
+              onPointerEnter={() => {
+                pointerEnterNode(n.id);
+              }}
+              onPointerLeave={() => {
+                pointerEnterNode(n.id);
+              }}
+            >
+              <SidebarMenuItemLabel className="font-normal text-sm">
+                {n.name}
+              </SidebarMenuItemLabel>
+              <SidebarMenuItemActions>
+                <SidebarMenuItemAction
+                  onClick={() => {
+                    toggleNodeLocked(n.id);
+                  }}
+                >
+                  {n.locked ? <LockClosedIcon /> : <LockOpen1Icon />}
+                </SidebarMenuItemAction>
+                <SidebarMenuItemAction
+                  onClick={() => {
+                    toggleNodeActive(n.id);
+                  }}
+                >
+                  {n.active ? <EyeOpenIcon /> : <EyeClosedIcon />}
+                </SidebarMenuItemAction>
+              </SidebarMenuItemActions>
+            </SidebarMenuItem>
+          </NodeHierarchyItemContextMenuWrapper>
         );
       })}
     </>
