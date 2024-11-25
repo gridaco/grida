@@ -26,6 +26,8 @@ import {
   EyeOpenIcon,
   EyeClosedIcon,
   LockOpen1Icon,
+  ViewVerticalIcon,
+  ViewHorizontalIcon,
 } from "@radix-ui/react-icons";
 import { grida } from "@/grida";
 import React from "react";
@@ -101,7 +103,7 @@ export function NodeHierarchyList() {
               onSelect={() => {
                 selectNode(n.id);
               }}
-              icon={<NodeHierarchyItemIcon type={n.type} className="w-4 h-4" />}
+              icon={<NodeHierarchyItemIcon node={n} className="w-4 h-4" />}
               onPointerEnter={() => {
                 pointerEnterNode(n.id);
               }}
@@ -138,13 +140,21 @@ export function NodeHierarchyList() {
 
 function NodeHierarchyItemIcon({
   className,
-  type,
+  node,
 }: {
-  type: grida.program.nodes.Node["type"];
+  node: grida.program.nodes.Node;
   className?: string;
 }) {
-  switch (type) {
+  switch (node.type) {
     case "container":
+      if (node.layout === "flex") {
+        switch (node.direction) {
+          case "horizontal":
+            return <ViewVerticalIcon />;
+          case "vertical":
+            return <ViewHorizontalIcon />;
+        }
+      }
       return <FrameIcon className={className} />;
     case "image":
       return <ImageIcon className={className} />;

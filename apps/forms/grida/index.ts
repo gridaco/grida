@@ -897,7 +897,6 @@ export namespace grida {
       export function paddingToPaddingCSS(
         padding: nodes.i.IPadding["padding"]
       ): string {
-        console.log(padding);
         if (!padding) return "0";
         if (typeof padding === "number") {
           return `${padding}px`;
