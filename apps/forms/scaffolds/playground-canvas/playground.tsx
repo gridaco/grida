@@ -236,6 +236,15 @@ export default function CanvasPlayground() {
                               IO PDF
                             </DropdownMenuItem>
                           </Link>
+                          <Link
+                            href="https://github.com/gridaco/p666"
+                            target="_blank"
+                          >
+                            <DropdownMenuItem>
+                              <OpenInNewWindowIcon className="me-2" />
+                              P666 Daemon
+                            </DropdownMenuItem>
+                          </Link>
                         </DropdownMenuSubContent>
                       </DropdownMenuSub>
                     </DropdownMenuContent>

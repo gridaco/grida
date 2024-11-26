@@ -9,6 +9,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import {
@@ -37,8 +38,11 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
 
-export function exportAsImage(
+function exportAsImage(
   node_id: string,
   format: "svg" | "png",
   {
@@ -101,6 +105,83 @@ export function exportAsImage(
     fetch(dataUrl)
       .then((res) => res.blob())
       .then((blob) => saveAs(blob, filename));
+  });
+
+  toast.promise(task, {
+    loading: "Exporting...",
+    success: "Exported",
+    error: "Failed to export",
+  });
+}
+
+/**
+ * @see https://github.com/gridaco/puppeteer-666
+ */
+function checkP666(): Promise<boolean> {
+  return fetch("http://localhost:666", {
+    method: "GET",
+  })
+    .then(() => {
+      return true;
+    })
+    .catch(() => {
+      return false;
+    });
+}
+
+/**
+ * @see https://github.com/gridaco/puppeteer-666
+ */
+async function exportWithP666(
+  node_id: string,
+  format: "png" | "pdf",
+  {
+    filename = `image.${format}`,
+    // xpath,
+  }: {
+    filename?: string;
+    // xpath?: string;
+  }
+) {
+  const daemonok = await checkP666();
+  if (!daemonok) {
+    console.error(
+      "Daemon is not running on port 666. @see https://github.com/gridaco/puppeteer-666"
+    );
+    toast.error("Daemon is not running on port 666");
+    return;
+  }
+
+  const domnode = document.getElementById(node_id);
+  const html = domnode!.outerHTML;
+
+  let requrl = "";
+  switch (format) {
+    case "pdf":
+      requrl = "http://localhost:666/api/pdf";
+      break;
+    case "png":
+      requrl = "http://localhost:666/api/screenshoot";
+      break;
+  }
+
+  // this will return pdf/png file (if the daemon is running)
+  const task = fetch(requrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      html,
+      options: {
+        width: domnode!.clientWidth,
+        height: domnode!.clientHeight,
+      },
+    }),
+  }).then((res) => {
+    res.blob().then((blob) => {
+      saveAs(blob, filename);
+    });
   });
 
   toast.promise(task, {
@@ -191,7 +272,20 @@ export function ExportNodeWithHtmlToImage({
             <span className="text-ellipsis overflow-hidden">Export as ...</span>
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent side="left" align="start">
+        <DropdownMenuContent side="left" align="start" collisionPadding={16}>
+          <DropdownMenuLabel>
+            <Badge variant="outline" className="text-xs">
+              BETA
+            </Badge>
+            <br />
+            <div className="w-40">
+              <small className="leading-tight font-normal text-muted-foreground">
+                &quot;Export as&quot; is currently in beta and may produce
+                inconsistent outputs.
+              </small>
+            </div>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={() => onExport("png")}>
             PNG
           </DropdownMenuItem>
@@ -217,9 +311,17 @@ function AdvancedExportDialog({
   node_id: string;
   defaultName: string;
 }) {
-  const [format, setFormat] = React.useState<"png" | "svg" | "archive">("png");
+  const [backend, setBackend] = React.useState<"canvas" | "p666">("canvas");
+  const [format, setFormat] = React.useState<"png" | "svg" | "archive" | "pdf">(
+    "png"
+  );
   const [name, setName] = React.useState<string>(defaultName);
   const [xpath, setXPath] = React.useState<string>("");
+
+  const options = {
+    canvas: ["png", "svg", "archive"],
+    p666: ["png", "pdf"],
+  };
 
   const onExport = () => {
     switch (format) {
@@ -232,6 +334,11 @@ function AdvancedExportDialog({
         break;
       case "archive":
         exportAsArchive(node_id);
+        break;
+      case "pdf":
+        exportWithP666(node_id, format, {
+          filename: name + "." + format,
+        });
         break;
     }
   };
@@ -248,6 +355,32 @@ function AdvancedExportDialog({
         <hr />
         <div className="grid gap-8 my-4">
           <div className="grid gap-2">
+            <Label>Mode</Label>
+            <ToggleGroup
+              type="single"
+              value={backend}
+              onValueChange={(v) => v && setBackend(v as any)}
+              className="w-min"
+            >
+              <ToggleGroupItem value="canvas">Canvas</ToggleGroupItem>
+              <ToggleGroupItem value="p666">Daemon</ToggleGroupItem>
+            </ToggleGroup>
+            {backend === "p666" && (
+              <div className="text-xs">
+                To use daemon, run{" "}
+                <Link
+                  href="https://github.com/gridaco/puppeteer-666"
+                  target="_blank"
+                >
+                  p666
+                </Link>{" "}
+                on your machine
+                <br />
+                <code>{">"} npx p666</code>
+              </div>
+            )}
+          </div>
+          <div className="grid gap-2">
             <Label>Name</Label>
             <Input
               placeholder="filename"
@@ -262,9 +395,28 @@ function AdvancedExportDialog({
                 <SelectValue placeholder="format" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="png">PNG</SelectItem>
-                <SelectItem value="svg">SVG</SelectItem>
-                <SelectItem value="archive">
+                <SelectItem
+                  value="png"
+                  disabled={!options[backend].includes("png")}
+                >
+                  PNG
+                </SelectItem>
+                <SelectItem
+                  value="svg"
+                  disabled={!options[backend].includes("svg")}
+                >
+                  SVG
+                </SelectItem>
+                <SelectItem
+                  value="pdf"
+                  disabled={!options[backend].includes("pdf")}
+                >
+                  PDF
+                </SelectItem>
+                <SelectItem
+                  value="archive"
+                  disabled={!options[backend].includes("archive")}
+                >
                   Archive - for testing & custom rendering
                 </SelectItem>
               </SelectContent>
@@ -288,6 +440,7 @@ function AdvancedExportDialog({
             <Textarea
               placeholder="e.g. //*[not(@data-grida-node-type='text')]"
               value={xpath}
+              disabled={backend === "p666"}
               onChange={(e) => setXPath(e.target.value)}
             />
           </div>
