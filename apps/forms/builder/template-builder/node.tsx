@@ -157,6 +157,7 @@ export function NodeElement<P extends Record<string, any>>({
 const fillings = {
   text: "color",
   container: "background",
+  iframe: "background",
   image: "background",
   vector: "none",
   rectangle: "none",

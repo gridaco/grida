@@ -87,6 +87,17 @@ export default function initialNode(
         ...seed,
       } satisfies grida.program.nodes.ContainerNode;
     }
+    case "iframe": {
+      return {
+        ...base,
+        ...position,
+        ...styles,
+        fill: white,
+        type: "iframe",
+        cornerRadius: 0,
+        ...seed,
+      } satisfies grida.program.nodes.HTMLIFrameNode;
+    }
     case "ellipse": {
       return {
         ...base,

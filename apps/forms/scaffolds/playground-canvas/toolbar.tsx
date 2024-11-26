@@ -1,5 +1,6 @@
 import { generate } from "@/app/(dev)/canvas/actions";
 import { useDocument, useEventTarget, type CursorMode } from "@/builder";
+import { OpenAILogo } from "@/components/logos/openai";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -13,11 +14,15 @@ import { useMetaEnter } from "@/hooks/use-meta-enter";
 import {
   BorderSolidIcon,
   BoxIcon,
+  ChatBubbleIcon,
   CircleIcon,
   CursorArrowIcon,
   FrameIcon,
   ImageIcon,
   LightningBoltIcon,
+  MagicWandIcon,
+  MixIcon,
+  PlusIcon,
   TextIcon,
 } from "@radix-ui/react-icons";
 import { PopoverClose } from "@radix-ui/react-popover";
@@ -151,11 +156,31 @@ export function PlaygroundToolbar() {
         <Popover>
           <PopoverTrigger asChild>
             <Button variant="ghost" className="px-3">
-              <LightningBoltIcon />
+              <OpenAILogo className="w-4 h-4" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent side="top" sideOffset={16} align="end">
+          <PopoverContent
+            side="top"
+            sideOffset={16}
+            align="end"
+            className="w-96"
+          >
             <Generate />
+          </PopoverContent>
+        </Popover>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="ghost" className="px-3">
+              <MixIcon />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent
+            side="top"
+            sideOffset={16}
+            align="center"
+            className="w-96"
+          >
+            <AddResources />
           </PopoverContent>
         </Popover>
       </ToggleGroup>
@@ -179,6 +204,7 @@ function Generate() {
         value={userprompt}
         onChange={(e) => setUserPrompt(e.target.value)}
         placeholder="Enter a prompt"
+        className="min-h-20"
       />
       <div className="flex justify-end">
         <PopoverClose asChild>
@@ -193,6 +219,26 @@ function Generate() {
           </Button>
         </PopoverClose>
       </div>
+    </div>
+  );
+}
+
+function AddResources() {
+  // resources
+  // images
+  // icons
+  // shapes
+  // Scribbles
+  //
+
+  // types
+  // - image
+  // - vector (mono path)
+  // - composite node
+  return (
+    <div className="flex flex-col gap-2">
+      Add
+      <Button>iframe</Button>
     </div>
   );
 }

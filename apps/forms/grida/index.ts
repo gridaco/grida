@@ -1208,6 +1208,7 @@ export namespace grida {
         | TextNode
         | ImageNode
         | ContainerNode
+        | HTMLIFrameNode
         | VectorNode
         | LineNode
         | RectangleNode
@@ -1717,6 +1718,34 @@ export namespace grida {
           i.IFlexContainer {
         readonly type: "container";
         //
+      }
+
+      /**
+       * <iframe> Node.
+       *
+       * The use and rendering of iframe node is limited by the environment.
+       */
+      export interface HTMLIFrameNode
+        extends i.IBaseNode,
+          i.ISceneNode,
+          i.ICSSStylable,
+          i.IRectangleCorner {
+        readonly type: "iframe";
+        /**
+         * The URL of the page to embed.
+         *
+         * when `srcdoc` is set, this value is ignored
+         *
+         * @see https://developer.mozilla.org/en-US/docs/Web/HTML/Element/iframe#src
+         */
+        src?: Tokens.StringValueExpression;
+
+        /**
+         * Inline HTML to embed, overriding the src attribute.
+         *
+         * @see https://developer.mozilla.org/en-US/docs/Web/HTML/Element/iframe#srcdoc
+         */
+        srcdoc?: Tokens.StringValueExpression;
       }
 
       /**
