@@ -8,6 +8,7 @@ import {
   SidebarSectionHeaderLabel,
 } from "@/components/sidebar";
 import { SelectedNodeProperties } from "@/scaffolds/sidecontrol/sidecontrol-selected-node";
+import { __TMP_ComponentProperties } from "@/scaffolds/sidecontrol/sidecontrol-component-properties";
 import { NodeHierarchyList } from "@/scaffolds/sidebar/sidebar-node-hierarchy-list";
 import {
   StandaloneDocumentEditor,
@@ -297,7 +298,11 @@ export default function CanvasPlayground() {
               </div>
               <hr />
               <FontFamilyListProvider fonts={fonts}>
-                {state.selected_node_id && <SelectedNodeProperties />}
+                {state.selected_node_id ? (
+                  <SelectedNodeProperties />
+                ) : (
+                  <__TMP_ComponentProperties />
+                )}
               </FontFamilyListProvider>
             </SidebarRoot>
           </aside>

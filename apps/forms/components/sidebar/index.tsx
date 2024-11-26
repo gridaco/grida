@@ -261,7 +261,23 @@ export function SidebarSectionHeaderLabel({
   return (
     <span
       className={cn(
-        "text-xs font-normal text-muted-foreground group-hover:text-accent-foreground",
+        "text-xs text-start font-normal text-muted-foreground overflow-hidden text-ellipsis group-hover:text-accent-foreground",
+        className
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+export function SidebarSectionHeaderActions({
+  children,
+  className,
+}: React.PropsWithChildren<{ className?: string }>) {
+  return (
+    <span
+      className={cn(
+        "invisible text-xs font-normal text-muted-foreground group-hover:visible",
         className
       )}
     >
