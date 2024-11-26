@@ -239,7 +239,7 @@ export function exportAsArchive(node_id: string) {
   //
 }
 
-export function ExportNodeWithHtmlToImage({
+export function ExportNodeControl({
   node_id,
   name,
 }: {

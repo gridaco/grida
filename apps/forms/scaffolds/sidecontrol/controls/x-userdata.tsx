@@ -34,7 +34,7 @@ export function UserDataControl({
 }: {
   node_id: string;
   value: unknown | undefined;
-  onValueCommit: (value: unknown | undefined) => void;
+  onValueCommit?: (value: unknown | undefined) => void;
 }) {
   const [txt, setTxt] = useState<string | undefined>(
     value ? JSON.stringify(value, null, 2) : ""
@@ -50,7 +50,7 @@ export function UserDataControl({
     if (!valid) return;
     const res = validate(txt);
     if (res) {
-      onValueCommit(res);
+      onValueCommit?.(res);
     } else {
       toast.error("Invalid User Data Format");
     }

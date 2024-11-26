@@ -35,7 +35,7 @@ import { SrcControl } from "./controls/src";
 import { BoxFitControl } from "./controls/box-fit";
 import { PropsControl } from "./controls/props";
 import { TargetBlankControl } from "./controls/target";
-import { ExportNodeWithHtmlToImage } from "./controls/export";
+import { ExportNodeControl } from "./controls/export";
 
 import { useComputedNode, useDocument, useNode } from "@/builder";
 import assert from "assert";
@@ -511,7 +511,7 @@ export function SelectedNodeProperties() {
         </SidebarSectionHeaderItem>
         <SidebarMenuSectionContent className="space-y-2">
           <PropertyLine>
-            <ExportNodeWithHtmlToImage node_id={id} name={name} />
+            <ExportNodeControl node_id={id} name={name} />
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>
