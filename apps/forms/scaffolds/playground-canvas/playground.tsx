@@ -71,6 +71,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ThemedMonacoEditor } from "@/components/monaco";
+import Image from "next/image";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useLocalStorage } from "@uidotdev/usehooks";
+import { CANVAS_PLAYGROUND_LOCALSTORAGE_PREFERENCES_BASE_AI_PROMPT_KEY } from "./k";
 
 export default function CanvasPlayground() {
   const [exampleid, setExampleId] = useState<string>("helloworld.grida");
@@ -195,7 +199,14 @@ export default function CanvasPlayground() {
                 <span className="px-2">
                   <DropdownMenu>
                     <DropdownMenuTrigger>
-                      <GridaLogo className="inline-block w-4 h-4 me-2" />
+                      <Image
+                        src="/private/demo-logo.png"
+                        alt="Logo"
+                        height={25}
+                        width={135}
+                        className="inline-block h-4 w-auto me-2"
+                      />
+                      {/* <GridaLogo className="inline-block w-4 h-4 me-2" /> */}
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start">
                       <DropdownMenuItem
@@ -251,7 +262,8 @@ export default function CanvasPlayground() {
                     </DropdownMenuContent>
                   </DropdownMenu>
                   <span className="font-bold text-xs">
-                    Canvas Playground
+                    {/* Canvas Playground */}
+                    Admin
                     <Badge variant="outline" className="ms-2 text-xs">
                       BETA
                     </Badge>
@@ -278,13 +290,13 @@ export default function CanvasPlayground() {
                   <StandaloneDocumentEditorContent />
                 </div>
               </div>
-              <div className="absolute bottom-20 left-0 right-0 flex items-center justify-center z-50 pointer-events-none">
-                <PlaygroundToolbar />
-              </div>
-              <div className="fixed bottom-20 left-10 flex items-center justify-center z-50 pointer-events-none">
-                <KeyboardInputOverlay />
-              </div>
             </CanvasEventTarget>
+            <div className="absolute bottom-20 left-0 right-0 flex items-center justify-center z-50 pointer-events-none">
+              <PlaygroundToolbar />
+            </div>
+            <div className="fixed bottom-20 left-10 flex items-center justify-center z-50 pointer-events-none">
+              <KeyboardInputOverlay />
+            </div>
             <DevtoolsPanel />
           </div>
           <aside className="h-full">
@@ -352,6 +364,11 @@ function ExampleSwitch({
 }
 
 function SettingsDialog(props: React.ComponentProps<typeof Dialog>) {
+  const [aiSettings, setAiSettings] = useLocalStorage<string | undefined>(
+    CANVAS_PLAYGROUND_LOCALSTORAGE_PREFERENCES_BASE_AI_PROMPT_KEY,
+    undefined
+  );
+
   return (
     <Dialog {...props}>
       <DialogContent>
@@ -359,9 +376,22 @@ function SettingsDialog(props: React.ComponentProps<typeof Dialog>) {
           <DialogTitle>Playground Settings</DialogTitle>
         </DialogHeader>
         <hr />
-        <div>
-          <ThemedMonacoEditor width="100%" height={400} />
-        </div>
+        <Tabs defaultValue="ai">
+          <TabsList>
+            <TabsTrigger value="ai">AI</TabsTrigger>
+          </TabsList>
+          <TabsContent value="ai">
+            <div>
+              <ThemedMonacoEditor
+                value={aiSettings}
+                onChange={setAiSettings}
+                width="100%"
+                height={400}
+                language="txt"
+              />
+            </div>
+          </TabsContent>
+        </Tabs>
         <hr />
         <DialogFooter>
           <DialogClose asChild>

@@ -26,8 +26,10 @@ import {
   TextIcon,
 } from "@radix-ui/react-icons";
 import { PopoverClose } from "@radix-ui/react-popover";
+import { useLocalStorage } from "@uidotdev/usehooks";
 import { readStreamableValue } from "ai/rsc";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CANVAS_PLAYGROUND_LOCALSTORAGE_PREFERENCES_BASE_AI_PROMPT_KEY } from "./k";
 
 function useGenerate() {
   const streamGeneration = useCallback(
@@ -56,6 +58,10 @@ function useTextRewriteDemo() {
   const { state, changeNodeText } = useDocument();
   const [delta, setDelta] = useState<{} | undefined>();
   const [loading, setLoading] = useState(false);
+  const [aiSettings] = useLocalStorage<string | undefined>(
+    CANVAS_PLAYGROUND_LOCALSTORAGE_PREFERENCES_BASE_AI_PROMPT_KEY,
+    undefined
+  );
 
   const generate = useGenerate();
 
@@ -85,6 +91,19 @@ Generate new text content for the following text nodes:
 ${JSON.stringify(payload, null, 2)}
 \`\`\`
 
+${
+  aiSettings
+    ? `
+------
+Additional developers provided prompt:
+\`\`\`
+${aiSettings}
+\`\`\`
+`
+    : ""
+}
+
+------
 Additional user provided prompt:
 \`\`\`
 ${userprompt}
