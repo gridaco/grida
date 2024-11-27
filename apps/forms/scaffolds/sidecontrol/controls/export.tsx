@@ -425,7 +425,7 @@ function AdvancedExportDialog({
         </div>
         <div className="grid gap-4">
           <div className="grid gap-2">
-            <Label>XPath Filter</Label>
+            <Label>Filter</Label>
             <Collapsible>
               <CollapsibleTrigger>
                 <small>
@@ -437,6 +437,24 @@ function AdvancedExportDialog({
                 <GridaXPathHelpArticle />
               </CollapsibleContent>
             </Collapsible>
+            <Select
+              value={xpath || undefined}
+              onValueChange={(v) => setXPath(v)}
+              disabled={backend === "p666"}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Choose preset" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="//*[not(@data-grida-node-type='text')]">
+                  Exclude Text
+                </SelectItem>
+                {/* TODO: inspect me */}
+                <SelectItem value="//*[not(@data-grida-node-type='image')]">
+                  Exclude Image
+                </SelectItem>
+              </SelectContent>
+            </Select>
             <Textarea
               placeholder="e.g. //*[not(@data-grida-node-type='text')]"
               value={xpath}
