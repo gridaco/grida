@@ -388,7 +388,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
     // #endregion [html backend] canvas event target
 
     // #region [universal backend] canvas event target
-    case "document/canvas/enter-content-edit-mode": {
+    case "document/canvas/content-edit-mode/try-enter": {
       if (!state.selected_node_id) return state;
       const { type: nodeType } = documentquery.__getNodeById(
         state,
@@ -400,6 +400,11 @@ export default function documentReducer<S extends IDocumentEditorState>(
         draft.surface_content_edit_mode = "text";
       });
       break;
+    }
+    case "document/canvas/content-edit-mode/try-exit": {
+      return produce(state, (draft) => {
+        draft.surface_content_edit_mode = false;
+      });
     }
     case "document/canvas/cursor-mode": {
       const { cursor_mode } = action;

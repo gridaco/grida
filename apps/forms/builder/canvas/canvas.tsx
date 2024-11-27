@@ -98,10 +98,12 @@ export function CanvasOverlay() {
       },
       onPointerDown: ({ event }) => {
         if (event.defaultPrevented) return;
+        if (content_edit_mode === "text") return;
         pointerDown(event);
       },
       onPointerUp: ({ event }) => {
         if (event.defaultPrevented) return;
+        if (content_edit_mode === "text") return;
         pointerUp(event);
       },
       onDoubleClick: ({ event }) => {
@@ -251,7 +253,7 @@ function Marquee({
 /**
  * returns the relative transform of the node surface relative to the portal
  */
-function useNodeSurfaceTransfrom(node_id: string) {
+function useNodeSurfaceTransfrom_v1(node_id: string) {
   const __rect_fallback = useMemo(() => new DOMRect(0, 0, 0, 0), []);
   const { getNodeAbsoluteRotation } = useDocument();
   const portal = useCanvasOverlayPortal();
@@ -284,6 +286,70 @@ function useNodeSurfaceTransfrom(node_id: string) {
     width: width,
     height: height,
   };
+}
+
+/**
+ * returns the relative transform of the node surface relative to the portal
+ * TODO: Not tested with the performance
+ */
+function useNodeSurfaceTransfrom(node_id: string) {
+  const __rect_fallback = useMemo(() => new DOMRect(0, 0, 0, 0), []);
+  const { getNodeAbsoluteRotation } = useDocument();
+  const portal = useCanvasOverlayPortal();
+  const node_element = useNodeDomElement(node_id);
+
+  const [transform, setTransform] = useState({
+    top: 0,
+    left: 0,
+    transform: "",
+    width: 0,
+    height: 0,
+  });
+
+  useEffect(() => {
+    if (!node_element || !portal) return;
+
+    const updateTransform = () => {
+      const portal_rect = portal.getBoundingClientRect();
+      const node_element_bounding_rect =
+        node_element.getBoundingClientRect() ?? __rect_fallback;
+
+      const centerX =
+        node_element_bounding_rect.left +
+        node_element_bounding_rect.width / 2 -
+        portal_rect.left;
+      const centerY =
+        node_element_bounding_rect.top +
+        node_element_bounding_rect.height / 2 -
+        portal_rect.top;
+
+      const width = node_element.clientWidth;
+      const height = node_element.clientHeight;
+
+      const absolute_rotation = getNodeAbsoluteRotation(node_id);
+
+      setTransform({
+        top: centerY,
+        left: centerX,
+        transform: `translate(-50%, -50%) rotate(${absolute_rotation ?? 0}deg)`,
+        width: width,
+        height: height,
+      });
+    };
+
+    // Observe size changes
+    const resizeObserver = new ResizeObserver(() => updateTransform());
+    resizeObserver.observe(node_element);
+
+    // Trigger initial update
+    updateTransform();
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [node_element, portal, getNodeAbsoluteRotation, node_id, __rect_fallback]);
+
+  return transform;
 }
 
 function NodeOverlay({
@@ -537,6 +603,7 @@ function RichTextEditorSurface({ node_id }: { node_id: string }) {
   const change = useNodeAction(node_id)!;
   const transform = useNodeSurfaceTransfrom(node_id);
   const node = useNode(node_id!);
+  const { tryExitContentEditMode } = useEventTarget();
 
   useEffect(() => {
     // select all text
@@ -574,12 +641,17 @@ function RichTextEditorSurface({ node_id }: { node_id: string }) {
         /> */}
         <textarea
           ref={inputref}
-          autoFocus
           // TODO: only supports literal text value
           onPointerDown={stopPropagation}
-          onKeyDown={stopPropagation}
           value={node.text as string}
           maxLength={node.maxLength}
+          onBlur={tryExitContentEditMode}
+          onKeyDown={(e) => {
+            stopPropagation(e);
+            if (e.key === "Escape") {
+              inputref.current?.blur();
+            }
+          }}
           onChange={(e) => {
             change.text(e.target.value);
           }}

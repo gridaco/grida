@@ -1084,7 +1084,13 @@ export function useEventTarget() {
    */
   const tryEnterContentEditMode = useCallback(() => {
     dispatch({
-      type: "document/canvas/enter-content-edit-mode",
+      type: "document/canvas/content-edit-mode/try-enter",
+    });
+  }, [dispatch]);
+
+  const tryExitContentEditMode = useCallback(() => {
+    dispatch({
+      type: "document/canvas/content-edit-mode/try-exit",
     });
   }, [dispatch]);
 
@@ -1258,6 +1264,7 @@ export function useEventTarget() {
       pointerUp,
       //
       tryEnterContentEditMode,
+      tryExitContentEditMode,
       //
       dragStart,
       dragEnd,
@@ -1294,6 +1301,7 @@ export function useEventTarget() {
     pointerUp,
     //
     tryEnterContentEditMode,
+    tryExitContentEditMode,
     //
     dragStart,
     dragEnd,

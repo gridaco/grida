@@ -1,3 +1,5 @@
+"use client";
+
 import { generate } from "@/app/(dev)/canvas/actions";
 import { useDocument, useEventTarget, type CursorMode } from "@/builder";
 import { OpenAILogo } from "@/components/logos/openai";

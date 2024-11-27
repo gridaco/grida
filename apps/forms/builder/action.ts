@@ -29,6 +29,7 @@ export type BuilderAction =
   | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDrag
   //
   | DocumentEditorEnterContentEditMode
+  | DocumentEditorExitContentEditMode
   //
   | DocumentEditorCursorMode
   //
@@ -113,7 +114,11 @@ export type DocumentEditorCanvasEventTargetHtmlBackendDragEnd = {
 };
 
 export type DocumentEditorEnterContentEditMode = {
-  type: "document/canvas/enter-content-edit-mode";
+  type: "document/canvas/content-edit-mode/try-enter";
+};
+
+export type DocumentEditorExitContentEditMode = {
+  type: "document/canvas/content-edit-mode/try-exit";
 };
 
 export type DocumentEditorCursorMode = {
