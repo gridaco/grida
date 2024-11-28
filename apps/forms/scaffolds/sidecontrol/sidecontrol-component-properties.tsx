@@ -23,12 +23,32 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { useDocument, useNode } from "@/builder";
+import { grida } from "@/grida";
+import toast from "react-hot-toast";
 
 export function __TMP_ComponentProperties() {
-  const [properties, setProperties] = useState<any[]>([]);
+  const {
+    state: {
+      document: { root_id },
+    },
+    schemaDefineProperty,
+    schemaRenameProperty,
+    schemaDeleteProperty,
+    schemaUpdateProperty,
+  } = useDocument();
+  const root = useNode(root_id);
+  const { properties } = root;
+  const keys = Object.keys(properties ?? {});
+  // const [properties, setProperties] = useState<any[]>([]);
 
   const addProperty = () => {
-    setProperties([...properties, {}]);
+    if (root.type !== "component") {
+      toast.error("Only component can have properties");
+      return;
+    }
+    // setProperties([...properties, {}]);
+    schemaDefineProperty();
   };
 
   return (
@@ -56,16 +76,35 @@ export function __TMP_ComponentProperties() {
         </SidebarMenuSectionContent>
       </SidebarSection>
       <div className="divide-y">
-        {properties.map((property, i) => (
+        {keys.map((key, i) => {
+          const property = properties![key];
+          return (
+            <NewPropertyString
+              key={i}
+              definition={property}
+              name={key}
+              onNameChange={(newName) => {
+                schemaRenameProperty(key, newName);
+              }}
+              onDefinitionChange={(value) => {
+                schemaUpdateProperty(key, value);
+              }}
+              onRemove={() => {
+                schemaDeleteProperty(key);
+              }}
+            />
+          );
+        })}
+        {/* {properties?.map((property, i) => (
           <NewPropertyString
             key={i}
             onRemove={() => {
               setProperties(properties.filter((_, index) => index !== i));
             }}
           />
-        ))}
+        ))} */}
       </div>
-      {properties.length > 0 && (
+      {keys.length > 0 && (
         <>
           <hr />
           <SidebarSection className="flex justify-end items-center gap-2 py-4">
@@ -80,11 +119,30 @@ export function __TMP_ComponentProperties() {
   );
 }
 
-function NewPropertyString({ onRemove }: { onRemove?: () => void }) {
-  // following json schema + userdata
-  const [type, setType] = useState<string>("string");
-  const [name, setName] = useState<string>("");
+function NewPropertyString({
+  name,
+  definition,
+  onRemove,
+  onDefinitionChange,
+  onNameChange,
+}: {
+  name?: string;
+  definition: grida.program.schema.PropertyDefinition;
+  onDefinitionChange?: (value: grida.program.schema.PropertyDefinition) => void;
+  onNameChange?: (value: string) => void;
+  onRemove?: () => void;
+}) {
+  const { type, default: defaultValue } = definition;
 
+  const setName = (value: string) => {
+    onNameChange?.(value);
+  };
+
+  const onDefinitionLineChange = (key: string, value: string) => {
+    onDefinitionChange?.({ ...definition, [key]: value });
+  };
+
+  // following json schema + userdata
   // - type: "string"
   // - name: string
   // - default: string
@@ -99,7 +157,7 @@ function NewPropertyString({ onRemove }: { onRemove?: () => void }) {
   // - userdata: object
 
   return (
-    <Collapsible defaultOpen>
+    <Collapsible>
       <SidebarSection className="mt-2">
         <CollapsibleTrigger className="w-full">
           <SidebarSectionHeaderItem>
@@ -139,7 +197,9 @@ function NewPropertyString({ onRemove }: { onRemove?: () => void }) {
               <PropertyLineLabel>Type *</PropertyLineLabel>
               <PropertyEnum
                 value={type}
-                onValueChange={setType}
+                onValueChange={(v) => {
+                  onDefinitionLineChange("type", v);
+                }}
                 enum={["string", "number", "boolean", "image", "color"]}
               />
             </PropertyLine>
@@ -164,7 +224,13 @@ function NewPropertyString({ onRemove }: { onRemove?: () => void }) {
             <PropertySeparator />
             <PropertyLine className="grid">
               <PropertyLineLabel>Default</PropertyLineLabel>
-              <PropertyTextarea placeholder="Enter Default Value" />
+              <PropertyTextarea
+                value={defaultValue}
+                onChange={(e) => {
+                  onDefinitionLineChange("default", e.target.value);
+                }}
+                placeholder="Enter Default Value"
+              />
             </PropertyLine>
           </SidebarMenuSectionContent>
         </SidebarSection>

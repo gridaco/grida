@@ -70,6 +70,7 @@ export function SelectedNodeProperties() {
   } = document;
 
   const node = useNode(selected_node_id!);
+  const root = useNode(root_id);
   const computed = useComputedNode(selected_node_id!);
   const {
     id,
@@ -117,6 +118,8 @@ export function SelectedNodeProperties() {
     // x
     userdata,
   } = node;
+
+  const { properties: root_properties } = root;
 
   // const istemplate = type?.startsWith("templates/");
   const is_instance = type === "instance";
@@ -297,6 +300,13 @@ export function SelectedNodeProperties() {
               value={node.text}
               maxlength={maxLength}
               onValueChange={selectedNode.text}
+              schema={
+                root_properties
+                  ? {
+                      properties: root_properties,
+                    }
+                  : undefined
+              }
             />
           </PropertyLine>
           <PropertyLine>

@@ -1213,6 +1213,7 @@ export namespace grida {
         | LineNode
         | RectangleNode
         | EllipseNode
+        | ComponentNode
         | InstanceNode
         | TemplateInstanceNode;
 
@@ -1848,6 +1849,21 @@ export namespace grida {
           i.IFill,
           i.IEffects {
         type: "ellipse";
+      }
+
+      //
+      export interface ComponentNode
+        extends i.IBaseNode,
+          i.ISceneNode,
+          i.ICSSStylable,
+          i.IHrefable,
+          i.IExpandable,
+          i.IChildren,
+          i.IRectangleCorner,
+          i.IPadding,
+          i.IFlexContainer,
+          i.IProperties {
+        readonly type: "component";
       }
 
       export interface InstanceNode

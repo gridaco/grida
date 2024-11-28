@@ -151,6 +151,7 @@ export default function initialNode(
       } satisfies grida.program.nodes.LineNode;
     }
     case "vector":
+    case "component":
     case "instance":
     case "template_instance": {
       throw new Error(`${type} insertion not supported`);

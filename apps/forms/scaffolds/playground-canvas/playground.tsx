@@ -199,14 +199,7 @@ export default function CanvasPlayground() {
                 <span className="px-2">
                   <DropdownMenu>
                     <DropdownMenuTrigger>
-                      <Image
-                        src="/private/demo-logo.png"
-                        alt="Logo"
-                        height={25}
-                        width={135}
-                        className="inline-block h-4 w-auto me-2"
-                      />
-                      {/* <GridaLogo className="inline-block w-4 h-4 me-2" /> */}
+                      <GridaLogo className="inline-block w-4 h-4 me-2" />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start">
                       <DropdownMenuItem
@@ -262,8 +255,7 @@ export default function CanvasPlayground() {
                     </DropdownMenuContent>
                   </DropdownMenu>
                   <span className="font-bold text-xs">
-                    {/* Canvas Playground */}
-                    Admin
+                    Canvas Playground
                     <Badge variant="outline" className="ms-2 text-xs">
                       BETA
                     </Badge>
@@ -341,6 +333,7 @@ function ExampleSwitch({
     "poster-01.grida",
     "resume-01.grida",
     "event-page-01.grida",
+    "component-01.grida",
   ];
   return (
     <Select defaultValue={value} onValueChange={onValueChange}>

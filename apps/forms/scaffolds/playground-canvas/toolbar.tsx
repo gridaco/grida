@@ -67,6 +67,8 @@ function useTextRewriteDemo() {
 
   const generate = useGenerate();
 
+  // TODO: check if text is child of a component or instance.
+
   const editableTextNodes: Array<grida.program.nodes.TextNode> = useMemo(() => {
     return Object.values(state.document.nodes).filter(
       (node) => node.type === "text" && node.locked === false

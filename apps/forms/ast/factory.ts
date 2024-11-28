@@ -2,6 +2,33 @@ import { Access } from "./access";
 import { Tokens } from "./tokens";
 
 export namespace Factory {
+  export namespace strfy {
+    export function stringValueExpression(
+      exp: Tokens.StringValueExpression
+    ): string {
+      if (typeof exp === "string") {
+        return exp;
+      } else if (Tokens.is.propertyAccessExpression(exp)) {
+        return exp.expression.join(".");
+      } else if (Tokens.is.templateExpression(exp)) {
+        return exp.templateSpans
+          .map((span) => {
+            switch (span.kind) {
+              case "StringLiteral":
+                return span.text;
+              case "Identifier":
+                return span.name;
+              case "PropertyAccessExpression":
+              default:
+                return "";
+            }
+          })
+          .join("");
+      }
+      return "";
+    }
+  }
+
   export function createStringLiteral(text: string): Tokens.StringLiteral {
     return {
       kind: "StringLiteral",

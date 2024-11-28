@@ -28,6 +28,7 @@ import {
   LockOpen1Icon,
   ViewVerticalIcon,
   ViewHorizontalIcon,
+  Component1Icon,
 } from "@radix-ui/react-icons";
 import { grida } from "@/grida";
 import React from "react";
@@ -156,6 +157,8 @@ function NodeHierarchyItemIcon({
         }
       }
       return <FrameIcon className={className} />;
+    case "component":
+      return <Component1Icon className={className} />;
     case "image":
       return <ImageIcon className={className} />;
     case "text":

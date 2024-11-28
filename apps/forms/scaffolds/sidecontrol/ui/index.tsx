@@ -69,21 +69,31 @@ export function PropertyTextarea({
   );
 }
 
+type EnumItem = string | { label: string; value: string };
+
 export function PropertyEnum({
   enum: enums,
+  placeholder,
   ...props
-}: React.ComponentProps<typeof Select> & { enum: string[] }) {
+}: React.ComponentProps<typeof Select> & {
+  enum: EnumItem[];
+  placeholder?: string;
+}) {
   return (
     <Select {...props}>
       <SelectTrigger className={cn(WorkbenchUI.inputVariants({ size: "sm" }))}>
-        <SelectValue />
+        <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
-        {enums.map((e) => (
-          <SelectItem key={e} value={e}>
-            {e}
-          </SelectItem>
-        ))}
+        {enums.map((e) => {
+          const value = typeof e === "string" ? e : e.value;
+          const label = typeof e === "string" ? e : e.label;
+          return (
+            <SelectItem key={value} value={value}>
+              {label}
+            </SelectItem>
+          );
+        })}
       </SelectContent>
     </Select>
   );

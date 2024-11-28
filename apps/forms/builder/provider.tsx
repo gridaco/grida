@@ -56,6 +56,20 @@ export function StandaloneDocumentEditor({
   const rootnode = initial.document.nodes[initial.document.root_id];
   assert(rootnode, "root node is not found");
   const shallowRootProps = useMemo(() => {
+    if (rootnode.type === "component") {
+      // transform property definitions to props with default values
+      const virtual_props_from_definition = Object.entries(
+        rootnode.properties
+      ).reduce(
+        (acc, [key, value]) => {
+          acc[key] = value.default;
+          return acc;
+        },
+        {} as Record<string, Tokens.StringValueExpression>
+      );
+
+      return virtual_props_from_definition;
+    }
     if (rootnode.type === "template_instance") {
       const defaultProps = initial.templates![rootnode.template_id].default;
       return Object.assign({}, defaultProps, rootnode.props);
@@ -902,6 +916,46 @@ export function useDocument() {
     [state.document_ctx, getNodeById]
   );
 
+  const schemaDefineProperty = useCallback(
+    (name?: string, definition?: grida.program.schema.PropertyDefinition) => {
+      dispatch({
+        type: "document/schema/property/define",
+        name: name,
+        definition: definition,
+      });
+    },
+    [dispatch]
+  );
+
+  const schemaRenameProperty = useCallback(
+    (name: string, newName: string) => {
+      dispatch({
+        type: "document/schema/property/rename",
+        name,
+        newName,
+      });
+    },
+    [dispatch]
+  );
+
+  const schemaUpdateProperty = useCallback(
+    (name: string, definition: grida.program.schema.PropertyDefinition) => {
+      dispatch({
+        type: "document/schema/property/update",
+        name: name,
+        definition: definition,
+      });
+    },
+    [dispatch]
+  );
+
+  const schemaDeleteProperty = useCallback(
+    (name: string) => {
+      dispatch({ type: "document/schema/property/delete", name: name });
+    },
+    [dispatch]
+  );
+
   const selectedNodeActions = useNodeAction(selected_node_id);
   const selectedNode = selected_node_id ? selectedNodeActions : undefined;
 
@@ -914,6 +968,10 @@ export function useDocument() {
       getNodeDepth,
       getNodeAbsoluteRotation,
       ...nodeActions,
+      schemaDefineProperty,
+      schemaRenameProperty,
+      schemaUpdateProperty,
+      schemaDeleteProperty,
     };
   }, [
     state,
@@ -923,6 +981,10 @@ export function useDocument() {
     getNodeDepth,
     getNodeAbsoluteRotation,
     nodeActions,
+    schemaDefineProperty,
+    schemaRenameProperty,
+    schemaUpdateProperty,
+    schemaDeleteProperty,
   ]);
 }
 

@@ -16,6 +16,7 @@ import { EllipseWidget } from "./ellipse";
 import { SVGLineWidget } from "./line";
 export namespace TemplateBuilderWidgets {
   export const container = ContainerWidget;
+  export const component = ContainerWidget; // TODO:
   // export const Component = ComponentWidget;
   export const flex = FlexWidget;
   // export const Grid = GridWidget;

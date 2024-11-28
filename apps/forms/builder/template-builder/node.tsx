@@ -59,6 +59,7 @@ export function NodeElement<P extends Record<string, any>>({
       case "vector":
       case "line":
       case "rectangle":
+      case "component":
       case "ellipse": {
         return TemplateBuilderWidgets[node.type];
       }
@@ -157,6 +158,7 @@ export function NodeElement<P extends Record<string, any>>({
 const fillings = {
   text: "color",
   container: "background",
+  component: "background",
   iframe: "background",
   image: "background",
   vector: "none",

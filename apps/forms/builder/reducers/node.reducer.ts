@@ -104,6 +104,7 @@ export default function nodeReducer<
         assert(
           draft.type === "rectangle" ||
             draft.type === "container" ||
+            draft.type === "component" ||
             draft.type === "image",
           "node type does not support cornerRadius"
         );
@@ -142,7 +143,8 @@ export default function nodeReducer<
             draft.type === "rectangle" ||
             draft.type === "ellipse" ||
             draft.type === "text" ||
-            draft.type === "container"
+            draft.type === "container" ||
+            draft.type === "component"
         );
         switch (action.fill.type) {
           case "linear_gradient":
@@ -163,7 +165,7 @@ export default function nodeReducer<
           // draft.type === "rectangle" ||
           // draft.type === "ellipse" ||
           // draft.type === "text" ||
-          draft.type === "container"
+          draft.type === "container" || draft.type === "component"
         );
         draft.border = action.border;
         break;
@@ -174,12 +176,12 @@ export default function nodeReducer<
         break;
       }
       case "node/change/padding": {
-        assert(draft.type === "container");
+        assert(draft.type === "container" || draft.type === "component");
         draft.padding = action.padding;
         break;
       }
       case "node/change/layout": {
-        assert(draft.type === "container");
+        assert(draft.type === "container" || draft.type === "component");
         assert(action.layout, "layout is required");
         draft.layout = action.layout;
         if (action.layout === "flex") {
@@ -194,25 +196,25 @@ export default function nodeReducer<
         break;
       }
       case "node/change/direction": {
-        assert(draft.type === "container");
+        assert(draft.type === "container" || draft.type === "component");
         assert(action.direction, "direction is required");
         draft.direction = action.direction;
         break;
       }
       case "node/change/mainAxisAlignment": {
-        assert(draft.type === "container");
+        assert(draft.type === "container" || draft.type === "component");
         assert(action.mainAxisAlignment, "mainAxisAlignment is required");
         draft.mainAxisAlignment = action.mainAxisAlignment;
         break;
       }
       case "node/change/crossAxisAlignment": {
-        assert(draft.type === "container");
+        assert(draft.type === "container" || draft.type === "component");
         assert(action.crossAxisAlignment, "crossAxisAlignment is required");
         draft.crossAxisAlignment = action.crossAxisAlignment;
         break;
       }
       case "node/change/gap": {
-        assert(draft.type === "container");
+        assert(draft.type === "container" || draft.type === "component");
         assert(
           typeof action.gap === "number" ||
             typeof action.gap.mainAxisGap === "number",
@@ -228,13 +230,13 @@ export default function nodeReducer<
         break;
       }
       case "node/change/mainAxisGap": {
-        assert(draft.type === "container");
+        assert(draft.type === "container" || draft.type === "component");
         assert(typeof action.mainAxisGap === "number", "invalid gap value");
         draft.mainAxisGap = action.mainAxisGap;
         break;
       }
       case "node/change/crossAxisGap": {
-        assert(draft.type === "container");
+        assert(draft.type === "container" || draft.type === "component");
         assert(typeof action.crossAxisGap === "number", "invalid gap value");
         draft.crossAxisGap = action.crossAxisGap;
         break;

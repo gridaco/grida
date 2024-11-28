@@ -22,6 +22,8 @@ import { Badge } from "@/components/ui/badge";
 import { Factory } from "@/ast/factory";
 import PropertyAccessDropdownMenu from "./context/variable";
 import PropertyTypeIcon from "@/components/property-type-icon";
+import { StringValuePropsPropertyAccessExpressionControl } from "./string-value-props-property-access-expression";
+import { grida } from "@/grida";
 
 export function StringValueControl({
   value,
@@ -29,12 +31,16 @@ export function StringValueControl({
   placeholder = "Value",
   maxlength,
   disabled,
+  schema,
 }: {
   value?: Tokens.StringValueExpression | null;
   onValueChange?: (value?: Tokens.StringValueExpression) => void;
   placeholder?: string;
   maxlength?: number;
   disabled?: boolean;
+  schema?: {
+    properties: grida.program.schema.Properties;
+  };
 }) {
   // const schema = useMemo(
   //   () =>
@@ -67,6 +73,23 @@ export function StringValueControl({
           side="bottom"
           className="max-w-sm overflow-hidden min-w-96"
         >
+          {schema && (
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <PropertyTypeIcon type="object" className="me-2 w-4 h-4" />
+                props
+              </DropdownMenuSubTrigger>
+              <DropdownMenuPortal>
+                <DropdownMenuSubContent>
+                  <StringValuePropsPropertyAccessExpressionControl
+                    value={value}
+                    onValueChange={onValueChange}
+                    schema={schema}
+                  />
+                </DropdownMenuSubContent>
+              </DropdownMenuPortal>
+            </DropdownMenuSub>
+          )}
           {/* TODO: */}
           <PropertyAccessDropdownMenu
             asSubmenu

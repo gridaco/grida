@@ -40,7 +40,9 @@ export type BuilderAction =
   | NodeOrderAction
   | NodeToggleAction
   | TemplateNodeOverrideChangeAction
-  | TemplateEditorSetTemplatePropsAction;
+  | TemplateEditorSetTemplatePropsAction
+  //
+  | SchemaAction;
 
 type Vector2 = [number, number];
 
@@ -449,4 +451,35 @@ export type TemplateNodeOverrideChangeAction = ITemplateInstanceNodeID & {
 export interface TemplateEditorSetTemplatePropsAction {
   type: "document/template/set/props";
   data: Record<string, any>;
+}
+
+// === WIP ===
+
+export type SchemaAction =
+  | DocumentSchemaDefinePropertyAction
+  | DocumentSchemaDeletePropertyAction
+  | DocumentSchemaRenamePropertyAction
+  | DocumentSchemaUpdatePropertyAction;
+
+export interface DocumentSchemaDefinePropertyAction {
+  type: "document/schema/property/define";
+  name?: string;
+  definition?: grida.program.schema.PropertyDefinition;
+}
+
+export interface DocumentSchemaUpdatePropertyAction {
+  type: "document/schema/property/update";
+  name: string;
+  definition: grida.program.schema.PropertyDefinition;
+}
+
+export interface DocumentSchemaRenamePropertyAction {
+  type: "document/schema/property/rename";
+  name: string;
+  newName: string;
+}
+
+export interface DocumentSchemaDeletePropertyAction {
+  type: "document/schema/property/delete";
+  name: string;
 }
