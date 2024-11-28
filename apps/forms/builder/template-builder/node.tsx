@@ -56,8 +56,10 @@ export function NodeElement<P extends Record<string, any>>({
       case "container":
       case "image":
       case "text":
-      case "svg":
+      case "vector":
+      case "line":
       case "rectangle":
+      case "component":
       case "ellipse": {
         return TemplateBuilderWidgets[node.type];
       }
@@ -87,7 +89,7 @@ export function NodeElement<P extends Record<string, any>>({
     text: computed.text,
     props: computed.props,
     src: computed.src,
-    svg: node.svg,
+    paths: node.paths,
     opacity: node.opacity,
     zIndex: DEFAULT_ZINDEX ?? node.zIndex,
     position: DEFAULT_POSITION ?? node.position,
@@ -127,6 +129,7 @@ export function NodeElement<P extends Record<string, any>>({
           ...props,
           ...({
             ["data-grida-node-id"]: node_id,
+            ["data-grida-node-locked"]: node.locked,
             ["data-grida-node-type"]: node.type,
             ["data-dev-editor-selected"]: selected,
             ["data-dev-editor-hovered"]: hovered,
@@ -134,10 +137,17 @@ export function NodeElement<P extends Record<string, any>>({
           style: {
             ...grida.program.css.toReactCSSProperties(node, {
               fill: fillings[node.type],
+              hasTextStyle: node.type === "text",
             }),
             // hard override user-select
             userSelect: document.editable ? "none" : undefined,
-          },
+            // hide this node when in surface edit mode
+            visibility: selected
+              ? document.surface_content_edit_mode
+                ? "hidden"
+                : undefined
+              : undefined,
+          } satisfies React.CSSProperties,
         } satisfies grida.program.document.IComputedNodeReactRenderProps<any>,
         computedchildren
       )}
@@ -148,12 +158,15 @@ export function NodeElement<P extends Record<string, any>>({
 const fillings = {
   text: "color",
   container: "background",
+  component: "background",
+  iframe: "background",
   image: "background",
-  svg: "none",
+  vector: "none",
   rectangle: "none",
   ellipse: "none",
   template_instance: "none",
   instance: "none",
+  line: "none",
 } as const;
 
 function HrefWrapper({

@@ -212,9 +212,12 @@ export const SidebarMenuItem = React.forwardRef(function SidebarMenuItem(
 
 export function SidebarMenuItemLabel({
   children,
-}: React.PropsWithChildren<{}>) {
+  className,
+}: React.PropsWithChildren<{ className?: string }>) {
   return (
-    <span className="text-ellipsis overflow-hidden cursor-default">
+    <span
+      className={cn("text-ellipsis overflow-hidden cursor-default", className)}
+    >
       {children}
     </span>
   );
@@ -253,9 +256,31 @@ export function SidebarSectionHeaderItem({
 
 export function SidebarSectionHeaderLabel({
   children,
-}: React.PropsWithChildren<{}>) {
+  className,
+}: React.PropsWithChildren<{ className?: string }>) {
   return (
-    <span className="text-xs font-normal text-muted-foreground group-hover:text-accent-foreground">
+    <span
+      className={cn(
+        "text-xs text-start font-normal text-muted-foreground overflow-hidden text-ellipsis group-hover:text-accent-foreground",
+        className
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+export function SidebarSectionHeaderActions({
+  children,
+  className,
+}: React.PropsWithChildren<{ className?: string }>) {
+  return (
+    <span
+      className={cn(
+        "invisible text-xs font-normal text-muted-foreground group-hover:visible",
+        className
+      )}
+    >
       {children}
     </span>
   );

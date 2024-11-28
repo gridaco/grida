@@ -345,6 +345,7 @@ _005.definition = {
       fontWeight: 400,
       fontSize: 24,
       textAlign: "left",
+      textAlignVertical: "top",
       textDecoration: "none",
       text: Factory.createPropertyAccessExpression(["props", "title"]),
       zIndex: 0,

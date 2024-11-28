@@ -5,14 +5,17 @@ export function GapControl({
   value,
   onValueChange,
 }: {
-  value?: number;
-  onValueChange?: (value?: number) => void;
+  value: { mainAxisGap: number; crossAxisGap: number };
+  onValueChange?: (
+    value: number | { mainAxisGap: number; crossAxisGap: number }
+  ) => void;
 }) {
   return (
     <Input
       type="number"
-      value={value}
-      placeholder="inherit"
+      // TODO: individual gap control
+      value={value.mainAxisGap === value.crossAxisGap ? value.mainAxisGap : ""}
+      placeholder="gap"
       step={1}
       className={WorkbenchUI.inputVariants({ size: "sm" })}
       onChange={(e) => {

@@ -1,7 +1,18 @@
 "use client";
 
 import { useDocument } from "@/builder";
-import { SidebarMenuItem, SidebarMenuItemLabel } from "@/components/sidebar";
+import {
+  SidebarMenuItem,
+  SidebarMenuItemAction,
+  SidebarMenuItemActions,
+  SidebarMenuItemLabel,
+} from "@/components/sidebar";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import {
   FrameIcon,
   BoxIcon,
@@ -10,14 +21,67 @@ import {
   TextIcon,
   TransformIcon,
   CircleIcon,
+  LockOpen2Icon,
+  LockClosedIcon,
+  EyeOpenIcon,
+  EyeClosedIcon,
+  LockOpen1Icon,
+  ViewVerticalIcon,
+  ViewHorizontalIcon,
+  Component1Icon,
 } from "@radix-ui/react-icons";
 import { grida } from "@/grida";
+import React from "react";
+import { useNodeAction } from "@/builder/provider";
+
+function NodeHierarchyItemContextMenuWrapper({
+  node_id,
+  children,
+}: React.PropsWithChildren<{
+  node_id: string;
+}>) {
+  const change = useNodeAction(node_id)!;
+
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger>{children}</ContextMenuTrigger>
+      <ContextMenuContent>
+        {/* <ContextMenuItem onSelect={() => {}}>Copy</ContextMenuItem> */}
+        {/* <ContextMenuItem>Paste here</ContextMenuItem> */}
+        <ContextMenuItem onSelect={change.bringFront}>
+          Bring to front
+        </ContextMenuItem>
+        <ContextMenuItem onSelect={change.pushBack}>
+          Send to back
+        </ContextMenuItem>
+        <ContextMenuItem
+          onSelect={() => {
+            const n = prompt("Rename");
+            if (n) change.name(n);
+          }}
+        >
+          Rename
+        </ContextMenuItem>
+        {/* <ContextMenuItem>Add Container</ContextMenuItem> */}
+        <ContextMenuItem onSelect={change.toggleActive}>
+          Set Active/Inactive
+        </ContextMenuItem>
+        <ContextMenuItem onSelect={change.toggleLocked}>
+          Lock/Unlock
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
+  );
+}
 
 export function NodeHierarchyList() {
   const {
     state: { document, selected_node_id, hovered_node_id },
     selectNode,
     pointerEnterNode,
+    toggleNodeLocked,
+    toggleNodeActive,
+    getNodeDepth,
   } = useDocument();
 
   // TODO: need nested nodes for templates
@@ -29,26 +93,46 @@ export function NodeHierarchyList() {
         const n = document.nodes[id];
         const selected = selected_node_id === n.id;
         const hovered = hovered_node_id === n.id;
+        const depth = getNodeDepth(n.id);
         return (
-          <SidebarMenuItem
-            key={n.id}
-            muted
-            hovered={hovered}
-            level={1}
-            selected={selected}
-            onSelect={() => {
-              selectNode(n.id);
-            }}
-            icon={<NodeHierarchyItemIcon type={n.type} className="w-4 h-4" />}
-            onPointerEnter={() => {
-              pointerEnterNode(n.id);
-            }}
-            onPointerLeave={() => {
-              pointerEnterNode(n.id);
-            }}
-          >
-            <SidebarMenuItemLabel>{n.name}</SidebarMenuItemLabel>
-          </SidebarMenuItem>
+          <NodeHierarchyItemContextMenuWrapper key={n.id} node_id={n.id}>
+            <SidebarMenuItem
+              muted
+              hovered={hovered}
+              level={depth}
+              selected={selected}
+              onSelect={() => {
+                selectNode(n.id);
+              }}
+              icon={<NodeHierarchyItemIcon node={n} className="w-4 h-4" />}
+              onPointerEnter={() => {
+                pointerEnterNode(n.id);
+              }}
+              onPointerLeave={() => {
+                pointerEnterNode(n.id);
+              }}
+            >
+              <SidebarMenuItemLabel className="font-normal text-sm">
+                {n.name}
+              </SidebarMenuItemLabel>
+              <SidebarMenuItemActions>
+                <SidebarMenuItemAction
+                  onClick={() => {
+                    toggleNodeLocked(n.id);
+                  }}
+                >
+                  {n.locked ? <LockClosedIcon /> : <LockOpen1Icon />}
+                </SidebarMenuItemAction>
+                <SidebarMenuItemAction
+                  onClick={() => {
+                    toggleNodeActive(n.id);
+                  }}
+                >
+                  {n.active ? <EyeOpenIcon /> : <EyeClosedIcon />}
+                </SidebarMenuItemAction>
+              </SidebarMenuItemActions>
+            </SidebarMenuItem>
+          </NodeHierarchyItemContextMenuWrapper>
         );
       })}
     </>
@@ -57,14 +141,24 @@ export function NodeHierarchyList() {
 
 function NodeHierarchyItemIcon({
   className,
-  type,
+  node,
 }: {
-  type: grida.program.nodes.Node["type"];
+  node: grida.program.nodes.Node;
   className?: string;
 }) {
-  switch (type) {
+  switch (node.type) {
     case "container":
+      if (node.layout === "flex") {
+        switch (node.direction) {
+          case "horizontal":
+            return <ViewVerticalIcon />;
+          case "vertical":
+            return <ViewHorizontalIcon />;
+        }
+      }
       return <FrameIcon className={className} />;
+    case "component":
+      return <Component1Icon className={className} />;
     case "image":
       return <ImageIcon className={className} />;
     case "text":
@@ -75,7 +169,7 @@ function NodeHierarchyItemIcon({
       return <BoxIcon className={className} />;
     case "ellipse":
       return <CircleIcon className={className} />;
-    case "svg":
+    case "vector":
       return <TransformIcon className={className} />;
   }
   return <BoxIcon className={className} />;

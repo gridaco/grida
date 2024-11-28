@@ -24,10 +24,10 @@ import { PaddingControl } from "./controls/padding";
 import { AspectRatioControl } from "./controls/aspect-ratio";
 import { BoxShadowControl } from "./controls/box-shadow";
 import { GapControl } from "./controls/gap";
-import { AlignItemsControl } from "./controls/align-items";
+import { CrossAxisAlignmentControl } from "./controls/cross-axis-alignment";
 import { FlexWrapControl } from "./controls/flex-wrap";
 import { FlexDirectionControl } from "./controls/flex-direction";
-import { JustifyContentControl } from "./controls/justify-content";
+import { MainAxisAlignmentControl } from "./controls/main-axis-alignment";
 import { TemplateControl } from "./controls/template";
 import { CursorControl } from "./controls/cursor";
 import { PropertyLine, PropertyLineLabel } from "./ui";
@@ -35,7 +35,7 @@ import { SrcControl } from "./controls/src";
 import { BoxFitControl } from "./controls/box-fit";
 import { PropsControl } from "./controls/props";
 import { TargetBlankControl } from "./controls/target";
-import { ExportNodeWithHtmlToImage } from "./controls/export";
+import { ExportNodeControl } from "./controls/export";
 
 import { useComputedNode, useDocument, useNode } from "@/builder";
 import assert from "assert";
@@ -48,20 +48,35 @@ import {
 } from "./controls/positioning";
 import { useNodeDomElement } from "@/builder/provider";
 import { RotateControl } from "./controls/rotate";
+import { LockClosedIcon } from "@radix-ui/react-icons";
+import { TextAlignVerticalControl } from "./controls/text-align-vertical";
+import { LetterSpacingControl } from "./controls/letter-spacing";
+import { LineHeightControl } from "./controls/line-height";
+import { NameControl } from "./controls/name";
+import { UserDataControl } from "./controls/x-userdata";
+import { LengthControl } from "./controls/length";
+import { LayoutControl } from "./controls/layout";
+import { AxisControl } from "./controls/axis";
+import { MaxlengthControl } from "./controls/maxlength";
 
 export function SelectedNodeProperties() {
   const { state: document, selectedNode } = useDocument();
   assert(selectedNode);
 
   // - color - variables
-  const { selected_node_id } = document;
+  const {
+    selected_node_id,
+    document: { root_id },
+  } = document;
 
   const node = useNode(selected_node_id!);
+  const root = useNode(root_id);
   const computed = useComputedNode(selected_node_id!);
   const {
     id,
     name,
     active,
+    locked,
     component_id,
     style,
     type,
@@ -81,8 +96,30 @@ export function SelectedNodeProperties() {
     fontFamily,
     fontWeight,
     fontSize,
+    lineHeight,
+    letterSpacing,
     textAlign,
+    textAlignVertical,
+    maxLength,
+
+    //
+    border,
+    //
+    padding,
+
+    //
+    layout,
+    direction,
+    mainAxisAlignment,
+    crossAxisAlignment,
+    mainAxisGap,
+    crossAxisGap,
+
+    // x
+    userdata,
   } = node;
+
+  const { properties: root_properties } = root;
 
   // const istemplate = type?.startsWith("templates/");
   const is_instance = type === "instance";
@@ -90,25 +127,21 @@ export function SelectedNodeProperties() {
   const is_text = type === "text";
   const is_image = type === "image";
   const is_container = type === "container";
-  const is_layout = is_container;
+  const is_root = selected_node_id === root_id;
+  const is_flex_container = is_container && layout === "flex";
   const is_stylable = type !== "template_instance";
 
   const {
     //
     boxShadow,
     //
-    borderWidth,
-    //
-    margin,
-    padding,
+    // margin,
+    // padding,
     //
     aspectRatio,
     //
-    flexDirection,
-    flexWrap,
-    justifyContent,
-    alignItems,
-    gap,
+    // flexWrap,
+    // gap,
     //
     cursor,
     //
@@ -118,34 +151,51 @@ export function SelectedNodeProperties() {
     ...(style || {}),
   } satisfies grida.program.css.ExplicitlySupportedCSSProperties;
 
-  const border = {
-    borderWidth,
-  };
-
   return (
-    <div key={selected_node_id}>
-      {process.env.NODE_ENV === "development" && (
+    <div key={selected_node_id} className="mt-4 mb-10">
+      {/* {process.env.NODE_ENV === "development" && (
         <SidebarSection className="border-b pb-4">
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Debug</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
           <DebugControls />
         </SidebarSection>
-      )}
+      )} */}
+      <SidebarSection className="border-b">
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel className="w-full flex justify-between items-center">
+            <div>
+              <div className="capitalize">{type}</div>
+              <br />
+              <small className="font-mono">{id}</small>
+            </div>
+          </SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+      </SidebarSection>
       <SidebarSection className="border-b pb-4">
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Layer</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine>
+          <PropertyLine className="items-center">
+            <PropertyLineLabel>Name</PropertyLineLabel>
+            <NameControl value={name} onValueChange={selectedNode.name} />
+          </PropertyLine>
+          <PropertyLine className="items-center">
             <PropertyLineLabel>Active</PropertyLineLabel>
             <HiddenControl value={active} onValueChange={selectedNode.active} />
           </PropertyLine>
+          <PropertyLine className="items-center">
+            <PropertyLineLabel>
+              <LockClosedIcon />
+            </PropertyLineLabel>
+            <HiddenControl value={locked} onValueChange={selectedNode.locked} />
+          </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>
-      <SidebarSection className="border-b pb-4">
+      <SidebarSection hidden={is_root} className="border-b pb-4">
         <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Positioning</SidebarSectionHeaderLabel>
+          <SidebarSectionHeaderLabel>Position</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuSectionContent className="space-y-2">
           <PropertyLine>
@@ -167,6 +217,28 @@ export function SelectedNodeProperties() {
               //
               onValueChange={selectedNode.positioningMode}
             />
+          </PropertyLine>
+          <PropertyLine>
+            <PropertyLineLabel>Rotate</PropertyLineLabel>
+            <RotateControl
+              value={rotation}
+              onValueChange={selectedNode.rotation}
+            />
+          </PropertyLine>
+        </SidebarMenuSectionContent>
+      </SidebarSection>
+      <SidebarSection className="border-b pb-4">
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>Size</SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuSectionContent className="space-y-2">
+          <PropertyLine>
+            <PropertyLineLabel>Width</PropertyLineLabel>
+            <LengthControl value={width} onValueChange={selectedNode.width} />
+          </PropertyLine>
+          <PropertyLine>
+            <PropertyLineLabel>Height</PropertyLineLabel>
+            <LengthControl value={height} onValueChange={selectedNode.height} />
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>
@@ -226,7 +298,15 @@ export function SelectedNodeProperties() {
             <PropertyLineLabel>Value</PropertyLineLabel>
             <StringValueControl
               value={node.text}
+              maxlength={maxLength}
               onValueChange={selectedNode.text}
+              schema={
+                root_properties
+                  ? {
+                      properties: root_properties,
+                    }
+                  : undefined
+              }
             />
           </PropertyLine>
           <PropertyLine>
@@ -251,10 +331,39 @@ export function SelectedNodeProperties() {
             />
           </PropertyLine>
           <PropertyLine>
+            <PropertyLineLabel>Line</PropertyLineLabel>
+            <LineHeightControl
+              value={lineHeight as any}
+              onValueChange={selectedNode.lineHeight}
+            />
+          </PropertyLine>
+          <PropertyLine>
+            <PropertyLineLabel>Letter</PropertyLineLabel>
+            <LetterSpacingControl
+              value={letterSpacing as any}
+              onValueChange={selectedNode.letterSpacing}
+            />
+          </PropertyLine>
+          <PropertyLine>
             <PropertyLineLabel>Align</PropertyLineLabel>
             <TextAlignControl
-              value={textAlign as any}
+              value={textAlign}
               onValueChange={selectedNode.textAlign}
+            />
+          </PropertyLine>
+          <PropertyLine>
+            <PropertyLineLabel></PropertyLineLabel>
+            <TextAlignVerticalControl
+              value={textAlignVertical}
+              onValueChange={selectedNode.textAlignVertical}
+            />
+          </PropertyLine>
+          <PropertyLine>
+            <PropertyLineLabel>Max Length</PropertyLineLabel>
+            <MaxlengthControl
+              value={maxLength}
+              placeholder={(computed.text as any as string)?.length?.toString()}
+              onValueChange={selectedNode.maxLength}
             />
           </PropertyLine>
         </SidebarMenuSectionContent>
@@ -274,46 +383,75 @@ export function SelectedNodeProperties() {
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>
-      <SidebarSection hidden={!is_layout} className="border-b pb-4">
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Layout</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine>
-            <PropertyLineLabel>Direction</PropertyLineLabel>
-            <FlexDirectionControl
-              value={flexDirection as any}
-              onValueChange={selectedNode.flexDirection}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Wrap</PropertyLineLabel>
-            <FlexWrapControl
-              value={flexWrap as any}
-              onValueChange={selectedNode.flexWrap}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Distribute</PropertyLineLabel>
-            <JustifyContentControl
-              value={justifyContent as any}
-              onValueChange={selectedNode.justifyContent}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Align</PropertyLineLabel>
-            <AlignItemsControl
-              value={alignItems as any}
-              flexDirection={flexDirection as any}
-              onValueChange={selectedNode.alignItems}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Gap</PropertyLineLabel>
-            <GapControl value={gap as any} onValueChange={selectedNode.gap} />
-          </PropertyLine>
-        </SidebarMenuSectionContent>
-      </SidebarSection>
+      {is_container && (
+        <SidebarSection className="border-b pb-4">
+          <SidebarSectionHeaderItem>
+            <SidebarSectionHeaderLabel>Layout</SidebarSectionHeaderLabel>
+          </SidebarSectionHeaderItem>
+          <SidebarMenuSectionContent className="space-y-2">
+            <PropertyLine>
+              <PropertyLineLabel>Type</PropertyLineLabel>
+              <LayoutControl
+                value={layout!}
+                onValueChange={selectedNode.layout}
+              />
+            </PropertyLine>
+            <PropertyLine hidden={!is_flex_container}>
+              <PropertyLineLabel>Direction</PropertyLineLabel>
+              <AxisControl
+                value={direction!}
+                onValueChange={selectedNode.direction}
+              />
+            </PropertyLine>
+            {/* <PropertyLine>
+              <PropertyLineLabel>Wrap</PropertyLineLabel>
+              <FlexWrapControl
+                value={flexWrap as any}
+                onValueChange={selectedNode.flexWrap}
+              />
+            </PropertyLine> */}
+            <PropertyLine hidden={!is_flex_container}>
+              <PropertyLineLabel>Distribute</PropertyLineLabel>
+              <MainAxisAlignmentControl
+                value={mainAxisAlignment!}
+                onValueChange={selectedNode.mainAxisAlignment}
+              />
+            </PropertyLine>
+            <PropertyLine hidden={!is_flex_container}>
+              <PropertyLineLabel>Align</PropertyLineLabel>
+              <CrossAxisAlignmentControl
+                value={crossAxisAlignment!}
+                direction={direction}
+                onValueChange={selectedNode.crossAxisAlignment}
+              />
+            </PropertyLine>
+            <PropertyLine hidden={!is_flex_container}>
+              <PropertyLineLabel>Gap</PropertyLineLabel>
+              <GapControl
+                value={{
+                  mainAxisGap: mainAxisGap!,
+                  crossAxisGap: crossAxisGap!,
+                }}
+                onValueChange={selectedNode.gap}
+              />
+            </PropertyLine>
+            {/* <PropertyLine hidden={!is_flex_container}>
+              <PropertyLineLabel>Margin</PropertyLineLabel>
+              <MarginControl
+                value={margin as any}
+                onValueChange={selectedNode.margin}
+              />
+            </PropertyLine> */}
+            <PropertyLine hidden={!is_flex_container}>
+              <PropertyLineLabel>Padding</PropertyLineLabel>
+              <PaddingControl
+                value={padding!}
+                onValueChange={selectedNode.padding}
+              />
+            </PropertyLine>
+          </SidebarMenuSectionContent>
+        </SidebarSection>
+      )}
       <SidebarSection hidden={!is_stylable} className="border-b pb-4">
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Styles</SidebarSectionHeaderLabel>
@@ -327,14 +465,6 @@ export function SelectedNodeProperties() {
             />
           </PropertyLine>
           <PropertyLine>
-            <PropertyLineLabel>Rotate</PropertyLineLabel>
-            <RotateControl
-              value={rotation}
-              onValueChange={selectedNode.rotation}
-            />
-          </PropertyLine>
-
-          <PropertyLine>
             <PropertyLineLabel>Radius</PropertyLineLabel>
             <CornerRadiusControl
               value={cornerRadius}
@@ -343,10 +473,7 @@ export function SelectedNodeProperties() {
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Border</PropertyLineLabel>
-            <BorderControl
-              value={border as any}
-              onValueChange={selectedNode.border}
-            />
+            <BorderControl value={border} onValueChange={selectedNode.border} />
           </PropertyLine>
           {fill && (
             <PropertyLine>
@@ -359,20 +486,6 @@ export function SelectedNodeProperties() {
             <BoxShadowControl
               value={{ boxShadow }}
               onValueChange={selectedNode.boxShadow}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Margin</PropertyLineLabel>
-            <MarginControl
-              value={margin as any}
-              onValueChange={selectedNode.margin}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Padding</PropertyLineLabel>
-            <PaddingControl
-              value={padding as any}
-              onValueChange={selectedNode.padding}
             />
           </PropertyLine>
           <PropertyLine>
@@ -390,11 +503,25 @@ export function SelectedNodeProperties() {
       </SidebarSection>
       <SidebarSection className="border-b pb-4">
         <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>Developer</SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuSectionContent className="space-y-2">
+          <PropertyLine>
+            <UserDataControl
+              node_id={id}
+              value={userdata}
+              onValueCommit={selectedNode.userdata}
+            />
+          </PropertyLine>
+        </SidebarMenuSectionContent>
+      </SidebarSection>
+      <SidebarSection className="border-b pb-4">
+        <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Export</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuSectionContent className="space-y-2">
           <PropertyLine>
-            <ExportNodeWithHtmlToImage node_id={id} name={name} />
+            <ExportNodeControl node_id={id} name={name} />
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>
@@ -450,8 +577,8 @@ function DebugControls() {
     <SidebarMenuSectionContent>
       <pre className="text-xs font-mono">
         <div>Node {selected_node_id}</div>
-        <div>Type {type}</div>
-        <div>Name {name}</div>
+        {/* <div>Type {type}</div> */}
+        {/* <div>Name {name}</div> */}
         <div>width {width}</div>
         <div>height {height}</div>
         <hr className="my-4" />

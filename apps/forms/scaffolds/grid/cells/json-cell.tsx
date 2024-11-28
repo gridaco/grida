@@ -1,6 +1,5 @@
 "use client";
 
-import Editor, { useMonaco } from "@monaco-editor/react";
 import {
   Popover,
   PopoverTrigger,
@@ -8,8 +7,7 @@ import {
 } from "@/components/ui/popover";
 import React, { useCallback, useEffect, useState } from "react";
 import { BlockKeys } from "./block-keys";
-import { useMonacoTheme } from "@/components/monaco";
-import { useTheme } from "next-themes";
+import { ThemedMonacoEditor } from "@/components/monaco";
 import { Spinner } from "@/components/spinner";
 import { JSONValue } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -135,15 +133,6 @@ export function JsonPopupEditorCell({
       </PopoverContent>
     </Popover>
   );
-}
-
-function ThemedMonacoEditor(props: React.ComponentProps<typeof Editor>) {
-  const { resolvedTheme } = useTheme();
-
-  const monaco = useMonaco();
-  useMonacoTheme(monaco, resolvedTheme ?? "light");
-
-  return <Editor {...props} />;
 }
 
 function safeStringifyJson(

@@ -7,14 +7,16 @@ import { LayerkWidget } from "./layer";
 import { LayoutWidget } from "./layout";
 import { LinkWidget } from "./link";
 import { RichTextWidget } from "./richtext";
-import { SvgWidget } from "./svg";
+import { VectorWidget } from "./vector";
 import { TextWidget } from "./text";
 import { ThemeWidget } from "./theme";
 import { ImageWidget } from "./image";
 import { RectangleWidget } from "./rectangle";
 import { EllipseWidget } from "./ellipse";
+import { SVGLineWidget } from "./line";
 export namespace TemplateBuilderWidgets {
   export const container = ContainerWidget;
+  export const component = ContainerWidget; // TODO:
   // export const Component = ComponentWidget;
   export const flex = FlexWidget;
   // export const Grid = GridWidget;
@@ -23,7 +25,8 @@ export namespace TemplateBuilderWidgets {
   export const Layout = LayoutWidget;
   // export const Link = LinkWidget;
   // export const RichText = RichTextWidget;
-  export const svg = SvgWidget;
+  export const vector = VectorWidget;
+  export const line = SVGLineWidget;
   export const rectangle = RectangleWidget;
   export const ellipse = EllipseWidget;
   export const text = TextWidget;

@@ -11,11 +11,6 @@ const svg_1 = `<svg width="311" height="311" viewBox="0 0 311 311" fill="none" x
 </svg>
 `;
 
-const svg_2 = `<svg width="639" height="345" viewBox="0 0 639 345" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M632.87 42.1812C627.912 2.97944 612.126 -38.0455 573.64 -60.9674C552.636 -73.4703 536.328 -76.3355 514.15 -74.7727C464.184 -71.647 437.961 -43.2551 419.957 -7.30923C415.261 1.9377 413.434 -0.537207 411.347 -7.70032C402.606 -39.0878 385.907 -69.3027 347.812 -77.2472C291.453 -88.8385 255.446 -63.1817 229.484 -12.3887C225.962 -5.48609 224.918 -2.88163 221.787 -11.0867C199.348 -71.6476 119.766 -70.2147 78.9319 -42.6042C15.3974 0.24431 -0.257731 95.7092 0.0031907 170.727C0.264113 238.19 22.3121 341.599 109.721 338.083C147.685 336.52 185.127 309.822 200.652 272.053C203.653 264.889 204.958 257.986 207.306 268.275C233.137 384.187 378.601 355.274 406.52 270.75C410.564 258.637 412.912 261.242 415.782 270.75C430.655 318.808 484.666 349.544 533.589 337.823C636.522 313.338 649.568 173.722 633 42.1812H632.87Z" fill="#99CEFF"/>
-</svg>
-`;
-
 // eslint-disable-next-line import/no-anonymous-default-export
 export default {
   root_id: "playground",
@@ -25,7 +20,7 @@ export default {
       name: "playground",
       type: "container",
       active: true,
-      locked: false,
+      locked: true,
       expanded: true,
       opacity: 1,
       zIndex: 0,
@@ -33,6 +28,8 @@ export default {
       width: 960,
       height: 540,
       fill: { type: "solid", color: { r: 255, g: 255, b: 255, a: 1 } },
+      padding: 0,
+      cornerRadius: 0,
       style: {
         boxShadow: "0 0 10px rgba(0,0,0,0.1)",
       },
@@ -47,6 +44,12 @@ export default {
         // "ellipse_1",
         "background",
       ],
+      layout: "flow",
+      direction: "horizontal",
+      mainAxisAlignment: "start",
+      crossAxisAlignment: "start",
+      mainAxisGap: 0,
+      crossAxisGap: 0,
     },
     background: {
       id: "background",
@@ -62,40 +65,50 @@ export default {
       width: 960,
       height: 540,
       fit: "cover",
+      cornerRadius: 0,
       style: {},
     },
     sticker_1: {
       id: "sticker_1",
       name: "sticker",
-      type: "svg",
+      type: "vector",
       active: true,
       locked: false,
       opacity: 1,
       zIndex: 0,
-      svg: svg_1,
+      // path: svg_1,
       position: "absolute",
       top: 300,
       left: -100,
       width: 320,
       height: 320,
-      style: {},
+      paths: [],
     },
     sticker_2: {
       id: "sticker_2",
       name: "sticker",
-      type: "svg",
+      type: "vector",
       active: true,
       locked: false,
       opacity: 1,
       zIndex: 0,
-      svg: svg_2,
       position: "absolute",
       top: -100,
       // left: 100,
       right: 10,
-      width: 400,
-      height: 200,
-      style: {},
+      width: 639,
+      height: 345,
+      fill: {
+        type: "solid",
+        color: { r: 153, g: 206, b: 255, a: 1 },
+      },
+      paths: [
+        {
+          d: "M632.87 42.1812C627.912 2.97944 612.126 -38.0455 573.64 -60.9674C552.636 -73.4703 536.328 -76.3355 514.15 -74.7727C464.184 -71.647 437.961 -43.2551 419.957 -7.30923C415.261 1.9377 413.434 -0.537207 411.347 -7.70032C402.606 -39.0878 385.907 -69.3027 347.812 -77.2472C291.453 -88.8385 255.446 -63.1817 229.484 -12.3887C225.962 -5.48609 224.918 -2.88163 221.787 -11.0867C199.348 -71.6476 119.766 -70.2147 78.9319 -42.6042C15.3974 0.24431 -0.257731 95.7092 0.0031907 170.727C0.264113 238.19 22.3121 341.599 109.721 338.083C147.685 336.52 185.127 309.822 200.652 272.053C203.653 264.889 204.958 257.986 207.306 268.275C233.137 384.187 378.601 355.274 406.52 270.75C410.564 258.637 412.912 261.242 415.782 270.75C430.655 318.808 484.666 349.544 533.589 337.823C636.522 313.338 649.568 173.722 633 42.1812H632.87Z",
+          fillRule: "evenodd",
+          fill: "fill",
+        },
+      ],
     },
     shapes_container: {
       id: "shapes_container",
@@ -113,7 +126,15 @@ export default {
       expanded: false,
       fill: { type: "solid", color: { r: 255, g: 255, b: 255, a: 1 } },
       style: {},
+      cornerRadius: 0,
+      padding: 0,
       children: ["child_rect_1", "child_rect_2"],
+      layout: "flow",
+      direction: "horizontal",
+      mainAxisAlignment: "start",
+      crossAxisAlignment: "start",
+      mainAxisGap: 0,
+      crossAxisGap: 0,
     },
     child_rect_1: {
       id: "child_rect_1",
@@ -240,6 +261,7 @@ export default {
       fontSize: 32,
       fontWeight: 500,
       textAlign: "center",
+      textAlignVertical: "center",
       textDecoration: "none",
       style: {},
     },
@@ -261,6 +283,7 @@ export default {
       fontSize: 13,
       fontWeight: 400,
       textAlign: "center",
+      textAlignVertical: "center",
       textDecoration: "none",
       style: {},
     },

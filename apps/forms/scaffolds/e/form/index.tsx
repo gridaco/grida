@@ -142,8 +142,8 @@ function FormStartPage({
 
   return (
     <StandaloneDocumentEditor
+      editable={false}
       initial={{
-        editable: false,
         document: start_page,
         templates: {
           [(

@@ -92,6 +92,7 @@ export default function FormStartEditPage() {
       <main className="h-full flex flex-1 w-full">
         {startpage ? (
           <StandaloneDocumentEditor
+            editable
             initial={startpage}
             dispatch={startPageDocumentDispatch}
           >

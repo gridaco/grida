@@ -2,9 +2,9 @@ import { useState } from "react";
 
 export function useDialogState<T = any>(
   name = "dialog",
-  config?: { refreshkey?: boolean }
+  config?: { refreshkey?: boolean; defaultOpen?: boolean }
 ) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState<boolean>(config?.defaultOpen ?? false);
   const [key, setKey] = useState(0);
   const [data, setData] = useState<T>();
   const openDialog = (data?: T | Event) => {
@@ -13,12 +13,14 @@ export function useDialogState<T = any>(
     if (config?.refreshkey) setKey((prev) => prev + 1);
   };
   const closeDialog = () => setOpen(false);
+  const toggleOpen = () => setOpen((prev) => !prev);
 
   return {
     refreshkey: name + key,
     open,
     setOpen,
     onOpenChange: setOpen,
+    toggleOpen,
     openDialog,
     closeDialog,
     data,

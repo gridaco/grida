@@ -1,8 +1,51 @@
-import type { Tokens } from "@/ast";
 import type { BuilderAction } from "./action";
 import { grida } from "@/grida";
 
 export type DocumentDispatcher = (action: BuilderAction) => void;
+
+export type CursorMode =
+  | {
+      type: "cursor";
+    }
+  | {
+      type: "insert";
+      node: "text" | "image" | "container" | "rectangle" | "ellipse" | "line";
+    };
+
+export type Marquee = {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+};
+
+const DEFAULT_RAY_TARGETING: SurfaceRaycastTargeting = {
+  target: "next",
+  ignores_root: true,
+  ignores_locked: true,
+};
+
+export type SurfaceRaycastTargeting = {
+  /**
+   * Determines how the target node is selected:
+   * - `deepest` => Selects the deepest (nested) node.
+   * - `shallowest` => Selects the shallowest (root) node.
+   * - `next` => Selects the next non-ignored shallowest node. (if the shallowest node is ignored and next is available)
+   *
+   * @default "next"
+   */
+  target: "deepest" | "shallowest" | "next";
+
+  /**
+   * @default true
+   */
+  ignores_root: boolean;
+
+  /**
+   * @default true
+   */
+  ignores_locked: boolean;
+};
 
 export interface IDocumentEditorInteractionCursorState {
   selected_node_id?: string;
@@ -43,10 +86,24 @@ export interface IDocumentEditorInteractionCursorState {
    *
    * @default false
    */
-  content_edit_mode?: false | "text" | "path";
+  surface_content_edit_mode?: false | "text" | "path";
+
+  /**
+   * the config of how the surface raycast targeting should be
+   */
+  surface_raycast_targeting: SurfaceRaycastTargeting;
 
   /**
    * @private - internal use only
+   *
+   * All node ids detected by the raycast (internally) - does not get affected by the targeting config
+   */
+  surface_raycast_detected_node_ids: string[];
+
+  /**
+   * @private - internal use only
+   *
+   * relative cursor position to the event target
    *
    * @default {x: 0, y: 0}
    */
@@ -62,6 +119,19 @@ export interface IDocumentEditorInteractionCursorState {
    */
   // __r: number;
   // selectedTextRange;
+
+  /**
+   * @private - internal use only
+   *
+   * cursor mode
+   *
+   * @default {type: "cursor"}
+   */
+  cursor_mode: CursorMode;
+
+  clipboard?: grida.program.nodes.Node;
+
+  marquee?: Marquee;
 }
 
 interface IDocumentEditorConfig {
@@ -101,7 +171,10 @@ export function initDocumentEditorState({
       grida.program.document.internal.createDocumentDefinitionRuntimeHierarchyContext(
         init.document
       ),
+    surface_raycast_targeting: DEFAULT_RAY_TARGETING,
+    surface_raycast_detected_node_ids: [],
     googlefonts: s.fonts().map((family) => ({ family })),
+    cursor_mode: { type: "cursor" },
     ...init,
   };
 }

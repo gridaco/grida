@@ -1,0 +1,202 @@
+{
+  "doctype": "v0_document",
+  "document": {
+    "nodes": {
+      "454:341": {
+        "id": "454:341",
+        "name": "root",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "container",
+        "expanded": false,
+        "position": "relative",
+        "left": 0,
+        "top": 0,
+        "width": 960,
+        "height": 540,
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 255,
+            "g": 255,
+            "b": 255,
+            "a": 1
+          }
+        },
+        "style": {
+          "overflow": "clip",
+          "padding": "0px 0px 0px 0px"
+        },
+        "cornerRadius": 0,
+        "children": [
+          "454:342",
+          "454:343",
+          "454:344",
+          "454:345",
+          "454:346"
+        ]
+      },
+      "454:342": {
+        "id": "454:342",
+        "name": "text",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "Hello World !",
+        "position": "absolute",
+        "left": 59,
+        "top": 251,
+        "right": 714,
+        "bottom": 251,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 0,
+            "g": 0,
+            "b": 0,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.2,
+        "letterSpacing": 0,
+        "fontSize": 32,
+        "fontFamily": "Pretendard",
+        "fontWeight": 600
+      },
+      "454:343": {
+        "id": "454:343",
+        "name": "text",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "text",
+        "text": "Welcome to Grida Canvas V0",
+        "position": "absolute",
+        "left": 59,
+        "top": 305,
+        "right": 693,
+        "bottom": 216,
+        "width": "auto",
+        "height": "auto",
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 0,
+            "g": 0,
+            "b": 0,
+            "a": 1
+          }
+        },
+        "style": {},
+        "textAlign": "left",
+        "textAlignVertical": "top",
+        "textDecoration": "none",
+        "lineHeight": 1.2,
+        "letterSpacing": 0,
+        "fontSize": 16,
+        "fontFamily": "Pretendard",
+        "fontWeight": 400
+      },
+      "454:344": {
+        "id": "454:344",
+        "name": "image",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "image",
+        "src": "https://s3-alpha-sig.figma.com/img/7f12/ea13/00756f144a0fb5daaf68dbfc01103a46?Expires=1733097600&Key-Pair-Id=APKAQ4GOSFWCVNEHN3O4&Signature=W9J8xSHlv8NW~UuDqEwA-R4bVDypjKIQSK9E49cV65WI4blhhFxjPJR9U1ZizlLWjctBB2Ji6KJxqPaHlaBi2ibfBx-QruQs5fFxFDk-lqrhv8Rvcfv2kR6tzy66T0NlHXzdgl0WrJr49s79cZAR8oGC0~dn5-OpeJ451wyZ0Hl7amFpgqJmZSOwdyZZYKPmoVx40DjFQuJremph8mr0K1yo6vVNb-dLlxPy4fEYKX2CR2bGj-RBy3cRIeOvM1t1kRrtDwy9~rvSpfNBHyKY9FeSENyAb0y3DIkX9c1K7pjU-Z67ECgzlJE8nEq56ThEQT9dOdnhV2M5qQWa3j7J6w__",
+        "position": "absolute",
+        "left": 613,
+        "top": 67,
+        "width": 140,
+        "height": 140,
+        "cornerRadius": 0,
+        "fit": "cover",
+        "style": {}
+      },
+      "454:345": {
+        "id": "454:345",
+        "name": "rectangle",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "rectangle",
+        "position": "absolute",
+        "left": 768,
+        "top": 67,
+        "width": 140,
+        "height": 406,
+        "fill": {
+          "type": "linear_gradient",
+          "id": "ee2883cd-716c-49ce-a08d-1179381ce91c",
+          "stops": [
+            {
+              "offset": 0,
+              "color": {
+                "r": 217,
+                "g": 217,
+                "b": 217,
+                "a": 1
+              }
+            },
+            {
+              "offset": 1,
+              "color": {
+                "r": 115,
+                "g": 115,
+                "b": 115,
+                "a": 1
+              }
+            }
+          ]
+        },
+        "effects": [],
+        "cornerRadius": 40
+      },
+      "454:346": {
+        "id": "454:346",
+        "name": "ellipse",
+        "active": true,
+        "locked": false,
+        "rotation": 0,
+        "opacity": 1,
+        "zIndex": 0,
+        "type": "ellipse",
+        "position": "absolute",
+        "left": 613,
+        "top": 231,
+        "width": 140,
+        "height": 140,
+        "fill": {
+          "type": "solid",
+          "color": {
+            "r": 0,
+            "g": 0,
+            "b": 0,
+            "a": 1
+          }
+        },
+        "effects": []
+      }
+    },
+    "root_id": "454:341"
+  }
+}

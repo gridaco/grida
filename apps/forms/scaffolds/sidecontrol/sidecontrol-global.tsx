@@ -51,9 +51,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import Link from "next/link";
-import { Editor, useMonaco } from "@monaco-editor/react";
 import { useTheme } from "next-themes";
-import { useMonacoTheme } from "@/components/monaco";
+import { ThemedMonacoEditor } from "@/components/monaco";
 import { customcss_starter_template } from "@/theme/customcss/k";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/utils";
@@ -560,9 +559,6 @@ function SectionStyle() {
 
 function CustomCSS() {
   const [state, dispatch] = useEditorState();
-  const monaco = useMonaco();
-  const { resolvedTheme } = useTheme();
-  useMonacoTheme(monaco, resolvedTheme ?? "light");
 
   const [css, setCss] = useState<string | undefined>(
     state.theme.customCSS || customcss_starter_template
@@ -605,7 +601,7 @@ function CustomCSS() {
           </DialogDescription>
         </DialogHeader>
         <div>
-          <Editor
+          <ThemedMonacoEditor
             className="rounded overflow-hidden border"
             width="100%"
             height={500}

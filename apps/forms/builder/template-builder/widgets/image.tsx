@@ -13,6 +13,7 @@ export const ImageWidget = ({
   const { objectFit, objectPosition, ...divStyles } = style || {};
   const data_attributes = {
     "data-grida-node-id": props["data-grida-node-id"],
+    "data-grida-node-locked": props["data-grida-node-locked"],
     "data-grida-node-type": props["data-grida-node-type"],
     "data-dev-editor-hovered": props["data-dev-editor-hovered"],
     "data-dev-editor-selected": props["data-dev-editor-selected"],
@@ -27,7 +28,11 @@ export const ImageWidget = ({
   };
 
   return (
-    <div id={id} style={divStyles} {...data_attributes}>
+    <div
+      id={id}
+      style={{ ...divStyles, overflow: "hidden" }}
+      {...data_attributes}
+    >
       {src && (
         // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
         <img

@@ -15,7 +15,7 @@ export function RectangleWidget({
     ? svg.fill.fill_with_defs(fill)
     : {
         defs: undefined,
-        fill: undefined,
+        fill: "none",
       };
 
   return (

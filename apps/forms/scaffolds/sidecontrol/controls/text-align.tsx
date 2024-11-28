@@ -1,3 +1,4 @@
+import { grida } from "@/grida";
 import { ToggleGroup, ToggleGroupItem } from "./utils/toggle-group";
 import {
   TextAlignLeftIcon,
@@ -6,11 +7,11 @@ import {
 } from "@radix-ui/react-icons";
 
 export function TextAlignControl({
-  value = "inherit",
+  value,
   onValueChange,
 }: {
-  value?: "left" | "center" | "right" | "inherit";
-  onValueChange?: (value: "left" | "center" | "right") => void;
+  value?: grida.program.cg.TextAlign;
+  onValueChange?: (value: grida.program.cg.TextAlign) => void;
 }) {
   return (
     <ToggleGroup
@@ -19,13 +20,13 @@ export function TextAlignControl({
       value={value}
       onValueChange={onValueChange}
     >
-      <ToggleGroupItem value="left">
+      <ToggleGroupItem value={"left" satisfies grida.program.cg.TextAlign}>
         <TextAlignLeftIcon />
       </ToggleGroupItem>
-      <ToggleGroupItem value="center">
+      <ToggleGroupItem value={"center" satisfies grida.program.cg.TextAlign}>
         <TextAlignCenterIcon />
       </ToggleGroupItem>
-      <ToggleGroupItem value="right">
+      <ToggleGroupItem value={"right" satisfies grida.program.cg.TextAlign}>
         <TextAlignRightIcon />
       </ToggleGroupItem>
     </ToggleGroup>

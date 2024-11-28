@@ -32,6 +32,7 @@
     "@radix-ui/react-avatar": "^0.0.14",
     "@radix-ui/react-checkbox": "^1.0.4",
     "@radix-ui/react-collapsible": "^1.0.3",
+    "@radix-ui/react-context-menu": "^2.2.2",
     "@radix-ui/react-dialog": "^1.0.5",
     "@radix-ui/react-dropdown-menu": "^2.0.6",
     "@radix-ui/react-hover-card": "^1.0.7",
@@ -106,6 +107,7 @@
     "embla-carousel-autoplay": "^8.3.0",
     "embla-carousel-react": "^8.3.0",
     "fast-xml-parser": "^4.4.0",
+    "figma-api": "2.0.1-beta",
     "file-saver": "^2.0.5",
     "flat": "^6.0.1",
     "framer-motion": "^11.1.9",
@@ -151,6 +153,7 @@
     "resend": "^3.2.0",
     "signature_pad": "^4.2.0",
     "stylis": "^4.3.2",
+    "svg-pathdata": "^7.1.0",
     "swr": "^2.2.5",
     "tailwind-merge": "^2.2.2",
     "timezones-list": "^3.0.3",
@@ -163,6 +166,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@figma/rest-api-spec": "^0.21.0",
     "@next/font": "^14.2.4",
     "@supabase/storage-js": "^2.6.0",
     "@tailwindcss/container-queries": "^0.1.1",

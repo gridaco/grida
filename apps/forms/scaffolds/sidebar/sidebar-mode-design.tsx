@@ -104,6 +104,7 @@ function HierarchyView() {
               selected_page_id === "site/dev-collection") &&
               document && (
                 <StandaloneDocumentEditor
+                  editable
                   initial={document}
                   dispatch={documentDispatch}
                 >

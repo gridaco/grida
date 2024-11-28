@@ -12,9 +12,9 @@ export function Footer_001() {
       // component={TemplateBuilderWidgets.container}
       style={{
         flexWrap: "wrap",
-        justifyContent: "center",
-        alignItems: "center",
-        gap: 2,
+        // justifyContent: "center",
+        // alignItems: "center",
+        // gap: 2,
       }}
     >
       <Link href="#">

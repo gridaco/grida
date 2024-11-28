@@ -1,6 +1,17 @@
 import type { Tokens } from "@/ast";
 
 export namespace grida {
+  export namespace io {
+    /**
+     * Grida Document File model
+     * .grida file is a JSON file that contains the document structure and metadata.
+     */
+    export interface DocumentFileModel {
+      doctype: "v0_document";
+      document: grida.program.document.IDocumentDefinition;
+    }
+  }
+
   export namespace program {
     export namespace schema {
       /**
@@ -158,6 +169,14 @@ export namespace grida {
          */
         export const HTML_ELEMET_DATA_ATTRIBUTE_GRIDA_NODE_ID_KEY =
           "data-grida-node-id";
+
+        /**
+         * Key for the data attribute that stores the node {@link nodes.Node.locked} in the HTML document.
+         *
+         * @see {@link INodeHtmlDocumentQueryDataAttributes}
+         */
+        export const HTML_ELEMET_DATA_ATTRIBUTE_GRIDA_NODE_LOCKED_KEY =
+          "data-grida-node-locked";
       }
 
       /**
@@ -166,7 +185,7 @@ export namespace grida {
        * @see {@link IDocumentDefinition}
        */
       export interface IDocumentNodesRepository {
-        nodes: Record<string, nodes.Node>;
+        nodes: Record<nodes.NodeID, nodes.Node>;
       }
 
       /**
@@ -300,6 +319,8 @@ export namespace grida {
 
           /**
            * Maps each node ID to an array of its child node IDs, enabling efficient downward traversal.
+           *
+           * This does NOT ensure the order of the children. when to reorder, use the `children` property in the node.
            */
           __ctx_nid_to_children_ids: Record<nodes.NodeID, nodes.NodeID[]>;
         }
@@ -343,6 +364,7 @@ export namespace grida {
 
       export interface INodeHtmlDocumentQueryDataAttributes {
         [k.HTML_ELEMET_DATA_ATTRIBUTE_GRIDA_NODE_ID_KEY]: nodes.Node["id"];
+        [k.HTML_ELEMET_DATA_ATTRIBUTE_GRIDA_NODE_LOCKED_KEY]: nodes.Node["locked"];
         ["data-grida-node-type"]: nodes.Node["type"];
         // #region dev properties
 
@@ -459,7 +481,72 @@ export namespace grida {
        */
       export type LengthPercentage = Length | Percentage;
 
-      export type RGBA = { r: number; g: number; b: number; a: number };
+      /**
+       * @see https://developer.mozilla.org/en-US/docs/Web/CSS/blend-mode
+       */
+      export type BlendMode =
+        | "normal"
+        | "multiply"
+        | "screen"
+        | "overlay"
+        | "darken"
+        | "lighten"
+        | "color-dodge"
+        | "color-burn"
+        | "hard-light"
+        | "soft-light"
+        | "difference"
+        | "exclusion"
+        | "hue"
+        | "saturation"
+        | "color"
+        | "luminosity";
+
+      /**
+       * Partially supported CSS border model.
+       * - each border can have different width
+       * - color is shared
+       * - only `solid` `dashed` border is supported
+       */
+      export type Border = {
+        borderStyle: "none" | "solid" | "dashed";
+        borderColor: cg.RGBA8888;
+        /**
+         * @example
+         * ```css
+         * border-width: <length>
+         * border-width: top | right | bottom | left
+         * ```
+         *
+         */
+        borderWidth:
+          | number
+          | {
+              top: number;
+              right: number;
+              bottom: number;
+              left: number;
+            };
+      };
+
+      /**
+       *
+       * {@link cg.textAlignVertical} to CSS `align-content` mapping
+       *
+       * - `top`:`start`
+       * - `center`:`center`
+       * - `bottom`:`end`
+       *
+       * @see https://developer.mozilla.org/en-US/docs/Web/CSS/align-content
+       */
+      export const text_align_vertical_to_css_align_content: Record<
+        cg.TextAlignVertical,
+        React.CSSProperties["alignContent"]
+      > = {
+        top: "start",
+        center: "center",
+        bottom: "end",
+      };
 
       /**
        * CSS properties that is supported via the standard editor
@@ -512,27 +599,16 @@ export namespace grida {
         // | "top"
         // | "left"
         //
-        // | "fontWeight"
-        // | "fontFamily"
-        // | "fontSize"
-        // | "lineHeight"
-        // | "textAlign"
         // | "textTransform"
         //
         | "boxShadow"
         //
-        | "borderWidth"
-        //
-        | "margin"
-        | "padding"
-        //
         | "aspectRatio"
         //
-        | "flexDirection"
+        | "overflow"
+        //
+        // | "margin"
         | "flexWrap"
-        | "justifyContent"
-        | "alignItems"
-        | "gap"
         //
         | "cursor"
         //
@@ -542,8 +618,11 @@ export namespace grida {
         styles: nodes.i.ICSSStylable &
           Partial<nodes.i.IRectangleCorner> &
           Partial<nodes.i.IBoxFit> &
-          Partial<nodes.i.ITextNodeStyle>,
+          Partial<nodes.i.ITextNodeStyle> &
+          Partial<nodes.i.IPadding> &
+          Partial<nodes.i.IFlexContainer>,
         config: {
+          hasTextStyle: boolean;
           fill: "color" | "background" | "fill" | "none";
         }
       ): React.CSSProperties {
@@ -560,18 +639,31 @@ export namespace grida {
           rotation,
           fill,
           fit,
-          cornerRadius: __,
+          cornerRadius,
           //
-          textAlign,
-          textDecoration,
-          fontFamily,
-          fontSize,
-          fontWeight,
+          border,
+          //
+          padding,
+          //
+          layout,
+          direction,
+          mainAxisAlignment,
+          crossAxisAlignment,
+          mainAxisGap,
+          crossAxisGap,
           //
           style,
         } = styles;
-        const without_fill = {
+
+        let result: React.CSSProperties = {
+          //
+          ...style,
+          //
           position: position,
+          // FIXME: support both auto - max-content
+          // for texts, when auto, it will automatically break the line (to prevent this, we can use max-content) BUT, when max-content it will not respect the right: xxx (which in this case, it should break line)
+          // width: width === "auto" ? "max-content" : toDimension(width),
+          // height: height === "auto" ? "max-content" : toDimension(height),
           width: toDimension(width),
           height: toDimension(height),
           top: top,
@@ -583,34 +675,128 @@ export namespace grida {
           objectFit: fit,
           rotate: rotation ? `${rotation}deg` : undefined,
           //
-          textAlign: textAlign,
-          textDecoration: textDecoration,
-          fontFamily: fontFamily,
-          fontSize: fontSize,
-          fontWeight: fontWeight,
+          borderRadius: cornerRadius
+            ? cornerRadiusToBorderRadiusCSS(cornerRadius)
+            : undefined,
           //
-          ...style,
+          padding: padding ? paddingToPaddingCSS(padding) : undefined,
+          //
+          ...(border ? toReactCSSBorder(border) : {}),
         } satisfies React.CSSProperties;
+
+        if (layout === "flex") {
+          result["display"] = "flex";
+          result["flexDirection"] = axisToFlexDirection(direction!);
+          result["justifyContent"] = mainAxisAlignment;
+          result["alignItems"] = crossAxisAlignment;
+          result["gap"] =
+            direction === "horizontal"
+              ? `${mainAxisGap}px ${crossAxisGap}px`
+              : `${crossAxisGap}px ${mainAxisGap}px`;
+        }
 
         switch (config.fill) {
           case "color":
-            return {
-              ...without_fill,
-              color: fill ? toFillString(fill) : undefined,
-            };
+            result["color"] = fill ? toFillString(fill) : undefined;
+            break;
           case "background":
-            return {
-              ...without_fill,
-              background: fill ? toFillString(fill) : undefined,
-            };
+            result["background"] = fill ? toFillString(fill) : undefined;
+            break;
           case "fill":
-            return {
-              ...without_fill,
-              fill: fill ? toFillString(fill) : undefined,
-            };
+            result["fill"] = fill ? toFillString(fill) : undefined;
+            break;
           case "none":
-            return without_fill;
+            break;
         }
+
+        if (config.hasTextStyle) {
+          const { textAlign, textAlignVertical } =
+            styles as Partial<nodes.i.ITextNodeStyle>;
+          const {
+            textDecoration,
+            fontFamily,
+            fontSize,
+            fontWeight,
+            letterSpacing,
+            lineHeight,
+          } = styles as nodes.i.ITextStyle;
+
+          result = {
+            ...result,
+            ...toReactTextStyle({
+              // text node style - can be undefined (need a better way to handle this - not pass it at all)
+              textAlign: textAlign ?? "left",
+              textAlignVertical: textAlignVertical ?? "top",
+              // text span style
+              textDecoration,
+              fontFamily,
+              fontSize,
+              fontWeight,
+              letterSpacing,
+              lineHeight,
+              fill: fill,
+            }),
+          };
+        }
+
+        return result;
+      }
+
+      export function toReactCSSBorder(
+        border: Border
+      ): Pick<
+        React.CSSProperties,
+        "borderStyle" | "borderColor" | "borderWidth"
+      > {
+        return {
+          borderStyle: border.borderStyle,
+          borderColor: toRGBAString(border.borderColor),
+          borderWidth:
+            typeof border.borderWidth === "number"
+              ? border.borderWidth
+              : `${border.borderWidth.top}px ${border.borderWidth.right}px ${border.borderWidth.bottom}px ${border.borderWidth.left}px`,
+        };
+      }
+
+      export function toReactTextStyle(
+        style: grida.program.nodes.i.ITextNodeStyle
+      ): Pick<
+        React.CSSProperties,
+        | "textAlign"
+        | "alignContent"
+        | "textDecoration"
+        | "fontFamily"
+        | "fontSize"
+        | "fontWeight"
+        | "letterSpacing"
+        | "lineHeight"
+        | "color"
+      > {
+        const {
+          textAlign,
+          textAlignVertical,
+          textDecoration,
+          fontFamily,
+          fontSize,
+          fontWeight,
+          letterSpacing,
+          lineHeight,
+          fill,
+        } = style;
+
+        return {
+          textAlign: textAlign,
+          alignContent: textAlignVertical
+            ? css.text_align_vertical_to_css_align_content[textAlignVertical]
+            : undefined,
+          textDecoration: textDecoration,
+          fontFamily: fontFamily,
+          lineHeight: lineHeight ?? "normal",
+          letterSpacing: letterSpacing,
+          fontSize: fontSize,
+          fontWeight: fontWeight,
+          color: fill ? toFillString(fill) : undefined,
+        };
       }
 
       export function toFillString(paint: cg.Paint): string {
@@ -624,7 +810,7 @@ export namespace grida {
         }
       }
 
-      export function toRGBAString(rgba: css.RGBA): string {
+      export function toRGBAString(rgba: cg.RGBA8888): string {
         return `rgba(${rgba.r}, ${rgba.g}, ${rgba.b}, ${rgba.a})`;
       }
 
@@ -699,8 +885,39 @@ export namespace grida {
        * @example `rgba_to_hex({ r: 255, g: 255, b: 255, a: 1 })` returns `"ffffff"`
        *
        */
-      export function rgbaToHex(color: grida.program.css.RGBA): string {
+      export function rgbaToHex(color: grida.program.cg.RGBA8888): string {
         return `${color.r.toString(16).padStart(2, "0")}${color.g.toString(16).padStart(2, "0")}${color.b.toString(16).padStart(2, "0")}`;
+      }
+
+      export function cornerRadiusToBorderRadiusCSS(
+        cr: nodes.i.IRectangleCorner["cornerRadius"]
+      ): string {
+        if (!cr) return "0";
+        if (typeof cr === "number") {
+          return `${cr}px`;
+        } else {
+          return `${cr.topLeftRadius}px ${cr.topRightRadius}px ${cr.bottomRightRadius}px ${cr.bottomLeftRadius}px`;
+        }
+      }
+
+      export function paddingToPaddingCSS(
+        padding: nodes.i.IPadding["padding"]
+      ): string {
+        if (!padding) return "0";
+        if (typeof padding === "number") {
+          return `${padding}px`;
+        } else {
+          return `${padding.paddingTop}px ${padding.paddingRight}px ${padding.paddingBottom}px ${padding.paddingLeft}px`;
+        }
+      }
+
+      export function axisToFlexDirection(axis: cg.Axis): "row" | "column" {
+        switch (axis) {
+          case "horizontal":
+            return "row";
+          case "vertical":
+            return "column";
+        }
       }
     }
 
@@ -708,6 +925,116 @@ export namespace grida {
      * Core Graphics
      */
     export namespace cg {
+      /**
+       * the RGBA structure itself. the rgb value may differ as it could both represent 0-1 or 0-255 by the context.
+       */
+      export type TRGBA = {
+        r: number;
+        g: number;
+        b: number;
+        a: number;
+      };
+
+      /**
+       * Floating-Point RGBA (Normalized RGBA)
+       * Used in computer graphics pipelines, shading, and rendering.
+       */
+      export type RGBAf = {
+        /**
+         * Red channel value, between 0 and 1.
+         */
+        r: number;
+        /**
+         * Green channel value, between 0 and 1.
+         */
+        g: number;
+        /**
+         * Blue channel value, between 0 and 1.
+         */
+        b: number;
+        /**
+         * Alpha channel value, between 0 and 1.
+         */
+        a: number;
+      };
+
+      /**
+       * 8-bit Integer RGBA (Standard RGBA)
+       * Used in web and raster graphics, including CSS and images.
+       */
+      export type RGBA8888 = {
+        /**
+         * Red channel value, between 0 and 255.
+         */
+        r: number;
+        /**
+         * Green channel value, between 0 and 255.
+         */
+        g: number;
+        /**
+         * Blue channel value, between 0 and 255.
+         */
+        b: number;
+        /**
+         * Alpha channel value, between 0 and 1.
+         */
+        a: number;
+      };
+
+      /**
+       * Converts a normalized RGBA color to an 8-bit integer RGBA color.
+       * @param rgba - The normalized RGBA color to convert.
+       * @returns The 8-bit integer RGBA color.
+       * @see {@link RGBAf}
+       * @see {@link RGBA8888}
+       * @example
+       * ```typescript
+       * const rgba: RGBAf = { r: 1, g: 0.5, b: 0, a: 0.75 };
+       * const rgba8888: RGBA8888 = rgbaf_to_rgba8888(rgba);
+       * console.log(rgba8888); // { r: 255, g: 128, b: 0, a: 0.75 }
+       * ```
+       */
+      export function rgbaf_to_rgba8888(rgba: RGBAf): RGBA8888 {
+        return {
+          r: Math.round(rgba.r * 255),
+          g: Math.round(rgba.g * 255),
+          b: Math.round(rgba.b * 255),
+          a: rgba.a,
+        };
+      }
+
+      export function rgbaf_multiply_alpha(color: TRGBA, alpha: number): TRGBA {
+        return {
+          r: color.r,
+          g: color.g,
+          b: color.b,
+          a: color.a * alpha,
+        };
+      }
+
+      /**
+       * Defines a single path
+       *
+       * @see https://developer.mozilla.org/en-US/docs/Web/SVG/Element/path
+       */
+      export type Path = {
+        /**
+         * This attribute defines the shape of the path.
+         */
+        d: string;
+
+        /**
+         * @see https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/fill-rule
+         */
+        fillRule: FillRule;
+      };
+
+      /**
+       * @see https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/fill-rule
+       * @see https://www.figma.com/plugin-docs/api/properties/VectorPath-windingrule/
+       */
+      export type FillRule = "nonzero" | "evenodd";
+
       /**
        *
        * Supported fit modes
@@ -740,7 +1067,17 @@ export namespace grida {
        * @see https://developer.mozilla.org/en-US/docs/Web/CSS/text-align
        * @see https://api.flutter.dev/flutter/dart-ui/TextAlign.html
        */
-      export type TextAign = "left" | "right" | "center" | "justify";
+      export type TextAlign = "left" | "right" | "center" | "justify";
+
+      /**
+       * Vertical text align modes
+       *
+       * - [Env:css] in css, uses `align-content` {@link css.text_align_vertical_to_css_align_content}
+       *
+       * @see https://developer.mozilla.org/en-US/docs/Web/CSS/align-content
+       * @see https://konvajs.org/api/Konva.Text.html#verticalAlign
+       */
+      export type TextAlignVertical = "top" | "center" | "bottom";
 
       /**
        * Supported font weights in numeric values
@@ -759,6 +1096,32 @@ export namespace grida {
         | 800
         | 900;
 
+      /**
+       * @see https://api.flutter.dev/flutter/painting/Axis.html
+       */
+      export type Axis = "horizontal" | "vertical";
+
+      /**
+       * @see https://developer.mozilla.org/en-US/docs/Web/CSS/justify-content
+       * @see https://developer.mozilla.org/en-US/docs/Glossary/Main_Axis
+       * @see https://api.flutter.dev/flutter/rendering/MainAxisAlignment.html
+       */
+      export type MainAxisAlignment =
+        | "start"
+        | "end"
+        | "center"
+        | "space-between"
+        | "space-around"
+        | "space-evenly"
+        | "stretch";
+
+      /**
+       * @see https://developer.mozilla.org/en-US/docs/Web/CSS/align-items
+       * @see https://developer.mozilla.org/en-US/docs/Glossary/Cross_Axis
+       * @see https://api.flutter.dev/flutter/rendering/CrossAxisAlignment.html
+       */
+      export type CrossAxisAlignment = "start" | "end" | "center" | "stretch";
+
       export type Paint =
         | SolidPaint
         | LinearGradientPaint
@@ -771,7 +1134,7 @@ export namespace grida {
 
       export type SolidPaint = {
         type: "solid";
-        color: css.RGBA;
+        color: cg.RGBA8888;
       };
 
       export type LinearGradientPaint = {
@@ -795,7 +1158,7 @@ export namespace grida {
          * 1 - end (100%)
          */
         offset: number;
-        color: css.RGBA;
+        color: cg.RGBA8888;
       };
       //
       //
@@ -843,13 +1206,17 @@ export namespace grida {
 
     export namespace nodes {
       export type NodeID = string;
+      export type NodeType = Node["type"];
       export type Node =
         | TextNode
         | ImageNode
         | ContainerNode
-        | SvgNode
+        | HTMLIFrameNode
+        | VectorNode
+        | LineNode
         | RectangleNode
         | EllipseNode
+        | ComponentNode
         | InstanceNode
         | TemplateInstanceNode;
 
@@ -863,7 +1230,8 @@ export namespace grida {
        */
       export type AnyNode = Omit<
         Partial<TextNode> &
-          Partial<SvgNode> &
+          Partial<VectorNode> &
+          Partial<LineNode> &
           Partial<RectangleNode> &
           Partial<ImageNode> &
           Partial<ContainerNode> &
@@ -880,6 +1248,11 @@ export namespace grida {
         export interface IBaseNode {
           readonly id: NodeID;
           name: string;
+
+          /**
+           * user-injected custom data
+           */
+          userdata?: Record<string, unknown> | undefined | null;
         }
 
         export interface ISceneNode {
@@ -904,6 +1277,7 @@ export namespace grida {
            *
            * @default false
            * @example when true, pointer-events:none
+           * @internal
            */
           locked: boolean;
         }
@@ -943,6 +1317,15 @@ export namespace grida {
         }
 
         /**
+         * specifies node's x rotation in degrees
+         *
+         * @default 0
+         */
+        export interface IRotation {
+          rotation?: number;
+        }
+
+        /**
          * Node that can be expanded in hierarchy
          */
         export interface IExpandable {
@@ -971,6 +1354,77 @@ export namespace grida {
         }
 
         /**
+         * padding
+         */
+        export interface IPadding {
+          padding:
+            | number
+            | {
+                paddingTop: number;
+                paddingRight: number;
+                paddingBottom: number;
+                paddingLeft: number;
+              };
+        }
+
+        /**
+         *
+         * Defines the layout behavior of the container.
+         * - `flex`: Enables Flexbox-like behavior.
+         * - `flow`: Equivalent to "block" in CSS, where elements are arranged in normal document flow.
+         * @see https://developer.mozilla.org/en-US/docs/Glossary/Flex_Container
+         * @see https://api.flutter.dev/flutter/widgets/Flex-class.html
+         */
+        export interface IFlexContainer {
+          /**
+           * the flex container only takes effect when layout is set to `flex`
+           */
+          layout: "flex" | "flow";
+
+          /**
+           *
+           * the flex model direction - takes effect when layout is set to `flex`
+           *
+           * @default "horizontal"
+           */
+          direction: cg.Axis;
+
+          /**
+           *
+           * the flex model main axis alignment - takes effect when layout is set to `flex`
+           *
+           * @default "start"
+           */
+          mainAxisAlignment: cg.MainAxisAlignment;
+
+          /**
+           *
+           * the flex model cross axis alignment - takes effect when layout is set to `flex`
+           *
+           * @default "start"
+           */
+          crossAxisAlignment: cg.CrossAxisAlignment;
+
+          /**
+           * the gap between the children in main axis - takes effect when layout is set to `flex`
+           *
+           * commonly refered as `row-gap` (in row direction) or `column-gap` (in column direction)
+           *
+           * @default 0
+           */
+          mainAxisGap: number;
+
+          /**
+           * the gap between the children in cross axis - takes effect when layout is set to `flex`
+           *
+           * commonly refered as `column-gap` (in row direction) or `row-gap` (in column direction)
+           *
+           * @default 0
+           */
+          crossAxisGap: number;
+        }
+
+        /**
          * Node wih Box Fit `fit`, a.k.a. `object-fit`
          */
         export interface IBoxFit {
@@ -992,9 +1446,15 @@ export namespace grida {
          * Node that supports stroke with color - such as rectangle, ellipse, etc.
          *
          * - [Env:HTML] for html text, `-webkit-text-stroke` will be used
+         *
+         * @deprecated [NOT USED]
          */
         export interface IStroke {
-          stroke: css.RGBA;
+          stroke: cg.RGBA8888;
+        }
+
+        export interface ICSSBorder {
+          border?: css.Border | undefined;
         }
 
         export interface IEffects {
@@ -1016,7 +1476,8 @@ export namespace grida {
             IFill,
             IOpacity,
             IRotation,
-            IZIndex {
+            IZIndex,
+            ICSSBorder {
           style: css.ExplicitlySupportedCSSProperties;
         }
 
@@ -1054,15 +1515,6 @@ export namespace grida {
         }
 
         /**
-         * specifies node's x rotation in degrees
-         *
-         * @default 0
-         */
-        export interface IRotation {
-          rotation?: number;
-        }
-
-        /**
          * Text Style
          *
          * a set of properties that can be either applied to a text or textspan
@@ -1072,6 +1524,14 @@ export namespace grida {
           fontFamily?: string;
           fontSize: number;
           fontWeight: cg.NFontWeight;
+          /**
+           * @default 0
+           */
+          letterSpacing?: number;
+          /**
+           * @deprecated
+           */
+          lineHeight?: number;
         }
 
         /**
@@ -1080,7 +1540,16 @@ export namespace grida {
          * a set of properties that can be applied to a text node, but not to a textspan
          */
         export interface ITextNodeStyle extends ITextStyle {
-          textAlign: cg.TextAign;
+          /**
+           * @default "left"
+           */
+          textAlign: cg.TextAlign;
+          /**
+           * @default "top"
+           */
+          textAlignVertical: cg.TextAlignVertical;
+
+          fill?: cg.Paint;
         }
 
         export interface ITextValue {
@@ -1098,6 +1567,14 @@ export namespace grida {
            * - by the standard implementation, within the visual editor context, when user attempts to updates the literal value (where it is a `props.[x]` and `props.[x] is literal`), it should actually update the `props.[x]` value, not this `text` literal value.
            */
           text: Tokens.StringValueExpression | null;
+
+          /**
+           * set max length of the text value
+           * - Note: max length is ignored when set programmatically
+           * - Note: this is a experimental feature and its behaviour is not strictly defined
+           * @see https://json-schema.org/understanding-json-schema/reference/string#length
+           */
+          maxLength?: number;
         }
 
         export interface IProperties {
@@ -1114,6 +1591,86 @@ export namespace grida {
            */
           props: Record<string, schema.Value>;
         }
+      }
+
+      export namespace properties {
+        export const ibase: ReadonlyArray<keyof i.IBaseNode> = ["id", "name"];
+        export const iscene: ReadonlyArray<keyof i.ISceneNode> = [
+          "active",
+          "locked",
+        ];
+        export const iexpandable: ReadonlyArray<keyof i.IExpandable> = [
+          "expanded",
+        ];
+        export const iexportable: ReadonlyArray<keyof i.IExportable> = [];
+        export const iopacity: ReadonlyArray<keyof i.IOpacity> = ["opacity"];
+        export const izindex: ReadonlyArray<keyof i.IZIndex> = ["zIndex"];
+        export const ihrefable: ReadonlyArray<keyof i.IHrefable> = [
+          "href",
+          "target",
+        ];
+        export const irectanglecorner: ReadonlyArray<keyof i.IRectangleCorner> =
+          ["cornerRadius"];
+        export const ifill: ReadonlyArray<keyof i.IFill> = ["fill"];
+        export const ieffects: ReadonlyArray<keyof i.IEffects> = ["effects"];
+        export const icssstylable: ReadonlyArray<keyof i.ICSSStylable> = [
+          "style",
+        ];
+
+        // nodes
+        export const image: ReadonlyArray<keyof ImageNode> = [
+          ...ibase,
+          ...iscene,
+          ...iopacity,
+          ...izindex,
+          ...ihrefable,
+          ...ifill,
+          "src",
+          "alt",
+        ];
+        export const rectangle: ReadonlyArray<keyof RectangleNode> = [
+          ...ibase,
+          ...iscene,
+          ...iopacity,
+          ...izindex,
+          ...ihrefable,
+          ...ifill,
+          ...ieffects,
+          ...irectanglecorner,
+          "width",
+          "height",
+        ];
+        export const ellipse: ReadonlyArray<keyof EllipseNode> = [
+          ...ibase,
+          ...iscene,
+          ...iopacity,
+          ...izindex,
+          ...ihrefable,
+          ...ifill,
+          ...ieffects,
+          "width",
+          "height",
+        ];
+
+        export const text: ReadonlyArray<keyof TextNode> = [
+          ...ibase,
+          ...iscene,
+          ...iopacity,
+          ...izindex,
+          ...ihrefable,
+          ...ifill,
+          "text",
+        ];
+
+        export const container: ReadonlyArray<keyof ContainerNode> = [
+          ...ibase,
+          ...iscene,
+          ...iopacity,
+          ...izindex,
+          ...ihrefable,
+          ...ifill,
+          ...irectanglecorner,
+        ];
       }
 
       /**
@@ -1143,7 +1700,8 @@ export namespace grida {
           i.ISceneNode,
           i.ICSSStylable,
           i.IBoxFit,
-          i.IHrefable {
+          i.IHrefable,
+          i.IRectangleCorner {
         readonly type: "image";
         /**
          * required - when falsy, the image will not be rendered
@@ -1158,21 +1716,93 @@ export namespace grida {
           i.ICSSStylable,
           i.IHrefable,
           i.IExpandable,
-          i.IChildren {
+          i.IChildren,
+          i.IRectangleCorner,
+          i.IPadding,
+          i.IFlexContainer {
         readonly type: "container";
         //
       }
 
       /**
-       * @deprecated - not ready - do not use in production
+       * <iframe> Node.
+       *
+       * The use and rendering of iframe node is limited by the environment.
        */
-      export interface SvgNode
+      export interface HTMLIFrameNode
         extends i.IBaseNode,
           i.ISceneNode,
           i.ICSSStylable,
-          i.IHrefable {
-        type: "svg";
-        svg: string;
+          i.IRectangleCorner {
+        readonly type: "iframe";
+        /**
+         * The URL of the page to embed.
+         *
+         * when `srcdoc` is set, this value is ignored
+         *
+         * @see https://developer.mozilla.org/en-US/docs/Web/HTML/Element/iframe#src
+         */
+        src?: Tokens.StringValueExpression;
+
+        /**
+         * Inline HTML to embed, overriding the src attribute.
+         *
+         * @see https://developer.mozilla.org/en-US/docs/Web/HTML/Element/iframe#srcdoc
+         */
+        srcdoc?: Tokens.StringValueExpression;
+      }
+
+      /**
+       * @deprecated - not ready - do not use in production
+       */
+      export interface VectorNode
+        extends i.IBaseNode,
+          i.ISceneNode,
+          i.IHrefable,
+          i.IPositioning,
+          // i.ICSSDimension,
+          i.IFixedDimension,
+          i.IOpacity,
+          i.IZIndex,
+          i.IRotation,
+          i.IFill {
+        type: "vector";
+        paths: (cg.Path & {
+          /**
+           * specifies which property to use to fill the path
+           * this is to support compatibility with figma rest api, where it returns a vector stroke as a path individually
+           *
+           * @default "fill"
+           */
+          fill: "fill" | "stroke";
+        })[];
+      }
+
+      /**
+       * Line Node
+       *
+       * Note: this does not represent a polyline or a path, it only represents a straight line with two points.
+       *
+       * - [Env:HTML/SVG] on svg rendering, this will be rendered as `<line>` with `x1`, `y1`, `x2`, `y2` attributes.
+       *
+       * @see {@link https://developer.mozilla.org/en-US/docs/Web/SVG/Element/line}
+       * @see {@link https://api.skia.org/classSkSVGLine.html}
+       * @see {@link https://www.figma.com/plugin-docs/api/LineNode/}
+       * @see {@link https://konvajs.org/api/Konva.Line.html}
+       *
+       */
+      export interface LineNode
+        extends i.IBaseNode,
+          i.ISceneNode,
+          i.IHrefable,
+          i.IPositioning,
+          // i.ICSSDimension,
+          i.IFixedDimension,
+          i.IOpacity,
+          i.IZIndex,
+          i.IRotation {
+        type: "line";
+        height: 0;
       }
 
       /**
@@ -1196,6 +1826,7 @@ export namespace grida {
           i.IFixedDimension,
           i.IOpacity,
           i.IZIndex,
+          i.IRotation,
           i.IFill,
           i.IEffects,
           i.IRectangleCorner {
@@ -1217,9 +1848,25 @@ export namespace grida {
           i.IFixedDimension,
           i.IOpacity,
           i.IZIndex,
+          i.IRotation,
           i.IFill,
           i.IEffects {
         type: "ellipse";
+      }
+
+      //
+      export interface ComponentNode
+        extends i.IBaseNode,
+          i.ISceneNode,
+          i.ICSSStylable,
+          i.IHrefable,
+          i.IExpandable,
+          i.IChildren,
+          i.IRectangleCorner,
+          i.IPadding,
+          i.IFlexContainer,
+          i.IProperties {
+        readonly type: "component";
       }
 
       export interface InstanceNode
@@ -1280,6 +1927,7 @@ export namespace grida {
           locked: false,
           properties,
           props: {},
+          userdata: {},
           overrides: cloneWithUndefinedValues(nodes),
           template_id: def.name,
           ...seed,
