@@ -1095,15 +1095,23 @@ export function useEventTarget() {
     [dispatch]
   );
 
+  const __canvas_space_position = (
+    pointer_event: PointerEvent | MouseEvent
+  ) => {
+    const { clientX, clientY } = pointer_event;
+
+    const canvas_rect = get_canvas_rect();
+    const position = {
+      x: clientX - canvas_rect.left,
+      y: clientY - canvas_rect.top,
+    };
+
+    return position;
+  };
+
   const pointerMove = useCallback(
     (event: PointerEvent) => {
-      const { clientX, clientY } = event;
-
-      const canvas_rect = get_canvas_rect();
-      const position = {
-        x: clientX - canvas_rect.left,
-        y: clientY - canvas_rect.top,
-      };
+      const position = __canvas_space_position(event);
 
       dispatch({
         type: "document/canvas/backend/html/event/on-pointer-move",
@@ -1134,6 +1142,17 @@ export function useEventTarget() {
     (event: PointerEvent) => {
       dispatch({
         type: "document/canvas/backend/html/event/on-pointer-up",
+      });
+    },
+    [dispatch]
+  );
+
+  const click = useCallback(
+    (event: MouseEvent) => {
+      const position = __canvas_space_position(event);
+      dispatch({
+        type: "document/canvas/backend/html/event/on-click",
+        position,
       });
     },
     [dispatch]
@@ -1324,6 +1343,7 @@ export function useEventTarget() {
       pointerMove,
       pointerDown,
       pointerUp,
+      click,
       //
       tryEnterContentEditMode,
       tryExitContentEditMode,
@@ -1361,6 +1381,7 @@ export function useEventTarget() {
     pointerMove,
     pointerDown,
     pointerUp,
+    click,
     //
     tryEnterContentEditMode,
     tryExitContentEditMode,
@@ -1409,7 +1430,7 @@ export function useRootTemplateInstanceNode() {
 
 export function useNode(node_id: string): grida.program.nodes.AnyNode & {
   meta: {
-    is_runtime_instance: boolean;
+    is_component_consumer: boolean;
   };
 } {
   const {
@@ -1473,7 +1494,7 @@ export function useNode(node_id: string): grida.program.nodes.AnyNode & {
     ) as grida.program.nodes.AnyNode;
   }, [node_definition, node_change]);
 
-  const is_runtime_instance =
+  const is_component_consumer =
     root.type === "component" ||
     root.type === "instance" ||
     root.type === "template_instance";
@@ -1481,7 +1502,7 @@ export function useNode(node_id: string): grida.program.nodes.AnyNode & {
   return {
     ...node,
     meta: {
-      is_runtime_instance: is_runtime_instance,
+      is_component_consumer: is_component_consumer,
     },
   };
 }

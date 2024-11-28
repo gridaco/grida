@@ -66,6 +66,7 @@ export function CanvasOverlay() {
     pointerMove,
     pointerDown,
     pointerUp,
+    click,
     drag,
     dragStart,
     dragEnd,
@@ -105,6 +106,9 @@ export function CanvasOverlay() {
         if (event.defaultPrevented) return;
         if (content_edit_mode === "text") return;
         pointerUp(event);
+      },
+      onClick: ({ event }) => {
+        click(event);
       },
       onDoubleClick: ({ event }) => {
         if (event.defaultPrevented) return;
@@ -364,7 +368,7 @@ function NodeOverlay({
 
   return (
     <div
-      data-node-is-runtime-instance={node.meta.is_runtime_instance}
+      data-node-is-runtime-instance={node.meta.is_component_consumer}
       className="relative group pointer-events-auto select-none border-2 border-workbench-accent-sky data-[node-is-runtime-instance='true']:border-workbench-accent-violet"
       style={{
         position: "absolute",

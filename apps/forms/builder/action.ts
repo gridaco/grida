@@ -3,35 +3,7 @@ import { grida } from "@/grida";
 import { CursorMode, IDocumentEditorState } from "./types";
 
 export type BuilderAction =
-  | DocumentEditorResetWithStateAction
-  //
-  | DocumentEditorCanvasEventTargetHtmlBackendKeyDown
-  | DocumentEditorCanvasEventTargetHtmlBackendKeyUp
-  //
-  | DocumentEditorCanvasEventTargetHtmlBackendPointerMove
-  | DocumentEditorCanvasEventTargetHtmlBackendPointerMoveRaycast
-  | DocumentEditorCanvasEventTargetHtmlBackendPointerDown
-  | DocumentEditorCanvasEventTargetHtmlBackendPointerUp
-  | DocumentEditorCanvasEventTargetHtmlBackendDragStart
-  | DocumentEditorCanvasEventTargetHtmlBackendDrag
-  | DocumentEditorCanvasEventTargetHtmlBackendDragEnd
-  //
-  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayResizeHandleDragStart
-  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayResizeHandleDragEnd
-  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayResizeHandleDrag
-  //
-  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayCornerRadiusHandleDragStart
-  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayCornerRadiusHandleDragEnd
-  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayCornerRadiusHandleDrag
-  //
-  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDragStart
-  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDragEnd
-  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDrag
-  //
-  | DocumentEditorEnterContentEditMode
-  | DocumentEditorExitContentEditMode
-  //
-  | DocumentEditorCursorMode
+  | SurfaceAction
   //
   | DocumentEditorNodeSelectAction
   | DocumentEditorNodePointerEnterAction
@@ -61,6 +33,38 @@ interface ICanvasEventTargetPointerEvent {
     distance: Vector2;
   };
 }
+
+export type SurfaceAction =
+  | DocumentEditorResetWithStateAction
+  //
+  | DocumentEditorCanvasEventTargetHtmlBackendKeyDown
+  | DocumentEditorCanvasEventTargetHtmlBackendKeyUp
+  //
+  | DocumentEditorCanvasEventTargetHtmlBackendPointerMove
+  | DocumentEditorCanvasEventTargetHtmlBackendPointerMoveRaycast
+  | DocumentEditorCanvasEventTargetHtmlBackendPointerDown
+  | DocumentEditorCanvasEventTargetHtmlBackendPointerUp
+  | DocumentEditorCanvasEventTargetHtmlBackendClick
+  | DocumentEditorCanvasEventTargetHtmlBackendDragStart
+  | DocumentEditorCanvasEventTargetHtmlBackendDrag
+  | DocumentEditorCanvasEventTargetHtmlBackendDragEnd
+  //
+  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayResizeHandleDragStart
+  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayResizeHandleDragEnd
+  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayResizeHandleDrag
+  //
+  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayCornerRadiusHandleDragStart
+  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayCornerRadiusHandleDragEnd
+  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayCornerRadiusHandleDrag
+  //
+  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDragStart
+  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDragEnd
+  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDrag
+  //
+  | DocumentEditorEnterContentEditMode
+  | DocumentEditorExitContentEditMode
+  //
+  | DocumentEditorCursorMode;
 
 export type DocumentEditorCanvasEventTargetHtmlBackendKeyDown = {
   type: "document/canvas/backend/html/event/on-key-down";
@@ -100,6 +104,17 @@ export type DocumentEditorCanvasEventTargetHtmlBackendPointerDown =
 
 export type DocumentEditorCanvasEventTargetHtmlBackendPointerUp = {
   type: "document/canvas/backend/html/event/on-pointer-up";
+};
+
+export type DocumentEditorCanvasEventTargetHtmlBackendClick = {
+  type: "document/canvas/backend/html/event/on-click";
+  /**
+   * position in canvas space - need to pass a resolved value
+   */
+  position: {
+    x: number;
+    y: number;
+  };
 };
 
 export type DocumentEditorCanvasEventTargetHtmlBackendDragStart = {
