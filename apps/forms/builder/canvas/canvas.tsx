@@ -364,7 +364,8 @@ function NodeOverlay({
 
   return (
     <div
-      className="group pointer-events-auto select-none border-2 border-workbench-accent-sky relative"
+      data-node-is-runtime-instance={node.meta.is_runtime_instance}
+      className="relative group pointer-events-auto select-none border-2 border-workbench-accent-sky data-[node-is-runtime-instance='true']:border-workbench-accent-violet"
       style={{
         position: "absolute",
         ...transform,

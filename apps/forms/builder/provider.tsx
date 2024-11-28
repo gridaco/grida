@@ -1407,13 +1407,19 @@ export function useRootTemplateInstanceNode() {
   );
 }
 
-export function useNode(node_id: string) {
+export function useNode(node_id: string): grida.program.nodes.AnyNode & {
+  meta: {
+    is_runtime_instance: boolean;
+  };
+} {
   const {
     state: {
-      document: { nodes },
+      document: { nodes, root_id },
       templates,
     },
   } = useDocument();
+
+  const root = nodes[root_id];
 
   let node_definition: grida.program.nodes.Node | undefined = undefined;
   let node_change: grida.program.nodes.NodeChange = undefined;
@@ -1467,7 +1473,17 @@ export function useNode(node_id: string) {
     ) as grida.program.nodes.AnyNode;
   }, [node_definition, node_change]);
 
-  return node;
+  const is_runtime_instance =
+    root.type === "component" ||
+    root.type === "instance" ||
+    root.type === "template_instance";
+
+  return {
+    ...node,
+    meta: {
+      is_runtime_instance: is_runtime_instance,
+    },
+  };
 }
 
 export function useComputedNode(node_id: string) {

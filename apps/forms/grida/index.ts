@@ -1204,6 +1204,7 @@ export namespace grida {
 
     export namespace nodes {
       export type NodeID = string;
+      export type NodeType = Node["type"];
       export type Node =
         | TextNode
         | ImageNode

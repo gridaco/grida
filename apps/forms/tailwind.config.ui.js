@@ -58,6 +58,9 @@ module.exports = {
         "workbench-accent-sky": {
           DEFAULT: colors.sky[500],
         },
+        "workbench-accent-violet": {
+          DEFAULT: colors.violet[500],
+        },
         "workbench-accent-orange": {
           DEFAULT: colors.orange[400],
         },
