@@ -662,8 +662,10 @@ export namespace grida {
           position: position,
           // FIXME: support both auto - max-content
           // for texts, when auto, it will automatically break the line (to prevent this, we can use max-content) BUT, when max-content it will not respect the right: xxx (which in this case, it should break line)
-          width: width === "auto" ? "max-content" : toDimension(width),
-          height: height === "auto" ? "max-content" : toDimension(height),
+          // width: width === "auto" ? "max-content" : toDimension(width),
+          // height: height === "auto" ? "max-content" : toDimension(height),
+          width: toDimension(width),
+          height: toDimension(height),
           top: top,
           left: left,
           right: right,
