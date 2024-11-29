@@ -65,6 +65,11 @@ export default function documentReducer<S extends IDocumentEditorState>(
 
         // Insert the prototype as the root node under the document's root
         insertNodeRecursive(draft, draft.document.root_id, prototype);
+
+        // after
+        draft.cursor_mode = { type: "cursor" };
+        // TODO:
+        draft.selected_node_id = undefined;
       });
     }
     case "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag":

@@ -90,6 +90,8 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
             if (newNode.left !== undefined) newNode.left += offset;
             if (newNode.top !== undefined) newNode.top += offset;
             self_insertNode(draft, newNode.id, newNode);
+            // after
+            draft.cursor_mode = { type: "cursor" };
             draft.selected_node_id = newNode.id; // Select the newly pasted node
           }
         }
@@ -194,6 +196,8 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
               top: position.y,
             });
             self_insertNode(draft, nnode.id, nnode);
+            draft.cursor_mode = { type: "cursor" };
+            draft.selected_node_id = nnode.id;
             break;
         }
       });
@@ -231,6 +235,8 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
               height: (draft.cursor_mode.node === "line" ? 0 : 1) as 0,
             });
             self_insertNode(draft, nnode.id, nnode);
+            draft.cursor_mode = { type: "cursor" };
+            draft.selected_node_id = nnode.id;
             draft.is_gesture_node_drag_resize = true;
             // TODO: after inserting, refresh fonts registry
             break;

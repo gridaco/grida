@@ -869,6 +869,10 @@ export function useDocument() {
       while (state.document_ctx.__ctx_nid_to_parent_id[current_id]) {
         const parent_id = state.document_ctx.__ctx_nid_to_parent_id[current_id];
         parent_ids.push(parent_id);
+        if (current_id === parent_id) {
+          reportError("parent_id is same as current_id");
+          break;
+        }
         current_id = parent_id;
       }
 
@@ -886,6 +890,10 @@ export function useDocument() {
       while (state.document_ctx.__ctx_nid_to_parent_id[current_id]) {
         const parent_id = state.document_ctx.__ctx_nid_to_parent_id[current_id];
         parent_ids.push(parent_id);
+        if (current_id === parent_id) {
+          reportError("parent_id is same as current_id");
+          break;
+        }
         current_id = parent_id;
       }
       parent_ids.reverse();

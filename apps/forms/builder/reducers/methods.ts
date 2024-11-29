@@ -81,7 +81,7 @@ export function self_insertNode<S extends IDocumentEditorState>(
   draft: Draft<S>,
   node_id: string,
   node: grida.program.nodes.Node
-) {
+): string {
   draft.document.nodes[node_id] = node;
   const parent_id = draft.document.root_id;
   const parent_node = draft.document.nodes[parent_id];
@@ -96,9 +96,8 @@ export function self_insertNode<S extends IDocumentEditorState>(
   draft.document_ctx.__ctx_nid_to_parent_id[node_id] = parent_id;
   draft.document_ctx.__ctx_nid_to_children_ids[parent_id].push(node_id);
 
-  // after
-  draft.cursor_mode = { type: "cursor" };
-  draft.selected_node_id = node_id;
+  return node_id;
+
   //
 }
 
