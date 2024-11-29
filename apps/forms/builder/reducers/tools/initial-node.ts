@@ -59,6 +59,7 @@ export default function initialNode(
         textAlign: "left",
         textAlignVertical: "top",
         textDecoration: "none",
+        fontFamily: "Inter",
         fontWeight: 400,
         fontSize: 14,
         fill: black,

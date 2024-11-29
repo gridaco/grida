@@ -232,6 +232,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
             });
             self_insertNode(draft, nnode.id, nnode);
             draft.is_gesture_node_drag_resize = true;
+            // TODO: after inserting, refresh fonts registry
             break;
         }
       });

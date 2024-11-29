@@ -916,6 +916,16 @@ export function useDocument() {
     [state.document_ctx, getNodeById]
   );
 
+  const insertNode = useCallback(
+    (prototype: grida.program.nodes.NodePrototype) => {
+      dispatch({
+        type: "document/insert",
+        prototype,
+      });
+    },
+    [dispatch]
+  );
+
   const schemaDefineProperty = useCallback(
     (name?: string, definition?: grida.program.schema.PropertyDefinition) => {
       dispatch({
@@ -967,6 +977,7 @@ export function useDocument() {
       clearSelection,
       getNodeDepth,
       getNodeAbsoluteRotation,
+      insertNode,
       ...nodeActions,
       schemaDefineProperty,
       schemaRenameProperty,
@@ -980,6 +991,7 @@ export function useDocument() {
     clearSelection,
     getNodeDepth,
     getNodeAbsoluteRotation,
+    insertNode,
     nodeActions,
     schemaDefineProperty,
     schemaRenameProperty,

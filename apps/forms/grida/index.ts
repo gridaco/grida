@@ -1235,6 +1235,52 @@ export namespace grida {
         | TemplateInstanceNode;
 
       /**
+       * A virtual, before-instantiation node that only stores the prototype of a node.
+       */
+      export type NodePrototype =
+        | __TPrototypeNode<Omit<TextNode, __base_scene_node_properties>>
+        | __TPrototypeNode<Omit<ImageNode, __base_scene_node_properties>>
+        | __TPrototypeNode<
+            Omit<ContainerNode, __base_scene_node_properties | "children"> &
+              __IProtoChildrenNodePrototype
+          >
+        | __TPrototypeNode<Omit<HTMLIFrameNode, __base_scene_node_properties>>
+        | __TPrototypeNode<Omit<VectorNode, __base_scene_node_properties>>
+        | __TPrototypeNode<Omit<LineNode, __base_scene_node_properties>>
+        | __TPrototypeNode<Omit<RectangleNode, __base_scene_node_properties>>
+        | __TPrototypeNode<Omit<EllipseNode, __base_scene_node_properties>>
+        | __TPrototypeNode<
+            Omit<ComponentNode, __base_scene_node_properties | "children"> &
+              __IProtoChildrenNodePrototype
+          >
+        | __TPrototypeNode<
+            Omit<InstanceNode, __base_scene_node_properties | "children"> &
+              __IProtoChildrenNodePrototype
+          >
+        | __TPrototypeNode<
+            Omit<TemplateInstanceNode, __base_scene_node_properties>
+          >;
+
+      /**
+       * @internal Prototype node can't have an id, and can optionally have BaseNode and SceneNode properties.
+       * Other properties are required.
+       */
+      type __TPrototypeNode<T> = Partial<Omit<i.IBaseNode, "id">> &
+        Partial<i.ISceneNode> &
+        T;
+
+      type __base_scene_node_properties =
+        | "id"
+        | "name"
+        | "userdata"
+        | "active"
+        | "locked";
+
+      type __IProtoChildrenNodePrototype = {
+        children: NodePrototype[];
+      };
+
+      /**
        * Type for containing instance's node changes data relative to master node
        */
       export type NodeChange = Partial<nodes.Node> | undefined;
@@ -1485,6 +1531,10 @@ export namespace grida {
             IRotation,
             IZIndex,
             ICSSBorder {
+          /**
+           * TODO: rename to css
+           * @deprecated
+           */
           style: css.ExplicitlySupportedCSSProperties;
         }
 

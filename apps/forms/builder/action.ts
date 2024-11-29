@@ -3,6 +3,9 @@ import { grida } from "@/grida";
 import { CursorMode, IDocumentEditorState } from "./types";
 
 export type BuilderAction =
+  | DocumentEditorResetWithStateAction
+  | DocumentEditorInsertNodeAction
+  //
   | SurfaceAction
   //
   | DocumentEditorNodeSelectAction
@@ -35,7 +38,6 @@ interface ICanvasEventTargetPointerEvent {
 }
 
 export type SurfaceAction =
-  | DocumentEditorResetWithStateAction
   //
   | DocumentEditorCanvasEventTargetHtmlBackendKeyDown
   | DocumentEditorCanvasEventTargetHtmlBackendKeyUp
@@ -219,6 +221,11 @@ export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleD
 export interface DocumentEditorResetWithStateAction {
   type: "document/reset";
   state: IDocumentEditorState;
+}
+
+export interface DocumentEditorInsertNodeAction {
+  type: "document/insert";
+  prototype: grida.program.nodes.NodePrototype;
 }
 
 export interface DocumentEditorNodeSelectAction {

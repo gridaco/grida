@@ -18,6 +18,8 @@ import assert from "assert";
 import { documentquery } from "../document-query";
 import nodeReducer from "./node.reducer";
 import surfaceReducer from "./surface.reducer";
+import { v4 } from "uuid";
+import { self_insertNode } from "./methods";
 
 export default function documentReducer<S extends IDocumentEditorState>(
   state: S,
@@ -28,6 +30,42 @@ export default function documentReducer<S extends IDocumentEditorState>(
     case "document/reset": {
       const { state: _new_state } = action;
       return _new_state as S;
+    }
+    case "document/insert": {
+      const { prototype } = action;
+
+      return produce(state, (draft) => {
+        function insertNodeRecursive(
+          draft: Draft<S>,
+          parentNodeId: string, // This is now properly used
+          nodePrototype: grida.program.nodes.NodePrototype
+        ): string {
+          // Generate a unique ID for the new node
+          const nodeId = v4();
+
+          // Convert prototype to actual node
+          const newNode: grida.program.nodes.Node = {
+            ...nodePrototype,
+            id: nodeId,
+            name: nodePrototype.name ?? nodePrototype.type,
+            locked: nodePrototype.locked ?? false,
+            active: nodePrototype.active ?? false,
+            // @ts-ignore
+            children: nodePrototype.children?.map(
+              (child: grida.program.nodes.NodePrototype) =>
+                insertNodeRecursive(draft, nodeId, child) // Pass the current nodeId as the parent for children
+            ),
+          };
+
+          // Insert the node using the `self_insertNode` helper
+          self_insertNode(draft, parentNodeId, newNode); // Correctly use parentNodeId here
+
+          return nodeId;
+        }
+
+        // Insert the prototype as the root node under the document's root
+        insertNodeRecursive(draft, draft.document.root_id, prototype);
+      });
     }
     case "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag":
     case "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-end":
