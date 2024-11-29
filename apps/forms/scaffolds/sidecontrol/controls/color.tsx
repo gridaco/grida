@@ -28,12 +28,12 @@ export function RGBAColorControl({
       <PopoverTrigger className="w-full">
         <div
           className={cn(
-            "flex gap-2 items-center border cursor-default",
+            "flex items-center border cursor-default",
             WorkbenchUI.inputVariants({ size: "sm" })
           )}
         >
           <RGBAChip rgba={value} />
-          {grida.program.css.rgbaToHex(value)}
+          <span className="ms-2">#{grida.program.css.rgbaToHex(value)}</span>
         </div>
       </PopoverTrigger>
       <PopoverContent align="start" side="right" sideOffset={16}>

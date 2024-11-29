@@ -896,7 +896,7 @@ export namespace grida {
         if (typeof cr === "number") {
           return `${cr}px`;
         } else {
-          return `${cr.topLeftRadius}px ${cr.topRightRadius}px ${cr.bottomRightRadius}px ${cr.bottomLeftRadius}px`;
+          return `${cr[0]}px ${cr[1]}px ${cr[2]}px ${cr[3]}px`;
         }
       }
 
@@ -1202,6 +1202,20 @@ export namespace grida {
          */
         radius: number;
       };
+
+      /**
+       *
+       * [top-left | top-right | bottom-right | bottom-left]
+       */
+      export type CornerRadius4 = [number, number, number, number];
+
+      export function cornerRadius4Identical(value: CornerRadius4): boolean {
+        return (
+          value[0] === value[1] &&
+          value[1] === value[2] &&
+          value[2] === value[3]
+        );
+      }
     }
 
     export namespace nodes {
@@ -1343,14 +1357,7 @@ export namespace grida {
          * Rectangle Corner
          */
         export interface IRectangleCorner {
-          cornerRadius:
-            | number
-            | {
-                topLeftRadius: number;
-                topRightRadius: number;
-                bottomLeftRadius: number;
-                bottomRightRadius: number;
-              };
+          cornerRadius: number | cg.CornerRadius4;
         }
 
         /**

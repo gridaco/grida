@@ -120,20 +120,15 @@ export default function nodeReducer<
                 bl: Math.max(action.cornerRadius, 0),
               }
             : {
-                tl: Math.max(action.cornerRadius.topLeftRadius, 0),
-                tr: Math.max(action.cornerRadius.topRightRadius, 0),
-                br: Math.max(action.cornerRadius.bottomRightRadius, 0),
-                bl: Math.max(action.cornerRadius.bottomLeftRadius, 0),
+                tl: Math.max(action.cornerRadius[0], 0),
+                tr: Math.max(action.cornerRadius[1], 0),
+                br: Math.max(action.cornerRadius[2], 0),
+                bl: Math.max(action.cornerRadius[3], 0),
               };
         if (each.tl === each.tr && each.tl === each.br && each.tl === each.bl) {
           draft.cornerRadius = each.tl;
         } else {
-          draft.cornerRadius = {
-            topLeftRadius: each.tl,
-            topRightRadius: each.tr,
-            bottomRightRadius: each.br,
-            bottomLeftRadius: each.bl,
-          };
+          draft.cornerRadius = [each.tl, each.tr, each.br, each.bl];
         }
         break;
       }

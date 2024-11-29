@@ -1,4 +1,3 @@
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -35,7 +34,7 @@ export function PropertyLine({
 
 export function PropertyLineLabel({ children }: React.PropsWithChildren<{}>) {
   return (
-    <Label className="text-muted-foreground h-8 min-w-20 w-20 flex items-center text-xs me-4 overflow-hidden">
+    <Label className="text-muted-foreground h-8 min-w-16 w-16 flex items-center text-xs me-4 overflow-hidden">
       <span className="text-ellipsis overflow-hidden">{children}</span>
     </Label>
   );
@@ -46,14 +45,31 @@ export function PropertySeparator() {
 }
 
 export function PropertyInput({
+  type,
   className,
+  icon,
   ...props
-}: React.ComponentProps<typeof Input>) {
+}: React.InputHTMLAttributes<HTMLInputElement> & {
+  icon?: React.ReactNode;
+}) {
   return (
-    <Input
-      {...props}
-      className={cn(WorkbenchUI.inputVariants({ size: "sm" }), className)}
-    />
+    <div className="w-full relative">
+      {icon && (
+        <div className="absolute left-1.5 top-1/2 transform -translate-y-1/2">
+          {icon}
+        </div>
+      )}
+      <input
+        type={type}
+        className={cn(
+          "flex w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
+          WorkbenchUI.inputVariants({ size: "sm" }),
+          icon ? "pl-6" : "",
+          className
+        )}
+        {...props}
+      />
+    </div>
   );
 }
 

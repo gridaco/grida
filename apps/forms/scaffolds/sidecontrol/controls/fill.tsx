@@ -101,7 +101,7 @@ export function FillControl({
               <PaintChip paint={value} />
               {value.type === "solid" && (
                 <span className="ms-2 text-xs">
-                  {grida.program.css.rgbaToHex(value.color)}
+                  #{grida.program.css.rgbaToHex(value.color)}
                 </span>
               )}
               {value.type === "linear_gradient" && (

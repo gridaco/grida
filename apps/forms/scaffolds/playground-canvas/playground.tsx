@@ -334,6 +334,7 @@ function ExampleSwitch({
     "resume-01.grida",
     "event-page-01.grida",
     "component-01.grida",
+    "layout-01.grida",
   ];
   return (
     <Select defaultValue={value} onValueChange={onValueChange}>

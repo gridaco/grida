@@ -486,13 +486,13 @@ export function SelectedNodeProperties() {
               onValueChange={selectedNode.boxShadow}
             />
           </PropertyLine>
-          <PropertyLine>
+          {/* <PropertyLine>
             <PropertyLineLabel>Ratio</PropertyLineLabel>
             <AspectRatioControl
               value={aspectRatio as any}
               onValueChange={selectedNode.aspectRatio}
             />
-          </PropertyLine>
+          </PropertyLine> */}
           <PropertyLine>
             <PropertyLineLabel>Cursor</PropertyLineLabel>
             <CursorControl value={cursor} onValueChange={selectedNode.cursor} />

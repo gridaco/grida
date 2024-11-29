@@ -372,11 +372,22 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
           return;
         }
 
+        // TODO: get accurate fixed width
+        // TODO: also handle by height
+        const fixed_width =
+          typeof node.width === "number" ? node.width : undefined;
+        const maxRaius = fixed_width ? fixed_width / 2 : undefined;
+
+        const nextRadius =
+          (typeof node.cornerRadius == "number" ? node.cornerRadius : 0) + d;
+
+        const nextRadiusClamped = Math.floor(
+          Math.min(maxRaius ?? Infinity, Math.max(0, nextRadius))
+        );
         draft.document.nodes[node_id] = nodeReducer(node, {
           type: "node/change/cornerRadius",
           // TODO: resolve by anchor
-          cornerRadius:
-            (typeof node.cornerRadius == "number" ? node.cornerRadius : 0) + d,
+          cornerRadius: nextRadiusClamped,
           node_id,
         });
       });
