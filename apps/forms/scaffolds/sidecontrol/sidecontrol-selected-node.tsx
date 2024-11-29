@@ -57,6 +57,7 @@ import assert from "assert";
 import { grida } from "@/grida";
 import { useNodeDomElement } from "@/builder/provider";
 import { LockClosedIcon } from "@radix-ui/react-icons";
+import { supports } from "@/grida/utils/supports";
 
 export function SelectedNodeProperties() {
   const { state: document, selectedNode } = useDocument();
@@ -463,7 +464,7 @@ export function SelectedNodeProperties() {
               onValueChange={selectedNode.opacity}
             />
           </PropertyLine>
-          {supports.cornerRadius.includes(node.type) && (
+          {supports.cornerRadius(node.type) && (
             <PropertyLine>
               <PropertyLineLabel>Radius</PropertyLineLabel>
               <CornerRadiusControl
@@ -472,7 +473,7 @@ export function SelectedNodeProperties() {
               />
             </PropertyLine>
           )}
-          {supports.border.includes(node.type) && (
+          {supports.border(node.type) && (
             <PropertyLine>
               <PropertyLineLabel>Border</PropertyLineLabel>
               <BorderControl
@@ -600,8 +601,3 @@ function DebugControls() {
     </SidebarMenuSectionContent>
   );
 }
-
-const supports: Record<string, ReadonlyArray<grida.program.nodes.NodeType>> = {
-  cornerRadius: ["rectangle", "image", "container", "component"],
-  border: ["container", "component"],
-} as const;

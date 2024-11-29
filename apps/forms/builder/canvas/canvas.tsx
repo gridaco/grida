@@ -22,6 +22,7 @@ import { CANVAS_EVENT_TARGET_ID } from "../k/id";
 import { grida } from "@/grida";
 import assert from "assert";
 import { useIsWindowResizing } from "./hooks/window-resizing";
+import { supports } from "@/grida/utils/supports";
 
 interface CanvasEventTargetContext {
   portal?: HTMLDivElement | null;
@@ -388,11 +389,10 @@ function NodeOverlay({
           {/* <ResizeHandle anchor="sw" readonly={readonly} node_id={node_id} /> */}
           {/* bottom right */}
           <ResizeHandle anchor="se" readonly={readonly} node_id={node_id} />
-          {node.type === "rectangle" ||
-            node.type === "image" ||
-            (node.type === "video" && (
+          {supports.cornerRadius(node.type) &&
+            !supports.children(node.type) && (
               <CornerRadiusHandle anchor="se" node_id={node_id} />
-            ))}
+            )}
           <RotationHandle anchor="ne" node_id={node_id} />
         </>
       )}

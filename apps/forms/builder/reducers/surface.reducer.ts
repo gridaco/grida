@@ -89,7 +89,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
             const offset = 10; // Offset to avoid overlapping
             if (newNode.left !== undefined) newNode.left += offset;
             if (newNode.top !== undefined) newNode.top += offset;
-            self_insertNode(draft, newNode.id, newNode);
+            self_insertNode(draft, draft.document.root_id, newNode);
             // after
             draft.cursor_mode = { type: "cursor" };
             draft.selected_node_id = newNode.id; // Select the newly pasted node
@@ -195,7 +195,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
               left: position.x,
               top: position.y,
             });
-            self_insertNode(draft, nnode.id, nnode);
+            self_insertNode(draft, draft.document.root_id, nnode);
             draft.cursor_mode = { type: "cursor" };
             draft.selected_node_id = nnode.id;
             break;
@@ -234,7 +234,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
               width: 1,
               height: (draft.cursor_mode.node === "line" ? 0 : 1) as 0,
             });
-            self_insertNode(draft, nnode.id, nnode);
+            self_insertNode(draft, draft.document.root_id, nnode);
             draft.cursor_mode = { type: "cursor" };
             draft.selected_node_id = nnode.id;
             draft.is_gesture_node_drag_resize = true;

@@ -5,6 +5,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
 } from "react";
 import {
@@ -1549,7 +1550,19 @@ export function useTemplateDefinition(template_id: string) {
 }
 
 export function useNodeDomElement(node_id: string) {
-  return useMemo(() => {
-    return document.getElementById(node_id);
+  const [nodeElement, setNodeElement] = React.useState<HTMLElement | null>(
+    null
+  );
+
+  useLayoutEffect(() => {
+    if (!node_id) {
+      setNodeElement(null);
+      return;
+    }
+
+    const element = document.getElementById(node_id);
+    setNodeElement(element);
   }, [node_id]);
+
+  return nodeElement;
 }
