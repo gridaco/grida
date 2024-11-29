@@ -140,6 +140,25 @@ export default function initialNode(
         ...seed,
       } satisfies grida.program.nodes.ImageNode;
     }
+    case "video": {
+      return {
+        ...base,
+        ...position,
+        ...styles,
+        type: "video",
+        cornerRadius: 0,
+        width: 100,
+        height: 100,
+        fill: undefined,
+        fit: "cover",
+        // TODO: replace with static url
+        src: "/assets/video.mp4",
+        loop: true,
+        muted: true,
+        autoplay: true,
+        ...seed,
+      } satisfies grida.program.nodes.VideoNode;
+    }
     case "line": {
       return {
         ...base,

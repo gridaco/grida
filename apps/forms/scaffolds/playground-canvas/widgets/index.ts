@@ -67,4 +67,159 @@ export namespace widget_presets {
       },
     ],
   } satisfies grida.program.nodes.NodePrototype;
+
+  export const column = {
+    ...row,
+    direction: "vertical",
+  } satisfies grida.program.nodes.NodePrototype;
+
+  export const text = {
+    type: "text",
+    width: "auto",
+    height: "auto",
+    position: "relative",
+    zIndex: 0,
+    opacity: 1,
+    text: "Hello, World!",
+    style: {},
+    fontSize: 16,
+    fontWeight: 400,
+    fontFamily: "Arial",
+    textAlign: "left",
+    textAlignVertical: "top",
+    lineHeight: 1.5,
+    letterSpacing: 0,
+    textDecoration: "none",
+  } satisfies grida.program.nodes.NodePrototype;
+
+  export const image = {
+    type: "image",
+    src: "/assets/image.png",
+    width: 100,
+    height: 100,
+    position: "relative",
+    zIndex: 0,
+    opacity: 1,
+    cornerRadius: 0,
+    style: {},
+    fit: "cover",
+  } satisfies grida.program.nodes.NodePrototype;
+
+  export const video = {
+    type: "video",
+    src: "/assets/video.mp4",
+    width: 320,
+    height: 240,
+    position: "relative",
+    zIndex: 0,
+    opacity: 1,
+    cornerRadius: 0,
+    style: {},
+    fit: "cover",
+    loop: true,
+    muted: true,
+    autoplay: true,
+  } satisfies grida.program.nodes.NodePrototype;
+
+  export const badge = {
+    type: "container",
+    name: "badge",
+    width: "auto",
+    height: "auto",
+    position: "relative",
+    zIndex: 0,
+    opacity: 1,
+    cornerRadius: 16,
+    style: {},
+    layout: "flex",
+    direction: "horizontal",
+    mainAxisAlignment: "center",
+    crossAxisAlignment: "center",
+    expanded: true,
+    mainAxisGap: 8,
+    crossAxisGap: 8,
+    padding: 8,
+    fill: {
+      type: "solid",
+      color: { r: 0, g: 0, b: 0, a: 1 },
+    },
+    children: [
+      {
+        type: "text",
+        name: "label",
+        width: "auto",
+        height: "auto",
+        position: "relative",
+        zIndex: 0,
+        opacity: 1,
+        text: "Label",
+        style: {},
+        fontSize: 12,
+        fill: {
+          type: "solid",
+          color: { r: 255, g: 255, b: 255, a: 1 },
+        },
+        fontWeight: 400,
+        fontFamily: "Arial",
+        textAlign: "center",
+        textAlignVertical: "center",
+        lineHeight: 1.5,
+        letterSpacing: 0,
+        textDecoration: "none",
+      },
+    ],
+  } satisfies grida.program.nodes.NodePrototype;
+
+  export const avatar = {
+    type: "container",
+    name: "avatar",
+    width: 48,
+    height: 48,
+    position: "relative",
+    zIndex: 0,
+    opacity: 1,
+    cornerRadius: 24,
+    style: {
+      overflow: "hidden",
+    },
+    layout: "flex",
+    direction: "horizontal",
+    mainAxisAlignment: "center",
+    crossAxisAlignment: "center",
+    expanded: true,
+    mainAxisGap: 8,
+    crossAxisGap: 8,
+    padding: 0,
+    fill: {
+      type: "solid",
+      color: { r: 255, g: 255, b: 255, a: 1 },
+    },
+    children: [
+      {
+        type: "image",
+        name: "image",
+        src: "/assets/image.png",
+        width: 48,
+        height: 48,
+        position: "relative",
+        zIndex: 0,
+        opacity: 1,
+        cornerRadius: 0,
+        style: {},
+        fit: "cover",
+      },
+    ],
+  } satisfies grida.program.nodes.NodePrototype;
+
+  export const embed = {
+    type: "iframe",
+    src: "https://example.com",
+    width: 320,
+    height: 240,
+    position: "relative",
+    zIndex: 0,
+    opacity: 1,
+    cornerRadius: 0,
+    style: {},
+  } satisfies grida.program.nodes.NodePrototype;
 }

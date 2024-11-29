@@ -388,9 +388,11 @@ function NodeOverlay({
           {/* <ResizeHandle anchor="sw" readonly={readonly} node_id={node_id} /> */}
           {/* bottom right */}
           <ResizeHandle anchor="se" readonly={readonly} node_id={node_id} />
-          {node.type === "rectangle" && (
-            <CornerRadiusHandle anchor="se" node_id={node_id} />
-          )}
+          {node.type === "rectangle" ||
+            node.type === "image" ||
+            (node.type === "video" && (
+              <CornerRadiusHandle anchor="se" node_id={node_id} />
+            ))}
           <RotationHandle anchor="ne" node_id={node_id} />
         </>
       )}

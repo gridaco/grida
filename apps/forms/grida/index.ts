@@ -1224,6 +1224,7 @@ export namespace grida {
       export type Node =
         | TextNode
         | ImageNode
+        | VideoNode
         | ContainerNode
         | HTMLIFrameNode
         | VectorNode
@@ -1240,6 +1241,7 @@ export namespace grida {
       export type NodePrototype =
         | __TPrototypeNode<Omit<TextNode, __base_scene_node_properties>>
         | __TPrototypeNode<Omit<ImageNode, __base_scene_node_properties>>
+        | __TPrototypeNode<Omit<VideoNode, __base_scene_node_properties>>
         | __TPrototypeNode<
             Omit<ContainerNode, __base_scene_node_properties | "children"> &
               __IProtoChildrenNodePrototype
@@ -1294,6 +1296,7 @@ export namespace grida {
           Partial<LineNode> &
           Partial<RectangleNode> &
           Partial<ImageNode> &
+          Partial<VideoNode> &
           Partial<ContainerNode> &
           Partial<InstanceNode> &
           Partial<TemplateInstanceNode>,
@@ -1765,6 +1768,27 @@ export namespace grida {
          */
         src?: Tokens.StringValueExpression;
         alt?: string;
+      }
+
+      export interface VideoNode
+        extends i.IBaseNode,
+          i.ISceneNode,
+          i.ICSSStylable,
+          i.IBoxFit,
+          i.IHrefable,
+          i.IRectangleCorner {
+        readonly type: "video";
+        /**
+         * required - when falsy, the video will not be rendered
+         */
+        src?: Tokens.StringValueExpression;
+        /**
+         * @see https://developer.mozilla.org/en-US/docs/Web/HTML/Element/video#poster
+         */
+        poster?: Tokens.StringValueExpression;
+        loop: boolean;
+        muted: boolean;
+        autoplay: boolean;
       }
 
       export interface ContainerNode

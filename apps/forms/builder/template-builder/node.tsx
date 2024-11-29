@@ -55,12 +55,14 @@ export function NodeElement<P extends Record<string, any>>({
       }
       case "container":
       case "image":
+      case "video":
       case "text":
       case "vector":
       case "line":
       case "rectangle":
       case "component":
-      case "ellipse": {
+      case "ellipse":
+      case "iframe": {
         return TemplateBuilderWidgets[node.type];
       }
       default:
@@ -89,6 +91,9 @@ export function NodeElement<P extends Record<string, any>>({
     text: computed.text,
     props: computed.props,
     src: computed.src,
+    loop: node.loop,
+    muted: node.muted,
+    autoplay: node.autoplay,
     paths: node.paths,
     opacity: node.opacity,
     zIndex: DEFAULT_ZINDEX ?? node.zIndex,
@@ -161,6 +166,7 @@ const fillings = {
   component: "background",
   iframe: "background",
   image: "background",
+  video: "background",
   vector: "none",
   rectangle: "none",
   ellipse: "none",

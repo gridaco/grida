@@ -1,7 +1,7 @@
 import React from "react";
 import { grida } from "@/grida";
 
-export const ContainerWidget = ({
+export const IFrameWidget = ({
   style,
   width,
   height,
@@ -21,4 +21,4 @@ export const ContainerWidget = ({
   );
 };
 
-ContainerWidget.type = "container";
+IFrameWidget.type = "iframe";

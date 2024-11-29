@@ -35,36 +35,47 @@ export default function documentReducer<S extends IDocumentEditorState>(
       const { prototype } = action;
 
       return produce(state, (draft) => {
-        function insertNodeRecursive(
+        function self_instanciateNodePrototype<S extends IDocumentEditorState>(
           draft: Draft<S>,
-          parentNodeId: string, // This is now properly used
+          parentNodeId: string,
           nodePrototype: grida.program.nodes.NodePrototype
         ): string {
-          // Generate a unique ID for the new node
           const nodeId = v4();
 
-          // Convert prototype to actual node
+          // Create the parent node
+          // @ts-expect-error
           const newNode: grida.program.nodes.Node = {
             ...nodePrototype,
             id: nodeId,
             name: nodePrototype.name ?? nodePrototype.type,
             locked: nodePrototype.locked ?? false,
-            active: nodePrototype.active ?? false,
-            // @ts-ignore
-            children: nodePrototype.children?.map(
-              (child: grida.program.nodes.NodePrototype) =>
-                insertNodeRecursive(draft, nodeId, child) // Pass the current nodeId as the parent for children
-            ),
+            active: nodePrototype.active ?? true,
+            type: nodePrototype.type,
+            children:
+              nodePrototype.type === "container" ||
+              nodePrototype.type === "component" ||
+              nodePrototype.type === "template_instance" ||
+              nodePrototype.type === "instance"
+                ? []
+                : undefined,
           };
 
-          // Insert the node using the `self_insertNode` helper
-          self_insertNode(draft, parentNodeId, newNode); // Correctly use parentNodeId here
+          // Insert the parent node into the document first
+          self_insertNode(draft, parentNodeId, newNode);
+
+          // Recursively process children and register them after the parent
+          if ("children" in nodePrototype) {
+            (newNode as grida.program.nodes.i.IChildren).children =
+              nodePrototype.children.map((childPrototype) =>
+                self_instanciateNodePrototype(draft, nodeId, childPrototype)
+              );
+          }
 
           return nodeId;
         }
 
         // Insert the prototype as the root node under the document's root
-        insertNodeRecursive(draft, draft.document.root_id, prototype);
+        self_instanciateNodePrototype(draft, draft.document.root_id, prototype);
 
         // after
         draft.cursor_mode = { type: "cursor" };

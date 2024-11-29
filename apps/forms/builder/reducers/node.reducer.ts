@@ -103,9 +103,10 @@ export default function nodeReducer<
       case "node/change/cornerRadius": {
         assert(
           draft.type === "rectangle" ||
+            draft.type === "image" ||
+            draft.type === "video" ||
             draft.type === "container" ||
-            draft.type === "component" ||
-            draft.type === "image",
+            draft.type === "component",
           "node type does not support cornerRadius"
         );
 
