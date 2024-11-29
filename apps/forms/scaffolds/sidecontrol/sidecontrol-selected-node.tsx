@@ -36,19 +36,13 @@ import { BoxFitControl } from "./controls/box-fit";
 import { PropsControl } from "./controls/props";
 import { TargetBlankControl } from "./controls/target";
 import { ExportNodeControl } from "./controls/export";
-
-import { useComputedNode, useDocument, useNode } from "@/builder";
-import assert from "assert";
-import { grida } from "@/grida";
 import { FontFamilyControl } from "./controls/font-family";
 import { TextColorControl } from "./controls/text-color";
 import {
   PositioningConstraintsControl,
   PositioningModeControl,
 } from "./controls/positioning";
-import { useNodeDomElement } from "@/builder/provider";
 import { RotateControl } from "./controls/rotate";
-import { LockClosedIcon } from "@radix-ui/react-icons";
 import { TextAlignVerticalControl } from "./controls/text-align-vertical";
 import { LetterSpacingControl } from "./controls/letter-spacing";
 import { LineHeightControl } from "./controls/line-height";
@@ -58,6 +52,11 @@ import { LengthControl } from "./controls/length";
 import { LayoutControl } from "./controls/layout";
 import { AxisControl } from "./controls/axis";
 import { MaxlengthControl } from "./controls/maxlength";
+import { useComputedNode, useDocument, useNode } from "@/builder";
+import assert from "assert";
+import { grida } from "@/grida";
+import { useNodeDomElement } from "@/builder/provider";
+import { LockClosedIcon } from "@radix-ui/react-icons";
 
 export function SelectedNodeProperties() {
   const { state: document, selectedNode } = useDocument();
@@ -464,17 +463,24 @@ export function SelectedNodeProperties() {
               onValueChange={selectedNode.opacity}
             />
           </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Radius</PropertyLineLabel>
-            <CornerRadiusControl
-              value={cornerRadius}
-              onValueChange={selectedNode.cornerRadius}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Border</PropertyLineLabel>
-            <BorderControl value={border} onValueChange={selectedNode.border} />
-          </PropertyLine>
+          {supports.cornerRadius.includes(node.type) && (
+            <PropertyLine>
+              <PropertyLineLabel>Radius</PropertyLineLabel>
+              <CornerRadiusControl
+                value={cornerRadius}
+                onValueChange={selectedNode.cornerRadius}
+              />
+            </PropertyLine>
+          )}
+          {supports.border.includes(node.type) && (
+            <PropertyLine>
+              <PropertyLineLabel>Border</PropertyLineLabel>
+              <BorderControl
+                value={border}
+                onValueChange={selectedNode.border}
+              />
+            </PropertyLine>
+          )}
           <PropertyLine>
             <PropertyLineLabel>Fill</PropertyLineLabel>
             <FillControl value={fill} onValueChange={selectedNode.fill} />
@@ -594,3 +600,8 @@ function DebugControls() {
     </SidebarMenuSectionContent>
   );
 }
+
+const supports: Record<string, ReadonlyArray<grida.program.nodes.NodeType>> = {
+  cornerRadius: ["rectangle", "image", "container", "component"],
+  border: ["container", "component"],
+} as const;
