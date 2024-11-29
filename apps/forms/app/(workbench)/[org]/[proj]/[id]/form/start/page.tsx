@@ -133,7 +133,7 @@ function SetupStartPage() {
   return (
     <>
       <BrowseStartPageTemplatesDialog
-        {...dialog}
+        {...dialog.props}
         onValueCommit={(template_id) => {
           setupStartPage(template_id);
         }}

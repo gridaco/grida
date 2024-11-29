@@ -207,7 +207,7 @@ export function CreateNewDocumentButton({
           </DropdownMenuGroup>
           <DropdownMenuGroup>
             <DropdownMenuLabel>CMS / Commerce</DropdownMenuLabel>
-            <DropdownMenuItem onSelect={() => newDatabaseDialog.openDialog()}>
+            <DropdownMenuItem onSelect={newDatabaseDialog.openDialog}>
               <ResourceTypeIcon
                 type="database"
                 className="w-4 h-4 me-2 align-middle"
@@ -246,7 +246,7 @@ export function CreateNewDocumentButton({
       <CreateNewDatabaseDialog
         project_id={project_id}
         project_name={project_name}
-        {...newDatabaseDialog}
+        {...newDatabaseDialog.props}
       />
     </>
   );

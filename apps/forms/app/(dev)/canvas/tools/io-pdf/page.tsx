@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { Button } from "@/components/ui/button";
 import { GridaLogo } from "@/components/grida-logo";
 import Link from "next/link";

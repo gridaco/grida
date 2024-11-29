@@ -229,6 +229,7 @@ export function ModeData() {
             to delete this table
           </>
         }
+        data={deleteTableDialog.data}
         placeholder={deleteTableDialog.data?.match}
         match={deleteTableDialog.data?.match}
         onDelete={async ({ id }, user_confirmation_txt) => {
@@ -259,15 +260,15 @@ export function ModeData() {
             return false;
           }
         }}
-        {...deleteTableDialog}
+        {...deleteTableDialog.props}
         key={deleteTableDialog.refreshkey}
       />
       <ConnectNewSupabaseTableDialog
-        {...newXSBTableDialog}
+        {...newXSBTableDialog.props}
         key={newXSBTableDialog.refreshkey}
       />
       <CreateNewSchemaTableDialog
-        {...newTableDialog}
+        {...newTableDialog.props}
         key={newTableDialog.refreshkey}
       />
       {renderMenuItems(state.sidebar.mode_data.tables, {

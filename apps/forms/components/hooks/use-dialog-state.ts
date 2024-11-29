@@ -1,9 +1,23 @@
+import { Dialog } from "@radix-ui/react-dialog";
+import React from "react";
 import { useState } from "react";
+
+type DialogProps = React.ComponentProps<typeof Dialog>;
 
 export function useDialogState<T = any>(
   name = "dialog",
   config?: { refreshkey?: boolean; defaultOpen?: boolean }
-) {
+): {
+  refreshkey: string;
+  props: DialogProps & { data?: T };
+  open: boolean;
+  setOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  toggleOpen: () => void;
+  openDialog: (data?: T | Event) => void;
+  closeDialog: () => void;
+  data: T | undefined;
+  setData: React.Dispatch<React.SetStateAction<T | undefined>>;
+} {
   const [open, setOpen] = useState<boolean>(config?.defaultOpen ?? false);
   const [key, setKey] = useState(0);
   const [data, setData] = useState<T>();
@@ -17,13 +31,17 @@ export function useDialogState<T = any>(
 
   return {
     refreshkey: name + key,
+    props: {
+      open,
+      onOpenChange: setOpen,
+      data,
+    },
+    data,
     open,
     setOpen,
-    onOpenChange: setOpen,
     toggleOpen,
     openDialog,
     closeDialog,
-    data,
     setData,
   };
 }

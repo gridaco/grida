@@ -164,10 +164,10 @@ export default function CanvasPlayground() {
 
   return (
     <main className="w-screen h-screen overflow-hidden">
-      <SettingsDialog {...settingsDialog} />
+      <SettingsDialog {...settingsDialog.props} />
       <ImportFromGridaFileJsonDialog
         key={importFromJson.refreshkey}
-        {...importFromJson}
+        {...importFromJson.props}
         onImport={(file) => {
           dispatch({
             type: "document/reset",
@@ -179,7 +179,7 @@ export default function CanvasPlayground() {
         }}
       />
       <ImportFromFigmaDialog
-        {...importFromFigmaDialog}
+        {...importFromFigmaDialog.props}
         onImport={(res) => {
           dispatch({
             type: "document/reset",
@@ -193,7 +193,7 @@ export default function CanvasPlayground() {
           });
         }}
       />
-      <Dialog {...playDialog} key={playDialog.refreshkey}>
+      <Dialog {...playDialog.props} key={playDialog.refreshkey}>
         <DialogContent className="max-w-screen h-screen">
           <StandaloneDocumentEditor editable={false} initial={state}>
             <div className="w-full h-full flex items-center justify-center overflow-hidden">
@@ -209,7 +209,7 @@ export default function CanvasPlayground() {
           <aside>
             {insertDialog.open ? (
               <>
-                <DialogPrimitive.Root {...insertDialog}>
+                <DialogPrimitive.Root {...insertDialog.props}>
                   <DialogPrimitive.Content className="h-full">
                     <SidebarRoot>
                       <InsertNodePanelContent />

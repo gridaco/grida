@@ -18,7 +18,7 @@ export default function IOFigmaPage() {
 
   return (
     <main className="w-dvw h-dvh">
-      <ImportFromFigmaDialog {...dialog} onImport={setFig} />
+      <ImportFromFigmaDialog {...dialog.props} onImport={setFig} />
       <div className="flex flex-col w-full h-full">
         <header className="flex items-center justify-between p-4 border-b">
           <div className="flex gap-4 items-center">
@@ -32,7 +32,7 @@ export default function IOFigmaPage() {
               <span className="text-xs">Figma Restful API Json Viewer</span>
             </div>
           </div>
-          <Button>
+          <Button onClick={dialog.openDialog}>
             <FigmaLogoIcon className="me-2" />
             Import Figma
           </Button>

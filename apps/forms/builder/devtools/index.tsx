@@ -24,7 +24,7 @@ export function DevtoolsPanel() {
   };
 
   return (
-    <Collapsible {...expandable}>
+    <Collapsible {...expandable.props}>
       <Tabs defaultValue="document" className="border-t">
         <div
           onClick={expandable.toggleOpen}

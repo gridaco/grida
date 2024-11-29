@@ -257,7 +257,7 @@ export function ExportNodeControl({
   return (
     <>
       <AdvancedExportDialog
-        {...advancedExportDialog}
+        {...advancedExportDialog.props}
         key={advancedExportDialog.refreshkey}
         defaultName={name}
         node_id={node_id}
