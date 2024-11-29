@@ -475,12 +475,10 @@ export function SelectedNodeProperties() {
             <PropertyLineLabel>Border</PropertyLineLabel>
             <BorderControl value={border} onValueChange={selectedNode.border} />
           </PropertyLine>
-          {fill && (
-            <PropertyLine>
-              <PropertyLineLabel>Fill</PropertyLineLabel>
-              <FillControl value={fill} onValueChange={selectedNode.fill} />
-            </PropertyLine>
-          )}
+          <PropertyLine>
+            <PropertyLineLabel>Fill</PropertyLineLabel>
+            <FillControl value={fill} onValueChange={selectedNode.fill} />
+          </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Shadow</PropertyLineLabel>
             <BoxShadowControl
