@@ -3,7 +3,8 @@ import { grida } from "@/grida";
 import { CursorMode, IDocumentEditorState } from "./types";
 
 export type BuilderAction =
-  | DocumentEditorResetWithStateAction
+  | __InternalSyncArtboardOffset
+  | __InternalResetAction
   | DocumentEditorInsertNodeAction
   //
   | SurfaceAction
@@ -20,6 +21,18 @@ export type BuilderAction =
   | SchemaAction;
 
 type Vector2 = [number, number];
+
+export type __InternalSyncArtboardOffset = {
+  type: "__internal/sync-artboard-offset";
+} & {
+  offset: Vector2;
+};
+
+export interface __InternalResetAction {
+  type: "__internal/reset";
+  key?: string;
+  state: IDocumentEditorState;
+}
 
 interface IHtmlBackendCanvasEventTargetPointerEvent {
   /**
@@ -218,10 +231,6 @@ export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleD
     };
 
 //
-export interface DocumentEditorResetWithStateAction {
-  type: "document/reset";
-  state: IDocumentEditorState;
-}
 
 export interface DocumentEditorInsertNodeAction {
   type: "document/insert";

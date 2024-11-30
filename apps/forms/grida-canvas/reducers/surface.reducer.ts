@@ -32,6 +32,7 @@ import {
   self_insertNode,
   self_updateSurfaceHoverState,
 } from "./methods";
+import { cmath } from "../math";
 
 const keyboard_key_bindings = {
   r: "rectangle",
@@ -139,8 +140,11 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
         position: { x, y },
       } = <DocumentEditorCanvasEventTargetHtmlBackendPointerMove>action;
       return produce(state, (draft) => {
-        draft.cursor_position.x = x;
-        draft.cursor_position.y = y;
+        draft.surface_cursor_position = [x, y];
+        draft.cursor_position = cmath.vector2.subtract(
+          draft.surface_cursor_position,
+          draft.translate ?? [0, 0]
+        );
       });
     }
     case "document/canvas/backend/html/event/on-pointer-move-raycast": {
@@ -191,10 +195,17 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
           }
           case "insert":
             const nnode = initialNode(draft.cursor_mode.node, {
-              // TODO: need to transform to a relative position (to root renderer or parent node
-              left: position.x,
-              top: position.y,
+              left: state.cursor_position[0],
+              top: state.cursor_position[1],
             });
+
+            // center translate the new node.
+            try {
+              const _nnode = nnode as grida.program.nodes.RectangleNode;
+              _nnode.left! -= _nnode.width / 2;
+              _nnode.top! -= _nnode.height / 2;
+            } catch (e) {}
+
             self_insertNode(draft, draft.document.root_id, nnode);
             draft.cursor_mode = { type: "cursor" };
             draft.selected_node_id = nnode.id;
@@ -215,10 +226,10 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
             if (!draft.selected_node_id) {
               // marquee selection
               draft.marquee = {
-                x1: draft.cursor_position.x,
-                y1: draft.cursor_position.y,
-                x2: draft.cursor_position.x,
-                y2: draft.cursor_position.y,
+                x1: draft.surface_cursor_position[0],
+                y1: draft.surface_cursor_position[1],
+                x2: draft.surface_cursor_position[0],
+                y2: draft.surface_cursor_position[1],
               };
             } else {
               draft.is_gesture_node_drag_move = true;
@@ -228,9 +239,8 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
           case "insert":
             //
             const nnode = initialNode(draft.cursor_mode.node, {
-              // TODO: need to transform to a relative position (to root renderer or parent node
-              left: draft.cursor_position.x,
-              top: draft.cursor_position.y,
+              left: draft.cursor_position[0],
+              top: draft.cursor_position[1],
               width: 1,
               height: (draft.cursor_mode.node === "line" ? 0 : 1) as 0,
             });
@@ -256,8 +266,8 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
       } = <DocumentEditorCanvasEventTargetHtmlBackendDrag>action;
       if (state.marquee) {
         return produce(state, (draft) => {
-          draft.marquee!.x2 = draft.cursor_position.x;
-          draft.marquee!.y2 = draft.cursor_position.y;
+          draft.marquee!.x2 = draft.surface_cursor_position[0];
+          draft.marquee!.y2 = draft.surface_cursor_position[1];
         });
       } else {
         //

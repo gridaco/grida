@@ -109,7 +109,7 @@ function EditorGoogleFontsManager({ children }: React.PropsWithChildren<{}>) {
   );
 }
 
-function useInternal() {
+export function __useInternal() {
   const state = useContext(DocumentContext);
   if (!state) {
     throw new Error(
@@ -707,7 +707,7 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
 }
 
 export function useNodeAction(node_id: string | undefined) {
-  const [_, dispatch] = useInternal();
+  const [_, dispatch] = __useInternal();
   const nodeActions = __useNodeActions(dispatch);
 
   return useMemo(() => {
@@ -816,7 +816,7 @@ export function useNodeAction(node_id: string | undefined) {
 }
 
 export function useDocument() {
-  const [state, dispatch] = useInternal();
+  const [state, dispatch] = __useInternal();
 
   const { selected_node_id } = state;
 
@@ -1001,7 +1001,7 @@ function throttle<T extends (...args: any[]) => void>(
 }
 
 export function useEventTargetCSSCursor() {
-  const [state] = useInternal();
+  const [state] = __useInternal();
 
   const { cursor_mode } = state;
 
@@ -1027,7 +1027,7 @@ export function useEventTargetCSSCursor() {
 }
 
 export function useEventTarget() {
-  const [state, dispatch] = useInternal();
+  const [state, dispatch] = __useInternal();
 
   const {
     is_gesture_node_drag_move: is_node_transforming,
