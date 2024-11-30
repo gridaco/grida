@@ -271,12 +271,12 @@ export namespace iofigma {
               cornerRadius: node.cornerRadius
                 ? node.cornerRadius
                 : node.rectangleCornerRadii
-                  ? {
-                      topLeftRadius: node.rectangleCornerRadii[0],
-                      topRightRadius: node.rectangleCornerRadii[1],
-                      bottomRightRadius: node.rectangleCornerRadii[2],
-                      bottomLeftRadius: node.rectangleCornerRadii[3],
-                    }
+                  ? (node.rectangleCornerRadii as [
+                      number,
+                      number,
+                      number,
+                      number,
+                    ])
                   : 0,
               padding:
                 paddingTop === paddingRight &&
@@ -449,12 +449,12 @@ export namespace iofigma {
             const cornerRadius = node.cornerRadius
               ? node.cornerRadius
               : node.rectangleCornerRadii
-                ? {
-                    topLeftRadius: node.rectangleCornerRadii[0],
-                    topRightRadius: node.rectangleCornerRadii[1],
-                    bottomRightRadius: node.rectangleCornerRadii[2],
-                    bottomLeftRadius: node.rectangleCornerRadii[3],
-                  }
+                ? (node.rectangleCornerRadii as [
+                    number,
+                    number,
+                    number,
+                    number,
+                  ])
                 : 0;
 
             if (first_visible_fill?.type === "IMAGE") {

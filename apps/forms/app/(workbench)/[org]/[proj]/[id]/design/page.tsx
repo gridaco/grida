@@ -8,11 +8,11 @@ import FormCollectionPage from "@/theme/templates/formcollection/page";
 import { CanvasFloatingToolbar } from "@/scaffolds/canvas-floating-toolbar";
 import {
   StandaloneDocumentEditor,
-  CanvasEventTarget,
-  CanvasOverlay,
-} from "@/builder";
+  ViewportRoot,
+  ViewportSurface,
+} from "@/grida-canvas";
 import { composeEditorDocumentAction } from "@/scaffolds/editor/action";
-import { BuilderAction } from "@/builder/action";
+import { BuilderAction } from "@/grida-canvas/action";
 
 export default function SiteDeisngPage() {
   return (
@@ -55,8 +55,8 @@ function CurrentPageCanvas() {
           initial={document}
           dispatch={documentDispatch}
         >
-          <CanvasEventTarget className="relative w-full no-scrollbar overflow-y-auto bg-transparent">
-            <CanvasOverlay />
+          <ViewportRoot className="relative w-full no-scrollbar overflow-y-auto bg-transparent">
+            <ViewportSurface />
             <>
               <AgentThemeProvider>
                 {/* // 430 932 max-h-[932px] no-scrollbar overflow-y-scroll */}
@@ -68,7 +68,7 @@ function CurrentPageCanvas() {
                 <CanvasFloatingToolbar />
               </div>
             </>
-          </CanvasEventTarget>
+          </ViewportRoot>
           <aside className="hidden lg:flex h-full">
             <SideControl />
           </aside>

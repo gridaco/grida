@@ -1,0 +1,59 @@
+import React from "react";
+import { grida } from "@/grida";
+
+export const VideoWidget = ({
+  id,
+  src,
+  poster,
+  width,
+  height,
+  style,
+  ...props
+}: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.VideoNode>) => {
+  const { objectFit, objectPosition, ...divStyles } = style || {};
+  const data_attributes = {
+    "data-grida-node-id": props["data-grida-node-id"],
+    "data-grida-node-locked": props["data-grida-node-locked"],
+    "data-grida-node-type": props["data-grida-node-type"],
+    "data-dev-editor-hovered": props["data-dev-editor-hovered"],
+    "data-dev-editor-selected": props["data-dev-editor-selected"],
+  } satisfies grida.program.document.INodeHtmlDocumentQueryDataAttributes;
+
+  const video_element_props_without_data_attributes = {
+    ...props,
+    "data-grida-node-id": undefined,
+    "data-grida-node-type": undefined,
+    "data-dev-editor-hovered": undefined,
+    "data-dev-editor-selected": undefined,
+  };
+
+  return (
+    <div
+      id={id}
+      style={{ ...divStyles, overflow: "hidden" }}
+      {...data_attributes}
+    >
+      {src && (
+        // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
+        <video
+          src={src as string}
+          poster={poster as string}
+          width={grida.program.css.toDimension(width)}
+          height={grida.program.css.toDimension(height)}
+          {...video_element_props_without_data_attributes}
+          loop={props.loop}
+          muted={props.muted}
+          autoPlay={props.autoplay}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit,
+            objectPosition,
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+VideoWidget.type = "video";

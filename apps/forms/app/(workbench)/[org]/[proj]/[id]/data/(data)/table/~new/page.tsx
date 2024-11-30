@@ -33,7 +33,7 @@ export default function WelcomeNewPage() {
         title={"Create your first table"}
         paragraph={"Let's get started by creating your first table."}
       />
-      <Dialog {...welcome}>
+      <Dialog {...welcome.props}>
         <DialogContent hideCloseButton className="outline-none overflow-hidden">
           <div className="-m-6">
             <Image

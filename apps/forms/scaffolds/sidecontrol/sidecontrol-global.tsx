@@ -77,7 +77,7 @@ import {
   useDocument,
   useNode,
   useTemplateDefinition,
-} from "@/builder/provider";
+} from "@/grida-canvas/provider";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -224,11 +224,11 @@ function FormStartPageTemplateControl() {
   return (
     <>
       <BrowseStartPageTemplatesDialog
-        {...switchTemplateDialog}
+        {...switchTemplateDialog.props}
         defaultValue={state.documents["form/startpage"]?.template_id}
         onValueCommit={setupStartPage}
       />
-      <AlertDialog {...removeConfirmDialog}>
+      <AlertDialog {...removeConfirmDialog.props}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>

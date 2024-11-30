@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { useStep } from "usehooks-ts";
 import { FormStartPage } from "@/theme/templates/formstart";
 import { SandboxWrapper } from "./sandbox";
-import { StandaloneDocumentEditor } from "@/builder";
+import { StandaloneDocumentEditor } from "@/grida-canvas";
 import { grida } from "@/grida";
 
 export function BrowseStartPageTemplatesDialog({

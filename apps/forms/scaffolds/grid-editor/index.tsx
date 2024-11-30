@@ -246,8 +246,7 @@ export function GridEditor({
         <TableDefinitionProvider definition={definition}>
           <GridLayout.Root>
             <DeleteFieldConfirmDialog
-              open={deleteFieldConfirmDialog.open}
-              onOpenChange={deleteFieldConfirmDialog.onOpenChange}
+              {...deleteFieldConfirmDialog.props}
               onCancel={deleteFieldConfirmDialog.closeDialog}
               field_id={deleteFieldConfirmDialog.data?.field_id}
               onDeleteConfirm={(field_id) => onDeleteField(field_id)}

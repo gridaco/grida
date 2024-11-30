@@ -896,7 +896,7 @@ export namespace grida {
         if (typeof cr === "number") {
           return `${cr}px`;
         } else {
-          return `${cr.topLeftRadius}px ${cr.topRightRadius}px ${cr.bottomRightRadius}px ${cr.bottomLeftRadius}px`;
+          return `${cr[0]}px ${cr[1]}px ${cr[2]}px ${cr[3]}px`;
         }
       }
 
@@ -1202,6 +1202,20 @@ export namespace grida {
          */
         radius: number;
       };
+
+      /**
+       *
+       * [top-left | top-right | bottom-right | bottom-left]
+       */
+      export type CornerRadius4 = [number, number, number, number];
+
+      export function cornerRadius4Identical(value: CornerRadius4): boolean {
+        return (
+          value[0] === value[1] &&
+          value[1] === value[2] &&
+          value[2] === value[3]
+        );
+      }
     }
 
     export namespace nodes {
@@ -1210,6 +1224,7 @@ export namespace grida {
       export type Node =
         | TextNode
         | ImageNode
+        | VideoNode
         | ContainerNode
         | HTMLIFrameNode
         | VectorNode
@@ -1219,6 +1234,53 @@ export namespace grida {
         | ComponentNode
         | InstanceNode
         | TemplateInstanceNode;
+
+      /**
+       * A virtual, before-instantiation node that only stores the prototype of a node.
+       */
+      export type NodePrototype =
+        | __TPrototypeNode<Omit<TextNode, __base_scene_node_properties>>
+        | __TPrototypeNode<Omit<ImageNode, __base_scene_node_properties>>
+        | __TPrototypeNode<Omit<VideoNode, __base_scene_node_properties>>
+        | __TPrototypeNode<
+            Omit<ContainerNode, __base_scene_node_properties | "children"> &
+              __IProtoChildrenNodePrototype
+          >
+        | __TPrototypeNode<Omit<HTMLIFrameNode, __base_scene_node_properties>>
+        | __TPrototypeNode<Omit<VectorNode, __base_scene_node_properties>>
+        | __TPrototypeNode<Omit<LineNode, __base_scene_node_properties>>
+        | __TPrototypeNode<Omit<RectangleNode, __base_scene_node_properties>>
+        | __TPrototypeNode<Omit<EllipseNode, __base_scene_node_properties>>
+        | __TPrototypeNode<
+            Omit<ComponentNode, __base_scene_node_properties | "children"> &
+              __IProtoChildrenNodePrototype
+          >
+        | __TPrototypeNode<
+            Omit<InstanceNode, __base_scene_node_properties | "children"> &
+              __IProtoChildrenNodePrototype
+          >
+        | __TPrototypeNode<
+            Omit<TemplateInstanceNode, __base_scene_node_properties>
+          >;
+
+      /**
+       * @internal Prototype node can't have an id, and can optionally have BaseNode and SceneNode properties.
+       * Other properties are required.
+       */
+      type __TPrototypeNode<T> = Partial<Omit<i.IBaseNode, "id">> &
+        Partial<i.ISceneNode> &
+        T;
+
+      type __base_scene_node_properties =
+        | "id"
+        | "name"
+        | "userdata"
+        | "active"
+        | "locked";
+
+      type __IProtoChildrenNodePrototype = {
+        children: NodePrototype[];
+      };
 
       /**
        * Type for containing instance's node changes data relative to master node
@@ -1234,6 +1296,7 @@ export namespace grida {
           Partial<LineNode> &
           Partial<RectangleNode> &
           Partial<ImageNode> &
+          Partial<VideoNode> &
           Partial<ContainerNode> &
           Partial<InstanceNode> &
           Partial<TemplateInstanceNode>,
@@ -1343,14 +1406,7 @@ export namespace grida {
          * Rectangle Corner
          */
         export interface IRectangleCorner {
-          cornerRadius:
-            | number
-            | {
-                topLeftRadius: number;
-                topRightRadius: number;
-                bottomLeftRadius: number;
-                bottomRightRadius: number;
-              };
+          cornerRadius: number | cg.CornerRadius4;
         }
 
         /**
@@ -1478,6 +1534,10 @@ export namespace grida {
             IRotation,
             IZIndex,
             ICSSBorder {
+          /**
+           * TODO: rename to css
+           * @deprecated
+           */
           style: css.ExplicitlySupportedCSSProperties;
         }
 
@@ -1708,6 +1768,27 @@ export namespace grida {
          */
         src?: Tokens.StringValueExpression;
         alt?: string;
+      }
+
+      export interface VideoNode
+        extends i.IBaseNode,
+          i.ISceneNode,
+          i.ICSSStylable,
+          i.IBoxFit,
+          i.IHrefable,
+          i.IRectangleCorner {
+        readonly type: "video";
+        /**
+         * required - when falsy, the video will not be rendered
+         */
+        src?: Tokens.StringValueExpression;
+        /**
+         * @see https://developer.mozilla.org/en-US/docs/Web/HTML/Element/video#poster
+         */
+        poster?: Tokens.StringValueExpression;
+        loop: boolean;
+        muted: boolean;
+        autoplay: boolean;
       }
 
       export interface ContainerNode

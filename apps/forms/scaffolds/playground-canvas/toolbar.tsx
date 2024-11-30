@@ -1,7 +1,7 @@
 "use client";
 
 import { generate } from "@/app/(dev)/canvas/actions";
-import { useDocument, useEventTarget, type CursorMode } from "@/builder";
+import { useDocument, useEventTarget, type CursorMode } from "@/grida-canvas";
 import { OpenAILogo } from "@/components/logos/openai";
 import { Button } from "@/components/ui/button";
 import {
@@ -136,7 +136,11 @@ ${userprompt}
   return { action, delta, loading };
 }
 
-export function PlaygroundToolbar() {
+export function PlaygroundToolbar({
+  onAddButtonClick,
+}: {
+  onAddButtonClick?: () => void;
+}) {
   const { setCursorMode, cursor_mode } = useEventTarget();
 
   return (
@@ -191,21 +195,9 @@ export function PlaygroundToolbar() {
             <Generate />
           </PopoverContent>
         </Popover>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="ghost" className="px-3">
-              <MixIcon />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent
-            side="top"
-            sideOffset={16}
-            align="center"
-            className="w-96"
-          >
-            <AddResources />
-          </PopoverContent>
-        </Popover>
+        <Button variant="ghost" className="px-3" onClick={onAddButtonClick}>
+          <MixIcon />
+        </Button>
       </ToggleGroup>
     </div>
   );
@@ -242,26 +234,6 @@ function Generate() {
           </Button>
         </PopoverClose>
       </div>
-    </div>
-  );
-}
-
-function AddResources() {
-  // resources
-  // images
-  // icons
-  // shapes
-  // Scribbles
-  //
-
-  // types
-  // - image
-  // - vector (mono path)
-  // - composite node
-  return (
-    <div className="flex flex-col gap-2">
-      Add
-      <Button>iframe</Button>
     </div>
   );
 }

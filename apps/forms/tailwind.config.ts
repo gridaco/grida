@@ -3,14 +3,14 @@ import type { Config } from "tailwindcss";
 const config: Config = {
   presets: [require("./tailwind.config.ui.js")],
   content: [
+    "./app/**/*.{js,ts,jsx,tsx,mdx}",
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
-    "./kits/**/*.{js,ts,jsx,tsx,mdx}",
     "./www/**/*.{js,ts,jsx,tsx,mdx}",
     "./theme/**/*.{js,ts,jsx,tsx,mdx}",
+    "./kits/**/*.{js,ts,jsx,tsx,mdx}",
     "./scaffolds/**/*.{js,ts,jsx,tsx,mdx}",
-    "./builder/**/*.{js,ts,jsx,tsx,mdx}",
-    "./app/**/*.{js,ts,jsx,tsx,mdx}",
+    "./grida-canvas/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
     extend: {

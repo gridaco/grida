@@ -26,7 +26,7 @@ import { Data } from "@/lib/data";
 import * as samples from "@/theme/templates/formcollection/samples";
 import { grida } from "@/grida";
 import { FormStartPage } from "@/theme/templates/formstart";
-import { initDocumentEditorState } from "@/builder";
+import { initDocumentEditorState } from "@/grida-canvas";
 
 export function initialEditorState(init: EditorInit): EditorState {
   switch (init.doctype) {

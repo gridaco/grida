@@ -20,7 +20,7 @@ import type {
   FormClientFetchResponseError,
 } from "@/app/(api)/v1/[id]/route";
 import { CTAProvider } from "@/theme/templates/kit/contexts/cta.context";
-import { StandaloneDocumentEditor } from "@/builder/provider";
+import { StandaloneDocumentEditor } from "@/grida-canvas/provider";
 import { grida } from "@/grida";
 
 export function Agent({

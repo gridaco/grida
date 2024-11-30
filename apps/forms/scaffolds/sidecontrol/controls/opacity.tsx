@@ -16,26 +16,30 @@ export function OpacityControl({
         size: "container",
       })}
     >
-      <Input
-        className={WorkbenchUI.inputVariants({ size: "sm" })}
-        value={value}
-        type="number"
-        min={0}
-        max={1}
-        step={0.01}
-        onChange={(e) => {
-          onValueChange?.(parseFloat(e.target.value));
-        }}
-      />
-      <Slider
-        min={0}
-        max={1}
-        step={0.01}
-        value={value ? [value] : undefined}
-        onValueChange={([v]) => {
-          onValueChange?.(v);
-        }}
-      />
+      <div className="flex-1">
+        <Input
+          className={WorkbenchUI.inputVariants({ size: "sm" })}
+          value={value}
+          type="number"
+          min={0}
+          max={1}
+          step={0.01}
+          onChange={(e) => {
+            onValueChange?.(parseFloat(e.target.value));
+          }}
+        />
+      </div>
+      <div className="flex-1">
+        <Slider
+          min={0}
+          max={1}
+          step={0.01}
+          value={value ? [value] : undefined}
+          onValueChange={([v]) => {
+            onValueChange?.(v);
+          }}
+        />
+      </div>
     </div>
   );
 }

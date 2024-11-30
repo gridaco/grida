@@ -2,6 +2,8 @@
 
 import React, { useEffect, useReducer, useState } from "react";
 import {
+  SidebarMenuGrid,
+  SidebarMenuGridItem,
   SidebarRoot,
   SidebarSection,
   SidebarSectionHeaderItem,
@@ -13,11 +15,12 @@ import { NodeHierarchyList } from "@/scaffolds/sidebar/sidebar-node-hierarchy-li
 import {
   StandaloneDocumentEditor,
   StandaloneDocumentEditorContent,
-  CanvasEventTarget,
-  CanvasOverlay,
+  ViewportRoot,
+  ViewportSurface,
   standaloneDocumentReducer,
   initDocumentEditorState,
-} from "@/builder";
+  useDocument,
+} from "@/grida-canvas";
 import {
   Select,
   SelectContent,
@@ -28,18 +31,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { GridaLogo } from "@/components/grida-logo";
-import { DevtoolsPanel } from "@/builder/devtools";
+import { DevtoolsPanel } from "@/grida-canvas/devtools";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
-import { useGoogleFontsList } from "@/builder/google.fonts";
+import { useGoogleFontsList } from "@/grida-canvas/google.fonts";
 import {
+  ButtonIcon,
   DownloadIcon,
   FigmaLogoIcon,
   FileIcon,
   GearIcon,
   OpenInNewWindowIcon,
   PlayIcon,
+  PlusIcon,
 } from "@radix-ui/react-icons";
-import KeyboardInputOverlay from "@/builder/devtools/keyboard-input-overlay";
+import KeyboardInputOverlay from "@/grida-canvas/devtools/keyboard-input-overlay";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -50,6 +55,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { ImportFromFigmaDialog } from "@/scaffolds/playground-canvas/modals/import-from-figma";
 import { iofigma } from "@/grida/io-figma";
@@ -71,16 +77,25 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ThemedMonacoEditor } from "@/components/monaco";
-import Image from "next/image";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLocalStorage } from "@uidotdev/usehooks";
 import { CANVAS_PLAYGROUND_LOCALSTORAGE_PREFERENCES_BASE_AI_PROMPT_KEY } from "./k";
+import { widget_presets } from "./widgets";
+import { useHotkeys } from "react-hotkeys-hook";
+import toast from "react-hot-toast";
 
 export default function CanvasPlayground() {
+  const [asideHidden, setAsideHidden] = useState(false);
   const [exampleid, setExampleId] = useState<string>("helloworld.grida");
   const playDialog = useDialogState("play", {
     refreshkey: true,
   });
+  const insertDialog = useDialogState("insert");
   const settingsDialog = useDialogState("settings");
   const importFromFigmaDialog = useDialogState("import-from-figma");
   const importFromJson = useDialogState("import-from-json", {
@@ -122,6 +137,10 @@ export default function CanvasPlayground() {
     })
   );
 
+  useHotkeys("/", () => {
+    setAsideHidden((v) => !v);
+  });
+
   useEffect(() => {
     fetch(`/examples/canvas/${exampleid}`).then((res) => {
       res.json().then((file) => {
@@ -151,10 +170,10 @@ export default function CanvasPlayground() {
 
   return (
     <main className="w-screen h-screen overflow-hidden">
-      <SettingsDialog {...settingsDialog} />
+      <SettingsDialog {...settingsDialog.props} />
       <ImportFromGridaFileJsonDialog
         key={importFromJson.refreshkey}
-        {...importFromJson}
+        {...importFromJson.props}
         onImport={(file) => {
           dispatch({
             type: "document/reset",
@@ -166,7 +185,7 @@ export default function CanvasPlayground() {
         }}
       />
       <ImportFromFigmaDialog
-        {...importFromFigmaDialog}
+        {...importFromFigmaDialog.props}
         onImport={(res) => {
           dispatch({
             type: "document/reset",
@@ -180,7 +199,7 @@ export default function CanvasPlayground() {
           });
         }}
       />
-      <Dialog {...playDialog} key={playDialog.refreshkey}>
+      <Dialog {...playDialog.props} key={playDialog.refreshkey}>
         <DialogContent className="max-w-screen h-screen">
           <StandaloneDocumentEditor editable={false} initial={state}>
             <div className="w-full h-full flex items-center justify-center overflow-hidden">
@@ -193,123 +212,165 @@ export default function CanvasPlayground() {
       </Dialog>
       <StandaloneDocumentEditor editable initial={state} dispatch={dispatch}>
         <div className="flex w-full h-full">
-          <aside>
-            <SidebarRoot>
-              <SidebarSection className="mt-4">
-                <span className="px-2">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger>
-                      <GridaLogo className="inline-block w-4 h-4 me-2" />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start">
-                      <DropdownMenuItem
-                        onClick={importFromFigmaDialog.openDialog}
-                      >
-                        <FigmaLogoIcon className="w-3.5 h-3.5 me-2 inline-block" />
-                        Import from Figma
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={importFromJson.openDialog}>
-                        <FileIcon className="w-3.5 h-3.5 me-2 inline-block" />
-                        Import from .grida
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={onExport}>
-                        <DownloadIcon className="w-3.5 h-3.5 me-2 inline-block" />
-                        Save as .grida
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={settingsDialog.openDialog}>
-                        <GearIcon className="me-2" />
-                        Settings
-                      </DropdownMenuItem>
+          {!asideHidden && (
+            <aside>
+              {insertDialog.open ? (
+                <>
+                  <DialogPrimitive.Root {...insertDialog.props}>
+                    <DialogPrimitive.Content className="h-full">
+                      <SidebarRoot>
+                        <InsertNodePanelContent />
+                      </SidebarRoot>
+                    </DialogPrimitive.Content>
+                  </DialogPrimitive.Root>
+                </>
+              ) : (
+                <>
+                  <SidebarRoot>
+                    <SidebarSection className="mt-4">
+                      <span className="px-2">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger>
+                            <GridaLogo className="inline-block w-4 h-4 me-2" />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start">
+                            <DropdownMenuItem
+                              onClick={importFromFigmaDialog.openDialog}
+                            >
+                              <FigmaLogoIcon className="w-3.5 h-3.5 me-2 inline-block" />
+                              Import from Figma
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={importFromJson.openDialog}
+                            >
+                              <FileIcon className="w-3.5 h-3.5 me-2 inline-block" />
+                              Import from .grida
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={onExport}>
+                              <DownloadIcon className="w-3.5 h-3.5 me-2 inline-block" />
+                              Save as .grida
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={settingsDialog.openDialog}
+                            >
+                              <GearIcon className="me-2" />
+                              Settings
+                            </DropdownMenuItem>
 
-                      <DropdownMenuSeparator />
-                      <DropdownMenuSub>
-                        <DropdownMenuSubTrigger>
-                          <OpenInNewWindowIcon className="me-2" />
-                          Tools
-                        </DropdownMenuSubTrigger>
-                        <DropdownMenuSubContent>
-                          <Link href="/canvas/tools/io-figma" target="_blank">
-                            <DropdownMenuItem>
-                              <OpenInNewWindowIcon className="me-2" />
-                              IO Figma
-                            </DropdownMenuItem>
-                          </Link>
-                          <Link href="/canvas/tools/io-pdf" target="_blank">
-                            <DropdownMenuItem>
-                              <OpenInNewWindowIcon className="me-2" />
-                              IO PDF
-                            </DropdownMenuItem>
-                          </Link>
-                          <Link
-                            href="https://github.com/gridaco/p666"
-                            target="_blank"
-                          >
-                            <DropdownMenuItem>
-                              <OpenInNewWindowIcon className="me-2" />
-                              P666 Daemon
-                            </DropdownMenuItem>
-                          </Link>
-                        </DropdownMenuSubContent>
-                      </DropdownMenuSub>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                  <span className="font-bold text-xs">
-                    Canvas Playground
-                    <Badge variant="outline" className="ms-2 text-xs">
-                      BETA
-                    </Badge>
-                  </span>
-                </span>
-              </SidebarSection>
-              <SidebarSection className="mt-4">
-                <ExampleSwitch value={exampleid} onValueChange={setExampleId} />
-              </SidebarSection>
-              <hr />
-              <SidebarSection>
-                <SidebarSectionHeaderItem>
-                  <SidebarSectionHeaderLabel>Layers</SidebarSectionHeaderLabel>
-                </SidebarSectionHeaderItem>
-                <NodeHierarchyList />
-              </SidebarSection>
-            </SidebarRoot>
-          </aside>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuSub>
+                              <DropdownMenuSubTrigger>
+                                <OpenInNewWindowIcon className="me-2" />
+                                Tools
+                              </DropdownMenuSubTrigger>
+                              <DropdownMenuSubContent>
+                                <Link
+                                  href="/canvas/tools/io-figma"
+                                  target="_blank"
+                                >
+                                  <DropdownMenuItem>
+                                    <OpenInNewWindowIcon className="me-2" />
+                                    IO Figma
+                                  </DropdownMenuItem>
+                                </Link>
+                                <Link
+                                  href="/canvas/tools/io-pdf"
+                                  target="_blank"
+                                >
+                                  <DropdownMenuItem>
+                                    <OpenInNewWindowIcon className="me-2" />
+                                    IO PDF
+                                  </DropdownMenuItem>
+                                </Link>
+                                <Link
+                                  href="https://github.com/gridaco/p666"
+                                  target="_blank"
+                                >
+                                  <DropdownMenuItem>
+                                    <OpenInNewWindowIcon className="me-2" />
+                                    P666 Daemon
+                                  </DropdownMenuItem>
+                                </Link>
+                              </DropdownMenuSubContent>
+                            </DropdownMenuSub>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                        <span className="font-bold text-xs">
+                          Canvas Playground
+                          <Badge variant="outline" className="ms-2 text-xs">
+                            BETA
+                          </Badge>
+                        </span>
+                      </span>
+                    </SidebarSection>
+                    <SidebarSection className="mt-4">
+                      <ExampleSwitch
+                        value={exampleid}
+                        onValueChange={setExampleId}
+                      />
+                    </SidebarSection>
+                    <hr />
+                    <SidebarSection>
+                      <SidebarSectionHeaderItem>
+                        <SidebarSectionHeaderLabel>
+                          Layers
+                        </SidebarSectionHeaderLabel>
+                      </SidebarSectionHeaderItem>
+                      <NodeHierarchyList />
+                    </SidebarSection>
+                  </SidebarRoot>
+                </>
+              )}
+            </aside>
+          )}
           <div className="w-full h-full flex flex-col relative">
-            <CanvasEventTarget className="relative w-full h-full no-scrollbar overflow-y-auto bg-transparent">
-              <CanvasOverlay />
+            <ViewportRoot className="relative w-full h-full no-scrollbar overflow-y-auto bg-transparent">
+              <ViewportSurface />
               <div className="w-full h-full flex bg-background items-center justify-center">
                 <div className="shadow-lg rounded-xl border overflow-hidden">
                   <StandaloneDocumentEditorContent />
                 </div>
               </div>
-            </CanvasEventTarget>
+            </ViewportRoot>
+            <div className="absolute top-4 left-4 z-50">
+              <Button
+                variant={insertDialog.open ? "default" : "outline"}
+                className="w-8 h-8 rounded-full p-0"
+                onClick={insertDialog.openDialog}
+              >
+                <PlusIcon className="w-4 h-4" />
+              </Button>
+            </div>
             <div className="absolute bottom-20 left-0 right-0 flex items-center justify-center z-50 pointer-events-none">
-              <PlaygroundToolbar />
+              <PlaygroundToolbar onAddButtonClick={insertDialog.openDialog} />
             </div>
             <div className="fixed bottom-20 left-10 flex items-center justify-center z-50 pointer-events-none">
               <KeyboardInputOverlay />
             </div>
             <DevtoolsPanel />
           </div>
-          <aside className="h-full">
-            <SidebarRoot side="right">
-              <div className="p-2">
-                <div className="flex justify-end">
-                  <Button variant="ghost" onClick={playDialog.openDialog}>
-                    <PlayIcon />
-                  </Button>
+          {!asideHidden && (
+            <aside className="h-full">
+              <SidebarRoot side="right">
+                <div className="p-2">
+                  <div className="flex justify-end">
+                    <Button variant="ghost" onClick={playDialog.openDialog}>
+                      <PlayIcon />
+                    </Button>
+                  </div>
                 </div>
-              </div>
-              <hr />
-              <FontFamilyListProvider fonts={fonts}>
-                {state.selected_node_id ? (
-                  <SelectedNodeProperties />
-                ) : (
-                  <__TMP_ComponentProperties />
-                )}
-              </FontFamilyListProvider>
-            </SidebarRoot>
-          </aside>
+                <hr />
+                <FontFamilyListProvider fonts={fonts}>
+                  {state.selected_node_id ? (
+                    <SelectedNodeProperties />
+                  ) : (
+                    <__TMP_ComponentProperties />
+                  )}
+                </FontFamilyListProvider>
+              </SidebarRoot>
+            </aside>
+          )}
         </div>
       </StandaloneDocumentEditor>
       <HelpFab />
@@ -334,6 +395,7 @@ function ExampleSwitch({
     "resume-01.grida",
     "event-page-01.grida",
     "component-01.grida",
+    "layout-01.grida",
   ];
   return (
     <Select defaultValue={value} onValueChange={onValueChange}>
@@ -396,5 +458,77 @@ function SettingsDialog(props: React.ComponentProps<typeof Dialog>) {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+const widgets = [
+  "text",
+  "rich text",
+  "note",
+  "image",
+  "video",
+  "icon",
+  "embed",
+  "column",
+  "row",
+  "cards",
+  "button",
+  "avatar",
+  "badge",
+  "separator",
+];
+
+function InsertNodePanelContent() {
+  const { insertNode } = useDocument();
+
+  const onInsert = (type: string) => {
+    const pre = (widget_presets as any)[type];
+    if (!pre) {
+      toast.error("Widget not found");
+      return;
+    }
+
+    // insert widget tree
+    insertNode(pre);
+  };
+
+  return (
+    <>
+      <SidebarSection className="mt-4"></SidebarSection>
+      <SidebarSection>
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>
+            <span>Widgets</span>
+          </SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuGrid>
+          {widgets.map((type) => {
+            return (
+              <HoverCard key={type} openDelay={100} closeDelay={100}>
+                {/*  */}
+                <HoverCardTrigger>
+                  <SidebarMenuGridItem
+                    draggable
+                    onClick={() => {
+                      onInsert(type);
+                    }}
+                    className="border rounded-md shadow-sm cursor-pointer text-foreground/50 hover:text-foreground"
+                  >
+                    {/* <BlockTypeIcon
+                  type={block_type}
+                  className="p-2 w-8 h-8 rounded"
+                /> */}
+                    <ButtonIcon />
+                    <div className="mt-1 w-full text-xs break-words text-center overflow-hidden text-ellipsis">
+                      {type}
+                    </div>
+                  </SidebarMenuGridItem>
+                </HoverCardTrigger>
+              </HoverCard>
+            );
+          })}
+        </SidebarMenuGrid>
+      </SidebarSection>
+    </>
   );
 }

@@ -22,7 +22,7 @@ import { PropertyLine, PropertyLineLabel } from "./ui";
 import { EditBinaryExpression } from "../panels/extensions/v-edit";
 import { PopoverClose } from "@radix-ui/react-popover";
 import { SelectedNodeProperties } from "./sidecontrol-selected-node";
-import { useDocument } from "@/builder/provider";
+import { useDocument } from "@/grida-canvas/provider";
 
 export function SideControlDoctypeForm() {
   const [state] = useEditorState();

@@ -53,14 +53,14 @@ import { CurrentPage } from "@/scaffolds/editor/utils/current-page";
 import { Spinner } from "@/components/spinner";
 import {
   StandaloneDocumentEditor,
-  CanvasEventTarget,
-  CanvasOverlay,
+  ViewportRoot,
+  ViewportSurface,
   useDocument,
   useRootTemplateInstanceNode,
-} from "@/builder";
+} from "@/grida-canvas";
 import { composeEditorDocumentAction } from "@/scaffolds/editor/action";
-import { BuilderAction } from "@/builder/action";
-import { DevtoolsPanel } from "@/builder/devtools";
+import { BuilderAction } from "@/grida-canvas/action";
+import { DevtoolsPanel } from "@/grida-canvas/devtools";
 import { Badge } from "@/components/ui/badge";
 import { ArrowRightIcon } from "@radix-ui/react-icons";
 
@@ -133,7 +133,7 @@ function SetupStartPage() {
   return (
     <>
       <BrowseStartPageTemplatesDialog
-        {...dialog}
+        {...dialog.props}
         onValueCommit={(template_id) => {
           setupStartPage(template_id);
         }}
@@ -178,14 +178,14 @@ function StartPageEditor() {
         <PropertiesEditSheet open={edit} onOpenChange={setEdit} />
       </ErrorBoundary>
 
-      <CanvasEventTarget
+      <ViewportRoot
         onDoubleClick={() => {
           console.log("dblclick");
           setEdit(true);
         }}
         className="relative w-full no-scrollbar overflow-y-auto bg-transparent"
       >
-        <CanvasOverlay />
+        <ViewportSurface />
         <AgentThemeProvider>
           <div className="w-full px-10 overflow-scroll">
             <div className="w-full mx-auto my-20 max-w-sm xl:max-w-4xl z-[-999]">
@@ -208,7 +208,7 @@ function StartPageEditor() {
             </div>
           </div>
         </AgentThemeProvider>
-      </CanvasEventTarget>
+      </ViewportRoot>
     </>
   );
 }

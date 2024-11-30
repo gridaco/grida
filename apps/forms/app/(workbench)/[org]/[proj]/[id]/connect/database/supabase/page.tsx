@@ -632,7 +632,7 @@ function ConnectSchema({
   return (
     <>
       <NewCustomSchemaDialog
-        {...newCustomSchemaDialog}
+        {...newCustomSchemaDialog.props}
         onUse={onUseCustomSchema}
         onTestConnection={onTestCustomSchemaConnection}
       />
@@ -663,9 +663,7 @@ function ConnectSchema({
             <Badge
               variant="default"
               className="font-mono cursor-pointer"
-              onClick={() => {
-                newCustomSchemaDialog.openDialog();
-              }}
+              onClick={newCustomSchemaDialog.openDialog}
             >
               <PlusCircledIcon className="me-2" />
               Add Custom Schema

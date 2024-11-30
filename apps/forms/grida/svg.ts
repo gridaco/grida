@@ -31,7 +31,12 @@ export namespace svg {
             bottomLeftRadius: cornerRadius,
             bottomRightRadius: cornerRadius,
           }
-        : cornerRadius;
+        : {
+            topLeftRadius: cornerRadius[0],
+            topRightRadius: cornerRadius[1],
+            bottomRightRadius: cornerRadius[2],
+            bottomLeftRadius: cornerRadius[3],
+          };
 
       return `
       M${topLeftRadius},0 
