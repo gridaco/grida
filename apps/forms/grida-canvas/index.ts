@@ -9,5 +9,5 @@ export {
 } from "./provider";
 export { StandaloneDocumentEditorContent } from "./renderer";
 export * from "./types";
-export * from "./canvas/canvas";
+export * from "./viewport";
 export { default as standaloneDocumentReducer } from "./reducers";

@@ -1,6 +1,5 @@
 import { grida } from "@/grida";
 import { svg } from "@/grida/svg";
-import { useMemo } from "react";
 
 export function RectangleWidget({
   width,

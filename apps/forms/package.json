@@ -139,6 +139,7 @@
     "react-fast-marquee": "^1.6.5",
     "react-hook-form": "^7.52.1",
     "react-hot-toast": "^2.4.0",
+    "react-hotkeys-hook": "^3.4.4",
     "react-i18next": "^13.5.0",
     "react-map-gl": "^7.1.7",
     "react-medium-image-zoom": "^5.2.11",

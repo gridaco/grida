@@ -21,7 +21,7 @@ import type {
 } from "./state";
 import type { Tokens } from "@/ast";
 import type { DataQueryAction } from "../data-query";
-import type { BuilderAction } from "@/builder/action";
+import type { BuilderAction } from "@/grida-canvas/action";
 import type { SYM_LOCALTZ } from "./symbols";
 import { grida } from "@/grida";
 

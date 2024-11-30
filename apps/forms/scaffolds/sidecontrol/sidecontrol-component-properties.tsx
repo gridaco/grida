@@ -23,7 +23,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { useDocument, useNode } from "@/builder";
+import { useDocument, useNode } from "@/grida-canvas";
 import { grida } from "@/grida";
 import toast from "react-hot-toast";
 

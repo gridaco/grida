@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
-import { TemplateBuilderWidgets } from "../widgets";
-import { NodeElement } from "../node";
+import { ReactNodeRenderers } from "../../nodes";
+import { NodeElement } from "../../nodes/node";
 import { IconWidget } from "../widgets/icon";
 import Link from "next/link";
 

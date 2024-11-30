@@ -17,8 +17,8 @@ import {
   FormCampaignStartPageContextProvider,
   useCampaignMeta,
 } from "@/theme/templates/kit/campaign";
-import { TemplateBuilderWidgets } from "@/builder/template-builder/widgets";
-import { NodeElement } from "@/builder/template-builder/node";
+import { ReactNodeRenderers } from "@/grida-canvas/nodes";
+import { NodeElement } from "@/grida-canvas/nodes/node";
 import { Factory } from "@/ast";
 import { useCTAContext } from "../../kit/contexts/cta.context";
 

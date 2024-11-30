@@ -17,7 +17,7 @@ import {
 } from "./types";
 import type { Tokens } from "@/ast";
 import { grida } from "@/grida";
-import { useComputed } from "./template-builder/use-computed";
+import { useComputed } from "./nodes/use-computed";
 import {
   DataProvider,
   ProgramDataContextHost,
@@ -25,7 +25,7 @@ import {
 import assert from "assert";
 import { documentquery } from "./document-query";
 import { GoogleFontsManager } from "./components/google-fonts";
-import { CANVAS_EVENT_TARGET_ID } from "./k/id";
+import { domapi } from "./domapi";
 
 type Vector2 = [number, number];
 
@@ -107,29 +107,6 @@ function EditorGoogleFontsManager({ children }: React.PropsWithChildren<{}>) {
       {children}
     </GoogleFontsManager>
   );
-}
-
-function get_canvas_rect() {
-  const el = window.document.getElementById(CANVAS_EVENT_TARGET_ID);
-  return el!.getBoundingClientRect();
-}
-
-/**
- *
- * @param x clientX
- * @param y clientY
- * @returns
- */
-function get_grida_node_elements_from_point(x: number, y: number) {
-  const hits = window.document.elementsFromPoint(x, y);
-
-  const node_elements = hits.filter((h) =>
-    h.attributes.getNamedItem(
-      grida.program.document.k.HTML_ELEMET_DATA_ATTRIBUTE_GRIDA_NODE_ID_KEY
-    )
-  );
-
-  return node_elements;
 }
 
 function useInternal() {
@@ -1102,7 +1079,7 @@ export function useEventTarget() {
   const _throttled_pointer_move_with_raycast = useCallback(
     throttle((event: PointerEvent, position) => {
       // this is throttled - as it is expensive
-      const els = get_grida_node_elements_from_point(
+      const els = domapi.get_grida_node_elements_from_point(
         event.clientX,
         event.clientY
       );
@@ -1121,7 +1098,7 @@ export function useEventTarget() {
   ) => {
     const { clientX, clientY } = pointer_event;
 
-    const canvas_rect = get_canvas_rect();
+    const canvas_rect = domapi.get_viewport_rect();
     const position = {
       x: clientX - canvas_rect.left,
       y: clientY - canvas_rect.top,
@@ -1146,7 +1123,7 @@ export function useEventTarget() {
 
   const pointerDown = useCallback(
     (event: PointerEvent) => {
-      const els = get_grida_node_elements_from_point(
+      const els = domapi.get_grida_node_elements_from_point(
         event.clientX,
         event.clientY
       );

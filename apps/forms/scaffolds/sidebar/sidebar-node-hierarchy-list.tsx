@@ -1,6 +1,6 @@
 "use client";
 
-import { useDocument } from "@/builder";
+import { useDocument } from "@/grida-canvas";
 import {
   SidebarMenuItem,
   SidebarMenuItemAction,
@@ -32,7 +32,7 @@ import {
 } from "@radix-ui/react-icons";
 import { grida } from "@/grida";
 import React from "react";
-import { useNodeAction } from "@/builder/provider";
+import { useNodeAction } from "@/grida-canvas/provider";
 
 function NodeHierarchyItemContextMenuWrapper({
   node_id,

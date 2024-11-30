@@ -8,7 +8,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { useEventTarget } from "@/builder";
+import { useEventTarget } from "@/grida-canvas";
 import { useGesture } from "@use-gesture/react";
 import {
   useDocument,
@@ -18,11 +18,12 @@ import {
   useNodeDomElement,
 } from "../provider";
 import { RotationCursorIcon } from "../components/cursor";
-import { CANVAS_EVENT_TARGET_ID } from "../k/id";
 import { grida } from "@/grida";
 import assert from "assert";
 import { useIsWindowResizing } from "./hooks/window-resizing";
 import { supports } from "@/grida/utils/supports";
+import { Marquee } from "./ui/marquee";
+import { domapi } from "../domapi";
 
 interface CanvasEventTargetContext {
   portal?: HTMLDivElement | null;
@@ -31,7 +32,7 @@ interface CanvasEventTargetContext {
 
 const EventTargetContext = createContext<CanvasEventTargetContext | null>(null);
 
-export function CanvasEventTarget({
+export function ViewportRoot({
   className,
   children,
   ...props
@@ -44,7 +45,7 @@ export function CanvasEventTarget({
     >
       <div
         {...props}
-        id={CANVAS_EVENT_TARGET_ID}
+        id={domapi.k.VIEWPORT_ELEMENT_ID}
         className={className}
         style={{ pointerEvents: "auto", overflow: "hidden" }}
       >
@@ -54,7 +55,7 @@ export function CanvasEventTarget({
   );
 }
 
-export function CanvasOverlay() {
+export function ViewportSurface() {
   const isWindowResizing = useIsWindowResizing();
   const {
     marquee,
@@ -193,7 +194,7 @@ export function CanvasOverlay() {
       }}
     >
       {content_edit_mode === "text" && selected_node_id && (
-        <RichTextEditorSurface node_id={selected_node_id} />
+        <SurfaceTextEditor node_id={selected_node_id} />
       )}
       <div className="w-full h-full" id="canvas-overlay-portal" ref={ref}>
         {selected_node_id && (
@@ -221,7 +222,7 @@ export function CanvasOverlay() {
   );
 }
 
-export function useCanvasOverlayPortal() {
+export function useViewportSurfacePortal() {
   const context = useContext(EventTargetContext);
   if (!context) {
     throw new Error(
@@ -231,37 +232,13 @@ export function useCanvasOverlayPortal() {
   return context.portal;
 }
 
-function Marquee({
-  x1,
-  y1,
-  x2,
-  y2,
-}: {
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
-}) {
-  return (
-    <div
-      className="absolute border border-workbench-accent-sky bg-workbench-accent-sky/20 pointer-events-none"
-      style={{
-        left: Math.min(x1, x2),
-        top: Math.min(y1, y2),
-        width: Math.abs(x2 - x1),
-        height: Math.abs(y2 - y1),
-      }}
-    />
-  );
-}
-
 /**
  * returns the relative transform of the node surface relative to the portal
  */
 function useNodeSurfaceTransfrom_v1(node_id: string) {
   const __rect_fallback = useMemo(() => new DOMRect(0, 0, 0, 0), []);
   const { getNodeAbsoluteRotation } = useDocument();
-  const portal = useCanvasOverlayPortal();
+  const portal = useViewportSurfacePortal();
   const node_element = useNodeDomElement(node_id);
   const portal_rect = portal?.getBoundingClientRect() ?? __rect_fallback;
   const node_element_bounding_rect =
@@ -300,7 +277,7 @@ function useNodeSurfaceTransfrom_v1(node_id: string) {
 function useNodeSurfaceTransfrom(node_id: string) {
   const __rect_fallback = useMemo(() => new DOMRect(0, 0, 0, 0), []);
   const { getNodeAbsoluteRotation } = useDocument();
-  const portal = useCanvasOverlayPortal();
+  const portal = useViewportSurfacePortal();
   const node_element = useNodeDomElement(node_id);
 
   const [transform, setTransform] = useState({
@@ -388,19 +365,23 @@ function NodeOverlay({
           {/* bottom left */}
           {/* <ResizeHandle anchor="sw" readonly={readonly} node_id={node_id} /> */}
           {/* bottom right */}
-          <ResizeHandle anchor="se" readonly={readonly} node_id={node_id} />
+          <NodeOverlayResizeHandle
+            anchor="se"
+            readonly={readonly}
+            node_id={node_id}
+          />
           {supports.cornerRadius(node.type) &&
             !supports.children(node.type) && (
-              <CornerRadiusHandle anchor="se" node_id={node_id} />
+              <NodeOverlayCornerRadiusHandle anchor="se" node_id={node_id} />
             )}
-          <RotationHandle anchor="ne" node_id={node_id} />
+          <NodeOverlayRotationHandle anchor="ne" node_id={node_id} />
         </>
       )}
     </div>
   );
 }
 
-function CornerRadiusHandle({
+function NodeOverlayCornerRadiusHandle({
   node_id,
   anchor,
   size = 8,
@@ -469,7 +450,7 @@ function CornerRadiusHandle({
   );
 }
 
-function RotationHandle({
+function NodeOverlayRotationHandle({
   node_id,
   anchor,
   offset = 8,
@@ -531,7 +512,7 @@ function RotationHandle({
   );
 }
 
-function ResizeHandle({
+function NodeOverlayResizeHandle({
   node_id,
   anchor,
   readonly,
@@ -605,7 +586,7 @@ const __resize_handle_cursor_map = {
   se: "nwse-resize",
 };
 
-function RichTextEditorSurface({ node_id }: { node_id: string }) {
+function SurfaceTextEditor({ node_id }: { node_id: string }) {
   const inputref = useRef<HTMLTextAreaElement>(null);
   const change = useNodeAction(node_id)!;
   const transform = useNodeSurfaceTransfrom(node_id);

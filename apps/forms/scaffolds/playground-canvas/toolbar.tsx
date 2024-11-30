@@ -1,7 +1,7 @@
 "use client";
 
 import { generate } from "@/app/(dev)/canvas/actions";
-import { useDocument, useEventTarget, type CursorMode } from "@/builder";
+import { useDocument, useEventTarget, type CursorMode } from "@/grida-canvas";
 import { OpenAILogo } from "@/components/logos/openai";
 import { Button } from "@/components/ui/button";
 import {

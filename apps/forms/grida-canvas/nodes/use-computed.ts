@@ -1,7 +1,7 @@
-import { useSelectValue, useValue } from "@/grida/react-runtime/data-context";
-import { TemplateValueProperties } from "./with-template";
-import { Tokens, Factory } from "@/ast";
 import { useMemo } from "react";
+import { useSelectValue, useValue } from "@/grida/react-runtime/data-context";
+import { TemplateValueProperties } from "../template-builder/with-template";
+import { Tokens, Factory } from "@/ast";
 
 function extractAccessIdentifiersDependencyArrayFromProps<
   P extends Record<string, any>,

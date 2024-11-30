@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { useDocument } from "@/builder";
+import { useDocument } from "@/grida-canvas";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { CaretDownIcon, CaretUpIcon } from "@radix-ui/react-icons";

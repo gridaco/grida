@@ -103,6 +103,16 @@ export interface IDocumentEditorInteractionCursorState {
   /**
    * @private - internal use only
    *
+   * translate (offset) of the to the stage relative to event target
+   */
+  translate?: {
+    x: number;
+    y: number;
+  };
+
+  /**
+   * @private - internal use only
+   *
    * relative cursor position to the event target
    *
    * @default {x: 0, y: 0}

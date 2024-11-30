@@ -1,5 +1,4 @@
 import { grida } from "@/grida";
-import { svg } from "@/grida/svg";
 import React from "react";
 
 export function SVGLineWidget({

@@ -1,10 +1,10 @@
 "use client";
 
 import React, { ReactNode, useMemo } from "react";
-import { TemplateComponents } from "@/builder/template-builder";
-import type { TemplateComponent } from "./with-template";
+import { TemplateComponents } from "@/grida-canvas/template-builder";
+import type { TemplateComponent } from "../template-builder/with-template";
 import { grida } from "@/grida";
-import { TemplateBuilderWidgets } from "./widgets";
+import { ReactNodeRenderers } from ".";
 import { useComputedNode, useDocument, useNode } from "../provider";
 import assert from "assert";
 
@@ -63,7 +63,7 @@ export function NodeElement<P extends Record<string, any>>({
       case "component":
       case "ellipse":
       case "iframe": {
-        return TemplateBuilderWidgets[node.type];
+        return ReactNodeRenderers[node.type];
       }
       default:
         throw new Error(`Unknown node type: ${node.type}`);

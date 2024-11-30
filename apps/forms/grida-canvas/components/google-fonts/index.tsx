@@ -2,7 +2,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { GoogleFontsFontInfo } from "./data.min";
 import { cn } from "@/utils";
-import { csslink, fontFamilyToId, svglink } from "@/builder/google.fonts";
+import { csslink, fontFamilyToId, svglink } from "@/grida-canvas/google.fonts";
 
 const GoogleFontsManagerProviderContext = React.createContext<{
   fonts: GoogleFontsFontInfo[];

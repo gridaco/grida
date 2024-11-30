@@ -33,8 +33,8 @@ import { useCTAContext } from "../../kit/contexts/cta.context";
 import { FileIO } from "@/lib/file";
 import type { grida } from "@/grida";
 import { Factory } from "@/ast";
-import { NodeElement } from "@/builder/template-builder/node";
-import { useComputed } from "@/builder/template-builder/use-computed";
+import { NodeElement } from "@/grida-canvas/nodes/node";
+import { useComputed } from "@/grida-canvas/nodes/use-computed";
 
 type Messages = typeof _messages;
 

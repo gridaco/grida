@@ -3,10 +3,10 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { HalfHeightGradient } from "./gradient-overlay";
 import { SlashIcon } from "@radix-ui/react-icons";
-import { withTemplateDefinition } from "@/builder/template-builder/with-template";
-import { NodeElement } from "@/builder/template-builder/node";
+import { withTemplateDefinition } from "@/grida-canvas/template-builder/with-template";
+import { NodeElement } from "@/grida-canvas/nodes/node";
 import { Media } from "./media";
-import { TemplateBuilderWidgets } from "../widgets";
+import { ReactNodeRenderers } from "../../nodes";
 import { grida } from "@/grida";
 
 const card_properties_definition = {

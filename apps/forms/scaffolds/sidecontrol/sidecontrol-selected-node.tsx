@@ -52,10 +52,10 @@ import { LengthControl } from "./controls/length";
 import { LayoutControl } from "./controls/layout";
 import { AxisControl } from "./controls/axis";
 import { MaxlengthControl } from "./controls/maxlength";
-import { useComputedNode, useDocument, useNode } from "@/builder";
+import { useComputedNode, useDocument, useNode } from "@/grida-canvas";
 import assert from "assert";
 import { grida } from "@/grida";
-import { useNodeDomElement } from "@/builder/provider";
+import { useNodeDomElement } from "@/grida-canvas/provider";
 import { LockClosedIcon } from "@radix-ui/react-icons";
 import { supports } from "@/grida/utils/supports";
 
