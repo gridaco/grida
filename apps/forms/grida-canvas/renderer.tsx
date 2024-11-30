@@ -11,7 +11,8 @@ import { domapi } from "./domapi";
  * @param contentRef - A ref to the content element within the editor.
  */
 function __useEditorContentOffsetNotifyEffect(
-  contentRef: React.RefObject<HTMLElement>
+  contentRef: React.RefObject<HTMLElement>,
+  deps: any[] = []
 ) {
   const [_, dispatch] = __useInternal();
 
@@ -60,18 +61,17 @@ function __useEditorContentOffsetNotifyEffect(
     return () => {
       observer.disconnect();
     };
-  }, [contentRef]);
+  }, [contentRef, syncoffset, ...deps]);
 }
 
 export function StandaloneDocumentEditorContent() {
   const ref = useRef<HTMLDivElement>(null);
   const {
-    state: {
-      document: { root_id },
-    },
+    state: { document, document_key },
   } = useDocument();
+  const { root_id } = document;
 
-  __useEditorContentOffsetNotifyEffect(ref);
+  __useEditorContentOffsetNotifyEffect(ref, [document_key]);
 
   return (
     <div ref={ref}>

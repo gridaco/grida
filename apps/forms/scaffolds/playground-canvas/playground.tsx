@@ -145,7 +145,8 @@ export default function CanvasPlayground() {
     fetch(`/examples/canvas/${exampleid}`).then((res) => {
       res.json().then((file) => {
         dispatch({
-          type: "document/reset",
+          type: "__internal/reset",
+          key: exampleid,
           state: initDocumentEditorState({
             editable: true,
             document: file.document,
@@ -176,7 +177,8 @@ export default function CanvasPlayground() {
         {...importFromJson.props}
         onImport={(file) => {
           dispatch({
-            type: "document/reset",
+            type: "__internal/reset",
+            key: file.document.root_id,
             state: initDocumentEditorState({
               editable: true,
               document: file.document,
@@ -188,7 +190,8 @@ export default function CanvasPlayground() {
         {...importFromFigmaDialog.props}
         onImport={(res) => {
           dispatch({
-            type: "document/reset",
+            type: "__internal/reset",
+            key: res.document.id,
             state: initDocumentEditorState({
               editable: true,
               document: iofigma.restful.map.document(

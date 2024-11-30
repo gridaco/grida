@@ -27,10 +27,6 @@ export default function documentReducer<S extends IDocumentEditorState>(
 ): S {
   if (!state.editable) return state;
   switch (action.type) {
-    case "document/reset": {
-      const { state: _new_state } = action;
-      return _new_state as S;
-    }
     case "document/insert": {
       const { prototype } = action;
 

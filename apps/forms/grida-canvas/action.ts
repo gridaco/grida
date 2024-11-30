@@ -4,7 +4,7 @@ import { CursorMode, IDocumentEditorState } from "./types";
 
 export type BuilderAction =
   | __InternalSyncArtboardOffset
-  | DocumentEditorResetWithStateAction
+  | __InternalResetAction
   | DocumentEditorInsertNodeAction
   //
   | SurfaceAction
@@ -27,6 +27,12 @@ export type __InternalSyncArtboardOffset = {
 } & {
   offset: Vector2;
 };
+
+export interface __InternalResetAction {
+  type: "__internal/reset";
+  key?: string;
+  state: IDocumentEditorState;
+}
 
 interface IHtmlBackendCanvasEventTargetPointerEvent {
   /**
@@ -225,10 +231,6 @@ export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleD
     };
 
 //
-export interface DocumentEditorResetWithStateAction {
-  type: "document/reset";
-  state: IDocumentEditorState;
-}
 
 export interface DocumentEditorInsertNodeAction {
   type: "document/insert";
