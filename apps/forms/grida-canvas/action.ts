@@ -3,6 +3,7 @@ import { grida } from "@/grida";
 import { CursorMode, IDocumentEditorState } from "./types";
 
 export type BuilderAction =
+  | __InternalSyncArtboardOffset
   | DocumentEditorResetWithStateAction
   | DocumentEditorInsertNodeAction
   //
@@ -20,6 +21,12 @@ export type BuilderAction =
   | SchemaAction;
 
 type Vector2 = [number, number];
+
+export type __InternalSyncArtboardOffset = {
+  type: "__internal/sync-artboard-offset";
+} & {
+  offset: Vector2;
+};
 
 interface IHtmlBackendCanvasEventTargetPointerEvent {
   /**

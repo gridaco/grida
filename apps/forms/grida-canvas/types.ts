@@ -1,6 +1,8 @@
 import type { BuilderAction } from "./action";
 import { grida } from "@/grida";
 
+type Vector2 = [number, number];
+
 export type DocumentDispatcher = (action: BuilderAction) => void;
 
 export type CursorMode =
@@ -105,22 +107,25 @@ export interface IDocumentEditorInteractionCursorState {
    *
    * translate (offset) of the to the stage relative to event target
    */
-  translate?: {
-    x: number;
-    y: number;
-  };
+  translate?: Vector2;
 
   /**
    * @private - internal use only
    *
-   * relative cursor position to the event target
+   * relative cursor position to the event target (position in viewport space)
    *
-   * @default {x: 0, y: 0}
+   * @default [0, 0]
    */
-  cursor_position: {
-    x: number;
-    y: number;
-  };
+  surface_cursor_position: Vector2;
+
+  /**
+   * @private - internal use only
+   *
+   * relative cursor position to document root (position in artboard (document) space)
+   *
+   * @default [0, 0]
+   */
+  cursor_position: Vector2;
 
   /**
    * @private - internal use only
@@ -176,7 +181,8 @@ export function initDocumentEditorState({
   const s = new DocumentState(init);
 
   return {
-    cursor_position: { x: 0, y: 0 },
+    surface_cursor_position: [0, 0],
+    cursor_position: [0, 0],
     document_ctx:
       grida.program.document.internal.createDocumentDefinitionRuntimeHierarchyContext(
         init.document

@@ -8,5 +8,13 @@ export default function reducer<S extends IDocumentEditorState>(
   state: S,
   action: BuilderAction
 ): S {
-  return documentReducer(state, action);
+  switch (action.type) {
+    case "__internal/sync-artboard-offset": {
+      return produce(state, (draft: Draft<S>) => {
+        draft.translate = action.offset;
+      });
+    }
+    default:
+      return documentReducer(state, action);
+  }
 }
