@@ -104,7 +104,7 @@ export function NodeHierarchyList() {
               onSelect={() => {
                 selectNode(n.id);
               }}
-              icon={<NodeHierarchyItemIcon node={n} className="w-4 h-4" />}
+              icon={<NodeHierarchyItemIcon node={n} className="w-3.5 h-3.5" />}
               onPointerEnter={() => {
                 pointerEnterNode(n.id);
               }}
@@ -112,7 +112,7 @@ export function NodeHierarchyList() {
                 pointerEnterNode(n.id);
               }}
             >
-              <SidebarMenuItemLabel className="font-normal text-sm">
+              <SidebarMenuItemLabel className="font-normal text-xs">
                 {n.name}
               </SidebarMenuItemLabel>
               <SidebarMenuItemActions>

@@ -40,6 +40,7 @@ const keyboard_key_bindings = {
   o: "ellipse",
   f: "container",
   a: "container",
+  l: "line",
 } as const;
 
 export default function surfaceReducer<S extends IDocumentEditorState>(
@@ -106,7 +107,8 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
           case "t":
           case "o":
           case "f":
-          case "a": {
+          case "a":
+          case "l": {
             draft.cursor_mode = {
               type: "insert",
               node: keyboard_key_bindings[key],

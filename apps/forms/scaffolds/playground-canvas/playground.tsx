@@ -328,9 +328,9 @@ export default function CanvasPlayground() {
             </aside>
           )}
           <div className="w-full h-full flex flex-col relative">
-            <ViewportRoot className="relative w-full h-full no-scrollbar overflow-y-auto bg-transparent">
+            <ViewportRoot className="relative w-full h-full no-scrollbar overflow-y-auto">
               <ViewportSurface />
-              <div className="w-full h-full flex bg-background items-center justify-center">
+              <div className="w-full h-full flex items-center justify-center bg-black/5">
                 <div className="shadow-lg rounded-xl border overflow-hidden">
                   <StandaloneDocumentEditorContent />
                 </div>
