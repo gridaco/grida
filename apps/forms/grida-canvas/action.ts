@@ -143,6 +143,7 @@ export type DocumentEditorCanvasEventTargetHtmlBackendDrag =
 
 export type DocumentEditorCanvasEventTargetHtmlBackendDragEnd = {
   type: "document/canvas/backend/html/event/on-drag-end";
+  node_ids_from_area?: string[];
 };
 
 export type DocumentEditorEnterContentEditMode = {

@@ -256,10 +256,16 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
       });
     }
     case "document/canvas/backend/html/event/on-drag-end": {
-      const {} = <DocumentEditorCanvasEventTargetHtmlBackendDragEnd>action;
+      const { node_ids_from_area } = <
+        DocumentEditorCanvasEventTargetHtmlBackendDragEnd
+      >action;
       return produce(state, (draft) => {
         draft.is_gesture_node_drag_move = false;
         draft.marquee = undefined;
+        if (node_ids_from_area) {
+          // TODO: multiple selection
+          draft.selected_node_id = node_ids_from_area[0];
+        }
       });
     }
     case "document/canvas/backend/html/event/on-drag": {

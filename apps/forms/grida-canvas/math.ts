@@ -9,11 +9,19 @@ export namespace cmath {
 
   /**
    * A Rectangle specifies an area that is enclosed by it’s top-left point (x, y), its width, and its height.
+   *
+   * width and height are non-negative values.
    */
   export type Rectangle = {
     x: number;
     y: number;
+    /**
+     * The width of the rectangle. Must be non-negative.
+     */
     width: number;
+    /**
+     * The height of the rectangle. Must be non-negative.
+     */
     height: number;
   };
 }
@@ -32,6 +40,39 @@ export namespace cmath.vector2 {
 }
 
 export namespace cmath.rect {
+  /**
+   * Creates a rectangle from two points `[x1, y1]` and `[x2, y2]`.
+   *
+   * This function ensures the resulting rectangle has positive width and height,
+   * regardless of the order of the input points.
+   *
+   * @param points - A tuple of two points: `[x1, y1]` and `[x2, y2]`.
+   * @returns A rectangle with `x`, `y`, `width`, and `height`.
+   *
+   * @example
+   * const rect = cmath.rect.fromPoints([[10, 20], [30, 40]]);
+   * console.log(rect); // { x: 10, y: 20, width: 20, height: 20 }
+   */
+  export function fromPoints(
+    points: [cmath.Vector2, cmath.Vector2]
+  ): Rectangle {
+    const [p1, p2] = points;
+
+    // Calculate min and max for x and y
+    const minX = Math.min(p1[0], p2[0]);
+    const minY = Math.min(p1[1], p2[1]);
+    const maxX = Math.max(p1[0], p2[0]);
+    const maxY = Math.max(p1[1], p2[1]);
+
+    // Return normalized rectangle
+    return {
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY,
+    };
+  }
+
   /**
    * Checks if rectangle `a` is fully contained within rectangle `b`.
    *

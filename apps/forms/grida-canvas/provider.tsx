@@ -26,6 +26,7 @@ import assert from "assert";
 import { documentquery } from "./document-query";
 import { GoogleFontsManager } from "./components/google-fonts";
 import { domapi } from "./domapi";
+import { cmath } from "./math";
 
 type Vector2 = [number, number];
 
@@ -1180,10 +1181,48 @@ export function useEventTarget() {
   }, [dispatch]);
 
   const dragEnd = useCallback(() => {
+    if (marquee) {
+      const contained: string[] = [];
+
+      const els = domapi.get_grida_node_elements();
+      const viewportdomrect = domapi.get_viewport_rect();
+      const viewport_pos = [viewportdomrect.x, viewportdomrect.y];
+      const translate: [number, number] = [
+        state.translate ? state.translate[0] : 0,
+        state.translate ? state.translate[1] : 0,
+      ];
+
+      const marqueerect = cmath.rect.fromPoints([
+        [marquee.x1, marquee.y1],
+        [marquee.x2, marquee.y2],
+      ]);
+      marqueerect.x = marqueerect.x - translate[0];
+      marqueerect.y = marqueerect.y - translate[1];
+
+      els.forEach((el) => {
+        const eldomrect = el.getBoundingClientRect();
+        const elrect = {
+          x: eldomrect.x - translate[0] - viewport_pos[0],
+          y: eldomrect.y - translate[1] - viewport_pos[1],
+          width: eldomrect.width,
+          height: eldomrect.height,
+        };
+        if (cmath.rect.contains(elrect, marqueerect)) {
+          contained.push(el.id);
+        }
+      });
+
+      dispatch({
+        type: "document/canvas/backend/html/event/on-drag-end",
+        node_ids_from_area: contained,
+      });
+
+      return;
+    }
     dispatch({
       type: "document/canvas/backend/html/event/on-drag-end",
     });
-  }, [dispatch]);
+  }, [dispatch, marquee, state.translate]);
 
   const drag = useCallback(
     (event: { delta: Vector2; distance: Vector2 }) => {

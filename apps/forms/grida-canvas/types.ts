@@ -146,6 +146,9 @@ export interface IDocumentEditorInteractionCursorState {
 
   clipboard?: grida.program.nodes.Node;
 
+  /**
+   * Marquee transform relative to viewport
+   */
   marquee?: Marquee;
 }
 
