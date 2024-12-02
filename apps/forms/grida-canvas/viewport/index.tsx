@@ -1,36 +1,21 @@
 "use client";
 
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useContext, useEffect, useRef } from "react";
 import { useEventTarget } from "@/grida-canvas";
 import { useGesture } from "@use-gesture/react";
-import {
-  useDocument,
-  useEventTargetCSSCursor,
-  useNode,
-  useNodeAction,
-  useNodeDomElement,
-} from "../provider";
+import { useEventTargetCSSCursor, useNode, useNodeAction } from "../provider";
 import { RotationCursorIcon } from "../components/cursor";
 import { grida } from "@/grida";
-import assert from "assert";
 import { useIsWindowResizing } from "./hooks/window-resizing";
 import { supports } from "@/grida/utils/supports";
 import { Marquee } from "./ui/marquee";
 import { domapi } from "../domapi";
-
-interface CanvasEventTargetContext {
-  portal?: HTMLDivElement | null;
-  setPortalRef?: (ref: HTMLDivElement | null) => void;
-}
-
-const EventTargetContext = createContext<CanvasEventTargetContext | null>(null);
+import { LayerOverlay } from "./ui/layer";
+import { ViewportSurfaceContext } from "./context";
+import {
+  useGroupSurfaceTransform,
+  useNodeSurfaceTransfrom,
+} from "./hooks/transform";
 
 export function ViewportRoot({
   className,
@@ -40,7 +25,7 @@ export function ViewportRoot({
   const [overlay, setOverlayRef] = React.useState<HTMLDivElement | null>(null);
 
   return (
-    <EventTargetContext.Provider
+    <ViewportSurfaceContext.Provider
       value={{ portal: overlay, setPortalRef: setOverlayRef }}
     >
       <div
@@ -51,7 +36,7 @@ export function ViewportRoot({
       >
         {children}
       </div>
-    </EventTargetContext.Provider>
+    </ViewportSurfaceContext.Provider>
   );
 }
 
@@ -76,7 +61,7 @@ export function ViewportSurface() {
   } = useEventTarget();
   const cursor = useEventTargetCSSCursor();
   const ref = useRef<HTMLDivElement>(null);
-  const context = useContext(EventTargetContext);
+  const context = useContext(ViewportSurfaceContext);
 
   useEffect(() => {
     if (context?.setPortalRef) {
@@ -197,14 +182,7 @@ export function ViewportSurface() {
         <SurfaceTextEditor node_id={selected_node_ids[0]} />
       )}
       <div className="w-full h-full" id="canvas-overlay-portal" ref={ref}>
-        {selected_node_ids.map((node_id) => (
-          <NodeOverlay
-            key={node_id}
-            node_id={node_id}
-            // TODO: based on positioning model
-            readonly={false}
-          />
-        ))}
+        <SelectionOverlay selection={selected_node_ids} readonly={false} />
         {hovered_node_id && !selected_node_ids.includes(hovered_node_id) && (
           <NodeOverlay node_id={hovered_node_id} readonly />
         )}
@@ -223,116 +201,36 @@ export function ViewportSurface() {
   );
 }
 
-export function useViewportSurfacePortal() {
-  const context = useContext(EventTargetContext);
-  if (!context) {
-    throw new Error(
-      "useCanvasOverlay must be used within a CanvasEventTarget."
-    );
+function SelectionOverlay({
+  readonly,
+  selection = [],
+}: {
+  readonly?: boolean;
+  selection?: string[];
+}) {
+  if (!selection || selection.length === 0) {
+    return <></>;
+  } else if (selection.length === 1) {
+    return <NodeOverlay node_id={selection[0]} readonly={readonly} />;
+  } else {
+    return <GroupOverlay node_ids={selection} readonly={readonly} />;
   }
-  return context.portal;
 }
 
-/**
- * returns the relative transform of the node surface relative to the portal
- */
-function useNodeSurfaceTransfrom_v1(node_id: string) {
-  const __rect_fallback = useMemo(() => new DOMRect(0, 0, 0, 0), []);
-  const { getNodeAbsoluteRotation } = useDocument();
-  const portal = useViewportSurfacePortal();
-  const node_element = useNodeDomElement(node_id);
-  const portal_rect = portal?.getBoundingClientRect() ?? __rect_fallback;
-  const node_element_bounding_rect =
-    node_element?.getBoundingClientRect() ?? __rect_fallback;
+function GroupOverlay({
+  node_ids,
+  readonly,
+}: {
+  node_ids: string[];
+  readonly?: boolean;
+}) {
+  const transform = useGroupSurfaceTransform(...node_ids);
 
-  // Calculate the center position relative to the portal
-  const centerX =
-    node_element_bounding_rect.left +
-    node_element_bounding_rect.width / 2 -
-    portal_rect.left;
-  const centerY =
-    node_element_bounding_rect.top +
-    node_element_bounding_rect.height / 2 -
-    portal_rect.top;
+  console.log("GroupOverlay", transform);
 
-  // Calculate the position of the target relative to the portal
-  const width = node_element?.clientWidth;
-  const height = node_element?.clientHeight;
-
-  // absolute rotation => accumulated rotation to the root
-  const absolute_rotation = getNodeAbsoluteRotation(node_id);
-
-  return {
-    top: centerY,
-    left: centerX,
-    transform: `translate(-50%, -50%) rotate(${absolute_rotation ?? 0}deg)`,
-    width: width,
-    height: height,
-  };
-}
-
-/**
- * returns the relative transform of the node surface relative to the portal
- * TODO: Not tested with the performance
- */
-function useNodeSurfaceTransfrom(node_id: string) {
-  const __rect_fallback = useMemo(() => new DOMRect(0, 0, 0, 0), []);
-  const { getNodeAbsoluteRotation } = useDocument();
-  const portal = useViewportSurfacePortal();
-  const node_element = useNodeDomElement(node_id);
-
-  const [transform, setTransform] = useState({
-    top: 0,
-    left: 0,
-    transform: "",
-    width: 0,
-    height: 0,
-  });
-
-  useEffect(() => {
-    if (!node_element || !portal) return;
-
-    const updateTransform = () => {
-      const portal_rect = portal.getBoundingClientRect();
-      const node_element_bounding_rect =
-        node_element.getBoundingClientRect() ?? __rect_fallback;
-
-      const centerX =
-        node_element_bounding_rect.left +
-        node_element_bounding_rect.width / 2 -
-        portal_rect.left;
-      const centerY =
-        node_element_bounding_rect.top +
-        node_element_bounding_rect.height / 2 -
-        portal_rect.top;
-
-      const width = node_element.clientWidth;
-      const height = node_element.clientHeight;
-
-      const absolute_rotation = getNodeAbsoluteRotation(node_id);
-
-      setTransform({
-        top: centerY,
-        left: centerX,
-        transform: `translate(-50%, -50%) rotate(${absolute_rotation ?? 0}deg)`,
-        width: width,
-        height: height,
-      });
-    };
-
-    // Observe size changes
-    const resizeObserver = new ResizeObserver(() => updateTransform());
-    resizeObserver.observe(node_element);
-
-    // Trigger initial update
-    updateTransform();
-
-    return () => {
-      resizeObserver.disconnect();
-    };
-  }, [node_element, portal, getNodeAbsoluteRotation, node_id, __rect_fallback]);
-
-  return transform;
+  return (
+    <LayerOverlay readonly={readonly} transform={transform}></LayerOverlay>
+  );
 }
 
 function NodeOverlay({
@@ -340,22 +238,16 @@ function NodeOverlay({
   readonly,
 }: {
   node_id: string;
-  readonly: boolean;
+  readonly?: boolean;
 }) {
   const transform = useNodeSurfaceTransfrom(node_id);
   const node = useNode(node_id);
 
   return (
-    <div
-      data-node-is-runtime-instance={node.meta.is_component_consumer}
-      className="relative group pointer-events-auto select-none border-2 border-workbench-accent-sky data-[node-is-runtime-instance='true']:border-workbench-accent-violet"
-      style={{
-        position: "absolute",
-        ...transform,
-        zIndex: readonly ? 1 : 2,
-        touchAction: "none",
-        willChange: "transform",
-      }}
+    <LayerOverlay
+      readonly={readonly}
+      transform={transform}
+      isComponentConsumer={node.meta.is_component_consumer}
     >
       {!readonly && (
         <>
@@ -366,7 +258,7 @@ function NodeOverlay({
           {/* bottom left */}
           {/* <ResizeHandle anchor="sw" readonly={readonly} node_id={node_id} /> */}
           {/* bottom right */}
-          <NodeOverlayResizeHandle
+          <LayerOverlayResizeHandle
             anchor="se"
             readonly={readonly}
             node_id={node_id}
@@ -375,10 +267,10 @@ function NodeOverlay({
             !supports.children(node.type) && (
               <NodeOverlayCornerRadiusHandle anchor="se" node_id={node_id} />
             )}
-          <NodeOverlayRotationHandle anchor="ne" node_id={node_id} />
+          <LayerOverlayRotationHandle anchor="ne" node_id={node_id} />
         </>
       )}
-    </div>
+    </LayerOverlay>
   );
 }
 
@@ -451,7 +343,7 @@ function NodeOverlayCornerRadiusHandle({
   );
 }
 
-function NodeOverlayRotationHandle({
+function LayerOverlayRotationHandle({
   node_id,
   anchor,
   offset = 8,
@@ -494,8 +386,9 @@ function NodeOverlayRotationHandle({
   return (
     <div
       {...bind()}
-      className="bg-transparent flex items-center justify-center"
+      className="flex items-center justify-center"
       style={{
+        background: "transparent",
         position: "absolute",
         top: anchor[0] === "n" ? -offset : "auto",
         bottom: anchor[0] === "s" ? -offset : "auto",
@@ -513,7 +406,7 @@ function NodeOverlayRotationHandle({
   );
 }
 
-function NodeOverlayResizeHandle({
+function LayerOverlayResizeHandle({
   node_id,
   anchor,
   readonly,
@@ -521,20 +414,18 @@ function NodeOverlayResizeHandle({
 }: {
   node_id: string;
   anchor: "nw" | "ne" | "sw" | "se";
-  readonly: boolean;
+  readonly?: boolean;
   size?: number;
 }) {
   const { dragResizeHandleStart, dragResizeHandleEnd, dragResizeHandle } =
     useEventTarget();
 
-  const node_element = useNodeDomElement(node_id);
-
   const bind = useGesture(
     {
       onDragStart: (e) => {
         e.event.stopPropagation();
-        if (!node_element) return;
-        const rect = node_element.getBoundingClientRect();
+        const rect = domapi.get_node_element(node_id)?.getBoundingClientRect();
+        if (!rect) return;
 
         dragResizeHandleStart(node_id, {
           width: rect.width,

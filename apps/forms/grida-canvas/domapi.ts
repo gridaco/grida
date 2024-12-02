@@ -6,6 +6,10 @@ export namespace domapi {
     export const EDITOR_CONTENT_ELEMENT_ID = "grida-canvas-sdk-editor-content";
   }
 
+  export function get_node_element(node_id: string) {
+    return window.document.getElementById(node_id);
+  }
+
   export function get_content_element() {
     return window.document.getElementById(k.EDITOR_CONTENT_ELEMENT_ID);
   }

@@ -55,7 +55,6 @@ import { MaxlengthControl } from "./controls/maxlength";
 import { useComputedNode, useDocument, useNode } from "@/grida-canvas";
 import assert from "assert";
 import { grida } from "@/grida";
-import { useNodeDomElement } from "@/grida-canvas/provider";
 import { LockClosedIcon } from "@radix-ui/react-icons";
 import { supports } from "@/grida/utils/supports";
 

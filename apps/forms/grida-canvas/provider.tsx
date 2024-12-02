@@ -1567,21 +1567,3 @@ export function useTemplateDefinition(template_id: string) {
 
   return templates![template_id];
 }
-
-export function useNodeDomElement(node_id: string) {
-  const [nodeElement, setNodeElement] = React.useState<HTMLElement | null>(
-    null
-  );
-
-  useLayoutEffect(() => {
-    if (!node_id) {
-      setNodeElement(null);
-      return;
-    }
-
-    const element = document.getElementById(node_id);
-    setNodeElement(element);
-  }, [node_id]);
-
-  return nodeElement;
-}

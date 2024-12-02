@@ -174,4 +174,52 @@ export namespace cmath.rect {
       height: maxY - minY,
     };
   }
+
+  /**
+   * Rotates a rectangle and computes the bounding box of the rotated rectangle.
+   *
+   * @param rect - The rectangle to rotate.
+   * @param rotate - The rotation angle in degrees (similar to CSS rotate).
+   * @returns A new rectangle representing the axis-aligned bounding box of the rotated rectangle.
+   *
+   * @example
+   * const rect = { x: 10, y: 10, width: 50, height: 30 };
+   * const rotated = cmath.rect.rotate(rect, 45);
+   * console.log(rotated); // { x: 3.03, y: -7.32, width: 70.71, height: 56.57 }
+   */
+  export function rotate(rect: Rectangle, rotate: number): Rectangle {
+    const radians = (rotate * Math.PI) / 180; // Convert degrees to radians
+
+    // Calculate the center of the rectangle
+    const centerX = rect.x + rect.width / 2;
+    const centerY = rect.y + rect.height / 2;
+
+    // Get the corners of the rectangle relative to the center
+    const corners: Vector2[] = [
+      [rect.x - centerX, rect.y - centerY], // Top-left
+      [rect.x + rect.width - centerX, rect.y - centerY], // Top-right
+      [rect.x + rect.width - centerX, rect.y + rect.height - centerY], // Bottom-right
+      [rect.x - centerX, rect.y + rect.height - centerY], // Bottom-left
+    ];
+
+    // Rotate each corner and compute their new positions
+    const rotatedCorners = corners.map(([x, y]) => {
+      const rotatedX = x * Math.cos(radians) - y * Math.sin(radians);
+      const rotatedY = x * Math.sin(radians) + y * Math.cos(radians);
+      return [rotatedX + centerX, rotatedY + centerY] as Vector2; // Translate back to the original center
+    });
+
+    // Compute the bounding box for the rotated corners
+    const minX = Math.min(...rotatedCorners.map(([x]) => x));
+    const minY = Math.min(...rotatedCorners.map(([_, y]) => y));
+    const maxX = Math.max(...rotatedCorners.map(([x]) => x));
+    const maxY = Math.max(...rotatedCorners.map(([_, y]) => y));
+
+    return {
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY,
+    };
+  }
 }
