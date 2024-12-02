@@ -1,6 +1,64 @@
 import { cmath } from "./math";
 
 describe("cmath.rect", () => {
+  describe("fromPoints", () => {
+    it("should create a rectangle with positive width and height from two points", () => {
+      const rect = cmath.rect.fromPoints([
+        [10, 20],
+        [30, 40],
+      ]);
+      expect(rect).toEqual({ x: 10, y: 20, width: 20, height: 20 });
+    });
+
+    it("should normalize points to ensure positive width and height", () => {
+      const rect = cmath.rect.fromPoints([
+        [30, 40],
+        [10, 20],
+      ]);
+      expect(rect).toEqual({ x: 10, y: 20, width: 20, height: 20 });
+    });
+
+    it("should handle points on the same line (zero width)", () => {
+      const rect = cmath.rect.fromPoints([
+        [10, 20],
+        [10, 40],
+      ]);
+      expect(rect).toEqual({ x: 10, y: 20, width: 0, height: 20 });
+    });
+
+    it("should handle points on the same line (zero height)", () => {
+      const rect = cmath.rect.fromPoints([
+        [10, 20],
+        [30, 20],
+      ]);
+      expect(rect).toEqual({ x: 10, y: 20, width: 20, height: 0 });
+    });
+
+    it("should handle identical points (zero width and height)", () => {
+      const rect = cmath.rect.fromPoints([
+        [10, 20],
+        [10, 20],
+      ]);
+      expect(rect).toEqual({ x: 10, y: 20, width: 0, height: 0 });
+    });
+
+    it("should work with negative coordinates", () => {
+      const rect = cmath.rect.fromPoints([
+        [-10, -20],
+        [30, 40],
+      ]);
+      expect(rect).toEqual({ x: -10, y: -20, width: 40, height: 60 });
+    });
+
+    it("should normalize negative coordinates and flip points if needed", () => {
+      const rect = cmath.rect.fromPoints([
+        [30, 40],
+        [-10, -20],
+      ]);
+      expect(rect).toEqual({ x: -10, y: -20, width: 40, height: 60 });
+    });
+  });
+
   describe("contains", () => {
     it("should return true when rectangle A is fully contained within rectangle B", () => {
       const a: cmath.Rectangle = { x: 20, y: 20, width: 40, height: 40 };
@@ -50,6 +108,32 @@ describe("cmath.rect", () => {
       const a: cmath.Rectangle = { x: 100, y: 50, width: 50, height: 50 };
       const b: cmath.Rectangle = { x: 50, y: 50, width: 50, height: 50 };
       expect(cmath.rect.intersects(a, b)).toBe(true);
+    });
+  });
+
+  describe("getBoundingRect", () => {
+    it("should compute the bounding rectangle for multiple rectangles", () => {
+      const rectangles: cmath.Rectangle[] = [
+        { x: 10, y: 10, width: 30, height: 40 },
+        { x: 50, y: 20, width: 20, height: 30 },
+        { x: 0, y: 5, width: 10, height: 10 },
+      ];
+      const boundingRect = cmath.rect.getBoundingRect(rectangles);
+      expect(boundingRect).toEqual({ x: 0, y: 5, width: 70, height: 45 });
+    });
+
+    it("should handle a single rectangle as input", () => {
+      const rectangles: cmath.Rectangle[] = [
+        { x: 10, y: 20, width: 30, height: 40 },
+      ];
+      const boundingRect = cmath.rect.getBoundingRect(rectangles);
+      expect(boundingRect).toEqual({ x: 10, y: 20, width: 30, height: 40 });
+    });
+
+    it("should throw an error for an empty array of rectangles", () => {
+      expect(() => cmath.rect.getBoundingRect([])).toThrow(
+        "Cannot compute bounding rect for an empty array of rectangles."
+      );
     });
   });
 });

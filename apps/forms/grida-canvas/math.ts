@@ -131,4 +131,47 @@ export namespace cmath.rect {
       ) // `a` is above `b`.
     );
   }
+
+  /**
+   * Computes the bounding rectangle that fully encloses an array of rectangles.
+   *
+   * @param rectangles - An array of rectangles to compute the bounding box for.
+   * @returns A new rectangle that bounds all the input rectangles.
+   *
+   * @example
+   * const rectangles = [
+   *   { x: 10, y: 10, width: 30, height: 40 },
+   *   { x: 50, y: 20, width: 20, height: 30 },
+   * ];
+   * const boundingRect = cmath.rect.getBoundingRect(rectangles);
+   * console.log(boundingRect); // { x: 10, y: 10, width: 60, height: 50 }
+   */
+  export function getBoundingRect(rectangles: Rectangle[]): Rectangle {
+    if (rectangles.length === 0) {
+      throw new Error(
+        "Cannot compute bounding rect for an empty array of rectangles."
+      );
+    }
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
+    for (const rect of rectangles) {
+      // Update min and max for x and y
+      minX = Math.min(minX, rect.x);
+      minY = Math.min(minY, rect.y);
+      maxX = Math.max(maxX, rect.x + rect.width);
+      maxY = Math.max(maxY, rect.y + rect.height);
+    }
+
+    // Return the bounding rectangle
+    return {
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY,
+    };
+  }
 }
