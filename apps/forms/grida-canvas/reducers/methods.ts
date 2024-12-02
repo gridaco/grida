@@ -11,9 +11,9 @@ import assert from "assert";
 export function self_selectNode<S extends IDocumentEditorState>(
   draft: Draft<S>,
   mode: "reset" | "add" | "toggle",
-  ...node_ids: string[]
+  ...__node_ids: string[]
 ) {
-  for (const node_id of node_ids) {
+  for (const node_id of __node_ids) {
     assert(node_id, "Node ID must be provided");
     assert(
       draft.document.nodes[node_id],
@@ -22,25 +22,39 @@ export function self_selectNode<S extends IDocumentEditorState>(
   }
 
   switch (mode) {
-    case "add":
-      const set = new Set([...draft.selected_node_ids, ...node_ids]);
-      draft.selected_node_ids = Array.from(set);
+    case "add": {
+      const set = new Set([...draft.selected_node_ids, ...__node_ids]);
+      const pruned = documentquery.pruneNestedNodes(
+        draft.document_ctx,
+        Array.from(set)
+      );
+      draft.selected_node_ids = pruned;
       break;
+    }
     case "toggle": {
       const set = new Set(draft.selected_node_ids);
-      for (const node_id of node_ids) {
+      for (const node_id of __node_ids) {
         if (set.has(node_id)) {
           set.delete(node_id);
         } else {
           set.add(node_id);
         }
       }
-      draft.selected_node_ids = Array.from(set);
+      const pruned = documentquery.pruneNestedNodes(
+        draft.document_ctx,
+        Array.from(set)
+      );
+      draft.selected_node_ids = pruned;
       break;
     }
-    case "reset":
-      draft.selected_node_ids = node_ids;
+    case "reset": {
+      const pruned = documentquery.pruneNestedNodes(
+        draft.document_ctx,
+        __node_ids
+      );
+      draft.selected_node_ids = pruned;
       break;
+    }
   }
   return draft;
 }

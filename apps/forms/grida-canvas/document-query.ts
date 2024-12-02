@@ -1,10 +1,63 @@
 import { grida } from "@/grida";
 import type { IDocumentEditorState } from "./types";
 
+type NodeID = string;
+
 /**
  * @internal
  */
 export namespace documentquery {
+  /**
+   * [UX]
+   *
+   * filters nodes by hierarchy in a UX friendly matter.
+   *
+   * When a parent and child is requested to be selected at the same time, only the parent shall be selected.
+   * This is to prevent recursive mutation of selected nodes in a nested way.
+   *
+   * Without this filtering, when modifying a tralsate or rotation will cause the nested children to be mutated as well.
+   *
+   * @example
+   * - input: [a, a.0, a.1, a.1.9, b, c, d.0, z.9.9.9]
+   * - output: [a, b, c, d.0, z.9.9.9]
+   */
+  export function pruneNestedNodes(
+    context: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext,
+    selection: NodeID[]
+  ): NodeID[] {
+    const prunedSelection: Set<NodeID> = new Set();
+
+    for (const node of selection) {
+      // If no ancestor of the current node is in the pruned selection, add it
+      if (
+        !Array.from(prunedSelection).some((selectedNode) =>
+          isAncestor(context, selectedNode, node)
+        )
+      ) {
+        prunedSelection.add(node);
+      }
+    }
+
+    return Array.from(prunedSelection);
+  }
+
+  function isAncestor(
+    context: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext,
+    ancestor: NodeID,
+    node: NodeID
+  ): boolean {
+    const { __ctx_nid_to_parent_id } = context;
+    let current = node;
+
+    while (current) {
+      const parent = __ctx_nid_to_parent_id[current];
+      if (parent === ancestor) return true; // Ancestor found
+      current = parent;
+    }
+
+    return false; // Ancestor not found
+  }
+
   /**
    * Retrieves a list of ancestor node IDs for a given node, starting from the root
    * and ending with the parent of the specified node.
@@ -38,7 +91,7 @@ export namespace documentquery {
   export function getAncestors(
     context: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext,
     node_id: string
-  ): string[] {
+  ): NodeID[] {
     const { __ctx_nid_to_parent_id } = context;
     const ancestors: string[] = [];
     let current = node_id;
@@ -57,7 +110,7 @@ export namespace documentquery {
   export function getParentId(
     context: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext,
     node_id: string
-  ): string | null {
+  ): NodeID | null {
     return context.__ctx_nid_to_parent_id[node_id] || null;
   }
 

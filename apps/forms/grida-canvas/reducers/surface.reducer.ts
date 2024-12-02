@@ -352,6 +352,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
               node_id !== draft.document.root_id &&
               !documentquery.__getNodeById(draft, node_id).locked
           );
+
           self_selectNode(
             draft,
             shiftKey ? "toggle" : "reset",
