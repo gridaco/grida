@@ -56,6 +56,7 @@ export default function KeyboardInputOverlay({
   }, []);
 
   const displayedKeys = Array.from(pressedKeys)
+    .filter(Boolean)
     .map((key) => keySymbolMap[key] || key.toUpperCase())
     .join(" + ");
 
