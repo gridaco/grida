@@ -293,6 +293,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
         // clear all trasform state
         draft.surface_content_edit_mode = false;
         draft.is_gesture_node_drag_resize = false;
+        draft.marquee = undefined;
 
         switch (draft.cursor_mode.type) {
           case "cursor": {
@@ -376,8 +377,8 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
           // const node_id = state.selected_node_ids[0];
 
           const [dx, dy] = delta;
-          state.selected_node_ids.forEach((node_id) => {
-            return produce(state, (draft) => {
+          return produce(state, (draft) => {
+            state.selected_node_ids.forEach((node_id) => {
               const node = documentquery.__getNodeById(draft, node_id);
 
               draft.document.nodes[node_id] = nodeTransformReducer(node, {
