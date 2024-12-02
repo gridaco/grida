@@ -4,6 +4,7 @@ import {
   useEffect,
   useLayoutEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { ViewportSurfaceContext } from "../context";
@@ -35,7 +36,7 @@ export function useNodeDomElement(node_id: string) {
   return nodeElement;
 }
 
-export function useNodeDomElements(...node_ids: string[]) {
+export function useNodeDomElements(node_ids: string[]) {
   const [nodeElement, setNodeElement] = useState<HTMLElement[] | null>(null);
 
   useLayoutEffect(() => {
@@ -48,7 +49,7 @@ export function useNodeDomElements(...node_ids: string[]) {
       .map((node_id) => document.getElementById(node_id))
       .filter(Boolean) as HTMLElement[];
     setNodeElement(elements);
-  }, [...node_ids]);
+  }, [node_ids]);
 
   return nodeElement;
 }
@@ -156,6 +157,33 @@ export function useNodeSurfaceTransfrom(node_id: string) {
 }
 
 /**
+ * Custom hook to memoize an array based on its contents
+ */
+function useStableNodeIds(node_ids: string[]): string[] {
+  const prevRef = useRef<string[]>(node_ids);
+  const stableNodeIds = useMemo(() => {
+    if (
+      prevRef.current.length !== node_ids.length ||
+      !shallowEqual(prevRef.current, node_ids)
+    ) {
+      prevRef.current = node_ids;
+    }
+    return prevRef.current;
+  }, [node_ids]);
+  return stableNodeIds;
+}
+
+/**
+ * Helper function to perform shallow comparison of arrays
+ */
+function shallowEqual(arr1: string[], arr2: string[]): boolean {
+  return (
+    arr1.length === arr2.length &&
+    arr1.every((item, index) => item === arr2[index])
+  );
+}
+
+/**
  * returns the relative transform of the group surface relative to the portal
  * The group surface will not have rotation - each children rotation is applied to calculate the group bounding rect
  *
@@ -166,7 +194,11 @@ export function useNodeSurfaceTransfrom(node_id: string) {
 export function useGroupSurfaceTransform(...node_ids: string[]) {
   const __rect_fallback = useMemo(() => new DOMRect(0, 0, 0, 0), []);
   const portal = useViewportSurfacePortal();
-  const node_elements = useNodeDomElements(...node_ids);
+
+  // Use stable node IDs to avoid unnecessary re-renders
+  const stableNodeIds = useStableNodeIds(node_ids);
+
+  const node_elements = useNodeDomElements(stableNodeIds);
 
   const [transform, setTransform] = useState({
     top: 0,
@@ -222,24 +254,13 @@ export function useGroupSurfaceTransform(...node_ids: string[]) {
       return observer;
     });
 
-    // Observe position changes using MutationObserver
-    const mutationObserver = new MutationObserver(() => updateTransform());
-    node_elements.forEach((el) => {
-      if (el)
-        mutationObserver.observe(el, {
-          attributes: true,
-          attributeFilter: ["style"],
-        });
-    });
-
     // Trigger initial update
     updateTransform();
 
     return () => {
       resizeObservers.forEach((observer) => observer.disconnect());
-      mutationObserver.disconnect();
     };
-  }, [...node_ids, node_elements, portal, __rect_fallback]);
+  }, [stableNodeIds, node_elements, portal, __rect_fallback]);
 
   return transform;
 }
