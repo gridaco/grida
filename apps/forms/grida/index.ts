@@ -1387,11 +1387,14 @@ export namespace grida {
 
         /**
          * specifies node's x rotation in degrees
-         *
-         * @default 0
          */
         export interface IRotation {
-          rotation?: number;
+          /**
+           * rotation in degrees
+           *
+           * @default 0
+           */
+          rotation: number;
         }
 
         /**
@@ -1639,6 +1642,8 @@ export namespace grida {
            * - Note: max length is ignored when set programmatically
            * - Note: this is a experimental feature and its behaviour is not strictly defined
            * @see https://json-schema.org/understanding-json-schema/reference/string#length
+           *
+           * @deprecated - not standard
            */
           maxLength?: number;
         }

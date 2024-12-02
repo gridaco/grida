@@ -55,7 +55,6 @@ import { MaxlengthControl } from "./controls/maxlength";
 import { useComputedNode, useDocument, useNode } from "@/grida-canvas";
 import assert from "assert";
 import { grida } from "@/grida";
-import { useNodeDomElement } from "@/grida-canvas/provider";
 import { LockClosedIcon } from "@radix-ui/react-icons";
 import { supports } from "@/grida/utils/supports";
 
@@ -65,13 +64,16 @@ export function SelectedNodeProperties() {
 
   // - color - variables
   const {
-    selected_node_id,
+    selected_node_ids,
     document: { root_id },
   } = document;
 
-  const node = useNode(selected_node_id!);
+  assert(selected_node_ids.length === 1);
+  const node_id = selected_node_ids[0];
+
+  const node = useNode(node_id);
   const root = useNode(root_id);
-  const computed = useComputedNode(selected_node_id!);
+  const computed = useComputedNode(node_id);
   const {
     id,
     name,
@@ -127,7 +129,7 @@ export function SelectedNodeProperties() {
   const is_text = type === "text";
   const is_image = type === "image";
   const is_container = type === "container";
-  const is_root = selected_node_id === root_id;
+  const is_root = node_id === root_id;
   const is_flex_container = is_container && layout === "flex";
   const is_stylable = type !== "template_instance";
 
@@ -152,7 +154,7 @@ export function SelectedNodeProperties() {
   } satisfies grida.program.css.ExplicitlySupportedCSSProperties;
 
   return (
-    <div key={selected_node_id} className="mt-4 mb-10">
+    <div key={node_id} className="mt-4 mb-10">
       {/* {process.env.NODE_ENV === "development" && (
         <SidebarSection className="border-b pb-4">
           <SidebarSectionHeaderItem>
@@ -531,73 +533,5 @@ export function SelectedNodeProperties() {
         </SidebarMenuSectionContent>
       </SidebarSection>
     </div>
-  );
-}
-
-// const i_map = {
-//   i_opacity: ["opacity"],
-//   i_positioning: ["position", "top", "left"],
-//   i_hrefable: ["href", "target"],
-//   i_css: ["style"],
-//   i_exportable: ["export"],
-// };
-
-// const properties_map = {
-//   rectangle: ["opacity", "cornerRadius", "fill", "cursor"],
-// } as const;
-
-function DebugControls() {
-  const { state: document, selectedNode } = useDocument();
-
-  const { selected_node_id } = document;
-
-  const node = useNode(selected_node_id!);
-  const {
-    id,
-    name,
-    active,
-    component_id,
-    style,
-    type,
-    properties,
-    opacity,
-    cornerRadius,
-    fill,
-    position,
-    width,
-    height,
-    left,
-    top,
-    right,
-    bottom,
-  } = node;
-
-  const nel = useNodeDomElement(selected_node_id!);
-
-  const clientRect = useMemo(() => {
-    return nel?.getBoundingClientRect();
-  }, [node]);
-
-  return (
-    <SidebarMenuSectionContent>
-      <pre className="text-xs font-mono">
-        <div>Node {selected_node_id}</div>
-        {/* <div>Type {type}</div> */}
-        {/* <div>Name {name}</div> */}
-        <div>width {width}</div>
-        <div>height {height}</div>
-        <hr className="my-4" />
-        <span className="font-bold">clientRect</span>
-        <div>x {clientRect?.x}</div>
-        <div>y {clientRect?.y}</div>
-        <div>top {clientRect?.top}</div>
-        <div>left {clientRect?.left}</div>
-        <div>right {clientRect?.right}</div>
-        <div>bottom {clientRect?.bottom}</div>
-        <div>width {clientRect?.width}</div>
-        <div>height {clientRect?.height}</div>
-        <hr className="my-4" />
-      </pre>
-    </SidebarMenuSectionContent>
   );
 }

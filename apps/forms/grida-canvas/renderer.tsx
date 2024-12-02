@@ -4,6 +4,7 @@ import React, { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { __useInternal, useDocument } from "./provider";
 import { NodeElement } from "./nodes/node";
 import { domapi } from "./domapi";
+import { cmath } from "./math";
 
 /**
  * A hook that calculates and notifies the editor content offset relative to the editor viewport.
@@ -17,10 +18,10 @@ function __useEditorContentOffsetNotifyEffect(
   const [_, dispatch] = __useInternal();
 
   const syncoffset = useCallback(
-    ({ x, y }: { x: number; y: number }) => {
+    (offset: cmath.Vector2) => {
       dispatch({
         type: "__internal/sync-artboard-offset",
-        offset: [x, y],
+        offset: offset,
       });
     },
     [dispatch]
@@ -36,7 +37,7 @@ function __useEditorContentOffsetNotifyEffect(
     }
 
     function updateOffset() {
-      const calculatedOffset = domapi.get_offset_between(
+      const calculatedOffset = domapi.get_displacement_between(
         viewportElement,
         contentElement
       );
@@ -74,7 +75,7 @@ export function StandaloneDocumentEditorContent() {
   __useEditorContentOffsetNotifyEffect(ref, [document_key]);
 
   return (
-    <div ref={ref}>
+    <div id={domapi.k.EDITOR_CONTENT_ELEMENT_ID} ref={ref}>
       <NodeElement node_id={root_id}></NodeElement>
     </div>
   );

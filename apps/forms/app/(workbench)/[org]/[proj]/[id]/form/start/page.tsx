@@ -54,7 +54,7 @@ import { Spinner } from "@/components/spinner";
 import {
   StandaloneDocumentEditor,
   ViewportRoot,
-  ViewportSurface,
+  EditorSurface,
   useDocument,
   useRootTemplateInstanceNode,
 } from "@/grida-canvas";
@@ -185,7 +185,7 @@ function StartPageEditor() {
         }}
         className="relative w-full no-scrollbar overflow-y-auto bg-transparent"
       >
-        <ViewportSurface />
+        <EditorSurface />
         <AgentThemeProvider>
           <div className="w-full px-10 overflow-scroll">
             <div className="w-full mx-auto my-20 max-w-sm xl:max-w-4xl z-[-999]">

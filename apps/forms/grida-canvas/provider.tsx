@@ -26,6 +26,7 @@ import assert from "assert";
 import { documentquery } from "./document-query";
 import { GoogleFontsManager } from "./components/google-fonts";
 import { domapi } from "./domapi";
+import { cmath } from "./math";
 
 type Vector2 = [number, number];
 
@@ -818,7 +819,7 @@ export function useNodeAction(node_id: string | undefined) {
 export function useDocument() {
   const [state, dispatch] = __useInternal();
 
-  const { selected_node_id } = state;
+  const { selected_node_ids } = state;
 
   const nodeActions = __useNodeActions(dispatch);
 
@@ -952,13 +953,16 @@ export function useDocument() {
     [dispatch]
   );
 
-  const selectedNodeActions = useNodeAction(selected_node_id);
-  const selectedNode = selected_node_id ? selectedNodeActions : undefined;
+  const selectedNodeActions = useNodeAction(
+    selected_node_ids.length === 1 ? selected_node_ids[0] : undefined
+  );
+  const selectedNode =
+    selected_node_ids.length === 1 ? selectedNodeActions : undefined;
 
   return useMemo(() => {
     return {
       state,
-      selected_node_id,
+      selected_node_ids,
       selectedNode,
       clearSelection,
       getNodeDepth,
@@ -972,7 +976,7 @@ export function useDocument() {
     };
   }, [
     state,
-    selected_node_id,
+    selected_node_ids,
     selectedNode,
     clearSelection,
     getNodeDepth,
@@ -1032,7 +1036,7 @@ export function useEventTarget() {
   const {
     is_gesture_node_drag_move: is_node_transforming,
     hovered_node_id,
-    selected_node_id,
+    selected_node_ids,
     surface_content_edit_mode: content_edit_mode,
     cursor_mode,
     marquee,
@@ -1088,6 +1092,7 @@ export function useEventTarget() {
         type: "document/canvas/backend/html/event/on-pointer-move-raycast",
         node_ids_from_point: els.map((n) => n.id),
         position,
+        shiftKey: event.shiftKey,
       });
     }, 30),
     [dispatch]
@@ -1131,6 +1136,7 @@ export function useEventTarget() {
       dispatch({
         type: "document/canvas/backend/html/event/on-pointer-down",
         node_ids_from_point: els.map((n) => n.id),
+        shiftKey: event.shiftKey,
       });
     },
     [dispatch]
@@ -1173,17 +1179,64 @@ export function useEventTarget() {
     });
   }, [dispatch]);
 
-  const dragStart = useCallback(() => {
-    dispatch({
-      type: "document/canvas/backend/html/event/on-drag-start",
-    });
-  }, [dispatch]);
+  const dragStart = useCallback(
+    (event: PointerEvent) => {
+      dispatch({
+        type: "document/canvas/backend/html/event/on-drag-start",
+        shiftKey: event.shiftKey,
+      });
+    },
+    [dispatch]
+  );
 
-  const dragEnd = useCallback(() => {
-    dispatch({
-      type: "document/canvas/backend/html/event/on-drag-end",
-    });
-  }, [dispatch]);
+  const dragEnd = useCallback(
+    (event: PointerEvent) => {
+      if (marquee) {
+        const contained: string[] = [];
+
+        const els = domapi.get_grida_node_elements();
+        const viewportdomrect = domapi.get_viewport_rect();
+        const viewport_pos = [viewportdomrect.x, viewportdomrect.y];
+        const translate: [number, number] = [
+          state.translate ? state.translate[0] : 0,
+          state.translate ? state.translate[1] : 0,
+        ];
+
+        const marqueerect = cmath.rect.fromPoints([
+          [marquee.x1, marquee.y1],
+          [marquee.x2, marquee.y2],
+        ]);
+        marqueerect.x = marqueerect.x - translate[0];
+        marqueerect.y = marqueerect.y - translate[1];
+
+        els.forEach((el) => {
+          const eldomrect = el.getBoundingClientRect();
+          const elrect = {
+            x: eldomrect.x - translate[0] - viewport_pos[0],
+            y: eldomrect.y - translate[1] - viewport_pos[1],
+            width: eldomrect.width,
+            height: eldomrect.height,
+          };
+          if (cmath.rect.intersects(elrect, marqueerect)) {
+            contained.push(el.id);
+          }
+        });
+
+        dispatch({
+          type: "document/canvas/backend/html/event/on-drag-end",
+          node_ids_from_area: contained,
+          shiftKey: event.shiftKey,
+        });
+
+        return;
+      }
+      dispatch({
+        type: "document/canvas/backend/html/event/on-drag-end",
+        shiftKey: event.shiftKey,
+      });
+    },
+    [dispatch, marquee, state.translate]
+  );
 
   const drag = useCallback(
     (event: { delta: Vector2; distance: Vector2 }) => {
@@ -1196,6 +1249,55 @@ export function useEventTarget() {
     },
     [dispatch]
   );
+
+  //
+  const layerClick = useCallback(
+    (selection: string[], event: MouseEvent) => {
+      const els = domapi.get_grida_node_elements_from_point(
+        event.clientX,
+        event.clientY
+      );
+
+      dispatch({
+        type: "document/canvas/backend/html/event/node-overlay/on-click",
+        selection: selection,
+        node_ids_from_point: els.map((n) => n.id),
+        shiftKey: event.shiftKey,
+      });
+    },
+    [dispatch]
+  );
+  const layerDragStart = useCallback(
+    (selection: string[], event: { delta: Vector2; distance: Vector2 }) => {
+      dispatch({
+        type: "document/canvas/backend/html/event/node-overlay/on-drag-start",
+        selection,
+        event,
+      });
+    },
+    [dispatch]
+  );
+  const layerDragEnd = useCallback(
+    (selection: string[], event: { delta: Vector2; distance: Vector2 }) => {
+      dispatch({
+        type: "document/canvas/backend/html/event/node-overlay/on-drag-end",
+        selection,
+        event,
+      });
+    },
+    [dispatch]
+  );
+  const layerDrag = useCallback(
+    (selection: string[], event: { delta: Vector2; distance: Vector2 }) => {
+      dispatch({
+        type: "document/canvas/backend/html/event/node-overlay/on-drag",
+        selection,
+        event,
+      });
+    },
+    [dispatch]
+  );
+  //
 
   // #region drag resize handle
   const dragResizeHandleStart = useCallback(
@@ -1319,7 +1421,7 @@ export function useEventTarget() {
       setCursorMode,
       //
       hovered_node_id,
-      selected_node_id,
+      selected_node_ids,
       is_node_transforming,
       content_edit_mode,
       //
@@ -1350,6 +1452,11 @@ export function useEventTarget() {
       dragEnd,
       drag,
       //
+      layerClick,
+      layerDragStart,
+      layerDragEnd,
+      layerDrag,
+      //
     };
   }, [
     marquee,
@@ -1357,7 +1464,7 @@ export function useEventTarget() {
     setCursorMode,
     //
     hovered_node_id,
-    selected_node_id,
+    selected_node_ids,
     is_node_transforming,
     content_edit_mode,
     //
@@ -1387,6 +1494,11 @@ export function useEventTarget() {
     dragStart,
     dragEnd,
     drag,
+    //
+    layerClick,
+    layerDragStart,
+    layerDragEnd,
+    layerDrag,
     //
   ]);
 }
@@ -1524,22 +1636,4 @@ export function useTemplateDefinition(template_id: string) {
   } = useDocument();
 
   return templates![template_id];
-}
-
-export function useNodeDomElement(node_id: string) {
-  const [nodeElement, setNodeElement] = React.useState<HTMLElement | null>(
-    null
-  );
-
-  useLayoutEffect(() => {
-    if (!node_id) {
-      setNodeElement(null);
-      return;
-    }
-
-    const element = document.getElementById(node_id);
-    setNodeElement(element);
-  }, [node_id]);
-
-  return nodeElement;
 }

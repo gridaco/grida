@@ -19,7 +19,11 @@ import { documentquery } from "../document-query";
 import nodeReducer from "./node.reducer";
 import surfaceReducer from "./surface.reducer";
 import { v4 } from "uuid";
-import { self_insertNode } from "./methods";
+import {
+  self_clearSelection,
+  self_insertNode,
+  self_selectNode,
+} from "./methods";
 
 export default function documentReducer<S extends IDocumentEditorState>(
   state: S,
@@ -76,7 +80,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
         // after
         draft.cursor_mode = { type: "cursor" };
         // TODO:
-        draft.selected_node_id = undefined;
+        self_clearSelection(draft);
       });
     }
     case "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag":
@@ -88,6 +92,10 @@ export default function documentReducer<S extends IDocumentEditorState>(
     case "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag":
     case "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag-end":
     case "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag-start":
+    case "document/canvas/backend/html/event/node-overlay/on-click":
+    case "document/canvas/backend/html/event/node-overlay/on-drag":
+    case "document/canvas/backend/html/event/node-overlay/on-drag-end":
+    case "document/canvas/backend/html/event/node-overlay/on-drag-start":
     case "document/canvas/backend/html/event/on-click":
     case "document/canvas/backend/html/event/on-drag":
     case "document/canvas/backend/html/event/on-drag-end":
@@ -119,7 +127,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
       const { node_id } = <DocumentEditorNodeSelectAction>action;
 
       return produce(state, (draft) => {
-        draft.selected_node_id = node_id;
+        if (node_id) self_selectNode(draft, "reset", node_id);
       });
     }
     case "document/node/on-pointer-enter": {

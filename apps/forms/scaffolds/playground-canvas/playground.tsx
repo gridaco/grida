@@ -16,7 +16,7 @@ import {
   StandaloneDocumentEditor,
   StandaloneDocumentEditorContent,
   ViewportRoot,
-  ViewportSurface,
+  EditorSurface,
   standaloneDocumentReducer,
   initDocumentEditorState,
   useDocument,
@@ -121,6 +121,7 @@ export default function CanvasPlayground() {
             style: {},
             opacity: 1,
             zIndex: 0,
+            rotation: 0,
             expanded: false,
             cornerRadius: 0,
             padding: 0,
@@ -328,9 +329,9 @@ export default function CanvasPlayground() {
             </aside>
           )}
           <div className="w-full h-full flex flex-col relative">
-            <ViewportRoot className="relative w-full h-full no-scrollbar overflow-y-auto bg-transparent">
-              <ViewportSurface />
-              <div className="w-full h-full flex bg-background items-center justify-center">
+            <ViewportRoot className="relative w-full h-full no-scrollbar overflow-y-auto">
+              <EditorSurface />
+              <div className="w-full h-full flex items-center justify-center bg-black/5">
                 <div className="shadow-lg rounded-xl border overflow-hidden">
                   <StandaloneDocumentEditorContent />
                 </div>
@@ -365,7 +366,7 @@ export default function CanvasPlayground() {
                 </div>
                 <hr />
                 <FontFamilyListProvider fonts={fonts}>
-                  {state.selected_node_id ? (
+                  {state.selected_node_ids.length === 1 ? (
                     <SelectedNodeProperties />
                   ) : (
                     <__TMP_ComponentProperties />

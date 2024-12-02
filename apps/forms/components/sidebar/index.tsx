@@ -197,7 +197,7 @@ export const SidebarMenuItem = React.forwardRef(function SidebarMenuItem(
             {icon && (
               <div
                 data-expandable={expandable}
-                className="w-4 h-4 me-2 data-[expandable='true']:group-hover:opacity-0"
+                className="w-4 h-4 me-2 flex items-center justify-center data-[expandable='true']:group-hover:opacity-0"
               >
                 {icon}
               </div>

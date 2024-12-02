@@ -20,7 +20,16 @@ export type BuilderAction =
   //
   | SchemaAction;
 
+type NodeID = string;
 type Vector2 = [number, number];
+
+interface INodeID {
+  node_id: NodeID;
+}
+
+interface ISelection {
+  selection: NodeID[];
+}
 
 export type __InternalSyncArtboardOffset = {
   type: "__internal/sync-artboard-offset";
@@ -41,6 +50,7 @@ interface IHtmlBackendCanvasEventTargetPointerEvent {
    * use document.elementFromPoint with filtering
    */
   node_ids_from_point: string[];
+  shiftKey: boolean;
 }
 
 interface ICanvasEventTargetPointerEvent {
@@ -52,44 +62,49 @@ interface ICanvasEventTargetPointerEvent {
 
 export type SurfaceAction =
   //
-  | DocumentEditorCanvasEventTargetHtmlBackendKeyDown
-  | DocumentEditorCanvasEventTargetHtmlBackendKeyUp
+  | EditorSurface_KeyDown
+  | EditorSurface_KeyUp
   //
-  | DocumentEditorCanvasEventTargetHtmlBackendPointerMove
-  | DocumentEditorCanvasEventTargetHtmlBackendPointerMoveRaycast
-  | DocumentEditorCanvasEventTargetHtmlBackendPointerDown
-  | DocumentEditorCanvasEventTargetHtmlBackendPointerUp
-  | DocumentEditorCanvasEventTargetHtmlBackendClick
-  | DocumentEditorCanvasEventTargetHtmlBackendDragStart
-  | DocumentEditorCanvasEventTargetHtmlBackendDrag
-  | DocumentEditorCanvasEventTargetHtmlBackendDragEnd
+  | EditorSurface_PointerMove
+  | EditorSurface_PointerMoveRaycast
+  | EditorSurface_PointerDown
+  | EditorSurface_PointerUp
+  | EditorSurface_Click
+  | EditorSurface_DragStart
+  | EditorSurface_Drag
+  | EditorSurface_DragEnd
   //
-  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayResizeHandleDragStart
-  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayResizeHandleDragEnd
-  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayResizeHandleDrag
+  | EditorSurface_NodeOverlay_Click
+  | EditorSurface_NodeOverlay_DragStart
+  | EditorSurface_NodeOverlay_DragEnd
+  | EditorSurface_NodeOverlay_Drag
   //
-  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayCornerRadiusHandleDragStart
-  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayCornerRadiusHandleDragEnd
-  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayCornerRadiusHandleDrag
+  | EditorSurface_NodeOverlayResizeHandle_DragStart
+  | EditorSurface_NodeOverlayResizeHandle_DragEnd
+  | EditorSurface_NodeOverlayResizeHandle_Drag
   //
-  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDragStart
-  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDragEnd
-  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDrag
+  | EditorSurface_NodeOverlayCornerRadiusHandle_DragStart
+  | EditorSurface_NodeOverlayCornerRadiusHandle_DragEnd
+  | EditorSurface_NodeOverlayCornerRadiusHandle_Drag
   //
-  | DocumentEditorEnterContentEditMode
-  | DocumentEditorExitContentEditMode
+  | EditorSurface_NodeOverlayRotationHandle_DragStart
+  | EditorSurface_NodeOverlayRotationHandle_DragEnd
+  | EditorSurface_NodeOverlayRotationHandle_Drag
   //
-  | DocumentEditorCursorMode;
+  | EditorSurface_EnterContentEditMode
+  | EditorSurface_ExitContentEditMode
+  //
+  | EditorSurface_CursorMode;
 
-export type DocumentEditorCanvasEventTargetHtmlBackendKeyDown = {
+export type EditorSurface_KeyDown = {
   type: "document/canvas/backend/html/event/on-key-down";
 } & Pick<KeyboardEvent, "key" | "altKey" | "ctrlKey" | "metaKey" | "shiftKey">;
 
-export type DocumentEditorCanvasEventTargetHtmlBackendKeyUp = {
+export type EditorSurface_KeyUp = {
   type: "document/canvas/backend/html/event/on-key-up";
 } & Pick<KeyboardEvent, "key" | "altKey" | "ctrlKey" | "metaKey" | "shiftKey">;
 
-export type DocumentEditorCanvasEventTargetHtmlBackendPointerMove = {
+export type EditorSurface_PointerMove = {
   type: "document/canvas/backend/html/event/on-pointer-move";
   /**
    * position in canvas space - need to pass a resolved value
@@ -100,7 +115,7 @@ export type DocumentEditorCanvasEventTargetHtmlBackendPointerMove = {
   };
 };
 
-export type DocumentEditorCanvasEventTargetHtmlBackendPointerMoveRaycast =
+export type EditorSurface_PointerMoveRaycast =
   IHtmlBackendCanvasEventTargetPointerEvent & {
     type: "document/canvas/backend/html/event/on-pointer-move-raycast";
     /**
@@ -112,16 +127,16 @@ export type DocumentEditorCanvasEventTargetHtmlBackendPointerMoveRaycast =
     };
   };
 
-export type DocumentEditorCanvasEventTargetHtmlBackendPointerDown =
+export type EditorSurface_PointerDown =
   IHtmlBackendCanvasEventTargetPointerEvent & {
     type: "document/canvas/backend/html/event/on-pointer-down";
   };
 
-export type DocumentEditorCanvasEventTargetHtmlBackendPointerUp = {
+export type EditorSurface_PointerUp = {
   type: "document/canvas/backend/html/event/on-pointer-up";
 };
 
-export type DocumentEditorCanvasEventTargetHtmlBackendClick = {
+export type EditorSurface_Click = {
   type: "document/canvas/backend/html/event/on-click";
   /**
    * position in canvas space - need to pass a resolved value
@@ -132,28 +147,30 @@ export type DocumentEditorCanvasEventTargetHtmlBackendClick = {
   };
 };
 
-export type DocumentEditorCanvasEventTargetHtmlBackendDragStart = {
+export type EditorSurface_DragStart = {
   type: "document/canvas/backend/html/event/on-drag-start";
+  shiftKey: boolean;
 };
 
-export type DocumentEditorCanvasEventTargetHtmlBackendDrag =
-  ICanvasEventTargetPointerEvent & {
-    type: "document/canvas/backend/html/event/on-drag";
-  };
+export type EditorSurface_Drag = ICanvasEventTargetPointerEvent & {
+  type: "document/canvas/backend/html/event/on-drag";
+};
 
-export type DocumentEditorCanvasEventTargetHtmlBackendDragEnd = {
+export type EditorSurface_DragEnd = {
   type: "document/canvas/backend/html/event/on-drag-end";
+  node_ids_from_area?: string[];
+  shiftKey: boolean;
 };
 
-export type DocumentEditorEnterContentEditMode = {
+export type EditorSurface_EnterContentEditMode = {
   type: "document/canvas/content-edit-mode/try-enter";
 };
 
-export type DocumentEditorExitContentEditMode = {
+export type EditorSurface_ExitContentEditMode = {
   type: "document/canvas/content-edit-mode/try-exit";
 };
 
-export type DocumentEditorCursorMode = {
+export type EditorSurface_CursorMode = {
   type: "document/canvas/cursor-mode";
   cursor_mode: CursorMode;
 };
@@ -176,59 +193,70 @@ interface IHtmlCanvasEventTargetCalculatedNodeSize {
   client_wh: grida.program.nodes.i.IFixedDimension;
 }
 
-export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayResizeHandleDragStart =
-  INodeID &
-    IHtmlCanvasEventTargetCalculatedNodeSize & {
-      type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-start";
-    };
-
-export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayResizeHandleDragEnd =
-  INodeID & {
-    type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-end";
+export type EditorSurface_NodeOverlay_Click = ISelection &
+  IHtmlBackendCanvasEventTargetPointerEvent & {
+    type: "document/canvas/backend/html/event/node-overlay/on-click";
   };
 
-export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayResizeHandleDrag =
-  INodeID &
-    ICanvasEventTargetPointerEvent &
-    ICanvasEventTargetResizeHandleEvent & {
-      type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag";
-    };
+export type EditorSurface_NodeOverlay_DragStart = ISelection &
+  ICanvasEventTargetPointerEvent & {
+    type: "document/canvas/backend/html/event/node-overlay/on-drag-start";
+  };
+
+export type EditorSurface_NodeOverlay_DragEnd = ISelection &
+  ICanvasEventTargetPointerEvent & {
+    type: "document/canvas/backend/html/event/node-overlay/on-drag-end";
+  };
+
+export type EditorSurface_NodeOverlay_Drag = ISelection &
+  ICanvasEventTargetPointerEvent & {
+    type: "document/canvas/backend/html/event/node-overlay/on-drag";
+  };
+
+export type EditorSurface_NodeOverlayResizeHandle_DragStart = INodeID &
+  IHtmlCanvasEventTargetCalculatedNodeSize & {
+    type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-start";
+  };
+
+export type EditorSurface_NodeOverlayResizeHandle_DragEnd = INodeID & {
+  type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-end";
+};
+
+export type EditorSurface_NodeOverlayResizeHandle_Drag = INodeID &
+  ICanvasEventTargetPointerEvent &
+  ICanvasEventTargetResizeHandleEvent & {
+    type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag";
+  };
 
 //
-export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayCornerRadiusHandleDragStart =
-  INodeID & {
-    type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-start";
-  };
+export type EditorSurface_NodeOverlayCornerRadiusHandle_DragStart = INodeID & {
+  type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-start";
+};
 
-export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayCornerRadiusHandleDragEnd =
-  INodeID & {
-    type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-end";
-  };
+export type EditorSurface_NodeOverlayCornerRadiusHandle_DragEnd = INodeID & {
+  type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-end";
+};
 
-export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayCornerRadiusHandleDrag =
-  INodeID &
-    ICanvasEventTargetPointerEvent &
-    ICanvasEventTargetResizeHandleEvent & {
-      type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag";
-    };
+export type EditorSurface_NodeOverlayCornerRadiusHandle_Drag = INodeID &
+  ICanvasEventTargetPointerEvent &
+  ICanvasEventTargetResizeHandleEvent & {
+    type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag";
+  };
 //
 
-export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDragStart =
-  INodeID & {
-    type: "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag-start";
-  };
+export type EditorSurface_NodeOverlayRotationHandle_DragStart = INodeID & {
+  type: "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag-start";
+};
 
-export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDragEnd =
-  INodeID & {
-    type: "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag-end";
-  };
+export type EditorSurface_NodeOverlayRotationHandle_DragEnd = INodeID & {
+  type: "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag-end";
+};
 
-export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDrag =
-  INodeID &
-    ICanvasEventTargetPointerEvent &
-    ICanvasEventTargetResizeHandleEvent & {
-      type: "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag";
-    };
+export type EditorSurface_NodeOverlayRotationHandle_Drag = INodeID &
+  ICanvasEventTargetPointerEvent &
+  ICanvasEventTargetResizeHandleEvent & {
+    type: "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag";
+  };
 
 //
 
@@ -239,11 +267,7 @@ export interface DocumentEditorInsertNodeAction {
 
 export interface DocumentEditorNodeSelectAction {
   type: "document/node/select";
-  node_id?: string;
-}
-
-interface INodeID {
-  node_id: string;
+  node_id?: NodeID;
 }
 
 interface ITemplateInstanceNodeID {

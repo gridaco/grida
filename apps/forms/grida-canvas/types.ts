@@ -50,7 +50,7 @@ export type SurfaceRaycastTargeting = {
 };
 
 export interface IDocumentEditorInteractionCursorState {
-  selected_node_id?: string;
+  selected_node_ids: string[];
   hovered_node_id?: string;
 
   /**
@@ -146,6 +146,9 @@ export interface IDocumentEditorInteractionCursorState {
 
   clipboard?: grida.program.nodes.Node;
 
+  /**
+   * Marquee transform relative to viewport
+   */
   marquee?: Marquee;
 }
 
@@ -181,6 +184,7 @@ export function initDocumentEditorState({
   const s = new DocumentState(init);
 
   return {
+    selected_node_ids: [],
     surface_cursor_position: [0, 0],
     cursor_position: [0, 0],
     document_ctx:

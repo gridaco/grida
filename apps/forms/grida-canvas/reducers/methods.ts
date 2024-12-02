@@ -4,6 +4,68 @@ import { documentquery } from "../document-query";
 import { grida } from "@/grida";
 import assert from "assert";
 
+/**
+ * TODO:
+ * - validate the selection by config (which does not exists yet), to only select subset of children or a container, but not both. - when both container and children are selected, when transform, it will transform both, resulting in a weird behavior.
+ */
+export function self_selectNode<S extends IDocumentEditorState>(
+  draft: Draft<S>,
+  mode: "reset" | "add" | "toggle",
+  ...__node_ids: string[]
+) {
+  for (const node_id of __node_ids) {
+    assert(node_id, "Node ID must be provided");
+    assert(
+      draft.document.nodes[node_id],
+      `Node not found with id: "${node_id}"`
+    );
+  }
+
+  switch (mode) {
+    case "add": {
+      const set = new Set([...draft.selected_node_ids, ...__node_ids]);
+      const pruned = documentquery.pruneNestedNodes(
+        draft.document_ctx,
+        Array.from(set)
+      );
+      draft.selected_node_ids = pruned;
+      break;
+    }
+    case "toggle": {
+      const set = new Set(draft.selected_node_ids);
+      for (const node_id of __node_ids) {
+        if (set.has(node_id)) {
+          set.delete(node_id);
+        } else {
+          set.add(node_id);
+        }
+      }
+      const pruned = documentquery.pruneNestedNodes(
+        draft.document_ctx,
+        Array.from(set)
+      );
+      draft.selected_node_ids = pruned;
+      break;
+    }
+    case "reset": {
+      const pruned = documentquery.pruneNestedNodes(
+        draft.document_ctx,
+        __node_ids
+      );
+      draft.selected_node_ids = pruned;
+      break;
+    }
+  }
+  return draft;
+}
+
+export function self_clearSelection<S extends IDocumentEditorState>(
+  draft: Draft<S>
+) {
+  draft.selected_node_ids = [];
+  return draft;
+}
+
 export function self_updateSurfaceHoverState<S extends IDocumentEditorState>(
   draft: Draft<S>
 ) {
@@ -117,7 +179,7 @@ export function self_deleteNode<S extends IDocumentEditorState>(
   draft: Draft<S>,
   node_id: string
 ) {
-  draft.selected_node_id = undefined;
+  draft.selected_node_ids = [];
   draft.hovered_node_id = undefined;
   const node = draft.document.nodes[node_id];
   const children = "children" in node ? node.children : undefined;
