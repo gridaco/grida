@@ -205,25 +205,66 @@ function GroupOverlay({
   node_ids: string[];
   readonly?: boolean;
 }) {
+  const { layerDragStart, layerDragEnd, layerDrag, layerClick } =
+    useEventTarget();
   const transform = useGroupSurfaceTransform(...node_ids);
+
+  // as there is no native way to prevent onclick from triggering after drag, this is a trick to prevent it.
+  // resetting this will be delayed by 100ms (on drag end)
+  const wasDragging = useRef(false);
+
+  const bind = useGesture(
+    {
+      onPointerDown: (e) => {
+        e.event.stopPropagation();
+      },
+      onDragStart: (e) => {
+        e.event.stopPropagation();
+        layerDragStart(node_ids, e);
+      },
+      onDragEnd: (e) => {
+        e.event.stopPropagation();
+        layerDragEnd(node_ids, e);
+        setTimeout(() => {
+          wasDragging.current = false;
+        }, 100);
+      },
+      onDrag: (e) => {
+        if (e.distance[0] > 0 || e.distance[1] > 0) {
+          wasDragging.current = true;
+        }
+        e.event.stopPropagation();
+        layerDrag(node_ids, e);
+      },
+      onClick: (e) => {
+        e.event.stopPropagation();
+        if (wasDragging.current) {
+          return;
+        }
+        layerClick(node_ids, e.event);
+      },
+    },
+    {
+      drag: {
+        threshold: 5,
+        // disable drag gesture with arrow keys
+        keyboardDisplacement: 0,
+      },
+    }
+  );
 
   return (
     <>
       <LayerOverlay
+        {...bind()}
         readonly={readonly}
         transform={transform}
         zIndex={10}
-      ></LayerOverlay>
+      />
       {
         // also hightlight the included nodes
         node_ids.map((node_id) => (
-          <NodeOverlay
-            key={node_id}
-            node_id={node_id}
-            readonly
-            disabled
-            zIndex={20}
-          />
+          <NodeOverlay key={node_id} node_id={node_id} readonly zIndex={20} />
         ))
       }
     </>
@@ -233,20 +274,34 @@ function GroupOverlay({
 function NodeOverlay({
   node_id,
   readonly,
-  disabled,
   zIndex,
 }: {
   node_id: string;
   readonly?: boolean;
-  disabled?: boolean;
   zIndex?: number;
 }) {
+  const { layerDragStart, layerDragEnd, layerDrag } = useEventTarget();
   const transform = useNodeSurfaceTransfrom(node_id);
   const node = useNode(node_id);
 
+  const bind = useGesture({
+    onDragStart: (e) => {
+      e.event.stopPropagation();
+      layerDragStart([node_id], e);
+    },
+    onDragEnd: (e) => {
+      e.event.stopPropagation();
+      layerDragEnd([node_id], e);
+    },
+    onDrag: (e) => {
+      e.event.stopPropagation();
+      layerDrag([node_id], e);
+    },
+  });
+
   return (
     <LayerOverlay
-      disabled={disabled}
+      {...bind()}
       readonly={readonly}
       transform={transform}
       zIndex={zIndex}

@@ -2,21 +2,22 @@ import { produce, type Draft } from "immer";
 
 import type {
   BuilderAction,
-  DocumentEditorCanvasEventTargetHtmlBackendKeyDown,
-  DocumentEditorCanvasEventTargetHtmlBackendKeyUp,
+  EditorSurface_KeyDown,
+  EditorSurface_KeyUp,
   //
-  DocumentEditorCanvasEventTargetHtmlBackendPointerMove,
-  DocumentEditorCanvasEventTargetHtmlBackendPointerMoveRaycast,
-  DocumentEditorCanvasEventTargetHtmlBackendPointerDown,
-  DocumentEditorCanvasEventTargetHtmlBackendClick,
+  EditorSurface_PointerMove,
+  EditorSurface_PointerMoveRaycast,
+  EditorSurface_PointerDown,
+  EditorSurface_Click,
   //
-  DocumentEditorCanvasEventTargetHtmlBackendDrag,
-  DocumentEditorCanvasEventTargetHtmlBackendDragStart,
-  DocumentEditorCanvasEventTargetHtmlBackendDragEnd,
+  EditorSurface_Drag,
+  EditorSurface_DragStart,
+  EditorSurface_DragEnd,
   //
-  DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDrag,
-  DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDragEnd,
-  DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDragStart,
+  EditorSurface_NodeOverlayRotationHandle_Drag,
+  EditorSurface_NodeOverlayRotationHandle_DragEnd,
+  EditorSurface_NodeOverlayRotationHandle_DragStart,
+  SurfaceAction,
   //
 } from "../action";
 import type { IDocumentEditorState, SurfaceRaycastTargeting } from "../types";
@@ -54,14 +55,13 @@ const keyboard_arrowy_key_vector_bindings = {
 
 export default function surfaceReducer<S extends IDocumentEditorState>(
   state: S,
-  action: BuilderAction
+  action: SurfaceAction
 ): S {
+  // console.log("surfaceReducer", action);
   switch (action.type) {
     // #region [html backend] canvas event target
     case "document/canvas/backend/html/event/on-key-down": {
-      const { key, altKey, metaKey, shiftKey } = <
-        DocumentEditorCanvasEventTargetHtmlBackendKeyDown
-      >action;
+      const { key, altKey, metaKey, shiftKey } = <EditorSurface_KeyDown>action;
 
       return produce(state, (draft) => {
         // Meta key (meta only)
@@ -183,9 +183,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
       });
     }
     case "document/canvas/backend/html/event/on-key-up": {
-      const { key, altKey, metaKey, shiftKey } = <
-        DocumentEditorCanvasEventTargetHtmlBackendKeyUp
-      >action;
+      const { key, altKey, metaKey, shiftKey } = <EditorSurface_KeyUp>action;
       return produce(state, (draft) => {
         if (key === "Meta") {
           draft.surface_raycast_targeting.target = "shallowest";
@@ -196,7 +194,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
     case "document/canvas/backend/html/event/on-pointer-move": {
       const {
         position: { x, y },
-      } = <DocumentEditorCanvasEventTargetHtmlBackendPointerMove>action;
+      } = <EditorSurface_PointerMove>action;
       return produce(state, (draft) => {
         draft.surface_cursor_position = [x, y];
         draft.cursor_position = cmath.vector2.subtract(
@@ -206,18 +204,44 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
       });
     }
     case "document/canvas/backend/html/event/on-pointer-move-raycast": {
-      const { node_ids_from_point } = <
-        DocumentEditorCanvasEventTargetHtmlBackendPointerMoveRaycast
-      >action;
+      const { node_ids_from_point } = <EditorSurface_PointerMoveRaycast>action;
       return produce(state, (draft) => {
         draft.surface_raycast_detected_node_ids = node_ids_from_point;
         self_updateSurfaceHoverState(draft);
       });
     }
+    case "document/canvas/backend/html/event/on-click": {
+      const { position } = <EditorSurface_Click>action;
+      return produce(state, (draft) => {
+        switch (draft.cursor_mode.type) {
+          case "cursor": {
+            // ignore
+            break;
+          }
+          case "insert":
+            const nnode = initialNode(draft.cursor_mode.node, {
+              left: state.cursor_position[0],
+              top: state.cursor_position[1],
+            });
+
+            // center translate the new node.
+            try {
+              const _nnode = nnode as grida.program.nodes.RectangleNode;
+              _nnode.left! -= _nnode.width / 2;
+              _nnode.top! -= _nnode.height / 2;
+            } catch (e) {}
+
+            self_insertNode(draft, draft.document.root_id, nnode);
+            draft.cursor_mode = { type: "cursor" };
+            self_selectNode(draft, "reset", nnode.id);
+            break;
+        }
+      });
+    }
     case "document/canvas/backend/html/event/on-pointer-down": {
-      const { node_ids_from_point, shiftKey } = <
-        DocumentEditorCanvasEventTargetHtmlBackendPointerDown
-      >action;
+      const { node_ids_from_point, shiftKey } = <EditorSurface_PointerDown>(
+        action
+      );
       return produce(state, (draft) => {
         switch (draft.cursor_mode.type) {
           case "cursor": {
@@ -254,41 +278,9 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
         draft.is_gesture_node_drag_resize = false;
       });
     }
-    case "document/canvas/backend/html/event/on-click": {
-      const { position } = <DocumentEditorCanvasEventTargetHtmlBackendClick>(
-        action
-      );
-      return produce(state, (draft) => {
-        switch (draft.cursor_mode.type) {
-          case "cursor": {
-            // ignore
-            break;
-          }
-          case "insert":
-            const nnode = initialNode(draft.cursor_mode.node, {
-              left: state.cursor_position[0],
-              top: state.cursor_position[1],
-            });
-
-            // center translate the new node.
-            try {
-              const _nnode = nnode as grida.program.nodes.RectangleNode;
-              _nnode.left! -= _nnode.width / 2;
-              _nnode.top! -= _nnode.height / 2;
-            } catch (e) {}
-
-            self_insertNode(draft, draft.document.root_id, nnode);
-            draft.cursor_mode = { type: "cursor" };
-            self_selectNode(draft, "reset", nnode.id);
-            break;
-        }
-      });
-    }
     // #region drag event
     case "document/canvas/backend/html/event/on-drag-start": {
-      const { shiftKey } = <
-        DocumentEditorCanvasEventTargetHtmlBackendDragStart
-      >action;
+      const { shiftKey } = <EditorSurface_DragStart>action;
       return produce(state, (draft) => {
         // clear all trasform state
         draft.surface_content_edit_mode = false;
@@ -339,9 +331,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
       });
     }
     case "document/canvas/backend/html/event/on-drag-end": {
-      const { node_ids_from_area, shiftKey } = <
-        DocumentEditorCanvasEventTargetHtmlBackendDragEnd
-      >action;
+      const { node_ids_from_area, shiftKey } = <EditorSurface_DragEnd>action;
       return produce(state, (draft) => {
         draft.is_gesture_node_drag_move = false;
         draft.marquee = undefined;
@@ -364,7 +354,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
     case "document/canvas/backend/html/event/on-drag": {
       const {
         event: { delta, distance },
-      } = <DocumentEditorCanvasEventTargetHtmlBackendDrag>action;
+      } = <EditorSurface_Drag>action;
       if (state.marquee) {
         return produce(state, (draft) => {
           draft.marquee!.x2 = draft.surface_cursor_position[0];
@@ -412,6 +402,58 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
         }
       }
 
+      break;
+    }
+    //
+    case "document/canvas/backend/html/event/node-overlay/on-click": {
+      const { selection, node_ids_from_point, shiftKey } = action;
+      if (state.is_gesture_node_drag_move) break;
+      return produce(state, (draft) => {
+        draft.surface_raycast_detected_node_ids = node_ids_from_point;
+        const { hovered_node_id } = self_updateSurfaceHoverState(draft);
+        if (shiftKey) {
+          if (hovered_node_id) {
+            self_selectNode(draft, "toggle", hovered_node_id);
+          } else {
+            // do nothing (when shift key is pressed)
+          }
+        } else {
+          if (hovered_node_id) {
+            self_selectNode(draft, "reset", hovered_node_id);
+          } else {
+            self_clearSelection(draft);
+          }
+        }
+      });
+    }
+    case "document/canvas/backend/html/event/node-overlay/on-drag-start": {
+      const { selection } = action;
+      return produce(state, (draft) => {
+        draft.is_gesture_node_drag_move = true;
+      });
+    }
+    case "document/canvas/backend/html/event/node-overlay/on-drag-end": {
+      const { selection } = action;
+      return produce(state, (draft) => {
+        draft.is_gesture_node_drag_move = false;
+      });
+    }
+    case "document/canvas/backend/html/event/node-overlay/on-drag": {
+      const { selection, event } = action;
+      const { delta, distance } = event;
+      const [dx, dy] = delta;
+      if (state.is_gesture_node_drag_move) {
+        return produce(state, (draft) => {
+          selection.forEach((node_id) => {
+            const node = documentquery.__getNodeById(draft, node_id);
+            draft.document.nodes[node_id] = nodeTransformReducer(node, {
+              type: "move",
+              dx: dx,
+              dy: dy,
+            });
+          });
+        });
+      }
       break;
     }
     // #endregion drag event
@@ -522,9 +564,9 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
 
     //
     case "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag-start": {
-      const { node_id } = <
-        DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDragStart
-      >action;
+      const { node_id } = <EditorSurface_NodeOverlayRotationHandle_DragStart>(
+        action
+      );
 
       return produce(state, (draft) => {
         self_selectNode(draft, "reset", node_id);
@@ -532,9 +574,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
       });
     }
     case "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag-end": {
-      const {} = <
-        DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDragEnd
-      >action;
+      const {} = <EditorSurface_NodeOverlayRotationHandle_DragEnd>action;
       return produce(state, (draft) => {
         draft.is_gesture_node_drag_rotation = false;
       });
@@ -543,9 +583,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
       const {
         node_id,
         event: { delta, distance },
-      } = <
-        DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDrag
-      >action;
+      } = <EditorSurface_NodeOverlayRotationHandle_Drag>action;
 
       const [dx, dy] = delta;
       // cancel if invalid state

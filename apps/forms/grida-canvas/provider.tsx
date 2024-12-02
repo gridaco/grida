@@ -1250,6 +1250,55 @@ export function useEventTarget() {
     [dispatch]
   );
 
+  //
+  const layerClick = useCallback(
+    (selection: string[], event: MouseEvent) => {
+      const els = domapi.get_grida_node_elements_from_point(
+        event.clientX,
+        event.clientY
+      );
+
+      dispatch({
+        type: "document/canvas/backend/html/event/node-overlay/on-click",
+        selection: selection,
+        node_ids_from_point: els.map((n) => n.id),
+        shiftKey: event.shiftKey,
+      });
+    },
+    [dispatch]
+  );
+  const layerDragStart = useCallback(
+    (selection: string[], event: { delta: Vector2; distance: Vector2 }) => {
+      dispatch({
+        type: "document/canvas/backend/html/event/node-overlay/on-drag-start",
+        selection,
+        event,
+      });
+    },
+    [dispatch]
+  );
+  const layerDragEnd = useCallback(
+    (selection: string[], event: { delta: Vector2; distance: Vector2 }) => {
+      dispatch({
+        type: "document/canvas/backend/html/event/node-overlay/on-drag-end",
+        selection,
+        event,
+      });
+    },
+    [dispatch]
+  );
+  const layerDrag = useCallback(
+    (selection: string[], event: { delta: Vector2; distance: Vector2 }) => {
+      dispatch({
+        type: "document/canvas/backend/html/event/node-overlay/on-drag",
+        selection,
+        event,
+      });
+    },
+    [dispatch]
+  );
+  //
+
   // #region drag resize handle
   const dragResizeHandleStart = useCallback(
     (node_id: string, client_wh: { width: number; height: number }) => {
@@ -1403,6 +1452,11 @@ export function useEventTarget() {
       dragEnd,
       drag,
       //
+      layerClick,
+      layerDragStart,
+      layerDragEnd,
+      layerDrag,
+      //
     };
   }, [
     marquee,
@@ -1440,6 +1494,11 @@ export function useEventTarget() {
     dragStart,
     dragEnd,
     drag,
+    //
+    layerClick,
+    layerDragStart,
+    layerDragEnd,
+    layerDrag,
     //
   ]);
 }
