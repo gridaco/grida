@@ -819,7 +819,7 @@ export function useNodeAction(node_id: string | undefined) {
 export function useDocument() {
   const [state, dispatch] = __useInternal();
 
-  const { selected_node_id } = state;
+  const { selected_node_ids } = state;
 
   const nodeActions = __useNodeActions(dispatch);
 
@@ -953,13 +953,16 @@ export function useDocument() {
     [dispatch]
   );
 
-  const selectedNodeActions = useNodeAction(selected_node_id);
-  const selectedNode = selected_node_id ? selectedNodeActions : undefined;
+  const selectedNodeActions = useNodeAction(
+    selected_node_ids.length === 1 ? selected_node_ids[0] : undefined
+  );
+  const selectedNode =
+    selected_node_ids.length === 1 ? selectedNodeActions : undefined;
 
   return useMemo(() => {
     return {
       state,
-      selected_node_id,
+      selected_node_ids,
       selectedNode,
       clearSelection,
       getNodeDepth,
@@ -973,7 +976,7 @@ export function useDocument() {
     };
   }, [
     state,
-    selected_node_id,
+    selected_node_ids,
     selectedNode,
     clearSelection,
     getNodeDepth,
@@ -1033,7 +1036,7 @@ export function useEventTarget() {
   const {
     is_gesture_node_drag_move: is_node_transforming,
     hovered_node_id,
-    selected_node_id,
+    selected_node_ids,
     surface_content_edit_mode: content_edit_mode,
     cursor_mode,
     marquee,
@@ -1358,7 +1361,7 @@ export function useEventTarget() {
       setCursorMode,
       //
       hovered_node_id,
-      selected_node_id,
+      selected_node_ids,
       is_node_transforming,
       content_edit_mode,
       //
@@ -1396,7 +1399,7 @@ export function useEventTarget() {
     setCursorMode,
     //
     hovered_node_id,
-    selected_node_id,
+    selected_node_ids,
     is_node_transforming,
     content_edit_mode,
     //

@@ -365,7 +365,7 @@ export default function CanvasPlayground() {
                 </div>
                 <hr />
                 <FontFamilyListProvider fonts={fonts}>
-                  {state.selected_node_id ? (
+                  {state.selected_node_ids.length === 1 ? (
                     <SelectedNodeProperties />
                   ) : (
                     <__TMP_ComponentProperties />

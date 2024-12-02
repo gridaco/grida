@@ -4,6 +4,29 @@ import { documentquery } from "../document-query";
 import { grida } from "@/grida";
 import assert from "assert";
 
+export function self_selectNode<S extends IDocumentEditorState>(
+  draft: Draft<S>,
+  ...node_ids: string[]
+) {
+  for (const node_id of node_ids) {
+    assert(node_id, "Node ID must be provided");
+    assert(
+      draft.document.nodes[node_id],
+      `Node not found with id: "${node_id}"`
+    );
+  }
+
+  draft.selected_node_ids = node_ids;
+  return draft;
+}
+
+export function self_clearSelection<S extends IDocumentEditorState>(
+  draft: Draft<S>
+) {
+  draft.selected_node_ids = [];
+  return draft;
+}
+
 export function self_updateSurfaceHoverState<S extends IDocumentEditorState>(
   draft: Draft<S>
 ) {
@@ -117,7 +140,7 @@ export function self_deleteNode<S extends IDocumentEditorState>(
   draft: Draft<S>,
   node_id: string
 ) {
-  draft.selected_node_id = undefined;
+  draft.selected_node_ids = [];
   draft.hovered_node_id = undefined;
   const node = draft.document.nodes[node_id];
   const children = "children" in node ? node.children : undefined;

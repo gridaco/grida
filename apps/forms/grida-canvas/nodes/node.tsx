@@ -34,11 +34,11 @@ export function NodeElement<P extends Record<string, any>>({
   fill: DEFAULT_FILL,
   style,
 }: React.PropsWithChildren<NodeElementProps<P>>) {
-  const { state: document, selected_node_id } = useDocument();
+  const { state: document, selected_node_ids } = useDocument();
 
   const node = useNode(node_id);
   const computed = useComputedNode(node_id);
-  const selected = node_id === selected_node_id;
+  const selected = selected_node_ids.includes(node_id);
   const hovered = node_id === document.hovered_node_id;
 
   const { component_id, children } = node;

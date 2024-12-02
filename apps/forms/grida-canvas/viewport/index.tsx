@@ -60,7 +60,7 @@ export function ViewportSurface() {
   const {
     marquee,
     hovered_node_id,
-    selected_node_id,
+    selected_node_ids,
     is_node_transforming,
     content_edit_mode,
     keyDown,
@@ -193,18 +193,19 @@ export function ViewportSurface() {
         cursor: cursor,
       }}
     >
-      {content_edit_mode === "text" && selected_node_id && (
-        <SurfaceTextEditor node_id={selected_node_id} />
+      {content_edit_mode === "text" && selected_node_ids.length === 1 && (
+        <SurfaceTextEditor node_id={selected_node_ids[0]} />
       )}
       <div className="w-full h-full" id="canvas-overlay-portal" ref={ref}>
-        {selected_node_id && (
+        {selected_node_ids.map((node_id) => (
           <NodeOverlay
-            node_id={selected_node_id}
+            key={node_id}
+            node_id={node_id}
             // TODO: based on positioning model
             readonly={false}
           />
-        )}
-        {hovered_node_id && hovered_node_id !== selected_node_id && (
+        ))}
+        {hovered_node_id && !selected_node_ids.includes(hovered_node_id) && (
           <NodeOverlay node_id={hovered_node_id} readonly />
         )}
         <div id="marquee-container" className="absolute top-0 left-0 w-0 h-0">

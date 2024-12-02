@@ -28,8 +28,10 @@ import nodeTransformReducer from "./node-transform.reducer";
 import initialNode from "./tools/initial-node";
 import assert from "assert";
 import {
+  self_clearSelection,
   self_deleteNode,
   self_insertNode,
+  self_selectNode,
   self_updateSurfaceHoverState,
 } from "./methods";
 import { cmath } from "../math";
@@ -41,6 +43,13 @@ const keyboard_key_bindings = {
   f: "container",
   a: "container",
   l: "line",
+} as const;
+
+const keyboard_arrowy_key_vector_bindings = {
+  ArrowUp: [0, -1],
+  ArrowDown: [0, 1],
+  ArrowLeft: [-1, 0],
+  ArrowRight: [1, 0],
 } as const;
 
 export default function surfaceReducer<S extends IDocumentEditorState>(
@@ -65,36 +74,48 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
           self_updateSurfaceHoverState(draft);
         }
         if (metaKey && key === "c") {
+          if (draft.selected_node_ids.length !== 1) {
+            return;
+          }
+
+          const node_id = draft.selected_node_ids[0];
+
           // Copy logic
-          if (draft.selected_node_id) {
-            const selectedNode = documentquery.__getNodeById(
-              draft,
-              draft.selected_node_id
-            );
-            draft.clipboard = JSON.parse(JSON.stringify(selectedNode)); // Deep copy the node
-          }
+          const selectedNode = documentquery.__getNodeById(draft, node_id);
+          draft.clipboard = JSON.parse(JSON.stringify(selectedNode)); // Deep copy the node
         } else if (metaKey && key === "x") {
-          // Cut logic
-          if (draft.selected_node_id) {
-            const selectedNode = documentquery.__getNodeById(
-              draft,
-              draft.selected_node_id
-            );
-            draft.clipboard = JSON.parse(JSON.stringify(selectedNode)); // Deep copy the node
-            self_deleteNode(draft, draft.selected_node_id);
+          if (draft.selected_node_ids.length !== 1) {
+            return;
           }
+
+          const node_id = draft.selected_node_ids[0];
+          // Cut logic
+          const selectedNode = documentquery.__getNodeById(draft, node_id);
+          draft.clipboard = JSON.parse(JSON.stringify(selectedNode)); // Deep copy the node
+          self_deleteNode(draft, node_id);
         } else if (metaKey && key === "v") {
           // Paste logic
           if (draft.clipboard) {
-            const newNode = JSON.parse(JSON.stringify(draft.clipboard));
-            newNode.id = v4(); // Assign a new unique ID
+            const data: grida.program.nodes.AnyNode = JSON.parse(
+              JSON.stringify(draft.clipboard)
+            );
+
+            const newNode = {
+              ...data,
+              id: v4(),
+            };
+
             const offset = 10; // Offset to avoid overlapping
             if (newNode.left !== undefined) newNode.left += offset;
             if (newNode.top !== undefined) newNode.top += offset;
-            self_insertNode(draft, draft.document.root_id, newNode);
+            self_insertNode(
+              draft,
+              draft.document.root_id,
+              newNode as grida.program.nodes.Node
+            );
             // after
             draft.cursor_mode = { type: "cursor" };
-            draft.selected_node_id = newNode.id; // Select the newly pasted node
+            self_selectNode(draft, newNode.id);
           }
         }
 
@@ -115,10 +136,26 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
             };
             break;
           }
+          case "ArrowUp":
+          case "ArrowDown":
+          case "ArrowLeft":
+          case "ArrowRight": {
+            const [dx, dy] = keyboard_arrowy_key_vector_bindings[key];
+            for (const node_id of draft.selected_node_ids) {
+              const node = documentquery.__getNodeById(draft, node_id);
+
+              draft.document.nodes[node_id] = nodeTransformReducer(node, {
+                type: "move",
+                dx: dx,
+                dy: dy,
+              });
+            }
+            break;
+          }
           case "Backspace": {
-            if (draft.selected_node_id) {
-              if (draft.document.root_id !== draft.selected_node_id) {
-                self_deleteNode(draft, draft.selected_node_id);
+            for (const node_id of draft.selected_node_ids) {
+              if (draft.document.root_id !== node_id) {
+                self_deleteNode(draft, node_id);
               }
             }
             break;
@@ -167,7 +204,8 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
           case "cursor": {
             draft.surface_raycast_detected_node_ids = node_ids_from_point;
             const { hovered_node_id } = self_updateSurfaceHoverState(draft);
-            draft.selected_node_id = hovered_node_id;
+            if (hovered_node_id) self_selectNode(draft, hovered_node_id);
+            else self_clearSelection(draft);
             break;
           }
           case "insert":
@@ -210,7 +248,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
 
             self_insertNode(draft, draft.document.root_id, nnode);
             draft.cursor_mode = { type: "cursor" };
-            draft.selected_node_id = nnode.id;
+            self_selectNode(draft, nnode.id);
             break;
         }
       });
@@ -225,7 +263,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
 
         switch (draft.cursor_mode.type) {
           case "cursor": {
-            if (!draft.selected_node_id) {
+            if (draft.selected_node_ids.length === 0) {
               // marquee selection
               draft.marquee = {
                 x1: draft.surface_cursor_position[0],
@@ -248,7 +286,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
             });
             self_insertNode(draft, draft.document.root_id, nnode);
             draft.cursor_mode = { type: "cursor" };
-            draft.selected_node_id = nnode.id;
+            self_selectNode(draft, nnode.id);
             draft.is_gesture_node_drag_resize = true;
             // TODO: after inserting, refresh fonts registry
             break;
@@ -263,8 +301,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
         draft.is_gesture_node_drag_move = false;
         draft.marquee = undefined;
         if (node_ids_from_area) {
-          // TODO: multiple selection
-          draft.selected_node_id = node_ids_from_area[0];
+          self_selectNode(draft, ...node_ids_from_area);
         }
       });
     }
@@ -280,28 +317,36 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
       } else {
         //
         if (state.is_gesture_node_drag_resize) {
-          return produce(state, (draft) => {
-            const node_id = state.selected_node_id!;
-            const node = documentquery.__getNodeById(draft, node_id);
-            const [dx, dy] = delta;
+          // TODO: support multiple selection
+          // if (state.selected_node_ids.length !== 1) break;
+          // const node_id = state.selected_node_ids[0];
 
-            draft.document.nodes[node_id] = nodeTransformReducer(node, {
-              type: "resize",
-              anchor: "se",
-              dx: dx,
-              dy: dy,
+          const [dx, dy] = delta;
+          state.selected_node_ids.forEach((node_id) => {
+            return produce(state, (draft) => {
+              const node = documentquery.__getNodeById(draft, node_id);
+
+              draft.document.nodes[node_id] = nodeTransformReducer(node, {
+                type: "resize",
+                anchor: "se",
+                dx: dx,
+                dy: dy,
+              });
             });
           });
         }
 
         if (state.is_gesture_node_drag_move) {
-          const nid = state.selected_node_id!;
+          // TODO: support multiple selection
+          if (state.selected_node_ids.length !== 1) break;
+
+          const node_id = state.selected_node_ids[0];
 
           const [dx, dy] = delta;
 
           return produce(state, (draft) => {
-            const node = documentquery.__getNodeById(draft, nid);
-            draft.document.nodes[nid] = nodeTransformReducer(node, {
+            const node = documentquery.__getNodeById(draft, node_id);
+            draft.document.nodes[node_id] = nodeTransformReducer(node, {
               type: "move",
               dx: dx,
               dy: dy,
@@ -370,7 +415,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
       const { node_id } = action;
 
       return produce(state, (draft) => {
-        draft.selected_node_id = node_id;
+        self_selectNode(draft, node_id);
         draft.is_gesture_node_drag_corner_radius = true;
       });
     }
@@ -426,7 +471,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
       >action;
 
       return produce(state, (draft) => {
-        draft.selected_node_id = node_id;
+        self_selectNode(draft, node_id);
         draft.is_gesture_node_drag_rotation = true;
       });
     }
@@ -468,8 +513,9 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
 
     // #region [universal backend] canvas event target
     case "document/canvas/content-edit-mode/try-enter": {
-      if (!state.selected_node_id) return state;
-      const node = documentquery.__getNodeById(state, state.selected_node_id);
+      if (state.selected_node_ids.length !== 1) break;
+      const node_id = state.selected_node_ids[0];
+      const node = documentquery.__getNodeById(state, node_id);
 
       // only text node can enter the content edit mode
       if (node.type !== "text") return state;
