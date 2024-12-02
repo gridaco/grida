@@ -4,6 +4,10 @@ import { documentquery } from "../document-query";
 import { grida } from "@/grida";
 import assert from "assert";
 
+/**
+ * TODO:
+ * - validate the selection by config (which does not exists yet), to only select subset of children or a container, but not both. - when both container and children are selected, when transform, it will transform both, resulting in a weird behavior.
+ */
 export function self_selectNode<S extends IDocumentEditorState>(
   draft: Draft<S>,
   ...node_ids: string[]

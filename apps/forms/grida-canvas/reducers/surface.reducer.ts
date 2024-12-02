@@ -301,7 +301,13 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
         draft.is_gesture_node_drag_move = false;
         draft.marquee = undefined;
         if (node_ids_from_area) {
-          self_selectNode(draft, ...node_ids_from_area);
+          // except the root node & locked nodes
+          const target_node_ids = node_ids_from_area.filter(
+            (node_id) =>
+              node_id !== draft.document.root_id &&
+              !documentquery.__getNodeById(draft, node_id).locked
+          );
+          self_selectNode(draft, ...target_node_ids);
         }
       });
     }

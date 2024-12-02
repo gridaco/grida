@@ -183,9 +183,11 @@ export function ViewportSurface() {
       )}
       <div className="w-full h-full" id="canvas-overlay-portal" ref={ref}>
         <SelectionOverlay selection={selected_node_ids} readonly={false} />
-        {hovered_node_id && !selected_node_ids.includes(hovered_node_id) && (
-          <NodeOverlay node_id={hovered_node_id} readonly />
-        )}
+        {!marquee &&
+          hovered_node_id &&
+          !selected_node_ids.includes(hovered_node_id) && (
+            <NodeOverlay node_id={hovered_node_id} readonly />
+          )}
         <div id="marquee-container" className="absolute top-0 left-0 w-0 h-0">
           {marquee && (
             <Marquee
@@ -226,27 +228,49 @@ function GroupOverlay({
 }) {
   const transform = useGroupSurfaceTransform(...node_ids);
 
-  console.log("GroupOverlay", transform);
-
   return (
-    <LayerOverlay readonly={readonly} transform={transform}></LayerOverlay>
+    <>
+      <LayerOverlay
+        readonly={readonly}
+        transform={transform}
+        zIndex={10}
+      ></LayerOverlay>
+      {
+        // also hightlight the included nodes
+        node_ids.map((node_id) => (
+          <NodeOverlay
+            key={node_id}
+            node_id={node_id}
+            readonly
+            disabled
+            zIndex={20}
+          />
+        ))
+      }
+    </>
   );
 }
 
 function NodeOverlay({
   node_id,
   readonly,
+  disabled,
+  zIndex,
 }: {
   node_id: string;
   readonly?: boolean;
+  disabled?: boolean;
+  zIndex?: number;
 }) {
   const transform = useNodeSurfaceTransfrom(node_id);
   const node = useNode(node_id);
 
   return (
     <LayerOverlay
+      disabled={disabled}
       readonly={readonly}
       transform={transform}
+      zIndex={zIndex}
       isComponentConsumer={node.meta.is_component_consumer}
     >
       {!readonly && (

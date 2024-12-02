@@ -1210,7 +1210,7 @@ export function useEventTarget() {
           width: eldomrect.width,
           height: eldomrect.height,
         };
-        if (cmath.rect.contains(elrect, marqueerect)) {
+        if (cmath.rect.intersects(elrect, marqueerect)) {
           contained.push(el.id);
         }
       });

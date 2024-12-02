@@ -158,10 +158,13 @@ export function useNodeSurfaceTransfrom(node_id: string) {
 /**
  * returns the relative transform of the group surface relative to the portal
  * The group surface will not have rotation - each children rotation is applied to calculate the group bounding rect
+ *
+ * TODO: Not tested with the performance
+ *
+ * Uses MutationObserver to observe position changes - expensive
  */
 export function useGroupSurfaceTransform(...node_ids: string[]) {
   const __rect_fallback = useMemo(() => new DOMRect(0, 0, 0, 0), []);
-  // const { getNodeAbsoluteRotation } = useDocument();
   const portal = useViewportSurfacePortal();
   const node_elements = useNodeDomElements(...node_ids);
 
@@ -200,7 +203,7 @@ export function useGroupSurfaceTransform(...node_ids: string[]) {
       const centerY =
         boundingRect.y + boundingRect.height / 2 - portal_rect.top;
 
-      // Rotation is ignored for groups, so this is always 0
+      // Rotation is ignored for groups
       const rotation = 0;
 
       setTransform({
@@ -212,11 +215,21 @@ export function useGroupSurfaceTransform(...node_ids: string[]) {
       });
     };
 
-    // Observe size changes for all elements in the group
+    // Observe size changes using ResizeObserver
     const resizeObservers = node_elements.map((el) => {
       const observer = new ResizeObserver(() => updateTransform());
       el && observer.observe(el);
       return observer;
+    });
+
+    // Observe position changes using MutationObserver
+    const mutationObserver = new MutationObserver(() => updateTransform());
+    node_elements.forEach((el) => {
+      if (el)
+        mutationObserver.observe(el, {
+          attributes: true,
+          attributeFilter: ["style"],
+        });
     });
 
     // Trigger initial update
@@ -224,6 +237,7 @@ export function useGroupSurfaceTransform(...node_ids: string[]) {
 
     return () => {
       resizeObservers.forEach((observer) => observer.disconnect());
+      mutationObserver.disconnect();
     };
   }, [node_elements, portal, __rect_fallback]);
 
