@@ -1092,6 +1092,7 @@ export function useEventTarget() {
         type: "document/canvas/backend/html/event/on-pointer-move-raycast",
         node_ids_from_point: els.map((n) => n.id),
         position,
+        shiftKey: event.shiftKey,
       });
     }, 30),
     [dispatch]
@@ -1135,6 +1136,7 @@ export function useEventTarget() {
       dispatch({
         type: "document/canvas/backend/html/event/on-pointer-down",
         node_ids_from_point: els.map((n) => n.id),
+        shiftKey: event.shiftKey,
       });
     },
     [dispatch]
@@ -1177,55 +1179,64 @@ export function useEventTarget() {
     });
   }, [dispatch]);
 
-  const dragStart = useCallback(() => {
-    dispatch({
-      type: "document/canvas/backend/html/event/on-drag-start",
-    });
-  }, [dispatch]);
-
-  const dragEnd = useCallback(() => {
-    if (marquee) {
-      const contained: string[] = [];
-
-      const els = domapi.get_grida_node_elements();
-      const viewportdomrect = domapi.get_viewport_rect();
-      const viewport_pos = [viewportdomrect.x, viewportdomrect.y];
-      const translate: [number, number] = [
-        state.translate ? state.translate[0] : 0,
-        state.translate ? state.translate[1] : 0,
-      ];
-
-      const marqueerect = cmath.rect.fromPoints([
-        [marquee.x1, marquee.y1],
-        [marquee.x2, marquee.y2],
-      ]);
-      marqueerect.x = marqueerect.x - translate[0];
-      marqueerect.y = marqueerect.y - translate[1];
-
-      els.forEach((el) => {
-        const eldomrect = el.getBoundingClientRect();
-        const elrect = {
-          x: eldomrect.x - translate[0] - viewport_pos[0],
-          y: eldomrect.y - translate[1] - viewport_pos[1],
-          width: eldomrect.width,
-          height: eldomrect.height,
-        };
-        if (cmath.rect.intersects(elrect, marqueerect)) {
-          contained.push(el.id);
-        }
+  const dragStart = useCallback(
+    (event: PointerEvent) => {
+      dispatch({
+        type: "document/canvas/backend/html/event/on-drag-start",
+        shiftKey: event.shiftKey,
       });
+    },
+    [dispatch]
+  );
 
+  const dragEnd = useCallback(
+    (event: PointerEvent) => {
+      if (marquee) {
+        const contained: string[] = [];
+
+        const els = domapi.get_grida_node_elements();
+        const viewportdomrect = domapi.get_viewport_rect();
+        const viewport_pos = [viewportdomrect.x, viewportdomrect.y];
+        const translate: [number, number] = [
+          state.translate ? state.translate[0] : 0,
+          state.translate ? state.translate[1] : 0,
+        ];
+
+        const marqueerect = cmath.rect.fromPoints([
+          [marquee.x1, marquee.y1],
+          [marquee.x2, marquee.y2],
+        ]);
+        marqueerect.x = marqueerect.x - translate[0];
+        marqueerect.y = marqueerect.y - translate[1];
+
+        els.forEach((el) => {
+          const eldomrect = el.getBoundingClientRect();
+          const elrect = {
+            x: eldomrect.x - translate[0] - viewport_pos[0],
+            y: eldomrect.y - translate[1] - viewport_pos[1],
+            width: eldomrect.width,
+            height: eldomrect.height,
+          };
+          if (cmath.rect.intersects(elrect, marqueerect)) {
+            contained.push(el.id);
+          }
+        });
+
+        dispatch({
+          type: "document/canvas/backend/html/event/on-drag-end",
+          node_ids_from_area: contained,
+          shiftKey: event.shiftKey,
+        });
+
+        return;
+      }
       dispatch({
         type: "document/canvas/backend/html/event/on-drag-end",
-        node_ids_from_area: contained,
+        shiftKey: event.shiftKey,
       });
-
-      return;
-    }
-    dispatch({
-      type: "document/canvas/backend/html/event/on-drag-end",
-    });
-  }, [dispatch, marquee, state.translate]);
+    },
+    [dispatch, marquee, state.translate]
+  );
 
   const drag = useCallback(
     (event: { delta: Vector2; distance: Vector2 }) => {

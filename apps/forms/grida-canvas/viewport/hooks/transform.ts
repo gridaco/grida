@@ -239,7 +239,7 @@ export function useGroupSurfaceTransform(...node_ids: string[]) {
       resizeObservers.forEach((observer) => observer.disconnect());
       mutationObserver.disconnect();
     };
-  }, [node_elements, portal, __rect_fallback]);
+  }, [...node_ids, node_elements, portal, __rect_fallback]);
 
   return transform;
 }

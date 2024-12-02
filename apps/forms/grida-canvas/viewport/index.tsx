@@ -103,11 +103,11 @@ export function ViewportSurface() {
       },
       onDragStart: ({ event }) => {
         if (event.defaultPrevented) return;
-        dragStart();
+        dragStart(event as PointerEvent);
       },
       onDragEnd: ({ event }) => {
         if (event.defaultPrevented) return;
-        dragEnd();
+        dragEnd(event as PointerEvent);
       },
       onDrag: (e) => {
         if (e.event.defaultPrevented) return;

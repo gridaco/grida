@@ -115,7 +115,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
             );
             // after
             draft.cursor_mode = { type: "cursor" };
-            self_selectNode(draft, newNode.id);
+            self_selectNode(draft, "reset", newNode.id);
           }
         }
 
@@ -196,7 +196,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
       });
     }
     case "document/canvas/backend/html/event/on-pointer-down": {
-      const { node_ids_from_point } = <
+      const { node_ids_from_point, shiftKey } = <
         DocumentEditorCanvasEventTargetHtmlBackendPointerDown
       >action;
       return produce(state, (draft) => {
@@ -204,8 +204,20 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
           case "cursor": {
             draft.surface_raycast_detected_node_ids = node_ids_from_point;
             const { hovered_node_id } = self_updateSurfaceHoverState(draft);
-            if (hovered_node_id) self_selectNode(draft, hovered_node_id);
-            else self_clearSelection(draft);
+            if (shiftKey) {
+              if (hovered_node_id) {
+                self_selectNode(draft, "toggle", hovered_node_id);
+              } else {
+                // do nothing (when shift key is pressed)
+              }
+            } else {
+              if (hovered_node_id) {
+                self_selectNode(draft, "reset", hovered_node_id);
+              } else {
+                self_clearSelection(draft);
+              }
+            }
+
             break;
           }
           case "insert":
@@ -248,14 +260,16 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
 
             self_insertNode(draft, draft.document.root_id, nnode);
             draft.cursor_mode = { type: "cursor" };
-            self_selectNode(draft, nnode.id);
+            self_selectNode(draft, "reset", nnode.id);
             break;
         }
       });
     }
     // #region drag event
     case "document/canvas/backend/html/event/on-drag-start": {
-      const {} = <DocumentEditorCanvasEventTargetHtmlBackendDragStart>action;
+      const { shiftKey } = <
+        DocumentEditorCanvasEventTargetHtmlBackendDragStart
+      >action;
       return produce(state, (draft) => {
         // clear all trasform state
         draft.surface_content_edit_mode = false;
@@ -263,7 +277,8 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
 
         switch (draft.cursor_mode.type) {
           case "cursor": {
-            if (draft.selected_node_ids.length === 0) {
+            // TODO: improve logic
+            if (shiftKey) {
               // marquee selection
               draft.marquee = {
                 x1: draft.surface_cursor_position[0],
@@ -272,7 +287,17 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
                 y2: draft.surface_cursor_position[1],
               };
             } else {
-              draft.is_gesture_node_drag_move = true;
+              if (draft.selected_node_ids.length === 0) {
+                // marquee selection
+                draft.marquee = {
+                  x1: draft.surface_cursor_position[0],
+                  y1: draft.surface_cursor_position[1],
+                  x2: draft.surface_cursor_position[0],
+                  y2: draft.surface_cursor_position[1],
+                };
+              } else {
+                draft.is_gesture_node_drag_move = true;
+              }
             }
             break;
           }
@@ -286,7 +311,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
             });
             self_insertNode(draft, draft.document.root_id, nnode);
             draft.cursor_mode = { type: "cursor" };
-            self_selectNode(draft, nnode.id);
+            self_selectNode(draft, "reset", nnode.id);
             draft.is_gesture_node_drag_resize = true;
             // TODO: after inserting, refresh fonts registry
             break;
@@ -294,7 +319,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
       });
     }
     case "document/canvas/backend/html/event/on-drag-end": {
-      const { node_ids_from_area } = <
+      const { node_ids_from_area, shiftKey } = <
         DocumentEditorCanvasEventTargetHtmlBackendDragEnd
       >action;
       return produce(state, (draft) => {
@@ -307,7 +332,11 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
               node_id !== draft.document.root_id &&
               !documentquery.__getNodeById(draft, node_id).locked
           );
-          self_selectNode(draft, ...target_node_ids);
+          self_selectNode(
+            draft,
+            shiftKey ? "toggle" : "reset",
+            ...target_node_ids
+          );
         }
       });
     }
@@ -421,7 +450,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
       const { node_id } = action;
 
       return produce(state, (draft) => {
-        self_selectNode(draft, node_id);
+        self_selectNode(draft, "reset", node_id);
         draft.is_gesture_node_drag_corner_radius = true;
       });
     }
@@ -477,7 +506,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
       >action;
 
       return produce(state, (draft) => {
-        self_selectNode(draft, node_id);
+        self_selectNode(draft, "reset", node_id);
         draft.is_gesture_node_drag_rotation = true;
       });
     }

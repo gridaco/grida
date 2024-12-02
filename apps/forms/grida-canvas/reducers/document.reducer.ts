@@ -123,7 +123,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
       const { node_id } = <DocumentEditorNodeSelectAction>action;
 
       return produce(state, (draft) => {
-        if (node_id) self_selectNode(draft, node_id);
+        if (node_id) self_selectNode(draft, "reset", node_id);
       });
     }
     case "document/node/on-pointer-enter": {

@@ -41,6 +41,7 @@ interface IHtmlBackendCanvasEventTargetPointerEvent {
    * use document.elementFromPoint with filtering
    */
   node_ids_from_point: string[];
+  shiftKey: boolean;
 }
 
 interface ICanvasEventTargetPointerEvent {
@@ -134,6 +135,7 @@ export type DocumentEditorCanvasEventTargetHtmlBackendClick = {
 
 export type DocumentEditorCanvasEventTargetHtmlBackendDragStart = {
   type: "document/canvas/backend/html/event/on-drag-start";
+  shiftKey: boolean;
 };
 
 export type DocumentEditorCanvasEventTargetHtmlBackendDrag =
@@ -144,6 +146,7 @@ export type DocumentEditorCanvasEventTargetHtmlBackendDrag =
 export type DocumentEditorCanvasEventTargetHtmlBackendDragEnd = {
   type: "document/canvas/backend/html/event/on-drag-end";
   node_ids_from_area?: string[];
+  shiftKey: boolean;
 };
 
 export type DocumentEditorEnterContentEditMode = {

@@ -10,6 +10,7 @@ import assert from "assert";
  */
 export function self_selectNode<S extends IDocumentEditorState>(
   draft: Draft<S>,
+  mode: "reset" | "add" | "toggle",
   ...node_ids: string[]
 ) {
   for (const node_id of node_ids) {
@@ -20,7 +21,27 @@ export function self_selectNode<S extends IDocumentEditorState>(
     );
   }
 
-  draft.selected_node_ids = node_ids;
+  switch (mode) {
+    case "add":
+      const set = new Set([...draft.selected_node_ids, ...node_ids]);
+      draft.selected_node_ids = Array.from(set);
+      break;
+    case "toggle": {
+      const set = new Set(draft.selected_node_ids);
+      for (const node_id of node_ids) {
+        if (set.has(node_id)) {
+          set.delete(node_id);
+        } else {
+          set.add(node_id);
+        }
+      }
+      draft.selected_node_ids = Array.from(set);
+      break;
+    }
+    case "reset":
+      draft.selected_node_ids = node_ids;
+      break;
+  }
   return draft;
 }
 
