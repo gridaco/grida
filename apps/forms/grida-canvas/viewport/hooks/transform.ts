@@ -254,11 +254,22 @@ export function useGroupSurfaceTransform(...node_ids: string[]) {
       return observer;
     });
 
+    // Observe position changes using MutationObserver
+    const mutationObserver = new MutationObserver(() => updateTransform());
+    node_elements.forEach((el) => {
+      if (el)
+        mutationObserver.observe(el, {
+          attributes: true,
+          attributeFilter: ["style", "transform"],
+        });
+    });
+
     // Trigger initial update
     updateTransform();
 
     return () => {
       resizeObservers.forEach((observer) => observer.disconnect());
+      mutationObserver.disconnect();
     };
   }, [stableNodeIds, node_elements, portal, __rect_fallback]);
 

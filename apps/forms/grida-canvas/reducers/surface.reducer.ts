@@ -62,6 +62,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
       const { key, altKey, metaKey, shiftKey } = <
         DocumentEditorCanvasEventTargetHtmlBackendKeyDown
       >action;
+
       return produce(state, (draft) => {
         // Meta key (meta only)
         if (
@@ -83,6 +84,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
           // Copy logic
           const selectedNode = documentquery.__getNodeById(draft, node_id);
           draft.clipboard = JSON.parse(JSON.stringify(selectedNode)); // Deep copy the node
+          return;
         } else if (metaKey && key === "x") {
           if (draft.selected_node_ids.length !== 1) {
             return;
@@ -93,6 +95,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
           const selectedNode = documentquery.__getNodeById(draft, node_id);
           draft.clipboard = JSON.parse(JSON.stringify(selectedNode)); // Deep copy the node
           self_deleteNode(draft, node_id);
+          return;
         } else if (metaKey && key === "v") {
           // Paste logic
           if (draft.clipboard) {
@@ -117,30 +120,54 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
             draft.cursor_mode = { type: "cursor" };
             self_selectNode(draft, "reset", newNode.id);
           }
+          return;
+        }
+
+        if (
+          // No modifier key is pressed
+          !metaKey &&
+          !altKey &&
+          !shiftKey
+        ) {
+          switch (key) {
+            case "v": {
+              draft.cursor_mode = { type: "cursor" };
+              return;
+            }
+            case "r":
+            case "t":
+            case "o":
+            case "f":
+            case "a":
+            case "l": {
+              draft.cursor_mode = {
+                type: "insert",
+                node: keyboard_key_bindings[key],
+              };
+              return;
+            }
+            case "Backspace": {
+              for (const node_id of draft.selected_node_ids) {
+                if (draft.document.root_id !== node_id) {
+                  self_deleteNode(draft, node_id);
+                }
+              }
+              return;
+            }
+          }
         }
 
         switch (key) {
-          case "v": {
-            draft.cursor_mode = { type: "cursor" };
-            break;
-          }
-          case "r":
-          case "t":
-          case "o":
-          case "f":
-          case "a":
-          case "l": {
-            draft.cursor_mode = {
-              type: "insert",
-              node: keyboard_key_bindings[key],
-            };
-            break;
-          }
           case "ArrowUp":
           case "ArrowDown":
           case "ArrowLeft":
           case "ArrowRight": {
-            const [dx, dy] = keyboard_arrowy_key_vector_bindings[key];
+            const [_dx, _dy] = keyboard_arrowy_key_vector_bindings[key];
+
+            const multiply = shiftKey ? 10 : 1;
+            const dx = _dx * multiply;
+            const dy = _dy * multiply;
+
             for (const node_id of draft.selected_node_ids) {
               const node = documentquery.__getNodeById(draft, node_id);
 
@@ -149,14 +176,6 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
                 dx: dx,
                 dy: dy,
               });
-            }
-            break;
-          }
-          case "Backspace": {
-            for (const node_id of draft.selected_node_ids) {
-              if (draft.document.root_id !== node_id) {
-                self_deleteNode(draft, node_id);
-              }
             }
             break;
           }

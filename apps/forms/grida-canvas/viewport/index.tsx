@@ -121,6 +121,8 @@ export function ViewportSurface() {
       },
       drag: {
         threshold: 5,
+        // disable drag gesture with arrow keys
+        keyboardDisplacement: 0,
       },
     }
   );
