@@ -121,6 +121,7 @@ export default function CanvasPlayground() {
             style: {},
             opacity: 1,
             zIndex: 0,
+            rotation: 0,
             expanded: false,
             cornerRadius: 0,
             padding: 0,

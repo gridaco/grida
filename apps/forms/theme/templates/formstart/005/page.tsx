@@ -336,6 +336,7 @@ _005.definition = {
       active: true,
       locked: false,
       opacity: 1,
+      rotation: 0,
       position: "relative",
       style: {},
       width: "auto",
