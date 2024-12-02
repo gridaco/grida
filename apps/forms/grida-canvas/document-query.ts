@@ -28,12 +28,20 @@ export namespace documentquery {
     const prunedSelection: Set<NodeID> = new Set();
 
     for (const node of selection) {
-      // If no ancestor of the current node is in the pruned selection, add it
+      // Check if the node is a descendant of any already selected parent
       if (
         !Array.from(prunedSelection).some((selectedNode) =>
           isAncestor(context, selectedNode, node)
         )
       ) {
+        // Remove descendants of the current node from the pruned selection
+        for (const selectedNode of Array.from(prunedSelection)) {
+          if (isAncestor(context, node, selectedNode)) {
+            prunedSelection.delete(selectedNode);
+          }
+        }
+
+        // Add the current node
         prunedSelection.add(node);
       }
     }
@@ -41,6 +49,40 @@ export namespace documentquery {
     return Array.from(prunedSelection);
   }
 
+  /**
+   * Determines whether a given node (`ancestor`) is an ancestor of another node (`node`).
+   *
+   * This function traverses upwards in the hierarchy from the specified node,
+   * checking each parent node until it reaches the root or finds the specified ancestor.
+   *
+   * @param context - The runtime hierarchy context containing the mapping of node IDs to their parent IDs.
+   * @param ancestor - The node ID to check as a potential ancestor.
+   * @param node - The node ID to check as a descendant.
+   * @returns `true` if the specified `ancestor` is an ancestor of the given `node`; otherwise, `false`.
+   *
+   * @example
+   * // Example context
+   * const context = {
+   *   __ctx_nid_to_parent_id: {
+   *     "node4": "node3",
+   *     "node3": "node2",
+   *     "node2": "node1",
+   *     "node1": null, // root node has no parent
+   *   }
+   * };
+   *
+   * // Check if "node2" is an ancestor of "node4"
+   * const result = isAncestor(context, "node2", "node4");
+   * console.log(result); // true
+   *
+   * // Check if "node1" is an ancestor of "node4"
+   * const result = isAncestor(context, "node1", "node4");
+   * console.log(result); // true
+   *
+   * // Check if "node3" is an ancestor of "node2"
+   * const result = isAncestor(context, "node3", "node2");
+   * console.log(result); // false
+   */
   function isAncestor(
     context: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext,
     ancestor: NodeID,
