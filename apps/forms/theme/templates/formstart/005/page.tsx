@@ -142,9 +142,7 @@ function Media() {
 
   // TODO: fixme - wrong type
   const media = props.media as any as FileIO.GridaAsset[];
-  // grida.program.objects.ImageSource
-
-  console.log("media", media);
+  // grida.program.objects.ImageSource[];
 
   return (
     <Carousel opts={{ loop: true }} plugins={[Autoplay()]}>
