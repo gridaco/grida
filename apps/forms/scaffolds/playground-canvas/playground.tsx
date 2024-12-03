@@ -14,7 +14,7 @@ import { __TMP_ComponentProperties } from "@/scaffolds/sidecontrol/sidecontrol-c
 import { NodeHierarchyList } from "@/scaffolds/sidebar/sidebar-node-hierarchy-list";
 import {
   StandaloneDocumentEditor,
-  StandaloneDocumentEditorContent,
+  StandaloneDocumentContent,
   ViewportRoot,
   EditorSurface,
   standaloneDocumentReducer,
@@ -208,7 +208,7 @@ export default function CanvasPlayground() {
           <StandaloneDocumentEditor editable={false} initial={state}>
             <div className="w-full h-full flex items-center justify-center overflow-hidden">
               <div className="rounded shadow-lg border overflow-hidden select-none">
-                <StandaloneDocumentEditorContent />
+                <StandaloneDocumentContent />
               </div>
             </div>
           </StandaloneDocumentEditor>
@@ -333,7 +333,7 @@ export default function CanvasPlayground() {
               <EditorSurface />
               <div className="w-full h-full flex items-center justify-center bg-black/5">
                 <div className="shadow-lg rounded-xl border overflow-hidden">
-                  <StandaloneDocumentEditorContent />
+                  <StandaloneDocumentContent />
                 </div>
               </div>
             </ViewportRoot>

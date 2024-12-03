@@ -43,34 +43,8 @@ const userprops = {
 
 type UserProps = grida.program.schema.TInferredPropTypes<typeof userprops>;
 
-export default function _001({
-  meta,
-  resources = _messages,
-  lang,
-}: FormStartPage.CampaignTemplateProps<UserProps, Messages>) {
-  const i18n = useMemo(() => {
-    return i18next.createInstance(
-      {
-        fallbackLng: "en",
-        resources: resources,
-        lng: lang,
-      },
-      (err, t) => {
-        if (err) return console.log("something went wrong loading", err);
-      }
-    );
-  }, [lang]);
-
-  return (
-    <FormCampaignStartPageContextProvider value={meta}>
-      <I18nextProvider
-        // @ts-expect-error
-        i18n={i18n}
-      >
-        <Consumer />
-      </I18nextProvider>
-    </FormCampaignStartPageContextProvider>
-  );
+export default function _001() {
+  return <Consumer />;
 }
 
 function Consumer() {

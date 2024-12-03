@@ -99,6 +99,19 @@ export default function initialNode(
         ...seed,
       } satisfies grida.program.nodes.HTMLIFrameNode;
     }
+    case "richtext": {
+      return {
+        ...base,
+        ...position,
+        ...styles,
+        fill: white,
+        type: "richtext",
+        width: "auto",
+        height: "auto",
+        html: __richtext_html,
+        ...seed,
+      } satisfies grida.program.nodes.HTMLRichTextNode;
+    }
     case "ellipse": {
       return {
         ...base,
@@ -178,3 +191,43 @@ export default function initialNode(
     }
   }
 }
+
+const __richtext_html = `
+<h1>Welcome to Rich Text Editor!</h1>
+<h2>Subheading Example</h2>
+<h3>Smaller Subheading</h3>
+<p>This is a regular paragraph where you can make words <strong>bold</strong> or <em>italic</em>.</p>
+<p>You can also <u>underline</u> words or show <s>crossed-out text</s> if needed.</p>
+<p>Want to call attention to something? Try <mark>highlighting</mark> it!</p>
+
+<blockquote>
+    "This is a great way to add a quote or a special message."
+</blockquote>
+
+<p>Here’s how you can create lists:</p>
+<ul>
+    <li>First item</li>
+    <li>Second item</li>
+    <li>Third item</li>
+</ul>
+
+<p>Or make a numbered list:</p>
+<ol>
+    <li>Step one</li>
+    <li>Step two</li>
+    <li>Step three</li>
+</ol>
+
+<p>Need to include a link? Here’s an example: <a href="https://example.com">Visit Example</a>.</p>
+<p>Want to add a little note? Use small text like this: <small>Some extra details here.</small></p>
+
+<p>You can also add <sup>superscripts</sup> for things like numbers<sup>2</sup>, or <sub>subscripts</sub> for small details<sub>2</sub>.</p>
+
+<pre>
+    This area is for text that needs to stay exactly as it is.
+    It's great for showing things like poetry or special formatting!
+</pre>
+
+<h2>Try experimenting with these elements!</h2>
+<p>Have fun creating beautiful, rich text content for your website!</p>
+`;

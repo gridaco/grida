@@ -284,20 +284,32 @@ function NodeOverlay({
   const transform = useNodeSurfaceTransfrom(node_id);
   const node = useNode(node_id);
 
-  const bind = useGesture({
-    onDragStart: (e) => {
-      e.event.stopPropagation();
-      layerDragStart([node_id], e);
+  const { is_component_consumer } = node.meta;
+  readonly = readonly || is_component_consumer;
+
+  const bind = useGesture(
+    {
+      onDragStart: (e) => {
+        e.event.stopPropagation();
+        layerDragStart([node_id], e);
+      },
+      onDragEnd: (e) => {
+        e.event.stopPropagation();
+        layerDragEnd([node_id], e);
+      },
+      onDrag: (e) => {
+        e.event.stopPropagation();
+        layerDrag([node_id], e);
+      },
     },
-    onDragEnd: (e) => {
-      e.event.stopPropagation();
-      layerDragEnd([node_id], e);
-    },
-    onDrag: (e) => {
-      e.event.stopPropagation();
-      layerDrag([node_id], e);
-    },
-  });
+    {
+      drag: {
+        threshold: 5,
+        // disable drag gesture with arrow keys
+        keyboardDisplacement: 0,
+      },
+    }
+  );
 
   return (
     <LayerOverlay
@@ -305,7 +317,7 @@ function NodeOverlay({
       readonly={readonly}
       transform={transform}
       zIndex={zIndex}
-      isComponentConsumer={node.meta.is_component_consumer}
+      isComponentConsumer={is_component_consumer}
     >
       {!readonly && (
         <>

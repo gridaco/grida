@@ -8,16 +8,7 @@ import {
   ScreenRoot,
   TextAlign,
 } from "@/theme/templates/kit/components";
-import Image from "next/image";
 import type { grida } from "@/grida";
-import type { FormStartPage } from "..";
-import { I18nextProvider, useTranslation } from "react-i18next";
-import i18next from "i18next";
-import {
-  FormCampaignStartPageContextProvider,
-  useCampaignMeta,
-} from "@/theme/templates/kit/campaign";
-import { ReactNodeRenderers } from "@/grida-canvas/nodes";
 import { NodeElement } from "@/grida-canvas/nodes/node";
 import { Factory } from "@/ast";
 import { useCTAContext } from "../../kit/contexts/cta.context";
@@ -30,34 +21,8 @@ const userprops = {
 
 type UserProps = grida.program.schema.TInferredPropTypes<typeof userprops>;
 
-export default function _003({
-  meta,
-  resources = {},
-  lang,
-}: FormStartPage.CampaignTemplateProps<UserProps, {}>) {
-  const i18n = useMemo(() => {
-    return i18next.createInstance(
-      {
-        fallbackLng: "en",
-        resources: resources,
-        lng: lang,
-      },
-      (err, t) => {
-        if (err) return console.log("something went wrong loading", err);
-      }
-    );
-  }, [lang]);
-
-  return (
-    <FormCampaignStartPageContextProvider value={meta}>
-      <I18nextProvider
-        // @ts-expect-error
-        i18n={i18n}
-      >
-        <Consumer />
-      </I18nextProvider>
-    </FormCampaignStartPageContextProvider>
-  );
+export default function _003() {
+  return <Consumer />;
 }
 
 function Consumer() {

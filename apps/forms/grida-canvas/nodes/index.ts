@@ -7,6 +7,7 @@ import { RectangleWidget } from "./rectangle";
 import { EllipseWidget } from "./ellipse";
 import { SVGLineWidget } from "./line";
 import { IFrameWidget } from "./iframe";
+import { RichTextWidget } from "./richtext";
 
 export namespace ReactNodeRenderers {
   export const container = ContainerWidget;
@@ -19,6 +20,7 @@ export namespace ReactNodeRenderers {
   export const text = TextWidget;
   export const image = ImageWidget;
   export const video = VideoWidget;
+  export const richtext = RichTextWidget;
   // export const icon = IconWidget;
   // export const Theme = ThemeWidget;
 }

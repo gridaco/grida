@@ -16,7 +16,7 @@ export function self_selectNode<S extends IDocumentEditorState>(
   for (const node_id of __node_ids) {
     assert(node_id, "Node ID must be provided");
     assert(
-      draft.document.nodes[node_id],
+      documentquery.__getNodeById(draft, node_id),
       `Node not found with id: "${node_id}"`
     );
   }

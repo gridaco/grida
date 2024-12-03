@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useCallback, useLayoutEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useContext,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { __useInternal, useDocument } from "./provider";
 import { NodeElement } from "./nodes/node";
 import { domapi } from "./domapi";
@@ -65,7 +71,27 @@ function __useEditorContentOffsetNotifyEffect(
   }, [contentRef, syncoffset, ...deps]);
 }
 
-export function StandaloneDocumentEditorContent() {
+const UserDocumentCustomRendererContext = React.createContext<
+  Record<string, CustomReactRenderer>
+>({});
+
+export function useUserDocumentCustomRenderer() {
+  return useContext(UserDocumentCustomRendererContext);
+}
+
+type CustomReactRenderer = React.ComponentType<any>;
+
+interface DocumentContentViewProps {
+  /**
+   * custom templates to render
+   */
+  templates?: Record<string, CustomReactRenderer>;
+}
+
+export function StandaloneDocumentContent({
+  templates,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement> & DocumentContentViewProps) {
   const ref = useRef<HTMLDivElement>(null);
   const {
     state: { document, document_key },
@@ -75,8 +101,10 @@ export function StandaloneDocumentEditorContent() {
   __useEditorContentOffsetNotifyEffect(ref, [document_key]);
 
   return (
-    <div id={domapi.k.EDITOR_CONTENT_ELEMENT_ID} ref={ref}>
-      <NodeElement node_id={root_id}></NodeElement>
+    <div id={domapi.k.EDITOR_CONTENT_ELEMENT_ID} ref={ref} {...props}>
+      <UserDocumentCustomRendererContext.Provider value={templates ?? {}}>
+        <NodeElement node_id={root_id} />
+      </UserDocumentCustomRendererContext.Provider>
     </div>
   );
 }

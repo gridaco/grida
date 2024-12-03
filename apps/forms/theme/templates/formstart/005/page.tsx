@@ -14,20 +14,14 @@ import {
   ScreenScrollable,
   Timer,
 } from "@/theme/templates/kit/components";
-import {
-  FormCampaignStartPageContextProvider,
-  useCampaignMeta,
-} from "@/theme/templates/kit/campaign";
-import Image from "next/image";
+import { useCampaignMeta } from "@/theme/templates/kit/campaign";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
 import _messages from "./messages.json";
 import { Features } from "@/lib/features/scheduling";
-import { I18nextProvider, useTranslation } from "react-i18next";
-import i18next from "i18next";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/utils";
-import type { FormStartPage } from "..";
 import { DataProvider, useData } from "../../kit/contexts/data.context";
 import { useCTAContext } from "../../kit/contexts/cta.context";
 import { FileIO } from "@/lib/file";
@@ -42,53 +36,23 @@ const userprops = {
   title: { type: "string", default: "[Your Title Goes Here.]" },
   body: {
     type: "richtext",
-    default: undefined,
+    default: {
+      type: "richtext",
+      html: "We are thrilled to announce the upcoming [Event Name], happening on [Date]. This is your chance to be part of an exclusive gathering of professionals, enthusiasts, and innovators in the [Industry/Field]. Whether you're looking to expand your network, gain valuable insights from industry leaders, or discover the latest trends and tools, [Event Name] offers something for everyone.<br/><br/>Over the course of [Number of Days] days, you will have the opportunity to attend workshops, keynotes, and panel discussions led by experts from around the world. Our carefully curated sessions will cover a wide range of topics, from [Topic 1] to [Topic 2], ensuring that there is something to match your interests and needs.<br/><br/><img src='https://images.unsplash.com/photo-1556505622-49ea9f8eaf76?q=80&w=3688&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D' alt='Event Image'/><br/>Don’t miss out on this unique opportunity to grow your skills, connect with peers, and take your career to the next level. Reserve your spot today!",
+    },
   },
   media: { type: "array", items: { type: "image" }, default: [] },
 } satisfies grida.program.document.template.TemplateDocumentDefinition["properties"];
 
 type UserProps = grida.program.schema.TInferredPropTypes<typeof userprops>;
 
-export default function _005({
-  meta,
-  resources = _messages,
-  lang,
-}: FormStartPage.CampaignTemplateProps<UserProps, Messages>) {
-  const i18n = useMemo(() => {
-    return i18next.createInstance(
-      {
-        fallbackLng: "en",
-        resources: resources,
-        lng: lang,
-      },
-      (err, t) => {
-        if (err) return console.log("something went wrong loading", err);
-      }
-    );
-  }, [lang]);
-
-  return (
-    <FormCampaignStartPageContextProvider value={meta}>
-      <I18nextProvider
-        // @ts-expect-error
-        i18n={i18n}
-      >
-        <Consumer />
-      </I18nextProvider>
-    </FormCampaignStartPageContextProvider>
-  );
+export default function _005() {
+  return <Consumer />;
 }
 
 function Consumer() {
   const { t } = useTranslation<any>();
   const data = useData();
-
-  const bodyHtml = useMemo(
-    () => ({
-      __html: data.body_html || t("body_html"),
-    }),
-    [data.body_html, t]
-  );
 
   return (
     <ScreenRoot>
@@ -108,30 +72,15 @@ function Consumer() {
                 </div>
                 <NextEventState className="py-4" />
               </header>
-              <Article />
-              {/* <article className="py-10 px-4 prose prose-sm dark:prose-invert prose-img:w-screen">
-                <div dangerouslySetInnerHTML={bodyHtml} />
-              </article> */}
+              <article className="py-10 px-4 prose prose-sm dark:prose-invert prose-img:w-screen">
+                <NodeElement node_id="005.body" />
+              </article>
             </div>
           </div>
           <CTAFooter />
         </ScreenScrollable>
       </ScreenMobileFrame>
     </ScreenRoot>
-  );
-}
-
-function Article() {
-  const props = useComputed({
-    __html: Factory.createPropertyAccessExpression(["props", "body"]),
-  });
-
-  const { __html } = props;
-
-  return (
-    <article className="py-10 px-4 prose prose-sm dark:prose-invert prose-img:w-screen">
-      <div dangerouslySetInnerHTML={{ __html }} />
-    </article>
   );
 }
 
@@ -349,20 +298,21 @@ _005.definition = {
       text: Factory.createPropertyAccessExpression(["props", "title"]),
       zIndex: 0,
     },
-    // "005.body": {
-    //   id: "005.body",
-    //   type: "text",
-    //   active: true,
-    //   locked: false,
-    //   name: "Body",
-    //   opacity: 1,
-    //   position: "relative",
-    //   style: {},
-    //   width: "auto",
-    //   height: "auto",
-    //   text: Factory.createPropertyAccessExpression(["props", "body"]),
-    //   zIndex: 0,
-    // },
+    "005.body": {
+      id: "005.body",
+      type: "richtext",
+      active: true,
+      locked: false,
+      name: "Body",
+      opacity: 1,
+      rotation: 0,
+      position: "relative",
+      style: {},
+      width: "auto",
+      height: "auto",
+      html: Factory.createPropertyAccessExpression(["props", "body"]),
+      zIndex: 0,
+    },
     // "005.media": {
     //   id: "005.media",
     //   active: true,

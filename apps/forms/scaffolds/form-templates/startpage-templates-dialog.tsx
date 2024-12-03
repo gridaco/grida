@@ -121,10 +121,8 @@ export function BrowseStartPageTemplatesDialog({
                     },
                   }}
                 >
-                  <template.component
-                    // props={{
-                    //   title: "",
-                    // }}
+                  <FormStartPage.TemplateRenderer
+                    name={template.name}
                     meta={campaign}
                     lang={lang}
                   />

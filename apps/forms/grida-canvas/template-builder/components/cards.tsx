@@ -6,7 +6,6 @@ import { SlashIcon } from "@radix-ui/react-icons";
 import { withTemplateDefinition } from "@/grida-canvas/template-builder/with-template";
 import { NodeElement } from "@/grida-canvas/nodes/node";
 import { Media } from "./media";
-import { ReactNodeRenderers } from "../../nodes";
 import { grida } from "@/grida";
 
 const card_properties_definition = {

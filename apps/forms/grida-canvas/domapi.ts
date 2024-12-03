@@ -27,9 +27,9 @@ export namespace domapi {
    * All elements with the `data-grida-node-id` attribute.
    * @deprecated Expensive
    */
-  export function get_grida_node_elements() {
+  export function get_grida_node_elements(): NodeListOf<Element> | undefined {
     const content = get_content_element();
-    return content!.querySelectorAll(
+    return content?.querySelectorAll(
       `[${grida.program.document.k.HTML_ELEMET_DATA_ATTRIBUTE_GRIDA_NODE_ID_KEY}]`
     );
   }

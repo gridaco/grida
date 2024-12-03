@@ -37,7 +37,7 @@ export function useCampaignMeta() {
     scheduling_close_at,
     scheduling_open_at,
     scheduling_tz,
-  } = campaign;
+  } = campaign ?? {};
 
   const is_schedule_in_range = useMemo(() => {
     if (!is_scheduling_enabled) return false;

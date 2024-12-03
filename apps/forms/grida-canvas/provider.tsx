@@ -1209,7 +1209,7 @@ export function useEventTarget() {
         marqueerect.x = marqueerect.x - translate[0];
         marqueerect.y = marqueerect.y - translate[1];
 
-        els.forEach((el) => {
+        els?.forEach((el) => {
           const eldomrect = el.getBoundingClientRect();
           const elrect = {
             x: eldomrect.x - translate[0] - viewport_pos[0],
@@ -1619,9 +1619,10 @@ export function useNode(node_id: string): grida.program.nodes.AnyNode & {
 
 export function useComputedNode(node_id: string) {
   const node = useNode(node_id);
-  const { active, style, component_id, props, text, src, href } = node;
+  const { active, style, component_id, props, text, html, src, href } = node;
   const computed = useComputed({
     text: text,
+    html: html,
     src: src,
     href: href,
     props: props,

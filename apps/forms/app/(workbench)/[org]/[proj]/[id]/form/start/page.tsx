@@ -92,12 +92,20 @@ export default function FormStartEditPage() {
       <main className="h-full flex flex-1 w-full">
         {startpage ? (
           <StandaloneDocumentEditor
+            key={startpage.template_id}
             editable
-            initial={startpage}
+            initial={{
+              ...startpage,
+              templates: {
+                [startpage.template_id]: FormStartPage.getTemplate(
+                  startpage.template_id
+                ),
+              },
+            }}
             dispatch={startPageDocumentDispatch}
           >
             <div className="w-full h-full flex flex-col">
-              <StartPageEditor />
+              <StartPageEditor template_id={startpage.template_id} />
               {process.env.NODE_ENV === "development" && <DevtoolsPanel />}
             </div>
             <aside className="hidden lg:flex h-full">
@@ -160,7 +168,7 @@ function SetupStartPage() {
   );
 }
 
-function StartPageEditor() {
+function StartPageEditor({ template_id }: { template_id: string }) {
   const [edit, setEdit] = useState(false);
 
   const [rootstate] = useEditorState();
@@ -192,14 +200,7 @@ function StartPageEditor() {
               <SandboxWrapper className="pointer-events-auto rounded-2xl shadow-2xl border overflow-hidden hover:outline hover:outline-2 hover:outline-workbench-accent-sky">
                 <div className="w-full min-h-[852px] h-[80dvh]">
                   <FormStartPage.TemplateRenderer
-                    // TODO: with dynamic renderer
-                    name={
-                      (
-                        state.document.nodes[
-                          state.document.root_id!
-                        ] as grida.program.nodes.TemplateInstanceNode
-                      ).template_id
-                    }
+                    name={template_id}
                     meta={campaign}
                     lang={lang}
                   />
