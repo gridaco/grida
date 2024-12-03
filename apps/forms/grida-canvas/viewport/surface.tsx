@@ -25,8 +25,6 @@ export function EditorSurface() {
     selected_node_ids,
     is_node_transforming,
     content_edit_mode,
-    keyDown,
-    keyUp,
     pointerMove,
     pointerDown,
     pointerUp,
@@ -103,46 +101,6 @@ export function EditorSurface() {
       },
     }
   );
-
-  useEffect(() => {
-    const shouldIgnore = (event: KeyboardEvent) => {
-      // Prevent conflicts with other input elements
-      if (
-        event.target instanceof HTMLInputElement ||
-        event.target instanceof HTMLTextAreaElement ||
-        (event.target instanceof HTMLElement && event.target.isContentEditable)
-      ) {
-        return true;
-      }
-      return false;
-    };
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      // Prevent conflicts with other input elements
-      if (shouldIgnore(event)) {
-        return;
-      }
-      // console.log("keydown", event.key);
-      keyDown(event);
-    };
-
-    const handleKeyUp = (event: KeyboardEvent) => {
-      if (shouldIgnore(event)) {
-        return;
-      }
-
-      keyUp(event);
-      // console.log("keyup", event.key);
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("keyup", handleKeyUp);
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("keyup", handleKeyUp);
-    };
-  }, [keyDown]);
 
   return (
     <div

@@ -88,6 +88,7 @@ import { CANVAS_PLAYGROUND_LOCALSTORAGE_PREFERENCES_BASE_AI_PROMPT_KEY } from ".
 import { widget_presets } from "./widgets";
 import { useHotkeys } from "react-hotkeys-hook";
 import toast from "react-hot-toast";
+import { useEditorHotKeys } from "@/grida-canvas/viewport/hotkeys";
 
 export default function CanvasPlayground() {
   const [asideHidden, setAsideHidden] = useState(false);
@@ -215,6 +216,7 @@ export default function CanvasPlayground() {
         </DialogContent>
       </Dialog>
       <StandaloneDocumentEditor editable initial={state} dispatch={dispatch}>
+        <Hotkyes />
         <div className="flex w-full h-full">
           {!asideHidden && (
             <aside>
@@ -350,7 +352,7 @@ export default function CanvasPlayground() {
               <PlaygroundToolbar onAddButtonClick={insertDialog.openDialog} />
             </div>
             <div className="fixed bottom-20 left-10 flex items-center justify-center z-50 pointer-events-none">
-              <KeyboardInputOverlay />
+              {/* <KeyboardInputOverlay /> */}
             </div>
             <DevtoolsPanel />
           </div>
@@ -380,6 +382,12 @@ export default function CanvasPlayground() {
       <HelpFab />
     </main>
   );
+}
+
+function Hotkyes() {
+  useEditorHotKeys();
+
+  return <></>;
 }
 
 function ExampleSwitch({

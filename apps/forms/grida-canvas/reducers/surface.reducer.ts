@@ -2,9 +2,6 @@ import { produce, type Draft } from "immer";
 
 import type {
   BuilderAction,
-  EditorSurface_KeyDown,
-  EditorSurface_KeyUp,
-  //
   EditorSurface_PointerMove,
   EditorSurface_PointerMoveRaycast,
   EditorSurface_PointerDown,
@@ -37,22 +34,6 @@ import {
 } from "./methods";
 import { cmath } from "../math";
 
-const keyboard_key_bindings = {
-  r: "rectangle",
-  t: "text",
-  o: "ellipse",
-  f: "container",
-  a: "container",
-  l: "line",
-} as const;
-
-const keyboard_arrowy_key_vector_bindings = {
-  ArrowUp: [0, -1],
-  ArrowDown: [0, 1],
-  ArrowLeft: [-1, 0],
-  ArrowRight: [1, 0],
-} as const;
-
 export default function surfaceReducer<S extends IDocumentEditorState>(
   state: S,
   action: SurfaceAction
@@ -60,137 +41,6 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
   // console.log("surfaceReducer", action);
   switch (action.type) {
     // #region [html backend] canvas event target
-    case "document/canvas/backend/html/event/on-key-down": {
-      const { key, altKey, metaKey, shiftKey } = <EditorSurface_KeyDown>action;
-
-      return produce(state, (draft) => {
-        // Meta key (meta only)
-        if (
-          metaKey && // Meta key is pressed
-          !altKey && // Alt key is not pressed
-          !shiftKey && // Shift key is not pressed
-          key === "Meta"
-        ) {
-          draft.surface_raycast_targeting.target = "deepest";
-          self_updateSurfaceHoverState(draft);
-        }
-        if (metaKey && key === "c") {
-          if (draft.selected_node_ids.length !== 1) {
-            return;
-          }
-
-          const node_id = draft.selected_node_ids[0];
-
-          // Copy logic
-          const selectedNode = documentquery.__getNodeById(draft, node_id);
-          draft.clipboard = JSON.parse(JSON.stringify(selectedNode)); // Deep copy the node
-          return;
-        } else if (metaKey && key === "x") {
-          if (draft.selected_node_ids.length !== 1) {
-            return;
-          }
-
-          const node_id = draft.selected_node_ids[0];
-          // Cut logic
-          const selectedNode = documentquery.__getNodeById(draft, node_id);
-          draft.clipboard = JSON.parse(JSON.stringify(selectedNode)); // Deep copy the node
-          self_deleteNode(draft, node_id);
-          return;
-        } else if (metaKey && key === "v") {
-          // Paste logic
-          if (draft.clipboard) {
-            const data: grida.program.nodes.AnyNode = JSON.parse(
-              JSON.stringify(draft.clipboard)
-            );
-
-            const newNode = {
-              ...data,
-              id: v4(),
-            };
-
-            const offset = 10; // Offset to avoid overlapping
-            if (newNode.left !== undefined) newNode.left += offset;
-            if (newNode.top !== undefined) newNode.top += offset;
-            self_insertNode(
-              draft,
-              draft.document.root_id,
-              newNode as grida.program.nodes.Node
-            );
-            // after
-            draft.cursor_mode = { type: "cursor" };
-            self_selectNode(draft, "reset", newNode.id);
-          }
-          return;
-        }
-
-        if (
-          // No modifier key is pressed
-          !metaKey &&
-          !altKey &&
-          !shiftKey
-        ) {
-          switch (key) {
-            case "v": {
-              draft.cursor_mode = { type: "cursor" };
-              return;
-            }
-            case "r":
-            case "t":
-            case "o":
-            case "f":
-            case "a":
-            case "l": {
-              draft.cursor_mode = {
-                type: "insert",
-                node: keyboard_key_bindings[key],
-              };
-              return;
-            }
-            case "Backspace": {
-              for (const node_id of draft.selected_node_ids) {
-                if (draft.document.root_id !== node_id) {
-                  self_deleteNode(draft, node_id);
-                }
-              }
-              return;
-            }
-          }
-        }
-
-        switch (key) {
-          case "ArrowUp":
-          case "ArrowDown":
-          case "ArrowLeft":
-          case "ArrowRight": {
-            const [_dx, _dy] = keyboard_arrowy_key_vector_bindings[key];
-
-            const multiply = shiftKey ? 10 : 1;
-            const dx = _dx * multiply;
-            const dy = _dy * multiply;
-
-            for (const node_id of draft.selected_node_ids) {
-              const node = documentquery.__getNodeById(draft, node_id);
-
-              draft.document.nodes[node_id] = nodeTransformReducer(node, {
-                type: "move",
-                dx: dx,
-                dy: dy,
-              });
-            }
-            break;
-          }
-        }
-      });
-    }
-    case "document/canvas/backend/html/event/on-key-up": {
-      const { key, altKey, metaKey, shiftKey } = <EditorSurface_KeyUp>action;
-      return produce(state, (draft) => {
-        if (key === "Meta") {
-          draft.surface_raycast_targeting.target = "shallowest";
-          self_updateSurfaceHoverState(draft);
-        }
-      });
-    }
     case "document/canvas/backend/html/event/on-pointer-move": {
       const {
         position: { x, y },

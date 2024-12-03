@@ -11,6 +11,7 @@ import type {
   NodeOrderAction,
   NodeToggleAction,
   TemplateNodeOverrideChangeAction,
+  DocumentAction,
 } from "../action";
 import type { IDocumentEditorState, SurfaceRaycastTargeting } from "../types";
 import { grida } from "@/grida";
@@ -18,19 +19,103 @@ import assert from "assert";
 import { documentquery } from "../document-query";
 import nodeReducer from "./node.reducer";
 import surfaceReducer from "./surface.reducer";
+import nodeTransformReducer from "./node-transform.reducer";
 import { v4 } from "uuid";
 import {
   self_clearSelection,
+  self_deleteNode,
   self_insertNode,
   self_selectNode,
 } from "./methods";
 
 export default function documentReducer<S extends IDocumentEditorState>(
   state: S,
-  action: BuilderAction
+  action: DocumentAction
 ): S {
   if (!state.editable) return state;
   switch (action.type) {
+    case "copy":
+    case "cut": {
+      const { target } = action;
+      const target_node_ids =
+        target === "selection" ? state.selected_node_ids : [target];
+
+      return produce(state, (draft) => {
+        // Only allow copy/cut of a single node
+        if (target_node_ids.length !== 1) {
+          return;
+        }
+
+        const node_id = target_node_ids[0];
+
+        // [copy]
+        const selectedNode = documentquery.__getNodeById(draft, node_id);
+        draft.clipboard = JSON.parse(JSON.stringify(selectedNode)); // Deep copy the node
+
+        if (action.type === "cut") {
+          self_deleteNode(draft, node_id);
+        }
+      });
+    }
+    case "paste": {
+      if (!state.clipboard) break;
+      const data: grida.program.nodes.AnyNode = JSON.parse(
+        JSON.stringify(state.clipboard)
+      );
+
+      const newNode = {
+        ...data,
+        id: v4(),
+      };
+
+      const offset = 10; // Offset to avoid overlapping
+
+      if (newNode.left !== undefined) newNode.left += offset;
+      if (newNode.top !== undefined) newNode.top += offset;
+
+      return produce(state, (draft) => {
+        self_insertNode(
+          draft,
+          draft.document.root_id,
+          newNode as grida.program.nodes.Node
+        );
+        // after
+        draft.cursor_mode = { type: "cursor" };
+        self_selectNode(draft, "reset", newNode.id);
+      });
+    }
+    case "delete": {
+      const { target } = action;
+      const target_node_ids =
+        target === "selection" ? state.selected_node_ids : [target];
+
+      return produce(state, (draft) => {
+        for (const node_id of target_node_ids) {
+          if (draft.document.root_id !== node_id) {
+            self_deleteNode(draft, node_id);
+          }
+        }
+      });
+    }
+    case "nudge": {
+      const { target, axis, delta } = action;
+      const target_node_ids =
+        target === "selection" ? state.selected_node_ids : [target];
+      const dx = axis === "x" ? delta : 0;
+      const dy = axis === "y" ? delta : 0;
+
+      return produce(state, (draft) => {
+        for (const node_id of target_node_ids) {
+          const node = documentquery.__getNodeById(draft, node_id);
+
+          draft.document.nodes[node_id] = nodeTransformReducer(node, {
+            type: "move",
+            dx: dx,
+            dy: dy,
+          });
+        }
+      });
+    }
     case "document/insert": {
       const { prototype } = action;
 
@@ -100,8 +185,8 @@ export default function documentReducer<S extends IDocumentEditorState>(
     case "document/canvas/backend/html/event/on-drag":
     case "document/canvas/backend/html/event/on-drag-end":
     case "document/canvas/backend/html/event/on-drag-start":
-    case "document/canvas/backend/html/event/on-key-down":
-    case "document/canvas/backend/html/event/on-key-up":
+    // case "document/canvas/backend/html/event/on-key-down":
+    // case "document/canvas/backend/html/event/on-key-up":
     case "document/canvas/backend/html/event/on-pointer-down":
     case "document/canvas/backend/html/event/on-pointer-move":
     case "document/canvas/backend/html/event/on-pointer-move-raycast":

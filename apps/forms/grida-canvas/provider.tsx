@@ -14,6 +14,7 @@ import {
   type IDocumentEditorInit,
   initDocumentEditorState,
   CursorMode,
+  SurfaceRaycastTargeting,
 } from "./types";
 import type { Tokens } from "@/ast";
 import { grida } from "@/grida";
@@ -823,6 +824,68 @@ export function useDocument() {
 
   const nodeActions = __useNodeActions(dispatch);
 
+  const cut = useCallback(
+    (target: "selection" | (string & {}) = "selection") => {
+      dispatch({
+        type: "cut",
+        target: target,
+      });
+    },
+    [dispatch]
+  );
+
+  const copy = useCallback(
+    (target: "selection" | (string & {}) = "selection") => {
+      dispatch({
+        type: "copy",
+        target: target,
+      });
+    },
+    [dispatch]
+  );
+
+  const paste = useCallback(() => {
+    dispatch({
+      type: "paste",
+    });
+  }, [dispatch]);
+
+  const deleteNode = useCallback(
+    (target: "selection" | (string & {}) = "selection") => {
+      dispatch({
+        type: "delete",
+        target: target,
+      });
+    },
+    [dispatch]
+  );
+
+  const nudge = useCallback(
+    (
+      target: "selection" | (string & {}) = "selection",
+      axis: "x" | "y",
+      delta: number = 1
+    ) => {
+      dispatch({
+        type: "nudge",
+        delta,
+        axis,
+        target,
+      });
+    },
+    [dispatch]
+  );
+
+  const configureSurfaceRaycastTargeting = useCallback(
+    (config: Partial<SurfaceRaycastTargeting>) => {
+      dispatch({
+        type: "config/surface/raycast-targeting",
+        config,
+      });
+    },
+    [dispatch]
+  );
+
   const clearSelection = useCallback(
     () =>
       dispatch({
@@ -964,6 +1027,14 @@ export function useDocument() {
       state,
       selected_node_ids,
       selectedNode,
+      //
+      cut,
+      copy,
+      paste,
+      deleteNode,
+      nudge,
+      configureSurfaceRaycastTargeting,
+      //
       clearSelection,
       getNodeDepth,
       getNodeAbsoluteRotation,
@@ -978,6 +1049,14 @@ export function useDocument() {
     state,
     selected_node_ids,
     selectedNode,
+    //
+    cut,
+    copy,
+    paste,
+    deleteNode,
+    nudge,
+    configureSurfaceRaycastTargeting,
+    //
     clearSelection,
     getNodeDepth,
     getNodeAbsoluteRotation,
@@ -1047,34 +1126,6 @@ export function useEventTarget() {
       dispatch({
         type: "document/canvas/cursor-mode",
         cursor_mode,
-      });
-    },
-    [dispatch]
-  );
-
-  const keyDown = useCallback(
-    (event: KeyboardEvent) => {
-      dispatch({
-        type: "document/canvas/backend/html/event/on-key-down",
-        key: event.key,
-        altKey: event.altKey,
-        metaKey: event.metaKey,
-        ctrlKey: event.ctrlKey,
-        shiftKey: event.shiftKey,
-      });
-    },
-    [dispatch]
-  );
-
-  const keyUp = useCallback(
-    (event: KeyboardEvent) => {
-      dispatch({
-        type: "document/canvas/backend/html/event/on-key-up",
-        key: event.key,
-        altKey: event.altKey,
-        metaKey: event.metaKey,
-        ctrlKey: event.ctrlKey,
-        shiftKey: event.shiftKey,
       });
     },
     [dispatch]
@@ -1425,9 +1476,6 @@ export function useEventTarget() {
       is_node_transforming,
       content_edit_mode,
       //
-      keyDown,
-      keyUp,
-      //
       dragResizeHandleStart,
       dragResizeHandleEnd,
       dragResizeHandle,
@@ -1467,9 +1515,6 @@ export function useEventTarget() {
     selected_node_ids,
     is_node_transforming,
     content_edit_mode,
-    //
-    keyDown,
-    keyUp,
     //
     dragResizeHandleStart,
     dragResizeHandleEnd,

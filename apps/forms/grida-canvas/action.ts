@@ -1,10 +1,21 @@
 import type { Tokens } from "@/ast";
 import { grida } from "@/grida";
-import { CursorMode, IDocumentEditorState } from "./types";
+import {
+  CursorMode,
+  IDocumentEditorState,
+  SurfaceRaycastTargeting,
+} from "./types";
 
 export type BuilderAction =
   | __InternalSyncArtboardOffset
   | __InternalResetAction
+  | EditorConfigAction
+  | DocumentAction;
+
+export type DocumentAction =
+  | EditorCopyCutPasteAction
+  | EditorDeleteAction
+  | EditorNudgeAction
   | DocumentEditorInsertNodeAction
   //
   | SurfaceAction
@@ -20,7 +31,7 @@ export type BuilderAction =
   //
   | SchemaAction;
 
-type NodeID = string;
+type NodeID = string & {};
 type Vector2 = [number, number];
 
 interface INodeID {
@@ -43,6 +54,47 @@ export interface __InternalResetAction {
   state: IDocumentEditorState;
 }
 
+// #region copy cut paste
+export type EditorCopyCutPasteAction =
+  | EditorCopyAction
+  | EditorCutAction
+  | EditorPasteAction;
+
+export interface EditorCopyAction {
+  type: "copy";
+  target: NodeID | "selection";
+}
+
+export interface EditorCutAction {
+  type: "cut";
+  target: NodeID | "selection";
+}
+
+export interface EditorPasteAction {
+  type: "paste";
+}
+
+// #endregion copy cut paste
+
+export interface EditorDeleteAction {
+  type: "delete";
+  target: NodeID | "selection";
+}
+
+export interface EditorNudgeAction {
+  type: "nudge";
+  target: NodeID | "selection";
+  axis: "x" | "y";
+  delta: number;
+}
+
+export type EditorConfigAction = EditorConfigureRaycastTargetingAction;
+
+export interface EditorConfigureRaycastTargetingAction {
+  type: "config/surface/raycast-targeting";
+  config: Partial<SurfaceRaycastTargeting>;
+}
+
 interface IHtmlBackendCanvasEventTargetPointerEvent {
   /**
    * The node ids from the point.
@@ -60,11 +112,8 @@ interface ICanvasEventTargetPointerEvent {
   };
 }
 
+// #region surface action
 export type SurfaceAction =
-  //
-  | EditorSurface_KeyDown
-  | EditorSurface_KeyUp
-  //
   | EditorSurface_PointerMove
   | EditorSurface_PointerMoveRaycast
   | EditorSurface_PointerDown
@@ -95,14 +144,6 @@ export type SurfaceAction =
   | EditorSurface_ExitContentEditMode
   //
   | EditorSurface_CursorMode;
-
-export type EditorSurface_KeyDown = {
-  type: "document/canvas/backend/html/event/on-key-down";
-} & Pick<KeyboardEvent, "key" | "altKey" | "ctrlKey" | "metaKey" | "shiftKey">;
-
-export type EditorSurface_KeyUp = {
-  type: "document/canvas/backend/html/event/on-key-up";
-} & Pick<KeyboardEvent, "key" | "altKey" | "ctrlKey" | "metaKey" | "shiftKey">;
 
 export type EditorSurface_PointerMove = {
   type: "document/canvas/backend/html/event/on-pointer-move";
@@ -259,6 +300,8 @@ export type EditorSurface_NodeOverlayRotationHandle_Drag = INodeID &
   };
 
 //
+
+// #endregion surface action
 
 export interface DocumentEditorInsertNodeAction {
   type: "document/insert";

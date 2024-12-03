@@ -1,9 +1,9 @@
 import { produce, type Draft } from "immer";
-import type { IDocumentEditorState, SurfaceRaycastTargeting } from "../types";
+import type { IDocumentEditorState } from "../types";
 import type { BuilderAction } from "../action";
 // import historyReducer from "./history.reducer";
 import documentReducer from "./document.reducer";
-import { cmath } from "../math";
+import { self_updateSurfaceHoverState } from "./methods";
 
 export default function reducer<S extends IDocumentEditorState>(
   state: S,
@@ -23,6 +23,19 @@ export default function reducer<S extends IDocumentEditorState>(
         // const delta = cmath.vector2.subtract(...)
         // draft.surface_cursor_position =
         // draft.cursor_position =
+      });
+    }
+    case "config/surface/raycast-targeting": {
+      const { config } = action;
+      return produce(state, (draft: Draft<S>) => {
+        if (config.target)
+          draft.surface_raycast_targeting.target = config.target;
+        if (config.ignores_locked)
+          draft.surface_raycast_targeting.ignores_locked =
+            config.ignores_locked;
+        if (config.ignores_root)
+          draft.surface_raycast_targeting.ignores_root = config.ignores_root;
+        self_updateSurfaceHoverState(draft);
       });
     }
     default:
