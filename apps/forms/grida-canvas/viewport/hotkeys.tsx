@@ -1,8 +1,10 @@
 import { useHotkeys } from "react-hotkeys-hook";
 import { useDocument, useEventTarget } from "../provider";
+import toast from "react-hot-toast";
 
 export function useEditorHotKeys() {
-  const { setCursorMode } = useEventTarget();
+  const { setCursorMode, tryEnterContentEditMode, tryExitContentEditMode } =
+    useEventTarget();
   const {
     cut,
     copy,
@@ -10,7 +12,37 @@ export function useEditorHotKeys() {
     deleteNode,
     nudge,
     configureSurfaceRaycastTargeting,
+    clearSelection,
+    selectedNode,
   } = useDocument();
+
+  useHotkeys("meta+z, ctrl+z", () => {
+    toast.error("[undo] is not implemented yet");
+  });
+
+  useHotkeys("meta+shift+z, ctrl+shift+z", () => {
+    toast.error("[redo] is not implemented yet");
+  });
+
+  useHotkeys("meta+b, ctrl+b", () => {
+    toast.error("[bold] is not implemented yet");
+  });
+
+  useHotkeys("shift+r", () => {
+    toast.error("[ruler] is not implemented yet");
+  });
+
+  useHotkeys("meta+d, ctrl+d", () => {
+    toast.error("[duplicate] is not implemented yet");
+  });
+
+  useHotkeys("shift+h", () => {
+    toast.error("[flip horizontal] is not implemented yet");
+  });
+
+  useHotkeys("shift+v", () => {
+    toast.error("[flip vertical] is not implemented yet");
+  });
 
   useHotkeys("meta+x, ctrl+x", () => cut("selection"));
 
@@ -50,6 +82,18 @@ export function useEditorHotKeys() {
 
   useHotkeys("Shift+ArrowDown", () => {
     nudge("selection", "y", 10);
+  });
+
+  useHotkeys("enter", (e) => {
+    // required for preventing this enter to replace autofocused content.
+    e.stopPropagation();
+    e.preventDefault();
+    tryEnterContentEditMode();
+  });
+
+  useHotkeys("escape", (e) => {
+    tryExitContentEditMode();
+    clearSelection();
   });
 
   // keydown
@@ -98,5 +142,45 @@ export function useEditorHotKeys() {
 
   useHotkeys("t", () => {
     setCursorMode({ type: "insert", node: "text" });
+  });
+
+  useHotkeys("0, 1, 2, 3, 4, 5, 6, 7, 8, 9", (e) => {
+    const i = parseInt(e.key);
+    const o = i / 10;
+    selectedNode?.opacity(o);
+    toast.success(`opacity: ${o}`);
+  });
+
+  useHotkeys("]", (e) => {
+    selectedNode?.bringFront();
+  });
+
+  useHotkeys("[", (e) => {
+    selectedNode?.pushBack();
+  });
+
+  useHotkeys("alt+a", (e) => {
+    toast.error("[align left] is not implemented yet");
+  });
+  useHotkeys("alt+d", (e) => {
+    toast.error("[align right] is not implemented yet");
+  });
+  useHotkeys("alt+w", (e) => {
+    toast.error("[align top] is not implemented yet");
+  });
+  useHotkeys("alt+s", (e) => {
+    toast.error("[align bottom] is not implemented yet");
+  });
+
+  useHotkeys("shift+a", (e) => {
+    toast.error("[container layout] is not implemented yet");
+  });
+
+  useHotkeys("alt+meta+k, alt+ctrl+k", (e) => {
+    toast.error("[create component] is not implemented yet");
+  });
+
+  useHotkeys("alt+meta+b, alt+ctrl+b", (e) => {
+    toast.error("[eject component] is not implemented yet");
   });
 }
