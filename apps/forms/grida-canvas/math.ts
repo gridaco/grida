@@ -176,6 +176,65 @@ export namespace cmath.rect {
   }
 
   /**
+   * Aligns an array of rectangles along a specified axis and alignment type.
+   *
+   * @param rectangles - An array of rectangles to align.
+   * @param alignment - The alignment type of each axis (horizontal and vertical).
+   * @returns A new array of rectangles with updated positions.
+   */
+  export function align(
+    rectangles: cmath.Rectangle[],
+    alignment: {
+      horizontal?: "none" | "min" | "max" | "center";
+      vertical?: "none" | "min" | "max" | "center";
+    }
+  ): cmath.Rectangle[] {
+    // Compute the bounding rectangle of all input rectangles
+    const boundingRect = getBoundingRect(rectangles);
+
+    return rectangles.map((rect) => {
+      let newX = rect.x;
+      let newY = rect.y;
+
+      // Horizontal alignment
+      if (alignment.horizontal) {
+        switch (alignment.horizontal) {
+          case "min": // Align to the left
+            newX = boundingRect.x;
+            break;
+          case "max": // Align to the right
+            newX = boundingRect.x + boundingRect.width - rect.width;
+            break;
+          case "center": // Align to the horizontal center
+            newX = boundingRect.x + (boundingRect.width - rect.width) / 2;
+            break;
+        }
+      }
+
+      // Vertical alignment
+      if (alignment.vertical) {
+        switch (alignment.vertical) {
+          case "min": // Align to the top
+            newY = boundingRect.y;
+            break;
+          case "max": // Align to the bottom
+            newY = boundingRect.y + boundingRect.height - rect.height;
+            break;
+          case "center": // Align to the vertical center
+            newY = boundingRect.y + (boundingRect.height - rect.height) / 2;
+            break;
+        }
+      }
+
+      return {
+        ...rect,
+        x: newX,
+        y: newY,
+      };
+    });
+  }
+
+  /**
    * Rotates a rectangle and computes the bounding box of the rotated rectangle.
    *
    * @param rect - The rectangle to rotate.

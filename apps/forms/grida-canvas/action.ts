@@ -16,6 +16,7 @@ export type DocumentAction =
   | EditorCopyCutPasteAction
   | EditorDeleteAction
   | EditorNudgeAction
+  | EditorAlignAction
   | DocumentEditorInsertNodeAction
   //
   | SurfaceAction
@@ -86,6 +87,15 @@ export interface EditorNudgeAction {
   target: NodeID | "selection";
   axis: "x" | "y";
   delta: number;
+}
+
+export interface EditorAlignAction {
+  type: "align";
+  target: NodeID | "selection";
+  alignment: {
+    horizontal?: "none" | "min" | "max" | "center";
+    vertical?: "none" | "min" | "max" | "center";
+  };
 }
 
 export type EditorConfigAction = EditorConfigureRaycastTargetingAction;

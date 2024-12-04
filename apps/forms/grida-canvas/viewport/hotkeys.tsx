@@ -11,6 +11,7 @@ export function useEditorHotKeys() {
     paste,
     deleteNode,
     nudge,
+    align,
     configureSurfaceRaycastTargeting,
     clearSelection,
     selectedNode,
@@ -160,16 +161,35 @@ export function useEditorHotKeys() {
   });
 
   useHotkeys("alt+a", (e) => {
-    toast.error("[align left] is not implemented yet");
+    align("selection", {
+      horizontal: "min",
+    });
   });
   useHotkeys("alt+d", (e) => {
-    toast.error("[align right] is not implemented yet");
+    align("selection", {
+      horizontal: "max",
+    });
   });
   useHotkeys("alt+w", (e) => {
-    toast.error("[align top] is not implemented yet");
+    align("selection", {
+      vertical: "min",
+    });
   });
   useHotkeys("alt+s", (e) => {
-    toast.error("[align bottom] is not implemented yet");
+    align("selection", {
+      vertical: "max",
+    });
+  });
+
+  useHotkeys("alt+v", (e) => {
+    align("selection", {
+      vertical: "center",
+    });
+  });
+  useHotkeys("alt+h", (e) => {
+    align("selection", {
+      horizontal: "center",
+    });
   });
 
   useHotkeys("shift+a", (e) => {

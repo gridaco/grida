@@ -136,4 +136,114 @@ describe("cmath.rect", () => {
       );
     });
   });
+
+  describe("align", () => {
+    it("should align rectangles to the left", () => {
+      const rectangles: cmath.Rectangle[] = [
+        { x: 10, y: 10, width: 30, height: 40 },
+        { x: 50, y: 20, width: 20, height: 30 },
+      ];
+
+      const aligned = cmath.rect.align(rectangles, { horizontal: "min" });
+      expect(aligned).toEqual([
+        { x: 10, y: 10, width: 30, height: 40 },
+        { x: 10, y: 20, width: 20, height: 30 },
+      ]);
+    });
+
+    it("should align rectangles to the right", () => {
+      const rectangles: cmath.Rectangle[] = [
+        { x: 10, y: 10, width: 30, height: 40 },
+        { x: 50, y: 20, width: 20, height: 30 },
+      ];
+
+      const aligned = cmath.rect.align(rectangles, { horizontal: "max" });
+      expect(aligned).toEqual([
+        { x: 40, y: 10, width: 30, height: 40 },
+        { x: 50, y: 20, width: 20, height: 30 },
+      ]);
+    });
+
+    it("should align rectangles to the top", () => {
+      const rectangles: cmath.Rectangle[] = [
+        { x: 10, y: 10, width: 30, height: 40 },
+        { x: 50, y: 20, width: 20, height: 30 },
+      ];
+
+      const aligned = cmath.rect.align(rectangles, { vertical: "min" });
+      expect(aligned).toEqual([
+        { x: 10, y: 10, width: 30, height: 40 },
+        { x: 50, y: 10, width: 20, height: 30 },
+      ]);
+    });
+
+    it("should align rectangles to the bottom", () => {
+      const rectangles: cmath.Rectangle[] = [
+        { x: 10, y: 10, width: 30, height: 40 },
+        { x: 50, y: 20, width: 20, height: 30 },
+      ];
+
+      const aligned = cmath.rect.align(rectangles, { vertical: "max" });
+      expect(aligned).toEqual([
+        //
+        { x: 10, y: 10, width: 30, height: 40 },
+        { x: 50, y: 20, width: 20, height: 30 },
+      ]);
+    });
+
+    it("should center rectangles horizontally", () => {
+      const rectangles: cmath.Rectangle[] = [
+        { x: 10, y: 10, width: 30, height: 40 },
+        { x: 50, y: 20, width: 20, height: 30 },
+      ];
+
+      const aligned = cmath.rect.align(rectangles, { horizontal: "center" });
+      expect(aligned).toEqual([
+        { x: 25, y: 10, width: 30, height: 40 },
+        { x: 30, y: 20, width: 20, height: 30 },
+      ]);
+    });
+
+    it("should center rectangles vertically", () => {
+      const rectangles: cmath.Rectangle[] = [
+        { x: 10, y: 10, width: 30, height: 40 },
+        { x: 50, y: 20, width: 20, height: 30 },
+      ];
+
+      const aligned = cmath.rect.align(rectangles, { vertical: "center" });
+      expect(aligned).toEqual([
+        { x: 10, y: 10, width: 30, height: 40 },
+        { x: 50, y: 15, width: 20, height: 30 },
+      ]);
+    });
+
+    it("should align rectangles both horizontally and vertically", () => {
+      const rectangles: cmath.Rectangle[] = [
+        { x: 10, y: 10, width: 30, height: 40 },
+        { x: 50, y: 20, width: 20, height: 30 },
+      ];
+
+      const aligned = cmath.rect.align(rectangles, {
+        horizontal: "center",
+        vertical: "center",
+      });
+      expect(aligned).toEqual([
+        { x: 25, y: 10, width: 30, height: 40 },
+        { x: 30, y: 15, width: 20, height: 30 },
+      ]);
+    });
+
+    it("should return the same rectangles for 'none' alignment", () => {
+      const rectangles: cmath.Rectangle[] = [
+        { x: 10, y: 10, width: 30, height: 40 },
+        { x: 50, y: 20, width: 20, height: 30 },
+      ];
+
+      const aligned = cmath.rect.align(rectangles, {
+        horizontal: "none",
+        vertical: "none",
+      });
+      expect(aligned).toEqual(rectangles);
+    });
+  });
 });

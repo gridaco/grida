@@ -27,6 +27,8 @@ import {
   self_insertNode,
   self_selectNode,
 } from "./methods";
+import { cmath } from "../math";
+import { domapi } from "../domapi";
 
 export default function documentReducer<S extends IDocumentEditorState>(
   state: S,
@@ -115,6 +117,46 @@ export default function documentReducer<S extends IDocumentEditorState>(
           });
         }
       });
+    }
+    case "align": {
+      const {
+        target,
+        alignment: { horizontal, vertical },
+      } = action;
+
+      const target_node_ids =
+        target === "selection" ? state.selected_node_ids : [target];
+
+      const rects = target_node_ids.map((node_id) =>
+        // FIXME: do not use domapi in reducer
+        domapi.get_node_element(node_id)!.getBoundingClientRect()
+      );
+
+      //
+      const transformed = cmath.rect.align(rects, { horizontal, vertical });
+      const deltas = transformed.map((rect, i) => {
+        const target_rect = rects[i];
+        const dx = rect.x - target_rect.x;
+        const dy = rect.y - target_rect.y;
+
+        return { dx, dy };
+      });
+
+      return produce(state, (draft) => {
+        let i = 0;
+        for (const node_id of target_node_ids) {
+          const node = documentquery.__getNodeById(state, node_id);
+          const moved = nodeTransformReducer(node, {
+            type: "move",
+            dx: deltas[i].dx,
+            dy: deltas[i].dy,
+          });
+          draft.document.nodes[node_id] = moved;
+          i++;
+        }
+      });
+
+      break;
     }
     case "document/insert": {
       const { prototype } = action;

@@ -876,6 +876,23 @@ export function useDocument() {
     [dispatch]
   );
 
+  const align = useCallback(
+    (
+      target: "selection" | (string & {}) = "selection",
+      alignment: {
+        horizontal?: "none" | "min" | "max" | "center";
+        vertical?: "none" | "min" | "max" | "center";
+      }
+    ) => {
+      dispatch({
+        type: "align",
+        target,
+        alignment,
+      });
+    },
+    [dispatch]
+  );
+
   const configureSurfaceRaycastTargeting = useCallback(
     (config: Partial<SurfaceRaycastTargeting>) => {
       dispatch({
@@ -1033,6 +1050,7 @@ export function useDocument() {
       paste,
       deleteNode,
       nudge,
+      align,
       configureSurfaceRaycastTargeting,
       //
       clearSelection,
@@ -1055,6 +1073,7 @@ export function useDocument() {
     paste,
     deleteNode,
     nudge,
+    align,
     configureSurfaceRaycastTargeting,
     //
     clearSelection,
