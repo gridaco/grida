@@ -95,6 +95,12 @@ export interface IDocumentEditorInteractionCursorState {
    */
   surface_raycast_targeting: SurfaceRaycastTargeting;
 
+  //
+  // TODO:
+  // translate (move) axis lock
+  // user can configure the axis lock mode (turn this on when shift key is pressed, the node will move only in x or y axis)
+  //
+
   /**
    * @private - internal use only
    *

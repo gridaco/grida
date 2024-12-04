@@ -126,8 +126,25 @@ export default function documentReducer<S extends IDocumentEditorState>(
 
       const target_node_ids =
         target === "selection" ? state.selected_node_ids : [target];
+      const bounding_node_ids = Array.from(target_node_ids);
 
-      const rects = target_node_ids.map((node_id) =>
+      if (target_node_ids.length === 1) {
+        // if a single node is selected, align it with its container. (if not root)
+        // TODO: Knwon issue: this does not work accurately if the node overflows the container
+        const node_id = target_node_ids[0];
+        if (state.document.root_id !== node_id) {
+          // get container (parent)
+          const parent_node_id = documentquery.getParentId(
+            state.document_ctx,
+            node_id
+          );
+          assert(parent_node_id, "parent node not found");
+          bounding_node_ids.push(parent_node_id);
+        }
+        //
+      }
+
+      const rects = bounding_node_ids.map((node_id) =>
         // FIXME: do not use domapi in reducer
         domapi.get_node_element(node_id)!.getBoundingClientRect()
       );
@@ -144,7 +161,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
 
       return produce(state, (draft) => {
         let i = 0;
-        for (const node_id of target_node_ids) {
+        for (const node_id of bounding_node_ids) {
           const node = documentquery.__getNodeById(state, node_id);
           const moved = nodeTransformReducer(node, {
             type: "move",

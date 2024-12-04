@@ -121,7 +121,7 @@ export function useEditorHotKeys() {
     }
   );
 
-  useHotkeys("a, f", () => {
+  useHotkeys("v", () => {
     setCursorMode({ type: "cursor" });
   });
 

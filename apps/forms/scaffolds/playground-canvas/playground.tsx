@@ -355,7 +355,7 @@ export default function CanvasPlayground() {
                 <PlaygroundToolbar onAddButtonClick={insertDialog.openDialog} />
               </div>
               <div className="fixed bottom-20 left-10 flex items-center justify-center z-50 pointer-events-none">
-                {/* <KeyboardInputOverlay /> */}
+                <KeyboardInputOverlay />
               </div>
               <DevtoolsPanel />
             </div>
@@ -392,12 +392,12 @@ export default function CanvasPlayground() {
 
 function AlignNodes() {
   const { state, align } = useDocument();
-  const is_multiple_selection = state.selected_node_ids.length > 1;
+  const has_selection = state.selected_node_ids.length >= 1;
 
   return (
     <SidebarSection className="mt-2">
       <AlignControl
-        disabled={!is_multiple_selection}
+        disabled={!has_selection}
         onAlign={(alignment) => {
           align("selection", alignment);
         }}
