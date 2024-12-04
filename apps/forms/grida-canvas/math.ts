@@ -1,7 +1,27 @@
+import assert from "assert";
+
 /**
  * A canvas math module.
  */
 export namespace cmath {
+  /**
+   * Represents a single numerical value, often referred to as a scalar in mathematics and computer science.
+   *
+   * Scalars are used to denote quantities without direction, such as magnitude, intensity, or single-dimensional values.
+   * They are fundamental in computations involving vectors, matrices, and transformations.
+   *
+   * @typedef Scalar
+   *
+   * @example
+   * // A scalar value representing magnitude
+   * const magnitude: cmath.Scalar = 5;
+   *
+   * @remarks
+   * Scalars are essential for defining operations on higher-dimensional objects, such as scaling vectors or matrices.
+   * They are typically implemented as `number` in most programming contexts.
+   */
+  export type Scalar = number;
+
   /**
    * A 2-dimensional vector. (commonly used for positions, sizes, etc.)
    */
@@ -24,6 +44,40 @@ export namespace cmath {
      */
     height: number;
   };
+
+  /**
+   * Quantizes a value to the nearest multiple of a specified step.
+   *
+   * This function maps a continuous value to a discrete set of steps,
+   * making it useful for rounding, grid alignment, or discretization in
+   * mathematical and graphical computations.
+   *
+   * @param value - The value to quantize.
+   * @param step - The step size for quantization. Must be a positive number.
+   * @returns The quantized value, snapped to the nearest multiple of the step.
+   *
+   * @example
+   * // Quantize to the nearest multiple of 10
+   * cmath.quantize(15, 10); // Returns 20
+   *
+   * // Quantize to a decimal step size
+   * cmath.quantize(0.1123, 0.1); // Returns 0.1
+   *
+   * // Quantize to a finer step
+   * cmath.quantize(7.35, 0.25); // Returns 7.25
+   */
+  export function quantize(value: Scalar, step: number): Scalar {
+    if (step <= 0) {
+      throw new Error("Step size must be a positive number.");
+    }
+    // Invert step size to normalize the value.
+    // This scaling ensures that 'value' is effectively measured in units of 'step'.
+    // By multiplying 'value' by 'factor', we transform the range so that the rounding operation
+    // works on a normalized integer-like scale (avoiding issues with small or fractional steps).
+    // This is critical for consistent behavior when 'step' is a fractional value like 0.1 or 0.01.
+    const factor = 1 / step;
+    return Math.round(value * factor) / factor;
+  }
 }
 
 /**
@@ -280,5 +334,74 @@ export namespace cmath.rect {
       width: maxX - minX,
       height: maxY - minY,
     };
+  }
+}
+
+/**
+ * Math utilities for "snapping" features.
+ *
+ * @example
+ * - snap to pixel grid - snap by `1`
+ * - snap to objects
+ */
+export namespace cmath.snap {
+  /**
+   * Snaps a scalar value to the nearest value in an array of scalars if it is within a specified threshold.
+   *
+   * @param point - The scalar value to snap.
+   * @param targets - An array of existing scalar values to snap to.
+   * @param threshold - The maximum allowed distance for snapping.
+   * @returns The snapped scalar if within the threshold; otherwise, the original scalar.
+   */
+  export function scalar(
+    point: Scalar,
+    targets: Scalar[],
+    threshold: number
+  ): Scalar {
+    assert(threshold >= 0, "Threshold must be a non-negative number.");
+    if (targets.length === 0) return point;
+
+    let closestScalar: number | null = null;
+    let minDistance = Infinity;
+
+    for (const s of targets) {
+      const distance = Math.abs(point - s);
+
+      if (distance <= threshold && distance < minDistance) {
+        minDistance = distance;
+        closestScalar = s;
+      }
+    }
+
+    return closestScalar ?? point;
+  }
+
+  /**
+   * Snaps a point to the nearest existing point if its x and y distances
+   * are within the specified threshold for each axis.
+   *
+   * @param point - The point to snap.
+   * @param targers - An array of existing points to snap to.
+   * @param threshold - The maximum allowed single-axis distance for snapping.
+   * @returns The snapped point if both x and y are within the threshold; otherwise, the original point.
+   */
+  export function vector2(
+    point: Vector2,
+    targets: Vector2[],
+    threshold: Vector2
+  ): Vector2 {
+    if (targets.length === 0) return point;
+    assert(threshold[0] >= 0, "Threshold must be a non-negative number.");
+    assert(threshold[1] >= 0, "Threshold must be a non-negative number.");
+
+    // Extract x and y components from all target points
+    const targetXs = targets.map(([x]) => x);
+    const targetYs = targets.map(([_, y]) => y);
+
+    // Snap x and y individually using scalar snapping
+    const snappedX = scalar(point[0], targetXs, threshold[0]);
+    const snappedY = scalar(point[1], targetYs, threshold[1]);
+
+    return [snappedX, snappedY];
   }
 }
