@@ -115,11 +115,28 @@ interface IHtmlBackendCanvasEventTargetPointerEvent {
   shiftKey: boolean;
 }
 
-interface ICanvasEventTargetPointerEvent {
-  event: {
-    delta: Vector2;
-    distance: Vector2;
-  };
+export type TCanvasEventTargetDragGestureState = {
+  /**
+   * Difference between the current movement and the previous movement.
+   */
+  delta: Vector2;
+  /**
+   * Cumulative distance of the gesture. Deltas are summed with their absolute
+   * values.
+   */
+  distance: Vector2;
+  /**
+   * Displacement of the current gesture.
+   */
+  movement: Vector2;
+  /**
+   * Raw values when the gesture started.
+   */
+  initial: Vector2;
+};
+
+interface ICanvasEventTargetDragEvent {
+  event: TCanvasEventTargetDragGestureState;
 }
 
 // #region surface action
@@ -200,10 +217,13 @@ export type EditorSurface_Click = {
 
 export type EditorSurface_DragStart = {
   type: "document/canvas/backend/html/event/on-drag-start";
+  /**
+   * @deprecated
+   */
   shiftKey: boolean;
 };
 
-export type EditorSurface_Drag = ICanvasEventTargetPointerEvent & {
+export type EditorSurface_Drag = ICanvasEventTargetDragEvent & {
   type: "document/canvas/backend/html/event/on-drag";
 };
 
@@ -250,17 +270,17 @@ export type EditorSurface_NodeOverlay_Click = ISelection &
   };
 
 export type EditorSurface_NodeOverlay_DragStart = ISelection &
-  ICanvasEventTargetPointerEvent & {
+  ICanvasEventTargetDragEvent & {
     type: "document/canvas/backend/html/event/node-overlay/on-drag-start";
   };
 
 export type EditorSurface_NodeOverlay_DragEnd = ISelection &
-  ICanvasEventTargetPointerEvent & {
+  ICanvasEventTargetDragEvent & {
     type: "document/canvas/backend/html/event/node-overlay/on-drag-end";
   };
 
 export type EditorSurface_NodeOverlay_Drag = ISelection &
-  ICanvasEventTargetPointerEvent & {
+  ICanvasEventTargetDragEvent & {
     type: "document/canvas/backend/html/event/node-overlay/on-drag";
   };
 
@@ -274,7 +294,7 @@ export type EditorSurface_NodeOverlayResizeHandle_DragEnd = INodeID & {
 };
 
 export type EditorSurface_NodeOverlayResizeHandle_Drag = INodeID &
-  ICanvasEventTargetPointerEvent &
+  ICanvasEventTargetDragEvent &
   ICanvasEventTargetResizeHandleEvent & {
     type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag";
   };
@@ -289,7 +309,7 @@ export type EditorSurface_NodeOverlayCornerRadiusHandle_DragEnd = INodeID & {
 };
 
 export type EditorSurface_NodeOverlayCornerRadiusHandle_Drag = INodeID &
-  ICanvasEventTargetPointerEvent &
+  ICanvasEventTargetDragEvent &
   ICanvasEventTargetResizeHandleEvent & {
     type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag";
   };
@@ -304,7 +324,7 @@ export type EditorSurface_NodeOverlayRotationHandle_DragEnd = INodeID & {
 };
 
 export type EditorSurface_NodeOverlayRotationHandle_Drag = INodeID &
-  ICanvasEventTargetPointerEvent &
+  ICanvasEventTargetDragEvent &
   ICanvasEventTargetResizeHandleEvent & {
     type: "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag";
   };

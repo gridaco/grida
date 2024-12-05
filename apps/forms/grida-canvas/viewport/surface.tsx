@@ -93,8 +93,12 @@ export function EditorSurface() {
       },
       onDrag: (e) => {
         if (e.event.defaultPrevented) return;
-        // console.log("drag", e.delta, e.distance);
-        drag({ delta: e.delta, distance: e.distance });
+        drag({
+          delta: e.delta,
+          distance: e.distance,
+          movement: e.movement,
+          initial: e.initial,
+        });
       },
     },
     {
@@ -351,6 +355,8 @@ function NodeOverlayCornerRadiusHandle({
         dragCornerRadiusHandle(node_id, anchor, {
           delta: e.delta,
           distance: e.distance,
+          movement: e.movement,
+          initial: e.initial,
         });
       },
     },
@@ -417,6 +423,8 @@ function LayerOverlayRotationHandle({
         dragRotationHandle(node_id, anchor, {
           delta: e.delta,
           distance: e.distance,
+          movement: e.movement,
+          initial: e.initial,
         });
       },
     },
@@ -486,6 +494,8 @@ function LayerOverlayResizeHandle({
         dragResizeHandle(node_id, anchor, {
           delta: e.delta,
           distance: e.distance,
+          movement: e.movement,
+          initial: e.initial,
         });
       },
     },

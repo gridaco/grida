@@ -28,6 +28,7 @@ import { documentquery } from "./document-query";
 import { GoogleFontsManager } from "./components/google-fonts";
 import { domapi } from "./domapi";
 import { cmath } from "./math";
+import { TCanvasEventTargetDragGestureState } from "./action";
 
 type Vector2 = [number, number];
 
@@ -1309,7 +1310,7 @@ export function useEventTarget() {
   );
 
   const drag = useCallback(
-    (event: { delta: Vector2; distance: Vector2 }) => {
+    (event: TCanvasEventTargetDragGestureState) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "document/canvas/backend/html/event/on-drag",
@@ -1338,7 +1339,7 @@ export function useEventTarget() {
     [dispatch]
   );
   const layerDragStart = useCallback(
-    (selection: string[], event: { delta: Vector2; distance: Vector2 }) => {
+    (selection: string[], event: TCanvasEventTargetDragGestureState) => {
       dispatch({
         type: "document/canvas/backend/html/event/node-overlay/on-drag-start",
         selection,
@@ -1348,7 +1349,7 @@ export function useEventTarget() {
     [dispatch]
   );
   const layerDragEnd = useCallback(
-    (selection: string[], event: { delta: Vector2; distance: Vector2 }) => {
+    (selection: string[], event: TCanvasEventTargetDragGestureState) => {
       dispatch({
         type: "document/canvas/backend/html/event/node-overlay/on-drag-end",
         selection,
@@ -1358,7 +1359,7 @@ export function useEventTarget() {
     [dispatch]
   );
   const layerDrag = useCallback(
-    (selection: string[], event: { delta: Vector2; distance: Vector2 }) => {
+    (selection: string[], event: TCanvasEventTargetDragGestureState) => {
       dispatch({
         type: "document/canvas/backend/html/event/node-overlay/on-drag",
         selection,
@@ -1393,7 +1394,7 @@ export function useEventTarget() {
     (
       node_id: string,
       anchor: "nw" | "ne" | "sw" | "se",
-      event: { delta: Vector2; distance: Vector2 }
+      event: TCanvasEventTargetDragGestureState
     ) => {
       requestAnimationFrame(() => {
         dispatch({
@@ -1431,7 +1432,7 @@ export function useEventTarget() {
     (
       node_id: string,
       anchor: "nw" | "ne" | "sw" | "se",
-      event: { delta: Vector2; distance: Vector2 }
+      event: TCanvasEventTargetDragGestureState
     ) => {
       requestAnimationFrame(() => {
         dispatch({
@@ -1469,7 +1470,7 @@ export function useEventTarget() {
     (
       node_id: string,
       anchor: "nw" | "ne" | "sw" | "se",
-      event: { delta: Vector2; distance: Vector2 }
+      event: TCanvasEventTargetDragGestureState
     ) => {
       requestAnimationFrame(() => {
         dispatch({
