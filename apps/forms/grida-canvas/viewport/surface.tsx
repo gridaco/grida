@@ -1,9 +1,14 @@
 "use client";
 
-import React, { useContext, useEffect, useRef } from "react";
+import React, { useContext, useEffect, useRef, useState } from "react";
 import { useEventTarget } from "@/grida-canvas";
 import { useGesture } from "@use-gesture/react";
-import { useEventTargetCSSCursor, useNode, useNodeAction } from "../provider";
+import {
+  useDocument,
+  useEventTargetCSSCursor,
+  useNode,
+  useNodeAction,
+} from "../provider";
 import { RotationCursorIcon } from "../components/cursor";
 import { grida } from "@/grida";
 import { useIsWindowResizing } from "./hooks/window-resizing";
@@ -16,6 +21,8 @@ import {
   useGroupSurfaceTransform,
   useNodeSurfaceTransfrom,
 } from "./hooks/transform";
+import { cmath } from "../math";
+import { useSnapGuide } from "./hooks/snap";
 
 export function EditorSurface() {
   const isWindowResizing = useIsWindowResizing();
@@ -104,10 +111,9 @@ export function EditorSurface() {
 
   return (
     <div
-      data-transforming={is_node_transforming || isWindowResizing}
       {...bind()}
       tabIndex={0}
-      className="absolute inset-0 pointer-events-auto will-change-transform z-50 opacity-100 data-[transforming='true']:opacity-0 transition-colors "
+      className="absolute inset-0 pointer-events-auto will-change-transform z-50"
       style={{
         userSelect: "none",
         touchAction: "none",
@@ -115,25 +121,36 @@ export function EditorSurface() {
         cursor: cursor,
       }}
     >
-      {content_edit_mode === "text" && selected_node_ids.length === 1 && (
-        <SurfaceTextEditor node_id={selected_node_ids[0]} />
-      )}
-      <div className="w-full h-full" id="canvas-overlay-portal" ref={ref}>
-        <SelectionOverlay selection={selected_node_ids} readonly={false} />
-        {!marquee &&
-          hovered_node_id &&
-          !selected_node_ids.includes(hovered_node_id) && (
-            <NodeOverlay node_id={hovered_node_id} readonly />
-          )}
-        <div id="marquee-container" className="absolute top-0 left-0 w-0 h-0">
-          {marquee && (
-            <Marquee
-              x1={marquee.x1}
-              y1={marquee.y1}
-              x2={marquee.x2}
-              y2={marquee.y2}
-            />
-          )}
+      <div
+        data-transforming={is_node_transforming || isWindowResizing}
+        className="opacity-0 data-[transforming='true']:opacity-100 transition-colors"
+      >
+        <SnapGuide />
+      </div>
+      <div
+        data-transforming={is_node_transforming || isWindowResizing}
+        className="opacity-100 data-[transforming='true']:opacity-0 transition-colors"
+      >
+        {content_edit_mode === "text" && selected_node_ids.length === 1 && (
+          <SurfaceTextEditor node_id={selected_node_ids[0]} />
+        )}
+        <div className="w-full h-full" id="canvas-overlay-portal" ref={ref}>
+          <SelectionOverlay selection={selected_node_ids} readonly={false} />
+          {!marquee &&
+            hovered_node_id &&
+            !selected_node_ids.includes(hovered_node_id) && (
+              <NodeOverlay node_id={hovered_node_id} readonly />
+            )}
+          <div id="marquee-container" className="absolute top-0 left-0 w-0 h-0">
+            {marquee && (
+              <Marquee
+                x1={marquee.x1}
+                y1={marquee.y1}
+                x2={marquee.x2}
+                y2={marquee.y2}
+              />
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -573,5 +590,108 @@ function SurfaceTextEditor({ node_id }: { node_id: string }) {
         />
       </div>
     </div>
+  );
+}
+
+function SnapGuide() {
+  const guide = useSnapGuide();
+
+  if (!guide) return <></>;
+
+  return (
+    <div className="">
+      {/* <pre className="absolute bottom-0 left-0 text-xs bg-foreground text-background z-50">
+        {JSON.stringify({ snaps: snap }, null, 2)}
+      </pre> */}
+      {guide.x?.map((snap, i) => (
+        <React.Fragment key={i}>
+          <div
+            style={{
+              position: "absolute",
+              left: snap.left,
+              top: snap.top,
+              transform: "translate(-50%, -50%)",
+              // background: "red",
+            }}
+          >
+            <Crosshair />
+          </div>
+          <Rule axis="y" offset={snap.left} />
+        </React.Fragment>
+      ))}
+      {guide.y?.map((snap, i) => (
+        <React.Fragment key={i}>
+          <div
+            style={{
+              position: "absolute",
+              left: snap.left,
+              top: snap.top,
+              transform: "translate(-50%, -50%)",
+              // background: "red",
+            }}
+          >
+            <Crosshair />
+          </div>
+          <Rule axis="x" offset={snap.top} />
+        </React.Fragment>
+      ))}
+    </div>
+  );
+}
+
+function Crosshair() {
+  return (
+    <div style={{ position: "relative", width: 5, height: 5 }}>
+      {/* Diagonal line from top-left to bottom-right */}
+      <div
+        style={{
+          position: "absolute",
+          width: "100%",
+          height: 0.5,
+          backgroundColor: "red",
+          transform: "rotate(45deg)",
+          top: "50%",
+          left: "0",
+          transformOrigin: "center",
+        }}
+      />
+
+      {/* Diagonal line from top-right to bottom-left */}
+      <div
+        style={{
+          position: "absolute",
+          width: "100%",
+          height: 0.5,
+          backgroundColor: "red",
+          transform: "rotate(-45deg)",
+          top: "50%",
+          left: "0",
+          transformOrigin: "center",
+        }}
+      />
+    </div>
+  );
+}
+
+function Rule({
+  axis,
+  offset,
+  width = 0.1,
+}: {
+  axis: "x" | "y";
+  offset: number;
+  width?: number;
+}) {
+  return (
+    <div
+      style={{
+        position: "absolute",
+        transform:
+          axis === "x" ? `translateY(${offset}px)` : `translateX(${offset}px)`,
+        width: axis === "x" ? "100%" : width,
+        height: axis === "y" ? "100%" : width,
+        background: "red",
+      }}
+    />
   );
 }
