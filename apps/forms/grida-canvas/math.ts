@@ -95,28 +95,37 @@ export namespace cmath.vector2 {
 
 export namespace cmath.rect {
   /**
-   * Creates a rectangle from two points `[x1, y1]` and `[x2, y2]`.
+   * Creates a rectangle that fully bounds the given points.
    *
-   * This function ensures the resulting rectangle has positive width and height,
-   * regardless of the order of the input points.
+   * This function computes the minimum bounding rectangle that encloses all the input points.
+   * At least 2 points are required.
    *
-   * @param points - A tuple of two points: `[x1, y1]` and `[x2, y2]`.
+   * @param points - An array of points (at least 2) to calculate the bounding rectangle.
    * @returns A rectangle with `x`, `y`, `width`, and `height`.
    *
    * @example
-   * const rect = cmath.rect.fromPoints([[10, 20], [30, 40]]);
+   * const rect = cmath.rect.fromPoints([[10, 20], [30, 40], [15, 25]]);
    * console.log(rect); // { x: 10, y: 20, width: 20, height: 20 }
    */
-  export function fromPoints(
-    points: [cmath.Vector2, cmath.Vector2]
-  ): Rectangle {
-    const [p1, p2] = points;
+  export function fromPoints(points: cmath.Vector2[]): cmath.Rectangle {
+    if (points.length < 2) {
+      throw new Error(
+        "At least two points are required to compute a bounding rectangle."
+      );
+    }
 
     // Calculate min and max for x and y
-    const minX = Math.min(p1[0], p2[0]);
-    const minY = Math.min(p1[1], p2[1]);
-    const maxX = Math.max(p1[0], p2[0]);
-    const maxY = Math.max(p1[1], p2[1]);
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
+    for (const [x, y] of points) {
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      if (x > maxX) maxX = x;
+      if (y > maxY) maxY = y;
+    }
 
     // Return normalized rectangle
     return {
@@ -124,6 +133,56 @@ export namespace cmath.rect {
       y: minY,
       width: maxX - minX,
       height: maxY - minY,
+    };
+  }
+
+  /**
+   * Returns an object containing 9 control points of a rectangle: 4 corners, 4 midpoints, and the center.
+   *
+   * @param rect - The rectangle to compute points from.
+   * @returns An object with properties for each control point.
+   *
+   * @example
+   * const rect = { x: 10, y: 20, width: 30, height: 40 };
+   * const points = cmath.rect.toPoints(rect);
+   * console.log(points);
+   * // Outputs:
+   * // {
+   * //   topLeft: [10, 20],
+   * //   topRight: [40, 20],
+   * //   bottomLeft: [10, 60],
+   * //   bottomRight: [40, 60],
+   * //   topCenter: [25, 20],
+   * //   leftCenter: [10, 40],
+   * //   rightCenter: [40, 40],
+   * //   bottomCenter: [25, 60],
+   * //   center: [25, 40],
+   * // }
+   */
+  export function toPoints(rect: Rectangle): {
+    topLeft: Vector2;
+    topRight: Vector2;
+    bottomLeft: Vector2;
+    bottomRight: Vector2;
+    topCenter: Vector2;
+    leftCenter: Vector2;
+    rightCenter: Vector2;
+    bottomCenter: Vector2;
+    center: Vector2;
+  } {
+    const { x, y, width, height } = rect;
+
+    // Compute the points
+    return {
+      topLeft: [x, y],
+      topRight: [x + width, y],
+      bottomLeft: [x, y + height],
+      bottomRight: [x + width, y + height],
+      topCenter: [x + width / 2, y],
+      leftCenter: [x, y + height / 2],
+      rightCenter: [x + width, y + height / 2],
+      bottomCenter: [x + width / 2, y + height],
+      center: [x + width / 2, y + height / 2],
     };
   }
 
@@ -348,60 +407,176 @@ export namespace cmath.snap {
   /**
    * Snaps a scalar value to the nearest value in an array of scalars if it is within a specified threshold.
    *
+   * This function is useful for aligning scalar values (e.g., positions, sizes, or grid snapping) to a discrete set of
+   * target values while ensuring the snap occurs only within a defined threshold.
+   *
    * @param point - The scalar value to snap.
    * @param targets - An array of existing scalar values to snap to.
-   * @param threshold - The maximum allowed distance for snapping.
-   * @returns The snapped scalar if within the threshold; otherwise, the original scalar.
+   * @param threshold - The maximum allowed distance for snapping. Must be non-negative.
+   *
+   * @returns A tuple `[value, distance, indicies]`:
+   * - `value`: The closest scalar value from the targets within the threshold, or the original scalar if no snapping occurs.
+   * - `distance`: The signed distance between the input scalar and the snapped target. Returns `Infinity` if no target is within the threshold.
+   * - `indicies`: An array of indices of the targets that are within the threshold.
+   *
+   * @example
+   * // Snap to the nearest value within a threshold
+   * const [snapped, distance, indicies] = cmath.snap.scalar(15, [10, 20, 25], 6);
+   * console.log(snapped); // 10
+   * console.log(distance); // 5
+   * console.log(indicies); // [0]
+   *
+   * // No snapping occurs as no target is within the threshold
+   * const [snapped, distance, indicies] = cmath.snap.scalar(15, [1, 2, 3], 5);
+   * console.log(snapped); // 15
+   * console.log(distance); // Infinity
+   * console.log(indicies); // []
+   *
+   * // Snap to an exact match if it exists in the targets
+   * const [snapped, distance, indicies] = cmath.snap.scalar(15, [10, 15, 20], 5);
+   * console.log(snapped); // 15
+   * console.log(distance); // 0
+   * console.log(indicies); // [1]
+   *
+   * @remarks
+   * - The `distance` value is signed, indicating the direction of the difference between the input scalar and the snapped value.
+   * - If `targets` is empty, the function returns the original scalar and `Infinity` for the distance.
+   * - If `threshold` is 0, snapping will only occur for exact matches.
+   * - Negative threshold values are not allowed and will throw an error.
    */
   export function scalar(
     point: Scalar,
     targets: Scalar[],
     threshold: number
-  ): Scalar {
+  ): [value: Scalar, distance: number, indicies: number[]] {
     assert(threshold >= 0, "Threshold must be a non-negative number.");
-    if (targets.length === 0) return point;
+    if (targets.length === 0) return [point, Infinity, []];
 
-    let closestScalar: number | null = null;
-    let minDistance = Infinity;
+    let nearest: cmath.Scalar | null = null;
+    let min_d = Infinity;
+    let signedDistance = 0;
+    const indicies: number[] = [];
 
-    for (const s of targets) {
-      const distance = Math.abs(point - s);
+    let i = 0;
+    for (const target of targets) {
+      const distance = point - target; // Signed distance
+      const absDistance = Math.abs(distance); // Absolute distance for comparison
 
-      if (distance <= threshold && distance < minDistance) {
-        minDistance = distance;
-        closestScalar = s;
+      if (absDistance <= threshold) {
+        indicies.push(i);
+        if (absDistance < min_d) {
+          min_d = absDistance;
+          nearest = target;
+          signedDistance = distance; // Keep the signed distance
+        }
       }
+      i++;
     }
 
-    return closestScalar ?? point;
+    return nearest !== null
+      ? [nearest, signedDistance, indicies]
+      : [point, Infinity, indicies];
   }
 
   /**
-   * Snaps a point to the nearest existing point if its x and y distances
-   * are within the specified threshold for each axis.
+   * Snaps an array of points to the nearest target point while maintaining relative positions.
+   * The entire set of points is translated to align with the nearest target.
    *
-   * @param point - The point to snap.
-   * @param targers - An array of existing points to snap to.
+   * @param points - An array of 2D points (Vector2) to snap.
+   * @param targets - An array of existing 2D points to snap to.
    * @param threshold - The maximum allowed single-axis distance for snapping.
-   * @returns The snapped point if both x and y are within the threshold; otherwise, the original point.
+   * @returns The snapped points and the translation applied:
+   *          - `value`: The translated points.
+   *          - `distance`: The distance vector to the nearest target.
    */
-  export function vector2(
-    point: Vector2,
+  /**
+   * Snaps an array of points to the nearest target point along each axis independently.
+   * The snapping delta is computed for each axis separately and applied to all points.
+   *
+   * @param points - An array of 2D points (Vector2) to snap.
+   * @param targets - An array of existing 2D points to snap to.
+   * @param threshold - The maximum allowed single-axis distance for snapping.
+   * @returns The snapped points and the delta applied:
+   *          - `value`: The translated points.
+   *          - `distance`: The delta vector applied to align the points.
+   */
+  export function axisAligned(
+    points: Vector2[],
     targets: Vector2[],
     threshold: Vector2
-  ): Vector2 {
-    if (targets.length === 0) return point;
+  ): [
+    value: Vector2[],
+    distance: Vector2,
+    anchors: { x: Vector2[]; y: Vector2[] },
+  ] {
+    if (targets.length === 0) return [points, [0, 0], { x: [], y: [] }];
     assert(threshold[0] >= 0, "Threshold must be a non-negative number.");
     assert(threshold[1] >= 0, "Threshold must be a non-negative number.");
 
-    // Extract x and y components from all target points
+    // Separate target points into x and y components
     const targetXs = targets.map(([x]) => x);
     const targetYs = targets.map(([_, y]) => y);
 
-    // Snap x and y individually using scalar snapping
-    const snappedX = scalar(point[0], targetXs, threshold[0]);
-    const snappedY = scalar(point[1], targetYs, threshold[1]);
+    // Initialize variables to store anchors and deltas
+    const xAnchors: Vector2[] = [];
+    const yAnchors: Vector2[] = [];
+    let minDeltaX = Infinity;
+    let minDeltaY = Infinity;
+    let signedDeltaX = 0;
+    let signedDeltaY = 0;
 
-    return [snappedX, snappedY];
+    // Find the closest snapping target and determine anchors for X and Y axes
+    for (const point of points) {
+      // Find the closest snapping target for X-axis
+      const [snapX, deltaX] = cmath.snap.scalar(
+        point[0],
+        targetXs,
+        threshold[0]
+      );
+      const signedDeltaForX = snapX - point[0];
+
+      if (Math.abs(deltaX) <= threshold[0]) {
+        if (minDeltaX === Infinity || signedDeltaForX === signedDeltaX) {
+          xAnchors.push(point); // Add points with identical deltas
+          minDeltaX = deltaX; // Keep track of the smallest delta
+          signedDeltaX = signedDeltaForX; // Track the snapping translation
+        }
+      }
+
+      // Find the closest snapping target for Y-axis
+      const [snapY, deltaY] = cmath.snap.scalar(
+        point[1],
+        targetYs,
+        threshold[1]
+      );
+      const signedDeltaForY = snapY - point[1];
+
+      if (Math.abs(deltaY) <= threshold[1]) {
+        if (minDeltaY === Infinity || signedDeltaForY === signedDeltaY) {
+          yAnchors.push(point); // Add points with identical deltas
+          minDeltaY = deltaY; // Keep track of the smallest delta
+          signedDeltaY = signedDeltaForY; // Track the snapping translation
+        }
+      }
+    }
+
+    // If no snapping occurs, return original points
+    if (minDeltaX === Infinity && minDeltaY === Infinity) {
+      return [points, [0, 0], { x: [], y: [] }];
+    }
+
+    // Compute the final translation delta (signed values)
+    const delta: Vector2 = [
+      minDeltaX === Infinity ? 0 : signedDeltaX,
+      minDeltaY === Infinity ? 0 : signedDeltaY,
+    ];
+
+    // Apply translation to all points
+    const snappedPoints: Vector2[] = points.map(([x, y]) => [
+      x + delta[0],
+      y + delta[1],
+    ]);
+
+    return [snappedPoints, delta, { x: xAnchors, y: yAnchors }];
   }
 }
