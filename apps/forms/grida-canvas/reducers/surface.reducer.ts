@@ -211,45 +211,46 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
           draft.marquee!.y2 = draft.surface_cursor_position[1];
         });
       } else {
-        //
+        // [insertion mode - resize after insertion]
         if (state.is_gesture_node_drag_resize) {
-          // TODO: support multiple selection
-          // if (state.selected_node_ids.length !== 1) break;
-          // const node_id = state.selected_node_ids[0];
+          assert(state.selected_node_ids.length === 1);
+          const node_id = state.selected_node_ids[0];
 
           const [dx, dy] = delta;
           return produce(state, (draft) => {
-            state.selected_node_ids.forEach((node_id) => {
-              const node = documentquery.__getNodeById(draft, node_id);
+            const node = documentquery.__getNodeById(draft, node_id);
 
-              draft.document.nodes[node_id] = nodeTransformReducer(node, {
-                type: "resize",
-                anchor: "se",
-                dx: dx,
-                dy: dy,
-              });
+            draft.document.nodes[node_id] = nodeTransformReducer(node, {
+              type: "resize",
+              anchor: "se",
+              dx: dx,
+              dy: dy,
             });
           });
         }
 
         if (state.is_gesture_node_drag_move) {
-          // TODO: support multiple selection
+          // this is to handle "immediately drag move node"
+          // multiple selection dragging will be handled by node overlay drag event
           if (state.selected_node_ids.length !== 1) break;
-
-          const node_id = state.selected_node_ids[0];
-
-          const [dx, dy] = delta;
-
-          return produce(state, (draft) => {
-            const node = documentquery.__getNodeById(draft, node_id);
-            draft.document.nodes[node_id] = nodeTransformReducer(node, {
-              type: "move",
-              dx: dx,
-              dy: dy,
-            });
-            //
-          });
         }
+
+        // TODO: support multiple selection
+        if (state.selected_node_ids.length !== 1) break;
+
+        const node_id = state.selected_node_ids[0];
+
+        const [dx, dy] = delta;
+
+        return produce(state, (draft) => {
+          const node = documentquery.__getNodeById(draft, node_id);
+          draft.document.nodes[node_id] = nodeTransformReducer(node, {
+            type: "move",
+            dx: dx,
+            dy: dy,
+          });
+          //
+        });
       }
 
       break;
