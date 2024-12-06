@@ -149,6 +149,52 @@ export namespace documentquery {
     return ancestors;
   }
 
+  /**
+   * Retrieves all sibling nodes of a specified node.
+   *
+   * @param context - The runtime hierarchy context containing the mapping of node IDs to their parent IDs.
+   * @param node_id - The ID of the node for which siblings are to be retrieved.
+   * @returns An array of sibling node IDs that share the same parent as the specified node.
+   *          The array excludes the input node itself.
+   *
+   * @example
+   * // Example context
+   * const context = {
+   *   __ctx_nid_to_parent_id: {
+   *     "node1": null, // root node
+   *     "node2": "node1",
+   *     "node3": "node1",
+   *     "node4": "node2",
+   *   }
+   * };
+   *
+   * // Get siblings for "node3"
+   * const siblings = getSiblings(context, "node3");
+   * console.log(siblings); // ["node2"]
+   *
+   * // Get siblings for "node1" (root node)
+   * const siblings = getSiblings(context, "node1");
+   * console.log(siblings); // []
+   */
+  export function getSiblings(
+    context: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext,
+    node_id: string
+  ): NodeID[] {
+    const parent_id = getParentId(context, node_id);
+
+    if (!parent_id) {
+      // If the node has no parent, it is at the root level, and all nodes without parents are its "siblings."
+      return Object.keys(context.__ctx_nid_to_parent_id).filter(
+        (id) => context.__ctx_nid_to_parent_id[id] === null
+      );
+    }
+
+    // Filter all nodes that share the same parent but exclude the input node itself.
+    return Object.keys(context.__ctx_nid_to_parent_id).filter(
+      (id) => context.__ctx_nid_to_parent_id[id] === parent_id && id !== node_id
+    );
+  }
+
   export function getParentId(
     context: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext,
     node_id: string

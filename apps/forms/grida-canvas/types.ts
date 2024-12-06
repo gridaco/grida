@@ -1,5 +1,6 @@
 import type { BuilderAction } from "./action";
 import { grida } from "@/grida";
+import { cmath } from "./math";
 
 type Vector2 = [number, number];
 
@@ -50,7 +51,7 @@ export type SurfaceRaycastTargeting = {
 };
 
 export interface IDocumentEditorInteractionCursorState {
-  selected_node_ids: string[];
+  selection: string[];
   hovered_node_id?: string;
 
   /**
@@ -59,6 +60,8 @@ export interface IDocumentEditorInteractionCursorState {
    * is gesture node-move and should hide the overlay ui
    */
   is_gesture_node_drag_move?: boolean;
+
+  gesture_node_drag_move_initial_bounding_rect?: cmath.Rectangle;
 
   /**
    * @private - internal use only
@@ -190,7 +193,7 @@ export function initDocumentEditorState({
   const s = new DocumentState(init);
 
   return {
-    selected_node_ids: [],
+    selection: [],
     surface_cursor_position: [0, 0],
     cursor_position: [0, 0],
     document_ctx:

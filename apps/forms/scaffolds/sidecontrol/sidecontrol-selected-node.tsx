@@ -64,12 +64,12 @@ export function SelectedNodeProperties() {
 
   // - color - variables
   const {
-    selected_node_ids,
+    selection,
     document: { root_id },
   } = document;
 
-  assert(selected_node_ids.length === 1);
-  const node_id = selected_node_ids[0];
+  assert(selection.length === 1);
+  const node_id = selection[0];
 
   const node = useNode(node_id);
   const root = useNode(root_id);

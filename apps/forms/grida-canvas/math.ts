@@ -84,8 +84,10 @@ export namespace cmath {
  * Vector2 computations.
  */
 export namespace cmath.vector2 {
-  export function add(a: Vector2, b: Vector2): Vector2 {
-    return [a[0] + b[0], a[1] + b[1]];
+  export function add(...vectors: Vector2[]): Vector2 {
+    return vectors.reduce((acc, [x, y]) => [acc[0] + x, acc[1] + y], [
+      0, 0,
+    ] as Vector2);
   }
 
   export function subtract(a: Vector2, b: Vector2): Vector2 {
@@ -144,7 +146,7 @@ export namespace cmath.rect {
    *
    * @example
    * const rect = { x: 10, y: 20, width: 30, height: 40 };
-   * const points = cmath.rect.toPoints(rect);
+   * const points = cmath.rect.to9Points(rect);
    * console.log(points);
    * // Outputs:
    * // {
@@ -159,7 +161,7 @@ export namespace cmath.rect {
    * //   center: [25, 40],
    * // }
    */
-  export function toPoints(rect: Rectangle): {
+  export function to9Points(rect: Rectangle): {
     topLeft: Vector2;
     topRight: Vector2;
     bottomLeft: Vector2;
@@ -345,6 +347,15 @@ export namespace cmath.rect {
         y: newY,
       };
     });
+  }
+
+  export function translate(rect: Rectangle, t: Vector2): Rectangle {
+    return {
+      x: rect.x + t[0],
+      y: rect.y + t[1],
+      width: rect.width,
+      height: rect.height,
+    };
   }
 
   /**

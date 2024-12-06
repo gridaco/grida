@@ -33,6 +33,8 @@ import {
   self_updateSurfaceHoverState,
 } from "./methods";
 import { cmath } from "../math";
+import { domapi } from "../domapi";
+import { snapMovementToObjects } from "./tools/snap";
 
 export default function surfaceReducer<S extends IDocumentEditorState>(
   state: S,
@@ -124,7 +126,6 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
         // clear all trasform state
 
         draft.surface_content_edit_mode = false;
-        draft.is_gesture_node_drag_move = false;
         draft.is_gesture_node_drag_resize = false;
       });
     }
@@ -149,7 +150,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
                 y2: draft.surface_cursor_position[1],
               };
             } else {
-              if (draft.selected_node_ids.length === 0) {
+              if (draft.selection.length === 0) {
                 // marquee selection
                 draft.marquee = {
                   x1: draft.surface_cursor_position[0],
@@ -158,7 +159,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
                   y2: draft.surface_cursor_position[1],
                 };
               } else {
-                draft.is_gesture_node_drag_move = true;
+                self_dragStartSelection(draft);
               }
             }
             break;
@@ -183,7 +184,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
     case "document/canvas/backend/html/event/on-drag-end": {
       const { node_ids_from_area, shiftKey } = <EditorSurface_DragEnd>action;
       return produce(state, (draft) => {
-        draft.is_gesture_node_drag_move = false;
+        self_dragEndSelection(draft);
         draft.marquee = undefined;
         if (node_ids_from_area) {
           // except the root node & locked nodes
@@ -203,7 +204,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
     }
     case "document/canvas/backend/html/event/on-drag": {
       const {
-        event: { delta, distance },
+        event: { delta, movement },
       } = <EditorSurface_Drag>action;
       if (state.marquee) {
         return produce(state, (draft) => {
@@ -213,8 +214,8 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
       } else {
         // [insertion mode - resize after insertion]
         if (state.is_gesture_node_drag_resize) {
-          assert(state.selected_node_ids.length === 1);
-          const node_id = state.selected_node_ids[0];
+          assert(state.selection.length === 1);
+          const node_id = state.selection[0];
 
           const [dx, dy] = delta;
           return produce(state, (draft) => {
@@ -229,27 +230,9 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
           });
         }
 
-        if (state.is_gesture_node_drag_move) {
-          // this is to handle "immediately drag move node"
-          // multiple selection dragging will be handled by node overlay drag event
-          if (state.selected_node_ids.length !== 1) break;
-        }
-
-        // TODO: support multiple selection
-        if (state.selected_node_ids.length !== 1) break;
-
-        const node_id = state.selected_node_ids[0];
-
-        const [dx, dy] = delta;
-
         return produce(state, (draft) => {
-          const node = documentquery.__getNodeById(draft, node_id);
-          draft.document.nodes[node_id] = nodeTransformReducer(node, {
-            type: "move",
-            dx: dx,
-            dy: dy,
-          });
-          //
+          // this is to handle "immediately drag move node"
+          self_dragSelection(draft, movement);
         });
       }
 
@@ -280,32 +263,22 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
     case "document/canvas/backend/html/event/node-overlay/on-drag-start": {
       const { selection } = action;
       return produce(state, (draft) => {
-        draft.is_gesture_node_drag_move = true;
+        self_dragStartSelection(draft);
       });
     }
     case "document/canvas/backend/html/event/node-overlay/on-drag-end": {
       const { selection } = action;
       return produce(state, (draft) => {
-        draft.is_gesture_node_drag_move = false;
+        self_dragEndSelection(draft);
       });
     }
     case "document/canvas/backend/html/event/node-overlay/on-drag": {
       const { selection, event } = action;
-      const { delta, distance } = event;
-      const [dx, dy] = delta;
-      if (state.is_gesture_node_drag_move) {
-        return produce(state, (draft) => {
-          selection.forEach((node_id) => {
-            const node = documentquery.__getNodeById(draft, node_id);
-            draft.document.nodes[node_id] = nodeTransformReducer(node, {
-              type: "move",
-              dx: dx,
-              dy: dy,
-            });
-          });
-        });
-      }
-      break;
+      const { movement } = event;
+
+      return produce(state, (draft) => {
+        self_dragSelection(draft, movement);
+      });
     }
     // #endregion drag event
     // #region resize handle event
@@ -316,7 +289,6 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
       return produce(state, (draft) => {
         draft.surface_content_edit_mode = false;
         draft.is_gesture_node_drag_resize = true;
-        draft.is_gesture_node_drag_move = false;
         draft.hovered_node_id = undefined;
 
         const node = documentquery.__getNodeById(draft, node_id);
@@ -458,8 +430,8 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
 
     // #region [universal backend] canvas event target
     case "document/canvas/content-edit-mode/try-enter": {
-      if (state.selected_node_ids.length !== 1) break;
-      const node_id = state.selected_node_ids[0];
+      if (state.selection.length !== 1) break;
+      const node_id = state.selection[0];
       const node = documentquery.__getNodeById(state, node_id);
 
       // only text node can enter the content edit mode
@@ -488,4 +460,69 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
   }
   //
   return state;
+}
+
+function self_dragStartSelection(draft: Draft<IDocumentEditorState>) {
+  draft.is_gesture_node_drag_move = true;
+
+  // TODO: handle multiple selection
+  const node_id = draft.selection[0];
+  const __origin_node_domrect = domapi.get_node_bounding_rect(node_id)!;
+
+  const initial_node_rect = __origin_node_domrect;
+
+  draft.gesture_node_drag_move_initial_bounding_rect = initial_node_rect;
+  //
+}
+
+function self_dragSelection(
+  draft: Draft<IDocumentEditorState>,
+  movement: cmath.Vector2
+) {
+  if (!draft.is_gesture_node_drag_move) return;
+  // selection.forEach((node_id) => {
+  //   const node = documentquery.__getNodeById(draft, node_id);
+  //   draft.document.nodes[node_id] = nodeTransformReducer(node, {
+  //     type: "position",
+  //     dx: dx,
+  //     dy: dy,
+  //   });
+  // });
+  // multiple selection dragging will be handled by node overlay drag event
+  // if (state.selected_node_ids.length !== 1) break;
+
+  //
+  const node_id = draft.selection[0];
+
+  //
+  const snap_target_node_ids = documentquery
+    .getSiblings(draft.document_ctx, node_id)
+    .concat(documentquery.getParentId(draft.document_ctx, node_id) ?? []);
+
+  const target_node_rects = snap_target_node_ids.map((node_id) => {
+    return domapi.get_node_bounding_rect(node_id);
+  });
+
+  assert(draft.gesture_node_drag_move_initial_bounding_rect);
+
+  const {
+    position: [x, y],
+  } = snapMovementToObjects(
+    draft.gesture_node_drag_move_initial_bounding_rect,
+    target_node_rects,
+    movement
+  );
+
+  const node = documentquery.__getNodeById(draft, node_id);
+
+  draft.document.nodes[node_id] = nodeTransformReducer(node, {
+    type: "position",
+    x: x,
+    y: y,
+  });
+}
+
+function self_dragEndSelection(draft: Draft<IDocumentEditorState>) {
+  draft.is_gesture_node_drag_move = false;
+  draft.gesture_node_drag_move_initial_bounding_rect = undefined;
 }

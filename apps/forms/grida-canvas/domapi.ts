@@ -10,6 +10,23 @@ export namespace domapi {
     return window.document.getElementById(node_id);
   }
 
+  /**
+   * returns a bounding Rectangle of the node element in the content (renderer) space
+   * @returns
+   */
+  export function get_node_bounding_rect(node_id: string) {
+    const el = get_node_element(node_id)!;
+    const contentrect = get_content_element()!.getBoundingClientRect();
+    const domrect = el.getBoundingClientRect();
+
+    return {
+      x: domrect.x - contentrect.x,
+      y: domrect.y - contentrect.y,
+      width: domrect.width,
+      height: domrect.height,
+    } satisfies cmath.Rectangle;
+  }
+
   export function get_content_element() {
     return window.document.getElementById(k.EDITOR_CONTENT_ELEMENT_ID);
   }

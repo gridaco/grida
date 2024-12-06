@@ -4,6 +4,7 @@ import React, { useContext, useEffect, useRef, useState } from "react";
 import { domapi } from "@/grida-canvas/domapi";
 import { cmath } from "@/grida-canvas/math";
 import { useDocument } from "@/grida-canvas/provider";
+import { documentquery } from "@/grida-canvas/document-query";
 
 export function useSnapGuide() {
   const { state, selected_node_ids } = useDocument();
@@ -36,25 +37,30 @@ export function useSnapGuide() {
     const first_selected_node_rect =
       first_selected_node!.getBoundingClientRect();
 
-    const node_rects = node_ids
-      .filter((node_id) => node_id !== first_selected_node_id)
-      .map((node_id) => {
-        const node = domapi.get_node_element(node_id);
-        return node!.getBoundingClientRect();
-      });
+    const snap_target_node_ids = documentquery
+      .getSiblings(state.document_ctx, first_selected_node_id)
+      .concat(
+        documentquery.getParentId(state.document_ctx, first_selected_node_id) ??
+          []
+      );
 
-    const targetpoints = node_rects
-      .map((r) => Object.values(cmath.rect.toPoints(r)))
+    const target_node_rects = snap_target_node_ids.map((node_id) => {
+      const node = domapi.get_node_element(node_id);
+      return node!.getBoundingClientRect();
+    });
+
+    const targetpoints = target_node_rects
+      .map((r) => Object.values(cmath.rect.to9Points(r)))
       .flat();
 
     const origin_points = Object.values(
-      cmath.rect.toPoints(first_selected_node_rect)
+      cmath.rect.to9Points(first_selected_node_rect)
     );
 
     const [points, delta, anchors] = cmath.snap.axisAligned(
       origin_points,
       targetpoints,
-      [2, 2]
+      [4, 4]
     );
 
     // const snaps: cmath.Vector2[] = ;

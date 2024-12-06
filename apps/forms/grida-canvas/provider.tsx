@@ -821,7 +821,7 @@ export function useNodeAction(node_id: string | undefined) {
 export function useDocument() {
   const [state, dispatch] = __useInternal();
 
-  const { selected_node_ids } = state;
+  const { selection } = state;
 
   const nodeActions = __useNodeActions(dispatch);
 
@@ -1035,15 +1035,14 @@ export function useDocument() {
   );
 
   const selectedNodeActions = useNodeAction(
-    selected_node_ids.length === 1 ? selected_node_ids[0] : undefined
+    selection.length === 1 ? selection[0] : undefined
   );
-  const selectedNode =
-    selected_node_ids.length === 1 ? selectedNodeActions : undefined;
+  const selectedNode = selection.length === 1 ? selectedNodeActions : undefined;
 
   return useMemo(() => {
     return {
       state,
-      selected_node_ids,
+      selected_node_ids: selection,
       selectedNode,
       //
       cut,
@@ -1066,7 +1065,7 @@ export function useDocument() {
     };
   }, [
     state,
-    selected_node_ids,
+    selection,
     selectedNode,
     //
     cut,
@@ -1135,7 +1134,7 @@ export function useEventTarget() {
   const {
     is_gesture_node_drag_move: is_node_transforming,
     hovered_node_id,
-    selected_node_ids,
+    selection: selected_node_ids,
     surface_content_edit_mode: content_edit_mode,
     cursor_mode,
     marquee,

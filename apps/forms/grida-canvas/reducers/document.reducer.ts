@@ -40,7 +40,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
     case "cut": {
       const { target } = action;
       const target_node_ids =
-        target === "selection" ? state.selected_node_ids : [target];
+        target === "selection" ? state.selection : [target];
 
       return produce(state, (draft) => {
         // Only allow copy/cut of a single node
@@ -89,7 +89,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
     case "delete": {
       const { target } = action;
       const target_node_ids =
-        target === "selection" ? state.selected_node_ids : [target];
+        target === "selection" ? state.selection : [target];
 
       return produce(state, (draft) => {
         for (const node_id of target_node_ids) {
@@ -102,7 +102,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
     case "nudge": {
       const { target, axis, delta } = action;
       const target_node_ids =
-        target === "selection" ? state.selected_node_ids : [target];
+        target === "selection" ? state.selection : [target];
       const dx = axis === "x" ? delta : 0;
       const dy = axis === "y" ? delta : 0;
 
@@ -111,7 +111,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
           const node = documentquery.__getNodeById(draft, node_id);
 
           draft.document.nodes[node_id] = nodeTransformReducer(node, {
-            type: "move",
+            type: "translate",
             dx: dx,
             dy: dy,
           });
@@ -125,7 +125,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
       } = action;
 
       const target_node_ids =
-        target === "selection" ? state.selected_node_ids : [target];
+        target === "selection" ? state.selection : [target];
       const bounding_node_ids = Array.from(target_node_ids);
 
       if (target_node_ids.length === 1) {
@@ -164,7 +164,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
         for (const node_id of bounding_node_ids) {
           const node = documentquery.__getNodeById(state, node_id);
           const moved = nodeTransformReducer(node, {
-            type: "move",
+            type: "translate",
             dx: deltas[i].dx,
             dy: deltas[i].dy,
           });

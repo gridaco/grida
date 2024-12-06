@@ -94,7 +94,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 
 export default function CanvasPlayground() {
   const [asideHidden, setAsideHidden] = useState(false);
-  const [exampleid, setExampleId] = useState<string>("helloworld.grida");
+  const [exampleid, setExampleId] = useState<string>("blank.grida");
   const playDialog = useDialogState("play", {
     refreshkey: true,
   });
@@ -373,7 +373,7 @@ export default function CanvasPlayground() {
                   <AlignNodes />
                   <hr />
                   <FontFamilyListProvider fonts={fonts}>
-                    {state.selected_node_ids.length === 1 ? (
+                    {state.selection.length === 1 ? (
                       <SelectedNodeProperties />
                     ) : (
                       <__TMP_ComponentProperties />
@@ -392,7 +392,7 @@ export default function CanvasPlayground() {
 
 function AlignNodes() {
   const { state, align } = useDocument();
-  const has_selection = state.selected_node_ids.length >= 1;
+  const has_selection = state.selection.length >= 1;
 
   return (
     <SidebarSection className="mt-2">

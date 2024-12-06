@@ -82,6 +82,12 @@ export interface EditorDeleteAction {
   target: NodeID | "selection";
 }
 
+/**
+ * [Nudge]
+ *
+ * Nudge, usually triggered by arrow keys, translates the selected nodes by a exact amount.
+ * Unlike dragging, nudge does not snaps to pixel grid or other objects.
+ */
 export interface EditorNudgeAction {
   type: "nudge";
   target: NodeID | "selection";

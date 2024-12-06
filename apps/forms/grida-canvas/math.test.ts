@@ -84,7 +84,7 @@ describe("cmath.rect", () => {
   describe("toPoints", () => {
     it("should return an object with 9 named control points", () => {
       const rect: cmath.Rectangle = { x: 10, y: 20, width: 30, height: 40 };
-      const points = cmath.rect.toPoints(rect);
+      const points = cmath.rect.to9Points(rect);
 
       expect(points).toEqual({
         topLeft: [10, 20],
@@ -101,7 +101,7 @@ describe("cmath.rect", () => {
 
     it("should handle rectangles with zero width or height", () => {
       const rect: cmath.Rectangle = { x: 10, y: 20, width: 0, height: 40 };
-      const points = cmath.rect.toPoints(rect);
+      const points = cmath.rect.to9Points(rect);
 
       expect(points).toEqual({
         topLeft: [10, 20],
@@ -118,7 +118,7 @@ describe("cmath.rect", () => {
 
     it("should handle rectangles with negative dimensions", () => {
       const rect: cmath.Rectangle = { x: 10, y: 20, width: -30, height: -40 };
-      const points = cmath.rect.toPoints(rect);
+      const points = cmath.rect.to9Points(rect);
 
       expect(points).toEqual({
         topLeft: [10, 20],

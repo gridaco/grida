@@ -76,7 +76,7 @@ function NodeHierarchyItemContextMenuWrapper({
 
 export function NodeHierarchyList() {
   const {
-    state: { document, selected_node_ids, hovered_node_id },
+    state: { document, selection, hovered_node_id },
     selectNode,
     pointerEnterNode,
     toggleNodeLocked,
@@ -91,7 +91,7 @@ export function NodeHierarchyList() {
     <>
       {ids.map((id) => {
         const n = document.nodes[id];
-        const selected = selected_node_ids.includes(n.id);
+        const selected = selection.includes(n.id);
         const hovered = hovered_node_id === n.id;
         const depth = getNodeDepth(n.id);
         return (

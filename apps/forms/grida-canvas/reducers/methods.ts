@@ -23,16 +23,16 @@ export function self_selectNode<S extends IDocumentEditorState>(
 
   switch (mode) {
     case "add": {
-      const set = new Set([...draft.selected_node_ids, ...__node_ids]);
+      const set = new Set([...draft.selection, ...__node_ids]);
       const pruned = documentquery.pruneNestedNodes(
         draft.document_ctx,
         Array.from(set)
       );
-      draft.selected_node_ids = pruned;
+      draft.selection = pruned;
       break;
     }
     case "toggle": {
-      const set = new Set(draft.selected_node_ids);
+      const set = new Set(draft.selection);
       for (const node_id of __node_ids) {
         if (set.has(node_id)) {
           set.delete(node_id);
@@ -44,7 +44,7 @@ export function self_selectNode<S extends IDocumentEditorState>(
         draft.document_ctx,
         Array.from(set)
       );
-      draft.selected_node_ids = pruned;
+      draft.selection = pruned;
       break;
     }
     case "reset": {
@@ -52,7 +52,7 @@ export function self_selectNode<S extends IDocumentEditorState>(
         draft.document_ctx,
         __node_ids
       );
-      draft.selected_node_ids = pruned;
+      draft.selection = pruned;
       break;
     }
   }
@@ -62,7 +62,7 @@ export function self_selectNode<S extends IDocumentEditorState>(
 export function self_clearSelection<S extends IDocumentEditorState>(
   draft: Draft<S>
 ) {
-  draft.selected_node_ids = [];
+  draft.selection = [];
   return draft;
 }
 
@@ -179,7 +179,7 @@ export function self_deleteNode<S extends IDocumentEditorState>(
   draft: Draft<S>,
   node_id: string
 ) {
-  draft.selected_node_ids = [];
+  draft.selection = [];
   draft.hovered_node_id = undefined;
   const node = draft.document.nodes[node_id];
   const children = "children" in node ? node.children : undefined;
