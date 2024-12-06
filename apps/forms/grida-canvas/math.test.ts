@@ -186,6 +186,64 @@ describe("cmath.rect", () => {
     });
   });
 
+  describe("intersection", () => {
+    test("rectangles fully overlap", () => {
+      const rectA = { x: 10, y: 10, width: 30, height: 30 };
+      const rectB = { x: 15, y: 15, width: 20, height: 20 };
+      const result = cmath.rect.intersection(rectA, rectB);
+
+      expect(result).toEqual({ x: 15, y: 15, width: 20, height: 20 });
+    });
+
+    test("rectangles partially overlap", () => {
+      const rectA = { x: 10, y: 10, width: 30, height: 30 };
+      const rectB = { x: 25, y: 25, width: 20, height: 20 };
+      const result = cmath.rect.intersection(rectA, rectB);
+
+      expect(result).toEqual({ x: 25, y: 25, width: 15, height: 15 });
+    });
+
+    test("rectangles just touch at an edge", () => {
+      const rectA = { x: 10, y: 10, width: 30, height: 30 };
+      const rectB = { x: 40, y: 10, width: 20, height: 30 };
+      const result = cmath.rect.intersection(rectA, rectB);
+
+      expect(result).toBeNull();
+    });
+
+    test("rectangles are completely separate", () => {
+      const rectA = { x: 10, y: 10, width: 30, height: 30 };
+      const rectB = { x: 50, y: 50, width: 20, height: 20 };
+      const result = cmath.rect.intersection(rectA, rectB);
+
+      expect(result).toBeNull();
+    });
+
+    test("one rectangle completely contains the other", () => {
+      const rectA = { x: 10, y: 10, width: 50, height: 50 };
+      const rectB = { x: 20, y: 20, width: 10, height: 10 };
+      const result = cmath.rect.intersection(rectA, rectB);
+
+      expect(result).toEqual({ x: 20, y: 20, width: 10, height: 10 });
+    });
+
+    test("rectangles share only a corner", () => {
+      const rectA = { x: 10, y: 10, width: 20, height: 20 };
+      const rectB = { x: 30, y: 30, width: 20, height: 20 };
+      const result = cmath.rect.intersection(rectA, rectB);
+
+      expect(result).toBeNull();
+    });
+
+    test("zero-width or zero-height rectangles", () => {
+      const rectA = { x: 10, y: 10, width: 0, height: 20 };
+      const rectB = { x: 10, y: 15, width: 20, height: 10 };
+      const result = cmath.rect.intersection(rectA, rectB);
+
+      expect(result).toBeNull();
+    });
+  });
+
   describe("getBoundingRect", () => {
     it("should compute the bounding rectangle for multiple rectangles", () => {
       const rectangles: cmath.Rectangle[] = [

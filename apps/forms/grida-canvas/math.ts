@@ -45,6 +45,8 @@ export namespace cmath {
     height: number;
   };
 
+  export type RectangleSide = "top" | "right" | "bottom" | "left";
+
   /**
    * Quantizes a value to the nearest multiple of a specified step.
    *
@@ -245,6 +247,42 @@ export namespace cmath.rect {
         aBottom < b.y
       ) // `a` is above `b`.
     );
+  }
+
+  /**
+   * Calculates the intersection of two rectangles in the { x, y, width, height } format.
+   *
+   * @param a - The first rectangle.
+   * @param b - The second rectangle.
+   * @returns A new rectangle representing the intersection of the two rectangles.
+   *          If the rectangles do not intersect, returns `null`.
+   *
+   * @example
+   * const a = { x: 10, y: 10, width: 30, height: 30 };
+   * const b = { x: 20, y: 20, width: 30, height: 30 };
+   * const result = intersection(a, b);
+   * console.log(result); // { x: 20, y: 20, width: 20, height: 20 }
+   */
+  export function intersection(
+    a: cmath.Rectangle,
+    b: cmath.Rectangle
+  ): cmath.Rectangle | null {
+    const x1 = Math.max(a.x, b.x);
+    const y1 = Math.max(a.y, b.y);
+    const x2 = Math.min(a.x + a.width, b.x + b.width);
+    const y2 = Math.min(a.y + a.height, b.y + b.height);
+
+    if (x2 <= x1 || y2 <= y1) {
+      // No intersection
+      return null;
+    }
+
+    return {
+      x: x1,
+      y: y1,
+      width: x2 - x1,
+      height: y2 - y1,
+    };
   }
 
   /**
@@ -590,4 +628,8 @@ export namespace cmath.snap {
 
     return [snappedPoints, delta, { x: xAnchors, y: yAnchors }];
   }
+}
+
+export namespace cmath.measure {
+  //
 }
