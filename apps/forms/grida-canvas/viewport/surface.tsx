@@ -22,7 +22,10 @@ import {
   useNodeSurfaceTransfrom,
 } from "./hooks/transform";
 import { cmath } from "../math";
-import { useSnapGuide } from "./hooks/snap";
+import { useMeasurement, useSnapGuide } from "./hooks/__tmp";
+import { Crosshair } from "./ui/crosshair";
+import { auxiliary_line_xylr, guide_line_xylr } from "../legacy-measure";
+import { MeasurementGuide } from "./ui/measurement";
 
 export function EditorSurface() {
   const isWindowResizing = useIsWindowResizing();
@@ -125,6 +128,7 @@ export function EditorSurface() {
         cursor: cursor,
       }}
     >
+      <MeasurementGuide />
       <div
         data-transforming={is_node_transforming || isWindowResizing}
         className="opacity-0 data-[transforming='true']:opacity-100 transition-colors"
@@ -645,40 +649,6 @@ function SnapGuide() {
           <Rule axis="x" offset={snap.top} />
         </React.Fragment>
       ))}
-    </div>
-  );
-}
-
-function Crosshair() {
-  return (
-    <div style={{ position: "relative", width: 5, height: 5 }}>
-      {/* Diagonal line from top-left to bottom-right */}
-      <div
-        style={{
-          position: "absolute",
-          width: "100%",
-          height: 0.5,
-          backgroundColor: "red",
-          transform: "rotate(45deg)",
-          top: "50%",
-          left: "0",
-          transformOrigin: "center",
-        }}
-      />
-
-      {/* Diagonal line from top-right to bottom-left */}
-      <div
-        style={{
-          position: "absolute",
-          width: "100%",
-          height: 0.5,
-          backgroundColor: "red",
-          transform: "rotate(-45deg)",
-          top: "50%",
-          left: "0",
-          transformOrigin: "center",
-        }}
-      />
     </div>
   );
 }

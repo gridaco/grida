@@ -1,0 +1,322 @@
+import { cmath } from "./math";
+
+export interface Measurement {
+  box: cmath.Rectangle;
+  /**
+   * top, right, bottom, left
+   */
+  distance: [number, number, number, number];
+}
+
+/**
+ * Calculates the base rectangle and the spacing of the nearest top, right, bottom, and left with given rectangles `a` and `b`.
+ *
+ * - If the two rectangles do not intersect, the base rectangle will be `a`.
+ * - If one rectangle is contained in another, the base rectangle will be the contained (smaller) rectangle.
+ * - If the two rectangles intersect, the base rectangle will be their intersection.
+ *
+ * The top, right, bottom, and left spacing is relative to the base rectangle.
+ *
+ * @param a - The first rectangle.
+ * @param b - The second rectangle.
+ * @returns The spacing guide with base rectangle and spacing values.
+ */
+export function measure(a: cmath.Rectangle, b: cmath.Rectangle): Measurement {
+  const intersection = cmath.rect.intersection(a, b)!;
+
+  // If no intersection
+  if (!intersection) {
+    const spacing = calculateNonIntersectingSpacing(a, b);
+    return {
+      box: a,
+      distance: spacing,
+    };
+  }
+
+  // If `a` contains `b`
+  if (cmath.rect.contains(b, a)) {
+    return {
+      box: b,
+      distance: calculateContainerSpacing(a, b),
+    };
+  }
+
+  // If `b` contains `a`
+  if (cmath.rect.contains(a, b)) {
+    return {
+      box: a,
+      distance: calculateContainerSpacing(b, a),
+    };
+  }
+
+  // Intersection case (no containment)
+  const spacing = calculateIntersectingSpacing(a, b, intersection);
+
+  return {
+    box: intersection,
+    distance: spacing,
+  };
+}
+
+/**
+ * Calculates spacing for intersecting rectangles (no containment).
+ *
+ * @param a - The first rectangle.
+ * @param b - The second rectangle.
+ * @param intersection - The intersection rectangle.
+ * @returns The distances [top, right, bottom, left] between the rectangles.
+ */
+function calculateIntersectingSpacing(
+  a: cmath.Rectangle,
+  b: cmath.Rectangle,
+  intersection: cmath.Rectangle
+): [number, number, number, number] {
+  return [
+    Math.abs(intersection.y - Math.min(a.y, b.y)),
+    Math.abs(
+      Math.max(a.x + a.width, b.x + b.width) -
+        (intersection.x + intersection.width)
+    ),
+    Math.abs(
+      Math.max(a.y + a.height, b.y + b.height) -
+        (intersection.y + intersection.height)
+    ),
+    Math.abs(intersection.x - Math.min(a.x, b.x)),
+  ];
+}
+
+/**
+ * https://eli.thegreenplace.net/2008/08/15/intersection-of-1d-segments
+ */
+const segments_intersect = (x1: number, x2: number, y1: number, y2: number) =>
+  x2 >= y1 && y2 >= x1;
+
+/**
+ * Calculates spacing for non-intersecting rectangles.
+ */
+function calculateNonIntersectingSpacing(
+  a: cmath.Rectangle,
+  b: cmath.Rectangle
+): [number, number, number, number] {
+  // return [
+  //   cmath.nearest(a.y, b.y, b.y + b.height),
+  //   cmath.nearest(a.x + a.width, b.x, b.x + b.width),
+  //   cmath.nearest(a.y + a.height, b.y, b.y + b.height),
+  //   cmath.nearest(a.x, b.x, b.x + b.width),
+  // ];
+
+  //   const x_intersects = segments_intersect(
+  //     a.x,
+  //     a.x + a.width,
+  //     b.x,
+  //     b.x + b.width
+  //   );
+
+  //   const y_intersects = segments_intersect(
+  //     a.y,
+  //     a.y + a.height,
+  //     b.y,
+  //     b.y + b.height
+  //   );
+
+  // legacy
+  let rop = 0,
+    right = 0,
+    bottom = 0,
+    left = 0;
+
+  if (a.x + a.width <= b.x) {
+    right = b.x - (a.x + a.width);
+  } else if (b.x + b.width <= a.x) {
+    left = a.x - (b.x + b.width);
+  }
+
+  if (a.y + a.height <= b.y) {
+    bottom = b.y - (a.y + a.height);
+  } else if (b.y + b.height <= a.y) {
+    rop = a.y - (b.y + b.height);
+  }
+
+  return [rop, right, bottom, left];
+}
+
+/**
+ * Calculates spacing for contained rectangles.
+ */
+function calculateContainerSpacing(
+  outer: cmath.Rectangle,
+  inner: cmath.Rectangle
+): [number, number, number, number] {
+  return [
+    Math.abs(outer.y - inner.y),
+    Math.abs(outer.x + outer.width - (inner.x + inner.width)),
+    Math.abs(outer.y + outer.height - (inner.y + inner.height)),
+    Math.abs(outer.x - inner.x),
+  ];
+}
+
+//
+//
+// =============
+//
+//
+type Side = "t" | "r" | "b" | "l";
+type LineXYXYLR = [number, number, number, number, number, number];
+
+/**
+ * Generates guide line coordinates with length and rotation based on a rectangle and side.
+ *
+ * @param rect - The rectangle in { x, y, width, height } format.
+ * @param side - The side of the rectangle: "t" (top), "r" (right), "b" (bottom), "l" (left).
+ * @param length - The length of the guide line.
+ * @param zoom - Optional zoom factor (default is 1).
+ * @returns An array representing the line's coordinates [x1, y1, x2, y2, length, rotation].
+ */
+export function guide_line_xylr(
+  rect: cmath.Rectangle,
+  side: Side,
+  length: number,
+  zoom: number = 1
+): LineXYXYLR {
+  const { x, y, width, height } = rect;
+  const midX = x + width / 2;
+  const midY = y + height / 2;
+  const scaledLength = length * zoom;
+
+  let x1 = 0,
+    y1 = 0,
+    x2 = 0,
+    y2 = 0,
+    rotation = 0;
+
+  switch (side) {
+    case "t": // Top
+      x1 = midX * zoom;
+      y1 = y * zoom;
+      x2 = x1;
+      y2 = y1 - scaledLength;
+      rotation = 180;
+      break;
+    case "r": // Right
+      x1 = (x + width) * zoom;
+      y1 = midY * zoom;
+      x2 = x1 + scaledLength;
+      y2 = y1;
+      rotation = 270;
+      break;
+    case "b": // Bottom
+      x1 = midX * zoom;
+      y1 = (y + height) * zoom;
+      x2 = x1;
+      y2 = y1 + scaledLength;
+      rotation = 0;
+      break;
+    case "l": // Left
+      x1 = x * zoom;
+      y1 = midY * zoom;
+      x2 = x1 - scaledLength;
+      y2 = y1;
+      rotation = 90;
+      break;
+  }
+
+  return [x1, y1, x2, y2, scaledLength, rotation];
+}
+
+const deg = (side: Side, length: number) => {
+  let r: number = __line_rotation_by_side_map[side];
+  if (length < 0) {
+    r = r * -1;
+  }
+  return r;
+};
+
+const __line_rotation_by_side_map = {
+  t: 180,
+  r: 270,
+  b: 0,
+  l: 90,
+} as const;
+
+/**
+ * Generates auxiliary guide line coordinates extending from a point towards the closest rectangle side.
+ *
+ * @param point - The reference point in { x, y } format.
+ * @param rect - The target rectangle in { x, y, width, height } format.
+ * @param side - The side of the rectangle: "t", "r", "b", or "l".
+ * @param zoom - Optional zoom factor (default is 1).
+ * @returns An array representing the auxiliary line's coordinates [x1, y1, x2, y2, length, rotation].
+ */
+export function auxiliary_line_xylr(
+  point: cmath.Vector2,
+  rect: cmath.Rectangle,
+  side: Side,
+  zoom: number = 1
+): LineXYXYLR {
+  const [px, py] = point;
+  const { x, y, width, height } = rect;
+
+  const rectRight = x + width;
+  const rectBottom = y + height;
+
+  let x1 = px * zoom,
+    y1 = py * zoom,
+    x2 = 0,
+    y2 = 0,
+    length = 0,
+    rotation = 0;
+
+  if (point_hits_rectangle(point, rect)) {
+    return [x1, y1, NaN, NaN, 0, 0];
+  }
+
+  switch (side) {
+    case "t": // Top
+    case "b": // Bottom
+      if (px < x) {
+        length = (x - px) * zoom;
+        rotation = -90;
+        x2 = x1 + length;
+        y2 = y1;
+      } else {
+        length = (px - rectRight) * zoom;
+        rotation = 90;
+        x2 = x1 - length;
+        y2 = y1;
+      }
+      break;
+
+    case "l": // Left
+    case "r": // Right
+      if (py > rectBottom) {
+        length = (py - rectBottom) * zoom;
+        rotation = 180;
+        x2 = x1;
+        y2 = y1 - length;
+      } else {
+        length = (y - py) * zoom;
+        rotation = 0;
+        x2 = x1;
+        y2 = y1 + length;
+      }
+      break;
+  }
+
+  return [x1, y1, x2, y2, length, rotation];
+}
+
+/**
+ * Checks if a point is inside a rectangle.
+ *
+ * @param point - The point to check, in { x, y } format.
+ * @param rect - The rectangle in { x, y, width, height } format.
+ * @returns `true` if the point is inside the rectangle, otherwise `false`.
+ */
+function point_hits_rectangle(
+  point: cmath.Vector2,
+  rect: cmath.Rectangle
+): boolean {
+  const [px, py] = point;
+  const { x, y, width, height } = rect;
+  return px >= x && px <= x + width && py >= y && py <= y + height;
+}

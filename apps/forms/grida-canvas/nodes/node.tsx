@@ -43,11 +43,11 @@ export function NodeElement<P extends Record<string, any>>({
   style,
 }: React.PropsWithChildren<NodeElementProps<P>>) {
   const user_registered_renderers = useUserDocumentCustomRenderer();
-  const { state: document, selected_node_ids } = useDocument();
+  const { state: document, selection } = useDocument();
 
   const node = useNode(node_id);
   const computed = useComputedNode(node_id);
-  const selected = selected_node_ids.includes(node_id);
+  const selected = selection.includes(node_id);
   const hovered = node_id === document.hovered_node_id;
 
   const { component_id, template_id, children } = node;

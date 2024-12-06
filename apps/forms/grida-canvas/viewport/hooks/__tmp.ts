@@ -5,9 +5,10 @@ import { domapi } from "@/grida-canvas/domapi";
 import { cmath } from "@/grida-canvas/math";
 import { useDocument } from "@/grida-canvas/provider";
 import { documentquery } from "@/grida-canvas/document-query";
+import { measure, Measurement } from "@/grida-canvas/legacy-measure";
 
 export function useSnapGuide() {
-  const { state, selected_node_ids } = useDocument();
+  const { state, selection: selected_node_ids } = useDocument();
 
   const [offset, setOffset] = useState<cmath.Vector2>([0, 0]);
   const [snaps, setSnaps] = useState<null | {
@@ -82,4 +83,37 @@ export function useSnapGuide() {
       top: snap[1] - offset[1],
     })),
   };
+}
+
+export function useMeasurement() {
+  const { state, selection } = useDocument();
+  const { hovered_node_id, translate } = state;
+
+  const [measurement, setMeasurement] = useState<Measurement>();
+  const [targetRect, setTargetRect] = useState<null | cmath.Rectangle>(null);
+
+  useEffect(() => {
+    const a = selection[0];
+    const b = hovered_node_id;
+
+    if (!a || !b) {
+      setMeasurement(undefined);
+      return;
+    }
+
+    const _a_rect = domapi.get_node_bounding_rect(a);
+    const a_rect = cmath.rect.translate(_a_rect, translate!);
+    const _b_rect = domapi.get_node_bounding_rect(b);
+    const b_rect = cmath.rect.translate(_b_rect, translate!);
+
+    setTargetRect(b_rect);
+
+    const measurement = measure(a_rect, b_rect);
+    setMeasurement({
+      distance: measurement.distance,
+      box: measurement.box, // cmath.rect.translate(measurement.box),
+    });
+  }, [state]);
+
+  return { measurement, targetRect };
 }

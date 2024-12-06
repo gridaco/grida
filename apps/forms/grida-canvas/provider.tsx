@@ -1042,7 +1042,7 @@ export function useDocument() {
   return useMemo(() => {
     return {
       state,
-      selected_node_ids: selection,
+      selection,
       selectedNode,
       //
       cut,
