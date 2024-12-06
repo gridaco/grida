@@ -80,6 +80,32 @@ export namespace cmath {
     const factor = 1 / step;
     return Math.round(value * factor) / factor;
   }
+
+  /**
+   * Finds the nearest value to a given number from a list of target numbers.
+   *
+   * This function calculates the absolute difference between the given value and each target,
+   * and returns the target with the smallest difference.
+   *
+   * @param value - The reference number to which the nearest target is determined.
+   * @param points - A list of numbers to compare against the reference number.
+   * @returns The number from the list of targets that is closest to the given value.
+   *          If the list is empty, `Infinity` is returned.
+   *
+   * @example
+   * const nearestValue = nearest(10, 3, 7, 15, 20);
+   * console.log(nearestValue); // Outputs: 7
+   *
+   * const nearestValueEmpty = nearest(10);
+   * console.log(nearestValueEmpty); // Outputs: Infinity
+   *
+   * @remarks
+   * If multiple targets have the same absolute difference to the given value, the first
+   * one encountered in the list will be returned.
+   */
+  export function nearest(value: Scalar, ...points: Scalar[]): Scalar {
+    return Math.min(...points.map((t) => Math.abs(t - value)));
+  }
 }
 
 /**
