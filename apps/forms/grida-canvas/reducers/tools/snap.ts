@@ -1,8 +1,4 @@
-import { cmath } from "../../math";
-
-export function drag() {
-  //
-}
+import { cmath } from "@/grida-canvas/cmath";
 
 export function snapMovementToObjects(
   origin: cmath.Rectangle,

@@ -2,10 +2,10 @@
 
 import React, { useContext, useEffect, useRef, useState } from "react";
 import { domapi } from "@/grida-canvas/domapi";
-import { cmath } from "@/grida-canvas/math";
+import { cmath } from "@/grida-canvas/cmath";
 import { useDocument } from "@/grida-canvas/provider";
 import { documentquery } from "@/grida-canvas/document-query";
-import { measure, Measurement } from "@/grida-canvas/legacy-measure";
+import { measure, Measurement } from "@/grida-canvas/cmath/_measurement";
 
 export function useSnapGuide() {
   const { state, selection: selected_node_ids } = useDocument();

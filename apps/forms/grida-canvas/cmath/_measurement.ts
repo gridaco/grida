@@ -1,4 +1,4 @@
-import { cmath } from "./math";
+import { cmath } from ".";
 
 export interface Measurement {
   box: cmath.Rectangle;

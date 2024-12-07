@@ -27,7 +27,7 @@ import assert from "assert";
 import { documentquery } from "./document-query";
 import { GoogleFontsManager } from "./components/google-fonts";
 import { domapi } from "./domapi";
-import { cmath } from "./math";
+import { cmath } from "./cmath";
 import { TCanvasEventTargetDragGestureState } from "./action";
 
 type Vector2 = [number, number];

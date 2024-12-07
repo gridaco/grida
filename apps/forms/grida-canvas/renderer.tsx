@@ -10,7 +10,7 @@ import React, {
 import { __useInternal, useDocument } from "./provider";
 import { NodeElement } from "./nodes/node";
 import { domapi } from "./domapi";
-import { cmath } from "./math";
+import { cmath } from "./cmath";
 
 /**
  * A hook that calculates and notifies the editor content offset relative to the editor viewport.

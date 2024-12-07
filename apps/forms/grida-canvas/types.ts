@@ -1,6 +1,6 @@
 import type { BuilderAction } from "./action";
 import { grida } from "@/grida";
-import { cmath } from "./math";
+import { cmath } from "./cmath";
 
 type Vector2 = [number, number];
 
@@ -126,6 +126,8 @@ export interface IDocumentEditorInteractionCursorState {
    * @default [0, 0]
    */
   surface_cursor_position: Vector2;
+
+  // surface_measurement:
 
   /**
    * @private - internal use only

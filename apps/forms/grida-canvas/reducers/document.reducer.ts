@@ -27,7 +27,7 @@ import {
   self_insertNode,
   self_selectNode,
 } from "./methods";
-import { cmath } from "../math";
+import { cmath } from "../cmath";
 import { domapi } from "../domapi";
 
 export default function documentReducer<S extends IDocumentEditorState>(

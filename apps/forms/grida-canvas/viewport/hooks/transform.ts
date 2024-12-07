@@ -8,7 +8,7 @@ import {
   useState,
 } from "react";
 import { ViewportSurfaceContext } from "../context";
-import { cmath } from "@/grida-canvas/math";
+import { cmath } from "@/grida-canvas/cmath";
 
 export function useViewportSurfacePortal() {
   const context = useContext(ViewportSurfaceContext);

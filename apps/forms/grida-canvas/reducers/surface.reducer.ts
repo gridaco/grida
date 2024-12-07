@@ -32,7 +32,7 @@ import {
   self_selectNode,
   self_updateSurfaceHoverState,
 } from "./methods";
-import { cmath } from "../math";
+import { cmath } from "../cmath";
 import { domapi } from "../domapi";
 import { snapMovementToObjects } from "./tools/snap";
 
