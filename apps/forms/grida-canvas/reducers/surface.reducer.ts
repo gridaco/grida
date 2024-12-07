@@ -405,21 +405,28 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
     case "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag": {
       const {
         node_id,
-        event: { delta, distance },
+        anchor,
+        event: { delta, movement },
       } = <EditorSurface_NodeOverlayRotationHandle_Drag>action;
 
-      const [dx, dy] = delta;
       // cancel if invalid state
       if (!state.is_gesture_node_drag_rotation) return state;
 
-      const d = Math.round(dx);
+      const angle = cmath.principalAngle(
+        cmath.vector2.angle(
+          // TODO: need to store the initial angle and subtract
+          // TODO: get anchor and calculate the offset
+          [0, 0],
+          movement
+        )
+      );
+
       return produce(state, (draft) => {
         const node = documentquery.__getNodeById(draft, node_id);
 
         draft.document.nodes[node_id] = nodeReducer(node, {
           type: "node/change/rotation",
-          rotation:
-            ((node as grida.program.nodes.i.IRotation).rotation ?? 0) + d,
+          rotation: angle,
           node_id,
         });
       });

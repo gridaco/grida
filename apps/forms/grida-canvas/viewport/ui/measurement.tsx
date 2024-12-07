@@ -4,6 +4,8 @@ import {
 } from "@/grida-canvas/legacy-measure";
 import { useMeasurement } from "../hooks/__tmp";
 import { MeterLabel } from "./meter";
+import { cn } from "@/utils";
+import { cmath } from "@/grida-canvas/math";
 
 export function MeasurementGuide() {
   const { measurement, targetRect } = useMeasurement();
@@ -15,23 +17,28 @@ export function MeasurementGuide() {
   const [st, sr, sb, sl] = distance;
   const b = targetRect || box;
 
-  const [tx, ty, tx2, ty2, tl, tr] = guide_line_xylr(box, "t", st);
-  const [rx, ry, rx2, ry2, rl, rr] = guide_line_xylr(box, "r", sr);
-  const [bx, by, bx2, by2, bl, br] = guide_line_xylr(box, "b", sb);
-  const [lx, ly, lx2, ly2, ll, lr] = guide_line_xylr(box, "l", sl);
-  const [tax, tay, , , tal, tar] = auxiliary_line_xylr([tx2, ty2], b, "t");
-  const [rax, ray, , , ral, rar] = auxiliary_line_xylr([rx2, ry2], b, "r");
-  const [bax, bay, , , bal, bar] = auxiliary_line_xylr([bx2, by2], b, "b");
-  const [lax, lay, , , lal, lar] = auxiliary_line_xylr([lx2, ly2], b, "l");
+  const [tx, ty, tx2, ty2, tl, tr] = guide_line_xylr(box, "top", st);
+  const [rx, ry, rx2, ry2, rl, rr] = guide_line_xylr(box, "right", sr);
+  const [bx, by, bx2, by2, bl, br] = guide_line_xylr(box, "bottom", sb);
+  const [lx, ly, lx2, ly2, ll, lr] = guide_line_xylr(box, "left", sl);
+  const [tax, tay, , , tal, tar] = auxiliary_line_xylr([tx2, ty2], b, "top");
+  const [rax, ray, , , ral, rar] = auxiliary_line_xylr([rx2, ry2], b, "right");
+  const [bax, bay, , , bal, bar] = auxiliary_line_xylr([bx2, by2], b, "bottom");
+  const [lax, lay, , , lal, lar] = auxiliary_line_xylr([lx2, ly2], b, "left");
 
   return (
     <div
-      id="position-guide"
       style={{
+        position: "absolute",
         pointerEvents: "none",
         willChange: "transform, opacity",
+        zIndex: 30,
       }}
     >
+      {/* box */}
+      <>
+        <Rectangle rect={box} />
+      </>
       <Conditional length={st}>
         <SpacingGuideLine x={tx} y={ty} length={tl} rotation={tr} />
         <Conditional length={tal}>
@@ -61,6 +68,37 @@ export function MeasurementGuide() {
         <SpacingMeterLabel length={sl} side="l" rect={box} />
       </Conditional>
     </div>
+  );
+}
+
+function Rectangle({
+  className,
+  zIndex,
+  rect,
+  ...props
+}: Omit<React.HTMLAttributes<HTMLDivElement>, "style"> & {
+  zIndex?: number;
+  rect: cmath.Rectangle;
+}) {
+  return (
+    <div
+      {...props}
+      className={cn(
+        "relative group pointer-events-auto select-none border-[1px] border-workbench-accent-orange",
+        className
+      )}
+      style={{
+        position: "absolute",
+        zIndex: zIndex,
+        touchAction: "none",
+        willChange: "transform",
+        left: rect.x,
+        top: rect.y,
+        width: rect.width,
+        height: rect.height,
+        pointerEvents: "none",
+      }}
+    />
   );
 }
 
@@ -170,7 +208,7 @@ function GuideLine({
         transformOrigin: "0px 0px",
         transform: `translate3d(${tx}px, ${ty}px, 0) rotate(${tr}deg)`,
         borderLeft: `${width}px ${dashed ? "dashed" : "solid"} ${color}`,
-        zIndex: 4,
+        zIndex: 99,
       }}
     />
   );

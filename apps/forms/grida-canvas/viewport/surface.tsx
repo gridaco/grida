@@ -21,10 +21,8 @@ import {
   useGroupSurfaceTransform,
   useNodeSurfaceTransfrom,
 } from "./hooks/transform";
-import { cmath } from "../math";
 import { useMeasurement, useSnapGuide } from "./hooks/__tmp";
 import { Crosshair } from "./ui/crosshair";
-import { auxiliary_line_xylr, guide_line_xylr } from "../legacy-measure";
 import { MeasurementGuide } from "./ui/measurement";
 
 export function EditorSurface() {

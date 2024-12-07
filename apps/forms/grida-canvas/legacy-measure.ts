@@ -160,7 +160,6 @@ function calculateContainerSpacing(
 // =============
 //
 //
-type Side = "t" | "r" | "b" | "l";
 type LineXYXYLR = [number, number, number, number, number, number];
 
 /**
@@ -174,7 +173,7 @@ type LineXYXYLR = [number, number, number, number, number, number];
  */
 export function guide_line_xylr(
   rect: cmath.Rectangle,
-  side: Side,
+  side: cmath.RectangleSide,
   length: number,
   zoom: number = 1
 ): LineXYXYLR {
@@ -190,28 +189,28 @@ export function guide_line_xylr(
     rotation = 0;
 
   switch (side) {
-    case "t": // Top
+    case "top": // Top
       x1 = midX * zoom;
       y1 = y * zoom;
       x2 = x1;
       y2 = y1 - scaledLength;
       rotation = 180;
       break;
-    case "r": // Right
+    case "right": // Right
       x1 = (x + width) * zoom;
       y1 = midY * zoom;
       x2 = x1 + scaledLength;
       y2 = y1;
       rotation = 270;
       break;
-    case "b": // Bottom
+    case "bottom": // Bottom
       x1 = midX * zoom;
       y1 = (y + height) * zoom;
       x2 = x1;
       y2 = y1 + scaledLength;
       rotation = 0;
       break;
-    case "l": // Left
+    case "left": // Left
       x1 = x * zoom;
       y1 = midY * zoom;
       x2 = x1 - scaledLength;
@@ -222,21 +221,6 @@ export function guide_line_xylr(
 
   return [x1, y1, x2, y2, scaledLength, rotation];
 }
-
-const deg = (side: Side, length: number) => {
-  let r: number = __line_rotation_by_side_map[side];
-  if (length < 0) {
-    r = r * -1;
-  }
-  return r;
-};
-
-const __line_rotation_by_side_map = {
-  t: 180,
-  r: 270,
-  b: 0,
-  l: 90,
-} as const;
 
 /**
  * Generates auxiliary guide line coordinates extending from a point towards the closest rectangle side.
@@ -250,7 +234,7 @@ const __line_rotation_by_side_map = {
 export function auxiliary_line_xylr(
   point: cmath.Vector2,
   rect: cmath.Rectangle,
-  side: Side,
+  side: cmath.RectangleSide,
   zoom: number = 1
 ): LineXYXYLR {
   const [px, py] = point;
@@ -266,13 +250,13 @@ export function auxiliary_line_xylr(
     length = 0,
     rotation = 0;
 
-  if (point_hits_rectangle(point, rect)) {
+  if (cmath.rect.containsPoint(rect, point)) {
     return [x1, y1, NaN, NaN, 0, 0];
   }
 
   switch (side) {
-    case "t": // Top
-    case "b": // Bottom
+    case "top": // Top
+    case "bottom": // Bottom
       if (px < x) {
         length = (x - px) * zoom;
         rotation = -90;
@@ -286,8 +270,8 @@ export function auxiliary_line_xylr(
       }
       break;
 
-    case "l": // Left
-    case "r": // Right
+    case "left": // Left
+    case "right": // Right
       if (py > rectBottom) {
         length = (py - rectBottom) * zoom;
         rotation = 180;
@@ -303,20 +287,4 @@ export function auxiliary_line_xylr(
   }
 
   return [x1, y1, x2, y2, length, rotation];
-}
-
-/**
- * Checks if a point is inside a rectangle.
- *
- * @param point - The point to check, in { x, y } format.
- * @param rect - The rectangle in { x, y, width, height } format.
- * @returns `true` if the point is inside the rectangle, otherwise `false`.
- */
-function point_hits_rectangle(
-  point: cmath.Vector2,
-  rect: cmath.Rectangle
-): boolean {
-  const [px, py] = point;
-  const { x, y, width, height } = rect;
-  return px >= x && px <= x + width && py >= y && py <= y + height;
 }

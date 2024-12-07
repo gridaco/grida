@@ -41,6 +41,100 @@ describe("cmath.quantize", () => {
   });
 });
 
+describe("cmath.vector2", () => {
+  describe("angle", () => {
+    it("should calculate the angle for a point in the first quadrant", () => {
+      const origin: cmath.Vector2 = [0, 0];
+      const point: cmath.Vector2 = [1, 1];
+
+      const angle = cmath.vector2.angle(origin, point);
+
+      expect(angle).toBeCloseTo(45); // Expected angle: 45 degrees
+    });
+
+    it("should calculate the angle for a point in the second quadrant", () => {
+      const origin: cmath.Vector2 = [0, 0];
+      const point: cmath.Vector2 = [-1, 1];
+
+      const angle = cmath.vector2.angle(origin, point);
+
+      expect(angle).toBeCloseTo(135); // Expected angle: 135 degrees
+    });
+
+    it("should calculate the angle for a point in the third quadrant", () => {
+      const origin: cmath.Vector2 = [0, 0];
+      const point: cmath.Vector2 = [-1, -1];
+
+      const angle = cmath.vector2.angle(origin, point);
+
+      expect(angle).toBeCloseTo(225); // Expected angle: 225 degrees
+    });
+
+    it("should calculate the angle for a point in the fourth quadrant", () => {
+      const origin: cmath.Vector2 = [0, 0];
+      const point: cmath.Vector2 = [1, -1];
+
+      const angle = cmath.vector2.angle(origin, point);
+
+      expect(angle).toBeCloseTo(315); // Expected angle: 315 degrees
+    });
+
+    it("should calculate the angle for a point on the positive x-axis", () => {
+      const origin: cmath.Vector2 = [0, 0];
+      const point: cmath.Vector2 = [1, 0];
+
+      const angle = cmath.vector2.angle(origin, point);
+
+      expect(angle).toBeCloseTo(0); // Expected angle: 0 degrees
+    });
+
+    it("should calculate the angle for a point on the negative x-axis", () => {
+      const origin: cmath.Vector2 = [0, 0];
+      const point: cmath.Vector2 = [-1, 0];
+
+      const angle = cmath.vector2.angle(origin, point);
+
+      expect(angle).toBeCloseTo(180); // Expected angle: 180 degrees
+    });
+
+    it("should calculate the angle for a point on the positive y-axis", () => {
+      const origin: cmath.Vector2 = [0, 0];
+      const point: cmath.Vector2 = [0, 1];
+
+      const angle = cmath.vector2.angle(origin, point);
+
+      expect(angle).toBeCloseTo(90); // Expected angle: 90 degrees
+    });
+
+    it("should calculate the angle for a point on the negative y-axis", () => {
+      const origin: cmath.Vector2 = [0, 0];
+      const point: cmath.Vector2 = [0, -1];
+
+      const angle = cmath.vector2.angle(origin, point);
+
+      expect(angle).toBeCloseTo(270); // Expected angle: 270 degrees
+    });
+
+    it("should return 0 for the origin point", () => {
+      const origin: cmath.Vector2 = [0, 0];
+      const point: cmath.Vector2 = [0, 0];
+
+      const angle = cmath.vector2.angle(origin, point);
+
+      expect(angle).toBeCloseTo(0); // Expected angle: 0 degrees
+    });
+
+    it("should calculate the angle for a non-origin origin point", () => {
+      const origin: cmath.Vector2 = [1, 1];
+      const point: cmath.Vector2 = [2, 2];
+
+      const angle = cmath.vector2.angle(origin, point);
+
+      expect(angle).toBeCloseTo(45); // Expected angle: 45 degrees relative to new origin
+    });
+  });
+});
+
 describe("cmath.rect", () => {
   describe("fromPoints", () => {
     it("should create a rectangle that bounds more than two points", () => {
@@ -377,6 +471,118 @@ describe("cmath.rect", () => {
         vertical: "none",
       });
       expect(aligned).toEqual(rectangles);
+    });
+  });
+
+  describe("translate", () => {
+    it("should translate a rectangle by a positive vector", () => {
+      const rect: cmath.Rectangle = { x: 10, y: 20, width: 30, height: 40 };
+      const translation: cmath.Vector2 = [5, 10];
+
+      const result = cmath.rect.translate(rect, translation);
+
+      expect(result).toEqual({ x: 15, y: 30, width: 30, height: 40 });
+    });
+
+    it("should translate a rectangle by a negative vector", () => {
+      const rect: cmath.Rectangle = { x: 10, y: 20, width: 30, height: 40 };
+      const translation: cmath.Vector2 = [-5, -10];
+
+      const result = cmath.rect.translate(rect, translation);
+
+      expect(result).toEqual({ x: 5, y: 10, width: 30, height: 40 });
+    });
+
+    it("should translate a rectangle by a zero vector (no movement)", () => {
+      const rect: cmath.Rectangle = { x: 10, y: 20, width: 30, height: 40 };
+      const translation: cmath.Vector2 = [0, 0];
+
+      const result = cmath.rect.translate(rect, translation);
+
+      expect(result).toEqual(rect); // No change expected
+    });
+  });
+
+  describe("scale", () => {
+    it("should scale a single rectangle with uniform scaling", () => {
+      const rect = { x: 10, y: 20, width: 30, height: 40 };
+      const origin: cmath.Vector2 = [0, 0];
+      const scale: cmath.Vector2 = [2, 2];
+
+      const result = cmath.rect.scale(rect, origin, scale);
+
+      expect(result).toEqual({ x: 20, y: 40, width: 60, height: 80 });
+    });
+
+    it("should scale a single rectangle with non-uniform scaling", () => {
+      const rect = { x: 10, y: 20, width: 30, height: 40 };
+      const origin: cmath.Vector2 = [0, 0];
+      const scale: cmath.Vector2 = [2, 1.5];
+
+      const result = cmath.rect.scale(rect, origin, scale);
+
+      expect(result).toEqual({ x: 20, y: 30, width: 60, height: 60 });
+    });
+
+    it("should scale a rectangle relative to a non-origin point", () => {
+      const rect = { x: 10, y: 20, width: 30, height: 40 };
+      const origin: cmath.Vector2 = [10, 20];
+      const scale: cmath.Vector2 = [2, 2];
+
+      const result = cmath.rect.scale(rect, origin, scale);
+
+      expect(result).toEqual({ x: 10, y: 20, width: 60, height: 80 });
+    });
+
+    it("should handle no scaling (scale factors = 1)", () => {
+      const rect = { x: 10, y: 20, width: 30, height: 40 };
+      const origin: cmath.Vector2 = [0, 0];
+      const scale: cmath.Vector2 = [1, 1];
+
+      const result = cmath.rect.scale(rect, origin, scale);
+
+      expect(result).toEqual(rect);
+    });
+
+    it("should handle scaling with negative scaling factors", () => {
+      const rect = { x: 10, y: 20, width: 30, height: 40 };
+      const origin: cmath.Vector2 = [0, 0];
+      const scale: cmath.Vector2 = [-1, -1];
+
+      const result = cmath.rect.scale(rect, origin, scale);
+
+      // Expect flipped dimensions and adjusted position
+      expect(result).toEqual({ x: -10, y: -20, width: -30, height: -40 });
+    });
+
+    it("should handle rectangles with zero width or height", () => {
+      const rect = { x: 10, y: 20, width: 0, height: 40 };
+      const origin: cmath.Vector2 = [0, 0];
+      const scale: cmath.Vector2 = [2, 2];
+
+      const result = cmath.rect.scale(rect, origin, scale);
+
+      expect(result).toEqual({ x: 20, y: 40, width: 0, height: 80 });
+    });
+
+    it("should scale multiple rectangles as part of a group transform", () => {
+      const rects = [
+        { x: 10, y: 20, width: 30, height: 40 },
+        { x: 50, y: 60, width: 20, height: 30 },
+        { x: 0, y: 0, width: 10, height: 10 },
+      ];
+      const origin: cmath.Vector2 = [0, 0];
+      const scale: cmath.Vector2 = [2, 2];
+
+      const results = rects.map((rect) =>
+        cmath.rect.scale(rect, origin, scale)
+      );
+
+      expect(results).toEqual([
+        { x: 20, y: 40, width: 60, height: 80 },
+        { x: 100, y: 120, width: 40, height: 60 },
+        { x: 0, y: 0, width: 20, height: 20 },
+      ]);
     });
   });
 });
