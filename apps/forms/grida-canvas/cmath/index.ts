@@ -23,7 +23,7 @@ export namespace cmath {
   export type Scalar = number;
 
   /**
-   * A 2-dimensional vector. (commonly used for positions, sizes, etc.)
+   * A 2-dimensional vector. (commonly used for positions, sizes, segment, etc.)
    */
   export type Vector2 = [number, number];
 
@@ -156,14 +156,18 @@ export namespace cmath.vector2 {
     return [a[0] - b[0], a[1] - b[1]];
   }
 
+  export function multiply(a: Vector2, b: Vector2): Vector2 {
+    return [a[0] * b[0], a[1] * b[1]];
+  }
+
   /**
    * Calculates the angle in degrees of a 2D point relative to an origin.
    *
    * This function computes the angle formed by the vector from the origin to the point
    * relative to the positive x-axis, measured counterclockwise.
    *
-   * @param origin - The origin point [x0, y0].
-   * @param point - The target point [x, y].
+   * @param pointA - The origin point [x0, y0].
+   * @param pointB - The target point [x, y].
    * @returns The angle in degrees, normalized to [0, 360).
    *
    * @example
@@ -172,9 +176,9 @@ export namespace cmath.vector2 {
    * const angle = cmath.vector2.angle(origin, point);
    * console.log(angle); // 45
    */
-  export function angle(origin: Vector2, point: Vector2): number {
-    const [x0, y0] = origin;
-    const [x, y] = point;
+  export function angle(pointA: Vector2, pointB: Vector2): number {
+    const [x0, y0] = pointA;
+    const [x, y] = pointB;
 
     // Calculate the angle in radians
     const radians = Math.atan2(y - y0, x - x0);
@@ -184,6 +188,48 @@ export namespace cmath.vector2 {
 
     // Normalize the angle to [0, 360)
     return (degrees + 360) % 360;
+  }
+
+  /**
+   * Checks if two 1D segments intersect or overlap.
+   *
+   * @param segmentA - The first segment [startA, endA].
+   * @param segmentB - The second segment [startB, endB].
+   * @returns `true` if the segments intersect or overlap, otherwise `false`.
+   */
+  export const intersects = (segmentA: Vector2, segmentB: Vector2): boolean =>
+    segmentA[1] >= segmentB[0] && segmentB[1] >= segmentA[0];
+
+  /**
+   * Calculates the intersection of two 1D segments.
+   *
+   * @param segmentA - The first segment as [startA, endA].
+   * @param segmentB - The second segment as [startB, endB].
+   * @returns A `Vector2` representing the intersection segment, or `null` if the segments do not intersect.
+   *
+   * @example
+   * // Overlapping segments
+   * const intersection = cmath.vector2.intersection([1, 5], [3, 7]);
+   * console.log(intersection); // [3, 5]
+   *
+   * // Non-overlapping segments
+   * const noIntersection = cmath.vector2.intersection([1, 5], [6, 8]);
+   * console.log(noIntersection); // null
+   */
+  export function intersection(
+    segmentA: cmath.Vector2,
+    segmentB: cmath.Vector2
+  ): cmath.Vector2 | null {
+    const start = Math.max(segmentA[0], segmentB[0]); // Largest start point
+    const end = Math.min(segmentA[1], segmentB[1]); // Smallest end point
+
+    // If the segments don't intersect, return null
+    if (start > end) {
+      return null;
+    }
+
+    // Return the intersecting segment as [start, end]
+    return [start, end];
   }
 }
 
@@ -450,6 +496,31 @@ export namespace cmath.rect {
     };
   }
 
+  export function getCardinalPoint(
+    rect: cmath.Rectangle,
+    point: "n" | "e" | "s" | "w" | "ne" | "se" | "sw" | "nw"
+  ): Vector2 {
+    const { x, y, width, height } = rect;
+    switch (point) {
+      case "n":
+        return [x + width / 2, y];
+      case "e":
+        return [x + width, y + height / 2];
+      case "s":
+        return [x + width / 2, y + height];
+      case "w":
+        return [x, y + height / 2];
+      case "ne":
+        return [x + width, y];
+      case "se":
+        return [x + width, y + height];
+      case "sw":
+        return [x, y + height];
+      case "nw":
+        return [x, y];
+    }
+  }
+
   /**
    * Calculates the center point of a rectangle.
    *
@@ -593,6 +664,95 @@ export namespace cmath.rect {
   }
 
   /**
+   * Calculates the overlapping projection of an array of rectangles along the **counter-axis** of the specified projection axis.
+   *
+   * The projection axis determines which axis to analyze for overlap:
+   * - `"x"`: Projects along the `y` axis (compares vertical ranges).
+   * - `"y"`: Projects along the `x` axis (compares horizontal ranges).
+   *
+   * This function determines if all rectangles have overlapping projections along the **counter-axis** of the specified projection axis. It returns the intersecting range as a `Vector2` or `null` if no intersection exists.
+   *
+   * @param rectangles - An array of rectangles to project.
+   * @param projectionAxis - The axis to calculate projections on ("x" for comparing vertical ranges, "y" for comparing horizontal ranges).
+   * @returns A `Vector2` representing the overlapping range of projections along the counter-axis, or `null` if the rectangles do not overlap.
+   *
+   *
+   * ### Visual Explanation
+   *
+   * This illustrates the projection: projectionAxis = "y" (compare x ranges)
+   * ```
+   * | 0  1  2  3  4  5  6  7  8  9  10
+   * |       +--------------+         |
+   * |       |      A       |         |
+   * |       |              |         |
+   * |       +--------------+         |
+   * |            [2 — 7]             |
+   * |                                |
+   * |                +--------+      |
+   * |                |    B   |      |
+   * |                |        |      |
+   * |                +--------+      |
+   * |                  [5 — 8]       |
+   * |                                |
+   * |                   +--------+   |
+   * |                   |   C    |   |
+   * |                   |        |   |
+   * |                   +--------+   |
+   * |                    [6 — 9]     |
+   * |                                |
+   * |                   +--+         |
+   * |                  [6 — 7]       |
+   * |               (Overlapping)    |
+   * ```
+   *
+   * @example
+   * ```typescript
+   * const rectangles = [
+   *   { x: 10, y: 20, width: 30, height: 40 },
+   *   { x: 20, y: 25, width: 40, height: 35 },
+   *   { x: 25, y: 15, width: 30, height: 50 },
+   * ];
+   * const projection = cmath.rect.axisAlignedProjection(rectangles, "x");
+   * console.log(projection); // Outputs: [25, 40] (overlapping vertical range)
+   * ```
+   *
+   * @remarks
+   * - The function reduces the projections of all rectangles along the counter-axis into a single overlapping range.
+   * - Returns `null` if no overlap exists between the projections.
+   * - The rectangles are treated as axis-aligned (non-rotated).
+   */
+  export function axisProjectionIntersection(
+    rectangles: cmath.Rectangle[],
+    projectionAxis: "x" | "y"
+  ): cmath.Vector2 | null {
+    if (rectangles.length < 2) {
+      throw new Error(
+        "At least two rectangles are required to compute axis-aligned projection."
+      );
+    }
+
+    // Map rectangles to projections along the counter-axis
+    const projections = rectangles.map((rect) => {
+      if (projectionAxis === "x") {
+        // If projecting along the x-axis, compare y ranges (vertical segments)
+        return [rect.y, rect.y + rect.height] as cmath.Vector2;
+      } else {
+        // If projecting along the y-axis, compare x ranges (horizontal segments)
+        return [rect.x, rect.x + rect.width] as cmath.Vector2;
+      }
+    });
+
+    // Reduce the projections to find the intersecting range
+    return projections.reduce<cmath.Vector2 | null>(
+      (currentIntersection, projection) => {
+        if (!currentIntersection) return null; // No overlap so far, propagate null
+        return cmath.vector2.intersection(currentIntersection, projection); // Calculate intersection
+      },
+      projections[0] // Start with the first projection
+    );
+  }
+
+  /**
    * Computes the bounding rectangle that fully encloses an array of rectangles.
    *
    * @param rectangles - An array of rectangles to compute the bounding box for.
@@ -692,6 +852,134 @@ export namespace cmath.rect {
         y: newY,
       };
     });
+  }
+
+  /**
+   * Calculates the gaps (spaces) between adjacent rectangles along a specified axis.
+   *
+   * @param rectangles - An array of rectangles to calculate the gaps for.
+   * @param axis - The axis to calculate the gaps along ("x" or "y").
+   * @returns An array of numbers representing the gaps between adjacent rectangles, excluding the last rectangle.
+   *
+   * @example
+   * const rectangles = [
+   *   { x: 10, y: 20, width: 30, height: 40 },
+   *   { x: 50, y: 20, width: 30, height: 40 },
+   *   { x: 90, y: 20, width: 30, height: 40 },
+   * ];
+   * const gaps = getDistribution(rectangles, "x");
+   * console.log(gaps); // [10, 10]
+   */
+  export function getGaps(
+    rectangles: cmath.Rectangle[],
+    axis: "x" | "y"
+  ): number[] {
+    if (rectangles.length < 2) {
+      return [];
+    }
+
+    // Sort rectangles based on their starting position along the specified axis
+    const sorted = [...rectangles].sort((a, b) =>
+      axis === "x" ? a.x - b.x : a.y - b.y
+    );
+
+    // Calculate gaps between adjacent rectangles
+    const gaps: number[] = [];
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const currentEnd =
+        axis === "x"
+          ? sorted[i].x + sorted[i].width
+          : sorted[i].y + sorted[i].height;
+      const nextStart = axis === "x" ? sorted[i + 1].x : sorted[i + 1].y;
+
+      const gap = nextStart - currentEnd;
+      gaps.push(gap);
+    }
+
+    return gaps;
+  }
+
+  /**
+   * Distributes rectangles evenly along a specified axis within the bounding box of the rectangles,
+   * while respecting the original input/output index order.
+   *
+   * The rectangles are repositioned to maintain equal spacing between their edges, calculated relative
+   * to their sorted positions along the specified axis (`x` or `y`). However, the output preserves
+   * the input order of rectangles, ensuring that the final output array corresponds 1:1 to the input.
+   *
+   * @param rectangles - An array of rectangles to distribute.
+   * @param axis - The axis to distribute along ("x" or "y").
+   * @returns A new array of rectangles with updated positions, respecting the original input/output order.
+   *
+   * ### Behaviour
+   * - **Input Order Respected**: The output array maintains the same indexing as the input array,
+   *   even though the internal logic calculates new positions based on the sorted positions of rectangles.
+   * - **Even Spacing**: Rectangles are repositioned to have equal gaps between their edges, distributed
+   *   within the bounding box of the original rectangles.
+   * - **No Shape Modification**: The width, height, and other properties of each rectangle remain unchanged.
+   *
+   * @example
+   * const rectangles = [
+   *   { x: 90, y: 20, width: 30, height: 40 },
+   *   { x: 10, y: 20, width: 30, height: 40 },
+   *   { x: 50, y: 20, width: 30, height: 40 },
+   * ];
+   *
+   * const distributed = cmath.rect.distributeEvenly(rectangles, "x");
+   * console.log(distributed);
+   * // Output:
+   * // [
+   * //   { x: 10, y: 20, width: 30, height: 40 }, // Moved to correct position for first
+   * //   { x: 50, y: 20, width: 30, height: 40 }, // Moved to correct position for second
+   * //   { x: 90, y: 20, width: 30, height: 40 }, // Moved to correct position for third
+   * // ]
+   *
+   * @remarks
+   * - The function ensures rectangles are repositioned evenly but retains their original order in the output array.
+   * - The repositioning logic calculates gaps based on the sorted positions of rectangles along the specified axis.
+   * - If fewer than 2 rectangles are provided, the input is returned unchanged.
+   */
+  export function distributeEvenly(
+    rectangles: cmath.Rectangle[],
+    axis: "x" | "y"
+  ): cmath.Rectangle[] {
+    if (rectangles.length < 2) return rectangles;
+
+    // Calculate bounding box and total available size
+    const boundingBox = cmath.rect.getBoundingRect(rectangles);
+    const start = axis === "x" ? boundingBox.x : boundingBox.y;
+    const totalSize = axis === "x" ? boundingBox.width : boundingBox.height;
+
+    // Calculate the total size occupied by the rectangles
+    const totalRectSize = rectangles.reduce(
+      (sum, rect) => sum + (axis === "x" ? rect.width : rect.height),
+      0
+    );
+
+    // Determine the new gap size for even distribution
+    const gapSize = (totalSize - totalRectSize) / (rectangles.length - 1);
+
+    // Sort rectangles by position along the specified axis
+    const sortedIndexes = [...rectangles.map((_, index) => index)].sort(
+      (a, b) =>
+        axis === "x"
+          ? rectangles[a].x - rectangles[b].x
+          : rectangles[a].y - rectangles[b].y
+    );
+
+    // Distribute rectangles evenly along the axis
+    let currentPosition = start;
+    const distributed = new Array(rectangles.length);
+    for (const index of sortedIndexes) {
+      const rect = rectangles[index];
+      distributed[index] = {
+        ...rect,
+        [axis]: currentPosition, // Update position along the axis
+      };
+      currentPosition += (axis === "x" ? rect.width : rect.height) + gapSize;
+    }
+
+    return distributed;
   }
 }
 

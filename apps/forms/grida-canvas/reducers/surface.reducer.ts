@@ -217,15 +217,11 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
           assert(state.selection.length === 1);
           const node_id = state.selection[0];
 
-          const [dx, dy] = delta;
           return produce(state, (draft) => {
-            const node = documentquery.__getNodeById(draft, node_id);
-
-            draft.document.nodes[node_id] = nodeTransformReducer(node, {
-              type: "resize",
-              anchor: "se",
-              dx: dx,
-              dy: dy,
+            self_dragResize(draft, {
+              node_id,
+              handle: "se",
+              delta: delta,
             });
           });
         }
@@ -308,24 +304,16 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
     case "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag": {
       const {
         node_id,
-        anchor,
+        handle,
         event: { delta, distance },
       } = action;
-      const [dx, dy] = delta;
 
       // cancel if invalid state
       if (!state.is_gesture_node_drag_resize) return state;
 
       return produce(state, (draft) => {
         // once the node's measurement mode is set to fixed (from drag start), we may safely cast the width / height sa fixed number
-        const node = documentquery.__getNodeById(draft, node_id);
-
-        draft.document.nodes[node_id] = nodeTransformReducer(node, {
-          type: "resize",
-          anchor,
-          dx: dx,
-          dy: dy,
-        });
+        self_dragResize(draft, { node_id, handle, delta });
       });
       //
       //
@@ -405,7 +393,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
     case "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag": {
       const {
         node_id,
-        anchor,
+        handle: anchor,
         event: { delta, movement },
       } = <EditorSurface_NodeOverlayRotationHandle_Drag>action;
 
@@ -467,6 +455,60 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
   }
   //
   return state;
+}
+
+/**
+ * maps the resize handle (direction) to the transform origin point (inverse)
+ */
+const __resize_handle_to_transform_origin_point = {
+  nw: "se",
+  ne: "sw",
+  sw: "ne",
+  se: "nw",
+} as const;
+
+/**
+ * maps the resize handle (direction) to the mouse delta direction multiplier (inverse)
+ */
+const __resize_handle_to_mouse_delta_multiplier = {
+  nw: [-1, -1] as cmath.Vector2,
+  ne: [1, -1] as cmath.Vector2,
+  sw: [-1, 1] as cmath.Vector2,
+  se: [1, 1] as cmath.Vector2,
+} as const;
+
+function self_dragResize(
+  draft: Draft<IDocumentEditorState>,
+  {
+    node_id,
+    handle,
+    delta,
+  }: {
+    node_id: string;
+    handle: "nw" | "ne" | "sw" | "se";
+    // raw delta from mouse event
+    delta: cmath.Vector2;
+  }
+) {
+  const [_dx, _dy] = delta;
+
+  const node = documentquery.__getNodeById(draft, node_id);
+
+  // get the origin point based on handle
+  const origin = __resize_handle_to_transform_origin_point[handle];
+
+  // inverse the delta based on handle
+  const [dx, dy] = cmath.vector2.multiply(
+    __resize_handle_to_mouse_delta_multiplier[handle],
+    [_dx, _dy]
+  );
+
+  draft.document.nodes[node_id] = nodeTransformReducer(node, {
+    type: "resize",
+    origin: origin,
+    dx: dx,
+    dy: dy,
+  });
 }
 
 function self_dragStartSelection(draft: Draft<IDocumentEditorState>) {

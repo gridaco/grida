@@ -894,6 +894,17 @@ export function useDocument() {
     [dispatch]
   );
 
+  const distributeEvenly = useCallback(
+    (target: "selection" | string[] = "selection", axis: "x" | "y") => {
+      dispatch({
+        type: "distribute-evenly",
+        target,
+        axis,
+      });
+    },
+    [dispatch]
+  );
+
   const configureSurfaceRaycastTargeting = useCallback(
     (config: Partial<SurfaceRaycastTargeting>) => {
       dispatch({
@@ -1061,6 +1072,7 @@ export function useDocument() {
       deleteNode,
       nudge,
       align,
+      distributeEvenly,
       configureSurfaceRaycastTargeting,
       configureMeasurement,
       //
@@ -1085,6 +1097,7 @@ export function useDocument() {
     deleteNode,
     nudge,
     align,
+    distributeEvenly,
     configureSurfaceRaycastTargeting,
     configureMeasurement,
     //
@@ -1146,7 +1159,7 @@ export function useEventTarget() {
   const {
     is_gesture_node_drag_move: is_node_transforming,
     hovered_node_id,
-    selection: selected_node_ids,
+    selection,
     surface_content_edit_mode: content_edit_mode,
     cursor_mode,
     marquee,
@@ -1411,7 +1424,7 @@ export function useEventTarget() {
         dispatch({
           type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag",
           node_id,
-          anchor,
+          handle: anchor,
           event,
         });
       });
@@ -1449,7 +1462,7 @@ export function useEventTarget() {
         dispatch({
           type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag",
           node_id,
-          anchor,
+          handle: anchor,
           event,
         });
       });
@@ -1487,7 +1500,7 @@ export function useEventTarget() {
         dispatch({
           type: "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag",
           node_id,
-          anchor,
+          handle: anchor,
           event,
         });
       });
@@ -1503,7 +1516,7 @@ export function useEventTarget() {
       setCursorMode,
       //
       hovered_node_id,
-      selected_node_ids,
+      selection,
       is_node_transforming,
       content_edit_mode,
       //
@@ -1543,7 +1556,7 @@ export function useEventTarget() {
     setCursorMode,
     //
     hovered_node_id,
-    selected_node_ids,
+    selection,
     is_node_transforming,
     content_edit_mode,
     //

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useContext, useEffect, useRef, useState } from "react";
+import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useEventTarget } from "@/grida-canvas";
 import { useGesture } from "@use-gesture/react";
 import {
@@ -9,7 +9,6 @@ import {
   useNode,
   useNodeAction,
 } from "../provider";
-import { RotationCursorIcon } from "../components/cursor";
 import { grida } from "@/grida";
 import { useIsWindowResizing } from "./hooks/window-resizing";
 import { supports } from "@/grida/utils/supports";
@@ -25,13 +24,16 @@ import { useMeasurement, useSnapGuide } from "./hooks/__tmp";
 import { Crosshair } from "./ui/crosshair";
 import { MeasurementGuide } from "./ui/measurement";
 import { Knob } from "./ui/knob";
+import { ColumnsIcon, RowsIcon } from "@radix-ui/react-icons";
+import { cmath } from "../cmath";
+import { cursors } from "../components/cursor";
 
 export function EditorSurface() {
   const isWindowResizing = useIsWindowResizing();
   const {
     marquee,
     hovered_node_id,
-    selected_node_ids,
+    selection,
     is_node_transforming,
     content_edit_mode,
     pointerMove,
@@ -138,14 +140,14 @@ export function EditorSurface() {
         data-transforming={is_node_transforming || isWindowResizing}
         className="opacity-100 data-[transforming='true']:opacity-0 transition-colors"
       >
-        {content_edit_mode === "text" && selected_node_ids.length === 1 && (
-          <SurfaceTextEditor node_id={selected_node_ids[0]} />
+        {content_edit_mode === "text" && selection.length === 1 && (
+          <SurfaceTextEditor node_id={selection[0]} />
         )}
         <div className="w-full h-full" id="canvas-overlay-portal" ref={ref}>
-          <SelectionOverlay selection={selected_node_ids} readonly={false} />
+          <SelectionOverlay selection={selection} readonly={false} />
           {!marquee &&
             hovered_node_id &&
-            !selected_node_ids.includes(hovered_node_id) && (
+            !selection.includes(hovered_node_id) && (
               <NodeOverlay node_id={hovered_node_id} readonly />
             )}
           <div id="marquee-container" className="absolute top-0 left-0 w-0 h-0">
@@ -244,6 +246,7 @@ function GroupOverlay({
         zIndex={10}
       >
         {/* <Knob anchor="se" /> */}
+        <DistributeButton />
       </LayerOverlay>
       {
         // also hightlight the included nodes
@@ -306,22 +309,21 @@ function NodeOverlay({
       {!readonly && (
         <>
           {/* top left */}
-          {/* <ResizeHandle anchor="nw" readonly={readonly} node_id={node_id} /> */}
+          <LayerOverlayResizeHandle anchor="nw" node_id={node_id} />
           {/* top right */}
-          {/* <ResizeHandle anchor="ne" readonly={readonly} node_id={node_id} /> */}
+          <LayerOverlayResizeHandle anchor="ne" node_id={node_id} />
           {/* bottom left */}
-          {/* <ResizeHandle anchor="sw" readonly={readonly} node_id={node_id} /> */}
+          <LayerOverlayResizeHandle anchor="sw" node_id={node_id} />
           {/* bottom right */}
-          <LayerOverlayResizeHandle
-            anchor="se"
-            readonly={readonly}
-            node_id={node_id}
-          />
+          <LayerOverlayResizeHandle anchor="se" node_id={node_id} />
           {supports.cornerRadius(node.type) &&
             !supports.children(node.type) && (
               <NodeOverlayCornerRadiusHandle anchor="se" node_id={node_id} />
             )}
+          <LayerOverlayRotationHandle anchor="nw" node_id={node_id} />
           <LayerOverlayRotationHandle anchor="ne" node_id={node_id} />
+          <LayerOverlayRotationHandle anchor="sw" node_id={node_id} />
+          <LayerOverlayRotationHandle anchor="se" node_id={node_id} />
         </>
       )}
     </LayerOverlay>
@@ -402,7 +404,7 @@ function NodeOverlayCornerRadiusHandle({
 function LayerOverlayRotationHandle({
   node_id,
   anchor,
-  offset = 8,
+  offset = 10,
   size = 16,
 }: {
   node_id: string;
@@ -410,8 +412,11 @@ function LayerOverlayRotationHandle({
   offset?: number;
   size?: number;
 }) {
+  const { getNodeAbsoluteRotation } = useDocument();
   const { dragRotationHandleStart, dragRotationHandle, dragRotationHandleEnd } =
     useEventTarget();
+
+  const rotation = getNodeAbsoluteRotation(node_id);
 
   const bind = useGesture(
     {
@@ -441,6 +446,20 @@ function LayerOverlayRotationHandle({
     }
   );
 
+  const anchor_initial_cursor_rotation = {
+    nw: -45,
+    ne: 45,
+    sw: -135,
+    se: 135,
+  };
+
+  const cursor_svg_data = useMemo(() => {
+    // TODO: not accurate
+    const initial_rotation = anchor_initial_cursor_rotation[anchor];
+    const svg_rotation = rotation === 0 ? initial_rotation : rotation;
+    return cursors.rotate_svg_data(svg_rotation);
+  }, [rotation, anchor]);
+
   return (
     <div
       {...bind()}
@@ -455,24 +474,20 @@ function LayerOverlayRotationHandle({
         width: size,
         height: size,
         transform: `translate(${anchor[1] === "w" ? "-50%" : "50%"}, ${anchor[0] === "n" ? "-50%" : "50%"})`,
-        cursor: "pointer",
+        cursor: `url(${cursor_svg_data}) 12 12, auto`,
         touchAction: "none",
       }}
-    >
-      <RotationCursorIcon />
-    </div>
+    />
   );
 }
 
 function LayerOverlayResizeHandle({
   node_id,
   anchor,
-  readonly,
   size = 8,
 }: {
   node_id: string;
   anchor: "nw" | "ne" | "sw" | "se";
-  readonly?: boolean;
   size?: number;
 }) {
   const { dragResizeHandleStart, dragResizeHandleEnd, dragResizeHandle } =
@@ -653,3 +668,61 @@ function Rule({
     />
   );
 }
+
+function usePrefferedDistributionAxis() {
+  const { selection, state, distributeEvenly } = useDocument();
+
+  const [axis, setAxis] = useState<"x" | "y">();
+
+  useEffect(() => {
+    const rects = selection.map((node_id) =>
+      domapi.get_node_bounding_rect(node_id)
+    );
+    const x_distribute = cmath.rect.axisProjectionIntersection(rects, "x");
+    if (x_distribute) {
+      const dist = cmath.rect.getGaps(rects, "x");
+      if (!gapsAreAligned(dist)) {
+        setAxis("x");
+        return;
+      }
+    }
+
+    const y_distribute = cmath.rect.axisProjectionIntersection(rects, "y");
+    if (y_distribute) {
+      const dist = cmath.rect.getGaps(rects, "y");
+      if (!gapsAreAligned(dist)) {
+        setAxis("y");
+        return;
+      }
+    }
+
+    setAxis(undefined);
+  }, [selection, state.document.nodes]);
+
+  return axis;
+}
+
+function DistributeButton() {
+  const { distributeEvenly } = useDocument();
+  const axis = usePrefferedDistributionAxis();
+  const onClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    distributeEvenly("selection", axis!);
+  };
+
+  if (!axis) return <></>;
+
+  return (
+    <div className="absolute hidden group-hover:block bottom-1 right-1 z-50">
+      <button
+        className="p-1 bg-workbench-accent-sky text-white rounded"
+        onClick={onClick}
+      >
+        {axis === "x" ? <ColumnsIcon /> : <RowsIcon />}
+      </button>
+    </div>
+  );
+}
+
+const gapsAreAligned = (arr: number[], tolerance = 0.1) =>
+  arr.every((v) => Math.abs(v - arr[0]) <= tolerance);

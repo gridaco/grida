@@ -17,6 +17,7 @@ export type DocumentAction =
   | EditorDeleteAction
   | EditorNudgeAction
   | EditorAlignAction
+  | EditorDistributeEvenlyAction
   | DocumentEditorInsertNodeAction
   //
   | SurfaceAction
@@ -102,6 +103,12 @@ export interface EditorAlignAction {
     horizontal?: "none" | "min" | "max" | "center";
     vertical?: "none" | "min" | "max" | "center";
   };
+}
+
+export interface EditorDistributeEvenlyAction {
+  type: "distribute-evenly";
+  target: NodeID[] | "selection";
+  axis: "x" | "y";
 }
 
 export type EditorConfigAction =
@@ -260,7 +267,7 @@ export type EditorSurface_CursorMode = {
 };
 
 interface ICanvasEventTargetResizeHandleEvent {
-  anchor: "nw" | "ne" | "sw" | "se";
+  handle: "nw" | "ne" | "sw" | "se";
 }
 
 /**

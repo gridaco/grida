@@ -19,12 +19,14 @@ import React from "react";
 export function AlignControl({
   disabled,
   onAlign,
+  onDistributeEvenly,
 }: {
   disabled?: boolean;
   onAlign?: (alignment: {
     horizontal?: "none" | "min" | "max" | "center";
     vertical?: "none" | "min" | "max" | "center";
   }) => void;
+  onDistributeEvenly?: (axis: "x" | "y") => void;
 }) {
   return (
     <div className="w-full flex items-center gap-2">
@@ -91,7 +93,7 @@ export function AlignControl({
           disabled={disabled}
           tooltip="Distribute horizontally"
           onClick={() => {
-            // onAlign?.({ vertical: "min" });
+            onDistributeEvenly?.("x");
           }}
         >
           <SpaceEvenlyHorizontallyIcon />
@@ -100,7 +102,7 @@ export function AlignControl({
           disabled={disabled}
           tooltip="Distribute vertically"
           onClick={() => {
-            // onAlign?.({ vertical: "center" });
+            onDistributeEvenly?.("y");
           }}
         >
           <SpaceEvenlyVerticallyIcon />

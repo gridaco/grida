@@ -126,6 +126,8 @@ export default function documentReducer<S extends IDocumentEditorState>(
 
       const target_node_ids =
         target === "selection" ? state.selection : [target];
+
+      // clone the target_node_ids
       const bounding_node_ids = Array.from(target_node_ids);
 
       if (target_node_ids.length === 1) {
@@ -162,6 +164,45 @@ export default function documentReducer<S extends IDocumentEditorState>(
       return produce(state, (draft) => {
         let i = 0;
         for (const node_id of bounding_node_ids) {
+          const node = documentquery.__getNodeById(state, node_id);
+          const moved = nodeTransformReducer(node, {
+            type: "translate",
+            dx: deltas[i].dx,
+            dy: deltas[i].dy,
+          });
+          draft.document.nodes[node_id] = moved;
+          i++;
+        }
+      });
+
+      break;
+    }
+    case "distribute-evenly": {
+      const { target, axis } = action;
+      const target_node_ids = target === "selection" ? state.selection : target;
+
+      const rects = target_node_ids.map((node_id) =>
+        // FIXME: do not use domapi in reducer
+        domapi.get_node_element(node_id)!.getBoundingClientRect()
+      );
+
+      // Only allow distribute-evenly of 3 or more nodes
+      if (target_node_ids.length < 3) return state;
+
+      //
+      const transformed = cmath.rect.distributeEvenly(rects, axis);
+
+      const deltas = transformed.map((rect, i) => {
+        const target_rect = rects[i];
+        const dx = rect.x - target_rect.x;
+        const dy = rect.y - target_rect.y;
+
+        return { dx, dy };
+      });
+
+      return produce(state, (draft) => {
+        let i = 0;
+        for (const node_id of target_node_ids) {
           const node = documentquery.__getNodeById(state, node_id);
           const moved = nodeTransformReducer(node, {
             type: "translate",

@@ -391,7 +391,7 @@ export default function CanvasPlayground() {
 }
 
 function AlignNodes() {
-  const { state, align } = useDocument();
+  const { state, align, distributeEvenly } = useDocument();
   const has_selection = state.selection.length >= 1;
 
   return (
@@ -400,6 +400,9 @@ function AlignNodes() {
         disabled={!has_selection}
         onAlign={(alignment) => {
           align("selection", alignment);
+        }}
+        onDistributeEvenly={(axis) => {
+          distributeEvenly("selection", axis);
         }}
       />
     </SidebarSection>

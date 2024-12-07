@@ -12,37 +12,87 @@ export function useEditorHotKeys() {
     deleteNode,
     nudge,
     align,
+    distributeEvenly,
     configureSurfaceRaycastTargeting,
     configureMeasurement,
     clearSelection,
     selectedNode,
   } = useDocument();
 
+  // always triggering. (alt, meta, ctrl, shift)
+  useHotkeys(
+    "*",
+    (e) => {
+      switch (e.key) {
+        case "Meta":
+        case "Control":
+          configureSurfaceRaycastTargeting({ target: "deepest" });
+          break;
+        case "Alt":
+          configureMeasurement("on");
+          break;
+      }
+      //
+    },
+    {
+      keydown: true,
+      keyup: false,
+    }
+  );
+
+  useHotkeys(
+    "*",
+    (e) => {
+      switch (e.key) {
+        case "Meta":
+        case "Control":
+          configureSurfaceRaycastTargeting({ target: "shallowest" });
+          break;
+        case "Alt":
+          configureMeasurement("off");
+          break;
+      }
+      //
+    },
+    {
+      keydown: false,
+      keyup: true,
+    }
+  );
+  //
+
   useHotkeys("meta+z, ctrl+z", () => {
+    // TODO:
     toast.error("[undo] is not implemented yet");
   });
 
   useHotkeys("meta+shift+z, ctrl+shift+z", () => {
+    // TODO:
     toast.error("[redo] is not implemented yet");
   });
 
   useHotkeys("meta+b, ctrl+b", () => {
+    // TODO:
     toast.error("[bold] is not implemented yet");
   });
 
   useHotkeys("shift+r", () => {
+    // TODO:
     toast.error("[ruler] is not implemented yet");
   });
 
   useHotkeys("meta+d, ctrl+d", () => {
+    // TODO:
     toast.error("[duplicate] is not implemented yet");
   });
 
   useHotkeys("shift+h", () => {
+    // TODO:
     toast.error("[flip horizontal] is not implemented yet");
   });
 
   useHotkeys("shift+v", () => {
+    // TODO:
     toast.error("[flip vertical] is not implemented yet");
   });
 
@@ -97,53 +147,6 @@ export function useEditorHotKeys() {
     tryExitContentEditMode();
     clearSelection();
   });
-
-  // keydown
-  useHotkeys(
-    "Meta, Control",
-    () => {
-      configureSurfaceRaycastTargeting({ target: "deepest" });
-    },
-    {
-      keydown: true,
-      keyup: false,
-    }
-  );
-
-  // keyup
-  useHotkeys(
-    "Meta, Control",
-    () => {
-      configureSurfaceRaycastTargeting({ target: "shallowest" });
-    },
-    {
-      keydown: false,
-      keyup: true,
-    }
-  );
-
-  // keydown
-  useHotkeys(
-    "alt",
-    () => {
-      configureMeasurement("on");
-    },
-    {
-      keydown: true,
-      keyup: false,
-    }
-  );
-
-  useHotkeys(
-    "alt",
-    () => {
-      configureMeasurement("off");
-    },
-    {
-      keydown: false,
-      keyup: true,
-    }
-  );
 
   // keyup
 
@@ -218,15 +221,26 @@ export function useEditorHotKeys() {
     });
   });
 
+  useHotkeys("alt+ctrl+v", (e) => {
+    distributeEvenly("selection", "x");
+  });
+
+  useHotkeys("alt+ctrl+h", (e) => {
+    distributeEvenly("selection", "y");
+  });
+
   useHotkeys("shift+a", (e) => {
+    // TODO:
     toast.error("[container layout] is not implemented yet");
   });
 
   useHotkeys("alt+meta+k, alt+ctrl+k", (e) => {
+    // TODO:
     toast.error("[create component] is not implemented yet");
   });
 
   useHotkeys("alt+meta+b, alt+ctrl+b", (e) => {
+    // TODO:
     toast.error("[eject component] is not implemented yet");
   });
 }

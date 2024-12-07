@@ -2,6 +2,7 @@ import { produce } from "immer";
 import { grida } from "@/grida";
 import assert from "assert";
 import { cmath } from "../cmath";
+import { domapi } from "../domapi";
 
 type NodeTransformAction =
   | {
@@ -28,13 +29,13 @@ type NodeTransformAction =
     }
   | {
       type: "resize";
-      anchor: "nw" | "ne" | "sw" | "se";
+      origin: "nw" | "ne" | "sw" | "se";
       /**
-       * distance or delta
+       * delta
        */
       dx: number;
       /**
-       * distance or delta
+       * delta
        */
       dy: number;
     };
@@ -69,47 +70,33 @@ export default function nodeTransformReducer(
         return moveNode(draft, dx, dy);
       }
       case "resize": {
-        const { anchor, dx, dy } = action;
-        //
-        // TODO: calculate the final delta based on anchor and movement delta
+        const { origin: _origin, dx, dy } = action;
 
-        switch (anchor) {
-          case "nw": {
-            break;
-          }
-          case "ne": {
-            break;
-          }
-          case "sw": {
-            break;
-          }
-          case "se": {
-            if (dx) {
-              ((draft as grida.program.nodes.i.ICSSDimension)
-                .width as number) += dx;
+        const rect = domapi.get_node_bounding_rect(draft.id);
 
-              if (draft.right !== undefined) {
-                draft.right -= dx;
-              }
-            }
+        const scale: cmath.Vector2 = [
+          (rect.width + dx) / rect.width,
+          (rect.height + dy) / rect.height,
+        ];
 
-            if (dy) {
-              if (draft.type === "line") {
-                // line cannot be resized in height
-                draft.height = 0;
-                break;
-              }
-              ((draft as grida.program.nodes.i.ICSSDimension)
-                .height as number) += dy;
+        const origin = cmath.rect.getCardinalPoint(rect, _origin);
 
-              if (draft.bottom !== undefined) {
-                draft.bottom -= dy;
-              }
-            }
+        const scaled = cmath.rect.scale(rect, origin, scale);
 
-            break;
-          }
+        const _draft = draft as grida.program.nodes.i.ICSSDimension &
+          grida.program.nodes.i.IPositioning;
+
+        // position
+        if (_draft.position === "absolute") {
+          // TODO: handle right and bottom
+          _draft.left = scaled.x;
+          _draft.top = scaled.y;
         }
+
+        // size
+        _draft.width = Math.max(scaled.width, 0);
+        if (draft.type === "line") _draft.height = 0;
+        else _draft.height = Math.max(scaled.height, 0);
 
         return;
       }
