@@ -24,6 +24,7 @@ import {
 import { useMeasurement, useSnapGuide } from "./hooks/__tmp";
 import { Crosshair } from "./ui/crosshair";
 import { MeasurementGuide } from "./ui/measurement";
+import { Knob } from "./ui/knob";
 
 export function EditorSurface() {
   const isWindowResizing = useIsWindowResizing();
@@ -175,20 +176,20 @@ function SelectionOverlay({
   } else if (selection.length === 1) {
     return <NodeOverlay node_id={selection[0]} readonly={readonly} />;
   } else {
-    return <GroupOverlay node_ids={selection} readonly={readonly} />;
+    return <GroupOverlay selection={selection} readonly={readonly} />;
   }
 }
 
 function GroupOverlay({
-  node_ids,
+  selection,
   readonly,
 }: {
-  node_ids: string[];
+  selection: string[];
   readonly?: boolean;
 }) {
   const { layerDragStart, layerDragEnd, layerDrag, layerClick } =
     useEventTarget();
-  const transform = useGroupSurfaceTransform(...node_ids);
+  const transform = useGroupSurfaceTransform(...selection);
 
   // as there is no native way to prevent onclick from triggering after drag, this is a trick to prevent it.
   // resetting this will be delayed by 100ms (on drag end)
@@ -201,11 +202,11 @@ function GroupOverlay({
       },
       onDragStart: (e) => {
         e.event.stopPropagation();
-        layerDragStart(node_ids, e);
+        layerDragStart(selection, e);
       },
       onDragEnd: (e) => {
         e.event.stopPropagation();
-        layerDragEnd(node_ids, e);
+        layerDragEnd(selection, e);
         setTimeout(() => {
           wasDragging.current = false;
         }, 100);
@@ -215,14 +216,14 @@ function GroupOverlay({
           wasDragging.current = true;
         }
         e.event.stopPropagation();
-        layerDrag(node_ids, e);
+        layerDrag(selection, e);
       },
       onClick: (e) => {
         e.event.stopPropagation();
         if (wasDragging.current) {
           return;
         }
-        layerClick(node_ids, e.event);
+        layerClick(selection, e.event);
       },
     },
     {
@@ -241,11 +242,13 @@ function GroupOverlay({
         readonly={readonly}
         transform={transform}
         zIndex={10}
-      />
+      >
+        {/* <Knob anchor="se" /> */}
+      </LayerOverlay>
       {
         // also hightlight the included nodes
-        node_ids.map((node_id) => (
-          <NodeOverlay key={node_id} node_id={node_id} readonly zIndex={20} />
+        selection.map((node_id) => (
+          <NodeOverlay key={node_id} node_id={node_id} readonly zIndex={1} />
         ))
       }
     </>
@@ -509,31 +512,8 @@ function LayerOverlayResizeHandle({
     }
   );
 
-  return (
-    <div
-      {...bind()}
-      className="border bg-white border-workbench-accent-sky absolute z-10 pointer-events-auto"
-      style={{
-        top: anchor[0] === "n" ? 0 : "auto",
-        bottom: anchor[0] === "s" ? 0 : "auto",
-        left: anchor[1] === "w" ? 0 : "auto",
-        right: anchor[1] === "e" ? 0 : "auto",
-        width: size,
-        height: size,
-        transform: `translate(${anchor[1] === "w" ? "-50%" : "50%"}, ${anchor[0] === "n" ? "-50%" : "50%"})`,
-        cursor: readonly ? "default" : __resize_handle_cursor_map[anchor],
-        touchAction: "none",
-      }}
-    />
-  );
+  return <Knob size={size} {...bind()} anchor={anchor} />;
 }
-
-const __resize_handle_cursor_map = {
-  nw: "nwse-resize",
-  ne: "nesw-resize",
-  sw: "nesw-resize",
-  se: "nwse-resize",
-};
 
 function SurfaceTextEditor({ node_id }: { node_id: string }) {
   const inputref = useRef<HTMLTextAreaElement>(null);

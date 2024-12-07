@@ -1,6 +1,8 @@
 import { cmath } from ".";
 
 export interface Measurement {
+  a: cmath.Rectangle;
+  b: cmath.Rectangle;
   box: cmath.Rectangle;
   /**
    * top, right, bottom, left
@@ -28,6 +30,8 @@ export function measure(a: cmath.Rectangle, b: cmath.Rectangle): Measurement {
   if (!intersection) {
     const spacing = calculateNonIntersectingSpacing(a, b);
     return {
+      a,
+      b,
       box: a,
       distance: spacing,
     };
@@ -35,15 +39,14 @@ export function measure(a: cmath.Rectangle, b: cmath.Rectangle): Measurement {
 
   // If `a` contains `b`
   if (cmath.rect.contains(b, a)) {
-    return {
-      box: b,
-      distance: calculateContainerSpacing(a, b),
-    };
+    return { a, b, box: b, distance: calculateContainerSpacing(a, b) };
   }
 
   // If `b` contains `a`
   if (cmath.rect.contains(a, b)) {
     return {
+      a,
+      b,
       box: a,
       distance: calculateContainerSpacing(b, a),
     };
@@ -53,6 +56,8 @@ export function measure(a: cmath.Rectangle, b: cmath.Rectangle): Measurement {
   const spacing = calculateIntersectingSpacing(a, b, intersection);
 
   return {
+    a,
+    b,
     box: intersection,
     distance: spacing,
   };

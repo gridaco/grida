@@ -72,7 +72,7 @@ export function useSnapGuide() {
       x: anchors.x.map((x) => cmath.vector2.add(x, delta)),
       y: anchors.y.map((y) => cmath.vector2.add(y, delta)),
     });
-  }, [state]);
+  }, [state.document, state.document_ctx, selected_node_ids]);
 
   return {
     x: snaps?.x?.map((snap) => ({
@@ -91,30 +91,30 @@ export function useMeasurement() {
   const { translate, surface_measurement_target } = state;
 
   const [measurement, setMeasurement] = useState<Measurement>();
-  const [targetRect, setTargetRect] = useState<null | cmath.Rectangle>(null);
 
   useEffect(() => {
-    const a = selection[0];
     const b = surface_measurement_target;
 
-    if (!a || !b) {
+    if (!(selection.length > 0) || !b) {
       setMeasurement(undefined);
       return;
     }
 
-    const _a_rect = domapi.get_node_bounding_rect(a);
+    const _a_rect = cmath.rect.getBoundingRect(
+      selection.map((id) => domapi.get_node_bounding_rect(id)!)
+    );
     const a_rect = cmath.rect.translate(_a_rect, translate!);
     const _b_rect = domapi.get_node_bounding_rect(b);
     const b_rect = cmath.rect.translate(_b_rect, translate!);
 
-    setTargetRect(b_rect);
-
     const measurement = measure(a_rect, b_rect);
     setMeasurement({
+      a: a_rect,
+      b: b_rect,
       distance: measurement.distance,
       box: measurement.box, // cmath.rect.translate(measurement.box),
     });
-  }, [state]);
+  }, [state.document, selection, surface_measurement_target, translate]);
 
-  return { measurement, targetRect };
+  return measurement;
 }

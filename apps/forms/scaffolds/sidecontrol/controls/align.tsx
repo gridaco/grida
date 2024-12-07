@@ -11,6 +11,8 @@ import {
   AlignBottomIcon,
   AlignCenterHorizontallyIcon,
   AlignCenterVerticallyIcon,
+  SpaceEvenlyHorizontallyIcon,
+  SpaceEvenlyVerticallyIcon,
 } from "@radix-ui/react-icons";
 import React from "react";
 
@@ -82,6 +84,26 @@ export function AlignControl({
           }}
         >
           <AlignBottomIcon />
+        </Item>
+      </div>
+      <div className="flex items-center gap-0 justify-center">
+        <Item
+          disabled={disabled}
+          tooltip="Distribute horizontally"
+          onClick={() => {
+            // onAlign?.({ vertical: "min" });
+          }}
+        >
+          <SpaceEvenlyHorizontallyIcon />
+        </Item>
+        <Item
+          disabled={disabled}
+          tooltip="Distribute vertically"
+          onClick={() => {
+            // onAlign?.({ vertical: "center" });
+          }}
+        >
+          <SpaceEvenlyVerticallyIcon />
         </Item>
       </div>
     </div>

@@ -8,14 +8,13 @@ import { cn } from "@/utils";
 import { cmath } from "@/grida-canvas/cmath";
 
 export function MeasurementGuide() {
-  const { measurement, targetRect } = useMeasurement();
+  const measurement = useMeasurement();
 
   if (!measurement) return <></>;
 
-  const { distance, box } = measurement;
+  const { distance, box, a, b } = measurement;
 
   const [st, sr, sb, sl] = distance;
-  const b = targetRect || box;
 
   const [tx, ty, tx2, ty2, tl, tr] = guide_line_xylr(box, "top", st);
   const [rx, ry, rx2, ry2, rl, rr] = guide_line_xylr(box, "right", sr);
@@ -37,7 +36,8 @@ export function MeasurementGuide() {
     >
       {/* box */}
       <>
-        <Rectangle rect={box} />
+        <Rectangle rect={a} />
+        <Rectangle rect={b} />
       </>
       <Conditional length={st}>
         <SpacingGuideLine x={tx} y={ty} length={tl} rotation={tr} />
