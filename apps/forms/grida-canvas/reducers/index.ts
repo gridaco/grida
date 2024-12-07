@@ -38,6 +38,25 @@ export default function reducer<S extends IDocumentEditorState>(
         self_updateSurfaceHoverState(draft);
       });
     }
+    case "config/surface/measurement": {
+      const { measurement } = action;
+      return produce(state, (draft: Draft<S>) => {
+        switch (measurement) {
+          case "on": {
+            draft.surface_measurement_targeting = "on";
+            self_updateSurfaceHoverState(draft);
+            break;
+          }
+          case "off": {
+            draft.surface_measurement_targeting = "off";
+            draft.surface_measurement_target = undefined;
+            self_updateSurfaceHoverState(draft);
+            break;
+          }
+        }
+      });
+      break;
+    }
     default:
       return documentReducer(state, action);
   }

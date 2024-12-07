@@ -904,6 +904,16 @@ export function useDocument() {
     [dispatch]
   );
 
+  const configureMeasurement = useCallback(
+    (measurement: "on" | "off") => {
+      dispatch({
+        type: "config/surface/measurement",
+        measurement,
+      });
+    },
+    [dispatch]
+  );
+
   const clearSelection = useCallback(
     () =>
       dispatch({
@@ -1052,6 +1062,7 @@ export function useDocument() {
       nudge,
       align,
       configureSurfaceRaycastTargeting,
+      configureMeasurement,
       //
       clearSelection,
       getNodeDepth,
@@ -1075,6 +1086,7 @@ export function useDocument() {
     nudge,
     align,
     configureSurfaceRaycastTargeting,
+    configureMeasurement,
     //
     clearSelection,
     getNodeDepth,

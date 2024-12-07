@@ -74,6 +74,11 @@ export function self_updateSurfaceHoverState<S extends IDocumentEditorState>(
     context: draft,
   });
   draft.hovered_node_id = target;
+
+  if (draft.surface_measurement_targeting === "on") {
+    draft.surface_measurement_target = target;
+  }
+
   return draft;
 }
 

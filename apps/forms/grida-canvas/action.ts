@@ -104,11 +104,18 @@ export interface EditorAlignAction {
   };
 }
 
-export type EditorConfigAction = EditorConfigureRaycastTargetingAction;
+export type EditorConfigAction =
+  | EditorConfigureRaycastTargetingAction
+  | EditorConfigureMeasurementAction;
 
 export interface EditorConfigureRaycastTargetingAction {
   type: "config/surface/raycast-targeting";
   config: Partial<SurfaceRaycastTargeting>;
+}
+
+export interface EditorConfigureMeasurementAction {
+  type: "config/surface/measurement";
+  measurement: "on" | "off";
 }
 
 interface IHtmlBackendCanvasEventTargetPointerEvent {

@@ -1,4 +1,5 @@
 import { cmath } from "@/grida-canvas/cmath";
+import { axisAligned } from "@/grida-canvas/cmath/_snap";
 
 export function snapMovementToObjects(
   origin: cmath.Rectangle,
@@ -17,7 +18,7 @@ export function snapMovementToObjects(
     .map((r) => Object.values(cmath.rect.to9Points(r)))
     .flat();
 
-  const [points, d, anchors] = cmath.snap.axisAligned(
+  const [points, d, anchors] = axisAligned(
     origin_points,
     target_points,
     [4, 4]

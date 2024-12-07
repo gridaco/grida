@@ -13,6 +13,7 @@ export function useEditorHotKeys() {
     nudge,
     align,
     configureSurfaceRaycastTargeting,
+    configureMeasurement,
     clearSelection,
     selectedNode,
   } = useDocument();
@@ -120,6 +121,31 @@ export function useEditorHotKeys() {
       keyup: true,
     }
   );
+
+  // keydown
+  useHotkeys(
+    "alt",
+    () => {
+      configureMeasurement("on");
+    },
+    {
+      keydown: true,
+      keyup: false,
+    }
+  );
+
+  useHotkeys(
+    "alt",
+    () => {
+      configureMeasurement("off");
+    },
+    {
+      keydown: false,
+      keyup: true,
+    }
+  );
+
+  // keyup
 
   useHotkeys("v", () => {
     setCursorMode({ type: "cursor" });

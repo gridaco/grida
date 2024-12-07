@@ -6,6 +6,7 @@ import { cmath } from "@/grida-canvas/cmath";
 import { useDocument } from "@/grida-canvas/provider";
 import { documentquery } from "@/grida-canvas/document-query";
 import { measure, Measurement } from "@/grida-canvas/cmath/_measurement";
+import { axisAligned } from "@/grida-canvas/cmath/_snap";
 
 export function useSnapGuide() {
   const { state, selection: selected_node_ids } = useDocument();
@@ -58,7 +59,7 @@ export function useSnapGuide() {
       cmath.rect.to9Points(first_selected_node_rect)
     );
 
-    const [points, delta, anchors] = cmath.snap.axisAligned(
+    const [points, delta, anchors] = axisAligned(
       origin_points,
       targetpoints,
       [4, 4]
@@ -87,14 +88,14 @@ export function useSnapGuide() {
 
 export function useMeasurement() {
   const { state, selection } = useDocument();
-  const { hovered_node_id, translate } = state;
+  const { translate, surface_measurement_target } = state;
 
   const [measurement, setMeasurement] = useState<Measurement>();
   const [targetRect, setTargetRect] = useState<null | cmath.Rectangle>(null);
 
   useEffect(() => {
     const a = selection[0];
-    const b = hovered_node_id;
+    const b = surface_measurement_target;
 
     if (!a || !b) {
       setMeasurement(undefined);

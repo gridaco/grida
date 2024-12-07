@@ -127,7 +127,11 @@ export interface IDocumentEditorInteractionCursorState {
    */
   surface_cursor_position: Vector2;
 
-  // surface_measurement:
+  /**
+   * target node id to measure distance between the selection
+   */
+  surface_measurement_target?: string;
+  surface_measurement_targeting: "on" | "off";
 
   /**
    * @private - internal use only
@@ -203,6 +207,7 @@ export function initDocumentEditorState({
         init.document
       ),
     surface_raycast_targeting: DEFAULT_RAY_TARGETING,
+    surface_measurement_targeting: "off",
     surface_raycast_detected_node_ids: [],
     googlefonts: s.fonts().map((family) => ({ family })),
     cursor_mode: { type: "cursor" },
