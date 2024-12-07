@@ -178,6 +178,7 @@ export default function initialNode(
         ...position,
         ...styles,
         type: "line",
+        stroke: black,
         width: 100,
         height: 0,
         ...seed,

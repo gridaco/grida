@@ -1520,7 +1520,7 @@ export namespace grida {
          * @deprecated [NOT USED]
          */
         export interface IStroke {
-          stroke: cg.RGBA8888;
+          stroke?: cg.Paint;
         }
 
         export interface ICSSBorder {
@@ -1917,7 +1917,7 @@ export namespace grida {
           i.ISceneNode,
           i.IHrefable,
           i.IPositioning,
-          // i.ICSSDimension,
+          i.IStroke,
           i.IFixedDimension,
           i.IOpacity,
           i.IZIndex,

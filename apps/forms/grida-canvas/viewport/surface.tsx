@@ -309,18 +309,23 @@ function NodeOverlay({
     >
       {!readonly && (
         <>
-          <LayerOverlayResizeHandle anchor="n" node_id={node_id} />
-          <LayerOverlayResizeHandle anchor="s" node_id={node_id} />
-          <LayerOverlayResizeHandle anchor="e" node_id={node_id} />
-          <LayerOverlayResizeHandle anchor="w" node_id={node_id} />
-          {/* top left */}
-          <LayerOverlayResizeHandle anchor="nw" node_id={node_id} />
-          {/* top right */}
-          <LayerOverlayResizeHandle anchor="ne" node_id={node_id} />
-          {/* bottom left */}
-          <LayerOverlayResizeHandle anchor="sw" node_id={node_id} />
-          {/* bottom right */}
-          <LayerOverlayResizeHandle anchor="se" node_id={node_id} />
+          {node.type === "line" ? (
+            <>
+              <LayerOverlayResizeHandle anchor="e" node_id={node_id} />
+              <LayerOverlayResizeHandle anchor="w" node_id={node_id} />
+            </>
+          ) : (
+            <>
+              <LayerOverlayResizeHandle anchor="n" node_id={node_id} />
+              <LayerOverlayResizeHandle anchor="s" node_id={node_id} />
+              <LayerOverlayResizeHandle anchor="e" node_id={node_id} />
+              <LayerOverlayResizeHandle anchor="w" node_id={node_id} />
+              <LayerOverlayResizeHandle anchor="nw" node_id={node_id} />
+              <LayerOverlayResizeHandle anchor="ne" node_id={node_id} />
+              <LayerOverlayResizeHandle anchor="sw" node_id={node_id} />
+              <LayerOverlayResizeHandle anchor="se" node_id={node_id} />
+            </>
+          )}
           {supports.cornerRadius(node.type) &&
             !supports.children(node.type) && (
               <NodeOverlayCornerRadiusHandle anchor="se" node_id={node_id} />

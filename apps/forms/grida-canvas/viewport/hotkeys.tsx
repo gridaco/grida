@@ -108,6 +108,7 @@ export function useEditorHotKeys() {
   useHotkeys(
     "arrowright, arrowleft, arrowup, arrowdown",
     (e) => {
+      e.preventDefault();
       const mod = e.shiftKey ? 10 : 1;
       switch (e.key) {
         case "ArrowRight":
