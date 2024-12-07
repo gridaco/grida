@@ -11,6 +11,7 @@ export function useEditorHotKeys() {
     paste,
     deleteNode,
     nudge,
+    nudgeResize,
     align,
     distributeEvenly,
     configureSurfaceRaycastTargeting,
@@ -104,38 +105,66 @@ export function useEditorHotKeys() {
 
   useHotkeys("Backspace, Delete", () => deleteNode("selection"));
 
-  useHotkeys("ArrowRight", () => {
-    nudge("selection", "x", 1);
+  useHotkeys(
+    "arrowright, arrowleft, arrowup, arrowdown",
+    (e) => {
+      const mod = e.shiftKey ? 10 : 1;
+      switch (e.key) {
+        case "ArrowRight":
+          nudge("selection", "x", mod);
+          break;
+        case "ArrowLeft":
+          nudge("selection", "x", -mod);
+          break;
+        case "ArrowUp":
+          nudge("selection", "y", -mod);
+          break;
+        case "ArrowDown":
+          nudge("selection", "y", mod);
+          break;
+      }
+    },
+    {
+      ignoreModifiers: true,
+      ignoreEventWhen: (event) => event.ctrlKey,
+    }
+  );
+
+  //
+
+  useHotkeys("ctrl+alt+arrowright", () => {
+    nudgeResize("selection", "x", 1);
   });
 
-  useHotkeys("Shift+ArrowRight", () => {
-    nudge("selection", "x", 10);
+  useHotkeys("ctrl+alt+shift+arrowright", () => {
+    nudgeResize("selection", "x", 10);
   });
 
-  useHotkeys("ArrowLeft", () => {
-    nudge("selection", "x", -1);
+  useHotkeys("ctrl+alt+arrowleft", () => {
+    nudgeResize("selection", "x", -1);
   });
 
-  useHotkeys("Shift+ArrowLeft", () => {
-    nudge("selection", "x", -10);
+  useHotkeys("ctrl+alt+shift+arrowleft", () => {
+    nudgeResize("selection", "x", -10);
   });
 
-  useHotkeys("ArrowUp", () => {
-    nudge("selection", "y", -1);
+  useHotkeys("ctrl+alt+arrowup", () => {
+    nudgeResize("selection", "y", -1);
   });
 
-  useHotkeys("Shift+ArrowUp", () => {
-    nudge("selection", "y", -10);
+  useHotkeys("ctrl+alt+shift+arrowup", () => {
+    nudgeResize("selection", "y", -10);
   });
 
-  useHotkeys("ArrowDown", () => {
-    nudge("selection", "y", 1);
+  useHotkeys("ctrl+alt+arrowdown", () => {
+    nudgeResize("selection", "y", 1);
   });
 
-  useHotkeys("Shift+ArrowDown", () => {
-    nudge("selection", "y", 10);
+  useHotkeys("ctrl+alt+shift+arrowdown", () => {
+    nudgeResize("selection", "y", 10);
   });
 
+  //
   useHotkeys("enter", (e) => {
     // required for preventing this enter to replace autofocused content.
     e.stopPropagation();

@@ -118,6 +118,24 @@ export default function documentReducer<S extends IDocumentEditorState>(
         }
       });
     }
+    case "nudge-resize": {
+      const { target, axis, delta } = action;
+      const target_node_ids =
+        target === "selection" ? state.selection : [target];
+      const dx = axis === "x" ? delta : 0;
+      const dy = axis === "y" ? delta : 0;
+
+      return produce(state, (draft) => {
+        for (const node_id of target_node_ids) {
+          const node = documentquery.__getNodeById(draft, node_id);
+
+          draft.document.nodes[node_id] = nodeTransformReducer(node, {
+            type: "resize",
+            delta: [dx, dy],
+          });
+        }
+      });
+    }
     case "align": {
       const {
         target,

@@ -877,6 +877,22 @@ export function useDocument() {
     [dispatch]
   );
 
+  const nudgeResize = useCallback(
+    (
+      target: "selection" | (string & {}) = "selection",
+      axis: "x" | "y",
+      delta: number = 1
+    ) => {
+      dispatch({
+        type: "nudge-resize",
+        delta,
+        axis,
+        target,
+      });
+    },
+    [dispatch]
+  );
+
   const align = useCallback(
     (
       target: "selection" | (string & {}) = "selection",
@@ -1071,6 +1087,7 @@ export function useDocument() {
       paste,
       deleteNode,
       nudge,
+      nudgeResize,
       align,
       distributeEvenly,
       configureSurfaceRaycastTargeting,
@@ -1096,6 +1113,7 @@ export function useDocument() {
     paste,
     deleteNode,
     nudge,
+    nudgeResize,
     align,
     distributeEvenly,
     configureSurfaceRaycastTargeting,

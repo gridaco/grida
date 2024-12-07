@@ -17,6 +17,7 @@ export type DocumentAction =
   | EditorCopyCutPasteAction
   | EditorDeleteAction
   | EditorNudgeAction
+  | EditorNudgeResizeAction
   | EditorAlignAction
   | EditorDistributeEvenlyAction
   | DocumentEditorInsertNodeAction
@@ -92,6 +93,19 @@ export interface EditorDeleteAction {
  */
 export interface EditorNudgeAction {
   type: "nudge";
+  target: NodeID | "selection";
+  axis: "x" | "y";
+  delta: number;
+}
+
+/**
+ * [NudgeResize]
+ *
+ * NudgeResize, usually triggered by ctrl + alt + arrow keys, resizes the selected nodes by a exact amount.
+ * Unlike dragging, nudge does not snaps to pixel grid or other objects.
+ */
+export interface EditorNudgeResizeAction {
+  type: "nudge-resize";
   target: NodeID | "selection";
   axis: "x" | "y";
   delta: number;
