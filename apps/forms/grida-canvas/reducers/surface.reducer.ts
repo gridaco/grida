@@ -126,7 +126,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
         // clear all trasform state
 
         draft.surface_content_edit_mode = false;
-        draft.is_gesture_node_drag_resize = false;
+        draft.gesture = undefined;
       });
     }
     // #region drag event
@@ -135,7 +135,6 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
       return produce(state, (draft) => {
         // clear all trasform state
         draft.surface_content_edit_mode = false;
-        draft.is_gesture_node_drag_resize = false;
         draft.marquee = undefined;
 
         switch (draft.cursor_mode.type) {
@@ -159,24 +158,33 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
                   y2: draft.surface_cursor_position[1],
                 };
               } else {
-                self_dragStartSelection(draft);
+                self_startTranslateGesture(draft);
               }
             }
             break;
           }
           case "insert":
+            const initial_rect = {
+              x: draft.cursor_position[0],
+              y: draft.cursor_position[1],
+              width: 1,
+              height: draft.cursor_mode.node === "line" ? 0 : 1,
+            };
             //
             const nnode = initialNode(draft.cursor_mode.node, {
-              left: draft.cursor_position[0],
-              top: draft.cursor_position[1],
-              width: 1,
-              height: (draft.cursor_mode.node === "line" ? 0 : 1) as 0,
+              left: initial_rect.x,
+              top: initial_rect.y,
+              width: initial_rect.width,
+              height: initial_rect.height as 0, // casting for line node
             });
+
             self_insertNode(draft, draft.document.root_id, nnode);
             draft.cursor_mode = { type: "cursor" };
             self_selectNode(draft, "reset", nnode.id);
-            draft.is_gesture_node_drag_resize = true;
-            // TODO: after inserting, refresh fonts registry
+            draft.gesture = {
+              type: "scale",
+              initial_bounding_rectangle: initial_rect,
+            };
             break;
         }
       });
@@ -184,7 +192,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
     case "document/canvas/backend/html/event/on-drag-end": {
       const { node_ids_from_area, shiftKey } = <EditorSurface_DragEnd>action;
       return produce(state, (draft) => {
-        self_dragEndSelection(draft);
+        self_endTranslateGesture(draft);
         draft.marquee = undefined;
         if (node_ids_from_area) {
           // except the root node & locked nodes
@@ -213,22 +221,22 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
         });
       } else {
         // [insertion mode - resize after insertion]
-        if (state.is_gesture_node_drag_resize) {
+        if (state.gesture?.type === "scale") {
           assert(state.selection.length === 1);
           const node_id = state.selection[0];
 
           return produce(state, (draft) => {
-            self_dragResize(draft, {
+            self_scaleGesture(draft, {
               node_id,
               handle: "se",
-              delta: delta,
+              rawMovement: movement,
             });
           });
         }
 
         return produce(state, (draft) => {
           // this is to handle "immediately drag move node"
-          self_dragSelection(draft, movement);
+          self_translateGesture(draft, movement);
         });
       }
 
@@ -237,7 +245,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
     //
     case "document/canvas/backend/html/event/node-overlay/on-click": {
       const { selection, node_ids_from_point, shiftKey } = action;
-      if (state.is_gesture_node_drag_move) break;
+      if (state.gesture?.type === "translate") break;
       return produce(state, (draft) => {
         draft.surface_raycast_detected_node_ids = node_ids_from_point;
         const { hovered_node_id } = self_updateSurfaceHoverState(draft);
@@ -259,13 +267,13 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
     case "document/canvas/backend/html/event/node-overlay/on-drag-start": {
       const { selection } = action;
       return produce(state, (draft) => {
-        self_dragStartSelection(draft);
+        self_startTranslateGesture(draft);
       });
     }
     case "document/canvas/backend/html/event/node-overlay/on-drag-end": {
       const { selection } = action;
       return produce(state, (draft) => {
-        self_dragEndSelection(draft);
+        self_endTranslateGesture(draft);
       });
     }
     case "document/canvas/backend/html/event/node-overlay/on-drag": {
@@ -273,49 +281,54 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
       const { movement } = event;
 
       return produce(state, (draft) => {
-        self_dragSelection(draft, movement);
+        self_translateGesture(draft, movement);
       });
     }
     // #endregion drag event
     // #region resize handle event
     case "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-start": {
-      const { node_id, client_wh } = action;
+      const { node_id } = action;
       //
 
       return produce(state, (draft) => {
         draft.surface_content_edit_mode = false;
-        draft.is_gesture_node_drag_resize = true;
+        const node = documentquery.__getNodeById(draft, node_id);
+        const node_rect = domapi.get_node_bounding_rect(node_id)!;
+        draft.gesture = {
+          type: "scale",
+          initial_bounding_rectangle: node_rect,
+        };
         draft.hovered_node_id = undefined;
 
-        const node = documentquery.__getNodeById(draft, node_id);
-
+        // once the node's measurement mode is set to fixed (from drag start), we may safely cast the width / height sa fixed number
         // need to assign a fixed size if width or height is a variable length
-        (node as grida.program.nodes.i.ICSSDimension).width = client_wh.width;
-        // (node as grida.program.nodes.i.ICSSStylable).style.width = client_wh.width;
-        (node as grida.program.nodes.i.ICSSDimension).height = client_wh.height;
-        // (node as grida.program.nodes.i.ICSSStylable).style.height = client_wh.height;
+        const _node = node as grida.program.nodes.i.ICSSDimension;
+        if (typeof _node.width !== "number") {
+          _node.width = node_rect.width;
+        }
+        if (typeof _node.height !== "number") {
+          _node.height = node_rect.height;
+        }
       });
     }
     case "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-end": {
       return produce(state, (draft) => {
-        draft.is_gesture_node_drag_resize = false;
+        draft.gesture = undefined;
       });
     }
     case "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag": {
       const {
         node_id,
-        handle,
-        event: { delta, distance },
+        direction: handle,
+        event: { movement },
       } = action;
 
       // cancel if invalid state
-      if (!state.is_gesture_node_drag_resize) return state;
+      if (state.gesture?.type !== "scale") return state;
 
       return produce(state, (draft) => {
-        // once the node's measurement mode is set to fixed (from drag start), we may safely cast the width / height sa fixed number
-        self_dragResize(draft, { node_id, handle, delta });
+        self_scaleGesture(draft, { node_id, handle, rawMovement: movement });
       });
-      //
       //
     }
     // #endregion resize handle event
@@ -325,12 +338,15 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
 
       return produce(state, (draft) => {
         self_selectNode(draft, "reset", node_id);
-        draft.is_gesture_node_drag_corner_radius = true;
+        draft.gesture = {
+          type: "corner-radius",
+          initial_bounding_rectangle: domapi.get_node_bounding_rect(node_id)!,
+        };
       });
     }
     case "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-end": {
       return produce(state, (draft) => {
-        draft.is_gesture_node_drag_corner_radius = false;
+        draft.gesture = undefined;
       });
     }
     case "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag": {
@@ -340,7 +356,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
       } = action;
       const [dx, dy] = delta;
       // cancel if invalid state
-      if (!state.is_gesture_node_drag_corner_radius) return state;
+      if (state.gesture?.type !== "corner-radius") return state;
 
       // const distance = Math.sqrt(dx * dx + dy * dy);
       const d = -Math.round(dx);
@@ -381,32 +397,36 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
 
       return produce(state, (draft) => {
         self_selectNode(draft, "reset", node_id);
-        draft.is_gesture_node_drag_rotation = true;
+        draft.gesture = {
+          type: "rotate",
+          initial_bounding_rectangle: domapi.get_node_bounding_rect(node_id)!,
+        };
       });
     }
     case "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag-end": {
       const {} = <EditorSurface_NodeOverlayRotationHandle_DragEnd>action;
       return produce(state, (draft) => {
-        draft.is_gesture_node_drag_rotation = false;
+        draft.gesture = undefined;
       });
     }
     case "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag": {
       const {
         node_id,
-        handle: anchor,
+        direction: anchor,
         event: { delta, movement },
       } = <EditorSurface_NodeOverlayRotationHandle_Drag>action;
 
       // cancel if invalid state
-      if (!state.is_gesture_node_drag_rotation) return state;
+      if (state.gesture?.type !== "rotate") return state;
 
-      const angle = cmath.principalAngle(
-        cmath.vector2.angle(
+      const angle = cmath.quantize(
+        cmath.principalAngle(
           // TODO: need to store the initial angle and subtract
           // TODO: get anchor and calculate the offset
-          [0, 0],
-          movement
-        )
+          // TODO: translate the movement (distance) relative to the center of the node
+          cmath.vector2.angle([0, 0], movement)
+        ),
+        1
       );
 
       return produce(state, (draft) => {
@@ -460,75 +480,84 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
 /**
  * maps the resize handle (direction) to the transform origin point (inverse)
  */
-const __resize_handle_to_transform_origin_point = {
+const __scale_direction_to_transform_origin_point = {
   nw: "se",
   ne: "sw",
   sw: "ne",
   se: "nw",
+  n: "s",
+  e: "w",
+  s: "n",
+  w: "e",
 } as const;
 
 /**
- * maps the resize handle (direction) to the mouse delta direction multiplier (inverse)
+ * maps the resize handle (direction) to the mouse movement direction multiplier (inverse)
  */
-const __resize_handle_to_mouse_delta_multiplier = {
+const __resize_handle_to_mouse_direction_multiplier = {
   nw: [-1, -1] as cmath.Vector2,
   ne: [1, -1] as cmath.Vector2,
   sw: [-1, 1] as cmath.Vector2,
   se: [1, 1] as cmath.Vector2,
+  n: [0, -1] as cmath.Vector2,
+  e: [1, 0] as cmath.Vector2,
+  s: [0, 1] as cmath.Vector2,
+  w: [-1, 0] as cmath.Vector2,
 } as const;
 
-function self_dragResize(
+function self_scaleGesture(
   draft: Draft<IDocumentEditorState>,
   {
     node_id,
     handle,
-    delta,
+    rawMovement,
   }: {
     node_id: string;
-    handle: "nw" | "ne" | "sw" | "se";
-    // raw delta from mouse event
-    delta: cmath.Vector2;
+    handle: cmath.CardinalDirection;
+    rawMovement: cmath.Vector2;
   }
 ) {
-  const [_dx, _dy] = delta;
-
+  if (draft.gesture?.type !== "scale") return;
   const node = documentquery.__getNodeById(draft, node_id);
 
+  const initial = draft.gesture.initial_bounding_rectangle;
+  assert(initial);
+
   // get the origin point based on handle
-  const origin = __resize_handle_to_transform_origin_point[handle];
+  const origin = cmath.rect.getCardinalPoint(
+    initial,
+    __scale_direction_to_transform_origin_point[handle]
+  );
 
   // inverse the delta based on handle
-  const [dx, dy] = cmath.vector2.multiply(
-    __resize_handle_to_mouse_delta_multiplier[handle],
-    [_dx, _dy]
+  const movement = cmath.vector2.multiply(
+    __resize_handle_to_mouse_direction_multiplier[handle],
+    rawMovement
   );
 
   draft.document.nodes[node_id] = nodeTransformReducer(node, {
-    type: "resize",
-    origin: origin,
-    dx: dx,
-    dy: dy,
+    type: "scale",
+    initial,
+    origin,
+    movement,
   });
 }
 
-function self_dragStartSelection(draft: Draft<IDocumentEditorState>) {
-  draft.is_gesture_node_drag_move = true;
-
+function self_startTranslateGesture(draft: Draft<IDocumentEditorState>) {
   // TODO: handle multiple selection
   const node_id = draft.selection[0];
-  const __origin_node_domrect = domapi.get_node_bounding_rect(node_id)!;
 
-  const initial_node_rect = __origin_node_domrect;
-
-  draft.gesture_node_drag_move_initial_bounding_rect = initial_node_rect;
-  //
+  draft.gesture = {
+    type: "translate",
+    initial_bounding_rectangle: domapi.get_node_bounding_rect(node_id)!,
+  };
 }
 
-function self_dragSelection(
+function self_translateGesture(
   draft: Draft<IDocumentEditorState>,
   movement: cmath.Vector2
 ) {
-  if (!draft.is_gesture_node_drag_move) return;
+  if (draft.gesture?.type !== "translate") return;
   // selection.forEach((node_id) => {
   //   const node = documentquery.__getNodeById(draft, node_id);
   //   draft.document.nodes[node_id] = nodeTransformReducer(node, {
@@ -549,15 +578,15 @@ function self_dragSelection(
     .concat(documentquery.getParentId(draft.document_ctx, node_id) ?? []);
 
   const target_node_rects = snap_target_node_ids.map((node_id) => {
-    return domapi.get_node_bounding_rect(node_id);
+    return domapi.get_node_bounding_rect(node_id)!;
   });
 
-  assert(draft.gesture_node_drag_move_initial_bounding_rect);
+  assert(draft.gesture.initial_bounding_rectangle);
 
   const {
     position: [x, y],
   } = snapMovementToObjects(
-    draft.gesture_node_drag_move_initial_bounding_rect,
+    draft.gesture.initial_bounding_rectangle,
     target_node_rects,
     movement
   );
@@ -571,7 +600,6 @@ function self_dragSelection(
   });
 }
 
-function self_dragEndSelection(draft: Draft<IDocumentEditorState>) {
-  draft.is_gesture_node_drag_move = false;
-  draft.gesture_node_drag_move_initial_bounding_rect = undefined;
+function self_endTranslateGesture(draft: Draft<IDocumentEditorState>) {
+  draft.gesture = undefined;
 }

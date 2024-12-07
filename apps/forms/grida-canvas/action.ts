@@ -1,10 +1,11 @@
 import type { Tokens } from "@/ast";
-import { grida } from "@/grida";
-import {
+import type { grida } from "@/grida";
+import type {
   CursorMode,
   IDocumentEditorState,
   SurfaceRaycastTargeting,
 } from "./types";
+import type { cmath } from "./cmath";
 
 export type BuilderAction =
   | __InternalSyncArtboardOffset
@@ -153,6 +154,10 @@ export type TCanvasEventTargetDragGestureState = {
    * Raw values when the gesture started.
    */
   initial: Vector2;
+  /**
+   * Pointer coordinates (alias to values)
+   */
+  xy: Vector2;
 };
 
 interface ICanvasEventTargetDragEvent {
@@ -267,21 +272,7 @@ export type EditorSurface_CursorMode = {
 };
 
 interface ICanvasEventTargetResizeHandleEvent {
-  handle: "nw" | "ne" | "sw" | "se";
-}
-
-/**
- * Payload when current node size is unknown and should change to known
- *
- * This payload is required when changing node sizing mode to auto => fixed
- */
-interface IHtmlCanvasEventTargetCalculatedNodeSize {
-  /**
-   * client width and height are required for non-numeric sized node.
-   *
-   * when resizing a node with `width: 100%`  resize delta
-   */
-  client_wh: grida.program.nodes.i.IFixedDimension;
+  direction: cmath.CardinalDirection;
 }
 
 export type EditorSurface_NodeOverlay_Click = ISelection &
@@ -304,10 +295,9 @@ export type EditorSurface_NodeOverlay_Drag = ISelection &
     type: "document/canvas/backend/html/event/node-overlay/on-drag";
   };
 
-export type EditorSurface_NodeOverlayResizeHandle_DragStart = INodeID &
-  IHtmlCanvasEventTargetCalculatedNodeSize & {
-    type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-start";
-  };
+export type EditorSurface_NodeOverlayResizeHandle_DragStart = INodeID & {
+  type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-start";
+};
 
 export type EditorSurface_NodeOverlayResizeHandle_DragEnd = INodeID & {
   type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-end";

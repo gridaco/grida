@@ -105,15 +105,16 @@ export function useMeasurement() {
     );
     const a_rect = cmath.rect.translate(_a_rect, translate!);
     const _b_rect = domapi.get_node_bounding_rect(b);
-    const b_rect = cmath.rect.translate(_b_rect, translate!);
+    const b_rect = cmath.rect.translate(_b_rect!, translate!);
 
     const measurement = measure(a_rect, b_rect);
-    setMeasurement({
-      a: a_rect,
-      b: b_rect,
-      distance: measurement.distance,
-      box: measurement.box, // cmath.rect.translate(measurement.box),
-    });
+    if (measurement)
+      setMeasurement({
+        a: a_rect,
+        b: b_rect,
+        distance: measurement.distance,
+        box: measurement.box, // cmath.rect.translate(measurement.box),
+      });
   }, [state.document, selection, surface_measurement_target, translate]);
 
   return measurement;

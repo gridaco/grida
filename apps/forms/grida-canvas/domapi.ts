@@ -15,8 +15,12 @@ export namespace domapi {
    * @returns
    */
   export function get_node_bounding_rect(node_id: string) {
-    const contentrect = get_content_element()!.getBoundingClientRect();
-    const domrect = get_node_element(node_id)!.getBoundingClientRect();
+    const contentrect = get_content_element()?.getBoundingClientRect();
+    const domrect = get_node_element(node_id)?.getBoundingClientRect();
+
+    if (!contentrect || !domrect) {
+      return null;
+    }
 
     return {
       x: domrect.x - contentrect.x,

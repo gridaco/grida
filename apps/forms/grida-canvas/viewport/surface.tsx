@@ -102,6 +102,7 @@ export function EditorSurface() {
           distance: e.distance,
           movement: e.movement,
           initial: e.initial,
+          xy: e.xy,
         });
       },
     },
@@ -308,6 +309,10 @@ function NodeOverlay({
     >
       {!readonly && (
         <>
+          <LayerOverlayResizeHandle anchor="n" node_id={node_id} />
+          <LayerOverlayResizeHandle anchor="s" node_id={node_id} />
+          <LayerOverlayResizeHandle anchor="e" node_id={node_id} />
+          <LayerOverlayResizeHandle anchor="w" node_id={node_id} />
           {/* top left */}
           <LayerOverlayResizeHandle anchor="nw" node_id={node_id} />
           {/* top right */}
@@ -364,6 +369,7 @@ function NodeOverlayCornerRadiusHandle({
           distance: e.distance,
           movement: e.movement,
           initial: e.initial,
+          xy: e.xy,
         });
       },
     },
@@ -435,6 +441,7 @@ function LayerOverlayRotationHandle({
           distance: e.distance,
           movement: e.movement,
           initial: e.initial,
+          xy: e.xy,
         });
       },
     },
@@ -487,7 +494,7 @@ function LayerOverlayResizeHandle({
   size = 8,
 }: {
   node_id: string;
-  anchor: "nw" | "ne" | "sw" | "se";
+  anchor: "nw" | "ne" | "sw" | "se" | "n" | "e" | "s" | "w";
   size?: number;
 }) {
   const { dragResizeHandleStart, dragResizeHandleEnd, dragResizeHandle } =
@@ -497,13 +504,7 @@ function LayerOverlayResizeHandle({
     {
       onDragStart: (e) => {
         e.event.stopPropagation();
-        const rect = domapi.get_node_element(node_id)?.getBoundingClientRect();
-        if (!rect) return;
-
-        dragResizeHandleStart(node_id, {
-          width: rect.width,
-          height: rect.height,
-        });
+        dragResizeHandleStart(node_id);
       },
       onDragEnd: (e) => {
         e.event.stopPropagation();
@@ -516,6 +517,7 @@ function LayerOverlayResizeHandle({
           distance: e.distance,
           movement: e.movement,
           initial: e.initial,
+          xy: e.xy,
         });
       },
     },
@@ -675,8 +677,8 @@ function usePrefferedDistributionAxis() {
   const [axis, setAxis] = useState<"x" | "y">();
 
   useEffect(() => {
-    const rects = selection.map((node_id) =>
-      domapi.get_node_bounding_rect(node_id)
+    const rects = selection.map(
+      (node_id) => domapi.get_node_bounding_rect(node_id)!
     );
     const x_distribute = cmath.rect.axisProjectionIntersection(rects, "x");
     if (x_distribute) {

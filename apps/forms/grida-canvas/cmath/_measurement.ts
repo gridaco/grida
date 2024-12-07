@@ -23,7 +23,11 @@ export interface Measurement {
  * @param b - The second rectangle.
  * @returns The spacing guide with base rectangle and spacing values.
  */
-export function measure(a: cmath.Rectangle, b: cmath.Rectangle): Measurement {
+export function measure(
+  a: cmath.Rectangle,
+  b: cmath.Rectangle
+): Measurement | null {
+  if (cmath.rect.identical(a, b)) return null;
   const intersection = cmath.rect.intersection(a, b)!;
 
   // If no intersection

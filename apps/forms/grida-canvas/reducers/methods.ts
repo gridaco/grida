@@ -148,6 +148,7 @@ function getSurfaceRayTarget(
   return undefined;
 }
 
+// TODO: after inserting, refresh fonts registry
 export function self_insertNode<S extends IDocumentEditorState>(
   draft: Draft<S>,
   parent_id: string,

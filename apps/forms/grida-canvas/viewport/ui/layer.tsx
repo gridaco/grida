@@ -22,9 +22,10 @@ export const LayerOverlay = React.forwardRef(function LayerOverlay(
     <div
       {...props}
       ref={ref}
+      data-readonly={readonly}
       data-layer-is-component-consumer={isComponentConsumer}
       className={cn(
-        "relative group pointer-events-auto select-none border-[1.5px] border-workbench-accent-sky data-[layer-is-component-consumer='true']:border-workbench-accent-violet",
+        "relative group pointer-events-auto select-none border-[1.5px] data-[readonly='true']:border-[0.5px] border-workbench-accent-sky data-[layer-is-component-consumer='true']:border-workbench-accent-violet",
         className
       )}
       style={{

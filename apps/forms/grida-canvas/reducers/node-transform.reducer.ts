@@ -28,16 +28,17 @@ type NodeTransformAction =
       dy: number;
     }
   | {
+      // scale changes top, right, bottom, left, width and height
+      // this is the one we should use when user "resizes" the node with the resize handles
+      type: "scale";
+      initial: cmath.Rectangle;
+      origin: cmath.Vector2;
+      movement: cmath.Vector2;
+    }
+  | {
+      // resize only changes right, bottom, width, height
       type: "resize";
-      origin: "nw" | "ne" | "sw" | "se";
-      /**
-       * delta
-       */
-      dx: number;
-      /**
-       * delta
-       */
-      dy: number;
+      delta: cmath.Vector2;
     };
 
 export default function nodeTransformReducer(
@@ -57,8 +58,8 @@ export default function nodeTransformReducer(
           // TODO: with resolve box model
           // TODO: also need to update right, bottom, width, height
 
-          draft.left = x;
-          draft.top = y;
+          draft.left = cmath.quantize(x, 1);
+          draft.top = cmath.quantize(y, 1);
         } else {
           // ignore
           reportError("node is not draggable");
@@ -69,19 +70,15 @@ export default function nodeTransformReducer(
         const { dx, dy } = action;
         return moveNode(draft, dx, dy);
       }
-      case "resize": {
-        const { origin: _origin, dx, dy } = action;
-
-        const rect = domapi.get_node_bounding_rect(draft.id);
+      case "scale": {
+        const { initial, origin, movement } = action;
 
         const scale: cmath.Vector2 = [
-          (rect.width + dx) / rect.width,
-          (rect.height + dy) / rect.height,
+          (initial.width + movement[0]) / initial.width,
+          (initial.height + movement[1]) / initial.height,
         ];
 
-        const origin = cmath.rect.getCardinalPoint(rect, _origin);
-
-        const scaled = cmath.rect.scale(rect, origin, scale);
+        const scaled = cmath.rect.scale(initial, origin, scale);
 
         const _draft = draft as grida.program.nodes.i.ICSSDimension &
           grida.program.nodes.i.IPositioning;
@@ -89,16 +86,32 @@ export default function nodeTransformReducer(
         // position
         if (_draft.position === "absolute") {
           // TODO: handle right and bottom
-          _draft.left = scaled.x;
-          _draft.top = scaled.y;
+          _draft.left = cmath.quantize(scaled.x, 1);
+          _draft.top = cmath.quantize(scaled.y, 1);
         }
 
         // size
-        _draft.width = Math.max(scaled.width, 0);
+        _draft.width = cmath.quantize(Math.max(scaled.width, 0), 1);
         if (draft.type === "line") _draft.height = 0;
-        else _draft.height = Math.max(scaled.height, 0);
+        else _draft.height = cmath.quantize(Math.max(scaled.height, 0), 1);
 
         return;
+      }
+      case "resize": {
+        const { delta } = action;
+        const [dx, dy] = delta;
+
+        const _draft = draft as grida.program.nodes.i.IFixedDimension &
+          grida.program.nodes.i.IPositioning;
+
+        // right, bottom
+        if (_draft.right) _draft.right -= dx;
+        if (_draft.bottom) _draft.bottom -= dy;
+
+        // size
+        _draft.width = cmath.quantize(Math.max(_draft.width + dx, 0), 1);
+        if (draft.type === "line") _draft.height = 0;
+        else _draft.height = cmath.quantize(Math.max(_draft.height + dy, 0), 1);
       }
     }
   });
@@ -115,28 +128,28 @@ function moveNode(
         if (draft.left !== undefined || draft.right !== undefined) {
           if (draft.left !== undefined) {
             const new_l = draft.left + dx;
-            draft.left = new_l;
+            draft.left = cmath.quantize(new_l, 1);
           }
           if (draft.right !== undefined) {
             const new_r = draft.right - dx;
-            draft.right = new_r;
+            draft.right = cmath.quantize(new_r, 1);
           }
         } else {
-          draft.left = dx;
+          draft.left = cmath.quantize(dx, 1);
         }
       }
       if (dy) {
         if (draft.top !== undefined || draft.bottom !== undefined) {
           if (draft.top !== undefined) {
             const new_t = draft.top + dy;
-            draft.top = new_t;
+            draft.top = cmath.quantize(new_t, 1);
           }
           if (draft.bottom !== undefined) {
             const new_b = draft.bottom - dy;
-            draft.bottom = new_b;
+            draft.bottom = cmath.quantize(new_b, 1);
           }
         } else {
-          draft.top = dy;
+          draft.top = cmath.quantize(dy, 1);
         }
       }
     } else {

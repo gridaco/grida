@@ -47,6 +47,16 @@ export namespace cmath {
 
   export type RectangleSide = "top" | "right" | "bottom" | "left";
 
+  export type CardinalDirection =
+    | "n"
+    | "e"
+    | "s"
+    | "w"
+    | "ne"
+    | "se"
+    | "sw"
+    | "nw";
+
   /**
    * Quantizes a value to the nearest multiple of a specified step.
    *
@@ -498,7 +508,7 @@ export namespace cmath.rect {
 
   export function getCardinalPoint(
     rect: cmath.Rectangle,
-    point: "n" | "e" | "s" | "w" | "ne" | "se" | "sw" | "nw"
+    point: CardinalDirection
   ): Vector2 {
     const { x, y, width, height } = rect;
     switch (point) {
@@ -749,6 +759,43 @@ export namespace cmath.rect {
         return cmath.vector2.intersection(currentIntersection, projection); // Calculate intersection
       },
       projections[0] // Start with the first projection
+    );
+  }
+
+  /**
+   * Checks if two rectangles are identical.
+   *
+   * Two rectangles are considered identical if their positions (`x`, `y`) and dimensions (`width`, `height`)
+   * are exactly the same.
+   *
+   * @param rectA - The first rectangle to compare.
+   * @param rectB - The second rectangle to compare.
+   * @returns `true` if the rectangles are identical, otherwise `false`.
+   *
+   * @example
+   * const rect1 = { x: 10, y: 20, width: 30, height: 40 };
+   * const rect2 = { x: 10, y: 20, width: 30, height: 40 };
+   * const isIdentical = cmath.rect.identical(rect1, rect2);
+   * console.log(isIdentical); // true
+   *
+   * @example
+   * const rect1 = { x: 10, y: 20, width: 30, height: 40 };
+   * const rect2 = { x: 10, y: 25, width: 30, height: 40 };
+   * const isIdentical = cmath.rect.identical(rect1, rect2);
+   * console.log(isIdentical); // false
+   *
+   * @remarks
+   * - The function performs a strict equality check on the `x`, `y`, `width`, and `height` properties.
+   */
+  export function identical(
+    rectA: cmath.Rectangle,
+    rectB: cmath.Rectangle
+  ): boolean {
+    return (
+      rectA.x === rectB.x &&
+      rectA.y === rectB.y &&
+      rectA.width === rectB.width &&
+      rectA.height === rectB.height
     );
   }
 

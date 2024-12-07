@@ -24,4 +24,15 @@ export namespace cursors {
     const svgData = rotate_svg(angle);
     return `data:image/svg+xml;base64,${btoa(svgData)}`;
   };
+
+  export const resize_handle_cursor_map = {
+    nw: "nwse-resize",
+    n: "ns-resize",
+    ne: "nesw-resize",
+    e: "ew-resize",
+    se: "nwse-resize",
+    s: "ns-resize",
+    sw: "nesw-resize",
+    w: "ew-resize",
+  };
 }

@@ -54,35 +54,16 @@ export interface IDocumentEditorInteractionCursorState {
   selection: string[];
   hovered_node_id?: string;
 
-  /**
-   * @private - internal use only
-   *
-   * is gesture node-move and should hide the overlay ui
-   */
-  is_gesture_node_drag_move?: boolean;
-
-  gesture_node_drag_move_initial_bounding_rect?: cmath.Rectangle;
-
-  /**
-   * @private - internal use only
-   *
-   * is gesture node-resize
-   */
-  is_gesture_node_drag_resize?: boolean;
-
-  /**
-   * @private - internal use only
-   *
-   * is gesture node-corner-radius
-   */
-  is_gesture_node_drag_corner_radius?: boolean;
-
-  /**
-   * @private - internal use only
-   *
-   * is gesture node-rotation
-   */
-  is_gesture_node_drag_rotation?: boolean;
+  gesture?: {
+    /**
+     * - translate (move)
+     * - scale (resize)
+     * - rotate
+     * - corner-radius
+     */
+    type: "translate" | "scale" | "rotate" | "corner-radius";
+    initial_bounding_rectangle: cmath.Rectangle | null;
+  };
 
   /**
    * @private - internal use only

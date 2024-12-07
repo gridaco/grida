@@ -1157,13 +1157,15 @@ export function useEventTarget() {
   const [state, dispatch] = __useInternal();
 
   const {
-    is_gesture_node_drag_move: is_node_transforming,
+    gesture,
     hovered_node_id,
     selection,
     surface_content_edit_mode: content_edit_mode,
     cursor_mode,
     marquee,
   } = state;
+
+  const is_node_transforming = !!gesture;
 
   const setCursorMode = useCallback(
     (cursor_mode: CursorMode) => {
@@ -1396,11 +1398,10 @@ export function useEventTarget() {
 
   // #region drag resize handle
   const dragResizeHandleStart = useCallback(
-    (node_id: string, client_wh: { width: number; height: number }) => {
+    (node_id: string) => {
       dispatch({
         type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-start",
         node_id,
-        client_wh,
       });
     },
     [dispatch]
@@ -1417,14 +1418,14 @@ export function useEventTarget() {
   const dragResizeHandle = useCallback(
     (
       node_id: string,
-      anchor: "nw" | "ne" | "sw" | "se",
+      direction: cmath.CardinalDirection,
       event: TCanvasEventTargetDragGestureState
     ) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag",
           node_id,
-          handle: anchor,
+          direction: direction,
           event,
         });
       });
@@ -1462,7 +1463,7 @@ export function useEventTarget() {
         dispatch({
           type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag",
           node_id,
-          handle: anchor,
+          direction: anchor,
           event,
         });
       });
@@ -1500,7 +1501,7 @@ export function useEventTarget() {
         dispatch({
           type: "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag",
           node_id,
-          handle: anchor,
+          direction: anchor,
           event,
         });
       });

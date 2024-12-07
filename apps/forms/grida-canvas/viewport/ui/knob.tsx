@@ -1,5 +1,7 @@
 import React from "react";
 import { cn } from "@/utils";
+import type { cmath } from "@/grida-canvas/cmath";
+import { cursors } from "@/grida-canvas/components/cursor";
 
 export const Knob = React.forwardRef(function Knob(
   {
@@ -17,11 +19,45 @@ export const Knob = React.forwardRef(function Knob(
     isComponentConsumer?: boolean;
     transform?: React.CSSProperties;
     zIndex?: number;
-    anchor: "nw" | "ne" | "sw" | "se";
+    anchor: cmath.CardinalDirection; // Supports 8 directions: "nw", "n", "ne", "e", "se", "s", "sw", "w"
     size?: number;
   },
   ref: React.Ref<HTMLDivElement>
 ) {
+  // Map directions to their relative positions
+  const anchorPositionMap: Record<
+    cmath.CardinalDirection,
+    { top: string; left: string }
+  > = {
+    nw: { top: "0", left: "0" },
+    n: { top: "0", left: "50%" },
+    ne: { top: "0", left: "100%" },
+    e: { top: "50%", left: "100%" },
+    se: { top: "100%", left: "100%" },
+    s: { top: "100%", left: "50%" },
+    sw: { top: "100%", left: "0" },
+    w: { top: "50%", left: "0" },
+  };
+
+  // Map directions to their translation offsets
+  const anchorTranslationMap: Record<
+    cmath.CardinalDirection,
+    { translateX: string; translateY: string }
+  > = {
+    nw: { translateX: "-50%", translateY: "-50%" },
+    n: { translateX: "-50%", translateY: "-50%" },
+    ne: { translateX: "-50%", translateY: "-50%" },
+    e: { translateX: "-50%", translateY: "-50%" },
+    se: { translateX: "-50%", translateY: "-50%" },
+    s: { translateX: "-50%", translateY: "-50%" },
+    sw: { translateX: "-50%", translateY: "-50%" },
+    w: { translateX: "-50%", translateY: "-50%" },
+  };
+
+  // Get the correct position and translation for the current anchor
+  const anchorPosition = anchorPositionMap[anchor];
+  const anchorTranslation = anchorTranslationMap[anchor];
+
   return (
     <div
       {...props}
@@ -32,26 +68,18 @@ export const Knob = React.forwardRef(function Knob(
         className
       )}
       style={{
-        top: anchor[0] === "n" ? 0 : "auto",
-        bottom: anchor[0] === "s" ? 0 : "auto",
-        left: anchor[1] === "w" ? 0 : "auto",
-        right: anchor[1] === "e" ? 0 : "auto",
+        top: anchorPosition.top,
+        left: anchorPosition.left,
+        transform: `translate(${anchorTranslation.translateX}, ${anchorTranslation.translateY})`,
         width: size,
         height: size,
-        transform: `translate(${anchor[1] === "w" ? "-50%" : "50%"}, ${anchor[0] === "n" ? "-50%" : "50%"})`,
-        cursor: readonly ? "default" : __resize_handle_cursor_map[anchor],
+        cursor: readonly ? "default" : cursors.resize_handle_cursor_map[anchor],
         touchAction: "none",
         zIndex: 11,
+        ...transform,
       }}
     >
       {children}
     </div>
   );
 });
-
-const __resize_handle_cursor_map = {
-  nw: "nwse-resize",
-  ne: "nesw-resize",
-  sw: "nesw-resize",
-  se: "nwse-resize",
-};
