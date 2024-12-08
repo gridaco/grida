@@ -1,5 +1,5 @@
 import { grida } from "@/grida";
-import type { IDocumentEditorState } from "./types";
+import type { IDocumentEditorState } from "./state";
 
 type NodeID = string;
 

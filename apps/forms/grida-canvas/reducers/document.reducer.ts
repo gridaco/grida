@@ -13,7 +13,7 @@ import type {
   TemplateNodeOverrideChangeAction,
   DocumentAction,
 } from "../action";
-import type { IDocumentEditorState } from "../types";
+import type { IDocumentEditorState } from "../state";
 import { grida } from "@/grida";
 import assert from "assert";
 import { documentquery } from "../document-query";
@@ -53,7 +53,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
 
         // [copy]
         const selectedNode = documentquery.__getNodeById(draft, node_id);
-        draft.clipboard = JSON.parse(JSON.stringify(selectedNode)); // Deep copy the node
+        draft.user_clipboard = JSON.parse(JSON.stringify(selectedNode)); // Deep copy the node
 
         if (action.type === "cut") {
           self_deleteNode(draft, node_id);
@@ -61,9 +61,9 @@ export default function documentReducer<S extends IDocumentEditorState>(
       });
     }
     case "paste": {
-      if (!state.clipboard) break;
+      if (!state.user_clipboard) break;
       const data: grida.program.nodes.AnyNode = JSON.parse(
-        JSON.stringify(state.clipboard)
+        JSON.stringify(state.user_clipboard)
       );
 
       const newNode = {

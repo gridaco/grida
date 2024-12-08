@@ -15,7 +15,7 @@ import {
   initDocumentEditorState,
   CursorMode,
   SurfaceRaycastTargeting,
-} from "./types";
+} from "./state";
 import type { Tokens } from "@/ast";
 import { grida } from "@/grida";
 import { useComputed } from "./nodes/use-computed";

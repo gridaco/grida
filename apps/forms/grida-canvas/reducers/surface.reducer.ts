@@ -1,7 +1,7 @@
 import { produce, type Draft } from "immer";
 
 import type { SurfaceAction } from "../action";
-import type { IDocumentEditorState } from "../types";
+import type { IDocumentEditorState } from "../state";
 import { documentquery } from "../document-query";
 
 export default function surfaceReducer<S extends IDocumentEditorState>(

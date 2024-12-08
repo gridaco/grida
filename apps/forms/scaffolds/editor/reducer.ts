@@ -47,7 +47,7 @@ import { grida } from "@/grida";
 import {
   IDocumentEditorState,
   initDocumentEditorState,
-} from "@/grida-canvas/types";
+} from "@/grida-canvas/state";
 
 export function reducer(state: EditorState, action: EditorAction): EditorState {
   switch (action.type) {

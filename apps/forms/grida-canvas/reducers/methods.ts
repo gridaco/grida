@@ -1,5 +1,5 @@
 import { type Draft } from "immer";
-import type { IDocumentEditorState, SurfaceRaycastTargeting } from "../types";
+import type { IDocumentEditorState, SurfaceRaycastTargeting } from "../state";
 import { documentquery } from "../document-query";
 import { grida } from "@/grida";
 import assert from "assert";

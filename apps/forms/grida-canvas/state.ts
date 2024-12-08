@@ -2,8 +2,6 @@ import type { BuilderAction } from "./action";
 import { grida } from "@/grida";
 import { cmath } from "./cmath";
 
-type Vector2 = [number, number];
-
 export type DocumentDispatcher = (action: BuilderAction) => void;
 
 export type CursorMode =
@@ -55,7 +53,10 @@ export type Modifiers = {
 };
 
 interface IDocumentEditorClipboardState {
-  clipboard?: grida.program.nodes.Node;
+  /**
+   * user clipboard - copied data
+   */
+  user_clipboard?: grida.program.nodes.Node;
 }
 
 interface IDocumentEditorTransformState {
@@ -64,7 +65,7 @@ interface IDocumentEditorTransformState {
    *
    * translate (offset) of the to the stage relative to event target
    */
-  translate?: Vector2;
+  translate?: cmath.Vector2;
 }
 
 /**
@@ -153,7 +154,7 @@ interface IDocumentEditorEventTargetState {
    *
    * @default [0, 0]
    */
-  surface_cursor_position: Vector2;
+  surface_cursor_position: cmath.Vector2;
 
   /**
    * @private - internal use only
@@ -162,7 +163,7 @@ interface IDocumentEditorEventTargetState {
    *
    * @default [0, 0]
    */
-  cursor_position: Vector2;
+  cursor_position: cmath.Vector2;
 
   /**
    * @private - internal use only

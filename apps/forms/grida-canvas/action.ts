@@ -4,7 +4,7 @@ import type {
   CursorMode,
   IDocumentEditorState,
   SurfaceRaycastTargeting,
-} from "./types";
+} from "./state";
 import type { cmath } from "./cmath";
 
 export type BuilderAction =

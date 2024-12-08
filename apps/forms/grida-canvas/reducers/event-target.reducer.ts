@@ -19,7 +19,7 @@ import type {
   EditorEventTarget_Node_PointerLeave,
   //
 } from "../action";
-import type { IDocumentEditorState, SurfaceRaycastTargeting } from "../types";
+import type { IDocumentEditorState, SurfaceRaycastTargeting } from "../state";
 import { grida } from "@/grida";
 import { documentquery } from "../document-query";
 import nodeReducer from "./node.reducer";

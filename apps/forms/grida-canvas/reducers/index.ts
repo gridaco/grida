@@ -1,5 +1,5 @@
 import { produce, type Draft } from "immer";
-import type { IDocumentEditorState } from "../types";
+import type { IDocumentEditorState } from "../state";
 import type { BuilderAction } from "../action";
 // import historyReducer from "./history.reducer";
 import documentReducer from "./document.reducer";
