@@ -280,17 +280,6 @@ export namespace grida {
       }
 
       export namespace internal {
-        export interface IDocumentEditorState {
-          document: IDocumentDefinition;
-          /**
-           * the document key set by user. user can update this to tell it's entirely replaced
-           *
-           * Optional, but recommended to set for better tracking and debugging.
-           */
-          document_key?: string;
-          document_ctx: IDocumentDefinitionRuntimeHierarchyContext;
-        }
-
         /**
          * @internal
          * Represents the current runtime state of the document hierarchy context.

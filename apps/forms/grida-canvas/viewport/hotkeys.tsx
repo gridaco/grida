@@ -6,6 +6,8 @@ export function useEditorHotKeys() {
   const { setCursorMode, tryEnterContentEditMode, tryExitContentEditMode } =
     useEventTarget();
   const {
+    undo,
+    redo,
     cut,
     copy,
     paste,
@@ -67,13 +69,11 @@ export function useEditorHotKeys() {
   //
 
   useHotkeys("meta+z, ctrl+z", () => {
-    // TODO:
-    toast.error("[undo] is not implemented yet");
+    undo();
   });
 
   useHotkeys("meta+shift+z, ctrl+shift+z", () => {
-    // TODO:
-    toast.error("[redo] is not implemented yet");
+    redo();
   });
 
   useHotkeys("meta+b, ctrl+b", () => {

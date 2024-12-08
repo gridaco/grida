@@ -30,8 +30,6 @@ import { domapi } from "./domapi";
 import { cmath } from "./cmath";
 import { TCanvasEventTargetDragGestureState } from "./action";
 
-type Vector2 = [number, number];
-
 const DocumentContext = createContext<IDocumentEditorState | null>(null);
 
 const __noop: DocumentDispatcher = () => void 0;
@@ -825,6 +823,18 @@ export function useDocument() {
 
   const nodeActions = __useNodeActions(dispatch);
 
+  const undo = useCallback(() => {
+    dispatch({
+      type: "undo",
+    });
+  }, [dispatch]);
+
+  const redo = useCallback(() => {
+    dispatch({
+      type: "redo",
+    });
+  }, [dispatch]);
+
   const cut = useCallback(
     (target: "selection" | (string & {}) = "selection") => {
       dispatch({
@@ -1102,6 +1112,8 @@ export function useDocument() {
       selection,
       selectedNode,
       //
+      undo,
+      redo,
       cut,
       copy,
       paste,
@@ -1130,6 +1142,8 @@ export function useDocument() {
     selection,
     selectedNode,
     //
+    undo,
+    redo,
     cut,
     copy,
     paste,

@@ -7,16 +7,19 @@ import type {
 } from "./state";
 import type { cmath } from "./cmath";
 
-export type BuilderAction =
+export type Action =
+  | InternalAction
+  | EditorAction
+  | EditorUndoAction
+  | EditorRedoAction;
+
+export type InternalAction =
   | __InternalSyncArtboardOffset
-  | __InternalResetAction
+  | __InternalResetAction;
+
+export type EditorAction =
   | EditorConfigAction
   | EventTargetAction
-  | HistoryAction;
-
-export type HistoryAction =
-  | EditorUndoAction
-  | EditorRedoAction
   | DocumentAction;
 
 export type DocumentAction =

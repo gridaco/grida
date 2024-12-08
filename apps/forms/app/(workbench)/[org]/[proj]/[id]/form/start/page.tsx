@@ -59,7 +59,7 @@ import {
   useRootTemplateInstanceNode,
 } from "@/grida-canvas";
 import { composeEditorDocumentAction } from "@/scaffolds/editor/action";
-import { BuilderAction } from "@/grida-canvas/action";
+import { CanvasAction } from "@/grida-canvas";
 import { DevtoolsPanel } from "@/grida-canvas/devtools";
 import { Badge } from "@/components/ui/badge";
 import { ArrowRightIcon } from "@radix-ui/react-icons";
@@ -74,7 +74,7 @@ export default function FormStartEditPage() {
   } = state;
 
   const startPageDocumentDispatch = useCallback(
-    (action: BuilderAction) => {
+    (action: CanvasAction) => {
       dispatch(composeEditorDocumentAction("form/startpage", action));
     },
     [dispatch]

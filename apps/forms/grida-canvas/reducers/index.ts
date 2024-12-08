@@ -1,14 +1,15 @@
-import { produce, type Draft } from "immer";
 import type { IDocumentEditorState } from "../state";
-import type { BuilderAction } from "../action";
-// import historyReducer from "./history.reducer";
-import documentReducer from "./document.reducer";
+import type { Action, EditorAction } from "../action";
+import { produce, type Draft } from "immer";
 import { self_updateSurfaceHoverState } from "./methods";
+import { history } from "./history";
 import eventTargetReducer from "./event-target.reducer";
+import documentReducer from "./document.reducer";
+import equal from "deep-equal";
 
 export default function reducer<S extends IDocumentEditorState>(
   state: S,
-  action: BuilderAction
+  action: Action
 ): S {
   switch (action.type) {
     case "__internal/reset": {
@@ -26,6 +27,75 @@ export default function reducer<S extends IDocumentEditorState>(
         // draft.cursor_position =
       });
     }
+    case "undo":
+      if (state.history.past.length === 0) {
+        return state;
+      } else {
+        return produce(state, (draft) => {
+          const nextPresent = draft.history.past.pop();
+          if (nextPresent) {
+            draft.history.future.unshift(
+              history.entry(nextPresent.actionType, history.snapshot(state))
+            );
+            history.apply(draft, nextPresent.state);
+          }
+        });
+      }
+    case "redo":
+      if (state.history.future.length === 0) {
+        return state;
+      } else {
+        return produce(state, (draft) => {
+          const nextPresent = draft.history.future.shift();
+          if (nextPresent) {
+            draft.history.past.push(
+              history.entry(nextPresent.actionType, history.snapshot(state))
+            );
+            history.apply(draft, nextPresent.state);
+          }
+        });
+      }
+    default:
+      return historyExtension(state, action, _reducer(state, action));
+  }
+}
+
+function historyExtension<S extends IDocumentEditorState>(
+  prev: S,
+  action: EditorAction,
+  next: S
+): S {
+  //
+  // checks if there is change in the document state, take snapshot
+  //
+  const hasChanged = !equal(prev.document, next.document);
+  if (!hasChanged) return next;
+  return produce(next, (draft) => {
+    const entry = history.entry(action.type, prev);
+    const mergableEntry = history.getMergableEntry(prev.history.past);
+
+    if (mergableEntry) {
+      draft.history.past[draft.history.past.length - 1] = {
+        ...entry,
+        state: mergableEntry.state,
+      };
+    } else {
+      const max_history = 100;
+      if (draft.history.past.length >= max_history) {
+        draft.history.past.shift(); // Remove the oldest entry
+      }
+      draft.history.past.push(entry);
+    }
+
+    draft.history.future = [];
+  });
+}
+
+function _reducer<S extends IDocumentEditorState>(
+  state: S,
+  action: EditorAction
+): S {
+  switch (action.type) {
     case "config/surface/raycast-targeting": {
       const { config } = action;
       return produce(state, (draft: Draft<S>) => {
@@ -63,10 +133,6 @@ export default function reducer<S extends IDocumentEditorState>(
         draft.modifiers.translate_with_clone = action.translate_with_clone;
       });
     }
-    case "undo":
-    case "redo": {
-      return state;
-    }
     case "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag":
     case "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-end":
     case "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-start":
@@ -92,9 +158,9 @@ export default function reducer<S extends IDocumentEditorState>(
     case "document/canvas/backend/html/event/on-pointer-up": {
       return eventTargetReducer(state, action);
     }
-
     // history actions
     default:
       return documentReducer(state, action);
   }
+  //
 }

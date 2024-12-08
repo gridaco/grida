@@ -1,7 +1,7 @@
 import { produce, type Draft } from "immer";
 
 import type {
-  BuilderAction,
+  EditorAction,
   //
   TemplateEditorSetTemplatePropsAction,
   DocumentEditorNodeSelectAction,
@@ -522,7 +522,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
 
     default: {
       throw new Error(
-        `unknown action type: "${(action as BuilderAction).type}"`
+        `unknown action type: "${(action as EditorAction).type}"`
       );
     }
   }

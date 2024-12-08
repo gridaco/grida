@@ -12,7 +12,7 @@ import {
   EditorSurface,
 } from "@/grida-canvas";
 import { composeEditorDocumentAction } from "@/scaffolds/editor/action";
-import { BuilderAction } from "@/grida-canvas/action";
+import { CanvasAction } from "@/grida-canvas";
 
 export default function SiteDeisngPage() {
   return (
@@ -35,7 +35,7 @@ function CurrentPageCanvas() {
   const document = documents[selected_page_id!];
 
   const documentDispatch = useCallback(
-    (action: BuilderAction) => {
+    (action: CanvasAction) => {
       dispatch(
         composeEditorDocumentAction(
           // @ts-ignore

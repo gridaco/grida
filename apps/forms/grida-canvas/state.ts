@@ -1,8 +1,8 @@
-import type { BuilderAction } from "./action";
+import type { Action, EditorAction } from "./action";
 import { grida } from "@/grida";
 import { cmath } from "./cmath";
 
-export type DocumentDispatcher = (action: BuilderAction) => void;
+export type DocumentDispatcher = (action: Action) => void;
 
 export type CursorMode =
   | {
@@ -186,7 +186,55 @@ interface IDocumentEditorEventTargetState {
   marquee?: Marquee;
 }
 
-interface IDocumentEditorSelectionState {
+interface IDocumentEditorConfig {
+  /**
+   *
+   * when editable is false, the document definition is not editable
+   * set editable false on production context - end-user-facing context
+   */
+  editable: boolean;
+}
+
+interface IDocumentGoogleFontsState {
+  googlefonts: { family: string }[];
+}
+
+export type HistoryEntry = {
+  actionType: EditorAction["type"];
+  timestamp: number;
+  state: IDocumentState;
+};
+
+// export type HistoryState = {
+//   past: HistoryEntry[];
+//   present: IDocumentState;
+//   future: HistoryEntry[];
+// };
+
+// function initialHistoryState(init: IDocumentEditorInit): HistoryState {
+//   return {
+//     past: [],
+//     present: {
+//       selection: [],
+//       document_ctx:
+//         grida.program.document.internal.createDocumentDefinitionRuntimeHierarchyContext(
+//           init.document
+//         ),
+//       document: init.document,
+//     },
+//     future: [],
+//   };
+// }
+export interface IDocumentState {
+  document: grida.program.document.IDocumentDefinition;
+  /**
+   * the document key set by user. user can update this to tell it's entirely replaced
+   *
+   * Optional, but recommended to set for better tracking and debugging.
+   */
+  document_key?: string;
+  document_ctx: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext;
+
   selection: string[];
 
   /**
@@ -207,17 +255,11 @@ interface IDocumentEditorSelectionState {
   // selectedTextRange;
 }
 
-interface IDocumentEditorConfig {
-  /**
-   *
-   * when editable is false, the document definition is not editable
-   * set editable false on production context - end-user-facing context
-   */
-  editable: boolean;
-}
-
-interface IDocumentGoogleFontsState {
-  googlefonts: { family: string }[];
+interface __TMP_HistoryExtension {
+  history: {
+    past: HistoryEntry[];
+    future: HistoryEntry[];
+  };
 }
 
 export interface IDocumentEditorInit
@@ -231,10 +273,10 @@ export interface IDocumentEditorState
     IDocumentEditorClipboardState,
     IDocumentEditorTransformState,
     IDocumentEditorEventTargetState,
-    IDocumentEditorSelectionState,
     IDocumentGoogleFontsState,
     grida.program.document.IDocumentTemplatesRepository,
-    grida.program.document.internal.IDocumentEditorState {}
+    __TMP_HistoryExtension,
+    IDocumentState {}
 
 export function initDocumentEditorState({
   ...init
@@ -244,6 +286,10 @@ export function initDocumentEditorState({
   return {
     selection: [],
     surface_cursor_position: [0, 0],
+    history: {
+      future: [],
+      past: [],
+    },
     cursor_position: [0, 0],
     modifiers: {
       translate_with_clone: "off",
@@ -252,6 +298,7 @@ export function initDocumentEditorState({
       grida.program.document.internal.createDocumentDefinitionRuntimeHierarchyContext(
         init.document
       ),
+    // history: initialHistoryState(init),
     surface_raycast_targeting: DEFAULT_RAY_TARGETING,
     surface_measurement_targeting: "off",
     surface_raycast_detected_node_ids: [],
