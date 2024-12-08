@@ -54,10 +54,25 @@ export type Modifiers = {
   translate_with_clone: "on" | "off";
 };
 
-export interface IDocumentEditorInteractionCursorState {
-  selection: string[];
-  hovered_node_id?: string;
+interface IDocumentEditorClipboardState {
+  clipboard?: grida.program.nodes.Node;
+}
 
+interface IDocumentEditorTransformState {
+  /**
+   * @private - internal use only
+   *
+   * translate (offset) of the to the stage relative to event target
+   */
+  translate?: Vector2;
+}
+
+/**
+ * [Surface Support State]
+ *
+ * this support state is not part of the document state and does not get saved or recorded as history
+ */
+interface IDocumentEditorEventTargetState {
   gesture?: // translate (move)
   | {
         type: "translate";
@@ -95,8 +110,6 @@ export interface IDocumentEditorInteractionCursorState {
         initial_bounding_rectangle: cmath.Rectangle | null;
       };
 
-  modifiers: Modifiers;
-
   // gesture?: // translate (move)
   // {
   //   type: "translate" | "scale" | "rotate" | "corner-radius";
@@ -110,25 +123,21 @@ export interface IDocumentEditorInteractionCursorState {
   //   };
   // };
 
-  /**
-   * @private - internal use only
-   *
-   * current content edit mode
-   *
-   * @default false
-   */
-  surface_content_edit_mode?: false | "text" | "path";
+  // =============
 
-  /**
-   * the config of how the surface raycast targeting should be
-   */
-  surface_raycast_targeting: SurfaceRaycastTargeting;
+  hovered_node_id?: string;
 
   //
   // TODO:
   // translate (move) axis lock
   // user can configure the axis lock mode (turn this on when shift key is pressed, the node will move only in x or y axis)
   //
+  modifiers: Modifiers;
+
+  /**
+   * the config of how the surface raycast targeting should be
+   */
+  surface_raycast_targeting: SurfaceRaycastTargeting;
 
   /**
    * @private - internal use only
@@ -140,24 +149,11 @@ export interface IDocumentEditorInteractionCursorState {
   /**
    * @private - internal use only
    *
-   * translate (offset) of the to the stage relative to event target
-   */
-  translate?: Vector2;
-
-  /**
-   * @private - internal use only
-   *
    * relative cursor position to the event target (position in viewport space)
    *
    * @default [0, 0]
    */
   surface_cursor_position: Vector2;
-
-  /**
-   * target node id to measure distance between the selection
-   */
-  surface_measurement_target?: string;
-  surface_measurement_targeting: "on" | "off";
 
   /**
    * @private - internal use only
@@ -171,26 +167,43 @@ export interface IDocumentEditorInteractionCursorState {
   /**
    * @private - internal use only
    *
-   * refresh key
-   */
-  // __r: number;
-  // selectedTextRange;
-
-  /**
-   * @private - internal use only
-   *
    * cursor mode
    *
    * @default {type: "cursor"}
    */
   cursor_mode: CursorMode;
 
-  clipboard?: grida.program.nodes.Node;
+  /**
+   * target node id to measure distance between the selection
+   */
+  surface_measurement_target?: string;
+  surface_measurement_targeting: "on" | "off";
 
   /**
    * Marquee transform relative to viewport
    */
   marquee?: Marquee;
+}
+
+interface IDocumentEditorSelectionState {
+  selection: string[];
+
+  /**
+   * @private - internal use only
+   *
+   * current content edit mode
+   *
+   * @default false
+   */
+  content_edit_mode?: false | "text" | "path";
+
+  /**
+   * @private - internal use only
+   *
+   * refresh key
+   */
+  // __r: number;
+  // selectedTextRange;
 }
 
 interface IDocumentEditorConfig {
@@ -214,7 +227,10 @@ export interface IDocumentEditorInit
 
 export interface IDocumentEditorState
   extends IDocumentEditorConfig,
-    IDocumentEditorInteractionCursorState,
+    IDocumentEditorClipboardState,
+    IDocumentEditorTransformState,
+    IDocumentEditorEventTargetState,
+    IDocumentEditorSelectionState,
     IDocumentGoogleFontsState,
     grida.program.document.IDocumentTemplatesRepository,
     grida.program.document.internal.IDocumentEditorState {}

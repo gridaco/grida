@@ -3,7 +3,6 @@ import type { grida } from "@/grida";
 import type {
   CursorMode,
   IDocumentEditorState,
-  Modifiers,
   SurfaceRaycastTargeting,
 } from "./types";
 import type { cmath } from "./cmath";
@@ -12,6 +11,7 @@ export type BuilderAction =
   | __InternalSyncArtboardOffset
   | __InternalResetAction
   | EditorConfigAction
+  | EventTargetAction
   | HistoryAction;
 
 export type HistoryAction =
@@ -31,11 +31,9 @@ export type DocumentAction =
   | SurfaceAction
   //
   | DocumentEditorNodeSelectAction
-  | DocumentEditorNodePointerEnterAction
-  | DocumentEditorNodePointerLeaveAction
   | NodeChangeAction
   | NodeOrderAction
-  | NodeToggleAction
+  | NodeToggleBasePropertyAction
   | TemplateNodeOverrideChangeAction
   | TemplateEditorSetTemplatePropsAction
   //
@@ -204,40 +202,38 @@ interface ICanvasEventTargetDragEvent {
   event: TCanvasEventTargetDragGestureState;
 }
 
-// #region surface action
-export type SurfaceAction =
-  | EditorSurface_PointerMove
-  | EditorSurface_PointerMoveRaycast
-  | EditorSurface_PointerDown
-  | EditorSurface_PointerUp
-  | EditorSurface_Click
-  | EditorSurface_DragStart
-  | EditorSurface_Drag
-  | EditorSurface_DragEnd
+export type EventTargetAction =
   //
-  | EditorSurface_NodeOverlay_Click
-  | EditorSurface_NodeOverlay_DragStart
-  | EditorSurface_NodeOverlay_DragEnd
-  | EditorSurface_NodeOverlay_Drag
+  | EditorEventTarget_PointerMove
+  | EditorEventTarget_PointerMoveRaycast
+  | EditorEventTarget_PointerDown
+  | EditorEventTarget_PointerUp
+  | EditorEventTarget_Click
+  | EditorEventTarget_DragStart
+  | EditorEventTarget_Drag
+  | EditorEventTarget_DragEnd
   //
-  | EditorSurface_NodeOverlayResizeHandle_DragStart
-  | EditorSurface_NodeOverlayResizeHandle_DragEnd
-  | EditorSurface_NodeOverlayResizeHandle_Drag
+  | EditorEventTarget_Node_PointerEnter
+  | EditorEventTarget_Node_PointerLeave
   //
-  | EditorSurface_NodeOverlayCornerRadiusHandle_DragStart
-  | EditorSurface_NodeOverlayCornerRadiusHandle_DragEnd
-  | EditorSurface_NodeOverlayCornerRadiusHandle_Drag
+  | EditorEventTarget_NodeOverlay_Click
+  | EditorEventTarget_NodeOverlay_DragStart
+  | EditorEventTarget_NodeOverlay_DragEnd
+  | EditorEventTarget_NodeOverlay_Drag
   //
-  | EditorSurface_NodeOverlayRotationHandle_DragStart
-  | EditorSurface_NodeOverlayRotationHandle_DragEnd
-  | EditorSurface_NodeOverlayRotationHandle_Drag
+  | EditorEventTarget_NodeOverlayResizeHandle_DragStart
+  | EditorEventTarget_NodeOverlayResizeHandle_DragEnd
+  | EditorEventTarget_NodeOverlayResizeHandle_Drag
   //
-  | EditorSurface_EnterContentEditMode
-  | EditorSurface_ExitContentEditMode
+  | EditorEventTarget_NodeOverlayCornerRadiusHandle_DragStart
+  | EditorEventTarget_NodeOverlayCornerRadiusHandle_DragEnd
+  | EditorEventTarget_NodeOverlayCornerRadiusHandle_Drag
   //
-  | EditorSurface_CursorMode;
+  | EditorEventTarget_NodeOverlayRotationHandle_DragStart
+  | EditorEventTarget_NodeOverlayRotationHandle_DragEnd
+  | EditorEventTarget_NodeOverlayRotationHandle_Drag;
 
-export type EditorSurface_PointerMove = {
+export type EditorEventTarget_PointerMove = {
   type: "document/canvas/backend/html/event/on-pointer-move";
   /**
    * position in canvas space - need to pass a resolved value
@@ -248,7 +244,7 @@ export type EditorSurface_PointerMove = {
   };
 };
 
-export type EditorSurface_PointerMoveRaycast =
+export type EditorEventTarget_PointerMoveRaycast =
   IHtmlBackendCanvasEventTargetPointerEvent & {
     type: "document/canvas/backend/html/event/on-pointer-move-raycast";
     /**
@@ -260,16 +256,16 @@ export type EditorSurface_PointerMoveRaycast =
     };
   };
 
-export type EditorSurface_PointerDown =
+export type EditorEventTarget_PointerDown =
   IHtmlBackendCanvasEventTargetPointerEvent & {
     type: "document/canvas/backend/html/event/on-pointer-down";
   };
 
-export type EditorSurface_PointerUp = {
+export type EditorEventTarget_PointerUp = {
   type: "document/canvas/backend/html/event/on-pointer-up";
 };
 
-export type EditorSurface_Click = {
+export type EditorEventTarget_Click = {
   type: "document/canvas/backend/html/event/on-click";
   /**
    * position in canvas space - need to pass a resolved value
@@ -280,7 +276,7 @@ export type EditorSurface_Click = {
   };
 };
 
-export type EditorSurface_DragStart = {
+export type EditorEventTarget_DragStart = {
   type: "document/canvas/backend/html/event/on-drag-start";
   /**
    * @deprecated
@@ -288,98 +284,118 @@ export type EditorSurface_DragStart = {
   shiftKey: boolean;
 };
 
-export type EditorSurface_Drag = ICanvasEventTargetDragEvent & {
+export type EditorEventTarget_Drag = ICanvasEventTargetDragEvent & {
   type: "document/canvas/backend/html/event/on-drag";
 };
 
-export type EditorSurface_DragEnd = {
+export type EditorEventTarget_DragEnd = {
   type: "document/canvas/backend/html/event/on-drag-end";
   node_ids_from_area?: string[];
   shiftKey: boolean;
 };
 
-export type EditorSurface_EnterContentEditMode = {
-  type: "document/canvas/content-edit-mode/try-enter";
+//
+
+export type EditorEventTarget_Node_PointerEnter = INodeID & {
+  type: "document/canvas/backend/html/event/node/on-pointer-enter";
 };
 
-export type EditorSurface_ExitContentEditMode = {
-  type: "document/canvas/content-edit-mode/try-exit";
+export type EditorEventTarget_Node_PointerLeave = INodeID & {
+  type: "document/canvas/backend/html/event/node/on-pointer-leave";
 };
 
-export type EditorSurface_CursorMode = {
-  type: "document/canvas/cursor-mode";
-  cursor_mode: CursorMode;
-};
-
+//
 interface ICanvasEventTargetResizeHandleEvent {
   direction: cmath.CardinalDirection;
 }
 
-export type EditorSurface_NodeOverlay_Click = ISelection &
+export type EditorEventTarget_NodeOverlay_Click = ISelection &
   IHtmlBackendCanvasEventTargetPointerEvent & {
     type: "document/canvas/backend/html/event/node-overlay/on-click";
   };
 
-export type EditorSurface_NodeOverlay_DragStart = ISelection &
+export type EditorEventTarget_NodeOverlay_DragStart = ISelection &
   ICanvasEventTargetDragEvent & {
     type: "document/canvas/backend/html/event/node-overlay/on-drag-start";
   };
 
-export type EditorSurface_NodeOverlay_DragEnd = ISelection &
+export type EditorEventTarget_NodeOverlay_DragEnd = ISelection &
   ICanvasEventTargetDragEvent & {
     type: "document/canvas/backend/html/event/node-overlay/on-drag-end";
   };
 
-export type EditorSurface_NodeOverlay_Drag = ISelection &
+export type EditorEventTarget_NodeOverlay_Drag = ISelection &
   ICanvasEventTargetDragEvent & {
     type: "document/canvas/backend/html/event/node-overlay/on-drag";
   };
 
-export type EditorSurface_NodeOverlayResizeHandle_DragStart = INodeID & {
+export type EditorEventTarget_NodeOverlayResizeHandle_DragStart = INodeID & {
   type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-start";
 };
 
-export type EditorSurface_NodeOverlayResizeHandle_DragEnd = INodeID & {
+export type EditorEventTarget_NodeOverlayResizeHandle_DragEnd = INodeID & {
   type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-end";
 };
 
-export type EditorSurface_NodeOverlayResizeHandle_Drag = INodeID &
+export type EditorEventTarget_NodeOverlayResizeHandle_Drag = INodeID &
   ICanvasEventTargetDragEvent &
   ICanvasEventTargetResizeHandleEvent & {
     type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag";
   };
 
 //
-export type EditorSurface_NodeOverlayCornerRadiusHandle_DragStart = INodeID & {
-  type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-start";
-};
+export type EditorEventTarget_NodeOverlayCornerRadiusHandle_DragStart =
+  INodeID & {
+    type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-start";
+  };
 
-export type EditorSurface_NodeOverlayCornerRadiusHandle_DragEnd = INodeID & {
-  type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-end";
-};
+export type EditorEventTarget_NodeOverlayCornerRadiusHandle_DragEnd =
+  INodeID & {
+    type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-end";
+  };
 
-export type EditorSurface_NodeOverlayCornerRadiusHandle_Drag = INodeID &
+export type EditorEventTarget_NodeOverlayCornerRadiusHandle_Drag = INodeID &
   ICanvasEventTargetDragEvent &
   ICanvasEventTargetResizeHandleEvent & {
     type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag";
   };
 //
 
-export type EditorSurface_NodeOverlayRotationHandle_DragStart = INodeID & {
+export type EditorEventTarget_NodeOverlayRotationHandle_DragStart = INodeID & {
   type: "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag-start";
 };
 
-export type EditorSurface_NodeOverlayRotationHandle_DragEnd = INodeID & {
+export type EditorEventTarget_NodeOverlayRotationHandle_DragEnd = INodeID & {
   type: "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag-end";
 };
 
-export type EditorSurface_NodeOverlayRotationHandle_Drag = INodeID &
+export type EditorEventTarget_NodeOverlayRotationHandle_Drag = INodeID &
   ICanvasEventTargetDragEvent &
   ICanvasEventTargetResizeHandleEvent & {
     type: "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag";
   };
 
 //
+
+// #region surface action
+export type SurfaceAction =
+  | EditorSurface_EnterContentEditMode
+  | EditorSurface_ExitContentEditMode
+  //
+  | EditorSurface_CursorMode;
+
+export type EditorSurface_EnterContentEditMode = {
+  type: "document/surface/content-edit-mode/try-enter";
+};
+
+export type EditorSurface_ExitContentEditMode = {
+  type: "document/surface/content-edit-mode/try-exit";
+};
+
+export type EditorSurface_CursorMode = {
+  type: "document/surface/cursor-mode";
+  cursor_mode: CursorMode;
+};
 
 // #endregion surface action
 
@@ -396,14 +412,6 @@ export interface DocumentEditorNodeSelectAction {
 interface ITemplateInstanceNodeID {
   template_instance_node_id: string;
 }
-
-export type DocumentEditorNodePointerEnterAction = INodeID & {
-  type: "document/node/on-pointer-enter";
-};
-
-export type DocumentEditorNodePointerLeaveAction = INodeID & {
-  type: "document/node/on-pointer-leave";
-};
 
 interface INodeChangeNameAction extends INodeID {
   name: string;
@@ -617,7 +625,7 @@ export type NodeOrderAction =
   | ({ type: "node/order/back" } & INodeID)
   | ({ type: "node/order/front" } & INodeID);
 
-export type NodeToggleAction =
+export type NodeToggleBasePropertyAction =
   | ({ type: "node/toggle/active" } & INodeID)
   | ({ type: "node/toggle/locked" } & INodeID);
 

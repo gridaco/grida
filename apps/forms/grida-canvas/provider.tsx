@@ -181,7 +181,7 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   const pointerEnterNode = useCallback(
     (node_id: string) => {
       dispatch({
-        type: "document/node/on-pointer-enter",
+        type: "document/canvas/backend/html/event/node/on-pointer-enter",
         node_id,
       });
     },
@@ -191,7 +191,7 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   const pointerLeaveNode = useCallback(
     (node_id: string) => {
       dispatch({
-        type: "document/node/on-pointer-leave",
+        type: "document/canvas/backend/html/event/node/on-pointer-leave",
         node_id,
       });
     },
@@ -1202,7 +1202,7 @@ export function useEventTarget() {
     gesture,
     hovered_node_id,
     selection,
-    surface_content_edit_mode: content_edit_mode,
+    content_edit_mode: content_edit_mode,
     cursor_mode,
     marquee,
   } = state;
@@ -1212,7 +1212,7 @@ export function useEventTarget() {
   const setCursorMode = useCallback(
     (cursor_mode: CursorMode) => {
       dispatch({
-        type: "document/canvas/cursor-mode",
+        type: "document/surface/cursor-mode",
         cursor_mode,
       });
     },
@@ -1308,13 +1308,13 @@ export function useEventTarget() {
    */
   const tryEnterContentEditMode = useCallback(() => {
     dispatch({
-      type: "document/canvas/content-edit-mode/try-enter",
+      type: "document/surface/content-edit-mode/try-enter",
     });
   }, [dispatch]);
 
   const tryExitContentEditMode = useCallback(() => {
     dispatch({
-      type: "document/canvas/content-edit-mode/try-exit",
+      type: "document/surface/content-edit-mode/try-exit",
     });
   }, [dispatch]);
 

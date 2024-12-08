@@ -5,15 +5,15 @@ import type {
   //
   TemplateEditorSetTemplatePropsAction,
   DocumentEditorNodeSelectAction,
-  DocumentEditorNodePointerEnterAction,
-  DocumentEditorNodePointerLeaveAction,
+  EditorEventTarget_Node_PointerEnter,
+  EditorEventTarget_Node_PointerLeave,
   NodeChangeAction,
   NodeOrderAction,
-  NodeToggleAction,
+  NodeToggleBasePropertyAction,
   TemplateNodeOverrideChangeAction,
   DocumentAction,
 } from "../action";
-import type { IDocumentEditorState, SurfaceRaycastTargeting } from "../types";
+import type { IDocumentEditorState } from "../types";
 import { grida } from "@/grida";
 import assert from "assert";
 import { documentquery } from "../document-query";
@@ -296,32 +296,9 @@ export default function documentReducer<S extends IDocumentEditorState>(
         self_clearSelection(draft);
       });
     }
-    case "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag":
-    case "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-end":
-    case "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-start":
-    case "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag":
-    case "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-end":
-    case "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-start":
-    case "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag":
-    case "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag-end":
-    case "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag-start":
-    case "document/canvas/backend/html/event/node-overlay/on-click":
-    case "document/canvas/backend/html/event/node-overlay/on-drag":
-    case "document/canvas/backend/html/event/node-overlay/on-drag-end":
-    case "document/canvas/backend/html/event/node-overlay/on-drag-start":
-    case "document/canvas/backend/html/event/on-click":
-    case "document/canvas/backend/html/event/on-drag":
-    case "document/canvas/backend/html/event/on-drag-end":
-    case "document/canvas/backend/html/event/on-drag-start":
-    // case "document/canvas/backend/html/event/on-key-down":
-    // case "document/canvas/backend/html/event/on-key-up":
-    case "document/canvas/backend/html/event/on-pointer-down":
-    case "document/canvas/backend/html/event/on-pointer-move":
-    case "document/canvas/backend/html/event/on-pointer-move-raycast":
-    case "document/canvas/backend/html/event/on-pointer-up":
-    case "document/canvas/content-edit-mode/try-enter":
-    case "document/canvas/content-edit-mode/try-exit":
-    case "document/canvas/cursor-mode": {
+    case "document/surface/content-edit-mode/try-enter":
+    case "document/surface/content-edit-mode/try-exit":
+    case "document/surface/cursor-mode": {
       return surfaceReducer(state, action);
     }
     case "document/template/set/props": {
@@ -341,20 +318,6 @@ export default function documentReducer<S extends IDocumentEditorState>(
 
       return produce(state, (draft) => {
         if (node_id) self_selectNode(draft, "reset", node_id);
-      });
-    }
-    case "document/node/on-pointer-enter": {
-      const { node_id } = <DocumentEditorNodePointerEnterAction>action;
-      return produce(state, (draft) => {
-        draft.hovered_node_id = node_id;
-      });
-    }
-    case "document/node/on-pointer-leave": {
-      const { node_id } = <DocumentEditorNodePointerLeaveAction>action;
-      return produce(state, (draft) => {
-        if (draft.hovered_node_id === node_id) {
-          draft.hovered_node_id = undefined;
-        }
       });
     }
     // case "document/template/change/props": {
@@ -458,7 +421,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
     //
     case "node/toggle/locked": {
       return produce(state, (draft) => {
-        const { node_id } = <NodeToggleAction>action;
+        const { node_id } = <NodeToggleBasePropertyAction>action;
         const node = documentquery.__getNodeById(draft, node_id);
         assert(node, `node not found with node_id: "${node_id}"`);
         node.locked = !node.locked;
@@ -466,7 +429,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
     }
     case "node/toggle/active": {
       return produce(state, (draft) => {
-        const { node_id } = <NodeToggleAction>action;
+        const { node_id } = <NodeToggleBasePropertyAction>action;
         const node = documentquery.__getNodeById(draft, node_id);
         assert(node, `node not found with node_id: "${node_id}"`);
         node.active = !node.active;

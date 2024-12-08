@@ -4,6 +4,7 @@ import type { BuilderAction } from "../action";
 // import historyReducer from "./history.reducer";
 import documentReducer from "./document.reducer";
 import { self_updateSurfaceHoverState } from "./methods";
+import eventTargetReducer from "./event-target.reducer";
 
 export default function reducer<S extends IDocumentEditorState>(
   state: S,
@@ -62,6 +63,36 @@ export default function reducer<S extends IDocumentEditorState>(
         draft.modifiers.translate_with_clone = action.translate_with_clone;
       });
     }
+    case "undo":
+    case "redo": {
+      return state;
+    }
+    case "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag":
+    case "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-end":
+    case "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-start":
+    case "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag":
+    case "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-end":
+    case "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-start":
+    case "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag":
+    case "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag-end":
+    case "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag-start":
+    case "document/canvas/backend/html/event/node-overlay/on-click":
+    case "document/canvas/backend/html/event/node-overlay/on-drag":
+    case "document/canvas/backend/html/event/node-overlay/on-drag-end":
+    case "document/canvas/backend/html/event/node-overlay/on-drag-start":
+    case "document/canvas/backend/html/event/node/on-pointer-enter":
+    case "document/canvas/backend/html/event/node/on-pointer-leave":
+    case "document/canvas/backend/html/event/on-click":
+    case "document/canvas/backend/html/event/on-drag":
+    case "document/canvas/backend/html/event/on-drag-end":
+    case "document/canvas/backend/html/event/on-drag-start":
+    case "document/canvas/backend/html/event/on-pointer-down":
+    case "document/canvas/backend/html/event/on-pointer-move":
+    case "document/canvas/backend/html/event/on-pointer-move-raycast":
+    case "document/canvas/backend/html/event/on-pointer-up": {
+      return eventTargetReducer(state, action);
+    }
+
     // history actions
     default:
       return documentReducer(state, action);

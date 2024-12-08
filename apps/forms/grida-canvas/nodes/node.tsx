@@ -164,7 +164,7 @@ export function NodeElement<P extends Record<string, any>>({
             userSelect: document.editable ? "none" : undefined,
             // hide this node when in surface edit mode
             visibility: selected
-              ? document.surface_content_edit_mode
+              ? document.content_edit_mode
                 ? "hidden"
                 : undefined
               : undefined,
