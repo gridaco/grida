@@ -1,8 +1,71 @@
 import { type Draft } from "immer";
-import type { IDocumentEditorState, SurfaceRaycastTargeting } from "../types";
+import type { IDocumentEditorState, SurfaceRaycastTargeting } from "../state";
 import { documentquery } from "../document-query";
 import { grida } from "@/grida";
 import assert from "assert";
+import { v4 } from "uuid";
+
+/**
+ * TODO:
+ * - validate the selection by config (which does not exists yet), to only select subset of children or a container, but not both. - when both container and children are selected, when transform, it will transform both, resulting in a weird behavior.
+ */
+export function self_selectNode<S extends IDocumentEditorState>(
+  draft: Draft<S>,
+  mode: "reset" | "add" | "toggle",
+  ...__node_ids: string[]
+) {
+  for (const node_id of __node_ids) {
+    assert(node_id, "Node ID must be provided");
+    assert(
+      documentquery.__getNodeById(draft, node_id),
+      `Node not found with id: "${node_id}"`
+    );
+  }
+
+  switch (mode) {
+    case "add": {
+      const set = new Set([...draft.selection, ...__node_ids]);
+      const pruned = documentquery.pruneNestedNodes(
+        draft.document_ctx,
+        Array.from(set)
+      );
+      draft.selection = pruned;
+      break;
+    }
+    case "toggle": {
+      const set = new Set(draft.selection);
+      for (const node_id of __node_ids) {
+        if (set.has(node_id)) {
+          set.delete(node_id);
+        } else {
+          set.add(node_id);
+        }
+      }
+      const pruned = documentquery.pruneNestedNodes(
+        draft.document_ctx,
+        Array.from(set)
+      );
+      draft.selection = pruned;
+      break;
+    }
+    case "reset": {
+      const pruned = documentquery.pruneNestedNodes(
+        draft.document_ctx,
+        __node_ids
+      );
+      draft.selection = pruned;
+      break;
+    }
+  }
+  return draft;
+}
+
+export function self_clearSelection<S extends IDocumentEditorState>(
+  draft: Draft<S>
+) {
+  draft.selection = [];
+  return draft;
+}
 
 export function self_updateSurfaceHoverState<S extends IDocumentEditorState>(
   draft: Draft<S>
@@ -12,6 +75,15 @@ export function self_updateSurfaceHoverState<S extends IDocumentEditorState>(
     context: draft,
   });
   draft.hovered_node_id = target;
+
+  if (draft.surface_measurement_targeting === "on") {
+    if (target) draft.surface_measurement_target = target;
+    else {
+      // set root as target
+      draft.surface_measurement_target = draft.document.root_id;
+    }
+  }
+
   return draft;
 }
 
@@ -77,10 +149,36 @@ function getSurfaceRayTarget(
   return undefined;
 }
 
+export function self_duplicateNode<S extends IDocumentEditorState>(
+  draft: Draft<S>,
+  ...node_ids: string[]
+) {
+  for (const node_id of node_ids) {
+    if (node_id === draft.document.root_id) continue;
+
+    const node = documentquery.__getNodeById(draft, node_id);
+
+    // serialize the node
+    const serialized = JSON.stringify(node);
+    const deserialized = JSON.parse(serialized);
+
+    // update the id
+    const new_id = v4();
+    deserialized.id = new_id;
+
+    const parent_id = documentquery.getParentId(draft.document_ctx, node_id);
+    assert(parent_id, `Parent node not found`);
+
+    // insert the node
+    self_insertNode(draft, parent_id, deserialized);
+  }
+}
+
+// TODO: after inserting, refresh fonts registry
 export function self_insertNode<S extends IDocumentEditorState>(
   draft: Draft<S>,
   parent_id: string,
-  node: grida.program.nodes.Node
+  node: grida.program.nodes.Node // TODO: NodePrototype
 ): string {
   const node_id = node.id;
 
@@ -117,7 +215,7 @@ export function self_deleteNode<S extends IDocumentEditorState>(
   draft: Draft<S>,
   node_id: string
 ) {
-  draft.selected_node_id = undefined;
+  draft.selection = [];
   draft.hovered_node_id = undefined;
   const node = draft.document.nodes[node_id];
   const children = "children" in node ? node.children : undefined;

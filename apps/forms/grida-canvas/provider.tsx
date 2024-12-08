@@ -14,7 +14,8 @@ import {
   type IDocumentEditorInit,
   initDocumentEditorState,
   CursorMode,
-} from "./types";
+  SurfaceRaycastTargeting,
+} from "./state";
 import type { Tokens } from "@/ast";
 import { grida } from "@/grida";
 import { useComputed } from "./nodes/use-computed";
@@ -26,8 +27,8 @@ import assert from "assert";
 import { documentquery } from "./document-query";
 import { GoogleFontsManager } from "./components/google-fonts";
 import { domapi } from "./domapi";
-
-type Vector2 = [number, number];
+import { cmath } from "./cmath";
+import { TCanvasEventTargetDragGestureState } from "./action";
 
 const DocumentContext = createContext<IDocumentEditorState | null>(null);
 
@@ -178,7 +179,7 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   const pointerEnterNode = useCallback(
     (node_id: string) => {
       dispatch({
-        type: "document/node/on-pointer-enter",
+        type: "document/canvas/backend/html/event/node/on-pointer-enter",
         node_id,
       });
     },
@@ -188,7 +189,7 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   const pointerLeaveNode = useCallback(
     (node_id: string) => {
       dispatch({
-        type: "document/node/on-pointer-leave",
+        type: "document/canvas/backend/html/event/node/on-pointer-leave",
         node_id,
       });
     },
@@ -818,9 +819,157 @@ export function useNodeAction(node_id: string | undefined) {
 export function useDocument() {
   const [state, dispatch] = __useInternal();
 
-  const { selected_node_id } = state;
+  const { selection } = state;
 
   const nodeActions = __useNodeActions(dispatch);
+
+  const undo = useCallback(() => {
+    dispatch({
+      type: "undo",
+    });
+  }, [dispatch]);
+
+  const redo = useCallback(() => {
+    dispatch({
+      type: "redo",
+    });
+  }, [dispatch]);
+
+  const cut = useCallback(
+    (target: "selection" | (string & {}) = "selection") => {
+      dispatch({
+        type: "cut",
+        target: target,
+      });
+    },
+    [dispatch]
+  );
+
+  const copy = useCallback(
+    (target: "selection" | (string & {}) = "selection") => {
+      dispatch({
+        type: "copy",
+        target: target,
+      });
+    },
+    [dispatch]
+  );
+
+  const paste = useCallback(() => {
+    dispatch({
+      type: "paste",
+    });
+  }, [dispatch]);
+
+  const duplicate = useCallback(
+    (target: "selection" | (string & {}) = "selection") => {
+      dispatch({
+        type: "duplicate",
+        target,
+      });
+    },
+    [dispatch]
+  );
+
+  const deleteNode = useCallback(
+    (target: "selection" | (string & {}) = "selection") => {
+      dispatch({
+        type: "delete",
+        target: target,
+      });
+    },
+    [dispatch]
+  );
+
+  const nudge = useCallback(
+    (
+      target: "selection" | (string & {}) = "selection",
+      axis: "x" | "y",
+      delta: number = 1
+    ) => {
+      dispatch({
+        type: "nudge",
+        delta,
+        axis,
+        target,
+      });
+    },
+    [dispatch]
+  );
+
+  const nudgeResize = useCallback(
+    (
+      target: "selection" | (string & {}) = "selection",
+      axis: "x" | "y",
+      delta: number = 1
+    ) => {
+      dispatch({
+        type: "nudge-resize",
+        delta,
+        axis,
+        target,
+      });
+    },
+    [dispatch]
+  );
+
+  const align = useCallback(
+    (
+      target: "selection" | (string & {}) = "selection",
+      alignment: {
+        horizontal?: "none" | "min" | "max" | "center";
+        vertical?: "none" | "min" | "max" | "center";
+      }
+    ) => {
+      dispatch({
+        type: "align",
+        target,
+        alignment,
+      });
+    },
+    [dispatch]
+  );
+
+  const distributeEvenly = useCallback(
+    (target: "selection" | string[] = "selection", axis: "x" | "y") => {
+      dispatch({
+        type: "distribute-evenly",
+        target,
+        axis,
+      });
+    },
+    [dispatch]
+  );
+
+  const configureSurfaceRaycastTargeting = useCallback(
+    (config: Partial<SurfaceRaycastTargeting>) => {
+      dispatch({
+        type: "config/surface/raycast-targeting",
+        config,
+      });
+    },
+    [dispatch]
+  );
+
+  const configureMeasurement = useCallback(
+    (measurement: "on" | "off") => {
+      dispatch({
+        type: "config/surface/measurement",
+        measurement,
+      });
+    },
+    [dispatch]
+  );
+
+  const configureTranslateWithCloneModifier = useCallback(
+    (translate_with_clone: "on" | "off") => {
+      dispatch({
+        type: "config/modifiers/translate-with-clone",
+        translate_with_clone,
+      });
+    },
+    [dispatch]
+  );
 
   const clearSelection = useCallback(
     () =>
@@ -952,14 +1101,32 @@ export function useDocument() {
     [dispatch]
   );
 
-  const selectedNodeActions = useNodeAction(selected_node_id);
-  const selectedNode = selected_node_id ? selectedNodeActions : undefined;
+  const selectedNodeActions = useNodeAction(
+    selection.length === 1 ? selection[0] : undefined
+  );
+  const selectedNode = selection.length === 1 ? selectedNodeActions : undefined;
 
   return useMemo(() => {
     return {
       state,
-      selected_node_id,
+      selection,
       selectedNode,
+      //
+      undo,
+      redo,
+      cut,
+      copy,
+      paste,
+      duplicate,
+      deleteNode,
+      nudge,
+      nudgeResize,
+      align,
+      distributeEvenly,
+      configureSurfaceRaycastTargeting,
+      configureMeasurement,
+      configureTranslateWithCloneModifier,
+      //
       clearSelection,
       getNodeDepth,
       getNodeAbsoluteRotation,
@@ -972,8 +1139,24 @@ export function useDocument() {
     };
   }, [
     state,
-    selected_node_id,
+    selection,
     selectedNode,
+    //
+    undo,
+    redo,
+    cut,
+    copy,
+    paste,
+    duplicate,
+    deleteNode,
+    nudge,
+    nudgeResize,
+    align,
+    distributeEvenly,
+    configureSurfaceRaycastTargeting,
+    configureMeasurement,
+    configureTranslateWithCloneModifier,
+    //
     clearSelection,
     getNodeDepth,
     getNodeAbsoluteRotation,
@@ -1030,47 +1213,21 @@ export function useEventTarget() {
   const [state, dispatch] = __useInternal();
 
   const {
-    is_gesture_node_drag_move: is_node_transforming,
+    gesture,
     hovered_node_id,
-    selected_node_id,
-    surface_content_edit_mode: content_edit_mode,
+    selection,
+    content_edit_mode: content_edit_mode,
     cursor_mode,
     marquee,
   } = state;
 
+  const is_node_transforming = !!gesture;
+
   const setCursorMode = useCallback(
     (cursor_mode: CursorMode) => {
       dispatch({
-        type: "document/canvas/cursor-mode",
+        type: "document/surface/cursor-mode",
         cursor_mode,
-      });
-    },
-    [dispatch]
-  );
-
-  const keyDown = useCallback(
-    (event: KeyboardEvent) => {
-      dispatch({
-        type: "document/canvas/backend/html/event/on-key-down",
-        key: event.key,
-        altKey: event.altKey,
-        metaKey: event.metaKey,
-        ctrlKey: event.ctrlKey,
-        shiftKey: event.shiftKey,
-      });
-    },
-    [dispatch]
-  );
-
-  const keyUp = useCallback(
-    (event: KeyboardEvent) => {
-      dispatch({
-        type: "document/canvas/backend/html/event/on-key-up",
-        key: event.key,
-        altKey: event.altKey,
-        metaKey: event.metaKey,
-        ctrlKey: event.ctrlKey,
-        shiftKey: event.shiftKey,
       });
     },
     [dispatch]
@@ -1088,6 +1245,7 @@ export function useEventTarget() {
         type: "document/canvas/backend/html/event/on-pointer-move-raycast",
         node_ids_from_point: els.map((n) => n.id),
         position,
+        shiftKey: event.shiftKey,
       });
     }, 30),
     [dispatch]
@@ -1131,6 +1289,7 @@ export function useEventTarget() {
       dispatch({
         type: "document/canvas/backend/html/event/on-pointer-down",
         node_ids_from_point: els.map((n) => n.id),
+        shiftKey: event.shiftKey,
       });
     },
     [dispatch]
@@ -1163,30 +1322,77 @@ export function useEventTarget() {
    */
   const tryEnterContentEditMode = useCallback(() => {
     dispatch({
-      type: "document/canvas/content-edit-mode/try-enter",
+      type: "document/surface/content-edit-mode/try-enter",
     });
   }, [dispatch]);
 
   const tryExitContentEditMode = useCallback(() => {
     dispatch({
-      type: "document/canvas/content-edit-mode/try-exit",
+      type: "document/surface/content-edit-mode/try-exit",
     });
   }, [dispatch]);
 
-  const dragStart = useCallback(() => {
-    dispatch({
-      type: "document/canvas/backend/html/event/on-drag-start",
-    });
-  }, [dispatch]);
+  const dragStart = useCallback(
+    (event: PointerEvent) => {
+      dispatch({
+        type: "document/canvas/backend/html/event/on-drag-start",
+        shiftKey: event.shiftKey,
+      });
+    },
+    [dispatch]
+  );
 
-  const dragEnd = useCallback(() => {
-    dispatch({
-      type: "document/canvas/backend/html/event/on-drag-end",
-    });
-  }, [dispatch]);
+  const dragEnd = useCallback(
+    (event: PointerEvent) => {
+      if (marquee) {
+        const contained: string[] = [];
+
+        const els = domapi.get_grida_node_elements();
+        const viewportdomrect = domapi.get_viewport_rect();
+        const viewport_pos = [viewportdomrect.x, viewportdomrect.y];
+        const translate: [number, number] = [
+          state.translate ? state.translate[0] : 0,
+          state.translate ? state.translate[1] : 0,
+        ];
+
+        const marqueerect = cmath.rect.fromPoints([
+          [marquee.x1, marquee.y1],
+          [marquee.x2, marquee.y2],
+        ]);
+        marqueerect.x = marqueerect.x - translate[0];
+        marqueerect.y = marqueerect.y - translate[1];
+
+        els?.forEach((el) => {
+          const eldomrect = el.getBoundingClientRect();
+          const elrect = {
+            x: eldomrect.x - translate[0] - viewport_pos[0],
+            y: eldomrect.y - translate[1] - viewport_pos[1],
+            width: eldomrect.width,
+            height: eldomrect.height,
+          };
+          if (cmath.rect.intersects(elrect, marqueerect)) {
+            contained.push(el.id);
+          }
+        });
+
+        dispatch({
+          type: "document/canvas/backend/html/event/on-drag-end",
+          node_ids_from_area: contained,
+          shiftKey: event.shiftKey,
+        });
+
+        return;
+      }
+      dispatch({
+        type: "document/canvas/backend/html/event/on-drag-end",
+        shiftKey: event.shiftKey,
+      });
+    },
+    [dispatch, marquee, state.translate]
+  );
 
   const drag = useCallback(
-    (event: { delta: Vector2; distance: Vector2 }) => {
+    (event: TCanvasEventTargetDragGestureState) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "document/canvas/backend/html/event/on-drag",
@@ -1197,13 +1403,61 @@ export function useEventTarget() {
     [dispatch]
   );
 
+  //
+  const layerClick = useCallback(
+    (selection: string[], event: MouseEvent) => {
+      const els = domapi.get_grida_node_elements_from_point(
+        event.clientX,
+        event.clientY
+      );
+
+      dispatch({
+        type: "document/canvas/backend/html/event/node-overlay/on-click",
+        selection: selection,
+        node_ids_from_point: els.map((n) => n.id),
+        shiftKey: event.shiftKey,
+      });
+    },
+    [dispatch]
+  );
+  const layerDragStart = useCallback(
+    (selection: string[], event: TCanvasEventTargetDragGestureState) => {
+      dispatch({
+        type: "document/canvas/backend/html/event/node-overlay/on-drag-start",
+        selection,
+        event,
+      });
+    },
+    [dispatch]
+  );
+  const layerDragEnd = useCallback(
+    (selection: string[], event: TCanvasEventTargetDragGestureState) => {
+      dispatch({
+        type: "document/canvas/backend/html/event/node-overlay/on-drag-end",
+        selection,
+        event,
+      });
+    },
+    [dispatch]
+  );
+  const layerDrag = useCallback(
+    (selection: string[], event: TCanvasEventTargetDragGestureState) => {
+      dispatch({
+        type: "document/canvas/backend/html/event/node-overlay/on-drag",
+        selection,
+        event,
+      });
+    },
+    [dispatch]
+  );
+  //
+
   // #region drag resize handle
   const dragResizeHandleStart = useCallback(
-    (node_id: string, client_wh: { width: number; height: number }) => {
+    (node_id: string) => {
       dispatch({
         type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-start",
         node_id,
-        client_wh,
       });
     },
     [dispatch]
@@ -1220,14 +1474,14 @@ export function useEventTarget() {
   const dragResizeHandle = useCallback(
     (
       node_id: string,
-      anchor: "nw" | "ne" | "sw" | "se",
-      event: { delta: Vector2; distance: Vector2 }
+      direction: cmath.CardinalDirection,
+      event: TCanvasEventTargetDragGestureState
     ) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag",
           node_id,
-          anchor,
+          direction: direction,
           event,
         });
       });
@@ -1259,13 +1513,13 @@ export function useEventTarget() {
     (
       node_id: string,
       anchor: "nw" | "ne" | "sw" | "se",
-      event: { delta: Vector2; distance: Vector2 }
+      event: TCanvasEventTargetDragGestureState
     ) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag",
           node_id,
-          anchor,
+          direction: anchor,
           event,
         });
       });
@@ -1297,13 +1551,13 @@ export function useEventTarget() {
     (
       node_id: string,
       anchor: "nw" | "ne" | "sw" | "se",
-      event: { delta: Vector2; distance: Vector2 }
+      event: TCanvasEventTargetDragGestureState
     ) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag",
           node_id,
-          anchor,
+          direction: anchor,
           event,
         });
       });
@@ -1319,12 +1573,9 @@ export function useEventTarget() {
       setCursorMode,
       //
       hovered_node_id,
-      selected_node_id,
+      selection,
       is_node_transforming,
       content_edit_mode,
-      //
-      keyDown,
-      keyUp,
       //
       dragResizeHandleStart,
       dragResizeHandleEnd,
@@ -1350,6 +1601,11 @@ export function useEventTarget() {
       dragEnd,
       drag,
       //
+      layerClick,
+      layerDragStart,
+      layerDragEnd,
+      layerDrag,
+      //
     };
   }, [
     marquee,
@@ -1357,12 +1613,9 @@ export function useEventTarget() {
     setCursorMode,
     //
     hovered_node_id,
-    selected_node_id,
+    selection,
     is_node_transforming,
     content_edit_mode,
-    //
-    keyDown,
-    keyUp,
     //
     dragResizeHandleStart,
     dragResizeHandleEnd,
@@ -1387,6 +1640,11 @@ export function useEventTarget() {
     dragStart,
     dragEnd,
     drag,
+    //
+    layerClick,
+    layerDragStart,
+    layerDragEnd,
+    layerDrag,
     //
   ]);
 }
@@ -1507,9 +1765,10 @@ export function useNode(node_id: string): grida.program.nodes.AnyNode & {
 
 export function useComputedNode(node_id: string) {
   const node = useNode(node_id);
-  const { active, style, component_id, props, text, src, href } = node;
+  const { active, style, component_id, props, text, html, src, href } = node;
   const computed = useComputed({
     text: text,
+    html: html,
     src: src,
     href: href,
     props: props,
@@ -1524,22 +1783,4 @@ export function useTemplateDefinition(template_id: string) {
   } = useDocument();
 
   return templates![template_id];
-}
-
-export function useNodeDomElement(node_id: string) {
-  const [nodeElement, setNodeElement] = React.useState<HTMLElement | null>(
-    null
-  );
-
-  useLayoutEffect(() => {
-    if (!node_id) {
-      setNodeElement(null);
-      return;
-    }
-
-    const element = document.getElementById(node_id);
-    setNodeElement(element);
-  }, [node_id]);
-
-  return nodeElement;
 }

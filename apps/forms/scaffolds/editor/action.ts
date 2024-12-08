@@ -21,7 +21,7 @@ import type {
 } from "./state";
 import type { Tokens } from "@/ast";
 import type { DataQueryAction } from "../data-query";
-import type { BuilderAction } from "@/grida-canvas/action";
+import type { CanvasAction } from "@/grida-canvas";
 import type { SYM_LOCALTZ } from "./symbols";
 import { grida } from "@/grida";
 
@@ -453,12 +453,12 @@ export interface FormStartPageRemoveAction {
 export interface EditorDocumentAction {
   type: "editor/document";
   key: "site/dev-collection" | "form/startpage";
-  action: BuilderAction;
+  action: CanvasAction;
 }
 
 export function composeEditorDocumentAction(
   document_key: "site/dev-collection" | "form/startpage",
-  action: BuilderAction
+  action: CanvasAction
 ): EditorDocumentAction {
   return {
     type: "editor/document",

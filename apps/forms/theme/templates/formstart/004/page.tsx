@@ -153,4 +153,11 @@ function ScreenStockTickerTape() {
   );
 }
 
-_004.properties = userprops;
+_004.definition = {
+  type: "template",
+  name: "004",
+  properties: userprops,
+  version: "1.0.0",
+  default: {},
+  nodes: {},
+} satisfies grida.program.document.template.TemplateDocumentDefinition;
