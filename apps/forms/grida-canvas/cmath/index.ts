@@ -856,6 +856,8 @@ export namespace cmath.rect {
       vertical?: "none" | "min" | "max" | "center";
     }
   ): cmath.Rectangle[] {
+    if (rectangles.length < 2) return rectangles;
+
     // Compute the bounding rectangle of all input rectangles
     const boundingRect = getBoundingRect(rectangles);
 

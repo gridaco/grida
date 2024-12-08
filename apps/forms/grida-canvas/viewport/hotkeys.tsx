@@ -135,6 +135,7 @@ export function useEditorHotKeys() {
       }
     },
     {
+      preventDefault: true,
       ignoreModifiers: true,
       ignoreEventWhen: (event) => event.ctrlKey,
     }
@@ -175,12 +176,13 @@ export function useEditorHotKeys() {
   });
 
   //
-  useHotkeys("enter", (e) => {
-    // required for preventing this enter to replace autofocused content.
-    e.stopPropagation();
-    e.preventDefault();
-    tryEnterContentEditMode();
-  });
+  useHotkeys(
+    "enter",
+    () => {
+      tryEnterContentEditMode();
+    },
+    { preventDefault: true }
+  );
 
   useHotkeys("escape", (e) => {
     tryExitContentEditMode();
@@ -233,11 +235,15 @@ export function useEditorHotKeys() {
       horizontal: "min",
     });
   });
-  useHotkeys("alt+d", (e) => {
-    align("selection", {
-      horizontal: "max",
-    });
-  });
+  useHotkeys(
+    "alt+d",
+    (e) => {
+      align("selection", {
+        horizontal: "max",
+      });
+    },
+    { preventDefault: true }
+  );
   useHotkeys("alt+w", (e) => {
     align("selection", {
       vertical: "min",

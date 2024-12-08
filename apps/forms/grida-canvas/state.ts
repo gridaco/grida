@@ -77,7 +77,8 @@ interface IDocumentEditorEventTargetState {
   gesture?: // translate (move)
   | {
         type: "translate";
-        initial_bounding_rectangle: cmath.Rectangle;
+        initial_rects: cmath.Rectangle[];
+        // initial
         // initial_node_id: string;
         // snapshot: IDocumentEditorState;
         // mods: {

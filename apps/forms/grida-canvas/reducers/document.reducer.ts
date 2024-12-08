@@ -318,6 +318,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
 
       return produce(state, (draft) => {
         if (node_id) self_selectNode(draft, "reset", node_id);
+        else self_clearSelection(draft);
       });
     }
     // case "document/template/change/props": {

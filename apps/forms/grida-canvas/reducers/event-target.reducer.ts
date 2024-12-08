@@ -533,14 +533,15 @@ function self_scaleGesture(
 }
 
 function self_startTranslateGesture(draft: Draft<IDocumentEditorState>) {
-  // TODO: handle multiple selection
-  const node_id = draft.selection[0];
-
   // const snapshot = JSON.parse(JSON.stringify(draft)); // TODO: check performance
+
+  const rects = draft.selection.map(
+    (node_id) => domapi.get_node_bounding_rect(node_id)!
+  );
 
   draft.gesture = {
     type: "translate",
-    initial_bounding_rectangle: domapi.get_node_bounding_rect(node_id)!,
+    initial_rects: rects,
     // initial_node_id: node_id,
     // snapshot: snapshot,
   };
@@ -562,39 +563,49 @@ function self_translateGesture(
   // multiple selection dragging will be handled by node overlay drag event
   // if (state.selected_node_ids.length !== 1) break;
 
+  // if (draft.modifiers.translate_with_clone) {
+  //   //
+  // }
   //
-  const node_id = draft.selection[0];
+  // const node_id = draft.selection[0];
 
-  if (draft.modifiers.translate_with_clone) {
-    //
-  }
-
-  //
-  const snap_target_node_ids = documentquery
-    .getSiblings(draft.document_ctx, node_id)
-    .concat(documentquery.getParentId(draft.document_ctx, node_id) ?? []);
+  // set of each sibling and parent of selection
+  const snap_target_node_ids = Array.from(
+    new Set(
+      draft.selection
+        .map((node_id) =>
+          documentquery
+            .getSiblings(draft.document_ctx, node_id)
+            .concat(
+              documentquery.getParentId(draft.document_ctx, node_id) ?? []
+            )
+        )
+        .flat()
+    )
+  ).filter((node_id) => !draft.selection.includes(node_id));
 
   const target_node_rects = snap_target_node_ids.map((node_id) => {
     return domapi.get_node_bounding_rect(node_id)!;
   });
 
-  assert(draft.gesture.initial_bounding_rectangle);
-
-  const {
-    position: [x, y],
-  } = snapMovementToObjects(
-    draft.gesture.initial_bounding_rectangle,
+  const results = snapMovementToObjects(
+    draft.gesture.initial_rects,
     target_node_rects,
     movement
   );
 
-  const node = documentquery.__getNodeById(draft, node_id);
+  let i = 0;
+  for (const node_id of draft.selection) {
+    const node = documentquery.__getNodeById(draft, node_id);
+    const r = results[i];
+    draft.document.nodes[node_id] = nodeTransformReducer(node, {
+      type: "position",
+      x: r.position[0],
+      y: r.position[1],
+    });
 
-  draft.document.nodes[node_id] = nodeTransformReducer(node, {
-    type: "position",
-    x: x,
-    y: y,
-  });
+    i++;
+  }
 }
 
 function self_endTranslateGesture(draft: Draft<IDocumentEditorState>) {
