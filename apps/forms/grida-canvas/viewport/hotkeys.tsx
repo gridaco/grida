@@ -9,6 +9,7 @@ export function useEditorHotKeys() {
     cut,
     copy,
     paste,
+    duplicate,
     deleteNode,
     nudge,
     nudgeResize,
@@ -16,6 +17,7 @@ export function useEditorHotKeys() {
     distributeEvenly,
     configureSurfaceRaycastTargeting,
     configureMeasurement,
+    configureTranslateWithCloneModifier,
     clearSelection,
     selectedNode,
   } = useDocument();
@@ -31,6 +33,7 @@ export function useEditorHotKeys() {
           break;
         case "Alt":
           configureMeasurement("on");
+          configureTranslateWithCloneModifier("on");
           break;
       }
       //
@@ -51,6 +54,7 @@ export function useEditorHotKeys() {
           break;
         case "Alt":
           configureMeasurement("off");
+          configureTranslateWithCloneModifier("off");
           break;
       }
       //
@@ -82,10 +86,15 @@ export function useEditorHotKeys() {
     toast.error("[ruler] is not implemented yet");
   });
 
-  useHotkeys("meta+d, ctrl+d", () => {
-    // TODO:
-    toast.error("[duplicate] is not implemented yet");
-  });
+  useHotkeys(
+    "meta+d, ctrl+d",
+    () => {
+      duplicate("selection");
+    },
+    {
+      preventDefault: true,
+    }
+  );
 
   useHotkeys("shift+h", () => {
     // TODO:

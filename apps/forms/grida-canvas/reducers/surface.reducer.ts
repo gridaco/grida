@@ -547,9 +547,13 @@ function self_startTranslateGesture(draft: Draft<IDocumentEditorState>) {
   // TODO: handle multiple selection
   const node_id = draft.selection[0];
 
+  // const snapshot = JSON.parse(JSON.stringify(draft)); // TODO: check performance
+
   draft.gesture = {
     type: "translate",
     initial_bounding_rectangle: domapi.get_node_bounding_rect(node_id)!,
+    // initial_node_id: node_id,
+    // snapshot: snapshot,
   };
 }
 
@@ -571,6 +575,10 @@ function self_translateGesture(
 
   //
   const node_id = draft.selection[0];
+
+  if (draft.modifiers.translate_with_clone) {
+    //
+  }
 
   //
   const snap_target_node_ids = documentquery

@@ -3,6 +3,7 @@ import type { IDocumentEditorState, SurfaceRaycastTargeting } from "../types";
 import { documentquery } from "../document-query";
 import { grida } from "@/grida";
 import assert from "assert";
+import { v4 } from "uuid";
 
 /**
  * TODO:
@@ -148,11 +149,36 @@ function getSurfaceRayTarget(
   return undefined;
 }
 
+export function self_duplicateNode<S extends IDocumentEditorState>(
+  draft: Draft<S>,
+  ...node_ids: string[]
+) {
+  for (const node_id of node_ids) {
+    if (node_id === draft.document.root_id) continue;
+
+    const node = documentquery.__getNodeById(draft, node_id);
+
+    // serialize the node
+    const serialized = JSON.stringify(node);
+    const deserialized = JSON.parse(serialized);
+
+    // update the id
+    const new_id = v4();
+    deserialized.id = new_id;
+
+    const parent_id = documentquery.getParentId(draft.document_ctx, node_id);
+    assert(parent_id, `Parent node not found`);
+
+    // insert the node
+    self_insertNode(draft, parent_id, deserialized);
+  }
+}
+
 // TODO: after inserting, refresh fonts registry
 export function self_insertNode<S extends IDocumentEditorState>(
   draft: Draft<S>,
   parent_id: string,
-  node: grida.program.nodes.Node
+  node: grida.program.nodes.Node // TODO: NodePrototype
 ): string {
   const node_id = node.id;
 

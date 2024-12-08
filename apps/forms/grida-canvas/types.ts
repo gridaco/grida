@@ -50,20 +50,65 @@ export type SurfaceRaycastTargeting = {
   ignores_locked: boolean;
 };
 
+export type Modifiers = {
+  translate_with_clone: "on" | "off";
+};
+
 export interface IDocumentEditorInteractionCursorState {
   selection: string[];
   hovered_node_id?: string;
 
-  gesture?: {
-    /**
-     * - translate (move)
-     * - scale (resize)
-     * - rotate
-     * - corner-radius
-     */
-    type: "translate" | "scale" | "rotate" | "corner-radius";
-    initial_bounding_rectangle: cmath.Rectangle | null;
-  };
+  gesture?: // translate (move)
+  | {
+        type: "translate";
+        initial_bounding_rectangle: cmath.Rectangle;
+        // initial_node_id: string;
+        // snapshot: IDocumentEditorState;
+        // mods: {
+        //   clone: boolean; // alt
+        //   // lock_axis: boolean; // shift
+        // };
+      }
+    // scale (resize)
+    | {
+        type: "scale";
+        initial_bounding_rectangle: cmath.Rectangle | null;
+        // mods: {
+        //   center_origin: boolean; // alt
+        //   lock_aspect_ratio: boolean; // shift
+        // };
+      }
+    // rotate
+    | {
+        type: "rotate";
+        initial_bounding_rectangle: cmath.Rectangle | null;
+        // mods: {
+        //   quantize: boolean; // shift
+        // };
+      }
+    // corner radius
+    | {
+        /**
+         * - corner-radius
+         */
+        type: "corner-radius";
+        initial_bounding_rectangle: cmath.Rectangle | null;
+      };
+
+  modifiers: Modifiers;
+
+  // gesture?: // translate (move)
+  // {
+  //   type: "translate" | "scale" | "rotate" | "corner-radius";
+  //   initial_bounding_rectangle: cmath.Rectangle;
+  //   mods: {
+  //     with_cloned_translate: boolean; // alt - applies to [translate]
+  //     // with_axis: boolean; // shift - applies to [translate]
+  //     // with_quantize: boolean; // shift - applies to [rotate]
+  //     // with_aspect_ratio: boolean; // shift - applies to [scale]
+  //     // with_center_transform_origin: boolean; // alt - applies to [scale]
+  //   };
+  // };
 
   /**
    * @private - internal use only
@@ -183,6 +228,9 @@ export function initDocumentEditorState({
     selection: [],
     surface_cursor_position: [0, 0],
     cursor_position: [0, 0],
+    modifiers: {
+      translate_with_clone: "off",
+    },
     document_ctx:
       grida.program.document.internal.createDocumentDefinitionRuntimeHierarchyContext(
         init.document

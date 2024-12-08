@@ -851,6 +851,16 @@ export function useDocument() {
     });
   }, [dispatch]);
 
+  const duplicate = useCallback(
+    (target: "selection" | (string & {}) = "selection") => {
+      dispatch({
+        type: "duplicate",
+        target,
+      });
+    },
+    [dispatch]
+  );
+
   const deleteNode = useCallback(
     (target: "selection" | (string & {}) = "selection") => {
       dispatch({
@@ -936,6 +946,16 @@ export function useDocument() {
       dispatch({
         type: "config/surface/measurement",
         measurement,
+      });
+    },
+    [dispatch]
+  );
+
+  const configureTranslateWithCloneModifier = useCallback(
+    (translate_with_clone: "on" | "off") => {
+      dispatch({
+        type: "config/modifiers/translate-with-clone",
+        translate_with_clone,
       });
     },
     [dispatch]
@@ -1085,6 +1105,7 @@ export function useDocument() {
       cut,
       copy,
       paste,
+      duplicate,
       deleteNode,
       nudge,
       nudgeResize,
@@ -1092,6 +1113,7 @@ export function useDocument() {
       distributeEvenly,
       configureSurfaceRaycastTargeting,
       configureMeasurement,
+      configureTranslateWithCloneModifier,
       //
       clearSelection,
       getNodeDepth,
@@ -1111,6 +1133,7 @@ export function useDocument() {
     cut,
     copy,
     paste,
+    duplicate,
     deleteNode,
     nudge,
     nudgeResize,
@@ -1118,6 +1141,7 @@ export function useDocument() {
     distributeEvenly,
     configureSurfaceRaycastTargeting,
     configureMeasurement,
+    configureTranslateWithCloneModifier,
     //
     clearSelection,
     getNodeDepth,

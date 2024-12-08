@@ -3,6 +3,7 @@ import type { grida } from "@/grida";
 import type {
   CursorMode,
   IDocumentEditorState,
+  Modifiers,
   SurfaceRaycastTargeting,
 } from "./types";
 import type { cmath } from "./cmath";
@@ -11,6 +12,11 @@ export type BuilderAction =
   | __InternalSyncArtboardOffset
   | __InternalResetAction
   | EditorConfigAction
+  | HistoryAction;
+
+export type HistoryAction =
+  | EditorUndoAction
+  | EditorRedoAction
   | DocumentAction;
 
 export type DocumentAction =
@@ -58,11 +64,20 @@ export interface __InternalResetAction {
   state: IDocumentEditorState;
 }
 
+export type EditorUndoAction = {
+  type: "undo";
+};
+
+export type EditorRedoAction = {
+  type: "redo";
+};
+
 // #region copy cut paste
 export type EditorCopyCutPasteAction =
   | EditorCopyAction
   | EditorCutAction
-  | EditorPasteAction;
+  | EditorPasteAction
+  | EditorDuplicateAction;
 
 export interface EditorCopyAction {
   type: "copy";
@@ -76,6 +91,11 @@ export interface EditorCutAction {
 
 export interface EditorPasteAction {
   type: "paste";
+}
+
+export interface EditorDuplicateAction {
+  type: "duplicate";
+  target: NodeID | "selection";
 }
 
 // #endregion copy cut paste
@@ -127,17 +147,23 @@ export interface EditorDistributeEvenlyAction {
 }
 
 export type EditorConfigAction =
-  | EditorConfigureRaycastTargetingAction
-  | EditorConfigureMeasurementAction;
+  | EditorConfigure_RaycastTargeting
+  | EditorConfigure_Measurement
+  | EditorConfigureModifier_TranslateWithClone;
 
-export interface EditorConfigureRaycastTargetingAction {
+export interface EditorConfigure_RaycastTargeting {
   type: "config/surface/raycast-targeting";
   config: Partial<SurfaceRaycastTargeting>;
 }
 
-export interface EditorConfigureMeasurementAction {
+export interface EditorConfigure_Measurement {
   type: "config/surface/measurement";
   measurement: "on" | "off";
+}
+
+export interface EditorConfigureModifier_TranslateWithClone {
+  type: "config/modifiers/translate-with-clone";
+  translate_with_clone: "on" | "off";
 }
 
 interface IHtmlBackendCanvasEventTargetPointerEvent {

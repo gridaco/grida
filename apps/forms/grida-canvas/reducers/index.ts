@@ -57,6 +57,12 @@ export default function reducer<S extends IDocumentEditorState>(
       });
       break;
     }
+    case "config/modifiers/translate-with-clone": {
+      return produce(state, (draft: Draft<S>) => {
+        draft.modifiers.translate_with_clone = action.translate_with_clone;
+      });
+    }
+    // history actions
     default:
       return documentReducer(state, action);
   }

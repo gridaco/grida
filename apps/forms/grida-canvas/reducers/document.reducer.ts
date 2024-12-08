@@ -24,6 +24,7 @@ import { v4 } from "uuid";
 import {
   self_clearSelection,
   self_deleteNode,
+  self_duplicateNode,
   self_insertNode,
   self_selectNode,
 } from "./methods";
@@ -85,6 +86,15 @@ export default function documentReducer<S extends IDocumentEditorState>(
         draft.cursor_mode = { type: "cursor" };
         self_selectNode(draft, "reset", newNode.id);
       });
+    }
+    case "duplicate": {
+      const { target } = action;
+      return produce(state, (draft) => {
+        const target_node_ids =
+          target === "selection" ? state.selection : [target];
+        self_duplicateNode(draft, ...target_node_ids);
+      });
+      break;
     }
     case "delete": {
       const { target } = action;
