@@ -156,8 +156,6 @@ function __self_update_gesture_transform_translate(
         self_insertNode(draft, draft.document.root_id, clone);
       });
 
-      draft.gesture.selection = initial_clone_ids;
-
       // reset the original node
       initial_selection.forEach((node_id, i) => {
         const node = documentquery.__getNodeById(draft, node_id);
@@ -168,6 +166,8 @@ function __self_update_gesture_transform_translate(
         });
       });
 
+      draft.gesture.selection = initial_clone_ids;
+      draft.selection = initial_clone_ids;
       // now, the cloned not will be measured relative to the original selection
       draft.surface_measurement_target = initial_selection;
       draft.surface_measurement_targeting_locked = true;
@@ -176,8 +176,6 @@ function __self_update_gesture_transform_translate(
     }
     case "off": {
       if (!draft.gesture.is_currently_cloned) break;
-      draft.gesture.is_currently_cloned = false;
-      draft.gesture.selection = initial_selection;
 
       try {
         initial_clone_ids.forEach((clone) => {
@@ -185,6 +183,9 @@ function __self_update_gesture_transform_translate(
         });
       } catch (e) {}
 
+      draft.gesture.is_currently_cloned = false;
+      draft.gesture.selection = initial_selection;
+      draft.selection = initial_selection;
       draft.surface_measurement_target = undefined;
       draft.surface_measurement_targeting_locked = false;
       break;
