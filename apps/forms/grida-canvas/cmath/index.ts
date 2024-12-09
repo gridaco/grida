@@ -357,6 +357,55 @@ export namespace cmath.rect {
     };
   }
 
+  /**
+   * Normalizes a rectangle to ensure positive width and height.
+   *
+   * This function adjusts the rectangle's `x` and `y` coordinates
+   * to ensure that the rectangle is defined with non-negative `width` and `height`.
+   * If the original rectangle has negative width or height, the function modifies
+   * the rectangle's position (`x` and `y`) and dimensions to maintain equivalence.
+   *
+   * @param rect - The input rectangle, which may have negative width or height.
+   * @returns A new rectangle with positive `width` and `height`,
+   *          and adjusted `x` and `y` coordinates.
+   *
+   * @example
+   * // Rectangle with negative width
+   * const rect = { x: 10, y: 20, width: -30, height: 40 };
+   * const normalized = cmath.rect.positive(rect);
+   * console.log(normalized);
+   * // { x: -20, y: 20, width: 30, height: 40 }
+   *
+   * @example
+   * // Rectangle with negative height
+   * const rect = { x: 10, y: 20, width: 30, height: -40 };
+   * const normalized = cmath.rect.positive(rect);
+   * console.log(normalized);
+   * // { x: 10, y: -20, width: 30, height: 40 }
+   *
+   * @example
+   * // Rectangle with both negative width and height
+   * const rect = { x: 10, y: 20, width: -30, height: -40 };
+   * const normalized = cmath.rect.positive(rect);
+   * console.log(normalized);
+   * // { x: -20, y: -20, width: 30, height: 40 }
+   *
+   * @remarks
+   * - This function is useful for ensuring that rectangles are represented
+   *   with positive dimensions, especially in computations where negative
+   *   dimensions can cause unexpected results.
+   * - The `x` and `y` coordinates are adjusted to maintain the rectangle's
+   *   equivalent area.
+   */
+  export function positive(rect: Rectangle): Rectangle {
+    return {
+      x: Math.min(rect.x, rect.x + rect.width),
+      y: Math.min(rect.y, rect.y + rect.height),
+      width: Math.abs(rect.width),
+      height: Math.abs(rect.height),
+    };
+  }
+
   export function aspectratio(rect: cmath.Rectangle): cmath.Scalar {
     const { width, height } = rect;
     return width / height;

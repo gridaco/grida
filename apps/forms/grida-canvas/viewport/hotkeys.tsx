@@ -25,6 +25,8 @@ export function useEditorHotKeys() {
     configureTransformWithPreserveAspectRatioModifier,
     configureRotateWithQuantizeModifier,
     clearSelection,
+    toggleActive,
+    toggleLocked,
     selectedNode,
   } = useDocument();
 
@@ -81,6 +83,20 @@ export function useEditorHotKeys() {
     }
   );
   //
+
+  useHotkeys(
+    "meta+shift+h, ctrl+shift+h",
+    () => {
+      toggleActive("selection");
+    },
+    {
+      preventDefault: true,
+    }
+  );
+
+  useHotkeys("meta+shift+l, ctrl+shift+l", () => {
+    toggleLocked("selection");
+  });
 
   useHotkeys("meta+z, ctrl+z", () => {
     undo();

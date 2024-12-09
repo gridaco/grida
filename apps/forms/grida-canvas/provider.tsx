@@ -1011,6 +1011,32 @@ export function useDocument() {
     [dispatch]
   );
 
+  const toggleActive = useCallback(
+    (target: "selection" | (string & {}) = "selection") => {
+      const target_ids = target === "selection" ? selection : [target];
+      target_ids.forEach((node_id) => {
+        dispatch({
+          type: "node/toggle/active",
+          node_id: node_id,
+        });
+      });
+    },
+    [dispatch, selection]
+  );
+
+  const toggleLocked = useCallback(
+    (target: "selection" | (string & {}) = "selection") => {
+      const target_ids = target === "selection" ? selection : [target];
+      target_ids.forEach((node_id) => {
+        dispatch({
+          type: "node/toggle/locked",
+          node_id: node_id,
+        });
+      });
+    },
+    [dispatch, selection]
+  );
+
   const clearSelection = useCallback(
     () =>
       dispatch({
@@ -1171,6 +1197,9 @@ export function useDocument() {
       configureTransformWithPreserveAspectRatioModifier,
       configureRotateWithQuantizeModifier,
       //
+      toggleActive,
+      toggleLocked,
+      //
       clearSelection,
       getNodeDepth,
       getNodeAbsoluteRotation,
@@ -1204,6 +1233,9 @@ export function useDocument() {
     configureTransformWithCenterOriginModifier,
     configureTransformWithPreserveAspectRatioModifier,
     configureRotateWithQuantizeModifier,
+    //
+    toggleActive,
+    toggleLocked,
     //
     clearSelection,
     getNodeDepth,

@@ -104,7 +104,9 @@ export default function nodeTransformReducer(
           });
         }
 
-        const scaled = cmath.rect.scale(initial, origin, scale);
+        const scaled = cmath.rect.positive(
+          cmath.rect.scale(initial, origin, scale)
+        );
 
         const _draft = draft as grida.program.nodes.i.ICSSDimension &
           grida.program.nodes.i.IPositioning;

@@ -37,7 +37,10 @@ export function useSnapGuide() {
 
     const first_selected_node = domapi.get_node_element(first_selected_node_id);
     const first_selected_node_rect =
-      first_selected_node!.getBoundingClientRect();
+      first_selected_node?.getBoundingClientRect();
+
+    // this can happen when selected node is not rendered (active false or delay)
+    if (!first_selected_node_rect) return;
 
     const snap_target_node_ids = documentquery
       .getSiblings(state.document_ctx, first_selected_node_id)
