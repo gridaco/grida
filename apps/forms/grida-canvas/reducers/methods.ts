@@ -6,6 +6,8 @@ import assert from "assert";
 import { v4 } from "uuid";
 import { cmath } from "../cmath";
 import nodeTransformReducer from "./node-transform.reducer";
+import { domapi } from "../domapi";
+import { snapMovementToObjects } from "./tools/snap";
 
 /**
  * TODO:
@@ -97,23 +99,118 @@ const __resize_handle_to_mouse_direction_multiplier = {
   w: [-1, 0] as cmath.Vector2,
 } as const;
 
-export function self_update_gesture_scale<S extends IDocumentEditorState>(
+export function self_update_gesture_transform<S extends IDocumentEditorState>(
   draft: Draft<S>
 ) {
-  if (draft.gesture?.type !== "scale") return;
-  const { selection, direction, movement: rawMovement } = draft.gesture;
+  if (!draft.gesture) return;
+  switch (draft.gesture.type) {
+    case "translate": {
+      return __self_update_gesture_transform_translate(draft);
+    }
+    case "scale": {
+      return __self_update_gesture_transform_scale(draft);
+    }
+    case "rotate": {
+      break;
+    }
+    case "corner-radius":
+    default:
+      throw new Error(`Gesture type not supported: ${draft.gesture.type}`);
+  }
+}
+
+function __self_update_gesture_transform_translate(
+  draft: Draft<IDocumentEditorState>
+) {
+  assert(draft.gesture!.type === "translate", "Gesture type must be translate");
+  const { movement, initial_rects } = draft.gesture!;
+  const { translate_with_clone, tarnslate_with_axis_lock } = draft.modifiers;
+
+  // TODO: translate_with_clone
+  // TODO: tarnslate_with_axis_lock
+
+  // selection.forEach((node_id) => {
+  //   const node = documentquery.__getNodeById(draft, node_id);
+  //   draft.document.nodes[node_id] = nodeTransformReducer(node, {
+  //     type: "position",
+  //     dx: dx,
+  //     dy: dy,
+  //   });
+  // });
+  // multiple selection dragging will be handled by node overlay drag event
+  // if (state.selected_node_ids.length !== 1) break;
+
+  // if (draft.modifiers.translate_with_clone) {
+  //   //
+  // }
+  //
+  // const node_id = draft.selection[0];
+
+  // set of each sibling and parent of selection
+  const snap_target_node_ids = Array.from(
+    new Set(
+      draft.selection
+        .map((node_id) =>
+          documentquery
+            .getSiblings(draft.document_ctx, node_id)
+            .concat(
+              documentquery.getParentId(draft.document_ctx, node_id) ?? []
+            )
+        )
+        .flat()
+    )
+  ).filter((node_id) => !draft.selection.includes(node_id));
+
+  const target_node_rects = snap_target_node_ids.map((node_id) => {
+    return domapi.get_node_bounding_rect(node_id)!;
+  });
+
+  const results = snapMovementToObjects(
+    initial_rects,
+    target_node_rects,
+    movement
+  );
+
+  let i = 0;
+  for (const node_id of draft.selection) {
+    const node = documentquery.__getNodeById(draft, node_id);
+    const r = results[i];
+    draft.document.nodes[node_id] = nodeTransformReducer(node, {
+      type: "position",
+      x: r.position[0],
+      y: r.position[1],
+    });
+
+    i++;
+  }
+}
+
+function __self_update_gesture_transform_scale(
+  draft: Draft<IDocumentEditorState>
+) {
+  assert(draft.gesture!.type === "scale", "Gesture type must be scale");
+  const { transform_with_center_origin, transform_with_preserve_aspect_ratio } =
+    draft.modifiers;
+
+  // TODO: transform_with_preserve_aspect_ratio
+
+  const {
+    selection,
+    direction,
+    movement: rawMovement,
+    initial_bounding_rectangle,
+  } = draft.gesture!;
   const node = documentquery.__getNodeById(draft, selection);
 
-  const initial = draft.gesture.initial_bounding_rectangle;
-  assert(initial);
+  assert(initial_bounding_rectangle);
 
   // get the origin point based on handle
 
   const origin =
-    draft.modifiers.transform_with_center_origin === "on"
-      ? cmath.rect.center(initial)
+    transform_with_center_origin === "on"
+      ? cmath.rect.center(initial_bounding_rectangle)
       : cmath.rect.getCardinalPoint(
-          initial,
+          initial_bounding_rectangle,
           __scale_direction_to_transform_origin_point[direction]
         );
 
@@ -121,12 +218,12 @@ export function self_update_gesture_scale<S extends IDocumentEditorState>(
   const movement = cmath.vector2.multiply(
     __resize_handle_to_mouse_direction_multiplier[direction],
     rawMovement,
-    draft.modifiers.transform_with_center_origin === "on" ? [2, 2] : [1, 1]
+    transform_with_center_origin === "on" ? [2, 2] : [1, 1]
   );
 
   draft.document.nodes[selection] = nodeTransformReducer(node, {
     type: "scale",
-    initial,
+    initial: initial_bounding_rectangle,
     origin,
     movement,
   });

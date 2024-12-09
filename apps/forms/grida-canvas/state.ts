@@ -81,6 +81,7 @@ interface IDocumentEditorEventTargetState {
   | {
         type: "translate";
         initial_rects: cmath.Rectangle[];
+        movement: cmath.Vector2;
         // initial
         // initial_node_id: string;
         // snapshot: IDocumentEditorState;

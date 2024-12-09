@@ -20,7 +20,9 @@ export function useEditorHotKeys() {
     configureSurfaceRaycastTargeting,
     configureMeasurement,
     configureTranslateWithCloneModifier,
+    configureTranslateWithAxisLockModifier,
     configureTransformWithCenterOriginModifier,
+    configureTransformWithPreserveAspectRatioModifier,
     clearSelection,
     selectedNode,
   } = useDocument();
@@ -39,6 +41,9 @@ export function useEditorHotKeys() {
           configureTranslateWithCloneModifier("on");
           configureTransformWithCenterOriginModifier("on");
           break;
+        case "Shift":
+          configureTranslateWithAxisLockModifier("on");
+          configureTransformWithPreserveAspectRatioModifier("on");
       }
       //
     },
@@ -61,6 +66,9 @@ export function useEditorHotKeys() {
           configureTranslateWithCloneModifier("off");
           configureTransformWithCenterOriginModifier("off");
           break;
+        case "Shift":
+          configureTranslateWithAxisLockModifier("off");
+          configureTransformWithPreserveAspectRatioModifier("off");
       }
       //
     },

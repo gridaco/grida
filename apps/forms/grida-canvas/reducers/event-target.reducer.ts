@@ -31,7 +31,7 @@ import {
   self_insertNode,
   self_selectNode,
   self_updateSurfaceHoverState,
-  self_update_gesture_scale,
+  self_update_gesture_transform,
 } from "./methods";
 import { cmath } from "../cmath";
 import { domapi } from "../domapi";
@@ -52,7 +52,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         draft.surface_cursor_position = [x, y];
         draft.cursor_position = cmath.vector2.subtract(
           draft.surface_cursor_position,
-          draft.translate ?? [0, 0]
+          draft.translate ?? cmath.vector2.zero
         );
       });
     }
@@ -161,7 +161,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                   y2: draft.surface_cursor_position[1],
                 };
               } else {
-                self_startTranslateGesture(draft);
+                self_start_gesture_translate(draft);
               }
             }
             break;
@@ -198,7 +198,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         action
       );
       return produce(state, (draft) => {
-        self_endTranslateGesture(draft);
+        draft.gesture = undefined;
         draft.marquee = undefined;
         if (node_ids_from_area) {
           // except the root node & locked nodes
@@ -235,13 +235,15 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             assert(draft.gesture?.type === "scale");
 
             draft.gesture.movement = movement;
-            self_update_gesture_scale(draft);
+            self_update_gesture_transform(draft);
           });
         }
 
         return produce(state, (draft) => {
+          if (draft.gesture?.type !== "translate") return;
           // this is to handle "immediately drag move node"
-          self_translateGesture(draft, movement);
+          draft.gesture.movement = movement;
+          self_update_gesture_transform(draft);
         });
       }
 
@@ -287,13 +289,13 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
     case "document/canvas/backend/html/event/node-overlay/on-drag-start": {
       const { selection } = action;
       return produce(state, (draft) => {
-        self_startTranslateGesture(draft);
+        self_start_gesture_translate(draft);
       });
     }
     case "document/canvas/backend/html/event/node-overlay/on-drag-end": {
       const { selection } = action;
       return produce(state, (draft) => {
-        self_endTranslateGesture(draft);
+        draft.gesture = undefined;
       });
     }
     case "document/canvas/backend/html/event/node-overlay/on-drag": {
@@ -301,7 +303,9 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       const { movement } = event;
 
       return produce(state, (draft) => {
-        self_translateGesture(draft, movement);
+        assert(draft.gesture?.type === "translate");
+        draft.gesture.movement = movement;
+        self_update_gesture_transform(draft);
       });
     }
     // #endregion drag event
@@ -338,7 +342,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         if (draft.gesture?.type !== "scale") return;
 
         draft.gesture.movement = movement;
-        self_update_gesture_scale(draft);
+        self_update_gesture_transform(draft);
       });
       //
     }
@@ -435,7 +439,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
           // TODO: need to store the initial angle and subtract
           // TODO: get anchor and calculate the offset
           // TODO: translate the movement (distance) relative to the center of the node
-          cmath.vector2.angle([0, 0], movement)
+          cmath.vector2.angle(cmath.vector2.zero, movement)
         ),
         1
       );
@@ -475,7 +479,7 @@ function self_start_gesture_scale(
   draft.gesture = {
     type: "scale",
     initial_bounding_rectangle,
-    movement: [0, 0],
+    movement: cmath.vector2.zero,
     selection: selection,
     direction: direction,
   };
@@ -491,9 +495,7 @@ function self_start_gesture_scale(
   }
 }
 
-function self_startTranslateGesture(draft: Draft<IDocumentEditorState>) {
-  // const snapshot = JSON.parse(JSON.stringify(draft)); // TODO: check performance
-
+function self_start_gesture_translate(draft: Draft<IDocumentEditorState>) {
   const rects = draft.selection.map(
     (node_id) => domapi.get_node_bounding_rect(node_id)!
   );
@@ -501,72 +503,8 @@ function self_startTranslateGesture(draft: Draft<IDocumentEditorState>) {
   draft.gesture = {
     type: "translate",
     initial_rects: rects,
+    movement: cmath.vector2.zero,
     // initial_node_id: node_id,
     // snapshot: snapshot,
   };
-}
-
-function self_translateGesture(
-  draft: Draft<IDocumentEditorState>,
-  movement: cmath.Vector2
-) {
-  if (draft.gesture?.type !== "translate") return;
-  // selection.forEach((node_id) => {
-  //   const node = documentquery.__getNodeById(draft, node_id);
-  //   draft.document.nodes[node_id] = nodeTransformReducer(node, {
-  //     type: "position",
-  //     dx: dx,
-  //     dy: dy,
-  //   });
-  // });
-  // multiple selection dragging will be handled by node overlay drag event
-  // if (state.selected_node_ids.length !== 1) break;
-
-  // if (draft.modifiers.translate_with_clone) {
-  //   //
-  // }
-  //
-  // const node_id = draft.selection[0];
-
-  // set of each sibling and parent of selection
-  const snap_target_node_ids = Array.from(
-    new Set(
-      draft.selection
-        .map((node_id) =>
-          documentquery
-            .getSiblings(draft.document_ctx, node_id)
-            .concat(
-              documentquery.getParentId(draft.document_ctx, node_id) ?? []
-            )
-        )
-        .flat()
-    )
-  ).filter((node_id) => !draft.selection.includes(node_id));
-
-  const target_node_rects = snap_target_node_ids.map((node_id) => {
-    return domapi.get_node_bounding_rect(node_id)!;
-  });
-
-  const results = snapMovementToObjects(
-    draft.gesture.initial_rects,
-    target_node_rects,
-    movement
-  );
-
-  let i = 0;
-  for (const node_id of draft.selection) {
-    const node = documentquery.__getNodeById(draft, node_id);
-    const r = results[i];
-    draft.document.nodes[node_id] = nodeTransformReducer(node, {
-      type: "position",
-      x: r.position[0],
-      y: r.position[1],
-    });
-
-    i++;
-  }
-}
-
-function self_endTranslateGesture(draft: Draft<IDocumentEditorState>) {
-  draft.gesture = undefined;
 }

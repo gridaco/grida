@@ -151,7 +151,9 @@ export type EditorConfigAction =
   | EditorConfigure_RaycastTargeting
   | EditorConfigure_Measurement
   | EditorConfigureModifier_TranslateWithClone
-  | EditorConfigureModifier_TransformWithCenterOrigin;
+  | EditorConfigureModifier_TranslateWithAxisLock
+  | EditorConfigureModifier_TransformWithCenterOrigin
+  | EditorConfigureModifier_TransformWithPreserveAspectRatio;
 
 export interface EditorConfigure_RaycastTargeting {
   type: "config/surface/raycast-targeting";
@@ -167,10 +169,19 @@ export interface EditorConfigureModifier_TranslateWithClone {
   type: "config/modifiers/translate-with-clone";
   translate_with_clone: "on" | "off";
 }
+export interface EditorConfigureModifier_TranslateWithAxisLock {
+  type: "config/modifiers/translate-with-axis-lock";
+  tarnslate_with_axis_lock: "on" | "off";
+}
 
 export interface EditorConfigureModifier_TransformWithCenterOrigin {
   type: "config/modifiers/transform-with-center-origin";
   transform_with_center_origin: "on" | "off";
+}
+
+export interface EditorConfigureModifier_TransformWithPreserveAspectRatio {
+  type: "config/modifiers/transform-with-preserve-aspect-ratio";
+  transform_with_preserve_aspect_ratio: "on" | "off";
 }
 
 interface IHtmlBackendCanvasEventTargetPointerEvent {

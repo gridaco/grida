@@ -156,6 +156,11 @@ export namespace cmath {
  * Vector2 computations.
  */
 export namespace cmath.vector2 {
+  /**
+   * The zero vector `[0, 0]`.
+   */
+  export const zero: Vector2 = [0, 0];
+
   export function add(...vectors: Vector2[]): Vector2 {
     return vectors.reduce((acc, [x, y]) => [acc[0] + x, acc[1] + y], [
       0, 0,
@@ -350,6 +355,34 @@ export namespace cmath.rect {
       width: width * scaleX,
       height: height * scaleY,
     };
+  }
+
+  /**
+   * Scales a rectangle while preserving its aspect ratio.
+   *
+   * @param rect - The original rectangle to scale.
+   * @param origin - The point ([originX, originY]) relative to which scaling is applied.
+   * @param scale - The scaling factors ([scaleX, scaleY]) for the x and y axes.
+   * @returns A new rectangle with adjusted width and height to maintain aspect ratio.
+   */
+  export function scaleWithAspectRatio(
+    rect: cmath.Rectangle,
+    origin: cmath.Vector2,
+    scale: cmath.Vector2
+  ): cmath.Rectangle {
+    const { width, height } = rect;
+    const aspectRatio = width / height;
+
+    // Determine the dominant axis for scaling
+    const dominantAxis = Math.abs(scale[0]) > Math.abs(scale[1]) ? 0 : 1;
+
+    // Adjust scale to preserve aspect ratio
+    const adjustedScale: Vector2 =
+      dominantAxis === 0
+        ? [scale[0], scale[0] / aspectRatio]
+        : [scale[1] * aspectRatio, scale[1]];
+
+    return cmath.rect.scale(rect, origin, adjustedScale);
   }
 
   /**

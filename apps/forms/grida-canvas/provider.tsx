@@ -971,11 +971,31 @@ export function useDocument() {
     [dispatch]
   );
 
+  const configureTranslateWithAxisLockModifier = useCallback(
+    (tarnslate_with_axis_lock: "on" | "off") => {
+      dispatch({
+        type: "config/modifiers/translate-with-axis-lock",
+        tarnslate_with_axis_lock,
+      });
+    },
+    [dispatch]
+  );
+
   const configureTransformWithCenterOriginModifier = useCallback(
     (transform_with_center_origin: "on" | "off") => {
       dispatch({
         type: "config/modifiers/transform-with-center-origin",
         transform_with_center_origin,
+      });
+    },
+    [dispatch]
+  );
+
+  const configureTransformWithPreserveAspectRatioModifier = useCallback(
+    (transform_with_preserve_aspect_ratio: "on" | "off") => {
+      dispatch({
+        type: "config/modifiers/transform-with-preserve-aspect-ratio",
+        transform_with_preserve_aspect_ratio,
       });
     },
     [dispatch]
@@ -1136,7 +1156,9 @@ export function useDocument() {
       configureSurfaceRaycastTargeting,
       configureMeasurement,
       configureTranslateWithCloneModifier,
+      configureTranslateWithAxisLockModifier,
       configureTransformWithCenterOriginModifier,
+      configureTransformWithPreserveAspectRatioModifier,
       //
       clearSelection,
       getNodeDepth,
@@ -1167,7 +1189,9 @@ export function useDocument() {
     configureSurfaceRaycastTargeting,
     configureMeasurement,
     configureTranslateWithCloneModifier,
+    configureTranslateWithAxisLockModifier,
     configureTransformWithCenterOriginModifier,
+    configureTransformWithPreserveAspectRatioModifier,
     //
     clearSelection,
     getNodeDepth,

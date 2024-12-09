@@ -2,7 +2,7 @@ import type { IDocumentEditorState } from "../state";
 import type { Action, EditorAction } from "../action";
 import { produce, type Draft } from "immer";
 import {
-  self_update_gesture_scale,
+  self_update_gesture_transform,
   self_updateSurfaceHoverState,
 } from "./methods";
 import { history } from "./history";
@@ -134,13 +134,28 @@ function _reducer<S extends IDocumentEditorState>(
     case "config/modifiers/translate-with-clone": {
       return produce(state, (draft: Draft<S>) => {
         draft.modifiers.translate_with_clone = action.translate_with_clone;
+        self_update_gesture_transform(draft);
+      });
+    }
+    case "config/modifiers/translate-with-axis-lock": {
+      return produce(state, (draft: Draft<S>) => {
+        draft.modifiers.tarnslate_with_axis_lock =
+          action.tarnslate_with_axis_lock;
+        self_update_gesture_transform(draft);
       });
     }
     case "config/modifiers/transform-with-center-origin": {
       return produce(state, (draft: Draft<S>) => {
         draft.modifiers.transform_with_center_origin =
           action.transform_with_center_origin;
-        self_update_gesture_scale(draft);
+        self_update_gesture_transform(draft);
+      });
+    }
+    case "config/modifiers/transform-with-preserve-aspect-ratio": {
+      return produce(state, (draft: Draft<S>) => {
+        draft.modifiers.transform_with_preserve_aspect_ratio =
+          action.transform_with_preserve_aspect_ratio;
+        self_update_gesture_transform(draft);
       });
     }
     case "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag":
