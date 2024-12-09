@@ -34,34 +34,8 @@ type UserProps = grida.program.schema.TInferredPropTypes<typeof userprops>;
 const image =
   "https://www.levi.co.kr/on/demandware.static/-/Sites-LeviKR-Library/default/dwe83fbc3c/images/redtabimg/images/RedTab-Header.jpg";
 
-export default function _006({
-  meta,
-  resources = _messages,
-  lang,
-}: FormStartPage.CampaignTemplateProps<UserProps, Messages>) {
-  const i18n = useMemo(() => {
-    return i18next.createInstance(
-      {
-        fallbackLng: "en",
-        resources: resources,
-        lng: lang,
-      },
-      (err, t) => {
-        if (err) return console.log("something went wrong loading", err);
-      }
-    );
-  }, [lang]);
-
-  return (
-    <FormCampaignStartPageContextProvider value={meta}>
-      <I18nextProvider
-        // @ts-expect-error
-        i18n={i18n}
-      >
-        <Consumer />
-      </I18nextProvider>
-    </FormCampaignStartPageContextProvider>
-  );
+export default function _006() {
+  return <Consumer />;
 }
 
 function Consumer() {
@@ -185,4 +159,11 @@ function CardBackground({ children }: React.PropsWithChildren<{}>) {
   return <div className="bg-background p-2">{children}</div>;
 }
 
-_006.properties = userprops;
+_006.definition = {
+  type: "template",
+  name: "006",
+  properties: userprops,
+  version: "1.0.0",
+  default: {},
+  nodes: {},
+} satisfies grida.program.document.template.TemplateDocumentDefinition;

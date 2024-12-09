@@ -1,9 +1,16 @@
 "use client";
 
-import React, { useCallback, useLayoutEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useContext,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { __useInternal, useDocument } from "./provider";
 import { NodeElement } from "./nodes/node";
 import { domapi } from "./domapi";
+import { cmath } from "./cmath";
 
 /**
  * A hook that calculates and notifies the editor content offset relative to the editor viewport.
@@ -17,10 +24,10 @@ function __useEditorContentOffsetNotifyEffect(
   const [_, dispatch] = __useInternal();
 
   const syncoffset = useCallback(
-    ({ x, y }: { x: number; y: number }) => {
+    (offset: cmath.Vector2) => {
       dispatch({
         type: "__internal/sync-artboard-offset",
-        offset: [x, y],
+        offset: offset,
       });
     },
     [dispatch]
@@ -36,7 +43,7 @@ function __useEditorContentOffsetNotifyEffect(
     }
 
     function updateOffset() {
-      const calculatedOffset = domapi.get_offset_between(
+      const calculatedOffset = domapi.get_displacement_between(
         viewportElement,
         contentElement
       );
@@ -64,7 +71,27 @@ function __useEditorContentOffsetNotifyEffect(
   }, [contentRef, syncoffset, ...deps]);
 }
 
-export function StandaloneDocumentEditorContent() {
+const UserDocumentCustomRendererContext = React.createContext<
+  Record<string, CustomReactRenderer>
+>({});
+
+export function useUserDocumentCustomRenderer() {
+  return useContext(UserDocumentCustomRendererContext);
+}
+
+type CustomReactRenderer = React.ComponentType<any>;
+
+interface DocumentContentViewProps {
+  /**
+   * custom templates to render
+   */
+  templates?: Record<string, CustomReactRenderer>;
+}
+
+export function StandaloneDocumentContent({
+  templates,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement> & DocumentContentViewProps) {
   const ref = useRef<HTMLDivElement>(null);
   const {
     state: { document, document_key },
@@ -74,8 +101,10 @@ export function StandaloneDocumentEditorContent() {
   __useEditorContentOffsetNotifyEffect(ref, [document_key]);
 
   return (
-    <div ref={ref}>
-      <NodeElement node_id={root_id}></NodeElement>
+    <div id={domapi.k.EDITOR_CONTENT_ELEMENT_ID} ref={ref} {...props}>
+      <UserDocumentCustomRendererContext.Provider value={templates ?? {}}>
+        <NodeElement node_id={root_id} />
+      </UserDocumentCustomRendererContext.Provider>
     </div>
   );
 }

@@ -280,17 +280,6 @@ export namespace grida {
       }
 
       export namespace internal {
-        export interface IDocumentEditorState {
-          document: IDocumentDefinition;
-          /**
-           * the document key set by user. user can update this to tell it's entirely replaced
-           *
-           * Optional, but recommended to set for better tracking and debugging.
-           */
-          document_key?: string;
-          document_ctx: IDocumentDefinitionRuntimeHierarchyContext;
-        }
-
         /**
          * @internal
          * Represents the current runtime state of the document hierarchy context.
@@ -869,6 +858,7 @@ export namespace grida {
       export function toDimension(
         value: css.LengthPercentage | "auto"
       ): string {
+        if (!value) return "";
         if (value === "auto") return "auto";
         if (typeof value === "number") {
           return `${value}px`;
@@ -1233,6 +1223,7 @@ export namespace grida {
         | VideoNode
         | ContainerNode
         | HTMLIFrameNode
+        | HTMLRichTextNode
         | VectorNode
         | LineNode
         | RectangleNode
@@ -1253,6 +1244,7 @@ export namespace grida {
               __IProtoChildrenNodePrototype
           >
         | __TPrototypeNode<Omit<HTMLIFrameNode, __base_scene_node_properties>>
+        | __TPrototypeNode<Omit<HTMLRichTextNode, __base_scene_node_properties>>
         | __TPrototypeNode<Omit<VectorNode, __base_scene_node_properties>>
         | __TPrototypeNode<Omit<LineNode, __base_scene_node_properties>>
         | __TPrototypeNode<Omit<RectangleNode, __base_scene_node_properties>>
@@ -1303,6 +1295,8 @@ export namespace grida {
           Partial<RectangleNode> &
           Partial<ImageNode> &
           Partial<VideoNode> &
+          Partial<HTMLRichTextNode> &
+          Partial<HTMLIFrameNode> &
           Partial<ContainerNode> &
           Partial<InstanceNode> &
           Partial<TemplateInstanceNode>,
@@ -1387,11 +1381,14 @@ export namespace grida {
 
         /**
          * specifies node's x rotation in degrees
-         *
-         * @default 0
          */
         export interface IRotation {
-          rotation?: number;
+          /**
+           * rotation in degrees
+           *
+           * @default 0
+           */
+          rotation: number;
         }
 
         /**
@@ -1512,7 +1509,7 @@ export namespace grida {
          * @deprecated [NOT USED]
          */
         export interface IStroke {
-          stroke: cg.RGBA8888;
+          stroke?: cg.Paint;
         }
 
         export interface ICSSBorder {
@@ -1618,29 +1615,37 @@ export namespace grida {
           fill?: cg.Paint;
         }
 
+        /**
+         * text value
+         *
+         * - expression - {@link Tokens.StringValueExpression} - computed or literal
+         *   - literal - e.g. `"A text value"`
+         *   - property access - {@link Tokens.PropertyAccessExpression} - computed, , e.g. `userdata.title`
+         *   - identifier - {@link Tokens.Identifier} - computed, e.g. `title`
+         *   - others - all {@link Tokens.StringValueExpression} types
+         *
+         * when used under a component / instance / template, the `props.` expression is reserved and refers to adjacent parent's props.
+         * - by the standard implementation, the `props.[x]` is recommended to be referenced only once in a single node.
+         * - by the standard implementation, within the visual editor context, when user attempts to updates the literal value (where it is a `props.[x]` and `props.[x] is literal`), it should actually update the `props.[x]` value, not this `text` literal value.
+         */
+        type PropsTextValue = Tokens.StringValueExpression;
+
         export interface ITextValue {
-          /**
-           * text value
-           *
-           * - expression - {@link Tokens.StringValueExpression} - computed or literal
-           *   - literal - e.g. `"A text value"`
-           *   - property access - {@link Tokens.PropertyAccessExpression} - computed, , e.g. `userdata.title`
-           *   - identifier - {@link Tokens.Identifier} - computed, e.g. `title`
-           *   - others - all {@link Tokens.StringValueExpression} types
-           *
-           * when used under a component / instance / template, the `props.` expression is reserved and refers to adjacent parent's props.
-           * - by the standard implementation, the `props.[x]` is recommended to be referenced only once in a single node.
-           * - by the standard implementation, within the visual editor context, when user attempts to updates the literal value (where it is a `props.[x]` and `props.[x] is literal`), it should actually update the `props.[x]` value, not this `text` literal value.
-           */
-          text: Tokens.StringValueExpression | null;
+          text: PropsTextValue | null;
 
           /**
            * set max length of the text value
            * - Note: max length is ignored when set programmatically
            * - Note: this is a experimental feature and its behaviour is not strictly defined
            * @see https://json-schema.org/understanding-json-schema/reference/string#length
+           *
+           * @deprecated - not standard
            */
           maxLength?: number;
+        }
+
+        export interface IHTMLRichTextValue {
+          html: PropsTextValue | null;
         }
 
         export interface IProperties {
@@ -1776,6 +1781,24 @@ export namespace grida {
         alt?: string;
       }
 
+      /**
+       * [HTMLRichText]
+       *
+       * Note:
+       * - Limited to HTML environment
+       * - {@link TextNode} also supports rich styling, but only limited to text spans.
+       *
+       * RichText can hold any html-like text content, including text spans, links, images, etc.
+       */
+      export interface HTMLRichTextNode
+        extends i.IBaseNode,
+          i.ISceneNode,
+          i.ICSSStylable,
+          i.IHrefable,
+          i.IHTMLRichTextValue {
+        readonly type: "richtext";
+      }
+
       export interface VideoNode
         extends i.IBaseNode,
           i.ISceneNode,
@@ -1883,7 +1906,7 @@ export namespace grida {
           i.ISceneNode,
           i.IHrefable,
           i.IPositioning,
-          // i.ICSSDimension,
+          i.IStroke,
           i.IFixedDimension,
           i.IOpacity,
           i.IZIndex,
