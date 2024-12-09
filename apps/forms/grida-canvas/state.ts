@@ -95,9 +95,8 @@ interface IDocumentEditorEventTargetState {
     // scale (resize)
     | {
         type: "scale";
-        initial_bounding_rectangle: cmath.Rectangle | null;
-        // TODO: support multiple selection
-        selection: string;
+        initial_rects: cmath.Rectangle[];
+        selection: string[];
         direction: cmath.CardinalDirection;
         /**
          * raw movement - independent of the direction
@@ -124,19 +123,6 @@ interface IDocumentEditorEventTargetState {
         type: "corner-radius";
         initial_bounding_rectangle: cmath.Rectangle | null;
       };
-
-  // gesture?: // translate (move)
-  // {
-  //   type: "translate" | "scale" | "rotate" | "corner-radius";
-  //   initial_bounding_rectangle: cmath.Rectangle;
-  //   mods: {
-  //     with_cloned_translate: boolean; // alt - applies to [translate]
-  //     // with_axis: boolean; // shift - applies to [translate]
-  //     // with_quantize: boolean; // shift - applies to [rotate]
-  //     // with_aspect_ratio: boolean; // shift - applies to [scale]
-  //     // with_center_transform_origin: boolean; // alt - applies to [scale]
-  //   };
-  // };
 
   // =============
 

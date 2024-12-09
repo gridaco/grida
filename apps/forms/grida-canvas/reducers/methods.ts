@@ -164,14 +164,12 @@ function __self_update_gesture_transform_translate(
   let i = 0;
   for (const node_id of draft.selection) {
     const node = documentquery.__getNodeById(draft, node_id);
-    const r = results[i];
+    const r = results[i++];
     draft.document.nodes[node_id] = nodeTransformReducer(node, {
       type: "position",
       x: r.position[0],
       y: r.position[1],
     });
-
-    i++;
   }
 }
 
@@ -186,11 +184,10 @@ function __self_update_gesture_transform_scale(
     selection,
     direction,
     movement: rawMovement,
-    initial_bounding_rectangle,
+    initial_rects,
   } = draft.gesture!;
-  const node = documentquery.__getNodeById(draft, selection);
 
-  assert(initial_bounding_rectangle);
+  const initial_bounding_rectangle = cmath.rect.getBoundingRect(initial_rects);
 
   // get the origin point based on handle
 
@@ -209,13 +206,19 @@ function __self_update_gesture_transform_scale(
     transform_with_center_origin === "on" ? [2, 2] : [1, 1]
   );
 
-  draft.document.nodes[selection] = nodeTransformReducer(node, {
-    type: "scale",
-    initial: initial_bounding_rectangle,
-    origin,
-    movement,
-    preserveAspectRatio: transform_with_preserve_aspect_ratio === "on",
-  });
+  let i = 0;
+  for (const node_id of selection) {
+    const initial_rect = initial_rects[i++];
+    const node = documentquery.__getNodeById(draft, node_id);
+
+    draft.document.nodes[node_id] = nodeTransformReducer(node, {
+      type: "scale",
+      initial: initial_rect,
+      origin,
+      movement,
+      preserveAspectRatio: transform_with_preserve_aspect_ratio === "on",
+    });
+  }
 }
 
 function __self_update_gesture_transform_rotate(

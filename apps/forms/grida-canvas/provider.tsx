@@ -28,7 +28,7 @@ import { documentquery } from "./document-query";
 import { GoogleFontsManager } from "./components/google-fonts";
 import { domapi } from "./domapi";
 import { cmath } from "./cmath";
-import { TCanvasEventTargetDragGestureState } from "./action";
+import type { TCanvasEventTargetDragGestureState } from "./action";
 
 const DocumentContext = createContext<IDocumentEditorState | null>(null);
 
@@ -1534,34 +1534,29 @@ export function useEventTarget() {
 
   // #region drag resize handle
   const dragResizeHandleStart = useCallback(
-    (node_id: string, direction: cmath.CardinalDirection) => {
+    (selection: string | string[], direction: cmath.CardinalDirection) => {
       dispatch({
         type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-start",
-        node_id,
+        selection: Array.isArray(selection) ? selection : [selection],
         direction,
       });
     },
     [dispatch]
   );
-  const dragResizeHandleEnd = useCallback(
-    (node_id: string) => {
-      dispatch({
-        type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-end",
-        node_id,
-      });
-    },
-    [dispatch]
-  );
+  const dragResizeHandleEnd = useCallback(() => {
+    dispatch({
+      type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-end",
+    });
+  }, [dispatch]);
+
   const dragResizeHandle = useCallback(
     (
-      node_id: string,
       direction: cmath.CardinalDirection,
       event: TCanvasEventTargetDragGestureState
     ) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag",
-          node_id,
           direction: direction,
           event,
         });

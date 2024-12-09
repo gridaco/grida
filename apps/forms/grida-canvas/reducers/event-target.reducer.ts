@@ -184,11 +184,11 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             self_insertNode(draft, draft.document.root_id, nnode);
             draft.cursor_mode = { type: "cursor" };
             self_selectNode(draft, "reset", nnode.id);
-            self_start_gesture_scale(draft, {
-              selection: nnode.id,
-              initial_bounding_rectangle: initial_rect,
-              direction: "se",
+            self_start_gesture_scale_draw_new_node(draft, {
+              new_node_id: nnode.id,
+              new_node_rect: initial_rect,
             });
+
             break;
         }
       });
@@ -311,7 +311,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
     // #endregion drag event
     // #region resize handle event
     case "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-start": {
-      const { node_id, direction } = action;
+      const { selection, direction } = action;
       //
 
       return produce(state, (draft) => {
@@ -319,9 +319,8 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         draft.hovered_node_id = undefined;
 
         self_start_gesture_scale(draft, {
-          selection: node_id,
+          selection: selection,
           direction: direction,
-          initial_bounding_rectangle: domapi.get_node_bounding_rect(node_id)!,
         });
       });
     }
@@ -332,7 +331,6 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
     }
     case "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag": {
       const {
-        node_id,
         direction: handle,
         event: { movement },
       } = action;
@@ -449,36 +447,65 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
   return state;
 }
 
+function self_start_gesture_scale_draw_new_node(
+  draft: Draft<IDocumentEditorState>,
+  {
+    new_node_id,
+    new_node_rect,
+  }: {
+    new_node_id: string;
+    new_node_rect: cmath.Rectangle;
+  }
+) {
+  draft.gesture = {
+    type: "scale",
+    initial_rects: [new_node_rect],
+    movement: cmath.vector2.zero,
+    selection: [new_node_id],
+    direction: "se",
+  };
+}
+
 function self_start_gesture_scale(
   draft: Draft<IDocumentEditorState>,
   {
     selection,
     direction,
-    initial_bounding_rectangle,
   }: {
-    selection: string;
+    selection: string[];
     direction: cmath.CardinalDirection;
-    initial_bounding_rectangle: cmath.Rectangle;
   }
 ) {
-  const node = documentquery.__getNodeById(draft, selection);
+  const rects = selection.map(
+    (node_id) => domapi.get_node_bounding_rect(node_id)!
+  );
 
   draft.gesture = {
     type: "scale",
-    initial_bounding_rectangle,
+    initial_rects: rects,
     movement: cmath.vector2.zero,
     selection: selection,
     direction: direction,
   };
 
-  // once the node's measurement mode is set to fixed (from drag start), we may safely cast the width / height sa fixed number
-  // need to assign a fixed size if width or height is a variable length
-  const _node = node as grida.program.nodes.i.ICSSDimension;
-  if (typeof _node.width !== "number") {
-    _node.width = initial_bounding_rectangle.width;
-  }
-  if (typeof _node.height !== "number") {
-    _node.height = initial_bounding_rectangle.height;
+  let i = 0;
+  for (const node_id of selection) {
+    const node = documentquery.__getNodeById(draft, node_id);
+    const rect = rects[i++];
+
+    // once the node's measurement mode is set to fixed (from drag start), we may safely cast the width / height sa fixed number
+    // need to assign a fixed size if width or height is a variable length
+    const _node = node as grida.program.nodes.i.ICSSDimension;
+    if (typeof _node.width !== "number") {
+      _node.width = rect.width;
+    }
+    if (typeof _node.height !== "number") {
+      if (node.type === "line") {
+        _node.height = 0;
+      } else {
+        _node.height = rect.height;
+      }
+    }
   }
 }
 

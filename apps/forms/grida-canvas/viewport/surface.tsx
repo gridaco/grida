@@ -246,7 +246,15 @@ function GroupOverlay({
         transform={transform}
         zIndex={10}
       >
-        {/* <Knob anchor="se" /> */}
+        <LayerOverlayResizeHandle anchor="n" selection={selection} />
+        <LayerOverlayResizeHandle anchor="s" selection={selection} />
+        <LayerOverlayResizeHandle anchor="e" selection={selection} />
+        <LayerOverlayResizeHandle anchor="w" selection={selection} />
+        <LayerOverlayResizeHandle anchor="nw" selection={selection} />
+        <LayerOverlayResizeHandle anchor="ne" selection={selection} />
+        <LayerOverlayResizeHandle anchor="sw" selection={selection} />
+        <LayerOverlayResizeHandle anchor="se" selection={selection} />
+        {/*  */}
         <DistributeButton />
       </LayerOverlay>
       {
@@ -311,19 +319,19 @@ function NodeOverlay({
         <>
           {node.type === "line" ? (
             <>
-              <LayerOverlayResizeHandle anchor="e" node_id={node_id} />
-              <LayerOverlayResizeHandle anchor="w" node_id={node_id} />
+              <LayerOverlayResizeHandle anchor="e" selection={node_id} />
+              <LayerOverlayResizeHandle anchor="w" selection={node_id} />
             </>
           ) : (
             <>
-              <LayerOverlayResizeHandle anchor="n" node_id={node_id} />
-              <LayerOverlayResizeHandle anchor="s" node_id={node_id} />
-              <LayerOverlayResizeHandle anchor="e" node_id={node_id} />
-              <LayerOverlayResizeHandle anchor="w" node_id={node_id} />
-              <LayerOverlayResizeHandle anchor="nw" node_id={node_id} />
-              <LayerOverlayResizeHandle anchor="ne" node_id={node_id} />
-              <LayerOverlayResizeHandle anchor="sw" node_id={node_id} />
-              <LayerOverlayResizeHandle anchor="se" node_id={node_id} />
+              <LayerOverlayResizeHandle anchor="n" selection={node_id} />
+              <LayerOverlayResizeHandle anchor="s" selection={node_id} />
+              <LayerOverlayResizeHandle anchor="e" selection={node_id} />
+              <LayerOverlayResizeHandle anchor="w" selection={node_id} />
+              <LayerOverlayResizeHandle anchor="nw" selection={node_id} />
+              <LayerOverlayResizeHandle anchor="ne" selection={node_id} />
+              <LayerOverlayResizeHandle anchor="sw" selection={node_id} />
+              <LayerOverlayResizeHandle anchor="se" selection={node_id} />
             </>
           )}
           {supports.cornerRadius(node.type) &&
@@ -494,11 +502,11 @@ function LayerOverlayRotationHandle({
 }
 
 function LayerOverlayResizeHandle({
-  node_id,
+  selection,
   anchor,
   size = 8,
 }: {
-  node_id: string;
+  selection: string | string[];
   anchor: "nw" | "ne" | "sw" | "se" | "n" | "e" | "s" | "w";
   size?: number;
 }) {
@@ -507,17 +515,21 @@ function LayerOverlayResizeHandle({
 
   const bind = useGesture(
     {
+      onClick: ({ event }) => {
+        event.preventDefault();
+        event.stopPropagation();
+      },
       onDragStart: (e) => {
         e.event.stopPropagation();
-        dragResizeHandleStart(node_id, anchor);
+        dragResizeHandleStart(selection, anchor);
       },
       onDragEnd: (e) => {
         e.event.stopPropagation();
-        dragResizeHandleEnd(node_id);
+        dragResizeHandleEnd();
       },
       onDrag: (e) => {
         e.event.stopPropagation();
-        dragResizeHandle(node_id, anchor, {
+        dragResizeHandle(anchor, {
           delta: e.delta,
           distance: e.distance,
           movement: e.movement,
