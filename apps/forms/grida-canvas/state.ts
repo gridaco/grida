@@ -68,7 +68,7 @@ interface IDocumentEditorClipboardState {
   /**
    * user clipboard - copied data
    */
-  user_clipboard?: grida.program.nodes.Node;
+  user_clipboard?: { selection: grida.program.nodes.Node[] };
 }
 
 interface IDocumentEditorTransformState {

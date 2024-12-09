@@ -44,47 +44,54 @@ export default function documentReducer<S extends IDocumentEditorState>(
         target === "selection" ? state.selection : [target];
 
       return produce(state, (draft) => {
-        // Only allow copy/cut of a single node
-        if (target_node_ids.length !== 1) {
-          return;
-        }
-
-        const node_id = target_node_ids[0];
+        const selection = target_node_ids.map((node_id) =>
+          documentquery.__getNodeById(draft, node_id)
+        );
 
         // [copy]
-        const selectedNode = documentquery.__getNodeById(draft, node_id);
-        draft.user_clipboard = JSON.parse(JSON.stringify(selectedNode)); // Deep copy the node
+        draft.user_clipboard = {
+          selection: JSON.parse(JSON.stringify(selection)),
+        };
 
         if (action.type === "cut") {
-          self_deleteNode(draft, node_id);
+          target_node_ids.forEach((node_id) => {
+            self_deleteNode(draft, node_id);
+          });
         }
       });
     }
     case "paste": {
       if (!state.user_clipboard) break;
-      const data: grida.program.nodes.AnyNode = JSON.parse(
-        JSON.stringify(state.user_clipboard)
-      );
-
-      const newNode = {
-        ...data,
-        id: v4(),
-      };
-
-      const offset = 10; // Offset to avoid overlapping
-
-      if (newNode.left !== undefined) newNode.left += offset;
-      if (newNode.top !== undefined) newNode.top += offset;
+      const selection: grida.program.nodes.Node[] =
+        state.user_clipboard.selection;
 
       return produce(state, (draft) => {
-        self_insertNode(
-          draft,
-          draft.document.root_id,
-          newNode as grida.program.nodes.Node
-        );
+        const new_ids = [];
+        for (const data of selection) {
+          //
+          const new_id = v4();
+          const newNode = {
+            ...data,
+            id: new_id,
+          } as grida.program.nodes.AnyNode;
+
+          const offset = 10; // Offset to avoid overlapping
+
+          if (newNode.left !== undefined) newNode.left += offset;
+          if (newNode.top !== undefined) newNode.top += offset;
+
+          self_insertNode(
+            draft,
+            draft.document.root_id,
+            newNode as grida.program.nodes.Node
+          );
+
+          new_ids.push(new_id);
+        }
+
         // after
         draft.cursor_mode = { type: "cursor" };
-        self_selectNode(draft, "reset", newNode.id);
+        self_selectNode(draft, "reset", ...new_ids);
       });
     }
     case "duplicate": {

@@ -336,6 +336,7 @@ export function self_duplicateNode<S extends IDocumentEditorState>(
   draft: Draft<S>,
   ...node_ids: string[]
 ) {
+  const new_ids = [];
   for (const node_id of node_ids) {
     if (node_id === draft.document.root_id) continue;
 
@@ -354,7 +355,12 @@ export function self_duplicateNode<S extends IDocumentEditorState>(
 
     // insert the node
     self_insertNode(draft, parent_id, deserialized);
+
+    new_ids.push(new_id);
   }
+
+  // after
+  self_selectNode(draft, "reset", ...new_ids);
 }
 
 // TODO: after inserting, refresh fonts registry
