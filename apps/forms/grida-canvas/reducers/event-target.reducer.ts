@@ -145,13 +145,17 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
           case "cursor": {
             // TODO: improve logic
             if (shiftKey) {
-              // marquee selection
-              draft.marquee = {
-                x1: draft.surface_cursor_position[0],
-                y1: draft.surface_cursor_position[1],
-                x2: draft.surface_cursor_position[0],
-                y2: draft.surface_cursor_position[1],
-              };
+              if (draft.hovered_node_id) {
+                self_start_gesture_translate(draft);
+              } else {
+                // marquee selection
+                draft.marquee = {
+                  x1: draft.surface_cursor_position[0],
+                  y1: draft.surface_cursor_position[1],
+                  x2: draft.surface_cursor_position[0],
+                  y2: draft.surface_cursor_position[1],
+                };
+              }
             } else {
               if (draft.selection.length === 0) {
                 // marquee selection
@@ -276,8 +280,6 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         if (shiftKey) {
           if (hovered_node_id) {
             self_selectNode(draft, "toggle", hovered_node_id);
-          } else {
-            // do nothing (when shift key is pressed)
           }
         } else {
           if (hovered_node_id) {
@@ -478,6 +480,7 @@ function self_start_gesture_scale(
     direction: cmath.CardinalDirection;
   }
 ) {
+  if (selection.length === 0) return;
   const rects = selection.map(
     (node_id) => domapi.get_node_bounding_rect(node_id)!
   );
@@ -513,6 +516,7 @@ function self_start_gesture_scale(
 
 function self_start_gesture_translate(draft: Draft<IDocumentEditorState>) {
   const selection = draft.selection;
+  if (selection.length === 0) return;
   const rects = draft.selection.map(
     (node_id) => domapi.get_node_bounding_rect(node_id)!
   );

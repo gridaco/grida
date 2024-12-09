@@ -131,6 +131,13 @@ interface IDocumentEditorEventTargetState {
 
   // =============
 
+  /**
+   * last movement of translate (move) gesture
+   *
+   * this is saved and used when "repeat duplicate"
+   */
+  // last_translate_movement?: cmath.Vector2;
+
   hovered_node_id?: string;
 
   //
