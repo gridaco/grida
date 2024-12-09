@@ -77,6 +77,9 @@ export default function nodeTransformReducer(
         let scale: cmath.Vector2;
 
         if (preserveAspectRatio) {
+          // TODO: need to use scale-applied rectangle to calculate the dominant axis
+          // the current implementation works, but it's not best for the ux.
+          // conceptually, the movement point should align with certain side of the rectangle
           const dominantAxis =
             Math.abs(movement[0]) > Math.abs(movement[1]) ? "x" : "y";
 

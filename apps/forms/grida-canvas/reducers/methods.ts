@@ -192,8 +192,6 @@ function __self_update_gesture_transform_scale(
   const { transform_with_center_origin, transform_with_preserve_aspect_ratio } =
     draft.modifiers;
 
-  // TODO: transform_with_preserve_aspect_ratio
-
   const {
     selection,
     direction,
