@@ -1141,3 +1141,23 @@ export namespace cmath.auxiliary_line.rectangular {
   // fromPointToVector
   // sideToPoint
 }
+export namespace cmath.ext.movement {
+  type Movement = Vector2;
+
+  /**
+   * returns a new movement vector with single axis locked by dominance.
+   * @param m
+   * @returns
+   */
+  export function axisLockedByDominance(m: Movement): Movement {
+    const [x, y] = m;
+    const abs_x = Math.abs(x);
+    const abs_y = Math.abs(y);
+
+    if (abs_x > abs_y) {
+      return [x, 0];
+    } else {
+      return [0, y];
+    }
+  }
+}

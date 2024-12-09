@@ -123,28 +123,17 @@ function __self_update_gesture_transform_translate(
   draft: Draft<IDocumentEditorState>
 ) {
   assert(draft.gesture!.type === "translate", "Gesture type must be translate");
-  const { movement, initial_rects } = draft.gesture!;
+  const { movement: _movement, initial_rects } = draft.gesture!;
   const { translate_with_clone, tarnslate_with_axis_lock } = draft.modifiers;
 
   // TODO: translate_with_clone
-  // TODO: tarnslate_with_axis_lock
+  // if (translate_with_clone) {}
 
-  // selection.forEach((node_id) => {
-  //   const node = documentquery.__getNodeById(draft, node_id);
-  //   draft.document.nodes[node_id] = nodeTransformReducer(node, {
-  //     type: "position",
-  //     dx: dx,
-  //     dy: dy,
-  //   });
-  // });
-  // multiple selection dragging will be handled by node overlay drag event
-  // if (state.selected_node_ids.length !== 1) break;
-
-  // if (draft.modifiers.translate_with_clone) {
-  //   //
-  // }
-  //
-  // const node_id = draft.selection[0];
+  // axis lock movement with dominant axis
+  const adj_movement =
+    tarnslate_with_axis_lock === "on"
+      ? cmath.ext.movement.axisLockedByDominance(_movement)
+      : _movement;
 
   // set of each sibling and parent of selection
   const snap_target_node_ids = Array.from(
@@ -168,7 +157,7 @@ function __self_update_gesture_transform_translate(
   const results = snapMovementToObjects(
     initial_rects,
     target_node_rects,
-    movement
+    adj_movement
   );
 
   let i = 0;
