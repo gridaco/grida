@@ -166,8 +166,16 @@ export namespace cmath.vector2 {
     return [a[0] - b[0], a[1] - b[1]];
   }
 
-  export function multiply(a: Vector2, b: Vector2): Vector2 {
-    return [a[0] * b[0], a[1] * b[1]];
+  export function multiply(...vectors: Vector2[]): Vector2 {
+    // Ensure there is at least one vector
+    if (vectors.length === 0) {
+      throw new Error("At least one vector is required for multiplication.");
+    }
+
+    // Start with [1, 1] as the identity for multiplication
+    return vectors.reduce((acc, [x, y]) => [acc[0] * x, acc[1] * y], [
+      1, 1,
+    ] as Vector2);
   }
 
   /**

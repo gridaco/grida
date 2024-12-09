@@ -4,6 +4,8 @@ import { documentquery } from "../document-query";
 import { grida } from "@/grida";
 import assert from "assert";
 import { v4 } from "uuid";
+import { cmath } from "../cmath";
+import nodeTransformReducer from "./node-transform.reducer";
 
 /**
  * TODO:
@@ -65,6 +67,69 @@ export function self_clearSelection<S extends IDocumentEditorState>(
 ) {
   draft.selection = [];
   return draft;
+}
+
+/**
+ * maps the resize handle (direction) to the transform origin point (inverse)
+ */
+const __scale_direction_to_transform_origin_point = {
+  nw: "se",
+  ne: "sw",
+  sw: "ne",
+  se: "nw",
+  n: "s",
+  e: "w",
+  s: "n",
+  w: "e",
+} as const;
+
+/**
+ * maps the resize handle (direction) to the mouse movement direction multiplier (inverse)
+ */
+const __resize_handle_to_mouse_direction_multiplier = {
+  nw: [-1, -1] as cmath.Vector2,
+  ne: [1, -1] as cmath.Vector2,
+  sw: [-1, 1] as cmath.Vector2,
+  se: [1, 1] as cmath.Vector2,
+  n: [0, -1] as cmath.Vector2,
+  e: [1, 0] as cmath.Vector2,
+  s: [0, 1] as cmath.Vector2,
+  w: [-1, 0] as cmath.Vector2,
+} as const;
+
+export function self_update_gesture_scale<S extends IDocumentEditorState>(
+  draft: Draft<S>
+) {
+  if (draft.gesture?.type !== "scale") return;
+  const { selection, direction, movement: rawMovement } = draft.gesture;
+  const node = documentquery.__getNodeById(draft, selection);
+
+  const initial = draft.gesture.initial_bounding_rectangle;
+  assert(initial);
+
+  // get the origin point based on handle
+
+  const origin =
+    draft.modifiers.transform_with_center_origin === "on"
+      ? cmath.rect.center(initial)
+      : cmath.rect.getCardinalPoint(
+          initial,
+          __scale_direction_to_transform_origin_point[direction]
+        );
+
+  // inverse the delta based on handle
+  const movement = cmath.vector2.multiply(
+    __resize_handle_to_mouse_direction_multiplier[direction],
+    rawMovement,
+    draft.modifiers.transform_with_center_origin === "on" ? [2, 2] : [1, 1]
+  );
+
+  draft.document.nodes[selection] = nodeTransformReducer(node, {
+    type: "scale",
+    initial,
+    origin,
+    movement,
+  });
 }
 
 export function self_updateSurfaceHoverState<S extends IDocumentEditorState>(

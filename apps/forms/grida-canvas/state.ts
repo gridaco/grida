@@ -50,6 +50,9 @@ export type SurfaceRaycastTargeting = {
 
 export type Modifiers = {
   translate_with_clone: "on" | "off";
+  tarnslate_with_axis_lock: "on" | "off";
+  transform_with_center_origin: "on" | "off";
+  transform_with_preserve_aspect_ratio: "on" | "off";
 };
 
 interface IDocumentEditorClipboardState {
@@ -90,6 +93,13 @@ interface IDocumentEditorEventTargetState {
     | {
         type: "scale";
         initial_bounding_rectangle: cmath.Rectangle | null;
+        selection: string;
+        direction: cmath.CardinalDirection;
+        /**
+         * raw movement - independent of the direction
+         */
+        movement: cmath.Vector2;
+
         // mods: {
         //   center_origin: boolean; // alt
         //   lock_aspect_ratio: boolean; // shift
@@ -294,6 +304,9 @@ export function initDocumentEditorState({
     cursor_position: [0, 0],
     modifiers: {
       translate_with_clone: "off",
+      tarnslate_with_axis_lock: "off",
+      transform_with_center_origin: "off",
+      transform_with_preserve_aspect_ratio: "off",
     },
     document_ctx:
       grida.program.document.internal.createDocumentDefinitionRuntimeHierarchyContext(

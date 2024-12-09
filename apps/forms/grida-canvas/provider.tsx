@@ -971,6 +971,16 @@ export function useDocument() {
     [dispatch]
   );
 
+  const configureTransformWithCenterOriginModifier = useCallback(
+    (transform_with_center_origin: "on" | "off") => {
+      dispatch({
+        type: "config/modifiers/transform-with-center-origin",
+        transform_with_center_origin,
+      });
+    },
+    [dispatch]
+  );
+
   const clearSelection = useCallback(
     () =>
       dispatch({
@@ -1126,6 +1136,7 @@ export function useDocument() {
       configureSurfaceRaycastTargeting,
       configureMeasurement,
       configureTranslateWithCloneModifier,
+      configureTransformWithCenterOriginModifier,
       //
       clearSelection,
       getNodeDepth,
@@ -1156,6 +1167,7 @@ export function useDocument() {
     configureSurfaceRaycastTargeting,
     configureMeasurement,
     configureTranslateWithCloneModifier,
+    configureTransformWithCenterOriginModifier,
     //
     clearSelection,
     getNodeDepth,
@@ -1454,10 +1466,11 @@ export function useEventTarget() {
 
   // #region drag resize handle
   const dragResizeHandleStart = useCallback(
-    (node_id: string) => {
+    (node_id: string, direction: cmath.CardinalDirection) => {
       dispatch({
         type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-start",
         node_id,
+        direction,
       });
     },
     [dispatch]

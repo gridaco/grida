@@ -150,7 +150,8 @@ export interface EditorDistributeEvenlyAction {
 export type EditorConfigAction =
   | EditorConfigure_RaycastTargeting
   | EditorConfigure_Measurement
-  | EditorConfigureModifier_TranslateWithClone;
+  | EditorConfigureModifier_TranslateWithClone
+  | EditorConfigureModifier_TransformWithCenterOrigin;
 
 export interface EditorConfigure_RaycastTargeting {
   type: "config/surface/raycast-targeting";
@@ -165,6 +166,11 @@ export interface EditorConfigure_Measurement {
 export interface EditorConfigureModifier_TranslateWithClone {
   type: "config/modifiers/translate-with-clone";
   translate_with_clone: "on" | "off";
+}
+
+export interface EditorConfigureModifier_TransformWithCenterOrigin {
+  type: "config/modifiers/transform-with-center-origin";
+  transform_with_center_origin: "on" | "off";
 }
 
 interface IHtmlBackendCanvasEventTargetPointerEvent {
@@ -334,6 +340,7 @@ export type EditorEventTarget_NodeOverlay_Drag = ISelection &
 
 export type EditorEventTarget_NodeOverlayResizeHandle_DragStart = INodeID & {
   type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-start";
+  direction: cmath.CardinalDirection;
 };
 
 export type EditorEventTarget_NodeOverlayResizeHandle_DragEnd = INodeID & {

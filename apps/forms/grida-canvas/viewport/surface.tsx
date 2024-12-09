@@ -509,7 +509,7 @@ function LayerOverlayResizeHandle({
     {
       onDragStart: (e) => {
         e.event.stopPropagation();
-        dragResizeHandleStart(node_id);
+        dragResizeHandleStart(node_id, anchor);
       },
       onDragEnd: (e) => {
         e.event.stopPropagation();

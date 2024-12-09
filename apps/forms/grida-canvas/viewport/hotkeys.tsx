@@ -20,6 +20,7 @@ export function useEditorHotKeys() {
     configureSurfaceRaycastTargeting,
     configureMeasurement,
     configureTranslateWithCloneModifier,
+    configureTransformWithCenterOriginModifier,
     clearSelection,
     selectedNode,
   } = useDocument();
@@ -36,6 +37,7 @@ export function useEditorHotKeys() {
         case "Alt":
           configureMeasurement("on");
           configureTranslateWithCloneModifier("on");
+          configureTransformWithCenterOriginModifier("on");
           break;
       }
       //
@@ -57,6 +59,7 @@ export function useEditorHotKeys() {
         case "Alt":
           configureMeasurement("off");
           configureTranslateWithCloneModifier("off");
+          configureTransformWithCenterOriginModifier("off");
           break;
       }
       //

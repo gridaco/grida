@@ -31,6 +31,7 @@ import {
   self_insertNode,
   self_selectNode,
   self_updateSurfaceHoverState,
+  self_update_gesture_scale,
 } from "./methods";
 import { cmath } from "../cmath";
 import { domapi } from "../domapi";
@@ -183,10 +184,11 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             self_insertNode(draft, draft.document.root_id, nnode);
             draft.cursor_mode = { type: "cursor" };
             self_selectNode(draft, "reset", nnode.id);
-            draft.gesture = {
-              type: "scale",
+            self_start_gesture_scale(draft, {
+              selection: nnode.id,
               initial_bounding_rectangle: initial_rect,
-            };
+              direction: "se",
+            });
             break;
         }
       });
@@ -230,11 +232,10 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
           const node_id = state.selection[0];
 
           return produce(state, (draft) => {
-            self_scaleGesture(draft, {
-              node_id,
-              handle: "se",
-              rawMovement: movement,
-            });
+            assert(draft.gesture?.type === "scale");
+
+            draft.gesture.movement = movement;
+            self_update_gesture_scale(draft);
           });
         }
 
@@ -306,28 +307,18 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
     // #endregion drag event
     // #region resize handle event
     case "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-start": {
-      const { node_id } = action;
+      const { node_id, direction } = action;
       //
 
       return produce(state, (draft) => {
         draft.content_edit_mode = false;
-        const node = documentquery.__getNodeById(draft, node_id);
-        const node_rect = domapi.get_node_bounding_rect(node_id)!;
-        draft.gesture = {
-          type: "scale",
-          initial_bounding_rectangle: node_rect,
-        };
         draft.hovered_node_id = undefined;
 
-        // once the node's measurement mode is set to fixed (from drag start), we may safely cast the width / height sa fixed number
-        // need to assign a fixed size if width or height is a variable length
-        const _node = node as grida.program.nodes.i.ICSSDimension;
-        if (typeof _node.width !== "number") {
-          _node.width = node_rect.width;
-        }
-        if (typeof _node.height !== "number") {
-          _node.height = node_rect.height;
-        }
+        self_start_gesture_scale(draft, {
+          selection: node_id,
+          direction: direction,
+          initial_bounding_rectangle: domapi.get_node_bounding_rect(node_id)!,
+        });
       });
     }
     case "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-end": {
@@ -342,11 +333,12 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         event: { movement },
       } = action;
 
-      // cancel if invalid state
-      if (state.gesture?.type !== "scale") return state;
-
       return produce(state, (draft) => {
-        self_scaleGesture(draft, { node_id, handle, rawMovement: movement });
+        // cancel if invalid state
+        if (draft.gesture?.type !== "scale") return;
+
+        draft.gesture.movement = movement;
+        self_update_gesture_scale(draft);
       });
       //
     }
@@ -466,70 +458,37 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
   return state;
 }
 
-/**
- * maps the resize handle (direction) to the transform origin point (inverse)
- */
-const __scale_direction_to_transform_origin_point = {
-  nw: "se",
-  ne: "sw",
-  sw: "ne",
-  se: "nw",
-  n: "s",
-  e: "w",
-  s: "n",
-  w: "e",
-} as const;
-
-/**
- * maps the resize handle (direction) to the mouse movement direction multiplier (inverse)
- */
-const __resize_handle_to_mouse_direction_multiplier = {
-  nw: [-1, -1] as cmath.Vector2,
-  ne: [1, -1] as cmath.Vector2,
-  sw: [-1, 1] as cmath.Vector2,
-  se: [1, 1] as cmath.Vector2,
-  n: [0, -1] as cmath.Vector2,
-  e: [1, 0] as cmath.Vector2,
-  s: [0, 1] as cmath.Vector2,
-  w: [-1, 0] as cmath.Vector2,
-} as const;
-
-function self_scaleGesture(
+function self_start_gesture_scale(
   draft: Draft<IDocumentEditorState>,
   {
-    node_id,
-    handle,
-    rawMovement,
+    selection,
+    direction,
+    initial_bounding_rectangle,
   }: {
-    node_id: string;
-    handle: cmath.CardinalDirection;
-    rawMovement: cmath.Vector2;
+    selection: string;
+    direction: cmath.CardinalDirection;
+    initial_bounding_rectangle: cmath.Rectangle;
   }
 ) {
-  if (draft.gesture?.type !== "scale") return;
-  const node = documentquery.__getNodeById(draft, node_id);
+  const node = documentquery.__getNodeById(draft, selection);
 
-  const initial = draft.gesture.initial_bounding_rectangle;
-  assert(initial);
-
-  // get the origin point based on handle
-  const origin = cmath.rect.getCardinalPoint(
-    initial,
-    __scale_direction_to_transform_origin_point[handle]
-  );
-
-  // inverse the delta based on handle
-  const movement = cmath.vector2.multiply(
-    __resize_handle_to_mouse_direction_multiplier[handle],
-    rawMovement
-  );
-
-  draft.document.nodes[node_id] = nodeTransformReducer(node, {
+  draft.gesture = {
     type: "scale",
-    initial,
-    origin,
-    movement,
-  });
+    initial_bounding_rectangle,
+    movement: [0, 0],
+    selection: selection,
+    direction: direction,
+  };
+
+  // once the node's measurement mode is set to fixed (from drag start), we may safely cast the width / height sa fixed number
+  // need to assign a fixed size if width or height is a variable length
+  const _node = node as grida.program.nodes.i.ICSSDimension;
+  if (typeof _node.width !== "number") {
+    _node.width = initial_bounding_rectangle.width;
+  }
+  if (typeof _node.height !== "number") {
+    _node.height = initial_bounding_rectangle.height;
+  }
 }
 
 function self_startTranslateGesture(draft: Draft<IDocumentEditorState>) {
