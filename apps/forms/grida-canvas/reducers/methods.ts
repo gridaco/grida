@@ -226,6 +226,7 @@ function __self_update_gesture_transform_scale(
     initial: initial_bounding_rectangle,
     origin,
     movement,
+    preserveAspectRatio: transform_with_preserve_aspect_ratio === "on",
   });
 }
 

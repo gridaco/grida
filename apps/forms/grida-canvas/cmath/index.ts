@@ -357,6 +357,11 @@ export namespace cmath.rect {
     };
   }
 
+  export function aspectratio(rect: cmath.Rectangle): cmath.Scalar {
+    const { width, height } = rect;
+    return width / height;
+  }
+
   /**
    * Scales a rectangle while preserving its aspect ratio.
    *
@@ -387,6 +392,8 @@ export namespace cmath.rect {
 
   /**
    * Computes the scale factors required to transform rectangle `a` to rectangle `b`.
+   *
+   * The position of the rectangles is not considered.
    *
    * @param a - The original rectangle.
    * @param b - The target rectangle.

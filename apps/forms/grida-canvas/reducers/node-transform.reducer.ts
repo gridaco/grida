@@ -34,6 +34,7 @@ type NodeTransformAction =
       initial: cmath.Rectangle;
       origin: cmath.Vector2;
       movement: cmath.Vector2;
+      preserveAspectRatio: boolean;
     }
   | {
       // resize only changes right, bottom, width, height
@@ -71,29 +72,51 @@ export default function nodeTransformReducer(
         return moveNode(draft, dx, dy);
       }
       case "scale": {
-        const { initial, origin, movement } = action;
+        const { initial, origin, movement, preserveAspectRatio } = action;
 
-        const scale: cmath.Vector2 = [
-          (initial.width + movement[0]) / initial.width,
-          (initial.height + movement[1]) / initial.height,
-        ];
+        let scale: cmath.Vector2;
+
+        if (preserveAspectRatio) {
+          const dominantAxis =
+            Math.abs(movement[0]) > Math.abs(movement[1]) ? "x" : "y";
+
+          switch (dominantAxis) {
+            case "x": {
+              const factor = (initial.width + movement[0]) / initial.width;
+              scale = [factor, factor];
+              break;
+            }
+            case "y": {
+              const factor = (initial.height + movement[1]) / initial.height;
+              scale = [factor, factor];
+              break;
+            }
+          }
+        } else {
+          scale = cmath.rect.getScaleFactors(initial, {
+            x: initial.x,
+            y: initial.y,
+            width: initial.width + movement[0],
+            height: initial.height + movement[1],
+          });
+        }
 
         const scaled = cmath.rect.scale(initial, origin, scale);
 
         const _draft = draft as grida.program.nodes.i.ICSSDimension &
           grida.program.nodes.i.IPositioning;
 
-        // position
         if (_draft.position === "absolute") {
-          // TODO: handle right and bottom
           _draft.left = cmath.quantize(scaled.x, 1);
           _draft.top = cmath.quantize(scaled.y, 1);
         }
 
-        // size
         _draft.width = cmath.quantize(Math.max(scaled.width, 0), 1);
-        if (draft.type === "line") _draft.height = 0;
-        else _draft.height = cmath.quantize(Math.max(scaled.height, 0), 1);
+        if (draft.type === "line") {
+          _draft.height = 0;
+        } else {
+          _draft.height = cmath.quantize(Math.max(scaled.height, 0), 1);
+        }
 
         return;
       }
