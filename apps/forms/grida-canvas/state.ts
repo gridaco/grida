@@ -77,7 +77,7 @@ interface IDocumentEditorTransformState {
    *
    * translate (offset) of the to the stage relative to event target
    */
-  translate?: cmath.Vector2;
+  translate: cmath.Vector2;
 }
 
 /**
@@ -89,8 +89,13 @@ interface IDocumentEditorEventTargetState {
   gesture?: // translate (move)
   | {
         type: "translate";
+        selection: string[];
+        initial_selection: string[];
+        initial_snapshot: IDocumentState["document"];
+        initial_clone_ids: string[];
         initial_rects: cmath.Rectangle[];
         movement: cmath.Vector2;
+        is_currently_cloned: boolean;
       }
     // scale (resize)
     | {
@@ -177,7 +182,8 @@ interface IDocumentEditorEventTargetState {
   /**
    * target node id to measure distance between the selection
    */
-  surface_measurement_target?: string;
+  surface_measurement_target?: string[];
+  surface_measurement_targeting_locked: boolean;
   surface_measurement_targeting: "on" | "off";
 
   /**
@@ -285,6 +291,7 @@ export function initDocumentEditorState({
 
   return {
     selection: [],
+    translate: [0, 0],
     surface_cursor_position: [0, 0],
     history: {
       future: [],
@@ -305,6 +312,7 @@ export function initDocumentEditorState({
     // history: initialHistoryState(init),
     surface_raycast_targeting: DEFAULT_RAY_TARGETING,
     surface_measurement_targeting: "off",
+    surface_measurement_targeting_locked: false,
     surface_raycast_detected_node_ids: [],
     googlefonts: s.fonts().map((family) => ({ family })),
     cursor_mode: { type: "cursor" },

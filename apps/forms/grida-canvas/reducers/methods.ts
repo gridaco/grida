@@ -123,12 +123,75 @@ export function self_update_gesture_transform<S extends IDocumentEditorState>(
 function __self_update_gesture_transform_translate(
   draft: Draft<IDocumentEditorState>
 ) {
-  assert(draft.gesture!.type === "translate", "Gesture type must be translate");
-  const { movement: _movement, initial_rects } = draft.gesture!;
+  assert(
+    draft.gesture && draft.gesture.type === "translate",
+    "Gesture type must be translate"
+  );
+  const {
+    movement: _movement,
+    initial_selection,
+    initial_rects,
+    initial_clone_ids,
+    initial_snapshot,
+  } = draft.gesture!;
   const { translate_with_clone, tarnslate_with_axis_lock } = draft.modifiers;
 
   // TODO: translate_with_clone
-  // if (translate_with_clone) {}
+  switch (translate_with_clone) {
+    case "on": {
+      if (draft.gesture.is_currently_cloned) break;
+      draft.gesture.is_currently_cloned = true;
+      // if translate with clone is on, switch selection (if not already) to the cloned node
+      // while..
+      // - reset the original node
+      // - update the cloned node
+
+      const clones = initial_selection.map((node_id, i) => {
+        const original = initial_snapshot.nodes[node_id];
+        const clone = { ...original, id: initial_clone_ids[i] };
+        return clone;
+      });
+
+      clones.forEach((clone) => {
+        self_insertNode(draft, draft.document.root_id, clone);
+      });
+
+      draft.gesture.selection = initial_clone_ids;
+
+      // reset the original node
+      initial_selection.forEach((node_id, i) => {
+        const node = documentquery.__getNodeById(draft, node_id);
+        draft.document.nodes[node_id] = nodeTransformReducer(node, {
+          type: "position",
+          x: initial_rects[i].x,
+          y: initial_rects[i].y,
+        });
+      });
+
+      // now, the cloned not will be measured relative to the original selection
+      draft.surface_measurement_target = initial_selection;
+      draft.surface_measurement_targeting_locked = true;
+
+      break;
+    }
+    case "off": {
+      if (!draft.gesture.is_currently_cloned) break;
+      draft.gesture.is_currently_cloned = false;
+      draft.gesture.selection = initial_selection;
+
+      try {
+        initial_clone_ids.forEach((clone) => {
+          self_deleteNode(draft, clone);
+        });
+      } catch (e) {}
+
+      draft.surface_measurement_target = undefined;
+      draft.surface_measurement_targeting_locked = false;
+      break;
+    }
+  }
+
+  const selection = draft.gesture.selection;
 
   // axis lock movement with dominant axis
   const adj_movement =
@@ -139,7 +202,7 @@ function __self_update_gesture_transform_translate(
   // set of each sibling and parent of selection
   const snap_target_node_ids = Array.from(
     new Set(
-      draft.selection
+      selection
         .map((node_id) =>
           documentquery
             .getSiblings(draft.document_ctx, node_id)
@@ -149,7 +212,7 @@ function __self_update_gesture_transform_translate(
         )
         .flat()
     )
-  ).filter((node_id) => !draft.selection.includes(node_id));
+  ).filter((node_id) => !selection.includes(node_id));
 
   const target_node_rects = snap_target_node_ids.map((node_id) => {
     return domapi.get_node_bounding_rect(node_id)!;
@@ -162,7 +225,7 @@ function __self_update_gesture_transform_translate(
   );
 
   let i = 0;
-  for (const node_id of draft.selection) {
+  for (const node_id of selection) {
     const node = documentquery.__getNodeById(draft, node_id);
     const r = results[i++];
     draft.document.nodes[node_id] = nodeTransformReducer(node, {
@@ -259,11 +322,14 @@ export function self_updateSurfaceHoverState<S extends IDocumentEditorState>(
   });
   draft.hovered_node_id = target;
 
-  if (draft.surface_measurement_targeting === "on") {
-    if (target) draft.surface_measurement_target = target;
+  if (
+    draft.surface_measurement_targeting === "on" &&
+    !draft.surface_measurement_targeting_locked
+  ) {
+    if (target) draft.surface_measurement_target = [target];
     else {
       // set root as target
-      draft.surface_measurement_target = draft.document.root_id;
+      draft.surface_measurement_target = [draft.document.root_id];
     }
   }
 

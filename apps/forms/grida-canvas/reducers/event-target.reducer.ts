@@ -36,6 +36,7 @@ import {
 import { cmath } from "../cmath";
 import { domapi } from "../domapi";
 import { snapMovementToObjects } from "./tools/snap";
+import { v4 } from "uuid";
 
 export default function eventTargetReducer<S extends IDocumentEditorState>(
   state: S,
@@ -198,6 +199,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         action
       );
       return produce(state, (draft) => {
+        self_maybe_end_gesture_translate(draft);
         draft.gesture = undefined;
         draft.marquee = undefined;
         if (node_ids_from_area) {
@@ -295,7 +297,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
     case "document/canvas/backend/html/event/node-overlay/on-drag-end": {
       const { selection } = action;
       return produce(state, (draft) => {
-        draft.gesture = undefined;
+        self_maybe_end_gesture_translate(draft);
       });
     }
     case "document/canvas/backend/html/event/node-overlay/on-drag": {
@@ -510,17 +512,32 @@ function self_start_gesture_scale(
 }
 
 function self_start_gesture_translate(draft: Draft<IDocumentEditorState>) {
+  const selection = draft.selection;
   const rects = draft.selection.map(
     (node_id) => domapi.get_node_bounding_rect(node_id)!
   );
 
   draft.gesture = {
     type: "translate",
+    selection: selection,
+    initial_clone_ids: selection.map(() => v4()),
+    initial_selection: selection,
     initial_rects: rects,
+    initial_snapshot: JSON.parse(JSON.stringify(draft.document)),
     movement: cmath.vector2.zero,
-    // initial_node_id: node_id,
-    // snapshot: snapshot,
+    is_currently_cloned: false,
   };
+}
+
+function self_maybe_end_gesture_translate(draft: Draft<IDocumentEditorState>) {
+  if (draft.gesture?.type !== "translate") return;
+  if (draft.gesture.is_currently_cloned) {
+    // update the selection as the cloned nodes
+    self_selectNode(draft, "reset", ...draft.gesture.selection);
+  }
+
+  draft.surface_measurement_targeting_locked = false;
+  draft.gesture = undefined;
 }
 
 function self_start_gesture_rotate(

@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useContext, useEffect, useRef, useState } from "react";
+import React, {
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { domapi } from "@/grida-canvas/domapi";
 import { cmath } from "@/grida-canvas/cmath";
 import { useDocument } from "@/grida-canvas/provider";
@@ -95,7 +101,7 @@ export function useMeasurement() {
 
   const [measurement, setMeasurement] = useState<Measurement>();
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const b = surface_measurement_target;
 
     if (!(selection.length > 0) || !b) {
@@ -107,7 +113,9 @@ export function useMeasurement() {
       selection.map((id) => domapi.get_node_bounding_rect(id)!)
     );
     const a_rect = cmath.rect.translate(_a_rect, translate!);
-    const _b_rect = domapi.get_node_bounding_rect(b);
+    const _b_rect = cmath.rect.getBoundingRect(
+      surface_measurement_target.map((id) => domapi.get_node_bounding_rect(id)!)
+    );
     const b_rect = cmath.rect.translate(_b_rect!, translate!);
 
     const measurement = measure(a_rect, b_rect);
