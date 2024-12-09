@@ -27,6 +27,7 @@ export function useEditorHotKeys() {
     clearSelection,
     toggleActive,
     toggleLocked,
+    toggleBold,
     selectedNode,
   } = useDocument();
 
@@ -107,8 +108,7 @@ export function useEditorHotKeys() {
   });
 
   useHotkeys("meta+b, ctrl+b", () => {
-    // TODO:
-    toast.error("[bold] is not implemented yet");
+    toggleBold("selection");
   });
 
   useHotkeys("shift+r", () => {

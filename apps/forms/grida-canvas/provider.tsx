@@ -176,6 +176,16 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
     [dispatch]
   );
 
+  const toggleNodeBold = useCallback(
+    (node_id: string) => {
+      dispatch({
+        type: "node/toggle/bold",
+        node_id: node_id,
+      });
+    },
+    [dispatch]
+  );
+
   const pointerEnterNode = useCallback(
     (node_id: string) => {
       dispatch({
@@ -668,6 +678,7 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
       pointerLeaveNode,
       toggleNodeActive,
       toggleNodeLocked,
+      toggleNodeBold,
       changeNodeActive,
       changeNodeLocked,
       changeNodeName,
@@ -718,6 +729,7 @@ export function useNodeAction(node_id: string | undefined) {
       bringFront: () => nodeActions.orderBringFront(node_id),
       toggleLocked: () => nodeActions.toggleNodeLocked(node_id),
       toggleActive: () => nodeActions.toggleNodeActive(node_id),
+      toggleBold: () => nodeActions.toggleNodeBold(node_id),
       component: (component_id: string) =>
         nodeActions.changeNodeComponent(node_id, component_id),
       text: (text?: Tokens.StringValueExpression) =>
@@ -1037,6 +1049,19 @@ export function useDocument() {
     [dispatch, selection]
   );
 
+  const toggleBold = useCallback(
+    (target: "selection" | (string & {}) = "selection") => {
+      const target_ids = target === "selection" ? selection : [target];
+      target_ids.forEach((node_id) => {
+        dispatch({
+          type: "node/toggle/bold",
+          node_id: node_id,
+        });
+      });
+    },
+    [dispatch, selection]
+  );
+
   const clearSelection = useCallback(
     () =>
       dispatch({
@@ -1199,6 +1224,7 @@ export function useDocument() {
       //
       toggleActive,
       toggleLocked,
+      toggleBold,
       //
       clearSelection,
       getNodeDepth,
@@ -1236,6 +1262,7 @@ export function useDocument() {
     //
     toggleActive,
     toggleLocked,
+    toggleBold,
     //
     clearSelection,
     getNodeDepth,

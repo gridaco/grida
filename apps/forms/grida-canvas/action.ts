@@ -37,6 +37,7 @@ export type DocumentAction =
   | NodeChangeAction
   | NodeOrderAction
   | NodeToggleBasePropertyAction
+  | NodeToggleBoldAction
   | TemplateNodeOverrideChangeAction
   | TemplateEditorSetTemplatePropsAction
   //
@@ -655,6 +656,8 @@ export type NodeOrderAction =
 export type NodeToggleBasePropertyAction =
   | ({ type: "node/toggle/active" } & INodeID)
   | ({ type: "node/toggle/locked" } & INodeID);
+
+export type NodeToggleBoldAction = { type: "node/toggle/bold" } & INodeID;
 
 export type TemplateNodeOverrideChangeAction = ITemplateInstanceNodeID & {
   type: "document/template/override/change/*";
