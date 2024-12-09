@@ -606,7 +606,7 @@ function SurfaceTextEditor({ node_id }: { node_id: string }) {
           onChange={(e) => {
             change.text(e.target.value);
           }}
-          className="m-0 p-0 border-none outline-none appearance-none bg-transparent h-full overflow-visible"
+          className="m-0 p-0 border-none outline-none appearance-none bg-transparent h-full overflow-visible resize-none"
           style={{
             width: "calc(100% + 1px)",
             ...grida.program.css.toReactTextStyle(
