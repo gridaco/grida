@@ -158,6 +158,12 @@ function _reducer<S extends IDocumentEditorState>(
         self_update_gesture_transform(draft);
       });
     }
+    case "config/modifiers/rotate-with-quantize": {
+      return produce(state, (draft: Draft<S>) => {
+        draft.modifiers.rotate_with_quantize = action.rotate_with_quantize;
+        self_update_gesture_transform(draft);
+      });
+    }
     case "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag":
     case "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-end":
     case "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-start":

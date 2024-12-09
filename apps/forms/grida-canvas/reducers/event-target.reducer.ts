@@ -412,10 +412,12 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
       return produce(state, (draft) => {
         self_selectNode(draft, "reset", node_id);
-        draft.gesture = {
-          type: "rotate",
+        self_start_gesture_rotate(draft, {
+          selection: node_id,
           initial_bounding_rectangle: domapi.get_node_bounding_rect(node_id)!,
-        };
+          // TODO: the offset of rotation handle relative to the center of the rectangle
+          offset: cmath.vector2.zero,
+        });
       });
     }
     case "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag-end": {
@@ -431,27 +433,12 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         event: { delta, movement },
       } = <EditorEventTarget_NodeOverlayRotationHandle_Drag>action;
 
-      // cancel if invalid state
-      if (state.gesture?.type !== "rotate") return state;
-
-      const angle = cmath.quantize(
-        cmath.principalAngle(
-          // TODO: need to store the initial angle and subtract
-          // TODO: get anchor and calculate the offset
-          // TODO: translate the movement (distance) relative to the center of the node
-          cmath.vector2.angle(cmath.vector2.zero, movement)
-        ),
-        1
-      );
-
       return produce(state, (draft) => {
-        const node = documentquery.__getNodeById(draft, node_id);
+        // cancel if invalid state
+        if (draft.gesture?.type !== "rotate") return;
+        draft.gesture.movement = movement;
 
-        draft.document.nodes[node_id] = nodeReducer(node, {
-          type: "node/change/rotation",
-          rotation: angle,
-          node_id,
-        });
+        self_update_gesture_transform(draft);
       });
       //
     }
@@ -506,5 +493,26 @@ function self_start_gesture_translate(draft: Draft<IDocumentEditorState>) {
     movement: cmath.vector2.zero,
     // initial_node_id: node_id,
     // snapshot: snapshot,
+  };
+}
+
+function self_start_gesture_rotate(
+  draft: Draft<IDocumentEditorState>,
+  {
+    selection,
+    offset,
+    initial_bounding_rectangle,
+  }: {
+    selection: string;
+    initial_bounding_rectangle: cmath.Rectangle;
+    offset: cmath.Vector2;
+  }
+) {
+  draft.gesture = {
+    type: "rotate",
+    initial_bounding_rectangle: initial_bounding_rectangle,
+    offset: offset,
+    selection: selection,
+    movement: cmath.vector2.zero,
   };
 }

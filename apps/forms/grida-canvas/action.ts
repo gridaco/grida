@@ -153,7 +153,8 @@ export type EditorConfigAction =
   | EditorConfigureModifier_TranslateWithClone
   | EditorConfigureModifier_TranslateWithAxisLock
   | EditorConfigureModifier_TransformWithCenterOrigin
-  | EditorConfigureModifier_TransformWithPreserveAspectRatio;
+  | EditorConfigureModifier_TransformWithPreserveAspectRatio
+  | EditorConfigureModifier_RotateWithQuantize;
 
 export interface EditorConfigure_RaycastTargeting {
   type: "config/surface/raycast-targeting";
@@ -182,6 +183,11 @@ export interface EditorConfigureModifier_TransformWithCenterOrigin {
 export interface EditorConfigureModifier_TransformWithPreserveAspectRatio {
   type: "config/modifiers/transform-with-preserve-aspect-ratio";
   transform_with_preserve_aspect_ratio: "on" | "off";
+}
+
+export interface EditorConfigureModifier_RotateWithQuantize {
+  type: "config/modifiers/rotate-with-quantize";
+  rotate_with_quantize: number | "off";
 }
 
 interface IHtmlBackendCanvasEventTargetPointerEvent {

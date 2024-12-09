@@ -53,6 +53,15 @@ export type Modifiers = {
   tarnslate_with_axis_lock: "on" | "off";
   transform_with_center_origin: "on" | "off";
   transform_with_preserve_aspect_ratio: "on" | "off";
+  /**
+   *
+   * Set the quantize value for the rotation (in degrees)
+   *
+   * `15` is a good value for most cases
+   *
+   * @default "off"
+   */
+  rotate_with_quantize: "off" | number;
 };
 
 interface IDocumentEditorClipboardState {
@@ -82,37 +91,30 @@ interface IDocumentEditorEventTargetState {
         type: "translate";
         initial_rects: cmath.Rectangle[];
         movement: cmath.Vector2;
-        // initial
-        // initial_node_id: string;
-        // snapshot: IDocumentEditorState;
-        // mods: {
-        //   clone: boolean; // alt
-        //   // lock_axis: boolean; // shift
-        // };
       }
     // scale (resize)
     | {
         type: "scale";
         initial_bounding_rectangle: cmath.Rectangle | null;
+        // TODO: support multiple selection
         selection: string;
         direction: cmath.CardinalDirection;
         /**
          * raw movement - independent of the direction
          */
         movement: cmath.Vector2;
-
-        // mods: {
-        //   center_origin: boolean; // alt
-        //   lock_aspect_ratio: boolean; // shift
-        // };
       }
     // rotate
     | {
         type: "rotate";
         initial_bounding_rectangle: cmath.Rectangle | null;
-        // mods: {
-        //   quantize: boolean; // shift
-        // };
+        // TODO: support multiple selection
+        selection: string;
+        offset: cmath.Vector2;
+        /**
+         * raw movement - independent of the offset
+         */
+        movement: cmath.Vector2;
       }
     // corner radius
     | {
@@ -308,6 +310,7 @@ export function initDocumentEditorState({
       tarnslate_with_axis_lock: "off",
       transform_with_center_origin: "off",
       transform_with_preserve_aspect_ratio: "off",
+      rotate_with_quantize: "off",
     },
     document_ctx:
       grida.program.document.internal.createDocumentDefinitionRuntimeHierarchyContext(

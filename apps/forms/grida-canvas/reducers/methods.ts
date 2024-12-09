@@ -5,9 +5,10 @@ import { grida } from "@/grida";
 import assert from "assert";
 import { v4 } from "uuid";
 import { cmath } from "../cmath";
-import nodeTransformReducer from "./node-transform.reducer";
 import { domapi } from "../domapi";
 import { snapMovementToObjects } from "./tools/snap";
+import nodeTransformReducer from "./node-transform.reducer";
+import nodeReducer from "./node.reducer";
 
 /**
  * TODO:
@@ -111,7 +112,7 @@ export function self_update_gesture_transform<S extends IDocumentEditorState>(
       return __self_update_gesture_transform_scale(draft);
     }
     case "rotate": {
-      break;
+      return __self_update_gesture_transform_rotate(draft);
     }
     case "corner-radius":
     default:
@@ -214,6 +215,34 @@ function __self_update_gesture_transform_scale(
     origin,
     movement,
     preserveAspectRatio: transform_with_preserve_aspect_ratio === "on",
+  });
+}
+
+function __self_update_gesture_transform_rotate(
+  draft: Draft<IDocumentEditorState>
+) {
+  assert(draft.gesture!.type === "rotate", "Gesture type must be rotate");
+  const { movement, selection } = draft.gesture!;
+  const { rotate_with_quantize } = draft.modifiers;
+
+  const _angle = cmath.principalAngle(
+    // TODO: need to store the initial angle and subtract
+    // TODO: get anchor and calculate the offset
+    // TODO: translate the movement (distance) relative to the center of the node
+    cmath.vector2.angle(cmath.vector2.zero, movement)
+  );
+
+  // quantize value - even when quantize modifier is off, we still use 0.01 as the default value
+  const q =
+    typeof rotate_with_quantize === "number" ? rotate_with_quantize : 0.01;
+  const angle = cmath.quantize(_angle, q);
+
+  const node = documentquery.__getNodeById(draft, selection);
+
+  draft.document.nodes[selection] = nodeReducer(node, {
+    type: "node/change/rotation",
+    rotation: angle,
+    node_id: selection,
   });
 }
 

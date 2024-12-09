@@ -1001,6 +1001,16 @@ export function useDocument() {
     [dispatch]
   );
 
+  const configureRotateWithQuantizeModifier = useCallback(
+    (rotate_with_quantize: number | "off") => {
+      dispatch({
+        type: "config/modifiers/rotate-with-quantize",
+        rotate_with_quantize,
+      });
+    },
+    [dispatch]
+  );
+
   const clearSelection = useCallback(
     () =>
       dispatch({
@@ -1159,6 +1169,7 @@ export function useDocument() {
       configureTranslateWithAxisLockModifier,
       configureTransformWithCenterOriginModifier,
       configureTransformWithPreserveAspectRatioModifier,
+      configureRotateWithQuantizeModifier,
       //
       clearSelection,
       getNodeDepth,
@@ -1192,6 +1203,7 @@ export function useDocument() {
     configureTranslateWithAxisLockModifier,
     configureTransformWithCenterOriginModifier,
     configureTransformWithPreserveAspectRatioModifier,
+    configureRotateWithQuantizeModifier,
     //
     clearSelection,
     getNodeDepth,

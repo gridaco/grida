@@ -23,6 +23,7 @@ export function useEditorHotKeys() {
     configureTranslateWithAxisLockModifier,
     configureTransformWithCenterOriginModifier,
     configureTransformWithPreserveAspectRatioModifier,
+    configureRotateWithQuantizeModifier,
     clearSelection,
     selectedNode,
   } = useDocument();
@@ -44,6 +45,7 @@ export function useEditorHotKeys() {
         case "Shift":
           configureTranslateWithAxisLockModifier("on");
           configureTransformWithPreserveAspectRatioModifier("on");
+          configureRotateWithQuantizeModifier(15);
       }
       //
     },
@@ -69,6 +71,7 @@ export function useEditorHotKeys() {
         case "Shift":
           configureTranslateWithAxisLockModifier("off");
           configureTransformWithPreserveAspectRatioModifier("off");
+          configureRotateWithQuantizeModifier("off");
       }
       //
     },
