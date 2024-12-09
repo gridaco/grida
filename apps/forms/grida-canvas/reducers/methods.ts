@@ -232,9 +232,10 @@ function __self_update_gesture_transform_rotate(
     cmath.vector2.angle(cmath.vector2.zero, movement)
   );
 
+  const _user_q =
+    typeof rotate_with_quantize === "number" ? rotate_with_quantize : 0;
   // quantize value - even when quantize modifier is off, we still use 0.01 as the default value
-  const q =
-    typeof rotate_with_quantize === "number" ? rotate_with_quantize : 0.01;
+  const q = Math.max(0.01, _user_q);
   const angle = cmath.quantize(_angle, q);
 
   const node = documentquery.__getNodeById(draft, selection);
