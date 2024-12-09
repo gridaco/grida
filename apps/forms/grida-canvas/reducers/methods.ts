@@ -321,6 +321,7 @@ export function self_updateSurfaceHoverState<S extends IDocumentEditorState>(
     config: draft.surface_raycast_targeting,
     context: draft,
   });
+
   draft.hovered_node_id = target;
 
   if (
@@ -358,7 +359,13 @@ function getSurfaceRayTarget(
     }
 
     const node = nodes[node_id];
-    if (config.ignores_locked && node?.locked) {
+
+    if (!node) {
+      // ensure target exists in current document (this can happen since the hover is triggered from the event target, where the new document state is not applied yet)
+      return false; // Ignore nodes that don't exist
+    }
+
+    if (config.ignores_locked && node.locked) {
       return false; // Ignore locked nodes if configured
     }
 

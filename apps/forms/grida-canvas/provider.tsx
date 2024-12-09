@@ -1787,17 +1787,33 @@ export function useRootTemplateInstanceNode() {
   );
 }
 
+class EditorConsumerError extends Error {
+  context: any;
+  constructor(message: string, context: any) {
+    super(message); // Pass message to the parent Error class
+    this.name = this.constructor.name; // Set the error name
+    this.context = context; // Attach the context object
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, this.constructor);
+    }
+  }
+
+  toString(): string {
+    return `${this.name}: ${this.message} - Context: ${JSON.stringify(this.context)}`;
+  }
+}
+
 export function useNode(node_id: string): grida.program.nodes.AnyNode & {
   meta: {
     is_component_consumer: boolean;
   };
 } {
+  const { state } = useDocument();
+
   const {
-    state: {
-      document: { nodes, root_id },
-      templates,
-    },
-  } = useDocument();
+    document: { nodes, root_id },
+    templates,
+  } = state;
 
   const root = nodes[root_id];
 
@@ -1810,7 +1826,10 @@ export function useNode(node_id: string): grida.program.nodes.AnyNode & {
   } else {
     assert(
       templates,
-      'node is not found under "nodes", but templates are not provided for additional lookup'
+      new EditorConsumerError(
+        `node '${node_id}' is not found under "nodes", but templates are not provided for additional lookup`,
+        { state }
+      )
     );
     // TODO: can do better with the query - performance
     // find the template definition that contains this node id
