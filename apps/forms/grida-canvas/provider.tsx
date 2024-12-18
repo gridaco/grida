@@ -124,18 +124,6 @@ export function __useInternal() {
 }
 
 function __useNodeActions(dispatch: DocumentDispatcher) {
-  //
-  //
-  const selectNode = useCallback(
-    (node_id: string) => {
-      dispatch({
-        type: "document/node/select",
-        node_id,
-      });
-    },
-    [dispatch]
-  );
-
   const orderPushBack = useCallback(
     (node_id: string) => {
       dispatch({
@@ -671,7 +659,6 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
 
   return useMemo(
     () => ({
-      selectNode,
       orderPushBack,
       orderBringFront,
       pointerEnterNode,
@@ -834,6 +821,23 @@ export function useDocument() {
   const { selection } = state;
 
   const nodeActions = __useNodeActions(dispatch);
+
+  const select = useCallback(
+    (...selection: string[]) =>
+      dispatch({
+        type: "select",
+        selection: selection,
+      }),
+    [dispatch]
+  );
+
+  const blur = useCallback(
+    () =>
+      dispatch({
+        type: "blur",
+      }),
+    [dispatch]
+  );
 
   const undo = useCallback(() => {
     dispatch({
@@ -1062,15 +1066,6 @@ export function useDocument() {
     [dispatch, selection]
   );
 
-  const clearSelection = useCallback(
-    () =>
-      dispatch({
-        type: "document/node/select",
-        node_id: undefined,
-      }),
-    [dispatch]
-  );
-
   const getNodeById = useCallback(
     (node_id: string): grida.program.nodes.Node => {
       return documentquery.__getNodeById(state, node_id);
@@ -1203,6 +1198,8 @@ export function useDocument() {
       selection,
       selectedNode,
       //
+      select,
+      blur,
       undo,
       redo,
       cut,
@@ -1226,7 +1223,6 @@ export function useDocument() {
       toggleLocked,
       toggleBold,
       //
-      clearSelection,
       getNodeDepth,
       getNodeAbsoluteRotation,
       insertNode,
@@ -1241,6 +1237,8 @@ export function useDocument() {
     selection,
     selectedNode,
     //
+    select,
+    blur,
     undo,
     redo,
     cut,
@@ -1264,7 +1262,6 @@ export function useDocument() {
     toggleLocked,
     toggleBold,
     //
-    clearSelection,
     getNodeDepth,
     getNodeAbsoluteRotation,
     insertNode,

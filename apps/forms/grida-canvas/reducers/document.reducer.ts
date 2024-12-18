@@ -4,7 +4,7 @@ import type {
   EditorAction,
   //
   TemplateEditorSetTemplatePropsAction,
-  DocumentEditorNodeSelectAction,
+  EditorSelectAction,
   EditorEventTarget_Node_PointerEnter,
   EditorEventTarget_Node_PointerLeave,
   NodeChangeAction,
@@ -38,6 +38,17 @@ export default function documentReducer<S extends IDocumentEditorState>(
 ): S {
   if (!state.editable) return state;
   switch (action.type) {
+    case "select": {
+      const { selection } = <EditorSelectAction>action;
+      return produce(state, (draft) => {
+        self_selectNode(draft, "reset", ...selection);
+      });
+    }
+    case "blur": {
+      return produce(state, (draft) => {
+        self_clearSelection(draft);
+      });
+    }
     case "copy":
     case "cut": {
       const { target } = action;
@@ -319,14 +330,6 @@ export default function documentReducer<S extends IDocumentEditorState>(
         );
         assert(root_template_instance.type === "template_instance");
         root_template_instance.props = data;
-      });
-    }
-    case "document/node/select": {
-      const { node_id } = <DocumentEditorNodeSelectAction>action;
-
-      return produce(state, (draft) => {
-        if (node_id) self_selectNode(draft, "reset", node_id);
-        else self_clearSelection(draft);
       });
     }
     // case "document/template/change/props": {

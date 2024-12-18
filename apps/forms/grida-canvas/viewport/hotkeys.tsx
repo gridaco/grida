@@ -6,6 +6,8 @@ export function useEditorHotKeys() {
   const { setCursorMode, tryEnterContentEditMode, tryExitContentEditMode } =
     useEventTarget();
   const {
+    select,
+    blur,
     undo,
     redo,
     cut,
@@ -24,7 +26,6 @@ export function useEditorHotKeys() {
     configureTransformWithCenterOriginModifier,
     configureTransformWithPreserveAspectRatioModifier,
     configureRotateWithQuantizeModifier,
-    clearSelection,
     toggleActive,
     toggleLocked,
     toggleBold,
@@ -49,6 +50,7 @@ export function useEditorHotKeys() {
           configureTranslateWithAxisLockModifier("on");
           configureTransformWithPreserveAspectRatioModifier("on");
           configureRotateWithQuantizeModifier(15);
+          break;
       }
       //
     },
@@ -64,7 +66,7 @@ export function useEditorHotKeys() {
       switch (e.key) {
         case "Meta":
         case "Control":
-          configureSurfaceRaycastTargeting({ target: "shallowest" });
+          configureSurfaceRaycastTargeting({ target: "next" });
           break;
         case "Alt":
           configureMeasurement("off");
@@ -75,6 +77,7 @@ export function useEditorHotKeys() {
           configureTranslateWithAxisLockModifier("off");
           configureTransformWithPreserveAspectRatioModifier("off");
           configureRotateWithQuantizeModifier("off");
+          break;
       }
       //
     },
@@ -84,6 +87,73 @@ export function useEditorHotKeys() {
     }
   );
   //
+
+  // #region selection
+  useHotkeys(
+    "meta+a, ctrl+a",
+    () => {
+      // TODO: select all
+    },
+    {
+      preventDefault: true,
+      enableOnFormTags: false,
+      enableOnContentEditable: false,
+    }
+  );
+
+  useHotkeys(
+    "enter",
+    () => {
+      // TODO: select children
+      tryEnterContentEditMode();
+    },
+    {
+      preventDefault: true,
+      enableOnFormTags: false,
+      enableOnContentEditable: false,
+    }
+  );
+
+  useHotkeys(
+    "shift+enter, \\",
+    () => {
+      // TODO: select parent
+    },
+    {
+      preventDefault: true,
+      enableOnFormTags: false,
+      enableOnContentEditable: false,
+    }
+  );
+
+  useHotkeys(
+    "tab",
+    () => {
+      // TODO: select next sibling
+    },
+    {
+      preventDefault: true,
+      enableOnFormTags: false,
+      enableOnContentEditable: false,
+    }
+  );
+
+  useHotkeys(
+    "shift+tab",
+    () => {
+      // TODO: select previous sibling
+    },
+    {
+      preventDefault: true,
+      enableOnFormTags: false,
+      enableOnContentEditable: false,
+    }
+  );
+
+  useHotkeys("escape, clear", (e) => {
+    tryExitContentEditMode();
+    blur();
+  });
 
   useHotkeys(
     "meta+shift+h, ctrl+shift+h",
@@ -98,12 +168,13 @@ export function useEditorHotKeys() {
   useHotkeys("meta+shift+l, ctrl+shift+l", () => {
     toggleLocked("selection");
   });
+  // #endregion
 
-  useHotkeys("meta+z, ctrl+z", () => {
+  useHotkeys("undo, meta+z, ctrl+z", () => {
     undo();
   });
 
-  useHotkeys("meta+shift+z, ctrl+shift+z", () => {
+  useHotkeys("redo, meta+shift+z, ctrl+shift+z", () => {
     redo();
   });
 
@@ -136,13 +207,29 @@ export function useEditorHotKeys() {
     toast.error("[flip vertical] is not implemented yet");
   });
 
-  useHotkeys("meta+x, ctrl+x", () => cut("selection"));
+  useHotkeys("cut, meta+x, ctrl+x", () => cut("selection"), {
+    preventDefault: true,
+    enableOnContentEditable: false,
+    enableOnFormTags: false,
+  });
 
-  useHotkeys("meta+c, ctrl+c", () => copy("selection"));
+  useHotkeys("copy, meta+c, ctrl+c", () => copy("selection"), {
+    preventDefault: true,
+    enableOnContentEditable: false,
+    enableOnFormTags: false,
+  });
 
-  useHotkeys("meta+v, ctrl+v", () => paste());
+  useHotkeys("paste, meta+v, ctrl+v", () => paste(), {
+    preventDefault: true,
+    enableOnContentEditable: false,
+    enableOnFormTags: false,
+  });
 
-  useHotkeys("Backspace, Delete", () => deleteNode("selection"));
+  useHotkeys("backspace, delete", () => deleteNode("selection"), {
+    preventDefault: true,
+    enableOnContentEditable: false,
+    enableOnFormTags: false,
+  });
 
   useHotkeys(
     "arrowright, arrowleft, arrowup, arrowdown",
@@ -203,20 +290,6 @@ export function useEditorHotKeys() {
 
   useHotkeys("ctrl+alt+shift+arrowdown", () => {
     nudgeResize("selection", "y", 10);
-  });
-
-  //
-  useHotkeys(
-    "enter",
-    () => {
-      tryEnterContentEditMode();
-    },
-    { preventDefault: true }
-  );
-
-  useHotkeys("escape", (e) => {
-    tryExitContentEditMode();
-    clearSelection();
   });
 
   // keyup

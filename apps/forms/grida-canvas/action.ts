@@ -23,6 +23,8 @@ export type EditorAction =
   | DocumentAction;
 
 export type DocumentAction =
+  | EditorSelectAction
+  | EditorBlurAction
   | EditorCopyCutPasteAction
   | EditorDeleteAction
   | EditorNudgeAction
@@ -33,7 +35,6 @@ export type DocumentAction =
   //
   | SurfaceAction
   //
-  | DocumentEditorNodeSelectAction
   | NodeChangeAction
   | NodeOrderAction
   | NodeToggleBasePropertyAction
@@ -88,6 +89,15 @@ export interface __InternalResetAction {
   type: "__internal/reset";
   key?: string;
   state: IDocumentEditorState;
+}
+
+export interface EditorSelectAction {
+  type: "select";
+  selection: NodeID[];
+}
+
+export interface EditorBlurAction {
+  type: "blur";
 }
 
 export type EditorUndoAction = {
@@ -430,11 +440,6 @@ export type EditorSurface_CursorMode = {
 export interface DocumentEditorInsertNodeAction {
   type: "document/insert";
   prototype: grida.program.nodes.NodePrototype;
-}
-
-export interface DocumentEditorNodeSelectAction {
-  type: "document/node/select";
-  node_id?: NodeID;
 }
 
 interface ITemplateInstanceNodeID {

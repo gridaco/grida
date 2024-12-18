@@ -77,7 +77,7 @@ function NodeHierarchyItemContextMenuWrapper({
 export function NodeHierarchyList() {
   const {
     state: { document, selection, hovered_node_id },
-    selectNode,
+    select,
     pointerEnterNode,
     toggleNodeLocked,
     toggleNodeActive,
@@ -102,7 +102,7 @@ export function NodeHierarchyList() {
               level={depth}
               selected={selected}
               onSelect={() => {
-                selectNode(n.id);
+                select(n.id);
               }}
               icon={<NodeHierarchyItemIcon node={n} className="w-3.5 h-3.5" />}
               onPointerEnter={() => {
