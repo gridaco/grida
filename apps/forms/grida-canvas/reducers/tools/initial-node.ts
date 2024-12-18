@@ -74,6 +74,9 @@ export default function initialNode(
         ...base,
         ...position,
         ...styles,
+        style: {
+          overflow: "clip",
+        },
         fill: white,
         type: "container",
         expanded: false,

@@ -35,11 +35,13 @@ export function EditorSurface() {
     hovered_node_id,
     selection,
     is_node_transforming,
+    is_node_translating,
     content_edit_mode,
     pointerMove,
     pointerDown,
     pointerUp,
     click,
+    doubleClick,
     drag,
     dragStart,
     dragEnd,
@@ -85,6 +87,7 @@ export function EditorSurface() {
       },
       onDoubleClick: ({ event }) => {
         if (event.defaultPrevented) return;
+        doubleClick(event);
         tryEnterContentEditMode();
       },
       onDragStart: ({ event }) => {
@@ -138,8 +141,8 @@ export function EditorSurface() {
         <SnapGuide />
       </div>
       <div
-        data-transforming={is_node_transforming || isWindowResizing}
-        className="opacity-100 data-[transforming='true']:opacity-0 transition-colors"
+        data-ux-hidden={is_node_translating || isWindowResizing}
+        className="opacity-100 data-[ux-hidden='true']:opacity-0 transition-colors"
       >
         {content_edit_mode === "text" && selection.length === 1 && (
           <SurfaceTextEditor node_id={selection[0]} />

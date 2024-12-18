@@ -1326,6 +1326,8 @@ export function useEventTarget() {
   } = state;
 
   const is_node_transforming = !!gesture;
+  const is_node_translating = gesture?.type === "translate";
+  const is_node_scaling = gesture?.type === "scale";
 
   const setCursorMode = useCallback(
     (cursor_mode: CursorMode) => {
@@ -1410,10 +1412,17 @@ export function useEventTarget() {
 
   const click = useCallback(
     (event: MouseEvent) => {
-      const position = __canvas_space_position(event);
       dispatch({
         type: "document/canvas/backend/html/event/on-click",
-        position,
+      });
+    },
+    [dispatch]
+  );
+
+  const doubleClick = useCallback(
+    (event: MouseEvent) => {
+      dispatch({
+        type: "document/canvas/backend/html/event/on-double-click",
       });
     },
     [dispatch]
@@ -1675,6 +1684,8 @@ export function useEventTarget() {
       hovered_node_id,
       selection,
       is_node_transforming,
+      is_node_translating,
+      is_node_scaling,
       content_edit_mode,
       //
       dragResizeHandleStart,
@@ -1693,6 +1704,7 @@ export function useEventTarget() {
       pointerDown,
       pointerUp,
       click,
+      doubleClick,
       //
       tryEnterContentEditMode,
       tryExitContentEditMode,
@@ -1714,7 +1726,11 @@ export function useEventTarget() {
     //
     hovered_node_id,
     selection,
+    //
     is_node_transforming,
+    is_node_translating,
+    is_node_scaling,
+    //
     content_edit_mode,
     //
     dragResizeHandleStart,
@@ -1733,6 +1749,7 @@ export function useEventTarget() {
     pointerDown,
     pointerUp,
     click,
+    doubleClick,
     //
     tryEnterContentEditMode,
     tryExitContentEditMode,

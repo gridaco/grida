@@ -247,6 +247,7 @@ export type EventTargetAction =
   | EditorEventTarget_PointerDown
   | EditorEventTarget_PointerUp
   | EditorEventTarget_Click
+  | EditorEventTarget_DoubleClick
   | EditorEventTarget_DragStart
   | EditorEventTarget_Drag
   | EditorEventTarget_DragEnd
@@ -305,13 +306,10 @@ export type EditorEventTarget_PointerUp = {
 
 export type EditorEventTarget_Click = {
   type: "document/canvas/backend/html/event/on-click";
-  /**
-   * position in canvas space - need to pass a resolved value
-   */
-  position: {
-    x: number;
-    y: number;
-  };
+};
+
+export type EditorEventTarget_DoubleClick = {
+  type: "document/canvas/backend/html/event/on-double-click";
 };
 
 export type EditorEventTarget_DragStart = {

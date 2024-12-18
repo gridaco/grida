@@ -67,7 +67,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       });
     }
     case "document/canvas/backend/html/event/on-click": {
-      const { position } = <EditorEventTarget_Click>action;
+      const {} = <EditorEventTarget_Click>action;
       return produce(state, (draft) => {
         switch (draft.cursor_mode.type) {
           case "cursor": {
@@ -75,24 +75,61 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             break;
           }
           case "insert":
-            const nnode = initialNode(draft.cursor_mode.node, {
-              left: state.cursor_position[0],
-              top: state.cursor_position[1],
-            });
+            const pos = draft.cursor_position;
+            const parent =
+              state.surface_raycast_detected_node_ids[0] ||
+              draft.document.root_id;
 
-            // center translate the new node.
+            const nnode = initialNode(draft.cursor_mode.node);
+
             try {
+              // center translate the new node.
               const _nnode = nnode as grida.program.nodes.RectangleNode;
-              _nnode.left! -= _nnode.width / 2;
-              _nnode.top! -= _nnode.height / 2;
+              _nnode.left! = pos[0] - _nnode.width / 2;
+              _nnode.top! = pos[1] - _nnode.height / 2;
             } catch (e) {}
 
-            self_insertNode(draft, draft.document.root_id, nnode);
+            self_insertNode(draft, parent, nnode);
             draft.cursor_mode = { type: "cursor" };
             self_selectNode(draft, "reset", nnode.id);
             break;
         }
       });
+    }
+    case "document/canvas/backend/html/event/on-double-click": {
+      // [double click event]
+      // - DOES NOT "enter content edit mode" - this is handled by its own action.
+      // - focus on the next descendant (next deep) hit node (if any) relative to the selection
+      return produce(state, (draft) => {
+        const { document_ctx, selection, surface_raycast_detected_node_ids } =
+          state;
+        // the selection is handled by the pointer down event, which is resolved before double click event.
+        // if selection is not 1, means its clicked on void.
+        // yet, do not assert, since 0 or 1+ is valid state when shift key is pressed. (althouth not handled by double click)
+        if (selection.length !== 1) return;
+        //
+
+        const s1 = selection[0];
+        // validate the state - the detected nodes shall include the selection
+        assert(surface_raycast_detected_node_ids.includes(s1));
+
+        // find the next descendant node (deepest first) relative to the selection
+        let nextFocus: string | undefined;
+
+        for (const nodeId of surface_raycast_detected_node_ids) {
+          const ancestors = documentquery.getAncestors(document_ctx, nodeId);
+          if (ancestors.includes(s1)) {
+            nextFocus = nodeId;
+            break;
+          }
+        }
+
+        // Update the selection if a valid next focus is found
+        if (nextFocus) {
+          self_selectNode(draft, "reset", nextFocus);
+        }
+      });
+      break;
     }
     case "document/canvas/backend/html/event/on-pointer-down": {
       const { node_ids_from_point, shiftKey } = <EditorEventTarget_PointerDown>(
