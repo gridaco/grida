@@ -101,6 +101,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       // - DOES NOT "enter content edit mode" - this is handled by its own action.
       // - focus on the next descendant (next deep) hit node (if any) relative to the selection
       return produce(state, (draft) => {
+        if (state.gesture) return;
         const { document_ctx, selection, surface_raycast_detected_node_ids } =
           state;
         // the selection is handled by the pointer down event, which is resolved before double click event.
@@ -111,7 +112,10 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
         const s1 = selection[0];
         // validate the state - the detected nodes shall include the selection
-        assert(surface_raycast_detected_node_ids.includes(s1));
+        if (!surface_raycast_detected_node_ids.includes(s1)) {
+          // invalid state - this can happen when double click is triggered on void space, when marquee ends
+          return;
+        }
 
         // find the next descendant node (deepest first) relative to the selection
         let nextFocus: string | undefined;

@@ -50,6 +50,7 @@ export function EditorSurface() {
   const cursor = useEventTargetCSSCursor();
   const ref = useRef<HTMLDivElement>(null);
   const context = useContext(ViewportSurfaceContext);
+  const should_prevent_double_click = useRef(false);
 
   useEffect(() => {
     if (context?.setPortalRef) {
@@ -85,7 +86,11 @@ export function EditorSurface() {
       onClick: ({ event }) => {
         click(event);
       },
-      onDoubleClick: ({ event }) => {
+      onDoubleClick: (e) => {
+        if (should_prevent_double_click.current) {
+          return;
+        }
+        const { event } = e;
         if (event.defaultPrevented) return;
         doubleClick(event);
         tryEnterContentEditMode();
@@ -93,10 +98,16 @@ export function EditorSurface() {
       onDragStart: ({ event }) => {
         if (event.defaultPrevented) return;
         dragStart(event as PointerEvent);
+        should_prevent_double_click.current = true;
       },
-      onDragEnd: ({ event }) => {
+      onDragEnd: (e) => {
+        const { event } = e;
         if (event.defaultPrevented) return;
         dragEnd(event as PointerEvent);
+        event.stopPropagation();
+        setTimeout(() => {
+          should_prevent_double_click.current = false;
+        }, 100);
       },
       onDrag: (e) => {
         if (e.event.defaultPrevented) return;
@@ -114,6 +125,7 @@ export function EditorSurface() {
         threshold: 2,
       },
       drag: {
+        delay: 100,
         threshold: 5,
         // disable drag gesture with arrow keys
         keyboardDisplacement: 0,
