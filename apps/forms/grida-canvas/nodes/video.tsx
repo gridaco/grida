@@ -7,18 +7,13 @@ export const VideoWidget = ({
   poster,
   width,
   height,
+  loop,
+  muted,
+  autoplay,
   style,
   ...props
 }: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.VideoNode>) => {
   const { objectFit, objectPosition, ...divStyles } = style || {};
-
-  const video_element_props_without_data_attributes = {
-    ...props,
-    "data-grida-node-id": undefined,
-    "data-grida-node-type": undefined,
-    "data-dev-editor-hovered": undefined,
-    "data-dev-editor-selected": undefined,
-  };
 
   return (
     <div
@@ -32,10 +27,9 @@ export const VideoWidget = ({
           poster={poster as string}
           width={grida.program.css.toDimension(width)}
           height={grida.program.css.toDimension(height)}
-          {...video_element_props_without_data_attributes}
-          loop={props.loop}
-          muted={props.muted}
-          autoPlay={props.autoplay}
+          loop={loop}
+          muted={muted}
+          autoPlay={autoplay}
           style={{
             width: "100%",
             height: "100%",

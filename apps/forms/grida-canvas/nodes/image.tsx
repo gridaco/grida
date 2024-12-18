@@ -32,7 +32,6 @@ export const ImageWidget = ({
           width={grida.program.css.toDimension(width)}
           height={grida.program.css.toDimension(height)}
           alt={alt}
-          {...img_element_props_without_data_attributes}
           style={{
             width: "100%",
             height: "100%",
