@@ -24,7 +24,7 @@ import {
   ProgramDataContextHost,
 } from "@/grida/react-runtime/data-context/context";
 import assert from "assert";
-import { documentquery } from "./document-query";
+import { documentquery, type Selector } from "./document-query";
 import { GoogleFontsManager } from "./components/google-fonts";
 import { domapi } from "./domapi";
 import { cmath } from "./cmath";
@@ -823,10 +823,10 @@ export function useDocument() {
   const nodeActions = __useNodeActions(dispatch);
 
   const select = useCallback(
-    (...selection: string[]) =>
+    (...selectors: Selector[]) =>
       dispatch({
         type: "select",
-        selection: selection,
+        selectors: selectors,
       }),
     [dispatch]
   );

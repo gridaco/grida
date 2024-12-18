@@ -102,7 +102,7 @@ export function NodeHierarchyList() {
               level={depth}
               selected={selected}
               onSelect={() => {
-                select(n.id);
+                select([n.id]);
               }}
               icon={<NodeHierarchyItemIcon node={n} className="w-3.5 h-3.5" />}
               onPointerEnter={() => {

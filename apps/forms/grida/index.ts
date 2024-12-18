@@ -308,16 +308,24 @@ export namespace grida {
          */
         export interface IDocumentDefinitionRuntimeHierarchyContext {
           /**
+           * Array (Set) of all node IDs in the document, facilitating traversal and lookup.
+           */
+          readonly __ctx_nids: Array<nodes.NodeID>;
+
+          /**
            * Maps each node ID to its respective parent node ID, facilitating upward traversal.
            */
-          __ctx_nid_to_parent_id: Record<nodes.NodeID, nodes.NodeID>;
+          readonly __ctx_nid_to_parent_id: Record<nodes.NodeID, nodes.NodeID>;
 
           /**
            * Maps each node ID to an array of its child node IDs, enabling efficient downward traversal.
            *
            * This does NOT ensure the order of the children. when to reorder, use the `children` property in the node.
            */
-          __ctx_nid_to_children_ids: Record<nodes.NodeID, nodes.NodeID[]>;
+          readonly __ctx_nid_to_children_ids: Record<
+            nodes.NodeID,
+            nodes.NodeID[]
+          >;
         }
 
         /**
@@ -333,6 +341,7 @@ export namespace grida {
         ): IDocumentDefinitionRuntimeHierarchyContext {
           const { nodes } = document;
           const ctx: IDocumentDefinitionRuntimeHierarchyContext = {
+            __ctx_nids: Object.keys(nodes),
             __ctx_nid_to_parent_id: {},
             __ctx_nid_to_children_ids: {},
           };

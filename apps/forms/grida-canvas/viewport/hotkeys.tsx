@@ -92,7 +92,7 @@ export function useEditorHotKeys() {
   useHotkeys(
     "meta+a, ctrl+a",
     () => {
-      // TODO: select all
+      select("selection", "~");
     },
     {
       preventDefault: true,
@@ -104,7 +104,7 @@ export function useEditorHotKeys() {
   useHotkeys(
     "enter",
     () => {
-      // TODO: select children
+      select(">");
       tryEnterContentEditMode();
     },
     {
@@ -117,7 +117,7 @@ export function useEditorHotKeys() {
   useHotkeys(
     "shift+enter, \\",
     () => {
-      // TODO: select parent
+      select("..");
     },
     {
       preventDefault: true,
@@ -130,6 +130,7 @@ export function useEditorHotKeys() {
     "tab",
     () => {
       // TODO: select next sibling
+      toast.error("[next sibling] is not implemented yet");
     },
     {
       preventDefault: true,
@@ -142,6 +143,7 @@ export function useEditorHotKeys() {
     "shift+tab",
     () => {
       // TODO: select previous sibling
+      toast.error("[prev sibling] is not implemented yet");
     },
     {
       preventDefault: true,

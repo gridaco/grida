@@ -459,6 +459,7 @@ export function self_insertNode<S extends IDocumentEditorState>(
   draft.document.nodes[node_id] = node;
 
   // Update the runtime context with parent-child relationships
+  draft.document_ctx.__ctx_nids.push(node_id);
   draft.document_ctx.__ctx_nid_to_parent_id[node_id] = parent_id;
 
   if (!draft.document_ctx.__ctx_nid_to_children_ids[parent_id]) {
@@ -487,6 +488,10 @@ export function self_deleteNode<S extends IDocumentEditorState>(
     delete draft.document.nodes[child_id];
     delete draft.document_ctx.__ctx_nid_to_parent_id[child_id];
     delete draft.document_ctx.__ctx_nid_to_children_ids[child_id];
+    const childIndex = draft.document_ctx.__ctx_nids.indexOf(child_id);
+    if (childIndex > -1) {
+      draft.document_ctx.__ctx_nids.splice(childIndex, 1); // Remove child from nids
+    }
   }
   const parent_id = draft.document_ctx.__ctx_nid_to_parent_id[node_id];
   if (parent_id) {
@@ -508,4 +513,8 @@ export function self_deleteNode<S extends IDocumentEditorState>(
   }
   delete draft.document_ctx.__ctx_nid_to_parent_id[node_id];
   delete draft.document_ctx.__ctx_nid_to_children_ids[node_id];
+  const indexInNids = draft.document_ctx.__ctx_nids.indexOf(node_id);
+  if (indexInNids > -1) {
+    draft.document_ctx.__ctx_nids.splice(indexInNids, 1); // Remove node_id from nids
+  }
 }

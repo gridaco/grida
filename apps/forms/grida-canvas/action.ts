@@ -6,6 +6,7 @@ import type {
   SurfaceRaycastTargeting,
 } from "./state";
 import type { cmath } from "./cmath";
+import type { Selector } from "./document-query";
 
 export type Action =
   | InternalAction
@@ -93,7 +94,7 @@ export interface __InternalResetAction {
 
 export interface EditorSelectAction {
   type: "select";
-  selection: NodeID[];
+  selectors: Selector[];
 }
 
 export interface EditorBlurAction {

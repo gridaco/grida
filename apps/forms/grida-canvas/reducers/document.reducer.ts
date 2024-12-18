@@ -39,9 +39,24 @@ export default function documentReducer<S extends IDocumentEditorState>(
   if (!state.editable) return state;
   switch (action.type) {
     case "select": {
-      const { selection } = <EditorSelectAction>action;
+      const { document_ctx, selection } = state;
+      const { selectors } = <EditorSelectAction>action;
       return produce(state, (draft) => {
-        self_selectNode(draft, "reset", ...selection);
+        const ids = Array.from(
+          new Set(
+            selectors.flatMap((selector) =>
+              documentquery.querySelector(document_ctx, selection, selector)
+            )
+          )
+        );
+
+        if (ids.length === 0) {
+          // if no ids found, keep the current selection
+          // e.g. this can happen whe `>` (select children) is used but no children found
+          return;
+        } else {
+          self_selectNode(draft, "reset", ...ids);
+        }
       });
     }
     case "blur": {
