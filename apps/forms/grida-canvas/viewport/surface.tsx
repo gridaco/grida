@@ -128,7 +128,6 @@ export function EditorSurface() {
         threshold: 2,
       },
       drag: {
-        delay: 100,
         threshold: 5,
         // disable drag gesture with arrow keys
         keyboardDisplacement: 0,
