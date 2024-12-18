@@ -30,10 +30,6 @@ export function useSnapGuide() {
   }, []);
 
   useEffect(() => {
-    const { nodes } = state.document;
-
-    const node_ids = Object.keys(nodes);
-
     const first_selected_node_id = selected_node_ids[0];
 
     if (!first_selected_node_id) {

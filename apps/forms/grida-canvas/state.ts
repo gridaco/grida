@@ -86,8 +86,9 @@ interface IDocumentEditorTransformState {
  * this support state is not part of the document state and does not get saved or recorded as history
  */
 interface IDocumentEditorEventTargetState {
-  gesture?: // translate (move)
-  | {
+  gesture?:
+    | {
+        // translate (move)
         type: "translate";
         selection: string[];
         initial_selection: string[];
@@ -97,8 +98,8 @@ interface IDocumentEditorEventTargetState {
         movement: cmath.Vector2;
         is_currently_cloned: boolean;
       }
-    // scale (resize)
     | {
+        // scale (resize)
         type: "scale";
         initial_rects: cmath.Rectangle[];
         selection: string[];
@@ -108,8 +109,8 @@ interface IDocumentEditorEventTargetState {
          */
         movement: cmath.Vector2;
       }
-    // rotate
     | {
+        // rotate
         type: "rotate";
         initial_bounding_rectangle: cmath.Rectangle | null;
         // TODO: support multiple selection

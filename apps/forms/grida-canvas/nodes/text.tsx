@@ -1,5 +1,6 @@
 import React from "react";
-import { grida } from "@/grida";
+import type { grida } from "@/grida";
+import queryattributes from "./utils/attributes";
 
 export const TextWidget = ({
   text,
@@ -9,7 +10,7 @@ export const TextWidget = ({
   const children = text?.toString();
 
   return (
-    <div {...props} style={style}>
+    <div {...queryattributes(props)} style={style}>
       {children?.split("\n").map((line, index) => (
         <React.Fragment key={index}>
           {/* to keep white space wrap behaviour, replace starting from 2 sequence */}

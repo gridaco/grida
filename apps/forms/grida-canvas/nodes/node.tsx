@@ -146,9 +146,9 @@ export function NodeElement<P extends Record<string, any>>({
       {React.createElement<any>(
         renderer,
         {
-          id: node_id,
           ...props,
           ...({
+            id: node_id,
             ["data-grida-node-id"]: node_id,
             ["data-grida-node-locked"]: node.locked,
             ["data-grida-node-type"]: node.type,

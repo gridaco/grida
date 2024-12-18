@@ -1,7 +1,9 @@
 import { grida } from "@/grida";
 import { svg } from "@/grida/svg";
+import queryattributes from "./utils/attributes";
 
 export function RectangleWidget({
+  style,
   width,
   height,
   fill,
@@ -18,7 +20,12 @@ export function RectangleWidget({
       };
 
   return (
-    <svg {...props} width={width} height={height}>
+    <svg
+      {...queryattributes(props)}
+      style={style}
+      width={width}
+      height={height}
+    >
       {defs && <g dangerouslySetInnerHTML={{ __html: defs }} />}
 
       {isUniformRadius ? (

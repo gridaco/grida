@@ -194,12 +194,6 @@ function __self_update_gesture_transform_translate(
 
   const selection = draft.gesture.selection;
 
-  // axis lock movement with dominant axis
-  const adj_movement =
-    tarnslate_with_axis_lock === "on"
-      ? cmath.ext.movement.axisLockedByDominance(_movement)
-      : _movement;
-
   // set of each sibling and parent of selection
   const snap_target_node_ids = Array.from(
     new Set(
@@ -215,20 +209,28 @@ function __self_update_gesture_transform_translate(
     )
   ).filter((node_id) => !selection.includes(node_id));
 
-  const target_node_rects = snap_target_node_ids.map((node_id) => {
+  const snap_target_node_rects = snap_target_node_ids.map((node_id) => {
     return domapi.get_node_bounding_rect(node_id)!;
   });
 
-  const results = snapMovementToObjects(
+  // axis lock movement with dominant axis
+  const adj_movement =
+    tarnslate_with_axis_lock === "on"
+      ? cmath.ext.movement.axisLockedByDominance(_movement)
+      : _movement;
+
+  const snap_results = snapMovementToObjects(
     initial_rects,
-    target_node_rects,
+    snap_target_node_rects,
     adj_movement
   );
+
+  console.log("m", adj_movement);
 
   let i = 0;
   for (const node_id of selection) {
     const node = documentquery.__getNodeById(draft, node_id);
-    const r = results[i++];
+    const r = snap_results[i++];
     draft.document.nodes[node_id] = nodeTransformReducer(node, {
       type: "position",
       x: r.position[0],

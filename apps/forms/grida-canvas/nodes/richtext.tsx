@@ -1,5 +1,6 @@
 import React from "react";
 import { grida } from "@/grida";
+import queryattributes from "./utils/attributes";
 
 export const RichTextWidget = ({
   html,
@@ -9,7 +10,7 @@ export const RichTextWidget = ({
   const __html = html?.toString() ?? "";
 
   return (
-    <div {...props} style={style}>
+    <div {...queryattributes(props)} style={style}>
       <div dangerouslySetInnerHTML={{ __html }} />
     </div>
   );

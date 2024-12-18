@@ -367,6 +367,7 @@ export namespace grida {
       }
 
       export interface INodeHtmlDocumentQueryDataAttributes {
+        id: nodes.Node["id"];
         [k.HTML_ELEMET_DATA_ATTRIBUTE_GRIDA_NODE_ID_KEY]: nodes.Node["id"];
         [k.HTML_ELEMET_DATA_ATTRIBUTE_GRIDA_NODE_LOCKED_KEY]: nodes.Node["locked"];
         ["data-grida-node-type"]: nodes.Node["type"];

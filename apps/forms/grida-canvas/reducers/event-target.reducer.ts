@@ -76,9 +76,13 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
           }
           case "insert":
             const pos = draft.cursor_position;
-            const parent =
-              state.surface_raycast_detected_node_ids[0] ||
-              draft.document.root_id;
+            const first_hit = state.surface_raycast_detected_node_ids[0];
+            const parent = first_hit
+              ? documentquery.__getNodeById(draft, first_hit).type ===
+                "container"
+                ? first_hit
+                : draft.document.root_id
+              : draft.document.root_id;
 
             const nnode = initialNode(draft.cursor_mode.node);
 
