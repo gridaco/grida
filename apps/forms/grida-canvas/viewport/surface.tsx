@@ -50,6 +50,8 @@ export function EditorSurface() {
   const cursor = useEventTargetCSSCursor();
   const ref = useRef<HTMLDivElement>(null);
   const context = useContext(ViewportSurfaceContext);
+
+  // double click triggers when drag ends (if double pointer down) - it might be a better idea to prevent it with the displacement, not by delayed flag
   const should_prevent_double_click = useRef(false);
 
   useEffect(() => {
@@ -92,8 +94,10 @@ export function EditorSurface() {
         }
         const { event } = e;
         if (event.defaultPrevented) return;
-        doubleClick(event);
-        tryEnterContentEditMode();
+
+        // [order matters] - otherwise, it will always try to enter the content edit mode
+        tryEnterContentEditMode(); // 1
+        doubleClick(event); // 2
       },
       onDragStart: ({ event }) => {
         if (event.defaultPrevented) return;
@@ -147,7 +151,7 @@ export function EditorSurface() {
     >
       <MeasurementGuide />
       <div
-        data-transforming={is_node_transforming || isWindowResizing}
+        data-transforming={is_node_transforming}
         className="opacity-0 data-[transforming='true']:opacity-100 transition-colors"
       >
         <SnapGuide />
@@ -300,6 +304,11 @@ function NodeOverlay({
 
   const bind = useGesture(
     {
+      onPointerDown: (e) => {
+        if (!e.shiftKey) {
+          e.event.stopPropagation();
+        }
+      },
       onDragStart: (e) => {
         e.event.stopPropagation();
         layerDragStart([node_id], e);
