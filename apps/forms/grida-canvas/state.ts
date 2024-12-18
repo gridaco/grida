@@ -1,6 +1,7 @@
 import type { Action, EditorAction } from "./action";
 import { grida } from "@/grida";
-import { cmath } from "./cmath";
+import type { cmath } from "./cmath";
+import type { SnapResult } from "./cmath/_snap";
 
 export type DocumentDispatcher = (action: Action) => void;
 
@@ -193,6 +194,11 @@ interface IDocumentEditorEventTargetState {
   surface_measurement_target?: string[];
   surface_measurement_targeting_locked: boolean;
   surface_measurement_targeting: "on" | "off";
+
+  /**
+   * surface snap guides - result of snap while translate (move) gesture
+   */
+  surface_snapping?: SnapResult;
 
   /**
    * Marquee transform relative to viewport

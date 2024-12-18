@@ -1,5 +1,12 @@
 import assert from "assert";
 import { cmath } from ".";
+
+export type SnapResult = {
+  value: cmath.Vector2[];
+  distance: cmath.Vector2;
+  anchors: { x: cmath.Vector2[]; y: cmath.Vector2[] };
+};
+
 /**
  * Snaps an array of points to the nearest target point while maintaining relative positions.
  * The entire set of points is translated to align with the nearest target.
@@ -26,12 +33,13 @@ export function axisAligned(
   points: cmath.Vector2[],
   targets: cmath.Vector2[],
   threshold: cmath.Vector2
-): [
-  value: cmath.Vector2[],
-  distance: cmath.Vector2,
-  anchors: { x: cmath.Vector2[]; y: cmath.Vector2[] },
-] {
-  if (targets.length === 0) return [points, [0, 0], { x: [], y: [] }];
+): SnapResult {
+  if (targets.length === 0)
+    return {
+      value: points,
+      distance: [0, 0],
+      anchors: { x: [], y: [] },
+    };
   assert(threshold[0] >= 0, "Threshold must be a non-negative number.");
   assert(threshold[1] >= 0, "Threshold must be a non-negative number.");
 
@@ -76,7 +84,11 @@ export function axisAligned(
 
   // If no snapping occurs, return original points
   if (minDeltaX === Infinity && minDeltaY === Infinity) {
-    return [points, [0, 0], { x: [], y: [] }];
+    return {
+      value: points,
+      distance: [0, 0],
+      anchors: { x: [], y: [] },
+    };
   }
 
   // Compute the final translation delta (signed values)
@@ -91,5 +103,9 @@ export function axisAligned(
     y + delta[1],
   ]);
 
-  return [snappedPoints, delta, { x: xAnchors, y: yAnchors }];
+  return {
+    value: snappedPoints,
+    distance: delta,
+    anchors: { x: xAnchors, y: yAnchors },
+  };
 }

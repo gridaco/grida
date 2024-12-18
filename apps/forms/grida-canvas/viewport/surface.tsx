@@ -20,9 +20,8 @@ import {
   useGroupSurfaceTransform,
   useNodeSurfaceTransfrom,
 } from "./hooks/transform";
-import { useMeasurement, useSnapGuide } from "./hooks/__tmp";
-import { Crosshair } from "./ui/crosshair";
 import { MeasurementGuide } from "./ui/measurement";
+import { SnapGuide } from "./ui/snap";
 import { Knob } from "./ui/knob";
 import { ColumnsIcon, RowsIcon } from "@radix-ui/react-icons";
 import { cmath } from "../cmath";
@@ -640,75 +639,6 @@ function SurfaceTextEditor({ node_id }: { node_id: string }) {
         />
       </div>
     </div>
-  );
-}
-
-function SnapGuide() {
-  const guide = useSnapGuide();
-
-  if (!guide) return <></>;
-
-  return (
-    <div className="">
-      {/* <pre className="absolute bottom-0 left-0 text-xs bg-foreground text-background z-50">
-        {JSON.stringify({ snaps: snap }, null, 2)}
-      </pre> */}
-      {guide.x?.map((snap, i) => (
-        <React.Fragment key={i}>
-          <div
-            style={{
-              position: "absolute",
-              left: snap.left,
-              top: snap.top,
-              transform: "translate(-50%, -50%)",
-              // background: "red",
-            }}
-          >
-            <Crosshair />
-          </div>
-          <Rule axis="y" offset={snap.left} />
-        </React.Fragment>
-      ))}
-      {guide.y?.map((snap, i) => (
-        <React.Fragment key={i}>
-          <div
-            style={{
-              position: "absolute",
-              left: snap.left,
-              top: snap.top,
-              transform: "translate(-50%, -50%)",
-              // background: "red",
-            }}
-          >
-            <Crosshair />
-          </div>
-          <Rule axis="x" offset={snap.top} />
-        </React.Fragment>
-      ))}
-    </div>
-  );
-}
-
-function Rule({
-  axis,
-  offset,
-  width = 0.1,
-}: {
-  axis: "x" | "y";
-  offset: number;
-  width?: number;
-}) {
-  return (
-    <div
-      style={{
-        position: "absolute",
-        transform:
-          axis === "x" ? `translateY(${offset}px)` : `translateX(${offset}px)`,
-        width: axis === "x" ? "100%" : width,
-        height: axis === "y" ? "100%" : width,
-        background: "red",
-      }}
-    />
   );
 }
 

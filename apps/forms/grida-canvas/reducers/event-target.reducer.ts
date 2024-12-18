@@ -19,11 +19,10 @@ import type {
   EditorEventTarget_Node_PointerLeave,
   //
 } from "../action";
-import type { IDocumentEditorState, SurfaceRaycastTargeting } from "../state";
+import type { IDocumentEditorState } from "../state";
 import { grida } from "@/grida";
 import { documentquery } from "../document-query";
 import nodeReducer from "./node.reducer";
-import nodeTransformReducer from "./node-transform.reducer";
 import initialNode from "./tools/initial-node";
 import assert from "assert";
 import {
@@ -35,7 +34,6 @@ import {
 } from "./methods";
 import { cmath } from "../cmath";
 import { domapi } from "../domapi";
-import { snapMovementToObjects } from "./tools/snap";
 import { v4 } from "uuid";
 
 export default function eventTargetReducer<S extends IDocumentEditorState>(

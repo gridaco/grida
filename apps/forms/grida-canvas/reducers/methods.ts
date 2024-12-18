@@ -219,18 +219,27 @@ function __self_update_gesture_transform_translate(
       ? cmath.ext.movement.axisLockedByDominance(_movement)
       : _movement;
 
-  const snap_results = snapMovementToObjects(
+  const { translated, snapping } = snapMovementToObjects(
     initial_rects,
     snap_target_node_rects,
     adj_movement
   );
 
-  console.log("m", adj_movement);
+  draft.surface_snapping = snapping;
+
+  // console.log(
+  //   "m",
+  //   initial_rects,
+  //   snap_target_node_rects,
+  //   adj_movement,
+  //   "r",
+  //   snap_results
+  // );
 
   let i = 0;
   for (const node_id of selection) {
     const node = documentquery.__getNodeById(draft, node_id);
-    const r = snap_results[i++];
+    const r = translated[i++];
     draft.document.nodes[node_id] = nodeTransformReducer(node, {
       type: "position",
       x: r.position[0],

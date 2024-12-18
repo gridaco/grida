@@ -20,17 +20,14 @@ export function snapMovementToObjects(
     .map((r) => Object.values(cmath.rect.to9Points(r)))
     .flat();
 
-  const [points, d, anchors] = axisAligned(
-    origin_points,
-    target_points,
-    [4, 4]
-  );
+  const result = axisAligned(origin_points, target_points, [4, 4]);
+  const { value: points } = result;
 
   // top left point of the bounding box
   const bounding_box_snapped_xy = points[0];
 
   // return each xy point of input selection relative to the snapped bounding box
-  return selection.map((r) => {
+  const translated = selection.map((r) => {
     const offset = cmath.vector2.subtract(
       [r.x, r.y],
       [bounding_rect.x, bounding_rect.y]
@@ -38,4 +35,6 @@ export function snapMovementToObjects(
     const position = cmath.vector2.add(bounding_box_snapped_xy, offset);
     return { position };
   });
+
+  return { translated, snapping: result };
 }
