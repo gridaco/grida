@@ -24,10 +24,17 @@ function __useEditorContentOffsetNotifyEffect(
   const [_, dispatch] = __useInternal();
 
   const syncoffset = useCallback(
-    (offset: cmath.Vector2) => {
+    ({
+      content_offset,
+      viewport_offset,
+    }: {
+      content_offset: cmath.Vector2;
+      viewport_offset: cmath.Vector2;
+    }) => {
       dispatch({
-        type: "__internal/sync-artboard-offset",
-        offset: offset,
+        type: "__internal/on-resize",
+        content_offset: content_offset,
+        viewport_offset: viewport_offset,
       });
     },
     [dispatch]
@@ -43,14 +50,23 @@ function __useEditorContentOffsetNotifyEffect(
     }
 
     function updateOffset() {
-      const calculatedOffset = domapi.get_displacement_between(
-        viewportElement,
-        contentElement
+      if (!viewportElement || !contentElement) return;
+      const viewport_rect = viewportElement.getBoundingClientRect();
+      const content_rect = contentElement.getBoundingClientRect();
+      const viewport_position: cmath.Vector2 = [
+        viewport_rect.x,
+        viewport_rect.y,
+      ];
+      const content_position: cmath.Vector2 = [content_rect.x, content_rect.y];
+
+      const content_offset = cmath.vector2.subtract(
+        content_position,
+        viewport_position
       );
 
       // Notify the editor engine (placeholder logic)
-      if (calculatedOffset) {
-        syncoffset(calculatedOffset);
+      if (content_offset) {
+        syncoffset({ content_offset, viewport_offset: viewport_position });
       }
     }
 

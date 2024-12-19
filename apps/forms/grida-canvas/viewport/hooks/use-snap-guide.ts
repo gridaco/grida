@@ -5,7 +5,7 @@ import { useDocument } from "@/grida-canvas/provider";
 
 export default function useSnapGuide() {
   const { state } = useDocument();
-  const { surface_snapping, translate } = state;
+  const { surface_snapping, content_offset: translate } = state;
 
   if (surface_snapping) {
     const { anchors, distance } = surface_snapping;

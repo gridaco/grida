@@ -1,5 +1,6 @@
 import type { Action, EditorAction } from "./action";
 import { grida } from "@/grida";
+import { document } from "./document-query";
 import type { cmath } from "./cmath";
 import type { SnapResult } from "./cmath/_snap";
 
@@ -69,16 +70,23 @@ interface IDocumentEditorClipboardState {
   /**
    * user clipboard - copied data
    */
-  user_clipboard?: { selection: grida.program.nodes.Node[] };
+  user_clipboard?: { nodes: grida.program.nodes.Node[] };
 }
 
 interface IDocumentEditorTransformState {
   /**
    * @private - internal use only
    *
-   * translate (offset) of the to the stage relative to event target
+   * translate (offset) of the content (stage) relative to surface (viewport, not window)
    */
-  translate: cmath.Vector2;
+  content_offset: cmath.Vector2;
+
+  /**
+   * @private - internal use only
+   *
+   * translate (offset) of the viewport (surface) relative to the window
+   */
+  viewport_offset: cmath.Vector2;
 }
 
 /**
@@ -305,13 +313,14 @@ export function initDocumentEditorState({
 
   return {
     selection: [],
-    translate: [0, 0],
+    content_offset: [0, 0],
+    viewport_offset: [0, 0],
+    cursor_position: [0, 0],
     surface_cursor_position: [0, 0],
     history: {
       future: [],
       past: [],
     },
-    cursor_position: [0, 0],
     modifiers: {
       translate_with_clone: "off",
       tarnslate_with_axis_lock: "off",
@@ -319,10 +328,7 @@ export function initDocumentEditorState({
       transform_with_preserve_aspect_ratio: "off",
       rotate_with_quantize: "off",
     },
-    document_ctx:
-      grida.program.document.internal.createDocumentDefinitionRuntimeHierarchyContext(
-        init.document
-      ),
+    document_ctx: document.Context.from(init.document).snapshot(),
     // history: initialHistoryState(init),
     surface_raycast_targeting: DEFAULT_RAY_TARGETING,
     surface_measurement_targeting: "off",

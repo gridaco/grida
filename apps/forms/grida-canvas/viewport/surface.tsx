@@ -304,7 +304,10 @@ function NodeOverlay({
   const bind = useGesture(
     {
       onPointerDown: (e) => {
-        if (!e.shiftKey) {
+        // TODO: need better way to prevent this
+        // shift - select multiple
+        // meta/ctrl - deep select
+        if (!(e.shiftKey || e.ctrlKey || e.metaKey)) {
           e.event.stopPropagation();
         }
       },

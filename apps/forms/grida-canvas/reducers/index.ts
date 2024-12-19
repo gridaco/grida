@@ -21,9 +21,10 @@ export default function reducer<S extends IDocumentEditorState>(
         if (key) draft.document_key = key;
       }) as S;
     }
-    case "__internal/sync-artboard-offset": {
+    case "__internal/on-resize": {
       return produce(state, (draft: Draft<S>) => {
-        draft.translate = action.offset;
+        draft.viewport_offset = action.viewport_offset;
+        draft.content_offset = action.content_offset;
         // TODO: apply delta to cursor position
         // const delta = cmath.vector2.subtract(...)
         // draft.surface_cursor_position =

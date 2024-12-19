@@ -8,7 +8,7 @@ import { measure, Measurement } from "@/grida-canvas/cmath/_measurement";
 
 export default function useMeasurement() {
   const { state, selection } = useDocument();
-  const { translate, surface_measurement_target } = state;
+  const { content_offset: translate, surface_measurement_target } = state;
 
   const [measurement, setMeasurement] = useState<Measurement>();
 

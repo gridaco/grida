@@ -1,6 +1,6 @@
 import { type Draft } from "immer";
 import type { IDocumentEditorState, SurfaceRaycastTargeting } from "../state";
-import { documentquery } from "../document-query";
+import { document } from "../document-query";
 import { grida } from "@/grida";
 import assert from "assert";
 import { v4 } from "uuid";
@@ -22,7 +22,7 @@ export function self_selectNode<S extends IDocumentEditorState>(
   for (const node_id of __node_ids) {
     assert(node_id, "Node ID must be provided");
     assert(
-      documentquery.__getNodeById(draft, node_id),
+      document.__getNodeById(draft, node_id),
       `Node not found with id: "${node_id}"`
     );
   }
@@ -30,7 +30,7 @@ export function self_selectNode<S extends IDocumentEditorState>(
   switch (mode) {
     case "add": {
       const set = new Set([...draft.selection, ...__node_ids]);
-      const pruned = documentquery.pruneNestedNodes(
+      const pruned = document.pruneNestedNodes(
         draft.document_ctx,
         Array.from(set)
       );
@@ -46,7 +46,7 @@ export function self_selectNode<S extends IDocumentEditorState>(
           set.add(node_id);
         }
       }
-      const pruned = documentquery.pruneNestedNodes(
+      const pruned = document.pruneNestedNodes(
         draft.document_ctx,
         Array.from(set)
       );
@@ -54,10 +54,7 @@ export function self_selectNode<S extends IDocumentEditorState>(
       break;
     }
     case "reset": {
-      const pruned = documentquery.pruneNestedNodes(
-        draft.document_ctx,
-        __node_ids
-      );
+      const pruned = document.pruneNestedNodes(draft.document_ctx, __node_ids);
       draft.selection = pruned;
       break;
     }
@@ -158,7 +155,7 @@ function __self_update_gesture_transform_translate(
 
       // reset the original node
       initial_selection.forEach((node_id, i) => {
-        const node = documentquery.__getNodeById(draft, node_id);
+        const node = document.__getNodeById(draft, node_id);
         draft.document.nodes[node_id] = nodeTransformReducer(node, {
           type: "position",
           x: initial_rects[i].x,
@@ -199,11 +196,9 @@ function __self_update_gesture_transform_translate(
     new Set(
       selection
         .map((node_id) =>
-          documentquery
+          document
             .getSiblings(draft.document_ctx, node_id)
-            .concat(
-              documentquery.getParentId(draft.document_ctx, node_id) ?? []
-            )
+            .concat(document.getParentId(draft.document_ctx, node_id) ?? [])
         )
         .flat()
     )
@@ -227,19 +222,13 @@ function __self_update_gesture_transform_translate(
 
   draft.surface_snapping = snapping;
 
-  // console.log(
-  //   "m",
-  //   initial_rects,
-  //   snap_target_node_rects,
-  //   adj_movement,
-  //   "r",
-  //   snap_results
-  // );
-
   let i = 0;
   for (const node_id of selection) {
-    const node = documentquery.__getNodeById(draft, node_id);
+    const node = document.__getNodeById(draft, node_id);
     const r = translated[i++];
+    // FIXME:
+    // the r position is relative to the canvas, we need to convert it to the node's local position
+    // absolute to relative => accumulated parent's position
     draft.document.nodes[node_id] = nodeTransformReducer(node, {
       type: "position",
       x: r.position[0],
@@ -284,7 +273,7 @@ function __self_update_gesture_transform_scale(
   let i = 0;
   for (const node_id of selection) {
     const initial_rect = initial_rects[i++];
-    const node = documentquery.__getNodeById(draft, node_id);
+    const node = document.__getNodeById(draft, node_id);
 
     draft.document.nodes[node_id] = nodeTransformReducer(node, {
       type: "scale",
@@ -316,7 +305,7 @@ function __self_update_gesture_transform_rotate(
   const q = Math.max(0.01, _user_q);
   const angle = cmath.quantize(_angle, q);
 
-  const node = documentquery.__getNodeById(draft, selection);
+  const node = document.__getNodeById(draft, selection);
 
   draft.document.nodes[selection] = nodeReducer(node, {
     type: "node/change/rotation",
@@ -398,7 +387,7 @@ function getSurfaceRayTarget(
     if (!deepestNode) return undefined;
 
     // Get the parent of the deepest node
-    const parentNodeId = documentquery.getAncestors(
+    const parentNodeId = document.getAncestors(
       context.document_ctx,
       deepestNode
     )[1];
@@ -425,7 +414,7 @@ export function self_duplicateNode<S extends IDocumentEditorState>(
   for (const node_id of node_ids) {
     if (node_id === draft.document.root_id) continue;
 
-    const node = documentquery.__getNodeById(draft, node_id);
+    const node = document.__getNodeById(draft, node_id);
 
     // serialize the node
     const serialized = JSON.stringify(node);
@@ -435,7 +424,7 @@ export function self_duplicateNode<S extends IDocumentEditorState>(
     const new_id = v4();
     deserialized.id = new_id;
 
-    const parent_id = documentquery.getParentId(draft.document_ctx, node_id);
+    const parent_id = document.getParentId(draft.document_ctx, node_id);
     assert(parent_id, `Parent node not found`);
 
     // insert the node
@@ -470,13 +459,9 @@ export function self_insertNode<S extends IDocumentEditorState>(
   draft.document.nodes[node_id] = node;
 
   // Update the runtime context with parent-child relationships
-  draft.document_ctx.__ctx_nids.push(node_id);
-  draft.document_ctx.__ctx_nid_to_parent_id[node_id] = parent_id;
-
-  if (!draft.document_ctx.__ctx_nid_to_children_ids[parent_id]) {
-    draft.document_ctx.__ctx_nid_to_children_ids[parent_id] = [];
-  }
-  draft.document_ctx.__ctx_nid_to_children_ids[parent_id].push(node_id);
+  const context = new document.Context(draft.document_ctx);
+  context.insert(node_id, parent_id);
+  draft.document_ctx = context.snapshot();
 
   // Add the child to the parent's children array (if not already added)
   if (!parent_node.children.includes(node_id)) {
@@ -504,6 +489,7 @@ export function self_deleteNode<S extends IDocumentEditorState>(
       draft.document_ctx.__ctx_nids.splice(childIndex, 1); // Remove child from nids
     }
   }
+  //
   const parent_id = draft.document_ctx.__ctx_nid_to_parent_id[node_id];
   if (parent_id) {
     const index = (

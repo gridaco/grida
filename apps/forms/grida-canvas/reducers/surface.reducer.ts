@@ -2,7 +2,7 @@ import { produce, type Draft } from "immer";
 
 import type { SurfaceAction } from "../action";
 import type { IDocumentEditorState } from "../state";
-import { documentquery } from "../document-query";
+import { document } from "../document-query";
 
 export default function surfaceReducer<S extends IDocumentEditorState>(
   state: S,
@@ -13,7 +13,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
     case "document/surface/content-edit-mode/try-enter": {
       if (state.selection.length !== 1) break;
       const node_id = state.selection[0];
-      const node = documentquery.__getNodeById(state, node_id);
+      const node = document.__getNodeById(state, node_id);
 
       // only text node can enter the content edit mode
       if (node.type !== "text") return state;

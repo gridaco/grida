@@ -26,7 +26,7 @@ export type Selector = "*" | "~" | ">" | ".." | "selection" | NodeID[];
 /**
  * @internal
  */
-export namespace documentquery {
+export namespace document {
   /**
    * Queries nodes in the document hierarchy based on a specified selector.
    *
@@ -91,30 +91,30 @@ export namespace documentquery {
           // when empty, select with * (all)
           return Array.from(context.__ctx_nids);
         } else if (selection.length === 1) {
-          return documentquery.getSiblings(context, selection[0]);
+          return document.getSiblings(context, selection[0]);
         } else {
           // multiple selection
           // when multiple, ensure that the current selection is a subset of the siblings (shares the same parent) / if not, ignore.
 
           const parentIds = selection.map((node_id) =>
-            documentquery.getParentId(context, node_id)
+            document.getParentId(context, node_id)
           );
           const uniqueParentIds = new Set(parentIds);
           const is_siblings = uniqueParentIds.size === 1;
 
           if (!is_siblings) return [];
-          const siblings = documentquery.getSiblings(context, selection[0]);
+          const siblings = document.getSiblings(context, selection[0]);
           return siblings;
         }
       }
       case ">": {
         return selection.flatMap((node_id) =>
-          documentquery.getChildren(context, node_id)
+          document.getChildren(context, node_id)
         );
       }
       case "..": {
         return selection.flatMap((node_id) => {
-          const parent = documentquery.getParentId(context, node_id);
+          const parent = document.getParentId(context, node_id);
           return parent ? [parent] : [];
         });
       }
@@ -270,6 +270,13 @@ export namespace documentquery {
     return ancestors;
   }
 
+  export function getDepth(
+    context: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext,
+    node_id: string
+  ): number {
+    return getAncestors(context, node_id).length;
+  }
+
   /**
    * Retrieves all sibling nodes of a specified node.
    *
@@ -405,4 +412,97 @@ export namespace documentquery {
     if (repo) return repo.nodes[node_id];
     throw new Error(`node not found with node_id: "${node_id}"`);
   }
+
+  export class Context
+    implements
+      grida.program.document.internal
+        .IDocumentDefinitionRuntimeHierarchyContext
+  {
+    readonly __ctx_nids: string[] = [];
+    readonly __ctx_nid_to_parent_id: Record<string, string> = {};
+    readonly __ctx_nid_to_children_ids: Record<string, string[]> = {};
+    constructor(
+      init?: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext
+    ) {
+      if (init) {
+        Object.assign(this, init);
+      }
+    }
+
+    static from(document: grida.program.document.IDocumentDefinition) {
+      const ctx =
+        grida.program.document.internal.createDocumentDefinitionRuntimeHierarchyContext(
+          document
+        );
+      return new Context(ctx);
+    }
+
+    insert(node_id: NodeID, parent_id: NodeID) {
+      assert(this.__ctx_nids.indexOf(node_id) === -1, "node_id already exists");
+      this.__ctx_nids.push(node_id);
+      this.__ctx_nid_to_parent_id[node_id] = parent_id;
+
+      if (!this.__ctx_nid_to_children_ids[parent_id]) {
+        this.__ctx_nid_to_children_ids[parent_id] = [];
+      }
+
+      this.__ctx_nid_to_children_ids[parent_id].push(node_id);
+    }
+
+    snapshot(): grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext {
+      return {
+        __ctx_nids: this.__ctx_nids.slice(),
+        __ctx_nid_to_parent_id: { ...this.__ctx_nid_to_parent_id },
+        __ctx_nid_to_children_ids: { ...this.__ctx_nid_to_children_ids },
+      };
+    }
+
+    // [NOT USED] - did not yet decided how to implement the callback (for updating the document - none-context)
+    // delete(node_id: NodeID) {
+    //   const deleted_node_ids = new Set<NodeID>(node_id);
+    //   // recursively delete children
+    //   const children_ids = this.__ctx_nid_to_children_ids[node_id] || [];
+    //   for (const child_id of children_ids) {
+    //     const deleted = this.delete(child_id);
+    //     deleted.forEach(deleted_node_ids.add, deleted_node_ids);
+    //   }
+
+    //   // detach from parent
+    //   const parent_id = this.__ctx_nid_to_parent_id[node_id];
+    //   if (parent_id) {
+    //     const parent_children_ids = this.__ctx_nid_to_children_ids[parent_id];
+    //     const index = parent_children_ids.indexOf(node_id);
+
+    //     if (index > -1) {
+    //       // remove from parent node's children array
+    //       // (
+    //       //   draft.document.nodes[parent_id] as grida.program.nodes.i.IChildren
+    //       // ).children!.splice(index, 1);
+
+    //       // remove from document context
+    //       parent_children_ids.splice(index, 1);
+    //     }
+    //   }
+
+    //   // delete self from context
+    //   delete this.__ctx_nid_to_parent_id[node_id];
+    //   delete this.__ctx_nid_to_children_ids[node_id];
+    //   const index = this.__ctx_nids.indexOf(node_id);
+    //   if (index > -1) {
+    //     this.__ctx_nids.splice(index, 1);
+    //   }
+
+    //   return Array.from(deleted_node_ids);
+    // }
+
+    getAncestors(node_id: NodeID): NodeID[] {
+      return getAncestors(this, node_id);
+    }
+
+    getDepth(node_id: NodeID): number {
+      return getDepth(this, node_id);
+    }
+  }
+
+  //
 }

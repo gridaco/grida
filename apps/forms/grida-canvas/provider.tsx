@@ -24,7 +24,7 @@ import {
   ProgramDataContextHost,
 } from "@/grida/react-runtime/data-context/context";
 import assert from "assert";
-import { documentquery, type Selector } from "./document-query";
+import { document, type Selector } from "./document-query";
 import { GoogleFontsManager } from "./components/google-fonts";
 import { domapi } from "./domapi";
 import { cmath } from "./cmath";
@@ -1068,51 +1068,24 @@ export function useDocument() {
 
   const getNodeById = useCallback(
     (node_id: string): grida.program.nodes.Node => {
-      return documentquery.__getNodeById(state, node_id);
+      return document.__getNodeById(state, node_id);
     },
     [state.document.nodes]
   );
 
   const getNodeDepth = useCallback(
     (node_id: string) => {
-      const parent_ids = [];
-      let current_id = node_id;
-
-      // Traverse up the tree to collect parent IDs
-      while (state.document_ctx.__ctx_nid_to_parent_id[current_id]) {
-        const parent_id = state.document_ctx.__ctx_nid_to_parent_id[current_id];
-        parent_ids.push(parent_id);
-        if (current_id === parent_id) {
-          reportError("parent_id is same as current_id");
-          break;
-        }
-        current_id = parent_id;
-      }
-
-      return parent_ids.length;
+      return document.getDepth(state.document_ctx, node_id);
     },
     [state.document_ctx]
   );
 
   const getNodeAbsoluteRotation = useCallback(
     (node_id: string) => {
-      const parent_ids = [];
-      let current_id = node_id;
+      const parent_ids = document.getAncestors(state.document_ctx, node_id);
 
-      // Traverse up the tree to collect parent IDs
-      while (state.document_ctx.__ctx_nid_to_parent_id[current_id]) {
-        const parent_id = state.document_ctx.__ctx_nid_to_parent_id[current_id];
-        parent_ids.push(parent_id);
-        if (current_id === parent_id) {
-          reportError("parent_id is same as current_id");
-          break;
-        }
-        current_id = parent_id;
-      }
-      parent_ids.reverse();
-
-      // Calculate the absolute rotation
       let rotation = 0;
+      // Calculate the absolute rotation
       try {
         for (const parent_id of parent_ids) {
           const parent_node = getNodeById(parent_id);
@@ -1464,8 +1437,8 @@ export function useEventTarget() {
         const viewportdomrect = domapi.get_viewport_rect();
         const viewport_pos = [viewportdomrect.x, viewportdomrect.y];
         const translate: [number, number] = [
-          state.translate ? state.translate[0] : 0,
-          state.translate ? state.translate[1] : 0,
+          state.content_offset ? state.content_offset[0] : 0,
+          state.content_offset ? state.content_offset[1] : 0,
         ];
 
         const marqueerect = cmath.rect.fromPoints([
@@ -1501,7 +1474,7 @@ export function useEventTarget() {
         shiftKey: event.shiftKey,
       });
     },
-    [dispatch, marquee, state.translate]
+    [dispatch, marquee, state.content_offset]
   );
 
   const drag = useCallback(

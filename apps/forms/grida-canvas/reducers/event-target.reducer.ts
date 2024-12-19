@@ -21,7 +21,7 @@ import type {
 } from "../action";
 import type { IDocumentEditorState } from "../state";
 import { grida } from "@/grida";
-import { documentquery } from "../document-query";
+import { document } from "../document-query";
 import nodeReducer from "./node.reducer";
 import initialNode from "./tools/initial-node";
 import assert from "assert";
@@ -51,7 +51,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         draft.surface_cursor_position = [x, y];
         draft.cursor_position = cmath.vector2.subtract(
           draft.surface_cursor_position,
-          draft.translate ?? cmath.vector2.zero
+          draft.content_offset ?? cmath.vector2.zero
         );
       });
     }
@@ -73,22 +73,28 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             break;
           }
           case "insert":
-            const pos = draft.cursor_position;
-            const first_hit = state.surface_raycast_detected_node_ids[0];
-            const parent = first_hit
-              ? documentquery.__getNodeById(draft, first_hit).type ===
-                "container"
-                ? first_hit
-                : draft.document.root_id
-              : draft.document.root_id;
+            const parent = __get_insert_target(state);
 
             const nnode = initialNode(draft.cursor_mode.node);
 
+            const parent_rect = domapi.get_node_bounding_rect(parent)!;
+
             try {
-              // center translate the new node.
               const _nnode = nnode as grida.program.nodes.RectangleNode;
-              _nnode.left! = pos[0] - _nnode.width / 2;
-              _nnode.top! = pos[1] - _nnode.height / 2;
+
+              const { cursor_position } = state;
+
+              const nnode_relative_position = cmath.vector2.subtract(
+                cursor_position,
+                // parent position relative to content space
+                [parent_rect.x, parent_rect.y],
+                // center translate the new node - so it can be positioned centered to the cursor point (width / 2, height / 2)
+                [_nnode.width / 2, _nnode.height / 2]
+              );
+
+              _nnode.position = "absolute";
+              _nnode.left! = nnode_relative_position[0];
+              _nnode.top! = nnode_relative_position[1];
             } catch (e) {}
 
             self_insertNode(draft, parent, nnode);
@@ -123,7 +129,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         let nextFocus: string | undefined;
 
         for (const nodeId of surface_raycast_detected_node_ids) {
-          const ancestors = documentquery.getAncestors(document_ctx, nodeId);
+          const ancestors = document.getAncestors(document_ctx, nodeId);
           if (ancestors.includes(s1)) {
             nextFocus = nodeId;
             break;
@@ -215,9 +221,21 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             break;
           }
           case "insert":
+            const { cursor_position } = state;
+
+            const parent = __get_insert_target(state);
+
+            const parent_rect = domapi.get_node_bounding_rect(parent)!;
+
+            const nnode_relative_position = cmath.vector2.subtract(
+              cursor_position,
+              // parent position relative to content space
+              [parent_rect.x, parent_rect.y]
+            );
+
             const initial_rect = {
-              x: draft.cursor_position[0],
-              y: draft.cursor_position[1],
+              x: nnode_relative_position[0],
+              y: nnode_relative_position[1],
               width: 1,
               height: draft.cursor_mode.node === "line" ? 0 : 1,
             };
@@ -229,7 +247,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               height: initial_rect.height as 0, // casting for line node
             });
 
-            self_insertNode(draft, draft.document.root_id, nnode);
+            self_insertNode(draft, parent, nnode);
             draft.cursor_mode = { type: "cursor" };
             self_selectNode(draft, "reset", nnode.id);
             self_start_gesture_scale_draw_new_node(draft, {
@@ -254,7 +272,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
           const target_node_ids = node_ids_from_area.filter(
             (node_id) =>
               node_id !== draft.document.root_id &&
-              !documentquery.__getNodeById(draft, node_id).locked
+              !document.__getNodeById(draft, node_id).locked
           );
 
           self_selectNode(
@@ -421,7 +439,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       // const distance = Math.sqrt(dx * dx + dy * dy);
       const d = -Math.round(dx);
       return produce(state, (draft) => {
-        const node = documentquery.__getNodeById(draft, node_id);
+        const node = document.__getNodeById(draft, node_id);
 
         if (!("cornerRadius" in node)) {
           return;
@@ -538,7 +556,7 @@ function self_start_gesture_scale(
 
   let i = 0;
   for (const node_id of selection) {
-    const node = documentquery.__getNodeById(draft, node_id);
+    const node = document.__getNodeById(draft, node_id);
     const rect = rects[i++];
 
     // once the node's measurement mode is set to fixed (from drag start), we may safely cast the width / height sa fixed number
@@ -606,4 +624,18 @@ function self_start_gesture_rotate(
     selection: selection,
     movement: cmath.vector2.zero,
   };
+}
+
+/**
+ * get the parent of newly inserting node based on the current state
+ * @returns
+ */
+function __get_insert_target(state: IDocumentEditorState): string {
+  const first_hit = state.surface_raycast_detected_node_ids[0];
+  const parent = first_hit
+    ? document.__getNodeById(state, first_hit).type === "container"
+      ? first_hit
+      : state.document.root_id
+    : state.document.root_id;
+  return parent;
 }

@@ -81,9 +81,10 @@ interface ISelection {
 }
 
 export type __InternalSyncArtboardOffset = {
-  type: "__internal/sync-artboard-offset";
+  type: "__internal/on-resize";
 } & {
-  offset: Vector2;
+  content_offset: Vector2;
+  viewport_offset: Vector2;
 };
 
 export interface __InternalResetAction {

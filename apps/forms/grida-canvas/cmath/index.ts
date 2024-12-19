@@ -167,8 +167,11 @@ export namespace cmath.vector2 {
     ] as Vector2);
   }
 
-  export function subtract(a: Vector2, b: Vector2): Vector2 {
-    return [a[0] - b[0], a[1] - b[1]];
+  export function subtract(...vectors: Vector2[]): Vector2 {
+    if (vectors.length === 1) {
+      return vectors[0];
+    }
+    return vectors.reduce((acc, [x, y]) => [acc[0] - x, acc[1] - y]);
   }
 
   export function multiply(...vectors: Vector2[]): Vector2 {

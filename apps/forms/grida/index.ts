@@ -333,7 +333,7 @@ export namespace grida {
          * parent-child relationships without modifying core node structure.
          *
          * @param document - The document definition containing all nodes.
-         * @returns {IDocumentDefinitionRuntimeHierarchyContext} The hierarchy context,
+         * @returns {grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext} The hierarchy context,
          * containing mappings of each node's parent and children.
          */
         export function createDocumentDefinitionRuntimeHierarchyContext(

@@ -17,7 +17,7 @@ import type {
 import type { IDocumentEditorState } from "../state";
 import { grida } from "@/grida";
 import assert from "assert";
-import { documentquery } from "../document-query";
+import { document } from "../document-query";
 import nodeReducer from "./node.reducer";
 import surfaceReducer from "./surface.reducer";
 import nodeTransformReducer from "./node-transform.reducer";
@@ -45,7 +45,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
         const ids = Array.from(
           new Set(
             selectors.flatMap((selector) =>
-              documentquery.querySelector(document_ctx, selection, selector)
+              document.querySelector(document_ctx, selection, selector)
             )
           )
         );
@@ -71,13 +71,13 @@ export default function documentReducer<S extends IDocumentEditorState>(
         target === "selection" ? state.selection : [target];
 
       return produce(state, (draft) => {
-        const selection = target_node_ids.map((node_id) =>
-          documentquery.__getNodeById(draft, node_id)
+        const nodes = target_node_ids.map((node_id) =>
+          document.__getNodeById(draft, node_id)
         );
 
         // [copy]
         draft.user_clipboard = {
-          selection: JSON.parse(JSON.stringify(selection)),
+          nodes: JSON.parse(JSON.stringify(nodes)),
         };
 
         if (action.type === "cut") {
@@ -89,31 +89,34 @@ export default function documentReducer<S extends IDocumentEditorState>(
     }
     case "paste": {
       if (!state.user_clipboard) break;
-      const selection: grida.program.nodes.Node[] =
-        state.user_clipboard.selection;
+      const { user_clipboard, selection } = state;
+      const nodes: grida.program.nodes.Node[] = user_clipboard.nodes;
 
       return produce(state, (draft) => {
         const new_ids = [];
-        for (const data of selection) {
-          //
-          const new_id = v4();
-          const newNode = {
-            ...data,
-            id: new_id,
-          } as grida.program.nodes.AnyNode;
+        const targets =
+          selection.length > 0 ? [...selection] : [state.document.root_id];
 
-          const offset = 10; // Offset to avoid overlapping
+        // the target (parent) node that will be pasted under
+        for (const target of targets) {
+          // to be pasted
+          for (const data of nodes) {
+            //
+            const new_id = v4();
+            const newNode = {
+              ...data,
+              id: new_id,
+            } as grida.program.nodes.AnyNode;
 
-          if (newNode.left !== undefined) newNode.left += offset;
-          if (newNode.top !== undefined) newNode.top += offset;
+            const offset = 10; // Offset to avoid overlapping
 
-          self_insertNode(
-            draft,
-            draft.document.root_id,
-            newNode as grida.program.nodes.Node
-          );
+            if (newNode.left !== undefined) newNode.left += offset;
+            if (newNode.top !== undefined) newNode.top += offset;
 
-          new_ids.push(new_id);
+            self_insertNode(draft, target, newNode as grida.program.nodes.Node);
+
+            new_ids.push(new_id);
+          }
         }
 
         // after
@@ -152,7 +155,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
 
       return produce(state, (draft) => {
         for (const node_id of target_node_ids) {
-          const node = documentquery.__getNodeById(draft, node_id);
+          const node = document.__getNodeById(draft, node_id);
 
           draft.document.nodes[node_id] = nodeTransformReducer(node, {
             type: "translate",
@@ -171,7 +174,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
 
       return produce(state, (draft) => {
         for (const node_id of target_node_ids) {
-          const node = documentquery.__getNodeById(draft, node_id);
+          const node = document.__getNodeById(draft, node_id);
 
           draft.document.nodes[node_id] = nodeTransformReducer(node, {
             type: "resize",
@@ -198,7 +201,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
         const node_id = target_node_ids[0];
         if (state.document.root_id !== node_id) {
           // get container (parent)
-          const parent_node_id = documentquery.getParentId(
+          const parent_node_id = document.getParentId(
             state.document_ctx,
             node_id
           );
@@ -226,7 +229,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
       return produce(state, (draft) => {
         let i = 0;
         for (const node_id of bounding_node_ids) {
-          const node = documentquery.__getNodeById(state, node_id);
+          const node = document.__getNodeById(state, node_id);
           const moved = nodeTransformReducer(node, {
             type: "translate",
             dx: deltas[i].dx,
@@ -265,7 +268,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
       return produce(state, (draft) => {
         let i = 0;
         for (const node_id of target_node_ids) {
-          const node = documentquery.__getNodeById(state, node_id);
+          const node = document.__getNodeById(state, node_id);
           const moved = nodeTransformReducer(node, {
             type: "translate",
             dx: deltas[i].dx,
@@ -339,7 +342,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
       const { data } = <TemplateEditorSetTemplatePropsAction>action;
 
       return produce(state, (draft) => {
-        const root_template_instance = documentquery.__getNodeById(
+        const root_template_instance = document.__getNodeById(
           draft,
           draft.document.root_id!
         );
@@ -398,7 +401,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
     case "node/change/text": {
       const { node_id } = <NodeChangeAction>action;
       return produce(state, (draft) => {
-        const node = documentquery.__getNodeById(draft, node_id);
+        const node = document.__getNodeById(draft, node_id);
         assert(node, `node not found with node_id: "${node_id}"`);
         draft.document.nodes[node_id] = nodeReducer(node, action);
 
@@ -415,13 +418,10 @@ export default function documentReducer<S extends IDocumentEditorState>(
     case "node/order/front": {
       const { node_id } = <NodeOrderAction>action;
       return produce(state, (draft) => {
-        const parent_id = documentquery.getParentId(
-          draft.document_ctx,
-          node_id
-        );
+        const parent_id = document.getParentId(draft.document_ctx, node_id);
         if (!parent_id) return; // root node case
         const parent_node: Draft<grida.program.nodes.i.IChildren> =
-          documentquery.__getNodeById(
+          document.__getNodeById(
             draft,
             parent_id
           ) as grida.program.nodes.i.IChildren;
@@ -449,7 +449,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
     case "node/toggle/locked": {
       return produce(state, (draft) => {
         const { node_id } = <NodeToggleBasePropertyAction>action;
-        const node = documentquery.__getNodeById(draft, node_id);
+        const node = document.__getNodeById(draft, node_id);
         assert(node, `node not found with node_id: "${node_id}"`);
         node.locked = !node.locked;
       });
@@ -457,7 +457,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
     case "node/toggle/active": {
       return produce(state, (draft) => {
         const { node_id } = <NodeToggleBasePropertyAction>action;
-        const node = documentquery.__getNodeById(draft, node_id);
+        const node = document.__getNodeById(draft, node_id);
         assert(node, `node not found with node_id: "${node_id}"`);
         node.active = !node.active;
       });
@@ -465,7 +465,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
     case "node/toggle/bold": {
       return produce(state, (draft) => {
         const { node_id } = <NodeToggleBoldAction>action;
-        const node = documentquery.__getNodeById(draft, node_id);
+        const node = document.__getNodeById(draft, node_id);
         assert(node, `node not found with node_id: "${node_id}"`);
         if (node.type !== "text") return;
 
@@ -486,7 +486,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
 
       return produce(state, (draft) => {
         const { node_id } = __action;
-        const template_instance_node = documentquery.__getNodeById(
+        const template_instance_node = document.__getNodeById(
           draft,
           template_instance_node_id
         );
@@ -508,10 +508,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
     //
     case "document/schema/property/define": {
       return produce(state, (draft) => {
-        const root_node = documentquery.__getNodeById(
-          draft,
-          draft.document.root_id
-        );
+        const root_node = document.__getNodeById(draft, draft.document.root_id);
         assert(root_node.type === "component");
 
         const property_name =
@@ -525,10 +522,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
     case "document/schema/property/rename": {
       const { name, newName } = action;
       return produce(state, (draft) => {
-        const root_node = documentquery.__getNodeById(
-          draft,
-          draft.document.root_id
-        );
+        const root_node = document.__getNodeById(draft, draft.document.root_id);
         assert(root_node.type === "component");
 
         // check for conflict
@@ -542,10 +536,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
     }
     case "document/schema/property/update": {
       return produce(state, (draft) => {
-        const root_node = documentquery.__getNodeById(
-          draft,
-          draft.document.root_id
-        );
+        const root_node = document.__getNodeById(draft, draft.document.root_id);
         assert(root_node.type === "component");
 
         root_node.properties[action.name] = action.definition;
@@ -553,10 +544,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
     }
     case "document/schema/property/delete": {
       return produce(state, (draft) => {
-        const root_node = documentquery.__getNodeById(
-          draft,
-          draft.document.root_id
-        );
+        const root_node = document.__getNodeById(draft, draft.document.root_id);
         assert(root_node.type === "component");
 
         delete root_node.properties[action.name];
