@@ -1,5 +1,6 @@
 import React from "react";
 import { grida } from "@/grida";
+import queryattributes from "./utils/attributes";
 
 export const IFrameWidget = ({
   style,
@@ -15,7 +16,7 @@ export const IFrameWidget = ({
       srcDoc={srcdoc as string}
       width={grida.program.css.toDimension(width)}
       height={grida.program.css.toDimension(height)}
-      {...props}
+      {...queryattributes(props)}
       style={style}
     />
   );

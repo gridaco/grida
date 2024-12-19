@@ -81,21 +81,38 @@
 <br/>
 <br/>
 
-# Localization (Comming this Fall)
+![Grida Database Editor](./.readme/cover-grida-canvas.png)
 
-- [ ] Stand-alone i18n / ICU Message Editor
-- [ ] API Access
+# Canvas (Canary)
+
+[Technical Demo](https://canary.grida.co/canvas)
+
+- [ ] Design Websites
+- [ ] Design Instagram posts
+- [ ] Design with AI
+- [ ] Drag & Drop
+- [ ] DOM rendering
+- [ ] GL rendering
+- [ ] Theming
+- [ ] Components / Templates
+- [ ] Import from Figma
+- [ ] Data Interface
+- [ ] SDK
 
 <br/>
 <br/>
 <br/>
 
-# Micro Sites (Working on it)
+# [Working on it]
 
-- [ ] Start from Templates
-- [ ] Connect CMS
-- [ ] Custom Auth
-- [ ] Custom Domain
+- Localization
+  - [ ] Stand-alone i18n / ICU Message Editor
+  - [ ] API Access
+- Micro Sites
+  - [ ] Start from Templates
+  - [ ] Connect CMS
+  - [ ] Custom Auth
+  - [ ] Custom Domain
 
 <br/>
 <br/>

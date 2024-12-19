@@ -1,8 +1,8 @@
 import React from "react";
 import { grida } from "@/grida";
+import queryattributes from "./utils/attributes";
 
 export const ImageWidget = ({
-  id,
   src,
   alt,
   width,
@@ -11,13 +11,6 @@ export const ImageWidget = ({
   ...props
 }: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.ImageNode>) => {
   const { objectFit, objectPosition, ...divStyles } = style || {};
-  const data_attributes = {
-    "data-grida-node-id": props["data-grida-node-id"],
-    "data-grida-node-locked": props["data-grida-node-locked"],
-    "data-grida-node-type": props["data-grida-node-type"],
-    "data-dev-editor-hovered": props["data-dev-editor-hovered"],
-    "data-dev-editor-selected": props["data-dev-editor-selected"],
-  } satisfies grida.program.document.INodeHtmlDocumentQueryDataAttributes;
 
   const img_element_props_without_data_attributes = {
     ...props,
@@ -29,9 +22,8 @@ export const ImageWidget = ({
 
   return (
     <div
-      id={id}
       style={{ ...divStyles, overflow: "hidden" }}
-      {...data_attributes}
+      {...queryattributes(props)}
     >
       {src && (
         // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
@@ -40,7 +32,6 @@ export const ImageWidget = ({
           width={grida.program.css.toDimension(width)}
           height={grida.program.css.toDimension(height)}
           alt={alt}
-          {...img_element_props_without_data_attributes}
           style={{
             width: "100%",
             height: "100%",

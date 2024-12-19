@@ -1,12 +1,11 @@
 import { Input } from "@/components/ui/input";
 import { WorkbenchUI } from "@/components/workbench";
 import { Select } from "@radix-ui/react-select";
-import {
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { SelectContent, SelectItem } from "@/components/ui/select";
+import * as SelectPrimitive from "@radix-ui/react-select";
+import { Button } from "@/components/ui/button";
+import { CaretDownIcon } from "@radix-ui/react-icons";
+import { cn } from "@/utils";
 
 export function FontSizeControl({
   value,
@@ -16,29 +15,48 @@ export function FontSizeControl({
   onValueChange?: (value: number) => void;
 }) {
   return (
-    <Input
-      type="number"
-      value={value}
-      placeholder="inherit"
-      min={1}
-      step={1}
-      className={WorkbenchUI.inputVariants({ size: "sm" })}
-      onChange={(e) => {
-        onValueChange?.(parseInt(e.target.value) || 1);
-      }}
-    />
-    // <Select>
-    //   <SelectTrigger>
-    //     <SelectValue />
-    //   </SelectTrigger>
-    //   <SelectContent>
-    //     {Object.entries(twsizes).map(([key, value]) => (
-    //       <SelectItem key={key} value={value.name}>
-    //         {value.name}
-    //       </SelectItem>
-    //     ))}
-    //   </SelectContent>
-    // </Select>
+    <div className="relative">
+      <Input
+        type="number"
+        value={value}
+        placeholder="inherit"
+        min={1}
+        step={1}
+        onChange={(e) => {
+          onValueChange?.(parseInt(e.target.value) || 1);
+        }}
+        className={cn(
+          WorkbenchUI.inputVariants({ size: "sm" }),
+          "overflow-hidden",
+          "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+        )}
+      />
+      <div className="absolute right-0 top-0 bottom-0 z-10 flex items-center justify-center border-l">
+        <Select
+          value={String(value)}
+          onValueChange={(_v) => {
+            const v = parseInt(_v);
+            onValueChange?.(v);
+          }}
+        >
+          <SelectPrimitive.SelectTrigger asChild>
+            <Button variant="ghost" size="xs" className="w-6 h-6 m-0.5 p-0">
+              <CaretDownIcon />
+            </Button>
+          </SelectPrimitive.SelectTrigger>
+          <SelectContent align="end">
+            {Object.entries(twsizes).map(([key, value]) => (
+              <SelectItem key={key} value={String(value["font-size"])}>
+                {value["font-size"]}{" "}
+                <span className="text-muted-foreground text-xs">
+                  {value.name}
+                </span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
   );
 }
 

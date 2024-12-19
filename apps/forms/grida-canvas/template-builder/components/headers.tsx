@@ -1,6 +1,5 @@
 import { GridaLogo } from "@/components/grida-logo";
 import { NodeElement } from "../../nodes/node";
-import { ReactNodeRenderers } from "../../nodes";
 
 export function Header_001({ logo }: { logo?: string }) {
   return (
