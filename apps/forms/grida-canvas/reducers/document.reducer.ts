@@ -1,17 +1,14 @@
 import { produce, type Draft } from "immer";
 
 import type {
-  EditorAction,
+  DocumentAction,
   //
-  TemplateEditorSetTemplatePropsAction,
   EditorSelectAction,
-  EditorEventTarget_Node_PointerEnter,
-  EditorEventTarget_Node_PointerLeave,
   NodeChangeAction,
   NodeOrderAction,
   NodeToggleBasePropertyAction,
+  TemplateEditorSetTemplatePropsAction,
   TemplateNodeOverrideChangeAction,
-  DocumentAction,
   NodeToggleBoldAction,
 } from "../action";
 import type { IDocumentEditorState } from "../state";
@@ -553,7 +550,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
 
     default: {
       throw new Error(
-        `unknown action type: "${(action as EditorAction).type}"`
+        `unknown action type: "${(action as DocumentAction).type}"`
       );
     }
   }

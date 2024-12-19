@@ -2,14 +2,8 @@
 
 import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useEventTarget } from "@/grida-canvas";
-import { useGesture } from "@use-gesture/react";
-import {
-  useDocument,
-  useEventTargetCSSCursor,
-  useNode,
-  useNodeAction,
-} from "../provider";
-import { grida } from "@/grida";
+import { useGesture as __useGesture } from "@use-gesture/react";
+import { useDocument, useEventTargetCSSCursor, useNode } from "../provider";
 import { useIsWindowResizing } from "./hooks/window-resizing";
 import { supports } from "@/grida/utils/supports";
 import { Marquee } from "./ui/marquee";
@@ -27,6 +21,49 @@ import { ColumnsIcon, RowsIcon } from "@radix-ui/react-icons";
 import { cmath } from "../cmath";
 import { cursors } from "../components/cursor";
 import { SurfaceTextEditor } from "./ui/textarea";
+
+function useSurfaceGesture(
+  {
+    onClick,
+    onDoubleClick,
+    onDragStart,
+    onDragEnd,
+    ...handlers
+  }: Parameters<typeof __useGesture>[0],
+  config: Parameters<typeof __useGesture>[1]
+) {
+  // click / double click triggers when drag ends (if double pointer down) - it might be a better idea to prevent it with the displacement, not by delayed flag
+  const should_prevent_click = useRef(false);
+
+  return __useGesture(
+    {
+      onClick: (e) => {
+        if (should_prevent_click.current) {
+          return;
+        }
+        onClick?.(e);
+      },
+      onDoubleClick: (e) => {
+        if (should_prevent_click.current) {
+          return;
+        }
+        onDoubleClick?.(e);
+      },
+      ...handlers,
+      onDragStart: (e) => {
+        onDragStart?.(e);
+        should_prevent_click.current = true;
+      },
+      onDragEnd: (e) => {
+        onDragEnd?.(e);
+        setTimeout(() => {
+          should_prevent_click.current = false;
+        }, 100);
+      },
+    },
+    config
+  );
+}
 
 export function EditorSurface() {
   const isWindowResizing = useIsWindowResizing();
@@ -51,9 +88,6 @@ export function EditorSurface() {
   const ref = useRef<HTMLDivElement>(null);
   const context = useContext(ViewportSurfaceContext);
 
-  // double click triggers when drag ends (if double pointer down) - it might be a better idea to prevent it with the displacement, not by delayed flag
-  const should_prevent_double_click = useRef(false);
-
   useEffect(() => {
     if (context?.setPortalRef) {
       context.setPortalRef(ref.current);
@@ -67,7 +101,7 @@ export function EditorSurface() {
     };
   }, [context]);
 
-  const bind = useGesture(
+  const bind = useSurfaceGesture(
     {
       onPointerMove: ({ event }) => {
         if (event.defaultPrevented) return;
@@ -89,9 +123,6 @@ export function EditorSurface() {
         click(event);
       },
       onDoubleClick: (e) => {
-        if (should_prevent_double_click.current) {
-          return;
-        }
         const { event } = e;
         if (event.defaultPrevented) return;
 
@@ -102,16 +133,12 @@ export function EditorSurface() {
       onDragStart: ({ event }) => {
         if (event.defaultPrevented) return;
         dragStart(event as PointerEvent);
-        should_prevent_double_click.current = true;
       },
       onDragEnd: (e) => {
         const { event } = e;
         if (event.defaultPrevented) return;
         dragEnd(event as PointerEvent);
         event.stopPropagation();
-        setTimeout(() => {
-          should_prevent_double_click.current = false;
-        }, 100);
       },
       onDrag: (e) => {
         if (e.event.defaultPrevented) return;
@@ -216,7 +243,7 @@ function GroupOverlay({
   // resetting this will be delayed by 100ms (on drag end)
   const wasDragging = useRef(false);
 
-  const bind = useGesture(
+  const bind = useSurfaceGesture(
     {
       onPointerDown: (e) => {
         e.event.stopPropagation();
@@ -301,7 +328,7 @@ function NodeOverlay({
   const { is_component_consumer } = node.meta;
   readonly = readonly || is_component_consumer;
 
-  const bind = useGesture(
+  const bind = useSurfaceGesture(
     {
       onPointerDown: (e) => {
         // TODO: need better way to prevent this
@@ -391,7 +418,7 @@ function NodeOverlayCornerRadiusHandle({
     dragCornerRadiusHandle,
   } = useEventTarget();
 
-  const bind = useGesture(
+  const bind = useSurfaceGesture(
     {
       onDragStart: (e) => {
         e.event.stopPropagation();
@@ -463,7 +490,7 @@ function LayerOverlayRotationHandle({
 
   const rotation = getNodeAbsoluteRotation(node_id);
 
-  const bind = useGesture(
+  const bind = useSurfaceGesture(
     {
       onDragStart: (e) => {
         e.event.stopPropagation();
@@ -539,7 +566,7 @@ function LayerOverlayResizeHandle({
   const { dragResizeHandleStart, dragResizeHandleEnd, dragResizeHandle } =
     useEventTarget();
 
-  const bind = useGesture(
+  const bind = useSurfaceGesture(
     {
       onClick: ({ event }) => {
         event.preventDefault();

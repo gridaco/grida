@@ -74,7 +74,7 @@ function __self_update_gesture_transform_translate(
   } = draft.gesture!;
   const { translate_with_clone, tarnslate_with_axis_lock } = draft.modifiers;
 
-  // TODO: translate_with_clone
+  // TODO: translate_with_clone - move it somewhere else
   switch (translate_with_clone) {
     case "on": {
       if (draft.gesture.is_currently_cloned) break;
@@ -167,13 +167,22 @@ function __self_update_gesture_transform_translate(
   for (const node_id of selection) {
     const node = document.__getNodeById(draft, node_id);
     const r = translated[i++];
-    // FIXME:
+
+    const parent_rect = domapi.get_node_bounding_rect(
+      document.getParentId(draft.document_ctx, node_id)!
+    )!;
+
     // the r position is relative to the canvas, we need to convert it to the node's local position
     // absolute to relative => accumulated parent's position
+    const relative_position = cmath.vector2.subtract(r.position, [
+      parent_rect.x,
+      parent_rect.y,
+    ]);
+
     draft.document.nodes[node_id] = nodeTransformReducer(node, {
       type: "position",
-      x: r.position[0],
-      y: r.position[1],
+      x: relative_position[0],
+      y: relative_position[1],
     });
   }
 }
