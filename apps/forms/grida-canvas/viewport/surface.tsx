@@ -101,14 +101,30 @@ export function EditorSurface() {
     };
   }, [context]);
 
+  //
+  // hook for pointer move event.
+  // pointer move event should 'always-trigger', to make this easier and clear, we register the listener for pointer move to a window.
+  //
+  useEffect(() => {
+    const handlePointerMove = (event: PointerEvent) => {
+      if (event.defaultPrevented) return;
+      // for performance reasons, we don't want to update the overlay when transforming (except for translate)
+      if (is_node_transforming && !is_node_translating) return;
+      pointerMove(event);
+    };
+
+    window.addEventListener("pointermove", handlePointerMove, {
+      capture: true,
+    });
+
+    return () =>
+      window.removeEventListener("pointermove", handlePointerMove, {
+        capture: true,
+      });
+  }, []);
+
   const bind = useSurfaceGesture(
     {
-      onPointerMove: ({ event }) => {
-        if (event.defaultPrevented) return;
-        // for performance reasons, we don't want to update the overlay when transforming
-        if (is_node_transforming) return;
-        pointerMove(event);
-      },
       onPointerDown: ({ event }) => {
         if (event.defaultPrevented) return;
         if (content_edit_mode === "text") return;
@@ -321,7 +337,8 @@ function NodeOverlay({
   readonly?: boolean;
   zIndex?: number;
 }) {
-  const { layerDragStart, layerDragEnd, layerDrag } = useEventTarget();
+  const { layerDragStart, layerDragEnd, layerDrag, cursor_mode } =
+    useEventTarget();
   const transform = useNodeSurfaceTransfrom(node_id);
   const node = useNode(node_id);
 
@@ -334,21 +351,22 @@ function NodeOverlay({
         // TODO: need better way to prevent this
         // shift - select multiple
         // meta/ctrl - deep select
+        // TODO: when cursor mode is "insert"
         if (!(e.shiftKey || e.ctrlKey || e.metaKey)) {
           e.event.stopPropagation();
         }
       },
       onDragStart: (e) => {
-        e.event.stopPropagation();
         layerDragStart([node_id], e);
+        e.event.stopPropagation();
       },
       onDragEnd: (e) => {
-        e.event.stopPropagation();
         layerDragEnd([node_id], e);
+        e.event.stopPropagation();
       },
       onDrag: (e) => {
-        e.event.stopPropagation();
         layerDrag([node_id], e);
+        e.event.stopPropagation();
       },
     },
     {

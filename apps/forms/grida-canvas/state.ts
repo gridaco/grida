@@ -50,8 +50,27 @@ export type SurfaceRaycastTargeting = {
   ignores_locked: boolean;
 };
 
-export type Modifiers = {
+export type GestureModifiers = {
+  /**
+   * when on, this will translate the selected nodes with the hierarchy change - when cursor escapes and hits a new parent, the selected nodes will be moved to the new parent, maintining its absolute position
+   * @default "on"
+   */
+  translate_with_hierarchy_change: "on" | "off";
+
+  /**
+   * [a.k.a press option to copy]
+   *
+   * when on, this will change the current document tree structure (inserts a clone), replace the current tranalate selection with the cloned nodes
+   *
+   * usually, this is toggled when the user press the option key
+   *
+   * @default "off"
+   */
   translate_with_clone: "on" | "off";
+  /**
+   * translate (move) with axis lock (dominant axis)
+   * user can configure the axis lock mode (turn this on when shift key is pressed, the node will move only in x or y axis)
+   */
   tarnslate_with_axis_lock: "on" | "off";
   transform_with_center_origin: "on" | "off";
   transform_with_preserve_aspect_ratio: "on" | "off";
@@ -140,6 +159,8 @@ interface IDocumentEditorEventTargetState {
         initial_bounding_rectangle: cmath.Rectangle | null;
       };
 
+  gesture_modifiers: GestureModifiers;
+
   // =============
 
   /**
@@ -150,13 +171,6 @@ interface IDocumentEditorEventTargetState {
   // last_translate_movement?: cmath.Vector2;
 
   hovered_node_id?: string;
-
-  //
-  // TODO:
-  // translate (move) axis lock
-  // user can configure the axis lock mode (turn this on when shift key is pressed, the node will move only in x or y axis)
-  //
-  modifiers: Modifiers;
 
   /**
    * the config of how the surface raycast targeting should be
@@ -322,7 +336,8 @@ export function initDocumentEditorState({
       future: [],
       past: [],
     },
-    modifiers: {
+    gesture_modifiers: {
+      translate_with_hierarchy_change: "on",
       translate_with_clone: "off",
       tarnslate_with_axis_lock: "off",
       transform_with_center_origin: "off",

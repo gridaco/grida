@@ -70,8 +70,11 @@ function __useEditorContentOffsetNotifyEffect(
       }
     }
 
-    // Initial offset update
+    // Initial offset update (once and after 50ms)
     updateOffset();
+    setTimeout(() => {
+      updateOffset();
+    }, 50);
 
     // Observe size or position changes
     const observer = new ResizeObserver(() => {

@@ -296,7 +296,7 @@ export function useEditorHotKeys() {
 
   // keyup
 
-  useHotkeys("v", () => {
+  useHotkeys("v, escape", () => {
     setCursorMode({ type: "cursor" });
   });
 

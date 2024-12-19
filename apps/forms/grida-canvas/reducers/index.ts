@@ -134,34 +134,36 @@ function _reducer<S extends IDocumentEditorState>(
     }
     case "config/modifiers/translate-with-clone": {
       return produce(state, (draft: Draft<S>) => {
-        draft.modifiers.translate_with_clone = action.translate_with_clone;
+        draft.gesture_modifiers.translate_with_clone =
+          action.translate_with_clone;
         self_update_gesture_transform(draft);
       });
     }
     case "config/modifiers/translate-with-axis-lock": {
       return produce(state, (draft: Draft<S>) => {
-        draft.modifiers.tarnslate_with_axis_lock =
+        draft.gesture_modifiers.tarnslate_with_axis_lock =
           action.tarnslate_with_axis_lock;
         self_update_gesture_transform(draft);
       });
     }
     case "config/modifiers/transform-with-center-origin": {
       return produce(state, (draft: Draft<S>) => {
-        draft.modifiers.transform_with_center_origin =
+        draft.gesture_modifiers.transform_with_center_origin =
           action.transform_with_center_origin;
         self_update_gesture_transform(draft);
       });
     }
     case "config/modifiers/transform-with-preserve-aspect-ratio": {
       return produce(state, (draft: Draft<S>) => {
-        draft.modifiers.transform_with_preserve_aspect_ratio =
+        draft.gesture_modifiers.transform_with_preserve_aspect_ratio =
           action.transform_with_preserve_aspect_ratio;
         self_update_gesture_transform(draft);
       });
     }
     case "config/modifiers/rotate-with-quantize": {
       return produce(state, (draft: Draft<S>) => {
-        draft.modifiers.rotate_with_quantize = action.rotate_with_quantize;
+        draft.gesture_modifiers.rotate_with_quantize =
+          action.rotate_with_quantize;
         self_update_gesture_transform(draft);
       });
     }
@@ -175,6 +177,7 @@ function _reducer<S extends IDocumentEditorState>(
           }
           case "off": {
             draft.gesture = undefined;
+            draft.surface_snapping = undefined;
             break;
           }
         }

@@ -4,6 +4,8 @@ import assert from "assert";
 
 type NodeID = string & {};
 
+const HARD_MAX_WHILE_LOOP = 5000;
+
 /**
  * Simple Node Selector
  *
@@ -212,10 +214,15 @@ export namespace document {
     const { __ctx_nid_to_parent_id } = context;
     let current = node;
 
+    let i = 0;
     while (current) {
       const parent = __ctx_nid_to_parent_id[current];
       if (parent === ancestor) return true; // Ancestor found
       current = parent;
+      if (i++ > HARD_MAX_WHILE_LOOP) {
+        reportError("HARD_MAX_WHILE_LOOP");
+        break;
+      }
     }
 
     return false; // Ancestor not found
@@ -260,11 +267,17 @@ export namespace document {
     let current = node_id;
 
     // Traverse upwards to collect ancestors
+    let i = 0;
     while (current) {
       const parent = __ctx_nid_to_parent_id[current];
       if (!parent) break; // Stop at root node
       ancestors.unshift(parent); // Insert at the beginning for root-first order
       current = parent;
+
+      if (i++ > HARD_MAX_WHILE_LOOP) {
+        reportError("HARD_MAX_WHILE_LOOP");
+        break;
+      }
     }
 
     return ancestors;

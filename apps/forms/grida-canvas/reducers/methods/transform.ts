@@ -9,6 +9,7 @@ import { getSnapTargets, snapMovementToObjects } from "../tools/snap";
 import nodeTransformReducer from "../node-transform.reducer";
 import nodeReducer from "../node.reducer";
 import assert from "assert";
+import { grida } from "@/grida";
 
 /**
  * maps the resize handle (direction) to the transform origin point (inverse)
@@ -75,9 +76,14 @@ function __self_update_gesture_transform_translate(
     initial_clone_ids,
     initial_snapshot,
   } = draft.gesture!;
-  const { translate_with_clone, tarnslate_with_axis_lock } = draft.modifiers;
+  const {
+    translate_with_clone,
+    tarnslate_with_axis_lock,
+    translate_with_hierarchy_change,
+  } = draft.gesture_modifiers;
 
   // TODO: translate_with_clone - move it somewhere else
+  // #region [translate_with_clone]
   switch (translate_with_clone) {
     case "on": {
       if (draft.gesture.is_currently_cloned) break;
@@ -132,19 +138,77 @@ function __self_update_gesture_transform_translate(
       break;
     }
   }
+  // #endregion
 
   const current_selection = draft.gesture.selection;
-  const snap_target_node_ids = getSnapTargets(current_selection, draft);
 
-  const snap_target_node_rects = snap_target_node_ids.map((node_id) => {
-    return domapi.get_node_bounding_rect(node_id)!;
-  });
-
+  // #region [tarnslate_with_axis_lock]
   // axis lock movement with dominant axis
   const adj_movement =
     tarnslate_with_axis_lock === "on"
       ? cmath.ext.movement.axisLockedByDominance(_movement)
       : _movement;
+  // #endregion
+
+  // #region [translate_with_hierarchy_change]
+  switch (translate_with_hierarchy_change) {
+    case "on": {
+      // check if the cursor finds a new parent (if it escapes the current parent or enters a new parent)
+      const hits = [...draft.surface_raycast_detected_node_ids];
+      // filter out the current selection (both original and cloned) and non-container nodes
+      // the current selection will always be hit as it moves with the cursor (unless not grouped - but does not matter)
+      // both original and cloned nodes are considered as the same node, unless, the cloned node will instantly be moved to the original (if its a container) - this is not the case when clone modifier is turned on after the translate has started, but does not matter.
+      const possible_parents = hits.filter((node_id) => {
+        if (initial_selection.includes(node_id)) return false;
+        if (initial_clone_ids.includes(node_id)) return false;
+        const node = document.__getNodeById(draft, node_id);
+        if (node.type !== "container") return false;
+        return true;
+      });
+
+      const new_parent_id = possible_parents[0];
+      // update the parent of the current selection
+      current_selection.forEach((node_id) => {
+        //
+        //
+        const prev_parent_id = document.getParentId(
+          draft.document_ctx,
+          node_id
+        )!;
+        if (prev_parent_id === new_parent_id) return;
+
+        // unregister the node from the previous parent
+        const parent = document.__getNodeById(
+          draft,
+          prev_parent_id
+        ) as grida.program.nodes.i.IChildren;
+        parent.children = parent.children?.filter((id) => id !== node_id);
+
+        // register the node to the new parent
+        const new_parent = document.__getNodeById(
+          draft,
+          new_parent_id
+        ) as grida.program.nodes.i.IChildren;
+        new_parent.children = new_parent.children ?? [];
+        new_parent.children.push(node_id);
+
+        // update the context
+        draft.document_ctx = document.Context.from(draft.document).snapshot();
+      });
+
+      break;
+    }
+    case "off": {
+      break;
+    }
+  }
+  // #endregion
+
+  const snap_target_node_ids = getSnapTargets(current_selection, draft);
+
+  const snap_target_node_rects = snap_target_node_ids.map((node_id) => {
+    return domapi.get_node_bounding_rect(node_id)!;
+  });
 
   const { translated, snapping } = snapMovementToObjects(
     initial_rects,
@@ -184,7 +248,7 @@ function __self_update_gesture_transform_scale(
 ) {
   assert(draft.gesture!.type === "scale", "Gesture type must be scale");
   const { transform_with_center_origin, transform_with_preserve_aspect_ratio } =
-    draft.modifiers;
+    draft.gesture_modifiers;
 
   const {
     selection,
@@ -232,7 +296,7 @@ function __self_update_gesture_transform_rotate(
 ) {
   assert(draft.gesture!.type === "rotate", "Gesture type must be rotate");
   const { movement, selection } = draft.gesture!;
-  const { rotate_with_quantize } = draft.modifiers;
+  const { rotate_with_quantize } = draft.gesture_modifiers;
 
   const _angle = cmath.principalAngle(
     // TODO: need to store the initial angle and subtract

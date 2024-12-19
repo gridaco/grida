@@ -368,7 +368,10 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       const { movement } = event;
 
       return produce(state, (draft) => {
-        assert(draft.gesture?.type === "translate");
+        assert(
+          draft.gesture?.type === "translate",
+          `was expecting translate, but got ${draft.gesture?.type}`
+        );
         draft.gesture.movement = movement;
         self_update_gesture_transform(draft);
       });
