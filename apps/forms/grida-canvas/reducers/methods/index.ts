@@ -1,14 +1,17 @@
 import { type Draft } from "immer";
-import type { IDocumentEditorState, SurfaceRaycastTargeting } from "../state";
-import { document } from "../document-query";
+import type {
+  IDocumentEditorState,
+  SurfaceRaycastTargeting,
+} from "../../state";
+import { document } from "../../document-query";
 import { grida } from "@/grida";
 import assert from "assert";
 import { v4 } from "uuid";
-import { cmath } from "../cmath";
-import { domapi } from "../domapi";
-import { snapMovementToObjects } from "./tools/snap";
-import nodeTransformReducer from "./node-transform.reducer";
-import nodeReducer from "./node.reducer";
+import { cmath } from "../../cmath";
+import { domapi } from "../../domapi";
+import { snapMovementToObjects } from "../tools/snap";
+import nodeTransformReducer from "../node-transform.reducer";
+import nodeReducer from "../node.reducer";
 
 /**
  * TODO:
