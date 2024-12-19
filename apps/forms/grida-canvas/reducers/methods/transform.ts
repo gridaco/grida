@@ -158,6 +158,7 @@ function __self_update_gesture_transform_translate(
       // filter out the current selection (both original and cloned) and non-container nodes
       // the current selection will always be hit as it moves with the cursor (unless not grouped - but does not matter)
       // both original and cloned nodes are considered as the same node, unless, the cloned node will instantly be moved to the original (if its a container) - this is not the case when clone modifier is turned on after the translate has started, but does not matter.
+      // TODO: room for performance improvement - use while loop and break when the first valid dropzone is found
       const possible_parents = hits.filter((node_id) => {
         if (initial_selection.includes(node_id)) return false;
         if (initial_clone_ids.includes(node_id)) return false;
@@ -167,6 +168,8 @@ function __self_update_gesture_transform_translate(
       });
 
       const new_parent_id = possible_parents[0];
+
+      // TODO: room for improvement - do a selection - parent comparison and handle at once (currently doing each comparison for each node) (this is redundant as if dropzone has changed, it will be changed for all selection)
       let is_parent_changed = false;
       // update the parent of the current selection
       current_selection.forEach((node_id) => {
