@@ -20,6 +20,7 @@ export type InternalAction =
 
 export type EditorAction =
   | EditorConfigAction
+  | EditorNudgeGestureStateAction
   | EventTargetAction
   | DocumentAction;
 
@@ -225,6 +226,19 @@ export interface EditorConfigureModifier_TransformWithPreserveAspectRatio {
 export interface EditorConfigureModifier_RotateWithQuantize {
   type: "config/modifiers/rotate-with-quantize";
   rotate_with_quantize: number | "off";
+}
+
+/**
+ * [gesture/nudge] - used with `nudge` {@link EditorNudgeAction} or `nudge-resize` {@link EditorNudgeResizeAction}
+ *
+ * By default, nudge is not a gesture, but a command. Unlike dragging, nudge does not has a "duration", as it's snap guides cannot be displayed.
+ * To mimic the nudge as a gesture (mostly when needed to display snap guides), use this action.
+ *
+ * @example when `nudge`, also call `gesture/nudge` to display snap guides. after certain duration, call `gesture/nudge` with `state: "off"`
+ */
+export interface EditorNudgeGestureStateAction {
+  type: "gesture/nudge";
+  state: "on" | "off";
 }
 
 interface IHtmlBackendCanvasEventTargetPointerEvent {

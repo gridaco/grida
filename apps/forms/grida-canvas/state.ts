@@ -96,6 +96,7 @@ interface IDocumentEditorTransformState {
  */
 interface IDocumentEditorEventTargetState {
   gesture?:
+    | { type: "nudge" }
     | {
         // translate (move)
         type: "translate";

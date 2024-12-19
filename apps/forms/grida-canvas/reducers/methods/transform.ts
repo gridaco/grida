@@ -1,14 +1,14 @@
 import type { Draft } from "immer";
 import type { IDocumentEditorState } from "../../state";
-import { document } from "../../document-query";
-import assert from "assert";
-import { cmath } from "../../cmath";
-import { domapi } from "../../domapi";
-import { snapMovementToObjects } from "../tools/snap";
-import nodeTransformReducer from "../node-transform.reducer";
-import nodeReducer from "../node.reducer";
 import { self_insertNode } from "./insert";
 import { self_deleteNode } from "./delete";
+import { document } from "../../document-query";
+import { cmath } from "../../cmath";
+import { domapi } from "../../domapi";
+import { getSnapTargets, snapMovementToObjects } from "../tools/snap";
+import nodeTransformReducer from "../node-transform.reducer";
+import nodeReducer from "../node.reducer";
+import assert from "assert";
 
 /**
  * maps the resize handle (direction) to the transform origin point (inverse)
@@ -52,6 +52,9 @@ export function self_update_gesture_transform<S extends IDocumentEditorState>(
     case "rotate": {
       return __self_update_gesture_transform_rotate(draft);
     }
+    case "nudge":
+      // nudge is not a transform gesture - only a virtual gesture
+      return;
     case "corner-radius":
     default:
       throw new Error(`Gesture type not supported: ${draft.gesture.type}`);
@@ -130,20 +133,8 @@ function __self_update_gesture_transform_translate(
     }
   }
 
-  const selection = draft.gesture.selection;
-
-  // set of each sibling and parent of selection
-  const snap_target_node_ids = Array.from(
-    new Set(
-      selection
-        .map((node_id) =>
-          document
-            .getSiblings(draft.document_ctx, node_id)
-            .concat(document.getParentId(draft.document_ctx, node_id) ?? [])
-        )
-        .flat()
-    )
-  ).filter((node_id) => !selection.includes(node_id));
+  const current_selection = draft.gesture.selection;
+  const snap_target_node_ids = getSnapTargets(current_selection, draft);
 
   const snap_target_node_rects = snap_target_node_ids.map((node_id) => {
     return domapi.get_node_bounding_rect(node_id)!;
@@ -158,13 +149,14 @@ function __self_update_gesture_transform_translate(
   const { translated, snapping } = snapMovementToObjects(
     initial_rects,
     snap_target_node_rects,
-    adj_movement
+    adj_movement,
+    [4, 4]
   );
 
   draft.surface_snapping = snapping;
 
   let i = 0;
-  for (const node_id of selection) {
+  for (const node_id of current_selection) {
     const node = document.__getNodeById(draft, node_id);
     const r = translated[i++];
 

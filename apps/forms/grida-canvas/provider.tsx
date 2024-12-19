@@ -7,6 +7,7 @@ import React, {
   useEffect,
   useLayoutEffect,
   useMemo,
+  useRef,
 } from "react";
 import {
   type DocumentDispatcher,
@@ -705,6 +706,119 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   );
 }
 
+type NudgeUXConfig = {
+  /**
+   * when gesture is true, it will set the gesture state to trigger the surface guide rendering.
+   *
+   * @default true
+   */
+  gesture: boolean;
+  /**
+   * delay in ms to toggle off the gesture state
+   *
+   * @default 500
+   */
+  delay: number;
+};
+
+function __useGestureNudgeState(dispatch: DocumentDispatcher) {
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const __gesture_nudge_debounced = useCallback(
+    (state: "on" | "off", delay: number) => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      timeoutRef.current = setTimeout(() => {
+        dispatch({
+          type: "gesture/nudge",
+          state: "off",
+        });
+      }, delay);
+    },
+    [dispatch]
+  );
+
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
+  return __gesture_nudge_debounced;
+}
+
+function __useNudgeActions(dispatch: DocumentDispatcher) {
+  const __gesture_nudge = useCallback(
+    (state: "on" | "off") => {
+      dispatch({
+        type: "gesture/nudge",
+        state,
+      });
+    },
+    [dispatch]
+  );
+
+  const __gesture_nudge_debounced = __useGestureNudgeState(dispatch);
+
+  const nudge = useCallback(
+    (
+      target: "selection" | (string & {}) = "selection",
+      axis: "x" | "y",
+      delta: number = 1,
+      config: NudgeUXConfig = {
+        delay: 500,
+        gesture: true,
+      }
+    ) => {
+      const { gesture = true, delay = 500 } = config;
+
+      if (gesture) {
+        // Trigger gesture
+        __gesture_nudge("on");
+
+        // Debounce to turn off gesture
+        __gesture_nudge_debounced("off", delay);
+      }
+
+      dispatch({
+        type: "nudge",
+        delta,
+        axis,
+        target,
+      });
+    },
+    [dispatch]
+  );
+
+  const nudgeResize = useCallback(
+    (
+      target: "selection" | (string & {}) = "selection",
+      axis: "x" | "y",
+      delta: number = 1
+    ) => {
+      dispatch({
+        type: "nudge-resize",
+        delta,
+        axis,
+        target,
+      });
+    },
+    [dispatch]
+  );
+
+  return useMemo(
+    () => ({
+      nudge,
+      nudgeResize,
+    }),
+    [dispatch]
+  );
+}
+
 export function useNodeAction(node_id: string | undefined) {
   const [_, dispatch] = __useInternal();
   const nodeActions = __useNodeActions(dispatch);
@@ -897,37 +1011,7 @@ export function useDocument() {
     [dispatch]
   );
 
-  const nudge = useCallback(
-    (
-      target: "selection" | (string & {}) = "selection",
-      axis: "x" | "y",
-      delta: number = 1
-    ) => {
-      dispatch({
-        type: "nudge",
-        delta,
-        axis,
-        target,
-      });
-    },
-    [dispatch]
-  );
-
-  const nudgeResize = useCallback(
-    (
-      target: "selection" | (string & {}) = "selection",
-      axis: "x" | "y",
-      delta: number = 1
-    ) => {
-      dispatch({
-        type: "nudge-resize",
-        delta,
-        axis,
-        target,
-      });
-    },
-    [dispatch]
-  );
+  const { nudge, nudgeResize } = __useNudgeActions(dispatch);
 
   const align = useCallback(
     (
@@ -1258,6 +1342,14 @@ function throttle<T extends (...args: any[]) => void>(
       setTimeout(() => (inThrottle = false), limit);
     }
   } as T;
+}
+
+function debounce(func: (...args: any[]) => void, wait: number) {
+  let timeout: NodeJS.Timeout;
+  return (...args: any[]) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  };
 }
 
 export function useEventTargetCSSCursor() {

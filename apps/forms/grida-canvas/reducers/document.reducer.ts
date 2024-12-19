@@ -28,6 +28,7 @@ import {
 } from "./methods";
 import { cmath } from "../cmath";
 import { domapi } from "../domapi";
+import { getSnapTargets, snapMovementToObjects } from "./tools/snap";
 
 export default function documentReducer<S extends IDocumentEditorState>(
   state: S,
@@ -150,7 +151,23 @@ export default function documentReducer<S extends IDocumentEditorState>(
       const dx = axis === "x" ? delta : 0;
       const dy = axis === "y" ? delta : 0;
 
+      const snap_target_node_ids = getSnapTargets(state.selection, state);
+      const snap_target_node_rects = snap_target_node_ids.map(
+        (node_id) => domapi.get_node_bounding_rect(node_id)!
+      );
+      const origin_rects = target_node_ids.map(
+        (node_id) => domapi.get_node_bounding_rect(node_id)!
+      );
+      const { snapping } = snapMovementToObjects(
+        origin_rects,
+        snap_target_node_rects,
+        [dx, dy],
+        [0.1, 0.1]
+      );
+
       return produce(state, (draft) => {
+        draft.surface_snapping = snapping;
+
         for (const node_id of target_node_ids) {
           const node = document.__getNodeById(draft, node_id);
 

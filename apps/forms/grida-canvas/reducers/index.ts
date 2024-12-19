@@ -165,6 +165,21 @@ function _reducer<S extends IDocumentEditorState>(
         self_update_gesture_transform(draft);
       });
     }
+    case "gesture/nudge": {
+      return produce(state, (draft: Draft<S>) => {
+        const { state } = action;
+        switch (state) {
+          case "on": {
+            draft.gesture = { type: "nudge" };
+            break;
+          }
+          case "off": {
+            draft.gesture = undefined;
+            break;
+          }
+        }
+      });
+    }
     case "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag":
     case "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-end":
     case "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-start":
