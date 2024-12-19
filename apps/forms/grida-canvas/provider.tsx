@@ -1384,6 +1384,7 @@ export function useEventTarget() {
   const {
     gesture,
     hovered_node_id,
+    dropzone_node_id,
     selection,
     content_edit_mode: content_edit_mode,
     cursor_mode,
@@ -1747,6 +1748,7 @@ export function useEventTarget() {
       setCursorMode,
       //
       hovered_node_id,
+      dropzone_node_id,
       selection,
       is_node_transforming,
       is_node_translating,
@@ -1790,6 +1792,7 @@ export function useEventTarget() {
     setCursorMode,
     //
     hovered_node_id,
+    dropzone_node_id,
     selection,
     //
     is_node_transforming,

@@ -65,11 +65,26 @@ function useSurfaceGesture(
   );
 }
 
+function SurfaceGroup({
+  hidden,
+  children,
+}: React.PropsWithChildren<{ hidden?: boolean }>) {
+  return (
+    <div
+      data-ux-hidden={hidden}
+      className="opacity-100 data-[ux-hidden='true']:opacity-0 transition-colors"
+    >
+      {children}
+    </div>
+  );
+}
+
 export function EditorSurface() {
   const isWindowResizing = useIsWindowResizing();
   const {
     marquee,
     hovered_node_id,
+    dropzone_node_id,
     selection,
     is_node_transforming,
     is_node_translating,
@@ -191,38 +206,39 @@ export function EditorSurface() {
         cursor: cursor,
       }}
     >
-      <MeasurementGuide />
-      <div
-        data-transforming={is_node_transforming}
-        className="opacity-0 data-[transforming='true']:opacity-100 transition-colors"
-      >
-        <SnapGuide />
-      </div>
-      <div
-        data-ux-hidden={is_node_translating || isWindowResizing}
-        className="opacity-100 data-[ux-hidden='true']:opacity-0 transition-colors"
-      >
-        {content_edit_mode === "text" && selection.length === 1 && (
-          <SurfaceTextEditor node_id={selection[0]} />
+      <div className="w-full h-full" id="canvas-overlay-portal" ref={ref}>
+        <MeasurementGuide />
+        <div
+          data-transforming={is_node_transforming}
+          className="opacity-0 data-[transforming='true']:opacity-100 transition-colors"
+        >
+          <SnapGuide />
+        </div>
+        {marquee && (
+          <div id="marquee-container" className="absolute top-0 left-0 w-0 h-0">
+            <Marquee
+              x1={marquee.x1}
+              y1={marquee.y1}
+              x2={marquee.x2}
+              y2={marquee.y2}
+            />
+          </div>
         )}
-        <div className="w-full h-full" id="canvas-overlay-portal" ref={ref}>
+        <SurfaceGroup hidden={is_node_translating || isWindowResizing}>
+          {content_edit_mode === "text" && selection.length === 1 && (
+            <SurfaceTextEditor node_id={selection[0]} />
+          )}
           <SelectionOverlay selection={selection} readonly={false} />
           {!marquee &&
             hovered_node_id &&
             !selection.includes(hovered_node_id) && (
+              // general hover
               <NodeOverlay node_id={hovered_node_id} readonly />
             )}
-          <div id="marquee-container" className="absolute top-0 left-0 w-0 h-0">
-            {marquee && (
-              <Marquee
-                x1={marquee.x1}
-                y1={marquee.y1}
-                x2={marquee.x2}
-                y2={marquee.y2}
-              />
-            )}
-          </div>
-        </div>
+        </SurfaceGroup>
+        {dropzone_node_id && (
+          <NodeOverlay node_id={dropzone_node_id} readonly />
+        )}
       </div>
     </div>
   );

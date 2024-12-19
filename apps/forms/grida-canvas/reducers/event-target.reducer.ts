@@ -606,6 +606,7 @@ function self_maybe_end_gesture_translate(draft: Draft<IDocumentEditorState>) {
 
   draft.surface_measurement_targeting_locked = false;
   draft.gesture = undefined;
+  draft.dropzone_node_id = undefined;
 }
 
 function self_start_gesture_rotate(

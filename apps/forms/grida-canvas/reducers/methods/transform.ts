@@ -167,6 +167,7 @@ function __self_update_gesture_transform_translate(
       });
 
       const new_parent_id = possible_parents[0];
+      let is_parent_changed = false;
       // update the parent of the current selection
       current_selection.forEach((node_id) => {
         //
@@ -176,6 +177,8 @@ function __self_update_gesture_transform_translate(
           node_id
         )!;
         if (prev_parent_id === new_parent_id) return;
+
+        is_parent_changed = true;
 
         // unregister the node from the previous parent
         const parent = document.__getNodeById(
@@ -196,9 +199,12 @@ function __self_update_gesture_transform_translate(
         draft.document_ctx = document.Context.from(draft.document).snapshot();
       });
 
+      if (is_parent_changed) draft.dropzone_node_id = new_parent_id;
+
       break;
     }
     case "off": {
+      draft.dropzone_node_id = undefined;
       break;
     }
   }

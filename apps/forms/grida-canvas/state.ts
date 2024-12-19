@@ -170,7 +170,15 @@ interface IDocumentEditorEventTargetState {
    */
   // last_translate_movement?: cmath.Vector2;
 
+  /**
+   * general hover state
+   */
   hovered_node_id?: string;
+
+  /**
+   * special hover state - when a node is a target of certain gesture, and ux needs to show the target node
+   */
+  dropzone_node_id?: string;
 
   /**
    * the config of how the surface raycast targeting should be
