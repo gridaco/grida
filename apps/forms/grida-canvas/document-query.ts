@@ -1,10 +1,226 @@
 import { grida } from "@/grida";
-import type { IDocumentEditorState } from "./types";
+import type { IDocumentEditorState } from "./state";
+import assert from "assert";
+
+type NodeID = string & {};
+
+/**
+ * Simple Node Selector
+ *
+ * - "*" - all nodes
+ * - "~" - siblings of current selection
+ *    - does not include the current selection
+ *    - if multiple selection, this is only valid if all selected nodes are siblings
+ * - ">" - children of current selection
+ * - "selection" - current selection
+ * - [] - specific nodes
+ *
+ * @example
+ * - Select all nodes: "*"
+ * - Select siblings of current selection: "~"
+ * - Select self and siblings: ["selection", "~"]
+ * - Select children of current selection: ">"
+ */
+export type Selector = "*" | "~" | ">" | ".." | "selection" | NodeID[];
 
 /**
  * @internal
  */
-export namespace documentquery {
+export namespace document {
+  /**
+   * Queries nodes in the document hierarchy based on a specified selector.
+   *
+   * @param context - The runtime hierarchy context containing the node structure and relationships.
+   * @param selection - The currently selected nodes, represented as an array of node IDs.
+   * @param selector - A `Selector` indicating the query type:
+   *  - `"*"`: Selects all nodes.
+   *  - `"~"`: Selects siblings of the current selection.
+   *    - If a single node is selected, returns its siblings.
+   *    - If multiple nodes are selected, ensures all selected nodes are siblings and returns their siblings.
+   *    - If no nodes are selected, defaults to `"*"` (all nodes).
+   *  - `">"`: Selects the direct children of the currently selected nodes.
+   *  - `"selection"`: Returns the currently selected nodes.
+   *  - `NodeID[]`: A specific array of node IDs to query directly.
+   *
+   * @returns An array of node IDs matching the specified query.
+   *
+   * @example
+   * // Example context
+   * const context = {
+   *   __ctx_nid_to_parent_id: {
+   *     "node1": null,    // Root node
+   *     "node2": "node1", // Child of node1
+   *     "node3": "node1", // Child of node1
+   *     "node4": "node2", // Child of node2
+   *   },
+   *   __ctx_nids: new Set(["node1", "node2", "node3", "node4"]),
+   * };
+   *
+   * // Query all nodes
+   * const allNodes = querySelector(context, [], "*");
+   * console.log(allNodes); // ["node1", "node2", "node3", "node4"]
+   *
+   * // Query siblings of "node2"
+   * const siblings = querySelector(context, ["node2"], "~");
+   * console.log(siblings); // ["node3"]
+   *
+   * // Query children of "node1"
+   * const children = querySelector(context, ["node1"], ">");
+   * console.log(children); // ["node2", "node3"]
+   *
+   * // Query specific nodes
+   * const specificNodes = querySelector(context, [], ["node2", "node3"]);
+   * console.log(specificNodes); // ["node2", "node3"]
+   *
+   * // Query current selection
+   * const currentSelection = querySelector(context, ["node4"], "selection");
+   * console.log(currentSelection); // ["node4"]
+   */
+  export function querySelector(
+    context: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext,
+    selection: NodeID[],
+    selector: Selector
+  ): NodeID[] {
+    switch (selector) {
+      case "*": {
+        return Array.from(context.__ctx_nids);
+      }
+      case "~": {
+        // check if selection is empty / single / multiple
+        if (selection.length === 0) {
+          // when empty, select with * (all)
+          return Array.from(context.__ctx_nids);
+        } else if (selection.length === 1) {
+          return document.getSiblings(context, selection[0]);
+        } else {
+          // multiple selection
+          // when multiple, ensure that the current selection is a subset of the siblings (shares the same parent) / if not, ignore.
+
+          const parentIds = selection.map((node_id) =>
+            document.getParentId(context, node_id)
+          );
+          const uniqueParentIds = new Set(parentIds);
+          const is_siblings = uniqueParentIds.size === 1;
+
+          if (!is_siblings) return [];
+          const siblings = document.getSiblings(context, selection[0]);
+          return siblings;
+        }
+      }
+      case ">": {
+        return selection.flatMap((node_id) =>
+          document.getChildren(context, node_id)
+        );
+      }
+      case "..": {
+        return selection.flatMap((node_id) => {
+          const parent = document.getParentId(context, node_id);
+          return parent ? [parent] : [];
+        });
+      }
+      case "selection": {
+        return selection;
+      }
+      default: {
+        assert(Array.isArray(selector), "selection must be an array");
+        return selector;
+      }
+    }
+  }
+
+  /**
+   * [UX]
+   *
+   * filters nodes by hierarchy in a UX friendly matter.
+   *
+   * When a parent and child is requested to be selected at the same time, only the parent shall be selected.
+   * This is to prevent recursive mutation of selected nodes in a nested way.
+   *
+   * Without this filtering, when modifying a tralsate or rotation will cause the nested children to be mutated as well.
+   *
+   * @example
+   * - input: [a, a.0, a.1, a.1.9, b, c, d.0, z.9.9.9]
+   * - output: [a, b, c, d.0, z.9.9.9]
+   */
+  export function pruneNestedNodes(
+    context: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext,
+    selection: NodeID[]
+  ): NodeID[] {
+    const prunedSelection: Set<NodeID> = new Set();
+
+    for (const node of selection) {
+      // Check if the node is a descendant of any already selected parent
+      if (
+        !Array.from(prunedSelection).some((selectedNode) =>
+          isAncestor(context, selectedNode, node)
+        )
+      ) {
+        // Remove descendants of the current node from the pruned selection
+        for (const selectedNode of Array.from(prunedSelection)) {
+          if (isAncestor(context, node, selectedNode)) {
+            prunedSelection.delete(selectedNode);
+          }
+        }
+
+        // Add the current node
+        prunedSelection.add(node);
+      }
+    }
+
+    return Array.from(prunedSelection);
+  }
+
+  /**
+   * Determines whether a given node (`ancestor`) is an ancestor of another node (`node`).
+   *
+   * This function traverses upwards in the hierarchy from the specified node,
+   * checking each parent node until it reaches the root or finds the specified ancestor.
+   *
+   * @param context - The runtime hierarchy context containing the mapping of node IDs to their parent IDs.
+   * @param ancestor - The node ID to check as a potential ancestor.
+   * @param node - The node ID to check as a descendant.
+   * @returns `true` if the specified `ancestor` is an ancestor of the given `node`; otherwise, `false`.
+   *
+   * @example
+   * // Example context
+   * const context = {
+   *   __ctx_nid_to_parent_id: {
+   *     "node4": "node3",
+   *     "node3": "node2",
+   *     "node2": "node1",
+   *     "node1": null, // root node has no parent
+   *   }
+   * };
+   *
+   * // Check if "node2" is an ancestor of "node4"
+   * const result = isAncestor(context, "node2", "node4");
+   * console.log(result); // true
+   *
+   * // Check if "node1" is an ancestor of "node4"
+   * const result = isAncestor(context, "node1", "node4");
+   * console.log(result); // true
+   *
+   * // Check if "node3" is an ancestor of "node2"
+   * const result = isAncestor(context, "node3", "node2");
+   * console.log(result); // false
+   */
+  function isAncestor(
+    context: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext,
+    ancestor: NodeID,
+    node: NodeID
+  ): boolean {
+    const { __ctx_nid_to_parent_id } = context;
+    let current = node;
+
+    while (current) {
+      const parent = __ctx_nid_to_parent_id[current];
+      if (parent === ancestor) return true; // Ancestor found
+      current = parent;
+    }
+
+    return false; // Ancestor not found
+  }
+
   /**
    * Retrieves a list of ancestor node IDs for a given node, starting from the root
    * and ending with the parent of the specified node.
@@ -38,7 +254,7 @@ export namespace documentquery {
   export function getAncestors(
     context: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext,
     node_id: string
-  ): string[] {
+  ): NodeID[] {
     const { __ctx_nid_to_parent_id } = context;
     const ancestors: string[] = [];
     let current = node_id;
@@ -54,10 +270,105 @@ export namespace documentquery {
     return ancestors;
   }
 
+  export function getDepth(
+    context: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext,
+    node_id: string
+  ): number {
+    return getAncestors(context, node_id).length;
+  }
+
+  /**
+   * Retrieves all sibling nodes of a specified node.
+   *
+   * @param context - The runtime hierarchy context containing the mapping of node IDs to their parent IDs.
+   * @param node_id - The ID of the node for which siblings are to be retrieved.
+   * @returns An array of sibling node IDs that share the same parent as the specified node.
+   *          The array excludes the input node itself.
+   *
+   * @example
+   * // Example context
+   * const context = {
+   *   __ctx_nid_to_parent_id: {
+   *     "node1": null, // root node
+   *     "node2": "node1",
+   *     "node3": "node1",
+   *     "node4": "node2",
+   *   }
+   * };
+   *
+   * // Get siblings for "node3"
+   * const siblings = getSiblings(context, "node3");
+   * console.log(siblings); // ["node2"]
+   *
+   * // Get siblings for "node1" (root node)
+   * const siblings = getSiblings(context, "node1");
+   * console.log(siblings); // []
+   */
+  export function getSiblings(
+    context: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext,
+    node_id: string
+  ): NodeID[] {
+    const parent_id = getParentId(context, node_id);
+
+    if (!parent_id) {
+      // If the node has no parent, it is at the root level, and all nodes without parents are its "siblings."
+      return Object.keys(context.__ctx_nid_to_parent_id).filter(
+        (id) => context.__ctx_nid_to_parent_id[id] === null
+      );
+    }
+
+    // Filter all nodes that share the same parent but exclude the input node itself.
+    return Object.keys(context.__ctx_nid_to_parent_id).filter(
+      (id) => context.__ctx_nid_to_parent_id[id] === parent_id && id !== node_id
+    );
+  }
+
+  /**
+   * Retrieves all child nodes of a specified node.
+   *
+   * @param context - The runtime hierarchy context containing the mapping of node IDs to their parent IDs.
+   * @param node_id - The ID of the node for which children are to be retrieved.
+   * @returns An array of child node IDs that have the specified node as their parent.
+   *
+   * @example
+   * // Example context
+   * const context = {
+   *   __ctx_nid_to_parent_id: {
+   *     "node1": null,    // Root node
+   *     "node2": "node1", // Child of node1
+   *     "node3": "node1", // Child of node1
+   *     "node4": "node2", // Child of node2
+   *   }
+   * };
+   *
+   * // Get children of "node1"
+   * const children = getChildren(context, "node1");
+   * console.log(children); // ["node2", "node3"]
+   *
+   * // Get children of "node2"
+   * const children = getChildren(context, "node2");
+   * console.log(children); // ["node4"]
+   *
+   * // Get children of a root node with no children
+   * const children = getChildren(context, "node3");
+   * console.log(children); // []
+   */
+  export function getChildren(
+    context: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext,
+    node_id: string
+  ): NodeID[] {
+    const { __ctx_nid_to_parent_id } = context;
+
+    // Filter all nodes that have the input node as their parent
+    return Object.keys(__ctx_nid_to_parent_id).filter(
+      (id) => __ctx_nid_to_parent_id[id] === node_id
+    );
+  }
+
   export function getParentId(
     context: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext,
     node_id: string
-  ): string | null {
+  ): NodeID | null {
     return context.__ctx_nid_to_parent_id[node_id] || null;
   }
 
@@ -101,4 +412,97 @@ export namespace documentquery {
     if (repo) return repo.nodes[node_id];
     throw new Error(`node not found with node_id: "${node_id}"`);
   }
+
+  export class Context
+    implements
+      grida.program.document.internal
+        .IDocumentDefinitionRuntimeHierarchyContext
+  {
+    readonly __ctx_nids: string[] = [];
+    readonly __ctx_nid_to_parent_id: Record<string, string> = {};
+    readonly __ctx_nid_to_children_ids: Record<string, string[]> = {};
+    constructor(
+      init?: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext
+    ) {
+      if (init) {
+        Object.assign(this, init);
+      }
+    }
+
+    static from(document: grida.program.document.IDocumentDefinition) {
+      const ctx =
+        grida.program.document.internal.createDocumentDefinitionRuntimeHierarchyContext(
+          document
+        );
+      return new Context(ctx);
+    }
+
+    insert(node_id: NodeID, parent_id: NodeID) {
+      assert(this.__ctx_nids.indexOf(node_id) === -1, "node_id already exists");
+      this.__ctx_nids.push(node_id);
+      this.__ctx_nid_to_parent_id[node_id] = parent_id;
+
+      if (!this.__ctx_nid_to_children_ids[parent_id]) {
+        this.__ctx_nid_to_children_ids[parent_id] = [];
+      }
+
+      this.__ctx_nid_to_children_ids[parent_id].push(node_id);
+    }
+
+    snapshot(): grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext {
+      return {
+        __ctx_nids: this.__ctx_nids.slice(),
+        __ctx_nid_to_parent_id: { ...this.__ctx_nid_to_parent_id },
+        __ctx_nid_to_children_ids: { ...this.__ctx_nid_to_children_ids },
+      };
+    }
+
+    // [NOT USED] - did not yet decided how to implement the callback (for updating the document - none-context)
+    // delete(node_id: NodeID) {
+    //   const deleted_node_ids = new Set<NodeID>(node_id);
+    //   // recursively delete children
+    //   const children_ids = this.__ctx_nid_to_children_ids[node_id] || [];
+    //   for (const child_id of children_ids) {
+    //     const deleted = this.delete(child_id);
+    //     deleted.forEach(deleted_node_ids.add, deleted_node_ids);
+    //   }
+
+    //   // detach from parent
+    //   const parent_id = this.__ctx_nid_to_parent_id[node_id];
+    //   if (parent_id) {
+    //     const parent_children_ids = this.__ctx_nid_to_children_ids[parent_id];
+    //     const index = parent_children_ids.indexOf(node_id);
+
+    //     if (index > -1) {
+    //       // remove from parent node's children array
+    //       // (
+    //       //   draft.document.nodes[parent_id] as grida.program.nodes.i.IChildren
+    //       // ).children!.splice(index, 1);
+
+    //       // remove from document context
+    //       parent_children_ids.splice(index, 1);
+    //     }
+    //   }
+
+    //   // delete self from context
+    //   delete this.__ctx_nid_to_parent_id[node_id];
+    //   delete this.__ctx_nid_to_children_ids[node_id];
+    //   const index = this.__ctx_nids.indexOf(node_id);
+    //   if (index > -1) {
+    //     this.__ctx_nids.splice(index, 1);
+    //   }
+
+    //   return Array.from(deleted_node_ids);
+    // }
+
+    getAncestors(node_id: NodeID): NodeID[] {
+      return getAncestors(this, node_id);
+    }
+
+    getDepth(node_id: NodeID): number {
+      return getDepth(this, node_id);
+    }
+  }
+
+  //
 }

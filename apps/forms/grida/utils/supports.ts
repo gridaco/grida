@@ -3,7 +3,14 @@ import type { grida } from "..";
 type NodeType = grida.program.nodes.NodeType;
 
 const __supports: Record<string, ReadonlyArray<NodeType>> = {
-  cornerRadius: ["rectangle", "image", "container", "component", "instance"],
+  cornerRadius: [
+    "rectangle",
+    "image",
+    "video",
+    "container",
+    "component",
+    "instance",
+  ],
   border: ["container", "component", "instance"],
   children: ["container", "component", "instance"],
 } as const;

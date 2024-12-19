@@ -76,8 +76,8 @@ function NodeHierarchyItemContextMenuWrapper({
 
 export function NodeHierarchyList() {
   const {
-    state: { document, selected_node_id, hovered_node_id },
-    selectNode,
+    state: { document, selection, hovered_node_id },
+    select,
     pointerEnterNode,
     toggleNodeLocked,
     toggleNodeActive,
@@ -91,7 +91,7 @@ export function NodeHierarchyList() {
     <>
       {ids.map((id) => {
         const n = document.nodes[id];
-        const selected = selected_node_id === n.id;
+        const selected = selection.includes(n.id);
         const hovered = hovered_node_id === n.id;
         const depth = getNodeDepth(n.id);
         return (
@@ -102,9 +102,9 @@ export function NodeHierarchyList() {
               level={depth}
               selected={selected}
               onSelect={() => {
-                selectNode(n.id);
+                select([n.id]);
               }}
-              icon={<NodeHierarchyItemIcon node={n} className="w-4 h-4" />}
+              icon={<NodeHierarchyItemIcon node={n} className="w-3.5 h-3.5" />}
               onPointerEnter={() => {
                 pointerEnterNode(n.id);
               }}
@@ -112,7 +112,7 @@ export function NodeHierarchyList() {
                 pointerEnterNode(n.id);
               }}
             >
-              <SidebarMenuItemLabel className="font-normal text-sm">
+              <SidebarMenuItemLabel className="font-normal text-xs">
                 {n.name}
               </SidebarMenuItemLabel>
               <SidebarMenuItemActions>

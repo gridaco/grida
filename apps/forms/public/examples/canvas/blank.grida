@@ -15,8 +15,8 @@
         "position": "relative",
         "left": 0,
         "top": 0,
-        "width": 960,
-        "height": 540,
+        "width": 500,
+        "height": 500,
         "fill": {
           "type": "solid",
           "color": {

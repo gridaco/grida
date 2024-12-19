@@ -9,10 +9,10 @@ import { CanvasFloatingToolbar } from "@/scaffolds/canvas-floating-toolbar";
 import {
   StandaloneDocumentEditor,
   ViewportRoot,
-  ViewportSurface,
+  EditorSurface,
 } from "@/grida-canvas";
 import { composeEditorDocumentAction } from "@/scaffolds/editor/action";
-import { BuilderAction } from "@/grida-canvas/action";
+import { CanvasAction } from "@/grida-canvas";
 
 export default function SiteDeisngPage() {
   return (
@@ -35,7 +35,7 @@ function CurrentPageCanvas() {
   const document = documents[selected_page_id!];
 
   const documentDispatch = useCallback(
-    (action: BuilderAction) => {
+    (action: CanvasAction) => {
       dispatch(
         composeEditorDocumentAction(
           // @ts-ignore
@@ -56,7 +56,7 @@ function CurrentPageCanvas() {
           dispatch={documentDispatch}
         >
           <ViewportRoot className="relative w-full no-scrollbar overflow-y-auto bg-transparent">
-            <ViewportSurface />
+            <EditorSurface />
             <>
               <AgentThemeProvider>
                 {/* // 430 932 max-h-[932px] no-scrollbar overflow-y-scroll */}

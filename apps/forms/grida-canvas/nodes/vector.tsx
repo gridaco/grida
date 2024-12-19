@@ -1,5 +1,6 @@
 import { grida } from "@/grida";
 import { svg } from "@/grida/svg";
+import queryattributes from "./utils/attributes";
 
 /**
  * @deprecated - not ready - do not use in production
@@ -34,7 +35,7 @@ export function VectorWidget({
 
   return (
     <svg
-      {...props}
+      {...queryattributes(props)}
       style={style_without_size}
       width={width}
       height={height || 1}

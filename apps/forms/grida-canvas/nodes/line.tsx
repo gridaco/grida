@@ -1,9 +1,11 @@
-import { grida } from "@/grida";
 import React from "react";
+import type { grida } from "@/grida";
+import queryattributes from "./utils/attributes";
 
 export function SVGLineWidget({
   width,
   height,
+  stroke,
   style,
   ...props
 }: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.LineNode>) {
@@ -11,8 +13,16 @@ export function SVGLineWidget({
     ...style,
     height: undefined,
   };
+
+  // TODO: stroke
+
   return (
-    <svg {...props} style={style_without_height} width={width} height={1}>
+    <svg
+      {...queryattributes(props)}
+      style={style_without_height}
+      width={width}
+      height={1}
+    >
       {/* {defs && <g dangerouslySetInnerHTML={{ __html: defs }} />} */}
       <line
         x1={0}

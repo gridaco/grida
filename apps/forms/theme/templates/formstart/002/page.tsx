@@ -49,7 +49,7 @@ type UserProps = grida.program.schema.TInferredPropTypes<typeof userprops>;
 
 // https://www.polestar.com/dato-assets/11286/1709559099-02-polestar-3-overview-stats-t.mp4
 
-export default function StartPage_002() {
+export default function _002() {
   return (
     <ScreenRoot>
       <ScreenMobileFrame>
@@ -253,4 +253,11 @@ function ModeratorDrawer({ children }: React.PropsWithChildren<{}>) {
   );
 }
 
-StartPage_002.properties = userprops;
+_002.definition = {
+  type: "template",
+  name: "002",
+  properties: userprops,
+  version: "1.0.0",
+  default: {},
+  nodes: {},
+} satisfies grida.program.document.template.TemplateDocumentDefinition;
