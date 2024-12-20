@@ -145,7 +145,7 @@ export const SidebarMenuItem = React.forwardRef(function SidebarMenuItem(
     className?: string;
     disabled?: boolean;
     icon?: React.ReactNode;
-    onSelect?: () => void;
+    onSelect?: (e: React.MouseEvent<HTMLDivElement>) => void;
     onExpandChange?: (expand: boolean) => void;
     onPointerEnter?: () => void;
     onPointerLeave?: () => void;
