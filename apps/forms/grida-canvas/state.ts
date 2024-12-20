@@ -115,7 +115,13 @@ interface IDocumentEditorTransformState {
  */
 interface IDocumentEditorEventTargetState {
   gesture?:
-    | { type: "nudge" }
+    | {
+        type: "nudge";
+        /**
+         * surface snap guides - result of snap while translate (move) gesture
+         */
+        surface_snapping?: SnapResult;
+      }
     | {
         // translate (move)
         type: "translate";
@@ -126,6 +132,11 @@ interface IDocumentEditorEventTargetState {
         initial_rects: cmath.Rectangle[];
         movement: cmath.Vector2;
         is_currently_cloned: boolean;
+
+        /**
+         * surface snap guides - result of snap while translate (move) gesture
+         */
+        surface_snapping?: SnapResult;
       }
     | {
         // scale (resize)
@@ -137,6 +148,11 @@ interface IDocumentEditorEventTargetState {
          * raw movement - independent of the direction
          */
         movement: cmath.Vector2;
+
+        /**
+         * surface snap guides - result of snap while translate (move) gesture
+         */
+        surface_snapping?: SnapResult;
       }
     | {
         // rotate
@@ -224,11 +240,6 @@ interface IDocumentEditorEventTargetState {
   surface_measurement_target?: string[];
   surface_measurement_targeting_locked: boolean;
   surface_measurement_targeting: "on" | "off";
-
-  /**
-   * surface snap guides - result of snap while translate (move) gesture
-   */
-  surface_snapping?: SnapResult;
 
   /**
    * Marquee transform relative to viewport

@@ -177,7 +177,6 @@ function _reducer<S extends IDocumentEditorState>(
           }
           case "off": {
             draft.gesture = undefined;
-            draft.surface_snapping = undefined;
             break;
           }
         }

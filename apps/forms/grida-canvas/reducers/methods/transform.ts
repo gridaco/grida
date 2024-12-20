@@ -215,9 +215,13 @@ function __self_update_gesture_transform_translate(
 
   const snap_target_node_ids = getSnapTargets(current_selection, draft);
 
-  const snap_target_node_rects = snap_target_node_ids.map((node_id) => {
-    return domapi.get_node_bounding_rect(node_id)!;
-  });
+  const snap_target_node_rects = snap_target_node_ids
+    .map((node_id: string) => {
+      const r = domapi.get_node_bounding_rect(node_id);
+      if (!r) reportError(`Node ${node_id} does not have a bounding rect`);
+      return r!;
+    })
+    .filter(Boolean);
 
   const { translated, snapping } = snapMovementToObjects(
     initial_rects,
@@ -226,16 +230,20 @@ function __self_update_gesture_transform_translate(
     [4, 4]
   );
 
-  draft.surface_snapping = snapping;
+  draft.gesture.surface_snapping = snapping;
 
   let i = 0;
   for (const node_id of current_selection) {
     const node = document.__getNodeById(draft, node_id);
     const r = translated[i++];
 
-    const parent_rect = domapi.get_node_bounding_rect(
-      document.getParentId(draft.document_ctx, node_id)!
-    )!;
+    const parent_id = document.getParentId(draft.document_ctx, node_id)!;
+    const parent_rect = domapi.get_node_bounding_rect(parent_id)!;
+
+    assert(
+      parent_rect,
+      "Parent rect must be defined : " + parent_id + "/" + node_id
+    );
 
     // the r position is relative to the canvas, we need to convert it to the node's local position
     // absolute to relative => accumulated parent's position

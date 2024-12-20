@@ -5,10 +5,16 @@ import { useDocument } from "@/grida-canvas/provider";
 
 export default function useSnapGuide() {
   const { state } = useDocument();
-  const { surface_snapping, content_offset: translate } = state;
+  const { gesture, content_offset: translate } = state;
 
-  if (surface_snapping) {
-    const { anchors, distance } = surface_snapping;
+  if (
+    gesture &&
+    (gesture.type === "translate" ||
+      gesture.type === "nudge" ||
+      gesture.type === "scale") &&
+    gesture.surface_snapping
+  ) {
+    const { anchors, distance } = gesture.surface_snapping;
 
     return {
       x: anchors.x.map((x) => cmath.vector2.add(x, distance, translate)),
