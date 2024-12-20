@@ -1386,7 +1386,7 @@ export function useEventTarget() {
     hovered_node_id,
     dropzone_node_id,
     selection,
-    content_edit_mode: content_edit_mode,
+    content_edit_mode,
     cursor_mode,
     marquee,
   } = state;

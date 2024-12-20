@@ -168,6 +168,7 @@ function __self_update_gesture_transform_translate(
       });
 
       const new_parent_id = possible_parents[0];
+      if (!new_parent_id) break; // this is when outside the canvas (this might need to change if we support infinite canvas)
 
       // TODO: room for improvement - do a selection - parent comparison and handle at once (currently doing each comparison for each node) (this is redundant as if dropzone has changed, it will be changed for all selection)
       let is_parent_changed = false;

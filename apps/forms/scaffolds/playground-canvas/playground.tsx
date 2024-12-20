@@ -94,7 +94,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import ErrorBoundary from "./error-boundary";
 
 export default function CanvasPlayground() {
-  const [asideHidden, setAsideHidden] = useState(false);
+  const [uiHidden, setUiHidden] = useState(false);
   const [exampleid, setExampleId] = useState<string>("blank.grida");
   const playDialog = useDialogState("play", {
     refreshkey: true,
@@ -142,8 +142,8 @@ export default function CanvasPlayground() {
     })
   );
 
-  useHotkeys("/", () => {
-    setAsideHidden((v) => !v);
+  useHotkeys("meta+\\, ctrl+\\", () => {
+    setUiHidden((v) => !v);
   });
 
   useEffect(() => {
@@ -227,7 +227,7 @@ export default function CanvasPlayground() {
           >
             <Hotkyes />
             <div className="flex w-full h-full">
-              {!asideHidden && (
+              {!uiHidden && (
                 <aside>
                   {insertDialog.open ? (
                     <>
@@ -348,26 +348,31 @@ export default function CanvasPlayground() {
                     </div>
                   </div>
                 </ViewportRoot>
-                <div className="absolute top-4 left-4 z-50">
-                  <Button
-                    variant={insertDialog.open ? "default" : "outline"}
-                    className="w-8 h-8 rounded-full p-0"
-                    onClick={insertDialog.openDialog}
-                  >
-                    <PlusIcon className="w-4 h-4" />
-                  </Button>
-                </div>
-                <div className="absolute bottom-20 left-0 right-0 flex items-center justify-center z-50 pointer-events-none">
-                  <PlaygroundToolbar
-                    onAddButtonClick={insertDialog.openDialog}
-                  />
-                </div>
-                <div className="fixed bottom-20 left-10 flex items-center justify-center z-50 pointer-events-none">
-                  <KeyboardInputOverlay />
-                </div>
-                <DevtoolsPanel />
+                {!uiHidden && (
+                  <>
+                    <div className="absolute top-4 left-4 z-50">
+                      <Button
+                        variant={insertDialog.open ? "default" : "outline"}
+                        className="w-8 h-8 rounded-full p-0"
+                        onClick={insertDialog.openDialog}
+                      >
+                        <PlusIcon className="w-4 h-4" />
+                      </Button>
+                    </div>
+
+                    <div className="absolute bottom-20 left-0 right-0 flex items-center justify-center z-50 pointer-events-none">
+                      <PlaygroundToolbar
+                        onAddButtonClick={insertDialog.openDialog}
+                      />
+                    </div>
+                    <div className="fixed bottom-20 left-10 flex items-center justify-center z-50 pointer-events-none">
+                      <KeyboardInputOverlay />
+                    </div>
+                    <DevtoolsPanel />
+                  </>
+                )}
               </div>
-              {!asideHidden && (
+              {!uiHidden && (
                 <aside className="h-full">
                   <SidebarRoot side="right">
                     <div className="p-2">
@@ -393,7 +398,7 @@ export default function CanvasPlayground() {
             </div>
           </StandaloneDocumentEditor>
         </ErrorBoundary>
-        <HelpFab />
+        {!uiHidden && <HelpFab />}
       </main>
     </TooltipProvider>
   );

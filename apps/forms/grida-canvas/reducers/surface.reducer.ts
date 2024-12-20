@@ -22,13 +22,16 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
       if (typeof node.text !== "string") return state;
 
       return produce(state, (draft) => {
-        draft.content_edit_mode = "text";
+        draft.content_edit_mode = {
+          type: "text",
+          selection: state.selection[0],
+        };
       });
       break;
     }
     case "document/surface/content-edit-mode/try-exit": {
       return produce(state, (draft) => {
-        draft.content_edit_mode = false;
+        draft.content_edit_mode = undefined;
       });
     }
     case "document/surface/cursor-mode": {

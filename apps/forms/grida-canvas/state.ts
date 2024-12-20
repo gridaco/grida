@@ -305,7 +305,16 @@ export interface IDocumentState {
    *
    * @default false
    */
-  content_edit_mode?: false | "text" | "path";
+  content_edit_mode?:
+    | {
+        type: "text";
+        /**
+         * text node id
+         */
+        selection: string;
+        // selectedTextRange;
+      }
+    | { type: "path" };
 
   /**
    * @private - internal use only
@@ -313,7 +322,6 @@ export interface IDocumentState {
    * refresh key
    */
   // __r: number;
-  // selectedTextRange;
 }
 
 interface __TMP_HistoryExtension {
@@ -342,7 +350,7 @@ export interface IDocumentEditorState
 export function initDocumentEditorState({
   ...init
 }: IDocumentEditorInit): IDocumentEditorState {
-  const s = new DocumentState(init);
+  const s = new document.DocumentState(init.document);
 
   return {
     selection: [],
@@ -372,28 +380,4 @@ export function initDocumentEditorState({
     cursor_mode: { type: "cursor" },
     ...init,
   };
-}
-
-class DocumentState {
-  constructor(private readonly init: IDocumentEditorInit) {}
-
-  private get nodes(): grida.program.document.IDocumentNodesRepository["nodes"] {
-    return this.init.document.nodes;
-  }
-
-  private get nodeids(): Array<string> {
-    return Object.keys(this.nodes);
-  }
-
-  textnodes(): Array<grida.program.nodes.TextNode> {
-    return this.nodeids
-      .map((id) => this.nodes[id])
-      .filter((node) => node.type === "text") as grida.program.nodes.TextNode[];
-  }
-
-  fonts(): Array<string> {
-    return this.textnodes()
-      .map((node) => node.fontFamily)
-      .filter(Boolean) as Array<string>;
-  }
 }

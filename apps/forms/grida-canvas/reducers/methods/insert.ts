@@ -4,7 +4,6 @@ import { document } from "../../document-query";
 import { grida } from "@/grida";
 import assert from "assert";
 
-// TODO: after inserting, refresh fonts registry
 export function self_insertNode<S extends IDocumentEditorState>(
   draft: Draft<S>,
   parent_id: string,
@@ -24,6 +23,10 @@ export function self_insertNode<S extends IDocumentEditorState>(
 
   // Add the node to the document
   draft.document.nodes[node_id] = node;
+
+  // Update the document's font registry
+  const s = new document.DocumentState(draft.document);
+  draft.googlefonts = s.fonts().map((family) => ({ family }));
 
   // Update the runtime context with parent-child relationships
   const context = new document.Context(draft.document_ctx);

@@ -80,26 +80,40 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             const parent_rect = domapi.get_node_bounding_rect(parent)!;
 
             try {
-              const _nnode = nnode as grida.program.nodes.RectangleNode;
+              const _nnode = nnode as grida.program.nodes.AnyNode;
 
               const { cursor_position } = state;
+
+              // center translate the new node - so it can be positioned centered to the cursor point (width / 2, height / 2)
+              const center_translate_delta: cmath.Vector2 =
+                // (if width and height is fixed number) - can be 'auto' for text node
+                typeof _nnode.width === "number" &&
+                typeof _nnode.height === "number"
+                  ? [_nnode.width / 2, _nnode.height / 2]
+                  : [0, 0];
 
               const nnode_relative_position = cmath.vector2.subtract(
                 cursor_position,
                 // parent position relative to content space
                 [parent_rect.x, parent_rect.y],
-                // center translate the new node - so it can be positioned centered to the cursor point (width / 2, height / 2)
-                [_nnode.width / 2, _nnode.height / 2]
+                center_translate_delta
               );
 
               _nnode.position = "absolute";
               _nnode.left! = nnode_relative_position[0];
               _nnode.top! = nnode_relative_position[1];
-            } catch (e) {}
+            } catch (e) {
+              reportError(e);
+            }
 
             self_insertNode(draft, parent, nnode);
             draft.cursor_mode = { type: "cursor" };
             self_selectNode(draft, "reset", nnode.id);
+
+            // if the node is text, enter content edit mode
+            if (nnode.type === "text") {
+              draft.content_edit_mode = { type: "text", selection: nnode.id };
+            }
             break;
         }
       });
@@ -178,7 +192,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       return produce(state, (draft) => {
         // clear all trasform state
 
-        draft.content_edit_mode = false;
+        draft.content_edit_mode = undefined;
         draft.gesture = undefined;
       });
     }
@@ -187,7 +201,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       const { shiftKey } = <EditorEventTarget_DragStart>action;
       return produce(state, (draft) => {
         // clear all trasform state
-        draft.content_edit_mode = false;
+        draft.content_edit_mode = undefined;
         draft.marquee = undefined;
 
         switch (draft.cursor_mode.type) {
@@ -383,7 +397,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       //
 
       return produce(state, (draft) => {
-        draft.content_edit_mode = false;
+        draft.content_edit_mode = undefined;
         draft.hovered_node_id = undefined;
 
         self_start_gesture_scale(draft, {

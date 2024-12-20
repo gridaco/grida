@@ -518,4 +518,32 @@ export namespace document {
   }
 
   //
+
+  export class DocumentState {
+    constructor(
+      private readonly document: grida.program.document.IDocumentDefinition
+    ) {}
+
+    private get nodes(): grida.program.document.IDocumentNodesRepository["nodes"] {
+      return this.document.nodes;
+    }
+
+    private get nodeids(): Array<string> {
+      return Object.keys(this.nodes);
+    }
+
+    textnodes(): Array<grida.program.nodes.TextNode> {
+      return this.nodeids
+        .map((id) => this.nodes[id])
+        .filter(
+          (node) => node.type === "text"
+        ) as grida.program.nodes.TextNode[];
+    }
+
+    fonts(): Array<string> {
+      return this.textnodes()
+        .map((node) => node.fontFamily)
+        .filter(Boolean) as Array<string>;
+    }
+  }
 }

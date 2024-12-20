@@ -145,12 +145,12 @@ export function EditorSurface() {
     {
       onPointerDown: ({ event }) => {
         if (event.defaultPrevented) return;
-        if (content_edit_mode === "text") return;
+        if (content_edit_mode) return;
         pointerDown(event);
       },
       onPointerUp: ({ event }) => {
         if (event.defaultPrevented) return;
-        if (content_edit_mode === "text") return;
+        if (content_edit_mode) return;
         pointerUp(event);
       },
       onClick: ({ event }) => {
@@ -230,10 +230,15 @@ export function EditorSurface() {
           </div>
         )}
         <SurfaceGroup hidden={is_node_translating || isWindowResizing}>
-          {content_edit_mode === "text" && selection.length === 1 && (
-            <SurfaceTextEditor node_id={selection[0]} />
+          {content_edit_mode?.type === "text" && (
+            <SurfaceTextEditor node_id={content_edit_mode.selection} />
           )}
-          <SelectionOverlay selection={selection} readonly={false} />
+        </SurfaceGroup>
+        <SurfaceGroup hidden={is_node_translating || isWindowResizing}>
+          <SelectionOverlay
+            selection={selection}
+            readonly={!!content_edit_mode}
+          />
           {!marquee &&
             hovered_node_id &&
             !selection.includes(hovered_node_id) && (
