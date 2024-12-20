@@ -1,10 +1,10 @@
 import type { Draft } from "immer";
 import type { IDocumentEditorState } from "../../state";
 import { document } from "../../document-query";
-import { v4 } from "uuid";
 import { self_insertNode } from "./insert";
 import { self_selectNode } from "./selection";
 import assert from "assert";
+import nid from "../tools/id";
 
 export function self_duplicateNode<S extends IDocumentEditorState>(
   draft: Draft<S>,
@@ -21,7 +21,7 @@ export function self_duplicateNode<S extends IDocumentEditorState>(
     const deserialized = JSON.parse(serialized);
 
     // update the id
-    const new_id = v4();
+    const new_id = nid();
     deserialized.id = new_id;
 
     const parent_id = document.getParentId(draft.document_ctx, node_id);

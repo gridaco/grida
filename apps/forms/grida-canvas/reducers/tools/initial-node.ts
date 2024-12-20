@@ -1,5 +1,5 @@
 import { grida } from "@/grida";
-import { v4 } from "uuid";
+import nid from "./id";
 
 export const gray: grida.program.cg.Paint = {
   type: "solid",
@@ -20,7 +20,7 @@ export default function initialNode(
   type: grida.program.nodes.Node["type"],
   seed: Partial<Omit<grida.program.nodes.AnyNode, "type">> = {}
 ): grida.program.nodes.Node {
-  const id = v4();
+  const id = nid();
   const base: grida.program.nodes.i.IBaseNode &
     grida.program.nodes.i.ISceneNode = {
     id: id,

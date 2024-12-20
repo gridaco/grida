@@ -150,7 +150,6 @@ interface IDocumentEditorEventTargetState {
          */
         movement: cmath.Vector2;
       }
-    // corner radius
     | {
         /**
          * - corner-radius

@@ -100,12 +100,13 @@ export function EditorSurface() {
     tryEnterContentEditMode,
   } = useEventTarget();
   const cursor = useEventTargetCSSCursor();
-  const ref = useRef<HTMLDivElement>(null);
+  const eventTargetRef = useRef<HTMLDivElement>(null);
+  const portalRef = useRef<HTMLDivElement>(null);
   const context = useContext(ViewportSurfaceContext);
 
   useEffect(() => {
     if (context?.setPortalRef) {
-      context.setPortalRef(ref.current);
+      context.setPortalRef(portalRef.current);
     }
 
     // Clean up when component unmounts
@@ -121,6 +122,8 @@ export function EditorSurface() {
   // pointer move event should 'always-trigger', to make this easier and clear, we register the listener for pointer move to a window.
   //
   useEffect(() => {
+    if (!eventTargetRef.current) return;
+    const et = eventTargetRef.current;
     const handlePointerMove = (event: PointerEvent) => {
       if (event.defaultPrevented) return;
       // for performance reasons, we don't want to update the overlay when transforming (except for translate)
@@ -128,15 +131,15 @@ export function EditorSurface() {
       pointerMove(event);
     };
 
-    window.addEventListener("pointermove", handlePointerMove, {
+    et.addEventListener("pointermove", handlePointerMove, {
       capture: true,
     });
 
     return () =>
-      window.removeEventListener("pointermove", handlePointerMove, {
+      et.removeEventListener("pointermove", handlePointerMove, {
         capture: true,
       });
-  }, []);
+  }, [eventTargetRef.current]);
 
   const bind = useSurfaceGesture(
     {
@@ -196,6 +199,8 @@ export function EditorSurface() {
 
   return (
     <div
+      id="event-target"
+      ref={eventTargetRef}
       {...bind()}
       tabIndex={0}
       className="absolute inset-0 pointer-events-auto will-change-transform z-50"
@@ -206,7 +211,7 @@ export function EditorSurface() {
         cursor: cursor,
       }}
     >
-      <div className="w-full h-full" id="canvas-overlay-portal" ref={ref}>
+      <div className="w-full h-full" id="canvas-overlay-portal" ref={portalRef}>
         <MeasurementGuide />
         <div
           data-transforming={is_node_transforming}

@@ -18,7 +18,6 @@ import { document } from "../document-query";
 import nodeReducer from "./node.reducer";
 import surfaceReducer from "./surface.reducer";
 import nodeTransformReducer from "./node-transform.reducer";
-import { v4 } from "uuid";
 import {
   self_clearSelection,
   self_deleteNode,
@@ -29,6 +28,7 @@ import {
 import { cmath } from "../cmath";
 import { domapi } from "../domapi";
 import { getSnapTargets, snapMovementToObjects } from "./tools/snap";
+import nid from "./tools/id";
 
 export default function documentReducer<S extends IDocumentEditorState>(
   state: S,
@@ -100,7 +100,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
           // to be pasted
           for (const data of nodes) {
             //
-            const new_id = v4();
+            const new_id = nid();
             const newNode = {
               ...data,
               id: new_id,
@@ -304,7 +304,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
           parentNodeId: string,
           nodePrototype: grida.program.nodes.NodePrototype
         ): string {
-          const nodeId = v4();
+          const nodeId = nid();
 
           // Create the parent node
           // @ts-expect-error

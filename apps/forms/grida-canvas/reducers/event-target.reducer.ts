@@ -34,7 +34,7 @@ import {
 } from "./methods";
 import { cmath } from "../cmath";
 import { domapi } from "../domapi";
-import { v4 } from "uuid";
+import nid from "./tools/id";
 
 export default function eventTargetReducer<S extends IDocumentEditorState>(
   state: S,
@@ -588,7 +588,7 @@ function self_start_gesture_translate(draft: Draft<IDocumentEditorState>) {
   draft.gesture = {
     type: "translate",
     selection: selection,
-    initial_clone_ids: selection.map(() => v4()),
+    initial_clone_ids: selection.map(() => nid()),
     initial_selection: selection,
     initial_rects: rects,
     initial_snapshot: JSON.parse(JSON.stringify(draft.document)),
