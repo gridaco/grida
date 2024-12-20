@@ -88,17 +88,31 @@ export default function documentReducer<S extends IDocumentEditorState>(
     case "paste": {
       if (!state.user_clipboard) break;
       const { user_clipboard, selection } = state;
-      const nodes: grida.program.nodes.Node[] = user_clipboard.nodes;
+      const clipboard_nodes: grida.program.nodes.Node[] = user_clipboard.nodes;
+      const clipboard_node_ids = clipboard_nodes.map((node) => node.id);
 
       return produce(state, (draft) => {
         const new_ids = [];
+
+        const valid_target_selection =
+          // 1. the target shall not be an original node
+          // 2. the target shall be a container
+          selection
+            .filter((node_id) => !clipboard_node_ids.includes(node_id))
+            .filter((node_id) => {
+              const node = document.__getNodeById(draft, node_id);
+              return node.type === "container";
+            });
+
         const targets =
-          selection.length > 0 ? [...selection] : [state.document.root_id];
+          valid_target_selection.length > 0
+            ? valid_target_selection
+            : [state.document.root_id]; // default to root
 
         // the target (parent) node that will be pasted under
         for (const target of targets) {
           // to be pasted
-          for (const data of nodes) {
+          for (const data of clipboard_nodes) {
             //
             const new_id = nid();
             const newNode = {
