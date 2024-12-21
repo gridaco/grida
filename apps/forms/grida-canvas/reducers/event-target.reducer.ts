@@ -237,17 +237,9 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
             const parent = __get_insert_target(state);
 
-            const parent_rect = domapi.get_node_bounding_rect(parent)!;
-
-            const nnode_relative_position = cmath.vector2.subtract(
-              cursor_position,
-              // parent position relative to content space
-              [parent_rect.x, parent_rect.y]
-            );
-
             const initial_rect = {
-              x: nnode_relative_position[0],
-              y: nnode_relative_position[1],
+              x: cursor_position[0],
+              y: cursor_position[1],
               width: 1,
               height: draft.cursor_mode.node === "line" ? 0 : 1,
             };
