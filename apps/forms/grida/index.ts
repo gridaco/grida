@@ -280,17 +280,6 @@ export namespace grida {
       }
 
       export namespace internal {
-        export interface IDocumentEditorState {
-          document: IDocumentDefinition;
-          /**
-           * the document key set by user. user can update this to tell it's entirely replaced
-           *
-           * Optional, but recommended to set for better tracking and debugging.
-           */
-          document_key?: string;
-          document_ctx: IDocumentDefinitionRuntimeHierarchyContext;
-        }
-
         /**
          * @internal
          * Represents the current runtime state of the document hierarchy context.
@@ -319,16 +308,24 @@ export namespace grida {
          */
         export interface IDocumentDefinitionRuntimeHierarchyContext {
           /**
+           * Array (Set) of all node IDs in the document, facilitating traversal and lookup.
+           */
+          readonly __ctx_nids: Array<nodes.NodeID>;
+
+          /**
            * Maps each node ID to its respective parent node ID, facilitating upward traversal.
            */
-          __ctx_nid_to_parent_id: Record<nodes.NodeID, nodes.NodeID>;
+          readonly __ctx_nid_to_parent_id: Record<nodes.NodeID, nodes.NodeID>;
 
           /**
            * Maps each node ID to an array of its child node IDs, enabling efficient downward traversal.
            *
            * This does NOT ensure the order of the children. when to reorder, use the `children` property in the node.
            */
-          __ctx_nid_to_children_ids: Record<nodes.NodeID, nodes.NodeID[]>;
+          readonly __ctx_nid_to_children_ids: Record<
+            nodes.NodeID,
+            nodes.NodeID[]
+          >;
         }
 
         /**
@@ -336,7 +333,7 @@ export namespace grida {
          * parent-child relationships without modifying core node structure.
          *
          * @param document - The document definition containing all nodes.
-         * @returns {IDocumentDefinitionRuntimeHierarchyContext} The hierarchy context,
+         * @returns {grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext} The hierarchy context,
          * containing mappings of each node's parent and children.
          */
         export function createDocumentDefinitionRuntimeHierarchyContext(
@@ -344,6 +341,7 @@ export namespace grida {
         ): IDocumentDefinitionRuntimeHierarchyContext {
           const { nodes } = document;
           const ctx: IDocumentDefinitionRuntimeHierarchyContext = {
+            __ctx_nids: Object.keys(nodes),
             __ctx_nid_to_parent_id: {},
             __ctx_nid_to_children_ids: {},
           };
@@ -369,6 +367,7 @@ export namespace grida {
       }
 
       export interface INodeHtmlDocumentQueryDataAttributes {
+        id: nodes.Node["id"];
         [k.HTML_ELEMET_DATA_ATTRIBUTE_GRIDA_NODE_ID_KEY]: nodes.Node["id"];
         [k.HTML_ELEMET_DATA_ATTRIBUTE_GRIDA_NODE_LOCKED_KEY]: nodes.Node["locked"];
         ["data-grida-node-type"]: nodes.Node["type"];
@@ -869,6 +868,7 @@ export namespace grida {
       export function toDimension(
         value: css.LengthPercentage | "auto"
       ): string {
+        if (!value) return "";
         if (value === "auto") return "auto";
         if (typeof value === "number") {
           return `${value}px`;
@@ -931,6 +931,8 @@ export namespace grida {
      * Core Graphics
      */
     export namespace cg {
+      export type Vector2 = [number, number];
+
       /**
        * the RGBA structure itself. the rgb value may differ as it could both represent 0-1 or 0-255 by the context.
        */
@@ -1233,7 +1235,9 @@ export namespace grida {
         | VideoNode
         | ContainerNode
         | HTMLIFrameNode
+        | HTMLRichTextNode
         | VectorNode
+        | PolylineNode
         | LineNode
         | RectangleNode
         | EllipseNode
@@ -1253,7 +1257,9 @@ export namespace grida {
               __IProtoChildrenNodePrototype
           >
         | __TPrototypeNode<Omit<HTMLIFrameNode, __base_scene_node_properties>>
+        | __TPrototypeNode<Omit<HTMLRichTextNode, __base_scene_node_properties>>
         | __TPrototypeNode<Omit<VectorNode, __base_scene_node_properties>>
+        | __TPrototypeNode<Omit<PolylineNode, __base_scene_node_properties>>
         | __TPrototypeNode<Omit<LineNode, __base_scene_node_properties>>
         | __TPrototypeNode<Omit<RectangleNode, __base_scene_node_properties>>
         | __TPrototypeNode<Omit<EllipseNode, __base_scene_node_properties>>
@@ -1299,10 +1305,13 @@ export namespace grida {
       export type AnyNode = Omit<
         Partial<TextNode> &
           Partial<VectorNode> &
+          Partial<PolylineNode> &
           Partial<LineNode> &
           Partial<RectangleNode> &
           Partial<ImageNode> &
           Partial<VideoNode> &
+          Partial<HTMLRichTextNode> &
+          Partial<HTMLIFrameNode> &
           Partial<ContainerNode> &
           Partial<InstanceNode> &
           Partial<TemplateInstanceNode>,
@@ -1387,11 +1396,14 @@ export namespace grida {
 
         /**
          * specifies node's x rotation in degrees
-         *
-         * @default 0
          */
         export interface IRotation {
-          rotation?: number;
+          /**
+           * rotation in degrees
+           *
+           * @default 0
+           */
+          rotation: number;
         }
 
         /**
@@ -1512,7 +1524,7 @@ export namespace grida {
          * @deprecated [NOT USED]
          */
         export interface IStroke {
-          stroke: cg.RGBA8888;
+          stroke?: cg.Paint;
         }
 
         export interface ICSSBorder {
@@ -1618,29 +1630,37 @@ export namespace grida {
           fill?: cg.Paint;
         }
 
+        /**
+         * text value
+         *
+         * - expression - {@link Tokens.StringValueExpression} - computed or literal
+         *   - literal - e.g. `"A text value"`
+         *   - property access - {@link Tokens.PropertyAccessExpression} - computed, , e.g. `userdata.title`
+         *   - identifier - {@link Tokens.Identifier} - computed, e.g. `title`
+         *   - others - all {@link Tokens.StringValueExpression} types
+         *
+         * when used under a component / instance / template, the `props.` expression is reserved and refers to adjacent parent's props.
+         * - by the standard implementation, the `props.[x]` is recommended to be referenced only once in a single node.
+         * - by the standard implementation, within the visual editor context, when user attempts to updates the literal value (where it is a `props.[x]` and `props.[x] is literal`), it should actually update the `props.[x]` value, not this `text` literal value.
+         */
+        type PropsTextValue = Tokens.StringValueExpression;
+
         export interface ITextValue {
-          /**
-           * text value
-           *
-           * - expression - {@link Tokens.StringValueExpression} - computed or literal
-           *   - literal - e.g. `"A text value"`
-           *   - property access - {@link Tokens.PropertyAccessExpression} - computed, , e.g. `userdata.title`
-           *   - identifier - {@link Tokens.Identifier} - computed, e.g. `title`
-           *   - others - all {@link Tokens.StringValueExpression} types
-           *
-           * when used under a component / instance / template, the `props.` expression is reserved and refers to adjacent parent's props.
-           * - by the standard implementation, the `props.[x]` is recommended to be referenced only once in a single node.
-           * - by the standard implementation, within the visual editor context, when user attempts to updates the literal value (where it is a `props.[x]` and `props.[x] is literal`), it should actually update the `props.[x]` value, not this `text` literal value.
-           */
-          text: Tokens.StringValueExpression | null;
+          text: PropsTextValue | null;
 
           /**
            * set max length of the text value
            * - Note: max length is ignored when set programmatically
            * - Note: this is a experimental feature and its behaviour is not strictly defined
            * @see https://json-schema.org/understanding-json-schema/reference/string#length
+           *
+           * @deprecated - not standard
            */
           maxLength?: number;
+        }
+
+        export interface IHTMLRichTextValue {
+          html: PropsTextValue | null;
         }
 
         export interface IProperties {
@@ -1776,6 +1796,24 @@ export namespace grida {
         alt?: string;
       }
 
+      /**
+       * [HTMLRichText]
+       *
+       * Note:
+       * - Limited to HTML environment
+       * - {@link TextNode} also supports rich styling, but only limited to text spans.
+       *
+       * RichText can hold any html-like text content, including text spans, links, images, etc.
+       */
+      export interface HTMLRichTextNode
+        extends i.IBaseNode,
+          i.ISceneNode,
+          i.ICSSStylable,
+          i.IHrefable,
+          i.IHTMLRichTextValue {
+        readonly type: "richtext";
+      }
+
       export interface VideoNode
         extends i.IBaseNode,
           i.ISceneNode,
@@ -1866,6 +1904,23 @@ export namespace grida {
       }
 
       /**
+       * @deprecated - not ready - do not use in production
+       */
+      export interface PolylineNode
+        extends i.IBaseNode,
+          i.ISceneNode,
+          i.IHrefable,
+          i.IPositioning,
+          i.IFixedDimension,
+          i.IOpacity,
+          i.IZIndex,
+          i.IRotation,
+          i.IFill {
+        type: "polyline";
+        points: cg.Vector2[];
+      }
+
+      /**
        * Line Node
        *
        * Note: this does not represent a polyline or a path, it only represents a straight line with two points.
@@ -1883,7 +1938,7 @@ export namespace grida {
           i.ISceneNode,
           i.IHrefable,
           i.IPositioning,
-          // i.ICSSDimension,
+          i.IStroke,
           i.IFixedDimension,
           i.IOpacity,
           i.IZIndex,

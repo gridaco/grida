@@ -1,9 +1,11 @@
 import { grida } from "@/grida";
 import { svg } from "@/grida/svg";
+import queryattributes from "./utils/attributes";
 
 export function EllipseWidget({
   // x,
   // y,
+  style,
   width,
   height,
   fill,
@@ -17,7 +19,12 @@ export function EllipseWidget({
       };
 
   return (
-    <svg {...props} width={width} height={height}>
+    <svg
+      {...queryattributes(props)}
+      width={width}
+      height={height}
+      style={style}
+    >
       {defs && <g dangerouslySetInnerHTML={{ __html: defs }} />}
       <ellipse
         cx={width / 2}

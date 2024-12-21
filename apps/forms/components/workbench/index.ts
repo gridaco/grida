@@ -9,6 +9,8 @@ export namespace WorkbenchUI {
       },
       size: {
         sm: "text-xs h-8 px-2 min-w-none",
+        // for paint inputs
+        paint: "text-xs h-8 px-1 min-w-none",
         container: "text-xs h-8 min-w-none",
       },
     },

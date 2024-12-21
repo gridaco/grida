@@ -7,6 +7,7 @@ import React, {
   useEffect,
   useLayoutEffect,
   useMemo,
+  useRef,
 } from "react";
 import {
   type DocumentDispatcher,
@@ -14,7 +15,8 @@ import {
   type IDocumentEditorInit,
   initDocumentEditorState,
   CursorMode,
-} from "./types";
+  SurfaceRaycastTargeting,
+} from "./state";
 import type { Tokens } from "@/ast";
 import { grida } from "@/grida";
 import { useComputed } from "./nodes/use-computed";
@@ -23,11 +25,11 @@ import {
   ProgramDataContextHost,
 } from "@/grida/react-runtime/data-context/context";
 import assert from "assert";
-import { documentquery } from "./document-query";
+import { document, type Selector } from "./document-query";
 import { GoogleFontsManager } from "./components/google-fonts";
 import { domapi } from "./domapi";
-
-type Vector2 = [number, number];
+import { cmath } from "./cmath";
+import type { TCanvasEventTargetDragGestureState } from "./action";
 
 const DocumentContext = createContext<IDocumentEditorState | null>(null);
 
@@ -123,18 +125,6 @@ export function __useInternal() {
 }
 
 function __useNodeActions(dispatch: DocumentDispatcher) {
-  //
-  //
-  const selectNode = useCallback(
-    (node_id: string) => {
-      dispatch({
-        type: "document/node/select",
-        node_id,
-      });
-    },
-    [dispatch]
-  );
-
   const orderPushBack = useCallback(
     (node_id: string) => {
       dispatch({
@@ -175,10 +165,20 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
     [dispatch]
   );
 
+  const toggleNodeBold = useCallback(
+    (node_id: string) => {
+      dispatch({
+        type: "node/toggle/bold",
+        node_id: node_id,
+      });
+    },
+    [dispatch]
+  );
+
   const pointerEnterNode = useCallback(
     (node_id: string) => {
       dispatch({
-        type: "document/node/on-pointer-enter",
+        type: "document/canvas/backend/html/event/node/on-pointer-enter",
         node_id,
       });
     },
@@ -188,7 +188,7 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   const pointerLeaveNode = useCallback(
     (node_id: string) => {
       dispatch({
-        type: "document/node/on-pointer-leave",
+        type: "document/canvas/backend/html/event/node/on-pointer-leave",
         node_id,
       });
     },
@@ -660,13 +660,13 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
 
   return useMemo(
     () => ({
-      selectNode,
       orderPushBack,
       orderBringFront,
       pointerEnterNode,
       pointerLeaveNode,
       toggleNodeActive,
       toggleNodeLocked,
+      toggleNodeBold,
       changeNodeActive,
       changeNodeLocked,
       changeNodeName,
@@ -706,6 +706,119 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   );
 }
 
+type NudgeUXConfig = {
+  /**
+   * when gesture is true, it will set the gesture state to trigger the surface guide rendering.
+   *
+   * @default true
+   */
+  gesture: boolean;
+  /**
+   * delay in ms to toggle off the gesture state
+   *
+   * @default 500
+   */
+  delay: number;
+};
+
+function __useGestureNudgeState(dispatch: DocumentDispatcher) {
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const __gesture_nudge_debounced = useCallback(
+    (state: "on" | "off", delay: number) => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      timeoutRef.current = setTimeout(() => {
+        dispatch({
+          type: "gesture/nudge",
+          state: "off",
+        });
+      }, delay);
+    },
+    [dispatch]
+  );
+
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
+  return __gesture_nudge_debounced;
+}
+
+function __useNudgeActions(dispatch: DocumentDispatcher) {
+  const __gesture_nudge = useCallback(
+    (state: "on" | "off") => {
+      dispatch({
+        type: "gesture/nudge",
+        state,
+      });
+    },
+    [dispatch]
+  );
+
+  const __gesture_nudge_debounced = __useGestureNudgeState(dispatch);
+
+  const nudge = useCallback(
+    (
+      target: "selection" | (string & {}) = "selection",
+      axis: "x" | "y",
+      delta: number = 1,
+      config: NudgeUXConfig = {
+        delay: 500,
+        gesture: true,
+      }
+    ) => {
+      const { gesture = true, delay = 500 } = config;
+
+      if (gesture) {
+        // Trigger gesture
+        __gesture_nudge("on");
+
+        // Debounce to turn off gesture
+        __gesture_nudge_debounced("off", delay);
+      }
+
+      dispatch({
+        type: "nudge",
+        delta,
+        axis,
+        target,
+      });
+    },
+    [dispatch]
+  );
+
+  const nudgeResize = useCallback(
+    (
+      target: "selection" | (string & {}) = "selection",
+      axis: "x" | "y",
+      delta: number = 1
+    ) => {
+      dispatch({
+        type: "nudge-resize",
+        delta,
+        axis,
+        target,
+      });
+    },
+    [dispatch]
+  );
+
+  return useMemo(
+    () => ({
+      nudge,
+      nudgeResize,
+    }),
+    [dispatch]
+  );
+}
+
 export function useNodeAction(node_id: string | undefined) {
   const [_, dispatch] = __useInternal();
   const nodeActions = __useNodeActions(dispatch);
@@ -717,6 +830,7 @@ export function useNodeAction(node_id: string | undefined) {
       bringFront: () => nodeActions.orderBringFront(node_id),
       toggleLocked: () => nodeActions.toggleNodeLocked(node_id),
       toggleActive: () => nodeActions.toggleNodeActive(node_id),
+      toggleBold: () => nodeActions.toggleNodeBold(node_id),
       component: (component_id: string) =>
         nodeActions.changeNodeComponent(node_id, component_id),
       text: (text?: Tokens.StringValueExpression) =>
@@ -818,66 +932,244 @@ export function useNodeAction(node_id: string | undefined) {
 export function useDocument() {
   const [state, dispatch] = __useInternal();
 
-  const { selected_node_id } = state;
+  const { selection } = state;
 
   const nodeActions = __useNodeActions(dispatch);
 
-  const clearSelection = useCallback(
-    () =>
+  const select = useCallback(
+    (...selectors: Selector[]) =>
       dispatch({
-        type: "document/node/select",
-        node_id: undefined,
+        type: "select",
+        selectors: selectors,
       }),
     [dispatch]
   );
 
+  const blur = useCallback(
+    () =>
+      dispatch({
+        type: "blur",
+      }),
+    [dispatch]
+  );
+
+  const undo = useCallback(() => {
+    dispatch({
+      type: "undo",
+    });
+  }, [dispatch]);
+
+  const redo = useCallback(() => {
+    dispatch({
+      type: "redo",
+    });
+  }, [dispatch]);
+
+  const cut = useCallback(
+    (target: "selection" | (string & {}) = "selection") => {
+      dispatch({
+        type: "cut",
+        target: target,
+      });
+    },
+    [dispatch]
+  );
+
+  const copy = useCallback(
+    (target: "selection" | (string & {}) = "selection") => {
+      dispatch({
+        type: "copy",
+        target: target,
+      });
+    },
+    [dispatch]
+  );
+
+  const paste = useCallback(() => {
+    dispatch({
+      type: "paste",
+    });
+  }, [dispatch]);
+
+  const duplicate = useCallback(
+    (target: "selection" | (string & {}) = "selection") => {
+      dispatch({
+        type: "duplicate",
+        target,
+      });
+    },
+    [dispatch]
+  );
+
+  const deleteNode = useCallback(
+    (target: "selection" | (string & {}) = "selection") => {
+      dispatch({
+        type: "delete",
+        target: target,
+      });
+    },
+    [dispatch]
+  );
+
+  const { nudge, nudgeResize } = __useNudgeActions(dispatch);
+
+  const align = useCallback(
+    (
+      target: "selection" | (string & {}) = "selection",
+      alignment: {
+        horizontal?: "none" | "min" | "max" | "center";
+        vertical?: "none" | "min" | "max" | "center";
+      }
+    ) => {
+      dispatch({
+        type: "align",
+        target,
+        alignment,
+      });
+    },
+    [dispatch]
+  );
+
+  const distributeEvenly = useCallback(
+    (target: "selection" | string[] = "selection", axis: "x" | "y") => {
+      dispatch({
+        type: "distribute-evenly",
+        target,
+        axis,
+      });
+    },
+    [dispatch]
+  );
+
+  const configureSurfaceRaycastTargeting = useCallback(
+    (config: Partial<SurfaceRaycastTargeting>) => {
+      dispatch({
+        type: "config/surface/raycast-targeting",
+        config,
+      });
+    },
+    [dispatch]
+  );
+
+  const configureMeasurement = useCallback(
+    (measurement: "on" | "off") => {
+      dispatch({
+        type: "config/surface/measurement",
+        measurement,
+      });
+    },
+    [dispatch]
+  );
+
+  const configureTranslateWithCloneModifier = useCallback(
+    (translate_with_clone: "on" | "off") => {
+      dispatch({
+        type: "config/modifiers/translate-with-clone",
+        translate_with_clone,
+      });
+    },
+    [dispatch]
+  );
+
+  const configureTranslateWithAxisLockModifier = useCallback(
+    (tarnslate_with_axis_lock: "on" | "off") => {
+      dispatch({
+        type: "config/modifiers/translate-with-axis-lock",
+        tarnslate_with_axis_lock,
+      });
+    },
+    [dispatch]
+  );
+
+  const configureTransformWithCenterOriginModifier = useCallback(
+    (transform_with_center_origin: "on" | "off") => {
+      dispatch({
+        type: "config/modifiers/transform-with-center-origin",
+        transform_with_center_origin,
+      });
+    },
+    [dispatch]
+  );
+
+  const configureTransformWithPreserveAspectRatioModifier = useCallback(
+    (transform_with_preserve_aspect_ratio: "on" | "off") => {
+      dispatch({
+        type: "config/modifiers/transform-with-preserve-aspect-ratio",
+        transform_with_preserve_aspect_ratio,
+      });
+    },
+    [dispatch]
+  );
+
+  const configureRotateWithQuantizeModifier = useCallback(
+    (rotate_with_quantize: number | "off") => {
+      dispatch({
+        type: "config/modifiers/rotate-with-quantize",
+        rotate_with_quantize,
+      });
+    },
+    [dispatch]
+  );
+
+  const toggleActive = useCallback(
+    (target: "selection" | (string & {}) = "selection") => {
+      const target_ids = target === "selection" ? selection : [target];
+      target_ids.forEach((node_id) => {
+        dispatch({
+          type: "node/toggle/active",
+          node_id: node_id,
+        });
+      });
+    },
+    [dispatch, selection]
+  );
+
+  const toggleLocked = useCallback(
+    (target: "selection" | (string & {}) = "selection") => {
+      const target_ids = target === "selection" ? selection : [target];
+      target_ids.forEach((node_id) => {
+        dispatch({
+          type: "node/toggle/locked",
+          node_id: node_id,
+        });
+      });
+    },
+    [dispatch, selection]
+  );
+
+  const toggleBold = useCallback(
+    (target: "selection" | (string & {}) = "selection") => {
+      const target_ids = target === "selection" ? selection : [target];
+      target_ids.forEach((node_id) => {
+        dispatch({
+          type: "node/toggle/bold",
+          node_id: node_id,
+        });
+      });
+    },
+    [dispatch, selection]
+  );
+
   const getNodeById = useCallback(
     (node_id: string): grida.program.nodes.Node => {
-      return documentquery.__getNodeById(state, node_id);
+      return document.__getNodeById(state, node_id);
     },
     [state.document.nodes]
   );
 
   const getNodeDepth = useCallback(
     (node_id: string) => {
-      const parent_ids = [];
-      let current_id = node_id;
-
-      // Traverse up the tree to collect parent IDs
-      while (state.document_ctx.__ctx_nid_to_parent_id[current_id]) {
-        const parent_id = state.document_ctx.__ctx_nid_to_parent_id[current_id];
-        parent_ids.push(parent_id);
-        if (current_id === parent_id) {
-          reportError("parent_id is same as current_id");
-          break;
-        }
-        current_id = parent_id;
-      }
-
-      return parent_ids.length;
+      return document.getDepth(state.document_ctx, node_id);
     },
     [state.document_ctx]
   );
 
   const getNodeAbsoluteRotation = useCallback(
     (node_id: string) => {
-      const parent_ids = [];
-      let current_id = node_id;
+      const parent_ids = document.getAncestors(state.document_ctx, node_id);
 
-      // Traverse up the tree to collect parent IDs
-      while (state.document_ctx.__ctx_nid_to_parent_id[current_id]) {
-        const parent_id = state.document_ctx.__ctx_nid_to_parent_id[current_id];
-        parent_ids.push(parent_id);
-        if (current_id === parent_id) {
-          reportError("parent_id is same as current_id");
-          break;
-        }
-        current_id = parent_id;
-      }
-      parent_ids.reverse();
-
-      // Calculate the absolute rotation
       let rotation = 0;
+      // Calculate the absolute rotation
       try {
         for (const parent_id of parent_ids) {
           const parent_node = getNodeById(parent_id);
@@ -952,15 +1244,42 @@ export function useDocument() {
     [dispatch]
   );
 
-  const selectedNodeActions = useNodeAction(selected_node_id);
-  const selectedNode = selected_node_id ? selectedNodeActions : undefined;
+  const selectedNodeActions = useNodeAction(
+    selection.length === 1 ? selection[0] : undefined
+  );
+  const selectedNode = selection.length === 1 ? selectedNodeActions : undefined;
 
   return useMemo(() => {
     return {
       state,
-      selected_node_id,
+      selection,
       selectedNode,
-      clearSelection,
+      //
+      select,
+      blur,
+      undo,
+      redo,
+      cut,
+      copy,
+      paste,
+      duplicate,
+      deleteNode,
+      nudge,
+      nudgeResize,
+      align,
+      distributeEvenly,
+      configureSurfaceRaycastTargeting,
+      configureMeasurement,
+      configureTranslateWithCloneModifier,
+      configureTranslateWithAxisLockModifier,
+      configureTransformWithCenterOriginModifier,
+      configureTransformWithPreserveAspectRatioModifier,
+      configureRotateWithQuantizeModifier,
+      //
+      toggleActive,
+      toggleLocked,
+      toggleBold,
+      //
       getNodeDepth,
       getNodeAbsoluteRotation,
       insertNode,
@@ -972,9 +1291,34 @@ export function useDocument() {
     };
   }, [
     state,
-    selected_node_id,
+    selection,
     selectedNode,
-    clearSelection,
+    //
+    select,
+    blur,
+    undo,
+    redo,
+    cut,
+    copy,
+    paste,
+    duplicate,
+    deleteNode,
+    nudge,
+    nudgeResize,
+    align,
+    distributeEvenly,
+    configureSurfaceRaycastTargeting,
+    configureMeasurement,
+    configureTranslateWithCloneModifier,
+    configureTranslateWithAxisLockModifier,
+    configureTransformWithCenterOriginModifier,
+    configureTransformWithPreserveAspectRatioModifier,
+    configureRotateWithQuantizeModifier,
+    //
+    toggleActive,
+    toggleLocked,
+    toggleBold,
+    //
     getNodeDepth,
     getNodeAbsoluteRotation,
     insertNode,
@@ -1000,6 +1344,14 @@ function throttle<T extends (...args: any[]) => void>(
   } as T;
 }
 
+function debounce(func: (...args: any[]) => void, wait: number) {
+  let timeout: NodeJS.Timeout;
+  return (...args: any[]) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  };
+}
+
 export function useEventTargetCSSCursor() {
   const [state] = __useInternal();
 
@@ -1022,6 +1374,8 @@ export function useEventTargetCSSCursor() {
             return "crosshair";
         }
       }
+      case "draw":
+        return "crosshair";
     }
   }, [cursor_mode]);
 }
@@ -1030,47 +1384,26 @@ export function useEventTarget() {
   const [state, dispatch] = __useInternal();
 
   const {
-    is_gesture_node_drag_move: is_node_transforming,
+    content_offset,
+    viewport_offset,
+    gesture,
     hovered_node_id,
-    selected_node_id,
-    surface_content_edit_mode: content_edit_mode,
+    dropzone_node_id,
+    selection,
+    content_edit_mode,
     cursor_mode,
     marquee,
   } = state;
 
+  const is_node_transforming = !!gesture;
+  const is_node_translating = gesture?.type === "translate";
+  const is_node_scaling = gesture?.type === "scale";
+
   const setCursorMode = useCallback(
     (cursor_mode: CursorMode) => {
       dispatch({
-        type: "document/canvas/cursor-mode",
+        type: "document/surface/cursor-mode",
         cursor_mode,
-      });
-    },
-    [dispatch]
-  );
-
-  const keyDown = useCallback(
-    (event: KeyboardEvent) => {
-      dispatch({
-        type: "document/canvas/backend/html/event/on-key-down",
-        key: event.key,
-        altKey: event.altKey,
-        metaKey: event.metaKey,
-        ctrlKey: event.ctrlKey,
-        shiftKey: event.shiftKey,
-      });
-    },
-    [dispatch]
-  );
-
-  const keyUp = useCallback(
-    (event: KeyboardEvent) => {
-      dispatch({
-        type: "document/canvas/backend/html/event/on-key-up",
-        key: event.key,
-        altKey: event.altKey,
-        metaKey: event.metaKey,
-        ctrlKey: event.ctrlKey,
-        shiftKey: event.shiftKey,
       });
     },
     [dispatch]
@@ -1088,6 +1421,7 @@ export function useEventTarget() {
         type: "document/canvas/backend/html/event/on-pointer-move-raycast",
         node_ids_from_point: els.map((n) => n.id),
         position,
+        shiftKey: event.shiftKey,
       });
     }, 30),
     [dispatch]
@@ -1131,6 +1465,7 @@ export function useEventTarget() {
       dispatch({
         type: "document/canvas/backend/html/event/on-pointer-down",
         node_ids_from_point: els.map((n) => n.id),
+        shiftKey: event.shiftKey,
       });
     },
     [dispatch]
@@ -1147,10 +1482,17 @@ export function useEventTarget() {
 
   const click = useCallback(
     (event: MouseEvent) => {
-      const position = __canvas_space_position(event);
       dispatch({
         type: "document/canvas/backend/html/event/on-click",
-        position,
+      });
+    },
+    [dispatch]
+  );
+
+  const doubleClick = useCallback(
+    (event: MouseEvent) => {
+      dispatch({
+        type: "document/canvas/backend/html/event/on-double-click",
       });
     },
     [dispatch]
@@ -1163,30 +1505,77 @@ export function useEventTarget() {
    */
   const tryEnterContentEditMode = useCallback(() => {
     dispatch({
-      type: "document/canvas/content-edit-mode/try-enter",
+      type: "document/surface/content-edit-mode/try-enter",
     });
   }, [dispatch]);
 
   const tryExitContentEditMode = useCallback(() => {
     dispatch({
-      type: "document/canvas/content-edit-mode/try-exit",
+      type: "document/surface/content-edit-mode/try-exit",
     });
   }, [dispatch]);
 
-  const dragStart = useCallback(() => {
-    dispatch({
-      type: "document/canvas/backend/html/event/on-drag-start",
-    });
-  }, [dispatch]);
+  const dragStart = useCallback(
+    (event: PointerEvent) => {
+      dispatch({
+        type: "document/canvas/backend/html/event/on-drag-start",
+        shiftKey: event.shiftKey,
+      });
+    },
+    [dispatch]
+  );
 
-  const dragEnd = useCallback(() => {
-    dispatch({
-      type: "document/canvas/backend/html/event/on-drag-end",
-    });
-  }, [dispatch]);
+  const dragEnd = useCallback(
+    (event: PointerEvent) => {
+      if (marquee) {
+        const contained: string[] = [];
+
+        const els = domapi.get_grida_node_elements();
+        const viewportdomrect = domapi.get_viewport_rect();
+        const viewport_pos = [viewportdomrect.x, viewportdomrect.y];
+        const translate: [number, number] = [
+          state.content_offset ? state.content_offset[0] : 0,
+          state.content_offset ? state.content_offset[1] : 0,
+        ];
+
+        const marqueerect = cmath.rect.fromPoints([
+          [marquee.x1, marquee.y1],
+          [marquee.x2, marquee.y2],
+        ]);
+        marqueerect.x = marqueerect.x - translate[0];
+        marqueerect.y = marqueerect.y - translate[1];
+
+        els?.forEach((el) => {
+          const eldomrect = el.getBoundingClientRect();
+          const elrect = {
+            x: eldomrect.x - translate[0] - viewport_pos[0],
+            y: eldomrect.y - translate[1] - viewport_pos[1],
+            width: eldomrect.width,
+            height: eldomrect.height,
+          };
+          if (cmath.rect.intersects(elrect, marqueerect)) {
+            contained.push(el.id);
+          }
+        });
+
+        dispatch({
+          type: "document/canvas/backend/html/event/on-drag-end",
+          node_ids_from_area: contained,
+          shiftKey: event.shiftKey,
+        });
+
+        return;
+      }
+      dispatch({
+        type: "document/canvas/backend/html/event/on-drag-end",
+        shiftKey: event.shiftKey,
+      });
+    },
+    [dispatch, marquee, state.content_offset]
+  );
 
   const drag = useCallback(
-    (event: { delta: Vector2; distance: Vector2 }) => {
+    (event: TCanvasEventTargetDragGestureState) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "document/canvas/backend/html/event/on-drag",
@@ -1197,37 +1586,81 @@ export function useEventTarget() {
     [dispatch]
   );
 
+  //
+  const layerClick = useCallback(
+    (selection: string[], event: MouseEvent) => {
+      const els = domapi.get_grida_node_elements_from_point(
+        event.clientX,
+        event.clientY
+      );
+
+      dispatch({
+        type: "document/canvas/backend/html/event/node-overlay/on-click",
+        selection: selection,
+        node_ids_from_point: els.map((n) => n.id),
+        shiftKey: event.shiftKey,
+      });
+    },
+    [dispatch]
+  );
+  const layerDragStart = useCallback(
+    (selection: string[], event: TCanvasEventTargetDragGestureState) => {
+      dispatch({
+        type: "document/canvas/backend/html/event/node-overlay/on-drag-start",
+        selection,
+        event,
+      });
+    },
+    [dispatch]
+  );
+  const layerDragEnd = useCallback(
+    (selection: string[], event: TCanvasEventTargetDragGestureState) => {
+      dispatch({
+        type: "document/canvas/backend/html/event/node-overlay/on-drag-end",
+        selection,
+        event,
+      });
+    },
+    [dispatch]
+  );
+  const layerDrag = useCallback(
+    (selection: string[], event: TCanvasEventTargetDragGestureState) => {
+      dispatch({
+        type: "document/canvas/backend/html/event/node-overlay/on-drag",
+        selection,
+        event,
+      });
+    },
+    [dispatch]
+  );
+  //
+
   // #region drag resize handle
   const dragResizeHandleStart = useCallback(
-    (node_id: string, client_wh: { width: number; height: number }) => {
+    (selection: string | string[], direction: cmath.CardinalDirection) => {
       dispatch({
         type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-start",
-        node_id,
-        client_wh,
+        selection: Array.isArray(selection) ? selection : [selection],
+        direction,
       });
     },
     [dispatch]
   );
-  const dragResizeHandleEnd = useCallback(
-    (node_id: string) => {
-      dispatch({
-        type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-end",
-        node_id,
-      });
-    },
-    [dispatch]
-  );
+  const dragResizeHandleEnd = useCallback(() => {
+    dispatch({
+      type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-end",
+    });
+  }, [dispatch]);
+
   const dragResizeHandle = useCallback(
     (
-      node_id: string,
-      anchor: "nw" | "ne" | "sw" | "se",
-      event: { delta: Vector2; distance: Vector2 }
+      direction: cmath.CardinalDirection,
+      event: TCanvasEventTargetDragGestureState
     ) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag",
-          node_id,
-          anchor,
+          direction: direction,
           event,
         });
       });
@@ -1259,13 +1692,13 @@ export function useEventTarget() {
     (
       node_id: string,
       anchor: "nw" | "ne" | "sw" | "se",
-      event: { delta: Vector2; distance: Vector2 }
+      event: TCanvasEventTargetDragGestureState
     ) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag",
           node_id,
-          anchor,
+          direction: anchor,
           event,
         });
       });
@@ -1297,13 +1730,13 @@ export function useEventTarget() {
     (
       node_id: string,
       anchor: "nw" | "ne" | "sw" | "se",
-      event: { delta: Vector2; distance: Vector2 }
+      event: TCanvasEventTargetDragGestureState
     ) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag",
           node_id,
-          anchor,
+          direction: anchor,
           event,
         });
       });
@@ -1314,17 +1747,20 @@ export function useEventTarget() {
 
   return useMemo(() => {
     return {
+      content_offset,
+      viewport_offset,
+      //
       marquee,
       cursor_mode,
       setCursorMode,
       //
       hovered_node_id,
-      selected_node_id,
+      dropzone_node_id,
+      selection,
       is_node_transforming,
+      is_node_translating,
+      is_node_scaling,
       content_edit_mode,
-      //
-      keyDown,
-      keyUp,
       //
       dragResizeHandleStart,
       dragResizeHandleEnd,
@@ -1342,6 +1778,7 @@ export function useEventTarget() {
       pointerDown,
       pointerUp,
       click,
+      doubleClick,
       //
       tryEnterContentEditMode,
       tryExitContentEditMode,
@@ -1350,19 +1787,29 @@ export function useEventTarget() {
       dragEnd,
       drag,
       //
+      layerClick,
+      layerDragStart,
+      layerDragEnd,
+      layerDrag,
+      //
     };
   }, [
+    content_offset,
+    viewport_offset,
+    //
     marquee,
     cursor_mode,
     setCursorMode,
     //
     hovered_node_id,
-    selected_node_id,
-    is_node_transforming,
-    content_edit_mode,
+    dropzone_node_id,
+    selection,
     //
-    keyDown,
-    keyUp,
+    is_node_transforming,
+    is_node_translating,
+    is_node_scaling,
+    //
+    content_edit_mode,
     //
     dragResizeHandleStart,
     dragResizeHandleEnd,
@@ -1380,6 +1827,7 @@ export function useEventTarget() {
     pointerDown,
     pointerUp,
     click,
+    doubleClick,
     //
     tryEnterContentEditMode,
     tryExitContentEditMode,
@@ -1387,6 +1835,11 @@ export function useEventTarget() {
     dragStart,
     dragEnd,
     drag,
+    //
+    layerClick,
+    layerDragStart,
+    layerDragEnd,
+    layerDrag,
     //
   ]);
 }
@@ -1426,17 +1879,33 @@ export function useRootTemplateInstanceNode() {
   );
 }
 
+class EditorConsumerError extends Error {
+  context: any;
+  constructor(message: string, context: any) {
+    super(message); // Pass message to the parent Error class
+    this.name = this.constructor.name; // Set the error name
+    this.context = context; // Attach the context object
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, this.constructor);
+    }
+  }
+
+  toString(): string {
+    return `${this.name}: ${this.message} - Context: ${JSON.stringify(this.context)}`;
+  }
+}
+
 export function useNode(node_id: string): grida.program.nodes.AnyNode & {
   meta: {
     is_component_consumer: boolean;
   };
 } {
+  const { state } = useDocument();
+
   const {
-    state: {
-      document: { nodes, root_id },
-      templates,
-    },
-  } = useDocument();
+    document: { nodes, root_id },
+    templates,
+  } = state;
 
   const root = nodes[root_id];
 
@@ -1449,7 +1918,10 @@ export function useNode(node_id: string): grida.program.nodes.AnyNode & {
   } else {
     assert(
       templates,
-      'node is not found under "nodes", but templates are not provided for additional lookup'
+      new EditorConsumerError(
+        `node '${node_id}' is not found under "nodes", but templates are not provided for additional lookup`,
+        { state }
+      )
     );
     // TODO: can do better with the query - performance
     // find the template definition that contains this node id
@@ -1507,9 +1979,10 @@ export function useNode(node_id: string): grida.program.nodes.AnyNode & {
 
 export function useComputedNode(node_id: string) {
   const node = useNode(node_id);
-  const { active, style, component_id, props, text, src, href } = node;
+  const { active, style, component_id, props, text, html, src, href } = node;
   const computed = useComputed({
     text: text,
+    html: html,
     src: src,
     href: href,
     props: props,
@@ -1524,22 +1997,4 @@ export function useTemplateDefinition(template_id: string) {
   } = useDocument();
 
   return templates![template_id];
-}
-
-export function useNodeDomElement(node_id: string) {
-  const [nodeElement, setNodeElement] = React.useState<HTMLElement | null>(
-    null
-  );
-
-  useLayoutEffect(() => {
-    if (!node_id) {
-      setNodeElement(null);
-      return;
-    }
-
-    const element = document.getElementById(node_id);
-    setNodeElement(element);
-  }, [node_id]);
-
-  return nodeElement;
 }

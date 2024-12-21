@@ -139,6 +139,7 @@ export default function nodeReducer<
             draft.type === "rectangle" ||
             draft.type === "ellipse" ||
             draft.type === "text" ||
+            draft.type === "richtext" ||
             draft.type === "container" ||
             draft.type === "component"
         );

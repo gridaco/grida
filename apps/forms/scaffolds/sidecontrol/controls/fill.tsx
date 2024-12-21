@@ -15,7 +15,8 @@ import {
   SolidPaintIcon,
 } from "./icons/paint-icon";
 import { PaintChip, RGBAChip } from "./utils/paint-chip";
-import { useCallback } from "react";
+import React, { useCallback } from "react";
+import HexValueInput from "./utils/hex";
 
 const transparent_paint: grida.program.cg.Paint = {
   type: "solid",
@@ -89,44 +90,61 @@ export function FillControl({
 
   return (
     <Popover>
-      <PopoverTrigger className="w-full">
-        {value ? (
-          <>
-            <div
-              className={cn(
-                "flex items-center border cursor-default",
-                WorkbenchUI.inputVariants({ size: "sm" })
-              )}
-            >
-              <PaintChip paint={value} />
-              {value.type === "solid" && (
-                <span className="ms-2 text-xs">
-                  #{grida.program.css.rgbaToHex(value.color)}
-                </span>
-              )}
-              {value.type === "linear_gradient" && (
+      {value ? (
+        <>
+          {value.type === "solid" && (
+            <PaintInputContainer>
+              <PopoverTrigger>
+                <PaintChip paint={value} />
+              </PopoverTrigger>
+              <HexValueInput
+                className="border-none outline-none w-full h-full ps-2 text-xs"
+                value={{
+                  r: value.color.r,
+                  g: value.color.g,
+                  b: value.color.b,
+                  // ommit the alpha
+                }}
+                onValueChange={(color) => {
+                  onValueChange({
+                    type: "solid",
+                    color: { ...color, a: value.color.a },
+                  });
+                }}
+              />
+            </PaintInputContainer>
+          )}
+          {value.type === "linear_gradient" && (
+            <PopoverTrigger className="w-full">
+              <PaintInputContainer>
+                <PaintChip paint={value} />
                 <span className="ms-2 text-xs">Linear</span>
-              )}
-              {value.type === "radial_gradient" && (
+              </PaintInputContainer>
+            </PopoverTrigger>
+          )}
+          {value.type === "radial_gradient" && (
+            <PopoverTrigger className="w-full">
+              <PaintInputContainer>
+                <PaintChip paint={value} />
                 <span className="ms-2 text-xs">Radial</span>
-              )}
-            </div>
-          </>
-        ) : (
-          <>
-            <div
-              className={cn(
-                "flex items-center border cursor-default",
-                WorkbenchUI.inputVariants({ size: "sm" })
-              )}
-              onClick={onAddFill}
-            >
-              <PaintChip paint={transparent_paint} />
-              <span className="ms-2 text-xs">Add</span>
-            </div>
-          </>
-        )}
-      </PopoverTrigger>
+              </PaintInputContainer>
+            </PopoverTrigger>
+          )}
+        </>
+      ) : (
+        <PopoverTrigger className="w-full">
+          <div
+            className={cn(
+              "flex items-center border cursor-default",
+              WorkbenchUI.inputVariants({ size: "paint" })
+            )}
+            onClick={onAddFill}
+          >
+            <PaintChip paint={transparent_paint} />
+            <span className="ms-2 text-xs">Add</span>
+          </div>
+        </PopoverTrigger>
+      )}
       <PopoverContent>
         <Tabs value={value?.type} onValueChange={onTabChange as any}>
           <TabsList>
@@ -167,5 +185,18 @@ export function FillControl({
         </Tabs>
       </PopoverContent>
     </Popover>
+  );
+}
+
+function PaintInputContainer({ children }: React.PropsWithChildren<{}>) {
+  return (
+    <div
+      className={cn(
+        "flex items-center border cursor-default",
+        WorkbenchUI.inputVariants({ size: "paint" })
+      )}
+    >
+      {children}
+    </div>
   );
 }

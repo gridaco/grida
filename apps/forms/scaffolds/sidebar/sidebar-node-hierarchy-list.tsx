@@ -21,7 +21,6 @@ import {
   TextIcon,
   TransformIcon,
   CircleIcon,
-  LockOpen2Icon,
   LockClosedIcon,
   EyeOpenIcon,
   EyeClosedIcon,
@@ -31,7 +30,7 @@ import {
   Component1Icon,
 } from "@radix-ui/react-icons";
 import { grida } from "@/grida";
-import React from "react";
+import React, { useMemo } from "react";
 import { useNodeAction } from "@/grida-canvas/provider";
 
 function NodeHierarchyItemContextMenuWrapper({
@@ -74,26 +73,53 @@ function NodeHierarchyItemContextMenuWrapper({
   );
 }
 
+function hierarchy(
+  root_id: string,
+  ctx: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext
+): { id: string; depth: number }[] {
+  const collectNodeIds = (
+    nodeId: string,
+    depth: number,
+    result: { id: string; depth: number }[] = []
+  ): { id: string; depth: number }[] => {
+    result.push({ id: nodeId, depth }); // Add current node ID with its depth
+
+    // Get children from context
+    const children = ctx.__ctx_nid_to_children_ids[nodeId] ?? [];
+    for (const childId of children) {
+      collectNodeIds(childId, depth + 1, result); // Increase depth for children
+    }
+
+    return result;
+  };
+
+  // Start traversal from the root node
+  return collectNodeIds(root_id, 0);
+}
+
 export function NodeHierarchyList() {
   const {
-    state: { document, selected_node_id, hovered_node_id },
-    selectNode,
+    state: { document, document_ctx, selection, hovered_node_id },
+    select,
     pointerEnterNode,
     toggleNodeLocked,
     toggleNodeActive,
-    getNodeDepth,
   } = useDocument();
 
   // TODO: need nested nodes for templates
 
-  const ids = Object.keys(document.nodes);
+  const list = useMemo(() => {
+    return hierarchy(document.root_id, document_ctx);
+  }, [document.root_id, document_ctx]);
+
+  // const ids = Object.keys(document.nodes);
+
   return (
     <>
-      {ids.map((id) => {
+      {list.map(({ id, depth }) => {
         const n = document.nodes[id];
-        const selected = selected_node_id === n.id;
+        const selected = selection.includes(n.id);
         const hovered = hovered_node_id === n.id;
-        const depth = getNodeDepth(n.id);
         return (
           <NodeHierarchyItemContextMenuWrapper key={n.id} node_id={n.id}>
             <SidebarMenuItem
@@ -101,10 +127,14 @@ export function NodeHierarchyList() {
               hovered={hovered}
               level={depth}
               selected={selected}
-              onSelect={() => {
-                selectNode(n.id);
+              onSelect={(e) => {
+                if (e.metaKey || e.ctrlKey) {
+                  select("selection", [n.id]);
+                } else {
+                  select([n.id]);
+                }
               }}
-              icon={<NodeHierarchyItemIcon node={n} className="w-4 h-4" />}
+              icon={<NodeHierarchyItemIcon node={n} className="w-3.5 h-3.5" />}
               onPointerEnter={() => {
                 pointerEnterNode(n.id);
               }}
@@ -112,7 +142,7 @@ export function NodeHierarchyList() {
                 pointerEnterNode(n.id);
               }}
             >
-              <SidebarMenuItemLabel className="font-normal text-sm">
+              <SidebarMenuItemLabel className="font-normal text-xs">
                 {n.name}
               </SidebarMenuItemLabel>
               <SidebarMenuItemActions>

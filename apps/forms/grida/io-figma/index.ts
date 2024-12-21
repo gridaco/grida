@@ -541,6 +541,8 @@ export namespace iofigma {
           case "BOOLEAN_OPERATION": {
           }
           case "LINE": {
+            const first_visible_stroke = first_visible(node.strokes ?? []);
+
             return {
               id: node.id,
               name: node.name,
@@ -551,6 +553,9 @@ export namespace iofigma {
               zIndex: 0,
               type: "line",
               position: "absolute",
+              stroke: first_visible_stroke
+                ? paint(first_visible_stroke)
+                : undefined,
               left: node.relativeTransform![0][2],
               top: node.relativeTransform![1][2],
               width: node.size!.x,

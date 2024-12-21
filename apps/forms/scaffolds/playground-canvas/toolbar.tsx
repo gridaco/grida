@@ -16,6 +16,7 @@ import { useMetaEnter } from "@/hooks/use-meta-enter";
 import {
   BorderSolidIcon,
   BoxIcon,
+  Pencil1Icon,
   ChatBubbleIcon,
   CircleIcon,
   CursorArrowIcon,
@@ -176,6 +177,9 @@ export function PlaygroundToolbar({
         <ToggleGroupItem value={"line" satisfies ToolbarToolType}>
           <BorderSolidIcon />
         </ToggleGroupItem>
+        <ToggleGroupItem value={"pencil" satisfies ToolbarToolType}>
+          <Pencil1Icon />
+        </ToggleGroupItem>
         <ToggleGroupItem value={"image" satisfies ToolbarToolType}>
           <ImageIcon />
         </ToggleGroupItem>
@@ -247,7 +251,8 @@ type ToolbarToolType =
   | "text"
   | "container"
   | "image"
-  | "line";
+  | "line"
+  | "pencil";
 
 function cursormode_to_toolbar_value(cm: CursorMode): ToolbarToolType {
   switch (cm.type) {
@@ -255,6 +260,8 @@ function cursormode_to_toolbar_value(cm: CursorMode): ToolbarToolType {
       return "cursor";
     case "insert":
       return cm.node;
+    case "draw":
+      return "pencil";
   }
 }
 
@@ -262,7 +269,14 @@ function toolbar_value_to_cursormode(tt: ToolbarToolType): CursorMode {
   switch (tt) {
     case "cursor":
       return { type: "cursor" };
-    default:
+    case "container":
+    case "ellipse":
+    case "image":
+    case "line":
+    case "rectangle":
+    case "text":
       return { type: "insert", node: tt };
+    case "pencil":
+      return { type: "draw", tool: "pencil" };
   }
 }
