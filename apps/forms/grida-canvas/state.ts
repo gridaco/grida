@@ -112,6 +112,38 @@ interface IDocumentEditorTransformState {
   viewport_offset: cmath.Vector2;
 }
 
+export type GestureNudge = {
+  type: "nudge";
+  /**
+   * surface snap guides - result of snap while translate (move) gesture
+   */
+  surface_snapping?: SnapResult;
+};
+
+export type GestureDraw = {
+  /**
+   * - draw points
+   */
+  type: "draw";
+
+  /**
+   * origin point - relative to content space
+   */
+  origin: cmath.Vector2;
+
+  /**
+   * record of points (movements)
+   * the absolute position of the points will be (p + origin)
+   */
+  points: cmath.Vector2[];
+
+  /**
+   * current movement
+   */
+  movement: cmath.Vector2;
+  node_id: string;
+};
+
 /**
  * [Surface Support State]
  *
@@ -119,13 +151,7 @@ interface IDocumentEditorTransformState {
  */
 interface IDocumentEditorEventTargetState {
   gesture?:
-    | {
-        type: "nudge";
-        /**
-         * surface snap guides - result of snap while translate (move) gesture
-         */
-        surface_snapping?: SnapResult;
-      }
+    | GestureNudge
     | {
         // translate (move)
         type: "translate";
@@ -177,18 +203,7 @@ interface IDocumentEditorEventTargetState {
         type: "corner-radius";
         initial_bounding_rectangle: cmath.Rectangle | null;
       }
-    | {
-        /**
-         * - draw points
-         */
-        type: "draw";
-        /**
-         * origin point
-         */
-        origin: cmath.Vector2;
-        movement: cmath.Vector2;
-        node_id: string;
-      };
+    | GestureDraw;
 
   gesture_modifiers: GestureModifiers;
 

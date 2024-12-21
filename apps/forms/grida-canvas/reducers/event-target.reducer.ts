@@ -1,4 +1,4 @@
-import { produce, type Draft } from "immer";
+import { original, produce, type Draft } from "immer";
 
 import type {
   EventTargetAction,
@@ -19,7 +19,7 @@ import type {
   EditorEventTarget_Node_PointerLeave,
   //
 } from "../action";
-import type { IDocumentEditorState } from "../state";
+import type { GestureDraw, IDocumentEditorState } from "../state";
 import { grida } from "@/grida";
 import { document } from "../document-query";
 import nodeReducer from "./node.reducer";
@@ -288,6 +288,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               type: "draw",
               origin: cursor_position,
               movement: cmath.vector2.zero,
+              points: [cmath.vector2.zero],
               node_id: vector.id,
             };
           }
@@ -345,7 +346,8 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             }
             case "draw": {
               draft.gesture.movement = movement;
-              const { node_id } = draft.gesture;
+              const { origin, points, node_id } = state.gesture as GestureDraw;
+
               const node = document.__getNodeById(
                 draft,
                 node_id
@@ -353,23 +355,29 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
               // take snapshot of the previous points
               const point = movement;
-              const points_prev = Array.from(node.points);
-              const points_next = [...points_prev, point];
+              const points_next = [...points, point];
+              draft.gesture.points = points_next;
 
               // get the box of the points
-              const bb_prev = cmath.rect.fromPoints(points_prev);
               const bb_next = cmath.rect.fromPoints(points_next);
-              const delta = cmath.vector2.subtract(
-                [bb_next.x, bb_next.y],
-                [bb_prev.x, bb_prev.y]
-              );
+              // delta is the x, y of the new bounding box - as it started from [0, 0]
+              const delta: cmath.Vector2 = [bb_next.x, bb_next.y];
 
               // update the points with the delta (so the most left top point is to be [0, 0])
-              node.points = points_next.map((p) => cmath.vector2.add(p, delta));
+              const delta_shifted_points = points_next.map((p) =>
+                cmath.vector2.add(
+                  p,
+                  // inverse
+                  cmath.vector2.multiply(delta, [-1, -1])
+                )
+              );
+              const dleta_shifted_pos = cmath.vector2.add(origin, delta);
+
+              node.points = delta_shifted_points;
 
               // update the node position & dimension
-              node.left = node.left! + delta[0];
-              node.top = node.top! + delta[1];
+              node.left = dleta_shifted_pos[0];
+              node.top = dleta_shifted_pos[1];
               node.width = bb_next.width;
               node.height = bb_next.height;
 

@@ -12,7 +12,12 @@ export function SVGPolyLineWidget({
   return (
     <svg
       {...queryattributes(props)}
-      style={{ ...style, border: "1px solid red" }}
+      style={{
+        ...style,
+        overflow: "visible", // shall be visible since the polyline has a stroke width
+        // debug
+        // border: "1px solid red"
+      }}
       width={width}
       height={height}
     >

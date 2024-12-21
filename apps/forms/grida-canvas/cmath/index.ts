@@ -257,6 +257,20 @@ export namespace cmath.vector2 {
     // Return the intersecting segment as [start, end]
     return [start, end];
   }
+
+  export function min(...vectors: Vector2[]): Vector2 {
+    return vectors.reduce(
+      (acc, [x, y]) => [Math.min(acc[0], x), Math.min(acc[1], y)],
+      [Infinity, Infinity] as Vector2
+    );
+  }
+
+  export function max(...vectors: Vector2[]): Vector2 {
+    return vectors.reduce(
+      (acc, [x, y]) => [Math.max(acc[0], x), Math.max(acc[1], y)],
+      [-Infinity, -Infinity] as Vector2
+    );
+  }
 }
 
 export namespace cmath.rect {
@@ -1196,6 +1210,7 @@ export namespace cmath.auxiliary_line.rectangular {
   // fromPointToVector
   // sideToPoint
 }
+
 export namespace cmath.ext.movement {
   type Movement = Vector2;
 
