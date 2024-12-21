@@ -316,6 +316,10 @@ export function useEditorHotKeys() {
     setCursorMode({ type: "insert", node: "line" });
   });
 
+  useHotkeys("p", () => {
+    setCursorMode({ type: "draw", tool: "pencil" });
+  });
+
   useHotkeys("t", () => {
     setCursorMode({ type: "insert", node: "text" });
   });

@@ -490,19 +490,22 @@ export namespace cmath.rect {
    * Creates a rectangle that fully bounds the given points.
    *
    * This function computes the minimum bounding rectangle that encloses all the input points.
-   * At least 2 points are required.
+   * At least 1 point is required.
    *
-   * @param points - An array of points (at least 2) to calculate the bounding rectangle.
+   * @param points - An array of points (at least 1) to calculate the bounding rectangle.
    * @returns A rectangle with `x`, `y`, `width`, and `height`.
    *
    * @example
    * const rect = cmath.rect.fromPoints([[10, 20], [30, 40], [15, 25]]);
    * console.log(rect); // { x: 10, y: 20, width: 20, height: 20 }
+   *
+   * const pointRect = cmath.rect.fromPoints([[10, 20]]);
+   * console.log(pointRect); // { x: 10, y: 20, width: 0, height: 0 }
    */
   export function fromPoints(points: cmath.Vector2[]): cmath.Rectangle {
-    if (points.length < 2) {
+    if (points.length <= 0) {
       throw new Error(
-        "At least two points are required to compute a bounding rectangle."
+        "At least one point is required to compute a bounding rectangle."
       );
     }
 

@@ -931,6 +931,8 @@ export namespace grida {
      * Core Graphics
      */
     export namespace cg {
+      export type Vector2 = [number, number];
+
       /**
        * the RGBA structure itself. the rgb value may differ as it could both represent 0-1 or 0-255 by the context.
        */
@@ -1235,6 +1237,7 @@ export namespace grida {
         | HTMLIFrameNode
         | HTMLRichTextNode
         | VectorNode
+        | PolylineNode
         | LineNode
         | RectangleNode
         | EllipseNode
@@ -1256,6 +1259,7 @@ export namespace grida {
         | __TPrototypeNode<Omit<HTMLIFrameNode, __base_scene_node_properties>>
         | __TPrototypeNode<Omit<HTMLRichTextNode, __base_scene_node_properties>>
         | __TPrototypeNode<Omit<VectorNode, __base_scene_node_properties>>
+        | __TPrototypeNode<Omit<PolylineNode, __base_scene_node_properties>>
         | __TPrototypeNode<Omit<LineNode, __base_scene_node_properties>>
         | __TPrototypeNode<Omit<RectangleNode, __base_scene_node_properties>>
         | __TPrototypeNode<Omit<EllipseNode, __base_scene_node_properties>>
@@ -1301,6 +1305,7 @@ export namespace grida {
       export type AnyNode = Omit<
         Partial<TextNode> &
           Partial<VectorNode> &
+          Partial<PolylineNode> &
           Partial<LineNode> &
           Partial<RectangleNode> &
           Partial<ImageNode> &
@@ -1896,6 +1901,23 @@ export namespace grida {
            */
           fill: "fill" | "stroke";
         })[];
+      }
+
+      /**
+       * @deprecated - not ready - do not use in production
+       */
+      export interface PolylineNode
+        extends i.IBaseNode,
+          i.ISceneNode,
+          i.IHrefable,
+          i.IPositioning,
+          i.IFixedDimension,
+          i.IOpacity,
+          i.IZIndex,
+          i.IRotation,
+          i.IFill {
+        type: "polyline";
+        points: cg.Vector2[];
       }
 
       /**

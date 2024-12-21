@@ -232,7 +232,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             }
             break;
           }
-          case "insert":
+          case "insert": {
             const { cursor_position } = state;
 
             const parent = __get_insert_target(state);
@@ -260,6 +260,37 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             });
 
             break;
+          }
+          case "draw": {
+            const { cursor_position } = state;
+            // insert a new vector node
+            const vector = {
+              type: "polyline",
+              id: nid(),
+              name: "polyline",
+              active: true,
+              locked: false,
+              position: "absolute",
+              left: cursor_position[0],
+              top: cursor_position[1],
+              opacity: 1,
+              width: 0,
+              height: 0,
+              rotation: 0,
+              zIndex: 0,
+              points: [cmath.vector2.zero],
+            } satisfies grida.program.nodes.PolylineNode;
+
+            self_insertNode(draft, draft.document.root_id, vector);
+
+            draft.content_edit_mode = { type: "points", selection: vector.id };
+            draft.gesture = {
+              type: "draw",
+              origin: cursor_position,
+              movement: cmath.vector2.zero,
+              node_id: vector.id,
+            };
+          }
         }
       });
     }
@@ -271,6 +302,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         self_maybe_end_gesture_translate(draft);
         draft.gesture = undefined;
         draft.marquee = undefined;
+        draft.cursor_mode = { type: "cursor" };
         if (node_ids_from_area) {
           const target_node_ids = getMarqueeSelection(
             state,
@@ -287,7 +319,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
     }
     case "document/canvas/backend/html/event/on-drag": {
       const {
-        event: { delta, movement },
+        event: { movement },
       } = <EditorEventTarget_Drag>action;
       if (state.marquee) {
         return produce(state, (draft) => {
@@ -295,24 +327,55 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
           draft.marquee!.y2 = draft.surface_cursor_position[1];
         });
       } else {
-        // [insertion mode - resize after insertion]
-        if (state.gesture?.type === "scale") {
-          assert(state.selection.length === 1);
-          const node_id = state.selection[0];
-
-          return produce(state, (draft) => {
-            assert(draft.gesture?.type === "scale");
-
-            draft.gesture.movement = movement;
-            self_update_gesture_transform(draft);
-          });
-        }
-
         return produce(state, (draft) => {
-          if (draft.gesture?.type !== "translate") return;
-          // this is to handle "immediately drag move node"
-          draft.gesture.movement = movement;
-          self_update_gesture_transform(draft);
+          switch (draft.gesture?.type) {
+            // [insertion mode - resize after insertion]
+            case "scale": {
+              assert(state.selection.length === 1);
+
+              draft.gesture.movement = movement;
+              self_update_gesture_transform(draft);
+              break;
+            }
+            // this is to handle "immediately drag move node"
+            case "translate": {
+              draft.gesture.movement = movement;
+              self_update_gesture_transform(draft);
+              break;
+            }
+            case "draw": {
+              draft.gesture.movement = movement;
+              const { node_id } = draft.gesture;
+              const node = document.__getNodeById(
+                draft,
+                node_id
+              ) as grida.program.nodes.PolylineNode;
+
+              // take snapshot of the previous points
+              const point = movement;
+              const points_prev = Array.from(node.points);
+              const points_next = [...points_prev, point];
+
+              // get the box of the points
+              const bb_prev = cmath.rect.fromPoints(points_prev);
+              const bb_next = cmath.rect.fromPoints(points_next);
+              const delta = cmath.vector2.subtract(
+                [bb_next.x, bb_next.y],
+                [bb_prev.x, bb_prev.y]
+              );
+
+              // update the points with the delta (so the most left top point is to be [0, 0])
+              node.points = points_next.map((p) => cmath.vector2.add(p, delta));
+
+              // update the node position & dimension
+              node.left = node.left! + delta[0];
+              node.top = node.top! + delta[1];
+              node.width = bb_next.width;
+              node.height = bb_next.height;
+
+              break;
+            }
+          }
         });
       }
 

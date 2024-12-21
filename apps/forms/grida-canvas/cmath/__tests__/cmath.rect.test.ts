@@ -13,10 +13,8 @@ describe("cmath.rect", () => {
       expect(rect).toEqual({ x: 5, y: 20, width: 25, height: 20 });
     });
 
-    it("should throw an error if less than 2 points are provided", () => {
-      expect(() => cmath.rect.fromPoints([[10, 20]])).toThrow(
-        "At least two points are required to compute a bounding rectangle."
-      );
+    it("should throw an error if less than 1 points are provided", () => {
+      expect(() => cmath.rect.fromPoints([])).toThrow();
     });
 
     it("should handle points with negative coordinates", () => {

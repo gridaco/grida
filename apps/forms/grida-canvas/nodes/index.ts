@@ -6,6 +6,7 @@ import { VideoWidget } from "./video";
 import { RectangleWidget } from "./rectangle";
 import { EllipseWidget } from "./ellipse";
 import { SVGLineWidget } from "./line";
+import { SVGPolyLineWidget } from "./polyline";
 import { IFrameWidget } from "./iframe";
 import { RichTextWidget } from "./richtext";
 
@@ -15,6 +16,7 @@ export namespace ReactNodeRenderers {
   export const iframe = IFrameWidget;
   export const vector = VectorWidget;
   export const line = SVGLineWidget;
+  export const polyline = SVGPolyLineWidget;
   export const rectangle = RectangleWidget;
   export const ellipse = EllipseWidget;
   export const text = TextWidget;

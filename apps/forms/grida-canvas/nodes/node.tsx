@@ -74,6 +74,7 @@ export function NodeElement<P extends Record<string, any>>({
       case "video":
       case "text":
       case "vector":
+      case "polyline":
       case "line":
       case "rectangle":
       case "component":
@@ -113,6 +114,7 @@ export function NodeElement<P extends Record<string, any>>({
     muted: node.muted,
     autoplay: node.autoplay,
     paths: node.paths,
+    points: node.points,
     opacity: node.opacity,
     zIndex: DEFAULT_ZINDEX ?? node.zIndex,
     position: DEFAULT_POSITION ?? node.position,
@@ -190,6 +192,7 @@ const fillings = {
   template_instance: "none",
   instance: "none",
   line: "none",
+  polyline: "none",
 } as const;
 
 function HrefWrapper({

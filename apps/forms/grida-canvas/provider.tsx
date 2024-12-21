@@ -1374,6 +1374,8 @@ export function useEventTargetCSSCursor() {
             return "crosshair";
         }
       }
+      case "draw":
+        return "crosshair";
     }
   }, [cursor_mode]);
 }

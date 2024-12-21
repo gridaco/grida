@@ -13,6 +13,10 @@ export type CursorMode =
   | {
       type: "insert";
       node: "text" | "image" | "container" | "rectangle" | "ellipse" | "line";
+    }
+  | {
+      type: "draw";
+      tool: "pencil";
     };
 
 export type Marquee = {
@@ -172,6 +176,18 @@ interface IDocumentEditorEventTargetState {
          */
         type: "corner-radius";
         initial_bounding_rectangle: cmath.Rectangle | null;
+      }
+    | {
+        /**
+         * - draw points
+         */
+        type: "draw";
+        /**
+         * origin point
+         */
+        origin: cmath.Vector2;
+        movement: cmath.Vector2;
+        node_id: string;
       };
 
   gesture_modifiers: GestureModifiers;
@@ -314,7 +330,7 @@ export interface IDocumentState {
         selection: string;
         // selectedTextRange;
       }
-    | { type: "path" };
+    | { type: "points"; selection: string };
 
   /**
    * @private - internal use only
