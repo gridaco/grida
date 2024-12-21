@@ -30,9 +30,32 @@ type NodeTransformAction =
       // scale changes top, right, bottom, left, width and height
       // this is the one we should use when user "resizes" the node with the resize handles
       type: "scale";
-      initial: cmath.Rectangle;
+
+      /**
+       * the initial rectangle to be scaled
+       */
+      rect: cmath.Rectangle;
+
+      /**
+       * the space of the node will be scaled
+       *
+       * e.g. when multiple nodes are selected, the space will be the bounding box of all selected nodes
+       */
+      // space: cmath.Rectangle;
+
+      /**
+       * the transform origin, absolute. (not relative to the space)
+       */
       origin: cmath.Vector2;
+
+      /**
+       * the direction and distance of the scale relative to the origin
+       */
       movement: cmath.Vector2;
+
+      /**
+       * whether to preserve the aspect ratio while scaling
+       */
       preserveAspectRatio: boolean;
     }
   | {
@@ -71,7 +94,7 @@ export default function nodeTransformReducer(
         return moveNode(draft, dx, dy);
       }
       case "scale": {
-        const { initial, origin, movement, preserveAspectRatio } = action;
+        const { rect, origin, movement, preserveAspectRatio } = action;
 
         let scale: cmath.Vector2;
 
@@ -84,27 +107,27 @@ export default function nodeTransformReducer(
 
           switch (dominantAxis) {
             case "x": {
-              const factor = (initial.width + movement[0]) / initial.width;
+              const factor = (rect.width + movement[0]) / rect.width;
               scale = [factor, factor];
               break;
             }
             case "y": {
-              const factor = (initial.height + movement[1]) / initial.height;
+              const factor = (rect.height + movement[1]) / rect.height;
               scale = [factor, factor];
               break;
             }
           }
         } else {
-          scale = cmath.rect.getScaleFactors(initial, {
-            x: initial.x,
-            y: initial.y,
-            width: initial.width + movement[0],
-            height: initial.height + movement[1],
+          scale = cmath.rect.getScaleFactors(rect, {
+            x: rect.x,
+            y: rect.y,
+            width: rect.width + movement[0],
+            height: rect.height + movement[1],
           });
         }
 
         const scaled = cmath.rect.positive(
-          cmath.rect.scale(initial, origin, scale)
+          cmath.rect.scale(rect, origin, scale)
         );
 
         const _draft = draft as grida.program.nodes.i.ICSSDimension &

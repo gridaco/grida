@@ -296,13 +296,37 @@ function __self_update_gesture_transform_scale(
 
   let i = 0;
   for (const node_id of selection) {
-    const initial_rect = initial_rects[i++];
     const node = document.__getNodeById(draft, node_id);
+    const initial_rect = initial_rects[i++];
+    const parent_id = document.getParentId(draft.document_ctx, node_id)!;
+    const parent_rect = domapi.get_node_bounding_rect(parent_id)!;
+
+    assert(
+      parent_rect,
+      "Parent rect must be defined : " + parent_id + "/" + node_id
+    );
+
+    // the r position is relative to the canvas, we need to convert it to the node's local position
+    const relative_position = cmath.vector2.subtract(
+      [initial_rect.x, initial_rect.y],
+      [parent_rect.x, parent_rect.y]
+    );
+    const relative_rect: cmath.Rectangle = {
+      x: relative_position[0],
+      y: relative_position[1],
+      width: initial_rect.width,
+      height: initial_rect.height,
+    };
+
+    const relative_origin = cmath.vector2.subtract(origin, [
+      parent_rect.x,
+      parent_rect.y,
+    ]);
 
     draft.document.nodes[node_id] = nodeTransformReducer(node, {
       type: "scale",
-      initial: initial_rect,
-      origin,
+      rect: relative_rect,
+      origin: relative_origin,
       movement,
       preserveAspectRatio: transform_with_preserve_aspect_ratio === "on",
     });

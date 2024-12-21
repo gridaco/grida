@@ -30,7 +30,7 @@ function useSurfaceGesture(
     onDragEnd,
     ...handlers
   }: Parameters<typeof __useGesture>[0],
-  config: Parameters<typeof __useGesture>[1]
+  config?: Parameters<typeof __useGesture>[1]
 ) {
   // click / double click triggers when drag ends (if double pointer down) - it might be a better idea to prevent it with the displacement, not by delayed flag
   const should_prevent_click = useRef(false);
@@ -277,47 +277,42 @@ function GroupOverlay({
   selection: string[];
   readonly?: boolean;
 }) {
-  const { layerDragStart, layerDragEnd, layerDrag, layerClick } =
+  const { layerDragStart, layerDragEnd, layerDrag, layerClick, cursor_mode } =
     useEventTarget();
   const transform = useGroupSurfaceTransform(...selection);
 
-  // as there is no native way to prevent onclick from triggering after drag, this is a trick to prevent it.
-  // resetting this will be delayed by 100ms (on drag end)
-  const wasDragging = useRef(false);
+  const enabled = !readonly && cursor_mode.type === "cursor";
 
   const bind = useSurfaceGesture(
     {
       onPointerDown: (e) => {
-        e.event.stopPropagation();
+        // if insert mode, the event should be passed to the master to start the insertion
+        if (cursor_mode.type !== "insert") {
+          // otherwise, it should be stopped here
+          // stop propagation to prevent the master event target from changing the selection
+          e.event.stopPropagation();
+        }
       },
       onDragStart: (e) => {
-        e.event.stopPropagation();
         layerDragStart(selection, e);
+        e.event.stopPropagation();
       },
       onDragEnd: (e) => {
-        e.event.stopPropagation();
         layerDragEnd(selection, e);
-        setTimeout(() => {
-          wasDragging.current = false;
-        }, 100);
+        e.event.stopPropagation();
       },
       onDrag: (e) => {
-        if (e.distance[0] > 0 || e.distance[1] > 0) {
-          wasDragging.current = true;
-        }
-        e.event.stopPropagation();
         layerDrag(selection, e);
+        e.event.stopPropagation();
       },
       onClick: (e) => {
-        e.event.stopPropagation();
-        if (wasDragging.current) {
-          return;
-        }
         layerClick(selection, e.event);
+        e.event.stopPropagation();
       },
     },
     {
       drag: {
+        enabled: enabled,
         threshold: 4,
         // disable drag gesture with arrow keys
         keyboardDisplacement: 0,
@@ -376,8 +371,12 @@ function NodeOverlay({
   const bind = useSurfaceGesture(
     {
       onPointerDown: (e) => {
-        // stop propagation to prevent the master event target from changing the selection
-        e.event.stopPropagation();
+        // if insert mode, the event should be passed to the master to start the insertion
+        if (cursor_mode.type !== "insert") {
+          // otherwise, it should be stopped here
+          // stop propagation to prevent the master event target from changing the selection
+          e.event.stopPropagation();
+        }
       },
       onDragStart: (e) => {
         layerDragStart([node_id], e);
@@ -610,6 +609,14 @@ function LayerOverlayResizeHandle({
 
   const bind = useSurfaceGesture(
     {
+      onPointerDown: ({ event }) => {
+        event.preventDefault();
+        event.stopPropagation();
+      },
+      onPointerUp: ({ event }) => {
+        event.preventDefault();
+        event.stopPropagation();
+      },
       onClick: ({ event }) => {
         event.preventDefault();
         event.stopPropagation();
@@ -634,9 +641,10 @@ function LayerOverlayResizeHandle({
       },
     },
     {
-      eventOptions: {
-        passive: false,
-        capture: true,
+      drag: {
+        threshold: 4,
+        // disable drag gesture with arrow keys
+        keyboardDisplacement: 0,
       },
     }
   );

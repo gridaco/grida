@@ -85,7 +85,7 @@ export function getMarqueeSelection(
   // [marquee selection target]
   // 1. shall not be a root node
   // 2. shall not be a locked node
-  // 3. the parent of this node shall also be hit by the marquee
+  // 3. the parent of this node shall also be hit by the marquee (unless it's the root node)
   const target_node_ids = hits.filter((hit_id) => {
     // (1) shall not be a root node
     if (hit_id === root_id) return false;
@@ -96,6 +96,7 @@ export function getMarqueeSelection(
     if (hit.locked) return false;
 
     const parent_id = document.getParentId(document_ctx, hit_id)!;
+    if (parent_id === root_id) return true;
     if (!hits.includes(parent_id)) return false;
 
     const parent = document.__getNodeById(state, parent_id!);
