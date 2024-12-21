@@ -190,7 +190,7 @@ export function EditorSurface() {
         threshold: 2,
       },
       drag: {
-        threshold: 5,
+        threshold: 4,
         // disable drag gesture with arrow keys
         keyboardDisplacement: 0,
       },
@@ -318,7 +318,7 @@ function GroupOverlay({
     },
     {
       drag: {
-        threshold: 5,
+        threshold: 4,
         // disable drag gesture with arrow keys
         keyboardDisplacement: 0,
       },
@@ -371,16 +371,13 @@ function NodeOverlay({
   const { is_component_consumer } = node.meta;
   readonly = readonly || is_component_consumer;
 
+  const enabled = !readonly && cursor_mode.type === "cursor";
+
   const bind = useSurfaceGesture(
     {
       onPointerDown: (e) => {
-        // TODO: need better way to prevent this
-        // shift - select multiple
-        // meta/ctrl - deep select
-        // TODO: when cursor mode is "insert"
-        if (!(e.shiftKey || e.ctrlKey || e.metaKey)) {
-          e.event.stopPropagation();
-        }
+        // stop propagation to prevent the master event target from changing the selection
+        e.event.stopPropagation();
       },
       onDragStart: (e) => {
         layerDragStart([node_id], e);
@@ -397,7 +394,8 @@ function NodeOverlay({
     },
     {
       drag: {
-        threshold: 5,
+        enabled: enabled,
+        threshold: 4,
         // disable drag gesture with arrow keys
         keyboardDisplacement: 0,
       },

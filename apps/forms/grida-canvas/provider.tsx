@@ -1382,6 +1382,8 @@ export function useEventTarget() {
   const [state, dispatch] = __useInternal();
 
   const {
+    content_offset,
+    viewport_offset,
     gesture,
     hovered_node_id,
     dropzone_node_id,
@@ -1743,6 +1745,9 @@ export function useEventTarget() {
 
   return useMemo(() => {
     return {
+      content_offset,
+      viewport_offset,
+      //
       marquee,
       cursor_mode,
       setCursorMode,
@@ -1787,6 +1792,9 @@ export function useEventTarget() {
       //
     };
   }, [
+    content_offset,
+    viewport_offset,
+    //
     marquee,
     cursor_mode,
     setCursorMode,

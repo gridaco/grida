@@ -146,6 +146,16 @@ export default function CanvasPlayground() {
     setUiHidden((v) => !v);
   });
 
+  useHotkeys(
+    "meta+s, ctrl+s",
+    () => {
+      onExport();
+    },
+    {
+      preventDefault: true,
+    }
+  );
+
   useEffect(() => {
     fetch(`/examples/canvas/${exampleid}`).then((res) => {
       res.json().then((file) => {

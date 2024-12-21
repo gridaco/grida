@@ -3,6 +3,7 @@ import type {
   SurfaceRaycastTargeting,
 } from "@/grida-canvas/state";
 import { document } from "../../document-query";
+import { grida } from "@/grida";
 
 export function getSurfaceRayTarget(
   node_ids_from_point: string[],
@@ -70,4 +71,57 @@ export function getSurfaceRayTarget(
 
   // If no valid node is found, return undefined
   return undefined;
+}
+
+export function getMarqueeSelection(
+  state: IDocumentEditorState,
+  hits: string[]
+): string[] {
+  const {
+    document: { root_id },
+    document_ctx,
+  } = state;
+
+  // [marquee selection target]
+  // 1. shall not be a root node
+  // 2. shall not be a locked node
+  // 3. the parent of this node shall also be hit by the marquee
+  const target_node_ids = hits.filter((hit_id) => {
+    // (1) shall not be a root node
+    if (hit_id === root_id) return false;
+
+    // (2) shall not be a locked node
+    const hit = document.__getNodeById(state, hit_id);
+    if (!hit) return false;
+    if (hit.locked) return false;
+
+    const parent_id = document.getParentId(document_ctx, hit_id)!;
+    if (!hits.includes(parent_id)) return false;
+
+    const parent = document.__getNodeById(state, parent_id!);
+    if (!parent) return false;
+    if (parent.locked) return false;
+
+    return true;
+  });
+
+  return target_node_ids;
+}
+
+export function getDoubleclickTarget(
+  state: IDocumentEditorState,
+  hits: string[],
+  current: string
+): string | undefined {
+  return Array.from(hits)
+    .reverse()
+    .find((hit_id) => {
+      const hit = document.__getNodeById(state, hit_id);
+      if (hit.locked) return false; // ignore locked
+
+      const ancestors = document.getAncestors(state.document_ctx, hit_id);
+      if (ancestors.includes(current)) {
+        return hit_id;
+      }
+    });
 }

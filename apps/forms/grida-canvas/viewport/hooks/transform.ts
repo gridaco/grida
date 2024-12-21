@@ -1,4 +1,4 @@
-import { useDocument } from "@/grida-canvas";
+import { useDocument, useEventTarget } from "@/grida-canvas";
 import {
   useContext,
   useEffect,
@@ -97,6 +97,7 @@ function useNodeSurfaceTransfrom_v1(node_id: string) {
  * TODO: Not tested with the performance
  */
 export function useNodeSurfaceTransfrom(node_id: string) {
+  const { content_offset, viewport_offset } = useEventTarget();
   const __rect_fallback = useMemo(() => new DOMRect(0, 0, 0, 0), []);
   const { getNodeAbsoluteRotation } = useDocument();
   const portal = useViewportSurfacePortal();
@@ -151,7 +152,16 @@ export function useNodeSurfaceTransfrom(node_id: string) {
     return () => {
       resizeObserver.disconnect();
     };
-  }, [node_element, portal, getNodeAbsoluteRotation, node_id, __rect_fallback]);
+  }, [
+    node_element,
+    portal,
+    getNodeAbsoluteRotation,
+    node_id,
+    __rect_fallback,
+    // recompute when viewport changes
+    content_offset,
+    viewport_offset,
+  ]);
 
   return transform;
 }
@@ -192,6 +202,7 @@ function shallowEqual(arr1: string[], arr2: string[]): boolean {
  * Uses MutationObserver to observe position changes - expensive
  */
 export function useGroupSurfaceTransform(...node_ids: string[]) {
+  const { content_offset, viewport_offset } = useEventTarget();
   const __rect_fallback = useMemo(() => new DOMRect(0, 0, 0, 0), []);
   const portal = useViewportSurfacePortal();
 
@@ -271,7 +282,15 @@ export function useGroupSurfaceTransform(...node_ids: string[]) {
       resizeObservers.forEach((observer) => observer.disconnect());
       mutationObserver.disconnect();
     };
-  }, [stableNodeIds, node_elements, portal, __rect_fallback]);
+  }, [
+    stableNodeIds,
+    node_elements,
+    portal,
+    __rect_fallback,
+    // recompute when viewport changes
+    content_offset,
+    viewport_offset,
+  ]);
 
   return transform;
 }

@@ -35,6 +35,7 @@ import {
 import { cmath } from "../cmath";
 import { domapi } from "../domapi";
 import nid from "./tools/id";
+import { getDoubleclickTarget, getMarqueeSelection } from "./tools/target";
 
 export default function eventTargetReducer<S extends IDocumentEditorState>(
   state: S,
@@ -133,29 +134,23 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         if (selection.length !== 1) return;
         //
 
-        const node_id = selection[0];
+        const current_node_id = selection[0];
         // validate the state - the detected nodes shall include the selection
-        if (!surface_raycast_detected_node_ids.includes(node_id)) {
+        if (!surface_raycast_detected_node_ids.includes(current_node_id)) {
           // invalid state - this can happen when double click is triggered on void space, when marquee ends
           return;
         }
 
         // find the next descendant node (deepest first) relative to the selection
-        const nextFocus = [...surface_raycast_detected_node_ids]
-          .reverse()
-          .find((hit_id) => {
-            const hit = document.__getNodeById(draft, hit_id);
-            if (hit.locked) return false; // ignore locked
-
-            const ancestors = document.getAncestors(document_ctx, hit_id);
-            if (ancestors.includes(node_id)) {
-              return hit_id;
-            }
-          });
+        const next = getDoubleclickTarget(
+          state,
+          surface_raycast_detected_node_ids,
+          current_node_id
+        );
 
         // Update the selection if a valid next focus is found
-        if (nextFocus) {
-          self_selectNode(draft, "reset", nextFocus);
+        if (next) {
+          self_selectNode(draft, "reset", next);
         }
       });
       break;
@@ -285,11 +280,9 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         draft.gesture = undefined;
         draft.marquee = undefined;
         if (node_ids_from_area) {
-          // except the root node & locked nodes
-          const target_node_ids = node_ids_from_area.filter(
-            (node_id) =>
-              node_id !== draft.document.root_id &&
-              !document.__getNodeById(draft, node_id).locked
+          const target_node_ids = getMarqueeSelection(
+            state,
+            node_ids_from_area
           );
 
           self_selectNode(
