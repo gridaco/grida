@@ -263,6 +263,8 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
           }
           case "draw": {
             const tool = draft.cursor_mode.tool;
+            if (tool === "pen") break;
+
             const { cursor_position } = state;
 
             let vector:
@@ -668,35 +670,79 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
     case "document/canvas/backend/html/event/path-point/on-drag-end":
     case "document/canvas/backend/html/event/path-point/on-drag-start": {
       return produce(state, (draft) => {
-        const { content_edit_mode } = draft;
+        const { content_edit_mode, gesture } = draft;
         assert(content_edit_mode && content_edit_mode.type === "path");
-        const { node_id, initialPoints } = content_edit_mode;
+        const { node_id, selected_points } = content_edit_mode;
         const node = document.__getNodeById(
           draft,
           node_id
         ) as grida.program.nodes.PolylineNode;
-        const { points } = node;
 
         switch (action.type) {
           case "document/canvas/backend/html/event/path-point/on-drag-start": {
             const { index } = action;
 
-            content_edit_mode.selectedPoints = [index];
+            content_edit_mode.selected_points = [index];
+            draft.gesture = {
+              type: "translate-point",
+              node_id: node_id,
+              initial_points: node.points,
+              initial_position: [node.left!, node.top!],
+            };
             break;
           }
           case "document/canvas/backend/html/event/path-point/on-drag-end": {
             const {} = action;
+            draft.gesture = { type: "idle" };
             break;
           }
           case "document/canvas/backend/html/event/path-point/on-drag": {
             const {
-              event: { movement },
+              event: { movement: _movement },
             } = action;
 
-            // translate the point
-            for (const i of content_edit_mode.selectedPoints) {
-              points[i] = cmath.vector2.add(initialPoints[i], movement);
+            assert(draft.gesture.type === "translate-point");
+            const { tarnslate_with_axis_lock } = state.gesture_modifiers;
+            const { initial_points, initial_position } = draft.gesture;
+
+            // axis lock movement with dominant axis
+            const adj_movement =
+              tarnslate_with_axis_lock === "on"
+                ? cmath.ext.movement.axisLockedByDominance(_movement)
+                : _movement;
+
+            const points_next = initial_points.slice();
+            for (const i of content_edit_mode.selected_points) {
+              points_next[i] = cmath.vector2.add(
+                initial_points[i],
+                adj_movement
+              );
             }
+
+            const bb_initial = cmath.rect.fromPoints(initial_points);
+            const bb_next = cmath.rect.fromPoints(points_next);
+            const delta = cmath.vector2.subtract(
+              [bb_next.x, bb_next.y],
+              [bb_initial.x, bb_initial.y]
+            );
+
+            const delta_shifted_points = points_next.map((p) =>
+              cmath.vector2.add(
+                p,
+                // inverse
+                cmath.vector2.multiply(delta, [-1, -1])
+              )
+            );
+
+            // translate the point
+            node.points = delta_shifted_points;
+
+            // position & dimension
+            const new_pos = cmath.vector2.add(initial_position, delta);
+            node.left = new_pos[0];
+            node.top = new_pos[1];
+            node.width = bb_next.width;
+            node.height = bb_next.height;
 
             break;
           }

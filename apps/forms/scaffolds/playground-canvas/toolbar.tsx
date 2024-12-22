@@ -252,7 +252,8 @@ type ToolbarToolType =
   | "container"
   | "image"
   | "line"
-  | "polyline";
+  | "polyline"
+  | "pen";
 
 function cursormode_to_toolbar_value(cm: CursorMode): ToolbarToolType {
   switch (cm.type) {
@@ -276,6 +277,7 @@ function toolbar_value_to_cursormode(tt: ToolbarToolType): CursorMode {
     case "text":
       return { type: "insert", node: tt };
     case "line":
+    case "pen":
     case "polyline":
       return { type: "draw", tool: tt };
   }

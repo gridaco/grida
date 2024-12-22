@@ -101,6 +101,7 @@ const PathPoint = React.forwardRef(
           top: point[1],
           transform: "translate(-50%, -50%)",
           cursor: "pointer",
+          touchAction: "none",
         }}
       />
     );

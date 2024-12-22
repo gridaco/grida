@@ -3,7 +3,7 @@ import { useDocument, useEventTarget } from "../provider";
 import toast from "react-hot-toast";
 
 export function useEditorHotKeys() {
-  const { setCursorMode, tryEnterContentEditMode, tryExitContentEditMode } =
+  const { setCursorMode, tryExitContentEditMode, tryToggleContentEditMode } =
     useEventTarget();
   const {
     select,
@@ -105,7 +105,9 @@ export function useEditorHotKeys() {
     "enter",
     () => {
       select(">");
-      tryEnterContentEditMode();
+
+      // TODO: check if select(">") is possible first, then toggle when not possible
+      tryToggleContentEditMode();
     },
     {
       preventDefault: true,
@@ -320,8 +322,8 @@ export function useEditorHotKeys() {
     setCursorMode({ type: "draw", tool: "line" });
   });
 
-  useHotkeys("shift+p", () => {
-    setCursorMode({ type: "draw", tool: "polyline" });
+  useHotkeys("p", () => {
+    setCursorMode({ type: "draw", tool: "pen" });
   });
 
   useHotkeys("shift+p", () => {

@@ -1562,6 +1562,14 @@ export function useEventTarget() {
     });
   }, [dispatch]);
 
+  const tryToggleContentEditMode = useCallback(() => {
+    if (content_edit_mode) {
+      tryExitContentEditMode();
+    } else {
+      tryEnterContentEditMode();
+    }
+  }, [dispatch, content_edit_mode]);
+
   const dragStart = useCallback(
     (event: PointerEvent) => {
       dispatch({
@@ -1829,6 +1837,7 @@ export function useEventTarget() {
       //
       tryEnterContentEditMode,
       tryExitContentEditMode,
+      tryToggleContentEditMode,
       //
       dragStart,
       dragEnd,
@@ -1878,6 +1887,7 @@ export function useEventTarget() {
     //
     tryEnterContentEditMode,
     tryExitContentEditMode,
+    tryToggleContentEditMode,
     //
     dragStart,
     dragEnd,
@@ -1895,7 +1905,7 @@ export function useSurfacePathEditor() {
   const [state, dispatch] = __useInternal();
   assert(state.content_edit_mode && state.content_edit_mode.type === "path");
 
-  const { node_id, selectedPoints } = state.content_edit_mode;
+  const { node_id, selected_points: selectedPoints } = state.content_edit_mode;
   const node = state.document.nodes[
     node_id
   ] as grida.program.nodes.PolylineNode;

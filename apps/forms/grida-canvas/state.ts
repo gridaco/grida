@@ -16,7 +16,7 @@ export type CursorMode =
     }
   | {
       type: "draw";
-      tool: "line" | "polyline";
+      tool: "line" | "pen" | "polyline";
     };
 
 export type Marquee = {
@@ -150,6 +150,28 @@ export type GestureDraw = {
 };
 
 /**
+ * Translate certain path point
+ *
+ * @remarks
+ * This is only valid with content edit mode is "path"
+ */
+export type GestureTranslatePoint = {
+  type: "translate-point";
+
+  /**
+   * initial (snapshot) value of the points
+   */
+  initial_points: cmath.Vector2[];
+
+  node_id: string;
+
+  /**
+   * initial position of node
+   */
+  initial_position: cmath.Vector2;
+};
+
+/**
  * [Surface Support State]
  *
  * this support state is not part of the document state and does not get saved or recorded as history
@@ -209,7 +231,8 @@ interface IDocumentEditorEventTargetState {
         type: "corner-radius";
         initial_bounding_rectangle: cmath.Rectangle | null;
       }
-    | GestureDraw;
+    | GestureDraw
+    | GestureTranslatePoint;
 
   gesture_modifiers: GestureModifiers;
 
@@ -354,8 +377,11 @@ export interface IDocumentState {
     | {
         type: "path";
         node_id: string;
-        selectedPoints: number[];
-        initialPoints: cmath.Vector2[];
+
+        /**
+         * selected points index
+         */
+        selected_points: number[];
       };
 
   /**
