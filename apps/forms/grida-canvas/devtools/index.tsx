@@ -24,6 +24,7 @@ export function DevtoolsPanel() {
     document_ctx,
     history,
     googlefonts,
+    user_clipboard,
     ...state_without_document
   } = state;
 
@@ -51,6 +52,9 @@ export function DevtoolsPanel() {
               <TabsTrigger onClick={onTabClick} value="fonts">
                 Fonts
               </TabsTrigger>
+              <TabsTrigger onClick={onTabClick} value="clipboard">
+                Clipboard
+              </TabsTrigger>
             </TabsList>
           </div>
           <CollapsibleTrigger asChild>
@@ -76,6 +80,12 @@ export function DevtoolsPanel() {
             className="p-2 overflow-scroll w-full h-full"
           >
             <JSONContent value={state_without_document} />
+          </TabsContent>
+          <TabsContent
+            value="clipboard"
+            className="p-2 overflow-scroll w-full h-full"
+          >
+            <JSONContent value={user_clipboard} />
           </TabsContent>
           <TabsContent
             value="fonts"
