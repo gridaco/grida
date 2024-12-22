@@ -1,17 +1,23 @@
 import React from "react";
-import { grida } from "@/grida";
-import { useNode, useSurfacePathEditor } from "@/grida-canvas/provider";
+import { useEventTarget, useSurfacePathEditor } from "@/grida-canvas/provider";
 import { useNodeSurfaceTransfrom } from "../hooks/transform";
 import { cmath } from "@/grida-canvas/cmath";
 import { useGesture } from "@use-gesture/react";
 import { cn } from "@/utils";
-import assert from "assert";
 
 export function SurfacePathEditor({ node_id }: { node_id: string }) {
-  const node = useNode(node_id!);
+  const { surface_cursor_position, cursor_mode, content_offset } =
+    useEventTarget();
+  const { offset, points } = useSurfacePathEditor();
   const transform = useNodeSurfaceTransfrom(node_id);
-  assert(node.type === "polyline");
-  const { points } = node as grida.program.nodes.PolylineNode;
+
+  const lastpoint = points[points.length - 1];
+
+  const surface_lastpoint = cmath.vector2.add(
+    offset,
+    lastpoint,
+    content_offset
+  );
 
   return (
     <div id="path-editor-surface" className="fixed left-0 top-0 w-0 h-0 z-10">
@@ -29,6 +35,21 @@ export function SurfacePathEditor({ node_id }: { node_id: string }) {
           <ControlPoint key={i} point={p} index={i} />
         ))}
       </div>
+      {cursor_mode.type === "path" && (
+        <>
+          {/* cursor point */}
+          <PathPoint
+            point={surface_cursor_position}
+            style={{ cursor: "crosshair" }}
+          />
+          <Line
+            x1={surface_lastpoint[0]}
+            y1={surface_lastpoint[1]}
+            x2={surface_cursor_position[0]}
+            y2={surface_cursor_position[1]}
+          />
+        </>
+      )}
     </div>
   );
 }
@@ -106,15 +127,53 @@ const PathPoint = React.forwardRef(
           className
         )}
         style={{
-          ...style,
           position: "absolute",
           left: point[0],
           top: point[1],
           transform: "translate(-50%, -50%)",
           cursor: "pointer",
           touchAction: "none",
+          ...style,
         }}
       />
     );
   }
 );
+
+function Line({
+  x1,
+  y1,
+  x2,
+  y2,
+  className,
+  style,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement> & {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}) {
+  // Calculate the length and angle of the line
+  const deltaX = x2 - x1;
+  const deltaY = y2 - y1;
+  const length = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+  const angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
+
+  return (
+    <div
+      {...props}
+      className={cn("bg-workbench-accent-sky", className)}
+      style={{
+        ...style,
+        position: "absolute",
+        left: `${x1}px`,
+        top: `${y1}px`,
+        width: `${length}px`,
+        height: 1,
+        transform: `rotate(${angle}deg)`,
+        transformOrigin: "0 50%", // Rotate around the left center
+      }}
+    />
+  );
+}

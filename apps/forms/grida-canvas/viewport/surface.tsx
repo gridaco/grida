@@ -148,12 +148,12 @@ export function EditorSurface() {
     {
       onPointerDown: ({ event }) => {
         if (event.defaultPrevented) return;
-        if (content_edit_mode) return;
+        if (content_edit_mode?.type === "text") return;
         pointerDown(event);
       },
       onPointerUp: ({ event }) => {
         if (event.defaultPrevented) return;
-        if (content_edit_mode) return;
+        if (content_edit_mode?.type === "text") return;
         pointerUp(event);
       },
       onClick: ({ event }) => {

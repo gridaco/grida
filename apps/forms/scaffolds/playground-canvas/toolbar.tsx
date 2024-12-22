@@ -267,6 +267,8 @@ function cursormode_to_toolbar_value(cm: CursorMode): ToolbarToolType {
       return cm.node;
     case "draw":
       return cm.tool;
+    case "path":
+      return "path";
   }
 }
 
@@ -281,8 +283,9 @@ function toolbar_value_to_cursormode(tt: ToolbarToolType): CursorMode {
     case "text":
       return { type: "insert", node: tt };
     case "line":
-    case "path":
     case "polyline":
       return { type: "draw", tool: tt };
+    case "path":
+      return { type: "path" };
   }
 }

@@ -324,7 +324,7 @@ export function useEditorHotKeys() {
   });
 
   useHotkeys("p", () => {
-    setCursorMode({ type: "draw", tool: "path" });
+    setCursorMode({ type: "path" });
   });
 
   useHotkeys("shift+p", () => {

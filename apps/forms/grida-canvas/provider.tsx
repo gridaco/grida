@@ -1423,6 +1423,8 @@ export function useEventTargetCSSCursor() {
       }
       case "draw":
         return "crosshair";
+      case "path":
+        return "crosshair";
     }
   }, [cursor_mode]);
 }
@@ -1439,6 +1441,8 @@ export function useEventTarget() {
     selection,
     content_edit_mode,
     cursor_mode,
+    cursor_position,
+    surface_cursor_position,
     marquee,
   } = state;
 
@@ -1807,6 +1811,8 @@ export function useEventTarget() {
       //
       marquee,
       cursor_mode,
+      cursor_position,
+      surface_cursor_position,
       setCursorMode,
       //
       hovered_node_id,
@@ -1855,6 +1861,8 @@ export function useEventTarget() {
     //
     marquee,
     cursor_mode,
+    cursor_position,
+    surface_cursor_position,
     setCursorMode,
     //
     hovered_node_id,
@@ -1911,6 +1919,9 @@ export function useSurfacePathEditor() {
   ] as grida.program.nodes.PolylineNode;
   const points = node.points;
 
+  // offset of the points (node position)
+  const offset: cmath.Vector2 = [node.left!, node.top!];
+
   const onPointDragStart = useCallback(
     (index: number) => {
       dispatch({
@@ -1954,6 +1965,7 @@ export function useSurfacePathEditor() {
     () => ({
       node_id,
       points,
+      offset,
       selectedPoints,
       onPointDragStart,
       onPointDrag,
@@ -1964,6 +1976,7 @@ export function useSurfacePathEditor() {
       //
       node_id,
       points,
+      offset,
       selectedPoints,
       onPointDragStart,
       onPointDrag,

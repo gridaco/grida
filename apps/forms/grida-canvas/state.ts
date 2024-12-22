@@ -16,7 +16,10 @@ export type CursorMode =
     }
   | {
       type: "draw";
-      tool: "line" | "polyline" | "path";
+      tool: "line" | "polyline";
+    }
+  | {
+      type: "path";
     };
 
 export type Marquee = {

@@ -41,7 +41,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
   state: S,
   action: EventTargetAction
 ): S {
-  // console.log("surfaceReducer", action);
+  // console.log("surface", action);
   switch (action.type) {
     // #region [html backend] canvas event target
     case "document/canvas/backend/html/event/on-pointer-move": {
@@ -183,14 +183,70 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
           case "insert":
             // ignore - insert mode will be handled via click or drag
             break;
+          case "path": {
+            if (draft.content_edit_mode?.type === "path") {
+              const node = document.__getNodeById(
+                draft,
+                draft.content_edit_mode.node_id
+              ) as grida.program.nodes.PolylineNode;
+
+              // add point
+              const position = cmath.vector2.subtract(draft.cursor_position, [
+                node.left!,
+                node.top!,
+              ]);
+              node.points.push(position);
+              const index = node.points.length - 1;
+              draft.content_edit_mode.selected_points = [index];
+              // ...
+            } else {
+              // create a new node
+              const new_node_id = nid();
+              // ...
+              const vector = {
+                id: new_node_id,
+                active: true,
+                locked: false,
+                position: "absolute",
+                left: 0,
+                top: 0,
+                opacity: 1,
+                width: 0,
+                height: 0,
+                rotation: 0,
+                zIndex: 0,
+                stroke: { type: "solid", color: { r: 0, g: 0, b: 0, a: 1 } },
+                strokeCap: "butt",
+                type: "polyline",
+                name: "path",
+                strokeWidth: 3,
+                points: [cmath.vector2.zero],
+              } satisfies grida.program.nodes.PolylineNode;
+
+              vector.left = draft.cursor_position[0];
+              vector.top = draft.cursor_position[1];
+
+              const parent = __get_insert_target(state);
+              self_insertNode(draft, parent, vector);
+
+              draft.content_edit_mode = {
+                type: "path",
+                selected_points: [],
+                node_id: new_node_id,
+              };
+              // draft.gesture = {
+              //   type: "curve",
+              // };
+            }
+
+            //
+            break;
+          }
         }
       });
     }
     case "document/canvas/backend/html/event/on-pointer-up": {
       return produce(state, (draft) => {
-        // clear all trasform state
-
-        draft.content_edit_mode = undefined;
         draft.gesture = { type: "idle" };
       });
     }
@@ -263,7 +319,6 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
           }
           case "draw": {
             const tool = draft.cursor_mode.tool;
-            if (tool === "path") break;
 
             const { cursor_position } = state;
 
