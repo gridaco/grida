@@ -115,31 +115,6 @@ export default function initialNode(
         ...seed,
       } satisfies grida.program.nodes.HTMLRichTextNode;
     }
-    case "ellipse": {
-      return {
-        ...base,
-        ...position,
-        ...styles,
-        type: "ellipse",
-        width: 100,
-        height: 100,
-        effects: [],
-        ...seed,
-      } satisfies grida.program.nodes.EllipseNode;
-    }
-    case "rectangle": {
-      return {
-        ...base,
-        ...position,
-        ...styles,
-        type: "rectangle",
-        cornerRadius: 0,
-        width: 100,
-        height: 100,
-        effects: [],
-        ...seed,
-      } satisfies grida.program.nodes.RectangleNode;
-    }
     case "image": {
       return {
         ...base,
@@ -175,6 +150,35 @@ export default function initialNode(
         ...seed,
       } satisfies grida.program.nodes.VideoNode;
     }
+    case "ellipse": {
+      return {
+        ...base,
+        ...position,
+        ...styles,
+        type: "ellipse",
+        width: 100,
+        height: 100,
+        effects: [],
+        strokeWidth: 0,
+        strokeCap: "butt",
+        ...seed,
+      } satisfies grida.program.nodes.EllipseNode;
+    }
+    case "rectangle": {
+      return {
+        ...base,
+        ...position,
+        ...styles,
+        type: "rectangle",
+        cornerRadius: 0,
+        width: 100,
+        height: 100,
+        effects: [],
+        strokeWidth: 0,
+        strokeCap: "butt",
+        ...seed,
+      } satisfies grida.program.nodes.RectangleNode;
+    }
     case "line": {
       return {
         ...base,
@@ -182,6 +186,8 @@ export default function initialNode(
         ...styles,
         type: "line",
         stroke: black,
+        strokeWidth: 1,
+        strokeCap: "butt",
         width: 100,
         height: 0,
         ...seed,

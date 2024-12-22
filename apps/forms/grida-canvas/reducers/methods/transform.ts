@@ -43,6 +43,9 @@ export function self_update_gesture_transform<S extends IDocumentEditorState>(
   draft: Draft<S>
 ) {
   if (draft.gesture.type === "idle") return;
+  if (draft.gesture.type === "draw") return;
+  if (draft.gesture.type === "corner-radius") return;
+  if (draft.gesture.type === "nudge") return; // nudge is not a transform gesture - only a virtual gesture
   switch (draft.gesture.type) {
     case "translate": {
       return __self_update_gesture_transform_translate(draft);
@@ -53,12 +56,10 @@ export function self_update_gesture_transform<S extends IDocumentEditorState>(
     case "rotate": {
       return __self_update_gesture_transform_rotate(draft);
     }
-    case "nudge":
-      // nudge is not a transform gesture - only a virtual gesture
-      return;
-    case "corner-radius":
     default:
-      throw new Error(`Gesture type not supported: ${draft.gesture.type}`);
+      throw new Error(
+        `Gesture type not supported: ${(draft.gesture as any).type}`
+      );
   }
 }
 

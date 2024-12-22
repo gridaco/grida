@@ -14,11 +14,11 @@ export function VectorWidget({
   style,
   ...props
 }: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.VectorNode>) {
-  const { defs, fill: fillDef } = fill
-    ? svg.fill.fill_with_defs(fill)
+  const { defs, ref: fillDef } = fill
+    ? svg.paint.defs(fill)
     : {
         defs: undefined,
-        fill: "none",
+        ref: "none",
       };
 
   const style_without_size = {

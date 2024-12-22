@@ -241,7 +241,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               x: cursor_position[0],
               y: cursor_position[1],
               width: 1,
-              height: draft.cursor_mode.node === "line" ? 0 : 1,
+              height: 1,
             };
             //
             const nnode = initialNode(draft.cursor_mode.node, {
@@ -262,12 +262,16 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             break;
           }
           case "draw": {
+            const tool = draft.cursor_mode.tool;
             const { cursor_position } = state;
-            // insert a new vector node
-            const vector = {
-              type: "polyline",
-              id: nid(),
-              name: "polyline",
+
+            let vector:
+              | grida.program.nodes.PolylineNode
+              | grida.program.nodes.LineNode;
+
+            const new_node_id = nid();
+            const __base = {
+              id: new_node_id,
               active: true,
               locked: false,
               position: "absolute",
@@ -278,11 +282,43 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               height: 0,
               rotation: 0,
               zIndex: 0,
-              points: [cmath.vector2.zero],
-            } satisfies grida.program.nodes.PolylineNode;
+              stroke: { type: "solid", color: { r: 0, g: 0, b: 0, a: 1 } },
+              strokeCap: "butt",
+            } as const;
 
+            switch (tool) {
+              case "polyline": {
+                vector = {
+                  ...__base,
+                  type: "polyline",
+                  name: "polyline",
+                  strokeWidth: 3,
+                  points: [cmath.vector2.zero],
+                } satisfies grida.program.nodes.PolylineNode;
+                break;
+              }
+              case "line": {
+                // vector = {
+                //   ...__base,
+                //   type: "line",
+                //   name: "line",
+                // } satisfies grida.program.nodes.LineNode;
+
+                vector = {
+                  ...__base,
+                  type: "polyline",
+                  name: "line",
+                  strokeWidth: 1,
+                  points: [cmath.vector2.zero],
+                } satisfies grida.program.nodes.PolylineNode;
+                break;
+              }
+            }
+
+            // insert a new vector node
             const parent = __get_insert_target(state);
             self_insertNode(draft, parent, vector);
+
             // position relative to the parent
             const parent_rect = domapi.get_node_bounding_rect(parent)!;
             const node_relative_pos = cmath.vector2.subtract(cursor_position, [
@@ -295,14 +331,24 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             draft.content_edit_mode = { type: "points", selection: vector.id };
             draft.gesture = {
               type: "draw",
+              mode: tool,
               origin: node_relative_pos,
               movement: cmath.vector2.zero,
               points: [cmath.vector2.zero],
               node_id: vector.id,
             };
 
-            // clear selection for draw mode
-            self_clearSelection(draft);
+            // selection & hover state
+            switch (tool) {
+              case "line":
+                // self_selectNode(draft, "reset", vector.id);
+                self_clearSelection(draft);
+                break;
+              case "polyline":
+                // clear selection for pencil mode
+                self_clearSelection(draft);
+                break;
+            }
           }
         }
       });
@@ -313,6 +359,16 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       );
       return produce(state, (draft) => {
         self_maybe_end_gesture_translate(draft);
+        // reset the cursor mode (unless pencil mode)
+        if (
+          !(
+            draft.cursor_mode.type === "draw" &&
+            draft.cursor_mode.tool === "polyline"
+          )
+        ) {
+          draft.cursor_mode = { type: "cursor" };
+        }
+
         draft.gesture = { type: "idle" };
         draft.marquee = undefined;
         if (node_ids_from_area) {
@@ -357,7 +413,12 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             }
             case "draw": {
               draft.gesture.movement = movement;
-              const { origin, points, node_id } = state.gesture as GestureDraw;
+              const mode = draft.gesture.mode;
+              const {
+                origin: origin,
+                points,
+                node_id,
+              } = state.gesture as GestureDraw;
 
               const node = document.__getNodeById(
                 draft,
@@ -366,7 +427,19 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
               // take snapshot of the previous points
               const point = movement;
-              const points_next = [...points, point];
+              let points_next: cmath.Vector2[] = [];
+
+              switch (mode) {
+                case "line":
+                  const a = points[0];
+                  const b = point;
+                  points_next = [a, b];
+                  break;
+                case "polyline":
+                  points_next = [...points, point];
+                  break;
+              }
+
               draft.gesture.points = points_next;
 
               // get the box of the points

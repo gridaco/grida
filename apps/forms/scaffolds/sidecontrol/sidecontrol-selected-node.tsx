@@ -57,6 +57,10 @@ import assert from "assert";
 import { grida } from "@/grida";
 import { LockClosedIcon } from "@radix-ui/react-icons";
 import { supports } from "@/grida/utils/supports";
+import { StrokeWidthControl } from "./controls/stroke-width";
+import { RGBAColorControl } from "./controls/color";
+import { PaintControl } from "./controls/paint";
+import { StrokeCapControl } from "./controls/stroke-cap";
 
 export function SelectedNodeProperties() {
   const { state: document, selectedNode } = useDocument();
@@ -87,6 +91,9 @@ export function SelectedNodeProperties() {
     cornerRadius,
     rotation,
     fill,
+    stroke,
+    strokeWidth,
+    strokeCap,
     position,
     width,
     height,
@@ -508,6 +515,37 @@ export function SelectedNodeProperties() {
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>
+      {supports.stroke(node.type) && (
+        <SidebarSection className="border-b pb-4">
+          <SidebarSectionHeaderItem>
+            <SidebarSectionHeaderLabel>Stroke</SidebarSectionHeaderLabel>
+          </SidebarSectionHeaderItem>
+          <SidebarMenuSectionContent className="space-y-2">
+            <PropertyLine>
+              <PropertyLineLabel>Width</PropertyLineLabel>
+              <StrokeWidthControl
+                value={strokeWidth}
+                onValueChange={selectedNode.strokeWidth}
+              />
+            </PropertyLine>
+            <PropertyLine>
+              <PropertyLineLabel>Color</PropertyLineLabel>
+              <PaintControl
+                value={stroke}
+                onValueChange={selectedNode.stroke}
+              />
+            </PropertyLine>
+            <PropertyLine hidden={!supports.strokeCap(node.type)}>
+              <PropertyLineLabel>Cap</PropertyLineLabel>
+              <StrokeCapControl
+                value={strokeCap}
+                onValueChange={selectedNode.strokeCap}
+              />
+            </PropertyLine>
+          </SidebarMenuSectionContent>
+        </SidebarSection>
+      )}
+
       <SidebarSection className="border-b pb-4">
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Developer</SidebarSectionHeaderLabel>

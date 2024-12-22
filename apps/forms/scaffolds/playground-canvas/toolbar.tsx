@@ -14,7 +14,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { grida } from "@/grida";
 import { useMetaEnter } from "@/hooks/use-meta-enter";
 import {
-  BorderSolidIcon,
+  SlashIcon,
   BoxIcon,
   Pencil1Icon,
   ChatBubbleIcon,
@@ -175,9 +175,9 @@ export function PlaygroundToolbar({
           <CircleIcon />
         </ToggleGroupItem>
         <ToggleGroupItem value={"line" satisfies ToolbarToolType}>
-          <BorderSolidIcon />
+          <SlashIcon />
         </ToggleGroupItem>
-        <ToggleGroupItem value={"pencil" satisfies ToolbarToolType}>
+        <ToggleGroupItem value={"polyline" satisfies ToolbarToolType}>
           <Pencil1Icon />
         </ToggleGroupItem>
         <ToggleGroupItem value={"image" satisfies ToolbarToolType}>
@@ -252,7 +252,7 @@ type ToolbarToolType =
   | "container"
   | "image"
   | "line"
-  | "pencil";
+  | "polyline";
 
 function cursormode_to_toolbar_value(cm: CursorMode): ToolbarToolType {
   switch (cm.type) {
@@ -261,7 +261,7 @@ function cursormode_to_toolbar_value(cm: CursorMode): ToolbarToolType {
     case "insert":
       return cm.node;
     case "draw":
-      return "pencil";
+      return cm.tool;
   }
 }
 
@@ -272,11 +272,11 @@ function toolbar_value_to_cursormode(tt: ToolbarToolType): CursorMode {
     case "container":
     case "ellipse":
     case "image":
-    case "line":
     case "rectangle":
     case "text":
       return { type: "insert", node: tt };
-    case "pencil":
-      return { type: "draw", tool: "pencil" };
+    case "line":
+    case "polyline":
+      return { type: "draw", tool: tt };
   }
 }

@@ -80,7 +80,7 @@ export namespace svg {
     }
   }
 
-  export namespace fill {
+  export namespace paint {
     /**
      * A fill data transformation function for when element `fill` cannot be inlined directly.
      *
@@ -96,14 +96,17 @@ export namespace svg {
      * );
      *
      */
-    export function fill_with_defs(paint: grida.program.cg.Paint) {
+    export function defs(paint: grida.program.cg.Paint): {
+      defs: string | undefined;
+      ref: string;
+    } {
       switch (paint.type) {
         case "linear_gradient": {
           const defs = `<defs>${gradient.stringifyLinearGradient(paint)}</defs>`;
 
           return {
             defs,
-            fill: `url(#${paint.id})`,
+            ref: `url(#${paint.id})`,
           };
         }
         case "radial_gradient": {
@@ -111,14 +114,14 @@ export namespace svg {
 
           return {
             defs,
-            fill: `url(#${paint.id})`,
+            ref: `url(#${paint.id})`,
           };
         }
         case "solid": {
           const { color } = paint;
           return {
             defs: undefined,
-            fill: `rgba(${color.r}, ${color.g}, ${color.b}, ${color.a})`,
+            ref: `rgba(${color.r}, ${color.g}, ${color.b}, ${color.a})`,
           };
         }
       }

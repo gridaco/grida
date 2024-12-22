@@ -7,26 +7,41 @@ export function RectangleWidget({
   width,
   height,
   fill,
+  stroke,
+  strokeWidth,
   cornerRadius,
   ...props
 }: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.RectangleNode>) {
   const isUniformRadius = typeof cornerRadius === "number";
 
-  const { defs, fill: fillDef } = fill
-    ? svg.fill.fill_with_defs(fill)
+  const { defs: fillDefs, ref: fillDef } = fill
+    ? svg.paint.defs(fill)
     : {
         defs: undefined,
-        fill: "none",
+        ref: "none",
+      };
+
+  const { defs: strokeDefs, ref: strokeDef } = stroke
+    ? svg.paint.defs(stroke)
+    : {
+        defs: undefined,
+        ref: "none",
       };
 
   return (
     <svg
       {...queryattributes(props)}
-      style={style}
+      style={{
+        ...style,
+        overflow: "visible", // shall be visible since the polyline has a stroke width
+        // debug
+        // border: "1px solid red",
+      }}
       width={width}
       height={height}
     >
-      {defs && <g dangerouslySetInnerHTML={{ __html: defs }} />}
+      {fillDefs && <g dangerouslySetInnerHTML={{ __html: fillDefs }} />}
+      {strokeDefs && <g dangerouslySetInnerHTML={{ __html: strokeDefs }} />}
 
       {isUniformRadius ? (
         <rect
@@ -35,11 +50,15 @@ export function RectangleWidget({
           rx={cornerRadius}
           ry={cornerRadius}
           fill={fillDef}
+          strokeWidth={strokeWidth}
+          stroke={strokeDef}
         />
       ) : (
         <path
           d={svg.d.generateRoundedRectPath(width, height, cornerRadius)}
           fill={fillDef}
+          strokeWidth={strokeWidth}
+          stroke={strokeDef}
         />
       )}
     </svg>

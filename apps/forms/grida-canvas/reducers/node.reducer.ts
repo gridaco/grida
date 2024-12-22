@@ -136,6 +136,7 @@ export default function nodeReducer<
       case "node/change/fill": {
         assert(
           draft.type === "vector" ||
+            draft.type === "polyline" ||
             draft.type === "rectangle" ||
             draft.type === "ellipse" ||
             draft.type === "text" ||
@@ -143,17 +144,20 @@ export default function nodeReducer<
             draft.type === "container" ||
             draft.type === "component"
         );
+
+        if (action.fill === null) {
+          draft.fill = undefined;
+          break;
+        }
+
         switch (action.fill.type) {
           case "linear_gradient":
-            draft.fill = { ...action.fill, id: `gradient-${v4()}` };
-            break;
           case "radial_gradient":
             draft.fill = { ...action.fill, id: `gradient-${v4()}` };
             break;
           case "solid":
             draft.fill = action.fill;
         }
-
         break;
       }
       case "node/change/border": {
@@ -165,6 +169,43 @@ export default function nodeReducer<
           draft.type === "container" || draft.type === "component"
         );
         draft.border = action.border;
+        break;
+      }
+      case "node/change/stroke":
+      case "node/change/stroke-width":
+      case "node/change/stroke-cap": {
+        assert(
+          draft.type === "polyline" ||
+            draft.type === "line" ||
+            draft.type === "rectangle" ||
+            draft.type === "ellipse"
+        );
+        switch (action.type) {
+          case "node/change/stroke": {
+            if (action.stroke === null) {
+              draft.stroke = undefined;
+              break;
+            }
+
+            switch (action.stroke.type) {
+              case "linear_gradient":
+              case "radial_gradient":
+                draft.stroke = { ...action.stroke, id: `gradient-${v4()}` };
+                break;
+              case "solid":
+                draft.stroke = action.stroke;
+            }
+            break;
+          }
+          case "node/change/stroke-width": {
+            draft.strokeWidth = Math.max(action.strokeWidth, 0);
+            break;
+          }
+          case "node/change/stroke-cap": {
+            draft.strokeCap = action.strokeCap;
+            break;
+          }
+        }
         break;
       }
       case "node/change/fit": {

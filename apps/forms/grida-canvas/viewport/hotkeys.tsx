@@ -312,16 +312,16 @@ export function useEditorHotKeys() {
     setCursorMode({ type: "insert", node: "ellipse" });
   });
 
+  useHotkeys("t", () => {
+    setCursorMode({ type: "insert", node: "text" });
+  });
+
   useHotkeys("l", () => {
-    setCursorMode({ type: "insert", node: "line" });
+    setCursorMode({ type: "draw", tool: "line" });
   });
 
   useHotkeys("p", () => {
-    setCursorMode({ type: "draw", tool: "pencil" });
-  });
-
-  useHotkeys("t", () => {
-    setCursorMode({ type: "insert", node: "text" });
+    setCursorMode({ type: "draw", tool: "polyline" });
   });
 
   useHotkeys("0, 1, 2, 3, 4, 5, 6, 7, 8, 9", (e) => {

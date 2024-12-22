@@ -6,6 +6,7 @@ import type {
   Paint,
   TypeStyle,
   Path,
+  LineNode,
   BooleanOperationNode,
   InstanceNode,
   GroupNode,
@@ -16,6 +17,27 @@ import type {
 export namespace iofigma {
   export namespace restful {
     export namespace map {
+      export const strokeCapMap: Record<
+        NonNullable<LineNode["strokeCap"]>,
+        grida.program.cg.StrokeCap | undefined
+      > = {
+        NONE: "butt",
+        ROUND: "round",
+        SQUARE: "square",
+        //
+        LINE_ARROW: undefined,
+        TRIANGLE_ARROW: undefined,
+        DIAMOND_FILLED: undefined,
+        CIRCLE_FILLED: undefined,
+        TRIANGLE_FILLED: undefined,
+        WASHI_TAPE_1: undefined,
+        WASHI_TAPE_2: undefined,
+        WASHI_TAPE_3: undefined,
+        WASHI_TAPE_4: undefined,
+        WASHI_TAPE_5: undefined,
+        WASHI_TAPE_6: undefined,
+      };
+
       export const textAlignMap: Record<
         NonNullable<TypeStyle["textAlignHorizontal"]>,
         grida.program.cg.TextAlign | undefined
@@ -439,7 +461,8 @@ export namespace iofigma {
             };
           }
           case "RECTANGLE": {
-            const { fills, strokes, strokeDashes, strokeWeight } = node;
+            const { fills, strokes, strokeDashes, strokeWeight, strokeCap } =
+              node;
 
             const first_visible_fill = first_visible(fills);
             const first_visible_stroke = strokes
@@ -511,11 +534,13 @@ export namespace iofigma {
               height: node.size!.y,
               fill: first_visible_fill ? paint(first_visible_fill) : undefined,
               effects: [], // TODO:
+              strokeWidth: strokeWeight ?? 0,
+              strokeCap: strokeCap ? strokeCapMap[strokeCap] ?? "butt" : "butt",
               cornerRadius: cornerRadius,
             } satisfies grida.program.nodes.RectangleNode;
           }
           case "ELLIPSE": {
-            const { fills } = node;
+            const { fills, strokeWeight, strokeCap } = node;
 
             const first_visible_fill = first_visible(fills);
 
@@ -535,12 +560,15 @@ export namespace iofigma {
               width: node.size!.x,
               height: node.size!.y,
               fill: first_visible_fill ? paint(first_visible_fill) : undefined,
+              strokeWidth: strokeWeight ?? 0,
+              strokeCap: strokeCap ? strokeCapMap[strokeCap] ?? "butt" : "butt",
               effects: [], // TODO:
             } satisfies grida.program.nodes.EllipseNode;
           }
           case "BOOLEAN_OPERATION": {
           }
           case "LINE": {
+            const { fills, strokeWeight, strokeCap } = node;
             const first_visible_stroke = first_visible(node.strokes ?? []);
 
             return {
@@ -556,6 +584,8 @@ export namespace iofigma {
               stroke: first_visible_stroke
                 ? paint(first_visible_stroke)
                 : undefined,
+              strokeWidth: strokeWeight ?? 0,
+              strokeCap: strokeCap ? strokeCapMap[strokeCap] ?? "butt" : "butt",
               left: node.relativeTransform![0][2],
               top: node.relativeTransform![1][2],
               width: node.size!.x,

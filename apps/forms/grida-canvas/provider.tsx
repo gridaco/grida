@@ -377,12 +377,51 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   );
 
   const changeNodeFill = useCallback(
-    (node_id: string, fill: grida.program.cg.PaintWithoutID) => {
+    (node_id: string, fill: grida.program.cg.PaintWithoutID | null) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "node/change/fill",
           node_id: node_id,
           fill,
+        });
+      });
+    },
+    [dispatch]
+  );
+
+  const changeNodeStroke = useCallback(
+    (node_id: string, stroke: grida.program.cg.PaintWithoutID | null) => {
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/stroke",
+          node_id: node_id,
+          stroke,
+        });
+      });
+    },
+    [dispatch]
+  );
+
+  const changeNodeStrokeWidth = useCallback(
+    (node_id: string, strokeWidth: number) => {
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/stroke-width",
+          node_id: node_id,
+          strokeWidth,
+        });
+      });
+    },
+    [dispatch]
+  );
+
+  const changeNodeStrokeCap = useCallback(
+    (node_id: string, strokeCap: grida.program.cg.StrokeCap) => {
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/stroke-cap",
+          node_id: node_id,
+          strokeCap,
         });
       });
     },
@@ -684,6 +723,9 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
       changeNodePositioningMode,
       changeNodeCornerRadius,
       changeNodeFill,
+      changeNodeStroke,
+      changeNodeStrokeWidth,
+      changeNodeStrokeCap,
       changeNodeFit,
       changeNodeOpacity,
       changeNodeRotation,
@@ -864,8 +906,14 @@ export function useNodeAction(node_id: string | undefined) {
       cornerRadius: (
         value: grida.program.nodes.i.IRectangleCorner["cornerRadius"]
       ) => nodeActions.changeNodeCornerRadius(node_id, value),
-      fill: (value: grida.program.cg.PaintWithoutID) =>
+      fill: (value: grida.program.cg.PaintWithoutID | null) =>
         nodeActions.changeNodeFill(node_id, value),
+      stroke: (value: grida.program.cg.PaintWithoutID | null) =>
+        nodeActions.changeNodeStroke(node_id, value),
+      strokeWidth: (value: number) =>
+        nodeActions.changeNodeStrokeWidth(node_id, value),
+      strokeCap: (value: grida.program.cg.StrokeCap) =>
+        nodeActions.changeNodeStrokeCap(node_id, value),
       fit: (value: grida.program.cg.BoxFit) =>
         nodeActions.changeNodeFit(node_id, value),
       // stylable
@@ -1370,7 +1418,6 @@ export function useEventTargetCSSCursor() {
           case "ellipse":
           case "container":
           case "image":
-          case "line":
             return "crosshair";
         }
       }

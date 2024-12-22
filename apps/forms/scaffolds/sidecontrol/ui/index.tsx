@@ -85,7 +85,13 @@ export function PropertyTextarea({
   );
 }
 
-type EnumItem = string | { label: string; value: string };
+type EnumItem =
+  | string
+  | {
+      icon?: React.ReactNode;
+      label: string;
+      value: string;
+    };
 
 export function PropertyEnum({
   enum: enums,
@@ -104,8 +110,10 @@ export function PropertyEnum({
         {enums.map((e) => {
           const value = typeof e === "string" ? e : e.value;
           const label = typeof e === "string" ? e : e.label;
+          const icon = typeof e === "string" ? undefined : e.icon;
           return (
             <SelectItem key={value} value={value}>
+              {icon && <div className="me-2">{icon}</div>}
               {label}
             </SelectItem>
           );

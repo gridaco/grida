@@ -9,13 +9,22 @@ export function EllipseWidget({
   width,
   height,
   fill,
+  stroke,
+  strokeWidth,
   ...props
 }: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.EllipseNode>) {
-  const { defs, fill: fillDef } = fill
-    ? svg.fill.fill_with_defs(fill)
+  const { defs: fillDefs, ref: fillDef } = fill
+    ? svg.paint.defs(fill)
     : {
         defs: undefined,
-        fill: "none",
+        ref: "none",
+      };
+
+  const { defs: strokeDefs, ref: strokeDef } = stroke
+    ? svg.paint.defs(stroke)
+    : {
+        defs: undefined,
+        ref: "none",
       };
 
   return (
@@ -23,15 +32,23 @@ export function EllipseWidget({
       {...queryattributes(props)}
       width={width}
       height={height}
-      style={style}
+      style={{
+        ...style,
+        overflow: "visible", // shall be visible since the polyline has a stroke width
+        // debug
+        // border: "1px solid red",
+      }}
     >
-      {defs && <g dangerouslySetInnerHTML={{ __html: defs }} />}
+      {fillDefs && <g dangerouslySetInnerHTML={{ __html: fillDefs }} />}
+      {strokeDefs && <g dangerouslySetInnerHTML={{ __html: strokeDefs }} />}
       <ellipse
         cx={width / 2}
         cy={height / 2}
         rx={width / 2}
         ry={height / 2}
         fill={fillDef}
+        strokeWidth={strokeWidth}
+        stroke={strokeDef}
       />
     </svg>
   );

@@ -510,7 +510,19 @@ interface INodeChangeCornerRadiusAction extends INodeID {
 }
 
 interface INodeChangeFillAction extends INodeID {
-  fill: grida.program.cg.PaintWithoutID;
+  fill: grida.program.cg.PaintWithoutID | null;
+}
+
+interface INodeChangeStrokeAction extends INodeID {
+  stroke: grida.program.cg.PaintWithoutID | null;
+}
+
+interface INodeChangeStrokeWidthAction extends INodeID {
+  strokeWidth: number;
+}
+
+interface INodeChangeStrokeCapAction extends INodeID {
+  strokeCap: grida.program.cg.StrokeCap;
 }
 
 interface INodeChangeBorderAction extends INodeID {
@@ -621,6 +633,9 @@ export type NodeChangeAction =
   | ({ type: "node/change/size" } & INodeChangeSizeAction)
   | ({ type: "node/change/cornerRadius" } & INodeChangeCornerRadiusAction)
   | ({ type: "node/change/fill" } & INodeChangeFillAction)
+  | ({ type: "node/change/stroke" } & INodeChangeStrokeAction)
+  | ({ type: "node/change/stroke-width" } & INodeChangeStrokeWidthAction)
+  | ({ type: "node/change/stroke-cap" } & INodeChangeStrokeCapAction)
   | ({ type: "node/change/border" } & INodeChangeBorderAction)
   | ({ type: "node/change/fit" } & INodeChangeFitAction)
   //

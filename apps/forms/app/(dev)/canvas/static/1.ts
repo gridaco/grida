@@ -170,6 +170,8 @@ export default {
           },
         ],
       },
+      strokeWidth: 0,
+      strokeCap: "butt",
       effects: [],
     },
     child_rect_2: {
@@ -201,6 +203,8 @@ export default {
           },
         ],
       },
+      strokeWidth: 0,
+      strokeCap: "butt",
       effects: [],
     },
     rect_1: {
@@ -233,6 +237,8 @@ export default {
           },
         ],
       },
+      strokeWidth: 0,
+      strokeCap: "butt",
       effects: [],
     },
     ellipse_1: {
@@ -250,6 +256,8 @@ export default {
       top: 100,
       left: 100,
       fill: { type: "solid", color: { r: 0, g: 255, b: 0, a: 1 } },
+      strokeWidth: 0,
+      strokeCap: "butt",
       effects: [],
     },
     h1: {

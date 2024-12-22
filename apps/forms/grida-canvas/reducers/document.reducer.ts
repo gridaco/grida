@@ -410,6 +410,9 @@ export default function documentReducer<S extends IDocumentEditorState>(
     case "node/change/cornerRadius":
     case "node/change/fill":
     case "node/change/border":
+    case "node/change/stroke":
+    case "node/change/stroke-width":
+    case "node/change/stroke-cap":
     case "node/change/fit":
     case "node/change/padding":
     case "node/change/layout":

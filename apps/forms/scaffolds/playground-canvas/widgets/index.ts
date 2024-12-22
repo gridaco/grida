@@ -36,6 +36,8 @@ export namespace widget_presets {
           color: { r: 0, g: 0, b: 0, a: 1 },
         },
         effects: [],
+        strokeWidth: 0,
+        strokeCap: "butt",
       },
       {
         type: "rectangle",
@@ -52,6 +54,8 @@ export namespace widget_presets {
           color: { r: 0, g: 0, b: 0, a: 1 },
         },
         effects: [],
+        strokeWidth: 0,
+        strokeCap: "butt",
       },
       {
         type: "rectangle",
@@ -68,6 +72,8 @@ export namespace widget_presets {
           color: { r: 0, g: 0, b: 0, a: 1 },
         },
         effects: [],
+        strokeWidth: 0,
+        strokeCap: "butt",
       },
     ],
   } satisfies grida.program.nodes.NodePrototype;

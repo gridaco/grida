@@ -12,11 +12,11 @@ export type CursorMode =
     }
   | {
       type: "insert";
-      node: "text" | "image" | "container" | "rectangle" | "ellipse" | "line";
+      node: "text" | "image" | "container" | "rectangle" | "ellipse";
     }
   | {
       type: "draw";
-      tool: "pencil";
+      tool: "line" | "polyline";
     };
 
 export type Marquee = {
@@ -129,6 +129,7 @@ export type GestureDraw = {
    * - draw points
    */
   type: "draw";
+  mode: "line" | "polyline";
 
   /**
    * origin point - relative to content space

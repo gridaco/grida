@@ -28,6 +28,8 @@ function _1000_rects(): Array<grida.program.nodes.RectangleNode> {
       left: 0 + i * 1,
       cornerRadius: 0,
       fill: { type: "solid", color: randcolor() },
+      strokeWidth: 0,
+      strokeCap: "butt",
       effects: [],
     } satisfies grida.program.nodes.RectangleNode);
   }

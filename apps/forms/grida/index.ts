@@ -1057,6 +1057,18 @@ export namespace grida {
       export type BoxFit = "contain" | "cover" | "none";
 
       /**
+       * Supported stoke cap modes
+       *
+       * - `butt`
+       * - `round`
+       * - `square`
+       *
+       * @see https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/stroke-linecap
+       * @see https://api.flutter.dev/flutter/dart-ui/StrokeCap.html
+       */
+      export type StrokeCap = "butt" | "round" | "square";
+
+      /**
        *
        * Supported text decoration modes
        *
@@ -1521,10 +1533,19 @@ export namespace grida {
          *
          * - [Env:HTML] for html text, `-webkit-text-stroke` will be used
          *
-         * @deprecated [NOT USED]
          */
         export interface IStroke {
           stroke?: cg.Paint;
+
+          /**
+           * stroke width - 0 or greater
+           */
+          strokeWidth: number;
+
+          /**
+           * @default "butt"
+           */
+          strokeCap: cg.StrokeCap;
         }
 
         export interface ICSSBorder {
@@ -1915,7 +1936,8 @@ export namespace grida {
           i.IOpacity,
           i.IZIndex,
           i.IRotation,
-          i.IFill {
+          i.IFill,
+          i.IStroke {
         type: "polyline";
         points: cg.Vector2[];
       }
@@ -1970,6 +1992,7 @@ export namespace grida {
           i.IZIndex,
           i.IRotation,
           i.IFill,
+          i.IStroke,
           i.IEffects,
           i.IRectangleCorner {
         type: "rectangle";
@@ -1992,6 +2015,7 @@ export namespace grida {
           i.IZIndex,
           i.IRotation,
           i.IFill,
+          i.IStroke,
           i.IEffects {
         type: "ellipse";
       }

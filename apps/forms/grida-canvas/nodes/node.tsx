@@ -123,6 +123,9 @@ export function NodeElement<P extends Record<string, any>>({
     width: DEFAULT_WIDTH ?? node.width,
     height: DEFAULT_HEIGHT ?? node.height,
     fill: DEFAULT_FILL ?? node.fill,
+    stroke: node.stroke,
+    strokeWidth: node.strokeWidth,
+    strokeCap: node.strokeCap,
     style: {
       ...style,
       ...node.style,
