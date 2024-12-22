@@ -8,16 +8,10 @@ import { cn } from "@/utils";
 export function SurfacePathEditor({ node_id }: { node_id: string }) {
   const { surface_cursor_position, cursor_mode, content_offset } =
     useEventTarget();
-  const { offset, points } = useSurfacePathEditor();
+  const { offset, points, selectedPoints } = useSurfacePathEditor();
   const transform = useNodeSurfaceTransfrom(node_id);
 
-  const lastpoint = points[points.length - 1];
-
-  const surface_lastpoint = cmath.vector2.add(
-    offset,
-    lastpoint,
-    content_offset
-  );
+  const extension = selectedPoints.length === 1 && selectedPoints[0];
 
   return (
     <div id="path-editor-surface" className="fixed left-0 top-0 w-0 h-0 z-10">
@@ -35,22 +29,23 @@ export function SurfacePathEditor({ node_id }: { node_id: string }) {
           <ControlPoint key={i} point={p} index={i} />
         ))}
       </div>
-      {cursor_mode.type === "path" && (
-        <>
-          {/* cursor point */}
-          <PathPoint
-            point={surface_cursor_position}
-            style={{ cursor: "crosshair" }}
-          />
-          <Line
-            x1={surface_lastpoint[0]}
-            y1={surface_lastpoint[1]}
-            x2={surface_cursor_position[0]}
-            y2={surface_cursor_position[1]}
-          />
-        </>
+      {cursor_mode.type === "path" && typeof extension === "number" && (
+        <Extension
+          a={cmath.vector2.add(offset, points[extension], content_offset)}
+          b={surface_cursor_position}
+        />
       )}
     </div>
+  );
+}
+
+function Extension({ a, b }: { a: cmath.Vector2; b: cmath.Vector2 }) {
+  return (
+    <>
+      {/* cursor point */}
+      <PathPoint point={b} style={{ cursor: "crosshair" }} />
+      <Line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} />
+    </>
   );
 }
 

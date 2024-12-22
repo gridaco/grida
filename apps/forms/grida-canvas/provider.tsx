@@ -1914,10 +1914,14 @@ export function useSurfacePathEditor() {
   assert(state.content_edit_mode && state.content_edit_mode.type === "path");
 
   const { node_id, selected_points: selectedPoints } = state.content_edit_mode;
-  const node = state.document.nodes[
-    node_id
-  ] as grida.program.nodes.PolylineNode;
-  const points = node.points;
+  const node = state.document.nodes[node_id] as
+    | grida.program.nodes.PolylineNode
+    | grida.program.nodes.VectorNode;
+
+  const points =
+    node.type === "polyline"
+      ? node.points
+      : node.vectorNetwork!.vertices.map((v) => v.p);
 
   // offset of the points (node position)
   const offset: cmath.Vector2 = [node.left!, node.top!];

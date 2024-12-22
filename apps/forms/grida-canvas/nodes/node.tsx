@@ -114,6 +114,7 @@ export function NodeElement<P extends Record<string, any>>({
     muted: node.muted,
     autoplay: node.autoplay,
     paths: node.paths,
+    vectorNetwork: node.vectorNetwork,
     points: node.points,
     opacity: node.opacity,
     zIndex: DEFAULT_ZINDEX ?? node.zIndex,

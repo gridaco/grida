@@ -241,6 +241,8 @@ export type GestureTranslatePoint = {
  */
 export type GestureCurve = {
   type: "curve";
+  initial: cmath.Vector2;
+  movement: cmath.Vector2;
 };
 
 /**

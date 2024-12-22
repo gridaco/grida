@@ -1,9 +1,70 @@
-import { v4 } from "uuid";
-import { SVGPathData } from "svg-pathdata";
+import { SVGCommand, encodeSVGPath, SVGPathData } from "svg-pathdata";
 import type { grida } from "./index";
 
 export namespace svg {
   export namespace d {
+    /**
+     * Converts a vector network to SVG path data.
+     *
+     * @param vn - Vector network to convert.
+     * @returns The SVG path data string representing the vector network.
+     */
+    export function fromVectorNetwork(
+      vn: grida.program.cg.vector_network.VectorNetwork
+    ) {
+      const { vertices, segments } = vn;
+
+      // Prepare path commands
+      const commands: SVGCommand[] = [];
+
+      // Keep track of visited segments to avoid duplicates
+      const visitedSegments = new Set();
+
+      segments.forEach((segment) => {
+        const { a, b, ta, tb } = segment;
+
+        // Skip if the segment is already visited
+        if (
+          visitedSegments.has(`${a}-${b}`) ||
+          visitedSegments.has(`${b}-${a}`)
+        ) {
+          return;
+        }
+
+        visitedSegments.add(`${a}-${b}`);
+
+        const start = vertices[a].p;
+        const end = vertices[b].p;
+        const control1 = [start[0] + ta[0], start[1] + ta[1]];
+        const control2 = [end[0] + tb[0], end[1] + tb[1]];
+
+        commands.push(
+          // Move to the starting point
+          {
+            type: SVGPathData.MOVE_TO,
+            x: start[0],
+            y: start[1],
+            relative: false,
+          },
+          {
+            type: SVGPathData.CURVE_TO,
+            x1: control1[0],
+            y1: control1[1],
+            x2: control2[0],
+            y2: control2[1],
+            x: end[0],
+            y: end[1],
+            relative: false,
+          } // Cubic Bezier curve
+        );
+      });
+
+      // Encode the path commands to SVG path data
+      return encodeSVGPath(commands);
+
+      //
+    }
+
     /**
      * Generates an SVG path with rounded corners for a rectangle.
      *

@@ -931,6 +931,104 @@ export namespace grida {
      * Core Graphics
      */
     export namespace cg {
+      export namespace vector_network {
+        /**
+         * Represents a vertex in the vector network.
+         */
+        export type VectorNetworkVertex = { p: Vector2 };
+
+        /**
+         * Represents a segment in the vector network, connecting two vertices.
+         *
+         * @property a - Index of the starting vertex.
+         * @property b - Index of the ending vertex.
+         * @property ta - Tangent at the starting vertex (relative to the vertex).
+         * @property tb - Tangent at the ending vertex (relative to the vertex).
+         */
+        export type VectorNetworkSegment = {
+          a: number;
+          b: number;
+          ta: Vector2;
+          tb: Vector2;
+        };
+
+        /**
+         * Represents the vector network, consisting of vertices and segments.
+         *
+         * @example
+         * ```ts
+         * const example: VectorNetwork = {
+         *   vertices: [
+         *     { x: 10, y: 10 }, // Index 0: Starting point
+         *     { x: 50, y: 10 }  // Index 1: End point
+         *   ],
+         *   segments: [
+         *     {
+         *       a: 0, // Start at vertices[0] (10, 10)
+         *       b: 1, // End at vertices[1] (50, 10)
+         *       ta: { x: 10, y: 10 }, // Tangent relative to start (absolute: 20, 20)
+         *       tb: { x: -10, y: 10 } // Tangent relative to end (absolute: 40, 20)
+         *     }
+         *   ]
+         * };
+         * ```
+         * This example corresponds to the SVG path:
+         * `M 10 10 C 20 20, 40 20, 50 10`
+         *
+         * ----
+         *
+         * ## Guidelines for Manipulating a Vector Network
+         *
+         * A vector network represents a graph-like structure of vertices and segments.
+         * Proper manipulation ensures correct rendering and functionality.
+         *
+         * ## Requirements
+         *
+         * 1. **Order of Vertices and Segments**:
+         *    - **Sequential Paths**: The order of vertices and segments must be respected for rendering strokes or paths.
+         *      - Example: Open or closed paths where the visual flow depends on the sequence.
+         *    - **Graph-Like Structures**: Order does not matter if the network is used as a graph with arbitrary connections.
+         *
+         * 2. **Region Construction**:
+         *    - Loops in regions (`VectorRegion.loops`) must maintain a consistent order.
+         *    - Ensure correct winding rules (clockwise or counterclockwise) for proper fill rendering.
+         *
+         * 3. **Adding/Removing Vertices or Segments**:
+         *    - After adding or removing elements, normalize the data:
+         *      - Update any dependent structures, such as `VectorRegion.loops`.
+         *      - Ensure indices in segments (`a`, `b`) remain valid.
+         *
+         * 4. **Consistency in Indices**:
+         *    - Segments (`a`, `b`) must reference valid indices in the `vertices` array.
+         *    - Avoid leaving unused or orphaned vertices.
+         *
+         * 5. **Control Points (Tangents)**:
+         *    - Ensure that control points (`ta`, `tb`) are relative to their respective vertices.
+         *    - Invalid or mismatched control points can lead to incorrect Bézier curve rendering.
+         *
+         * 6. **Validation After Manipulation**:
+         *    - Check for disconnected segments or invalid references to vertices.
+         *    - Ensure all closed regions are properly defined, with no overlapping or missing paths.
+         *
+         * 7. **Rendering Context**:
+         *    - Understand the context of the vector network:
+         *      - Sequential paths (order matters).
+         *      - Arbitrary connections (order may not matter).
+         *
+         * ## Best Practices
+         *
+         * - Always maintain a consistent order for paths or regions.
+         * - Normalize the vector network data after edits to avoid rendering issues.
+         * - Use explicit indexing (`a`, `b`) to define segment connections instead of relying on order alone.
+         * - Validate data integrity before rendering or exporting to formats like SVG.
+         */
+
+        export type VectorNetwork = {
+          vertices: VectorNetworkVertex[];
+          segments: VectorNetworkSegment[];
+        };
+      }
+
       export type Vector2 = [number, number];
 
       /**
@@ -1913,6 +2011,10 @@ export namespace grida {
           i.IRotation,
           i.IFill {
         type: "vector";
+
+        /**
+         * @deprecated - use vectorNetwork instead
+         */
         paths: (cg.Path & {
           /**
            * specifies which property to use to fill the path
@@ -1922,6 +2024,12 @@ export namespace grida {
            */
           fill: "fill" | "stroke";
         })[];
+
+        /**
+         * @deprecated
+         * @todo
+         */
+        vectorNetwork?: cg.vector_network.VectorNetwork;
       }
 
       /**

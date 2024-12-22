@@ -185,25 +185,75 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             break;
           case "path": {
             if (draft.content_edit_mode?.type === "path") {
+              // // polyline mode
+              // const node = document.__getNodeById(
+              //   draft,
+              //   draft.content_edit_mode.node_id
+              // ) as grida.program.nodes.PolylineNode;
+
+              // // add point
+              // const position = cmath.vector2.subtract(draft.cursor_position, [
+              //   node.left!,
+              //   node.top!,
+              // ]);
+              // node.points.push(position);
+              // const index = node.points.length - 1;
+              // draft.content_edit_mode.selected_points = [index];
+
               const node = document.__getNodeById(
                 draft,
                 draft.content_edit_mode.node_id
-              ) as grida.program.nodes.PolylineNode;
+              ) as grida.program.nodes.VectorNode;
 
               // add point
               const position = cmath.vector2.subtract(draft.cursor_position, [
                 node.left!,
                 node.top!,
               ]);
-              node.points.push(position);
-              const index = node.points.length - 1;
+              node.vectorNetwork!.vertices.push({ p: position });
+              const index = node.vectorNetwork!.vertices.length - 1;
+              if (index > 0) {
+                node.vectorNetwork!.segments.push({
+                  a: index - 1,
+                  b: index,
+                  ta: [0, 0],
+                  tb: [0, 0],
+                });
+              }
               draft.content_edit_mode.selected_points = [index];
               // ...
             } else {
               // create a new node
               const new_node_id = nid();
               // ...
+              // const vector = {
+              //   type: "polyline",
+              //   name: "path",
+              //   id: new_node_id,
+              //   active: true,
+              //   locked: false,
+              //   position: "absolute",
+              //   left: 0,
+              //   top: 0,
+              //   opacity: 1,
+              //   width: 0,
+              //   height: 0,
+              //   rotation: 0,
+              //   zIndex: 0,
+              //   stroke: { type: "solid", color: { r: 0, g: 0, b: 0, a: 1 } },
+              //   strokeCap: "butt",
+              //   strokeWidth: 3,
+              //   points: [cmath.vector2.zero],
+              //   // paths: [],
+              //   // vectorNetwork: {
+              //   //   vertices: [{ p: cmath.vector2.zero }],
+              //   //   segments: [],
+              //   // },
+              // } satisfies grida.program.nodes.PolylineNode;
+
               const vector = {
+                type: "vector",
+                name: "path",
                 id: new_node_id,
                 active: true,
                 locked: false,
@@ -215,13 +265,16 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                 height: 0,
                 rotation: 0,
                 zIndex: 0,
-                stroke: { type: "solid", color: { r: 0, g: 0, b: 0, a: 1 } },
-                strokeCap: "butt",
-                type: "polyline",
-                name: "path",
-                strokeWidth: 3,
-                points: [cmath.vector2.zero],
-              } satisfies grida.program.nodes.PolylineNode;
+                // stroke: { type: "solid", color: { r: 0, g: 0, b: 0, a: 1 } },
+                // strokeCap: "butt",
+                // strokeWidth: 3,
+                // points: [cmath.vector2.zero],
+                paths: [],
+                vectorNetwork: {
+                  vertices: [{ p: cmath.vector2.zero }],
+                  segments: [],
+                },
+              } satisfies grida.program.nodes.VectorNode;
 
               vector.left = draft.cursor_position[0];
               vector.top = draft.cursor_position[1];
@@ -234,9 +287,6 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                 selected_points: [],
                 node_id: new_node_id,
               };
-              // draft.gesture = {
-              //   type: "curve",
-              // };
             }
 
             //
@@ -255,7 +305,6 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       const { shiftKey } = <EditorEventTarget_DragStart>action;
       return produce(state, (draft) => {
         // clear all trasform state
-        draft.content_edit_mode = undefined;
         draft.marquee = undefined;
 
         switch (draft.cursor_mode.type) {
@@ -405,6 +454,16 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                 self_clearSelection(draft);
                 break;
             }
+            break;
+          }
+          case "path": {
+            // curve mode (if pen tool)
+            draft.gesture = {
+              type: "curve",
+              initial: draft.cursor_position,
+              movement: cmath.vector2.zero,
+            };
+            break;
           }
         }
       });
@@ -418,8 +477,9 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         // reset the cursor mode (unless pencil mode)
         if (
           !(
-            draft.cursor_mode.type === "draw" &&
-            draft.cursor_mode.tool === "polyline"
+            (draft.cursor_mode.type === "draw" &&
+              draft.cursor_mode.tool === "polyline") ||
+            draft.cursor_mode.type === "path"
           )
         ) {
           draft.cursor_mode = { type: "cursor" };
@@ -522,6 +582,19 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               node.height = bb_next.height;
 
               break;
+            }
+            case "curve": {
+              //
+              draft.gesture.movement = movement;
+              const { node_id } = draft.content_edit_mode!;
+              const node = document.__getNodeById(
+                draft,
+                node_id
+              ) as grida.program.nodes.VectorNode;
+
+              node.vectorNetwork!.segments[
+                node.vectorNetwork!.segments.length - 1
+              ].tb = cmath.vector2.multiply(movement, [-1, -1]);
             }
           }
         });
