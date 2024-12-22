@@ -6,11 +6,17 @@ export function self_updateSurfaceHoverState<S extends IDocumentEditorState>(
   draft: Draft<S>
 ) {
   // do not change the hovered node if the gesture is...
-  if (draft.gesture?.type === "draw") return draft;
-  if (draft.gesture?.type === "rotate") return draft;
-  if (draft.gesture?.type === "scale") return draft;
-  if (draft.gesture?.type === "nudge") return draft;
-  if (draft.gesture?.type === "corner-radius") return draft;
+  if (
+    draft.gesture.type === "draw" ||
+    draft.gesture.type === "rotate" ||
+    draft.gesture.type === "scale" ||
+    draft.gesture.type === "nudge" ||
+    draft.gesture.type === "corner-radius"
+  ) {
+    // clear the hover state
+    draft.hovered_node_id = null;
+    return draft;
+  }
 
   const target = getSurfaceRayTarget(draft.surface_raycast_detected_node_ids, {
     config: draft.surface_raycast_targeting,

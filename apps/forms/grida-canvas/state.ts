@@ -112,6 +112,10 @@ interface IDocumentEditorTransformState {
   viewport_offset: cmath.Vector2;
 }
 
+export type GestureIdle = {
+  type: "idle";
+};
+
 export type GestureNudge = {
   type: "nudge";
   /**
@@ -150,7 +154,8 @@ export type GestureDraw = {
  * this support state is not part of the document state and does not get saved or recorded as history
  */
 interface IDocumentEditorEventTargetState {
-  gesture?:
+  gesture:
+    | GestureIdle
     | GestureNudge
     | {
         // translate (move)
@@ -219,7 +224,7 @@ interface IDocumentEditorEventTargetState {
   /**
    * general hover state
    */
-  hovered_node_id?: string;
+  hovered_node_id: string | null;
 
   /**
    * special hover state - when a node is a target of certain gesture, and ux needs to show the target node
@@ -385,6 +390,7 @@ export function initDocumentEditorState({
 
   return {
     selection: [],
+    hovered_node_id: null,
     content_offset: [0, 0],
     viewport_offset: [0, 0],
     cursor_position: [0, 0],
@@ -393,6 +399,7 @@ export function initDocumentEditorState({
       future: [],
       past: [],
     },
+    gesture: { type: "idle" },
     gesture_modifiers: {
       translate_with_hierarchy_change: "on",
       translate_with_clone: "off",

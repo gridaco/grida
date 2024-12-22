@@ -7,7 +7,7 @@ export function self_deleteNode<S extends IDocumentEditorState>(
   node_id: string
 ) {
   draft.selection = [];
-  draft.hovered_node_id = undefined;
+  draft.hovered_node_id = null;
   const node = draft.document.nodes[node_id];
   const children = "children" in node ? node.children : undefined;
   delete draft.document.nodes[node_id];

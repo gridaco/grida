@@ -14,7 +14,7 @@ export function getSurfaceRayTarget(
     config: SurfaceRaycastTargeting;
     context: IDocumentEditorState;
   }
-): string | undefined {
+): string | null {
   const {
     document: { root_id, nodes },
   } = context;
@@ -51,7 +51,7 @@ export function getSurfaceRayTarget(
   if (config.target === "next") {
     // "Next" logic: find the shallowest node above the deepest one
     const deepestNode = filteredNodes[0];
-    if (!deepestNode) return undefined;
+    if (!deepestNode) return null;
 
     // Get the parent of the deepest node
     const parentNodeId = document.getAncestors(
@@ -69,8 +69,8 @@ export function getSurfaceRayTarget(
     return deepestNode;
   }
 
-  // If no valid node is found, return undefined
-  return undefined;
+  // If no valid node is found, return null
+  return null;
 }
 
 export function getMarqueeSelection(

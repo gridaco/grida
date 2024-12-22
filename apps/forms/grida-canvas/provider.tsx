@@ -1395,9 +1395,9 @@ export function useEventTarget() {
     marquee,
   } = state;
 
-  const is_node_transforming = !!gesture;
-  const is_node_translating = gesture?.type === "translate";
-  const is_node_scaling = gesture?.type === "scale";
+  const is_node_transforming = gesture.type !== "idle";
+  const is_node_translating = gesture.type === "translate";
+  const is_node_scaling = gesture.type === "scale";
 
   const setCursorMode = useCallback(
     (cursor_mode: CursorMode) => {

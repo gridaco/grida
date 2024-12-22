@@ -8,7 +8,6 @@ export default function useSnapGuide() {
   const { gesture, content_offset: translate } = state;
 
   if (
-    gesture &&
     (gesture.type === "translate" ||
       gesture.type === "nudge" ||
       gesture.type === "scale") &&

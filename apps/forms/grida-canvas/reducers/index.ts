@@ -176,7 +176,7 @@ function _reducer<S extends IDocumentEditorState>(
             break;
           }
           case "off": {
-            draft.gesture = undefined;
+            draft.gesture = { type: "idle" };
             break;
           }
         }

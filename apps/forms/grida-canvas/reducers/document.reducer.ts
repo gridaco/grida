@@ -167,7 +167,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
 
       return produce(state, (draft) => {
         // for nudge, gesture is not required, but only for surface ux.
-        if (draft.gesture?.type === "nudge") {
+        if (draft.gesture.type === "nudge") {
           const snap_target_node_ids = getSnapTargets(state.selection, state);
           const snap_target_node_rects = snap_target_node_ids.map(
             (node_id) => domapi.get_node_bounding_rect(node_id)!

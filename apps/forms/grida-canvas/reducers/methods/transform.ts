@@ -42,7 +42,7 @@ const __resize_handle_to_mouse_direction_multiplier = {
 export function self_update_gesture_transform<S extends IDocumentEditorState>(
   draft: Draft<S>
 ) {
-  if (!draft.gesture) return;
+  if (draft.gesture.type === "idle") return;
   switch (draft.gesture.type) {
     case "translate": {
       return __self_update_gesture_transform_translate(draft);
@@ -65,17 +65,14 @@ export function self_update_gesture_transform<S extends IDocumentEditorState>(
 function __self_update_gesture_transform_translate(
   draft: Draft<IDocumentEditorState>
 ) {
-  assert(
-    draft.gesture && draft.gesture.type === "translate",
-    "Gesture type must be translate"
-  );
+  assert(draft.gesture.type === "translate", "Gesture type must be translate");
   const {
     movement: _movement,
     initial_selection,
     initial_rects,
     initial_clone_ids,
     initial_snapshot,
-  } = draft.gesture!;
+  } = draft.gesture;
   const {
     translate_with_clone,
     tarnslate_with_axis_lock,
@@ -264,7 +261,7 @@ function __self_update_gesture_transform_translate(
 function __self_update_gesture_transform_scale(
   draft: Draft<IDocumentEditorState>
 ) {
-  assert(draft.gesture!.type === "scale", "Gesture type must be scale");
+  assert(draft.gesture.type === "scale", "Gesture type must be scale");
   const { transform_with_center_origin, transform_with_preserve_aspect_ratio } =
     draft.gesture_modifiers;
 
@@ -273,7 +270,7 @@ function __self_update_gesture_transform_scale(
     direction,
     movement: rawMovement,
     initial_rects,
-  } = draft.gesture!;
+  } = draft.gesture;
 
   const initial_bounding_rectangle = cmath.rect.getBoundingRect(initial_rects);
 
@@ -336,8 +333,8 @@ function __self_update_gesture_transform_scale(
 function __self_update_gesture_transform_rotate(
   draft: Draft<IDocumentEditorState>
 ) {
-  assert(draft.gesture!.type === "rotate", "Gesture type must be rotate");
-  const { movement, selection } = draft.gesture!;
+  assert(draft.gesture.type === "rotate", "Gesture type must be rotate");
+  const { movement, selection } = draft.gesture;
   const { rotate_with_quantize } = draft.gesture_modifiers;
 
   const _angle = cmath.principalAngle(

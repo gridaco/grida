@@ -124,7 +124,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       // - DOES NOT "enter content edit mode" - this is handled by its own action.
       // - focus on the next descendant (next deep) hit node (if any) relative to the selection
       return produce(state, (draft) => {
-        if (state.gesture) return; // ignore when gesture is active
+        if (state.gesture.type !== "idle") return; // ignore when gesture is active
 
         const { document_ctx, selection, surface_raycast_detected_node_ids } =
           state;
@@ -191,7 +191,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         // clear all trasform state
 
         draft.content_edit_mode = undefined;
-        draft.gesture = undefined;
+        draft.gesture = { type: "idle" };
       });
     }
     // #region drag event
@@ -300,6 +300,9 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               points: [cmath.vector2.zero],
               node_id: vector.id,
             };
+
+            // clear selection for draw mode
+            self_clearSelection(draft);
           }
         }
       });
@@ -310,7 +313,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       );
       return produce(state, (draft) => {
         self_maybe_end_gesture_translate(draft);
-        draft.gesture = undefined;
+        draft.gesture = { type: "idle" };
         draft.marquee = undefined;
         if (node_ids_from_area) {
           const target_node_ids = getMarqueeSelection(
@@ -337,7 +340,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         });
       } else {
         return produce(state, (draft) => {
-          switch (draft.gesture?.type) {
+          switch (draft.gesture.type) {
             // [insertion mode - resize after insertion]
             case "scale": {
               assert(state.selection.length === 1);
@@ -408,14 +411,14 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       const { node_id } = <EditorEventTarget_Node_PointerLeave>action;
       return produce(state, (draft) => {
         if (draft.hovered_node_id === node_id) {
-          draft.hovered_node_id = undefined;
+          draft.hovered_node_id = null;
         }
       });
     }
     //
     case "document/canvas/backend/html/event/node-overlay/on-click": {
       const { selection, node_ids_from_point, shiftKey } = action;
-      if (state.gesture?.type === "translate") break;
+      if (state.gesture.type === "translate") break;
       return produce(state, (draft) => {
         draft.surface_raycast_detected_node_ids = node_ids_from_point;
         const { hovered_node_id } = self_updateSurfaceHoverState(draft);
@@ -450,8 +453,8 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
       return produce(state, (draft) => {
         assert(
-          draft.gesture?.type === "translate",
-          `was expecting translate, but got ${draft.gesture?.type}`
+          draft.gesture.type === "translate",
+          `was expecting translate, but got ${draft.gesture.type}`
         );
         draft.gesture.movement = movement;
         self_update_gesture_transform(draft);
@@ -465,7 +468,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
       return produce(state, (draft) => {
         draft.content_edit_mode = undefined;
-        draft.hovered_node_id = undefined;
+        draft.hovered_node_id = null;
 
         self_start_gesture_scale(draft, {
           selection: selection,
@@ -475,7 +478,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
     }
     case "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-end": {
       return produce(state, (draft) => {
-        draft.gesture = undefined;
+        draft.gesture = { type: "idle" };
       });
     }
     case "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag": {
@@ -486,7 +489,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
       return produce(state, (draft) => {
         // cancel if invalid state
-        if (draft.gesture?.type !== "scale") return;
+        if (draft.gesture.type !== "scale") return;
 
         draft.gesture.movement = movement;
         self_update_gesture_transform(draft);
@@ -508,7 +511,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
     }
     case "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-end": {
       return produce(state, (draft) => {
-        draft.gesture = undefined;
+        draft.gesture = { type: "idle" };
       });
     }
     case "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag": {
@@ -518,7 +521,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       } = action;
       const [dx, dy] = delta;
       // cancel if invalid state
-      if (state.gesture?.type !== "corner-radius") return state;
+      if (state.gesture.type !== "corner-radius") return state;
 
       // const distance = Math.sqrt(dx * dx + dy * dy);
       const d = -Math.round(dx);
@@ -570,7 +573,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
     case "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag-end": {
       const {} = <EditorEventTarget_NodeOverlayRotationHandle_DragEnd>action;
       return produce(state, (draft) => {
-        draft.gesture = undefined;
+        draft.gesture = { type: "idle" };
       });
     }
     case "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag": {
@@ -582,7 +585,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
       return produce(state, (draft) => {
         // cancel if invalid state
-        if (draft.gesture?.type !== "rotate") return;
+        if (draft.gesture.type !== "rotate") return;
         draft.gesture.movement = movement;
 
         self_update_gesture_transform(draft);
@@ -679,14 +682,14 @@ function self_start_gesture_translate(draft: Draft<IDocumentEditorState>) {
 }
 
 function self_maybe_end_gesture_translate(draft: Draft<IDocumentEditorState>) {
-  if (draft.gesture?.type !== "translate") return;
+  if (draft.gesture.type !== "translate") return;
   if (draft.gesture.is_currently_cloned) {
     // update the selection as the cloned nodes
     self_selectNode(draft, "reset", ...draft.gesture.selection);
   }
 
   draft.surface_measurement_targeting_locked = false;
-  draft.gesture = undefined;
+  draft.gesture = { type: "idle" };
   draft.dropzone_node_id = undefined;
 }
 
