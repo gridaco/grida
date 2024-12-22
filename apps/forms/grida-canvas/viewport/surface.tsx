@@ -20,7 +20,8 @@ import { Knob } from "./ui/knob";
 import { ColumnsIcon, RowsIcon } from "@radix-ui/react-icons";
 import { cmath } from "../cmath";
 import { cursors } from "../components/cursor";
-import { SurfaceTextEditor } from "./ui/textarea";
+import { SurfaceTextEditor } from "./ui/text-editor";
+import { SurfacePathEditor } from "./ui/path-editor";
 
 const DRAG_THRESHOLD = 2;
 
@@ -233,10 +234,19 @@ export function EditorSurface() {
         )}
         <SurfaceGroup hidden={is_node_translating || isWindowResizing}>
           {content_edit_mode?.type === "text" && (
-            <SurfaceTextEditor node_id={content_edit_mode.selection} />
+            <SurfaceTextEditor node_id={content_edit_mode.node_id} />
+          )}
+          {content_edit_mode?.type === "path" && (
+            <SurfacePathEditor node_id={content_edit_mode.node_id} />
           )}
         </SurfaceGroup>
-        <SurfaceGroup hidden={is_node_translating || isWindowResizing}>
+        <SurfaceGroup
+          hidden={
+            is_node_translating ||
+            isWindowResizing ||
+            content_edit_mode?.type === "path"
+          }
+        >
           <SelectionOverlay
             selection={selection}
             readonly={!!content_edit_mode}

@@ -522,17 +522,17 @@ export function SelectedNodeProperties() {
           </SidebarSectionHeaderItem>
           <SidebarMenuSectionContent className="space-y-2">
             <PropertyLine>
-              <PropertyLineLabel>Width</PropertyLineLabel>
-              <StrokeWidthControl
-                value={strokeWidth}
-                onValueChange={selectedNode.strokeWidth}
-              />
-            </PropertyLine>
-            <PropertyLine>
               <PropertyLineLabel>Color</PropertyLineLabel>
               <PaintControl
                 value={stroke}
                 onValueChange={selectedNode.stroke}
+              />
+            </PropertyLine>
+            <PropertyLine>
+              <PropertyLineLabel>Width</PropertyLineLabel>
+              <StrokeWidthControl
+                value={strokeWidth}
+                onValueChange={selectedNode.strokeWidth}
               />
             </PropertyLine>
             <PropertyLine hidden={!supports.strokeCap(node.type)}>

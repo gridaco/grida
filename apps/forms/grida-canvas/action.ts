@@ -53,6 +53,10 @@ interface INodeID {
   node_id: NodeID;
 }
 
+interface IPathPointIndex {
+  index: number;
+}
+
 export type TCanvasEventTargetDragGestureState = {
   /**
    * Difference between the current movement and the previous movement.
@@ -285,7 +289,11 @@ export type EventTargetAction =
   //
   | EditorEventTarget_NodeOverlayRotationHandle_DragStart
   | EditorEventTarget_NodeOverlayRotationHandle_DragEnd
-  | EditorEventTarget_NodeOverlayRotationHandle_Drag;
+  | EditorEventTarget_NodeOverlayRotationHandle_Drag
+  //
+  | EditorEventTarget_PathPoint_DragStart
+  | EditorEventTarget_PathPoint_DragEnd
+  | EditorEventTarget_PathPoint_Drag;
 
 export type EditorEventTarget_PointerMove = {
   type: "document/canvas/backend/html/event/on-pointer-move";
@@ -428,6 +436,17 @@ export type EditorEventTarget_NodeOverlayRotationHandle_Drag = INodeID &
   };
 
 //
+export type EditorEventTarget_PathPoint_DragStart = IPathPointIndex & {
+  type: "document/canvas/backend/html/event/path-point/on-drag-start";
+};
+
+export type EditorEventTarget_PathPoint_DragEnd = {
+  type: "document/canvas/backend/html/event/path-point/on-drag-end";
+};
+
+export type EditorEventTarget_PathPoint_Drag = ICanvasEventTargetDragEvent & {
+  type: "document/canvas/backend/html/event/path-point/on-drag";
+};
 
 // #region surface action
 export type SurfaceAction =

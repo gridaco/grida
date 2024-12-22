@@ -15,18 +15,29 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
       const node_id = state.selection[0];
       const node = document.__getNodeById(state, node_id);
 
-      // only text node can enter the content edit mode
-      if (node.type !== "text") return state;
-
-      // the text node should have a string literal value assigned (we don't support props editing via surface)
-      if (typeof node.text !== "string") return state;
-
       return produce(state, (draft) => {
-        draft.content_edit_mode = {
-          type: "text",
-          selection: state.selection[0],
-        };
+        switch (node.type) {
+          case "text": {
+            // the text node should have a string literal value assigned (we don't support props editing via surface)
+            if (typeof node.text !== "string") return;
+
+            draft.content_edit_mode = {
+              type: "text",
+              node_id: node_id,
+            };
+            break;
+          }
+          case "polyline": {
+            draft.content_edit_mode = {
+              type: "path",
+              node_id: node_id,
+              selectedPoints: [],
+            };
+            break;
+          }
+        }
       });
+
       break;
     }
     case "document/surface/content-edit-mode/try-exit": {

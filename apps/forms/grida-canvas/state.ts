@@ -348,10 +348,15 @@ export interface IDocumentState {
         /**
          * text node id
          */
-        selection: string;
+        node_id: string;
         // selectedTextRange;
       }
-    | { type: "points"; selection: string };
+    | {
+        type: "path";
+        node_id: string;
+        selectedPoints: number[];
+        initialPoints: cmath.Vector2[];
+      };
 
   /**
    * @private - internal use only

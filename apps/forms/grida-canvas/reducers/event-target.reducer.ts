@@ -113,7 +113,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
             // if the node is text, enter content edit mode
             if (nnode.type === "text") {
-              draft.content_edit_mode = { type: "text", selection: nnode.id };
+              draft.content_edit_mode = { type: "text", node_id: nnode.id };
             }
             break;
         }
@@ -328,7 +328,6 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             vector.left = node_relative_pos[0];
             vector.top = node_relative_pos[1];
 
-            draft.content_edit_mode = { type: "points", selection: vector.id };
             draft.gesture = {
               type: "draw",
               mode: tool,
@@ -664,6 +663,47 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         self_update_gesture_transform(draft);
       });
       //
+    }
+    case "document/canvas/backend/html/event/path-point/on-drag":
+    case "document/canvas/backend/html/event/path-point/on-drag-end":
+    case "document/canvas/backend/html/event/path-point/on-drag-start": {
+      return produce(state, (draft) => {
+        const { content_edit_mode } = draft;
+        assert(content_edit_mode && content_edit_mode.type === "path");
+        const { node_id, initialPoints } = content_edit_mode;
+        const node = document.__getNodeById(
+          draft,
+          node_id
+        ) as grida.program.nodes.PolylineNode;
+        const { points } = node;
+
+        switch (action.type) {
+          case "document/canvas/backend/html/event/path-point/on-drag-start": {
+            const { index } = action;
+
+            content_edit_mode.selectedPoints = [index];
+            content_edit_mode.initialPoints = [...points];
+
+            break;
+          }
+          case "document/canvas/backend/html/event/path-point/on-drag-end": {
+            const {} = action;
+            break;
+          }
+          case "document/canvas/backend/html/event/path-point/on-drag": {
+            const {
+              event: { movement },
+            } = action;
+
+            // translate the point
+            for (const i of content_edit_mode.selectedPoints) {
+              points[i] = cmath.vector2.add(initialPoints[i], movement);
+            }
+
+            break;
+          }
+        }
+      });
     }
 
     // #endregion [html backend] canvas event target

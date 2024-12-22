@@ -1891,6 +1891,63 @@ export function useEventTarget() {
   ]);
 }
 
+export function useSurfacePathEditor() {
+  const [state, dispatch] = __useInternal();
+  assert(state.content_edit_mode && state.content_edit_mode.type === "path");
+
+  const { node_id, selectedPoints } = state.content_edit_mode;
+  const node = state.document.nodes[
+    node_id
+  ] as grida.program.nodes.PolylineNode;
+  const points = node.points;
+
+  const onPointDragStart = useCallback(
+    (index: number) => {
+      dispatch({
+        type: "document/canvas/backend/html/event/path-point/on-drag-start",
+        index,
+      });
+    },
+    [dispatch]
+  );
+
+  const onPointDrag = useCallback(
+    (event: TCanvasEventTargetDragGestureState) => {
+      dispatch({
+        type: "document/canvas/backend/html/event/path-point/on-drag",
+        event,
+      });
+    },
+    [dispatch]
+  );
+
+  const onPointDragEnd = useCallback(() => {
+    dispatch({
+      type: "document/canvas/backend/html/event/path-point/on-drag-end",
+    });
+  }, [dispatch]);
+
+  return useMemo(
+    () => ({
+      node_id,
+      points,
+      selectedPoints,
+      onPointDragStart,
+      onPointDrag,
+      onPointDragEnd,
+    }),
+    [
+      //
+      node_id,
+      points,
+      selectedPoints,
+      onPointDragStart,
+      onPointDrag,
+      onPointDragEnd,
+    ]
+  );
+}
+
 /**
  * Must be used when root node is {@link grida.program.nodes.TemplateInstanceNode} node
  */
