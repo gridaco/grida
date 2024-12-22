@@ -3,12 +3,15 @@ import type { grida } from "@/grida";
 import queryattributes from "./utils/attributes";
 
 export function SVGPolyLineWidget({
-  width,
-  height,
+  width: _width,
+  height: _height,
   points,
   style,
   ...props
 }: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.PolylineNode>) {
+  const width = Math.max(_width, 1);
+  const height = Math.max(_height, 1);
+
   return (
     <svg
       {...queryattributes(props)}

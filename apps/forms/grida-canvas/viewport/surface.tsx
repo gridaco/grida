@@ -22,6 +22,8 @@ import { cmath } from "../cmath";
 import { cursors } from "../components/cursor";
 import { SurfaceTextEditor } from "./ui/textarea";
 
+const DRAG_THRESHOLD = 2;
+
 function useSurfaceGesture(
   {
     onClick,
@@ -190,7 +192,7 @@ export function EditorSurface() {
         threshold: 2,
       },
       drag: {
-        threshold: 4,
+        threshold: DRAG_THRESHOLD,
         // disable drag gesture with arrow keys
         keyboardDisplacement: 0,
       },
@@ -313,7 +315,7 @@ function GroupOverlay({
     {
       drag: {
         enabled: enabled,
-        threshold: 4,
+        threshold: DRAG_THRESHOLD,
         // disable drag gesture with arrow keys
         keyboardDisplacement: 0,
       },
@@ -394,7 +396,7 @@ function NodeOverlay({
     {
       drag: {
         enabled: enabled,
-        threshold: 4,
+        threshold: DRAG_THRESHOLD,
         // disable drag gesture with arrow keys
         keyboardDisplacement: 0,
       },
@@ -642,7 +644,7 @@ function LayerOverlayResizeHandle({
     },
     {
       drag: {
-        threshold: 4,
+        threshold: DRAG_THRESHOLD,
         // disable drag gesture with arrow keys
         keyboardDisplacement: 0,
       },

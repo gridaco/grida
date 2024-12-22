@@ -303,7 +303,6 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         self_maybe_end_gesture_translate(draft);
         draft.gesture = undefined;
         draft.marquee = undefined;
-        draft.cursor_mode = { type: "cursor" };
         if (node_ids_from_area) {
           const target_node_ids = getMarqueeSelection(
             state,
