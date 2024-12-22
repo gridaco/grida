@@ -374,7 +374,7 @@ function NodeOverlay({
     {
       onPointerDown: (e) => {
         // if insert mode, the event should be passed to the master to start the insertion
-        if (cursor_mode.type !== "insert") {
+        if (cursor_mode.type !== "insert" && cursor_mode.type !== "draw") {
           // otherwise, it should be stopped here
           // stop propagation to prevent the master event target from changing the selection
           e.event.stopPropagation();

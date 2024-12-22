@@ -459,20 +459,25 @@ export default function documentReducer<S extends IDocumentEditorState>(
         const childIndex = parent_node.children!.indexOf(node_id);
         assert(childIndex !== -1, "node not found in children");
 
+        const before = [...parent_node.children!];
+        const reordered = [...before];
         switch (action.type) {
           case "node/order/back": {
             // change the children id order - move the node_id to the first (first is the back)
-            parent_node.children!.splice(childIndex, 1);
-            parent_node.children!.unshift(node_id);
+            reordered.splice(childIndex, 1);
+            reordered.unshift(node_id);
             break;
           }
           case "node/order/front": {
             // change the children id order - move the node_id to the last (last is the front)
-            parent_node.children!.splice(childIndex, 1);
-            parent_node.children!.push(node_id);
+            reordered.splice(childIndex, 1);
+            reordered.push(node_id);
             break;
           }
         }
+
+        parent_node.children = reordered;
+        draft.document_ctx.__ctx_nid_to_children_ids[parent_id] = reordered;
       });
     }
     //

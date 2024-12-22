@@ -271,8 +271,8 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               active: true,
               locked: false,
               position: "absolute",
-              left: cursor_position[0],
-              top: cursor_position[1],
+              left: 0,
+              top: 0,
               opacity: 1,
               width: 0,
               height: 0,
@@ -281,12 +281,21 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               points: [cmath.vector2.zero],
             } satisfies grida.program.nodes.PolylineNode;
 
-            self_insertNode(draft, draft.document.root_id, vector);
+            const parent = __get_insert_target(state);
+            self_insertNode(draft, parent, vector);
+            // position relative to the parent
+            const parent_rect = domapi.get_node_bounding_rect(parent)!;
+            const node_relative_pos = cmath.vector2.subtract(cursor_position, [
+              parent_rect.x,
+              parent_rect.y,
+            ]);
+            vector.left = node_relative_pos[0];
+            vector.top = node_relative_pos[1];
 
             draft.content_edit_mode = { type: "points", selection: vector.id };
             draft.gesture = {
               type: "draw",
-              origin: cursor_position,
+              origin: node_relative_pos,
               movement: cmath.vector2.zero,
               points: [cmath.vector2.zero],
               node_id: vector.id,

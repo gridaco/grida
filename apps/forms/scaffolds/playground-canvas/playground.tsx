@@ -357,6 +357,13 @@ export default function CanvasPlayground() {
                       <StandaloneDocumentContent />
                     </div>
                   </div>
+                  {!uiHidden && (
+                    <div className="absolute bottom-8 left-0 right-0 flex items-center justify-center z-50 pointer-events-none">
+                      <PlaygroundToolbar
+                        onAddButtonClick={insertDialog.openDialog}
+                      />
+                    </div>
+                  )}
                 </ViewportRoot>
                 {!uiHidden && (
                   <>
@@ -370,11 +377,6 @@ export default function CanvasPlayground() {
                       </Button>
                     </div>
 
-                    <div className="absolute bottom-20 left-0 right-0 flex items-center justify-center z-50 pointer-events-none">
-                      <PlaygroundToolbar
-                        onAddButtonClick={insertDialog.openDialog}
-                      />
-                    </div>
                     <div className="fixed bottom-20 left-10 flex items-center justify-center z-50 pointer-events-none">
                       <KeyboardInputOverlay />
                     </div>

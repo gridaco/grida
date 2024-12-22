@@ -15,7 +15,17 @@ import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { useGoogleFontsList } from "../google.fonts";
 
 export function DevtoolsPanel() {
+  const { state } = useDocument();
+  const fonts = useGoogleFontsList();
   const expandable = useDialogState();
+
+  const {
+    document,
+    document_ctx,
+    history,
+    googlefonts,
+    ...state_without_document
+  } = state;
 
   const onTabClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
@@ -34,6 +44,9 @@ export function DevtoolsPanel() {
             <TabsList className="m-2">
               <TabsTrigger onClick={onTabClick} value="document">
                 Document
+              </TabsTrigger>
+              <TabsTrigger onClick={onTabClick} value="editor">
+                Editor
               </TabsTrigger>
               <TabsTrigger onClick={onTabClick} value="fonts">
                 Fonts
@@ -56,13 +69,26 @@ export function DevtoolsPanel() {
             value="document"
             className="p-2 overflow-scroll w-full h-full"
           >
-            <DocumentTabContent />
+            <JSONContent value={{ document, document_ctx }} />
+          </TabsContent>
+          <TabsContent
+            value="editor"
+            className="p-2 overflow-scroll w-full h-full"
+          >
+            <JSONContent value={state_without_document} />
           </TabsContent>
           <TabsContent
             value="fonts"
             className="p-2 overflow-scroll w-full h-full"
           >
-            <FontsTabContent />
+            <JSONContent
+              value={{
+                // used fonts
+                fonts: googlefonts,
+                // all fonts
+                registry: fonts,
+              }}
+            />
           </TabsContent>
         </CollapsibleContent>
       </Tabs>
@@ -70,36 +96,14 @@ export function DevtoolsPanel() {
   );
 }
 
-function DocumentTabContent() {
-  const { state } = useDocument();
-
+function JSONContent({ value }: { value: unknown }) {
   return (
     <div className="w-full h-full">
       <MonacoEditor
         height="100%"
         width="100%"
         defaultLanguage="json"
-        value={JSON.stringify(state, null, 2)}
-        options={{
-          minimap: { enabled: false },
-          readOnly: true,
-        }}
-      />
-    </div>
-  );
-}
-
-function FontsTabContent() {
-  const fonts = useGoogleFontsList();
-  const { state } = useDocument();
-
-  return (
-    <div className="w-full h-full">
-      <MonacoEditor
-        height="100%"
-        width="100%"
-        defaultLanguage="json"
-        value={JSON.stringify(fonts, null, 2)}
+        value={JSON.stringify(value, null, 2)}
         options={{
           minimap: { enabled: false },
           readOnly: true,
