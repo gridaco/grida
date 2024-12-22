@@ -152,7 +152,13 @@ export default function documentReducer<S extends IDocumentEditorState>(
 
       return produce(state, (draft) => {
         for (const node_id of target_node_ids) {
-          if (draft.document.root_id !== node_id) {
+          if (
+            // the deleting node cannot be..
+            // 1. a root node
+            node_id !== draft.document.root_id &&
+            // 2. in content edit mode
+            node_id !== state.content_edit_mode?.node_id
+          ) {
             self_deleteNode(draft, node_id);
           }
         }
@@ -310,6 +316,20 @@ export default function documentReducer<S extends IDocumentEditorState>(
       });
 
       break;
+    }
+    case "delete-point": {
+      return produce(state, (draft) => {
+        const {
+          target: { node_id, point_index },
+        } = action;
+        const node = document.__getNodeById(draft, node_id);
+
+        // TODO: update the node transform as the points are changed
+        if ("points" in node) {
+          const points = node.points;
+          points.splice(point_index, 1);
+        }
+      });
     }
     case "document/insert": {
       const { prototype } = action;

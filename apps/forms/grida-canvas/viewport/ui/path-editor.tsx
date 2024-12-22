@@ -66,9 +66,20 @@ function ControlPoint({
       const { event } = state;
       event.stopPropagation();
     },
+    onKeyDown: (state) => {
+      const { event } = state;
+
+      if (event.key === "Delete" || event.key === "Backspace") {
+        event.stopPropagation();
+        event.preventDefault();
+        editor.onPointDelete(index);
+      }
+    },
   });
 
-  return <PathPoint {...bind()} selected={selected} point={point} />;
+  return (
+    <PathPoint {...bind()} tabIndex={index} selected={selected} point={point} />
+  );
 }
 
 const PathPoint = React.forwardRef(

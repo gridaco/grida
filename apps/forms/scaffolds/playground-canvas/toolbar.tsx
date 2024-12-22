@@ -33,6 +33,7 @@ import { useLocalStorage } from "@uidotdev/usehooks";
 import { readStreamableValue } from "ai/rsc";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CANVAS_PLAYGROUND_LOCALSTORAGE_PREFERENCES_BASE_AI_PROMPT_KEY } from "./k";
+import { PenToolIcon } from "lucide-react";
 
 function useGenerate() {
   const streamGeneration = useCallback(
@@ -180,6 +181,9 @@ export function PlaygroundToolbar({
         <ToggleGroupItem value={"polyline" satisfies ToolbarToolType}>
           <Pencil1Icon />
         </ToggleGroupItem>
+        <ToggleGroupItem value={"path" satisfies ToolbarToolType}>
+          <PenToolIcon className="w-3.5 h-3.5" />
+        </ToggleGroupItem>
         <ToggleGroupItem value={"image" satisfies ToolbarToolType}>
           <ImageIcon />
         </ToggleGroupItem>
@@ -253,7 +257,7 @@ type ToolbarToolType =
   | "image"
   | "line"
   | "polyline"
-  | "pen";
+  | "path";
 
 function cursormode_to_toolbar_value(cm: CursorMode): ToolbarToolType {
   switch (cm.type) {
@@ -277,7 +281,7 @@ function toolbar_value_to_cursormode(tt: ToolbarToolType): CursorMode {
     case "text":
       return { type: "insert", node: tt };
     case "line":
-    case "pen":
+    case "path":
     case "polyline":
       return { type: "draw", tool: tt };
   }

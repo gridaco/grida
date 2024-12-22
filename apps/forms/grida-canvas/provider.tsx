@@ -1937,6 +1937,19 @@ export function useSurfacePathEditor() {
     });
   }, [dispatch]);
 
+  const onPointDelete = useCallback(
+    (index: number) => {
+      dispatch({
+        type: "delete-point",
+        target: {
+          node_id,
+          point_index: index,
+        },
+      });
+    },
+    [node_id, dispatch]
+  );
+
   return useMemo(
     () => ({
       node_id,
@@ -1945,6 +1958,7 @@ export function useSurfacePathEditor() {
       onPointDragStart,
       onPointDrag,
       onPointDragEnd,
+      onPointDelete,
     }),
     [
       //
@@ -1954,6 +1968,7 @@ export function useSurfacePathEditor() {
       onPointDragStart,
       onPointDrag,
       onPointDragEnd,
+      onPointDelete,
     ]
   );
 }

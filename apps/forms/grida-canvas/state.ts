@@ -16,7 +16,7 @@ export type CursorMode =
     }
   | {
       type: "draw";
-      tool: "line" | "pen" | "polyline";
+      tool: "line" | "polyline" | "path";
     };
 
 export type Marquee = {
@@ -112,6 +112,58 @@ interface IDocumentEditorTransformState {
   viewport_offset: cmath.Vector2;
 }
 
+export type GestureState =
+  | GestureIdle
+  | GestureNudge
+  | {
+      // translate (move)
+      type: "translate";
+      selection: string[];
+      initial_selection: string[];
+      initial_snapshot: IDocumentState["document"];
+      initial_clone_ids: string[];
+      initial_rects: cmath.Rectangle[];
+      movement: cmath.Vector2;
+      is_currently_cloned: boolean;
+
+      /**
+       * surface snap guides - result of snap while translate (move) gesture
+       */
+      surface_snapping?: SnapResult;
+    }
+  | {
+      // scale (resize)
+      type: "scale";
+      initial_rects: cmath.Rectangle[];
+      selection: string[];
+      direction: cmath.CardinalDirection;
+      /**
+       * raw movement - independent of the direction
+       */
+      movement: cmath.Vector2;
+
+      /**
+       * surface snap guides - result of snap while translate (move) gesture
+       */
+      surface_snapping?: SnapResult;
+    }
+  | {
+      // rotate
+      type: "rotate";
+      initial_bounding_rectangle: cmath.Rectangle | null;
+      // TODO: support multiple selection
+      selection: string;
+      offset: cmath.Vector2;
+      /**
+       * raw movement - independent of the offset
+       */
+      movement: cmath.Vector2;
+    }
+  | GestyreCornerRadius
+  | GestureDraw
+  | GestureTranslatePoint
+  | GestureCurve;
+
 export type GestureIdle = {
   type: "idle";
 };
@@ -122,6 +174,14 @@ export type GestureNudge = {
    * surface snap guides - result of snap while translate (move) gesture
    */
   surface_snapping?: SnapResult;
+};
+
+export type GestyreCornerRadius = {
+  /**
+   * - corner-radius
+   */
+  type: "corner-radius";
+  initial_bounding_rectangle: cmath.Rectangle | null;
 };
 
 export type GestureDraw = {
@@ -172,67 +232,21 @@ export type GestureTranslatePoint = {
 };
 
 /**
+ * add a new curve point
+ *
+ * @deprecated
+ */
+export type GestureCurve = {
+  type: "curve";
+};
+
+/**
  * [Surface Support State]
  *
  * this support state is not part of the document state and does not get saved or recorded as history
  */
 interface IDocumentEditorEventTargetState {
-  gesture:
-    | GestureIdle
-    | GestureNudge
-    | {
-        // translate (move)
-        type: "translate";
-        selection: string[];
-        initial_selection: string[];
-        initial_snapshot: IDocumentState["document"];
-        initial_clone_ids: string[];
-        initial_rects: cmath.Rectangle[];
-        movement: cmath.Vector2;
-        is_currently_cloned: boolean;
-
-        /**
-         * surface snap guides - result of snap while translate (move) gesture
-         */
-        surface_snapping?: SnapResult;
-      }
-    | {
-        // scale (resize)
-        type: "scale";
-        initial_rects: cmath.Rectangle[];
-        selection: string[];
-        direction: cmath.CardinalDirection;
-        /**
-         * raw movement - independent of the direction
-         */
-        movement: cmath.Vector2;
-
-        /**
-         * surface snap guides - result of snap while translate (move) gesture
-         */
-        surface_snapping?: SnapResult;
-      }
-    | {
-        // rotate
-        type: "rotate";
-        initial_bounding_rectangle: cmath.Rectangle | null;
-        // TODO: support multiple selection
-        selection: string;
-        offset: cmath.Vector2;
-        /**
-         * raw movement - independent of the offset
-         */
-        movement: cmath.Vector2;
-      }
-    | {
-        /**
-         * - corner-radius
-         */
-        type: "corner-radius";
-        initial_bounding_rectangle: cmath.Rectangle | null;
-      }
-    | GestureDraw
-    | GestureTranslatePoint;
+  gesture: GestureState;
 
   gesture_modifiers: GestureModifiers;
 

@@ -233,6 +233,7 @@ export function useEditorHotKeys() {
     preventDefault: true,
     enableOnContentEditable: false,
     enableOnFormTags: false,
+    ignoreEventWhen: (e) => e.defaultPrevented,
   });
 
   useHotkeys(
@@ -323,7 +324,7 @@ export function useEditorHotKeys() {
   });
 
   useHotkeys("p", () => {
-    setCursorMode({ type: "draw", tool: "pen" });
+    setCursorMode({ type: "draw", tool: "path" });
   });
 
   useHotkeys("shift+p", () => {

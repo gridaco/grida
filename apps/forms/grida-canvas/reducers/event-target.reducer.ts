@@ -263,7 +263,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
           }
           case "draw": {
             const tool = draft.cursor_mode.tool;
-            if (tool === "pen") break;
+            if (tool === "path") break;
 
             const { cursor_position } = state;
 

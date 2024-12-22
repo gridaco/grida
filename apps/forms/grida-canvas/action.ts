@@ -29,6 +29,7 @@ export type DocumentAction =
   | EditorBlurAction
   | EditorCopyCutPasteAction
   | EditorDeleteAction
+  | EditorDeletePointAction
   | EditorNudgeAction
   | EditorNudgeResizeAction
   | EditorAlignAction
@@ -146,6 +147,14 @@ export interface EditorDuplicateAction {
 export interface EditorDeleteAction {
   type: "delete";
   target: NodeID | "selection";
+}
+
+export interface EditorDeletePointAction {
+  type: "delete-point";
+  target: {
+    node_id: NodeID;
+    point_index: number;
+  };
 }
 
 /**
