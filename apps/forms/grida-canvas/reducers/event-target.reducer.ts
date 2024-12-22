@@ -682,8 +682,6 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             const { index } = action;
 
             content_edit_mode.selectedPoints = [index];
-            content_edit_mode.initialPoints = [...points];
-
             break;
           }
           case "document/canvas/backend/html/event/path-point/on-drag-end": {

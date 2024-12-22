@@ -32,6 +32,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
               type: "path",
               node_id: node_id,
               selectedPoints: [],
+              initialPoints: node.points,
             };
             break;
           }

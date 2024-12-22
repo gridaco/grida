@@ -320,7 +320,11 @@ export function useEditorHotKeys() {
     setCursorMode({ type: "draw", tool: "line" });
   });
 
-  useHotkeys("p", () => {
+  useHotkeys("shift+p", () => {
+    setCursorMode({ type: "draw", tool: "polyline" });
+  });
+
+  useHotkeys("shift+p", () => {
     setCursorMode({ type: "draw", tool: "polyline" });
   });
 
