@@ -12,7 +12,6 @@ export function VectorWidget({
   fill,
   style,
   paths,
-  vectorNetwork,
   ...props
 }: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.VectorNode>) {
   const { defs, ref: fillDef } = fill
@@ -27,32 +26,6 @@ export function VectorWidget({
     width: undefined,
     height: undefined,
   };
-
-  // TODO: experimental
-  if (vectorNetwork) {
-    const d = svg.d.fromVectorNetwork(vectorNetwork);
-
-    return (
-      <svg
-        {...queryattributes(props)}
-        style={{
-          ...style,
-          overflow: "visible",
-        }}
-        width={width || 1}
-        height={height || 1}
-      >
-        {defs && <g dangerouslySetInnerHTML={{ __html: defs }} />}
-        <path
-          d={d}
-          fill={fillDef}
-          // TODO:
-          strokeWidth={1}
-          stroke="red"
-        />
-      </svg>
-    );
-  }
 
   const fillpaths = paths.filter((p) => p.fill === "fill");
   const strokepaths = paths.filter((p) => p.fill === "stroke");

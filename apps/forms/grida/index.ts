@@ -1347,6 +1347,7 @@ export namespace grida {
         | HTMLIFrameNode
         | HTMLRichTextNode
         | VectorNode
+        | PathNode
         | PolylineNode
         | LineNode
         | RectangleNode
@@ -1369,6 +1370,7 @@ export namespace grida {
         | __TPrototypeNode<Omit<HTMLIFrameNode, __base_scene_node_properties>>
         | __TPrototypeNode<Omit<HTMLRichTextNode, __base_scene_node_properties>>
         | __TPrototypeNode<Omit<VectorNode, __base_scene_node_properties>>
+        | __TPrototypeNode<Omit<PathNode, __base_scene_node_properties>>
         | __TPrototypeNode<Omit<PolylineNode, __base_scene_node_properties>>
         | __TPrototypeNode<Omit<LineNode, __base_scene_node_properties>>
         | __TPrototypeNode<Omit<RectangleNode, __base_scene_node_properties>>
@@ -1415,6 +1417,7 @@ export namespace grida {
       export type AnyNode = Omit<
         Partial<TextNode> &
           Partial<VectorNode> &
+          Partial<PathNode> &
           Partial<PolylineNode> &
           Partial<LineNode> &
           Partial<RectangleNode> &
@@ -2024,12 +2027,26 @@ export namespace grida {
            */
           fill: "fill" | "stroke";
         })[];
+      }
+
+      export interface PathNode
+        extends i.IBaseNode,
+          i.ISceneNode,
+          i.IHrefable,
+          i.IPositioning,
+          i.IFixedDimension,
+          i.IOpacity,
+          i.IZIndex,
+          i.IRotation,
+          i.IFill,
+          i.IStroke {
+        type: "path";
 
         /**
          * @deprecated
          * @todo
          */
-        vectorNetwork?: cg.vector_network.VectorNetwork;
+        vectorNetwork: cg.vector_network.VectorNetwork;
       }
 
       /**

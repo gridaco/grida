@@ -100,7 +100,7 @@ export function EditorSurface() {
     drag,
     dragStart,
     dragEnd,
-    tryEnterContentEditMode,
+    tryToggleContentEditMode,
   } = useEventTarget();
   const cursor = useEventTargetCSSCursor();
   const eventTargetRef = useRef<HTMLDivElement>(null);
@@ -164,7 +164,7 @@ export function EditorSurface() {
         if (event.defaultPrevented) return;
 
         // [order matters] - otherwise, it will always try to enter the content edit mode
-        tryEnterContentEditMode(); // 1
+        tryToggleContentEditMode(); // 1
         doubleClick(event); // 2
       },
       onDragStart: ({ event }) => {

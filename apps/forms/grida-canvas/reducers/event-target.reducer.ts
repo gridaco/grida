@@ -122,12 +122,14 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
     case "document/canvas/backend/html/event/on-double-click": {
       // [double click event]
       // - DOES NOT "enter content edit mode" - this is handled by its own action.
-      // - focus on the next descendant (next deep) hit node (if any) relative to the selection
       return produce(state, (draft) => {
         if (state.gesture.type !== "idle") return; // ignore when gesture is active
 
         const { document_ctx, selection, surface_raycast_detected_node_ids } =
           state;
+        // #region [nested selection]
+        // - focus on the next descendant (next deep) hit node (if any) relative to the selection
+
         // the selection is handled by the pointer down event, which is resolved before double click event.
         // if selection is not 1, means its clicked on void.
         // yet, do not assert, since 0 or 1+ is valid state when shift key is pressed. (althouth not handled by double click)
@@ -152,6 +154,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         if (next) {
           self_selectNode(draft, "reset", next);
         }
+        // #endregion
       });
       break;
     }
@@ -203,7 +206,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               const node = document.__getNodeById(
                 draft,
                 draft.content_edit_mode.node_id
-              ) as grida.program.nodes.VectorNode;
+              ) as grida.program.nodes.PathNode;
 
               // TODO: atm, only adding to the last point is allowed.
               // TODO: allow adding to first and last point (then also any point)
@@ -213,18 +216,18 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                 node.left!,
                 node.top!,
               ]);
-              node.vectorNetwork!.vertices.push({ p: position });
-              const index = node.vectorNetwork!.vertices.length - 1;
+              node.vectorNetwork.vertices.push({ p: position });
+              const index = node.vectorNetwork.vertices.length - 1;
               if (index > 0) {
                 const prev_segment_index =
-                  node.vectorNetwork!.segments.length - 1;
+                  node.vectorNetwork.segments.length - 1;
                 // use the previous `-tb` as the `ta` of the new segment (if any)
                 const ta: cmath.Vector2 = cmath.vector2.invert(
-                  node.vectorNetwork!.segments[prev_segment_index]?.tb ??
+                  node.vectorNetwork.segments[prev_segment_index]?.tb ??
                     cmath.vector2.zero
                 );
 
-                node.vectorNetwork!.segments.push({
+                node.vectorNetwork.segments.push({
                   a: index - 1,
                   b: index,
                   ta: ta,
@@ -263,7 +266,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               // } satisfies grida.program.nodes.PolylineNode;
 
               const vector = {
-                type: "vector",
+                type: "path",
                 name: "path",
                 id: new_node_id,
                 active: true,
@@ -276,16 +279,14 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                 height: 0,
                 rotation: 0,
                 zIndex: 0,
-                // stroke: { type: "solid", color: { r: 0, g: 0, b: 0, a: 1 } },
-                // strokeCap: "butt",
-                // strokeWidth: 3,
-                // points: [cmath.vector2.zero],
-                paths: [],
+                stroke: { type: "solid", color: { r: 0, g: 0, b: 0, a: 1 } },
+                strokeCap: "butt",
+                strokeWidth: 3,
                 vectorNetwork: {
                   vertices: [{ p: cmath.vector2.zero }],
                   segments: [],
                 },
-              } satisfies grida.program.nodes.VectorNode;
+              } satisfies grida.program.nodes.PathNode;
 
               vector.left = draft.cursor_position[0];
               vector.top = draft.cursor_position[1];
@@ -601,11 +602,11 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               const node = document.__getNodeById(
                 draft,
                 node_id
-              ) as grida.program.nodes.VectorNode;
+              ) as grida.program.nodes.PathNode;
 
-              if (node.vectorNetwork!.segments.length > 0) {
-                node.vectorNetwork!.segments[
-                  node.vectorNetwork!.segments.length - 1
+              if (node.vectorNetwork.segments.length > 0) {
+                node.vectorNetwork.segments[
+                  node.vectorNetwork.segments.length - 1
                 ].tb = cmath.vector2.multiply(movement, [-1, -1]);
               }
             }
@@ -816,7 +817,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         const { node_id, selected_points } = content_edit_mode;
         const node = document.__getNodeById(draft, node_id) as
           | grida.program.nodes.PolylineNode
-          | grida.program.nodes.VectorNode;
+          | grida.program.nodes.PathNode;
 
         switch (action.type) {
           case "document/canvas/backend/html/event/path-point/on-drag-start": {
@@ -825,7 +826,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             const verticies =
               node.type === "polyline"
                 ? node.points
-                : node.vectorNetwork!.vertices.map((v) => v.p);
+                : node.vectorNetwork.vertices.map((v) => v.p);
 
             content_edit_mode.selected_points = [index];
             draft.gesture = {
@@ -884,10 +885,10 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               case "polyline":
                 node.points = delta_shifted_points;
                 break;
-              case "vector":
-                node.vectorNetwork!.vertices = delta_shifted_points.map(
-                  (p) => ({ p })
-                );
+              case "path":
+                node.vectorNetwork.vertices = delta_shifted_points.map((p) => ({
+                  p,
+                }));
             }
 
             // position & dimension

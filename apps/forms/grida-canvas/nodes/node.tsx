@@ -74,6 +74,7 @@ export function NodeElement<P extends Record<string, any>>({
       case "video":
       case "text":
       case "vector":
+      case "path":
       case "polyline":
       case "line":
       case "rectangle":
@@ -190,12 +191,13 @@ const fillings = {
   richtext: "color",
   image: "background",
   video: "background",
-  vector: "none",
   rectangle: "none",
   ellipse: "none",
   template_instance: "none",
   instance: "none",
+  vector: "none",
   line: "none",
+  path: "none",
   polyline: "none",
 } as const;
 

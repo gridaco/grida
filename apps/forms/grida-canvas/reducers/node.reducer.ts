@@ -136,6 +136,7 @@ export default function nodeReducer<
       case "node/change/fill": {
         assert(
           draft.type === "vector" ||
+            draft.type === "path" ||
             draft.type === "polyline" ||
             draft.type === "rectangle" ||
             draft.type === "ellipse" ||
