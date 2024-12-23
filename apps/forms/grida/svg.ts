@@ -1,8 +1,47 @@
 import { SVGCommand, encodeSVGPath, SVGPathData } from "svg-pathdata";
 import type { grida } from "./index";
+import { cmath } from "@/grida-canvas/cmath";
 
 export namespace svg {
   export namespace d {
+    export function encode(commands: SVGCommand[]) {
+      return encodeSVGPath(commands);
+    }
+
+    /**
+     * @param a M [x y] - starting point
+     * @param ta C [x1 y1] - control point 1 (relative to `a`)
+     * @param tb C [x2 y2] - control point 2 (relative to `b`)
+     * @param b C [x y] - ending point
+     */
+    export function curve(
+      a: cmath.Vector2,
+      ta: cmath.Vector2,
+      tb: cmath.Vector2,
+      b: cmath.Vector2
+    ): SVGCommand[] {
+      return [
+        // Move to the starting point
+        {
+          type: SVGPathData.MOVE_TO,
+          x: a[0],
+          y: a[1],
+          relative: false,
+        },
+        // Cubic Bezier curve command
+        {
+          type: SVGPathData.CURVE_TO,
+          x1: a[0] + ta[0],
+          y1: a[1] + ta[1],
+          x2: b[0] + tb[0],
+          y2: b[1] + tb[1],
+          x: b[0],
+          y: b[1],
+          relative: false,
+        },
+      ];
+    }
+
     /**
      * Converts a vector network to SVG path data.
      *

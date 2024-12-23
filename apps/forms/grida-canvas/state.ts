@@ -224,7 +224,7 @@ export type GestureTranslatePoint = {
   /**
    * initial (snapshot) value of the points
    */
-  initial_points: cmath.Vector2[];
+  initial_verticies: cmath.Vector2[];
 
   node_id: string;
 

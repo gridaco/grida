@@ -195,7 +195,6 @@ export default function initialNode(
     }
     case "polyline":
     case "vector":
-    case "vector-v2":
     case "component":
     case "instance":
     case "template_instance": {

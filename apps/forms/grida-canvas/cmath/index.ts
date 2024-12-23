@@ -161,6 +161,21 @@ export namespace cmath.vector2 {
    */
   export const zero: Vector2 = [0, 0];
 
+  /**
+   * Inverts a 2D vector by negating both its components.
+   *
+   * @param vector - The vector to invert, in the format `[x, y]`.
+   * @returns A new vector `[−x, −y]` with both components inverted.
+   *
+   * @example
+   * const v: cmath.Vector2 = [3, -4];
+   * const inverted = cmath.vector2.invert(v);
+   * console.log(inverted); // [-3, 4]
+   */
+  export function invert(vector: Vector2): Vector2 {
+    return [-vector[0], -vector[1]];
+  }
+
   export function add(...vectors: Vector2[]): Vector2 {
     return vectors.reduce((acc, [x, y]) => [acc[0] + x, acc[1] + y], [
       0, 0,

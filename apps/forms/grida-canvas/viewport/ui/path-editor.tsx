@@ -4,14 +4,25 @@ import { useNodeSurfaceTransfrom } from "../hooks/transform";
 import { cmath } from "@/grida-canvas/cmath";
 import { useGesture } from "@use-gesture/react";
 import { cn } from "@/utils";
+import { svg } from "@/grida/svg";
 
 export function SurfacePathEditor({ node_id }: { node_id: string }) {
   const { surface_cursor_position, cursor_mode, content_offset } =
     useEventTarget();
-  const { offset, points, selectedPoints } = useSurfacePathEditor();
+  const { offset, verticies, segments, selectedPoints, curve } =
+    useSurfacePathEditor();
   const transform = useNodeSurfaceTransfrom(node_id);
 
-  const extension = selectedPoints.length === 1 && selectedPoints[0];
+  const origin_idx =
+    selectedPoints.length === 1 ? selectedPoints[0] : undefined;
+  const origin_is_last = origin_idx === verticies.length - 1;
+
+  const lastseg = segments[segments.length - 1];
+
+  // segments that are connected to the origin point
+  const neighboring_segments = segments.filter((s) => {
+    return s.a === origin_idx || s.b === origin_idx;
+  });
 
   return (
     <div id="path-editor-surface" className="fixed left-0 top-0 w-0 h-0 z-10">
@@ -25,31 +36,126 @@ export function SurfacePathEditor({ node_id }: { node_id: string }) {
           zIndex: 1,
         }}
       >
-        {points.map((p, i) => (
-          <ControlPoint key={i} point={p} index={i} />
+        {verticies.map(({ p }, i) => (
+          <VertexPoint key={i} point={p} index={i} />
         ))}
       </div>
-      {cursor_mode.type === "path" && typeof extension === "number" && (
-        <Extension
-          a={cmath.vector2.add(offset, points[extension], content_offset)}
-          b={surface_cursor_position}
-        />
+      {cursor_mode.type === "path" && typeof origin_idx === "number" && (
+        <>
+          {/* next segment */}
+          <Extension
+            a={cmath.vector2.add(
+              offset,
+              content_offset,
+              verticies[origin_idx].p
+            )}
+            b={surface_cursor_position}
+            ta={lastseg && cmath.vector2.invert(lastseg.tb)}
+          />
+        </>
       )}
+      {neighboring_segments.map((s, i) => {
+        const a = verticies[s.a].p;
+        const b = verticies[s.b].p;
+        const ta = s.ta;
+        const tb = s.tb;
+
+        const d = cmath.vector2.add(offset, content_offset);
+
+        return (
+          <React.Fragment key={i}>
+            <div
+              style={{
+                position: "absolute",
+                left: d[0],
+                top: d[1],
+              }}
+            >
+              <Extension a={a} b={cmath.vector2.add(a, ta)} />
+              <Extension a={b} b={cmath.vector2.add(b, tb)} />
+              {/* preview the next ta - cannot be edited */}
+              {origin_is_last && (
+                <Extension
+                  a={b}
+                  b={cmath.vector2.add(b, cmath.vector2.invert(tb))}
+                />
+              )}
+            </div>
+          </React.Fragment>
+          // <React.Fragment key={i}>
+          //   <Extension
+          //     a={cmath.vector2.add(
+          //       content_offset,
+          //       offset,
+          //       verticies[originidx].p
+          //     )}
+          //     b={cmath.vector2.add(
+          //       //
+          //       content_offset,
+          //       offset,
+          //       verticies[originidx].p,
+          //       s.tb
+          //     )}
+          //   />
+          //   <Extension
+          //     a={cmath.vector2.add(
+          //       content_offset,
+          //       offset,
+          //       verticies[originidx].p
+          //     )}
+          //     b={cmath.vector2.add(
+          //       //
+          //       content_offset,
+          //       offset,
+          //       verticies[originidx].p,
+          //       cmath.vector2.invert(s.tb)
+          //     )}
+          //   />
+          // </React.Fragment>
+        );
+      })}
     </div>
   );
 }
 
-function Extension({ a, b }: { a: cmath.Vector2; b: cmath.Vector2 }) {
+function Extension({
+  a,
+  b,
+  ta,
+  tb,
+}: {
+  a: cmath.Vector2;
+  b: cmath.Vector2;
+  ta?: cmath.Vector2;
+  tb?: cmath.Vector2;
+}) {
   return (
     <>
       {/* cursor point */}
-      <PathPoint point={b} style={{ cursor: "crosshair" }} />
-      <Line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} />
+      <Point point={b} style={{ cursor: "crosshair" }} />
+      <Curve a={a} b={b} ta={ta} tb={tb} />
     </>
   );
 }
 
-function ControlPoint({
+function CurveControlPoint({
+  point,
+  selected,
+}: {
+  point: cmath.Vector2;
+  selected?: boolean;
+}) {
+  return (
+    <Point
+      // {...bind()}
+      tabIndex={0}
+      selected={selected}
+      point={point}
+    />
+  );
+}
+
+function VertexPoint({
   point,
   index,
 }: {
@@ -94,21 +200,23 @@ function ControlPoint({
   });
 
   return (
-    <PathPoint {...bind()} tabIndex={index} selected={selected} point={point} />
+    <Point {...bind()} tabIndex={index} selected={selected} point={point} />
   );
 }
 
-const PathPoint = React.forwardRef(
+const Point = React.forwardRef(
   (
     {
       point,
       className,
       style,
       selected,
+      size = 6,
       ...props
     }: React.HtmlHTMLAttributes<HTMLDivElement> & {
       point: cmath.Vector2;
       selected?: boolean;
+      size?: number;
     },
     ref: React.Ref<HTMLDivElement>
   ) => {
@@ -118,13 +226,15 @@ const PathPoint = React.forwardRef(
         {...props}
         data-selected={selected}
         className={cn(
-          "w-2 aspect-square rounded-full border border-workbench-accent-sky bg-background data-[selected='true']:w-3 data-[selected='true']:shadow-sm data-[selected='true']:bg-workbench-accent-sky data-[selected='true']:border-2 data-[selected='true']:border-background",
+          "rounded-full border border-workbench-accent-sky bg-background data-[selected='true']:shadow-sm data-[selected='true']:bg-workbench-accent-sky data-[selected='true']:border-spacing-1.5 data-[selected='true']:border-background",
           className
         )}
         style={{
           position: "absolute",
           left: point[0],
           top: point[1],
+          width: size,
+          height: size,
           transform: "translate(-50%, -50%)",
           cursor: "pointer",
           touchAction: "none",
@@ -134,6 +244,8 @@ const PathPoint = React.forwardRef(
     );
   }
 );
+
+Point.displayName = "Point";
 
 function Line({
   x1,
@@ -170,5 +282,39 @@ function Line({
         transformOrigin: "0 50%", // Rotate around the left center
       }}
     />
+  );
+}
+
+function Curve({
+  a,
+  b,
+  ta = [0, 0],
+  tb = [0, 0],
+}: {
+  a: cmath.Vector2;
+  b: cmath.Vector2;
+  ta?: cmath.Vector2;
+  tb?: cmath.Vector2;
+}) {
+  //
+  const offset = a;
+  const _a = cmath.vector2.subtract(a, offset);
+  const _b = cmath.vector2.subtract(b, offset);
+  const path = svg.d.encode(svg.d.curve(_a, ta, tb, _b));
+
+  return (
+    <svg
+      id="curve"
+      style={{
+        position: "absolute",
+        width: 1,
+        height: 1,
+        left: offset[0],
+        top: offset[1],
+        overflow: "visible",
+      }}
+    >
+      <path d={path} stroke={"skyblue"} fill="none" strokeWidth="2" />
+    </svg>
   );
 }

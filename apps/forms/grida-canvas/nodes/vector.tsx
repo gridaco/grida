@@ -32,8 +32,6 @@ export function VectorWidget({
   if (vectorNetwork) {
     const d = svg.d.fromVectorNetwork(vectorNetwork);
 
-    console.log("d", d, vectorNetwork);
-
     return (
       <svg
         {...queryattributes(props)}
@@ -78,6 +76,7 @@ export function VectorWidget({
       {/* stroke paths */}
       {strokepaths.map(({ d, fillRule }, i) => (
         <path
+          key={i}
           kernelMatrix={i}
           d={d}
           // TODO:

@@ -205,6 +205,9 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                 draft.content_edit_mode.node_id
               ) as grida.program.nodes.VectorNode;
 
+              // TODO: atm, only adding to the last point is allowed.
+              // TODO: allow adding to first and last point (then also any point)
+
               // add point
               const position = cmath.vector2.subtract(draft.cursor_position, [
                 node.left!,
@@ -213,11 +216,19 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               node.vectorNetwork!.vertices.push({ p: position });
               const index = node.vectorNetwork!.vertices.length - 1;
               if (index > 0) {
+                const prev_segment_index =
+                  node.vectorNetwork!.segments.length - 1;
+                // use the previous `-tb` as the `ta` of the new segment (if any)
+                const ta: cmath.Vector2 = cmath.vector2.invert(
+                  node.vectorNetwork!.segments[prev_segment_index]?.tb ??
+                    cmath.vector2.zero
+                );
+
                 node.vectorNetwork!.segments.push({
                   a: index - 1,
                   b: index,
-                  ta: [0, 0],
-                  tb: [0, 0],
+                  ta: ta,
+                  tb: cmath.vector2.zero,
                 });
               }
               draft.content_edit_mode.selected_points = [index];
@@ -284,8 +295,8 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
               draft.content_edit_mode = {
                 type: "path",
-                selected_points: [],
                 node_id: new_node_id,
+                selected_points: [0], // select the first point
               };
             }
 
@@ -592,9 +603,11 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                 node_id
               ) as grida.program.nodes.VectorNode;
 
-              node.vectorNetwork!.segments[
-                node.vectorNetwork!.segments.length - 1
-              ].tb = cmath.vector2.multiply(movement, [-1, -1]);
+              if (node.vectorNetwork!.segments.length > 0) {
+                node.vectorNetwork!.segments[
+                  node.vectorNetwork!.segments.length - 1
+                ].tb = cmath.vector2.multiply(movement, [-1, -1]);
+              }
             }
           }
         });
@@ -801,20 +814,24 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         const { content_edit_mode, gesture } = draft;
         assert(content_edit_mode && content_edit_mode.type === "path");
         const { node_id, selected_points } = content_edit_mode;
-        const node = document.__getNodeById(
-          draft,
-          node_id
-        ) as grida.program.nodes.PolylineNode;
+        const node = document.__getNodeById(draft, node_id) as
+          | grida.program.nodes.PolylineNode
+          | grida.program.nodes.VectorNode;
 
         switch (action.type) {
           case "document/canvas/backend/html/event/path-point/on-drag-start": {
             const { index } = action;
 
+            const verticies =
+              node.type === "polyline"
+                ? node.points
+                : node.vectorNetwork!.vertices.map((v) => v.p);
+
             content_edit_mode.selected_points = [index];
             draft.gesture = {
               type: "translate-point",
               node_id: node_id,
-              initial_points: node.points,
+              initial_verticies: verticies,
               initial_position: [node.left!, node.top!],
             };
             break;
@@ -831,7 +848,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
             assert(draft.gesture.type === "translate-point");
             const { tarnslate_with_axis_lock } = state.gesture_modifiers;
-            const { initial_points, initial_position } = draft.gesture;
+            const { initial_verticies, initial_position } = draft.gesture;
 
             // axis lock movement with dominant axis
             const adj_movement =
@@ -839,15 +856,15 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                 ? cmath.ext.movement.axisLockedByDominance(_movement)
                 : _movement;
 
-            const points_next = initial_points.slice();
+            const points_next = initial_verticies.slice();
             for (const i of content_edit_mode.selected_points) {
               points_next[i] = cmath.vector2.add(
-                initial_points[i],
+                initial_verticies[i],
                 adj_movement
               );
             }
 
-            const bb_initial = cmath.rect.fromPoints(initial_points);
+            const bb_initial = cmath.rect.fromPoints(initial_verticies);
             const bb_next = cmath.rect.fromPoints(points_next);
             const delta = cmath.vector2.subtract(
               [bb_next.x, bb_next.y],
@@ -863,7 +880,15 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             );
 
             // translate the point
-            node.points = delta_shifted_points;
+            switch (node.type) {
+              case "polyline":
+                node.points = delta_shifted_points;
+                break;
+              case "vector":
+                node.vectorNetwork!.vertices = delta_shifted_points.map(
+                  (p) => ({ p })
+                );
+            }
 
             // position & dimension
             const new_pos = cmath.vector2.add(initial_position, delta);

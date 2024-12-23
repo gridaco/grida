@@ -27,6 +27,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
             };
             break;
           }
+          case "vector":
           case "polyline": {
             draft.content_edit_mode = {
               type: "path",
