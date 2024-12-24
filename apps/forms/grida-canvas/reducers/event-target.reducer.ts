@@ -238,18 +238,30 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                 node_id
               ) as grida.program.nodes.PathNode;
 
-              const vne = new vn.VectorNetworkEditor({ ...node.vectorNetwork });
+              const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
 
-              // relative position
               const position =
                 typeof hovered_point === "number"
                   ? node.vectorNetwork.vertices[hovered_point].p
-                  : cmath.vector2.sub(path_cursor_position, [
+                  : // relative position
+                    cmath.vector2.sub(path_cursor_position, [
                       node.left!,
                       node.top!,
                     ]);
 
               const next = vne.addVertex(position, a_point, true);
+              const bb_b = vne.getBBox();
+
+              const delta: cmath.Vector2 = [bb_b.x, bb_b.y];
+              vne.translate(cmath.vector2.invert(delta));
+
+              const new_pos = cmath.vector2.add([node.left!, node.top!], delta);
+
+              node.left = new_pos[0];
+              node.top = new_pos[1];
+              node.width = bb_b.width;
+              node.height = bb_b.height;
+
               node.vectorNetwork = vne.value;
 
               draft.content_edit_mode.selected_points = [next];
@@ -603,11 +615,35 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                 node_id
               ) as grida.program.nodes.PathNode;
 
-              if (node.vectorNetwork.segments.length > 0) {
-                node.vectorNetwork.segments[
-                  node.vectorNetwork.segments.length - 1
-                ].tb = cmath.vector2.multiply(movement, [-1, -1]);
+              const { vectorNetwork } = node;
+              const vne = new vn.VectorNetworkEditor(vectorNetwork);
+              if (vectorNetwork.segments.length > 0) {
+                // always last segment as it is a add & curve gesture.
+                vne.updateTangent(
+                  vectorNetwork.segments.length - 1,
+                  "tb",
+                  cmath.vector2.invert(movement),
+                  false
+                );
               }
+
+              // TODO: try consider updating the transform on drag end as it could be expensive
+
+              const bb = vne.getBBox();
+              const delta: cmath.Vector2 = [bb.x, bb.y];
+
+              vne.translate(cmath.vector2.invert(delta));
+
+              const new_pos = cmath.vector2.add([node.left!, node.top!], delta);
+
+              node.left = new_pos[0];
+              node.top = new_pos[1];
+              node.width = bb.width;
+              node.height = bb.height;
+
+              node.vectorNetwork = vne.value;
+
+              //
             }
           }
         });

@@ -124,8 +124,8 @@ export namespace vn {
 
     constructor(value?: VectorNetwork) {
       if (value) {
-        this.vertices = Array.from(value.vertices);
-        this.segments = Array.from(value.segments);
+        this.vertices = value.vertices;
+        this.segments = value.segments;
       }
     }
 
