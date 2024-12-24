@@ -229,7 +229,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             break;
           case "path": {
             if (draft.content_edit_mode?.type === "path") {
-              const { hovered_point } = state;
+              const { hovered_vertex_idx: hovered_point } = state;
               const { node_id, path_cursor_position, a_point } =
                 draft.content_edit_mode;
 
@@ -264,7 +264,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
               node.vectorNetwork = vne.value;
 
-              draft.content_edit_mode.selected_points = [next];
+              draft.content_edit_mode.selected_vertices = [next];
               draft.content_edit_mode.a_point = next;
 
               // ...
@@ -307,7 +307,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               draft.content_edit_mode = {
                 type: "path",
                 node_id: new_node_id,
-                selected_points: [0], // select the first point
+                selected_vertices: [0], // select the first point
                 a_point: 0,
                 path_cursor_position: pos,
               };
@@ -481,10 +481,27 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             break;
           }
           case "path": {
-            // curve mode (if pen tool)
+            assert(draft.content_edit_mode?.type === "path");
+            const { node_id, selected_vertices } = draft.content_edit_mode;
+            assert(selected_vertices.length === 1);
+            const vertex = selected_vertices[0];
+
+            const node = document.__getNodeById(
+              draft,
+              node_id
+            ) as grida.program.nodes.PathNode;
+            const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
+            const segments = vne.findSegments(vertex);
+
+            assert(segments.length === 1);
+            const segment = segments[0];
+
             draft.gesture = {
               type: "curve",
-              initial: draft.cursor_position,
+              node_id: node_id,
+              segment: segment,
+              initial: cmath.vector2.zero,
+              control: "tb",
               movement: cmath.vector2.zero,
             };
             break;
@@ -609,7 +626,8 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             case "curve": {
               //
               draft.gesture.movement = movement;
-              const { node_id } = draft.content_edit_mode!;
+              const { node_id, segment, initial, control } = draft.gesture;
+              // const { node_id } = draft.content_edit_mode!;
               const node = document.__getNodeById(
                 draft,
                 node_id
@@ -617,15 +635,13 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
               const { vectorNetwork } = node;
               const vne = new vn.VectorNetworkEditor(vectorNetwork);
-              if (vectorNetwork.segments.length > 0) {
-                // always last segment as it is a add & curve gesture.
-                vne.updateTangent(
-                  vectorNetwork.segments.length - 1,
-                  "tb",
-                  cmath.vector2.invert(movement),
-                  false
-                );
-              }
+
+              const tangentPos = cmath.vector2.add(
+                initial,
+                cmath.vector2.invert(movement)
+              );
+
+              vne.updateTangent(segment, control, tangentPos, false);
 
               // TODO: try consider updating the transform on drag end as it could be expensive
 
@@ -847,9 +863,9 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
     case "document/canvas/backend/html/event/path-point/on-drag-end":
     case "document/canvas/backend/html/event/path-point/on-drag-start": {
       return produce(state, (draft) => {
-        const { content_edit_mode, gesture } = draft;
+        const { content_edit_mode } = draft;
         assert(content_edit_mode && content_edit_mode.type === "path");
-        const { node_id, selected_points } = content_edit_mode;
+        const { node_id } = content_edit_mode;
         const node = document.__getNodeById(
           draft,
           node_id
@@ -861,7 +877,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
             const verticies = node.vectorNetwork.vertices.map((v) => v.p);
 
-            content_edit_mode.selected_points = [index];
+            content_edit_mode.selected_vertices = [index];
             content_edit_mode.a_point = index;
 
             draft.gesture = {
@@ -899,7 +915,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
             const bb_a = vne.getBBox();
 
-            for (const i of content_edit_mode.selected_points) {
+            for (const i of content_edit_mode.selected_vertices) {
               vne.translateVertex(i, adj_movement);
             }
 

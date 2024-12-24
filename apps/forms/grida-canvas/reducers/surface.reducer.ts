@@ -32,7 +32,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
             draft.content_edit_mode = {
               type: "path",
               node_id: node_id,
-              selected_points: [],
+              selected_vertices: [],
               a_point: null,
               path_cursor_position: draft.cursor_position,
             };

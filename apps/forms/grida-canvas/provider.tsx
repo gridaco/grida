@@ -1918,8 +1918,8 @@ export function useSurfacePathEditor() {
   const [state, dispatch] = __useInternal();
   assert(state.content_edit_mode && state.content_edit_mode.type === "path");
 
-  const { hovered_point, cursor_mode } = state;
-  const { node_id, selected_points, a_point, path_cursor_position } =
+  const { hovered_vertex_idx: hovered_point, cursor_mode } = state;
+  const { node_id, selected_vertices, a_point, path_cursor_position } =
     state.content_edit_mode;
   const node = state.document.nodes[node_id] as grida.program.nodes.PathNode;
 
@@ -2005,7 +2005,7 @@ export function useSurfacePathEditor() {
       vertices,
       segments,
       offset,
-      selected_points,
+      selected_vertices,
       hovered_point,
       a_point,
       onPointPointerDown,
@@ -2022,7 +2022,7 @@ export function useSurfacePathEditor() {
       vertices,
       segments,
       offset,
-      selected_points,
+      selected_vertices,
       hovered_point,
       a_point,
       onPointPointerDown,

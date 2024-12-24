@@ -45,6 +45,7 @@ export function PathWidget({
       }}
       width={width}
       height={height}
+      viewBox={`0 0 ${width} ${height}`}
     >
       {fillDefs && <g dangerouslySetInnerHTML={{ __html: fillDefs }} />}
       {strokeDefs && <g dangerouslySetInnerHTML={{ __html: strokeDefs }} />}

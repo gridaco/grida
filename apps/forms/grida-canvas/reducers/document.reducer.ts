@@ -343,7 +343,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
           case "select-vertex": {
             assert(draft.content_edit_mode?.type === "path");
             draft.selection = [node_id];
-            draft.content_edit_mode.selected_points = [point_index];
+            draft.content_edit_mode.selected_vertices = [point_index];
             draft.content_edit_mode.a_point = point_index;
             break;
           }
@@ -354,10 +354,10 @@ export default function documentReducer<S extends IDocumentEditorState>(
             );
             switch (action.event) {
               case "enter":
-                draft.hovered_point = point_index;
+                draft.hovered_vertex_idx = point_index;
                 break;
               case "leave":
-                draft.hovered_point = null;
+                draft.hovered_vertex_idx = null;
                 break;
             }
             break;

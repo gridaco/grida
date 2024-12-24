@@ -247,13 +247,34 @@ export type GestureTranslatePoint = {
 };
 
 /**
- * add a new curve point
- *
- * @deprecated
+ * curves the segment
  */
 export type GestureCurve = {
   type: "curve";
+
+  /**
+   * selected path node id
+   */
+  node_id: string;
+
+  /**
+   * segment index
+   */
+  segment: number;
+
+  /**
+   * control point
+   */
+  control: "ta" | "tb";
+
+  /**
+   * initial position of the control point
+   */
   initial: cmath.Vector2;
+
+  /**
+   * current movement of the drag
+   */
   movement: cmath.Vector2;
 };
 
@@ -282,9 +303,9 @@ interface IDocumentEditorEventTargetState {
   hovered_node_id: string | null;
 
   /**
-   * hovered point index (of a selected path node)
+   * hovered vertex index (of a selected path node)
    */
-  hovered_point: number | null;
+  hovered_vertex_idx: number | null;
 
   /**
    * special hover state - when a node is a target of certain gesture, and ux needs to show the target node
@@ -416,13 +437,13 @@ export interface IDocumentState {
         node_id: string;
 
         /**
-         * selected points index
+         * selected vertex indices
          */
-        selected_points: number[];
+        selected_vertices: number[];
 
         /**
          * origin point - the new point will be connected to this point
-         * also `selected_points[0]`
+         * also `selected_vertices[0]`
          */
         a_point: number | null;
 
@@ -471,7 +492,7 @@ export function initDocumentEditorState({
   return {
     selection: [],
     hovered_node_id: null,
-    hovered_point: null,
+    hovered_vertex_idx: null,
     content_offset: [0, 0],
     viewport_offset: [0, 0],
     cursor_position: [0, 0],

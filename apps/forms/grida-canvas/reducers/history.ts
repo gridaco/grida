@@ -16,7 +16,7 @@ export namespace history {
 
     // hover state should be cleared to prevent errors
     draft.hovered_node_id = null;
-    draft.hovered_point = null;
+    draft.hovered_vertex_idx = null;
     return;
   }
 

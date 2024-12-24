@@ -147,7 +147,7 @@ function VertexPoint({
   index: number;
 }) {
   const editor = useSurfacePathEditor();
-  const selected = editor.selected_points.includes(index);
+  const selected = editor.selected_vertices.includes(index);
   const hovered = editor.hovered_point === index;
   const bind = useGesture(
     {
