@@ -1,16 +1,22 @@
 import { Draft } from "immer";
-import { HistoryEntry, IDocumentState } from "../state";
+import { HistoryEntry, IDocumentEditorState, IDocumentState } from "../state";
 
 export namespace history {
   export function apply(
-    draft: Draft<IDocumentState>,
+    draft: Draft<IDocumentEditorState>,
     snapshot: IDocumentState
   ) {
+    //
     draft.selection = snapshot.selection;
     draft.document = snapshot.document;
     draft.document_ctx = snapshot.document_ctx;
     draft.content_edit_mode = snapshot.content_edit_mode;
     draft.document_key = snapshot.document_key;
+    //
+
+    // hover state should be cleared to prevent errors
+    draft.hovered_node_id = null;
+    draft.hovered_point = null;
     return;
   }
 

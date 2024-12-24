@@ -238,7 +238,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                 node_id
               ) as grida.program.nodes.PathNode;
 
-              const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
+              const vne = new vn.VectorNetworkEditor({ ...node.vectorNetwork });
 
               // relative position
               const position =
@@ -249,7 +249,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                       node.top!,
                     ]);
 
-              const next = vne.addVertex(position, a_point);
+              const next = vne.addVertex(position, a_point, true);
               node.vectorNetwork = vne.value;
 
               draft.content_edit_mode.selected_points = [next];
