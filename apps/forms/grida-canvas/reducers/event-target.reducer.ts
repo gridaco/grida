@@ -542,6 +542,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             case "draw": {
               draft.gesture.movement = movement;
               const mode = draft.gesture.mode;
+
               const {
                 origin: origin,
                 points,
@@ -553,45 +554,45 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                 node_id
               ) as grida.program.nodes.PathNode;
 
-              // take snapshot of the previous points
               const point = movement;
-              let points_next: cmath.Vector2[] = [];
+
+              const vne = new vn.VectorNetworkEditor({
+                vertices: points.map((p) => ({ p })),
+                segments: node.vectorNetwork.segments,
+              });
 
               switch (mode) {
                 case "line":
-                  const a = points[0];
-                  const b = point;
-                  points_next = [a, b];
+                  vne.extendLine(point);
                   break;
                 case "pencil":
-                  points_next = [...points, point];
+                  vne.extendPolyline(point);
                   break;
               }
 
-              draft.gesture.points = points_next;
+              draft.gesture.points = vne.value.vertices.map((v) => v.p);
 
               // get the box of the points
-              const bb_next = cmath.rect.fromPoints(points_next);
+              const bb = cmath.rect.fromPoints(
+                vne.value.vertices.map((v) => v.p)
+              );
+
               // delta is the x, y of the new bounding box - as it started from [0, 0]
-              const delta: cmath.Vector2 = [bb_next.x, bb_next.y];
+              const delta: cmath.Vector2 = [bb.x, bb.y];
 
               // update the points with the delta (so the most left top point is to be [0, 0])
-              const delta_shifted_points = points_next.map((p) =>
-                cmath.vector2.add(
-                  p,
-                  // inverse
-                  cmath.vector2.multiply(delta, [-1, -1])
-                )
-              );
-              const dleta_shifted_pos = cmath.vector2.add(origin, delta);
+              vne.translate(cmath.vector2.invert(delta));
 
-              node.vectorNetwork = vn.polyline(delta_shifted_points);
+              const dleta_shifted_pos = cmath.vector2.add(origin, delta);
 
               // update the node position & dimension
               node.left = dleta_shifted_pos[0];
               node.top = dleta_shifted_pos[1];
-              node.width = bb_next.width;
-              node.height = bb_next.height;
+              node.width = bb.width;
+              node.height = bb.height;
+
+              // finally, update the node's vector network
+              node.vectorNetwork = vne.value;
 
               break;
             }

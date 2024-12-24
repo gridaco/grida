@@ -103,6 +103,7 @@ export namespace vn {
    * @returns
    */
   export function polyline(points: Vector2[]): VectorNetwork {
+    // TODO: this does not validate the duplicate points
     const vertices = points.map((p) => ({ p }));
     const segments = vertices.slice(0, -1).map((_, i) => ({
       a: i,
@@ -123,8 +124,8 @@ export namespace vn {
 
     constructor(value?: VectorNetwork) {
       if (value) {
-        this.vertices = value.vertices;
-        this.segments = value.segments;
+        this.vertices = Array.from(value.vertices);
+        this.segments = Array.from(value.segments);
       }
     }
 
@@ -237,10 +238,9 @@ export namespace vn {
     }
 
     translate(delta: Vector2) {
-      for (let i = 0; i < this.vertices.length; i++) {
-        this.vertices[i].p[0] += delta[0];
-        this.vertices[i].p[1] += delta[1];
-      }
+      this.vertices = this.vertices.map((v) => ({
+        p: [v.p[0] + delta[0], v.p[1] + delta[1]],
+      }));
     }
 
     addSegment(a: number, b: number, ta: Vector2, tb: Vector2) {
@@ -292,6 +292,39 @@ export namespace vn {
         // invert
         this.segments[i][otherControl] = [-value[0], -value[1]];
       }
+    }
+
+    getBBox(): cmath.Rectangle {
+      return getBBox(this.value);
+    }
+
+    /**
+     * Use with Pencil tool
+     *
+     * extends the polyline by adding a new vertex at the end
+     * - assumes the the verteces are in order
+     * @param p
+     */
+    extendPolyline(p: Vector2) {
+      // TODO: this does not validate the duplicate points
+      const pl = polyline([...this.vertices.map((v) => v.p), p]);
+      this.vertices = pl.vertices;
+      this.segments = pl.segments;
+    }
+
+    /**
+     * Use with Line tool
+     * extends the line by moving the last vertex to the new position
+     * - assumes the the verteces are in order
+     * - assumes there are exactly 1 or 2 vertices
+     * @param p
+     */
+    extendLine(p: Vector2) {
+      // TODO: this does not validate the duplicate points
+      const a = this.vertices[0];
+      const b = p;
+      this.vertices = [a, { p: b }];
+      this.segments = [{ a: 0, b: 1, ta: [0, 0], tb: [0, 0] }];
     }
   }
 
