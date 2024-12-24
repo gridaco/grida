@@ -29,7 +29,7 @@ export type DocumentAction =
   | EditorBlurAction
   | EditorCopyCutPasteAction
   | EditorDeleteAction
-  | EditorDeletePointAction
+  | EditorPathAction
   | EditorNudgeAction
   | EditorNudgeResizeAction
   | EditorAlignAction
@@ -149,6 +149,11 @@ export interface EditorDeleteAction {
   target: NodeID | "selection";
 }
 
+// #region [path]
+export type EditorPathAction =
+  | EditorDeletePointAction
+  | EditorSelectPointAction
+  | EditorHoverPointAction;
 export interface EditorDeletePointAction {
   type: "delete-point";
   target: {
@@ -156,6 +161,24 @@ export interface EditorDeletePointAction {
     point_index: number;
   };
 }
+
+export interface EditorSelectPointAction {
+  type: "select-point";
+  target: {
+    node_id: NodeID;
+    point_index: number;
+  };
+}
+
+export interface EditorHoverPointAction {
+  type: "hover-point";
+  event: "enter" | "leave";
+  target: {
+    node_id: NodeID;
+    point_index: number;
+  };
+}
+// #endregion
 
 /**
  * [Nudge]

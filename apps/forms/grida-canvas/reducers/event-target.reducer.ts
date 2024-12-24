@@ -48,12 +48,48 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       const {
         position: { x, y },
       } = <EditorEventTarget_PointerMove>action;
+      const c_surface_pos: cmath.Vector2 = [x, y];
+      const c_content_pos = cmath.vector2.subtract(
+        state.surface_cursor_position,
+        state.content_offset ?? cmath.vector2.zero
+      );
+
       return produce(state, (draft) => {
-        draft.surface_cursor_position = [x, y];
-        draft.cursor_position = cmath.vector2.subtract(
-          draft.surface_cursor_position,
-          draft.content_offset ?? cmath.vector2.zero
-        );
+        draft.surface_cursor_position = c_surface_pos;
+        draft.cursor_position = c_content_pos;
+        if (draft.content_edit_mode?.type === "path") {
+          const { a_point, node_id } = draft.content_edit_mode;
+          const { tarnslate_with_axis_lock } = state.gesture_modifiers;
+
+          if (
+            typeof a_point === "number" &&
+            tarnslate_with_axis_lock === "on"
+          ) {
+            const node = document.__getNodeById(
+              state,
+              node_id
+            ) as grida.program.nodes.PathNode;
+            const { left: nx, top: ny } = node;
+            const n_offset: cmath.Vector2 = [nx!, ny!];
+            const { vertices } = node.vectorNetwork;
+            const a = vertices[a_point];
+
+            // mock the movement (movement = cursor pos - anchor pos)
+            const movement = cmath.vector2.subtract(
+              c_content_pos,
+              cmath.vector2.add(n_offset, a.p)
+            );
+
+            // movement relative to `a` point
+            const adj_movement =
+              cmath.ext.movement.axisLockedByDominance(movement);
+
+            const adj_pos = cmath.vector2.add(a.p, adj_movement, n_offset);
+            draft.content_edit_mode.path_cursor_position = adj_pos;
+          } else {
+            draft.content_edit_mode.path_cursor_position = c_content_pos;
+          }
+        }
       });
     }
     case "document/canvas/backend/html/event/on-pointer-move-raycast": {
@@ -167,6 +203,10 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
           case "cursor": {
             draft.surface_raycast_detected_node_ids = node_ids_from_point;
             const { hovered_node_id } = self_updateSurfaceHoverState(draft);
+
+            // ignore if in content edit mode
+            if (draft.content_edit_mode) break;
+
             if (shiftKey) {
               if (hovered_node_id) {
                 self_selectNode(draft, "toggle", hovered_node_id);
@@ -188,37 +228,35 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             break;
           case "path": {
             if (draft.content_edit_mode?.type === "path") {
-              // // polyline mode
-              // const node = document.__getNodeById(
-              //   draft,
-              //   draft.content_edit_mode.node_id
-              // ) as grida.program.nodes.PolylineNode;
-
-              // // add point
-              // const position = cmath.vector2.subtract(draft.cursor_position, [
-              //   node.left!,
-              //   node.top!,
-              // ]);
-              // node.points.push(position);
-              // const index = node.points.length - 1;
-              // draft.content_edit_mode.selected_points = [index];
+              const { hovered_point } = state;
+              const { node_id, path_cursor_position, a_point } =
+                draft.content_edit_mode;
 
               const node = document.__getNodeById(
                 draft,
-                draft.content_edit_mode.node_id
+                node_id
               ) as grida.program.nodes.PathNode;
 
-              // TODO: atm, only adding to the last point is allowed.
-              // TODO: allow adding to first and last point (then also any point)
+              // if hovered point, do not add new point, but only connect the segment to it,.
 
-              // add point
-              const position = cmath.vector2.subtract(draft.cursor_position, [
-                node.left!,
-                node.top!,
-              ]);
-              node.vectorNetwork.vertices.push({ p: position });
-              const index = node.vectorNetwork.vertices.length - 1;
-              if (index > 0) {
+              let b_point: number | null = null;
+              let closed = false;
+              if (hovered_point) {
+                b_point = hovered_point;
+                closed = true;
+              } else {
+                // relative position
+                const position = cmath.vector2.subtract(path_cursor_position, [
+                  node.left!,
+                  node.top!,
+                ]);
+
+                // add point
+                node.vectorNetwork.vertices.push({ p: position });
+                b_point = node.vectorNetwork.vertices.length - 1;
+              }
+
+              if (a_point !== b_point) {
                 const prev_segment_index =
                   node.vectorNetwork.segments.length - 1;
                 // use the previous `-tb` as the `ta` of the new segment (if any)
@@ -227,14 +265,22 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                     cmath.vector2.zero
                 );
 
+                // if a (anchor point) is not defined, use the previous point as a
+                const a = a_point ?? b_point - 1;
+
                 node.vectorNetwork.segments.push({
-                  a: index - 1,
-                  b: index,
+                  a: a,
+                  b: b_point,
                   ta: ta,
                   tb: cmath.vector2.zero,
                 });
               }
-              draft.content_edit_mode.selected_points = [index];
+
+              if (!closed) {
+                draft.content_edit_mode.selected_points = [b_point];
+                draft.content_edit_mode.a_point = b_point;
+              }
+
               // ...
             } else {
               // create a new node
@@ -288,16 +334,21 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                 },
               } satisfies grida.program.nodes.PathNode;
 
-              vector.left = draft.cursor_position[0];
-              vector.top = draft.cursor_position[1];
+              const pos = draft.cursor_position;
+
+              vector.left = pos[0];
+              vector.top = pos[1];
 
               const parent = __get_insert_target(state);
               self_insertNode(draft, parent, vector);
+              self_selectNode(draft, "reset", vector.id);
 
               draft.content_edit_mode = {
                 type: "path",
                 node_id: new_node_id,
                 selected_points: [0], // select the first point
+                a_point: 0,
+                path_cursor_position: pos,
               };
             }
 
@@ -829,6 +880,8 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                 : node.vectorNetwork.vertices.map((v) => v.p);
 
             content_edit_mode.selected_points = [index];
+            content_edit_mode.a_point = index;
+
             draft.gesture = {
               type: "translate-point",
               node_id: node_id,

@@ -7,21 +7,17 @@ import { cn } from "@/utils";
 import { svg } from "@/grida/svg";
 
 export function SurfacePathEditor({ node_id }: { node_id: string }) {
-  const { surface_cursor_position, cursor_mode, content_offset } =
-    useEventTarget();
-  const { offset, verticies, segments, selectedPoints, curve } =
+  const { debug, cursor_mode, content_offset } = useEventTarget();
+  const { offset, vertices, segments, a_point, curve, path_cursor_position } =
     useSurfacePathEditor();
   const transform = useNodeSurfaceTransfrom(node_id);
 
-  const origin_idx =
-    selectedPoints.length === 1 ? selectedPoints[0] : undefined;
-  const origin_is_last = origin_idx === verticies.length - 1;
-
+  const a_point_is_last = a_point === vertices.length - 1;
   const lastseg = segments[segments.length - 1];
 
   // segments that are connected to the origin point
   const neighboring_segments = segments.filter((s) => {
-    return s.a === origin_idx || s.b === origin_idx;
+    return s.a === a_point || s.b === a_point;
   });
 
   return (
@@ -36,27 +32,45 @@ export function SurfacePathEditor({ node_id }: { node_id: string }) {
           zIndex: 1,
         }}
       >
-        {verticies.map(({ p }, i) => (
+        {vertices.map(({ p }, i) => (
           <VertexPoint key={i} point={p} index={i} />
         ))}
+        {debug && (
+          <svg
+            width={1}
+            height={1}
+            style={{
+              overflow: "visible",
+            }}
+          >
+            {/* // debug */}
+            {vertices.map((v, i) => (
+              <text
+                key={i}
+                x={v.p[0] - 8}
+                y={v.p[1] - 8}
+                fontSize={8}
+                fill="fuchsia"
+              >
+                p{i} ({Math.round(v.p[0])}, {Math.round(v.p[1])})
+              </text>
+            ))}
+          </svg>
+        )}
       </div>
-      {cursor_mode.type === "path" && typeof origin_idx === "number" && (
+      {cursor_mode.type === "path" && typeof a_point === "number" && (
         <>
           {/* next segment */}
           <Extension
-            a={cmath.vector2.add(
-              offset,
-              content_offset,
-              verticies[origin_idx].p
-            )}
-            b={surface_cursor_position}
+            a={cmath.vector2.add(offset, content_offset, vertices[a_point].p)}
+            b={cmath.vector2.add(path_cursor_position, content_offset)}
             ta={lastseg && cmath.vector2.invert(lastseg.tb)}
           />
         </>
       )}
       {neighboring_segments.map((s, i) => {
-        const a = verticies[s.a].p;
-        const b = verticies[s.b].p;
+        const a = vertices[s.a].p;
+        const b = vertices[s.b].p;
         const ta = s.ta;
         const tb = s.tb;
 
@@ -74,7 +88,7 @@ export function SurfacePathEditor({ node_id }: { node_id: string }) {
               <Extension a={a} b={cmath.vector2.add(a, ta)} />
               <Extension a={b} b={cmath.vector2.add(b, tb)} />
               {/* preview the next ta - cannot be edited */}
-              {origin_is_last && (
+              {a_point_is_last && (
                 <Extension
                   a={b}
                   b={cmath.vector2.add(b, cmath.vector2.invert(tb))}
@@ -82,36 +96,6 @@ export function SurfacePathEditor({ node_id }: { node_id: string }) {
               )}
             </div>
           </React.Fragment>
-          // <React.Fragment key={i}>
-          //   <Extension
-          //     a={cmath.vector2.add(
-          //       content_offset,
-          //       offset,
-          //       verticies[originidx].p
-          //     )}
-          //     b={cmath.vector2.add(
-          //       //
-          //       content_offset,
-          //       offset,
-          //       verticies[originidx].p,
-          //       s.tb
-          //     )}
-          //   />
-          //   <Extension
-          //     a={cmath.vector2.add(
-          //       content_offset,
-          //       offset,
-          //       verticies[originidx].p
-          //     )}
-          //     b={cmath.vector2.add(
-          //       //
-          //       content_offset,
-          //       offset,
-          //       verticies[originidx].p,
-          //       cmath.vector2.invert(s.tb)
-          //     )}
-          //   />
-          // </React.Fragment>
         );
       })}
     </div>
@@ -163,44 +147,69 @@ function VertexPoint({
   index: number;
 }) {
   const editor = useSurfacePathEditor();
-  const selected = editor.selectedPoints.includes(index);
-  const bind = useGesture({
-    onPointerDown: ({ event }) => {
-      event.stopPropagation();
-    },
-    onDragStart: (state) => {
-      const { event } = state;
-      event.stopPropagation();
-      editor.onPointDragStart(index);
-    },
-    onDrag: (state) => {
-      const { movement, distance, delta, initial, xy, event } = state;
-      event.stopPropagation();
-      editor.onPointDrag({
-        movement,
-        distance,
-        delta,
-        initial,
-        xy,
-      });
-    },
-    onDragEnd: (state) => {
-      const { event } = state;
-      event.stopPropagation();
-    },
-    onKeyDown: (state) => {
-      const { event } = state;
-
-      if (event.key === "Delete" || event.key === "Backspace") {
+  const selected = editor.selected_points.includes(index);
+  const hovered = editor.hovered_point === index;
+  const bind = useGesture(
+    {
+      onHover: (s) => {
+        // enter
+        if (s.first) {
+          editor.onHoverPoint(index, "enter");
+        }
+        // leave
+        if (s.last) {
+          editor.onHoverPoint(index, "leave");
+        }
+      },
+      onPointerDown: ({ event }) => {
+        // event.stopPropagation();
+        editor.onSelectPoint(index);
+      },
+      onDragStart: (state) => {
+        const { event } = state;
         event.stopPropagation();
-        event.preventDefault();
-        editor.onPointDelete(index);
-      }
+        editor.onPointDragStart(index);
+      },
+      onDrag: (state) => {
+        const { movement, distance, delta, initial, xy, event } = state;
+        event.stopPropagation();
+        editor.onPointDrag({
+          movement,
+          distance,
+          delta,
+          initial,
+          xy,
+        });
+      },
+      onDragEnd: (state) => {
+        const { event } = state;
+        event.stopPropagation();
+      },
+      onKeyDown: (state) => {
+        const { event } = state;
+
+        if (event.key === "Delete" || event.key === "Backspace") {
+          event.stopPropagation();
+          event.preventDefault();
+          editor.onPointDelete(index);
+        }
+      },
     },
-  });
+    {
+      drag: {
+        threshold: 1,
+      },
+    }
+  );
 
   return (
-    <Point {...bind()} tabIndex={index} selected={selected} point={point} />
+    <Point
+      {...bind()}
+      tabIndex={index}
+      selected={selected}
+      hovered={hovered}
+      point={point}
+    />
   );
 }
 
@@ -211,11 +220,13 @@ const Point = React.forwardRef(
       className,
       style,
       selected,
+      hovered,
       size = 6,
       ...props
     }: React.HtmlHTMLAttributes<HTMLDivElement> & {
       point: cmath.Vector2;
       selected?: boolean;
+      hovered?: boolean;
       size?: number;
     },
     ref: React.Ref<HTMLDivElement>
@@ -225,8 +236,11 @@ const Point = React.forwardRef(
         ref={ref}
         {...props}
         data-selected={selected}
+        data-hovered={hovered}
         className={cn(
-          "rounded-full border border-workbench-accent-sky bg-background data-[selected='true']:shadow-sm data-[selected='true']:bg-workbench-accent-sky data-[selected='true']:border-spacing-1.5 data-[selected='true']:border-background",
+          "rounded-full border border-workbench-accent-sky bg-background",
+          "data-[selected='true']:shadow-sm data-[selected='true']:bg-workbench-accent-sky data-[selected='true']:border-spacing-1.5 data-[selected='true']:border-background",
+          "data-[hovered='true']:opacity-50",
           className
         )}
         style={{

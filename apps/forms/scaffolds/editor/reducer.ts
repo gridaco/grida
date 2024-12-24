@@ -382,6 +382,7 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
           template_id: template_id,
           ...initDocumentEditorState({
             editable: true,
+            debug: false,
             document: {
               root_id: "page",
               nodes: {

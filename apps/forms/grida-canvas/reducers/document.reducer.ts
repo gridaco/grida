@@ -317,20 +317,57 @@ export default function documentReducer<S extends IDocumentEditorState>(
 
       break;
     }
-    case "delete-point": {
+    //
+    case "delete-point":
+    case "select-point":
+    case "hover-point": {
       return produce(state, (draft) => {
         const {
           target: { node_id, point_index },
         } = action;
         const node = document.__getNodeById(draft, node_id);
 
-        // TODO: update the node transform as the points are changed
-        if ("points" in node) {
-          const points = node.points;
-          points.splice(point_index, 1);
+        switch (action.type) {
+          case "delete-point": {
+            if (node.type === "polyline" || node.type === "path") {
+              switch (node.type) {
+                case "polyline":
+                  // TODO: update the node transform as the points are changed
+                  node.points.splice(point_index, 1);
+                  break;
+                case "path":
+                  node.vectorNetwork.vertices.splice(point_index, 1);
+                  // TODO: also update the segments
+                  break;
+              }
+            }
+            break;
+          }
+          case "select-point": {
+            assert(draft.content_edit_mode?.type === "path");
+            draft.content_edit_mode.selected_points = [point_index];
+            break;
+          }
+          case "hover-point": {
+            assert(
+              draft.selection[0] === node_id,
+              "hovered point should be in the selected node"
+            );
+            switch (action.event) {
+              case "enter":
+                draft.hovered_point = point_index;
+                break;
+              case "leave":
+                draft.hovered_point = null;
+                break;
+            }
+            break;
+          }
         }
       });
     }
+
+    //
     case "document/insert": {
       const { prototype } = action;
 

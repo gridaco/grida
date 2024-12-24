@@ -41,9 +41,11 @@ export function StandaloneDocumentEditor({
   editable,
   dispatch,
   children,
+  debug = false,
 }: React.PropsWithChildren<{
   editable: boolean;
-  initial: Omit<IDocumentEditorInit, "editable">;
+  debug?: boolean;
+  initial: Omit<IDocumentEditorInit, "editable" | "debug">;
   dispatch?: DocumentDispatcher;
 }>) {
   useEffect(() => {
@@ -83,7 +85,7 @@ export function StandaloneDocumentEditor({
 
   return (
     <DocumentContext.Provider
-      value={initDocumentEditorState({ ...initial, editable })}
+      value={initDocumentEditorState({ ...initial, editable, debug })}
     >
       <DocumentDispatcherContext.Provider value={__dispatch}>
         <ProgramDataContextHost>
@@ -1444,6 +1446,7 @@ export function useEventTarget() {
     cursor_position,
     surface_cursor_position,
     marquee,
+    debug,
   } = state;
 
   const is_node_transforming = gesture.type !== "idle";
@@ -1806,6 +1809,7 @@ export function useEventTarget() {
 
   return useMemo(() => {
     return {
+      debug,
       content_offset,
       viewport_offset,
       //
@@ -1856,6 +1860,7 @@ export function useEventTarget() {
       //
     };
   }, [
+    debug,
     content_offset,
     viewport_offset,
     //
@@ -1914,12 +1919,14 @@ export function useSurfacePathEditor() {
   assert(state.content_edit_mode && state.content_edit_mode.type === "path");
 
   const curve = state.gesture.type === "curve" ? state.gesture : undefined;
-  const { node_id, selected_points: selectedPoints } = state.content_edit_mode;
+  const { hovered_point } = state;
+  const { node_id, selected_points, a_point, path_cursor_position } =
+    state.content_edit_mode;
   const node = state.document.nodes[node_id] as
     | grida.program.nodes.PolylineNode
     | grida.program.nodes.PathNode;
 
-  const verticies =
+  const vertices =
     node.type === "polyline"
       ? node.points.map((p) => ({
           p,
@@ -1930,6 +1937,33 @@ export function useSurfacePathEditor() {
 
   // offset of the points (node position)
   const offset: cmath.Vector2 = [node.left!, node.top!];
+
+  const onSelectPoint = useCallback(
+    (index: number) => {
+      dispatch({
+        type: "select-point",
+        target: {
+          node_id,
+          point_index: index,
+        },
+      });
+    },
+    [dispatch, node_id]
+  );
+
+  const onHoverPoint = useCallback(
+    (index: number, eventType: "enter" | "leave") => {
+      dispatch({
+        type: "hover-point",
+        event: eventType,
+        target: {
+          node_id,
+          point_index: index,
+        },
+      });
+    },
+    [dispatch, node_id]
+  );
 
   const onPointDragStart = useCallback(
     (index: number) => {
@@ -1973,11 +2007,16 @@ export function useSurfacePathEditor() {
   return useMemo(
     () => ({
       node_id,
-      verticies,
+      path_cursor_position,
+      vertices,
       segments,
       curve,
       offset,
-      selectedPoints,
+      selected_points,
+      hovered_point,
+      a_point,
+      onSelectPoint,
+      onHoverPoint,
       onPointDragStart,
       onPointDrag,
       onPointDragEnd,
@@ -1986,11 +2025,16 @@ export function useSurfacePathEditor() {
     [
       //
       node_id,
-      verticies,
+      path_cursor_position,
+      vertices,
       segments,
       offset,
       curve,
-      selectedPoints,
+      selected_points,
+      hovered_point,
+      a_point,
+      onSelectPoint,
+      onHoverPoint,
       onPointDragStart,
       onPointDrag,
       onPointDragEnd,

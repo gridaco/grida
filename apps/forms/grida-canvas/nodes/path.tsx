@@ -7,27 +7,34 @@ import queryattributes from "./utils/attributes";
  * @returns
  */
 export function PathWidget({
-  width,
-  height,
+  width: _width,
+  height: _height,
   fill,
+  stroke,
+  strokeWidth,
+  strokeCap,
   style,
   vectorNetwork,
   ...props
 }: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.PathNode>) {
-  const { defs, ref: fillDef } = fill
+  const width = Math.max(_width, 1);
+  const height = Math.max(_height, 1);
+
+  const { defs: fillDefs, ref: fillDef } = fill
     ? svg.paint.defs(fill)
     : {
         defs: undefined,
         ref: "none",
       };
 
-  const style_without_size = {
-    ...style,
-    width: undefined,
-    height: undefined,
-  };
+  const { defs: strokeDefs, ref: strokeDef } = stroke
+    ? svg.paint.defs(stroke)
+    : {
+        defs: undefined,
+        ref: "none",
+      };
 
-  const d = svg.d.fromVectorNetwork(vectorNetwork);
+  const d = svg.network.fromVectorNetwork(vectorNetwork);
 
   return (
     <svg
@@ -36,16 +43,17 @@ export function PathWidget({
         ...style,
         overflow: "visible",
       }}
-      width={width || 1}
-      height={height || 1}
+      width={width}
+      height={height}
     >
-      {defs && <g dangerouslySetInnerHTML={{ __html: defs }} />}
+      {fillDefs && <g dangerouslySetInnerHTML={{ __html: fillDefs }} />}
+      {strokeDefs && <g dangerouslySetInnerHTML={{ __html: strokeDefs }} />}
       <path
         d={d}
         fill={fillDef}
-        // TODO:
-        strokeWidth={1}
-        stroke="red"
+        stroke={strokeDef}
+        strokeWidth={strokeWidth}
+        strokeLinecap={strokeCap}
       />
     </svg>
   );

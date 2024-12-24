@@ -97,6 +97,18 @@ interface IDocumentEditorClipboardState {
    * user clipboard - copied data
    */
   user_clipboard?: { nodes: grida.program.nodes.Node[] };
+
+  /**
+   *
+   * last font used - used when new text node is created
+   *
+   * save when
+   * - font is changed
+   * - text (or range) is selected
+   *
+   * @deprecated - not ready
+   */
+  last_font_family?: string;
 }
 
 interface IDocumentEditorTransformState {
@@ -270,6 +282,11 @@ interface IDocumentEditorEventTargetState {
   hovered_node_id: string | null;
 
   /**
+   * hovered point index (of a selected path node)
+   */
+  hovered_point: number | null;
+
+  /**
    * special hover state - when a node is a target of certain gesture, and ux needs to show the target node
    */
   dropzone_node_id?: string;
@@ -333,6 +350,7 @@ interface IDocumentEditorConfig {
    * set editable false on production context - end-user-facing context
    */
   editable: boolean;
+  debug: boolean;
 }
 
 interface IDocumentGoogleFontsState {
@@ -401,6 +419,17 @@ export interface IDocumentState {
          * selected points index
          */
         selected_points: number[];
+
+        /**
+         * origin point - the new point will be connected to this point
+         * also `selected_points[0]`
+         */
+        a_point: number | null;
+
+        /**
+         * next points position
+         */
+        path_cursor_position: cmath.Vector2;
       };
 
   /**
@@ -442,6 +471,7 @@ export function initDocumentEditorState({
   return {
     selection: [],
     hovered_node_id: null,
+    hovered_point: null,
     content_offset: [0, 0],
     viewport_offset: [0, 0],
     cursor_position: [0, 0],

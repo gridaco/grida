@@ -5,16 +5,16 @@ import { getSurfaceRayTarget } from "../tools/target";
 export function self_updateSurfaceHoverState<S extends IDocumentEditorState>(
   draft: Draft<S>
 ) {
-  // do not change the hovered node if the gesture is...
   if (
+    // do not change the hovered node if the content edit mode is on
+    draft.content_edit_mode ||
+    // do not change the hovered node if the gesture is...
     draft.gesture.type === "draw" ||
     draft.gesture.type === "rotate" ||
     draft.gesture.type === "scale" ||
     draft.gesture.type === "nudge" ||
     draft.gesture.type === "corner-radius"
   ) {
-    // clear the hover state
-    draft.hovered_node_id = null;
     return draft;
   }
 

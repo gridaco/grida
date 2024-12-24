@@ -176,7 +176,8 @@ export default function nodeReducer<
       case "node/change/stroke-width":
       case "node/change/stroke-cap": {
         assert(
-          draft.type === "polyline" ||
+          draft.type === "path" ||
+            draft.type === "polyline" ||
             draft.type === "line" ||
             draft.type === "rectangle" ||
             draft.type === "ellipse"

@@ -10,8 +10,8 @@ export function SVGPolyLineWidget({
   stroke,
   strokeWidth,
   strokeCap,
-  points,
   style,
+  points,
   ...props
 }: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.PolylineNode>) {
   const width = Math.max(_width, 1);

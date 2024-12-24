@@ -34,6 +34,8 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
               type: "path",
               node_id: node_id,
               selected_points: [],
+              a_point: null,
+              path_cursor_position: draft.cursor_position,
             };
             break;
           }

@@ -110,6 +110,7 @@ export default function CanvasPlayground() {
     standaloneDocumentReducer,
     initDocumentEditorState({
       editable: true,
+      debug: true,
       document: {
         nodes: {
           root: {
@@ -165,6 +166,7 @@ export default function CanvasPlayground() {
           state: initDocumentEditorState({
             editable: true,
             document: file.document,
+            debug: true,
           }),
         });
       });
@@ -198,6 +200,7 @@ export default function CanvasPlayground() {
               state: initDocumentEditorState({
                 editable: true,
                 document: file.document,
+                debug: true,
               }),
             });
           }}
@@ -210,6 +213,7 @@ export default function CanvasPlayground() {
               key: res.document.id,
               state: initDocumentEditorState({
                 editable: true,
+                debug: true,
                 document: iofigma.restful.map.document(
                   res.document as any,
                   res.images
@@ -232,6 +236,7 @@ export default function CanvasPlayground() {
         <ErrorBoundary>
           <StandaloneDocumentEditor
             editable
+            debug
             initial={state}
             dispatch={dispatch}
           >
