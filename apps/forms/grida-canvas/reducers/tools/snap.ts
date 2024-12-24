@@ -31,7 +31,7 @@ export function snapMovementToObjects(
 
   // return each xy point of input selection relative to the snapped bounding box
   const translated = selection.map((r) => {
-    const offset = cmath.vector2.subtract(
+    const offset = cmath.vector2.sub(
       [r.x, r.y],
       [bounding_rect.x, bounding_rect.y]
     );

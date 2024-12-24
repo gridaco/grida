@@ -50,7 +50,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         position: { x, y },
       } = <EditorEventTarget_PointerMove>action;
       const c_surface_pos: cmath.Vector2 = [x, y];
-      const c_content_pos = cmath.vector2.subtract(
+      const c_content_pos = cmath.vector2.sub(
         state.surface_cursor_position,
         state.content_offset ?? cmath.vector2.zero
       );
@@ -76,7 +76,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             const a = vertices[a_point];
 
             // mock the movement (movement = cursor pos - anchor pos)
-            const movement = cmath.vector2.subtract(
+            const movement = cmath.vector2.sub(
               c_content_pos,
               cmath.vector2.add(n_offset, a.p)
             );
@@ -130,7 +130,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                   ? [_nnode.width / 2, _nnode.height / 2]
                   : [0, 0];
 
-              const nnode_relative_position = cmath.vector2.subtract(
+              const nnode_relative_position = cmath.vector2.sub(
                 cursor_position,
                 // parent position relative to content space
                 [parent_rect.x, parent_rect.y],
@@ -244,7 +244,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               const position =
                 typeof hovered_point === "number"
                   ? node.vectorNetwork.vertices[hovered_point].p
-                  : cmath.vector2.subtract(path_cursor_position, [
+                  : cmath.vector2.sub(path_cursor_position, [
                       node.left!,
                       node.top!,
                     ]);
@@ -439,7 +439,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
             // position relative to the parent
             const parent_rect = domapi.get_node_bounding_rect(parent)!;
-            const node_relative_pos = cmath.vector2.subtract(cursor_position, [
+            const node_relative_pos = cmath.vector2.sub(cursor_position, [
               parent_rect.x,
               parent_rect.y,
             ]);
@@ -851,13 +851,15 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
             assert(draft.gesture.type === "translate-vertex");
             const { tarnslate_with_axis_lock } = state.gesture_modifiers;
-            const { initial_verticies, initial_position } = draft.gesture;
-
             // axis lock movement with dominant axis
             const adj_movement =
               tarnslate_with_axis_lock === "on"
                 ? cmath.ext.movement.axisLockedByDominance(_movement)
                 : _movement;
+
+            const { initial_verticies, initial_position } = draft.gesture;
+
+            const bb_initial = cmath.rect.fromPoints(initial_verticies);
 
             const points_next = initial_verticies.slice();
             for (const i of content_edit_mode.selected_points) {
@@ -867,19 +869,15 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               );
             }
 
-            const bb_initial = cmath.rect.fromPoints(initial_verticies);
             const bb_next = cmath.rect.fromPoints(points_next);
-            const delta = cmath.vector2.subtract(
+
+            const delta = cmath.vector2.sub(
               [bb_next.x, bb_next.y],
               [bb_initial.x, bb_initial.y]
             );
 
             const delta_shifted_points = points_next.map((p) =>
-              cmath.vector2.add(
-                p,
-                // inverse
-                cmath.vector2.multiply(delta, [-1, -1])
-              )
+              cmath.vector2.add(p, cmath.vector2.invert(delta))
             );
 
             // translate the point

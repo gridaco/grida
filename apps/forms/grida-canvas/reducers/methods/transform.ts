@@ -249,7 +249,7 @@ function __self_update_gesture_transform_translate(
 
     // the r position is relative to the canvas, we need to convert it to the node's local position
     // absolute to relative => accumulated parent's position
-    const relative_position = cmath.vector2.subtract(r.position, [
+    const relative_position = cmath.vector2.sub(r.position, [
       parent_rect.x,
       parent_rect.y,
     ]);
@@ -308,7 +308,7 @@ function __self_update_gesture_transform_scale(
     );
 
     // the r position is relative to the canvas, we need to convert it to the node's local position
-    const relative_position = cmath.vector2.subtract(
+    const relative_position = cmath.vector2.sub(
       [initial_rect.x, initial_rect.y],
       [parent_rect.x, parent_rect.y]
     );
@@ -319,7 +319,7 @@ function __self_update_gesture_transform_scale(
       height: initial_rect.height,
     };
 
-    const relative_origin = cmath.vector2.subtract(origin, [
+    const relative_origin = cmath.vector2.sub(origin, [
       parent_rect.x,
       parent_rect.y,
     ]);

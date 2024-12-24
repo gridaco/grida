@@ -19,12 +19,12 @@ describe("cmath.vector2", () => {
     });
   });
 
-  describe("subtract", () => {
+  describe("sub", () => {
     it("should correctly subtract one vector from another", () => {
       const v1: cmath.Vector2 = [5, 7];
       const v2: cmath.Vector2 = [2, 3];
 
-      const result = cmath.vector2.subtract(v1, v2);
+      const result = cmath.vector2.sub(v1, v2);
 
       expect(result).toEqual([3, 4]); // Expected result: [3, 4]
     });
@@ -33,7 +33,7 @@ describe("cmath.vector2", () => {
       const v1: cmath.Vector2 = [2, 3];
       const v2: cmath.Vector2 = [5, 7];
 
-      const result = cmath.vector2.subtract(v1, v2);
+      const result = cmath.vector2.sub(v1, v2);
 
       expect(result).toEqual([-3, -4]); // Expected result: [-3, -4]
     });

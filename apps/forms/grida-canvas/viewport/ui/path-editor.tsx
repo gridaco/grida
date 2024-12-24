@@ -311,8 +311,8 @@ function Curve({
 }) {
   //
   const offset = a;
-  const _a = cmath.vector2.subtract(a, offset);
-  const _b = cmath.vector2.subtract(b, offset);
+  const _a = cmath.vector2.sub(a, offset);
+  const _b = cmath.vector2.sub(b, offset);
   const path = svg.d.encode(svg.d.curve(_a, ta, tb, _b));
 
   return (

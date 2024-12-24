@@ -95,9 +95,6 @@ export namespace domapi {
     const bRect = b.getBoundingClientRect();
 
     // Calculate the displacement as a Vector2
-    return cmath.vector2.subtract(
-      [bRect.left, bRect.top],
-      [aRect.left, aRect.top]
-    );
+    return cmath.vector2.sub([bRect.left, bRect.top], [aRect.left, aRect.top]);
   }
 }

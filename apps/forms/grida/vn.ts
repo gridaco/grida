@@ -1,3 +1,5 @@
+import { cmath } from "@/grida-canvas/cmath";
+
 type Vector2 = [number, number];
 export namespace vn {
   /**
@@ -211,6 +213,20 @@ export namespace vn {
       }));
     }
 
+    moveVertex(i: number, p: Vector2) {
+      if (i < 0 || i >= this.vertices.length) {
+        throw new Error(`Invalid vertex index: ${i}`);
+      }
+      this.vertices[i].p = p;
+    }
+
+    translate(delta: Vector2) {
+      for (let i = 0; i < this.vertices.length; i++) {
+        this.vertices[i].p[0] += delta[0];
+        this.vertices[i].p[1] += delta[1];
+      }
+    }
+
     addSegment(a: number, b: number, ta: Vector2, tb: Vector2) {
       // TODO: check for duplicate segments and ignore.
 
@@ -261,5 +277,53 @@ export namespace vn {
         this.segments[i][otherControl] = [-value[0], -value[1]];
       }
     }
+  }
+
+  /**
+   * Returns an approximate bounding box for the entire vector network
+   * by collecting vertices and their tangent (control) points.
+   */
+  export function getBBoxApprox(vn: VectorNetwork): cmath.Rectangle {
+    const pts: Vector2[] = [];
+
+    // 1. collect all vertex positions
+    for (const v of vn.vertices) {
+      pts.push(v.p);
+    }
+
+    // 2. collect tangent endpoints (a + ta, b + tb)
+    for (const seg of vn.segments) {
+      const a = vn.vertices[seg.a].p;
+      const b = vn.vertices[seg.b].p;
+      pts.push([a[0] + seg.ta[0], a[1] + seg.ta[1]]);
+      pts.push([b[0] + seg.tb[0], b[1] + seg.tb[1]]);
+    }
+
+    // 3. compute bounding box from all points
+    return cmath.rect.fromPoints(pts);
+  }
+
+  /**
+   * Exact bounding box of a vector network by summing each segment's cubic bounding box.
+   **/
+  export function getBBox(vn: vn.VectorNetwork) {
+    if (vn.vertices.length === 0) {
+      return { x: 0, y: 0, width: 0, height: 0 };
+    }
+
+    let box = { x: Infinity, y: Infinity, width: 0, height: 0 };
+    for (const seg of vn.segments) {
+      const { a: _a, b: _b, ta, tb } = seg;
+      const a = vn.vertices[_a].p;
+      const b = vn.vertices[_b].p;
+      const sb = cmath.bezier.toBBox({ a, b, ta, tb });
+      if (box.x === Infinity) {
+        box = sb;
+      } else {
+        box = cmath.rect.union([box, sb]);
+      }
+    }
+
+    return box;
   }
 }

@@ -161,28 +161,13 @@ export namespace cmath.vector2 {
    */
   export const zero: Vector2 = [0, 0];
 
-  /**
-   * Inverts a 2D vector by negating both its components.
-   *
-   * @param vector - The vector to invert, in the format `[x, y]`.
-   * @returns A new vector `[−x, −y]` with both components inverted.
-   *
-   * @example
-   * const v: cmath.Vector2 = [3, -4];
-   * const inverted = cmath.vector2.invert(v);
-   * console.log(inverted); // [-3, 4]
-   */
-  export function invert(vector: Vector2): Vector2 {
-    return [-vector[0], -vector[1]];
-  }
-
   export function add(...vectors: Vector2[]): Vector2 {
     return vectors.reduce((acc, [x, y]) => [acc[0] + x, acc[1] + y], [
       0, 0,
     ] as Vector2);
   }
 
-  export function subtract(...vectors: Vector2[]): Vector2 {
+  export function sub(...vectors: Vector2[]): Vector2 {
     if (vectors.length === 1) {
       return vectors[0];
     }
@@ -199,6 +184,21 @@ export namespace cmath.vector2 {
     return vectors.reduce((acc, [x, y]) => [acc[0] * x, acc[1] * y], [
       1, 1,
     ] as Vector2);
+  }
+
+  /**
+   * Inverts a 2D vector by negating both its components.
+   *
+   * @param vector - The vector to invert, in the format `[x, y]`.
+   * @returns A new vector `[−x, −y]` with both components inverted.
+   *
+   * @example
+   * const v: cmath.Vector2 = [3, -4];
+   * const inverted = cmath.vector2.invert(v);
+   * console.log(inverted); // [-3, 4]
+   */
+  export function invert(vector: Vector2): Vector2 {
+    return [-vector[0], -vector[1]];
   }
 
   /**
@@ -1216,6 +1216,125 @@ export namespace cmath.snap {
     return nearest !== null
       ? [nearest, signedDistance, indicies]
       : [point, Infinity, indicies];
+  }
+}
+
+export namespace cmath.bezier {
+  /**
+   * @property a - Position of the starting vertex.
+   * @property b - Position of the ending vertex.
+   * @property ta - Tangent at the starting vertex (relative to the vertex).
+   * @property tb - Tangent at the ending vertex (relative to the vertex).
+   */
+  type CubicBezierSegment = {
+    a: Vector2;
+    b: Vector2;
+    ta: Vector2;
+    tb: Vector2;
+  };
+  /**
+   * Solves a quadratic equation \( a x^2 + b x + c = 0 \).
+   * @param a - Quadratic coefficient \( a \).
+   * @param b - Linear coefficient \( b \).
+   * @param c - Constant term \( c \).
+   * @returns The real roots in the interval \([-\infty, \infty]\). Returns an empty array if none exist.
+   */
+  function solve_quad(a: number, b: number, c: number): number[] {
+    const D = b * b - 4 * a * c;
+    if (D < 0) return [];
+    if (D === 0) return [-b / (2 * a)];
+    const sqrtD = Math.sqrt(D);
+    return [(-b + sqrtD) / (2 * a), (-b - sqrtD) / (2 * a)];
+  }
+
+  /**
+   * Returns the derivative coefficients \([A, B, C]\) of the cubic polynomial for calculating \(`p'(t) = 0`\).
+   * @param p0 - The start point coordinate.
+   * @param p1 - The first control point coordinate.
+   * @param p2 - The second control point coordinate.
+   * @param p3 - The end point coordinate.
+   * @returns Coefficients \([A, B, C]\) for the derivative cubic equation \( A t^2 + B t + C = 0 \).
+   */
+  function cubic_deriv_coeffs(
+    p0: number,
+    p1: number,
+    p2: number,
+    p3: number
+  ): [number, number, number] {
+    const c0 = -p0 + 3 * p1 - 3 * p2 + p3; // for t^3
+    const c1 = 3 * p0 - 6 * p1 + 3 * p2; // for t^2
+    const c2 = -3 * p0 + 3 * p1; // for t^1
+    // derivative => 3*c0*t^2 + 2*c1*t + c2 = 0
+    return [3 * c0, 2 * c1, c2];
+  }
+
+  /**
+   * Evaluates a cubic Bézier function at parameter `t` in \([0, 1]\).
+   * @param p0 - The start coordinate.
+   * @param p1 - The first control coordinate (absolute).
+   * @param p2 - The second control coordinate (absolute).
+   * @param p3 - The end coordinate.
+   * @param t - Parameter in \([0, 1]\).
+   * @returns The evaluated cubic value at `t`.
+   */
+  function cubic_eval(
+    p0: number,
+    p1: number,
+    p2: number,
+    p3: number,
+    t: number
+  ): number {
+    const mt = 1 - t;
+    return (
+      mt * mt * mt * p0 +
+      3 * mt * mt * t * p1 +
+      3 * mt * t * t * p2 +
+      t * t * t * p3
+    );
+  }
+
+  /**
+   * Calculates the exact bounding box of a single cubic Bézier segment by finding all extrema.
+   * @param a - The start vertex \([x, y]\).
+   * @param ta - The start tangent (relative to `a`).
+   * @param b - The end vertex \([x, y]\).
+   * @param tb - The end tangent (relative to `b`).
+   * @returns The bounding box \(\{ x, y, width, height \}\) that encloses the entire cubic.
+   */
+  export function toBBox(segment: CubicBezierSegment): Rectangle {
+    const { a, b, ta, tb } = segment;
+    const c1: Vector2 = [a[0] + ta[0], a[1] + ta[1]];
+    const c2: Vector2 = [b[0] + tb[0], b[1] + tb[1]];
+
+    const dx = cubic_deriv_coeffs(a[0], c1[0], c2[0], b[0]);
+    const dy = cubic_deriv_coeffs(a[1], c1[1], c2[1], b[1]);
+    const tx = solve_quad(dx[0], dx[1], dx[2]);
+    const ty = solve_quad(dy[0], dy[1], dy[2]);
+
+    const candidates = new Set<number>([0, 1]);
+    for (const t of tx) if (t >= 0 && t <= 1) candidates.add(t);
+    for (const t of ty) if (t >= 0 && t <= 1) candidates.add(t);
+
+    let minX = Infinity,
+      minY = Infinity,
+      maxX = -Infinity,
+      maxY = -Infinity;
+
+    for (const t of Array.from(candidates)) {
+      const x = cubic_eval(a[0], c1[0], c2[0], b[0], t);
+      const y = cubic_eval(a[1], c1[1], c2[1], b[1], t);
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+
+    return {
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY,
+    };
   }
 }
 

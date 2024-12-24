@@ -59,7 +59,7 @@ function __useEditorContentOffsetNotifyEffect(
       ];
       const content_position: cmath.Vector2 = [content_rect.x, content_rect.y];
 
-      const content_offset = cmath.vector2.subtract(
+      const content_offset = cmath.vector2.sub(
         content_position,
         viewport_position
       );
