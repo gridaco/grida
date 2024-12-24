@@ -324,7 +324,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
     case "hover-vertex": {
       return produce(state, (draft) => {
         const {
-          target: { node_id, point_index },
+          target: { node_id, vertex: point_index },
         } = action;
         const node = document.__getNodeById(draft, node_id);
 
@@ -421,7 +421,8 @@ export default function documentReducer<S extends IDocumentEditorState>(
     }
     case "document/surface/content-edit-mode/try-enter":
     case "document/surface/content-edit-mode/try-exit":
-    case "document/surface/cursor-mode": {
+    case "document/surface/cursor-mode":
+    case "document/surface/gesture/start": {
       return surfaceReducer(state, action);
     }
     case "document/template/set/props": {

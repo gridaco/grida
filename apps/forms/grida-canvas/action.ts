@@ -2,6 +2,7 @@ import type { Tokens } from "@/ast";
 import type { grida } from "@/grida";
 import type {
   CursorMode,
+  GestureCurve,
   IDocumentEditorState,
   SurfaceRaycastTargeting,
 } from "./state";
@@ -54,8 +55,18 @@ interface INodeID {
   node_id: NodeID;
 }
 
-interface IPathPointIndex {
-  index: number;
+interface IVertexIdx {
+  /**
+   * index of the vertex
+   */
+  vertex: number;
+}
+
+interface VertexQuery extends IVertexIdx {
+  /**
+   * node id (must be a path node)
+   */
+  node_id: NodeID;
 }
 
 export type TCanvasEventTargetDragGestureState = {
@@ -157,27 +168,18 @@ export type EditorPathAction =
 
 export interface EditorDeleteVertexAction {
   type: "delete-vertex";
-  target: {
-    node_id: NodeID;
-    point_index: number;
-  };
+  target: VertexQuery;
 }
 
 export interface EditorSelectVertexAction {
   type: "select-vertex";
-  target: {
-    node_id: NodeID;
-    point_index: number;
-  };
+  target: VertexQuery;
 }
 
 export interface EditorHoverPointAction {
   type: "hover-vertex";
   event: "enter" | "leave";
-  target: {
-    node_id: NodeID;
-    point_index: number;
-  };
+  target: VertexQuery;
 }
 // #endregion
 
@@ -469,16 +471,16 @@ export type EditorEventTarget_NodeOverlayRotationHandle_Drag = INodeID &
   };
 
 //
-export type EditorEventTarget_PathPoint_DragStart = IPathPointIndex & {
-  type: "document/canvas/backend/html/event/path-point/on-drag-start";
+export type EditorEventTarget_PathPoint_DragStart = IVertexIdx & {
+  type: "document/canvas/backend/html/event/vertex/on-drag-start";
 };
 
 export type EditorEventTarget_PathPoint_DragEnd = {
-  type: "document/canvas/backend/html/event/path-point/on-drag-end";
+  type: "document/canvas/backend/html/event/vertex/on-drag-end";
 };
 
 export type EditorEventTarget_PathPoint_Drag = ICanvasEventTargetDragEvent & {
-  type: "document/canvas/backend/html/event/path-point/on-drag";
+  type: "document/canvas/backend/html/event/vertex/on-drag";
 };
 
 // #region surface action
@@ -486,7 +488,8 @@ export type SurfaceAction =
   | EditorSurface_EnterContentEditMode
   | EditorSurface_ExitContentEditMode
   //
-  | EditorSurface_CursorMode;
+  | EditorSurface_CursorMode
+  | EditorSurface_StartGesture;
 
 export type EditorSurface_EnterContentEditMode = {
   type: "document/surface/content-edit-mode/try-enter";
@@ -499,6 +502,13 @@ export type EditorSurface_ExitContentEditMode = {
 export type EditorSurface_CursorMode = {
   type: "document/surface/cursor-mode";
   cursor_mode: CursorMode;
+};
+
+export type EditorSurface_StartGesture = {
+  type: "document/surface/gesture/start";
+  gesture: Pick<GestureCurve, "type" | "control" | "node_id"> & {
+    vertex: number;
+  };
 };
 
 // #endregion surface action

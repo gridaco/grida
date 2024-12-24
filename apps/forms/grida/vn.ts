@@ -115,23 +115,34 @@ export namespace vn {
   }
 
   export class VectorNetworkEditor {
-    private vertices: VectorNetworkVertex[] = [];
-    private segments: VectorNetworkSegment[] = [];
+    private _vertices: VectorNetworkVertex[] = [];
+    private _segments: VectorNetworkSegment[] = [];
 
     get value(): VectorNetwork {
-      return { vertices: this.vertices, segments: this.segments };
+      return { vertices: this._vertices, segments: this._segments };
+    }
+
+    get vertices(): VectorNetworkVertex[] {
+      return this.vertices;
+    }
+
+    get segments(): VectorNetworkSegment[] {
+      return this._segments;
     }
 
     constructor(value?: VectorNetwork) {
       if (value) {
-        this.vertices = value.vertices;
-        this.segments = value.segments;
+        this._vertices = value.vertices;
+        this._segments = value.segments;
       }
     }
 
     findVertex(p: Vector2): number | null {
-      for (let i = 0; i < this.vertices.length; i++) {
-        if (this.vertices[i].p[0] === p[0] && this.vertices[i].p[1] === p[1]) {
+      for (let i = 0; i < this._vertices.length; i++) {
+        if (
+          this._vertices[i].p[0] === p[0] &&
+          this._vertices[i].p[1] === p[1]
+        ) {
           return i;
         }
       }
@@ -140,13 +151,19 @@ export namespace vn {
 
     /**
      * finds the segment that contains the given vertex index
-     * @param i
+     * @param v
      * @returns
      */
-    findSegments(i: number): number[] {
+    findSegments(v: number, point: "a" | "b" | "any" = "any"): number[] {
       const result: number[] = [];
-      for (let j = 0; j < this.segments.length; j++) {
-        if (this.segments[j].a === i || this.segments[j].b === i) {
+      for (let j = 0; j < this._segments.length; j++) {
+        if (point === "any") {
+          if (this._segments[j].a === v || this._segments[j].b === v) {
+            result.push(j);
+          }
+        } else if (point === "a" && this._segments[j].a === v) {
+          result.push(j);
+        } else if (point === "b" && this._segments[j].b === v) {
           result.push(j);
         }
       }
@@ -169,7 +186,7 @@ export namespace vn {
       let vertex_idx: number;
       const existing = this.findVertex(p);
       if (existing === null) {
-        vertex_idx = this.vertices.push({ p }) - 1;
+        vertex_idx = this._vertices.push({ p }) - 1;
       } else {
         vertex_idx = existing;
       }
@@ -184,7 +201,7 @@ export namespace vn {
           if (selection_segments.length === 1) {
             // one segment means the force is open.
             // use the origin -tb as the new ta
-            const prev_tb = this.segments[selection_segments[0]].tb;
+            const prev_tb = this._segments[selection_segments[0]].tb;
             ta = [-prev_tb[0], -prev_tb[1]];
           }
         }
@@ -209,20 +226,20 @@ export namespace vn {
      * ```
      */
     deleteVertex(i: number) {
-      if (i < 0 || i >= this.vertices.length) {
+      if (i < 0 || i >= this._vertices.length) {
         throw new Error(`Invalid vertex index: ${i}`);
       }
 
       // Remove the vertex at index `i`
-      this.vertices.splice(i, 1);
+      this._vertices.splice(i, 1);
 
       // Remove segments associated with the vertex
-      this.segments = this.segments.filter(
+      this._segments = this._segments.filter(
         (segment) => segment.a !== i && segment.b !== i
       );
 
       // Adjust remaining segment indices to reflect the deleted vertex
-      this.segments = this.segments.map((segment) => ({
+      this._segments = this._segments.map((segment) => ({
         a: segment.a > i ? segment.a - 1 : segment.a,
         b: segment.b > i ? segment.b - 1 : segment.b,
         ta: segment.ta,
@@ -231,22 +248,22 @@ export namespace vn {
     }
 
     moveVertex(i: number, p: Vector2) {
-      if (i < 0 || i >= this.vertices.length) {
+      if (i < 0 || i >= this._vertices.length) {
         throw new Error(`Invalid vertex index: ${i}`);
       }
-      this.vertices[i].p = p;
+      this._vertices[i].p = p;
     }
 
     translateVertex(i: number, delta: Vector2) {
-      if (i < 0 || i >= this.vertices.length) {
+      if (i < 0 || i >= this._vertices.length) {
         throw new Error(`Invalid vertex index: ${i}`);
       }
-      const p = this.vertices[i].p;
-      this.vertices[i].p = [p[0] + delta[0], p[1] + delta[1]];
+      const p = this._vertices[i].p;
+      this._vertices[i].p = [p[0] + delta[0], p[1] + delta[1]];
     }
 
     translate(delta: Vector2) {
-      this.vertices = this.vertices.map((v) => ({
+      this._vertices = this._vertices.map((v) => ({
         p: [v.p[0] + delta[0], v.p[1] + delta[1]],
       }));
     }
@@ -254,7 +271,7 @@ export namespace vn {
     addSegment(a: number, b: number, ta: Vector2, tb: Vector2) {
       // TODO: check for duplicate segments and ignore.
 
-      this.segments.push({
+      this._segments.push({
         a,
         b,
         ta,
@@ -277,16 +294,16 @@ export namespace vn {
       reflection: boolean
     ) {
       // 1. update the primary tangent
-      this.segments[segmentIndex][control] = value;
+      this._segments[segmentIndex][control] = value;
 
       // 2. optional reflection
       if (!reflection) return;
 
-      const seg = this.segments[segmentIndex];
+      const seg = this._segments[segmentIndex];
       const vertexIndex = control === "ta" ? seg.a : seg.b;
 
       // find connected segment sharing this vertex
-      const connected = this.segments
+      const connected = this._segments
         .map((s, i) => ({ s, i }))
         .filter(
           ({ s, i }) =>
@@ -298,7 +315,7 @@ export namespace vn {
         const { s, i } = connected[0];
         const otherControl = s.a === vertexIndex ? "ta" : "tb";
         // invert
-        this.segments[i][otherControl] = [-value[0], -value[1]];
+        this._segments[i][otherControl] = [-value[0], -value[1]];
       }
     }
 
@@ -315,9 +332,9 @@ export namespace vn {
      */
     extendPolyline(p: Vector2) {
       // TODO: this does not validate the duplicate points
-      const pl = polyline([...this.vertices.map((v) => v.p), p]);
-      this.vertices = pl.vertices;
-      this.segments = pl.segments;
+      const pl = polyline([...this._vertices.map((v) => v.p), p]);
+      this._vertices = pl.vertices;
+      this._segments = pl.segments;
     }
 
     /**
@@ -329,10 +346,10 @@ export namespace vn {
      */
     extendLine(p: Vector2) {
       // TODO: this does not validate the duplicate points
-      const a = this.vertices[0];
+      const a = this._vertices[0];
       const b = p;
-      this.vertices = [a, { p: b }];
-      this.segments = [{ a: 0, b: 1, ta: [0, 0], tb: [0, 0] }];
+      this._vertices = [a, { p: b }];
+      this._segments = [{ a: 0, b: 1, ta: [0, 0], tb: [0, 0] }];
     }
   }
 

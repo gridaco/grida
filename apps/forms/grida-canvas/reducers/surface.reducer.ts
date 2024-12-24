@@ -3,6 +3,8 @@ import { produce, type Draft } from "immer";
 import type { SurfaceAction } from "../action";
 import type { IDocumentEditorState } from "../state";
 import { document } from "../document-query";
+import { getInitialCurveGesture } from "./tools/gesture";
+import assert from "assert";
 
 export default function surfaceReducer<S extends IDocumentEditorState>(
   state: S,
@@ -53,6 +55,26 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
       return produce(state, (draft) => {
         draft.cursor_mode = cursor_mode;
       });
+    }
+    case "document/surface/gesture/start": {
+      const {
+        gesture: { node_id, vertex, control },
+      } = action;
+
+      assert(state.content_edit_mode?.type === "path");
+      assert(state.content_edit_mode?.node_id === node_id);
+
+      const gesture = getInitialCurveGesture(state, {
+        node_id,
+        vertex,
+        control,
+      });
+
+      return produce(state, (draft) => {
+        draft.gesture = gesture;
+      });
+
+      break;
     }
     // #endregion
   }

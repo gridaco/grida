@@ -37,6 +37,7 @@ import { domapi } from "../domapi";
 import nid from "./tools/id";
 import { getDoubleclickTarget, getMarqueeSelection } from "./tools/target";
 import { vn } from "@/grida/vn";
+import { getInitialCurveGesture } from "./tools/gesture";
 
 export default function eventTargetReducer<S extends IDocumentEditorState>(
   state: S,
@@ -327,6 +328,10 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
     // #region drag event
     case "document/canvas/backend/html/event/on-drag-start": {
       const { shiftKey } = <EditorEventTarget_DragStart>action;
+
+      // if there is already a gesture, ignore
+      if (state.gesture.type !== "idle") return state;
+
       return produce(state, (draft) => {
         // clear all trasform state
         draft.marquee = undefined;
@@ -481,29 +486,18 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             break;
           }
           case "path": {
-            assert(draft.content_edit_mode?.type === "path");
-            const { node_id, selected_vertices } = draft.content_edit_mode;
+            assert(state.content_edit_mode?.type === "path");
+            const { node_id, selected_vertices } = state.content_edit_mode;
             assert(selected_vertices.length === 1);
             const vertex = selected_vertices[0];
 
-            const node = document.__getNodeById(
-              draft,
-              node_id
-            ) as grida.program.nodes.PathNode;
-            const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
-            const segments = vne.findSegments(vertex);
-
-            assert(segments.length === 1);
-            const segment = segments[0];
-
-            draft.gesture = {
-              type: "curve",
-              node_id: node_id,
-              segment: segment,
-              initial: cmath.vector2.zero,
+            const gesture = getInitialCurveGesture(state, {
+              node_id,
+              vertex,
               control: "tb",
-              movement: cmath.vector2.zero,
-            };
+            });
+
+            draft.gesture = gesture;
             break;
           }
         }
@@ -641,7 +635,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                 cmath.vector2.invert(movement)
               );
 
-              vne.updateTangent(segment, control, tangentPos, false);
+              vne.updateTangent(segment, control, tangentPos, true);
 
               // TODO: try consider updating the transform on drag end as it could be expensive
 
@@ -859,9 +853,9 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       });
       //
     }
-    case "document/canvas/backend/html/event/path-point/on-drag":
-    case "document/canvas/backend/html/event/path-point/on-drag-end":
-    case "document/canvas/backend/html/event/path-point/on-drag-start": {
+    case "document/canvas/backend/html/event/vertex/on-drag":
+    case "document/canvas/backend/html/event/vertex/on-drag-end":
+    case "document/canvas/backend/html/event/vertex/on-drag-start": {
       return produce(state, (draft) => {
         const { content_edit_mode } = draft;
         assert(content_edit_mode && content_edit_mode.type === "path");
@@ -872,8 +866,8 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         ) as grida.program.nodes.PathNode;
 
         switch (action.type) {
-          case "document/canvas/backend/html/event/path-point/on-drag-start": {
-            const { index } = action;
+          case "document/canvas/backend/html/event/vertex/on-drag-start": {
+            const { vertex: index } = action;
 
             const verticies = node.vectorNetwork.vertices.map((v) => v.p);
 
@@ -888,12 +882,12 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             };
             break;
           }
-          case "document/canvas/backend/html/event/path-point/on-drag-end": {
+          case "document/canvas/backend/html/event/vertex/on-drag-end": {
             const {} = action;
             draft.gesture = { type: "idle" };
             break;
           }
-          case "document/canvas/backend/html/event/path-point/on-drag": {
+          case "document/canvas/backend/html/event/vertex/on-drag": {
             const {
               event: { movement: _movement },
             } = action;

@@ -85,8 +85,18 @@ export function SurfacePathEditor({ node_id }: { node_id: string }) {
                 top: d[1],
               }}
             >
-              <Extension a={a} b={cmath.vector2.add(a, ta)} />
-              <Extension a={b} b={cmath.vector2.add(b, tb)} />
+              <CurveControlExtension
+                vertex={s.a}
+                control="tb"
+                a={a}
+                b={cmath.vector2.add(a, ta)}
+              />
+              <CurveControlExtension
+                vertex={s.a}
+                control="ta"
+                a={b}
+                b={cmath.vector2.add(b, tb)}
+              />
               {/* preview the next ta - cannot be edited */}
               {a_point_is_last && (
                 <Extension
@@ -99,6 +109,39 @@ export function SurfacePathEditor({ node_id }: { node_id: string }) {
         );
       })}
     </div>
+  );
+}
+
+function CurveControlExtension({
+  vertex,
+  control,
+  a,
+  b,
+  ta,
+  tb,
+}: {
+  vertex: number;
+  control: "ta" | "tb";
+  //
+  a: cmath.Vector2;
+  b: cmath.Vector2;
+  ta?: cmath.Vector2;
+  tb?: cmath.Vector2;
+}) {
+  const editor = useSurfacePathEditor();
+  const bind = useGesture({
+    onDragStart: ({ event }) => {
+      // event.stopPropagation();
+      editor.onCurveControlPointDragStart(vertex, control);
+    },
+  });
+
+  return (
+    <>
+      {/* cursor point */}
+      <Point {...bind()} point={b} style={{ cursor: "pointer", zIndex: 99 }} />
+      <Curve a={a} b={b} ta={ta} tb={tb} />
+    </>
   );
 }
 
@@ -154,25 +197,25 @@ function VertexPoint({
       onHover: (s) => {
         // enter
         if (s.first) {
-          editor.onPointHover(index, "enter");
+          editor.onVertexHover(index, "enter");
         }
         // leave
         if (s.last) {
-          editor.onPointHover(index, "leave");
+          editor.onVertexHover(index, "leave");
         }
       },
       onPointerDown: ({ event }) => {
-        editor.onPointPointerDown(index);
+        editor.onVertexPointerDown(index);
       },
       onDragStart: (state) => {
         const { event } = state;
         event.stopPropagation();
-        editor.onPointDragStart(index);
+        editor.onVertexDragStart(index);
       },
       onDrag: (state) => {
         const { movement, distance, delta, initial, xy, event } = state;
         event.stopPropagation();
-        editor.onPointDrag({
+        editor.onVertexDrag({
           movement,
           distance,
           delta,
@@ -190,7 +233,7 @@ function VertexPoint({
         if (event.key === "Delete" || event.key === "Backspace") {
           event.stopPropagation();
           event.preventDefault();
-          editor.onPointDelete(index);
+          editor.onVertexDelete(index);
         }
       },
     },

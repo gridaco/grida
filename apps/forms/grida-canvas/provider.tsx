@@ -1929,8 +1929,8 @@ export function useSurfacePathEditor() {
   // offset of the points (node position)
   const offset: cmath.Vector2 = [node.left!, node.top!];
 
-  const onPointPointerDown = useCallback(
-    (index: number) => {
+  const onVertexPointerDown = useCallback(
+    (vertex: number) => {
       if (cursor_mode.type === "path") {
         return;
       }
@@ -1938,64 +1938,79 @@ export function useSurfacePathEditor() {
         type: "select-vertex",
         target: {
           node_id,
-          point_index: index,
+          vertex,
         },
       });
     },
     [dispatch, node_id]
   );
 
-  const onPointHover = useCallback(
-    (index: number, eventType: "enter" | "leave") => {
+  const onVertexHover = useCallback(
+    (vertex: number, eventType: "enter" | "leave") => {
       dispatch({
         type: "hover-vertex",
         event: eventType,
         target: {
           node_id,
-          point_index: index,
+          vertex,
         },
       });
     },
     [dispatch, node_id]
   );
 
-  const onPointDragStart = useCallback(
-    (index: number) => {
+  const onVertexDragStart = useCallback(
+    (vertex: number) => {
       dispatch({
-        type: "document/canvas/backend/html/event/path-point/on-drag-start",
-        index,
+        type: "document/canvas/backend/html/event/vertex/on-drag-start",
+        vertex,
       });
     },
     [dispatch]
   );
 
-  const onPointDrag = useCallback(
+  const onVertexDrag = useCallback(
     (event: TCanvasEventTargetDragGestureState) => {
       dispatch({
-        type: "document/canvas/backend/html/event/path-point/on-drag",
+        type: "document/canvas/backend/html/event/vertex/on-drag",
         event,
       });
     },
     [dispatch]
   );
 
-  const onPointDragEnd = useCallback(() => {
+  const onVertexDragEnd = useCallback(() => {
     dispatch({
-      type: "document/canvas/backend/html/event/path-point/on-drag-end",
+      type: "document/canvas/backend/html/event/vertex/on-drag-end",
     });
   }, [dispatch]);
 
-  const onPointDelete = useCallback(
-    (index: number) => {
+  const onVertexDelete = useCallback(
+    (vertex: number) => {
       dispatch({
         type: "delete-vertex",
         target: {
           node_id,
-          point_index: index,
+          vertex: vertex,
         },
       });
     },
     [node_id, dispatch]
+  );
+
+  const onCurveControlPointDragStart = useCallback(
+    (vertex: number, control: "ta" | "tb") => {
+      dispatch({
+        type: "document/surface/gesture/start",
+        gesture: {
+          type: "curve",
+          node_id,
+          control,
+          vertex,
+        },
+      });
+    },
+    [dispatch, node_id]
   );
 
   return useMemo(
@@ -2008,12 +2023,13 @@ export function useSurfacePathEditor() {
       selected_vertices,
       hovered_point,
       a_point,
-      onPointPointerDown,
-      onPointHover,
-      onPointDragStart,
-      onPointDrag,
-      onPointDragEnd,
-      onPointDelete,
+      onVertexPointerDown,
+      onVertexHover,
+      onVertexDragStart,
+      onVertexDrag,
+      onVertexDragEnd,
+      onVertexDelete,
+      onCurveControlPointDragStart,
     }),
     [
       //
@@ -2025,12 +2041,13 @@ export function useSurfacePathEditor() {
       selected_vertices,
       hovered_point,
       a_point,
-      onPointPointerDown,
-      onPointHover,
-      onPointDragStart,
-      onPointDrag,
-      onPointDragEnd,
-      onPointDelete,
+      onVertexPointerDown,
+      onVertexHover,
+      onVertexDragStart,
+      onVertexDrag,
+      onVertexDragEnd,
+      onVertexDelete,
+      onCurveControlPointDragStart,
     ]
   );
 }
