@@ -1,5 +1,6 @@
 import { SVGCommand, encodeSVGPath, SVGPathData } from "svg-pathdata";
 import type { grida } from "./index";
+import type { vn } from "./vn";
 import { cmath } from "@/grida-canvas/cmath";
 
 export namespace svg {
@@ -10,9 +11,7 @@ export namespace svg {
      * @param vn - Vector network to convert.
      * @returns The SVG path data string representing the vector network.
      */
-    export function fromVectorNetwork(
-      vn: grida.program.cg.vector_network.VectorNetwork
-    ) {
+    export function fromVectorNetwork(vn: vn.VectorNetwork) {
       const { vertices, segments } = vn;
 
       // Prepare path commands

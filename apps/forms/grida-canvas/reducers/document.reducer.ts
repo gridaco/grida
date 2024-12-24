@@ -29,6 +29,7 @@ import { cmath } from "../cmath";
 import { domapi } from "../domapi";
 import { getSnapTargets, snapMovementToObjects } from "./tools/snap";
 import nid from "./tools/id";
+import { vn } from "@/grida/vn";
 
 export default function documentReducer<S extends IDocumentEditorState>(
   state: S,
@@ -318,9 +319,9 @@ export default function documentReducer<S extends IDocumentEditorState>(
       break;
     }
     //
-    case "delete-point":
-    case "select-point":
-    case "hover-point": {
+    case "delete-vertex":
+    case "select-vertex":
+    case "hover-vertex": {
       return produce(state, (draft) => {
         const {
           target: { node_id, point_index },
@@ -328,30 +329,41 @@ export default function documentReducer<S extends IDocumentEditorState>(
         const node = document.__getNodeById(draft, node_id);
 
         switch (action.type) {
-          case "delete-point": {
+          case "delete-vertex": {
             if (node.type === "polyline" || node.type === "path") {
               switch (node.type) {
-                case "polyline":
-                  // TODO: update the node transform as the points are changed
-                  node.points.splice(point_index, 1);
+                case "polyline": {
+                  const vne = new vn.VectorNetworkEditor({
+                    vertices: node.points.map((p) => ({ p })),
+                    segments: [],
+                  });
+                  vne.deleteVertex(point_index);
+                  node.points = vne.value.vertices.map((v) => v.p);
                   break;
-                case "path":
-                  node.vectorNetwork.vertices.splice(point_index, 1);
-                  // TODO: also update the segments
+                }
+                case "path": {
+                  const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
+                  vne.deleteVertex(point_index);
+                  node.vectorNetwork = vne.value;
                   break;
+                }
               }
+
+              // TODO: update the node transform as the points are changed
             }
             break;
           }
-          case "select-point": {
+          case "select-vertex": {
             assert(draft.content_edit_mode?.type === "path");
+            draft.selection = [node_id];
             draft.content_edit_mode.selected_points = [point_index];
+            draft.content_edit_mode.a_point = point_index;
             break;
           }
-          case "hover-point": {
+          case "hover-vertex": {
             assert(
               draft.selection[0] === node_id,
-              "hovered point should be in the selected node"
+              "hovered vertex should be in the selected node"
             );
             switch (action.event) {
               case "enter":

@@ -151,19 +151,20 @@ export interface EditorDeleteAction {
 
 // #region [path]
 export type EditorPathAction =
-  | EditorDeletePointAction
-  | EditorSelectPointAction
+  | EditorDeleteVertexAction
+  | EditorSelectVertexAction
   | EditorHoverPointAction;
-export interface EditorDeletePointAction {
-  type: "delete-point";
+
+export interface EditorDeleteVertexAction {
+  type: "delete-vertex";
   target: {
     node_id: NodeID;
     point_index: number;
   };
 }
 
-export interface EditorSelectPointAction {
-  type: "select-point";
+export interface EditorSelectVertexAction {
+  type: "select-vertex";
   target: {
     node_id: NodeID;
     point_index: number;
@@ -171,7 +172,7 @@ export interface EditorSelectPointAction {
 }
 
 export interface EditorHoverPointAction {
-  type: "hover-point";
+  type: "hover-vertex";
   event: "enter" | "leave";
   target: {
     node_id: NodeID;

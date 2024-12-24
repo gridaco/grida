@@ -46,7 +46,7 @@ export function self_update_gesture_transform<S extends IDocumentEditorState>(
   if (draft.gesture.type === "draw") return;
   if (draft.gesture.type === "corner-radius") return;
   if (draft.gesture.type === "nudge") return; // nudge is not a transform gesture - only a virtual gesture
-  if (draft.gesture.type === "translate-point") return;
+  if (draft.gesture.type === "translate-vertex") return;
   if (draft.gesture.type === "curve") return;
 
   switch (draft.gesture.type) {

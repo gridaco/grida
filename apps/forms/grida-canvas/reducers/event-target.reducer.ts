@@ -36,6 +36,7 @@ import { cmath } from "../cmath";
 import { domapi } from "../domapi";
 import nid from "./tools/id";
 import { getDoubleclickTarget, getMarqueeSelection } from "./tools/target";
+import { vn } from "@/grida/vn";
 
 export default function eventTargetReducer<S extends IDocumentEditorState>(
   state: S,
@@ -237,79 +238,27 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                 node_id
               ) as grida.program.nodes.PathNode;
 
-              // if hovered point, do not add new point, but only connect the segment to it,.
+              const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
 
-              let b_point: number | null = null;
-              let closed = false;
-              if (hovered_point) {
-                b_point = hovered_point;
-                closed = true;
-              } else {
-                // relative position
-                const position = cmath.vector2.subtract(path_cursor_position, [
-                  node.left!,
-                  node.top!,
-                ]);
+              // relative position
+              const position =
+                typeof hovered_point === "number"
+                  ? node.vectorNetwork.vertices[hovered_point].p
+                  : cmath.vector2.subtract(path_cursor_position, [
+                      node.left!,
+                      node.top!,
+                    ]);
 
-                // add point
-                node.vectorNetwork.vertices.push({ p: position });
-                b_point = node.vectorNetwork.vertices.length - 1;
-              }
+              const next = vne.addVertex(position, a_point);
+              node.vectorNetwork = vne.value;
 
-              if (a_point !== b_point) {
-                const prev_segment_index =
-                  node.vectorNetwork.segments.length - 1;
-                // use the previous `-tb` as the `ta` of the new segment (if any)
-                const ta: cmath.Vector2 = cmath.vector2.invert(
-                  node.vectorNetwork.segments[prev_segment_index]?.tb ??
-                    cmath.vector2.zero
-                );
-
-                // if a (anchor point) is not defined, use the previous point as a
-                const a = a_point ?? b_point - 1;
-
-                node.vectorNetwork.segments.push({
-                  a: a,
-                  b: b_point,
-                  ta: ta,
-                  tb: cmath.vector2.zero,
-                });
-              }
-
-              if (!closed) {
-                draft.content_edit_mode.selected_points = [b_point];
-                draft.content_edit_mode.a_point = b_point;
-              }
+              draft.content_edit_mode.selected_points = [next];
+              draft.content_edit_mode.a_point = next;
 
               // ...
             } else {
               // create a new node
               const new_node_id = nid();
-              // ...
-              // const vector = {
-              //   type: "polyline",
-              //   name: "path",
-              //   id: new_node_id,
-              //   active: true,
-              //   locked: false,
-              //   position: "absolute",
-              //   left: 0,
-              //   top: 0,
-              //   opacity: 1,
-              //   width: 0,
-              //   height: 0,
-              //   rotation: 0,
-              //   zIndex: 0,
-              //   stroke: { type: "solid", color: { r: 0, g: 0, b: 0, a: 1 } },
-              //   strokeCap: "butt",
-              //   strokeWidth: 3,
-              //   points: [cmath.vector2.zero],
-              //   // paths: [],
-              //   // vectorNetwork: {
-              //   //   vertices: [{ p: cmath.vector2.zero }],
-              //   //   segments: [],
-              //   // },
-              // } satisfies grida.program.nodes.PolylineNode;
 
               const vector = {
                 type: "path",
@@ -883,7 +832,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             content_edit_mode.a_point = index;
 
             draft.gesture = {
-              type: "translate-point",
+              type: "translate-vertex",
               node_id: node_id,
               initial_verticies: verticies,
               initial_position: [node.left!, node.top!],
@@ -900,7 +849,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               event: { movement: _movement },
             } = action;
 
-            assert(draft.gesture.type === "translate-point");
+            assert(draft.gesture.type === "translate-vertex");
             const { tarnslate_with_axis_lock } = state.gesture_modifiers;
             const { initial_verticies, initial_position } = draft.gesture;
 

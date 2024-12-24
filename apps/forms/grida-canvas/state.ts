@@ -231,7 +231,7 @@ export type GestureDraw = {
  * This is only valid with content edit mode is "path"
  */
 export type GestureTranslatePoint = {
-  type: "translate-point";
+  type: "translate-vertex";
 
   /**
    * initial (snapshot) value of the points

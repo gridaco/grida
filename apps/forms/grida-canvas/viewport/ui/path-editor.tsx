@@ -8,7 +8,7 @@ import { svg } from "@/grida/svg";
 
 export function SurfacePathEditor({ node_id }: { node_id: string }) {
   const { debug, cursor_mode, content_offset } = useEventTarget();
-  const { offset, vertices, segments, a_point, curve, path_cursor_position } =
+  const { offset, vertices, segments, a_point, path_cursor_position } =
     useSurfacePathEditor();
   const transform = useNodeSurfaceTransfrom(node_id);
 
@@ -154,16 +154,15 @@ function VertexPoint({
       onHover: (s) => {
         // enter
         if (s.first) {
-          editor.onHoverPoint(index, "enter");
+          editor.onPointHover(index, "enter");
         }
         // leave
         if (s.last) {
-          editor.onHoverPoint(index, "leave");
+          editor.onPointHover(index, "leave");
         }
       },
       onPointerDown: ({ event }) => {
-        // event.stopPropagation();
-        editor.onSelectPoint(index);
+        editor.onPointPointerDown(index);
       },
       onDragStart: (state) => {
         const { event } = state;

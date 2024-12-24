@@ -1918,8 +1918,7 @@ export function useSurfacePathEditor() {
   const [state, dispatch] = __useInternal();
   assert(state.content_edit_mode && state.content_edit_mode.type === "path");
 
-  const curve = state.gesture.type === "curve" ? state.gesture : undefined;
-  const { hovered_point } = state;
+  const { hovered_point, cursor_mode } = state;
   const { node_id, selected_points, a_point, path_cursor_position } =
     state.content_edit_mode;
   const node = state.document.nodes[node_id] as
@@ -1938,10 +1937,13 @@ export function useSurfacePathEditor() {
   // offset of the points (node position)
   const offset: cmath.Vector2 = [node.left!, node.top!];
 
-  const onSelectPoint = useCallback(
+  const onPointPointerDown = useCallback(
     (index: number) => {
+      if (cursor_mode.type === "path") {
+        return;
+      }
       dispatch({
-        type: "select-point",
+        type: "select-vertex",
         target: {
           node_id,
           point_index: index,
@@ -1951,10 +1953,10 @@ export function useSurfacePathEditor() {
     [dispatch, node_id]
   );
 
-  const onHoverPoint = useCallback(
+  const onPointHover = useCallback(
     (index: number, eventType: "enter" | "leave") => {
       dispatch({
-        type: "hover-point",
+        type: "hover-vertex",
         event: eventType,
         target: {
           node_id,
@@ -1994,7 +1996,7 @@ export function useSurfacePathEditor() {
   const onPointDelete = useCallback(
     (index: number) => {
       dispatch({
-        type: "delete-point",
+        type: "delete-vertex",
         target: {
           node_id,
           point_index: index,
@@ -2010,13 +2012,12 @@ export function useSurfacePathEditor() {
       path_cursor_position,
       vertices,
       segments,
-      curve,
       offset,
       selected_points,
       hovered_point,
       a_point,
-      onSelectPoint,
-      onHoverPoint,
+      onPointPointerDown,
+      onPointHover,
       onPointDragStart,
       onPointDrag,
       onPointDragEnd,
@@ -2029,12 +2030,11 @@ export function useSurfacePathEditor() {
       vertices,
       segments,
       offset,
-      curve,
       selected_points,
       hovered_point,
       a_point,
-      onSelectPoint,
-      onHoverPoint,
+      onPointPointerDown,
+      onPointHover,
       onPointDragStart,
       onPointDrag,
       onPointDragEnd,
