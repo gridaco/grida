@@ -20,11 +20,11 @@ export default function useMeasurement() {
       return;
     }
 
-    const _a_rect = cmath.rect.getBoundingRect(
+    const _a_rect = cmath.rect.union(
       selection.map((id) => domapi.get_node_bounding_rect(id)!)
     );
     const a_rect = cmath.rect.translate(_a_rect, translate!);
-    const _b_rect = cmath.rect.getBoundingRect(
+    const _b_rect = cmath.rect.union(
       surface_measurement_target.map((id) => domapi.get_node_bounding_rect(id)!)
     );
     const b_rect = cmath.rect.translate(_b_rect!, translate!);

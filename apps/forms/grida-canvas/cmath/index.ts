@@ -914,10 +914,10 @@ export namespace cmath.rect {
    *   { x: 10, y: 10, width: 30, height: 40 },
    *   { x: 50, y: 20, width: 20, height: 30 },
    * ];
-   * const boundingRect = cmath.rect.getBoundingRect(rectangles);
-   * console.log(boundingRect); // { x: 10, y: 10, width: 60, height: 50 }
+   * const rect = cmath.rect.union(rectangles);
+   * console.log(rect); // { x: 10, y: 10, width: 60, height: 50 }
    */
-  export function getBoundingRect(rectangles: Rectangle[]): Rectangle {
+  export function union(rectangles: Rectangle[]): Rectangle {
     if (rectangles.length === 0) {
       throw new Error(
         "Cannot compute bounding rect for an empty array of rectangles."
@@ -963,7 +963,7 @@ export namespace cmath.rect {
     if (rectangles.length < 2) return rectangles;
 
     // Compute the bounding rectangle of all input rectangles
-    const boundingRect = getBoundingRect(rectangles);
+    const boundingRect = union(rectangles);
 
     return rectangles.map((rect) => {
       let newX = rect.x;
@@ -1099,7 +1099,7 @@ export namespace cmath.rect {
     if (rectangles.length < 2) return rectangles;
 
     // Calculate bounding box and total available size
-    const boundingBox = cmath.rect.getBoundingRect(rectangles);
+    const boundingBox = cmath.rect.union(rectangles);
     const start = axis === "x" ? boundingBox.x : boundingBox.y;
     const totalSize = axis === "x" ? boundingBox.width : boundingBox.height;
 

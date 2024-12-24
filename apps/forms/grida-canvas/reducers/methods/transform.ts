@@ -276,7 +276,7 @@ function __self_update_gesture_transform_scale(
     initial_rects,
   } = draft.gesture;
 
-  const initial_bounding_rectangle = cmath.rect.getBoundingRect(initial_rects);
+  const initial_bounding_rectangle = cmath.rect.union(initial_rects);
 
   // get the origin point based on handle
 

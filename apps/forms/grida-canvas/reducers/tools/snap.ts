@@ -11,7 +11,7 @@ export function snapMovementToObjects(
 ) {
   const [mx, my] = movement;
 
-  const bounding_rect = cmath.rect.getBoundingRect(selection);
+  const bounding_rect = cmath.rect.union(selection);
 
   const _virtually_moved_rect = cmath.rect.translate(bounding_rect, [mx, my]);
 

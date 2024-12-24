@@ -201,14 +201,14 @@ describe("cmath.rect", () => {
     });
   });
 
-  describe("getBoundingRect", () => {
-    it("should compute the bounding rectangle for multiple rectangles", () => {
+  describe("union", () => {
+    it("should compute the union rectangle for multiple rectangles", () => {
       const rectangles: cmath.Rectangle[] = [
         { x: 10, y: 10, width: 30, height: 40 },
         { x: 50, y: 20, width: 20, height: 30 },
         { x: 0, y: 5, width: 10, height: 10 },
       ];
-      const boundingRect = cmath.rect.getBoundingRect(rectangles);
+      const boundingRect = cmath.rect.union(rectangles);
       expect(boundingRect).toEqual({ x: 0, y: 5, width: 70, height: 45 });
     });
 
@@ -216,12 +216,12 @@ describe("cmath.rect", () => {
       const rectangles: cmath.Rectangle[] = [
         { x: 10, y: 20, width: 30, height: 40 },
       ];
-      const boundingRect = cmath.rect.getBoundingRect(rectangles);
+      const boundingRect = cmath.rect.union(rectangles);
       expect(boundingRect).toEqual({ x: 10, y: 20, width: 30, height: 40 });
     });
 
     it("should throw an error for an empty array of rectangles", () => {
-      expect(() => cmath.rect.getBoundingRect([])).toThrow(
+      expect(() => cmath.rect.union([])).toThrow(
         "Cannot compute bounding rect for an empty array of rectangles."
       );
     });

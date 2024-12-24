@@ -231,7 +231,7 @@ export function useGroupSurfaceTransform(...node_ids: string[]) {
       );
 
       // Calculate the bounding rectangle that encloses all node elements
-      const boundingRect = cmath.rect.getBoundingRect(
+      const boundingRect = cmath.rect.union(
         node_rects.map((rect) => ({
           x: rect.left,
           y: rect.top,
