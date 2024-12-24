@@ -276,6 +276,11 @@ export type GestureCurve = {
    * current movement of the drag
    */
   movement: cmath.Vector2;
+
+  /**
+   * rather to invert the movement
+   */
+  invert: boolean;
 };
 
 /**

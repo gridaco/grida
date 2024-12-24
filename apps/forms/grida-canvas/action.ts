@@ -506,9 +506,7 @@ export type EditorSurface_CursorMode = {
 
 export type EditorSurface_StartGesture = {
   type: "document/surface/gesture/start";
-  gesture: Pick<GestureCurve, "type" | "control" | "node_id"> & {
-    vertex: number;
-  };
+  gesture: Pick<GestureCurve, "type" | "control" | "node_id" | "segment">;
 };
 
 // #endregion surface action

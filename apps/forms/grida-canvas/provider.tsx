@@ -1999,14 +1999,14 @@ export function useSurfacePathEditor() {
   );
 
   const onCurveControlPointDragStart = useCallback(
-    (vertex: number, control: "ta" | "tb") => {
+    (segment: number, control: "ta" | "tb") => {
       dispatch({
         type: "document/surface/gesture/start",
         gesture: {
           type: "curve",
           node_id,
           control,
-          vertex,
+          segment,
         },
       });
     },

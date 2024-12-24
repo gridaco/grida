@@ -15,11 +15,6 @@ export function SurfacePathEditor({ node_id }: { node_id: string }) {
   const a_point_is_last = a_point === vertices.length - 1;
   const lastseg = segments[segments.length - 1];
 
-  // segments that are connected to the origin point
-  const neighboring_segments = segments.filter((s) => {
-    return s.a === a_point || s.b === a_point;
-  });
-
   return (
     <div id="path-editor-surface" className="fixed left-0 top-0 w-0 h-0 z-10">
       <div
@@ -68,11 +63,13 @@ export function SurfacePathEditor({ node_id }: { node_id: string }) {
           />
         </>
       )}
-      {neighboring_segments.map((s, i) => {
+      {segments.map((s, i) => {
         const a = vertices[s.a].p;
         const b = vertices[s.b].p;
         const ta = s.ta;
         const tb = s.tb;
+        const is_neighbouring = a_point === s.a || a_point === s.b;
+        if (!is_neighbouring) return <></>;
 
         const d = cmath.vector2.add(offset, content_offset);
 
@@ -86,14 +83,14 @@ export function SurfacePathEditor({ node_id }: { node_id: string }) {
               }}
             >
               <CurveControlExtension
-                vertex={s.a}
-                control="tb"
+                segment={i}
+                control="ta"
                 a={a}
                 b={cmath.vector2.add(a, ta)}
               />
               <CurveControlExtension
-                vertex={s.a}
-                control="ta"
+                segment={i}
+                control="tb"
                 a={b}
                 b={cmath.vector2.add(b, tb)}
               />
@@ -113,14 +110,14 @@ export function SurfacePathEditor({ node_id }: { node_id: string }) {
 }
 
 function CurveControlExtension({
-  vertex,
+  segment,
   control,
   a,
   b,
   ta,
   tb,
 }: {
-  vertex: number;
+  segment: number;
   control: "ta" | "tb";
   //
   a: cmath.Vector2;
@@ -131,8 +128,7 @@ function CurveControlExtension({
   const editor = useSurfacePathEditor();
   const bind = useGesture({
     onDragStart: ({ event }) => {
-      // event.stopPropagation();
-      editor.onCurveControlPointDragStart(vertex, control);
+      editor.onCurveControlPointDragStart(segment, control);
     },
   });
 

@@ -58,7 +58,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
     }
     case "document/surface/gesture/start": {
       const {
-        gesture: { node_id, vertex, control },
+        gesture: { node_id, segment, control },
       } = action;
 
       assert(state.content_edit_mode?.type === "path");
@@ -66,8 +66,9 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
 
       const gesture = getInitialCurveGesture(state, {
         node_id,
-        vertex,
+        segment,
         control,
+        invert: false,
       });
 
       return produce(state, (draft) => {

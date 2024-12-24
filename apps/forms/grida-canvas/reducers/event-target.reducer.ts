@@ -486,15 +486,28 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             break;
           }
           case "path": {
+            // [path tool, drag start]
             assert(state.content_edit_mode?.type === "path");
             const { node_id, selected_vertices } = state.content_edit_mode;
             assert(selected_vertices.length === 1);
             const vertex = selected_vertices[0];
 
+            const node = document.__getNodeById(
+              state,
+              node_id
+            ) as grida.program.nodes.PathNode;
+
+            const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
+            const segments = vne.findSegments(vertex);
+
+            assert(segments.length === 1);
+            const segment_idx = segments[0];
+
             const gesture = getInitialCurveGesture(state, {
               node_id,
-              vertex,
+              segment: segment_idx,
               control: "tb",
+              invert: true,
             });
 
             draft.gesture = gesture;
@@ -620,7 +633,8 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             case "curve": {
               //
               draft.gesture.movement = movement;
-              const { node_id, segment, initial, control } = draft.gesture;
+              const { node_id, segment, initial, control, invert } =
+                draft.gesture;
               // const { node_id } = draft.content_edit_mode!;
               const node = document.__getNodeById(
                 draft,
@@ -632,7 +646,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
               const tangentPos = cmath.vector2.add(
                 initial,
-                cmath.vector2.invert(movement)
+                invert ? cmath.vector2.invert(movement) : movement
               );
 
               vne.updateTangent(segment, control, tangentPos, true);
