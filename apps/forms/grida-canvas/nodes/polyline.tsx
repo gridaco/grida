@@ -1,8 +1,31 @@
 import React from "react";
-import type { grida } from "@/grida";
 import queryattributes from "./utils/attributes";
+import { grida } from "@/grida";
 import { svg } from "@/grida/svg";
 
+/**
+ * @deprecated - not ready - do not use in production
+ */
+interface PolylineNode
+  extends grida.program.nodes.i.IBaseNode,
+    grida.program.nodes.i.ISceneNode,
+    grida.program.nodes.i.IHrefable,
+    grida.program.nodes.i.IPositioning,
+    grida.program.nodes.i.IFixedDimension,
+    grida.program.nodes.i.IOpacity,
+    grida.program.nodes.i.IZIndex,
+    grida.program.nodes.i.IRotation,
+    grida.program.nodes.i.IFill,
+    grida.program.nodes.i.IStroke {
+  type: "polyline";
+  points: grida.program.cg.Vector2[];
+}
+
+/**
+ * @deprecated
+ *
+ * only for archive purposes
+ */
 export function SVGPolyLineWidget({
   width: _width,
   height: _height,
@@ -13,7 +36,8 @@ export function SVGPolyLineWidget({
   style,
   points,
   ...props
-}: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.PolylineNode>) {
+}: // @ts-expect-error
+grida.program.document.IComputedNodeReactRenderProps<PolylineNode>) {
   const width = Math.max(_width, 1);
   const height = Math.max(_height, 1);
 

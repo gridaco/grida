@@ -75,7 +75,6 @@ export function NodeElement<P extends Record<string, any>>({
       case "text":
       case "vector":
       case "path":
-      case "polyline":
       case "line":
       case "rectangle":
       case "component":
@@ -116,7 +115,6 @@ export function NodeElement<P extends Record<string, any>>({
     autoplay: node.autoplay,
     paths: node.paths,
     vectorNetwork: node.vectorNetwork,
-    points: node.points,
     opacity: node.opacity,
     zIndex: DEFAULT_ZINDEX ?? node.zIndex,
     position: DEFAULT_POSITION ?? node.position,

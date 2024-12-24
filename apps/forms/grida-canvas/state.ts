@@ -16,7 +16,7 @@ export type CursorMode =
     }
   | {
       type: "draw";
-      tool: "line" | "polyline";
+      tool: "line" | "pencil";
     }
   | {
       type: "path";
@@ -204,7 +204,7 @@ export type GestureDraw = {
    * - draw points
    */
   type: "draw";
-  mode: "line" | "polyline";
+  mode: "line" | "pencil";
 
   /**
    * origin point - relative to content space

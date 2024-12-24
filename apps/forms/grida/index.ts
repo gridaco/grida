@@ -1253,7 +1253,6 @@ export namespace grida {
         | HTMLRichTextNode
         | VectorNode
         | PathNode
-        | PolylineNode
         | LineNode
         | RectangleNode
         | EllipseNode
@@ -1276,7 +1275,6 @@ export namespace grida {
         | __TPrototypeNode<Omit<HTMLRichTextNode, __base_scene_node_properties>>
         | __TPrototypeNode<Omit<VectorNode, __base_scene_node_properties>>
         | __TPrototypeNode<Omit<PathNode, __base_scene_node_properties>>
-        | __TPrototypeNode<Omit<PolylineNode, __base_scene_node_properties>>
         | __TPrototypeNode<Omit<LineNode, __base_scene_node_properties>>
         | __TPrototypeNode<Omit<RectangleNode, __base_scene_node_properties>>
         | __TPrototypeNode<Omit<EllipseNode, __base_scene_node_properties>>
@@ -1323,7 +1321,6 @@ export namespace grida {
         Partial<TextNode> &
           Partial<VectorNode> &
           Partial<PathNode> &
-          Partial<PolylineNode> &
           Partial<LineNode> &
           Partial<RectangleNode> &
           Partial<ImageNode> &
@@ -1952,24 +1949,6 @@ export namespace grida {
          * @todo
          */
         vectorNetwork: vn.VectorNetwork;
-      }
-
-      /**
-       * @deprecated - not ready - do not use in production
-       */
-      export interface PolylineNode
-        extends i.IBaseNode,
-          i.ISceneNode,
-          i.IHrefable,
-          i.IPositioning,
-          i.IFixedDimension,
-          i.IOpacity,
-          i.IZIndex,
-          i.IRotation,
-          i.IFill,
-          i.IStroke {
-        type: "polyline";
-        points: cg.Vector2[];
       }
 
       /**

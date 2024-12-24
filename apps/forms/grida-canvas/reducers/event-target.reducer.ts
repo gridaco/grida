@@ -384,7 +384,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             const { cursor_position } = state;
 
             let vector:
-              | grida.program.nodes.PolylineNode
+              | grida.program.nodes.PathNode
               | grida.program.nodes.LineNode;
 
             const new_node_id = nid();
@@ -405,14 +405,14 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             } as const;
 
             switch (tool) {
-              case "polyline": {
+              case "pencil": {
                 vector = {
                   ...__base,
-                  type: "polyline",
-                  name: "polyline",
+                  type: "path",
+                  name: "path",
                   strokeWidth: 3,
-                  points: [cmath.vector2.zero],
-                } satisfies grida.program.nodes.PolylineNode;
+                  vectorNetwork: vn.polyline([cmath.vector2.zero]),
+                } satisfies grida.program.nodes.PathNode;
                 break;
               }
               case "line": {
@@ -424,11 +424,11 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
                 vector = {
                   ...__base,
-                  type: "polyline",
+                  type: "path",
                   name: "line",
                   strokeWidth: 1,
-                  points: [cmath.vector2.zero],
-                } satisfies grida.program.nodes.PolylineNode;
+                  vectorNetwork: vn.polyline([cmath.vector2.zero]),
+                } satisfies grida.program.nodes.PathNode;
                 break;
               }
             }
@@ -461,7 +461,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                 // self_selectNode(draft, "reset", vector.id);
                 self_clearSelection(draft);
                 break;
-              case "polyline":
+              case "pencil":
                 // clear selection for pencil mode
                 self_clearSelection(draft);
                 break;
@@ -490,7 +490,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         if (
           !(
             (draft.cursor_mode.type === "draw" &&
-              draft.cursor_mode.tool === "polyline") ||
+              draft.cursor_mode.tool === "pencil") ||
             draft.cursor_mode.type === "path"
           )
         ) {
@@ -551,7 +551,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               const node = document.__getNodeById(
                 draft,
                 node_id
-              ) as grida.program.nodes.PolylineNode;
+              ) as grida.program.nodes.PathNode;
 
               // take snapshot of the previous points
               const point = movement;
@@ -563,7 +563,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                   const b = point;
                   points_next = [a, b];
                   break;
-                case "polyline":
+                case "pencil":
                   points_next = [...points, point];
                   break;
               }
@@ -585,7 +585,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               );
               const dleta_shifted_pos = cmath.vector2.add(origin, delta);
 
-              node.points = delta_shifted_points;
+              node.vectorNetwork = vn.polyline(delta_shifted_points);
 
               // update the node position & dimension
               node.left = dleta_shifted_pos[0];
@@ -815,18 +815,16 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         const { content_edit_mode, gesture } = draft;
         assert(content_edit_mode && content_edit_mode.type === "path");
         const { node_id, selected_points } = content_edit_mode;
-        const node = document.__getNodeById(draft, node_id) as
-          | grida.program.nodes.PolylineNode
-          | grida.program.nodes.PathNode;
+        const node = document.__getNodeById(
+          draft,
+          node_id
+        ) as grida.program.nodes.PathNode;
 
         switch (action.type) {
           case "document/canvas/backend/html/event/path-point/on-drag-start": {
             const { index } = action;
 
-            const verticies =
-              node.type === "polyline"
-                ? node.points
-                : node.vectorNetwork.vertices.map((v) => v.p);
+            const verticies = node.vectorNetwork.vertices.map((v) => v.p);
 
             content_edit_mode.selected_points = [index];
             content_edit_mode.a_point = index;
@@ -881,15 +879,9 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             );
 
             // translate the point
-            switch (node.type) {
-              case "polyline":
-                node.points = delta_shifted_points;
-                break;
-              case "path":
-                node.vectorNetwork.vertices = delta_shifted_points.map((p) => ({
-                  p,
-                }));
-            }
+            node.vectorNetwork.vertices = delta_shifted_points.map((p) => ({
+              p,
+            }));
 
             // position & dimension
             const new_pos = cmath.vector2.add(initial_position, delta);

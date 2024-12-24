@@ -97,6 +97,22 @@ export namespace vn {
     segments: VectorNetworkSegment[];
   }
 
+  /**
+   * creates a vector network from a polyline points
+   * @param points points in the polyline
+   * @returns
+   */
+  export function polyline(points: Vector2[]): VectorNetwork {
+    const vertices = points.map((p) => ({ p }));
+    const segments = vertices.slice(0, -1).map((_, i) => ({
+      a: i,
+      b: i + 1,
+      ta: cmath.vector2.zero,
+      tb: cmath.vector2.zero,
+    }));
+    return { vertices, segments };
+  }
+
   export class VectorNetworkEditor {
     private vertices: VectorNetworkVertex[] = [];
     private segments: VectorNetworkSegment[] = [];

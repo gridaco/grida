@@ -328,7 +328,7 @@ export function useEditorHotKeys() {
   });
 
   useHotkeys("shift+p", () => {
-    setCursorMode({ type: "draw", tool: "polyline" });
+    setCursorMode({ type: "draw", tool: "pencil" });
   });
 
   useHotkeys("0, 1, 2, 3, 4, 5, 6, 7, 8, 9", (e) => {

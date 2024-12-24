@@ -137,7 +137,6 @@ export default function nodeReducer<
         assert(
           draft.type === "vector" ||
             draft.type === "path" ||
-            draft.type === "polyline" ||
             draft.type === "rectangle" ||
             draft.type === "ellipse" ||
             draft.type === "text" ||
@@ -177,7 +176,6 @@ export default function nodeReducer<
       case "node/change/stroke-cap": {
         assert(
           draft.type === "path" ||
-            draft.type === "polyline" ||
             draft.type === "line" ||
             draft.type === "rectangle" ||
             draft.type === "ellipse"

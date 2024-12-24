@@ -194,7 +194,6 @@ export default function initialNode(
       } satisfies grida.program.nodes.LineNode;
     }
     case "vector":
-    case "polyline":
     case "path":
     case "component":
     case "instance":

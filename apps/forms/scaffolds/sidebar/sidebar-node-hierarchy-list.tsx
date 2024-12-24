@@ -200,7 +200,6 @@ function NodeHierarchyItemIcon({
     case "ellipse":
       return <CircleIcon className={className} />;
     case "vector":
-    case "polyline":
     case "line":
     case "path":
       return <TransformIcon className={className} />;

@@ -330,24 +330,11 @@ export default function documentReducer<S extends IDocumentEditorState>(
 
         switch (action.type) {
           case "delete-vertex": {
-            if (node.type === "polyline" || node.type === "path") {
-              switch (node.type) {
-                case "polyline": {
-                  const vne = new vn.VectorNetworkEditor({
-                    vertices: node.points.map((p) => ({ p })),
-                    segments: [],
-                  });
-                  vne.deleteVertex(point_index);
-                  node.points = vne.value.vertices.map((v) => v.p);
-                  break;
-                }
-                case "path": {
-                  const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
-                  vne.deleteVertex(point_index);
-                  node.vectorNetwork = vne.value;
-                  break;
-                }
-              }
+            if (node.type === "path") {
+              const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
+              vne.deleteVertex(point_index);
+              node.vectorNetwork = vne.value;
+              break;
 
               // TODO: update the node transform as the points are changed
             }

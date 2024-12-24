@@ -13,11 +13,11 @@ const __supports: Record<string, ReadonlyArray<NodeType>> = {
   ],
   border: ["container", "component", "instance"],
   children: ["container", "component", "instance"],
-  stroke: ["path", "polyline", "line", "rectangle", "ellipse"],
+  stroke: ["path", "line", "rectangle", "ellipse"],
   /**
    * strokeCap value itself is supported by all istroke nodes, yet it should be visible to editor only for polyline and line nodes. (path-like nodes)
    */
-  strokeCap: ["path", "polyline", "line"],
+  strokeCap: ["path", "line"],
 } as const;
 
 export namespace supports {
