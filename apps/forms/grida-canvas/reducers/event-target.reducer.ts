@@ -573,9 +573,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               draft.gesture.points = vne.value.vertices.map((v) => v.p);
 
               // get the box of the points
-              const bb = cmath.rect.fromPoints(
-                vne.value.vertices.map((v) => v.p)
-              );
+              const bb = vne.getBBox();
 
               // delta is the x, y of the new bounding box - as it started from [0, 0]
               const delta: cmath.Vector2 = [bb.x, bb.y];
@@ -583,11 +581,11 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               // update the points with the delta (so the most left top point is to be [0, 0])
               vne.translate(cmath.vector2.invert(delta));
 
-              const dleta_shifted_pos = cmath.vector2.add(origin, delta);
+              const new_pos = cmath.vector2.add(origin, delta);
 
               // update the node position & dimension
-              node.left = dleta_shifted_pos[0];
-              node.top = dleta_shifted_pos[1];
+              node.left = new_pos[0];
+              node.top = new_pos[1];
               node.width = bb.width;
               node.height = bb.height;
 
@@ -858,38 +856,32 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
             const { initial_verticies, initial_position } = draft.gesture;
 
-            const bb_initial = cmath.rect.fromPoints(initial_verticies);
+            const vne = new vn.VectorNetworkEditor({
+              vertices: initial_verticies.map((p) => ({ p })),
+              segments: node.vectorNetwork.segments,
+            });
 
-            const points_next = initial_verticies.slice();
+            const bb_a = vne.getBBox();
+
             for (const i of content_edit_mode.selected_points) {
-              points_next[i] = cmath.vector2.add(
-                initial_verticies[i],
-                adj_movement
-              );
+              vne.translateVertex(i, adj_movement);
             }
 
-            const bb_next = cmath.rect.fromPoints(points_next);
+            const bb_b = vne.getBBox();
 
-            const delta = cmath.vector2.sub(
-              [bb_next.x, bb_next.y],
-              [bb_initial.x, bb_initial.y]
-            );
+            const delta = cmath.vector2.sub([bb_b.x, bb_b.y], [bb_a.x, bb_a.y]);
 
-            const delta_shifted_points = points_next.map((p) =>
-              cmath.vector2.add(p, cmath.vector2.invert(delta))
-            );
-
-            // translate the point
-            node.vectorNetwork.vertices = delta_shifted_points.map((p) => ({
-              p,
-            }));
+            vne.translate(cmath.vector2.invert(delta));
 
             // position & dimension
             const new_pos = cmath.vector2.add(initial_position, delta);
             node.left = new_pos[0];
             node.top = new_pos[1];
-            node.width = bb_next.width;
-            node.height = bb_next.height;
+            node.width = bb_b.width;
+            node.height = bb_b.height;
+
+            // update the node's vector network
+            node.vectorNetwork = vne.value;
 
             break;
           }

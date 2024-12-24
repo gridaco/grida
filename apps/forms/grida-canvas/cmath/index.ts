@@ -1301,8 +1301,11 @@ export namespace cmath.bezier {
    * @param tb - The end tangent (relative to `b`).
    * @returns The bounding box \(\{ x, y, width, height \}\) that encloses the entire cubic.
    */
-  export function toBBox(segment: CubicBezierSegment): Rectangle {
+  export function getBBox(segment: CubicBezierSegment): Rectangle {
     const { a, b, ta, tb } = segment;
+    if (ta[0] === 0 && ta[1] === 0 && tb[0] === 0 && tb[1] === 0) {
+      return cmath.rect.fromPoints([a, b]);
+    }
     const c1: Vector2 = [a[0] + ta[0], a[1] + ta[1]];
     const c2: Vector2 = [b[0] + tb[0], b[1] + tb[1]];
 

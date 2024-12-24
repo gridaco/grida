@@ -237,6 +237,14 @@ export namespace vn {
       this.vertices[i].p = p;
     }
 
+    translateVertex(i: number, delta: Vector2) {
+      if (i < 0 || i >= this.vertices.length) {
+        throw new Error(`Invalid vertex index: ${i}`);
+      }
+      const p = this.vertices[i].p;
+      this.vertices[i].p = [p[0] + delta[0], p[1] + delta[1]];
+    }
+
     translate(delta: Vector2) {
       this.vertices = this.vertices.map((v) => ({
         p: [v.p[0] + delta[0], v.p[1] + delta[1]],
@@ -365,7 +373,7 @@ export namespace vn {
       const { a: _a, b: _b, ta, tb } = seg;
       const a = vn.vertices[_a].p;
       const b = vn.vertices[_b].p;
-      const sb = cmath.bezier.toBBox({ a, b, ta, tb });
+      const sb = cmath.bezier.getBBox({ a, b, ta, tb });
       if (box.x === Infinity) {
         box = sb;
       } else {
