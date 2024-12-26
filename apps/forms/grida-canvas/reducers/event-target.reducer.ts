@@ -808,9 +808,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       });
       //
     }
-    case "document/canvas/backend/html/event/vertex/on-drag":
-    case "document/canvas/backend/html/event/vertex/on-drag-end":
-    case "document/canvas/backend/html/event/vertex/on-drag-start": {
+    case "document/canvas/backend/html/event/vertex/on-drag": {
       return produce(state, (draft) => {
         const { content_edit_mode } = draft;
         assert(content_edit_mode && content_edit_mode.type === "path");
@@ -821,27 +819,6 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         ) as grida.program.nodes.PathNode;
 
         switch (action.type) {
-          case "document/canvas/backend/html/event/vertex/on-drag-start": {
-            const { vertex: index } = action;
-
-            const verticies = node.vectorNetwork.vertices.map((v) => v.p);
-
-            content_edit_mode.selected_vertices = [index];
-            content_edit_mode.a_point = index;
-
-            draft.gesture = {
-              type: "translate-vertex",
-              node_id: node_id,
-              initial_verticies: verticies,
-              initial_position: [node.left!, node.top!],
-            };
-            break;
-          }
-          case "document/canvas/backend/html/event/vertex/on-drag-end": {
-            const {} = action;
-            draft.gesture = { type: "idle" };
-            break;
-          }
           case "document/canvas/backend/html/event/vertex/on-drag": {
             const {
               event: { movement: _movement },

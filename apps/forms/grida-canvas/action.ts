@@ -6,6 +6,7 @@ import type {
   GestureCurve,
   GestureRotate,
   GestureScale,
+  GestureTranslateVertex,
   IDocumentEditorState,
   SurfaceRaycastTargeting,
 } from "./state";
@@ -323,8 +324,6 @@ export type EventTargetAction =
   //
   | EditorEventTarget_NodeOverlayRotationHandle_Drag
   //
-  | EditorEventTarget_PathPoint_DragStart
-  | EditorEventTarget_PathPoint_DragEnd
   | EditorEventTarget_PathPoint_Drag;
 
 export type EditorEventTarget_PointerMove = {
@@ -441,13 +440,6 @@ export type EditorEventTarget_NodeOverlayRotationHandle_Drag = INodeID &
   };
 
 //
-export type EditorEventTarget_PathPoint_DragStart = IVertexIdx & {
-  type: "document/canvas/backend/html/event/vertex/on-drag-start";
-};
-
-export type EditorEventTarget_PathPoint_DragEnd = {
-  type: "document/canvas/backend/html/event/vertex/on-drag-end";
-};
 
 export type EditorEventTarget_PathPoint_Drag = ICanvasEventTargetDragEvent & {
   type: "document/canvas/backend/html/event/vertex/on-drag";
@@ -477,10 +469,11 @@ export type EditorSurface_CursorMode = {
 export type EditorSurface_StartGesture = {
   type: "surface/gesture/start";
   gesture:
-    | Pick<GestureCurve, "type" | "control" | "node_id" | "segment">
     | Pick<GestureScale, "type" | "direction" | "selection">
     | Pick<GestureRotate, "type" | "selection">
-    | Pick<GestureCornerRadius, "type" | "selection">;
+    | Pick<GestureCornerRadius, "type" | "node_id">
+    | Pick<GestureCurve, "type" | "control" | "node_id" | "segment">
+    | Pick<GestureTranslateVertex, "type" | "node_id" | "vertex">;
 };
 
 // #endregion surface action

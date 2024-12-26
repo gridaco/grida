@@ -1736,7 +1736,7 @@ export function useEventTarget() {
         type: "surface/gesture/start",
         gesture: {
           type: "corner-radius",
-          selection,
+          node_id: selection,
         },
       });
     },
@@ -1909,7 +1909,7 @@ export function useSurfacePathEditor() {
   // offset of the points (node position)
   const offset: cmath.Vector2 = [node.left!, node.top!];
 
-  const onVertexPointerDown = useCallback(
+  const selectVertex = useCallback(
     (vertex: number) => {
       if (cursor_mode.type === "path") {
         return;
@@ -1942,11 +1942,15 @@ export function useSurfacePathEditor() {
   const onVertexDragStart = useCallback(
     (vertex: number) => {
       dispatch({
-        type: "document/canvas/backend/html/event/vertex/on-drag-start",
-        vertex,
+        type: "surface/gesture/start",
+        gesture: {
+          type: "translate-vertex",
+          vertex,
+          node_id,
+        },
       });
     },
-    [dispatch]
+    [dispatch, node_id]
   );
 
   const onVertexDrag = useCallback(
@@ -1958,12 +1962,6 @@ export function useSurfacePathEditor() {
     },
     [dispatch]
   );
-
-  const onVertexDragEnd = useCallback(() => {
-    dispatch({
-      type: "document/canvas/backend/html/event/vertex/on-drag-end",
-    });
-  }, [dispatch]);
 
   const onVertexDelete = useCallback(
     (vertex: number) => {
@@ -2003,11 +2001,10 @@ export function useSurfacePathEditor() {
       selected_vertices,
       hovered_point,
       a_point,
-      onVertexPointerDown,
+      selectVertex,
       onVertexHover,
       onVertexDragStart,
       onVertexDrag,
-      onVertexDragEnd,
       onVertexDelete,
       onCurveControlPointDragStart,
     }),
@@ -2021,11 +2018,10 @@ export function useSurfacePathEditor() {
       selected_vertices,
       hovered_point,
       a_point,
-      onVertexPointerDown,
+      selectVertex,
       onVertexHover,
       onVertexDragStart,
       onVertexDrag,
-      onVertexDragEnd,
       onVertexDelete,
       onCurveControlPointDragStart,
     ]

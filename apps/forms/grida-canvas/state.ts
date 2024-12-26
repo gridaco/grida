@@ -135,7 +135,7 @@ export type GestureState =
   | GestureRotate
   | GestureCornerRadius
   | GestureDraw
-  | GestureTranslatePoint
+  | GestureTranslateVertex
   | GestureCurve;
 
 export type GestureIdle = {
@@ -203,7 +203,7 @@ export type GestureCornerRadius = {
    * - corner-radius
    */
   type: "corner-radius";
-  selection: string;
+  node_id: string;
   initial_bounding_rectangle: cmath.Rectangle | null;
 };
 
@@ -238,13 +238,18 @@ export type GestureDraw = {
  * @remarks
  * This is only valid with content edit mode is "path"
  */
-export type GestureTranslatePoint = {
+export type GestureTranslateVertex = {
   type: "translate-vertex";
 
   /**
    * initial (snapshot) value of the points
    */
   initial_verticies: cmath.Vector2[];
+
+  /**
+   * index of the vertex
+   */
+  vertex: number;
 
   node_id: string;
 

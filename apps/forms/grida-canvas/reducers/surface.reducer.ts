@@ -94,15 +94,15 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
           //
         }
         case "corner-radius": {
-          const { selection } = gesture;
+          const { node_id } = gesture;
 
           return produce(state, (draft) => {
-            self_selectNode(draft, "reset", selection);
+            self_selectNode(draft, "reset", node_id);
             draft.gesture = {
               type: "corner-radius",
               initial_bounding_rectangle:
-                domapi.get_node_bounding_rect(selection)!,
-              selection,
+                domapi.get_node_bounding_rect(node_id)!,
+              node_id: node_id,
             };
           });
         }
@@ -118,6 +118,33 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
               // TODO: the offset of rotation handle relative to the center of the rectangle
               offset: cmath.vector2.zero,
             });
+          });
+          //
+        }
+        case "translate-vertex": {
+          return produce(state, (draft) => {
+            const { vertex: index } = gesture;
+
+            const { content_edit_mode } = draft;
+            assert(content_edit_mode && content_edit_mode.type === "path");
+            const { node_id } = content_edit_mode;
+            const node = document.__getNodeById(
+              draft,
+              node_id
+            ) as grida.program.nodes.PathNode;
+
+            const verticies = node.vectorNetwork.vertices.map((v) => v.p);
+
+            content_edit_mode.selected_vertices = [index];
+            content_edit_mode.a_point = index;
+
+            draft.gesture = {
+              type: "translate-vertex",
+              node_id: node_id,
+              initial_verticies: verticies,
+              vertex: index,
+              initial_position: [node.left!, node.top!],
+            };
           });
           //
         }

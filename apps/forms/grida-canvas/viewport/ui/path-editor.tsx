@@ -185,6 +185,7 @@ function VertexPoint({
   point: cmath.Vector2;
   index: number;
 }) {
+  const { dragEnd } = useEventTarget();
   const editor = useSurfacePathEditor();
   const selected = editor.selected_vertices.includes(index);
   const hovered = editor.hovered_point === index;
@@ -201,7 +202,7 @@ function VertexPoint({
         }
       },
       onPointerDown: ({ event }) => {
-        editor.onVertexPointerDown(index);
+        editor.selectVertex(index);
       },
       onDragStart: (state) => {
         const { event } = state;
@@ -222,6 +223,7 @@ function VertexPoint({
       onDragEnd: (state) => {
         const { event } = state;
         event.stopPropagation();
+        dragEnd(event as PointerEvent);
       },
       onKeyDown: (state) => {
         const { event } = state;
