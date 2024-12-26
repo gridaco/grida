@@ -753,23 +753,6 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       //
     }
     // #endregion resize handle event
-
-    case "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-start": {
-      const { node_id } = action;
-
-      return produce(state, (draft) => {
-        self_selectNode(draft, "reset", node_id);
-        draft.gesture = {
-          type: "corner-radius",
-          initial_bounding_rectangle: domapi.get_node_bounding_rect(node_id)!,
-        };
-      });
-    }
-    case "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-end": {
-      return produce(state, (draft) => {
-        draft.gesture = { type: "idle" };
-      });
-    }
     case "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag": {
       const {
         node_id,

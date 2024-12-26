@@ -2,7 +2,9 @@ import type { Tokens } from "@/ast";
 import type { grida } from "@/grida";
 import type {
   CursorMode,
+  GestureCornerRadius,
   GestureCurve,
+  GestureRotate,
   GestureScale,
   IDocumentEditorState,
   SurfaceRaycastTargeting,
@@ -317,8 +319,6 @@ export type EventTargetAction =
   //
   | EditorEventTarget_NodeOverlayResizeHandle_Drag
   //
-  | EditorEventTarget_NodeOverlayCornerRadiusHandle_DragStart
-  | EditorEventTarget_NodeOverlayCornerRadiusHandle_DragEnd
   | EditorEventTarget_NodeOverlayCornerRadiusHandle_Drag
   //
   | EditorEventTarget_NodeOverlayRotationHandle_DragStart
@@ -429,16 +429,6 @@ export type EditorEventTarget_NodeOverlayResizeHandle_Drag =
     };
 
 //
-export type EditorEventTarget_NodeOverlayCornerRadiusHandle_DragStart =
-  INodeID & {
-    type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-start";
-  };
-
-export type EditorEventTarget_NodeOverlayCornerRadiusHandle_DragEnd =
-  INodeID & {
-    type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-end";
-  };
-
 export type EditorEventTarget_NodeOverlayCornerRadiusHandle_Drag = INodeID &
   ICanvasEventTargetDragEvent &
   ICanvasEventTargetResizeHandleEvent & {
@@ -498,7 +488,9 @@ export type EditorSurface_StartGesture = {
   type: "surface/gesture/start";
   gesture:
     | Pick<GestureCurve, "type" | "control" | "node_id" | "segment">
-    | Pick<GestureScale, "type" | "direction" | "selection">;
+    | Pick<GestureScale, "type" | "direction" | "selection">
+    | Pick<GestureRotate, "type" | "selection">
+    | Pick<GestureCornerRadius, "type" | "selection">;
 };
 
 // #endregion surface action

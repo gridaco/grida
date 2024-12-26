@@ -1730,20 +1730,14 @@ export function useEventTarget() {
   // #endregion drag resize handle
 
   // #region drag resize handle
-  const dragCornerRadiusHandleStart = useCallback(
-    (node_id: string) => {
+  const startCornerRadiusGesture = useCallback(
+    (selection: string) => {
       dispatch({
-        type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-start",
-        node_id,
-      });
-    },
-    [dispatch]
-  );
-  const dragCornerRadiusHandleEnd = useCallback(
-    (node_id: string) => {
-      dispatch({
-        type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-end",
-        node_id,
+        type: "surface/gesture/start",
+        gesture: {
+          type: "corner-radius",
+          selection,
+        },
       });
     },
     [dispatch]
@@ -1826,10 +1820,9 @@ export function useEventTarget() {
       content_edit_mode,
       //
       startScaleGesture,
-      dragResizeHandle,
+      startCornerRadiusGesture,
       //
-      dragCornerRadiusHandleStart,
-      dragCornerRadiusHandleEnd,
+      dragResizeHandle,
       dragCornerRadiusHandle,
       //
       dragRotationHandleStart,
@@ -1880,8 +1873,7 @@ export function useEventTarget() {
     startScaleGesture,
     dragResizeHandle,
     //
-    dragCornerRadiusHandleStart,
-    dragCornerRadiusHandleEnd,
+    startCornerRadiusGesture,
     dragCornerRadiusHandle,
     //
     dragRotationHandleStart,

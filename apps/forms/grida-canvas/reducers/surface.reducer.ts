@@ -8,6 +8,7 @@ import assert from "assert";
 import { cmath } from "../cmath";
 import { domapi } from "../domapi";
 import { grida } from "@/grida";
+import { self_selectNode } from "./methods";
 
 export default function surfaceReducer<S extends IDocumentEditorState>(
   state: S,
@@ -91,6 +92,19 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
             });
           });
           //
+        }
+        case "corner-radius": {
+          const { selection } = gesture;
+
+          return produce(state, (draft) => {
+            self_selectNode(draft, "reset", selection);
+            draft.gesture = {
+              type: "corner-radius",
+              initial_bounding_rectangle:
+                domapi.get_node_bounding_rect(selection)!,
+              selection,
+            };
+          });
         }
       }
     }

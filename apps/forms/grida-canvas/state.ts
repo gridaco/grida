@@ -203,6 +203,7 @@ export type GestureCornerRadius = {
    * - corner-radius
    */
   type: "corner-radius";
+  selection: string;
   initial_bounding_rectangle: cmath.Rectangle | null;
 };
 

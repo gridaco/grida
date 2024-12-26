@@ -465,40 +465,28 @@ function NodeOverlayCornerRadiusHandle({
   margin?: number;
   size?: number;
 }) {
-  const {
-    dragCornerRadiusHandleStart,
-    dragCornerRadiusHandleEnd,
-    dragCornerRadiusHandle,
-  } = useEventTarget();
+  const { startCornerRadiusGesture, dragCornerRadiusHandle, dragEnd } =
+    useEventTarget();
 
-  const bind = useSurfaceGesture(
-    {
-      onDragStart: (e) => {
-        e.event.stopPropagation();
-        dragCornerRadiusHandleStart(node_id);
-      },
-      onDragEnd: (e) => {
-        e.event.stopPropagation();
-        dragCornerRadiusHandleEnd(node_id);
-      },
-      onDrag: (e) => {
-        e.event.stopPropagation();
-        dragCornerRadiusHandle(node_id, anchor, {
-          delta: e.delta,
-          distance: e.distance,
-          movement: e.movement,
-          initial: e.initial,
-          xy: e.xy,
-        });
-      },
+  const bind = useSurfaceGesture({
+    onDragStart: (e) => {
+      e.event.stopPropagation();
+      startCornerRadiusGesture(node_id);
     },
-    {
-      eventOptions: {
-        passive: false,
-        capture: true,
-      },
-    }
-  );
+    onDragEnd: (e) => {
+      dragEnd(e.event as PointerEvent);
+    },
+    onDrag: (e) => {
+      e.event.stopPropagation();
+      dragCornerRadiusHandle(node_id, anchor, {
+        delta: e.delta,
+        distance: e.distance,
+        movement: e.movement,
+        initial: e.initial,
+        xy: e.xy,
+      });
+    },
+  });
 
   const node = useNode(node_id);
 
