@@ -31,6 +31,7 @@ export type EditorAction =
 
 export type DocumentAction =
   | EditorSelectAction
+  | EditorHoverAction
   | EditorBlurAction
   | EditorCopyCutPasteAction
   | EditorDeleteAction
@@ -119,6 +120,12 @@ export interface EditorSelectAction {
   selectors: Selector[];
 }
 
+export interface EditorHoverAction {
+  type: "hover";
+  event: "enter" | "leave";
+  target: NodeID;
+}
+
 export interface EditorBlurAction {
   type: "blur";
 }
@@ -168,7 +175,7 @@ export interface EditorDeleteAction {
 export type EditorPathAction =
   | EditorDeleteVertexAction
   | EditorSelectVertexAction
-  | EditorHoverPointAction;
+  | EditorHoverVertexAction;
 
 export interface EditorDeleteVertexAction {
   type: "delete-vertex";
@@ -180,7 +187,7 @@ export interface EditorSelectVertexAction {
   target: VertexQuery;
 }
 
-export interface EditorHoverPointAction {
+export interface EditorHoverVertexAction {
   type: "hover-vertex";
   event: "enter" | "leave";
   target: VertexQuery;
@@ -310,9 +317,6 @@ export type EventTargetAction =
   | EditorEventTarget_Drag
   | EditorEventTarget_DragEnd
   //
-  | EditorEventTarget_Node_PointerEnter
-  | EditorEventTarget_Node_PointerLeave
-  //
   | EditorEventTarget_NodeOverlay_Click
   | EditorEventTarget_NodeOverlay_DragStart
   | EditorEventTarget_NodeOverlay_DragEnd
@@ -374,16 +378,6 @@ export type EditorEventTarget_DragEnd = {
   type: "document/canvas/backend/html/event/on-drag-end";
   node_ids_from_area?: string[];
   shiftKey: boolean;
-};
-
-//
-
-export type EditorEventTarget_Node_PointerEnter = INodeID & {
-  type: "document/canvas/backend/html/event/node/on-pointer-enter";
-};
-
-export type EditorEventTarget_Node_PointerLeave = INodeID & {
-  type: "document/canvas/backend/html/event/node/on-pointer-leave";
 };
 
 //

@@ -186,8 +186,6 @@ function _reducer<S extends IDocumentEditorState>(
     case "document/canvas/backend/html/event/node-overlay/on-drag":
     case "document/canvas/backend/html/event/node-overlay/on-drag-end":
     case "document/canvas/backend/html/event/node-overlay/on-drag-start":
-    case "document/canvas/backend/html/event/node/on-pointer-enter":
-    case "document/canvas/backend/html/event/node/on-pointer-leave":
     case "document/canvas/backend/html/event/on-click":
     case "document/canvas/backend/html/event/on-double-click":
     case "document/canvas/backend/html/event/on-drag":

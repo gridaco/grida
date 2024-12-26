@@ -12,9 +12,6 @@ import type {
   EditorEventTarget_DragStart,
   EditorEventTarget_DragEnd,
   //
-  EditorEventTarget_Node_PointerEnter,
-  EditorEventTarget_Node_PointerLeave,
-  //
 } from "../action";
 import type { GestureDraw, IDocumentEditorState } from "../state";
 import { grida } from "@/grida";
@@ -762,21 +759,6 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       }
 
       break;
-    }
-    //
-    case "document/canvas/backend/html/event/node/on-pointer-enter": {
-      const { node_id } = <EditorEventTarget_Node_PointerEnter>action;
-      return produce(state, (draft) => {
-        draft.hovered_node_id = node_id;
-      });
-    }
-    case "document/canvas/backend/html/event/node/on-pointer-leave": {
-      const { node_id } = <EditorEventTarget_Node_PointerLeave>action;
-      return produce(state, (draft) => {
-        if (draft.hovered_node_id === node_id) {
-          draft.hovered_node_id = null;
-        }
-      });
     }
     //
     case "document/canvas/backend/html/event/node-overlay/on-click": {

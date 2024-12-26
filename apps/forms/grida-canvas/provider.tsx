@@ -177,24 +177,25 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
     [dispatch]
   );
 
-  const pointerEnterNode = useCallback(
-    (node_id: string) => {
+  const hoverNode = useCallback(
+    (node_id: string, event: "enter" | "leave") => {
       dispatch({
-        type: "document/canvas/backend/html/event/node/on-pointer-enter",
-        node_id,
+        type: "hover",
+        target: node_id,
+        event,
       });
     },
     [dispatch]
   );
 
-  const pointerLeaveNode = useCallback(
-    (node_id: string) => {
-      dispatch({
-        type: "document/canvas/backend/html/event/node/on-pointer-leave",
-        node_id,
-      });
-    },
-    [dispatch]
+  const hoverEnterNode = useCallback(
+    (node_id: string) => hoverNode(node_id, "enter"),
+    [hoverNode]
+  );
+
+  const hoverLeaveNode = useCallback(
+    (node_id: string) => hoverNode(node_id, "leave"),
+    [hoverNode]
   );
 
   const changeNodeProps = useCallback(
@@ -703,8 +704,9 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
     () => ({
       orderPushBack,
       orderBringFront,
-      pointerEnterNode,
-      pointerLeaveNode,
+      hoverNode,
+      hoverEnterNode,
+      hoverLeaveNode,
       toggleNodeActive,
       toggleNodeLocked,
       toggleNodeBold,

@@ -63,6 +63,24 @@ export default function documentReducer<S extends IDocumentEditorState>(
         self_clearSelection(draft);
       });
     }
+    case "hover": {
+      const { event, target } = action;
+      switch (event) {
+        case "enter": {
+          return produce(state, (draft) => {
+            draft.hovered_node_id = target;
+          });
+        }
+        case "leave": {
+          return produce(state, (draft) => {
+            if (draft.hovered_node_id === target) {
+              draft.hovered_node_id = null;
+            }
+          });
+        }
+      }
+      //
+    }
     case "copy":
     case "cut": {
       const { target } = action;

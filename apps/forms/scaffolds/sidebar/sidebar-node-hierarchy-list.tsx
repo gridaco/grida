@@ -101,7 +101,7 @@ export function NodeHierarchyList() {
   const {
     state: { document, document_ctx, selection, hovered_node_id },
     select,
-    pointerEnterNode,
+    hoverNode,
     toggleNodeLocked,
     toggleNodeActive,
   } = useDocument();
@@ -136,10 +136,10 @@ export function NodeHierarchyList() {
               }}
               icon={<NodeHierarchyItemIcon node={n} className="w-3.5 h-3.5" />}
               onPointerEnter={() => {
-                pointerEnterNode(n.id);
+                hoverNode(n.id, "enter");
               }}
               onPointerLeave={() => {
-                pointerEnterNode(n.id);
+                hoverNode(n.id, "leave");
               }}
             >
               <SidebarMenuItemLabel className="font-normal text-xs">
