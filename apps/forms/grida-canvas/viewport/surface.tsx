@@ -465,8 +465,7 @@ function NodeOverlayCornerRadiusHandle({
   margin?: number;
   size?: number;
 }) {
-  const { startCornerRadiusGesture, dragCornerRadiusHandle, dragEnd } =
-    useEventTarget();
+  const { startCornerRadiusGesture, drag, dragEnd } = useEventTarget();
 
   const bind = useSurfaceGesture({
     onDragStart: (e) => {
@@ -478,7 +477,7 @@ function NodeOverlayCornerRadiusHandle({
     },
     onDrag: (e) => {
       e.event.stopPropagation();
-      dragCornerRadiusHandle(node_id, anchor, {
+      drag({
         delta: e.delta,
         distance: e.distance,
         movement: e.movement,
@@ -526,37 +525,30 @@ function LayerOverlayRotationHandle({
   size?: number;
 }) {
   const { getNodeAbsoluteRotation } = useDocument();
-  const { startRotateGesture, dragRotationHandle, dragEnd } = useEventTarget();
+  const { startRotateGesture, dragEnd, drag } = useEventTarget();
 
   const rotation = getNodeAbsoluteRotation(node_id);
 
-  const bind = useSurfaceGesture(
-    {
-      onDragStart: (e) => {
-        e.event.stopPropagation();
-        startRotateGesture(node_id);
-      },
-      onDragEnd: (e) => {
-        dragEnd(e.event as PointerEvent);
-      },
-      onDrag: (e) => {
-        e.event.stopPropagation();
-        dragRotationHandle(node_id, anchor, {
-          delta: e.delta,
-          distance: e.distance,
-          movement: e.movement,
-          initial: e.initial,
-          xy: e.xy,
-        });
-      },
+  const bind = useSurfaceGesture({
+    onDragStart: (e) => {
+      e.event.stopPropagation();
+      startRotateGesture(node_id);
     },
-    {
-      eventOptions: {
-        passive: false,
-        capture: true,
-      },
-    }
-  );
+    onDragEnd: (e) => {
+      dragEnd(e.event as PointerEvent);
+    },
+    onDrag: (e) => {
+      e.event.stopPropagation();
+      const event = {
+        delta: e.delta,
+        distance: e.distance,
+        movement: e.movement,
+        initial: e.initial,
+        xy: e.xy,
+      };
+      drag(event);
+    },
+  });
 
   const anchor_initial_cursor_rotation = {
     nw: -45,
@@ -602,7 +594,7 @@ function LayerOverlayResizeHandle({
   anchor: "nw" | "ne" | "sw" | "se" | "n" | "e" | "s" | "w";
   size?: number;
 }) {
-  const { startScaleGesture, dragResizeHandle } = useEventTarget();
+  const { startScaleGesture, drag } = useEventTarget();
 
   const bind = useSurfaceGesture(
     {
@@ -624,7 +616,7 @@ function LayerOverlayResizeHandle({
       },
       onDrag: (e) => {
         e.event.stopPropagation();
-        dragResizeHandle(anchor, {
+        drag({
           delta: e.delta,
           distance: e.distance,
           movement: e.movement,

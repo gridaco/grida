@@ -1697,7 +1697,6 @@ export function useEventTarget() {
   );
   //
 
-  // #region drag resize handle
   const startScaleGesture = useCallback(
     (selection: string | string[], direction: cmath.CardinalDirection) => {
       dispatch({
@@ -1712,23 +1711,6 @@ export function useEventTarget() {
     [dispatch]
   );
 
-  const dragResizeHandle = useCallback(
-    (
-      direction: cmath.CardinalDirection,
-      event: TCanvasEventTargetDragGestureState
-    ) => {
-      requestAnimationFrame(() => {
-        dispatch({
-          type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag",
-          direction: direction,
-          event,
-        });
-      });
-    },
-    [dispatch]
-  );
-  // #endregion drag resize handle
-
   // #region drag resize handle
   const startCornerRadiusGesture = useCallback(
     (selection: string) => {
@@ -1742,26 +1724,8 @@ export function useEventTarget() {
     },
     [dispatch]
   );
-  const dragCornerRadiusHandle = useCallback(
-    (
-      node_id: string,
-      anchor: "nw" | "ne" | "sw" | "se",
-      event: TCanvasEventTargetDragGestureState
-    ) => {
-      requestAnimationFrame(() => {
-        dispatch({
-          type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag",
-          node_id,
-          direction: anchor,
-          event,
-        });
-      });
-    },
-    [dispatch]
-  );
   // #endregion drag resize handle
 
-  // #region drag rotate handle
   const startRotateGesture = useCallback(
     (selection: string) => {
       dispatch({
@@ -1774,25 +1738,6 @@ export function useEventTarget() {
     },
     [dispatch]
   );
-
-  const dragRotationHandle = useCallback(
-    (
-      node_id: string,
-      anchor: "nw" | "ne" | "sw" | "se",
-      event: TCanvasEventTargetDragGestureState
-    ) => {
-      requestAnimationFrame(() => {
-        dispatch({
-          type: "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag",
-          node_id,
-          direction: anchor,
-          event,
-        });
-      });
-    },
-    [dispatch]
-  );
-  // #endregion drag rotate handle
 
   return useMemo(() => {
     return {
@@ -1817,11 +1762,6 @@ export function useEventTarget() {
       startScaleGesture,
       startCornerRadiusGesture,
       startRotateGesture,
-      //
-      dragResizeHandle,
-      dragCornerRadiusHandle,
-      //
-      dragRotationHandle,
       //
       pointerMove,
       pointerDown,
@@ -1867,10 +1807,6 @@ export function useEventTarget() {
     startScaleGesture,
     startCornerRadiusGesture,
     startRotateGesture,
-    //
-    dragResizeHandle,
-    dragCornerRadiusHandle,
-    dragRotationHandle,
     //
     pointerMove,
     pointerDown,
@@ -1953,16 +1889,6 @@ export function useSurfacePathEditor() {
     [dispatch, node_id]
   );
 
-  const onVertexDrag = useCallback(
-    (event: TCanvasEventTargetDragGestureState) => {
-      dispatch({
-        type: "document/canvas/backend/html/event/vertex/on-drag",
-        event,
-      });
-    },
-    [dispatch]
-  );
-
   const onVertexDelete = useCallback(
     (vertex: number) => {
       dispatch({
@@ -2004,7 +1930,6 @@ export function useSurfacePathEditor() {
       selectVertex,
       onVertexHover,
       onVertexDragStart,
-      onVertexDrag,
       onVertexDelete,
       onCurveControlPointDragStart,
     }),
@@ -2021,7 +1946,6 @@ export function useSurfacePathEditor() {
       selectVertex,
       onVertexHover,
       onVertexDragStart,
-      onVertexDrag,
       onVertexDelete,
       onCurveControlPointDragStart,
     ]

@@ -316,15 +316,7 @@ export type EventTargetAction =
   | EditorEventTarget_NodeOverlay_Click
   | EditorEventTarget_NodeOverlay_DragStart
   | EditorEventTarget_NodeOverlay_DragEnd
-  | EditorEventTarget_NodeOverlay_Drag
-  //
-  | EditorEventTarget_NodeOverlayResizeHandle_Drag
-  //
-  | EditorEventTarget_NodeOverlayCornerRadiusHandle_Drag
-  //
-  | EditorEventTarget_NodeOverlayRotationHandle_Drag
-  //
-  | EditorEventTarget_PathPoint_Drag;
+  | EditorEventTarget_NodeOverlay_Drag;
 
 export type EditorEventTarget_PointerMove = {
   type: "document/canvas/backend/html/event/on-pointer-move";
@@ -418,32 +410,6 @@ export type EditorEventTarget_NodeOverlay_Drag = ISelection &
   ICanvasEventTargetDragEvent & {
     type: "document/canvas/backend/html/event/node-overlay/on-drag";
   };
-
-export type EditorEventTarget_NodeOverlayResizeHandle_Drag =
-  ICanvasEventTargetDragEvent &
-    ICanvasEventTargetResizeHandleEvent & {
-      type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag";
-    };
-
-//
-export type EditorEventTarget_NodeOverlayCornerRadiusHandle_Drag = INodeID &
-  ICanvasEventTargetDragEvent &
-  ICanvasEventTargetResizeHandleEvent & {
-    type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag";
-  };
-//
-
-export type EditorEventTarget_NodeOverlayRotationHandle_Drag = INodeID &
-  ICanvasEventTargetDragEvent &
-  ICanvasEventTargetResizeHandleEvent & {
-    type: "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag";
-  };
-
-//
-
-export type EditorEventTarget_PathPoint_Drag = ICanvasEventTargetDragEvent & {
-  type: "document/canvas/backend/html/event/vertex/on-drag";
-};
 
 // #region surface action
 export type SurfaceAction =

@@ -12,7 +12,6 @@ import type {
   EditorEventTarget_DragStart,
   EditorEventTarget_DragEnd,
   //
-  EditorEventTarget_NodeOverlayRotationHandle_Drag,
   EditorEventTarget_Node_PointerEnter,
   EditorEventTarget_Node_PointerLeave,
   //
@@ -549,7 +548,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
     }
     case "document/canvas/backend/html/event/on-drag": {
       const {
-        event: { movement },
+        event: { movement, delta },
       } = <EditorEventTarget_Drag>action;
       if (state.marquee) {
         return produce(state, (draft) => {
@@ -561,14 +560,17 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
           switch (draft.gesture.type) {
             // [insertion mode - resize after insertion]
             case "scale": {
-              assert(state.selection.length === 1);
-
               draft.gesture.movement = movement;
               self_update_gesture_transform(draft);
               break;
             }
             // this is to handle "immediately drag move node"
             case "translate": {
+              draft.gesture.movement = movement;
+              self_update_gesture_transform(draft);
+              break;
+            }
+            case "rotate": {
               draft.gesture.movement = movement;
               self_update_gesture_transform(draft);
               break;
@@ -664,7 +666,95 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               node.height = bb.height;
 
               node.vectorNetwork = vne.value;
+              break;
+              //
+            }
+            case "translate-vertex": {
+              const { content_edit_mode } = draft;
+              assert(content_edit_mode && content_edit_mode.type === "path");
+              const { node_id } = content_edit_mode;
+              const node = document.__getNodeById(
+                draft,
+                node_id
+              ) as grida.program.nodes.PathNode;
 
+              const {
+                event: { movement: _movement },
+              } = action;
+
+              assert(draft.gesture.type === "translate-vertex");
+              const { tarnslate_with_axis_lock } = state.gesture_modifiers;
+              // axis lock movement with dominant axis
+              const adj_movement =
+                tarnslate_with_axis_lock === "on"
+                  ? cmath.ext.movement.axisLockedByDominance(_movement)
+                  : _movement;
+
+              const { initial_verticies, initial_position } = draft.gesture;
+
+              const vne = new vn.VectorNetworkEditor({
+                vertices: initial_verticies.map((p) => ({ p })),
+                segments: node.vectorNetwork.segments,
+              });
+
+              const bb_a = vne.getBBox();
+
+              for (const i of content_edit_mode.selected_vertices) {
+                vne.translateVertex(i, adj_movement);
+              }
+
+              const bb_b = vne.getBBox();
+
+              const delta = cmath.vector2.sub(
+                [bb_b.x, bb_b.y],
+                [bb_a.x, bb_a.y]
+              );
+
+              vne.translate(cmath.vector2.invert(delta));
+
+              // position & dimension
+              const new_pos = cmath.vector2.add(initial_position, delta);
+              node.left = new_pos[0];
+              node.top = new_pos[1];
+              node.width = bb_b.width;
+              node.height = bb_b.height;
+
+              // update the node's vector network
+              node.vectorNetwork = vne.value;
+
+              break;
+            }
+            case "corner-radius": {
+              const { node_id } = draft.gesture;
+              const [dx, dy] = delta;
+              const d = -Math.round(dx);
+              const node = document.__getNodeById(draft, node_id);
+
+              if (!("cornerRadius" in node)) {
+                return;
+              }
+
+              // TODO: get accurate fixed width
+              // TODO: also handle by height
+              const fixed_width =
+                typeof node.width === "number" ? node.width : undefined;
+              const maxRaius = fixed_width ? fixed_width / 2 : undefined;
+
+              const nextRadius =
+                (typeof node.cornerRadius == "number" ? node.cornerRadius : 0) +
+                d;
+
+              const nextRadiusClamped = Math.floor(
+                Math.min(maxRaius ?? Infinity, Math.max(0, nextRadius))
+              );
+              draft.document.nodes[node_id] = nodeReducer(node, {
+                type: "node/change/cornerRadius",
+                // TODO: resolve by anchor
+                cornerRadius: nextRadiusClamped,
+                node_id,
+              });
+
+              break;
               //
             }
           }
@@ -734,138 +824,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       });
     }
     // #endregion drag event
-    // #region resize handle event
-    case "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag": {
-      const {
-        direction: handle,
-        event: { movement },
-      } = action;
-
-      return produce(state, (draft) => {
-        // cancel if invalid state
-        if (draft.gesture.type !== "scale") return;
-
-        draft.gesture.movement = movement;
-        self_update_gesture_transform(draft);
-      });
-      //
-    }
-    // #endregion resize handle event
-    case "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag": {
-      const {
-        node_id,
-        event: { delta, distance },
-      } = action;
-      const [dx, dy] = delta;
-      // cancel if invalid state
-      if (state.gesture.type !== "corner-radius") return state;
-
-      // const distance = Math.sqrt(dx * dx + dy * dy);
-      const d = -Math.round(dx);
-      return produce(state, (draft) => {
-        const node = document.__getNodeById(draft, node_id);
-
-        if (!("cornerRadius" in node)) {
-          return;
-        }
-
-        // TODO: get accurate fixed width
-        // TODO: also handle by height
-        const fixed_width =
-          typeof node.width === "number" ? node.width : undefined;
-        const maxRaius = fixed_width ? fixed_width / 2 : undefined;
-
-        const nextRadius =
-          (typeof node.cornerRadius == "number" ? node.cornerRadius : 0) + d;
-
-        const nextRadiusClamped = Math.floor(
-          Math.min(maxRaius ?? Infinity, Math.max(0, nextRadius))
-        );
-        draft.document.nodes[node_id] = nodeReducer(node, {
-          type: "node/change/cornerRadius",
-          // TODO: resolve by anchor
-          cornerRadius: nextRadiusClamped,
-          node_id,
-        });
-      });
-      //
-    }
-
     //
-    case "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag": {
-      const {
-        node_id,
-        direction: anchor,
-        event: { delta, movement },
-      } = <EditorEventTarget_NodeOverlayRotationHandle_Drag>action;
-
-      return produce(state, (draft) => {
-        // cancel if invalid state
-        if (draft.gesture.type !== "rotate") return;
-        draft.gesture.movement = movement;
-
-        self_update_gesture_transform(draft);
-      });
-      //
-    }
-    case "document/canvas/backend/html/event/vertex/on-drag": {
-      return produce(state, (draft) => {
-        const { content_edit_mode } = draft;
-        assert(content_edit_mode && content_edit_mode.type === "path");
-        const { node_id } = content_edit_mode;
-        const node = document.__getNodeById(
-          draft,
-          node_id
-        ) as grida.program.nodes.PathNode;
-
-        switch (action.type) {
-          case "document/canvas/backend/html/event/vertex/on-drag": {
-            const {
-              event: { movement: _movement },
-            } = action;
-
-            assert(draft.gesture.type === "translate-vertex");
-            const { tarnslate_with_axis_lock } = state.gesture_modifiers;
-            // axis lock movement with dominant axis
-            const adj_movement =
-              tarnslate_with_axis_lock === "on"
-                ? cmath.ext.movement.axisLockedByDominance(_movement)
-                : _movement;
-
-            const { initial_verticies, initial_position } = draft.gesture;
-
-            const vne = new vn.VectorNetworkEditor({
-              vertices: initial_verticies.map((p) => ({ p })),
-              segments: node.vectorNetwork.segments,
-            });
-
-            const bb_a = vne.getBBox();
-
-            for (const i of content_edit_mode.selected_vertices) {
-              vne.translateVertex(i, adj_movement);
-            }
-
-            const bb_b = vne.getBBox();
-
-            const delta = cmath.vector2.sub([bb_b.x, bb_b.y], [bb_a.x, bb_a.y]);
-
-            vne.translate(cmath.vector2.invert(delta));
-
-            // position & dimension
-            const new_pos = cmath.vector2.add(initial_position, delta);
-            node.left = new_pos[0];
-            node.top = new_pos[1];
-            node.width = bb_b.width;
-            node.height = bb_b.height;
-
-            // update the node's vector network
-            node.vectorNetwork = vne.value;
-
-            break;
-          }
-        }
-      });
-    }
 
     // #endregion [html backend] canvas event target
   }
