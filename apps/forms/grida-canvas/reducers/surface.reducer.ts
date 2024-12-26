@@ -106,6 +106,21 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
             };
           });
         }
+        case "rotate": {
+          const { selection } = gesture;
+
+          return produce(state, (draft) => {
+            self_selectNode(draft, "reset", selection);
+            self_start_gesture_rotate(draft, {
+              selection: selection,
+              initial_bounding_rectangle:
+                domapi.get_node_bounding_rect(selection)!,
+              // TODO: the offset of rotation handle relative to the center of the rectangle
+              offset: cmath.vector2.zero,
+            });
+          });
+          //
+        }
       }
     }
     // #endregion
@@ -157,4 +172,25 @@ function self_start_gesture_scale(
       }
     }
   }
+}
+
+function self_start_gesture_rotate(
+  draft: Draft<IDocumentEditorState>,
+  {
+    selection,
+    offset,
+    initial_bounding_rectangle,
+  }: {
+    selection: string;
+    initial_bounding_rectangle: cmath.Rectangle;
+    offset: cmath.Vector2;
+  }
+) {
+  draft.gesture = {
+    type: "rotate",
+    initial_bounding_rectangle: initial_bounding_rectangle,
+    offset: offset,
+    selection: selection,
+    movement: cmath.vector2.zero,
+  };
 }

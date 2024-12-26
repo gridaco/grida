@@ -526,8 +526,7 @@ function LayerOverlayRotationHandle({
   size?: number;
 }) {
   const { getNodeAbsoluteRotation } = useDocument();
-  const { dragRotationHandleStart, dragRotationHandle, dragRotationHandleEnd } =
-    useEventTarget();
+  const { startRotateGesture, dragRotationHandle, dragEnd } = useEventTarget();
 
   const rotation = getNodeAbsoluteRotation(node_id);
 
@@ -535,11 +534,10 @@ function LayerOverlayRotationHandle({
     {
       onDragStart: (e) => {
         e.event.stopPropagation();
-        dragRotationHandleStart(node_id);
+        startRotateGesture(node_id);
       },
       onDragEnd: (e) => {
-        e.event.stopPropagation();
-        dragRotationHandleEnd(node_id);
+        dragEnd(e.event as PointerEvent);
       },
       onDrag: (e) => {
         e.event.stopPropagation();

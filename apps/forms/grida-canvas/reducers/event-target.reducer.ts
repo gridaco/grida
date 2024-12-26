@@ -1,4 +1,4 @@
-import { original, produce, type Draft } from "immer";
+import { produce, type Draft } from "immer";
 
 import type {
   EventTargetAction,
@@ -13,8 +13,6 @@ import type {
   EditorEventTarget_DragEnd,
   //
   EditorEventTarget_NodeOverlayRotationHandle_Drag,
-  EditorEventTarget_NodeOverlayRotationHandle_DragEnd,
-  EditorEventTarget_NodeOverlayRotationHandle_DragStart,
   EditorEventTarget_Node_PointerEnter,
   EditorEventTarget_Node_PointerLeave,
   //
@@ -794,27 +792,6 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
     }
 
     //
-    case "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag-start": {
-      const { node_id } = <
-        EditorEventTarget_NodeOverlayRotationHandle_DragStart
-      >action;
-
-      return produce(state, (draft) => {
-        self_selectNode(draft, "reset", node_id);
-        self_start_gesture_rotate(draft, {
-          selection: node_id,
-          initial_bounding_rectangle: domapi.get_node_bounding_rect(node_id)!,
-          // TODO: the offset of rotation handle relative to the center of the rectangle
-          offset: cmath.vector2.zero,
-        });
-      });
-    }
-    case "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag-end": {
-      const {} = <EditorEventTarget_NodeOverlayRotationHandle_DragEnd>action;
-      return produce(state, (draft) => {
-        draft.gesture = { type: "idle" };
-      });
-    }
     case "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag": {
       const {
         node_id,
@@ -968,27 +945,6 @@ function self_maybe_end_gesture_translate(draft: Draft<IDocumentEditorState>) {
   draft.surface_measurement_targeting_locked = false;
   draft.gesture = { type: "idle" };
   draft.dropzone_node_id = undefined;
-}
-
-function self_start_gesture_rotate(
-  draft: Draft<IDocumentEditorState>,
-  {
-    selection,
-    offset,
-    initial_bounding_rectangle,
-  }: {
-    selection: string;
-    initial_bounding_rectangle: cmath.Rectangle;
-    offset: cmath.Vector2;
-  }
-) {
-  draft.gesture = {
-    type: "rotate",
-    initial_bounding_rectangle: initial_bounding_rectangle,
-    offset: offset,
-    selection: selection,
-    movement: cmath.vector2.zero,
-  };
 }
 
 /**

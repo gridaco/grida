@@ -1762,24 +1762,19 @@ export function useEventTarget() {
   // #endregion drag resize handle
 
   // #region drag rotate handle
-  const dragRotationHandleStart = useCallback(
-    (node_id: string) => {
+  const startRotateGesture = useCallback(
+    (selection: string) => {
       dispatch({
-        type: "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag-start",
-        node_id,
+        type: "surface/gesture/start",
+        gesture: {
+          type: "rotate",
+          selection,
+        },
       });
     },
     [dispatch]
   );
-  const dragRotationHandleEnd = useCallback(
-    (node_id: string) => {
-      dispatch({
-        type: "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag-end",
-        node_id,
-      });
-    },
-    [dispatch]
-  );
+
   const dragRotationHandle = useCallback(
     (
       node_id: string,
@@ -1821,12 +1816,11 @@ export function useEventTarget() {
       //
       startScaleGesture,
       startCornerRadiusGesture,
+      startRotateGesture,
       //
       dragResizeHandle,
       dragCornerRadiusHandle,
       //
-      dragRotationHandleStart,
-      dragRotationHandleEnd,
       dragRotationHandle,
       //
       pointerMove,
@@ -1871,13 +1865,11 @@ export function useEventTarget() {
     content_edit_mode,
     //
     startScaleGesture,
-    dragResizeHandle,
-    //
     startCornerRadiusGesture,
-    dragCornerRadiusHandle,
+    startRotateGesture,
     //
-    dragRotationHandleStart,
-    dragRotationHandleEnd,
+    dragResizeHandle,
+    dragCornerRadiusHandle,
     dragRotationHandle,
     //
     pointerMove,

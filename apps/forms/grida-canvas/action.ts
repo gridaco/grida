@@ -321,8 +321,6 @@ export type EventTargetAction =
   //
   | EditorEventTarget_NodeOverlayCornerRadiusHandle_Drag
   //
-  | EditorEventTarget_NodeOverlayRotationHandle_DragStart
-  | EditorEventTarget_NodeOverlayRotationHandle_DragEnd
   | EditorEventTarget_NodeOverlayRotationHandle_Drag
   //
   | EditorEventTarget_PathPoint_DragStart
@@ -435,14 +433,6 @@ export type EditorEventTarget_NodeOverlayCornerRadiusHandle_Drag = INodeID &
     type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag";
   };
 //
-
-export type EditorEventTarget_NodeOverlayRotationHandle_DragStart = INodeID & {
-  type: "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag-start";
-};
-
-export type EditorEventTarget_NodeOverlayRotationHandle_DragEnd = INodeID & {
-  type: "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag-end";
-};
 
 export type EditorEventTarget_NodeOverlayRotationHandle_Drag = INodeID &
   ICanvasEventTargetDragEvent &
