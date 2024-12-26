@@ -14,7 +14,7 @@ export function StrokeWidthControl({
       value={value}
       min={0}
       step={1}
-      className={WorkbenchUI.inputVariants({ size: "sm" })}
+      className={WorkbenchUI.inputVariants({ size: "xs" })}
       onChange={(e) => {
         const v = parseFloat(e.target.value);
         if (isNaN(v)) {

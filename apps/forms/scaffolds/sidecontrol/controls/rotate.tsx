@@ -12,7 +12,7 @@ export function RotateControl({
     <Input
       type="number"
       placeholder="0deg"
-      className={WorkbenchUI.inputVariants({ size: "sm" })}
+      className={WorkbenchUI.inputVariants({ size: "xs" })}
       value={value}
       onChange={(e) => {
         const value = parseFloat(e.target.value) || 0;

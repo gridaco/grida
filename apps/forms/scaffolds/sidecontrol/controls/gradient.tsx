@@ -150,7 +150,7 @@ function GradientStop({
 
           onValueChange?.({ ...stop, offset: v });
         }}
-        className={cn("flex-1", WorkbenchUI.inputVariants({ size: "sm" }))}
+        className={cn("flex-1", WorkbenchUI.inputVariants({ size: "xs" }))}
       />
       <div className="flex-[2]">
         <RGBAColorControl

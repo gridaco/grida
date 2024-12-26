@@ -12,7 +12,7 @@ export function AspectRatioControl({
     <Input
       value={value}
       onChange={(e) => onValueChange?.(parseFloat(e.target.value) || undefined)}
-      className={WorkbenchUI.inputVariants({ size: "sm" })}
+      className={WorkbenchUI.inputVariants({ size: "xs" })}
     />
   );
 }

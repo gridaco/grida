@@ -19,7 +19,7 @@ export function LayoutControl({
 }) {
   return (
     <Select value={value} onValueChange={onValueChange}>
-      <SelectTrigger className={WorkbenchUI.inputVariants({ size: "sm" })}>
+      <SelectTrigger className={WorkbenchUI.inputVariants({ size: "xs" })}>
         <SelectValue placeholder="Display" />
       </SelectTrigger>
       <SelectContent>

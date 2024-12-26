@@ -15,7 +15,7 @@ export function LineHeightControl({
       placeholder="inherit"
       min={1}
       step={1}
-      className={WorkbenchUI.inputVariants({ size: "sm" })}
+      className={WorkbenchUI.inputVariants({ size: "xs" })}
       onChange={(e) => {
         const v = parseFloat(e.target.value);
         if (isNaN(v)) {

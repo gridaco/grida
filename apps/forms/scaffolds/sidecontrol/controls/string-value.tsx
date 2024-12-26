@@ -235,7 +235,7 @@ function StringLiteralControl({
       disabled={disabled}
       maxLength={maxLength}
       onChange={(e) => onValueChange?.(e.target.value)}
-      className={WorkbenchUI.inputVariants({ size: "sm" })}
+      className={WorkbenchUI.inputVariants({ size: "xs" })}
     />
   );
 }

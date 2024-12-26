@@ -65,7 +65,7 @@ export function FontFamilyControl({
       align="start"
       className={cn(
         "overflow-hidden",
-        WorkbenchUI.inputVariants({ size: "sm" })
+        WorkbenchUI.inputVariants({ size: "xs" })
       )}
     />
   );

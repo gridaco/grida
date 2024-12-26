@@ -48,7 +48,7 @@ export function BorderControl({
           <div
             className={cn(
               "flex items-center gap-2 border cursor-default",
-              WorkbenchUI.inputVariants({ size: "sm" })
+              WorkbenchUI.inputVariants({ size: "xs" })
             )}
           >
             <RGBAChip rgba={value?.borderColor ?? { r: 0, g: 0, b: 0, a: 0 }} />
@@ -59,7 +59,7 @@ export function BorderControl({
           <div
             className={cn(
               "flex items-center gap-2 border cursor-default",
-              WorkbenchUI.inputVariants({ size: "sm" })
+              WorkbenchUI.inputVariants({ size: "xs" })
             )}
             onClick={onAddBorder}
           >
@@ -97,7 +97,7 @@ export function BorderControl({
               {/* TODO: individual handling */}
               <Input
                 type="number"
-                className={WorkbenchUI.inputVariants({ size: "sm" })}
+                className={WorkbenchUI.inputVariants({ size: "xs" })}
                 min={0}
                 value={
                   typeof value?.borderWidth === "number"

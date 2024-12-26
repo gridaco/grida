@@ -12,7 +12,7 @@ import {
 import { TextAlignControl } from "./controls/text-align";
 import { FontSizeControl } from "./controls/font-size";
 import { FontWeightControl } from "./controls/font-weight";
-import { HiddenControl } from "./controls/hidden";
+import { SwitchControl } from "./controls/switch";
 import { OpacityControl } from "./controls/opacity";
 import { HrefControl } from "./controls/href";
 import { CornerRadiusControl } from "./controls/corner-radius";
@@ -170,7 +170,7 @@ export function SelectedNodeProperties() {
           <DebugControls />
         </SidebarSection>
       )} */}
-      <SidebarSection className="border-b">
+      {/* <SidebarSection className="border-b">
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel className="w-full flex justify-between items-center">
             <div>
@@ -180,10 +180,13 @@ export function SelectedNodeProperties() {
             </div>
           </SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
-      </SidebarSection>
+      </SidebarSection> */}
       <SidebarSection className="border-b pb-4">
         <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Layer</SidebarSectionHeaderLabel>
+          <SidebarSectionHeaderLabel>
+            Layer
+            <small className="ms-2 font-mono">{id}</small>
+          </SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuSectionContent className="space-y-2">
           <PropertyLine className="items-center">
@@ -192,13 +195,13 @@ export function SelectedNodeProperties() {
           </PropertyLine>
           <PropertyLine className="items-center">
             <PropertyLineLabel>Active</PropertyLineLabel>
-            <HiddenControl value={active} onValueChange={selectedNode.active} />
+            <SwitchControl value={active} onValueChange={selectedNode.active} />
           </PropertyLine>
           <PropertyLine className="items-center">
             <PropertyLineLabel>
               <LockClosedIcon />
             </PropertyLineLabel>
-            <HiddenControl value={locked} onValueChange={selectedNode.locked} />
+            <SwitchControl value={locked} onValueChange={selectedNode.locked} />
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>

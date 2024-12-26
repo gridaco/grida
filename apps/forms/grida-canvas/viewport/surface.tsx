@@ -461,7 +461,7 @@ function LayerOverlayRotationHandle({
   size?: number;
 }) {
   const { getNodeAbsoluteRotation } = useDocument();
-  const { startRotateGesture, dragEnd, drag } = useEventTarget();
+  const { startRotateGesture } = useEventTarget();
 
   const rotation = getNodeAbsoluteRotation(node_id);
 

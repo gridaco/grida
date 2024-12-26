@@ -24,7 +24,7 @@ export function LengthControl({
           onValueChange(n);
         }
       }}
-      className={WorkbenchUI.inputVariants({ size: "sm" })}
+      className={WorkbenchUI.inputVariants({ size: "xs" })}
     />
   );
 }

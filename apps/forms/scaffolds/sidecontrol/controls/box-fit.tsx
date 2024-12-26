@@ -23,7 +23,7 @@ export function BoxFitControl({
         onValueChange?.(v as grida.program.cg.BoxFit);
       }}
     >
-      <SelectTrigger className={WorkbenchUI.inputVariants({ size: "sm" })}>
+      <SelectTrigger className={WorkbenchUI.inputVariants({ size: "xs" })}>
         <SelectValue placeholder="Fit" />
       </SelectTrigger>
       <SelectContent>

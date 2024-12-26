@@ -169,7 +169,6 @@ function VertexPoint({
   point: cmath.Vector2;
   index: number;
 }) {
-  const { drag, dragEnd } = useEventTarget();
   const editor = useSurfacePathEditor();
   const selected = editor.selected_vertices.includes(index);
   const hovered = editor.hovered_point === index;

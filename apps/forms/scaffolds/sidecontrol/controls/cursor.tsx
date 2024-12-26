@@ -20,7 +20,7 @@ export function CursorControl({
 
   return (
     <Select value={value} onValueChange={onValueChange}>
-      <SelectTrigger className={WorkbenchUI.inputVariants({ size: "sm" })}>
+      <SelectTrigger className={WorkbenchUI.inputVariants({ size: "xs" })}>
         <SelectValue placeholder="Select...">
           <div className="flex gap-1 items-center text-xs">
             <Image src={cursor.src} width={16} height={16} alt={cursor.label} />

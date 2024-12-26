@@ -29,7 +29,7 @@ export function RGBAColorControl({
         <div
           className={cn(
             "flex items-center border cursor-default",
-            WorkbenchUI.inputVariants({ size: "sm" })
+            WorkbenchUI.inputVariants({ size: "xs" })
           )}
         >
           <RGBAChip rgba={value} />

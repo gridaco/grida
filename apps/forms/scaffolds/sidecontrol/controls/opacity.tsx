@@ -18,7 +18,7 @@ export function OpacityControl({
     >
       <div className="flex-1">
         <Input
-          className={WorkbenchUI.inputVariants({ size: "sm" })}
+          className={WorkbenchUI.inputVariants({ size: "xs" })}
           value={value}
           type="number"
           min={0}

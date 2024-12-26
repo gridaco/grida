@@ -89,7 +89,7 @@ export function SrcControl({
       onClick={openFilePicker}
       className={cn(
         "flex items-center border cursor-default",
-        WorkbenchUI.inputVariants({ size: "sm" })
+        WorkbenchUI.inputVariants({ size: "xs" })
       )}
     >
       {value ? (

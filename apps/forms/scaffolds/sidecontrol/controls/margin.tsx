@@ -14,7 +14,7 @@ export function MarginControl({
       value={value}
       placeholder="inherit"
       step={1}
-      className={WorkbenchUI.inputVariants({ size: "sm" })}
+      className={WorkbenchUI.inputVariants({ size: "xs" })}
       onChange={(e) => {
         onValueChange?.(parseInt(e.target.value));
       }}

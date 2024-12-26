@@ -1,6 +1,6 @@
-import { Switch } from "@/components/ui/switch";
+import { Switch } from "./utils/switch";
 
-export function HiddenControl({
+export function SwitchControl({
   value,
   onValueChange,
 }: {

@@ -24,7 +24,7 @@ export function FontWeightControl({
         onValueChange?.(parseInt(v) as FontWeight);
       }}
     >
-      <SelectTrigger className={WorkbenchUI.inputVariants({ size: "sm" })}>
+      <SelectTrigger className={WorkbenchUI.inputVariants({ size: "xs" })}>
         <SelectValue placeholder="inherit" />
       </SelectTrigger>
       <SelectContent>

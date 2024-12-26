@@ -23,7 +23,7 @@ export function MainAxisAlignmentControl({
         onValueChange?.(v as grida.program.cg.MainAxisAlignment);
       }}
     >
-      <SelectTrigger className={WorkbenchUI.inputVariants({ size: "sm" })}>
+      <SelectTrigger className={WorkbenchUI.inputVariants({ size: "xs" })}>
         <SelectValue placeholder="Select..." />
       </SelectTrigger>
       <SelectContent>

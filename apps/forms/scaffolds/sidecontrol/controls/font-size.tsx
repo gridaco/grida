@@ -26,7 +26,7 @@ export function FontSizeControl({
           onValueChange?.(parseInt(e.target.value) || 1);
         }}
         className={cn(
-          WorkbenchUI.inputVariants({ size: "sm" }),
+          WorkbenchUI.inputVariants({ size: "xs" }),
           "overflow-hidden",
           "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
         )}

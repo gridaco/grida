@@ -15,7 +15,7 @@ export function NameControl({
         onValueChange?.(e.target.value);
       }}
       placeholder="Name"
-      className={WorkbenchUI.inputVariants({ size: "sm" })}
+      className={WorkbenchUI.inputVariants({ size: "xs" })}
     />
   );
 }

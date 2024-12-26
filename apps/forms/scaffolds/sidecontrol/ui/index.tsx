@@ -34,7 +34,7 @@ export function PropertyLine({
 
 export function PropertyLineLabel({ children }: React.PropsWithChildren<{}>) {
   return (
-    <Label className="text-muted-foreground h-8 min-w-16 w-16 flex items-center text-xs me-4 overflow-hidden">
+    <Label className="text-[11px] text-muted-foreground h-6 min-w-16 w-16 flex items-center me-4 overflow-hidden">
       <span className="text-ellipsis overflow-hidden">{children}</span>
     </Label>
   );
@@ -103,7 +103,7 @@ export function PropertyEnum({
 }) {
   return (
     <Select {...props}>
-      <SelectTrigger className={cn(WorkbenchUI.inputVariants({ size: "sm" }))}>
+      <SelectTrigger className={cn(WorkbenchUI.inputVariants({ size: "xs" }))}>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>

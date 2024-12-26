@@ -15,7 +15,7 @@ export function MaxlengthControl({
       type="number"
       placeholder={placeholder}
       min={0}
-      className={WorkbenchUI.inputVariants({ size: "sm" })}
+      className={WorkbenchUI.inputVariants({ size: "xs" })}
       value={value ?? ""}
       onChange={(e) => {
         const v = parseFloat(e.target.value);
