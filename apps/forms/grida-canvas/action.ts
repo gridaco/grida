@@ -317,8 +317,7 @@ export type EventTargetAction =
   | EditorEventTarget_Drag
   | EditorEventTarget_DragEnd
   //
-  | EditorEventTarget_NodeOverlay_Click
-  | EditorEventTarget_NodeOverlay_DragStart;
+  | EditorEventTarget_NodeOverlay_Click;
 
 export type EditorEventTarget_PointerMove = {
   type: "document/canvas/backend/html/event/on-pointer-move";
@@ -380,18 +379,9 @@ export type EditorEventTarget_DragEnd = {
 };
 
 //
-interface ICanvasEventTargetResizeHandleEvent {
-  direction: cmath.CardinalDirection;
-}
-
 export type EditorEventTarget_NodeOverlay_Click = ISelection &
   IHtmlBackendCanvasEventTargetPointerEvent & {
     type: "document/canvas/backend/html/event/node-overlay/on-click";
-  };
-
-export type EditorEventTarget_NodeOverlay_DragStart = ISelection &
-  ICanvasEventTargetDragEvent & {
-    type: "document/canvas/backend/html/event/node-overlay/on-drag-start";
   };
 
 // #region surface action

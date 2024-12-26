@@ -289,7 +289,7 @@ function GroupOverlay({
   selection: string[];
   readonly?: boolean;
 }) {
-  const { layerDragStart, drag, dragEnd, layerClick, cursor_mode } =
+  const { dragStart, drag, dragEnd, layerClick, cursor_mode } =
     useEventTarget();
   const transform = useGroupSurfaceTransform(...selection);
 
@@ -299,14 +299,14 @@ function GroupOverlay({
     {
       onPointerDown: (e) => {
         // if insert mode, the event should be passed to the master to start the insertion
-        if (cursor_mode.type !== "insert") {
+        if (cursor_mode.type !== "insert" && cursor_mode.type !== "draw") {
           // otherwise, it should be stopped here
           // stop propagation to prevent the master event target from changing the selection
           e.event.stopPropagation();
         }
       },
       onDragStart: (e) => {
-        layerDragStart(selection, e);
+        dragStart(e.event as PointerEvent);
         e.event.stopPropagation();
       },
       onDragEnd: (e) => {
@@ -379,7 +379,7 @@ function NodeOverlay({
   readonly?: boolean;
   zIndex?: number;
 }) {
-  const { layerDragStart, drag, dragEnd, cursor_mode } = useEventTarget();
+  const { dragStart, drag, dragEnd, cursor_mode } = useEventTarget();
   const transform = useNodeSurfaceTransfrom(node_id);
   const node = useNode(node_id);
 
@@ -399,7 +399,7 @@ function NodeOverlay({
         }
       },
       onDragStart: (e) => {
-        layerDragStart([node_id], e);
+        dragStart(e.event as PointerEvent);
         e.event.stopPropagation();
       },
       onDragEnd: (e) => {

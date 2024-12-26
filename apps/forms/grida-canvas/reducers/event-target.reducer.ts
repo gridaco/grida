@@ -780,12 +780,6 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         }
       });
     }
-    case "document/canvas/backend/html/event/node-overlay/on-drag-start": {
-      const { selection } = action;
-      return produce(state, (draft) => {
-        self_start_gesture_translate(draft);
-      });
-    }
     // #endregion drag event
     //
 

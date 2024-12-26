@@ -1674,16 +1674,6 @@ export function useEventTarget() {
     },
     [dispatch]
   );
-  const layerDragStart = useCallback(
-    (selection: string[], event: TCanvasEventTargetDragGestureState) => {
-      dispatch({
-        type: "document/canvas/backend/html/event/node-overlay/on-drag-start",
-        selection,
-        event,
-      });
-    },
-    [dispatch]
-  );
 
   //
 
@@ -1768,7 +1758,6 @@ export function useEventTarget() {
       drag,
       //
       layerClick,
-      layerDragStart,
       //
     };
   }, [
@@ -1811,7 +1800,6 @@ export function useEventTarget() {
     drag,
     //
     layerClick,
-    layerDragStart,
     //
   ]);
 }

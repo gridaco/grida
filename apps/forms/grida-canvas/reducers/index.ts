@@ -183,7 +183,6 @@ function _reducer<S extends IDocumentEditorState>(
       });
     }
     case "document/canvas/backend/html/event/node-overlay/on-click":
-    case "document/canvas/backend/html/event/node-overlay/on-drag-start":
     case "document/canvas/backend/html/event/on-click":
     case "document/canvas/backend/html/event/on-double-click":
     case "document/canvas/backend/html/event/on-drag":
