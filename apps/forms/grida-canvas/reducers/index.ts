@@ -186,8 +186,6 @@ function _reducer<S extends IDocumentEditorState>(
     case "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-end":
     case "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-start":
     case "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag":
-    case "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-end":
-    case "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-start":
     case "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag":
     case "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag-end":
     case "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag-start":

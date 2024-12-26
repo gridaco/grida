@@ -5,6 +5,9 @@ import type { IDocumentEditorState } from "../state";
 import { document } from "../document-query";
 import { getInitialCurveGesture } from "./tools/gesture";
 import assert from "assert";
+import { cmath } from "../cmath";
+import { domapi } from "../domapi";
+import { grida } from "@/grida";
 
 export default function surfaceReducer<S extends IDocumentEditorState>(
   state: S,
@@ -12,7 +15,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
 ): S {
   switch (action.type) {
     // #region [universal backend] canvas event target
-    case "document/surface/content-edit-mode/try-enter": {
+    case "surface/content-edit-mode/try-enter": {
       if (state.selection.length !== 1) break;
       const node_id = state.selection[0];
       const node = document.__getNodeById(state, node_id);
@@ -45,40 +48,99 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
 
       break;
     }
-    case "document/surface/content-edit-mode/try-exit": {
+    case "surface/content-edit-mode/try-exit": {
       return produce(state, (draft) => {
         draft.content_edit_mode = undefined;
       });
     }
-    case "document/surface/cursor-mode": {
+    case "surface/cursor-mode": {
       const { cursor_mode } = action;
       return produce(state, (draft) => {
         draft.cursor_mode = cursor_mode;
       });
     }
-    case "document/surface/gesture/start": {
-      const {
-        gesture: { node_id, segment, control },
-      } = action;
+    case "surface/gesture/start": {
+      const { gesture } = action;
+      switch (gesture.type) {
+        case "curve": {
+          const { node_id, segment, control } = gesture;
 
-      assert(state.content_edit_mode?.type === "path");
-      assert(state.content_edit_mode?.node_id === node_id);
+          assert(state.content_edit_mode?.type === "path");
+          assert(state.content_edit_mode?.node_id === node_id);
 
-      const gesture = getInitialCurveGesture(state, {
-        node_id,
-        segment,
-        control,
-        invert: false,
-      });
+          return produce(state, (draft) => {
+            draft.gesture = getInitialCurveGesture(state, {
+              node_id,
+              segment,
+              control,
+              invert: false,
+            });
+          });
+        }
+        case "scale": {
+          const { selection, direction } = gesture;
+          //
 
-      return produce(state, (draft) => {
-        draft.gesture = gesture;
-      });
+          return produce(state, (draft) => {
+            draft.content_edit_mode = undefined;
+            draft.hovered_node_id = null;
 
-      break;
+            self_start_gesture_scale(draft, {
+              selection: selection,
+              direction: direction,
+            });
+          });
+          //
+        }
+      }
     }
     // #endregion
   }
   //
   return state;
+}
+
+function self_start_gesture_scale(
+  draft: Draft<IDocumentEditorState>,
+  {
+    selection,
+    direction,
+  }: {
+    selection: string[];
+    direction: cmath.CardinalDirection;
+  }
+) {
+  if (selection.length === 0) return;
+  const rects = selection.map(
+    (node_id) => domapi.get_node_bounding_rect(node_id)!
+  );
+
+  draft.gesture = {
+    type: "scale",
+    initial_snapshot: JSON.parse(JSON.stringify(draft.document)),
+    initial_rects: rects,
+    movement: cmath.vector2.zero,
+    selection: selection,
+    direction: direction,
+  };
+
+  let i = 0;
+  for (const node_id of selection) {
+    const node = document.__getNodeById(draft, node_id);
+    const rect = rects[i++];
+
+    // once the node's measurement mode is set to fixed (from drag start), we may safely cast the width / height sa fixed number
+    // need to assign a fixed size if width or height is a variable length
+    const _node = node as grida.program.nodes.i.ICSSDimension;
+    if (typeof _node.width !== "number") {
+      _node.width = rect.width;
+    }
+    if (typeof _node.height !== "number") {
+      if (node.type === "line") {
+        _node.height = 0;
+      } else {
+        _node.height = rect.height;
+      }
+    }
+  }
 }

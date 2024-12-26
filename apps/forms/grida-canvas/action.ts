@@ -3,6 +3,7 @@ import type { grida } from "@/grida";
 import type {
   CursorMode,
   GestureCurve,
+  GestureScale,
   IDocumentEditorState,
   SurfaceRaycastTargeting,
 } from "./state";
@@ -314,8 +315,6 @@ export type EventTargetAction =
   | EditorEventTarget_NodeOverlay_DragEnd
   | EditorEventTarget_NodeOverlay_Drag
   //
-  | EditorEventTarget_NodeOverlayResizeHandle_DragStart
-  | EditorEventTarget_NodeOverlayResizeHandle_DragEnd
   | EditorEventTarget_NodeOverlayResizeHandle_Drag
   //
   | EditorEventTarget_NodeOverlayCornerRadiusHandle_DragStart
@@ -423,15 +422,6 @@ export type EditorEventTarget_NodeOverlay_Drag = ISelection &
     type: "document/canvas/backend/html/event/node-overlay/on-drag";
   };
 
-export type EditorEventTarget_NodeOverlayResizeHandle_DragStart = ISelection & {
-  type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-start";
-  direction: cmath.CardinalDirection;
-};
-
-export type EditorEventTarget_NodeOverlayResizeHandle_DragEnd = {
-  type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-end";
-};
-
 export type EditorEventTarget_NodeOverlayResizeHandle_Drag =
   ICanvasEventTargetDragEvent &
     ICanvasEventTargetResizeHandleEvent & {
@@ -492,21 +482,23 @@ export type SurfaceAction =
   | EditorSurface_StartGesture;
 
 export type EditorSurface_EnterContentEditMode = {
-  type: "document/surface/content-edit-mode/try-enter";
+  type: "surface/content-edit-mode/try-enter";
 };
 
 export type EditorSurface_ExitContentEditMode = {
-  type: "document/surface/content-edit-mode/try-exit";
+  type: "surface/content-edit-mode/try-exit";
 };
 
 export type EditorSurface_CursorMode = {
-  type: "document/surface/cursor-mode";
+  type: "surface/cursor-mode";
   cursor_mode: CursorMode;
 };
 
 export type EditorSurface_StartGesture = {
-  type: "document/surface/gesture/start";
-  gesture: Pick<GestureCurve, "type" | "control" | "node_id" | "segment">;
+  type: "surface/gesture/start";
+  gesture:
+    | Pick<GestureCurve, "type" | "control" | "node_id" | "segment">
+    | Pick<GestureScale, "type" | "direction" | "selection">;
 };
 
 // #endregion surface action

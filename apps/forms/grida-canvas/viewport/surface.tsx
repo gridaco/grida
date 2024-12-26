@@ -616,8 +616,7 @@ function LayerOverlayResizeHandle({
   anchor: "nw" | "ne" | "sw" | "se" | "n" | "e" | "s" | "w";
   size?: number;
 }) {
-  const { dragResizeHandleStart, dragResizeHandleEnd, dragResizeHandle } =
-    useEventTarget();
+  const { startScaleGesture, dragResizeHandle } = useEventTarget();
 
   const bind = useSurfaceGesture(
     {
@@ -635,11 +634,7 @@ function LayerOverlayResizeHandle({
       },
       onDragStart: (e) => {
         e.event.stopPropagation();
-        dragResizeHandleStart(selection, anchor);
-      },
-      onDragEnd: (e) => {
-        e.event.stopPropagation();
-        dragResizeHandleEnd();
+        startScaleGesture(selection, anchor);
       },
       onDrag: (e) => {
         e.event.stopPropagation();

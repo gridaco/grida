@@ -1456,7 +1456,7 @@ export function useEventTarget() {
   const setCursorMode = useCallback(
     (cursor_mode: CursorMode) => {
       dispatch({
-        type: "document/surface/cursor-mode",
+        type: "surface/cursor-mode",
         cursor_mode,
       });
     },
@@ -1559,13 +1559,13 @@ export function useEventTarget() {
    */
   const tryEnterContentEditMode = useCallback(() => {
     dispatch({
-      type: "document/surface/content-edit-mode/try-enter",
+      type: "surface/content-edit-mode/try-enter",
     });
   }, [dispatch]);
 
   const tryExitContentEditMode = useCallback(() => {
     dispatch({
-      type: "document/surface/content-edit-mode/try-exit",
+      type: "surface/content-edit-mode/try-exit",
     });
   }, [dispatch]);
 
@@ -1698,21 +1698,19 @@ export function useEventTarget() {
   //
 
   // #region drag resize handle
-  const dragResizeHandleStart = useCallback(
+  const startScaleGesture = useCallback(
     (selection: string | string[], direction: cmath.CardinalDirection) => {
       dispatch({
-        type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-start",
-        selection: Array.isArray(selection) ? selection : [selection],
-        direction,
+        type: "surface/gesture/start",
+        gesture: {
+          type: "scale",
+          selection: Array.isArray(selection) ? selection : [selection],
+          direction,
+        },
       });
     },
     [dispatch]
   );
-  const dragResizeHandleEnd = useCallback(() => {
-    dispatch({
-      type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-end",
-    });
-  }, [dispatch]);
 
   const dragResizeHandle = useCallback(
     (
@@ -1827,8 +1825,7 @@ export function useEventTarget() {
       is_node_scaling,
       content_edit_mode,
       //
-      dragResizeHandleStart,
-      dragResizeHandleEnd,
+      startScaleGesture,
       dragResizeHandle,
       //
       dragCornerRadiusHandleStart,
@@ -1880,8 +1877,7 @@ export function useEventTarget() {
     //
     content_edit_mode,
     //
-    dragResizeHandleStart,
-    dragResizeHandleEnd,
+    startScaleGesture,
     dragResizeHandle,
     //
     dragCornerRadiusHandleStart,
@@ -2001,7 +1997,7 @@ export function useSurfacePathEditor() {
   const onCurveControlPointDragStart = useCallback(
     (segment: number, control: "ta" | "tb") => {
       dispatch({
-        type: "document/surface/gesture/start",
+        type: "surface/gesture/start",
         gesture: {
           type: "curve",
           node_id,

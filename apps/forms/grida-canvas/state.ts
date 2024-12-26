@@ -130,52 +130,10 @@ interface IDocumentEditorTransformState {
 export type GestureState =
   | GestureIdle
   | GestureNudge
-  | {
-      // translate (move)
-      type: "translate";
-      selection: string[];
-      initial_selection: string[];
-      initial_snapshot: IDocumentState["document"];
-      initial_clone_ids: string[];
-      initial_rects: cmath.Rectangle[];
-      movement: cmath.Vector2;
-      is_currently_cloned: boolean;
-
-      /**
-       * surface snap guides - result of snap while translate (move) gesture
-       */
-      surface_snapping?: SnapResult;
-    }
-  | {
-      // scale (resize)
-      type: "scale";
-      selection: string[];
-      initial_snapshot: IDocumentState["document"];
-      initial_rects: cmath.Rectangle[];
-      direction: cmath.CardinalDirection;
-      /**
-       * raw movement - independent of the direction
-       */
-      movement: cmath.Vector2;
-
-      /**
-       * surface snap guides - result of snap while translate (move) gesture
-       */
-      surface_snapping?: SnapResult;
-    }
-  | {
-      // rotate
-      type: "rotate";
-      initial_bounding_rectangle: cmath.Rectangle | null;
-      // TODO: support multiple selection
-      selection: string;
-      offset: cmath.Vector2;
-      /**
-       * raw movement - independent of the offset
-       */
-      movement: cmath.Vector2;
-    }
-  | GestyreCornerRadius
+  | GestureTranslate
+  | GestureScale
+  | GestureRotate
+  | GestureCornerRadius
   | GestureDraw
   | GestureTranslatePoint
   | GestureCurve;
@@ -192,7 +150,55 @@ export type GestureNudge = {
   surface_snapping?: SnapResult;
 };
 
-export type GestyreCornerRadius = {
+export type GestureTranslate = {
+  // translate (move)
+  type: "translate";
+  selection: string[];
+  initial_selection: string[];
+  initial_snapshot: IDocumentState["document"];
+  initial_clone_ids: string[];
+  initial_rects: cmath.Rectangle[];
+  movement: cmath.Vector2;
+  is_currently_cloned: boolean;
+
+  /**
+   * surface snap guides - result of snap while translate (move) gesture
+   */
+  surface_snapping?: SnapResult;
+};
+
+export type GestureScale = {
+  // scale (resize)
+  type: "scale";
+  selection: string[];
+  initial_snapshot: IDocumentState["document"];
+  initial_rects: cmath.Rectangle[];
+  direction: cmath.CardinalDirection;
+  /**
+   * raw movement - independent of the direction
+   */
+  movement: cmath.Vector2;
+
+  /**
+   * surface snap guides - result of snap while translate (move) gesture
+   */
+  surface_snapping?: SnapResult;
+};
+
+export type GestureRotate = {
+  // rotate
+  type: "rotate";
+  initial_bounding_rectangle: cmath.Rectangle | null;
+  // TODO: support multiple selection
+  selection: string;
+  offset: cmath.Vector2;
+  /**
+   * raw movement - independent of the offset
+   */
+  movement: cmath.Vector2;
+};
+
+export type GestureCornerRadius = {
   /**
    * - corner-radius
    */

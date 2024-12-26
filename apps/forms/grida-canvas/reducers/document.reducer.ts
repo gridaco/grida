@@ -419,10 +419,10 @@ export default function documentReducer<S extends IDocumentEditorState>(
         self_clearSelection(draft);
       });
     }
-    case "document/surface/content-edit-mode/try-enter":
-    case "document/surface/content-edit-mode/try-exit":
-    case "document/surface/cursor-mode":
-    case "document/surface/gesture/start": {
+    case "surface/content-edit-mode/try-enter":
+    case "surface/content-edit-mode/try-exit":
+    case "surface/cursor-mode":
+    case "surface/gesture/start": {
       return surfaceReducer(state, action);
     }
     case "document/template/set/props": {

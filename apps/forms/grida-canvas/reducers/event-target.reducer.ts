@@ -737,25 +737,6 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
     }
     // #endregion drag event
     // #region resize handle event
-    case "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-start": {
-      const { selection, direction } = action;
-      //
-
-      return produce(state, (draft) => {
-        draft.content_edit_mode = undefined;
-        draft.hovered_node_id = null;
-
-        self_start_gesture_scale(draft, {
-          selection: selection,
-          direction: direction,
-        });
-      });
-    }
-    case "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-end": {
-      return produce(state, (draft) => {
-        draft.gesture = { type: "idle" };
-      });
-    }
     case "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag": {
       const {
         direction: handle,
@@ -973,51 +954,6 @@ function self_start_gesture_scale_draw_new_node(
     selection: [new_node_id],
     direction: "se",
   };
-}
-
-function self_start_gesture_scale(
-  draft: Draft<IDocumentEditorState>,
-  {
-    selection,
-    direction,
-  }: {
-    selection: string[];
-    direction: cmath.CardinalDirection;
-  }
-) {
-  if (selection.length === 0) return;
-  const rects = selection.map(
-    (node_id) => domapi.get_node_bounding_rect(node_id)!
-  );
-
-  draft.gesture = {
-    type: "scale",
-    initial_snapshot: JSON.parse(JSON.stringify(draft.document)),
-    initial_rects: rects,
-    movement: cmath.vector2.zero,
-    selection: selection,
-    direction: direction,
-  };
-
-  let i = 0;
-  for (const node_id of selection) {
-    const node = document.__getNodeById(draft, node_id);
-    const rect = rects[i++];
-
-    // once the node's measurement mode is set to fixed (from drag start), we may safely cast the width / height sa fixed number
-    // need to assign a fixed size if width or height is a variable length
-    const _node = node as grida.program.nodes.i.ICSSDimension;
-    if (typeof _node.width !== "number") {
-      _node.width = rect.width;
-    }
-    if (typeof _node.height !== "number") {
-      if (node.type === "line") {
-        _node.height = 0;
-      } else {
-        _node.height = rect.height;
-      }
-    }
-  }
 }
 
 function self_start_gesture_translate(draft: Draft<IDocumentEditorState>) {
