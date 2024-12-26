@@ -168,11 +168,11 @@ export function NodeElement<P extends Record<string, any>>({
             // hard override user-select
             userSelect: document.editable ? "none" : undefined,
             // hide this node when in surface edit mode
-            visibility: selected
-              ? document.content_edit_mode?.type === "text"
+            visibility:
+              document.content_edit_mode?.type === "text" &&
+              document.content_edit_mode.node_id === node_id
                 ? "hidden"
-                : undefined
-              : undefined,
+                : undefined,
           } satisfies React.CSSProperties,
         } satisfies grida.program.document.IComputedNodeReactRenderProps<any>,
         computedchildren

@@ -30,7 +30,7 @@ export type Marquee = {
 };
 
 const DEFAULT_RAY_TARGETING: SurfaceRaycastTargeting = {
-  target: "next",
+  target: "auto",
   ignores_root: true,
   ignores_locked: true,
 };
@@ -38,20 +38,22 @@ const DEFAULT_RAY_TARGETING: SurfaceRaycastTargeting = {
 export type SurfaceRaycastTargeting = {
   /**
    * Determines how the target node is selected:
+   * - `auto` => selects the shallowest, while selecting the siblings first
    * - `deepest` => Selects the deepest (nested) node.
    * - `shallowest` => Selects the shallowest (root) node.
-   * - `next` => Selects the next non-ignored shallowest node. (if the shallowest node is ignored and next is available)
    *
-   * @default "next"
+   * @default "auto"
    */
-  target: "deepest" | "shallowest" | "next";
+  target: "auto" | "deepest" | "shallowest";
 
   /**
+   * ignores the root node from the targeting
    * @default true
    */
   ignores_root: boolean;
 
   /**
+   * ignores the locked node from the targeting
    * @default true
    */
   ignores_locked: boolean;

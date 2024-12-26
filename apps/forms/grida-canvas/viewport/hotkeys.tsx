@@ -66,7 +66,7 @@ export function useEditorHotKeys() {
       switch (e.key) {
         case "Meta":
         case "Control":
-          configureSurfaceRaycastTargeting({ target: "next" });
+          configureSurfaceRaycastTargeting({ target: "auto" });
           break;
         case "Alt":
           configureMeasurement("off");

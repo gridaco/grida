@@ -3,70 +3,80 @@ import type {
   SurfaceRaycastTargeting,
 } from "@/grida-canvas/state";
 import { document } from "../../document-query";
-import { grida } from "@/grida";
 
 export function getSurfaceRayTarget(
-  node_ids_from_point: string[],
+  hits: string[],
   {
     config,
     context,
   }: {
     config: SurfaceRaycastTargeting;
     context: IDocumentEditorState;
-  }
+  },
+  nested_first: boolean = false
 ): string | null {
   const {
+    selection,
     document: { root_id, nodes },
   } = context;
 
   // Filter the nodes based on the configuration
-  const filteredNodes = node_ids_from_point.filter((node_id) => {
-    if (config.ignores_root && node_id === root_id) {
-      return false; // Ignore the root node if configured
+  const filtered = hits
+    .filter((node_id) => {
+      if (config.ignores_root && node_id === root_id) {
+        return false; // Ignore the root node if configured
+      }
+
+      const node = nodes[node_id];
+
+      if (!node) {
+        // ensure target exists in current document (this can happen since the hover is triggered from the event target, where the new document state is not applied yet)
+        return false; // Ignore nodes that don't exist
+      }
+
+      if (config.ignores_locked && node.locked) {
+        return false; // Ignore locked nodes if configured
+      }
+
+      return true; // Include this node
+    })
+    .sort((a, b) => {
+      return (
+        document.getDepth(context.document_ctx, a) -
+        document.getDepth(context.document_ctx, b)
+      );
+    });
+
+  switch (config.target) {
+    case "auto": {
+      const selection_sibling_ids = new Set(
+        selection
+          .map((node_id) => document.getSiblings(context.document_ctx, node_id))
+          .flat()
+      );
+
+      filtered.sort((a, b) => {
+        if (selection.includes(a)) {
+          return -2;
+        }
+
+        if (selection_sibling_ids.has(a)) {
+          return -1;
+        }
+
+        const a_parent = document.getParentId(context.document_ctx, a);
+        if (a_parent && selection.includes(a_parent)) {
+          return nested_first ? -3 : 0;
+        }
+
+        return 0;
+      });
+      return filtered[0]; // shallowest node
     }
-
-    const node = nodes[node_id];
-
-    if (!node) {
-      // ensure target exists in current document (this can happen since the hover is triggered from the event target, where the new document state is not applied yet)
-      return false; // Ignore nodes that don't exist
-    }
-
-    if (config.ignores_locked && node.locked) {
-      return false; // Ignore locked nodes if configured
-    }
-
-    return true; // Include this node
-  });
-
-  // Select the target based on the configuration
-  if (config.target === "deepest") {
-    return filteredNodes[0]; // Deepest node (first in the array)
-  }
-
-  if (config.target === "shallowest") {
-    return filteredNodes[filteredNodes.length - 1]; // Shallowest node (last in the array)
-  }
-
-  if (config.target === "next") {
-    // "Next" logic: find the shallowest node above the deepest one
-    const deepestNode = filteredNodes[0];
-    if (!deepestNode) return null;
-
-    // Get the parent of the deepest node
-    const parentNodeId = document.getAncestors(
-      context.document_ctx,
-      deepestNode
-    )[1];
-    if (!parentNodeId) return deepestNode; // If no parent, fallback to the deepest node
-
-    // Ensure the parent is part of the filtered nodes
-    if (filteredNodes.includes(parentNodeId)) {
-      return parentNodeId;
-    }
-
-    // Fallback to the deepest node if no valid parent is found
-    return deepestNode;
+    case "deepest":
+      return filtered.reverse()[0]; // Deepest node (first in the array)
+    case "shallowest":
+      return filtered[0]; // Shallowest node (last in the array)
   }
 
   // If no valid node is found, return null
@@ -107,22 +117,4 @@ export function getMarqueeSelection(
   });
 
   return target_node_ids;
-}
-
-export function getDoubleclickTarget(
-  state: IDocumentEditorState,
-  hits: string[],
-  current: string
-): string | undefined {
-  return Array.from(hits)
-    .reverse()
-    .find((hit_id) => {
-      const hit = document.__getNodeById(state, hit_id);
-      if (hit.locked) return false; // ignore locked
-
-      const ancestors = document.getAncestors(state.document_ctx, hit_id);
-      if (ancestors.includes(current)) {
-        return hit_id;
-      }
-    });
 }

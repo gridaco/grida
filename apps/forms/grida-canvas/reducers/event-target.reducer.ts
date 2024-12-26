@@ -29,7 +29,7 @@ import {
 import { cmath } from "../cmath";
 import { domapi } from "../domapi";
 import nid from "./tools/id";
-import { getDoubleclickTarget, getMarqueeSelection } from "./tools/target";
+import { getMarqueeSelection, getSurfaceRayTarget } from "./tools/target";
 import { vn } from "@/grida/vn";
 import { getInitialCurveGesture } from "./tools/gesture";
 
@@ -176,10 +176,13 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         }
 
         // find the next descendant node (deepest first) relative to the selection
-        const next = getDoubleclickTarget(
-          state,
+        const next = getSurfaceRayTarget(
           surface_raycast_detected_node_ids,
-          current_node_id
+          {
+            context: state,
+            config: state.surface_raycast_targeting,
+          },
+          true
         );
 
         // Update the selection if a valid next focus is found
