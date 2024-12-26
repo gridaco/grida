@@ -1538,8 +1538,15 @@ export function useEventTarget() {
 
   const click = useCallback(
     (event: MouseEvent) => {
+      const els = domapi.get_grida_node_elements_from_point(
+        event.clientX,
+        event.clientY
+      );
+
       dispatch({
         type: "document/canvas/backend/html/event/on-click",
+        node_ids_from_point: els.map((n) => n.id),
+        shiftKey: event.shiftKey,
       });
     },
     [dispatch]
@@ -1677,26 +1684,7 @@ export function useEventTarget() {
     },
     [dispatch]
   );
-  const layerDragEnd = useCallback(
-    (selection: string[], event: TCanvasEventTargetDragGestureState) => {
-      dispatch({
-        type: "document/canvas/backend/html/event/node-overlay/on-drag-end",
-        selection,
-        event,
-      });
-    },
-    [dispatch]
-  );
-  const layerDrag = useCallback(
-    (selection: string[], event: TCanvasEventTargetDragGestureState) => {
-      dispatch({
-        type: "document/canvas/backend/html/event/node-overlay/on-drag",
-        selection,
-        event,
-      });
-    },
-    [dispatch]
-  );
+
   //
 
   const startScaleGesture = useCallback(
@@ -1781,8 +1769,6 @@ export function useEventTarget() {
       //
       layerClick,
       layerDragStart,
-      layerDragEnd,
-      layerDrag,
       //
     };
   }, [
@@ -1826,8 +1812,6 @@ export function useEventTarget() {
     //
     layerClick,
     layerDragStart,
-    layerDragEnd,
-    layerDrag,
     //
   ]);
 }

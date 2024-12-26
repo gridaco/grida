@@ -318,9 +318,7 @@ export type EventTargetAction =
   | EditorEventTarget_DragEnd
   //
   | EditorEventTarget_NodeOverlay_Click
-  | EditorEventTarget_NodeOverlay_DragStart
-  | EditorEventTarget_NodeOverlay_DragEnd
-  | EditorEventTarget_NodeOverlay_Drag;
+  | EditorEventTarget_NodeOverlay_DragStart;
 
 export type EditorEventTarget_PointerMove = {
   type: "document/canvas/backend/html/event/on-pointer-move";
@@ -354,9 +352,10 @@ export type EditorEventTarget_PointerUp = {
   type: "document/canvas/backend/html/event/on-pointer-up";
 };
 
-export type EditorEventTarget_Click = {
-  type: "document/canvas/backend/html/event/on-click";
-};
+export type EditorEventTarget_Click =
+  IHtmlBackendCanvasEventTargetPointerEvent & {
+    type: "document/canvas/backend/html/event/on-click";
+  };
 
 export type EditorEventTarget_DoubleClick = {
   type: "document/canvas/backend/html/event/on-double-click";
@@ -393,16 +392,6 @@ export type EditorEventTarget_NodeOverlay_Click = ISelection &
 export type EditorEventTarget_NodeOverlay_DragStart = ISelection &
   ICanvasEventTargetDragEvent & {
     type: "document/canvas/backend/html/event/node-overlay/on-drag-start";
-  };
-
-export type EditorEventTarget_NodeOverlay_DragEnd = ISelection &
-  ICanvasEventTargetDragEvent & {
-    type: "document/canvas/backend/html/event/node-overlay/on-drag-end";
-  };
-
-export type EditorEventTarget_NodeOverlay_Drag = ISelection &
-  ICanvasEventTargetDragEvent & {
-    type: "document/canvas/backend/html/event/node-overlay/on-drag";
   };
 
 // #region surface action

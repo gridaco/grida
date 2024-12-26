@@ -289,7 +289,7 @@ function GroupOverlay({
   selection: string[];
   readonly?: boolean;
 }) {
-  const { layerDragStart, layerDragEnd, layerDrag, layerClick, cursor_mode } =
+  const { layerDragStart, drag, dragEnd, layerClick, cursor_mode } =
     useEventTarget();
   const transform = useGroupSurfaceTransform(...selection);
 
@@ -310,11 +310,20 @@ function GroupOverlay({
         e.event.stopPropagation();
       },
       onDragEnd: (e) => {
-        layerDragEnd(selection, e);
+        dragEnd(e.event as PointerEvent);
         e.event.stopPropagation();
       },
       onDrag: (e) => {
-        layerDrag(selection, e);
+        const { delta, distance, movement, initial, xy } = e;
+
+        drag({
+          delta,
+          distance,
+          movement,
+          initial,
+          xy,
+        });
+
         e.event.stopPropagation();
       },
       onClick: (e) => {
@@ -370,8 +379,7 @@ function NodeOverlay({
   readonly?: boolean;
   zIndex?: number;
 }) {
-  const { layerDragStart, layerDragEnd, layerDrag, cursor_mode } =
-    useEventTarget();
+  const { layerDragStart, drag, dragEnd, cursor_mode } = useEventTarget();
   const transform = useNodeSurfaceTransfrom(node_id);
   const node = useNode(node_id);
 
@@ -395,11 +403,20 @@ function NodeOverlay({
         e.event.stopPropagation();
       },
       onDragEnd: (e) => {
-        layerDragEnd([node_id], e);
+        dragEnd(e.event as PointerEvent);
         e.event.stopPropagation();
       },
       onDrag: (e) => {
-        layerDrag([node_id], e);
+        const { delta, distance, movement, initial, xy } = e;
+
+        drag({
+          delta,
+          distance,
+          movement,
+          initial,
+          xy,
+        });
+
         e.event.stopPropagation();
       },
     },

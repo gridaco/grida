@@ -786,25 +786,6 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         self_start_gesture_translate(draft);
       });
     }
-    case "document/canvas/backend/html/event/node-overlay/on-drag-end": {
-      const { selection } = action;
-      return produce(state, (draft) => {
-        self_maybe_end_gesture_translate(draft);
-      });
-    }
-    case "document/canvas/backend/html/event/node-overlay/on-drag": {
-      const { selection, event } = action;
-      const { movement } = event;
-
-      return produce(state, (draft) => {
-        assert(
-          draft.gesture.type === "translate",
-          `was expecting translate, but got ${draft.gesture.type}`
-        );
-        draft.gesture.movement = movement;
-        self_update_gesture_transform(draft);
-      });
-    }
     // #endregion drag event
     //
 
