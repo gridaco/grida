@@ -40,7 +40,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
   // console.log("surface", action);
   switch (action.type) {
     // #region [html backend] canvas event target
-    case "document/canvas/backend/html/event/on-pointer-move": {
+    case "event-target/event/on-pointer-move": {
       const {
         position: { x, y },
       } = <EditorEventTarget_PointerMove>action;
@@ -88,7 +88,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         }
       });
     }
-    case "document/canvas/backend/html/event/on-pointer-move-raycast": {
+    case "event-target/event/on-pointer-move-raycast": {
       const { node_ids_from_point } = <EditorEventTarget_PointerMoveRaycast>(
         action
       );
@@ -97,7 +97,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         self_updateSurfaceHoverState(draft);
       });
     }
-    case "document/canvas/backend/html/event/on-click": {
+    case "event-target/event/on-click": {
       const {} = <EditorEventTarget_Click>action;
       return produce(state, (draft) => {
         switch (draft.cursor_mode.type) {
@@ -151,7 +151,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         }
       });
     }
-    case "document/canvas/backend/html/event/on-double-click": {
+    case "event-target/event/on-double-click": {
       // [double click event]
       // - DOES NOT "enter content edit mode" - this is handled by its own action.
       return produce(state, (draft) => {
@@ -190,7 +190,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       });
       break;
     }
-    case "document/canvas/backend/html/event/on-pointer-down": {
+    case "event-target/event/on-pointer-down": {
       const { node_ids_from_point, shiftKey } = <EditorEventTarget_PointerDown>(
         action
       );
@@ -314,13 +314,13 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         }
       });
     }
-    case "document/canvas/backend/html/event/on-pointer-up": {
+    case "event-target/event/on-pointer-up": {
       return produce(state, (draft) => {
         draft.gesture = { type: "idle" };
       });
     }
     // #region drag event
-    case "document/canvas/backend/html/event/on-drag-start": {
+    case "event-target/event/on-drag-start": {
       const { shiftKey } = <EditorEventTarget_DragStart>action;
 
       // if there is already a gesture, ignore
@@ -510,7 +510,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         }
       });
     }
-    case "document/canvas/backend/html/event/on-drag-end": {
+    case "event-target/event/on-drag-end": {
       const { node_ids_from_area, shiftKey } = <EditorEventTarget_DragEnd>(
         action
       );
@@ -543,7 +543,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         }
       });
     }
-    case "document/canvas/backend/html/event/on-drag": {
+    case "event-target/event/on-drag": {
       const {
         event: { movement, delta },
       } = <EditorEventTarget_Drag>action;
@@ -761,7 +761,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       break;
     }
     //
-    case "document/canvas/backend/html/event/node-overlay/on-click": {
+    case "event-target/event/multiple-selection-overlay/on-click": {
       const { selection, node_ids_from_point, shiftKey } = action;
       if (state.gesture.type === "translate") break;
       return produce(state, (draft) => {

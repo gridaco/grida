@@ -128,6 +128,7 @@ function CurveControlExtension({
   const editor = useSurfacePathEditor();
   const bind = useGesture({
     onDragStart: ({ event }) => {
+      event.preventDefault();
       editor.onCurveControlPointDragStart(segment, control);
     },
   });
@@ -161,23 +162,6 @@ function Extension({
   );
 }
 
-function CurveControlPoint({
-  point,
-  selected,
-}: {
-  point: cmath.Vector2;
-  selected?: boolean;
-}) {
-  return (
-    <Point
-      // {...bind()}
-      tabIndex={0}
-      selected={selected}
-      point={point}
-    />
-  );
-}
-
 function VertexPoint({
   point,
   index,
@@ -202,28 +186,13 @@ function VertexPoint({
         }
       },
       onPointerDown: ({ event }) => {
+        event.preventDefault();
         editor.selectVertex(index);
       },
       onDragStart: (state) => {
         const { event } = state;
-        event.stopPropagation();
+        event.preventDefault();
         editor.onVertexDragStart(index);
-      },
-      onDrag: (state) => {
-        const { movement, distance, delta, initial, xy, event } = state;
-        event.stopPropagation();
-        drag({
-          movement,
-          distance,
-          delta,
-          initial,
-          xy,
-        });
-      },
-      onDragEnd: (state) => {
-        const { event } = state;
-        event.stopPropagation();
-        dragEnd(event as PointerEvent);
       },
       onKeyDown: (state) => {
         const { event } = state;
@@ -300,44 +269,6 @@ const Point = React.forwardRef(
 );
 
 Point.displayName = "Point";
-
-function Line({
-  x1,
-  y1,
-  x2,
-  y2,
-  className,
-  style,
-  ...props
-}: React.HTMLAttributes<HTMLDivElement> & {
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
-}) {
-  // Calculate the length and angle of the line
-  const deltaX = x2 - x1;
-  const deltaY = y2 - y1;
-  const length = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-  const angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
-
-  return (
-    <div
-      {...props}
-      className={cn("bg-workbench-accent-sky", className)}
-      style={{
-        ...style,
-        position: "absolute",
-        left: `${x1}px`,
-        top: `${y1}px`,
-        width: `${length}px`,
-        height: 1,
-        transform: `rotate(${angle}deg)`,
-        transformOrigin: "0 50%", // Rotate around the left center
-      }}
-    />
-  );
-}
 
 function Curve({
   a,

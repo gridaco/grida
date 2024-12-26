@@ -1474,7 +1474,7 @@ export function useEventTarget() {
       );
 
       dispatch({
-        type: "document/canvas/backend/html/event/on-pointer-move-raycast",
+        type: "event-target/event/on-pointer-move-raycast",
         node_ids_from_point: els.map((n) => n.id),
         position,
         shiftKey: event.shiftKey,
@@ -1502,7 +1502,7 @@ export function useEventTarget() {
       const position = __canvas_space_position(event);
 
       dispatch({
-        type: "document/canvas/backend/html/event/on-pointer-move",
+        type: "event-target/event/on-pointer-move",
         position: position,
       });
 
@@ -1519,7 +1519,7 @@ export function useEventTarget() {
       );
 
       dispatch({
-        type: "document/canvas/backend/html/event/on-pointer-down",
+        type: "event-target/event/on-pointer-down",
         node_ids_from_point: els.map((n) => n.id),
         shiftKey: event.shiftKey,
       });
@@ -1530,7 +1530,7 @@ export function useEventTarget() {
   const pointerUp = useCallback(
     (event: PointerEvent) => {
       dispatch({
-        type: "document/canvas/backend/html/event/on-pointer-up",
+        type: "event-target/event/on-pointer-up",
       });
     },
     [dispatch]
@@ -1544,7 +1544,7 @@ export function useEventTarget() {
       );
 
       dispatch({
-        type: "document/canvas/backend/html/event/on-click",
+        type: "event-target/event/on-click",
         node_ids_from_point: els.map((n) => n.id),
         shiftKey: event.shiftKey,
       });
@@ -1555,7 +1555,7 @@ export function useEventTarget() {
   const doubleClick = useCallback(
     (event: MouseEvent) => {
       dispatch({
-        type: "document/canvas/backend/html/event/on-double-click",
+        type: "event-target/event/on-double-click",
       });
     },
     [dispatch]
@@ -1589,7 +1589,7 @@ export function useEventTarget() {
   const dragStart = useCallback(
     (event: PointerEvent) => {
       dispatch({
-        type: "document/canvas/backend/html/event/on-drag-start",
+        type: "event-target/event/on-drag-start",
         shiftKey: event.shiftKey,
       });
     },
@@ -1630,7 +1630,7 @@ export function useEventTarget() {
         });
 
         dispatch({
-          type: "document/canvas/backend/html/event/on-drag-end",
+          type: "event-target/event/on-drag-end",
           node_ids_from_area: contained,
           shiftKey: event.shiftKey,
         });
@@ -1638,7 +1638,7 @@ export function useEventTarget() {
         return;
       }
       dispatch({
-        type: "document/canvas/backend/html/event/on-drag-end",
+        type: "event-target/event/on-drag-end",
         shiftKey: event.shiftKey,
       });
     },
@@ -1649,7 +1649,7 @@ export function useEventTarget() {
     (event: TCanvasEventTargetDragGestureState) => {
       requestAnimationFrame(() => {
         dispatch({
-          type: "document/canvas/backend/html/event/on-drag",
+          type: "event-target/event/on-drag",
           event,
         });
       });
@@ -1658,7 +1658,7 @@ export function useEventTarget() {
   );
 
   //
-  const layerClick = useCallback(
+  const multipleSelectionOverlayClick = useCallback(
     (selection: string[], event: MouseEvent) => {
       const els = domapi.get_grida_node_elements_from_point(
         event.clientX,
@@ -1666,7 +1666,7 @@ export function useEventTarget() {
       );
 
       dispatch({
-        type: "document/canvas/backend/html/event/node-overlay/on-click",
+        type: "event-target/event/multiple-selection-overlay/on-click",
         selection: selection,
         node_ids_from_point: els.map((n) => n.id),
         shiftKey: event.shiftKey,
@@ -1757,7 +1757,7 @@ export function useEventTarget() {
       dragEnd,
       drag,
       //
-      layerClick,
+      multipleSelectionOverlayClick,
       //
     };
   }, [
@@ -1799,7 +1799,7 @@ export function useEventTarget() {
     dragEnd,
     drag,
     //
-    layerClick,
+    multipleSelectionOverlayClick,
     //
   ]);
 }

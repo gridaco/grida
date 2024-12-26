@@ -182,16 +182,16 @@ function _reducer<S extends IDocumentEditorState>(
         }
       });
     }
-    case "document/canvas/backend/html/event/node-overlay/on-click":
-    case "document/canvas/backend/html/event/on-click":
-    case "document/canvas/backend/html/event/on-double-click":
-    case "document/canvas/backend/html/event/on-drag":
-    case "document/canvas/backend/html/event/on-drag-end":
-    case "document/canvas/backend/html/event/on-drag-start":
-    case "document/canvas/backend/html/event/on-pointer-down":
-    case "document/canvas/backend/html/event/on-pointer-move":
-    case "document/canvas/backend/html/event/on-pointer-move-raycast":
-    case "document/canvas/backend/html/event/on-pointer-up": {
+    case "event-target/event/multiple-selection-overlay/on-click":
+    case "event-target/event/on-click":
+    case "event-target/event/on-double-click":
+    case "event-target/event/on-drag":
+    case "event-target/event/on-drag-end":
+    case "event-target/event/on-drag-start":
+    case "event-target/event/on-pointer-down":
+    case "event-target/event/on-pointer-move":
+    case "event-target/event/on-pointer-move-raycast":
+    case "event-target/event/on-pointer-up": {
       return eventTargetReducer(state, action);
     }
     // history actions

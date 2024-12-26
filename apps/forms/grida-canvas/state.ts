@@ -153,12 +153,12 @@ export type GestureNudge = {
 export type GestureTranslate = {
   // translate (move)
   type: "translate";
+  movement: cmath.Vector2;
   selection: string[];
   initial_selection: string[];
   initial_snapshot: IDocumentState["document"];
   initial_clone_ids: string[];
   initial_rects: cmath.Rectangle[];
-  movement: cmath.Vector2;
   is_currently_cloned: boolean;
 
   /**
@@ -170,14 +170,14 @@ export type GestureTranslate = {
 export type GestureScale = {
   // scale (resize)
   type: "scale";
-  selection: string[];
-  initial_snapshot: IDocumentState["document"];
-  initial_rects: cmath.Rectangle[];
-  direction: cmath.CardinalDirection;
   /**
    * raw movement - independent of the direction
    */
   movement: cmath.Vector2;
+  selection: string[];
+  initial_snapshot: IDocumentState["document"];
+  initial_rects: cmath.Rectangle[];
+  direction: cmath.CardinalDirection;
 
   /**
    * surface snap guides - result of snap while translate (move) gesture
@@ -186,16 +186,15 @@ export type GestureScale = {
 };
 
 export type GestureRotate = {
-  // rotate
   type: "rotate";
-  initial_bounding_rectangle: cmath.Rectangle | null;
-  // TODO: support multiple selection
-  selection: string;
-  offset: cmath.Vector2;
   /**
    * raw movement - independent of the offset
    */
   movement: cmath.Vector2;
+  initial_bounding_rectangle: cmath.Rectangle | null;
+  // TODO: support multiple selection
+  selection: string;
+  offset: cmath.Vector2;
 };
 
 export type GestureCornerRadius = {

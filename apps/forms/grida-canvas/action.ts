@@ -317,10 +317,10 @@ export type EventTargetAction =
   | EditorEventTarget_Drag
   | EditorEventTarget_DragEnd
   //
-  | EditorEventTarget_NodeOverlay_Click;
+  | EditorEventTarget_MultipleSelectionLayer_Click;
 
 export type EditorEventTarget_PointerMove = {
-  type: "document/canvas/backend/html/event/on-pointer-move";
+  type: "event-target/event/on-pointer-move";
   /**
    * position in canvas space - need to pass a resolved value
    */
@@ -332,7 +332,7 @@ export type EditorEventTarget_PointerMove = {
 
 export type EditorEventTarget_PointerMoveRaycast =
   IHtmlBackendCanvasEventTargetPointerEvent & {
-    type: "document/canvas/backend/html/event/on-pointer-move-raycast";
+    type: "event-target/event/on-pointer-move-raycast";
     /**
      * position in canvas space - need to pass a resolved value
      */
@@ -344,24 +344,24 @@ export type EditorEventTarget_PointerMoveRaycast =
 
 export type EditorEventTarget_PointerDown =
   IHtmlBackendCanvasEventTargetPointerEvent & {
-    type: "document/canvas/backend/html/event/on-pointer-down";
+    type: "event-target/event/on-pointer-down";
   };
 
 export type EditorEventTarget_PointerUp = {
-  type: "document/canvas/backend/html/event/on-pointer-up";
+  type: "event-target/event/on-pointer-up";
 };
 
 export type EditorEventTarget_Click =
   IHtmlBackendCanvasEventTargetPointerEvent & {
-    type: "document/canvas/backend/html/event/on-click";
+    type: "event-target/event/on-click";
   };
 
 export type EditorEventTarget_DoubleClick = {
-  type: "document/canvas/backend/html/event/on-double-click";
+  type: "event-target/event/on-double-click";
 };
 
 export type EditorEventTarget_DragStart = {
-  type: "document/canvas/backend/html/event/on-drag-start";
+  type: "event-target/event/on-drag-start";
   /**
    * @deprecated
    */
@@ -369,19 +369,19 @@ export type EditorEventTarget_DragStart = {
 };
 
 export type EditorEventTarget_Drag = ICanvasEventTargetDragEvent & {
-  type: "document/canvas/backend/html/event/on-drag";
+  type: "event-target/event/on-drag";
 };
 
 export type EditorEventTarget_DragEnd = {
-  type: "document/canvas/backend/html/event/on-drag-end";
+  type: "event-target/event/on-drag-end";
   node_ids_from_area?: string[];
   shiftKey: boolean;
 };
 
 //
-export type EditorEventTarget_NodeOverlay_Click = ISelection &
+export type EditorEventTarget_MultipleSelectionLayer_Click = ISelection &
   IHtmlBackendCanvasEventTargetPointerEvent & {
-    type: "document/canvas/backend/html/event/node-overlay/on-click";
+    type: "event-target/event/multiple-selection-overlay/on-click";
   };
 
 // #region surface action

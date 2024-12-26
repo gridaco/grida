@@ -157,10 +157,10 @@ export function EditorSurface() {
         pointerUp(event);
       },
       onClick: ({ event }) => {
+        if (event.defaultPrevented) return;
         click(event);
       },
-      onDoubleClick: (e) => {
-        const { event } = e;
+      onDoubleClick: ({ event }) => {
         if (event.defaultPrevented) return;
 
         // [order matters] - otherwise, it will always try to enter the content edit mode
@@ -171,11 +171,9 @@ export function EditorSurface() {
         if (event.defaultPrevented) return;
         dragStart(event as PointerEvent);
       },
-      onDragEnd: (e) => {
-        const { event } = e;
+      onDragEnd: ({ event }) => {
         if (event.defaultPrevented) return;
         dragEnd(event as PointerEvent);
-        event.stopPropagation();
       },
       onDrag: (e) => {
         if (e.event.defaultPrevented) return;
@@ -278,56 +276,36 @@ function SelectionOverlay({
   } else if (selection.length === 1) {
     return <NodeOverlay node_id={selection[0]} readonly={readonly} />;
   } else {
-    return <GroupOverlay selection={selection} readonly={readonly} />;
+    return (
+      <MultipleSelectionOverlay selection={selection} readonly={readonly} />
+    );
   }
 }
 
-function GroupOverlay({
+function MultipleSelectionOverlay({
   selection,
   readonly,
 }: {
   selection: string[];
   readonly?: boolean;
 }) {
-  const { dragStart, drag, dragEnd, layerClick, cursor_mode } =
-    useEventTarget();
+  const { multipleSelectionOverlayClick, cursor_mode } = useEventTarget();
   const transform = useGroupSurfaceTransform(...selection);
 
   const enabled = !readonly && cursor_mode.type === "cursor";
 
   const bind = useSurfaceGesture(
     {
-      onPointerDown: (e) => {
+      onPointerDown: ({ event }) => {
         // if insert mode, the event should be passed to the master to start the insertion
         if (cursor_mode.type !== "insert" && cursor_mode.type !== "draw") {
           // otherwise, it should be stopped here
-          // stop propagation to prevent the master event target from changing the selection
-          e.event.stopPropagation();
+          // prevent default to prevent the master event target from changing the selection
+          event.preventDefault();
         }
       },
-      onDragStart: (e) => {
-        dragStart(e.event as PointerEvent);
-        e.event.stopPropagation();
-      },
-      onDragEnd: (e) => {
-        dragEnd(e.event as PointerEvent);
-        e.event.stopPropagation();
-      },
-      onDrag: (e) => {
-        const { delta, distance, movement, initial, xy } = e;
-
-        drag({
-          delta,
-          distance,
-          movement,
-          initial,
-          xy,
-        });
-
-        e.event.stopPropagation();
-      },
       onClick: (e) => {
-        layerClick(selection, e.event);
+        multipleSelectionOverlayClick(selection, e.event);
         e.event.stopPropagation();
       },
     },
@@ -379,60 +357,14 @@ function NodeOverlay({
   readonly?: boolean;
   zIndex?: number;
 }) {
-  const { dragStart, drag, dragEnd, cursor_mode } = useEventTarget();
   const transform = useNodeSurfaceTransfrom(node_id);
   const node = useNode(node_id);
 
   const { is_component_consumer } = node.meta;
   readonly = readonly || is_component_consumer;
 
-  const enabled = !readonly && cursor_mode.type === "cursor";
-
-  const bind = useSurfaceGesture(
-    {
-      onPointerDown: (e) => {
-        // if insert mode, the event should be passed to the master to start the insertion
-        if (cursor_mode.type !== "insert" && cursor_mode.type !== "draw") {
-          // otherwise, it should be stopped here
-          // stop propagation to prevent the master event target from changing the selection
-          e.event.stopPropagation();
-        }
-      },
-      onDragStart: (e) => {
-        dragStart(e.event as PointerEvent);
-        e.event.stopPropagation();
-      },
-      onDragEnd: (e) => {
-        dragEnd(e.event as PointerEvent);
-        e.event.stopPropagation();
-      },
-      onDrag: (e) => {
-        const { delta, distance, movement, initial, xy } = e;
-
-        drag({
-          delta,
-          distance,
-          movement,
-          initial,
-          xy,
-        });
-
-        e.event.stopPropagation();
-      },
-    },
-    {
-      drag: {
-        enabled: enabled,
-        threshold: DRAG_THRESHOLD,
-        // disable drag gesture with arrow keys
-        keyboardDisplacement: 0,
-      },
-    }
-  );
-
   return (
     <LayerOverlay
-      {...bind()}
       readonly={readonly}
       transform={transform}
       zIndex={zIndex}
@@ -482,25 +414,12 @@ function NodeOverlayCornerRadiusHandle({
   margin?: number;
   size?: number;
 }) {
-  const { startCornerRadiusGesture, drag, dragEnd } = useEventTarget();
+  const { startCornerRadiusGesture } = useEventTarget();
 
   const bind = useSurfaceGesture({
-    onDragStart: (e) => {
-      e.event.stopPropagation();
+    onDragStart: ({ event }) => {
+      event.preventDefault();
       startCornerRadiusGesture(node_id);
-    },
-    onDragEnd: (e) => {
-      dragEnd(e.event as PointerEvent);
-    },
-    onDrag: (e) => {
-      e.event.stopPropagation();
-      drag({
-        delta: e.delta,
-        distance: e.distance,
-        movement: e.movement,
-        initial: e.initial,
-        xy: e.xy,
-      });
     },
   });
 
@@ -547,23 +466,9 @@ function LayerOverlayRotationHandle({
   const rotation = getNodeAbsoluteRotation(node_id);
 
   const bind = useSurfaceGesture({
-    onDragStart: (e) => {
-      e.event.stopPropagation();
+    onDragStart: ({ event }) => {
+      event.preventDefault();
       startRotateGesture(node_id);
-    },
-    onDragEnd: (e) => {
-      dragEnd(e.event as PointerEvent);
-    },
-    onDrag: (e) => {
-      e.event.stopPropagation();
-      const event = {
-        delta: e.delta,
-        distance: e.distance,
-        movement: e.movement,
-        initial: e.initial,
-        xy: e.xy,
-      };
-      drag(event);
     },
   });
 
@@ -611,51 +516,23 @@ function LayerOverlayResizeHandle({
   anchor: "nw" | "ne" | "sw" | "se" | "n" | "e" | "s" | "w";
   size?: number;
 }) {
-  const { startScaleGesture, drag } = useEventTarget();
+  const { startScaleGesture } = useEventTarget();
 
-  const bind = useSurfaceGesture(
-    {
-      onPointerDown: ({ event }) => {
-        event.preventDefault();
-        event.stopPropagation();
-      },
-      onPointerUp: ({ event }) => {
-        event.preventDefault();
-        event.stopPropagation();
-      },
-      onClick: ({ event }) => {
-        event.preventDefault();
-        event.stopPropagation();
-      },
-      onDragStart: (e) => {
-        e.event.stopPropagation();
-        startScaleGesture(selection, anchor);
-      },
-      onDrag: (e) => {
-        e.event.stopPropagation();
-        drag({
-          delta: e.delta,
-          distance: e.distance,
-          movement: e.movement,
-          initial: e.initial,
-          xy: e.xy,
-        });
-      },
+  const bind = useSurfaceGesture({
+    onPointerDown: ({ event }) => {
+      event.preventDefault();
     },
-    {
-      drag: {
-        threshold: DRAG_THRESHOLD,
-        // disable drag gesture with arrow keys
-        keyboardDisplacement: 0,
-      },
-    }
-  );
+    onDragStart: ({ event }) => {
+      event.preventDefault();
+      startScaleGesture(selection, anchor);
+    },
+  });
 
   return <Knob size={size} {...bind()} anchor={anchor} />;
 }
 
 function usePrefferedDistributionAxis() {
-  const { selection, state, distributeEvenly } = useDocument();
+  const { selection, state } = useDocument();
 
   const [axis, setAxis] = useState<"x" | "y">();
 
