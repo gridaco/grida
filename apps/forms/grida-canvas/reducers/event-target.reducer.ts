@@ -967,6 +967,7 @@ function self_start_gesture_scale_draw_new_node(
 ) {
   draft.gesture = {
     type: "scale",
+    initial_snapshot: JSON.parse(JSON.stringify(draft.document)),
     initial_rects: [new_node_rect],
     movement: cmath.vector2.zero,
     selection: [new_node_id],
@@ -991,6 +992,7 @@ function self_start_gesture_scale(
 
   draft.gesture = {
     type: "scale",
+    initial_snapshot: JSON.parse(JSON.stringify(draft.document)),
     initial_rects: rects,
     movement: cmath.vector2.zero,
     selection: selection,

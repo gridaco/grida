@@ -268,6 +268,18 @@ export namespace vn {
       }));
     }
 
+    scale(factor: Vector2) {
+      this._vertices = this._vertices.map((v) => ({
+        p: cmath.vector2.multiply(v.p, factor),
+      }));
+      this._segments = this._segments.map((s) => ({
+        a: s.a,
+        b: s.b,
+        ta: cmath.vector2.multiply(s.ta, factor),
+        tb: cmath.vector2.multiply(s.tb, factor),
+      }));
+    }
+
     addSegment(a: number, b: number, ta: Vector2, tb: Vector2) {
       // TODO: check for duplicate segments and ignore.
 

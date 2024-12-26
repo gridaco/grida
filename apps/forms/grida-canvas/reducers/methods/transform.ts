@@ -10,6 +10,7 @@ import nodeTransformReducer from "../node-transform.reducer";
 import nodeReducer from "../node.reducer";
 import assert from "assert";
 import { grida } from "@/grida";
+import { vn } from "@/grida/vn";
 
 /**
  * maps the resize handle (direction) to the transform origin point (inverse)
@@ -272,6 +273,7 @@ function __self_update_gesture_transform_scale(
   const {
     selection,
     direction,
+    initial_snapshot,
     movement: rawMovement,
     initial_rects,
   } = draft.gesture;
@@ -297,7 +299,7 @@ function __self_update_gesture_transform_scale(
 
   let i = 0;
   for (const node_id of selection) {
-    const node = document.__getNodeById(draft, node_id);
+    const node = initial_snapshot.nodes[node_id];
     const initial_rect = initial_rects[i++];
     const parent_id = document.getParentId(draft.document_ctx, node_id)!;
     const parent_rect = domapi.get_node_bounding_rect(parent_id)!;
@@ -331,6 +333,22 @@ function __self_update_gesture_transform_scale(
       movement,
       preserveAspectRatio: transform_with_preserve_aspect_ratio === "on",
     });
+
+    if (node.type === "path") {
+      // TODO: mrege with the above
+      const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
+      const scale = cmath.rect.getScaleFactors(initial_rect, {
+        x: initial_rect.x,
+        y: initial_rect.y,
+        width: initial_rect.width + movement[0],
+        height: initial_rect.height + movement[1],
+      });
+      vne.scale(scale);
+      (
+        draft.document.nodes[node_id] as grida.program.nodes.PathNode
+      ).vectorNetwork = vne.value;
+      //
+    }
   }
 }
 

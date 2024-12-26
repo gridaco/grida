@@ -149,8 +149,9 @@ export type GestureState =
   | {
       // scale (resize)
       type: "scale";
-      initial_rects: cmath.Rectangle[];
       selection: string[];
+      initial_snapshot: IDocumentState["document"];
+      initial_rects: cmath.Rectangle[];
       direction: cmath.CardinalDirection;
       /**
        * raw movement - independent of the direction
