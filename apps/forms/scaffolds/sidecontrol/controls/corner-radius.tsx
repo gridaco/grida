@@ -17,9 +17,11 @@ import {
 import { PropertyInput } from "../ui";
 
 export function CornerRadiusControl({
+  disabled,
   value,
   onValueChange,
 }: {
+  disabled?: boolean;
   value?: grida.program.nodes.i.IRectangleCorner["cornerRadius"];
   onValueChange?: (
     value: grida.program.nodes.i.IRectangleCorner["cornerRadius"]
@@ -37,6 +39,7 @@ export function CornerRadiusControl({
           })}
         >
           <Input
+            disabled={disabled}
             type="number"
             value={mode === "all" ? (value as number) : ""}
             placeholder={mode === "all" ? "0" : "mixed"}
@@ -49,6 +52,7 @@ export function CornerRadiusControl({
           />
           <PopoverTrigger asChild>
             <Button
+              disabled={disabled}
               variant={mode === "each" ? "secondary" : "ghost"}
               size="icon"
               className="w-8 h-8 min-w-8"

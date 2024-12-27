@@ -155,6 +155,7 @@ export default function nodeReducer<
         assert(
           draft.type === "vector" ||
             draft.type === "path" ||
+            draft.type === "image" ||
             draft.type === "rectangle" ||
             draft.type === "ellipse" ||
             draft.type === "text" ||

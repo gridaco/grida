@@ -576,6 +576,9 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             }
             case "draw": {
               draft.gesture.movement = movement;
+              const {
+                gesture_modifiers: { tarnslate_with_axis_lock },
+              } = state;
               const mode = draft.gesture.mode;
 
               const {
@@ -589,7 +592,12 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                 node_id
               ) as grida.program.nodes.PathNode;
 
-              const point = movement;
+              const adj_movement =
+                tarnslate_with_axis_lock === "on"
+                  ? cmath.ext.movement.axisLockedByDominance(movement)
+                  : movement;
+
+              const point = adj_movement;
 
               const vne = new vn.VectorNetworkEditor({
                 vertices: points.map((p) => ({ p })),

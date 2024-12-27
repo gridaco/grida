@@ -1255,6 +1255,15 @@ export function useSelection() {
     [mixedProperties.crossAxisAlignment?.ids]
   );
 
+  const cornerRadius = useCallback(
+    (value: grida.program.nodes.i.IRectangleCorner["cornerRadius"]) => {
+      mixedProperties.cornerRadius?.ids.forEach((id) => {
+        __actions.changeNodeCornerRadius(id, value);
+      });
+    },
+    [mixedProperties.cornerRadius?.ids]
+  );
+
   const cursor = useCallback(
     (value: grida.program.cg.SystemMouseCursor) => {
       mixedProperties.cursor?.ids.forEach((id) => {
@@ -1290,6 +1299,7 @@ export function useSelection() {
       direction,
       mainAxisAlignment,
       crossAxisAlignment,
+      cornerRadius,
       cursor,
     }),
     [
@@ -1317,6 +1327,7 @@ export function useSelection() {
       direction,
       mainAxisAlignment,
       crossAxisAlignment,
+      cornerRadius,
       cursor,
     ]
   );

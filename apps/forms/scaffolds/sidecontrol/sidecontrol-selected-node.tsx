@@ -415,15 +415,19 @@ export function SelectionMixedProperties() {
                 onValueChange={change.opacity}
               />
             </PropertyLine>
-            {/* {supports_corner_radius && (
+            {supports_corner_radius && (
               <PropertyLine>
                 <PropertyLineLabel>Radius</PropertyLineLabel>
-                <CornerRadiusControl
-                  value={cornerRadius?.value}
-                  onValueChange={actions.cornerRadius}
-                />
+                {cornerRadius?.mixed ? (
+                  <CornerRadiusControl onValueChange={change.cornerRadius} />
+                ) : (
+                  <CornerRadiusControl
+                    value={cornerRadius?.value}
+                    onValueChange={change.cornerRadius}
+                  />
+                )}
               </PropertyLine>
-            )} */}
+            )}
             {/* {supports.border(node.type) && (
               <PropertyLine>
                 <PropertyLineLabel>Border</PropertyLineLabel>
