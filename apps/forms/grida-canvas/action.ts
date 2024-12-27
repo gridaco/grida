@@ -579,6 +579,10 @@ interface IFlexContainerNodeChangeCrossAxisGapAction extends INodeID {
   crossAxisGap: grida.program.nodes.i.IFlexContainer["crossAxisGap"];
 }
 
+interface INodeChangeMouseCursorAction extends INodeID {
+  cursor: grida.program.cg.SystemMouseCursor;
+}
+
 interface INodeChangeStyleAction extends INodeID {
   style: Partial<React.CSSProperties>;
 }
@@ -658,6 +662,7 @@ export type NodeChangeAction =
       type: "node/change/crossAxisGap";
     } & IFlexContainerNodeChangeCrossAxisGapAction)
   //
+  | ({ type: "node/change/mouse-cursor" } & INodeChangeMouseCursorAction)
   | ({ type: "node/change/style" } & INodeChangeStyleAction)
   | ({ type: "node/change/src" } & INodeChangeSrcAction)
   | ({ type: "node/change/href" } & INodeChangeHrefAction)

@@ -540,6 +540,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
     case "node/change/component":
     case "node/change/href":
     case "node/change/target":
+    case "node/change/mouse-cursor":
     case "node/change/src":
     case "node/change/props":
     case "node/change/opacity":

@@ -131,6 +131,8 @@ export function SelectionMixedProperties() {
     crossAxisAlignment,
     mainAxisGap,
     crossAxisGap,
+    //
+    cursor,
 
     // x
     userdata,
@@ -162,7 +164,7 @@ export function SelectionMixedProperties() {
                 className="me-1"
               />
               <NameControl
-                value={name.mixed ? "mixed" : name.value}
+                value={name.mixed ? `${ids.length} selections` : name.value}
                 disabled={name.mixed}
                 onValueChange={change.name}
               />
@@ -443,10 +445,13 @@ export function SelectionMixedProperties() {
                 onValueChange={actions.boxShadow}
               />
             </PropertyLine> */}
-            {/* <PropertyLine>
+            <PropertyLine>
               <PropertyLineLabel>Cursor</PropertyLineLabel>
-              <CursorControl value={cursor} onValueChange={actions.cursor} />
-            </PropertyLine> */}
+              <CursorControl
+                value={cursor?.value}
+                onValueChange={change.cursor}
+              />
+            </PropertyLine>
           </SidebarMenuSectionContent>
         </SidebarSection>
         {supports_stroke && (
@@ -516,7 +521,7 @@ export function SelectionMixedProperties() {
             </PropertyLine>
           </SidebarMenuSectionContent>
         </SidebarSection>
-        <SidebarSection className="border-b pb-4">
+        <SidebarSection className="pb-4">
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Export</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
@@ -593,6 +598,11 @@ export function SelectedNodeProperties() {
     mainAxisGap,
     crossAxisGap,
 
+    //
+    href,
+    target,
+    cursor,
+
     // x
     userdata,
   } = node;
@@ -620,9 +630,6 @@ export function SelectedNodeProperties() {
     //
     // flexWrap,
     // gap,
-    //
-    cursor,
-    //
     //
   } = {
     // ...selected_node_default_style,
@@ -1002,13 +1009,13 @@ export function SelectedNodeProperties() {
         <SidebarMenuSectionContent className="space-y-2">
           <PropertyLine>
             <PropertyLineLabel>Link To</PropertyLineLabel>
-            <HrefControl value={node.href} onValueChange={actions.href} />
+            <HrefControl value={href} onValueChange={actions.href} />
           </PropertyLine>
-          {node.href && (
+          {href && (
             <PropertyLine>
               <PropertyLineLabel>New Tab</PropertyLineLabel>
               <TargetBlankControl
-                value={node.target}
+                value={target}
                 onValueChange={actions.target}
               />
             </PropertyLine>
@@ -1030,7 +1037,7 @@ export function SelectedNodeProperties() {
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>
-      <SidebarSection className="border-b pb-4">
+      <SidebarSection className="pb-4">
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Export</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>

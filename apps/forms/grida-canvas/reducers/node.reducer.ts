@@ -75,6 +75,10 @@ export default function nodeReducer<
         (draft as grida.program.nodes.i.IHrefable).target = action.target;
         break;
       }
+      case "node/change/mouse-cursor": {
+        (draft as grida.program.nodes.i.IMouseCursor).cursor = action.cursor;
+        break;
+      }
       case "node/change/component": {
         assert(draft.type === "instance");
         draft.component_id = action.component_id;

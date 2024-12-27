@@ -705,6 +705,17 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   );
   //
 
+  const changeNodeMouseCursor = useCallback(
+    (node_id: string, cursor: grida.program.cg.SystemMouseCursor) => {
+      dispatch({
+        type: "node/change/mouse-cursor",
+        node_id,
+        cursor,
+      });
+    },
+    [dispatch]
+  );
+
   const changeNodeStyle = useCallback(
     (
       node_id: string,
@@ -743,6 +754,7 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
       changeNodeComponent,
       changeNodeText,
       changeNodeStyle,
+      changeNodeMouseCursor,
       changeNodeSrc,
       changeNodeHref,
       changeNodeTarget,
@@ -1001,8 +1013,8 @@ export function useNodeAction(node_id: string | undefined) {
         nodeActions.changeNodeStyle(node_id, "aspectRatio", value),
       boxShadow: (value?: any) =>
         nodeActions.changeNodeStyle(node_id, "boxShadow", value.boxShadow),
-      cursor: (value?: string) =>
-        nodeActions.changeNodeStyle(node_id, "cursor", value),
+      cursor: (value: grida.program.cg.SystemMouseCursor) =>
+        nodeActions.changeNodeMouseCursor(node_id, value),
     };
   }, [node_id, nodeActions]);
 }
@@ -1243,6 +1255,15 @@ export function useSelection() {
     [mixedProperties.crossAxisAlignment?.ids]
   );
 
+  const cursor = useCallback(
+    (value: grida.program.cg.SystemMouseCursor) => {
+      mixedProperties.cursor?.ids.forEach((id) => {
+        __actions.changeNodeMouseCursor(id, value);
+      });
+    },
+    [mixedProperties.cursor?.ids]
+  );
+
   const actions = useMemo(
     () => ({
       active,
@@ -1269,6 +1290,7 @@ export function useSelection() {
       direction,
       mainAxisAlignment,
       crossAxisAlignment,
+      cursor,
     }),
     [
       active,
@@ -1295,6 +1317,7 @@ export function useSelection() {
       direction,
       mainAxisAlignment,
       crossAxisAlignment,
+      cursor,
     ]
   );
 

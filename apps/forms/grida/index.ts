@@ -618,12 +618,11 @@ export namespace grida {
         // | "margin"
         | "flexWrap"
         //
-        | "cursor"
-        //
       >;
 
       export function toReactCSSProperties(
         styles: nodes.i.ICSSStylable &
+          Partial<nodes.i.IMouseCursor> &
           Partial<nodes.i.IRectangleCorner> &
           Partial<nodes.i.IBoxFit> &
           Partial<nodes.i.ITextNodeStyle> &
@@ -660,6 +659,8 @@ export namespace grida {
           mainAxisGap,
           crossAxisGap,
           //
+          cursor,
+          //
           style,
         } = styles;
 
@@ -689,6 +690,7 @@ export namespace grida {
           //
           padding: padding ? paddingToPaddingCSS(padding) : undefined,
           //
+          cursor: cursor,
           ...(border ? toReactCSSBorder(border) : {}),
         } satisfies React.CSSProperties;
 
@@ -934,8 +936,6 @@ export namespace grida {
      * Core Graphics
      */
     export namespace cg {
-      export namespace vector_network {}
-
       export type Vector2 = [number, number];
 
       /**
@@ -1146,6 +1146,48 @@ export namespace grida {
        * @see https://api.flutter.dev/flutter/rendering/CrossAxisAlignment.html
        */
       export type CrossAxisAlignment = "start" | "end" | "center" | "stretch";
+
+      /**
+       * @see https://developer.mozilla.org/en-US/docs/Web/CSS/cursor
+       * @see https://api.flutter.dev/flutter/services/SystemMouseCursors-class.html
+       */
+      export type SystemMouseCursor =
+        | "alias"
+        | "all-scroll"
+        | "auto"
+        | "cell"
+        | "col-resize"
+        | "context-menu"
+        | "copy"
+        | "crosshair"
+        | "default"
+        | "e-resize"
+        | "ew-resize"
+        | "grab"
+        | "grabbing"
+        | "help"
+        | "move"
+        | "n-resize"
+        | "ne-resize"
+        | "nesw-resize"
+        | "no-drop"
+        | "none"
+        | "not-allowed"
+        | "ns-resize"
+        | "nw-resize"
+        | "nwse-resize"
+        | "pointer"
+        | "progress"
+        | "row-resize"
+        | "s-resize"
+        | "se-resize"
+        | "sw-resize"
+        | "text"
+        | "vertical-text"
+        | "w-resize"
+        | "wait"
+        | "zoom-in"
+        | "zoom-out";
 
       export type Paint =
         | SolidPaint
@@ -1585,6 +1627,10 @@ export namespace grida {
           style: css.ExplicitlySupportedCSSProperties;
         }
 
+        export interface IMouseCursor {
+          cursor?: cg.SystemMouseCursor;
+        }
+
         export interface IHrefable {
           href?: string;
           target?: "_self" | "_blank" | undefined;
@@ -1801,6 +1847,7 @@ export namespace grida {
           i.ISceneNode,
           i.ICSSStylable,
           i.IHrefable,
+          i.IMouseCursor,
           i.ITextNodeStyle,
           i.ITextValue {
         readonly type: "text";
@@ -1813,6 +1860,7 @@ export namespace grida {
           i.ICSSStylable,
           i.IBoxFit,
           i.IHrefable,
+          i.IMouseCursor,
           i.IRectangleCorner {
         readonly type: "image";
         /**
@@ -1836,6 +1884,7 @@ export namespace grida {
           i.ISceneNode,
           i.ICSSStylable,
           i.IHrefable,
+          i.IMouseCursor,
           i.IHTMLRichTextValue {
         readonly type: "richtext";
       }
@@ -1846,6 +1895,7 @@ export namespace grida {
           i.ICSSStylable,
           i.IBoxFit,
           i.IHrefable,
+          i.IMouseCursor,
           i.IRectangleCorner {
         readonly type: "video";
         /**
@@ -1866,6 +1916,7 @@ export namespace grida {
           i.ISceneNode,
           i.ICSSStylable,
           i.IHrefable,
+          i.IMouseCursor,
           i.IExpandable,
           i.IChildren,
           i.IRectangleCorner,
@@ -1910,6 +1961,7 @@ export namespace grida {
         extends i.IBaseNode,
           i.ISceneNode,
           i.IHrefable,
+          i.IMouseCursor,
           i.IPositioning,
           // i.ICSSDimension,
           i.IFixedDimension,
@@ -1937,6 +1989,7 @@ export namespace grida {
         extends i.IBaseNode,
           i.ISceneNode,
           i.IHrefable,
+          i.IMouseCursor,
           i.IPositioning,
           i.IFixedDimension,
           i.IOpacity,
@@ -1970,6 +2023,7 @@ export namespace grida {
         extends i.IBaseNode,
           i.ISceneNode,
           i.IHrefable,
+          i.IMouseCursor,
           i.IPositioning,
           i.IStroke,
           i.IFixedDimension,
@@ -1996,6 +2050,7 @@ export namespace grida {
         extends i.IBaseNode,
           i.ISceneNode,
           i.IHrefable,
+          i.IMouseCursor,
           i.IPositioning,
           // i.ICSSDimension,
           i.IFixedDimension,
@@ -2019,6 +2074,7 @@ export namespace grida {
         extends i.IBaseNode,
           i.ISceneNode,
           i.IHrefable,
+          i.IMouseCursor,
           i.IPositioning,
           // i.ICSSDimension,
           i.IFixedDimension,
@@ -2037,6 +2093,7 @@ export namespace grida {
           i.ISceneNode,
           i.ICSSStylable,
           i.IHrefable,
+          i.IMouseCursor,
           i.IExpandable,
           i.IChildren,
           i.IRectangleCorner,
@@ -2052,6 +2109,7 @@ export namespace grida {
           i.IPositioning,
           // i.ICSSStylable,
           i.IHrefable,
+          i.IMouseCursor,
           i.IProperties,
           i.IProps {
         readonly type: "instance";
@@ -2073,6 +2131,7 @@ export namespace grida {
       export interface TemplateInstanceNode
         extends i.IBaseNode,
           i.IHrefable,
+          i.IMouseCursor,
           i.ISceneNode,
           i.IProperties,
           i.IProps,

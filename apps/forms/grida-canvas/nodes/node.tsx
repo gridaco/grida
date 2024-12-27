@@ -126,6 +126,7 @@ export function NodeElement<P extends Record<string, any>>({
     stroke: node.stroke,
     strokeWidth: node.strokeWidth,
     strokeCap: node.strokeCap,
+    cursor: node.cursor,
     style: {
       ...style,
       ...node.style,
