@@ -55,7 +55,480 @@ import { PaintControl } from "./controls/paint";
 import { StrokeCapControl } from "./controls/stroke-cap";
 import { grida } from "@/grida";
 import assert from "assert";
-import { useNodeAction } from "@/grida-canvas/provider";
+import { useNodeAction, useSelection } from "@/grida-canvas/provider";
+
+export function SelectionMixedProperties() {
+  const { state: document } = useDocument();
+
+  const {
+    document: { root_id },
+  } = document;
+
+  const { ids, nodes, properties, actions: change } = useSelection();
+  const {
+    id,
+    name,
+    active,
+    locked,
+    component_id,
+    style,
+    type,
+    // properties,
+    opacity,
+    cornerRadius,
+    rotation,
+    fill,
+    stroke,
+    strokeWidth,
+    strokeCap,
+    position,
+    width,
+    height,
+    left,
+    top,
+    right,
+    bottom,
+    fit,
+    fontFamily,
+    fontWeight,
+    fontSize,
+    lineHeight,
+    letterSpacing,
+    textAlign,
+    textAlignVertical,
+    maxLength,
+
+    //
+    border,
+    //
+    padding,
+
+    //
+    layout,
+    direction,
+    mainAxisAlignment,
+    crossAxisAlignment,
+    mainAxisGap,
+    crossAxisGap,
+
+    // x
+    userdata,
+  } = properties;
+
+  const sid = ids.join(",");
+  const is_root = ids[0] === root_id; // assuming when root is selected, only root is selected
+  const types = new Set(nodes.map((n) => n.type));
+  const _types = Array.from(types);
+
+  const supports_corner_radius = _types.some((t) => supports.cornerRadius(t));
+  const supports_stroke = _types.some((t) => supports.stroke(t));
+  const supports_stroke_cap = _types.some((t) => supports.strokeCap(t));
+  const has_container = types.has("container");
+  const has_flex_container =
+    has_container && nodes.some((n) => "layout" in n && n.layout === "flex");
+
+  return (
+    <>
+      <div key={sid} className="mt-4 mb-10">
+        <SidebarSection className="border-b pb-4">
+          <SidebarSectionHeaderItem>
+            <SidebarSectionHeaderLabel>
+              Layer
+              <small className="ms-2 font-mono">{ids.length} selection</small>
+            </SidebarSectionHeaderLabel>
+          </SidebarSectionHeaderItem>
+          <SidebarMenuSectionContent className="space-y-2">
+            <PropertyLine className="items-center">
+              <PropertyLineLabel>Name</PropertyLineLabel>
+              <NameControl
+                value={name.mixed ? "mixed" : name.value}
+                disabled={name.mixed}
+                onValueChange={change.name}
+              />
+            </PropertyLine>
+            <PropertyLine className="items-center">
+              <PropertyLineLabel>Active</PropertyLineLabel>
+              <SwitchControl
+                value={active.mixed ? false : active.value}
+                disabled={active.mixed}
+                onValueChange={change.active}
+              />
+            </PropertyLine>
+            <PropertyLine className="items-center">
+              <PropertyLineLabel>
+                <LockClosedIcon />
+              </PropertyLineLabel>
+              <SwitchControl
+                value={locked.mixed ? true : locked.value}
+                disabled={locked.mixed}
+                onValueChange={change.locked}
+              />
+            </PropertyLine>
+          </SidebarMenuSectionContent>
+        </SidebarSection>
+        <SidebarSection hidden={is_root} className="border-b pb-4">
+          <SidebarSectionHeaderItem>
+            <SidebarSectionHeaderLabel>Position</SidebarSectionHeaderLabel>
+          </SidebarSectionHeaderItem>
+          <SidebarMenuSectionContent className="space-y-2">
+            <PropertyLine>
+              <PositioningConstraintsControl
+                // TODO:
+                value={{
+                  position: "relative",
+                  top: undefined,
+                  left: undefined,
+                  right: undefined,
+                  bottom: undefined,
+                }}
+                // onValueChange={actions.positioning}
+              />
+            </PropertyLine>
+            <PropertyLine>
+              <PropertyLineLabel>Mode</PropertyLineLabel>
+              <PositioningModeControl
+                value={position.value}
+                onValueChange={change.positioningMode}
+              />
+            </PropertyLine>
+            <PropertyLine>
+              <PropertyLineLabel>Rotate</PropertyLineLabel>
+              <RotateControl
+                value={rotation.value}
+                onValueChange={change.rotation}
+              />
+            </PropertyLine>
+          </SidebarMenuSectionContent>
+        </SidebarSection>
+        <SidebarSection className="border-b pb-4">
+          <SidebarSectionHeaderItem>
+            <SidebarSectionHeaderLabel>Size</SidebarSectionHeaderLabel>
+          </SidebarSectionHeaderItem>
+          <SidebarMenuSectionContent className="space-y-2">
+            <PropertyLine>
+              <PropertyLineLabel>Width</PropertyLineLabel>
+              <LengthControl value={width.value} onValueChange={change.width} />
+            </PropertyLine>
+            <PropertyLine>
+              <PropertyLineLabel>Height</PropertyLineLabel>
+              <LengthControl
+                value={height.value}
+                onValueChange={change.height}
+              />
+            </PropertyLine>
+          </SidebarMenuSectionContent>
+        </SidebarSection>
+        {/* TODO: */}
+        {/* <SidebarSection className="border-b pb-4">
+          <SidebarSectionHeaderItem>
+            <SidebarSectionHeaderLabel>Link</SidebarSectionHeaderLabel>
+          </SidebarSectionHeaderItem>
+          <SidebarMenuSectionContent className="space-y-2">
+            <PropertyLine>
+              <PropertyLineLabel>Link To</PropertyLineLabel>
+              <HrefControl value={node.href} onValueChange={actions.href} />
+            </PropertyLine>
+            {node.href && (
+              <PropertyLine>
+                <PropertyLineLabel>New Tab</PropertyLineLabel>
+                <TargetBlankControl
+                  value={node.target}
+                  onValueChange={actions.target}
+                />
+              </PropertyLine>
+            )}
+          </SidebarMenuSectionContent>
+        </SidebarSection> */}
+        {/* <SidebarSection hidden={!is_templateinstance} className="border-b pb-4">
+          <SidebarSectionHeaderItem>
+            <SidebarSectionHeaderLabel>Template</SidebarSectionHeaderLabel>
+          </SidebarSectionHeaderItem>
+          <SidebarMenuSectionContent>
+            <TemplateControl
+              value={component_id}
+              onValueChange={actions.component}
+            />
+          </SidebarMenuSectionContent>
+        </SidebarSection> */}
+        {/* <SidebarSection hidden={!is_templateinstance} className="border-b pb-4">
+          <SidebarSectionHeaderItem>
+            <SidebarSectionHeaderLabel>Props</SidebarSectionHeaderLabel>
+          </SidebarSectionHeaderItem>
+
+          {properties && (
+            <SidebarMenuSectionContent className="space-y-2">
+              <PropsControl
+                properties={properties}
+                props={computed.props || {}}
+                onValueChange={actions.value}
+              />
+            </SidebarMenuSectionContent>
+          )}
+        </SidebarSection> */}
+        <SidebarSection hidden={!types.has("text")} className="border-b pb-4">
+          <SidebarSectionHeaderItem>
+            <SidebarSectionHeaderLabel>Text</SidebarSectionHeaderLabel>
+          </SidebarSectionHeaderItem>
+          <SidebarMenuSectionContent className="space-y-2">
+            {/* <PropertyLine>
+              <PropertyLineLabel>Value</PropertyLineLabel>
+              <StringValueControl
+                value={node.text}
+                maxlength={maxLength}
+                onValueChange={actions.text}
+                schema={
+                  root_properties
+                    ? {
+                        properties: root_properties,
+                      }
+                    : undefined
+                }
+              />
+            </PropertyLine> */}
+            <PropertyLine>
+              <PropertyLineLabel>Font</PropertyLineLabel>
+              <FontFamilyControl
+                value={fontFamily?.value}
+                onValueChange={change.fontFamily}
+              />
+            </PropertyLine>
+            <PropertyLine>
+              <PropertyLineLabel>Weight</PropertyLineLabel>
+              <FontWeightControl
+                value={fontWeight?.value}
+                onValueChange={change.fontWeight}
+              />
+            </PropertyLine>
+            <PropertyLine>
+              <PropertyLineLabel>Size</PropertyLineLabel>
+              <FontSizeControl
+                value={fontSize?.value}
+                onValueChange={change.fontSize}
+              />
+            </PropertyLine>
+            <PropertyLine>
+              <PropertyLineLabel>Line</PropertyLineLabel>
+              <LineHeightControl
+                value={lineHeight?.value}
+                onValueChange={change.lineHeight}
+              />
+            </PropertyLine>
+            <PropertyLine>
+              <PropertyLineLabel>Letter</PropertyLineLabel>
+              <LetterSpacingControl
+                value={letterSpacing?.value}
+                onValueChange={change.letterSpacing}
+              />
+            </PropertyLine>
+            <PropertyLine>
+              <PropertyLineLabel>Align</PropertyLineLabel>
+              <TextAlignControl
+                value={textAlign?.value}
+                onValueChange={change.textAlign}
+              />
+            </PropertyLine>
+            <PropertyLine>
+              <PropertyLineLabel></PropertyLineLabel>
+              <TextAlignVerticalControl
+                value={textAlignVertical?.value}
+                onValueChange={change.textAlignVertical}
+              />
+            </PropertyLine>
+            {/* <PropertyLine>
+              <PropertyLineLabel>Max Length</PropertyLineLabel>
+              <MaxlengthControl
+                value={maxLength}
+                placeholder={(
+                  computed.text as any as string
+                )?.length?.toString()}
+                onValueChange={actions.maxLength}
+              />
+            </PropertyLine> */}
+          </SidebarMenuSectionContent>
+        </SidebarSection>
+        <SidebarSection hidden={!types.has("image")} className="border-b pb-4">
+          <SidebarSectionHeaderItem>
+            <SidebarSectionHeaderLabel>Image</SidebarSectionHeaderLabel>
+          </SidebarSectionHeaderItem>
+          <SidebarMenuSectionContent className="space-y-2">
+            {/* <PropertyLine>
+              <PropertyLineLabel>Source</PropertyLineLabel>
+              <SrcControl value={node.src} onValueChange={actions.src} />
+            </PropertyLine> */}
+            <PropertyLine>
+              <PropertyLineLabel>Fit</PropertyLineLabel>
+              <BoxFitControl value={fit?.value} onValueChange={change.fit} />
+            </PropertyLine>
+          </SidebarMenuSectionContent>
+        </SidebarSection>
+        {types.has("container") && (
+          <SidebarSection className="border-b pb-4">
+            <SidebarSectionHeaderItem>
+              <SidebarSectionHeaderLabel>Layout</SidebarSectionHeaderLabel>
+            </SidebarSectionHeaderItem>
+            <SidebarMenuSectionContent className="space-y-2">
+              <PropertyLine>
+                <PropertyLineLabel>Type</PropertyLineLabel>
+                <LayoutControl
+                  value={layout?.value}
+                  onValueChange={change.layout}
+                />
+              </PropertyLine>
+              <PropertyLine hidden={!has_flex_container}>
+                <PropertyLineLabel>Direction</PropertyLineLabel>
+                <AxisControl
+                  value={direction?.value}
+                  onValueChange={change.direction}
+                />
+              </PropertyLine>
+              <PropertyLine hidden={!has_flex_container}>
+                <PropertyLineLabel>Distribute</PropertyLineLabel>
+                <MainAxisAlignmentControl
+                  value={mainAxisAlignment?.value}
+                  onValueChange={change.mainAxisAlignment}
+                />
+              </PropertyLine>
+              <PropertyLine hidden={!has_flex_container}>
+                <PropertyLineLabel>Align</PropertyLineLabel>
+                <CrossAxisAlignmentControl
+                  value={crossAxisAlignment?.value}
+                  direction={
+                    direction?.value !== grida.mixed
+                      ? direction?.value
+                      : undefined
+                  }
+                  onValueChange={change.crossAxisAlignment}
+                />
+              </PropertyLine>
+              {/* <PropertyLine hidden={!has_flex_container}>
+                <PropertyLineLabel>Gap</PropertyLineLabel>
+                <GapControl
+                  value={{
+                    mainAxisGap: mainAxisGap!,
+                    crossAxisGap: crossAxisGap!,
+                  }}
+                  onValueChange={actions.gap}
+                />
+              </PropertyLine> */}
+              {/* <PropertyLine hidden={!has_flex_container}>
+                <PropertyLineLabel>Padding</PropertyLineLabel>
+                <PaddingControl
+                  value={padding!}
+                  onValueChange={actions.padding}
+                />
+              </PropertyLine> */}
+            </SidebarMenuSectionContent>
+          </SidebarSection>
+        )}
+        <SidebarSection className="border-b pb-4">
+          <SidebarSectionHeaderItem>
+            <SidebarSectionHeaderLabel>Styles</SidebarSectionHeaderLabel>
+          </SidebarSectionHeaderItem>
+          <SidebarMenuSectionContent className="space-y-2">
+            <PropertyLine>
+              <PropertyLineLabel>Opacity</PropertyLineLabel>
+              <OpacityControl
+                value={opacity.value}
+                onValueChange={change.opacity}
+              />
+            </PropertyLine>
+            {/* {supports_corner_radius && (
+              <PropertyLine>
+                <PropertyLineLabel>Radius</PropertyLineLabel>
+                <CornerRadiusControl
+                  value={cornerRadius?.value}
+                  onValueChange={actions.cornerRadius}
+                />
+              </PropertyLine>
+            )} */}
+            {/* {supports.border(node.type) && (
+              <PropertyLine>
+                <PropertyLineLabel>Border</PropertyLineLabel>
+                <BorderControl value={border} onValueChange={actions.border} />
+              </PropertyLine>
+            )} */}
+            {/* <PropertyLine>
+              <PropertyLineLabel>Fill</PropertyLineLabel>
+              <FillControl value={fill} onValueChange={actions.fill} />
+            </PropertyLine> */}
+            {/* <PropertyLine>
+              <PropertyLineLabel>Shadow</PropertyLineLabel>
+              <BoxShadowControl
+                value={{ boxShadow }}
+                onValueChange={actions.boxShadow}
+              />
+            </PropertyLine> */}
+            {/* <PropertyLine>
+              <PropertyLineLabel>Cursor</PropertyLineLabel>
+              <CursorControl value={cursor} onValueChange={actions.cursor} />
+            </PropertyLine> */}
+          </SidebarMenuSectionContent>
+        </SidebarSection>
+        {supports_stroke && (
+          <SidebarSection className="border-b pb-4">
+            <SidebarSectionHeaderItem>
+              <SidebarSectionHeaderLabel>Stroke</SidebarSectionHeaderLabel>
+            </SidebarSectionHeaderItem>
+            <SidebarMenuSectionContent className="space-y-2">
+              <PropertyLine>
+                <PropertyLineLabel>Color</PropertyLineLabel>
+                {stroke?.mixed || stroke?.partial ? (
+                  <PaintControl
+                    value={undefined}
+                    onValueChange={change.stroke}
+                  />
+                ) : (
+                  <PaintControl
+                    value={stroke?.value}
+                    onValueChange={change.stroke}
+                  />
+                )}
+              </PropertyLine>
+              <PropertyLine hidden={!stroke?.value}>
+                <PropertyLineLabel>Width</PropertyLineLabel>
+                <StrokeWidthControl
+                  value={strokeWidth?.value}
+                  onValueChange={change.strokeWidth}
+                />
+              </PropertyLine>
+              <PropertyLine hidden={!supports_stroke_cap}>
+                <PropertyLineLabel>Cap</PropertyLineLabel>
+                <StrokeCapControl
+                  value={strokeCap?.value}
+                  onValueChange={change.strokeCap}
+                />
+              </PropertyLine>
+            </SidebarMenuSectionContent>
+          </SidebarSection>
+        )}
+        {/* <SidebarSection className="border-b pb-4">
+          <SidebarSectionHeaderItem>
+            <SidebarSectionHeaderLabel>Developer</SidebarSectionHeaderLabel>
+          </SidebarSectionHeaderItem>
+          <SidebarMenuSectionContent className="space-y-2">
+            <PropertyLine>
+              <UserDataControl
+                node_id={id}
+                value={userdata}
+                onValueCommit={actions.userdata}
+              />
+            </PropertyLine>
+          </SidebarMenuSectionContent>
+        </SidebarSection> */}
+        {/* <SidebarSection className="border-b pb-4">
+          <SidebarSectionHeaderItem>
+            <SidebarSectionHeaderLabel>Export</SidebarSectionHeaderLabel>
+          </SidebarSectionHeaderItem>
+          <SidebarMenuSectionContent className="space-y-2">
+            <PropertyLine>
+              <ExportNodeControl node_id={id} name={name} />
+            </PropertyLine>
+          </SidebarMenuSectionContent>
+        </SidebarSection> */}
+      </div>
+    </>
+  );
+}
 
 export function SelectedNodeProperties() {
   const { state: document } = useDocument();
@@ -316,35 +789,35 @@ export function SelectedNodeProperties() {
           <PropertyLine>
             <PropertyLineLabel>Font</PropertyLineLabel>
             <FontFamilyControl
-              value={fontFamily as any}
+              value={fontFamily}
               onValueChange={actions.fontFamily}
             />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Weight</PropertyLineLabel>
             <FontWeightControl
-              value={fontWeight as any}
+              value={fontWeight}
               onValueChange={actions.fontWeight}
             />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Size</PropertyLineLabel>
             <FontSizeControl
-              value={fontSize as any}
+              value={fontSize}
               onValueChange={actions.fontSize}
             />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Line</PropertyLineLabel>
             <LineHeightControl
-              value={lineHeight as any}
+              value={lineHeight}
               onValueChange={actions.lineHeight}
             />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Letter</PropertyLineLabel>
             <LetterSpacingControl
-              value={letterSpacing as any}
+              value={letterSpacing}
               onValueChange={actions.letterSpacing}
             />
           </PropertyLine>
@@ -514,7 +987,7 @@ export function SelectedNodeProperties() {
               <PropertyLineLabel>Color</PropertyLineLabel>
               <PaintControl value={stroke} onValueChange={actions.stroke} />
             </PropertyLine>
-            <PropertyLine>
+            <PropertyLine hidden={!stroke}>
               <PropertyLineLabel>Width</PropertyLineLabel>
               <StrokeWidthControl
                 value={strokeWidth}

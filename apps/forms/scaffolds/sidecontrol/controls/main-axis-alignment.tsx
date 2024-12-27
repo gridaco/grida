@@ -1,58 +1,42 @@
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { WorkbenchUI } from "@/components/workbench";
-import { grida } from "@/grida";
+import type { grida } from "@/grida";
+import type { TMixed } from "./utils/types";
+import { PropertyEnum } from "../ui";
+
+type MainAxisAlignment = grida.program.cg.MainAxisAlignment;
 
 export function MainAxisAlignmentControl({
   value,
   onValueChange,
 }: {
-  value: grida.program.cg.MainAxisAlignment;
-  onValueChange?: (value: grida.program.cg.MainAxisAlignment) => void;
+  value?: TMixed<MainAxisAlignment>;
+  onValueChange?: (value: MainAxisAlignment) => void;
 }) {
   return (
-    <Select
+    <PropertyEnum<MainAxisAlignment>
+      enum={[
+        {
+          label: "Start",
+          value: "start",
+        },
+        {
+          label: "Center",
+          value: "center",
+        },
+        {
+          label: "Space Between",
+          value: "space-between",
+        },
+        {
+          label: "Space Around",
+          value: "space-around",
+        },
+        {
+          label: "Space Evenly",
+          value: "space-evenly",
+        },
+      ]}
       value={value}
-      onValueChange={(v) => {
-        if (!v) return;
-        onValueChange?.(v as grida.program.cg.MainAxisAlignment);
-      }}
-    >
-      <SelectTrigger className={WorkbenchUI.inputVariants({ size: "xs" })}>
-        <SelectValue placeholder="Select..." />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem
-          value={"start" satisfies grida.program.cg.MainAxisAlignment}
-        >
-          Start
-        </SelectItem>
-        <SelectItem
-          value={"center" satisfies grida.program.cg.MainAxisAlignment}
-        >
-          Center
-        </SelectItem>
-        <SelectItem
-          value={"space-between" satisfies grida.program.cg.MainAxisAlignment}
-        >
-          Space Between
-        </SelectItem>
-        <SelectItem
-          value={"space-around" satisfies grida.program.cg.MainAxisAlignment}
-        >
-          Space Around
-        </SelectItem>
-        <SelectItem
-          value={"space-evenly" satisfies grida.program.cg.MainAxisAlignment}
-        >
-          Space Evenly
-        </SelectItem>
-      </SelectContent>
-    </Select>
+      onValueChange={onValueChange}
+    />
   );
 }

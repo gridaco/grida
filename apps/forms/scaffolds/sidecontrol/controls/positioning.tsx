@@ -9,6 +9,8 @@ import {
 import { WorkbenchUI } from "@/components/workbench";
 import { grida } from "@/grida";
 import { cn } from "@/utils";
+import { TMixed } from "./utils/types";
+import { PropertyEnum } from "../ui";
 
 function parseIntFallback(
   value: string,
@@ -19,25 +21,30 @@ function parseIntFallback(
   return v;
 }
 
+type PositioningMode = grida.program.nodes.i.IPositioning["position"];
+
 export function PositioningModeControl({
   value,
   onValueChange,
 }: {
-  value: grida.program.nodes.i.IPositioning["position"];
-  onValueChange?: (
-    value: grida.program.nodes.i.IPositioning["position"]
-  ) => void;
+  value: TMixed<PositioningMode>;
+  onValueChange?: (value: PositioningMode) => void;
 }) {
   return (
-    <Select value={value} onValueChange={onValueChange}>
-      <SelectTrigger className={WorkbenchUI.inputVariants({ size: "xs" })}>
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="absolute">Absolute</SelectItem>
-        <SelectItem value="relative">Relative</SelectItem>
-      </SelectContent>
-    </Select>
+    <PropertyEnum
+      enum={[
+        {
+          value: "absolute",
+          label: "Absolute",
+        },
+        {
+          value: "relative",
+          label: "Relative",
+        },
+      ]}
+      value={value}
+      onValueChange={onValueChange}
+    />
   );
 }
 

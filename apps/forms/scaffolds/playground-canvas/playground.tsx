@@ -9,7 +9,10 @@ import {
   SidebarSectionHeaderItem,
   SidebarSectionHeaderLabel,
 } from "@/components/sidebar";
-import { SelectedNodeProperties } from "@/scaffolds/sidecontrol/sidecontrol-selected-node";
+import {
+  SelectionMixedProperties,
+  SelectedNodeProperties,
+} from "@/scaffolds/sidecontrol/sidecontrol-selected-node";
 import { __TMP_ComponentProperties } from "@/scaffolds/sidecontrol/sidecontrol-component-properties";
 import { NodeHierarchyList } from "@/scaffolds/sidebar/sidebar-node-hierarchy-list";
 import {
@@ -407,10 +410,14 @@ export default function CanvasPlayground() {
                     <AlignNodes />
                     <hr />
                     <FontFamilyListProvider fonts={fonts}>
-                      {state.selection.length === 1 ? (
-                        <SelectedNodeProperties />
-                      ) : (
+                      {state.selection.length === 0 && (
                         <__TMP_ComponentProperties />
+                      )}
+                      {state.selection.length === 1 && (
+                        <SelectedNodeProperties />
+                      )}
+                      {state.selection.length > 1 && (
+                        <SelectionMixedProperties />
                       )}
                     </FontFamilyListProvider>
                   </SidebarRoot>

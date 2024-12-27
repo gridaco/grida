@@ -1,32 +1,35 @@
 "use client";
 
-import { ToggleGroup, ToggleGroupItem } from "./utils/toggle-group";
 import { ViewHorizontalIcon, ViewVerticalIcon } from "@radix-ui/react-icons";
 import type { grida } from "@/grida";
+import { TMixed } from "./utils/types";
+import { PropertyEnumToggle } from "../ui";
+
+type Axis = grida.program.cg.Axis;
 
 export function AxisControl({
   value,
   onValueChange,
 }: {
-  value: grida.program.cg.Axis;
-  onValueChange?: (value: grida.program.cg.Axis) => void;
+  value?: TMixed<Axis>;
+  onValueChange?: (value: Axis) => void;
 }) {
   return (
-    <ToggleGroup
-      type="single"
-      id="flex-direction"
+    <PropertyEnumToggle<Axis>
+      enum={[
+        {
+          label: "Horizontal",
+          value: "horizontal" satisfies Axis,
+          icon: <ViewVerticalIcon />,
+        },
+        {
+          label: "Vertical",
+          value: "vertical" satisfies Axis,
+          icon: <ViewHorizontalIcon />,
+        },
+      ]}
       value={value}
-      onValueChange={(v) => {
-        if (!v) return;
-        onValueChange?.(v as grida.program.cg.Axis);
-      }}
-    >
-      <ToggleGroupItem value={"horizontal" satisfies grida.program.cg.Axis}>
-        <ViewVerticalIcon />
-      </ToggleGroupItem>
-      <ToggleGroupItem value={"vertical" satisfies grida.program.cg.Axis}>
-        <ViewHorizontalIcon />
-      </ToggleGroupItem>
-    </ToggleGroup>
+      onValueChange={onValueChange}
+    />
   );
 }

@@ -29,7 +29,8 @@ import { document, type Selector } from "./document-query";
 import { GoogleFontsManager } from "./components/google-fonts";
 import { domapi } from "./domapi";
 import { cmath } from "./cmath";
-import type { TCanvasEventTargetDragGestureState } from "./action";
+import type { TCanvasEventTargetDragGestureState, TChange } from "./action";
+import mixed from "./mixed";
 
 const DocumentContext = createContext<IDocumentEditorState | null>(null);
 
@@ -119,7 +120,11 @@ function EditorGoogleFontsManager({ children }: React.PropsWithChildren<{}>) {
   );
 }
 
-export function __useInternal() {
+function __useDispatch() {
+  return useContext(DocumentDispatcherContext);
+}
+
+function __useInternal() {
   const state = useContext(DocumentContext);
   if (!state) {
     throw new Error(
@@ -127,9 +132,31 @@ export function __useInternal() {
     );
   }
 
-  const dispatch = useContext(DocumentDispatcherContext);
+  const dispatch = __useDispatch();
 
   return useMemo(() => [state, dispatch] as const, [state, dispatch]);
+}
+
+export function useResizeNotifier() {
+  const dispatch = __useDispatch();
+  const notifyResize = useCallback(
+    ({
+      content_offset,
+      viewport_offset,
+    }: {
+      content_offset: cmath.Vector2;
+      viewport_offset: cmath.Vector2;
+    }) => {
+      dispatch({
+        type: "__internal/on-resize",
+        content_offset,
+        viewport_offset,
+      });
+    },
+    [dispatch]
+  );
+
+  return notifyResize;
 }
 
 function __useNodeActions(dispatch: DocumentDispatcher) {
@@ -333,7 +360,7 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   );
 
   const changeNodeOpacity = useCallback(
-    (node_id: string, opacity: number) => {
+    (node_id: string, opacity: TChange<number>) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "node/change/opacity",
@@ -346,7 +373,7 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   );
 
   const changeNodeRotation = useCallback(
-    (node_id: string, rotation: number) => {
+    (node_id: string, rotation: TChange<number>) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "node/change/rotation",
@@ -403,7 +430,7 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   );
 
   const changeNodeStrokeWidth = useCallback(
-    (node_id: string, strokeWidth: number) => {
+    (node_id: string, strokeWidth: TChange<number>) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "node/change/stroke-width",
@@ -485,7 +512,7 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   );
 
   const changeTextNodeFontSize = useCallback(
-    (node_id: string, fontSize: number) => {
+    (node_id: string, fontSize: TChange<number>) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "node/change/fontSize",
@@ -529,7 +556,7 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   const changeTextNodeLineHeight = useCallback(
     (
       node_id: string,
-      lineHeight: grida.program.nodes.TextNode["lineHeight"]
+      lineHeight: TChange<grida.program.nodes.TextNode["lineHeight"]>
     ) => {
       requestAnimationFrame(() => {
         dispatch({
@@ -545,7 +572,7 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   const changeTextNodeLetterSpacing = useCallback(
     (
       node_id: string,
-      letterSpacing: grida.program.nodes.TextNode["letterSpacing"]
+      letterSpacing: TChange<grida.program.nodes.TextNode["letterSpacing"]>
     ) => {
       requestAnimationFrame(() => {
         dispatch({
@@ -862,7 +889,7 @@ function __useNudgeActions(dispatch: DocumentDispatcher) {
 }
 
 export function useNodeAction(node_id: string | undefined) {
-  const [_, dispatch] = __useInternal();
+  const dispatch = __useDispatch();
   const nodeActions = __useNodeActions(dispatch);
 
   return useMemo(() => {
@@ -910,16 +937,17 @@ export function useNodeAction(node_id: string | undefined) {
         nodeActions.changeNodeFill(node_id, value),
       stroke: (value: grida.program.cg.PaintWithoutID | null) =>
         nodeActions.changeNodeStroke(node_id, value),
-      strokeWidth: (value: number) =>
-        nodeActions.changeNodeStrokeWidth(node_id, value),
+      strokeWidth: (change: TChange<number>) =>
+        nodeActions.changeNodeStrokeWidth(node_id, change),
       strokeCap: (value: grida.program.cg.StrokeCap) =>
         nodeActions.changeNodeStrokeCap(node_id, value),
       fit: (value: grida.program.cg.BoxFit) =>
         nodeActions.changeNodeFit(node_id, value),
       // stylable
-      opacity: (value: number) => nodeActions.changeNodeOpacity(node_id, value),
-      rotation: (value: number) =>
-        nodeActions.changeNodeRotation(node_id, value),
+      opacity: (change: TChange<number>) =>
+        nodeActions.changeNodeOpacity(node_id, change),
+      rotation: (change: TChange<number>) =>
+        nodeActions.changeNodeRotation(node_id, change),
       width: (value: grida.program.css.Length | "auto") =>
         nodeActions.changeNodeSize(node_id, "width", value),
       height: (value: grida.program.css.Length | "auto") =>
@@ -930,16 +958,18 @@ export function useNodeAction(node_id: string | undefined) {
         nodeActions.changeTextNodeFontFamily(node_id, value),
       fontWeight: (value: grida.program.cg.NFontWeight) =>
         nodeActions.changeTextNodeFontWeight(node_id, value),
-      fontSize: (value: number) =>
-        nodeActions.changeTextNodeFontSize(node_id, value),
+      fontSize: (change: TChange<number>) =>
+        nodeActions.changeTextNodeFontSize(node_id, change),
       textAlign: (value: grida.program.cg.TextAlign) =>
         nodeActions.changeTextNodeTextAlign(node_id, value),
       textAlignVertical: (value: grida.program.cg.TextAlignVertical) =>
         nodeActions.changeTextNodeTextAlignVertical(node_id, value),
-      lineHeight: (value: grida.program.nodes.TextNode["lineHeight"]) =>
-        nodeActions.changeTextNodeLineHeight(node_id, value),
-      letterSpacing: (value: grida.program.nodes.TextNode["letterSpacing"]) =>
-        nodeActions.changeTextNodeLetterSpacing(node_id, value),
+      lineHeight: (
+        change: TChange<grida.program.nodes.TextNode["lineHeight"]>
+      ) => nodeActions.changeTextNodeLineHeight(node_id, change),
+      letterSpacing: (
+        change: TChange<grida.program.nodes.TextNode["letterSpacing"]>
+      ) => nodeActions.changeTextNodeLetterSpacing(node_id, change),
       maxLength: (value: number | undefined) =>
         nodeActions.changeTextNodeMaxlength(node_id, value),
 
@@ -975,6 +1005,297 @@ export function useNodeAction(node_id: string | undefined) {
         nodeActions.changeNodeStyle(node_id, "cursor", value),
     };
   }, [node_id, nodeActions]);
+}
+
+export function useSelection() {
+  const [state, dispatch] = __useInternal();
+  const __actions = __useNodeActions(dispatch);
+  const selection = state.selection;
+
+  const nodes = useMemo(() => {
+    return selection.map((node_id) => {
+      return state.document.nodes[node_id];
+    });
+  }, [selection, state.document.nodes]);
+
+  const mixedProperties = mixed<
+    grida.program.nodes.AnyNode,
+    typeof grida.mixed
+  >(nodes as grida.program.nodes.AnyNode[], {
+    idKey: "id",
+    ignoredKeys: ["id", "type", "userdata"],
+    mixed: grida.mixed,
+  });
+
+  const name = useCallback(
+    (value: string) => {
+      selection.forEach((id) => {
+        __actions.changeNodeName(id, value);
+      });
+    },
+    [selection]
+  );
+
+  const active = useCallback(
+    (value: boolean) => {
+      selection.forEach((id) => {
+        __actions.changeNodeActive(id, value);
+      });
+    },
+    [selection]
+  );
+
+  const locked = useCallback(
+    (value: boolean) => {
+      selection.forEach((id) => {
+        __actions.changeNodeLocked(id, value);
+      });
+    },
+    [selection]
+  );
+
+  const rotation = useCallback(
+    (change: TChange<number>) => {
+      mixedProperties.rotation.ids.forEach((id) => {
+        __actions.changeNodeRotation(id, change);
+      });
+    },
+    [mixedProperties.rotation.ids]
+  );
+
+  const opacity = useCallback(
+    (change: TChange<number>) => {
+      mixedProperties.opacity.ids.forEach((id) => {
+        __actions.changeNodeOpacity(id, change);
+      });
+    },
+    [mixedProperties.opacity.ids]
+  );
+
+  const width = useCallback(
+    (value: grida.program.css.Length | "auto") => {
+      mixedProperties.width.ids.forEach((id) => {
+        __actions.changeNodeSize(id, "width", value);
+      });
+    },
+    [mixedProperties.width.ids]
+  );
+
+  const height = useCallback(
+    (value: grida.program.css.Length | "auto") => {
+      mixedProperties.height.ids.forEach((id) => {
+        __actions.changeNodeSize(id, "height", value);
+      });
+    },
+    [mixedProperties.height.ids]
+  );
+
+  const positioningMode = useCallback(
+    (position: grida.program.nodes.i.IPositioning["position"]) => {
+      mixedProperties.position.ids.forEach((id) => {
+        __actions.changeNodePositioningMode(id, position);
+      });
+    },
+    [mixedProperties.position.ids]
+  );
+
+  const fontFamily = useCallback(
+    (value: string) => {
+      mixedProperties.fontFamily?.ids.forEach((id) => {
+        __actions.changeTextNodeFontFamily(id, value);
+      });
+    },
+    [mixedProperties.fontFamily?.ids]
+  );
+
+  const fontWeight = useCallback(
+    (value: grida.program.cg.NFontWeight) => {
+      mixedProperties.fontWeight?.ids.forEach((id) => {
+        __actions.changeTextNodeFontWeight(id, value);
+      });
+    },
+    [mixedProperties.fontWeight?.ids]
+  );
+
+  const fontSize = useCallback(
+    (change: TChange<number>) => {
+      mixedProperties.fontSize?.ids.forEach((id) => {
+        __actions.changeTextNodeFontSize(id, change);
+      });
+    },
+    [mixedProperties.fontSize?.ids]
+  );
+
+  const lineHeight = useCallback(
+    (change: TChange<grida.program.nodes.TextNode["lineHeight"]>) => {
+      mixedProperties.lineHeight?.ids.forEach((id) => {
+        __actions.changeTextNodeLineHeight(id, change);
+      });
+    },
+    [mixedProperties.lineHeight?.ids]
+  );
+
+  const letterSpacing = useCallback(
+    (change: TChange<grida.program.nodes.TextNode["letterSpacing"]>) => {
+      mixedProperties.letterSpacing?.ids.forEach((id) => {
+        __actions.changeTextNodeLetterSpacing(id, change);
+      });
+    },
+    [mixedProperties.letterSpacing?.ids]
+  );
+
+  const textAlign = useCallback(
+    (value: grida.program.cg.TextAlign) => {
+      mixedProperties.textAlign?.ids.forEach((id) => {
+        __actions.changeTextNodeTextAlign(id, value);
+      });
+    },
+    [mixedProperties.textAlign?.ids]
+  );
+
+  const textAlignVertical = useCallback(
+    (value: grida.program.cg.TextAlignVertical) => {
+      mixedProperties.textAlignVertical?.ids.forEach((id) => {
+        __actions.changeTextNodeTextAlignVertical(id, value);
+      });
+    },
+    [mixedProperties.textAlignVertical?.ids]
+  );
+
+  const fit = useCallback(
+    (value: grida.program.cg.BoxFit) => {
+      mixedProperties.fit?.ids.forEach((id) => {
+        __actions.changeNodeFit(id, value);
+      });
+    },
+    [mixedProperties.fit?.ids]
+  );
+
+  const stroke = useCallback(
+    (value: grida.program.cg.PaintWithoutID | null) => {
+      mixedProperties.stroke?.ids.forEach((id) => {
+        __actions.changeNodeStroke(id, value);
+      });
+    },
+    [mixedProperties.stroke?.ids]
+  );
+
+  const strokeWidth = useCallback(
+    (change: TChange<number>) => {
+      mixedProperties.strokeWidth?.ids.forEach((id) => {
+        __actions.changeNodeStrokeWidth(id, change);
+      });
+    },
+    [mixedProperties.strokeWidth?.ids]
+  );
+
+  const strokeCap = useCallback(
+    (value: grida.program.cg.StrokeCap) => {
+      mixedProperties.strokeCap?.ids.forEach((id) => {
+        __actions.changeNodeStrokeCap(id, value);
+      });
+    },
+    [mixedProperties.strokeCap?.ids]
+  );
+
+  const layout = useCallback(
+    (value: grida.program.nodes.i.IFlexContainer["layout"]) => {
+      mixedProperties.layout?.ids.forEach((id) => {
+        __actions.changeContainerNodeLayout(id, value);
+      });
+    },
+    [mixedProperties.layout?.ids]
+  );
+
+  const direction = useCallback(
+    (value: grida.program.cg.Axis) => {
+      mixedProperties.direction?.ids.forEach((id) => {
+        __actions.changeFlexContainerNodeDirection(id, value);
+      });
+    },
+    [mixedProperties.direction?.ids]
+  );
+
+  const mainAxisAlignment = useCallback(
+    (value: grida.program.cg.MainAxisAlignment) => {
+      mixedProperties.mainAxisAlignment?.ids.forEach((id) => {
+        __actions.changeFlexContainerNodeMainAxisAlignment(id, value);
+      });
+    },
+    [mixedProperties.mainAxisAlignment?.ids]
+  );
+
+  const crossAxisAlignment = useCallback(
+    (value: grida.program.cg.CrossAxisAlignment) => {
+      mixedProperties.crossAxisAlignment?.ids.forEach((id) => {
+        __actions.changeFlexContainerNodeCrossAxisAlignment(id, value);
+      });
+    },
+    [mixedProperties.crossAxisAlignment?.ids]
+  );
+
+  const actions = useMemo(
+    () => ({
+      active,
+      locked,
+      name,
+      rotation,
+      opacity,
+      width,
+      height,
+      positioningMode,
+      fontWeight,
+      fontFamily,
+      fontSize,
+      lineHeight,
+      letterSpacing,
+      textAlign,
+      textAlignVertical,
+      fit,
+      stroke,
+      strokeWidth,
+      strokeCap,
+      layout,
+      direction,
+      mainAxisAlignment,
+      crossAxisAlignment,
+    }),
+    [
+      active,
+      locked,
+      name,
+      rotation,
+      opacity,
+      width,
+      height,
+      positioningMode,
+      fontWeight,
+      fontFamily,
+      fontSize,
+      lineHeight,
+      letterSpacing,
+      textAlign,
+      textAlignVertical,
+      fit,
+      stroke,
+      strokeWidth,
+      strokeCap,
+      layout,
+      direction,
+      mainAxisAlignment,
+      crossAxisAlignment,
+    ]
+  );
+
+  return useMemo(() => {
+    return {
+      ids: selection,
+      nodes: nodes,
+      properties: mixedProperties,
+      actions,
+    };
+  }, [selection, mixedProperties, actions]);
+  //
 }
 
 export function useDocument() {
@@ -1219,7 +1540,7 @@ export function useDocument() {
         dispatch({
           type: "node/change/opacity",
           node_id: node_id,
-          opacity,
+          opacity: { type: "set", value: opacity },
         });
       });
     },

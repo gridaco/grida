@@ -1,34 +1,42 @@
-import { grida } from "@/grida";
-import { ToggleGroup, ToggleGroupItem } from "./utils/toggle-group";
 import {
   TextAlignLeftIcon,
   TextAlignCenterIcon,
   TextAlignRightIcon,
 } from "@radix-ui/react-icons";
+import type { grida } from "@/grida";
+import type { TMixed } from "./utils/types";
+import { PropertyEnumToggle } from "../ui";
+
+type TextAlign = grida.program.cg.TextAlign;
 
 export function TextAlignControl({
   value,
   onValueChange,
 }: {
-  value?: grida.program.cg.TextAlign;
-  onValueChange?: (value: grida.program.cg.TextAlign) => void;
+  value?: TMixed<TextAlign>;
+  onValueChange?: (value: TextAlign) => void;
 }) {
   return (
-    <ToggleGroup
-      type="single"
-      id="horizontal"
+    <PropertyEnumToggle<TextAlign>
+      enum={[
+        {
+          label: "Left",
+          value: "left" satisfies grida.program.cg.TextAlign,
+          icon: <TextAlignLeftIcon />,
+        },
+        {
+          label: "Center",
+          value: "center" satisfies grida.program.cg.TextAlign,
+          icon: <TextAlignCenterIcon />,
+        },
+        {
+          label: "Right",
+          value: "right" satisfies grida.program.cg.TextAlign,
+          icon: <TextAlignRightIcon />,
+        },
+      ]}
       value={value}
       onValueChange={onValueChange}
-    >
-      <ToggleGroupItem value={"left" satisfies grida.program.cg.TextAlign}>
-        <TextAlignLeftIcon />
-      </ToggleGroupItem>
-      <ToggleGroupItem value={"center" satisfies grida.program.cg.TextAlign}>
-        <TextAlignCenterIcon />
-      </ToggleGroupItem>
-      <ToggleGroupItem value={"right" satisfies grida.program.cg.TextAlign}>
-        <TextAlignRightIcon />
-      </ToggleGroupItem>
-    </ToggleGroup>
+    />
   );
 }

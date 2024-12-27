@@ -6,27 +6,26 @@ import * as SelectPrimitive from "@radix-ui/react-select";
 import { Button } from "@/components/ui/button";
 import { CaretDownIcon } from "@radix-ui/react-icons";
 import { cn } from "@/utils";
+import { TChange, TMixed } from "./utils/types";
+import { PropertyNumber } from "../ui";
 
 export function FontSizeControl({
   value,
   onValueChange,
 }: {
-  value?: number;
-  onValueChange?: (value: number) => void;
+  value?: TMixed<number>;
+  onValueChange?: (change: TChange<number>) => void;
 }) {
   return (
     <div className="relative">
-      <Input
-        type="number"
+      <PropertyNumber
+        type="integer"
         value={value}
         placeholder="inherit"
         min={1}
         step={1}
-        onChange={(e) => {
-          onValueChange?.(parseInt(e.target.value) || 1);
-        }}
+        onValueChange={onValueChange}
         className={cn(
-          WorkbenchUI.inputVariants({ size: "xs" }),
           "overflow-hidden",
           "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
         )}
@@ -35,8 +34,8 @@ export function FontSizeControl({
         <Select
           value={String(value)}
           onValueChange={(_v) => {
-            const v = parseInt(_v);
-            onValueChange?.(v);
+            const value = parseInt(_v);
+            onValueChange?.({ type: "set", value });
           }}
         >
           <SelectPrimitive.SelectTrigger asChild>

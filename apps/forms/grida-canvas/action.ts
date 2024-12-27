@@ -465,7 +465,7 @@ interface INodeChangeTextAction extends INodeID {
 }
 
 interface INodeChangeOpacityAction extends INodeID {
-  opacity: number;
+  opacity: TChange<number>;
 }
 
 interface INodeChangeSizeAction extends INodeID {
@@ -473,8 +473,18 @@ interface INodeChangeSizeAction extends INodeID {
   length: grida.program.css.Length | "auto";
 }
 
+export type TChange<T> =
+  | {
+      type: "set";
+      value: T;
+    }
+  | {
+      type: "delta";
+      value: NonNullable<T>;
+    };
+
 interface INodeChangeRotationAction extends INodeID {
-  rotation: grida.program.nodes.i.IRotation["rotation"];
+  rotation: TChange<grida.program.nodes.i.IRotation["rotation"]>;
 }
 
 interface INodeChangeCornerRadiusAction extends INodeID {
@@ -490,7 +500,7 @@ interface INodeChangeStrokeAction extends INodeID {
 }
 
 interface INodeChangeStrokeWidthAction extends INodeID {
-  strokeWidth: number;
+  strokeWidth: TChange<number>;
 }
 
 interface INodeChangeStrokeCapAction extends INodeID {
@@ -513,7 +523,7 @@ interface ITextNodeChangeFontWeightAction extends INodeID {
   fontWeight: grida.program.cg.NFontWeight;
 }
 interface ITextNodeChangeFontSizeAction extends INodeID {
-  fontSize: number;
+  fontSize: TChange<number>;
 }
 interface ITextNodeChangeTextAlignAction extends INodeID {
   textAlign: grida.program.cg.TextAlign;
@@ -524,11 +534,11 @@ interface ITextNodeChangeTextAlignVerticalAction extends INodeID {
 }
 
 interface ITextNodeChangeLineHeightAction extends INodeID {
-  lineHeight: grida.program.nodes.TextNode["lineHeight"];
+  lineHeight: TChange<grida.program.nodes.TextNode["lineHeight"]>;
 }
 
 interface ITextNodeChangeLetterSpacingAction extends INodeID {
-  letterSpacing: grida.program.nodes.TextNode["letterSpacing"];
+  letterSpacing: TChange<grida.program.nodes.TextNode["letterSpacing"]>;
 }
 
 interface ITextNodeChangeMaxlengthAction extends INodeID {

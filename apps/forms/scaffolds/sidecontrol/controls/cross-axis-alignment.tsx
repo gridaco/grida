@@ -1,5 +1,4 @@
 import React from "react";
-import { ToggleGroup, ToggleGroupItem } from "./utils/toggle-group";
 import {
   AlignLeftIcon,
   AlignRightIcon,
@@ -8,7 +7,9 @@ import {
   AlignCenterVerticallyIcon,
   AlignBottomIcon,
 } from "@radix-ui/react-icons";
-import { grida } from "@/grida";
+import type { grida } from "@/grida";
+import type { TMixed } from "./utils/types";
+import { PropertyEnumToggle } from "../ui";
 
 const iconsbyaxis = {
   vertical: {
@@ -28,40 +29,38 @@ const icons = {
   vertical: iconsbyaxis.horizontal,
 };
 
+type CrossAxisAlignment = grida.program.cg.CrossAxisAlignment;
+
 export function CrossAxisAlignmentControl({
   value,
   direction = "horizontal",
   onValueChange,
 }: {
-  value: grida.program.cg.CrossAxisAlignment;
+  value?: TMixed<CrossAxisAlignment>;
   direction?: grida.program.cg.Axis;
-  onValueChange?: (value: grida.program.cg.CrossAxisAlignment) => void;
+  onValueChange?: (value: CrossAxisAlignment) => void;
 }) {
   return (
-    <ToggleGroup
-      type="single"
-      id="align-items"
+    <PropertyEnumToggle<CrossAxisAlignment>
+      enum={[
+        {
+          label: "Start",
+          value: "start",
+          icon: React.createElement(icons[direction].start),
+        },
+        {
+          label: "Center",
+          value: "center",
+          icon: React.createElement(icons[direction].center),
+        },
+        {
+          label: "End",
+          value: "end",
+          icon: React.createElement(icons[direction].end),
+        },
+      ]}
       value={value}
-      onValueChange={(v) => {
-        if (!v) return;
-        onValueChange?.(v as grida.program.cg.CrossAxisAlignment);
-      }}
-    >
-      <ToggleGroupItem
-        value={"start" satisfies grida.program.cg.CrossAxisAlignment}
-      >
-        {React.createElement(icons[direction || "horizontal"].start)}
-      </ToggleGroupItem>
-      <ToggleGroupItem
-        value={"center" satisfies grida.program.cg.CrossAxisAlignment}
-      >
-        {React.createElement(icons[direction || "horizontal"].center)}
-      </ToggleGroupItem>
-      <ToggleGroupItem
-        value={"end" satisfies grida.program.cg.CrossAxisAlignment}
-      >
-        {React.createElement(icons[direction || "horizontal"].end)}
-      </ToggleGroupItem>
-    </ToggleGroup>
+      onValueChange={onValueChange}
+    />
   );
 }

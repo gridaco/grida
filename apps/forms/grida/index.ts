@@ -2,6 +2,8 @@ import type { Tokens } from "@/ast";
 import type { vn } from "./vn";
 
 export namespace grida {
+  export const mixed: unique symbol = Symbol();
+
   export namespace io {
     /**
      * Grida Document File model

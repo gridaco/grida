@@ -1,13 +1,7 @@
 "use client";
 
-import React, {
-  useCallback,
-  useContext,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react";
-import { __useInternal, useDocument } from "./provider";
+import React, { useCallback, useContext, useLayoutEffect, useRef } from "react";
+import { useDocument, useResizeNotifier } from "./provider";
 import { NodeElement } from "./nodes/node";
 import { domapi } from "./domapi";
 import { cmath } from "./cmath";
@@ -21,7 +15,7 @@ function __useEditorContentOffsetNotifyEffect(
   contentRef: React.RefObject<HTMLElement>,
   deps: any[] = []
 ) {
-  const [_, dispatch] = __useInternal();
+  const notify = useResizeNotifier();
 
   const syncoffset = useCallback(
     ({
@@ -31,13 +25,12 @@ function __useEditorContentOffsetNotifyEffect(
       content_offset: cmath.Vector2;
       viewport_offset: cmath.Vector2;
     }) => {
-      dispatch({
-        type: "__internal/on-resize",
+      notify({
         content_offset: content_offset,
         viewport_offset: viewport_offset,
       });
     },
-    [dispatch]
+    [notify]
   );
 
   useLayoutEffect(() => {

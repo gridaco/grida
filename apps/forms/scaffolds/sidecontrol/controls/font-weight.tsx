@@ -1,43 +1,34 @@
 import React from "react";
-import {
-  Select,
-  SelectTrigger,
-  SelectContent,
-  SelectItem,
-  SelectValue,
-} from "@/components/ui/select";
-import { WorkbenchUI } from "@/components/workbench";
+import { grida } from "@/grida";
+import { TMixed } from "./utils/types";
+import { PropertyEnum } from "../ui";
 
-type FontWeight = 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900;
+type NFontWeight = grida.program.cg.NFontWeight;
 
 export function FontWeightControl({
   value,
   onValueChange,
 }: {
-  value?: FontWeight;
-  onValueChange?: (value: FontWeight) => void;
+  value?: TMixed<NFontWeight>;
+  onValueChange?: (value: NFontWeight) => void;
 }) {
   return (
-    <Select
-      value={value?.toString()}
+    <PropertyEnum
+      value={typeof value === "number" ? value.toString() : value}
+      enum={[
+        { value: "100", label: "Thin" },
+        { value: "200", label: "Extra Light" },
+        { value: "300", label: "Light" },
+        { value: "400", label: "Regular" },
+        { value: "500", label: "Medium" },
+        { value: "600", label: "Semi Bold" },
+        { value: "700", label: "Bold" },
+        { value: "800", label: "Extra Bold" },
+        { value: "900", label: "Black" },
+      ]}
       onValueChange={(v) => {
-        onValueChange?.(parseInt(v) as FontWeight);
+        onValueChange?.(parseInt(v) as NFontWeight);
       }}
-    >
-      <SelectTrigger className={WorkbenchUI.inputVariants({ size: "xs" })}>
-        <SelectValue placeholder="inherit" />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="100">Thin</SelectItem>
-        <SelectItem value="200">Extra Light</SelectItem>
-        <SelectItem value="300">Light</SelectItem>
-        <SelectItem value="400">Regular</SelectItem>
-        <SelectItem value="500">Medium</SelectItem>
-        <SelectItem value="600">Semi Bold</SelectItem>
-        <SelectItem value="700">Bold</SelectItem>
-        <SelectItem value="800">Extra Bold</SelectItem>
-        <SelectItem value="900">Black</SelectItem>
-      </SelectContent>
-    </Select>
+    />
   );
 }

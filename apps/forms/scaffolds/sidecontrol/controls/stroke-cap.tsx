@@ -1,11 +1,12 @@
 import { grida } from "@/grida";
 import { PropertyEnum } from "../ui";
+import { TMixed } from "./utils/types";
 
 export function StrokeCapControl({
   value,
   onValueChange,
 }: {
-  value?: grida.program.cg.StrokeCap;
+  value?: TMixed<grida.program.cg.StrokeCap>;
   onValueChange?: (value: grida.program.cg.StrokeCap) => void;
 }) {
   return (
