@@ -2,6 +2,129 @@ import { useHotkeys } from "react-hotkeys-hook";
 import { useDocument, useEventTarget } from "../provider";
 import toast from "react-hot-toast";
 
+export const keybindings_sheet = [
+  {
+    name: "select all siblings",
+    description: "Select all siblings of the current selection",
+    keys: ["meta+a"],
+  },
+  {
+    name: "select children",
+    description: "Select all children of the current selection",
+    keys: ["enter"],
+  },
+  {
+    name: "nudge",
+    description: "Move selection by 1px",
+    keys: ["arrowright", "arrowleft", "arrowup", "arrowdown"],
+  },
+  {
+    name: "duplicate",
+    description: "Duplicate the current selection",
+    keys: ["meta+d"],
+  },
+  {
+    name: "undo",
+    description: "Undo the last action",
+    keys: ["meta+z"],
+  },
+  {
+    name: "redo",
+    description: "Redo the last undone action",
+    keys: ["meta+shift+z"],
+  },
+  {
+    name: "cut",
+    description: "Cut the current selection",
+    keys: ["meta+x"],
+  },
+  {
+    name: "copy",
+    description: "Copy the current selection",
+    keys: ["meta+c"],
+  },
+  {
+    name: "paste",
+    description: "Paste from the clipboard",
+    keys: ["meta+v"],
+  },
+  {
+    name: "toggle bold",
+    description: "Toggle bold style",
+    keys: ["meta+b"],
+  },
+  {
+    name: "toggle active",
+    description: "Toggle active state for the selection",
+    keys: ["meta+shift+h"],
+  },
+  {
+    name: "toggle locked",
+    description: "Toggle locked state for the selection",
+    keys: ["meta+shift+l"],
+  },
+  {
+    name: "select parent",
+    description: "Select the parent of the current selection",
+    keys: ["shift+enter", "\\"],
+  },
+  {
+    name: "select next sibling",
+    description: "Select the next sibling of the current selection",
+    keys: ["tab"],
+  },
+  {
+    name: "select previous sibling",
+    description: "Select the previous sibling of the current selection",
+    keys: ["shift+tab"],
+  },
+  {
+    name: "delete node",
+    description: "Delete the current selection",
+    keys: ["backspace", "delete"],
+  },
+  {
+    name: "align left",
+    description: "Align selection to the left",
+    keys: ["alt+a"],
+  },
+  {
+    name: "align right",
+    description: "Align selection to the right",
+    keys: ["alt+d"],
+  },
+  {
+    name: "align top",
+    description: "Align selection to the top",
+    keys: ["alt+w"],
+  },
+  {
+    name: "align bottom",
+    description: "Align selection to the bottom",
+    keys: ["alt+s"],
+  },
+  {
+    name: "align horizontal center",
+    description: "Align selection horizontally centered",
+    keys: ["alt+h"],
+  },
+  {
+    name: "align vertical center",
+    description: "Align selection vertically centered",
+    keys: ["alt+v"],
+  },
+  {
+    name: "distribute horizontally",
+    description: "Distribute selection evenly horizontally",
+    keys: ["alt+ctrl+v"],
+  },
+  {
+    name: "distribute vertically",
+    description: "Distribute selection evenly vertically",
+    keys: ["alt+ctrl+h"],
+  },
+];
+
 export function useEditorHotKeys() {
   const { setCursorMode, tryExitContentEditMode, tryToggleContentEditMode } =
     useEventTarget();

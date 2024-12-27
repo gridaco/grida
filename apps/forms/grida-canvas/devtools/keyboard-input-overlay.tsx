@@ -1,21 +1,7 @@
 import { cn } from "@/utils";
 import { useState } from "react";
 import { usePersistentHotkeys } from "../hotkey/hooks";
-
-const keysymbols: Record<string, string> = {
-  Control: "⌃",
-  Shift: "⇧",
-  Alt: "⌥",
-  Meta: "⌘",
-  Enter: "↵",
-  Backspace: "⌫",
-  Escape: "⎋",
-  ArrowUp: "↑",
-  ArrowDown: "↓",
-  ArrowLeft: "←",
-  ArrowRight: "→",
-  // Add more key mappings as needed
-};
+import { keysymbols } from "./keysymbols";
 
 export default function KeyboardInputOverlay({
   className,
@@ -30,7 +16,7 @@ export default function KeyboardInputOverlay({
 
   const displayedKeys = Array.from(pressedKeys)
     .filter(Boolean)
-    .map((key) => keysymbols[key] || key.toUpperCase())
+    .map((key) => keysymbols[key.toLowerCase()] || key.toUpperCase())
     .join(" + ");
 
   return (

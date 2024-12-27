@@ -91,11 +91,16 @@ import { CANVAS_PLAYGROUND_LOCALSTORAGE_PREFERENCES_BASE_AI_PROMPT_KEY } from ".
 import { widget_presets } from "./widgets";
 import { useHotkeys } from "react-hotkeys-hook";
 import toast from "react-hot-toast";
-import { useEditorHotKeys } from "@/grida-canvas/viewport/hotkeys";
+import {
+  keybindings_sheet,
+  useEditorHotKeys,
+} from "@/grida-canvas/viewport/hotkeys";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import ErrorBoundary from "./error-boundary";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { keysymbols } from "@/grida-canvas/devtools/keysymbols";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 export default function CanvasPlayground() {
   const [pref, setPref] = useState<Preferences>({ debug: false });
@@ -176,6 +181,13 @@ export default function CanvasPlayground() {
       });
     });
   }, [exampleid]);
+
+  useEffect(() => {
+    addEventListener("beforeunload", (event) => {
+      event.preventDefault();
+      return "";
+    });
+  }, []);
 
   const onExport = () => {
     const documentData = {
@@ -497,8 +509,9 @@ function SettingsDialog(
           <DialogTitle>Playground Settings</DialogTitle>
         </DialogHeader>
         <hr />
-        <Tabs defaultValue="general">
+        <Tabs defaultValue="keybindings" className="min-h-96">
           <TabsList>
+            <TabsTrigger value="keybindings">Keyboard Shortcuts</TabsTrigger>
             <TabsTrigger value="general">General</TabsTrigger>
             <TabsTrigger value="ai">AI</TabsTrigger>
           </TabsList>
@@ -530,6 +543,47 @@ function SettingsDialog(
               </label> */}
               {/* <label>Nudge Amount</label> */}
             </div>
+          </TabsContent>
+          <TabsContent value="keybindings">
+            <ScrollArea className="h-96">
+              <ScrollBar />
+              <div>
+                {keybindings_sheet.map((action) => {
+                  return (
+                    <div
+                      key={action.name}
+                      className="flex items-center justify-between p-2 border-b last:border-b-0"
+                    >
+                      <div className="grid gap-1">
+                        <span className="font-medium text-sm text-gray-800">
+                          {action.name}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {action.description}
+                        </span>
+                      </div>
+                      <div className="flex space-x-2">
+                        {action.keys.map((key) => (
+                          <span
+                            key={key}
+                            className="px-2 py-1 text-xs font-mono font-bold text-gray-700 bg-gray-200 rounded-md shadow"
+                          >
+                            {key
+                              .split("+")
+                              .map(
+                                (part) =>
+                                  keysymbols[part.toLowerCase()] ||
+                                  part.toUpperCase()
+                              )
+                              .join(" + ")}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </ScrollArea>
           </TabsContent>
           <TabsContent value="ai">
             <div>

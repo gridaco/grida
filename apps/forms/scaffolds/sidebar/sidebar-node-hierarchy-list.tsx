@@ -11,6 +11,7 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuShortcut,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import {
@@ -49,9 +50,11 @@ function NodeHierarchyItemContextMenuWrapper({
         {/* <ContextMenuItem>Paste here</ContextMenuItem> */}
         <ContextMenuItem onSelect={() => change.order("front")}>
           Bring to front
+          <ContextMenuShortcut>{"]"}</ContextMenuShortcut>
         </ContextMenuItem>
         <ContextMenuItem onSelect={() => change.order("back")}>
           Send to back
+          <ContextMenuShortcut>{"["}</ContextMenuShortcut>
         </ContextMenuItem>
         <ContextMenuItem
           onSelect={() => {
@@ -64,9 +67,11 @@ function NodeHierarchyItemContextMenuWrapper({
         {/* <ContextMenuItem>Add Container</ContextMenuItem> */}
         <ContextMenuItem onSelect={change.toggleActive}>
           Set Active/Inactive
+          <ContextMenuShortcut>{"⌘⇧H"}</ContextMenuShortcut>
         </ContextMenuItem>
         <ContextMenuItem onSelect={change.toggleLocked}>
           Lock/Unlock
+          <ContextMenuShortcut>{"⌘⇧L"}</ContextMenuShortcut>
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
