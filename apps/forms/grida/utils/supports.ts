@@ -11,7 +11,7 @@ const __supports: Record<string, ReadonlyArray<NodeType>> = {
     "component",
     "instance",
   ],
-  border: ["container", "component", "instance"],
+  border: ["container", "component", "instance", "image", "video"],
   children: ["container", "component", "instance"],
   stroke: ["path", "line", "rectangle", "ellipse"],
   /**

@@ -181,11 +181,11 @@ export default function nodeReducer<
       }
       case "node/change/border": {
         assert(
-          // draft.type === "vector" ||
-          // draft.type === "rectangle" ||
-          // draft.type === "ellipse" ||
           // draft.type === "text" ||
-          draft.type === "container" || draft.type === "component"
+          draft.type === "image" ||
+            draft.type === "video" ||
+            draft.type === "container" ||
+            draft.type === "component"
         );
         draft.border = action.border;
         break;
