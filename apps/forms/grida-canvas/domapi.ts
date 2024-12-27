@@ -16,17 +16,21 @@ export namespace domapi {
    */
   export function get_node_bounding_rect(node_id: string) {
     const contentrect = get_content_element()?.getBoundingClientRect();
-    const domrect = get_node_element(node_id)?.getBoundingClientRect();
+    const noderect = get_node_element(node_id)?.getBoundingClientRect();
 
-    if (!contentrect || !domrect) {
+    if (!contentrect) {
+      throw new Error("renderer missing - content element rect is null");
+    }
+
+    if (!noderect) {
       return null;
     }
 
     return {
-      x: domrect.x - contentrect.x,
-      y: domrect.y - contentrect.y,
-      width: domrect.width,
-      height: domrect.height,
+      x: noderect.x - contentrect.x,
+      y: noderect.y - contentrect.y,
+      width: noderect.width,
+      height: noderect.height,
     } satisfies cmath.Rectangle;
   }
 

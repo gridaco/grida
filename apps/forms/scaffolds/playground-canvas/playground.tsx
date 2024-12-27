@@ -92,7 +92,6 @@ import { widget_presets } from "./widgets";
 import { useHotkeys } from "react-hotkeys-hook";
 import toast from "react-hot-toast";
 import { useEditorHotKeys } from "@/grida-canvas/viewport/hotkeys";
-import { AlignControl } from "../sidecontrol/controls/align";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import ErrorBoundary from "./error-boundary";
 import { Switch } from "@/components/ui/switch";
@@ -407,8 +406,6 @@ export default function CanvasPlayground() {
                       </div>
                     </div>
                     <hr />
-                    <AlignNodes />
-                    <hr />
                     <FontFamilyListProvider fonts={fonts}>
                       {state.selection.length === 0 && (
                         <__TMP_ComponentProperties />
@@ -429,25 +426,6 @@ export default function CanvasPlayground() {
         {!uiHidden && <HelpFab />}
       </main>
     </TooltipProvider>
-  );
-}
-
-function AlignNodes() {
-  const { state, align, distributeEvenly } = useDocument();
-  const has_selection = state.selection.length >= 1;
-
-  return (
-    <SidebarSection className="mt-2">
-      <AlignControl
-        disabled={!has_selection}
-        onAlign={(alignment) => {
-          align("selection", alignment);
-        }}
-        onDistributeEvenly={(axis) => {
-          distributeEvenly("selection", axis);
-        }}
-      />
-    </SidebarSection>
   );
 }
 

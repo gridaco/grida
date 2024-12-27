@@ -5,14 +5,13 @@ export namespace WorkbenchUI {
     variants: {
       variant: {
         input: "shadow-sm border border-input",
-        container: "px-0 flex items-center gap-2",
+        container: "!px-0 flex items-center gap-2",
+        // for paint inputs
+        "paint-container": "!p-0.5",
       },
       size: {
         xs: "text-[11px] h-6 px-1.5 min-w-none",
         sm: "text-xs h-8 px-2 min-w-none",
-        // for paint inputs
-        paint: "text-xs h-8 px-1 min-w-none",
-        container: "text-xs h-8 min-w-none",
       },
     },
     defaultVariants: {

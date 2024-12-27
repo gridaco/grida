@@ -5,13 +5,16 @@ export function MaxlengthControl({
   value,
   placeholder,
   onValueChange,
+  disabled,
 }: {
   value?: number;
   placeholder?: string;
   onValueChange?: (value: number | undefined) => void;
+  disabled?: boolean;
 }) {
   return (
     <Input
+      disabled={disabled}
       type="number"
       placeholder={placeholder}
       min={0}

@@ -29,7 +29,7 @@ export function AlignControl({
   onDistributeEvenly?: (axis: "x" | "y") => void;
 }) {
   return (
-    <div className="w-full flex items-center gap-2">
+    <div className="flex items-center gap-2">
       <div className="flex items-center gap-0 justify-center">
         <Item
           disabled={disabled}

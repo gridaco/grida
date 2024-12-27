@@ -12,7 +12,6 @@ import {
 import { TextAlignControl } from "./controls/text-align";
 import { FontSizeControl } from "./controls/font-size";
 import { FontWeightControl } from "./controls/font-weight";
-import { SwitchControl } from "./controls/switch";
 import { OpacityControl } from "./controls/opacity";
 import { HrefControl } from "./controls/href";
 import { CornerRadiusControl } from "./controls/corner-radius";
@@ -48,7 +47,7 @@ import { LayoutControl } from "./controls/layout";
 import { AxisControl } from "./controls/axis";
 import { MaxlengthControl } from "./controls/maxlength";
 import { useComputedNode, useDocument, useNode } from "@/grida-canvas";
-import { LockClosedIcon } from "@radix-ui/react-icons";
+import { LockClosedIcon, LockOpen1Icon } from "@radix-ui/react-icons";
 import { supports } from "@/grida/utils/supports";
 import { StrokeWidthControl } from "./controls/stroke-width";
 import { PaintControl } from "./controls/paint";
@@ -56,6 +55,28 @@ import { StrokeCapControl } from "./controls/stroke-cap";
 import { grida } from "@/grida";
 import assert from "assert";
 import { useNodeAction, useSelection } from "@/grida-canvas/provider";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Toggle } from "@/components/ui/toggle";
+import { AlignControl } from "./controls/align";
+
+function AlignNodes() {
+  const { state, align, distributeEvenly } = useDocument();
+  const has_selection = state.selection.length >= 1;
+
+  return (
+    <SidebarSection className="mt-2 flex justify-center">
+      <AlignControl
+        disabled={!has_selection}
+        onAlign={(alignment) => {
+          align("selection", alignment);
+        }}
+        onDistributeEvenly={(axis) => {
+          distributeEvenly("selection", axis);
+        }}
+      />
+    </SidebarSection>
+  );
+}
 
 export function SelectionMixedProperties() {
   const { state: document } = useDocument();
@@ -130,39 +151,36 @@ export function SelectionMixedProperties() {
   return (
     <>
       <div key={sid} className="mt-4 mb-10">
+        <AlignNodes />
         <SidebarSection className="border-b pb-4">
-          <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>
-              Layer
-              <small className="ms-2 font-mono">{ids.length} selection</small>
-            </SidebarSectionHeaderLabel>
-          </SidebarSectionHeaderItem>
           <SidebarMenuSectionContent className="space-y-2">
-            <PropertyLine className="items-center">
-              <PropertyLineLabel>Name</PropertyLineLabel>
+            <PropertyLine className="items-center gap-1">
+              <Checkbox
+                checked={active.mixed ? false : active.value}
+                disabled={active.mixed}
+                onCheckedChange={change.active}
+                className="me-1"
+              />
               <NameControl
                 value={name.mixed ? "mixed" : name.value}
                 disabled={name.mixed}
                 onValueChange={change.name}
               />
-            </PropertyLine>
-            <PropertyLine className="items-center">
-              <PropertyLineLabel>Active</PropertyLineLabel>
-              <SwitchControl
-                value={active.mixed ? false : active.value}
-                disabled={active.mixed}
-                onValueChange={change.active}
-              />
-            </PropertyLine>
-            <PropertyLine className="items-center">
-              <PropertyLineLabel>
-                <LockClosedIcon />
-              </PropertyLineLabel>
-              <SwitchControl
-                value={locked.mixed ? true : locked.value}
+              <Toggle
+                variant="outline"
+                size="sm"
                 disabled={locked.mixed}
-                onValueChange={change.locked}
-              />
+                pressed={locked.mixed ? true : locked.value}
+                onPressedChange={change.locked}
+                className="w-6 h-6 p-0.5 aspect-square"
+              >
+                {locked ? (
+                  <LockOpen1Icon className="w-3 h-3" />
+                ) : (
+                  <LockClosedIcon className="w-3 h-3" />
+                )}
+              </Toggle>
+              {/* <small className="ms-2 font-mono">{id}</small> */}
             </PropertyLine>
           </SidebarMenuSectionContent>
         </SidebarSection>
@@ -219,26 +237,6 @@ export function SelectionMixedProperties() {
           </SidebarMenuSectionContent>
         </SidebarSection>
         {/* TODO: */}
-        {/* <SidebarSection className="border-b pb-4">
-          <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>Link</SidebarSectionHeaderLabel>
-          </SidebarSectionHeaderItem>
-          <SidebarMenuSectionContent className="space-y-2">
-            <PropertyLine>
-              <PropertyLineLabel>Link To</PropertyLineLabel>
-              <HrefControl value={node.href} onValueChange={actions.href} />
-            </PropertyLine>
-            {node.href && (
-              <PropertyLine>
-                <PropertyLineLabel>New Tab</PropertyLineLabel>
-                <TargetBlankControl
-                  value={node.target}
-                  onValueChange={actions.target}
-                />
-              </PropertyLine>
-            )}
-          </SidebarMenuSectionContent>
-        </SidebarSection> */}
         {/* <SidebarSection hidden={!is_templateinstance} className="border-b pb-4">
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Template</SidebarSectionHeaderLabel>
@@ -270,21 +268,10 @@ export function SelectionMixedProperties() {
             <SidebarSectionHeaderLabel>Text</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
           <SidebarMenuSectionContent className="space-y-2">
-            {/* <PropertyLine>
+            <PropertyLine>
               <PropertyLineLabel>Value</PropertyLineLabel>
-              <StringValueControl
-                value={node.text}
-                maxlength={maxLength}
-                onValueChange={actions.text}
-                schema={
-                  root_properties
-                    ? {
-                        properties: root_properties,
-                      }
-                    : undefined
-                }
-              />
-            </PropertyLine> */}
+              <StringValueControl disabled value={"multiple"} />
+            </PropertyLine>
             <PropertyLine>
               <PropertyLineLabel>Font</PropertyLineLabel>
               <FontFamilyControl
@@ -334,16 +321,10 @@ export function SelectionMixedProperties() {
                 onValueChange={change.textAlignVertical}
               />
             </PropertyLine>
-            {/* <PropertyLine>
+            <PropertyLine>
               <PropertyLineLabel>Max Length</PropertyLineLabel>
-              <MaxlengthControl
-                value={maxLength}
-                placeholder={(
-                  computed.text as any as string
-                )?.length?.toString()}
-                onValueChange={actions.maxLength}
-              />
-            </PropertyLine> */}
+              <MaxlengthControl disabled placeholder={"multiple"} />
+            </PropertyLine>
           </SidebarMenuSectionContent>
         </SidebarSection>
         <SidebarSection hidden={!types.has("image")} className="border-b pb-4">
@@ -447,10 +428,14 @@ export function SelectionMixedProperties() {
                 <BorderControl value={border} onValueChange={actions.border} />
               </PropertyLine>
             )} */}
-            {/* <PropertyLine>
+            <PropertyLine>
               <PropertyLineLabel>Fill</PropertyLineLabel>
-              <FillControl value={fill} onValueChange={actions.fill} />
-            </PropertyLine> */}
+              {fill?.mixed || fill?.partial ? (
+                <PaintControl value={undefined} onValueChange={change.fill} />
+              ) : (
+                <PaintControl value={fill?.value} onValueChange={change.fill} />
+              )}
+            </PropertyLine>
             {/* <PropertyLine>
               <PropertyLineLabel>Shadow</PropertyLineLabel>
               <BoxShadowControl
@@ -503,28 +488,44 @@ export function SelectionMixedProperties() {
         )}
         {/* <SidebarSection className="border-b pb-4">
           <SidebarSectionHeaderItem>
+            <SidebarSectionHeaderLabel>Link</SidebarSectionHeaderLabel>
+          </SidebarSectionHeaderItem>
+          <SidebarMenuSectionContent className="space-y-2">
+            <PropertyLine>
+              <PropertyLineLabel>Link To</PropertyLineLabel>
+              <HrefControl value={node.href} onValueChange={actions.href} />
+            </PropertyLine>
+            {node.href && (
+              <PropertyLine>
+                <PropertyLineLabel>New Tab</PropertyLineLabel>
+                <TargetBlankControl
+                  value={node.target}
+                  onValueChange={actions.target}
+                />
+              </PropertyLine>
+            )}
+          </SidebarMenuSectionContent>
+        </SidebarSection> */}
+        <SidebarSection className="border-b pb-4">
+          <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Developer</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
           <SidebarMenuSectionContent className="space-y-2">
             <PropertyLine>
-              <UserDataControl
-                node_id={id}
-                value={userdata}
-                onValueCommit={actions.userdata}
-              />
+              <UserDataControl disabled node_id={""} value={undefined} />
             </PropertyLine>
           </SidebarMenuSectionContent>
-        </SidebarSection> */}
-        {/* <SidebarSection className="border-b pb-4">
+        </SidebarSection>
+        <SidebarSection className="border-b pb-4">
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Export</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
           <SidebarMenuSectionContent className="space-y-2">
             <PropertyLine>
-              <ExportNodeControl node_id={id} name={name} />
+              <ExportNodeControl disabled node_id={""} name={""} />
             </PropertyLine>
           </SidebarMenuSectionContent>
-        </SidebarSection> */}
+        </SidebarSection>
       </div>
     </>
   );
@@ -630,6 +631,7 @@ export function SelectedNodeProperties() {
 
   return (
     <div key={node_id} className="mt-4 mb-10">
+      <AlignNodes />
       {/* {process.env.NODE_ENV === "development" && (
         <SidebarSection className="border-b pb-4">
           <SidebarSectionHeaderItem>
@@ -650,26 +652,28 @@ export function SelectedNodeProperties() {
         </SidebarSectionHeaderItem>
       </SidebarSection> */}
       <SidebarSection className="border-b pb-4">
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>
-            Layer
-            <small className="ms-2 font-mono">{id}</small>
-          </SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
         <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine className="items-center">
-            <PropertyLineLabel>Name</PropertyLineLabel>
+          <PropertyLine className="items-center gap-1">
+            <Checkbox
+              checked={active}
+              onCheckedChange={actions.active}
+              className="me-1"
+            />
             <NameControl value={name} onValueChange={actions.name} />
-          </PropertyLine>
-          <PropertyLine className="items-center">
-            <PropertyLineLabel>Active</PropertyLineLabel>
-            <SwitchControl value={active} onValueChange={actions.active} />
-          </PropertyLine>
-          <PropertyLine className="items-center">
-            <PropertyLineLabel>
-              <LockClosedIcon />
-            </PropertyLineLabel>
-            <SwitchControl value={locked} onValueChange={actions.locked} />
+            <Toggle
+              variant="outline"
+              size="sm"
+              pressed={locked}
+              onPressedChange={actions.locked}
+              className="w-6 h-6 p-0.5 aspect-square"
+            >
+              {locked ? (
+                <LockOpen1Icon className="w-3 h-3" />
+              ) : (
+                <LockClosedIcon className="w-3 h-3" />
+              )}
+            </Toggle>
+            {/* <small className="ms-2 font-mono">{id}</small> */}
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>
@@ -717,26 +721,6 @@ export function SelectedNodeProperties() {
             <PropertyLineLabel>Height</PropertyLineLabel>
             <LengthControl value={height} onValueChange={actions.height} />
           </PropertyLine>
-        </SidebarMenuSectionContent>
-      </SidebarSection>
-      <SidebarSection className="border-b pb-4">
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Link</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine>
-            <PropertyLineLabel>Link To</PropertyLineLabel>
-            <HrefControl value={node.href} onValueChange={actions.href} />
-          </PropertyLine>
-          {node.href && (
-            <PropertyLine>
-              <PropertyLineLabel>New Tab</PropertyLineLabel>
-              <TargetBlankControl
-                value={node.target}
-                onValueChange={actions.target}
-              />
-            </PropertyLine>
-          )}
         </SidebarMenuSectionContent>
       </SidebarSection>
       <SidebarSection hidden={!is_templateinstance} className="border-b pb-4">
@@ -957,13 +941,6 @@ export function SelectedNodeProperties() {
             <PropertyLineLabel>Fill</PropertyLineLabel>
             <FillControl value={fill} onValueChange={actions.fill} />
           </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Shadow</PropertyLineLabel>
-            <BoxShadowControl
-              value={{ boxShadow }}
-              onValueChange={actions.boxShadow}
-            />
-          </PropertyLine>
           {/* <PropertyLine>
             <PropertyLineLabel>Ratio</PropertyLineLabel>
             <AspectRatioControl
@@ -1004,6 +981,40 @@ export function SelectedNodeProperties() {
           </SidebarMenuSectionContent>
         </SidebarSection>
       )}
+      <SidebarSection hidden={!is_stylable} className="border-b pb-4">
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>Effects</SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuSectionContent className="space-y-2">
+          <PropertyLine>
+            <PropertyLineLabel>Shadow</PropertyLineLabel>
+            <BoxShadowControl
+              value={{ boxShadow }}
+              onValueChange={actions.boxShadow}
+            />
+          </PropertyLine>
+        </SidebarMenuSectionContent>
+      </SidebarSection>
+      <SidebarSection className="border-b pb-4">
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>Link</SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuSectionContent className="space-y-2">
+          <PropertyLine>
+            <PropertyLineLabel>Link To</PropertyLineLabel>
+            <HrefControl value={node.href} onValueChange={actions.href} />
+          </PropertyLine>
+          {node.href && (
+            <PropertyLine>
+              <PropertyLineLabel>New Tab</PropertyLineLabel>
+              <TargetBlankControl
+                value={node.target}
+                onValueChange={actions.target}
+              />
+            </PropertyLine>
+          )}
+        </SidebarMenuSectionContent>
+      </SidebarSection>
 
       <SidebarSection className="border-b pb-4">
         <SidebarSectionHeaderItem>

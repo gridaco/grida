@@ -14,10 +14,9 @@ import {
   RadialGradientPaintIcon,
   SolidPaintIcon,
 } from "./icons/paint-icon";
-import { PaintChip, RGBAChip } from "./utils/paint-chip";
+import { PaintChip } from "./utils/paint-chip";
 import React, { useCallback } from "react";
 import HexValueInput from "./utils/hex";
-import { Button } from "@/components/ui/button";
 import { Cross2Icon } from "@radix-ui/react-icons";
 
 const transparent_paint: grida.program.cg.Paint = {
@@ -148,7 +147,10 @@ export function PaintControl({
           <div
             className={cn(
               "flex items-center border cursor-default",
-              WorkbenchUI.inputVariants({ size: "paint" })
+              WorkbenchUI.inputVariants({
+                size: "xs",
+                variant: "paint-container",
+              })
             )}
             onClick={onAddPaint}
           >
@@ -205,7 +207,10 @@ function PaintInputContainer({ children }: React.PropsWithChildren<{}>) {
     <div
       className={cn(
         "flex items-center border cursor-default",
-        WorkbenchUI.inputVariants({ size: "paint" })
+        WorkbenchUI.inputVariants({
+          size: "xs",
+          variant: "paint-container",
+        })
       )}
     >
       {children}

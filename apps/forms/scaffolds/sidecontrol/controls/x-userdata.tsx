@@ -28,10 +28,12 @@ function validate(value: string | undefined): any | false {
 }
 
 export function UserDataControl({
+  disabled,
   node_id,
   value,
   onValueCommit,
 }: {
+  disabled?: boolean;
   node_id: string;
   value: unknown | undefined;
   onValueCommit?: (value: unknown | undefined) => void;
@@ -59,7 +61,12 @@ export function UserDataControl({
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button variant="outline" size="xs" className="w-full">
+        <Button
+          variant="outline"
+          size="xs"
+          className="w-full"
+          disabled={disabled}
+        >
           Custom Data
         </Button>
       </DialogTrigger>

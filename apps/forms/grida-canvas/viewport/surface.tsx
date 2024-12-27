@@ -547,24 +547,31 @@ function usePrefferedDistributionAxis() {
   const [axis, setAxis] = useState<"x" | "y">();
 
   useEffect(() => {
-    const rects = selection.map(
+    const activeSelection = selection.filter(
+      (node_id) => state.document.nodes[node_id].active
+    );
+
+    const rects = activeSelection.map(
       (node_id) => domapi.get_node_bounding_rect(node_id)!
     );
-    const x_distribute = cmath.rect.axisProjectionIntersection(rects, "x");
-    if (x_distribute) {
-      const dist = cmath.rect.getGaps(rects, "x");
-      if (!gapsAreAligned(dist)) {
-        setAxis("x");
-        return;
-      }
-    }
 
-    const y_distribute = cmath.rect.axisProjectionIntersection(rects, "y");
-    if (y_distribute) {
-      const dist = cmath.rect.getGaps(rects, "y");
-      if (!gapsAreAligned(dist)) {
-        setAxis("y");
-        return;
+    if (rects.length > 2) {
+      const x_distribute = cmath.rect.axisProjectionIntersection(rects, "x");
+      if (x_distribute) {
+        const dist = cmath.rect.getGaps(rects, "x");
+        if (!gapsAreAligned(dist)) {
+          setAxis("x");
+          return;
+        }
+      }
+
+      const y_distribute = cmath.rect.axisProjectionIntersection(rects, "y");
+      if (y_distribute) {
+        const dist = cmath.rect.getGaps(rects, "y");
+        if (!gapsAreAligned(dist)) {
+          setAxis("y");
+          return;
+        }
       }
     }
 

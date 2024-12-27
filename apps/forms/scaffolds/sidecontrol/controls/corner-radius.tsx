@@ -33,7 +33,7 @@ export function CornerRadiusControl({
         <div
           className={WorkbenchUI.inputVariants({
             variant: "container",
-            size: "container",
+            size: "xs",
           })}
         >
           <Input

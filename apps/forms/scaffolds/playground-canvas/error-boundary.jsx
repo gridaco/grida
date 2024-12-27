@@ -1,4 +1,6 @@
 import React from "react";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -21,14 +23,26 @@ class ErrorBoundary extends React.Component {
     if (this.state.hasError) {
       // You can render any custom fallback UI
       return (
-        <div>
-          <h2>Oops, there is an error!</h2>
-          <button
-            type="button"
-            onClick={() => this.setState({ hasError: false })}
-          >
-            Try again?
-          </button>
+        <div className="flex flex-col items-center justify-center min-h-screen bg-background">
+          <h1 className="text-4xl font-bold mb-4">
+            Oops! Something went wrong
+          </h1>
+          <p className="text-xl mb-8 text-muted-foreground">
+            We're sorry, but an error occurred while processing your request.
+          </p>
+          <div className="flex space-x-4">
+            <Button
+              onClick={() => {
+                // Reset the error state
+                this.setState({ hasError: false });
+              }}
+            >
+              Try again
+            </Button>
+            <Link href="https://github.com/gridaco/grida/issues">
+              <Button variant="secondary">Report a problem</Button>
+            </Link>
+          </div>
         </div>
       );
     }

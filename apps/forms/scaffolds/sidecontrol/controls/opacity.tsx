@@ -15,7 +15,7 @@ export function OpacityControl({
     <div
       className={WorkbenchUI.inputVariants({
         variant: "container",
-        size: "container",
+        size: "xs",
       })}
     >
       <div className="flex-1">

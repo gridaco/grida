@@ -1171,6 +1171,15 @@ export function useSelection() {
     [mixedProperties.fit?.ids]
   );
 
+  const fill = useCallback(
+    (value: grida.program.cg.PaintWithoutID | null) => {
+      mixedProperties.fill?.ids.forEach((id) => {
+        __actions.changeNodeFill(id, value);
+      });
+    },
+    [mixedProperties.fill?.ids]
+  );
+
   const stroke = useCallback(
     (value: grida.program.cg.PaintWithoutID | null) => {
       mixedProperties.stroke?.ids.forEach((id) => {
@@ -1252,6 +1261,7 @@ export function useSelection() {
       textAlign,
       textAlignVertical,
       fit,
+      fill,
       stroke,
       strokeWidth,
       strokeCap,
@@ -1277,6 +1287,7 @@ export function useSelection() {
       textAlign,
       textAlignVertical,
       fit,
+      fill,
       stroke,
       strokeWidth,
       strokeCap,
