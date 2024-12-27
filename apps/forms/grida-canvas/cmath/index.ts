@@ -161,6 +161,10 @@ export namespace cmath.vector2 {
    */
   export const zero: Vector2 = [0, 0];
 
+  export function isZero(vector: Vector2): boolean {
+    return vector[0] === 0 && vector[1] === 0;
+  }
+
   export function add(...vectors: Vector2[]): Vector2 {
     return vectors.reduce((acc, [x, y]) => [acc[0] + x, acc[1] + y], [
       0, 0,

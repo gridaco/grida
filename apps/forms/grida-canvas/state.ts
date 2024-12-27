@@ -504,6 +504,7 @@ export interface IDocumentEditorState
     IDocumentState {}
 
 export function initDocumentEditorState({
+  debug,
   ...init
 }: Omit<IDocumentEditorInit, "debug"> & {
   debug?: boolean;
@@ -511,7 +512,7 @@ export function initDocumentEditorState({
   const s = new document.DocumentState(init.document);
 
   return {
-    debug: false,
+    debug: debug ?? false,
     selection: [],
     hovered_node_id: null,
     hovered_vertex_idx: null,

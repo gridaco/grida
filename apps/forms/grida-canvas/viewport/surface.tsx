@@ -236,11 +236,14 @@ export function EditorSurface() {
         )}
         <SurfaceGroup hidden={is_node_translating || isWindowResizing}>
           {content_edit_mode?.type === "text" && (
-            <SurfaceTextEditor node_id={content_edit_mode.node_id} />
+            <SurfaceTextEditor
+              key="text-editor"
+              node_id={content_edit_mode.node_id}
+            />
           )}
           {content_edit_mode?.type === "path" && (
             <SurfacePathEditor
-              key={content_edit_mode.node_id}
+              key="path-editor"
               node_id={content_edit_mode.node_id}
             />
           )}

@@ -113,6 +113,7 @@ export default function CanvasPlayground() {
     standaloneDocumentReducer,
     initDocumentEditorState({
       editable: true,
+      debug: pref.debug,
       document: {
         nodes: {
           root: {

@@ -22,7 +22,7 @@ export default function reducer<S extends IDocumentEditorState>(
       action.type === "event-target/event/on-drag"
     )
   ) {
-    console.log("debug:event", action.type, action);
+    console.log("debug:action", action.type, action);
   }
 
   switch (action.type) {

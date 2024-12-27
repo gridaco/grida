@@ -82,18 +82,22 @@ export function SurfacePathEditor({ node_id }: { node_id: string }) {
                 top: d[1],
               }}
             >
-              <CurveControlExtension
-                segment={i}
-                control="ta"
-                a={a}
-                b={cmath.vector2.add(a, ta)}
-              />
-              <CurveControlExtension
-                segment={i}
-                control="tb"
-                a={b}
-                b={cmath.vector2.add(b, tb)}
-              />
+              {!cmath.vector2.isZero(ta) && (
+                <CurveControlExtension
+                  segment={i}
+                  control="ta"
+                  a={a}
+                  b={cmath.vector2.add(a, ta)}
+                />
+              )}
+              {!cmath.vector2.isZero(tb) && (
+                <CurveControlExtension
+                  segment={i}
+                  control="tb"
+                  a={b}
+                  b={cmath.vector2.add(b, tb)}
+                />
+              )}
               {/* preview the next ta - cannot be edited */}
               {a_point_is_last && (
                 <Extension
@@ -186,6 +190,11 @@ function VertexPoint({
       },
       onPointerDown: ({ event }) => {
         event.preventDefault();
+        const element = event.target as HTMLDivElement;
+        if (element.hasAttribute("tabindex")) {
+          // focus explicitly for key events (as default behavior is prevented)
+          element.focus();
+        }
         editor.selectVertex(index);
       },
       onDragStart: (state) => {
@@ -213,7 +222,7 @@ function VertexPoint({
   return (
     <Point
       {...bind()}
-      tabIndex={index}
+      tabIndex={0}
       selected={selected}
       hovered={hovered}
       point={point}
