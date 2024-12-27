@@ -153,14 +153,14 @@ export namespace document {
     for (const node of selection) {
       // Check if the node is a descendant of any already selected parent
       if (
-        !Array.from(prunedSelection).some((selectedNode) =>
-          isAncestor(context, selectedNode, node)
+        !Array.from(prunedSelection).some((selected) =>
+          isAncestor(context, selected, node)
         )
       ) {
         // Remove descendants of the current node from the pruned selection
-        for (const selectedNode of Array.from(prunedSelection)) {
-          if (isAncestor(context, node, selectedNode)) {
-            prunedSelection.delete(selectedNode);
+        for (const selected of Array.from(prunedSelection)) {
+          if (isAncestor(context, node, selected)) {
+            prunedSelection.delete(selected);
           }
         }
 

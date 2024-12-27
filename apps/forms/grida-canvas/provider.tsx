@@ -1320,16 +1320,10 @@ export function useDocument() {
     [dispatch]
   );
 
-  const selectedNodeActions = useNodeAction(
-    selection.length === 1 ? selection[0] : undefined
-  );
-  const selectedNode = selection.length === 1 ? selectedNodeActions : undefined;
-
   return useMemo(() => {
     return {
       state,
       selection,
-      selectedNode,
       //
       select,
       blur,
@@ -1371,7 +1365,6 @@ export function useDocument() {
   }, [
     state,
     selection,
-    selectedNode,
     //
     select,
     blur,

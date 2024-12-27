@@ -55,10 +55,10 @@ import { PaintControl } from "./controls/paint";
 import { StrokeCapControl } from "./controls/stroke-cap";
 import { grida } from "@/grida";
 import assert from "assert";
+import { useNodeAction } from "@/grida-canvas/provider";
 
 export function SelectedNodeProperties() {
-  const { state: document, selectedNode } = useDocument();
-  assert(selectedNode);
+  const { state: document } = useDocument();
 
   // - color - variables
   const {
@@ -68,6 +68,7 @@ export function SelectedNodeProperties() {
 
   assert(selection.length === 1);
   const node_id = selection[0];
+  const actions = useNodeAction(node_id)!;
 
   const node = useNode(node_id);
   const root = useNode(root_id);
@@ -141,7 +142,7 @@ export function SelectedNodeProperties() {
     // margin,
     // padding,
     //
-    aspectRatio,
+    // aspectRatio,
     //
     // flexWrap,
     // gap,
@@ -185,17 +186,17 @@ export function SelectedNodeProperties() {
         <SidebarMenuSectionContent className="space-y-2">
           <PropertyLine className="items-center">
             <PropertyLineLabel>Name</PropertyLineLabel>
-            <NameControl value={name} onValueChange={selectedNode.name} />
+            <NameControl value={name} onValueChange={actions.name} />
           </PropertyLine>
           <PropertyLine className="items-center">
             <PropertyLineLabel>Active</PropertyLineLabel>
-            <SwitchControl value={active} onValueChange={selectedNode.active} />
+            <SwitchControl value={active} onValueChange={actions.active} />
           </PropertyLine>
           <PropertyLine className="items-center">
             <PropertyLineLabel>
               <LockClosedIcon />
             </PropertyLineLabel>
-            <SwitchControl value={locked} onValueChange={selectedNode.locked} />
+            <SwitchControl value={locked} onValueChange={actions.locked} />
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>
@@ -213,7 +214,7 @@ export function SelectedNodeProperties() {
                 right,
                 bottom,
               }}
-              onValueChange={selectedNode.positioning}
+              onValueChange={actions.positioning}
             />
           </PropertyLine>
           <PropertyLine>
@@ -221,15 +222,12 @@ export function SelectedNodeProperties() {
             <PositioningModeControl
               value={position}
               //
-              onValueChange={selectedNode.positioningMode}
+              onValueChange={actions.positioningMode}
             />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Rotate</PropertyLineLabel>
-            <RotateControl
-              value={rotation}
-              onValueChange={selectedNode.rotation}
-            />
+            <RotateControl value={rotation} onValueChange={actions.rotation} />
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>
@@ -240,11 +238,11 @@ export function SelectedNodeProperties() {
         <SidebarMenuSectionContent className="space-y-2">
           <PropertyLine>
             <PropertyLineLabel>Width</PropertyLineLabel>
-            <LengthControl value={width} onValueChange={selectedNode.width} />
+            <LengthControl value={width} onValueChange={actions.width} />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Height</PropertyLineLabel>
-            <LengthControl value={height} onValueChange={selectedNode.height} />
+            <LengthControl value={height} onValueChange={actions.height} />
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>
@@ -255,14 +253,14 @@ export function SelectedNodeProperties() {
         <SidebarMenuSectionContent className="space-y-2">
           <PropertyLine>
             <PropertyLineLabel>Link To</PropertyLineLabel>
-            <HrefControl value={node.href} onValueChange={selectedNode.href} />
+            <HrefControl value={node.href} onValueChange={actions.href} />
           </PropertyLine>
           {node.href && (
             <PropertyLine>
               <PropertyLineLabel>New Tab</PropertyLineLabel>
               <TargetBlankControl
                 value={node.target}
-                onValueChange={selectedNode.target}
+                onValueChange={actions.target}
               />
             </PropertyLine>
           )}
@@ -275,7 +273,7 @@ export function SelectedNodeProperties() {
         <SidebarMenuSectionContent>
           <TemplateControl
             value={component_id}
-            onValueChange={selectedNode.component}
+            onValueChange={actions.component}
           />
         </SidebarMenuSectionContent>
       </SidebarSection>
@@ -289,7 +287,7 @@ export function SelectedNodeProperties() {
             <PropsControl
               properties={properties}
               props={computed.props || {}}
-              onValueChange={selectedNode.value}
+              onValueChange={actions.value}
             />
           </SidebarMenuSectionContent>
         )}
@@ -305,7 +303,7 @@ export function SelectedNodeProperties() {
             <StringValueControl
               value={node.text}
               maxlength={maxLength}
-              onValueChange={selectedNode.text}
+              onValueChange={actions.text}
               schema={
                 root_properties
                   ? {
@@ -319,49 +317,49 @@ export function SelectedNodeProperties() {
             <PropertyLineLabel>Font</PropertyLineLabel>
             <FontFamilyControl
               value={fontFamily as any}
-              onValueChange={selectedNode.fontFamily}
+              onValueChange={actions.fontFamily}
             />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Weight</PropertyLineLabel>
             <FontWeightControl
               value={fontWeight as any}
-              onValueChange={selectedNode.fontWeight}
+              onValueChange={actions.fontWeight}
             />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Size</PropertyLineLabel>
             <FontSizeControl
               value={fontSize as any}
-              onValueChange={selectedNode.fontSize}
+              onValueChange={actions.fontSize}
             />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Line</PropertyLineLabel>
             <LineHeightControl
               value={lineHeight as any}
-              onValueChange={selectedNode.lineHeight}
+              onValueChange={actions.lineHeight}
             />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Letter</PropertyLineLabel>
             <LetterSpacingControl
               value={letterSpacing as any}
-              onValueChange={selectedNode.letterSpacing}
+              onValueChange={actions.letterSpacing}
             />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Align</PropertyLineLabel>
             <TextAlignControl
               value={textAlign}
-              onValueChange={selectedNode.textAlign}
+              onValueChange={actions.textAlign}
             />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel></PropertyLineLabel>
             <TextAlignVerticalControl
               value={textAlignVertical}
-              onValueChange={selectedNode.textAlignVertical}
+              onValueChange={actions.textAlignVertical}
             />
           </PropertyLine>
           <PropertyLine>
@@ -369,7 +367,7 @@ export function SelectedNodeProperties() {
             <MaxlengthControl
               value={maxLength}
               placeholder={(computed.text as any as string)?.length?.toString()}
-              onValueChange={selectedNode.maxLength}
+              onValueChange={actions.maxLength}
             />
           </PropertyLine>
         </SidebarMenuSectionContent>
@@ -381,11 +379,11 @@ export function SelectedNodeProperties() {
         <SidebarMenuSectionContent className="space-y-2">
           <PropertyLine>
             <PropertyLineLabel>Source</PropertyLineLabel>
-            <SrcControl value={node.src} onValueChange={selectedNode.src} />
+            <SrcControl value={node.src} onValueChange={actions.src} />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Fit</PropertyLineLabel>
-            <BoxFitControl value={fit} onValueChange={selectedNode.fit} />
+            <BoxFitControl value={fit} onValueChange={actions.fit} />
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>
@@ -397,30 +395,27 @@ export function SelectedNodeProperties() {
           <SidebarMenuSectionContent className="space-y-2">
             <PropertyLine>
               <PropertyLineLabel>Type</PropertyLineLabel>
-              <LayoutControl
-                value={layout!}
-                onValueChange={selectedNode.layout}
-              />
+              <LayoutControl value={layout!} onValueChange={actions.layout} />
             </PropertyLine>
             <PropertyLine hidden={!is_flex_container}>
               <PropertyLineLabel>Direction</PropertyLineLabel>
               <AxisControl
                 value={direction!}
-                onValueChange={selectedNode.direction}
+                onValueChange={actions.direction}
               />
             </PropertyLine>
             {/* <PropertyLine>
               <PropertyLineLabel>Wrap</PropertyLineLabel>
               <FlexWrapControl
                 value={flexWrap as any}
-                onValueChange={selectedNode.flexWrap}
+                onValueChange={actions.flexWrap}
               />
             </PropertyLine> */}
             <PropertyLine hidden={!is_flex_container}>
               <PropertyLineLabel>Distribute</PropertyLineLabel>
               <MainAxisAlignmentControl
                 value={mainAxisAlignment!}
-                onValueChange={selectedNode.mainAxisAlignment}
+                onValueChange={actions.mainAxisAlignment}
               />
             </PropertyLine>
             <PropertyLine hidden={!is_flex_container}>
@@ -428,7 +423,7 @@ export function SelectedNodeProperties() {
               <CrossAxisAlignmentControl
                 value={crossAxisAlignment!}
                 direction={direction}
-                onValueChange={selectedNode.crossAxisAlignment}
+                onValueChange={actions.crossAxisAlignment}
               />
             </PropertyLine>
             <PropertyLine hidden={!is_flex_container}>
@@ -438,21 +433,21 @@ export function SelectedNodeProperties() {
                   mainAxisGap: mainAxisGap!,
                   crossAxisGap: crossAxisGap!,
                 }}
-                onValueChange={selectedNode.gap}
+                onValueChange={actions.gap}
               />
             </PropertyLine>
             {/* <PropertyLine hidden={!is_flex_container}>
               <PropertyLineLabel>Margin</PropertyLineLabel>
               <MarginControl
                 value={margin as any}
-                onValueChange={selectedNode.margin}
+                onValueChange={actions.margin}
               />
             </PropertyLine> */}
             <PropertyLine hidden={!is_flex_container}>
               <PropertyLineLabel>Padding</PropertyLineLabel>
               <PaddingControl
                 value={padding!}
-                onValueChange={selectedNode.padding}
+                onValueChange={actions.padding}
               />
             </PropertyLine>
           </SidebarMenuSectionContent>
@@ -467,7 +462,7 @@ export function SelectedNodeProperties() {
             <PropertyLineLabel>Opacity</PropertyLineLabel>
             <OpacityControl
               value={opacity as any}
-              onValueChange={selectedNode.opacity}
+              onValueChange={actions.opacity}
             />
           </PropertyLine>
           {supports.cornerRadius(node.type) && (
@@ -475,40 +470,37 @@ export function SelectedNodeProperties() {
               <PropertyLineLabel>Radius</PropertyLineLabel>
               <CornerRadiusControl
                 value={cornerRadius}
-                onValueChange={selectedNode.cornerRadius}
+                onValueChange={actions.cornerRadius}
               />
             </PropertyLine>
           )}
           {supports.border(node.type) && (
             <PropertyLine>
               <PropertyLineLabel>Border</PropertyLineLabel>
-              <BorderControl
-                value={border}
-                onValueChange={selectedNode.border}
-              />
+              <BorderControl value={border} onValueChange={actions.border} />
             </PropertyLine>
           )}
           <PropertyLine>
             <PropertyLineLabel>Fill</PropertyLineLabel>
-            <FillControl value={fill} onValueChange={selectedNode.fill} />
+            <FillControl value={fill} onValueChange={actions.fill} />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Shadow</PropertyLineLabel>
             <BoxShadowControl
               value={{ boxShadow }}
-              onValueChange={selectedNode.boxShadow}
+              onValueChange={actions.boxShadow}
             />
           </PropertyLine>
           {/* <PropertyLine>
             <PropertyLineLabel>Ratio</PropertyLineLabel>
             <AspectRatioControl
               value={aspectRatio as any}
-              onValueChange={selectedNode.aspectRatio}
+              onValueChange={actions.aspectRatio}
             />
           </PropertyLine> */}
           <PropertyLine>
             <PropertyLineLabel>Cursor</PropertyLineLabel>
-            <CursorControl value={cursor} onValueChange={selectedNode.cursor} />
+            <CursorControl value={cursor} onValueChange={actions.cursor} />
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>
@@ -520,23 +512,20 @@ export function SelectedNodeProperties() {
           <SidebarMenuSectionContent className="space-y-2">
             <PropertyLine>
               <PropertyLineLabel>Color</PropertyLineLabel>
-              <PaintControl
-                value={stroke}
-                onValueChange={selectedNode.stroke}
-              />
+              <PaintControl value={stroke} onValueChange={actions.stroke} />
             </PropertyLine>
             <PropertyLine>
               <PropertyLineLabel>Width</PropertyLineLabel>
               <StrokeWidthControl
                 value={strokeWidth}
-                onValueChange={selectedNode.strokeWidth}
+                onValueChange={actions.strokeWidth}
               />
             </PropertyLine>
             <PropertyLine hidden={!supports.strokeCap(node.type)}>
               <PropertyLineLabel>Cap</PropertyLineLabel>
               <StrokeCapControl
                 value={strokeCap}
-                onValueChange={selectedNode.strokeCap}
+                onValueChange={actions.strokeCap}
               />
             </PropertyLine>
           </SidebarMenuSectionContent>
@@ -552,7 +541,7 @@ export function SelectedNodeProperties() {
             <UserDataControl
               node_id={id}
               value={userdata}
-              onValueCommit={selectedNode.userdata}
+              onValueCommit={actions.userdata}
             />
           </PropertyLine>
         </SidebarMenuSectionContent>
