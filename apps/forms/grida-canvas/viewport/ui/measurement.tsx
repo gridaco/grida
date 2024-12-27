@@ -147,7 +147,7 @@ function SpacingMeterLabel({
   return (
     <MeterLabel
       label={(Math.round(length * 10) / 10).toString()}
-      background={"darkorange"}
+      className="bg-workbench-accent-orange"
       x={tx}
       y={ty}
       weight={"bolder"}

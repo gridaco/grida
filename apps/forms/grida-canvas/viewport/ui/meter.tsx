@@ -3,19 +3,21 @@ import React from "react";
 // import type { Rectangle } from "../types";
 // import * as k from "./k";
 
-const font_size = 10;
+const font_size = 11;
 
 export function SizeMeterLabel({
   size,
   margin = 0,
   rect,
   zoom,
+  className,
 }: {
   size: { width: number; height: number };
   margin?: number;
 } & {
   rect: cmath.Rectangle;
   zoom: number;
+  className?: string;
 }) {
   const { x, y, width, height } = rect;
   const bottomY = y + height;
@@ -26,13 +28,13 @@ export function SizeMeterLabel({
   return (
     <MeterLabel
       label={text}
-      background={"rgb(0, 87, 255)"}
       x={centerX}
       y={bottomY}
       anchor="s"
       margin={margin}
       zoom={zoom}
       zIndex={5}
+      className={className}
     />
   );
 }
@@ -40,27 +42,27 @@ export function SizeMeterLabel({
 export function MeterLabel({
   x,
   y,
-  background,
   label,
   anchor,
   zoom,
   margin = 0,
   zIndex = 5,
   weight = 500,
+  className,
 }: {
   x: number;
   y: number;
   weight?: React.CSSProperties["fontWeight"];
-  background?: React.CSSProperties["background"];
   label: string;
   anchor: "w" | "n" | "s" | "e";
   margin?: number;
   zoom: number;
   zIndex?: number;
+  className?: string;
 }) {
   const labelWidth = (label.length * font_size) / 1.8; // Estimate text width
   const viewWidth = labelWidth + 4; // 4 is for horizontal padding
-  const viewHeight = font_size + 4; // 4 is for vertical padding
+  const viewHeight = font_size + 2; // 2 is for vertical padding
 
   let t: [number, number] = [0, 0];
   switch (anchor) {
@@ -96,8 +98,6 @@ export function MeterLabel({
         boxSizing: "border-box",
         whiteSpace: "nowrap",
         borderRadius: 4,
-        background: background,
-        padding: "2px 4px",
         color: "white",
         fontSize: font_size,
         fontFamily: "Inter, sans-serif",
@@ -105,6 +105,7 @@ export function MeterLabel({
         textAlign: "center",
         zIndex: zIndex,
       }}
+      className={className}
     >
       {label}
     </div>

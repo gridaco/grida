@@ -22,6 +22,7 @@ import { cmath } from "../cmath";
 import { cursors } from "../components/cursor";
 import { SurfaceTextEditor } from "./ui/text-editor";
 import { SurfacePathEditor } from "./ui/path-editor";
+import { SizeMeterLabel } from "./ui/meter";
 
 const DRAG_THRESHOLD = 2;
 
@@ -284,7 +285,7 @@ function SelectionOverlay({
   if (!selection || selection.length === 0) {
     return <></>;
   } else if (selection.length === 1) {
-    return <NodeOverlay node_id={selection[0]} readonly={readonly} />;
+    return <NodeOverlay node_id={selection[0]} readonly={readonly} focused />;
   } else {
     return (
       <MultipleSelectionOverlay selection={selection} readonly={readonly} />
@@ -347,6 +348,21 @@ function MultipleSelectionOverlay({
         <LayerOverlayResizeHandle anchor="se" selection={selection} />
         {/*  */}
         <DistributeButton />
+        <SizeMeterLabel
+          margin={6}
+          size={{
+            width: transform.width,
+            height: transform.height,
+          }}
+          rect={{
+            x: 0,
+            y: 0,
+            width: transform.width,
+            height: transform.height,
+          }}
+          zoom={1}
+          className="bg-workbench-accent-sky"
+        />
       </LayerOverlay>
       {
         // also hightlight the included nodes
@@ -362,10 +378,12 @@ function NodeOverlay({
   node_id,
   readonly,
   zIndex,
+  focused,
 }: {
   node_id: string;
   readonly?: boolean;
   zIndex?: number;
+  focused?: boolean;
 }) {
   const transform = useNodeSurfaceTransfrom(node_id);
   const node = useNode(node_id);
@@ -380,7 +398,7 @@ function NodeOverlay({
       zIndex={zIndex}
       isComponentConsumer={is_component_consumer}
     >
-      {!readonly && (
+      {focused && !readonly && (
         <>
           {node.type === "line" ? (
             <>
@@ -408,6 +426,23 @@ function NodeOverlay({
           <LayerOverlayRotationHandle anchor="sw" node_id={node_id} />
           <LayerOverlayRotationHandle anchor="se" node_id={node_id} />
         </>
+      )}
+      {focused && (
+        <SizeMeterLabel
+          margin={6}
+          size={{
+            width: transform.width,
+            height: transform.height,
+          }}
+          rect={{
+            x: 0,
+            y: 0,
+            width: transform.width,
+            height: transform.height,
+          }}
+          zoom={1}
+          className="bg-workbench-accent-sky"
+        />
       )}
     </LayerOverlay>
   );

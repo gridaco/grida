@@ -225,7 +225,7 @@ export function useEditorHotKeys() {
   });
 
   useHotkeys("paste, meta+v, ctrl+v", () => paste(), {
-    preventDefault: true,
+    preventDefault: false,
     enableOnContentEditable: false,
     enableOnFormTags: false,
   });

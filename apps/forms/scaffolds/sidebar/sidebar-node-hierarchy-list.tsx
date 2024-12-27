@@ -118,10 +118,10 @@ export function NodeHierarchyList() {
     <>
       {list.map(({ id, depth }) => {
         const n = document.nodes[id];
-        const selected = selection.includes(n.id);
-        const hovered = hovered_node_id === n.id;
+        const selected = selection.includes(id);
+        const hovered = hovered_node_id === id;
         return (
-          <NodeHierarchyItemContextMenuWrapper key={n.id} node_id={n.id}>
+          <NodeHierarchyItemContextMenuWrapper key={id} node_id={id}>
             <SidebarMenuItem
               muted
               hovered={hovered}
@@ -129,17 +129,17 @@ export function NodeHierarchyList() {
               selected={selected}
               onSelect={(e) => {
                 if (e.metaKey || e.ctrlKey) {
-                  select("selection", [n.id]);
+                  select("selection", [id]);
                 } else {
-                  select([n.id]);
+                  select([id]);
                 }
               }}
               icon={<NodeHierarchyItemIcon node={n} className="w-3.5 h-3.5" />}
               onPointerEnter={() => {
-                hoverNode(n.id, "enter");
+                hoverNode(id, "enter");
               }}
               onPointerLeave={() => {
-                hoverNode(n.id, "leave");
+                hoverNode(id, "leave");
               }}
             >
               <SidebarMenuItemLabel className="font-normal text-xs">
@@ -148,14 +148,14 @@ export function NodeHierarchyList() {
               <SidebarMenuItemActions>
                 <SidebarMenuItemAction
                   onClick={() => {
-                    toggleNodeLocked(n.id);
+                    toggleNodeLocked(id);
                   }}
                 >
                   {n.locked ? <LockClosedIcon /> : <LockOpen1Icon />}
                 </SidebarMenuItemAction>
                 <SidebarMenuItemAction
                   onClick={() => {
-                    toggleNodeActive(n.id);
+                    toggleNodeActive(id);
                   }}
                 >
                   {n.active ? <EyeOpenIcon /> : <EyeClosedIcon />}
