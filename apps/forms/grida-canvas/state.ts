@@ -505,10 +505,13 @@ export interface IDocumentEditorState
 
 export function initDocumentEditorState({
   ...init
-}: IDocumentEditorInit): IDocumentEditorState {
+}: Omit<IDocumentEditorInit, "debug"> & {
+  debug?: boolean;
+}): IDocumentEditorState {
   const s = new document.DocumentState(init.document);
 
   return {
+    debug: false,
     selection: [],
     hovered_node_id: null,
     hovered_vertex_idx: null,

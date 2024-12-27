@@ -92,8 +92,11 @@ import { useEditorHotKeys } from "@/grida-canvas/viewport/hotkeys";
 import { AlignControl } from "../sidecontrol/controls/align";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import ErrorBoundary from "./error-boundary";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 export default function CanvasPlayground() {
+  const [pref, setPref] = useState<Preferences>({ debug: false });
   const [uiHidden, setUiHidden] = useState(false);
   const [exampleid, setExampleId] = useState<string>("blank.grida");
   const playDialog = useDialogState("play", {
@@ -110,7 +113,6 @@ export default function CanvasPlayground() {
     standaloneDocumentReducer,
     initDocumentEditorState({
       editable: true,
-      debug: true,
       document: {
         nodes: {
           root: {
@@ -166,7 +168,6 @@ export default function CanvasPlayground() {
           state: initDocumentEditorState({
             editable: true,
             document: file.document,
-            debug: true,
           }),
         });
       });
@@ -189,7 +190,11 @@ export default function CanvasPlayground() {
   return (
     <TooltipProvider>
       <main className="w-screen h-screen overflow-hidden">
-        <SettingsDialog {...settingsDialog.props} />
+        <SettingsDialog
+          {...settingsDialog.props}
+          preferences={pref}
+          onPreferencesChange={setPref}
+        />
         <ImportFromGridaFileJsonDialog
           key={importFromJson.refreshkey}
           {...importFromJson.props}
@@ -200,7 +205,6 @@ export default function CanvasPlayground() {
               state: initDocumentEditorState({
                 editable: true,
                 document: file.document,
-                debug: true,
               }),
             });
           }}
@@ -213,7 +217,6 @@ export default function CanvasPlayground() {
               key: res.document.id,
               state: initDocumentEditorState({
                 editable: true,
-                debug: true,
                 document: iofigma.restful.map.document(
                   res.document as any,
                   res.images
@@ -236,7 +239,7 @@ export default function CanvasPlayground() {
         <ErrorBoundary>
           <StandaloneDocumentEditor
             editable
-            debug
+            debug={pref.debug}
             initial={state}
             dispatch={dispatch}
           >
@@ -486,7 +489,16 @@ function ExampleSwitch({
   );
 }
 
-function SettingsDialog(props: React.ComponentProps<typeof Dialog>) {
+type Preferences = {
+  debug: boolean;
+};
+
+function SettingsDialog(
+  props: React.ComponentProps<typeof Dialog> & {
+    preferences: Preferences;
+    onPreferencesChange: (preferences: Preferences) => void;
+  }
+) {
   const [aiSettings, setAiSettings] = useLocalStorage<string | undefined>(
     CANVAS_PLAYGROUND_LOCALSTORAGE_PREFERENCES_BASE_AI_PROMPT_KEY,
     undefined
@@ -499,10 +511,40 @@ function SettingsDialog(props: React.ComponentProps<typeof Dialog>) {
           <DialogTitle>Playground Settings</DialogTitle>
         </DialogHeader>
         <hr />
-        <Tabs defaultValue="ai">
+        <Tabs defaultValue="general">
           <TabsList>
+            <TabsTrigger value="general">General</TabsTrigger>
             <TabsTrigger value="ai">AI</TabsTrigger>
           </TabsList>
+          <TabsContent value="general">
+            <div className="py-4 divide-y-2">
+              <Label className="flex items-center justify-between">
+                Debug Mode
+                <Switch
+                  checked={props.preferences.debug}
+                  onCheckedChange={(v) => {
+                    props.onPreferencesChange({
+                      ...props.preferences,
+                      debug: v,
+                    });
+                  }}
+                />
+              </Label>
+              {/* <label>
+                Snap to geometry
+                <Switch />
+              </label>
+              <label>
+                Snap to objects
+                <Switch />
+              </label>
+              <label>
+                Snap to pixel grid
+                <Switch />
+              </label> */}
+              {/* <label>Nudge Amount</label> */}
+            </div>
+          </TabsContent>
           <TabsContent value="ai">
             <div>
               <ThemedMonacoEditor
@@ -515,15 +557,6 @@ function SettingsDialog(props: React.ComponentProps<typeof Dialog>) {
             </div>
           </TabsContent>
         </Tabs>
-        <hr />
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="outline">Close</Button>
-          </DialogClose>
-          <DialogClose asChild>
-            <Button>Save</Button>
-          </DialogClose>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

@@ -37,7 +37,6 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
   state: S,
   action: EventTargetAction
 ): S {
-  // console.log("surface", action);
   switch (action.type) {
     // #region [html backend] canvas event target
     case "event-target/event/on-pointer-move": {

@@ -56,7 +56,15 @@ export function StandaloneDocumentEditor({
     }
   }, [editable, dispatch]);
 
-  const __dispatch = editable ? dispatch ?? __noop : __noop;
+  const __dispatch = useMemo(
+    () => (editable ? dispatch ?? __noop : __noop),
+    [editable]
+  );
+
+  const state = useMemo(
+    () => initDocumentEditorState({ ...initial, editable, debug }),
+    [initial, editable, debug]
+  );
 
   const rootnode = initial.document.nodes[initial.document.root_id];
   assert(rootnode, "root node is not found");
@@ -84,9 +92,7 @@ export function StandaloneDocumentEditor({
   }, [rootnode]);
 
   return (
-    <DocumentContext.Provider
-      value={initDocumentEditorState({ ...initial, editable, debug })}
-    >
+    <DocumentContext.Provider value={state}>
       <DocumentDispatcherContext.Provider value={__dispatch}>
         <ProgramDataContextHost>
           <DataProvider data={{ props: shallowRootProps }}>

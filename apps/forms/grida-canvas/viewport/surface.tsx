@@ -147,13 +147,17 @@ export function EditorSurface() {
   const bind = useSurfaceGesture(
     {
       onPointerDown: ({ event }) => {
+        if (content_edit_mode?.type === "text") {
+          event.preventDefault();
+        }
         if (event.defaultPrevented) return;
-        if (content_edit_mode?.type === "text") return;
         pointerDown(event);
       },
       onPointerUp: ({ event }) => {
+        if (content_edit_mode?.type === "text") {
+          event.preventDefault();
+        }
         if (event.defaultPrevented) return;
-        if (content_edit_mode?.type === "text") return;
         pointerUp(event);
       },
       onClick: ({ event }) => {
@@ -235,7 +239,10 @@ export function EditorSurface() {
             <SurfaceTextEditor node_id={content_edit_mode.node_id} />
           )}
           {content_edit_mode?.type === "path" && (
-            <SurfacePathEditor node_id={content_edit_mode.node_id} />
+            <SurfacePathEditor
+              key={content_edit_mode.node_id}
+              node_id={content_edit_mode.node_id}
+            />
           )}
         </SurfaceGroup>
         <SurfaceGroup

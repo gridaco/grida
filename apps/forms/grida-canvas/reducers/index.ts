@@ -14,11 +14,28 @@ export default function reducer<S extends IDocumentEditorState>(
   state: S,
   action: Action
 ): S {
+  if (
+    state.debug &&
+    !(
+      action.type === "event-target/event/on-pointer-move" ||
+      action.type === "event-target/event/on-pointer-move-raycast" ||
+      action.type === "event-target/event/on-drag"
+    )
+  ) {
+    console.log("debug:event", action.type, action);
+  }
+
   switch (action.type) {
     case "__internal/reset": {
       const { state: _new_state, key } = action;
+      const prev_state = state;
       return produce(_new_state, (draft) => {
         if (key) draft.document_key = key;
+        // even on reset, the following should be preserved
+        draft.viewport_offset = prev_state.viewport_offset;
+        draft.content_offset = prev_state.content_offset;
+        draft.cursor_position = prev_state.cursor_position;
+        draft.surface_cursor_position = prev_state.surface_cursor_position;
       }) as S;
     }
     case "__internal/on-resize": {
