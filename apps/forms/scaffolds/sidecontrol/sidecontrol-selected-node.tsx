@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo } from "react";
+import React from "react";
 
 import {
   SidebarMenuSectionContent,
@@ -19,14 +19,10 @@ import { CornerRadiusControl } from "./controls/corner-radius";
 import { BorderControl } from "./controls/border";
 import { FillControl } from "./controls/fill";
 import { StringValueControl } from "./controls/string-value";
-import { MarginControl } from "./controls/margin";
 import { PaddingControl } from "./controls/padding";
-import { AspectRatioControl } from "./controls/aspect-ratio";
 import { BoxShadowControl } from "./controls/box-shadow";
 import { GapControl } from "./controls/gap";
 import { CrossAxisAlignmentControl } from "./controls/cross-axis-alignment";
-import { FlexWrapControl } from "./controls/flex-wrap";
-import { FlexDirectionControl } from "./controls/flex-direction";
 import { MainAxisAlignmentControl } from "./controls/main-axis-alignment";
 import { TemplateControl } from "./controls/template";
 import { CursorControl } from "./controls/cursor";
@@ -37,7 +33,6 @@ import { PropsControl } from "./controls/props";
 import { TargetBlankControl } from "./controls/target";
 import { ExportNodeControl } from "./controls/export";
 import { FontFamilyControl } from "./controls/font-family";
-import { TextColorControl } from "./controls/text-color";
 import {
   PositioningConstraintsControl,
   PositioningModeControl,
@@ -53,14 +48,13 @@ import { LayoutControl } from "./controls/layout";
 import { AxisControl } from "./controls/axis";
 import { MaxlengthControl } from "./controls/maxlength";
 import { useComputedNode, useDocument, useNode } from "@/grida-canvas";
-import assert from "assert";
-import { grida } from "@/grida";
 import { LockClosedIcon } from "@radix-ui/react-icons";
 import { supports } from "@/grida/utils/supports";
 import { StrokeWidthControl } from "./controls/stroke-width";
-import { RGBAColorControl } from "./controls/color";
 import { PaintControl } from "./controls/paint";
 import { StrokeCapControl } from "./controls/stroke-cap";
+import { grida } from "@/grida";
+import assert from "assert";
 
 export function SelectedNodeProperties() {
   const { state: document, selectedNode } = useDocument();

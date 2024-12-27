@@ -47,10 +47,10 @@ function NodeHierarchyItemContextMenuWrapper({
       <ContextMenuContent>
         {/* <ContextMenuItem onSelect={() => {}}>Copy</ContextMenuItem> */}
         {/* <ContextMenuItem>Paste here</ContextMenuItem> */}
-        <ContextMenuItem onSelect={change.bringFront}>
+        <ContextMenuItem onSelect={() => change.order("front")}>
           Bring to front
         </ContextMenuItem>
-        <ContextMenuItem onSelect={change.pushBack}>
+        <ContextMenuItem onSelect={() => change.order("back")}>
           Send to back
         </ContextMenuItem>
         <ContextMenuItem

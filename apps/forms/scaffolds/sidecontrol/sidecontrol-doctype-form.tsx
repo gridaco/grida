@@ -52,8 +52,8 @@ function SelectedPageForm() {
 }
 
 function SelectedPageFormStart() {
-  const { selectedNode } = useDocument();
-  if (selectedNode) {
+  const { selection } = useDocument();
+  if (selection.length === 1) {
     return <SelectedNodeProperties />;
   } else {
     return <SideControlGlobal />;

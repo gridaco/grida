@@ -133,21 +133,12 @@ export function __useInternal() {
 }
 
 function __useNodeActions(dispatch: DocumentDispatcher) {
-  const orderPushBack = useCallback(
-    (node_id: string) => {
+  const order = useCallback(
+    (node_id: string, order: "back" | "front" | number) => {
       dispatch({
-        type: "node/order/back",
-        node_id,
-      });
-    },
-    [dispatch]
-  );
-
-  const orderBringFront = useCallback(
-    (node_id: string) => {
-      dispatch({
-        type: "node/order/front",
-        node_id,
+        type: "order",
+        target: node_id,
+        order: order,
       });
     },
     [dispatch]
@@ -708,8 +699,7 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
 
   return useMemo(
     () => ({
-      orderPushBack,
-      orderBringFront,
+      order,
       hoverNode,
       hoverEnterNode,
       hoverLeaveNode,
@@ -878,8 +868,8 @@ export function useNodeAction(node_id: string | undefined) {
   return useMemo(() => {
     if (!node_id) return;
     return {
-      pushBack: () => nodeActions.orderPushBack(node_id),
-      bringFront: () => nodeActions.orderBringFront(node_id),
+      order: (order: "back" | "front" | number) =>
+        nodeActions.order(node_id, order),
       toggleLocked: () => nodeActions.toggleNodeLocked(node_id),
       toggleActive: () => nodeActions.toggleNodeActive(node_id),
       toggleBold: () => nodeActions.toggleNodeBold(node_id),
@@ -992,7 +982,7 @@ export function useDocument() {
 
   const { selection } = state;
 
-  const nodeActions = __useNodeActions(dispatch);
+  const { order: _, ...nodeActions } = __useNodeActions(dispatch);
 
   const select = useCallback(
     (...selectors: Selector[]) =>
@@ -1083,6 +1073,20 @@ export function useDocument() {
         type: "align",
         target,
         alignment,
+      });
+    },
+    [dispatch]
+  );
+
+  const order = useCallback(
+    (
+      target: "selection" | (string & {}) = "selection",
+      order: "back" | "front" | number
+    ) => {
+      dispatch({
+        type: "order",
+        target: target,
+        order,
       });
     },
     [dispatch]
@@ -1208,6 +1212,20 @@ export function useDocument() {
     [dispatch, selection]
   );
 
+  const setOpacity = useCallback(
+    (target: "selection" | (string & {}) = "selection", opacity: number) => {
+      const target_ids = target === "selection" ? selection : [target];
+      target_ids.forEach((node_id) => {
+        dispatch({
+          type: "node/change/opacity",
+          node_id: node_id,
+          opacity,
+        });
+      });
+    },
+    [dispatch, selection]
+  );
+
   const getNodeById = useCallback(
     (node_id: string): grida.program.nodes.Node => {
       return document.__getNodeById(state, node_id);
@@ -1325,6 +1343,7 @@ export function useDocument() {
       nudge,
       nudgeResize,
       align,
+      order,
       distributeEvenly,
       configureSurfaceRaycastTargeting,
       configureMeasurement,
@@ -1337,6 +1356,8 @@ export function useDocument() {
       toggleActive,
       toggleLocked,
       toggleBold,
+      //
+      setOpacity,
       //
       getNodeDepth,
       getNodeAbsoluteRotation,
@@ -1364,6 +1385,7 @@ export function useDocument() {
     nudge,
     nudgeResize,
     align,
+    order,
     distributeEvenly,
     configureSurfaceRaycastTargeting,
     configureMeasurement,
@@ -1376,6 +1398,8 @@ export function useDocument() {
     toggleActive,
     toggleLocked,
     toggleBold,
+    //
+    setOpacity,
     //
     getNodeDepth,
     getNodeAbsoluteRotation,

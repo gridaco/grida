@@ -18,6 +18,7 @@ export function useEditorHotKeys() {
     nudge,
     nudgeResize,
     align,
+    order,
     distributeEvenly,
     configureSurfaceRaycastTargeting,
     configureMeasurement,
@@ -29,7 +30,7 @@ export function useEditorHotKeys() {
     toggleActive,
     toggleLocked,
     toggleBold,
-    selectedNode,
+    setOpacity,
   } = useDocument();
 
   // always triggering. (alt, meta, ctrl, shift)
@@ -334,16 +335,16 @@ export function useEditorHotKeys() {
   useHotkeys("0, 1, 2, 3, 4, 5, 6, 7, 8, 9", (e) => {
     const i = parseInt(e.key);
     const o = i / 10;
-    selectedNode?.opacity(o);
+    setOpacity("selection", o);
     toast.success(`opacity: ${o}`);
   });
 
   useHotkeys("]", (e) => {
-    selectedNode?.bringFront();
+    order("selection", "front");
   });
 
   useHotkeys("[", (e) => {
-    selectedNode?.pushBack();
+    order("selection", "back");
   });
 
   useHotkeys("alt+a", (e) => {

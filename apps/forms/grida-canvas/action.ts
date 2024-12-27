@@ -35,6 +35,7 @@ export type DocumentAction =
   | EditorBlurAction
   | EditorCopyCutPasteAction
   | EditorDeleteAction
+  | EditorOrderAction
   | EditorPathAction
   | EditorNudgeAction
   | EditorNudgeResizeAction
@@ -45,7 +46,6 @@ export type DocumentAction =
   | SurfaceAction
   //
   | NodeChangeAction
-  | NodeOrderAction
   | NodeToggleBasePropertyAction
   | NodeToggleBoldAction
   | TemplateNodeOverrideChangeAction
@@ -169,6 +169,12 @@ export interface EditorDuplicateAction {
 export interface EditorDeleteAction {
   type: "delete";
   target: NodeID | "selection";
+}
+
+export interface EditorOrderAction {
+  type: "order";
+  target: NodeID | "selection";
+  order: "front" | "back" | number;
 }
 
 // #region [path]
@@ -647,11 +653,6 @@ export type NodeChangeAction =
   | ({ type: "node/change/href" } & INodeChangeHrefAction)
   | ({ type: "node/change/target" } & INodeChangeTargetAction)
   | ({ type: "node/change/props" } & INodeChangePropsAction);
-
-export type NodeOrderAction =
-  // | ({ type: "node/order/reorder" } & INodeID &)
-  | ({ type: "node/order/back" } & INodeID)
-  | ({ type: "node/order/front" } & INodeID);
 
 export type NodeToggleBasePropertyAction =
   | ({ type: "node/toggle/active" } & INodeID)

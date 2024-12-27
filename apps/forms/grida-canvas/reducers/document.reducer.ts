@@ -5,7 +5,6 @@ import type {
   //
   EditorSelectAction,
   NodeChangeAction,
-  NodeOrderAction,
   NodeToggleBasePropertyAction,
   TemplateEditorSetTemplatePropsAction,
   TemplateNodeOverrideChangeAction,
@@ -182,6 +181,52 @@ export default function documentReducer<S extends IDocumentEditorState>(
           }
         }
       });
+    }
+    case "order": {
+      const { target, order } = action;
+      const target_node_ids =
+        target === "selection" ? state.selection : [target];
+
+      return produce(state, (draft) => {
+        for (const node_id of target_node_ids) {
+          const parent_id = document.getParentId(draft.document_ctx, node_id);
+          if (!parent_id) return; // root node case
+          const parent_node: Draft<grida.program.nodes.i.IChildren> =
+            document.__getNodeById(
+              draft,
+              parent_id
+            ) as grida.program.nodes.i.IChildren;
+
+          const childIndex = parent_node.children!.indexOf(node_id);
+          assert(childIndex !== -1, "node not found in children");
+
+          const before = [...parent_node.children!];
+          const reordered = [...before];
+          switch (order) {
+            case "back": {
+              // change the children id order - move the node_id to the first (first is the back)
+              reordered.splice(childIndex, 1);
+              reordered.unshift(node_id);
+              break;
+            }
+            case "front": {
+              // change the children id order - move the node_id to the last (last is the front)
+              reordered.splice(childIndex, 1);
+              reordered.push(node_id);
+              break;
+            }
+            default: {
+              // shift order
+              reordered.splice(childIndex, 1);
+              reordered.splice(order, 0, node_id);
+            }
+          }
+
+          parent_node.children = reordered;
+          draft.document_ctx.__ctx_nid_to_children_ids[parent_id] = reordered;
+        }
+      });
+      break;
     }
     case "nudge": {
       const { target, axis, delta } = action;
@@ -536,43 +581,6 @@ export default function documentReducer<S extends IDocumentEditorState>(
             draft.googlefonts.push({ family: action.fontFamily });
           }
         }
-      });
-    }
-    //
-    case "node/order/back":
-    case "node/order/front": {
-      const { node_id } = <NodeOrderAction>action;
-      return produce(state, (draft) => {
-        const parent_id = document.getParentId(draft.document_ctx, node_id);
-        if (!parent_id) return; // root node case
-        const parent_node: Draft<grida.program.nodes.i.IChildren> =
-          document.__getNodeById(
-            draft,
-            parent_id
-          ) as grida.program.nodes.i.IChildren;
-
-        const childIndex = parent_node.children!.indexOf(node_id);
-        assert(childIndex !== -1, "node not found in children");
-
-        const before = [...parent_node.children!];
-        const reordered = [...before];
-        switch (action.type) {
-          case "node/order/back": {
-            // change the children id order - move the node_id to the first (first is the back)
-            reordered.splice(childIndex, 1);
-            reordered.unshift(node_id);
-            break;
-          }
-          case "node/order/front": {
-            // change the children id order - move the node_id to the last (last is the front)
-            reordered.splice(childIndex, 1);
-            reordered.push(node_id);
-            break;
-          }
-        }
-
-        parent_node.children = reordered;
-        draft.document_ctx.__ctx_nid_to_children_ids[parent_id] = reordered;
       });
     }
     //
