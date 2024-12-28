@@ -13,11 +13,14 @@ import {
 import { Editor as MonacoEditor } from "@monaco-editor/react";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { useGoogleFontsList } from "../google.fonts";
+import { useThrottle } from "@uidotdev/usehooks";
 
 export function DevtoolsPanel() {
-  const { state } = useDocument();
+  const { state: _state } = useDocument();
   const fonts = useGoogleFontsList();
   const expandable = useDialogState();
+
+  const state = useThrottle(_state, 1000);
 
   const {
     document,
