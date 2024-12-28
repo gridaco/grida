@@ -235,6 +235,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
       const dx = axis === "x" ? delta : 0;
       const dy = axis === "y" ? delta : 0;
 
+      if (target_node_ids.length === 0) return state;
       return produce(state, (draft) => {
         // for nudge, gesture is not required, but only for surface ux.
         if (draft.gesture.type === "nudge") {
