@@ -7,25 +7,6 @@ type NodeID = string & {};
 const HARD_MAX_WHILE_LOOP = 5000;
 
 /**
- * Simple Node Selector
- *
- * - "*" - all nodes
- * - "~" - siblings of current selection
- *    - does not include the current selection
- *    - if multiple selection, this is only valid if all selected nodes are siblings
- * - ">" - children of current selection
- * - "selection" - current selection
- * - [] - specific nodes
- *
- * @example
- * - Select all nodes: "*"
- * - Select siblings of current selection: "~"
- * - Select self and siblings: ["selection", "~"]
- * - Select children of current selection: ">"
- */
-export type Selector = "*" | "~" | ">" | ".." | "selection" | NodeID[];
-
-/**
  * @internal
  */
 export namespace document {
@@ -81,7 +62,7 @@ export namespace document {
   export function querySelector(
     context: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext,
     selection: NodeID[],
-    selector: Selector
+    selector: grida.program.document.Selector
   ): NodeID[] {
     switch (selector) {
       case "*": {

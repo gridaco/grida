@@ -342,7 +342,7 @@ export function useEditorHotKeys() {
   });
 
   useHotkeys("copy, meta+c, ctrl+c", () => copy("selection"), {
-    preventDefault: true,
+    preventDefault: false,
     enableOnContentEditable: false,
     enableOnFormTags: false,
   });

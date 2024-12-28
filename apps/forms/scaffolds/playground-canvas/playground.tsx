@@ -381,6 +381,23 @@ export default function CanvasPlayground() {
                     </div>
                   </div>
                   {!uiHidden && (
+                    <>
+                      <div className="absolute top-4 left-4 z-50">
+                        <Button
+                          variant={insertDialog.open ? "default" : "outline"}
+                          className="w-8 h-8 rounded-full p-0"
+                          onClick={insertDialog.openDialog}
+                        >
+                          <PlusIcon className="w-4 h-4" />
+                        </Button>
+                      </div>
+
+                      <div className="fixed bottom-20 left-10 flex items-center justify-center z-50 pointer-events-none">
+                        <KeyboardInputOverlay />
+                      </div>
+                    </>
+                  )}
+                  {!uiHidden && (
                     <div className="absolute bottom-8 left-0 right-0 flex items-center justify-center z-50 pointer-events-none">
                       <PlaygroundToolbar
                         onAddButtonClick={insertDialog.openDialog}
@@ -388,24 +405,7 @@ export default function CanvasPlayground() {
                     </div>
                   )}
                 </ViewportRoot>
-                {!uiHidden && (
-                  <>
-                    <div className="absolute top-4 left-4 z-50">
-                      <Button
-                        variant={insertDialog.open ? "default" : "outline"}
-                        className="w-8 h-8 rounded-full p-0"
-                        onClick={insertDialog.openDialog}
-                      >
-                        <PlusIcon className="w-4 h-4" />
-                      </Button>
-                    </div>
-
-                    <div className="fixed bottom-20 left-10 flex items-center justify-center z-50 pointer-events-none">
-                      <KeyboardInputOverlay />
-                    </div>
-                    <DevtoolsPanel />
-                  </>
-                )}
+                <DevtoolsPanel />
               </div>
               {!uiHidden && (
                 <aside className="h-full">

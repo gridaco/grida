@@ -36,13 +36,16 @@ export default function nodeReducer<
       }
       case "node/change/positioning": {
         const { positioning } = action;
-        (draft as grida.program.nodes.i.IPositioning).left = positioning.left;
-        (draft as grida.program.nodes.i.IPositioning).top = positioning.top;
-        (draft as grida.program.nodes.i.IPositioning).right = positioning.right;
-        (draft as grida.program.nodes.i.IPositioning).bottom =
-          positioning.bottom;
-        (draft as grida.program.nodes.i.IPositioning).position =
-          positioning.position;
+        const pos = draft as grida.program.nodes.i.IPositioning;
+        if ("position" in positioning) {
+          if (positioning.position) {
+            pos.position = positioning.position;
+          }
+        }
+        if ("left" in positioning) pos.left = positioning.left;
+        if ("top" in positioning) pos.top = positioning.top;
+        if ("right" in positioning) pos.right = positioning.right;
+        if ("bottom" in positioning) pos.bottom = positioning.bottom;
         break;
       }
       case "node/change/positioning-mode": {

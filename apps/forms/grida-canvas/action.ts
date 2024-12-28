@@ -10,8 +10,6 @@ import type {
   IDocumentEditorState,
   SurfaceRaycastTargeting,
 } from "./state";
-import type { cmath } from "./cmath";
-import type { Selector } from "./document-query";
 
 export type Action =
   | InternalAction
@@ -117,7 +115,7 @@ export interface __InternalResetAction {
 
 export interface EditorSelectAction {
   type: "select";
-  selectors: Selector[];
+  selectors: grida.program.document.Selector[];
 }
 
 export interface EditorHoverAction {
@@ -449,7 +447,7 @@ interface INodeChangeLockedAction extends INodeID {
 }
 
 interface INodeChangePositioningAction extends INodeID {
-  positioning: grida.program.nodes.i.IPositioning;
+  positioning: Partial<grida.program.nodes.i.IPositioning>;
 }
 
 interface INodeChangePositioningModeAction extends INodeID {

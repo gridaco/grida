@@ -1,6 +1,9 @@
 import type { Tokens } from "@/ast";
 import type { vn } from "./vn";
 
+// TODO: remove this dependency
+import type { DocumentDispatcher } from "@/grida-canvas";
+
 export namespace grida {
   export const mixed: unique symbol = Symbol();
 
@@ -164,6 +167,31 @@ export namespace grida {
     }
 
     export namespace document {
+      /**
+       * Simple Node Selector
+       *
+       * - "*" - all nodes
+       * - "~" - siblings of current selection
+       *    - does not include the current selection
+       *    - if multiple selection, this is only valid if all selected nodes are siblings
+       * - ">" - children of current selection
+       * - "selection" - current selection
+       * - [] - specific nodes
+       *
+       * @example
+       * - Select all nodes: "*"
+       * - Select siblings of current selection: "~"
+       * - Select self and siblings: ["selection", "~"]
+       * - Select children of current selection: ">"
+       */
+      export type Selector =
+        | "*"
+        | "~"
+        | ">"
+        | ".."
+        | "selection"
+        | nodes.NodeID[];
+
       export namespace k {
         /**
          * Key for the data attribute that stores the node ID in the HTML document.
@@ -2170,6 +2198,47 @@ export namespace grida {
         };
         //
       }
+
+      export function createNodeFromPrototype(
+        id: NodeID,
+        prototype: Partial<NodePrototype>
+      ): Node | null {
+        const default_fill: cg.Paint = {
+          type: "solid",
+          color: { r: 0, g: 0, b: 0, a: 1 },
+        };
+        switch (prototype.type) {
+          case "rectangle": {
+            return {
+              id: id,
+              name: "rectangle",
+              type: "rectangle",
+              active: true,
+              locked: false,
+              opacity: 1,
+              zIndex: 0,
+              rotation: 0,
+              width: 100,
+              height: 100,
+              position: "absolute",
+              top: 0,
+              left: 0,
+              cornerRadius: 0,
+              fill: default_fill,
+              strokeWidth: 0,
+              strokeCap: "butt",
+              effects: [],
+              ...prototype,
+            } satisfies RectangleNode;
+          }
+          default:
+            throw new Error(
+              `Unsupported node prototype type: ${prototype.type}`
+            );
+        }
+
+        return null;
+      }
     }
   }
 }
@@ -2181,3 +2250,147 @@ const cloneWithUndefinedValues = (
     string,
     undefined
   >;
+
+export namespace grida.program.api {
+  export type NodeID = string & {};
+
+  export namespace internal {
+    export function createApiProxyNode(
+      node: nodes.Node,
+      context: {
+        dispatcher: DocumentDispatcher;
+      }
+    ): nodes.Node {
+      const p = new Proxy(
+        { ...node },
+        {
+          get(target, prop, receiver) {
+            return Reflect.get(target, prop, receiver);
+          },
+          set(target, prop, value, receiver) {
+            switch (prop as keyof nodes.AnyNode) {
+              case "width":
+                context.dispatcher({
+                  type: "node/change/size",
+                  axis: "width",
+                  node_id: node.id,
+                  length: value,
+                });
+                return true;
+              case "height":
+                context.dispatcher({
+                  type: "node/change/size",
+                  axis: "height",
+                  node_id: node.id,
+                  length: value,
+                });
+                return true;
+              case "top":
+              case "right":
+              case "bottom":
+              case "left":
+                context.dispatcher({
+                  type: "node/change/positioning",
+                  node_id: node.id,
+                  positioning: {
+                    position: "absolute",
+                    [prop]: value,
+                  },
+                });
+                return true;
+              default:
+                console.error(`Unsupported property: ${prop.toString()}`);
+            }
+
+            return false;
+          },
+        }
+      );
+      return p;
+    }
+  }
+
+  export interface IStandaloneEditorApi {
+    selection: ReadonlyArray<NodeID>;
+    getNodeById: (node_id: NodeID) => nodes.Node;
+    getNodeDepth: (node_id: NodeID) => number;
+    getNodeAbsoluteRotation: (node_id: NodeID) => number;
+
+    select: (...selectors: document.Selector[]) => void;
+    blur: () => void;
+    undo: () => void;
+    redo: () => void;
+    cut: (target: "selection" | NodeID) => void;
+    copy: (target: "selection" | NodeID) => void;
+    paste: () => void;
+    duplicate: (target: "selection" | NodeID) => void;
+    delete: (target: "selection" | NodeID) => void;
+    rename: (target: "selection" | NodeID, name: string) => void;
+
+    nudge: (
+      target: "selection" | NodeID,
+      axis: "x" | "y",
+      delta: number
+    ) => void;
+    nudgeResize: (
+      target: "selection" | NodeID,
+      axis: "x" | "y",
+      delta: number
+    ) => void;
+
+    align: (
+      target: "selection" | NodeID,
+      alignment: {
+        horizontal?: "none" | "min" | "max" | "center";
+        vertical?: "none" | "min" | "max" | "center";
+      }
+    ) => void;
+    order: (
+      target: "selection" | NodeID,
+      order: "back" | "front" | number
+    ) => void;
+    distributeEvenly: (target: "selection" | NodeID[], axis: "x" | "y") => void;
+
+    toggleActive: (target: "selection" | NodeID) => void;
+    toggleLocked: (target: "selection" | NodeID) => void;
+    toggleBold: (target: "selection" | NodeID) => void;
+    setOpacity: (target: "selection" | NodeID, opacity: number) => void;
+
+    createRectangle(
+      props: Omit<grida.program.nodes.NodePrototype, "type">
+    ): void;
+    createEllipse(props: Omit<grida.program.nodes.NodePrototype, "type">): void;
+    createText(props: Omit<grida.program.nodes.NodePrototype, "type">): void;
+
+    // defineSchemaProperty: (
+    //   name?: string,
+    //   definition?: grida.program.schema.PropertyDefinition
+    // ) => void;
+    // renameSchemaProperty: (name: string, newName: string) => void;
+    // updateSchemaProperty: (
+    //   name: string,
+    //   definition: grida.program.schema.PropertyDefinition
+    // ) => void;
+    // deleteSchemaProperty: (name: string) => void;
+
+    // configureSurfaceRaycastTargeting: (
+    //   config: Partial<SurfaceRaycastTargeting>
+    // ) => void;
+    configureMeasurement: (measurement: "on" | "off") => void;
+    configureTranslateWithCloneModifier: (
+      translate_with_clone: "on" | "off"
+    ) => void;
+    configureTranslateWithAxisLockModifier: (
+      tarnslate_with_axis_lock: "on" | "off"
+    ) => void;
+    configureTransformWithCenterOriginModifier: (
+      transform_with_center_origin: "on" | "off"
+    ) => void;
+    configureTransformWithPreserveAspectRatioModifier: (
+      transform_with_preserve_aspect_ratio: "on" | "off"
+    ) => void;
+    configureRotateWithQuantizeModifier: (
+      rotate_with_quantize: number | "off"
+    ) => void;
+  }
+}

@@ -25,7 +25,7 @@ import {
   ProgramDataContextHost,
 } from "@/grida/react-runtime/data-context/context";
 import assert from "assert";
-import { document, type Selector } from "./document-query";
+import { document } from "./document-query";
 import { GoogleFontsManager } from "./components/google-fonts";
 import { domapi } from "./domapi";
 import { cmath } from "./cmath";
@@ -1351,7 +1351,7 @@ export function useDocument() {
   const { order: _, ...nodeActions } = __useNodeActions(dispatch);
 
   const select = useCallback(
-    (...selectors: Selector[]) =>
+    (...selectors: grida.program.document.Selector[]) =>
       dispatch({
         type: "select",
         selectors: selectors,
@@ -2468,4 +2468,95 @@ export function useTemplateDefinition(template_id: string) {
   } = useDocument();
 
   return templates![template_id];
+}
+
+const __not_implemented = (...args: any): any => {
+  throw new Error("not implemented");
+};
+export function useEditorApi() {
+  const document = useDocument();
+  const dispatcher = __useDispatch();
+
+  const getNodeById: grida.program.api.IStandaloneEditorApi["getNodeById"] =
+    useCallback(
+      (id: grida.program.api.NodeID) => {
+        const nodedata = document.state.document.nodes[id];
+        return grida.program.api.internal.createApiProxyNode(nodedata, {
+          dispatcher,
+        });
+      },
+      [document.state.document.nodes]
+    );
+
+  const createRectangle = useCallback(
+    (props: Omit<grida.program.nodes.NodePrototype, "type"> = {}) => {
+      dispatcher({
+        type: "document/insert",
+        prototype: {
+          type: "rectangle",
+          ...props,
+        } as grida.program.nodes.NodePrototype,
+      });
+    },
+    [dispatcher]
+  );
+
+  const createEllipse = useCallback(
+    (props: Omit<grida.program.nodes.NodePrototype, "type">) => {
+      dispatcher({
+        type: "document/insert",
+        prototype: {
+          type: "ellipse",
+          ...props,
+        } as grida.program.nodes.NodePrototype,
+      });
+    },
+    [dispatcher]
+  );
+
+  const editor: grida.program.api.IStandaloneEditorApi = useMemo(() => {
+    return {
+      selection: document.selection,
+      getNodeById,
+      createRectangle,
+      createEllipse,
+      createText: __not_implemented,
+      getNodeDepth: document.getNodeDepth,
+      getNodeAbsoluteRotation: document.getNodeAbsoluteRotation,
+      select: document.select,
+      blur: document.blur,
+      undo: document.undo,
+      redo: document.redo,
+      cut: document.cut,
+      copy: document.copy,
+      paste: document.paste,
+      duplicate: document.duplicate,
+      delete: document.deleteNode,
+      rename: document.changeNodeName,
+      nudge: document.nudge,
+      nudgeResize: document.nudgeResize,
+      align: document.align,
+      order: document.order,
+      distributeEvenly: document.distributeEvenly,
+      configureSurfaceRaycastTargeting:
+        document.configureSurfaceRaycastTargeting,
+      configureMeasurement: document.configureMeasurement,
+      configureTranslateWithCloneModifier:
+        document.configureTranslateWithCloneModifier,
+      configureTranslateWithAxisLockModifier:
+        document.configureTranslateWithAxisLockModifier,
+      configureTransformWithCenterOriginModifier:
+        document.configureTransformWithCenterOriginModifier,
+      configureTransformWithPreserveAspectRatioModifier:
+        document.configureTransformWithPreserveAspectRatioModifier,
+      configureRotateWithQuantizeModifier:
+        document.configureRotateWithQuantizeModifier,
+      toggleActive: document.toggleActive,
+      toggleLocked: document.toggleLocked,
+      toggleBold: document.toggleBold,
+      setOpacity: document.setOpacity,
+    };
+  }, [document, getNodeById, createRectangle, createEllipse]);
+
+  return editor;
 }

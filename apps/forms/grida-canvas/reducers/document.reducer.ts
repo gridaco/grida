@@ -460,22 +460,35 @@ export default function documentReducer<S extends IDocumentEditorState>(
           const nodeId = nid();
 
           // Create the parent node
+          let newNode: grida.program.nodes.Node;
+          try {
+            newNode = grida.program.nodes.createNodeFromPrototype(
+              nodeId,
+              nodePrototype
+            )!;
+          } catch (e) {
+            // TODO: not all nodes are implemented
+          }
           // @ts-expect-error
-          const newNode: grida.program.nodes.Node = {
-            ...nodePrototype,
-            id: nodeId,
-            name: nodePrototype.name ?? nodePrototype.type,
-            locked: nodePrototype.locked ?? false,
-            active: nodePrototype.active ?? true,
-            type: nodePrototype.type,
-            children:
-              nodePrototype.type === "container" ||
-              nodePrototype.type === "component" ||
-              nodePrototype.type === "template_instance" ||
-              nodePrototype.type === "instance"
-                ? []
-                : undefined,
-          };
+          if (!newNode) {
+            // @ts-expect-error
+            newNode = {
+              ...nodePrototype,
+              id: nodeId,
+              name: nodePrototype.name ?? nodePrototype.type,
+              locked: nodePrototype.locked ?? false,
+              active: nodePrototype.active ?? true,
+
+              type: nodePrototype.type,
+              children:
+                nodePrototype.type === "container" ||
+                nodePrototype.type === "component" ||
+                nodePrototype.type === "template_instance" ||
+                nodePrototype.type === "instance"
+                  ? []
+                  : undefined,
+            };
+          }
 
           // Insert the parent node into the document first
           self_insertNode(draft, parentNodeId, newNode);
