@@ -15,6 +15,7 @@ import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { useGoogleFontsList } from "../google.fonts";
 import { useThrottle } from "@uidotdev/usehooks";
 import { __UNSAFE_CONSOLE } from "@/scaffolds/playground-canvas/__unsafe-console";
+import type { grida } from "@/grida";
 
 export function DevtoolsPanel() {
   const { state: _state } = useDocument();
@@ -80,6 +81,9 @@ export function DevtoolsPanel() {
           <TabsContent value="document" className="h-full">
             <Tabs defaultValue="document" className="w-full h-full">
               <TabsList className="mx-2">
+                <TabsTrigger value="hierarchy" className="text-xs uppercase">
+                  Hierarchy
+                </TabsTrigger>
                 <TabsTrigger value="document" className="text-xs uppercase">
                   Document
                 </TabsTrigger>
@@ -93,6 +97,11 @@ export function DevtoolsPanel() {
                   Clipboard
                 </TabsTrigger>
               </TabsList>
+              <TabsContent value="hierarchy" className="h-full">
+                <JSONContent
+                  value={devdata_hierarchy_only(document, document_ctx)}
+                />
+              </TabsContent>
               <TabsContent value="document" className="h-full">
                 <JSONContent value={{ document, document_ctx }} />
               </TabsContent>
@@ -118,6 +127,24 @@ export function DevtoolsPanel() {
       </Tabs>
     </Collapsible>
   );
+}
+
+function devdata_hierarchy_only(
+  document: grida.program.document.IDocumentDefinition,
+  document_ctx: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext
+) {
+  const { root_id, nodes } = document;
+  return {
+    root_id: root_id,
+    document_ctx,
+    nodes: Object.entries(nodes).reduce((acc: any, [id, node]) => {
+      acc[id] = {
+        type: node.type,
+        children: (node as any).children,
+      };
+      return acc;
+    }, {}),
+  };
 }
 
 function JSONContent({ value }: { value: unknown }) {
