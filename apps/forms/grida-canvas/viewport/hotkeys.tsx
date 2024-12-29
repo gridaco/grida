@@ -169,6 +169,8 @@ export function useEditorHotKeys() {
           configureMeasurement("on");
           configureTranslateWithCloneModifier("on");
           configureTransformWithCenterOriginModifier("on");
+          // NOTE: on some systems, the alt key focuses to the browser menu, so we need to prevent that. (e.g. alt key on windows/chrome)
+          e.preventDefault();
           break;
         case "Shift":
           configureTranslateWithAxisLockModifier("on");
