@@ -1,6 +1,6 @@
 import type { Draft } from "immer";
 import type { IDocumentEditorState } from "../../state";
-import { self_insertNode } from "./insert";
+import { self_insertNode, self_insertSubDocument } from "./insert";
 import { self_deleteNode } from "./delete";
 import { document } from "../../document-query";
 import { cmath } from "../../cmath";
@@ -15,6 +15,7 @@ import nodeReducer from "../node.reducer";
 import assert from "assert";
 import { grida } from "@/grida";
 import { vn } from "@/grida/vn";
+import nid from "../tools/id";
 
 const SNAP: cmath.Vector2 = [4, 4];
 
@@ -97,41 +98,55 @@ function __self_update_gesture_transform_translate(
   } = draft.gesture_modifiers;
 
   // TODO: translate_with_clone - move it somewhere else
+  // FIXME: this does not respect the hierarchy and relative position
   // #region [translate_with_clone]
   switch (translate_with_clone) {
     case "on": {
-      // FIXME: this does not respect the hierarchy and relative position
-      if (draft.gesture.is_currently_cloned) break;
-      draft.gesture.is_currently_cloned = true;
+      if (draft.gesture.is_currently_cloned) break; // already cloned
+
       // if translate with clone is on, switch selection (if not already) to the cloned node
       // while..
       // - reset the original node
       // - update the cloned node
 
-      const clones = initial_selection.map((node_id, i) => {
-        const original = initial_snapshot.document.nodes[node_id];
-        const clone = { ...original, id: initial_clone_ids[i] };
-        return clone;
-      });
+      const to_be_cloned = initial_selection.slice();
 
-      clones.forEach((clone) => {
+      to_be_cloned.forEach((original_id, i) => {
         const initial_parent_id = document.getParentId(
           initial_snapshot.document_ctx,
-          clone.id
+          original_id
         )!;
 
-        self_insertNode(
-          draft,
-          initial_parent_id ?? draft.document.root_id,
-          clone
-        );
+        const parent_id = initial_parent_id ?? draft.document.root_id;
+
+        const prototype =
+          grida.program.nodes.factory.createPrototypeFromSnapshot(
+            initial_snapshot.document,
+            original_id
+          );
+
+        const sub =
+          grida.program.nodes.factory.createSubDocumentDefinitionFromPrototype(
+            prototype,
+            (_, depth) => {
+              // the root shall be assigned to reserved id
+              if (depth === 0) return initial_clone_ids[i];
+
+              // else, default.
+              return nid();
+            }
+          );
+
+        self_insertSubDocument(draft, parent_id, sub);
       });
 
-      // reset the original node
+      // reset the original node (these were previously the selection, moving targets.)
+      // FIXME: not only reset the position, but it should also reset the hierarchy. (which current approach cannot handle) (it's more of 'undo')
       initial_selection.forEach((node_id, i) => {
         const node = document.__getNodeById(draft, node_id);
         draft.document.nodes[node_id] = nodeTransformReducer(node, {
           type: "position",
+          // TODO: use the relative position
           x: initial_rects[i].x,
           y: initial_rects[i].y,
         });
@@ -142,6 +157,9 @@ function __self_update_gesture_transform_translate(
       // now, the cloned not will be measured relative to the original selection
       draft.surface_measurement_target = initial_selection;
       draft.surface_measurement_targeting_locked = true;
+
+      // set the flag
+      draft.gesture.is_currently_cloned = true;
 
       break;
     }
@@ -178,7 +196,7 @@ function __self_update_gesture_transform_translate(
   switch (translate_with_hierarchy_change) {
     case "on": {
       // check if the cursor finds a new parent (if it escapes the current parent or enters a new parent)
-      const hits = [...draft.surface_raycast_detected_node_ids];
+      const hits = draft.surface_raycast_detected_node_ids.slice();
       // filter out the current selection (both original and cloned) and non-container nodes
       // the current selection will always be hit as it moves with the cursor (unless not grouped - but does not matter)
       // both original and cloned nodes are considered as the same node, unless, the cloned node will instantly be moved to the original (if its a container) - this is not the case when clone modifier is turned on after the translate has started, but does not matter.
@@ -198,7 +216,6 @@ function __self_update_gesture_transform_translate(
       let is_parent_changed = false;
       // update the parent of the current selection
       current_selection.forEach((node_id) => {
-        //
         //
         const prev_parent_id = document.getParentId(
           draft.document_ctx,
@@ -265,10 +282,20 @@ function __self_update_gesture_transform_translate(
     const parent_id = document.getParentId(draft.document_ctx, node_id)!;
     const parent_rect = domapi.get_node_bounding_rect(parent_id)!;
 
-    assert(
-      parent_rect,
-      "Parent rect must be defined : " + parent_id + "/" + node_id
-    );
+    if (!parent_rect) {
+      console.error("below error is caused by");
+      console.error(
+        JSON.parse(
+          JSON.stringify({
+            document_ctx: draft.document_ctx,
+            document: draft.document,
+          })
+        )
+      );
+      throw new Error(
+        `Parent '${parent_id}' rect must be defined [${parent_id}/${node_id}]`
+      );
+    }
 
     // the r position is relative to the canvas, we need to convert it to the node's local position
     // absolute to relative => accumulated parent's position

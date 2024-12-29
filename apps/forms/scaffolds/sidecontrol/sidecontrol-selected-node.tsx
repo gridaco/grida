@@ -547,6 +547,7 @@ export function SelectedNodeProperties() {
   const {
     selection,
     document: { root_id },
+    debug,
   } = document;
 
   assert(selection.length === 1);
@@ -643,7 +644,7 @@ export function SelectedNodeProperties() {
   return (
     <div key={node_id} className="mt-4 mb-10">
       <AlignNodes />
-      {/* {process.env.NODE_ENV === "development" && (
+      {/* {debug && (
         <SidebarSection className="border-b pb-4">
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Debug</SidebarSectionHeaderLabel>
@@ -686,7 +687,7 @@ export function SelectedNodeProperties() {
             </Toggle>
           </PropertyLine>
 
-          {process.env.NODE_ENV === "development" && (
+          {debug && (
             <PropertyLine className="items-center gap-1">
               <PropertyLineLabel>id</PropertyLineLabel>
               <small className="ms-2 font-mono">{id}</small>

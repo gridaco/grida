@@ -2216,7 +2216,7 @@ export namespace grida {
          */
         export function createNodeDataFromPrototypeWithoutChildren(
           prototype: Partial<NodePrototype>,
-          nid: () => NodeID
+          id: NodeID
         ): Node {
           switch (prototype.type) {
             case "rectangle": {
@@ -2238,7 +2238,7 @@ export namespace grida {
                 strokeCap: "butt",
                 effects: [],
                 ...prototype,
-                id: nid(),
+                id: id,
               } satisfies RectangleNode;
             }
             // TODO:
@@ -2257,7 +2257,7 @@ export namespace grida {
                 rotation: 0,
                 children: [],
                 ...prototype,
-                id: nid(),
+                id: id,
               } as AnyNode;
             }
             // TODO:
@@ -2280,7 +2280,7 @@ export namespace grida {
                 zIndex: 0,
                 rotation: 0,
                 ...prototype,
-                id: nid(),
+                id: id,
               } as AnyNode;
             }
             default:
@@ -2290,14 +2290,18 @@ export namespace grida {
           }
         }
 
+        type FactoryNodeIdGenerator<D> = (data: D, depth: number) => NodeID;
+
         /**
          * Creates a sub document {@link document.IDocumentDefinition} from a prototype input.
          *
          * When injecting this to the master document, simply merge this to the master document, and add the root as a children of certain node.
          */
-        export function createSubDocumentDefinitionFromPrototype(
-          prototype: Partial<NodePrototype>,
-          nid: () => NodeID
+        export function createSubDocumentDefinitionFromPrototype<
+          D extends Partial<NodePrototype>,
+        >(
+          prototype: D,
+          nid: FactoryNodeIdGenerator<D | Partial<NodePrototype>>
         ): document.IDocumentDefinition {
           const document: document.IDocumentDefinition = {
             nodes: {},
@@ -2305,12 +2309,14 @@ export namespace grida {
           };
 
           function processNode(
-            prototype: Partial<NodePrototype>,
-            nid: () => NodeID
+            prototype: D | Partial<NodePrototype>,
+            nid: FactoryNodeIdGenerator<D | Partial<NodePrototype>>,
+            depth: number = 0
           ): nodes.Node {
+            const id = nid(prototype, depth);
             const node = createNodeDataFromPrototypeWithoutChildren(
               prototype,
-              nid
+              id
             );
             document.nodes[node.id] = node;
 
@@ -2318,7 +2324,7 @@ export namespace grida {
               const node_with_children = node as nodes.i.IChildrenReference;
               node_with_children.children = [];
               for (const childPrototype of prototype.children ?? []) {
-                const childNode = processNode(childPrototype, nid);
+                const childNode = processNode(childPrototype, nid, depth + 1);
                 node_with_children.children.push(childNode.id);
               }
             }

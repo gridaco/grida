@@ -183,10 +183,18 @@ export type GestureTranslate = IGesture & {
   // translate (move)
   type: "translate";
   selection: string[];
+
+  /**
+   * initial selection of the nodes - the original node ids
+   */
   initial_selection: string[];
   initial_snapshot: IMinimalDocumentState;
   initial_clone_ids: string[];
   initial_rects: cmath.Rectangle[];
+
+  /**
+   * indicator between gesture events to ensure if the current selection is cloned ones or not
+   */
   is_currently_cloned: boolean;
 
   /**
