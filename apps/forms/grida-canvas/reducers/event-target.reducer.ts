@@ -904,6 +904,9 @@ function self_maybe_end_gesture_translate(draft: Draft<IDocumentEditorState>) {
 
 /**
  * get the parent of newly inserting node based on the current state
+ *
+ * this relies on `surface_raycast_detected_node_ids`, make sure it's updated before calling this function
+ *
  * @returns the parent node id
  */
 function __get_insert_target(state: IDocumentEditorState): string {
