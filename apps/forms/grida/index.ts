@@ -2255,7 +2255,12 @@ export namespace grida.program.api {
   export type NodeID = string & {};
 
   export namespace internal {
-    export function createApiProxyNode(
+    /**
+     * @deprecated
+     * @returns
+     * This model does not work. it's a proof of concept. - will be removed
+     */
+    export function __createApiProxyNode_experimental(
       node: nodes.Node,
       context: {
         dispatcher: DocumentDispatcher;

@@ -2481,9 +2481,12 @@ export function useEditorApi() {
     useCallback(
       (id: grida.program.api.NodeID) => {
         const nodedata = document.state.document.nodes[id];
-        return grida.program.api.internal.createApiProxyNode(nodedata, {
-          dispatcher,
-        });
+        return grida.program.api.internal.__createApiProxyNode_experimental(
+          nodedata,
+          {
+            dispatcher,
+          }
+        );
       },
       [document.state.document.nodes]
     );

@@ -505,12 +505,15 @@ export default function documentReducer<S extends IDocumentEditorState>(
         }
 
         // Insert the prototype as the root node under the document's root
-        self_instanciateNodePrototype(draft, draft.document.root_id, prototype);
+        const prototype_root_id = self_instanciateNodePrototype(
+          draft,
+          draft.document.root_id,
+          prototype
+        );
 
         // after
         draft.cursor_mode = { type: "cursor" };
-        // TODO:
-        self_clearSelection(draft);
+        self_selectNode(draft, "reset", prototype_root_id);
       });
     }
     case "surface/content-edit-mode/try-enter":
