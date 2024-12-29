@@ -102,15 +102,16 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       });
     }
     case "event-target/event/on-click": {
-      const {} = <EditorEventTarget_Click>action;
+      const { node_ids_from_point } = <EditorEventTarget_Click>action;
       return produce(state, (draft) => {
+        draft.surface_raycast_detected_node_ids = node_ids_from_point;
         switch (draft.cursor_mode.type) {
           case "cursor": {
             // ignore
             break;
           }
           case "insert":
-            const parent = __get_insert_target(state);
+            const parent = __get_insert_target(draft);
 
             const nnode = initialNode(draft.cursor_mode.node);
 
@@ -202,11 +203,11 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         action
       );
       return produce(state, (draft) => {
+        draft.surface_raycast_detected_node_ids = node_ids_from_point;
+
         switch (draft.cursor_mode.type) {
           case "cursor": {
-            draft.surface_raycast_detected_node_ids = node_ids_from_point;
             const { hovered_node_id } = self_updateSurfaceHoverState(draft);
-
             // ignore if in content edit mode
             if (draft.content_edit_mode) break;
 
@@ -310,7 +311,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               vector.left = pos[0];
               vector.top = pos[1];
 
-              const parent = __get_insert_target(state);
+              const parent = __get_insert_target(draft);
               self_insertNode(draft, parent, vector);
               self_selectNode(draft, "reset", vector.id);
 
@@ -379,7 +380,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
           case "insert": {
             const { cursor_position } = state;
 
-            const parent = __get_insert_target(state);
+            const parent = __get_insert_target(draft);
 
             const initial_rect = {
               x: cursor_position[0],
@@ -461,7 +462,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             }
 
             // insert a new vector node
-            const parent = __get_insert_target(state);
+            const parent = __get_insert_target(draft);
             self_insertNode(draft, parent, vector);
 
             // position relative to the parent
@@ -903,7 +904,7 @@ function self_maybe_end_gesture_translate(draft: Draft<IDocumentEditorState>) {
 
 /**
  * get the parent of newly inserting node based on the current state
- * @returns
+ * @returns the parent node id
  */
 function __get_insert_target(state: IDocumentEditorState): string {
   const first_hit = state.surface_raycast_detected_node_ids[0];

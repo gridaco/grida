@@ -142,14 +142,10 @@ function __self_update_gesture_transform_translate(
 
       // reset the original node (these were previously the selection, moving targets.)
       // FIXME: not only reset the position, but it should also reset the hierarchy. (which current approach cannot handle) (it's more of 'undo')
+      // To fix this, we actually need to reset the entire document, and move the clones.
       initial_selection.forEach((node_id, i) => {
-        const node = document.__getNodeById(draft, node_id);
-        draft.document.nodes[node_id] = nodeTransformReducer(node, {
-          type: "position",
-          // TODO: use the relative position
-          x: initial_rects[i].x,
-          y: initial_rects[i].y,
-        });
+        draft.document.nodes[node_id] =
+          initial_snapshot.document.nodes[node_id];
       });
 
       draft.gesture.selection = initial_clone_ids;
@@ -193,6 +189,7 @@ function __self_update_gesture_transform_translate(
   // #endregion
 
   // #region [translate_with_hierarchy_change]
+  // FIXME:
   switch (translate_with_hierarchy_change) {
     case "on": {
       // check if the cursor finds a new parent (if it escapes the current parent or enters a new parent)
@@ -274,41 +271,49 @@ function __self_update_gesture_transform_translate(
 
   draft.gesture.surface_snapping = snapping;
 
-  let i = 0;
-  for (const node_id of current_selection) {
-    const node = document.__getNodeById(draft, node_id);
-    const r = translated[i++];
+  try {
+    let i = 0;
 
-    const parent_id = document.getParentId(draft.document_ctx, node_id)!;
-    const parent_rect = domapi.get_node_bounding_rect(parent_id)!;
+    for (const node_id of current_selection) {
+      const node = document.__getNodeById(draft, node_id);
+      const r = translated[i++];
 
-    if (!parent_rect) {
-      console.error("below error is caused by");
-      console.error(
-        JSON.parse(
-          JSON.stringify({
-            document_ctx: draft.document_ctx,
-            document: draft.document,
-          })
-        )
-      );
-      throw new Error(
-        `Parent '${parent_id}' rect must be defined [${parent_id}/${node_id}]`
-      );
+      const parent_id = document.getParentId(draft.document_ctx, node_id)!;
+      const parent_rect = domapi.get_node_bounding_rect(parent_id)!;
+
+      if (!parent_rect) {
+        console.error("below error is caused by");
+        console.error(
+          JSON.parse(
+            JSON.stringify({
+              document_ctx: draft.document_ctx,
+              document: draft.document,
+            })
+          )
+        );
+        throw new Error(
+          `Parent '${parent_id}' rect must be defined [${parent_id}/${node_id}]`
+        );
+      }
+
+      // the r position is relative to the canvas, we need to convert it to the node's local position
+      // absolute to relative => accumulated parent's position
+      const relative_position = cmath.vector2.sub(r.position, [
+        parent_rect.x,
+        parent_rect.y,
+      ]);
+
+      draft.document.nodes[node_id] = nodeTransformReducer(node, {
+        type: "position",
+        x: relative_position[0],
+        y: relative_position[1],
+      });
     }
-
-    // the r position is relative to the canvas, we need to convert it to the node's local position
-    // absolute to relative => accumulated parent's position
-    const relative_position = cmath.vector2.sub(r.position, [
-      parent_rect.x,
-      parent_rect.y,
-    ]);
-
-    draft.document.nodes[node_id] = nodeTransformReducer(node, {
-      type: "position",
-      x: relative_position[0],
-      y: relative_position[1],
-    });
+  } catch (e) {
+    // FIXME: thre is a problem with the hierarchy change logic.
+    // REMOVE TRY-CATCH AFTER FIXING THE ISSUE
+    // this can happen since using unsafe domapi.
+    reportError(e);
   }
 }
 
