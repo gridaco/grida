@@ -13,7 +13,11 @@ import type {
   EditorEventTarget_DragEnd,
   //
 } from "../action";
-import type { GestureDraw, IDocumentEditorState } from "../state";
+import type {
+  GestureDraw,
+  IDocumentEditorState,
+  IMinimalDocumentState,
+} from "../state";
 import { grida } from "@/grida";
 import { document } from "../document-query";
 import nodeReducer from "./node.reducer";
@@ -32,6 +36,7 @@ import nid from "./tools/id";
 import { getMarqueeSelection, getSurfaceRayTarget } from "./tools/target";
 import { vn } from "@/grida/vn";
 import { getInitialCurveGesture } from "./tools/gesture";
+import { createMinimalDocumentStateSnapshot } from "./tools/snapshot";
 
 export default function eventTargetReducer<S extends IDocumentEditorState>(
   state: S,
@@ -581,26 +586,27 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         });
       } else {
         return produce(state, (draft) => {
+          if (draft.gesture.type === "idle") return;
+          if (draft.gesture.type === "nudge") return;
+
+          draft.gesture.movement = movement;
+
           switch (draft.gesture.type) {
             // [insertion mode - resize after insertion]
             case "scale": {
-              draft.gesture.movement = movement;
               self_update_gesture_transform(draft);
               break;
             }
             // this is to handle "immediately drag move node"
             case "translate": {
-              draft.gesture.movement = movement;
               self_update_gesture_transform(draft);
               break;
             }
             case "rotate": {
-              draft.gesture.movement = movement;
               self_update_gesture_transform(draft);
               break;
             }
             case "draw": {
-              draft.gesture.movement = movement;
               const {
                 gesture_modifiers: { tarnslate_with_axis_lock },
               } = state;
@@ -664,7 +670,6 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             }
             case "curve": {
               assert(draft.content_edit_mode?.type === "path");
-              draft.gesture.movement = movement;
               const { node_id, segment, initial, control, invert } =
                 draft.gesture;
 
@@ -712,7 +717,6 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             }
             case "curve-a": {
               assert(draft.content_edit_mode?.type === "path");
-              draft.gesture.movement = movement;
               const { node_id, vertex, initial, control, invert } =
                 draft.gesture;
 
@@ -734,9 +738,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                 node_id
               ) as grida.program.nodes.PathNode;
 
-              const {
-                event: { movement: _movement },
-              } = action;
+              const { movement: _movement } = draft.gesture;
 
               assert(draft.gesture.type === "translate-vertex");
               const { tarnslate_with_axis_lock } = state.gesture_modifiers;
@@ -860,7 +862,7 @@ function self_start_gesture_scale_draw_new_node(
 ) {
   draft.gesture = {
     type: "scale",
-    initial_snapshot: JSON.parse(JSON.stringify(draft.document)),
+    initial_snapshot: createMinimalDocumentStateSnapshot(draft),
     initial_rects: [new_node_rect],
     movement: cmath.vector2.zero,
     selection: [new_node_id],
@@ -881,7 +883,7 @@ function self_start_gesture_translate(draft: Draft<IDocumentEditorState>) {
     initial_clone_ids: selection.map(() => nid()),
     initial_selection: selection,
     initial_rects: rects,
-    initial_snapshot: JSON.parse(JSON.stringify(draft.document)),
+    initial_snapshot: createMinimalDocumentStateSnapshot(draft),
     movement: cmath.vector2.zero,
     is_currently_cloned: false,
   };

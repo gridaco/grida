@@ -5,17 +5,23 @@ import { self_deleteNode } from "./delete";
 import { document } from "../../document-query";
 import { cmath } from "../../cmath";
 import { domapi } from "../../domapi";
-import { getSnapTargets, snapMovementToObjects } from "../tools/snap";
+import {
+  getSnapTargets,
+  snapMovement,
+  snapObjectsTranslation,
+} from "../tools/snap";
 import nodeTransformReducer from "../node-transform.reducer";
 import nodeReducer from "../node.reducer";
 import assert from "assert";
 import { grida } from "@/grida";
 import { vn } from "@/grida/vn";
 
+const SNAP: cmath.Vector2 = [4, 4];
+
 /**
- * maps the resize handle (direction) to the transform origin point (inverse)
+ * Inverted cardinal directions `nw -> se, ne -> sw` and so on
  */
-const __scale_direction_to_transform_origin_point = {
+const inverted_cardinal_directions = {
   nw: "se",
   ne: "sw",
   sw: "ne",
@@ -27,9 +33,15 @@ const __scale_direction_to_transform_origin_point = {
 } as const;
 
 /**
- * maps the resize handle (direction) to the mouse movement direction multiplier (inverse)
+ * Cardinal direction vector
+ *
+ * - `n -> [0, -1]`
+ * - `e -> [1, 0]`
+ * - `s -> [0, 1]`
+ * - `w -> [-1, 0]`
+ * - ... and so on
  */
-const __resize_handle_to_mouse_direction_multiplier = {
+const cardinal_direction_vector = {
   nw: [-1, -1] as cmath.Vector2,
   ne: [1, -1] as cmath.Vector2,
   sw: [-1, 1] as cmath.Vector2,
@@ -97,13 +109,22 @@ function __self_update_gesture_transform_translate(
       // - update the cloned node
 
       const clones = initial_selection.map((node_id, i) => {
-        const original = initial_snapshot.nodes[node_id];
+        const original = initial_snapshot.document.nodes[node_id];
         const clone = { ...original, id: initial_clone_ids[i] };
         return clone;
       });
 
       clones.forEach((clone) => {
-        self_insertNode(draft, draft.document.root_id, clone);
+        const initial_parent_id = document.getParentId(
+          initial_snapshot.document_ctx,
+          clone.id
+        )!;
+
+        self_insertNode(
+          draft,
+          initial_parent_id ?? draft.document.root_id,
+          clone
+        );
       });
 
       // reset the original node
@@ -227,11 +248,11 @@ function __self_update_gesture_transform_translate(
     })
     .filter(Boolean);
 
-  const { translated, snapping } = snapMovementToObjects(
+  const { translated, snapping } = snapObjectsTranslation(
     initial_rects,
     snap_target_node_rects,
     adj_movement,
-    [4, 4]
+    SNAP
   );
 
   draft.gesture.surface_snapping = snapping;
@@ -279,28 +300,62 @@ function __self_update_gesture_transform_scale(
     initial_rects,
   } = draft.gesture;
 
+  const snap_target_node_ids = getSnapTargets(selection, draft);
+
+  const snap_target_node_rects = snap_target_node_ids
+    .map((node_id: string) => {
+      const r = domapi.get_node_bounding_rect(node_id);
+      if (!r) reportError(`Node ${node_id} does not have a bounding rect`);
+      return r!;
+    })
+    .filter(Boolean);
+
   const initial_bounding_rectangle = cmath.rect.union(initial_rects);
 
   // get the origin point based on handle
-
   const origin =
     transform_with_center_origin === "on"
       ? cmath.rect.center(initial_bounding_rectangle)
       : cmath.rect.getCardinalPoint(
           initial_bounding_rectangle,
-          __scale_direction_to_transform_origin_point[direction]
+          // maps the resize handle (direction) to the transform origin point (inverse)
+          inverted_cardinal_directions[direction]
         );
+
+  /**
+  // #region [snap]
+  // the actual handle position
+  const anchorpos = cmath.rect.getCardinalPoint(
+    initial_bounding_rectangle,
+    direction
+  );
+
+  const { movement: snappedMovement, snapping } = snapMovement(
+    anchorpos,
+    snap_target_node_rects
+      .map((r) => {
+        const _9 = cmath.rect.to9Points(r);
+        return Object.keys(_9).map((k) => _9[k as keyof typeof _9]);
+      })
+      .flat(),
+    rawMovement,
+    SNAP
+  );
+
+  draft.gesture.surface_snapping = snapping;
+  // #endregion
+   */
 
   // inverse the delta based on handle
   const movement = cmath.vector2.multiply(
-    __resize_handle_to_mouse_direction_multiplier[direction],
+    cardinal_direction_vector[direction],
     rawMovement,
     transform_with_center_origin === "on" ? [2, 2] : [1, 1]
   );
 
   let i = 0;
   for (const node_id of selection) {
-    const node = initial_snapshot.nodes[node_id];
+    const node = initial_snapshot.document.nodes[node_id];
     const initial_rect = initial_rects[i++];
     const is_root = node_id === draft.document.root_id;
 

@@ -5,7 +5,9 @@ import { self_insertNode } from "./insert";
 import { self_selectNode } from "./selection";
 import assert from "assert";
 import nid from "../tools/id";
+import { grida } from "@/grida";
 
+// TODO: recursively clone.
 export function self_duplicateNode<S extends IDocumentEditorState>(
   draft: Draft<S>,
   ...node_ids: string[]
@@ -17,18 +19,22 @@ export function self_duplicateNode<S extends IDocumentEditorState>(
     const node = document.__getNodeById(draft, node_id);
 
     // serialize the node
-    const serialized = JSON.stringify(node);
-    const deserialized = JSON.parse(serialized);
+    const data: grida.program.nodes.NodePrototype = JSON.parse(
+      JSON.stringify(node)
+    );
 
-    // update the id
+    // assign new id
     const new_id = nid();
-    deserialized.id = new_id;
+    const newnode = grida.program.nodes.factory.createNodeDataFromPrototype(
+      new_id,
+      data
+    );
 
     const parent_id = document.getParentId(draft.document_ctx, node_id);
     assert(parent_id, `Parent node not found`);
 
     // insert the node
-    self_insertNode(draft, parent_id, deserialized);
+    self_insertNode(draft, parent_id, newnode);
 
     new_ids.push(new_id);
   }

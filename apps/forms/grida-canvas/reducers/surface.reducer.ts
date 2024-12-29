@@ -9,6 +9,7 @@ import { cmath } from "../cmath";
 import { domapi } from "../domapi";
 import { grida } from "@/grida";
 import { self_selectNode } from "./methods";
+import { createMinimalDocumentStateSnapshot } from "./tools/snapshot";
 
 export default function surfaceReducer<S extends IDocumentEditorState>(
   state: S,
@@ -120,6 +121,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
             self_selectNode(draft, "reset", node_id);
             draft.gesture = {
               type: "corner-radius",
+              movement: cmath.vector2.zero,
               initial_bounding_rectangle:
                 domapi.get_node_bounding_rect(node_id)!,
               node_id: node_id,
@@ -163,6 +165,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
               node_id: node_id,
               initial_verticies: verticies,
               vertex: index,
+              movement: cmath.vector2.zero,
               initial_position: [node.left!, node.top!],
             };
           });
@@ -193,7 +196,7 @@ function self_start_gesture_scale(
 
   draft.gesture = {
     type: "scale",
-    initial_snapshot: JSON.parse(JSON.stringify(draft.document)),
+    initial_snapshot: createMinimalDocumentStateSnapshot(draft),
     initial_rects: rects,
     movement: cmath.vector2.zero,
     selection: selection,

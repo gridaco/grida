@@ -132,7 +132,7 @@ interface IDocumentEditorTransformState {
 
 export type GestureState =
   | GestureIdle
-  | GestureNudge
+  | GestureVirtualNudge
   | GestureTranslate
   | GestureScale
   | GestureRotate
@@ -142,11 +142,27 @@ export type GestureState =
   | GestureCurve
   | GestureCurveA;
 
+interface IGesture {
+  /**
+   * current movement of the drag
+   *
+   * raw movement - independent of the offset or origin, purely the movement of the mouse.
+   */
+  movement: cmath.Vector2;
+}
+
 export type GestureIdle = {
   type: "idle";
 };
 
-export type GestureNudge = {
+/**
+ * virtual nudge gesture.
+ *
+ * this is not a real gesture, commonly triggered by keyboard arrow keys.
+ *
+ * this is required to tell the surface that it is nudging, thus, show snaps & related ux
+ */
+export type GestureVirtualNudge = {
   type: "nudge";
   /**
    * surface snap guides - result of snap while translate (move) gesture
@@ -154,13 +170,12 @@ export type GestureNudge = {
   surface_snapping?: SnapResult;
 };
 
-export type GestureTranslate = {
+export type GestureTranslate = IGesture & {
   // translate (move)
   type: "translate";
-  movement: cmath.Vector2;
   selection: string[];
   initial_selection: string[];
-  initial_snapshot: IDocumentState["document"];
+  initial_snapshot: IMinimalDocumentState;
   initial_clone_ids: string[];
   initial_rects: cmath.Rectangle[];
   is_currently_cloned: boolean;
@@ -171,15 +186,11 @@ export type GestureTranslate = {
   surface_snapping?: SnapResult;
 };
 
-export type GestureScale = {
+export type GestureScale = IGesture & {
   // scale (resize)
   type: "scale";
-  /**
-   * raw movement - independent of the direction
-   */
-  movement: cmath.Vector2;
   selection: string[];
-  initial_snapshot: IDocumentState["document"];
+  initial_snapshot: IMinimalDocumentState;
   initial_rects: cmath.Rectangle[];
   direction: cmath.CardinalDirection;
 
@@ -189,19 +200,15 @@ export type GestureScale = {
   surface_snapping?: SnapResult;
 };
 
-export type GestureRotate = {
+export type GestureRotate = IGesture & {
   type: "rotate";
-  /**
-   * raw movement - independent of the offset
-   */
-  movement: cmath.Vector2;
   initial_bounding_rectangle: cmath.Rectangle | null;
   // TODO: support multiple selection
   selection: string;
   offset: cmath.Vector2;
 };
 
-export type GestureCornerRadius = {
+export type GestureCornerRadius = IGesture & {
   /**
    * - corner-radius
    */
@@ -210,7 +217,7 @@ export type GestureCornerRadius = {
   initial_bounding_rectangle: cmath.Rectangle | null;
 };
 
-export type GestureDraw = {
+export type GestureDraw = IGesture & {
   /**
    * - draw points
    */
@@ -228,10 +235,6 @@ export type GestureDraw = {
    */
   points: cmath.Vector2[];
 
-  /**
-   * current movement
-   */
-  movement: cmath.Vector2;
   node_id: string;
 };
 
@@ -241,7 +244,7 @@ export type GestureDraw = {
  * @remarks
  * This is only valid with content edit mode is "path"
  */
-export type GestureTranslateVertex = {
+export type GestureTranslateVertex = IGesture & {
   type: "translate-vertex";
 
   /**
@@ -265,7 +268,7 @@ export type GestureTranslateVertex = {
 /**
  * curves the existing segment
  */
-export type GestureCurve = {
+export type GestureCurve = IGesture & {
   type: "curve";
 
   /**
@@ -289,11 +292,6 @@ export type GestureCurve = {
   initial: cmath.Vector2;
 
   /**
-   * current movement of the drag
-   */
-  movement: cmath.Vector2;
-
-  /**
    * rather to invert the movement
    */
   invert: boolean;
@@ -304,7 +302,7 @@ export type GestureCurve = {
  *
  * This is used when user creates a new vertex point without connection, yet dragging to first configure the `ta` of the next segment
  */
-export type GestureCurveA = {
+export type GestureCurveA = IGesture & {
   type: "curve-a";
 
   /**
@@ -326,11 +324,6 @@ export type GestureCurveA = {
    * initial position of the control point - always `zero`
    */
   initial: cmath.Vector2;
-
-  /**
-   * current movement of the drag
-   */
-  movement: cmath.Vector2;
 
   /**
    * rather to invert the movement
@@ -506,7 +499,7 @@ type PathContentEditMode = {
   path_cursor_position: cmath.Vector2;
 };
 
-export interface IDocumentState {
+export interface IMinimalDocumentState {
   document: grida.program.document.IDocumentDefinition;
   /**
    * the document key set by user. user can update this to tell it's entirely replaced
@@ -515,7 +508,9 @@ export interface IDocumentState {
    */
   document_key?: string;
   document_ctx: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext;
+}
 
+export interface IDocumentState extends IMinimalDocumentState {
   selection: string[];
 
   /**

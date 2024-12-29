@@ -26,7 +26,7 @@ import {
 } from "./methods";
 import { cmath } from "../cmath";
 import { domapi } from "../domapi";
-import { getSnapTargets, snapMovementToObjects } from "./tools/snap";
+import { getSnapTargets, snapObjectsTranslation } from "./tools/snap";
 import nid from "./tools/id";
 import { vn } from "@/grida/vn";
 
@@ -246,7 +246,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
           const origin_rects = target_node_ids.map(
             (node_id) => domapi.get_node_bounding_rect(node_id)!
           );
-          const { snapping } = snapMovementToObjects(
+          const { snapping } = snapObjectsTranslation(
             origin_rects,
             snap_target_node_rects,
             [dx, dy],
@@ -460,35 +460,11 @@ export default function documentReducer<S extends IDocumentEditorState>(
           const nodeId = nid();
 
           // Create the parent node
-          let newNode: grida.program.nodes.Node;
-          try {
-            newNode = grida.program.nodes.createNodeFromPrototype(
+          const newNode =
+            grida.program.nodes.factory.createNodeDataFromPrototype(
               nodeId,
               nodePrototype
             )!;
-          } catch (e) {
-            // TODO: not all nodes are implemented
-          }
-          // @ts-expect-error
-          if (!newNode) {
-            // @ts-expect-error
-            newNode = {
-              ...nodePrototype,
-              id: nodeId,
-              name: nodePrototype.name ?? nodePrototype.type,
-              locked: nodePrototype.locked ?? false,
-              active: nodePrototype.active ?? true,
-
-              type: nodePrototype.type,
-              children:
-                nodePrototype.type === "container" ||
-                nodePrototype.type === "component" ||
-                nodePrototype.type === "template_instance" ||
-                nodePrototype.type === "instance"
-                  ? []
-                  : undefined,
-            };
-          }
 
           // Insert the parent node into the document first
           self_insertNode(draft, parentNodeId, newNode);

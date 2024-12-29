@@ -112,7 +112,7 @@ export function BrowseStartPageTemplatesDialog({
                     document: {
                       nodes: {
                         preview:
-                          grida.program.nodes.createTemplateInstanceNodeFromTemplateDefinition(
+                          grida.program.nodes.factory.createTemplateInstanceNodeDataFromTemplateDefinition(
                             "preview",
                             template
                           ),

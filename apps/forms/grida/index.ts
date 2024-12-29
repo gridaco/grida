@@ -2173,71 +2173,116 @@ export namespace grida {
         template_id: string;
       }
 
-      /**
-       * calling this does not actually contribute to the rendering by itself, it creates a {@link TemplateInstanceNode} data.
-       */
-      export function createTemplateInstanceNodeFromTemplateDefinition(
-        id: string,
-        def: document.template.TemplateDocumentDefinition,
-        seed?: Partial<Omit<TemplateInstanceNode, "id">>
-      ): TemplateInstanceNode {
-        const { nodes, properties } = def;
+      export namespace factory {
+        /**
+         * calling this does not actually contribute to the rendering by itself, it creates a {@link TemplateInstanceNode} data.
+         */
+        export function createTemplateInstanceNodeDataFromTemplateDefinition(
+          id: string,
+          def: document.template.TemplateDocumentDefinition,
+          seed?: Partial<Omit<TemplateInstanceNode, "id">>
+        ): TemplateInstanceNode {
+          const { nodes, properties } = def;
 
-        return {
-          id,
-          name: def.name,
-          type: "template_instance",
-          active: true,
-          locked: false,
-          properties,
-          props: {},
-          userdata: {},
-          overrides: cloneWithUndefinedValues(nodes),
-          template_id: def.name,
-          ...seed,
-        };
-        //
-      }
-
-      export function createNodeFromPrototype(
-        id: NodeID,
-        prototype: Partial<NodePrototype>
-      ): Node | null {
-        const default_fill: cg.Paint = {
-          type: "solid",
-          color: { r: 0, g: 0, b: 0, a: 1 },
-        };
-        switch (prototype.type) {
-          case "rectangle": {
-            return {
-              id: id,
-              name: "rectangle",
-              type: "rectangle",
-              active: true,
-              locked: false,
-              opacity: 1,
-              zIndex: 0,
-              rotation: 0,
-              width: 100,
-              height: 100,
-              position: "absolute",
-              top: 0,
-              left: 0,
-              cornerRadius: 0,
-              fill: default_fill,
-              strokeWidth: 0,
-              strokeCap: "butt",
-              effects: [],
-              ...prototype,
-            } satisfies RectangleNode;
-          }
-          default:
-            throw new Error(
-              `Unsupported node prototype type: ${prototype.type}`
-            );
+          return {
+            id,
+            name: def.name,
+            type: "template_instance",
+            active: true,
+            locked: false,
+            properties,
+            props: {},
+            userdata: {},
+            overrides: cloneWithUndefinedValues(nodes),
+            template_id: def.name,
+            ...seed,
+          };
+          //
         }
 
-        return null;
+        /**
+         * calling this does not actually contribute to the rendering by itself, it creates a {@link Node} data.
+         */
+        export function createNodeDataFromPrototype(
+          id: NodeID,
+          prototype: Partial<NodePrototype>
+        ): Node {
+          const default_fill: cg.Paint = {
+            type: "solid",
+            color: { r: 0, g: 0, b: 0, a: 1 },
+          };
+          switch (prototype.type) {
+            case "rectangle": {
+              return {
+                name: "rectangle",
+                type: "rectangle",
+                active: true,
+                locked: false,
+                opacity: 1,
+                zIndex: 0,
+                rotation: 0,
+                width: 100,
+                height: 100,
+                position: "absolute",
+                top: 0,
+                left: 0,
+                cornerRadius: 0,
+                fill: default_fill,
+                strokeWidth: 0,
+                strokeCap: "butt",
+                effects: [],
+                ...prototype,
+                id: id,
+              } satisfies RectangleNode;
+            }
+            // TODO:
+            case "container":
+            case "component":
+            case "instance":
+            case "template_instance": {
+              // @ts-expect-error
+              return {
+                name: prototype.type,
+                type: prototype.type,
+                active: true,
+                locked: false,
+                opacity: 1,
+                zIndex: 0,
+                rotation: 0,
+                children: [],
+                ...prototype,
+                id: id,
+              } as AnyNode;
+            }
+            // TODO:
+            case "ellipse":
+            case "iframe":
+            case "image":
+            case "line":
+            case "path":
+            case "richtext":
+            case "text":
+            case "vector":
+            case "video": {
+              // @ts-expect-error
+              return {
+                name: prototype.type,
+                type: prototype.type,
+                active: true,
+                locked: false,
+                opacity: 1,
+                zIndex: 0,
+                rotation: 0,
+                ...prototype,
+                id: id,
+              } as AnyNode;
+            }
+            default:
+              throw new Error(
+                `Unsupported node prototype type: ${prototype.type}`
+              );
+          }
+        }
       }
     }
   }

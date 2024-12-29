@@ -3,23 +3,37 @@ import { cmath } from "@/grida-canvas/cmath";
 import { document } from "@/grida-canvas/document-query";
 import { axisAligned } from "@/grida-canvas/cmath/_snap";
 
-export function snapMovementToObjects(
-  selection: cmath.Rectangle[],
-  objects: cmath.Rectangle[],
+export function snapMovement(
+  origin: cmath.Vector2,
+  references: cmath.Vector2[],
   movement: cmath.Vector2,
   threshold: cmath.Vector2
 ) {
-  const [mx, my] = movement;
+  const virtually_moved = cmath.vector2.add(origin, movement);
 
-  const bounding_rect = cmath.rect.union(selection);
+  const result = axisAligned([virtually_moved], references, threshold);
 
-  const _virtually_moved_rect = cmath.rect.translate(bounding_rect, [mx, my]);
+  return {
+    movement: result.value[0],
+    snapping: result,
+  };
+}
+
+export function snapObjectsTranslation(
+  objects: cmath.Rectangle[],
+  references: cmath.Rectangle[],
+  movement: cmath.Vector2,
+  threshold: cmath.Vector2
+) {
+  const bounding_rect = cmath.rect.union(objects);
+
+  const _virtually_moved_rect = cmath.rect.translate(bounding_rect, movement);
 
   const origin_points = Object.values(
     cmath.rect.to9Points(_virtually_moved_rect)
   );
 
-  const target_points = objects
+  const target_points = references
     .map((r) => Object.values(cmath.rect.to9Points(r)))
     .flat();
 
@@ -30,7 +44,7 @@ export function snapMovementToObjects(
   const bounding_box_snapped_xy = points[0];
 
   // return each xy point of input selection relative to the snapped bounding box
-  const translated = selection.map((r) => {
+  const translated = objects.map((r) => {
     const offset = cmath.vector2.sub(
       [r.x, r.y],
       [bounding_rect.x, bounding_rect.y]
