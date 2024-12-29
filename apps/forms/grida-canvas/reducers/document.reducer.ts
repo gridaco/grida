@@ -219,10 +219,10 @@ export default function documentReducer<S extends IDocumentEditorState>(
               parent_id
             ) as grida.program.nodes.i.IChildrenReference;
 
-          const childIndex = parent_node.children!.indexOf(node_id);
+          const childIndex = parent_node.children.indexOf(node_id);
           assert(childIndex !== -1, "node not found in children");
 
-          const before = [...parent_node.children!];
+          const before = [...parent_node.children];
           const reordered = [...before];
           switch (order) {
             case "back": {

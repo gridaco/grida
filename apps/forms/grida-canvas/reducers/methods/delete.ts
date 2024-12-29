@@ -33,7 +33,7 @@ export function self_deleteNode<S extends IDocumentEditorState>(
     const parent = draft.document.nodes[
       parent_id
     ] as grida.program.nodes.i.IChildrenReference;
-    parent.children!.splice(parent.children!.indexOf(node_id), 1);
+    parent.children.splice(parent.children.indexOf(node_id), 1);
   }
 
   // [4]

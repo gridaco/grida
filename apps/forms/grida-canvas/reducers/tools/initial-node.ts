@@ -88,6 +88,7 @@ export default function initialNode(
         crossAxisAlignment: "start",
         mainAxisGap: 0,
         crossAxisGap: 0,
+        children: [],
         ...seed,
       } satisfies grida.program.nodes.ContainerNode;
     }

@@ -216,6 +216,16 @@ export namespace iofigma {
         };
       }
 
+      /**
+       * Creates a Node data from figma input, while ignoring the figma's children.
+       *
+       * It still follows the node structure and returns with empty array `{ children: [] }` if the node requires children property.
+       *
+       * @param node
+       * @param images
+       * @param parent
+       * @returns
+       */
       export function node_without_children(
         node: SubcanvasNode,
         images: { [key: string]: string },
@@ -319,6 +329,7 @@ export namespace iofigma {
               crossAxisAlignment: "start",
               mainAxisGap: itemSpacing ?? 0,
               crossAxisGap: counterAxisSpacing ?? itemSpacing ?? 0,
+              children: [],
             } satisfies grida.program.nodes.ContainerNode;
           }
           case "GROUP": {
@@ -354,6 +365,7 @@ export namespace iofigma {
               crossAxisAlignment: "start",
               mainAxisGap: 0,
               crossAxisGap: 0,
+              children: [],
             } satisfies grida.program.nodes.ContainerNode;
             // throw new Error(`Unsupported node type: ${node.type}`);
           }

@@ -387,7 +387,7 @@ export namespace grida {
             // If the node has children, map each child to its parent and add to the parent’s child array
             if (Array.isArray((node as nodes.AnyNode).children)) {
               for (const child_id of (node as nodes.i.IChildrenReference)
-                .children!) {
+                .children) {
                 ctx.__ctx_nid_to_parent_id[child_id] = node_id;
                 ctx.__ctx_nid_to_children_ids[node_id].push(child_id);
               }
@@ -1596,7 +1596,7 @@ export namespace grida {
         }
 
         export interface IChildrenReference {
-          children?: NodeID[];
+          children: NodeID[];
         }
 
         /**

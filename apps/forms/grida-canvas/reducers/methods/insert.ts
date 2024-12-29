@@ -48,8 +48,8 @@ export function self_insertSubDocument<S extends IDocumentEditorState>(
   draft.document_ctx = context.snapshot();
 
   // Add the child to the parent's children array (if not already added)
-  if (!parent_node.children!.includes(sub.root_id)) {
-    parent_node.children!.push(sub.root_id);
+  if (!parent_node.children.includes(sub.root_id)) {
+    parent_node.children.push(sub.root_id);
   }
 
   return sub.root_id;
