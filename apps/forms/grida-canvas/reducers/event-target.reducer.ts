@@ -910,11 +910,10 @@ function self_maybe_end_gesture_translate(draft: Draft<IDocumentEditorState>) {
  * @returns the parent node id
  */
 function __get_insert_target(state: IDocumentEditorState): string {
-  const first_hit = state.surface_raycast_detected_node_ids[0];
-  const parent = first_hit
-    ? document.__getNodeById(state, first_hit).type === "container"
-      ? first_hit
-      : state.document.root_id
-    : state.document.root_id;
-  return parent;
+  const hits = state.surface_raycast_detected_node_ids.slice();
+  for (const hit of hits) {
+    const node = document.__getNodeById(state, hit);
+    if (node.type === "container") return hit;
+  }
+  return state.document.root_id;
 }
