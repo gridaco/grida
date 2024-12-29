@@ -149,16 +149,10 @@ export function EditorSurface() {
   const bind = useSurfaceGesture(
     {
       onPointerDown: ({ event }) => {
-        if (content_edit_mode?.type === "text") {
-          event.preventDefault();
-        }
         if (event.defaultPrevented) return;
         pointerDown(event);
       },
       onPointerUp: ({ event }) => {
-        if (content_edit_mode?.type === "text") {
-          event.preventDefault();
-        }
         if (event.defaultPrevented) return;
         pointerUp(event);
       },
