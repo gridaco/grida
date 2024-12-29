@@ -313,7 +313,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
       }
 
       const rects = bounding_node_ids.map((node_id) =>
-        // FIXME: do not use domapi in reducer
+        // TODO: do not use domapi in reducer
         domapi.get_node_element(node_id)!.getBoundingClientRect()
       );
 
@@ -348,7 +348,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
       const target_node_ids = target === "selection" ? state.selection : target;
 
       const rects = target_node_ids.map((node_id) =>
-        // FIXME: do not use domapi in reducer
+        // TODO: do not use domapi in reducer
         domapi.get_node_element(node_id)!.getBoundingClientRect()
       );
 

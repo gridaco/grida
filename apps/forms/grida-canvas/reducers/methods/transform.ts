@@ -88,6 +88,7 @@ function __self_update_gesture_transform_translate(
   // #region [translate_with_clone]
   switch (translate_with_clone) {
     case "on": {
+      // FIXME: this does not respect the hierarchy and relative position
       if (draft.gesture.is_currently_cloned) break;
       draft.gesture.is_currently_cloned = true;
       // if translate with clone is on, switch selection (if not already) to the cloned node

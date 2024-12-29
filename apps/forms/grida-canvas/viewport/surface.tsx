@@ -90,6 +90,7 @@ export function EditorSurface() {
     hovered_node_id,
     dropzone_node_id,
     selection,
+    cursor_mode,
     is_node_transforming,
     is_node_translating,
     content_edit_mode,
@@ -260,12 +261,12 @@ export function EditorSurface() {
             selection={selection}
             readonly={!!content_edit_mode}
           />
-          {!marquee &&
-            hovered_node_id &&
-            !selection.includes(hovered_node_id) && (
+          <SurfaceGroup hidden={!!marquee || cursor_mode.type !== "cursor"}>
+            {hovered_node_id && (
               // general hover
               <NodeOverlay node_id={hovered_node_id} readonly />
             )}
+          </SurfaceGroup>
         </SurfaceGroup>
         {dropzone_node_id && (
           <NodeOverlay node_id={dropzone_node_id} readonly />
