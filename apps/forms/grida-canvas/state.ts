@@ -6,6 +6,7 @@ import type { SnapResult } from "./cmath/_snap";
 
 export type DocumentDispatcher = (action: Action) => void;
 
+export type CursorModeType = CursorMode["type"];
 export type CursorMode =
   | {
       type: "cursor";
@@ -138,7 +139,8 @@ export type GestureState =
   | GestureCornerRadius
   | GestureDraw
   | GestureTranslateVertex
-  | GestureCurve;
+  | GestureCurve
+  | GestureCurveA;
 
 export type GestureIdle = {
   type: "idle";
@@ -261,7 +263,7 @@ export type GestureTranslateVertex = {
 };
 
 /**
- * curves the segment
+ * curves the existing segment
  */
 export type GestureCurve = {
   type: "curve";
@@ -283,6 +285,45 @@ export type GestureCurve = {
 
   /**
    * initial position of the control point
+   */
+  initial: cmath.Vector2;
+
+  /**
+   * current movement of the drag
+   */
+  movement: cmath.Vector2;
+
+  /**
+   * rather to invert the movement
+   */
+  invert: boolean;
+};
+
+/**
+ * pre-curve the future segment (when only vertex is present)
+ *
+ * This is used when user creates a new vertex point without connection, yet dragging to first configure the `ta` of the next segment
+ */
+export type GestureCurveA = {
+  type: "curve-a";
+
+  /**
+   * selected path node id
+   */
+  node_id: string;
+
+  /**
+   * vertex index
+   */
+  vertex: number;
+
+  /**
+   * control point - always `ta`
+   */
+  control: "ta";
+
+  /**
+   * initial position of the control point - always `zero`
    */
   initial: cmath.Vector2;
 
@@ -423,6 +464,48 @@ export type HistoryEntry = {
 //     future: [],
 //   };
 // }
+
+type ContentEditModeState = TextContentEditMode | PathContentEditMode;
+
+type TextContentEditMode = {
+  type: "text";
+  /**
+   * text node id
+   */
+  node_id: string;
+  // selectedTextRange;
+};
+
+type PathContentEditMode = {
+  type: "path";
+  node_id: string;
+
+  /**
+   * selected vertex indices
+   */
+  selected_vertices: number[];
+
+  /**
+   * origin point - the new point will be connected to this point
+   * also `selected_vertices[0]`
+   */
+  a_point: number | null;
+
+  /**
+   * next `ta` value when segment is created (connected)
+   *
+   * used when user creates a new vertex point without connection, yet dragging to first configure the `ta` of the next segment
+   *
+   * @default zero
+   */
+  next_ta: cmath.Vector2 | null;
+
+  /**
+   * next points position
+   */
+  path_cursor_position: cmath.Vector2;
+};
+
 export interface IDocumentState {
   document: grida.program.document.IDocumentDefinition;
   /**
@@ -442,35 +525,7 @@ export interface IDocumentState {
    *
    * @default false
    */
-  content_edit_mode?:
-    | {
-        type: "text";
-        /**
-         * text node id
-         */
-        node_id: string;
-        // selectedTextRange;
-      }
-    | {
-        type: "path";
-        node_id: string;
-
-        /**
-         * selected vertex indices
-         */
-        selected_vertices: number[];
-
-        /**
-         * origin point - the new point will be connected to this point
-         * also `selected_vertices[0]`
-         */
-        a_point: number | null;
-
-        /**
-         * next points position
-         */
-        path_cursor_position: cmath.Vector2;
-      };
+  content_edit_mode?: ContentEditModeState;
 
   /**
    * @private - internal use only

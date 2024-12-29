@@ -8,12 +8,12 @@ import { svg } from "@/grida/svg";
 
 export function SurfacePathEditor({ node_id }: { node_id: string }) {
   const { debug, cursor_mode, content_offset } = useEventTarget();
-  const { offset, vertices, segments, a_point, path_cursor_position } =
+  const { offset, vertices, segments, path_cursor_position, a_point, next_ta } =
     useSurfacePathEditor();
   const transform = useNodeSurfaceTransfrom(node_id);
 
   const a_point_is_last = a_point === vertices.length - 1;
-  const lastseg = segments[segments.length - 1];
+  // const lastseg = segments[segments.length - 1];
 
   return (
     <div id="path-editor-surface" className="fixed left-0 top-0 w-0 h-0 z-10">
@@ -59,7 +59,7 @@ export function SurfacePathEditor({ node_id }: { node_id: string }) {
           <Extension
             a={cmath.vector2.add(offset, content_offset, vertices[a_point].p)}
             b={cmath.vector2.add(path_cursor_position, content_offset)}
-            ta={lastseg && cmath.vector2.invert(lastseg.tb)}
+            ta={next_ta ? next_ta : undefined}
           />
         </>
       )}

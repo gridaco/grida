@@ -1,7 +1,7 @@
 import { produce, type Draft } from "immer";
 
 import type { SurfaceAction } from "../action";
-import type { IDocumentEditorState } from "../state";
+import type { CursorModeType, IDocumentEditorState } from "../state";
 import { document } from "../document-query";
 import { getInitialCurveGesture } from "./tools/gesture";
 import assert from "assert";
@@ -40,6 +40,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
               node_id: node_id,
               selected_vertices: [],
               a_point: null,
+              next_ta: null,
               path_cursor_position: draft.cursor_position,
             };
             break;
@@ -56,7 +57,26 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
     }
     case "surface/cursor-mode": {
       const { cursor_mode } = action;
+      const path_edit_mode_valid_cursor_modes: CursorModeType[] = [
+        "cursor",
+        "path",
+      ];
+      const text_edit_mode_valid_cursor_modes: CursorModeType[] = ["cursor"];
       return produce(state, (draft) => {
+        // validate cursor mode
+        if (draft.content_edit_mode) {
+          switch (draft.content_edit_mode.type) {
+            case "path":
+              if (!path_edit_mode_valid_cursor_modes.includes(cursor_mode.type))
+                return;
+              break;
+            case "text":
+              if (!text_edit_mode_valid_cursor_modes.includes(cursor_mode.type))
+                return;
+              break;
+          }
+        }
+
         draft.cursor_mode = cursor_mode;
       });
     }

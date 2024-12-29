@@ -174,13 +174,15 @@ export namespace vn {
      * adds a vertex to the network (optionally connecting it to the selected vertex)
      * @param p the position of the new vertex
      * @param origin the index of the vertex to connect the new vertex to
-     * @param reflection if true, the tangent of the new segment will be the inverse of the tangent of the previous segment (if the previous segment exists)
+     * @param ta if origin is provided, and the new segment is to be created, this is the `ta` value of the new segment. - use {@link getNextMirroredTangent} to get the mirrored value of the previous segment's tb
+     * @param tb if origin is provided, and the new segment is to be created, this is the `tb` value of the new segment.
      * @returns the index of the added vertex
      */
     addVertex(
       p: Vector2,
       origin?: number | null,
-      reflection?: boolean
+      ta: Vector2 = [0, 0],
+      tb: Vector2 = [0, 0]
     ): number {
       // check if new point already exists
       let vertex_idx: number;
@@ -192,23 +194,25 @@ export namespace vn {
       }
 
       if (typeof origin === "number") {
-        // connect the new point to the selected point
-
-        let ta: Vector2 | undefined;
-
-        if (reflection) {
-          const selection_segments = this.findSegments(origin);
-          if (selection_segments.length === 1) {
-            // one segment means the force is open.
-            // use the origin -tb as the new ta
-            const prev_tb = this._segments[selection_segments[0]].tb;
-            ta = [-prev_tb[0], -prev_tb[1]];
-          }
-        }
-
-        this.addSegment(origin, vertex_idx, ta ?? [0, 0], [0, 0]);
+        this.addSegment(origin, vertex_idx, ta, tb);
       }
       return vertex_idx;
+    }
+
+    /**
+     * virtually, if the `origin` were to be connected to another vertex, it returns the new segment's ta value, based on previous segment's tb value, inverted
+     * @param origin
+     */
+    getNextMirroredTangent(origin: number): Vector2 {
+      let mirrored: Vector2 = [0, 0];
+      const selection_segments = this.findSegments(origin);
+      if (selection_segments.length === 1) {
+        // one segment means the force is open.
+        // use the origin -tb as the new ta
+        const prev_tb = this._segments[selection_segments[0]].tb;
+        mirrored = [-prev_tb[0], -prev_tb[1]];
+      }
+      return mirrored;
     }
 
     /**

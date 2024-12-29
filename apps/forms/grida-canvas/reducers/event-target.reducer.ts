@@ -227,7 +227,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
           case "path": {
             if (draft.content_edit_mode?.type === "path") {
               const { hovered_vertex_idx: hovered_point } = state;
-              const { node_id, path_cursor_position, a_point } =
+              const { node_id, path_cursor_position, a_point, next_ta } =
                 draft.content_edit_mode;
 
               const node = document.__getNodeById(
@@ -246,7 +246,15 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                       node.top!,
                     ]);
 
-              const next = vne.addVertex(position, a_point, true);
+              const new_vertex_idx = vne.addVertex(
+                position,
+                a_point,
+                next_ta ?? undefined
+              );
+
+              // clear the next ta as it's used
+              draft.content_edit_mode.next_ta = null;
+
               const bb_b = vne.getBBox();
 
               const delta: cmath.Vector2 = [bb_b.x, bb_b.y];
@@ -261,8 +269,8 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
               node.vectorNetwork = vne.value;
 
-              draft.content_edit_mode.selected_vertices = [next];
-              draft.content_edit_mode.a_point = next;
+              draft.content_edit_mode.selected_vertices = [new_vertex_idx];
+              draft.content_edit_mode.a_point = new_vertex_idx;
 
               // ...
             } else {
@@ -306,6 +314,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                 node_id: new_node_id,
                 selected_vertices: [0], // select the first point
                 a_point: 0,
+                next_ta: null,
                 path_cursor_position: pos,
               };
             }
@@ -496,17 +505,33 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             const vne = new vn.VectorNetworkEditor(node.vectorNetwork);
             const segments = vne.findSegments(vertex);
 
-            assert(segments.length === 1);
-            const segment_idx = segments[0];
+            if (segments.length === 0) {
+              draft.gesture = {
+                type: "curve-a",
+                node_id,
+                vertex,
+                control: "ta",
+                initial: cmath.vector2.zero,
+                movement: cmath.vector2.zero,
+                invert: false,
+              };
+            } else if (segments.length === 1) {
+              const segment_idx = segments[0];
 
-            const gesture = getInitialCurveGesture(state, {
-              node_id,
-              segment: segment_idx,
-              control: "tb",
-              invert: true,
-            });
+              const gesture = getInitialCurveGesture(state, {
+                node_id,
+                segment: segment_idx,
+                control: "tb",
+                invert: true,
+              });
 
-            draft.gesture = gesture;
+              draft.gesture = gesture;
+            } else {
+              reportError(
+                "invalid vector network path editing state. multiple segments found"
+              );
+            }
+
             break;
           }
         }
@@ -638,11 +663,11 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               break;
             }
             case "curve": {
-              //
+              assert(draft.content_edit_mode?.type === "path");
               draft.gesture.movement = movement;
               const { node_id, segment, initial, control, invert } =
                 draft.gesture;
-              // const { node_id } = draft.content_edit_mode!;
+
               const node = document.__getNodeById(
                 draft,
                 node_id
@@ -657,6 +682,15 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               );
 
               vne.updateTangent(segment, control, tangentPos, true);
+
+              if (segment === vne.segments.length - 1) {
+                // TODO: add a new "curve-b" and make it isolated from control point editing.
+                // on drawing mode - this should be true.
+                // on control point edit mode, this should be false
+                // if last segment, update the next ta as mirror of the tangent
+                draft.content_edit_mode.next_ta =
+                  cmath.vector2.invert(tangentPos);
+              }
 
               // TODO: try consider updating the transform on drag end as it could be expensive
 
@@ -676,9 +710,24 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               break;
               //
             }
+            case "curve-a": {
+              assert(draft.content_edit_mode?.type === "path");
+              draft.gesture.movement = movement;
+              const { node_id, vertex, initial, control, invert } =
+                draft.gesture;
+
+              const tangentPos = cmath.vector2.add(
+                initial,
+                invert ? cmath.vector2.invert(movement) : movement
+              );
+
+              draft.content_edit_mode.next_ta = tangentPos;
+
+              break;
+            }
             case "translate-vertex": {
+              assert(draft.content_edit_mode?.type === "path");
               const { content_edit_mode } = draft;
-              assert(content_edit_mode && content_edit_mode.type === "path");
               const { node_id } = content_edit_mode;
               const node = document.__getNodeById(
                 draft,
