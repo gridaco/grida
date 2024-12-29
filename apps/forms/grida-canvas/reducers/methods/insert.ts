@@ -39,8 +39,8 @@ export function self_insertSubDocument<S extends IDocumentEditorState>(
   };
 
   draft.googlefonts = Array.from(
-    new Set([...draft.googlefonts, ...sub_fonts.map((family) => ({ family }))])
-  );
+    new Set([...draft.googlefonts.map((g) => g.family), ...sub_fonts])
+  ).map((family) => ({ family }));
 
   // Update the runtime context with parent-child relationships
   const context = new document.Context(draft.document_ctx);

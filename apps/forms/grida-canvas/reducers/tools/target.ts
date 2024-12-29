@@ -48,6 +48,9 @@ export function getSurfaceRayTarget(
     });
 
   switch (config.target) {
+    // TODO: can use for loop for optimization
+    // TODO: this should also take relative depth into account (also moving up)
+    // BASED ON GRAPH-DISTANCE
     case "auto": {
       const selection_sibling_ids = new Set(
         selection

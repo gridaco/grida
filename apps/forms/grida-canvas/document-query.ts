@@ -407,6 +407,31 @@ export namespace document {
     throw new Error(`node not found with node_id: "${node_id}"`);
   }
 
+  //
+  export function hierarchy(
+    node_id: string,
+    ctx: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext
+  ): { id: string; depth: number }[] {
+    const collectNodeIds = (
+      nodeId: string,
+      depth: number,
+      result: { id: string; depth: number }[] = []
+    ): { id: string; depth: number }[] => {
+      result.push({ id: nodeId, depth }); // Add current node ID with its depth
+
+      // Get children from context
+      const children = ctx.__ctx_nid_to_children_ids[nodeId] ?? [];
+      for (const childId of children) {
+        collectNodeIds(childId, depth + 1, result); // Increase depth for children
+      }
+
+      return result;
+    };
+
+    // Start traversal from the root node
+    return collectNodeIds(node_id, 0);
+  }
+
   export class Context
     implements
       grida.program.document.internal
@@ -539,9 +564,13 @@ export namespace document {
     }
 
     fonts(): Array<string> {
-      return this.textnodes()
-        .map((node) => node.fontFamily)
-        .filter(Boolean) as Array<string>;
+      return Array.from(
+        new Set(
+          this.textnodes()
+            .map((node) => node.fontFamily)
+            .filter(Boolean) as Array<string>
+        )
+      );
     }
   }
 }

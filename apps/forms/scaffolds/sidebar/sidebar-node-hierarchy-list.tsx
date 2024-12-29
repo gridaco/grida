@@ -33,6 +33,7 @@ import {
 import { grida } from "@/grida";
 import React, { useMemo } from "react";
 import { useNodeAction } from "@/grida-canvas/provider";
+import { document as dq } from "@/grida-canvas/document-query";
 
 function NodeHierarchyItemContextMenuWrapper({
   node_id,
@@ -78,30 +79,6 @@ function NodeHierarchyItemContextMenuWrapper({
   );
 }
 
-function hierarchy(
-  root_id: string,
-  ctx: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext
-): { id: string; depth: number }[] {
-  const collectNodeIds = (
-    nodeId: string,
-    depth: number,
-    result: { id: string; depth: number }[] = []
-  ): { id: string; depth: number }[] => {
-    result.push({ id: nodeId, depth }); // Add current node ID with its depth
-
-    // Get children from context
-    const children = ctx.__ctx_nid_to_children_ids[nodeId] ?? [];
-    for (const childId of children) {
-      collectNodeIds(childId, depth + 1, result); // Increase depth for children
-    }
-
-    return result;
-  };
-
-  // Start traversal from the root node
-  return collectNodeIds(root_id, 0);
-}
-
 export function NodeHierarchyList() {
   const {
     state: { document, document_ctx, selection, hovered_node_id },
@@ -114,7 +91,7 @@ export function NodeHierarchyList() {
   // TODO: need nested nodes for templates
 
   const list = useMemo(() => {
-    return hierarchy(document.root_id, document_ctx);
+    return dq.hierarchy(document.root_id, document_ctx);
   }, [document.root_id, document_ctx]);
 
   // const ids = Object.keys(document.nodes);
