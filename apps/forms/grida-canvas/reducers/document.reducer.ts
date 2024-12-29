@@ -21,7 +21,7 @@ import {
   self_clearSelection,
   self_deleteNode,
   self_duplicateNode,
-  self_insertNode,
+  self_insertSubDocument,
   self_selectNode,
 } from "./methods";
 import { cmath } from "../cmath";
@@ -87,13 +87,15 @@ export default function documentReducer<S extends IDocumentEditorState>(
         target === "selection" ? state.selection : [target];
 
       return produce(state, (draft) => {
-        const nodes = target_node_ids.map((node_id) =>
-          document.__getNodeById(draft, node_id)
-        );
-
         // [copy]
         draft.user_clipboard = {
-          nodes: JSON.parse(JSON.stringify(nodes)),
+          ids: target_node_ids,
+          prototypes: target_node_ids.map((id) =>
+            grida.program.nodes.factory.createPrototypeFromSnapshot(
+              draft.document,
+              id
+            )
+          ),
         };
 
         if (action.type === "cut") {
@@ -106,17 +108,19 @@ export default function documentReducer<S extends IDocumentEditorState>(
     case "paste": {
       if (!state.user_clipboard) break;
       const { user_clipboard, selection } = state;
-      const clipboard_nodes: grida.program.nodes.Node[] = user_clipboard.nodes;
-      const clipboard_node_ids = clipboard_nodes.map((node) => node.id);
+      const { ids, prototypes } = user_clipboard;
+      // const clipboard_nodes: grida.program.nodes.Node[] =
+      //   user_clipboard.prototypes;
+      // const clipboard_node_ids = clipboard_nodes.map((node) => node.id);
 
       return produce(state, (draft) => {
-        const new_ids = [];
+        const new_top_ids = [];
 
         const valid_target_selection =
           // 1. the target shall not be an original node
           // 2. the target shall be a container
           selection
-            .filter((node_id) => !clipboard_node_ids.includes(node_id))
+            .filter((node_id) => !ids.includes(node_id))
             .filter((node_id) => {
               const node = document.__getNodeById(draft, node_id);
               return node.type === "container";
@@ -130,28 +134,25 @@ export default function documentReducer<S extends IDocumentEditorState>(
         // the target (parent) node that will be pasted under
         for (const target of targets) {
           // to be pasted
-          for (const data of clipboard_nodes) {
-            //
-            const new_id = nid();
-            const newNode = {
-              ...data,
-              id: new_id,
-            } as grida.program.nodes.AnyNode;
+          for (const prototype of prototypes) {
+            const sub =
+              grida.program.nodes.factory.createSubDocumentDefinitionFromPrototype(
+                prototype,
+                nid
+              );
 
-            const offset = 10; // Offset to avoid overlapping
+            const top_id = self_insertSubDocument(draft, target, sub);
+            new_top_ids.push(top_id);
 
-            if (newNode.left !== undefined) newNode.left += offset;
-            if (newNode.top !== undefined) newNode.top += offset;
-
-            self_insertNode(draft, target, newNode as grida.program.nodes.Node);
-
-            new_ids.push(new_id);
+            // const offset = 10; // Offset to avoid overlapping
+            // if (newNode.left !== undefined) newNode.left += offset;
+            // if (newNode.top !== undefined) newNode.top += offset;
           }
         }
 
         // after
         draft.cursor_mode = { type: "cursor" };
-        self_selectNode(draft, "reset", ...new_ids);
+        self_selectNode(draft, "reset", ...new_top_ids);
       });
     }
     case "duplicate": {
@@ -182,6 +183,27 @@ export default function documentReducer<S extends IDocumentEditorState>(
         }
       });
     }
+    case "insert": {
+      const { prototype } = action;
+
+      return produce(state, (draft) => {
+        const sub =
+          grida.program.nodes.factory.createSubDocumentDefinitionFromPrototype(
+            prototype,
+            nid
+          );
+
+        const new_top_id = self_insertSubDocument(
+          draft,
+          draft.document.root_id,
+          sub
+        );
+
+        // after
+        draft.cursor_mode = { type: "cursor" };
+        self_selectNode(draft, "reset", new_top_id);
+      });
+    }
     case "order": {
       const { target, order } = action;
       const target_node_ids =
@@ -191,11 +213,11 @@ export default function documentReducer<S extends IDocumentEditorState>(
         for (const node_id of target_node_ids) {
           const parent_id = document.getParentId(draft.document_ctx, node_id);
           if (!parent_id) return; // root node case
-          const parent_node: Draft<grida.program.nodes.i.IChildren> =
+          const parent_node: Draft<grida.program.nodes.i.IChildrenReference> =
             document.__getNodeById(
               draft,
               parent_id
-            ) as grida.program.nodes.i.IChildren;
+            ) as grida.program.nodes.i.IChildrenReference;
 
           const childIndex = parent_node.children!.indexOf(node_id);
           assert(childIndex !== -1, "node not found in children");
@@ -446,52 +468,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
         }
       });
     }
-
     //
-    case "document/insert": {
-      const { prototype } = action;
-
-      return produce(state, (draft) => {
-        function self_instanciateNodePrototype<S extends IDocumentEditorState>(
-          draft: Draft<S>,
-          parentNodeId: string,
-          nodePrototype: grida.program.nodes.NodePrototype
-        ): string {
-          const nodeId = nid();
-
-          // Create the parent node
-          const newNode =
-            grida.program.nodes.factory.createNodeDataFromPrototype(
-              nodeId,
-              nodePrototype
-            )!;
-
-          // Insert the parent node into the document first
-          self_insertNode(draft, parentNodeId, newNode);
-
-          // Recursively process children and register them after the parent
-          if ("children" in nodePrototype) {
-            (newNode as grida.program.nodes.i.IChildren).children =
-              nodePrototype.children.map((childPrototype) =>
-                self_instanciateNodePrototype(draft, nodeId, childPrototype)
-              );
-          }
-
-          return nodeId;
-        }
-
-        // Insert the prototype as the root node under the document's root
-        const prototype_root_id = self_instanciateNodePrototype(
-          draft,
-          draft.document.root_id,
-          prototype
-        );
-
-        // after
-        draft.cursor_mode = { type: "cursor" };
-        self_selectNode(draft, "reset", prototype_root_id);
-      });
-    }
     case "surface/content-edit-mode/try-enter":
     case "surface/content-edit-mode/try-exit":
     case "surface/cursor-mode":

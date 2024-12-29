@@ -684,8 +684,14 @@ export function SelectedNodeProperties() {
                 <LockClosedIcon className="w-3 h-3" />
               )}
             </Toggle>
-            {/* <small className="ms-2 font-mono">{id}</small> */}
           </PropertyLine>
+
+          {process.env.NODE_ENV === "development" && (
+            <PropertyLine className="items-center gap-1">
+              <PropertyLineLabel>id</PropertyLineLabel>
+              <small className="ms-2 font-mono">{id}</small>
+            </PropertyLine>
+          )}
         </SidebarMenuSectionContent>
       </SidebarSection>
       <SidebarSection hidden={is_root} className="border-b pb-4">

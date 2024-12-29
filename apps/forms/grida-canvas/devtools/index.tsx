@@ -139,6 +139,8 @@ function devdata_hierarchy_only(
     document_ctx,
     nodes: Object.entries(nodes).reduce((acc: any, [id, node]) => {
       acc[id] = {
+        id: node.id,
+        name: node.name,
         type: node.type,
         children: (node as any).children,
       };

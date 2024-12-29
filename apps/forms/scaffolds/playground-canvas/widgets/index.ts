@@ -1,6 +1,6 @@
 import { grida } from "@/grida";
 
-export namespace widget_presets {
+export namespace prototypes {
   export const row = {
     type: "container",
     name: "row",

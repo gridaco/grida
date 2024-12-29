@@ -99,7 +99,16 @@ interface IDocumentEditorClipboardState {
   /**
    * user clipboard - copied data
    */
-  user_clipboard?: { nodes: grida.program.nodes.Node[] };
+  user_clipboard?: {
+    /**
+     * copied node data as prototype
+     */
+    prototypes: grida.program.nodes.NodePrototype[];
+    /**
+     * original node ids (top ids)
+     */
+    ids: string[];
+  };
 
   /**
    *

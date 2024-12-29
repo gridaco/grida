@@ -188,13 +188,14 @@ export namespace iofigma {
 
           // If the node has children, process them recursively
           if ("children" in currentNode && currentNode.children?.length) {
-            (processedNode as grida.program.nodes.i.IChildren).children =
-              currentNode.children
-                .map((c) => {
-                  return processNode(c, currentNode as FigmaParentNode);
-                }) // Process each child
-                .filter((child) => child !== undefined) // Remove undefined nodes
-                .map((child) => child!.id); // Map to IDs
+            (
+              processedNode as grida.program.nodes.i.IChildrenReference
+            ).children = currentNode.children
+              .map((c) => {
+                return processNode(c, currentNode as FigmaParentNode);
+              }) // Process each child
+              .filter((child) => child !== undefined) // Remove undefined nodes
+              .map((child) => child!.id); // Map to IDs
           }
 
           return processedNode;

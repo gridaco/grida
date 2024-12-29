@@ -386,7 +386,8 @@ export namespace grida {
 
             // If the node has children, map each child to its parent and add to the parent’s child array
             if (Array.isArray((node as nodes.AnyNode).children)) {
-              for (const child_id of (node as nodes.i.IChildren).children!) {
+              for (const child_id of (node as nodes.i.IChildrenReference)
+                .children!) {
                 ctx.__ctx_nid_to_parent_id[child_id] = node_id;
                 ctx.__ctx_nid_to_children_ids[node_id].push(child_id);
               }
@@ -1334,6 +1335,8 @@ export namespace grida {
 
       /**
        * A virtual, before-instantiation node that only stores the prototype of a node.
+       *
+       * Main difference between an actual node or node data is, a prototype is only required to have a partial node data, and it has its own hierarchy of children.
        */
       export type NodePrototype =
         | __TPrototypeNode<Omit<TextNode, __base_scene_node_properties>>
@@ -1341,7 +1344,7 @@ export namespace grida {
         | __TPrototypeNode<Omit<VideoNode, __base_scene_node_properties>>
         | __TPrototypeNode<
             Omit<ContainerNode, __base_scene_node_properties | "children"> &
-              __IProtoChildrenNodePrototype
+              __IPrototypeNodeChildren
           >
         | __TPrototypeNode<Omit<HTMLIFrameNode, __base_scene_node_properties>>
         | __TPrototypeNode<Omit<HTMLRichTextNode, __base_scene_node_properties>>
@@ -1352,11 +1355,11 @@ export namespace grida {
         | __TPrototypeNode<Omit<EllipseNode, __base_scene_node_properties>>
         | __TPrototypeNode<
             Omit<ComponentNode, __base_scene_node_properties | "children"> &
-              __IProtoChildrenNodePrototype
+              __IPrototypeNodeChildren
           >
         | __TPrototypeNode<
             Omit<InstanceNode, __base_scene_node_properties | "children"> &
-              __IProtoChildrenNodePrototype
+              __IPrototypeNodeChildren
           >
         | __TPrototypeNode<
             Omit<TemplateInstanceNode, __base_scene_node_properties>
@@ -1377,7 +1380,7 @@ export namespace grida {
         | "active"
         | "locked";
 
-      type __IProtoChildrenNodePrototype = {
+      type __IPrototypeNodeChildren = {
         children: NodePrototype[];
       };
 
@@ -1592,7 +1595,7 @@ export namespace grida {
           fit: cg.BoxFit;
         }
 
-        export interface IChildren {
+        export interface IChildrenReference {
           children?: NodeID[];
         }
 
@@ -1865,7 +1868,7 @@ export namespace grida {
       export interface GroupNode
         extends i.IBaseNode,
           i.ISceneNode,
-          i.IChildren,
+          i.IChildrenReference,
           i.IExpandable {
         //
       }
@@ -1946,7 +1949,7 @@ export namespace grida {
           i.IHrefable,
           i.IMouseCursor,
           i.IExpandable,
-          i.IChildren,
+          i.IChildrenReference,
           i.IRectangleCorner,
           i.IPadding,
           i.IFlexContainer {
@@ -2123,7 +2126,7 @@ export namespace grida {
           i.IHrefable,
           i.IMouseCursor,
           i.IExpandable,
-          i.IChildren,
+          i.IChildrenReference,
           i.IRectangleCorner,
           i.IPadding,
           i.IFlexContainer,
@@ -2201,16 +2204,20 @@ export namespace grida {
         }
 
         /**
+         * Creates a Node data from prototype input, while ignoring the prototype's children.
+         *
+         * It still follows the node structure and returns with empty array `{ children: [] }` if the node requires children property.
+         *
          * calling this does not actually contribute to the rendering by itself, it creates a {@link Node} data.
+         *
+         * @param prototype partial node prototype to start with
+         * @param nid nid generator
+         * @returns
          */
-        export function createNodeDataFromPrototype(
-          id: NodeID,
-          prototype: Partial<NodePrototype>
+        export function createNodeDataFromPrototypeWithoutChildren(
+          prototype: Partial<NodePrototype>,
+          nid: () => NodeID
         ): Node {
-          const default_fill: cg.Paint = {
-            type: "solid",
-            color: { r: 0, g: 0, b: 0, a: 1 },
-          };
           switch (prototype.type) {
             case "rectangle": {
               return {
@@ -2221,18 +2228,17 @@ export namespace grida {
                 opacity: 1,
                 zIndex: 0,
                 rotation: 0,
-                width: 100,
-                height: 100,
+                width: 0,
+                height: 0,
                 position: "absolute",
                 top: 0,
                 left: 0,
                 cornerRadius: 0,
-                fill: default_fill,
                 strokeWidth: 0,
                 strokeCap: "butt",
                 effects: [],
                 ...prototype,
-                id: id,
+                id: nid(),
               } satisfies RectangleNode;
             }
             // TODO:
@@ -2251,7 +2257,7 @@ export namespace grida {
                 rotation: 0,
                 children: [],
                 ...prototype,
-                id: id,
+                id: nid(),
               } as AnyNode;
             }
             // TODO:
@@ -2274,7 +2280,7 @@ export namespace grida {
                 zIndex: 0,
                 rotation: 0,
                 ...prototype,
-                id: id,
+                id: nid(),
               } as AnyNode;
             }
             default:
@@ -2282,6 +2288,80 @@ export namespace grida {
                 `Unsupported node prototype type: ${prototype.type}`
               );
           }
+        }
+
+        /**
+         * Creates a sub document {@link document.IDocumentDefinition} from a prototype input.
+         *
+         * When injecting this to the master document, simply merge this to the master document, and add the root as a children of certain node.
+         */
+        export function createSubDocumentDefinitionFromPrototype(
+          prototype: Partial<NodePrototype>,
+          nid: () => NodeID
+        ): document.IDocumentDefinition {
+          const document: document.IDocumentDefinition = {
+            nodes: {},
+            root_id: "",
+          };
+
+          function processNode(
+            prototype: Partial<NodePrototype>,
+            nid: () => NodeID
+          ): nodes.Node {
+            const node = createNodeDataFromPrototypeWithoutChildren(
+              prototype,
+              nid
+            );
+            document.nodes[node.id] = node;
+
+            if ("children" in prototype) {
+              const node_with_children = node as nodes.i.IChildrenReference;
+              node_with_children.children = [];
+              for (const childPrototype of prototype.children ?? []) {
+                const childNode = processNode(childPrototype, nid);
+                node_with_children.children.push(childNode.id);
+              }
+            }
+
+            return node;
+          }
+
+          const rootNode = processNode(prototype, nid);
+          document.root_id = rootNode.id;
+
+          return document;
+        }
+
+        /**
+         * @param snapshot entire or partial document snapshot - this must include the target and its children, otherwise it will throw.
+         * @param id target node id
+         */
+        export function createPrototypeFromSnapshot(
+          snapshot: document.IDocumentDefinition,
+          id: nodes.NodeID
+        ): nodes.NodePrototype {
+          // Ensure the node exists in the snapshot
+          const node = snapshot.nodes[id];
+          if (!node) {
+            throw new Error(`Node with ID "${id}" not found in the snapshot.`);
+          }
+
+          // Create a shallow copy of the node, excluding the `id` field
+          const prototype: Partial<nodes.NodePrototype> = JSON.parse(
+            JSON.stringify(node)
+          );
+          // @ts-expect-error
+          delete prototype.id;
+
+          // Handle children recursively, if the node has children
+          if ("children" in node && Array.isArray(node.children)) {
+            (prototype as __IPrototypeNodeChildren).children =
+              node.children.map((childId) =>
+                createPrototypeFromSnapshot(snapshot, childId)
+              );
+          }
+
+          return prototype as nodes.NodePrototype;
         }
       }
     }

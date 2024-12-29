@@ -88,7 +88,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLocalStorage } from "@uidotdev/usehooks";
 import { CANVAS_PLAYGROUND_LOCALSTORAGE_PREFERENCES_BASE_AI_PROMPT_KEY } from "./k";
-import { widget_presets } from "./widgets";
+import { prototypes } from "./widgets";
 import { useHotkeys } from "react-hotkeys-hook";
 import toast from "react-hot-toast";
 import {
@@ -623,7 +623,7 @@ function InsertNodePanelContent() {
   const { insertNode } = useDocument();
 
   const onInsert = (type: string) => {
-    const pre = (widget_presets as any)[type];
+    const pre = (prototypes as any)[type];
     if (!pre) {
       toast.error("Widget not found");
       return;

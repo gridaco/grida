@@ -28,13 +28,17 @@ export function self_deleteNode<S extends IDocumentEditorState>(
   const parent_id = draft.document_ctx.__ctx_nid_to_parent_id[node_id];
   if (parent_id) {
     const index = (
-      draft.document.nodes[parent_id] as grida.program.nodes.i.IChildren
+      draft.document.nodes[
+        parent_id
+      ] as grida.program.nodes.i.IChildrenReference
     ).children!.indexOf(node_id);
     // only splice array when item is found
     if (index > -1) {
       // remove from parent node's children array
       (
-        draft.document.nodes[parent_id] as grida.program.nodes.i.IChildren
+        draft.document.nodes[
+          parent_id
+        ] as grida.program.nodes.i.IChildrenReference
       ).children!.splice(index, 1);
 
       // remove from document context

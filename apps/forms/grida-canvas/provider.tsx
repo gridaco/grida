@@ -1639,7 +1639,7 @@ export function useDocument() {
   const insertNode = useCallback(
     (prototype: grida.program.nodes.NodePrototype) => {
       dispatch({
-        type: "document/insert",
+        type: "insert",
         prototype,
       });
     },
@@ -2496,7 +2496,7 @@ export function useEditorApi() {
   const createRectangle = useCallback(
     (props: Omit<grida.program.nodes.NodePrototype, "type"> = {}) => {
       dispatcher({
-        type: "document/insert",
+        type: "insert",
         prototype: {
           type: "rectangle",
           ...props,
@@ -2509,7 +2509,7 @@ export function useEditorApi() {
   const createEllipse = useCallback(
     (props: Omit<grida.program.nodes.NodePrototype, "type">) => {
       dispatcher({
-        type: "document/insert",
+        type: "insert",
         prototype: {
           type: "ellipse",
           ...props,

@@ -212,14 +212,14 @@ function __self_update_gesture_transform_translate(
         const parent = document.__getNodeById(
           draft,
           prev_parent_id
-        ) as grida.program.nodes.i.IChildren;
+        ) as grida.program.nodes.i.IChildrenReference;
         parent.children = parent.children?.filter((id) => id !== node_id);
 
         // register the node to the new parent
         const new_parent = document.__getNodeById(
           draft,
           new_parent_id
-        ) as grida.program.nodes.i.IChildren;
+        ) as grida.program.nodes.i.IChildrenReference;
         new_parent.children = new_parent.children ?? [];
         new_parent.children.push(node_id);
 

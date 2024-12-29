@@ -443,6 +443,23 @@ export namespace document {
       this.__ctx_nid_to_children_ids[parent_id].push(node_id);
     }
 
+    /**
+     * place the node as a child of the parent node.
+     * this does not consider the current parent of the node. or does anything about it.
+     *
+     * The use of this methid is very limited.
+     *
+     * @param node_id
+     * @param parent_id
+     */
+    blindlymove(node_id: NodeID, parent_id: NodeID) {
+      this.__ctx_nid_to_parent_id[node_id] = parent_id;
+      if (!this.__ctx_nid_to_children_ids[parent_id]) {
+        this.__ctx_nid_to_children_ids[parent_id] = [];
+      }
+      this.__ctx_nid_to_children_ids[parent_id].push(node_id);
+    }
+
     snapshot(): grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext {
       return {
         __ctx_nids: this.__ctx_nids.slice(),

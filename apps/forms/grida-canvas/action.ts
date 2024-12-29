@@ -422,7 +422,7 @@ export type EditorSurface_StartGesture = {
 // #endregion surface action
 
 export interface DocumentEditorInsertNodeAction {
-  type: "document/insert";
+  type: "insert";
   prototype: grida.program.nodes.NodePrototype;
 }
 
