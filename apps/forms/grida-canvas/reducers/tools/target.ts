@@ -55,21 +55,25 @@ export function getSurfaceRayTarget(
           .flat()
       );
 
-      filtered.sort((a, b) => {
-        if (selection.includes(a)) {
+      const priority = (node_id: string) => {
+        if (selection.includes(node_id)) {
           return -2;
         }
 
-        if (selection_sibling_ids.has(a)) {
+        if (selection_sibling_ids.has(node_id)) {
           return -1;
         }
 
-        const a_parent = document.getParentId(context.document_ctx, a);
+        const a_parent = document.getParentId(context.document_ctx, node_id);
         if (a_parent && selection.includes(a_parent)) {
           return nested_first ? -3 : 0;
         }
 
         return 0;
+      };
+
+      filtered.sort((a, b) => {
+        return priority(a) - priority(b);
       });
       return filtered[0]; // shallowest node
     }
