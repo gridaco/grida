@@ -28,7 +28,7 @@ import assert from "assert";
 import { document } from "./document-query";
 import { GoogleFontsManager } from "./components/google-fonts";
 import { domapi } from "./domapi";
-import { cmath } from "../grida-cmath";
+import { cmath } from "@grida/cmath";
 import type { TCanvasEventTargetDragGestureState, TChange } from "./action";
 import mixed from "./mixed";
 

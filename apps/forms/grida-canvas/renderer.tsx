@@ -4,7 +4,7 @@ import React, { useCallback, useContext, useLayoutEffect, useRef } from "react";
 import { useDocument, useResizeNotifier } from "./provider";
 import { NodeElement } from "./nodes/node";
 import { domapi } from "./domapi";
-import { cmath } from "../grida-cmath";
+import { cmath } from "@grida/cmath";
 
 /**
  * A hook that calculates and notifies the editor content offset relative to the editor viewport.

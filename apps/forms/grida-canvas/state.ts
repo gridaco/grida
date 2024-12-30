@@ -1,8 +1,8 @@
 import type { Action, EditorAction } from "./action";
 import { grida } from "@/grida";
 import { document } from "./document-query";
-import type { cmath } from "../grida-cmath";
-import type { SnapResult } from "../grida-cmath/_snap";
+import { cmath } from "@grida/cmath";
+import type { SnapResult } from "@grida/cmath/_snap";
 
 export type DocumentDispatcher = (action: Action) => void;
 

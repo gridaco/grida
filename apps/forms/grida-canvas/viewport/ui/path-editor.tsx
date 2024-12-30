@@ -1,7 +1,7 @@
 import React from "react";
 import { useEventTarget, useSurfacePathEditor } from "@/grida-canvas/provider";
 import { useNodeSurfaceTransfrom } from "../hooks/transform";
-import { cmath } from "@/grida-cmath";
+import { cmath } from "@grida/cmath";
 import { useGesture } from "@use-gesture/react";
 import { cn } from "@/utils";
 import { svg } from "@/grida/svg";

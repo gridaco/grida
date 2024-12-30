@@ -1,0 +1,7 @@
+{
+  "name": "@grida/cmath",
+  "version": "0.0.0",
+  "devDependencies": {
+    "@types/node": "^22.10.2"
+  }
+}

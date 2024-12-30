@@ -2,9 +2,9 @@
 
 import { useLayoutEffect, useState } from "react";
 import { domapi } from "@/grida-canvas/domapi";
-import { cmath } from "@/grida-cmath";
+import { cmath } from "@grida/cmath";
 import { useDocument } from "@/grida-canvas/provider";
-import { measure, Measurement } from "@/grida-cmath/_measurement";
+import { measure, Measurement } from "@grida/cmath/_measurement";
 
 export default function useMeasurement() {
   const { state, selection } = useDocument();

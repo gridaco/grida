@@ -3,7 +3,7 @@ import {
   useSurfaceGradientEditor,
 } from "@/grida-canvas/provider";
 import { useNodeSurfaceTransfrom } from "../hooks/transform";
-import { cmath } from "@/grida-cmath";
+import { cmath } from "@grida/cmath";
 
 export function SurfaceGradientEditor({ node_id }: { node_id: string }) {
   const { debug, cursor_mode, content_offset } = useEventTarget();

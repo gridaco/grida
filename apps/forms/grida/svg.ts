@@ -1,5 +1,5 @@
 import { SVGCommand, encodeSVGPath, SVGPathData } from "svg-pathdata";
-import { cmath } from "@/grida-cmath";
+import { cmath } from "@grida/cmath";
 import type { grida } from "./index";
 import type { vn } from "./vn";
 

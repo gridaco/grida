@@ -5,7 +5,7 @@ import type { CursorModeType, IDocumentEditorState } from "../state";
 import { document } from "../document-query";
 import { getInitialCurveGesture } from "./tools/gesture";
 import assert from "assert";
-import { cmath } from "../../grida-cmath";
+import { cmath } from "@grida/cmath";
 import { domapi } from "../domapi";
 import { grida } from "@/grida";
 import { self_selectNode } from "./methods";

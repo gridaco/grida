@@ -19,7 +19,7 @@ import React, { useCallback } from "react";
 import HexValueInput from "./utils/hex";
 import { Cross2Icon } from "@radix-ui/react-icons";
 import { ColorPicker } from "./color-picker";
-import { cmath } from "@/grida-cmath";
+import { cmath } from "@grida/cmath";
 
 const transparent_paint: grida.program.cg.Paint = {
   type: "solid",

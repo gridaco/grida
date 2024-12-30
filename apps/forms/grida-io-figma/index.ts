@@ -10,7 +10,7 @@ import type {
   FrameNode,
   BlendMode,
 } from "@figma/rest-api-spec";
-import { cmath } from "@/grida-cmath";
+import { cmath } from "@grida/cmath";
 import { grida } from "@/grida";
 
 export namespace iofigma {

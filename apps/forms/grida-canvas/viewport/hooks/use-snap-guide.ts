@@ -1,6 +1,6 @@
 "use client";
 
-import { cmath } from "@/grida-cmath";
+import { cmath } from "@grida/cmath";
 import { useDocument } from "@/grida-canvas/provider";
 
 export default function useSnapGuide() {
