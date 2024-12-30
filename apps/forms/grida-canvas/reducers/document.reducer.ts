@@ -24,7 +24,7 @@ import {
   self_insertSubDocument,
   self_selectNode,
 } from "./methods";
-import { cmath } from "../cmath";
+import { cmath } from "../../grida-cmath";
 import { domapi } from "../domapi";
 import { getSnapTargets, snapObjectsTranslation } from "./tools/snap";
 import nid from "./tools/id";

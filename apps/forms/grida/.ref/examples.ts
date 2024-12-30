@@ -1,4 +1,4 @@
-import { grida } from "./index";
+import type { grida } from "../index";
 
 const userprops = {
   title: { type: "string" },

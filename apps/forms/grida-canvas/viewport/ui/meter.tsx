@@ -1,4 +1,4 @@
-import { cmath } from "@/grida-canvas/cmath";
+import { cmath } from "@/grida-cmath";
 import React from "react";
 // import type { Rectangle } from "../types";
 // import * as k from "./k";

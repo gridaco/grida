@@ -1,6 +1,6 @@
 import React from "react";
 import { cn } from "@/utils";
-import type { cmath } from "@/grida-canvas/cmath";
+import type { cmath } from "@/grida-cmath";
 import { cursors } from "@/grida-canvas/components/cursor";
 
 export const Knob = React.forwardRef(function Knob(

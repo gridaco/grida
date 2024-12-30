@@ -18,7 +18,7 @@ import { MeasurementGuide } from "./ui/measurement";
 import { SnapGuide } from "./ui/snap";
 import { Knob } from "./ui/knob";
 import { ColumnsIcon, RowsIcon } from "@radix-ui/react-icons";
-import { cmath } from "../cmath";
+import { cmath } from "../../grida-cmath";
 import { cursors } from "../components/cursor";
 import { SurfaceTextEditor } from "./ui/text-editor";
 import { SurfacePathEditor } from "./ui/path-editor";

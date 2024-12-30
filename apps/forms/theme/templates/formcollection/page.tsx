@@ -15,8 +15,8 @@ import * as samples from "./samples";
 import {
   ProgramDataContextHost,
   DataProvider,
-} from "@/grida/react-runtime/data-context";
-import ArrayMap from "@/grida/react-runtime/data-context/array";
+} from "@/ast-react-program-context/data-context";
+import ArrayMap from "@/ast-react-program-context/data-context/array";
 import { useDocument } from "@/grida-canvas/provider";
 import assert from "assert";
 

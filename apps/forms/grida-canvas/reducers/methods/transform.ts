@@ -3,7 +3,7 @@ import type { IDocumentEditorState } from "../../state";
 import { self_insertNode, self_insertSubDocument } from "./insert";
 import { self_deleteNode } from "./delete";
 import { document } from "../../document-query";
-import { cmath } from "../../cmath";
+import { cmath } from "../../../grida-cmath";
 import { domapi } from "../../domapi";
 import {
   getSnapTargets,

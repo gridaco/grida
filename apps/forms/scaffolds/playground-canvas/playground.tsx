@@ -232,9 +232,12 @@ export default function CanvasPlayground() {
               key: res.document.id,
               state: initDocumentEditorState({
                 editable: true,
-                document: iofigma.restful.map.document(
+                document: iofigma.restful.factory.document(
                   res.document as any,
-                  res.images
+                  res.images,
+                  {
+                    gradient_id_generator: () => v4(),
+                  }
                 ),
               }),
             });

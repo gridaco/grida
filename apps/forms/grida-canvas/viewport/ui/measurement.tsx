@@ -1,10 +1,10 @@
 import {
   auxiliary_line_xylr,
   guide_line_xylr,
-} from "@/grida-canvas/cmath/_measurement";
+} from "@/grida-cmath/_measurement";
 import { MeterLabel } from "./meter";
 import { cn } from "@/utils";
-import { cmath } from "@/grida-canvas/cmath";
+import { cmath } from "@/grida-cmath";
 import useMeasurement from "../hooks/use-measurement";
 
 export function MeasurementGuide() {

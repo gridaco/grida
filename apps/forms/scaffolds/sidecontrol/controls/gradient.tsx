@@ -6,7 +6,7 @@ import { cn } from "@/utils";
 import { Cross2Icon } from "@radix-ui/react-icons";
 import * as SliderPrimitive from "@radix-ui/react-slider";
 import { PropertyNumber } from "../ui";
-import { cmath } from "@/grida-canvas/cmath";
+import { cmath } from "@/grida-cmath";
 
 export function GradientControl({
   value,

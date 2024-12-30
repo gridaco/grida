@@ -3,7 +3,7 @@ import type { vn } from "./vn";
 
 // TODO: remove this dependency
 import type { DocumentDispatcher } from "@/grida-canvas";
-import { cmath } from "@/grida-canvas/cmath";
+import { cmath } from "@/grida-cmath";
 
 export namespace grida {
   export const mixed: unique symbol = Symbol();

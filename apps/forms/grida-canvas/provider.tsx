@@ -23,12 +23,12 @@ import { useComputed } from "./nodes/use-computed";
 import {
   DataProvider,
   ProgramDataContextHost,
-} from "@/grida/react-runtime/data-context/context";
+} from "@/ast-react-program-context/data-context/context";
 import assert from "assert";
 import { document } from "./document-query";
 import { GoogleFontsManager } from "./components/google-fonts";
 import { domapi } from "./domapi";
-import { cmath } from "./cmath";
+import { cmath } from "../grida-cmath";
 import type { TCanvasEventTargetDragGestureState, TChange } from "./action";
 import mixed from "./mixed";
 

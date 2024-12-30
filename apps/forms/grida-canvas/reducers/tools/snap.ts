@@ -1,7 +1,7 @@
 import { grida } from "@/grida";
-import { cmath } from "@/grida-canvas/cmath";
+import { cmath } from "@/grida-cmath";
 import { document } from "@/grida-canvas/document-query";
-import { axisAligned } from "@/grida-canvas/cmath/_snap";
+import { axisAligned } from "@/grida-cmath/_snap";
 
 export function snapMovement(
   origin: cmath.Vector2,

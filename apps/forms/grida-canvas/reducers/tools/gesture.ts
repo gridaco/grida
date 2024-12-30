@@ -1,6 +1,6 @@
 import type { GestureCurve, IDocumentEditorState } from "@/grida-canvas/state";
 import { grida } from "@/grida";
-import { cmath } from "@/grida-canvas/cmath";
+import { cmath } from "@/grida-cmath";
 import { document } from "@/grida-canvas/document-query";
 
 export function getInitialCurveGesture(

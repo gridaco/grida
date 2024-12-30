@@ -1,5 +1,5 @@
 import { grida } from "@/grida";
-import { cmath } from "./cmath";
+import { cmath } from "../grida-cmath";
 export namespace domapi {
   export namespace k {
     export const VIEWPORT_ELEMENT_ID = "grida-canvas-sdk-viewport";

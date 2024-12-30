@@ -1,4 +1,3 @@
-import { v4 } from "uuid";
 import type {
   SubcanvasNode,
   Paint,
@@ -11,7 +10,7 @@ import type {
   FrameNode,
   BlendMode,
 } from "@figma/rest-api-spec";
-import { cmath } from "@/grida-canvas/cmath";
+import { cmath } from "@/grida-cmath";
 import { grida } from "@/grida";
 
 export namespace iofigma {
@@ -98,8 +97,13 @@ export namespace iofigma {
         COLOR: "color",
         LUMINOSITY: "luminosity",
       };
+    }
 
-      export function paint(paint: Paint): grida.program.cg.Paint | undefined {
+    export namespace factory {
+      function paint(
+        paint: Paint,
+        id: () => string
+      ): grida.program.cg.Paint | undefined {
         switch (paint.type) {
           case "SOLID": {
             return {
@@ -119,7 +123,7 @@ export namespace iofigma {
             } as const;
             return {
               type: _t[paint.type],
-              id: v4(),
+              id: id(),
               // TODO: transform: paint.gradientHandlePositions
               transform: cmath.transform.identity,
               stops: paint.gradientStops.map((stop) => {
@@ -140,7 +144,7 @@ export namespace iofigma {
             // fallback to linear gradient
             return {
               type: "linear_gradient",
-              id: v4(),
+              id: id(),
               transform: cmath.transform.identity,
               stops: [
                 { offset: 0, color: { r: 217, g: 217, b: 217, a: 1 } },
@@ -154,7 +158,7 @@ export namespace iofigma {
        * the default visible value is true, when undefined, it shall be interpreted as true
        * @returns
        */
-      export function first_visible<T extends { visible?: boolean }>(
+      function first_visible<T extends { visible?: boolean }>(
         arr: T[]
       ): T | undefined {
         return arr.filter((f) => f.visible !== false)[0];
@@ -166,9 +170,15 @@ export namespace iofigma {
         | FrameNode
         | GroupNode;
 
+      export type FactoryContext = {
+        // node_id_generator: () => string;
+        gradient_id_generator: () => string;
+      };
+
       export function document(
         node: SubcanvasNode,
-        images: { [key: string]: string }
+        images: { [key: string]: string },
+        context: FactoryContext
       ): grida.program.document.IDocumentDefinition {
         const nodes: Record<string, grida.program.nodes.Node> = {};
 
@@ -179,7 +189,8 @@ export namespace iofigma {
           const processedNode = node_without_children(
             currentNode,
             images,
-            parent
+            parent,
+            context
           );
 
           if (!processedNode) {
@@ -229,10 +240,11 @@ export namespace iofigma {
        * @param parent
        * @returns
        */
-      export function node_without_children(
+      function node_without_children(
         node: SubcanvasNode,
         images: { [key: string]: string },
-        parent?: FigmaParentNode
+        parent: FigmaParentNode | undefined,
+        context: FactoryContext
       ): grida.program.nodes.Node | undefined {
         switch (node.type) {
           case "SECTION": {
@@ -284,7 +296,9 @@ export namespace iofigma {
               width: node.size!.x,
               height: node.size!.y,
 
-              fill: first_visible_fill ? paint(first_visible_fill) : undefined,
+              fill: first_visible_fill
+                ? paint(first_visible_fill, context.gradient_id_generator)
+                : undefined,
               //
               border:
                 first_visible_stroke?.type === "SOLID"
@@ -437,7 +451,9 @@ export namespace iofigma {
                 figma_text_resizing_model === "HEIGHT"
                   ? "auto"
                   : fixedheight,
-              fill: first_visible_fill ? paint(first_visible_fill) : undefined,
+              fill: first_visible_fill
+                ? paint(first_visible_fill, context.gradient_id_generator)
+                : undefined,
               //
               border:
                 first_visible_stroke?.type === "SOLID"
@@ -455,13 +471,13 @@ export namespace iofigma {
               //
               style: {},
               textAlign: node.style.textAlignHorizontal
-                ? textAlignMap[node.style.textAlignHorizontal] ?? "left"
+                ? map.textAlignMap[node.style.textAlignHorizontal] ?? "left"
                 : "left",
               textAlignVertical: node.style.textAlignVertical
-                ? textAlignVerticalMap[node.style.textAlignVertical]
+                ? map.textAlignVerticalMap[node.style.textAlignVertical]
                 : "top",
               textDecoration: node.style.textDecoration
-                ? textDecorationMap[node.style.textDecoration] ?? "none"
+                ? map.textDecorationMap[node.style.textDecoration] ?? "none"
                 : "none",
               lineHeight: node.style.lineHeightPercentFontSize
                 ? node.style.lineHeightPercentFontSize / 100
@@ -548,10 +564,14 @@ export namespace iofigma {
               top: node.relativeTransform![1][2],
               width: node.size!.x,
               height: node.size!.y,
-              fill: first_visible_fill ? paint(first_visible_fill) : undefined,
+              fill: first_visible_fill
+                ? paint(first_visible_fill, context.gradient_id_generator)
+                : undefined,
               effects: [], // TODO:
               strokeWidth: strokeWeight ?? 0,
-              strokeCap: strokeCap ? strokeCapMap[strokeCap] ?? "butt" : "butt",
+              strokeCap: strokeCap
+                ? map.strokeCapMap[strokeCap] ?? "butt"
+                : "butt",
               cornerRadius: cornerRadius,
             } satisfies grida.program.nodes.RectangleNode;
           }
@@ -575,9 +595,13 @@ export namespace iofigma {
               top: node.relativeTransform![1][2],
               width: node.size!.x,
               height: node.size!.y,
-              fill: first_visible_fill ? paint(first_visible_fill) : undefined,
+              fill: first_visible_fill
+                ? paint(first_visible_fill, context.gradient_id_generator)
+                : undefined,
               strokeWidth: strokeWeight ?? 0,
-              strokeCap: strokeCap ? strokeCapMap[strokeCap] ?? "butt" : "butt",
+              strokeCap: strokeCap
+                ? map.strokeCapMap[strokeCap] ?? "butt"
+                : "butt",
               effects: [], // TODO:
             } satisfies grida.program.nodes.EllipseNode;
           }
@@ -598,10 +622,12 @@ export namespace iofigma {
               type: "line",
               position: "absolute",
               stroke: first_visible_stroke
-                ? paint(first_visible_stroke)
+                ? paint(first_visible_stroke, context.gradient_id_generator)
                 : undefined,
               strokeWidth: strokeWeight ?? 0,
-              strokeCap: strokeCap ? strokeCapMap[strokeCap] ?? "butt" : "butt",
+              strokeCap: strokeCap
+                ? map.strokeCapMap[strokeCap] ?? "butt"
+                : "butt",
               left: node.relativeTransform![0][2],
               top: node.relativeTransform![1][2],
               width: node.size!.x,
@@ -659,7 +685,9 @@ export namespace iofigma {
               top: node.relativeTransform![1][2],
               width: node.size!.x,
               height: node.size!.y,
-              fill: first_visible_fill ? paint(first_visible_fill) : undefined,
+              fill: first_visible_fill
+                ? paint(first_visible_fill, context.gradient_id_generator)
+                : undefined,
               // effects: [], // TODO:
               // cornerRadius: node.cornerRadius
               //   ? node.cornerRadius
@@ -674,12 +702,12 @@ export namespace iofigma {
               paths: [
                 ...(node.fillGeometry?.map((p) => ({
                   d: p.path ?? "",
-                  fillRule: windingRuleMap[p.windingRule],
+                  fillRule: map.windingRuleMap[p.windingRule],
                   fill: "fill" as const,
                 })) ?? []),
                 ...(node.strokeGeometry?.map((p) => ({
                   d: p.path ?? "",
-                  fillRule: windingRuleMap[p.windingRule],
+                  fillRule: map.windingRuleMap[p.windingRule],
                   fill: "stroke" as const,
                 })) ?? []),
               ],
