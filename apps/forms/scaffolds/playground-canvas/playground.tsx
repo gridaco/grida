@@ -36,7 +36,6 @@ import {
 import { GridaLogo } from "@/components/grida-logo";
 import { DevtoolsPanel } from "@/grida-react-canvas/devtools";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
-import { useGoogleFontsList } from "@/grida-react-canvas/google.fonts";
 import {
   ButtonIcon,
   DownloadIcon,
@@ -101,6 +100,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { keysymbols } from "@/grida-react-canvas/devtools/keysymbols";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { useGoogleFontsList } from "@/grida-fonts/react/hooks";
 
 export default function CanvasPlayground() {
   const [pref, setPref] = useState<Preferences>({ debug: false });

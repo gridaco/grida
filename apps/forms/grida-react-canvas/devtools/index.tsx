@@ -12,10 +12,10 @@ import {
 } from "@/components/ui/collapsible";
 import { ThemedMonacoEditor } from "@/components/monaco";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
-import { useGoogleFontsList } from "../google.fonts";
 import { useThrottle } from "@uidotdev/usehooks";
 import { __UNSAFE_CONSOLE } from "@/scaffolds/playground-canvas/__unsafe-console";
 import type { grida } from "@/grida";
+import { useGoogleFontsList } from "../../grida-fonts/react/hooks";
 
 export function DevtoolsPanel() {
   const { state: _state } = useDocument();

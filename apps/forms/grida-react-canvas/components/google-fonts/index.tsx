@@ -1,15 +1,10 @@
 "use client";
-import React, { useEffect, useRef, useState } from "react";
-import { GoogleFontsFontInfo } from "./data.min";
+import React, { useEffect, useRef } from "react";
 import { cn } from "@/utils";
-import {
-  csslink,
-  fontFamilyToId,
-  svglink,
-} from "@/grida-react-canvas/google.fonts";
+import * as Fonts from "@/grida-fonts";
 
 const GoogleFontsManagerProviderContext = React.createContext<{
-  fonts: GoogleFontsFontInfo[];
+  fonts: Fonts.google.GoogleFontsFontInfo[];
 }>({ fonts: [] });
 
 export function GoogleFontsManager({
@@ -17,7 +12,7 @@ export function GoogleFontsManager({
   children,
   stylesheets,
 }: React.PropsWithChildren<{
-  fonts: GoogleFontsFontInfo[];
+  fonts: Fonts.google.GoogleFontsFontInfo[];
   stylesheets?: boolean;
 }>) {
   return (
@@ -36,7 +31,7 @@ export function GoogleFontsStylesheets() {
 
   useEffect(() => {
     fonts.forEach((font) => {
-      const fontId = `gfm-${fontFamilyToId(font.family)}`;
+      const fontId = `gfm-${Fonts.google.fontFamilyToId(font.family)}`;
 
       // Only inject if not already in the document or in the injectedFonts Set
       if (
@@ -66,7 +61,7 @@ export function GoogleFontsStylesheets() {
 }
 
 function injectGoogleFontsLink(fontFamily: string): HTMLLinkElement {
-  const id = `gfm-${fontFamilyToId(fontFamily)}`;
+  const id = `gfm-${Fonts.google.fontFamilyToId(fontFamily)}`;
   const existing = document.getElementById(id);
   if (existing) return existing as HTMLLinkElement;
 
@@ -75,7 +70,7 @@ function injectGoogleFontsLink(fontFamily: string): HTMLLinkElement {
   link.id = id;
   link.setAttribute("data-gfm", "true");
   link.setAttribute("data-font-family", fontFamily);
-  link.href = csslink({ fontFamily });
+  link.href = Fonts.google.csslink({ fontFamily });
   link.rel = "stylesheet";
   document.head.appendChild(link);
 
@@ -95,7 +90,7 @@ export function GoogleFontsPreview({
     // eslint-disable-next-line @next/next/no-img-element
     <img
       data-font-family={fontFamily}
-      src={svglink(id)}
+      src={Fonts.google.svglink(id)}
       alt={fontFamily}
       className={cn("dark:invert", className)}
     />
