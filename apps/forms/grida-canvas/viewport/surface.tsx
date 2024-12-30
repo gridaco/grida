@@ -23,6 +23,7 @@ import { cursors } from "../components/cursor";
 import { SurfaceTextEditor } from "./ui/text-editor";
 import { SurfacePathEditor } from "./ui/path-editor";
 import { SizeMeterLabel } from "./ui/meter";
+import { SurfaceGradientEditor } from "./ui/gradient-editor";
 
 const DRAG_THRESHOLD = 2;
 
@@ -240,6 +241,12 @@ export function EditorSurface() {
           {content_edit_mode?.type === "path" && (
             <SurfacePathEditor
               key="path-editor"
+              node_id={content_edit_mode.node_id}
+            />
+          )}
+          {content_edit_mode?.type === "gradient" && (
+            <SurfaceGradientEditor
+              key="gradient-editor"
               node_id={content_edit_mode.node_id}
             />
           )}

@@ -475,7 +475,10 @@ export type HistoryEntry = {
 //   };
 // }
 
-type ContentEditModeState = TextContentEditMode | PathContentEditMode;
+type ContentEditModeState =
+  | TextContentEditMode
+  | PathContentEditMode
+  | GradientContentEditMode;
 
 type TextContentEditMode = {
   type: "text";
@@ -514,6 +517,14 @@ type PathContentEditMode = {
    * next points position
    */
   path_cursor_position: cmath.Vector2;
+};
+
+/**
+ * @deprecated - WIP
+ */
+type GradientContentEditMode = {
+  type: "gradient";
+  node_id: string;
 };
 
 export interface IMinimalDocumentState {

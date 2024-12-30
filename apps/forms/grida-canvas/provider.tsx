@@ -2318,6 +2318,28 @@ export function useSurfacePathEditor() {
 }
 
 /**
+ * @deprecated - WIP
+ * @returns
+ */
+export function useSurfaceGradientEditor() {
+  const [state, dispatch] = __useInternal();
+  assert(
+    state.content_edit_mode && state.content_edit_mode.type === "gradient"
+  );
+
+  const node = state.document.nodes[
+    state.content_edit_mode.node_id
+  ] as grida.program.nodes.i.IFill;
+  const fill = node.fill;
+  assert(fill?.type === "linear_gradient");
+
+  const { transform, stops } = fill;
+
+  //
+  return useMemo(() => ({ transform, stops }), [transform, stops]);
+}
+
+/**
  * Must be used when root node is {@link grida.program.nodes.TemplateInstanceNode} node
  */
 export function useRootTemplateInstanceNode() {

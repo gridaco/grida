@@ -47,7 +47,11 @@ export function PaintControl({
                 transform: cmath.transform.identity,
                 stops: [
                   { offset: 0, color: value.color },
-                  { offset: 1, color: value.color },
+                  {
+                    offset: 1,
+                    // TODO: darken second color based on the first color
+                    color: { r: 255, g: 255, b: 255, a: 1 },
+                  },
                 ],
               });
               break;

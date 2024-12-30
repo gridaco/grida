@@ -46,6 +46,17 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
             };
             break;
           }
+          // TODO: experimental - remove me
+          // case "rectangle":
+          // case "ellipse": {
+          //   if (node.fill?.type === "linear_gradient") {
+          //     draft.content_edit_mode = {
+          //       type: "gradient",
+          //       node_id: node_id,
+          //     };
+          //   }
+          //   //
+          // }
         }
       });
 
