@@ -1,4 +1,4 @@
-import { tokens } from "./";
+import { tokens } from "./tokens";
 
 const token_test_property_access_expression =
   tokens.factory.createPropertyAccessExpression(["props", "a"]);

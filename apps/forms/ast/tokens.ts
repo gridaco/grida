@@ -269,6 +269,7 @@ export namespace tokens {
 }
 
 export namespace tokens.access {
+  export const a = "";
   /**
    * A type that represents a path as an array of strings that are valid keys of the object type T and its nested objects.
    *

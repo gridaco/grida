@@ -1,4 +1,4 @@
-import { tokens } from "./";
+import { tokens } from "./tokens";
 
 describe("resolvePath", () => {
   const context: tokens.access.ScopedIdentifiersContext = {

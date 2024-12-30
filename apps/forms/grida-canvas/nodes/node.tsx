@@ -1,7 +1,6 @@
 "use client";
 
 import React, { ReactNode, useMemo } from "react";
-import { TemplateComponents } from "@/grida-canvas/template-builder";
 import type { TemplateComponent } from "../template-builder/with-template";
 import { grida } from "@/grida";
 import { ReactNodeRenderers } from ".";
