@@ -191,12 +191,25 @@ export namespace svg {
     export function stringifyLinearGradient(
       paint: grida.program.cg.LinearGradientPaint
     ) {
-      const { id, stops } = paint;
+      const { id, stops, transform } = paint;
+
+      // De-structure the 2x3 transform matrix:
+      // [
+      //   [a, b, tx],
+      //   [c, d, ty]
+      // ]
+      // SVG expects "matrix(a c b d tx ty)" which means:
+      // x' = a*x + c*y + tx
+      // y' = b*x + d*y + ty
+      const [[a, b, tx], [c, d, ty]] = transform ?? cmath.transform.identity;
+      const gradientTransform = `matrix(${a} ${c} ${b} ${d} ${tx} ${ty})`;
 
       // Creating gradient stops
       const gradientStops = stops.map(stringifyGradientStop).join("\n");
 
-      return `<linearGradient id="${id}">${gradientStops}</linearGradient>`;
+      return `<linearGradient id="${id}" gradientTransform="${gradientTransform}">
+${gradientStops}
+  </linearGradient>`;
     }
 
     export function stringifyRadialGradient(

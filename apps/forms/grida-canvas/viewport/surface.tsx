@@ -422,7 +422,7 @@ function NodeOverlay({
           <LayerOverlayRotationHandle anchor="se" node_id={node_id} />
         </>
       )}
-      {focused && (
+      {focused && !readonly && (
         <SizeMeterLabel
           margin={6}
           size={{

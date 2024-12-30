@@ -13,6 +13,7 @@ import type {
   FrameNode,
   BlendMode,
 } from "@figma/rest-api-spec";
+import { cmath } from "@/grida-canvas/cmath";
 
 export namespace iofigma {
   export namespace restful {
@@ -120,6 +121,8 @@ export namespace iofigma {
             return {
               type: _t[paint.type],
               id: v4(),
+              // TODO: transform: paint.gradientHandlePositions
+              transform: cmath.transform.identity,
               stops: paint.gradientStops.map((stop) => {
                 return {
                   offset: stop.position,
@@ -139,6 +142,7 @@ export namespace iofigma {
             return {
               type: "linear_gradient",
               id: v4(),
+              transform: cmath.transform.identity,
               stops: [
                 { offset: 0, color: { r: 217, g: 217, b: 217, a: 1 } },
                 { offset: 1, color: { r: 115, g: 115, b: 115, a: 1 } },

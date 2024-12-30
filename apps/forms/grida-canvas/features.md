@@ -34,6 +34,7 @@ This document lists all implemented features including the ones that are not yet
 | align vertical center   | center selection vertically             | `alt+v`        | `alt+v`        | canvas |
 | distribute horizontally | distribute selection horizontally       | `alt+ctrl+v`   | `alt+ctrl+v`   | canvas |
 | distribute vertically   | distribute selection vertically         | `alt+ctrl+h`   | `alt+ctrl+h`   | canvas |
+| eye dropper             | open eye dropper                        | `i`            | `i`            | canvas |
 
 **Modifiers (while pressed)**
 
@@ -113,3 +114,7 @@ This document lists all implemented features including the ones that are not yet
 
 - [external] drop image / svg to insert
 - [external] paste value from clipboard
+
+### Known Limitations
+
+- css backend node's `linear-gradient` does not support custom transform matrix

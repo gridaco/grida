@@ -3,6 +3,7 @@ import type { vn } from "./vn";
 
 // TODO: remove this dependency
 import type { DocumentDispatcher } from "@/grida-canvas";
+import { cmath } from "@/grida-canvas/cmath";
 
 export namespace grida {
   export const mixed: unique symbol = Symbol();
@@ -854,7 +855,10 @@ export namespace grida.program.css {
   export function toLinearGradientString(
     paint: Omit<cg.LinearGradientPaint, "id">
   ): string {
-    const { stops } = paint;
+    const { stops, transform } = paint;
+
+    // the css linear-gradient does not support custom matrix transformation
+    const deg = cmath.transform.angle(transform ?? cmath.transform.identity);
 
     const gradientStops = stops
       .map((stop) => {
@@ -862,7 +866,7 @@ export namespace grida.program.css {
       })
       .join(", ");
 
-    return `linear-gradient(${gradientStops})`;
+    return `linear-gradient(${deg}deg, ${gradientStops})`;
   }
 
   /**
@@ -2011,6 +2015,69 @@ export namespace grida.program.cg {
   export type Vector2 = [number, number];
 
   /**
+   * A 2D Affine Transformation Matrix.
+   *
+   * This matrix is used to perform linear transformations (e.g., scaling, rotation, shearing)
+   * and translations in a two-dimensional coordinate space. It is a compact representation
+   * of a transformation that maps points, lines, or shapes from one space to another while
+   * preserving straight lines and parallelism.
+   *
+   * ### Matrix Structure:
+   * The affine transform matrix is a 2x3 matrix, represented as:
+   *
+   * ```
+   * [
+   *   [a, b, tx],
+   *   [c, d, ty]
+   * ]
+   * ```
+   *
+   * ### Components:
+   * - **a, d**: Scaling factors along the x-axis and y-axis, respectively.
+   *   - `a`: Horizontal scale (x-axis stretch/shrink factor).
+   *   - `d`: Vertical scale (y-axis stretch/shrink factor).
+   * - **b, c**: Shearing (skewing) factors.
+   *   - `b`: Horizontal skewing (how much the y-axis tilts along the x-axis).
+   *   - `c`: Vertical skewing (how much the x-axis tilts along the y-axis).
+   * - **tx, ty**: Translation offsets.
+   *   - `tx`: Horizontal translation (movement along the x-axis).
+   *   - `ty`: Vertical translation (movement along the y-axis).
+   *
+   * ### Transformations:
+   * Affine transforms combine multiple transformations into a single operation. Examples include:
+   * - **Translation**: Moving a shape by tx and ty.
+   * - **Scaling**: Resizing along x and y axes.
+   * - **Rotation**: Rotating around the origin by combining scaling and skewing.
+   * - **Shearing**: Slanting a shape along one or both axes.
+   *
+   * ### Applying the Transformation:
+   * To transform a 2D point `[x, y]`, append a constant `1` to form `[x, y, 1]`,
+   * then multiply by the matrix:
+   *
+   * ```
+   * [x', y', 1] = [
+   *   [a, b, tx],
+   *   [c, d, ty]
+   * ] * [x, y, 1]
+   *
+   * Result:
+   * x' = a * x + b * y + tx
+   * y' = c * x + d * y + ty
+   * ```
+   *
+   * The transformed point `[x', y']` represents the new coordinates.
+   *
+   * ### Notes:
+   * - This matrix supports 2D transformations only.
+   * - It assumes homogeneous coordinates for points (i.e., the constant `1` in `[x, y, 1]`).
+   * - For transformations in 3D space, a 4x4 matrix must be used instead.
+   */
+  export type AffineTransform = [
+    [number, number, number],
+    [number, number, number],
+  ];
+
+  /**
    * the RGBA structure itself. the rgb value may differ as it could both represent 0-1 or 0-255 by the context.
    */
   export type TRGBA = {
@@ -2281,14 +2348,14 @@ export namespace grida.program.cg {
   export type LinearGradientPaint = {
     type: "linear_gradient";
     id: string;
-    // transform: unknown;
+    transform: AffineTransform;
     stops: Array<GradientStop>;
   };
 
   export type RadialGradientPaint = {
     type: "radial_gradient";
     id: string;
-    // transform: unknown;
+    transform: AffineTransform;
     stops: Array<GradientStop>;
   };
 

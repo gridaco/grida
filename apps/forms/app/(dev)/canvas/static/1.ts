@@ -1,4 +1,5 @@
 import { grida } from "@/grida";
+import { cmath } from "@/grida-canvas/cmath";
 
 const svg_1 = `<svg width="311" height="311" viewBox="0 0 311 311" fill="none" xmlns="http://www.w3.org/2000/svg">
 <mask id="mask0_198_311" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="311" height="311">
@@ -169,6 +170,7 @@ export default {
             color: { r: 0, g: 0, b: 255, a: 1 },
           },
         ],
+        transform: cmath.transform.identity,
       },
       strokeWidth: 0,
       strokeCap: "butt",
@@ -202,6 +204,7 @@ export default {
             color: { r: 0, g: 255, b: 0, a: 1 },
           },
         ],
+        transform: cmath.transform.identity,
       },
       strokeWidth: 0,
       strokeCap: "butt",
@@ -236,6 +239,7 @@ export default {
             color: { r: 0, g: 0, b: 255, a: 1 },
           },
         ],
+        transform: cmath.transform.identity,
       },
       strokeWidth: 0,
       strokeCap: "butt",

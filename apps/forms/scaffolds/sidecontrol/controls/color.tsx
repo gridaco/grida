@@ -1,5 +1,4 @@
 import { WorkbenchUI } from "@/components/workbench";
-import { RgbaColorPicker } from "react-colorful";
 import { RGBAChip } from "./utils/paint-chip";
 import {
   Popover,
@@ -8,6 +7,7 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/utils";
 import { grida } from "@/grida";
+import { ColorPicker } from "./color-picker";
 
 type RGBA = { r: number; g: number; b: number; a: number };
 
@@ -36,12 +36,13 @@ export function RGBAColorControl({
           <span className="ms-2">#{grida.program.css.rgbaToHex(value)}</span>
         </div>
       </PopoverTrigger>
-      <PopoverContent align="start" side="right" sideOffset={16}>
-        <RgbaColorPicker
-          color={value}
-          className="w-full"
-          onChange={onValueChange}
-        />
+      <PopoverContent
+        align="start"
+        side="right"
+        sideOffset={16}
+        className="p-0"
+      >
+        <ColorPicker color={value} onColorChange={onValueChange} />
       </PopoverContent>
     </Popover>
   );

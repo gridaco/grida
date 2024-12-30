@@ -18,7 +18,8 @@ import { PaintChip } from "./utils/paint-chip";
 import React, { useCallback } from "react";
 import HexValueInput from "./utils/hex";
 import { Cross2Icon } from "@radix-ui/react-icons";
-import { RgbaColorPicker } from "react-colorful";
+import { ColorPicker } from "./color-picker";
+import { cmath } from "@/grida-canvas/cmath";
 
 const transparent_paint: grida.program.cg.Paint = {
   type: "solid",
@@ -43,6 +44,7 @@ export function PaintControl({
             case "radial_gradient": {
               onValueChange({
                 type: to,
+                transform: cmath.transform.identity,
                 stops: [
                   { offset: 0, color: value.color },
                   { offset: 1, color: value.color },
@@ -72,6 +74,7 @@ export function PaintControl({
               onValueChange({
                 type: to,
                 stops: value.stops,
+                transform: cmath.transform.identity,
               });
               break;
             }
@@ -130,7 +133,13 @@ export function PaintControl({
             <PopoverTrigger className="w-full">
               <PaintInputContainer>
                 <PaintChip paint={value} />
-                <span className="ms-2 text-xs">Linear</span>
+                <span className="ms-2 text-start text-xs flex-1">Linear</span>
+                <button
+                  onClick={onRemovePaint}
+                  className="px-1 py-1 me-0.5 text-muted-foreground"
+                >
+                  <Cross2Icon className="w-3.5 h-3.5" />
+                </button>
               </PaintInputContainer>
             </PopoverTrigger>
           )}
@@ -138,7 +147,13 @@ export function PaintControl({
             <PopoverTrigger className="w-full">
               <PaintInputContainer>
                 <PaintChip paint={value} />
-                <span className="ms-2 text-xs">Radial</span>
+                <span className="ms-2 text-start text-xs flex-1">Radial</span>
+                <button
+                  onClick={onRemovePaint}
+                  className="px-1 py-1 me-0.5 text-muted-foreground"
+                >
+                  <Cross2Icon className="w-3.5 h-3.5" />
+                </button>
               </PaintInputContainer>
             </PopoverTrigger>
           )}
@@ -179,37 +194,15 @@ export function PaintControl({
           </TabsList>
           <TabsContent value="solid" className="p-0 m-0">
             {value?.type === "solid" && (
-              <div>
-                <RgbaColorPicker
-                  color={value.color}
-                  className="!w-full"
-                  onChange={(color) => {
-                    onValueChange({
-                      type: "solid",
-                      color,
-                    });
-                  }}
-                />
-                <div className="p-2">
-                  <PaintInputContainer>
-                    <HexValueInput
-                      className="border-none outline-none w-full h-full ps-2 text-xs"
-                      value={{
-                        r: value.color.r,
-                        g: value.color.g,
-                        b: value.color.b,
-                        // ommit the alpha
-                      }}
-                      onValueChange={(color) => {
-                        onValueChange({
-                          type: "solid",
-                          color: { ...color, a: value.color.a },
-                        });
-                      }}
-                    />
-                  </PaintInputContainer>
-                </div>
-              </div>
+              <ColorPicker
+                color={value.color}
+                onColorChange={(color) => {
+                  onValueChange({
+                    type: "solid",
+                    color,
+                  });
+                }}
+              />
             )}
           </TabsContent>
           <TabsContent value="linear_gradient" className="p-2">

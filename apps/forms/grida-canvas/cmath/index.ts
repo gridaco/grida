@@ -27,6 +27,8 @@ export namespace cmath {
    */
   export type Vector2 = [number, number];
 
+  export type Transform = [[number, number, number], [number, number, number]];
+
   /**
    * A Rectangle specifies an area that is enclosed by it’s top-left point (x, y), its width, and its height.
    *
@@ -1342,6 +1344,86 @@ export namespace cmath.bezier {
       width: maxX - minX,
       height: maxY - minY,
     };
+  }
+}
+
+export namespace cmath.transform {
+  export const identity: Transform = [
+    [1, 0, 0],
+    [0, 1, 0],
+  ];
+
+  /** 2x3 matrix multiply: C = A * B */
+  export function multiply(A: Transform, B: Transform): Transform {
+    return [
+      [
+        A[0][0] * B[0][0] + A[0][1] * B[1][0],
+        A[0][0] * B[0][1] + A[0][1] * B[1][1],
+        A[0][0] * B[0][2] + A[0][1] * B[1][2] + A[0][2],
+      ],
+      [
+        A[1][0] * B[0][0] + A[1][1] * B[1][0],
+        A[1][0] * B[0][1] + A[1][1] * B[1][1],
+        A[1][0] * B[0][2] + A[1][1] * B[1][2] + A[1][2],
+      ],
+    ];
+  }
+
+  /**
+   * Produces a relative 2D transform matrix for a linear gradient at `deg` degrees
+   * in a normalized 1x1 space (Figma-like behavior).
+   */
+  export function computeRelativeLinearGradientTransform(
+    deg: number
+  ): Transform {
+    // Convert to radians
+    const rad = (deg * Math.PI) / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+
+    // Translate center to origin
+    const Tneg: Transform = [
+      [1, 0, -0.5],
+      [0, 1, -0.5],
+    ];
+
+    // Rotate
+    const R: Transform = [
+      [cos, -sin, 0],
+      [sin, cos, 0],
+    ];
+
+    // Translate origin back to center
+    const Tpos: Transform = [
+      [1, 0, 0.5],
+      [0, 1, 0.5],
+    ];
+
+    // Compose final = Tpos * R * Tneg
+    const TR = multiply(R, Tneg);
+    return multiply(Tpos, TR);
+  }
+
+  /**
+   * Extracts the approximate rotation angle (in degrees) from a 2×3 affine transform matrix.
+   *
+   * @param transform - The 2D transform matrix:
+   *   [
+   *     [a, b, tx],
+   *     [c, d, ty]
+   *   ]
+   * @returns The rotation angle in degrees, derived via `atan2(c, a)`.
+   *
+   * @remarks
+   * - This assumes the matrix is primarily rotation (plus optional uniform scaling).
+   *   If there's skew or non-uniform scaling, the computed angle might be off.
+   * - The returned angle is in the range (-180, 180].
+   */
+  export function angle(transform: Transform): number {
+    const [[a, b, _tx], [c, d, _ty]] = transform;
+    const radians = Math.atan2(c, a); // typical for rotation matrix: a = cosθ, c = sinθ
+    const degrees = radians * (180 / Math.PI);
+    return degrees;
   }
 }
 

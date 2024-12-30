@@ -103,10 +103,11 @@ export function PropertyEnum<T extends string>({
   placeholder,
   value,
   ...props
-}: Omit<React.ComponentProps<typeof Select>, "value"> & {
+}: Omit<React.ComponentProps<typeof Select>, "value" | "onValueChange"> & {
   enum: EnumItem<T>[];
   value?: TMixed<T>;
   placeholder?: string;
+  onValueChange?: (value: T) => void;
 }) {
   const mixed = value === grida.mixed;
   const hasIcon = enums.some((e) => typeof e !== "string" && e.icon);
@@ -177,6 +178,7 @@ export function PropertyNumber({
   value,
   className,
   onKeyDown,
+  disableDelta,
   onValueChange,
   step = 1,
   ...props
@@ -187,6 +189,7 @@ export function PropertyNumber({
   type?: "integer" | "number";
   value?: TMixed<number | "">;
   step?: number;
+  disableDelta?: boolean;
   onValueChange?: (change: TChange<number>) => void;
 }) {
   const mixed = value === grida.mixed;
@@ -202,6 +205,8 @@ export function PropertyNumber({
         onKeyDown?.(e);
 
         if (e.defaultPrevented) return;
+
+        if (disableDelta) return;
 
         const multiplier = e.shiftKey ? 10 : 1;
         if (e.key === "ArrowUp") {
