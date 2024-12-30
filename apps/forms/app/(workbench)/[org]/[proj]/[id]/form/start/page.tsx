@@ -149,9 +149,14 @@ function SetupStartPage() {
       <div className="w-full h-full flex items-center justify-center">
         <Card className="max-w-sm">
           <CardHeader>
-            <Badge className="w-min mb-4" variant="outline">
-              BETA
-            </Badge>
+            <div className="flex gap-2 items-center mb-4">
+              <Badge className="w-min" variant="outline">
+                ALPHA
+              </Badge>
+              <span className="text-xs text-muted-foreground">
+                Technical preview
+              </span>
+            </div>
             <CardTitle>Add a cover page for your campaign</CardTitle>
             <CardDescription>
               You can add a engaging cover (start) page for this campaign. By
