@@ -299,7 +299,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                 zIndex: 0,
                 stroke: { type: "solid", color: { r: 0, g: 0, b: 0, a: 1 } },
                 strokeCap: "butt",
-                strokeWidth: 3,
+                strokeWidth: 1,
                 vectorNetwork: {
                   vertices: [{ p: cmath.vector2.zero }],
                   segments: [],

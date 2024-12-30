@@ -48,7 +48,7 @@ export function SnapGuide() {
 function Rule({
   axis,
   offset,
-  width = 0.1,
+  width = 1,
 }: {
   axis: "x" | "y";
   offset: number;
@@ -57,6 +57,7 @@ function Rule({
   return (
     <div
       style={{
+        opacity: 0.5,
         position: "absolute",
         transform:
           axis === "x" ? `translateY(${offset}px)` : `translateX(${offset}px)`,
