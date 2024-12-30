@@ -23,7 +23,7 @@ import { useComputed } from "./nodes/use-computed";
 import {
   DataProvider,
   ProgramDataContextHost,
-} from "@/ast-react-program-context/data-context/context";
+} from "@/program-context/data-context/context";
 import assert from "assert";
 import { document } from "./document-query";
 import { GoogleFontsManager } from "./components/google-fonts";
