@@ -1,5 +1,4 @@
 import { grida } from "./index";
-import { Factory } from "@/ast";
 
 const userprops = {
   title: { type: "string" },

@@ -77,6 +77,8 @@
 - [ ] Custom Auth Gate
 - [ ] Accept Payments
 
+---
+
 <br/>
 <br/>
 <br/>
