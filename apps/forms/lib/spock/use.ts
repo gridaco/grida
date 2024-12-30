@@ -1,4 +1,4 @@
-import { Access, Tokens } from "@/ast";
+import { Tokens } from "@/ast";
 import { useFormAgentState } from "@/lib/formstate";
 import assert from "assert";
 import { useMemo } from "react";
@@ -71,7 +71,7 @@ function access(
   }
   if (Tokens.is.jsonRef(exp)) {
     const path = resolveJsonRefPath(exp);
-    const value = Access.access(data, path);
+    const value = Tokens.Access.access(data, path);
     return value;
   }
   if (Tokens.is.inferredShorthandBinaryExpression(exp)) {

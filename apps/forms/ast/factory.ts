@@ -1,4 +1,3 @@
-import { Access } from "./access";
 import { Tokens } from "./tokens";
 
 export namespace Factory {
@@ -44,7 +43,7 @@ export namespace Factory {
   }
 
   export function createPropertyAccessExpression<T = any>(
-    paths: Access.KeyPath<T> | string[]
+    paths: Tokens.Access.KeyPath<T> | string[]
   ): Tokens.PropertyAccessExpression {
     return {
       kind: "PropertyAccessExpression",
@@ -160,7 +159,7 @@ export namespace Factory {
     expression: Tokens.PropertyAccessExpression,
     context: any
   ) {
-    return Access.access(context, expression.expression as any);
+    return Tokens.Access.access(context, expression.expression as any);
   }
 
   export function renderTemplateExpression(
@@ -175,7 +174,7 @@ export namespace Factory {
           case "Identifier":
             return context[span.name]?.toString() || "";
           case "PropertyAccessExpression":
-            const value = Access.access(context, span.expression as any);
+            const value = Tokens.Access.access(context, span.expression as any);
             return value !== undefined ? value.toString() : "";
           default:
             return "";
