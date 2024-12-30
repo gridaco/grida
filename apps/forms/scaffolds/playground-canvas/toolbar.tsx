@@ -14,8 +14,9 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { grida } from "@/grida";
 import { useMetaEnter } from "@/hooks/use-meta-enter";
 import {
-  BorderSolidIcon,
+  SlashIcon,
   BoxIcon,
+  Pencil1Icon,
   ChatBubbleIcon,
   CircleIcon,
   CursorArrowIcon,
@@ -32,6 +33,7 @@ import { useLocalStorage } from "@uidotdev/usehooks";
 import { readStreamableValue } from "ai/rsc";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CANVAS_PLAYGROUND_LOCALSTORAGE_PREFERENCES_BASE_AI_PROMPT_KEY } from "./k";
+import { PenToolIcon } from "lucide-react";
 
 function useGenerate() {
   const streamGeneration = useCallback(
@@ -174,7 +176,13 @@ export function PlaygroundToolbar({
           <CircleIcon />
         </ToggleGroupItem>
         <ToggleGroupItem value={"line" satisfies ToolbarToolType}>
-          <BorderSolidIcon />
+          <SlashIcon />
+        </ToggleGroupItem>
+        <ToggleGroupItem value={"pencil" satisfies ToolbarToolType}>
+          <Pencil1Icon />
+        </ToggleGroupItem>
+        <ToggleGroupItem value={"path" satisfies ToolbarToolType}>
+          <PenToolIcon className="w-3.5 h-3.5" />
         </ToggleGroupItem>
         <ToggleGroupItem value={"image" satisfies ToolbarToolType}>
           <ImageIcon />
@@ -247,7 +255,9 @@ type ToolbarToolType =
   | "text"
   | "container"
   | "image"
-  | "line";
+  | "line"
+  | "pencil"
+  | "path";
 
 function cursormode_to_toolbar_value(cm: CursorMode): ToolbarToolType {
   switch (cm.type) {
@@ -255,6 +265,10 @@ function cursormode_to_toolbar_value(cm: CursorMode): ToolbarToolType {
       return "cursor";
     case "insert":
       return cm.node;
+    case "draw":
+      return cm.tool;
+    case "path":
+      return "path";
   }
 }
 
@@ -262,7 +276,16 @@ function toolbar_value_to_cursormode(tt: ToolbarToolType): CursorMode {
   switch (tt) {
     case "cursor":
       return { type: "cursor" };
-    default:
+    case "container":
+    case "ellipse":
+    case "image":
+    case "rectangle":
+    case "text":
       return { type: "insert", node: tt };
+    case "line":
+    case "pencil":
+      return { type: "draw", tool: tt };
+    case "path":
+      return { type: "path" };
   }
 }

@@ -1,32 +1,30 @@
 import { Slider } from "./utils/slider";
 import { WorkbenchUI } from "@/components/workbench";
-import { Input } from "@/components/ui/input";
+import { PropertyNumber } from "../ui";
+import { grida } from "@/grida";
+import type { TChange, TMixed } from "./utils/types";
 
 export function OpacityControl({
-  value = 1,
+  value,
   onValueChange,
 }: {
-  value?: number;
-  onValueChange?: (value: number) => void;
+  value?: TMixed<number>;
+  onValueChange?: (change: TChange<number>) => void;
 }) {
   return (
     <div
       className={WorkbenchUI.inputVariants({
         variant: "container",
-        size: "container",
+        size: "xs",
       })}
     >
       <div className="flex-1">
-        <Input
-          className={WorkbenchUI.inputVariants({ size: "sm" })}
+        <PropertyNumber
           value={value}
-          type="number"
           min={0}
           max={1}
           step={0.01}
-          onChange={(e) => {
-            onValueChange?.(parseFloat(e.target.value));
-          }}
+          onValueChange={onValueChange}
         />
       </div>
       <div className="flex-1">
@@ -34,9 +32,9 @@ export function OpacityControl({
           min={0}
           max={1}
           step={0.01}
-          value={value ? [value] : undefined}
-          onValueChange={([v]) => {
-            onValueChange?.(v);
+          value={value === grida.mixed ? [0.5] : value ? [value] : undefined}
+          onValueChange={([value]) => {
+            onValueChange?.({ type: "set", value });
           }}
         />
       </div>

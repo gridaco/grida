@@ -282,6 +282,7 @@ function initialSiteEditorState(init: SiteDocumentEditorInit): EditorState {
     documents: {
       ["site/dev-collection"]: initDocumentEditorState({
         editable: true,
+        debug: false,
         document: { nodes: {}, root_id: "root" },
         templates: {
           ["formcollection_sample_001_the_bundle"]: {
@@ -509,6 +510,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
             template_id: init.start.template_id,
             ...initDocumentEditorState({
               editable: true,
+              debug: false,
               document: init.start,
               templates: {
                 [init.start.template_id]: FormStartPage.getTemplate(

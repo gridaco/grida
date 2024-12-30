@@ -54,12 +54,12 @@ import { Spinner } from "@/components/spinner";
 import {
   StandaloneDocumentEditor,
   ViewportRoot,
-  ViewportSurface,
+  EditorSurface,
   useDocument,
   useRootTemplateInstanceNode,
 } from "@/grida-canvas";
 import { composeEditorDocumentAction } from "@/scaffolds/editor/action";
-import { BuilderAction } from "@/grida-canvas/action";
+import { CanvasAction } from "@/grida-canvas";
 import { DevtoolsPanel } from "@/grida-canvas/devtools";
 import { Badge } from "@/components/ui/badge";
 import { ArrowRightIcon } from "@radix-ui/react-icons";
@@ -74,7 +74,7 @@ export default function FormStartEditPage() {
   } = state;
 
   const startPageDocumentDispatch = useCallback(
-    (action: BuilderAction) => {
+    (action: CanvasAction) => {
       dispatch(composeEditorDocumentAction("form/startpage", action));
     },
     [dispatch]
@@ -92,12 +92,20 @@ export default function FormStartEditPage() {
       <main className="h-full flex flex-1 w-full">
         {startpage ? (
           <StandaloneDocumentEditor
+            key={startpage.template_id}
             editable
-            initial={startpage}
+            initial={{
+              ...startpage,
+              templates: {
+                [startpage.template_id]: FormStartPage.getTemplate(
+                  startpage.template_id
+                ),
+              },
+            }}
             dispatch={startPageDocumentDispatch}
           >
             <div className="w-full h-full flex flex-col">
-              <StartPageEditor />
+              <StartPageEditor template_id={startpage.template_id} />
               {process.env.NODE_ENV === "development" && <DevtoolsPanel />}
             </div>
             <aside className="hidden lg:flex h-full">
@@ -141,9 +149,14 @@ function SetupStartPage() {
       <div className="w-full h-full flex items-center justify-center">
         <Card className="max-w-sm">
           <CardHeader>
-            <Badge className="w-min mb-4" variant="outline">
-              BETA
-            </Badge>
+            <div className="flex gap-2 items-center mb-4">
+              <Badge className="w-min" variant="outline">
+                ALPHA
+              </Badge>
+              <span className="text-xs text-muted-foreground">
+                Technical preview
+              </span>
+            </div>
             <CardTitle>Add a cover page for your campaign</CardTitle>
             <CardDescription>
               You can add a engaging cover (start) page for this campaign. By
@@ -160,7 +173,7 @@ function SetupStartPage() {
   );
 }
 
-function StartPageEditor() {
+function StartPageEditor({ template_id }: { template_id: string }) {
   const [edit, setEdit] = useState(false);
 
   const [rootstate] = useEditorState();
@@ -185,21 +198,14 @@ function StartPageEditor() {
         }}
         className="relative w-full no-scrollbar overflow-y-auto bg-transparent"
       >
-        <ViewportSurface />
+        <EditorSurface />
         <AgentThemeProvider>
           <div className="w-full px-10 overflow-scroll">
             <div className="w-full mx-auto my-20 max-w-sm xl:max-w-4xl z-[-999]">
               <SandboxWrapper className="pointer-events-auto rounded-2xl shadow-2xl border overflow-hidden hover:outline hover:outline-2 hover:outline-workbench-accent-sky">
                 <div className="w-full min-h-[852px] h-[80dvh]">
                   <FormStartPage.TemplateRenderer
-                    // TODO: with dynamic renderer
-                    name={
-                      (
-                        state.document.nodes[
-                          state.document.root_id!
-                        ] as grida.program.nodes.TemplateInstanceNode
-                      ).template_id
-                    }
+                    name={template_id}
                     meta={campaign}
                     lang={lang}
                   />

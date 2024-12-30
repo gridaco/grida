@@ -7,6 +7,7 @@ import React, {
   useEffect,
   useLayoutEffect,
   useMemo,
+  useRef,
 } from "react";
 import {
   type DocumentDispatcher,
@@ -14,7 +15,8 @@ import {
   type IDocumentEditorInit,
   initDocumentEditorState,
   CursorMode,
-} from "./types";
+  SurfaceRaycastTargeting,
+} from "./state";
 import type { Tokens } from "@/ast";
 import { grida } from "@/grida";
 import { useComputed } from "./nodes/use-computed";
@@ -23,11 +25,12 @@ import {
   ProgramDataContextHost,
 } from "@/grida/react-runtime/data-context/context";
 import assert from "assert";
-import { documentquery } from "./document-query";
+import { document } from "./document-query";
 import { GoogleFontsManager } from "./components/google-fonts";
 import { domapi } from "./domapi";
-
-type Vector2 = [number, number];
+import { cmath } from "./cmath";
+import type { TCanvasEventTargetDragGestureState, TChange } from "./action";
+import mixed from "./mixed";
 
 const DocumentContext = createContext<IDocumentEditorState | null>(null);
 
@@ -39,9 +42,11 @@ export function StandaloneDocumentEditor({
   editable,
   dispatch,
   children,
+  debug = false,
 }: React.PropsWithChildren<{
   editable: boolean;
-  initial: Omit<IDocumentEditorInit, "editable">;
+  debug?: boolean;
+  initial: Omit<IDocumentEditorInit, "editable" | "debug">;
   dispatch?: DocumentDispatcher;
 }>) {
   useEffect(() => {
@@ -52,7 +57,15 @@ export function StandaloneDocumentEditor({
     }
   }, [editable, dispatch]);
 
-  const __dispatch = editable ? dispatch ?? __noop : __noop;
+  const __dispatch = useMemo(
+    () => (editable ? dispatch ?? __noop : __noop),
+    [editable]
+  );
+
+  const state = useMemo(
+    () => initDocumentEditorState({ ...initial, editable, debug }),
+    [initial, editable, debug]
+  );
 
   const rootnode = initial.document.nodes[initial.document.root_id];
   assert(rootnode, "root node is not found");
@@ -80,9 +93,7 @@ export function StandaloneDocumentEditor({
   }, [rootnode]);
 
   return (
-    <DocumentContext.Provider
-      value={initDocumentEditorState({ ...initial, editable })}
-    >
+    <DocumentContext.Provider value={state}>
       <DocumentDispatcherContext.Provider value={__dispatch}>
         <ProgramDataContextHost>
           <DataProvider data={{ props: shallowRootProps }}>
@@ -109,7 +120,11 @@ function EditorGoogleFontsManager({ children }: React.PropsWithChildren<{}>) {
   );
 }
 
-export function __useInternal() {
+function __useDispatch() {
+  return useContext(DocumentDispatcherContext);
+}
+
+function __useInternal() {
   const state = useContext(DocumentContext);
   if (!state) {
     throw new Error(
@@ -117,39 +132,40 @@ export function __useInternal() {
     );
   }
 
-  const dispatch = useContext(DocumentDispatcherContext);
+  const dispatch = __useDispatch();
 
   return useMemo(() => [state, dispatch] as const, [state, dispatch]);
 }
 
+export function useResizeNotifier() {
+  const dispatch = __useDispatch();
+  const notifyResize = useCallback(
+    ({
+      content_offset,
+      viewport_offset,
+    }: {
+      content_offset: cmath.Vector2;
+      viewport_offset: cmath.Vector2;
+    }) => {
+      dispatch({
+        type: "__internal/on-resize",
+        content_offset,
+        viewport_offset,
+      });
+    },
+    [dispatch]
+  );
+
+  return notifyResize;
+}
+
 function __useNodeActions(dispatch: DocumentDispatcher) {
-  //
-  //
-  const selectNode = useCallback(
-    (node_id: string) => {
+  const order = useCallback(
+    (node_id: string, order: "back" | "front" | number) => {
       dispatch({
-        type: "document/node/select",
-        node_id,
-      });
-    },
-    [dispatch]
-  );
-
-  const orderPushBack = useCallback(
-    (node_id: string) => {
-      dispatch({
-        type: "node/order/back",
-        node_id,
-      });
-    },
-    [dispatch]
-  );
-
-  const orderBringFront = useCallback(
-    (node_id: string) => {
-      dispatch({
-        type: "node/order/front",
-        node_id,
+        type: "order",
+        target: node_id,
+        order: order,
       });
     },
     [dispatch]
@@ -175,24 +191,35 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
     [dispatch]
   );
 
-  const pointerEnterNode = useCallback(
+  const toggleNodeBold = useCallback(
     (node_id: string) => {
       dispatch({
-        type: "document/node/on-pointer-enter",
-        node_id,
+        type: "node/toggle/bold",
+        node_id: node_id,
       });
     },
     [dispatch]
   );
 
-  const pointerLeaveNode = useCallback(
-    (node_id: string) => {
+  const hoverNode = useCallback(
+    (node_id: string, event: "enter" | "leave") => {
       dispatch({
-        type: "document/node/on-pointer-leave",
-        node_id,
+        type: "hover",
+        target: node_id,
+        event,
       });
     },
     [dispatch]
+  );
+
+  const hoverEnterNode = useCallback(
+    (node_id: string) => hoverNode(node_id, "enter"),
+    [hoverNode]
+  );
+
+  const hoverLeaveNode = useCallback(
+    (node_id: string) => hoverNode(node_id, "leave"),
+    [hoverNode]
   );
 
   const changeNodeProps = useCallback(
@@ -333,7 +360,7 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   );
 
   const changeNodeOpacity = useCallback(
-    (node_id: string, opacity: number) => {
+    (node_id: string, opacity: TChange<number>) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "node/change/opacity",
@@ -346,7 +373,7 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   );
 
   const changeNodeRotation = useCallback(
-    (node_id: string, rotation: number) => {
+    (node_id: string, rotation: TChange<number>) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "node/change/rotation",
@@ -377,12 +404,51 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   );
 
   const changeNodeFill = useCallback(
-    (node_id: string, fill: grida.program.cg.PaintWithoutID) => {
+    (node_id: string, fill: grida.program.cg.PaintWithoutID | null) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "node/change/fill",
           node_id: node_id,
           fill,
+        });
+      });
+    },
+    [dispatch]
+  );
+
+  const changeNodeStroke = useCallback(
+    (node_id: string, stroke: grida.program.cg.PaintWithoutID | null) => {
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/stroke",
+          node_id: node_id,
+          stroke,
+        });
+      });
+    },
+    [dispatch]
+  );
+
+  const changeNodeStrokeWidth = useCallback(
+    (node_id: string, strokeWidth: TChange<number>) => {
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/stroke-width",
+          node_id: node_id,
+          strokeWidth,
+        });
+      });
+    },
+    [dispatch]
+  );
+
+  const changeNodeStrokeCap = useCallback(
+    (node_id: string, strokeCap: grida.program.cg.StrokeCap) => {
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/stroke-cap",
+          node_id: node_id,
+          strokeCap,
         });
       });
     },
@@ -446,7 +512,7 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   );
 
   const changeTextNodeFontSize = useCallback(
-    (node_id: string, fontSize: number) => {
+    (node_id: string, fontSize: TChange<number>) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "node/change/fontSize",
@@ -490,7 +556,7 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   const changeTextNodeLineHeight = useCallback(
     (
       node_id: string,
-      lineHeight: grida.program.nodes.TextNode["lineHeight"]
+      lineHeight: TChange<grida.program.nodes.TextNode["lineHeight"]>
     ) => {
       requestAnimationFrame(() => {
         dispatch({
@@ -506,7 +572,7 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   const changeTextNodeLetterSpacing = useCallback(
     (
       node_id: string,
-      letterSpacing: grida.program.nodes.TextNode["letterSpacing"]
+      letterSpacing: TChange<grida.program.nodes.TextNode["letterSpacing"]>
     ) => {
       requestAnimationFrame(() => {
         dispatch({
@@ -639,6 +705,17 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   );
   //
 
+  const changeNodeMouseCursor = useCallback(
+    (node_id: string, cursor: grida.program.cg.SystemMouseCursor) => {
+      dispatch({
+        type: "node/change/mouse-cursor",
+        node_id,
+        cursor,
+      });
+    },
+    [dispatch]
+  );
+
   const changeNodeStyle = useCallback(
     (
       node_id: string,
@@ -660,13 +737,13 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
 
   return useMemo(
     () => ({
-      selectNode,
-      orderPushBack,
-      orderBringFront,
-      pointerEnterNode,
-      pointerLeaveNode,
+      order,
+      hoverNode,
+      hoverEnterNode,
+      hoverLeaveNode,
       toggleNodeActive,
       toggleNodeLocked,
+      toggleNodeBold,
       changeNodeActive,
       changeNodeLocked,
       changeNodeName,
@@ -677,6 +754,7 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
       changeNodeComponent,
       changeNodeText,
       changeNodeStyle,
+      changeNodeMouseCursor,
       changeNodeSrc,
       changeNodeHref,
       changeNodeTarget,
@@ -684,6 +762,9 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
       changeNodePositioningMode,
       changeNodeCornerRadius,
       changeNodeFill,
+      changeNodeStroke,
+      changeNodeStrokeWidth,
+      changeNodeStrokeCap,
       changeNodeFit,
       changeNodeOpacity,
       changeNodeRotation,
@@ -706,17 +787,131 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   );
 }
 
+type NudgeUXConfig = {
+  /**
+   * when gesture is true, it will set the gesture state to trigger the surface guide rendering.
+   *
+   * @default true
+   */
+  gesture: boolean;
+  /**
+   * delay in ms to toggle off the gesture state
+   *
+   * @default 500
+   */
+  delay: number;
+};
+
+function __useGestureNudgeState(dispatch: DocumentDispatcher) {
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const __gesture_nudge_debounced = useCallback(
+    (state: "on" | "off", delay: number) => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      timeoutRef.current = setTimeout(() => {
+        dispatch({
+          type: "gesture/nudge",
+          state: "off",
+        });
+      }, delay);
+    },
+    [dispatch]
+  );
+
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
+  return __gesture_nudge_debounced;
+}
+
+function __useNudgeActions(dispatch: DocumentDispatcher) {
+  const __gesture_nudge = useCallback(
+    (state: "on" | "off") => {
+      dispatch({
+        type: "gesture/nudge",
+        state,
+      });
+    },
+    [dispatch]
+  );
+
+  const __gesture_nudge_debounced = __useGestureNudgeState(dispatch);
+
+  const nudge = useCallback(
+    (
+      target: "selection" | (string & {}) = "selection",
+      axis: "x" | "y",
+      delta: number = 1,
+      config: NudgeUXConfig = {
+        delay: 500,
+        gesture: true,
+      }
+    ) => {
+      const { gesture = true, delay = 500 } = config;
+
+      if (gesture) {
+        // Trigger gesture
+        __gesture_nudge("on");
+
+        // Debounce to turn off gesture
+        __gesture_nudge_debounced("off", delay);
+      }
+
+      dispatch({
+        type: "nudge",
+        delta,
+        axis,
+        target,
+      });
+    },
+    [dispatch]
+  );
+
+  const nudgeResize = useCallback(
+    (
+      target: "selection" | (string & {}) = "selection",
+      axis: "x" | "y",
+      delta: number = 1
+    ) => {
+      dispatch({
+        type: "nudge-resize",
+        delta,
+        axis,
+        target,
+      });
+    },
+    [dispatch]
+  );
+
+  return useMemo(
+    () => ({
+      nudge,
+      nudgeResize,
+    }),
+    [dispatch]
+  );
+}
+
 export function useNodeAction(node_id: string | undefined) {
-  const [_, dispatch] = __useInternal();
+  const dispatch = __useDispatch();
   const nodeActions = __useNodeActions(dispatch);
 
   return useMemo(() => {
     if (!node_id) return;
     return {
-      pushBack: () => nodeActions.orderPushBack(node_id),
-      bringFront: () => nodeActions.orderBringFront(node_id),
+      order: (order: "back" | "front" | number) =>
+        nodeActions.order(node_id, order),
       toggleLocked: () => nodeActions.toggleNodeLocked(node_id),
       toggleActive: () => nodeActions.toggleNodeActive(node_id),
+      toggleBold: () => nodeActions.toggleNodeBold(node_id),
       component: (component_id: string) =>
         nodeActions.changeNodeComponent(node_id, component_id),
       text: (text?: Tokens.StringValueExpression) =>
@@ -750,14 +945,21 @@ export function useNodeAction(node_id: string | undefined) {
       cornerRadius: (
         value: grida.program.nodes.i.IRectangleCorner["cornerRadius"]
       ) => nodeActions.changeNodeCornerRadius(node_id, value),
-      fill: (value: grida.program.cg.PaintWithoutID) =>
+      fill: (value: grida.program.cg.PaintWithoutID | null) =>
         nodeActions.changeNodeFill(node_id, value),
+      stroke: (value: grida.program.cg.PaintWithoutID | null) =>
+        nodeActions.changeNodeStroke(node_id, value),
+      strokeWidth: (change: TChange<number>) =>
+        nodeActions.changeNodeStrokeWidth(node_id, change),
+      strokeCap: (value: grida.program.cg.StrokeCap) =>
+        nodeActions.changeNodeStrokeCap(node_id, value),
       fit: (value: grida.program.cg.BoxFit) =>
         nodeActions.changeNodeFit(node_id, value),
       // stylable
-      opacity: (value: number) => nodeActions.changeNodeOpacity(node_id, value),
-      rotation: (value: number) =>
-        nodeActions.changeNodeRotation(node_id, value),
+      opacity: (change: TChange<number>) =>
+        nodeActions.changeNodeOpacity(node_id, change),
+      rotation: (change: TChange<number>) =>
+        nodeActions.changeNodeRotation(node_id, change),
       width: (value: grida.program.css.Length | "auto") =>
         nodeActions.changeNodeSize(node_id, "width", value),
       height: (value: grida.program.css.Length | "auto") =>
@@ -768,16 +970,18 @@ export function useNodeAction(node_id: string | undefined) {
         nodeActions.changeTextNodeFontFamily(node_id, value),
       fontWeight: (value: grida.program.cg.NFontWeight) =>
         nodeActions.changeTextNodeFontWeight(node_id, value),
-      fontSize: (value: number) =>
-        nodeActions.changeTextNodeFontSize(node_id, value),
+      fontSize: (change: TChange<number>) =>
+        nodeActions.changeTextNodeFontSize(node_id, change),
       textAlign: (value: grida.program.cg.TextAlign) =>
         nodeActions.changeTextNodeTextAlign(node_id, value),
       textAlignVertical: (value: grida.program.cg.TextAlignVertical) =>
         nodeActions.changeTextNodeTextAlignVertical(node_id, value),
-      lineHeight: (value: grida.program.nodes.TextNode["lineHeight"]) =>
-        nodeActions.changeTextNodeLineHeight(node_id, value),
-      letterSpacing: (value: grida.program.nodes.TextNode["letterSpacing"]) =>
-        nodeActions.changeTextNodeLetterSpacing(node_id, value),
+      lineHeight: (
+        change: TChange<grida.program.nodes.TextNode["lineHeight"]>
+      ) => nodeActions.changeTextNodeLineHeight(node_id, change),
+      letterSpacing: (
+        change: TChange<grida.program.nodes.TextNode["letterSpacing"]>
+      ) => nodeActions.changeTextNodeLetterSpacing(node_id, change),
       maxLength: (value: number | undefined) =>
         nodeActions.changeTextNodeMaxlength(node_id, value),
 
@@ -809,75 +1013,605 @@ export function useNodeAction(node_id: string | undefined) {
         nodeActions.changeNodeStyle(node_id, "aspectRatio", value),
       boxShadow: (value?: any) =>
         nodeActions.changeNodeStyle(node_id, "boxShadow", value.boxShadow),
-      cursor: (value?: string) =>
-        nodeActions.changeNodeStyle(node_id, "cursor", value),
+      cursor: (value: grida.program.cg.SystemMouseCursor) =>
+        nodeActions.changeNodeMouseCursor(node_id, value),
     };
   }, [node_id, nodeActions]);
+}
+
+export function useSelection() {
+  const [state, dispatch] = __useInternal();
+  const __actions = __useNodeActions(dispatch);
+  const selection = state.selection;
+
+  const nodes = useMemo(() => {
+    return selection.map((node_id) => {
+      return state.document.nodes[node_id];
+    });
+  }, [selection, state.document.nodes]);
+
+  const mixedProperties = mixed<
+    grida.program.nodes.AnyNode,
+    typeof grida.mixed
+  >(nodes as grida.program.nodes.AnyNode[], {
+    idKey: "id",
+    ignoredKeys: ["id", "type", "userdata"],
+    mixed: grida.mixed,
+  });
+
+  const name = useCallback(
+    (value: string) => {
+      selection.forEach((id) => {
+        __actions.changeNodeName(id, value);
+      });
+    },
+    [selection]
+  );
+
+  const active = useCallback(
+    (value: boolean) => {
+      selection.forEach((id) => {
+        __actions.changeNodeActive(id, value);
+      });
+    },
+    [selection]
+  );
+
+  const locked = useCallback(
+    (value: boolean) => {
+      selection.forEach((id) => {
+        __actions.changeNodeLocked(id, value);
+      });
+    },
+    [selection]
+  );
+
+  const rotation = useCallback(
+    (change: TChange<number>) => {
+      mixedProperties.rotation.ids.forEach((id) => {
+        __actions.changeNodeRotation(id, change);
+      });
+    },
+    [mixedProperties.rotation?.ids]
+  );
+
+  const opacity = useCallback(
+    (change: TChange<number>) => {
+      mixedProperties.opacity.ids.forEach((id) => {
+        __actions.changeNodeOpacity(id, change);
+      });
+    },
+    [mixedProperties.opacity?.ids]
+  );
+
+  const width = useCallback(
+    (value: grida.program.css.Length | "auto") => {
+      mixedProperties.width.ids.forEach((id) => {
+        __actions.changeNodeSize(id, "width", value);
+      });
+    },
+    [mixedProperties.width?.ids]
+  );
+
+  const height = useCallback(
+    (value: grida.program.css.Length | "auto") => {
+      mixedProperties.height.ids.forEach((id) => {
+        __actions.changeNodeSize(id, "height", value);
+      });
+    },
+    [mixedProperties.height?.ids]
+  );
+
+  const positioningMode = useCallback(
+    (position: grida.program.nodes.i.IPositioning["position"]) => {
+      mixedProperties.position.ids.forEach((id) => {
+        __actions.changeNodePositioningMode(id, position);
+      });
+    },
+    [mixedProperties.position?.ids]
+  );
+
+  const fontFamily = useCallback(
+    (value: string) => {
+      mixedProperties.fontFamily?.ids.forEach((id) => {
+        __actions.changeTextNodeFontFamily(id, value);
+      });
+    },
+    [mixedProperties.fontFamily?.ids]
+  );
+
+  const fontWeight = useCallback(
+    (value: grida.program.cg.NFontWeight) => {
+      mixedProperties.fontWeight?.ids.forEach((id) => {
+        __actions.changeTextNodeFontWeight(id, value);
+      });
+    },
+    [mixedProperties.fontWeight?.ids]
+  );
+
+  const fontSize = useCallback(
+    (change: TChange<number>) => {
+      mixedProperties.fontSize?.ids.forEach((id) => {
+        __actions.changeTextNodeFontSize(id, change);
+      });
+    },
+    [mixedProperties.fontSize?.ids]
+  );
+
+  const lineHeight = useCallback(
+    (change: TChange<grida.program.nodes.TextNode["lineHeight"]>) => {
+      mixedProperties.lineHeight?.ids.forEach((id) => {
+        __actions.changeTextNodeLineHeight(id, change);
+      });
+    },
+    [mixedProperties.lineHeight?.ids]
+  );
+
+  const letterSpacing = useCallback(
+    (change: TChange<grida.program.nodes.TextNode["letterSpacing"]>) => {
+      mixedProperties.letterSpacing?.ids.forEach((id) => {
+        __actions.changeTextNodeLetterSpacing(id, change);
+      });
+    },
+    [mixedProperties.letterSpacing?.ids]
+  );
+
+  const textAlign = useCallback(
+    (value: grida.program.cg.TextAlign) => {
+      mixedProperties.textAlign?.ids.forEach((id) => {
+        __actions.changeTextNodeTextAlign(id, value);
+      });
+    },
+    [mixedProperties.textAlign?.ids]
+  );
+
+  const textAlignVertical = useCallback(
+    (value: grida.program.cg.TextAlignVertical) => {
+      mixedProperties.textAlignVertical?.ids.forEach((id) => {
+        __actions.changeTextNodeTextAlignVertical(id, value);
+      });
+    },
+    [mixedProperties.textAlignVertical?.ids]
+  );
+
+  const fit = useCallback(
+    (value: grida.program.cg.BoxFit) => {
+      mixedProperties.fit?.ids.forEach((id) => {
+        __actions.changeNodeFit(id, value);
+      });
+    },
+    [mixedProperties.fit?.ids]
+  );
+
+  const fill = useCallback(
+    (value: grida.program.cg.PaintWithoutID | null) => {
+      mixedProperties.fill?.ids.forEach((id) => {
+        __actions.changeNodeFill(id, value);
+      });
+    },
+    [mixedProperties.fill?.ids]
+  );
+
+  const stroke = useCallback(
+    (value: grida.program.cg.PaintWithoutID | null) => {
+      mixedProperties.stroke?.ids.forEach((id) => {
+        __actions.changeNodeStroke(id, value);
+      });
+    },
+    [mixedProperties.stroke?.ids]
+  );
+
+  const strokeWidth = useCallback(
+    (change: TChange<number>) => {
+      mixedProperties.strokeWidth?.ids.forEach((id) => {
+        __actions.changeNodeStrokeWidth(id, change);
+      });
+    },
+    [mixedProperties.strokeWidth?.ids]
+  );
+
+  const strokeCap = useCallback(
+    (value: grida.program.cg.StrokeCap) => {
+      mixedProperties.strokeCap?.ids.forEach((id) => {
+        __actions.changeNodeStrokeCap(id, value);
+      });
+    },
+    [mixedProperties.strokeCap?.ids]
+  );
+
+  const layout = useCallback(
+    (value: grida.program.nodes.i.IFlexContainer["layout"]) => {
+      mixedProperties.layout?.ids.forEach((id) => {
+        __actions.changeContainerNodeLayout(id, value);
+      });
+    },
+    [mixedProperties.layout?.ids]
+  );
+
+  const direction = useCallback(
+    (value: grida.program.cg.Axis) => {
+      mixedProperties.direction?.ids.forEach((id) => {
+        __actions.changeFlexContainerNodeDirection(id, value);
+      });
+    },
+    [mixedProperties.direction?.ids]
+  );
+
+  const mainAxisAlignment = useCallback(
+    (value: grida.program.cg.MainAxisAlignment) => {
+      mixedProperties.mainAxisAlignment?.ids.forEach((id) => {
+        __actions.changeFlexContainerNodeMainAxisAlignment(id, value);
+      });
+    },
+    [mixedProperties.mainAxisAlignment?.ids]
+  );
+
+  const crossAxisAlignment = useCallback(
+    (value: grida.program.cg.CrossAxisAlignment) => {
+      mixedProperties.crossAxisAlignment?.ids.forEach((id) => {
+        __actions.changeFlexContainerNodeCrossAxisAlignment(id, value);
+      });
+    },
+    [mixedProperties.crossAxisAlignment?.ids]
+  );
+
+  const cornerRadius = useCallback(
+    (value: grida.program.nodes.i.IRectangleCorner["cornerRadius"]) => {
+      mixedProperties.cornerRadius?.ids.forEach((id) => {
+        __actions.changeNodeCornerRadius(id, value);
+      });
+    },
+    [mixedProperties.cornerRadius?.ids]
+  );
+
+  const cursor = useCallback(
+    (value: grida.program.cg.SystemMouseCursor) => {
+      mixedProperties.cursor?.ids.forEach((id) => {
+        __actions.changeNodeMouseCursor(id, value);
+      });
+    },
+    [mixedProperties.cursor?.ids]
+  );
+
+  const actions = useMemo(
+    () => ({
+      active,
+      locked,
+      name,
+      rotation,
+      opacity,
+      width,
+      height,
+      positioningMode,
+      fontWeight,
+      fontFamily,
+      fontSize,
+      lineHeight,
+      letterSpacing,
+      textAlign,
+      textAlignVertical,
+      fit,
+      fill,
+      stroke,
+      strokeWidth,
+      strokeCap,
+      layout,
+      direction,
+      mainAxisAlignment,
+      crossAxisAlignment,
+      cornerRadius,
+      cursor,
+    }),
+    [
+      active,
+      locked,
+      name,
+      rotation,
+      opacity,
+      width,
+      height,
+      positioningMode,
+      fontWeight,
+      fontFamily,
+      fontSize,
+      lineHeight,
+      letterSpacing,
+      textAlign,
+      textAlignVertical,
+      fit,
+      fill,
+      stroke,
+      strokeWidth,
+      strokeCap,
+      layout,
+      direction,
+      mainAxisAlignment,
+      crossAxisAlignment,
+      cornerRadius,
+      cursor,
+    ]
+  );
+
+  return useMemo(() => {
+    return {
+      selection,
+      nodes: nodes,
+      properties: mixedProperties,
+      actions,
+    };
+  }, [selection, mixedProperties, actions]);
+  //
 }
 
 export function useDocument() {
   const [state, dispatch] = __useInternal();
 
-  const { selected_node_id } = state;
+  const { selection } = state;
 
-  const nodeActions = __useNodeActions(dispatch);
+  const { order: _, ...nodeActions } = __useNodeActions(dispatch);
 
-  const clearSelection = useCallback(
-    () =>
+  const select = useCallback(
+    (...selectors: grida.program.document.Selector[]) =>
       dispatch({
-        type: "document/node/select",
-        node_id: undefined,
+        type: "select",
+        selectors: selectors,
       }),
     [dispatch]
   );
 
+  const blur = useCallback(
+    () =>
+      dispatch({
+        type: "blur",
+      }),
+    [dispatch]
+  );
+
+  const undo = useCallback(() => {
+    dispatch({
+      type: "undo",
+    });
+  }, [dispatch]);
+
+  const redo = useCallback(() => {
+    dispatch({
+      type: "redo",
+    });
+  }, [dispatch]);
+
+  const cut = useCallback(
+    (target: "selection" | (string & {}) = "selection") => {
+      dispatch({
+        type: "cut",
+        target: target,
+      });
+    },
+    [dispatch]
+  );
+
+  const copy = useCallback(
+    (target: "selection" | (string & {}) = "selection") => {
+      dispatch({
+        type: "copy",
+        target: target,
+      });
+    },
+    [dispatch]
+  );
+
+  const paste = useCallback(() => {
+    dispatch({
+      type: "paste",
+    });
+  }, [dispatch]);
+
+  const duplicate = useCallback(
+    (target: "selection" | (string & {}) = "selection") => {
+      dispatch({
+        type: "duplicate",
+        target,
+      });
+    },
+    [dispatch]
+  );
+
+  const deleteNode = useCallback(
+    (target: "selection" | (string & {}) = "selection") => {
+      dispatch({
+        type: "delete",
+        target: target,
+      });
+    },
+    [dispatch]
+  );
+
+  const { nudge, nudgeResize } = __useNudgeActions(dispatch);
+
+  const align = useCallback(
+    (
+      target: "selection" | (string & {}) = "selection",
+      alignment: {
+        horizontal?: "none" | "min" | "max" | "center";
+        vertical?: "none" | "min" | "max" | "center";
+      }
+    ) => {
+      dispatch({
+        type: "align",
+        target,
+        alignment,
+      });
+    },
+    [dispatch]
+  );
+
+  const order = useCallback(
+    (
+      target: "selection" | (string & {}) = "selection",
+      order: "back" | "front" | number
+    ) => {
+      dispatch({
+        type: "order",
+        target: target,
+        order,
+      });
+    },
+    [dispatch]
+  );
+
+  const distributeEvenly = useCallback(
+    (target: "selection" | string[] = "selection", axis: "x" | "y") => {
+      dispatch({
+        type: "distribute-evenly",
+        target,
+        axis,
+      });
+    },
+    [dispatch]
+  );
+
+  const configureSurfaceRaycastTargeting = useCallback(
+    (config: Partial<SurfaceRaycastTargeting>) => {
+      dispatch({
+        type: "config/surface/raycast-targeting",
+        config,
+      });
+    },
+    [dispatch]
+  );
+
+  const configureMeasurement = useCallback(
+    (measurement: "on" | "off") => {
+      dispatch({
+        type: "config/surface/measurement",
+        measurement,
+      });
+    },
+    [dispatch]
+  );
+
+  const configureTranslateWithCloneModifier = useCallback(
+    (translate_with_clone: "on" | "off") => {
+      dispatch({
+        type: "config/modifiers/translate-with-clone",
+        translate_with_clone,
+      });
+    },
+    [dispatch]
+  );
+
+  const configureTranslateWithAxisLockModifier = useCallback(
+    (tarnslate_with_axis_lock: "on" | "off") => {
+      dispatch({
+        type: "config/modifiers/translate-with-axis-lock",
+        tarnslate_with_axis_lock,
+      });
+    },
+    [dispatch]
+  );
+
+  const configureTransformWithCenterOriginModifier = useCallback(
+    (transform_with_center_origin: "on" | "off") => {
+      dispatch({
+        type: "config/modifiers/transform-with-center-origin",
+        transform_with_center_origin,
+      });
+    },
+    [dispatch]
+  );
+
+  const configureTransformWithPreserveAspectRatioModifier = useCallback(
+    (transform_with_preserve_aspect_ratio: "on" | "off") => {
+      dispatch({
+        type: "config/modifiers/transform-with-preserve-aspect-ratio",
+        transform_with_preserve_aspect_ratio,
+      });
+    },
+    [dispatch]
+  );
+
+  const configureRotateWithQuantizeModifier = useCallback(
+    (rotate_with_quantize: number | "off") => {
+      dispatch({
+        type: "config/modifiers/rotate-with-quantize",
+        rotate_with_quantize,
+      });
+    },
+    [dispatch]
+  );
+
+  const toggleActive = useCallback(
+    (target: "selection" | (string & {}) = "selection") => {
+      const target_ids = target === "selection" ? selection : [target];
+      target_ids.forEach((node_id) => {
+        dispatch({
+          type: "node/toggle/active",
+          node_id: node_id,
+        });
+      });
+    },
+    [dispatch, selection]
+  );
+
+  const toggleLocked = useCallback(
+    (target: "selection" | (string & {}) = "selection") => {
+      const target_ids = target === "selection" ? selection : [target];
+      target_ids.forEach((node_id) => {
+        dispatch({
+          type: "node/toggle/locked",
+          node_id: node_id,
+        });
+      });
+    },
+    [dispatch, selection]
+  );
+
+  const toggleBold = useCallback(
+    (target: "selection" | (string & {}) = "selection") => {
+      const target_ids = target === "selection" ? selection : [target];
+      target_ids.forEach((node_id) => {
+        dispatch({
+          type: "node/toggle/bold",
+          node_id: node_id,
+        });
+      });
+    },
+    [dispatch, selection]
+  );
+
+  const setOpacity = useCallback(
+    (target: "selection" | (string & {}) = "selection", opacity: number) => {
+      const target_ids = target === "selection" ? selection : [target];
+      target_ids.forEach((node_id) => {
+        dispatch({
+          type: "node/change/opacity",
+          node_id: node_id,
+          opacity: { type: "set", value: opacity },
+        });
+      });
+    },
+    [dispatch, selection]
+  );
+
   const getNodeById = useCallback(
     (node_id: string): grida.program.nodes.Node => {
-      return documentquery.__getNodeById(state, node_id);
+      return document.__getNodeById(state, node_id);
     },
     [state.document.nodes]
   );
 
   const getNodeDepth = useCallback(
     (node_id: string) => {
-      const parent_ids = [];
-      let current_id = node_id;
-
-      // Traverse up the tree to collect parent IDs
-      while (state.document_ctx.__ctx_nid_to_parent_id[current_id]) {
-        const parent_id = state.document_ctx.__ctx_nid_to_parent_id[current_id];
-        parent_ids.push(parent_id);
-        if (current_id === parent_id) {
-          reportError("parent_id is same as current_id");
-          break;
-        }
-        current_id = parent_id;
-      }
-
-      return parent_ids.length;
+      return document.getDepth(state.document_ctx, node_id);
     },
     [state.document_ctx]
   );
 
   const getNodeAbsoluteRotation = useCallback(
     (node_id: string) => {
-      const parent_ids = [];
-      let current_id = node_id;
+      const parent_ids = document.getAncestors(state.document_ctx, node_id);
 
-      // Traverse up the tree to collect parent IDs
-      while (state.document_ctx.__ctx_nid_to_parent_id[current_id]) {
-        const parent_id = state.document_ctx.__ctx_nid_to_parent_id[current_id];
-        parent_ids.push(parent_id);
-        if (current_id === parent_id) {
-          reportError("parent_id is same as current_id");
-          break;
-        }
-        current_id = parent_id;
-      }
-      parent_ids.reverse();
-
-      // Calculate the absolute rotation
       let rotation = 0;
+      // Calculate the absolute rotation
       try {
         for (const parent_id of parent_ids) {
           const parent_node = getNodeById(parent_id);
@@ -905,7 +1639,7 @@ export function useDocument() {
   const insertNode = useCallback(
     (prototype: grida.program.nodes.NodePrototype) => {
       dispatch({
-        type: "document/insert",
+        type: "insert",
         prototype,
       });
     },
@@ -952,15 +1686,39 @@ export function useDocument() {
     [dispatch]
   );
 
-  const selectedNodeActions = useNodeAction(selected_node_id);
-  const selectedNode = selected_node_id ? selectedNodeActions : undefined;
-
   return useMemo(() => {
     return {
       state,
-      selected_node_id,
-      selectedNode,
-      clearSelection,
+      selection,
+      //
+      select,
+      blur,
+      undo,
+      redo,
+      cut,
+      copy,
+      paste,
+      duplicate,
+      deleteNode,
+      nudge,
+      nudgeResize,
+      align,
+      order,
+      distributeEvenly,
+      configureSurfaceRaycastTargeting,
+      configureMeasurement,
+      configureTranslateWithCloneModifier,
+      configureTranslateWithAxisLockModifier,
+      configureTransformWithCenterOriginModifier,
+      configureTransformWithPreserveAspectRatioModifier,
+      configureRotateWithQuantizeModifier,
+      //
+      toggleActive,
+      toggleLocked,
+      toggleBold,
+      //
+      setOpacity,
+      //
       getNodeDepth,
       getNodeAbsoluteRotation,
       insertNode,
@@ -972,9 +1730,36 @@ export function useDocument() {
     };
   }, [
     state,
-    selected_node_id,
-    selectedNode,
-    clearSelection,
+    selection,
+    //
+    select,
+    blur,
+    undo,
+    redo,
+    cut,
+    copy,
+    paste,
+    duplicate,
+    deleteNode,
+    nudge,
+    nudgeResize,
+    align,
+    order,
+    distributeEvenly,
+    configureSurfaceRaycastTargeting,
+    configureMeasurement,
+    configureTranslateWithCloneModifier,
+    configureTranslateWithAxisLockModifier,
+    configureTransformWithCenterOriginModifier,
+    configureTransformWithPreserveAspectRatioModifier,
+    configureRotateWithQuantizeModifier,
+    //
+    toggleActive,
+    toggleLocked,
+    toggleBold,
+    //
+    setOpacity,
+    //
     getNodeDepth,
     getNodeAbsoluteRotation,
     insertNode,
@@ -1000,6 +1785,14 @@ function throttle<T extends (...args: any[]) => void>(
   } as T;
 }
 
+function debounce(func: (...args: any[]) => void, wait: number) {
+  let timeout: NodeJS.Timeout;
+  return (...args: any[]) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  };
+}
+
 export function useEventTargetCSSCursor() {
   const [state] = __useInternal();
 
@@ -1018,10 +1811,13 @@ export function useEventTargetCSSCursor() {
           case "ellipse":
           case "container":
           case "image":
-          case "line":
             return "crosshair";
         }
       }
+      case "draw":
+        return "crosshair";
+      case "path":
+        return "crosshair";
     }
   }, [cursor_mode]);
 }
@@ -1030,47 +1826,29 @@ export function useEventTarget() {
   const [state, dispatch] = __useInternal();
 
   const {
-    is_gesture_node_drag_move: is_node_transforming,
+    content_offset,
+    viewport_offset,
+    gesture,
     hovered_node_id,
-    selected_node_id,
-    surface_content_edit_mode: content_edit_mode,
+    dropzone_node_id,
+    selection,
+    content_edit_mode,
     cursor_mode,
+    cursor_position,
+    surface_cursor_position,
     marquee,
+    debug,
   } = state;
+
+  const is_node_transforming = gesture.type !== "idle";
+  const is_node_translating = gesture.type === "translate";
+  const is_node_scaling = gesture.type === "scale";
 
   const setCursorMode = useCallback(
     (cursor_mode: CursorMode) => {
       dispatch({
-        type: "document/canvas/cursor-mode",
+        type: "surface/cursor-mode",
         cursor_mode,
-      });
-    },
-    [dispatch]
-  );
-
-  const keyDown = useCallback(
-    (event: KeyboardEvent) => {
-      dispatch({
-        type: "document/canvas/backend/html/event/on-key-down",
-        key: event.key,
-        altKey: event.altKey,
-        metaKey: event.metaKey,
-        ctrlKey: event.ctrlKey,
-        shiftKey: event.shiftKey,
-      });
-    },
-    [dispatch]
-  );
-
-  const keyUp = useCallback(
-    (event: KeyboardEvent) => {
-      dispatch({
-        type: "document/canvas/backend/html/event/on-key-up",
-        key: event.key,
-        altKey: event.altKey,
-        metaKey: event.metaKey,
-        ctrlKey: event.ctrlKey,
-        shiftKey: event.shiftKey,
       });
     },
     [dispatch]
@@ -1085,9 +1863,10 @@ export function useEventTarget() {
       );
 
       dispatch({
-        type: "document/canvas/backend/html/event/on-pointer-move-raycast",
+        type: "event-target/event/on-pointer-move-raycast",
         node_ids_from_point: els.map((n) => n.id),
         position,
+        shiftKey: event.shiftKey,
       });
     }, 30),
     [dispatch]
@@ -1112,7 +1891,7 @@ export function useEventTarget() {
       const position = __canvas_space_position(event);
 
       dispatch({
-        type: "document/canvas/backend/html/event/on-pointer-move",
+        type: "event-target/event/on-pointer-move",
         position: position,
       });
 
@@ -1129,8 +1908,9 @@ export function useEventTarget() {
       );
 
       dispatch({
-        type: "document/canvas/backend/html/event/on-pointer-down",
+        type: "event-target/event/on-pointer-down",
         node_ids_from_point: els.map((n) => n.id),
+        shiftKey: event.shiftKey,
       });
     },
     [dispatch]
@@ -1139,7 +1919,7 @@ export function useEventTarget() {
   const pointerUp = useCallback(
     (event: PointerEvent) => {
       dispatch({
-        type: "document/canvas/backend/html/event/on-pointer-up",
+        type: "event-target/event/on-pointer-up",
       });
     },
     [dispatch]
@@ -1147,10 +1927,24 @@ export function useEventTarget() {
 
   const click = useCallback(
     (event: MouseEvent) => {
-      const position = __canvas_space_position(event);
+      const els = domapi.get_grida_node_elements_from_point(
+        event.clientX,
+        event.clientY
+      );
+
       dispatch({
-        type: "document/canvas/backend/html/event/on-click",
-        position,
+        type: "event-target/event/on-click",
+        node_ids_from_point: els.map((n) => n.id),
+        shiftKey: event.shiftKey,
+      });
+    },
+    [dispatch]
+  );
+
+  const doubleClick = useCallback(
+    (event: MouseEvent) => {
+      dispatch({
+        type: "event-target/event/on-double-click",
       });
     },
     [dispatch]
@@ -1163,232 +1957,386 @@ export function useEventTarget() {
    */
   const tryEnterContentEditMode = useCallback(() => {
     dispatch({
-      type: "document/canvas/content-edit-mode/try-enter",
+      type: "surface/content-edit-mode/try-enter",
     });
   }, [dispatch]);
 
   const tryExitContentEditMode = useCallback(() => {
     dispatch({
-      type: "document/canvas/content-edit-mode/try-exit",
+      type: "surface/content-edit-mode/try-exit",
     });
   }, [dispatch]);
 
-  const dragStart = useCallback(() => {
-    dispatch({
-      type: "document/canvas/backend/html/event/on-drag-start",
-    });
-  }, [dispatch]);
+  const tryToggleContentEditMode = useCallback(() => {
+    if (content_edit_mode) {
+      tryExitContentEditMode();
+    } else {
+      tryEnterContentEditMode();
+    }
+  }, [dispatch, content_edit_mode]);
 
-  const dragEnd = useCallback(() => {
-    dispatch({
-      type: "document/canvas/backend/html/event/on-drag-end",
-    });
-  }, [dispatch]);
+  const dragStart = useCallback(
+    (event: PointerEvent) => {
+      dispatch({
+        type: "event-target/event/on-drag-start",
+        shiftKey: event.shiftKey,
+      });
+    },
+    [dispatch]
+  );
+
+  const dragEnd = useCallback(
+    (event: PointerEvent) => {
+      if (marquee) {
+        const contained: string[] = [];
+
+        const els = domapi.get_grida_node_elements();
+        const viewportdomrect = domapi.get_viewport_rect();
+        const viewport_pos = [viewportdomrect.x, viewportdomrect.y];
+        const translate: [number, number] = [
+          state.content_offset ? state.content_offset[0] : 0,
+          state.content_offset ? state.content_offset[1] : 0,
+        ];
+
+        const marqueerect = cmath.rect.fromPoints([
+          [marquee.x1, marquee.y1],
+          [marquee.x2, marquee.y2],
+        ]);
+        marqueerect.x = marqueerect.x - translate[0];
+        marqueerect.y = marqueerect.y - translate[1];
+
+        els?.forEach((el) => {
+          const eldomrect = el.getBoundingClientRect();
+          const elrect = {
+            x: eldomrect.x - translate[0] - viewport_pos[0],
+            y: eldomrect.y - translate[1] - viewport_pos[1],
+            width: eldomrect.width,
+            height: eldomrect.height,
+          };
+          if (cmath.rect.intersects(elrect, marqueerect)) {
+            contained.push(el.id);
+          }
+        });
+
+        dispatch({
+          type: "event-target/event/on-drag-end",
+          node_ids_from_area: contained,
+          shiftKey: event.shiftKey,
+        });
+
+        return;
+      }
+      dispatch({
+        type: "event-target/event/on-drag-end",
+        shiftKey: event.shiftKey,
+      });
+    },
+    [dispatch, marquee, state.content_offset]
+  );
 
   const drag = useCallback(
-    (event: { delta: Vector2; distance: Vector2 }) => {
+    (event: TCanvasEventTargetDragGestureState) => {
       requestAnimationFrame(() => {
         dispatch({
-          type: "document/canvas/backend/html/event/on-drag",
+          type: "event-target/event/on-drag",
           event,
         });
+      });
+    },
+    [dispatch]
+  );
+
+  //
+  const multipleSelectionOverlayClick = useCallback(
+    (selection: string[], event: MouseEvent) => {
+      const els = domapi.get_grida_node_elements_from_point(
+        event.clientX,
+        event.clientY
+      );
+
+      dispatch({
+        type: "event-target/event/multiple-selection-overlay/on-click",
+        selection: selection,
+        node_ids_from_point: els.map((n) => n.id),
+        shiftKey: event.shiftKey,
+      });
+    },
+    [dispatch]
+  );
+
+  //
+
+  const startScaleGesture = useCallback(
+    (selection: string | string[], direction: cmath.CardinalDirection) => {
+      dispatch({
+        type: "surface/gesture/start",
+        gesture: {
+          type: "scale",
+          selection: Array.isArray(selection) ? selection : [selection],
+          direction,
+        },
       });
     },
     [dispatch]
   );
 
   // #region drag resize handle
-  const dragResizeHandleStart = useCallback(
-    (node_id: string, client_wh: { width: number; height: number }) => {
+  const startCornerRadiusGesture = useCallback(
+    (selection: string) => {
       dispatch({
-        type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-start",
-        node_id,
-        client_wh,
-      });
-    },
-    [dispatch]
-  );
-  const dragResizeHandleEnd = useCallback(
-    (node_id: string) => {
-      dispatch({
-        type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-end",
-        node_id,
-      });
-    },
-    [dispatch]
-  );
-  const dragResizeHandle = useCallback(
-    (
-      node_id: string,
-      anchor: "nw" | "ne" | "sw" | "se",
-      event: { delta: Vector2; distance: Vector2 }
-    ) => {
-      requestAnimationFrame(() => {
-        dispatch({
-          type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag",
-          node_id,
-          anchor,
-          event,
-        });
+        type: "surface/gesture/start",
+        gesture: {
+          type: "corner-radius",
+          node_id: selection,
+        },
       });
     },
     [dispatch]
   );
   // #endregion drag resize handle
 
-  // #region drag resize handle
-  const dragCornerRadiusHandleStart = useCallback(
-    (node_id: string) => {
+  const startRotateGesture = useCallback(
+    (selection: string) => {
       dispatch({
-        type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-start",
-        node_id,
+        type: "surface/gesture/start",
+        gesture: {
+          type: "rotate",
+          selection,
+        },
       });
     },
     [dispatch]
   );
-  const dragCornerRadiusHandleEnd = useCallback(
-    (node_id: string) => {
-      dispatch({
-        type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-end",
-        node_id,
-      });
-    },
-    [dispatch]
-  );
-  const dragCornerRadiusHandle = useCallback(
-    (
-      node_id: string,
-      anchor: "nw" | "ne" | "sw" | "se",
-      event: { delta: Vector2; distance: Vector2 }
-    ) => {
-      requestAnimationFrame(() => {
-        dispatch({
-          type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag",
-          node_id,
-          anchor,
-          event,
-        });
-      });
-    },
-    [dispatch]
-  );
-  // #endregion drag resize handle
-
-  // #region drag rotate handle
-  const dragRotationHandleStart = useCallback(
-    (node_id: string) => {
-      dispatch({
-        type: "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag-start",
-        node_id,
-      });
-    },
-    [dispatch]
-  );
-  const dragRotationHandleEnd = useCallback(
-    (node_id: string) => {
-      dispatch({
-        type: "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag-end",
-        node_id,
-      });
-    },
-    [dispatch]
-  );
-  const dragRotationHandle = useCallback(
-    (
-      node_id: string,
-      anchor: "nw" | "ne" | "sw" | "se",
-      event: { delta: Vector2; distance: Vector2 }
-    ) => {
-      requestAnimationFrame(() => {
-        dispatch({
-          type: "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag",
-          node_id,
-          anchor,
-          event,
-        });
-      });
-    },
-    [dispatch]
-  );
-  // #endregion drag rotate handle
 
   return useMemo(() => {
     return {
+      debug,
+      content_offset,
+      viewport_offset,
+      //
       marquee,
       cursor_mode,
+      cursor_position,
+      surface_cursor_position,
       setCursorMode,
       //
       hovered_node_id,
-      selected_node_id,
+      dropzone_node_id,
+      selection,
       is_node_transforming,
+      is_node_translating,
+      is_node_scaling,
       content_edit_mode,
       //
-      keyDown,
-      keyUp,
-      //
-      dragResizeHandleStart,
-      dragResizeHandleEnd,
-      dragResizeHandle,
-      //
-      dragCornerRadiusHandleStart,
-      dragCornerRadiusHandleEnd,
-      dragCornerRadiusHandle,
-      //
-      dragRotationHandleStart,
-      dragRotationHandleEnd,
-      dragRotationHandle,
+      startScaleGesture,
+      startCornerRadiusGesture,
+      startRotateGesture,
       //
       pointerMove,
       pointerDown,
       pointerUp,
       click,
+      doubleClick,
       //
       tryEnterContentEditMode,
       tryExitContentEditMode,
+      tryToggleContentEditMode,
       //
       dragStart,
       dragEnd,
       drag,
       //
+      multipleSelectionOverlayClick,
+      //
     };
   }, [
+    debug,
+    content_offset,
+    viewport_offset,
+    //
     marquee,
     cursor_mode,
+    cursor_position,
+    surface_cursor_position,
     setCursorMode,
     //
     hovered_node_id,
-    selected_node_id,
+    dropzone_node_id,
+    selection,
+    //
     is_node_transforming,
+    is_node_translating,
+    is_node_scaling,
+    //
     content_edit_mode,
     //
-    keyDown,
-    keyUp,
-    //
-    dragResizeHandleStart,
-    dragResizeHandleEnd,
-    dragResizeHandle,
-    //
-    dragCornerRadiusHandleStart,
-    dragCornerRadiusHandleEnd,
-    dragCornerRadiusHandle,
-    //
-    dragRotationHandleStart,
-    dragRotationHandleEnd,
-    dragRotationHandle,
+    startScaleGesture,
+    startCornerRadiusGesture,
+    startRotateGesture,
     //
     pointerMove,
     pointerDown,
     pointerUp,
     click,
+    doubleClick,
     //
     tryEnterContentEditMode,
     tryExitContentEditMode,
+    tryToggleContentEditMode,
     //
     dragStart,
     dragEnd,
     drag,
     //
+    multipleSelectionOverlayClick,
+    //
   ]);
+}
+
+export function useSurfacePathEditor() {
+  const [state, dispatch] = __useInternal();
+  assert(state.content_edit_mode && state.content_edit_mode.type === "path");
+
+  const { hovered_vertex_idx: hovered_point, cursor_mode } = state;
+  const { node_id, selected_vertices, a_point, path_cursor_position, next_ta } =
+    state.content_edit_mode;
+  const node = state.document.nodes[node_id] as grida.program.nodes.PathNode;
+
+  const vertices = node.vectorNetwork.vertices;
+  const segments = node.vectorNetwork.segments;
+
+  // offset of the points (node position)
+  const offset: cmath.Vector2 = [node.left!, node.top!];
+
+  const selectVertex = useCallback(
+    (vertex: number) => {
+      if (cursor_mode.type === "path") {
+        return;
+      }
+      dispatch({
+        type: "select-vertex",
+        target: {
+          node_id,
+          vertex,
+        },
+      });
+    },
+    [dispatch, node_id]
+  );
+
+  const onVertexHover = useCallback(
+    (vertex: number, eventType: "enter" | "leave") => {
+      dispatch({
+        type: "hover-vertex",
+        event: eventType,
+        target: {
+          node_id,
+          vertex,
+        },
+      });
+    },
+    [dispatch, node_id]
+  );
+
+  const onVertexDragStart = useCallback(
+    (vertex: number) => {
+      dispatch({
+        type: "surface/gesture/start",
+        gesture: {
+          type: "translate-vertex",
+          vertex,
+          node_id,
+        },
+      });
+    },
+    [dispatch, node_id]
+  );
+
+  const onVertexDelete = useCallback(
+    (vertex: number) => {
+      dispatch({
+        type: "delete-vertex",
+        target: {
+          node_id,
+          vertex: vertex,
+        },
+      });
+    },
+    [node_id, dispatch]
+  );
+
+  const onCurveControlPointDragStart = useCallback(
+    (segment: number, control: "ta" | "tb") => {
+      dispatch({
+        type: "surface/gesture/start",
+        gesture: {
+          type: "curve",
+          node_id,
+          control,
+          segment,
+        },
+      });
+    },
+    [dispatch, node_id]
+  );
+
+  return useMemo(
+    () => ({
+      node_id,
+      path_cursor_position,
+      vertices,
+      segments,
+      offset,
+      selected_vertices,
+      hovered_point,
+      a_point,
+      next_ta,
+      selectVertex,
+      onVertexHover,
+      onVertexDragStart,
+      onVertexDelete,
+      onCurveControlPointDragStart,
+    }),
+    [
+      //
+      node_id,
+      path_cursor_position,
+      vertices,
+      segments,
+      offset,
+      selected_vertices,
+      hovered_point,
+      a_point,
+      next_ta,
+      selectVertex,
+      onVertexHover,
+      onVertexDragStart,
+      onVertexDelete,
+      onCurveControlPointDragStart,
+    ]
+  );
+}
+
+/**
+ * @deprecated - WIP
+ * @returns
+ */
+export function useSurfaceGradientEditor() {
+  const [state, dispatch] = __useInternal();
+  assert(
+    state.content_edit_mode && state.content_edit_mode.type === "gradient"
+  );
+
+  const node = state.document.nodes[
+    state.content_edit_mode.node_id
+  ] as grida.program.nodes.i.IFill;
+  const fill = node.fill;
+  assert(fill?.type === "linear_gradient");
+
+  const { transform, stops } = fill;
+
+  //
+  return useMemo(() => ({ transform, stops }), [transform, stops]);
 }
 
 /**
@@ -1426,17 +2374,33 @@ export function useRootTemplateInstanceNode() {
   );
 }
 
+class EditorConsumerError extends Error {
+  context: any;
+  constructor(message: string, context: any) {
+    super(message); // Pass message to the parent Error class
+    this.name = this.constructor.name; // Set the error name
+    this.context = context; // Attach the context object
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, this.constructor);
+    }
+  }
+
+  toString(): string {
+    return `${this.name}: ${this.message} - Context: ${JSON.stringify(this.context)}`;
+  }
+}
+
 export function useNode(node_id: string): grida.program.nodes.AnyNode & {
   meta: {
     is_component_consumer: boolean;
   };
 } {
+  const { state } = useDocument();
+
   const {
-    state: {
-      document: { nodes, root_id },
-      templates,
-    },
-  } = useDocument();
+    document: { nodes, root_id },
+    templates,
+  } = state;
 
   const root = nodes[root_id];
 
@@ -1449,7 +2413,10 @@ export function useNode(node_id: string): grida.program.nodes.AnyNode & {
   } else {
     assert(
       templates,
-      'node is not found under "nodes", but templates are not provided for additional lookup'
+      new EditorConsumerError(
+        `node '${node_id}' is not found under "nodes", but templates are not provided for additional lookup`,
+        { state }
+      )
     );
     // TODO: can do better with the query - performance
     // find the template definition that contains this node id
@@ -1507,9 +2474,10 @@ export function useNode(node_id: string): grida.program.nodes.AnyNode & {
 
 export function useComputedNode(node_id: string) {
   const node = useNode(node_id);
-  const { active, style, component_id, props, text, src, href } = node;
+  const { active, style, component_id, props, text, html, src, href } = node;
   const computed = useComputed({
     text: text,
+    html: html,
     src: src,
     href: href,
     props: props,
@@ -1526,20 +2494,96 @@ export function useTemplateDefinition(template_id: string) {
   return templates![template_id];
 }
 
-export function useNodeDomElement(node_id: string) {
-  const [nodeElement, setNodeElement] = React.useState<HTMLElement | null>(
-    null
+const __not_implemented = (...args: any): any => {
+  throw new Error("not implemented");
+};
+export function useEditorApi() {
+  const document = useDocument();
+  const dispatcher = __useDispatch();
+
+  const getNodeById: grida.program.api.IStandaloneEditorApi["getNodeById"] =
+    useCallback(
+      (id: grida.program.api.NodeID) => {
+        const nodedata = document.state.document.nodes[id];
+        return grida.program.api.internal.__createApiProxyNode_experimental(
+          nodedata,
+          {
+            dispatcher,
+          }
+        );
+      },
+      [document.state.document.nodes]
+    );
+
+  const createRectangle = useCallback(
+    (props: Omit<grida.program.nodes.NodePrototype, "type"> = {}) => {
+      dispatcher({
+        type: "insert",
+        prototype: {
+          type: "rectangle",
+          ...props,
+        } as grida.program.nodes.NodePrototype,
+      });
+    },
+    [dispatcher]
   );
 
-  useLayoutEffect(() => {
-    if (!node_id) {
-      setNodeElement(null);
-      return;
-    }
+  const createEllipse = useCallback(
+    (props: Omit<grida.program.nodes.NodePrototype, "type">) => {
+      dispatcher({
+        type: "insert",
+        prototype: {
+          type: "ellipse",
+          ...props,
+        } as grida.program.nodes.NodePrototype,
+      });
+    },
+    [dispatcher]
+  );
 
-    const element = document.getElementById(node_id);
-    setNodeElement(element);
-  }, [node_id]);
+  const editor: grida.program.api.IStandaloneEditorApi = useMemo(() => {
+    return {
+      selection: document.selection,
+      getNodeById,
+      createRectangle,
+      createEllipse,
+      createText: __not_implemented,
+      getNodeDepth: document.getNodeDepth,
+      getNodeAbsoluteRotation: document.getNodeAbsoluteRotation,
+      select: document.select,
+      blur: document.blur,
+      undo: document.undo,
+      redo: document.redo,
+      cut: document.cut,
+      copy: document.copy,
+      paste: document.paste,
+      duplicate: document.duplicate,
+      delete: document.deleteNode,
+      rename: document.changeNodeName,
+      nudge: document.nudge,
+      nudgeResize: document.nudgeResize,
+      align: document.align,
+      order: document.order,
+      distributeEvenly: document.distributeEvenly,
+      configureSurfaceRaycastTargeting:
+        document.configureSurfaceRaycastTargeting,
+      configureMeasurement: document.configureMeasurement,
+      configureTranslateWithCloneModifier:
+        document.configureTranslateWithCloneModifier,
+      configureTranslateWithAxisLockModifier:
+        document.configureTranslateWithAxisLockModifier,
+      configureTransformWithCenterOriginModifier:
+        document.configureTransformWithCenterOriginModifier,
+      configureTransformWithPreserveAspectRatioModifier:
+        document.configureTransformWithPreserveAspectRatioModifier,
+      configureRotateWithQuantizeModifier:
+        document.configureRotateWithQuantizeModifier,
+      toggleActive: document.toggleActive,
+      toggleLocked: document.toggleLocked,
+      toggleBold: document.toggleBold,
+      setOpacity: document.setOpacity,
+    };
+  }, [document, getNodeById, createRectangle, createEllipse]);
 
-  return nodeElement;
+  return editor;
 }

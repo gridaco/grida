@@ -6,16 +6,39 @@ import type {
   Paint,
   TypeStyle,
   Path,
+  LineNode,
   BooleanOperationNode,
   InstanceNode,
   GroupNode,
   FrameNode,
   BlendMode,
 } from "@figma/rest-api-spec";
+import { cmath } from "@/grida-canvas/cmath";
 
 export namespace iofigma {
   export namespace restful {
     export namespace map {
+      export const strokeCapMap: Record<
+        NonNullable<LineNode["strokeCap"]>,
+        grida.program.cg.StrokeCap | undefined
+      > = {
+        NONE: "butt",
+        ROUND: "round",
+        SQUARE: "square",
+        //
+        LINE_ARROW: undefined,
+        TRIANGLE_ARROW: undefined,
+        DIAMOND_FILLED: undefined,
+        CIRCLE_FILLED: undefined,
+        TRIANGLE_FILLED: undefined,
+        WASHI_TAPE_1: undefined,
+        WASHI_TAPE_2: undefined,
+        WASHI_TAPE_3: undefined,
+        WASHI_TAPE_4: undefined,
+        WASHI_TAPE_5: undefined,
+        WASHI_TAPE_6: undefined,
+      };
+
       export const textAlignMap: Record<
         NonNullable<TypeStyle["textAlignHorizontal"]>,
         grida.program.cg.TextAlign | undefined
@@ -98,6 +121,8 @@ export namespace iofigma {
             return {
               type: _t[paint.type],
               id: v4(),
+              // TODO: transform: paint.gradientHandlePositions
+              transform: cmath.transform.identity,
               stops: paint.gradientStops.map((stop) => {
                 return {
                   offset: stop.position,
@@ -117,6 +142,7 @@ export namespace iofigma {
             return {
               type: "linear_gradient",
               id: v4(),
+              transform: cmath.transform.identity,
               stops: [
                 { offset: 0, color: { r: 217, g: 217, b: 217, a: 1 } },
                 { offset: 1, color: { r: 115, g: 115, b: 115, a: 1 } },
@@ -166,13 +192,14 @@ export namespace iofigma {
 
           // If the node has children, process them recursively
           if ("children" in currentNode && currentNode.children?.length) {
-            (processedNode as grida.program.nodes.i.IChildren).children =
-              currentNode.children
-                .map((c) => {
-                  return processNode(c, currentNode as FigmaParentNode);
-                }) // Process each child
-                .filter((child) => child !== undefined) // Remove undefined nodes
-                .map((child) => child!.id); // Map to IDs
+            (
+              processedNode as grida.program.nodes.i.IChildrenReference
+            ).children = currentNode.children
+              .map((c) => {
+                return processNode(c, currentNode as FigmaParentNode);
+              }) // Process each child
+              .filter((child) => child !== undefined) // Remove undefined nodes
+              .map((child) => child!.id); // Map to IDs
           }
 
           return processedNode;
@@ -193,6 +220,16 @@ export namespace iofigma {
         };
       }
 
+      /**
+       * Creates a Node data from figma input, while ignoring the figma's children.
+       *
+       * It still follows the node structure and returns with empty array `{ children: [] }` if the node requires children property.
+       *
+       * @param node
+       * @param images
+       * @param parent
+       * @returns
+       */
       export function node_without_children(
         node: SubcanvasNode,
         images: { [key: string]: string },
@@ -296,6 +333,7 @@ export namespace iofigma {
               crossAxisAlignment: "start",
               mainAxisGap: itemSpacing ?? 0,
               crossAxisGap: counterAxisSpacing ?? itemSpacing ?? 0,
+              children: [],
             } satisfies grida.program.nodes.ContainerNode;
           }
           case "GROUP": {
@@ -331,6 +369,7 @@ export namespace iofigma {
               crossAxisAlignment: "start",
               mainAxisGap: 0,
               crossAxisGap: 0,
+              children: [],
             } satisfies grida.program.nodes.ContainerNode;
             // throw new Error(`Unsupported node type: ${node.type}`);
           }
@@ -439,7 +478,8 @@ export namespace iofigma {
             };
           }
           case "RECTANGLE": {
-            const { fills, strokes, strokeDashes, strokeWeight } = node;
+            const { fills, strokes, strokeDashes, strokeWeight, strokeCap } =
+              node;
 
             const first_visible_fill = first_visible(fills);
             const first_visible_stroke = strokes
@@ -511,11 +551,13 @@ export namespace iofigma {
               height: node.size!.y,
               fill: first_visible_fill ? paint(first_visible_fill) : undefined,
               effects: [], // TODO:
+              strokeWidth: strokeWeight ?? 0,
+              strokeCap: strokeCap ? strokeCapMap[strokeCap] ?? "butt" : "butt",
               cornerRadius: cornerRadius,
             } satisfies grida.program.nodes.RectangleNode;
           }
           case "ELLIPSE": {
-            const { fills } = node;
+            const { fills, strokeWeight, strokeCap } = node;
 
             const first_visible_fill = first_visible(fills);
 
@@ -535,12 +577,17 @@ export namespace iofigma {
               width: node.size!.x,
               height: node.size!.y,
               fill: first_visible_fill ? paint(first_visible_fill) : undefined,
+              strokeWidth: strokeWeight ?? 0,
+              strokeCap: strokeCap ? strokeCapMap[strokeCap] ?? "butt" : "butt",
               effects: [], // TODO:
             } satisfies grida.program.nodes.EllipseNode;
           }
           case "BOOLEAN_OPERATION": {
           }
           case "LINE": {
+            const { fills, strokeWeight, strokeCap } = node;
+            const first_visible_stroke = first_visible(node.strokes ?? []);
+
             return {
               id: node.id,
               name: node.name,
@@ -551,6 +598,11 @@ export namespace iofigma {
               zIndex: 0,
               type: "line",
               position: "absolute",
+              stroke: first_visible_stroke
+                ? paint(first_visible_stroke)
+                : undefined,
+              strokeWidth: strokeWeight ?? 0,
+              strokeCap: strokeCap ? strokeCapMap[strokeCap] ?? "butt" : "butt",
               left: node.relativeTransform![0][2],
               top: node.relativeTransform![1][2],
               width: node.size!.x,

@@ -1,37 +1,298 @@
 import type { Tokens } from "@/ast";
-import { grida } from "@/grida";
-import { CursorMode, IDocumentEditorState } from "./types";
+import type { grida } from "@/grida";
+import type {
+  CursorMode,
+  GestureCornerRadius,
+  GestureCurve,
+  GestureRotate,
+  GestureScale,
+  GestureTranslateVertex,
+  IDocumentEditorState,
+  SurfaceRaycastTargeting,
+} from "./state";
 
-export type BuilderAction =
+export type Action =
+  | InternalAction
+  | EditorAction
+  | EditorUndoAction
+  | EditorRedoAction;
+
+export type InternalAction =
   | __InternalSyncArtboardOffset
-  | __InternalResetAction
+  | __InternalResetAction;
+
+export type EditorAction =
+  | EditorConfigAction
+  | EditorNudgeGestureStateAction
+  | EventTargetAction
+  | DocumentAction;
+
+export type DocumentAction =
+  | EditorSelectAction
+  | EditorHoverAction
+  | EditorBlurAction
+  | EditorCopyCutPasteAction
+  | EditorDeleteAction
+  | EditorOrderAction
+  | EditorPathAction
+  | EditorNudgeAction
+  | EditorNudgeResizeAction
+  | EditorAlignAction
+  | EditorDistributeEvenlyAction
   | DocumentEditorInsertNodeAction
   //
   | SurfaceAction
   //
-  | DocumentEditorNodeSelectAction
-  | DocumentEditorNodePointerEnterAction
-  | DocumentEditorNodePointerLeaveAction
   | NodeChangeAction
-  | NodeOrderAction
-  | NodeToggleAction
+  | NodeToggleBasePropertyAction
+  | NodeToggleBoldAction
   | TemplateNodeOverrideChangeAction
   | TemplateEditorSetTemplatePropsAction
   //
   | SchemaAction;
 
+type NodeID = string & {};
 type Vector2 = [number, number];
 
+interface INodeID {
+  node_id: NodeID;
+}
+
+interface IVertexIdx {
+  /**
+   * index of the vertex
+   */
+  vertex: number;
+}
+
+interface VertexQuery extends IVertexIdx {
+  /**
+   * node id (must be a path node)
+   */
+  node_id: NodeID;
+}
+
+export type TCanvasEventTargetDragGestureState = {
+  /**
+   * Difference between the current movement and the previous movement.
+   */
+  delta: Vector2;
+  /**
+   * Cumulative distance of the gesture. Deltas are summed with their absolute
+   * values.
+   */
+  distance: Vector2;
+  /**
+   * Displacement of the current gesture.
+   */
+  movement: Vector2;
+  /**
+   * Raw values when the gesture started.
+   */
+  initial: Vector2;
+  /**
+   * Pointer coordinates (alias to values)
+   */
+  xy: Vector2;
+};
+
+interface ISelection {
+  selection: NodeID[];
+}
+
 export type __InternalSyncArtboardOffset = {
-  type: "__internal/sync-artboard-offset";
+  type: "__internal/on-resize";
 } & {
-  offset: Vector2;
+  content_offset: Vector2;
+  viewport_offset: Vector2;
 };
 
 export interface __InternalResetAction {
   type: "__internal/reset";
   key?: string;
   state: IDocumentEditorState;
+}
+
+export interface EditorSelectAction {
+  type: "select";
+  selectors: grida.program.document.Selector[];
+}
+
+export interface EditorHoverAction {
+  type: "hover";
+  event: "enter" | "leave";
+  target: NodeID;
+}
+
+export interface EditorBlurAction {
+  type: "blur";
+}
+
+export type EditorUndoAction = {
+  type: "undo";
+};
+
+export type EditorRedoAction = {
+  type: "redo";
+};
+
+// #region copy cut paste
+export type EditorCopyCutPasteAction =
+  | EditorCopyAction
+  | EditorCutAction
+  | EditorPasteAction
+  | EditorDuplicateAction;
+
+export interface EditorCopyAction {
+  type: "copy";
+  target: NodeID | "selection";
+}
+
+export interface EditorCutAction {
+  type: "cut";
+  target: NodeID | "selection";
+}
+
+export interface EditorPasteAction {
+  type: "paste";
+}
+
+export interface EditorDuplicateAction {
+  type: "duplicate";
+  target: NodeID | "selection";
+}
+
+// #endregion copy cut paste
+
+export interface EditorDeleteAction {
+  type: "delete";
+  target: NodeID | "selection";
+}
+
+export interface EditorOrderAction {
+  type: "order";
+  target: NodeID | "selection";
+  order: "front" | "back" | number;
+}
+
+// #region [path]
+export type EditorPathAction =
+  | EditorDeleteVertexAction
+  | EditorSelectVertexAction
+  | EditorHoverVertexAction;
+
+export interface EditorDeleteVertexAction {
+  type: "delete-vertex";
+  target: VertexQuery;
+}
+
+export interface EditorSelectVertexAction {
+  type: "select-vertex";
+  target: VertexQuery;
+}
+
+export interface EditorHoverVertexAction {
+  type: "hover-vertex";
+  event: "enter" | "leave";
+  target: VertexQuery;
+}
+// #endregion
+
+/**
+ * [Nudge]
+ *
+ * Nudge, usually triggered by arrow keys, translates the selected nodes by a exact amount.
+ * Unlike dragging, nudge does not snaps to pixel grid or other objects.
+ */
+export interface EditorNudgeAction {
+  type: "nudge";
+  target: NodeID | "selection";
+  axis: "x" | "y";
+  delta: number;
+}
+
+/**
+ * [NudgeResize]
+ *
+ * NudgeResize, usually triggered by ctrl + alt + arrow keys, resizes the selected nodes by a exact amount.
+ * Unlike dragging, nudge does not snaps to pixel grid or other objects.
+ */
+export interface EditorNudgeResizeAction {
+  type: "nudge-resize";
+  target: NodeID | "selection";
+  axis: "x" | "y";
+  delta: number;
+}
+
+export interface EditorAlignAction {
+  type: "align";
+  target: NodeID | "selection";
+  alignment: {
+    horizontal?: "none" | "min" | "max" | "center";
+    vertical?: "none" | "min" | "max" | "center";
+  };
+}
+
+export interface EditorDistributeEvenlyAction {
+  type: "distribute-evenly";
+  target: NodeID[] | "selection";
+  axis: "x" | "y";
+}
+
+export type EditorConfigAction =
+  | EditorConfigure_RaycastTargeting
+  | EditorConfigure_Measurement
+  | EditorConfigureModifier_TranslateWithClone
+  | EditorConfigureModifier_TranslateWithAxisLock
+  | EditorConfigureModifier_TransformWithCenterOrigin
+  | EditorConfigureModifier_TransformWithPreserveAspectRatio
+  | EditorConfigureModifier_RotateWithQuantize;
+
+export interface EditorConfigure_RaycastTargeting {
+  type: "config/surface/raycast-targeting";
+  config: Partial<SurfaceRaycastTargeting>;
+}
+
+export interface EditorConfigure_Measurement {
+  type: "config/surface/measurement";
+  measurement: "on" | "off";
+}
+
+export interface EditorConfigureModifier_TranslateWithClone {
+  type: "config/modifiers/translate-with-clone";
+  translate_with_clone: "on" | "off";
+}
+export interface EditorConfigureModifier_TranslateWithAxisLock {
+  type: "config/modifiers/translate-with-axis-lock";
+  tarnslate_with_axis_lock: "on" | "off";
+}
+
+export interface EditorConfigureModifier_TransformWithCenterOrigin {
+  type: "config/modifiers/transform-with-center-origin";
+  transform_with_center_origin: "on" | "off";
+}
+
+export interface EditorConfigureModifier_TransformWithPreserveAspectRatio {
+  type: "config/modifiers/transform-with-preserve-aspect-ratio";
+  transform_with_preserve_aspect_ratio: "on" | "off";
+}
+
+export interface EditorConfigureModifier_RotateWithQuantize {
+  type: "config/modifiers/rotate-with-quantize";
+  rotate_with_quantize: number | "off";
+}
+
+/**
+ * [gesture/nudge] - used with `nudge` {@link EditorNudgeAction} or `nudge-resize` {@link EditorNudgeResizeAction}
+ *
+ * By default, nudge is not a gesture, but a command. Unlike dragging, nudge does not has a "duration", as it's snap guides cannot be displayed.
+ * To mimic the nudge as a gesture (mostly when needed to display snap guides), use this action.
+ *
+ * @example when `nudge`, also call `gesture/nudge` to display snap guides. after certain duration, call `gesture/nudge` with `state: "off"`
+ */
+export interface EditorNudgeGestureStateAction {
+  type: "gesture/nudge";
+  state: "on" | "off";
 }
 
 interface IHtmlBackendCanvasEventTargetPointerEvent {
@@ -41,56 +302,29 @@ interface IHtmlBackendCanvasEventTargetPointerEvent {
    * use document.elementFromPoint with filtering
    */
   node_ids_from_point: string[];
+  shiftKey: boolean;
 }
 
-interface ICanvasEventTargetPointerEvent {
-  event: {
-    delta: Vector2;
-    distance: Vector2;
-  };
+interface ICanvasEventTargetDragEvent {
+  event: TCanvasEventTargetDragGestureState;
 }
 
-export type SurfaceAction =
+export type EventTargetAction =
   //
-  | DocumentEditorCanvasEventTargetHtmlBackendKeyDown
-  | DocumentEditorCanvasEventTargetHtmlBackendKeyUp
+  | EditorEventTarget_PointerMove
+  | EditorEventTarget_PointerMoveRaycast
+  | EditorEventTarget_PointerDown
+  | EditorEventTarget_PointerUp
+  | EditorEventTarget_Click
+  | EditorEventTarget_DoubleClick
+  | EditorEventTarget_DragStart
+  | EditorEventTarget_Drag
+  | EditorEventTarget_DragEnd
   //
-  | DocumentEditorCanvasEventTargetHtmlBackendPointerMove
-  | DocumentEditorCanvasEventTargetHtmlBackendPointerMoveRaycast
-  | DocumentEditorCanvasEventTargetHtmlBackendPointerDown
-  | DocumentEditorCanvasEventTargetHtmlBackendPointerUp
-  | DocumentEditorCanvasEventTargetHtmlBackendClick
-  | DocumentEditorCanvasEventTargetHtmlBackendDragStart
-  | DocumentEditorCanvasEventTargetHtmlBackendDrag
-  | DocumentEditorCanvasEventTargetHtmlBackendDragEnd
-  //
-  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayResizeHandleDragStart
-  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayResizeHandleDragEnd
-  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayResizeHandleDrag
-  //
-  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayCornerRadiusHandleDragStart
-  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayCornerRadiusHandleDragEnd
-  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayCornerRadiusHandleDrag
-  //
-  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDragStart
-  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDragEnd
-  | DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDrag
-  //
-  | DocumentEditorEnterContentEditMode
-  | DocumentEditorExitContentEditMode
-  //
-  | DocumentEditorCursorMode;
+  | EditorEventTarget_MultipleSelectionLayer_Click;
 
-export type DocumentEditorCanvasEventTargetHtmlBackendKeyDown = {
-  type: "document/canvas/backend/html/event/on-key-down";
-} & Pick<KeyboardEvent, "key" | "altKey" | "ctrlKey" | "metaKey" | "shiftKey">;
-
-export type DocumentEditorCanvasEventTargetHtmlBackendKeyUp = {
-  type: "document/canvas/backend/html/event/on-key-up";
-} & Pick<KeyboardEvent, "key" | "altKey" | "ctrlKey" | "metaKey" | "shiftKey">;
-
-export type DocumentEditorCanvasEventTargetHtmlBackendPointerMove = {
-  type: "document/canvas/backend/html/event/on-pointer-move";
+export type EditorEventTarget_PointerMove = {
+  type: "event-target/event/on-pointer-move";
   /**
    * position in canvas space - need to pass a resolved value
    */
@@ -100,9 +334,9 @@ export type DocumentEditorCanvasEventTargetHtmlBackendPointerMove = {
   };
 };
 
-export type DocumentEditorCanvasEventTargetHtmlBackendPointerMoveRaycast =
+export type EditorEventTarget_PointerMoveRaycast =
   IHtmlBackendCanvasEventTargetPointerEvent & {
-    type: "document/canvas/backend/html/event/on-pointer-move-raycast";
+    type: "event-target/event/on-pointer-move-raycast";
     /**
      * position in canvas space - need to pass a resolved value
      */
@@ -112,151 +346,89 @@ export type DocumentEditorCanvasEventTargetHtmlBackendPointerMoveRaycast =
     };
   };
 
-export type DocumentEditorCanvasEventTargetHtmlBackendPointerDown =
+export type EditorEventTarget_PointerDown =
   IHtmlBackendCanvasEventTargetPointerEvent & {
-    type: "document/canvas/backend/html/event/on-pointer-down";
+    type: "event-target/event/on-pointer-down";
   };
 
-export type DocumentEditorCanvasEventTargetHtmlBackendPointerUp = {
-  type: "document/canvas/backend/html/event/on-pointer-up";
+export type EditorEventTarget_PointerUp = {
+  type: "event-target/event/on-pointer-up";
 };
 
-export type DocumentEditorCanvasEventTargetHtmlBackendClick = {
-  type: "document/canvas/backend/html/event/on-click";
+export type EditorEventTarget_Click =
+  IHtmlBackendCanvasEventTargetPointerEvent & {
+    type: "event-target/event/on-click";
+  };
+
+export type EditorEventTarget_DoubleClick = {
+  type: "event-target/event/on-double-click";
+};
+
+export type EditorEventTarget_DragStart = {
+  type: "event-target/event/on-drag-start";
   /**
-   * position in canvas space - need to pass a resolved value
+   * @deprecated
    */
-  position: {
-    x: number;
-    y: number;
+  shiftKey: boolean;
+};
+
+export type EditorEventTarget_Drag = ICanvasEventTargetDragEvent & {
+  type: "event-target/event/on-drag";
+};
+
+export type EditorEventTarget_DragEnd = {
+  type: "event-target/event/on-drag-end";
+  node_ids_from_area?: string[];
+  shiftKey: boolean;
+};
+
+//
+export type EditorEventTarget_MultipleSelectionLayer_Click = ISelection &
+  IHtmlBackendCanvasEventTargetPointerEvent & {
+    type: "event-target/event/multiple-selection-overlay/on-click";
   };
+
+// #region surface action
+export type SurfaceAction =
+  | EditorSurface_EnterContentEditMode
+  | EditorSurface_ExitContentEditMode
+  //
+  | EditorSurface_CursorMode
+  | EditorSurface_StartGesture;
+
+export type EditorSurface_EnterContentEditMode = {
+  type: "surface/content-edit-mode/try-enter";
 };
 
-export type DocumentEditorCanvasEventTargetHtmlBackendDragStart = {
-  type: "document/canvas/backend/html/event/on-drag-start";
+export type EditorSurface_ExitContentEditMode = {
+  type: "surface/content-edit-mode/try-exit";
 };
 
-export type DocumentEditorCanvasEventTargetHtmlBackendDrag =
-  ICanvasEventTargetPointerEvent & {
-    type: "document/canvas/backend/html/event/on-drag";
-  };
-
-export type DocumentEditorCanvasEventTargetHtmlBackendDragEnd = {
-  type: "document/canvas/backend/html/event/on-drag-end";
-};
-
-export type DocumentEditorEnterContentEditMode = {
-  type: "document/canvas/content-edit-mode/try-enter";
-};
-
-export type DocumentEditorExitContentEditMode = {
-  type: "document/canvas/content-edit-mode/try-exit";
-};
-
-export type DocumentEditorCursorMode = {
-  type: "document/canvas/cursor-mode";
+export type EditorSurface_CursorMode = {
+  type: "surface/cursor-mode";
   cursor_mode: CursorMode;
 };
 
-interface ICanvasEventTargetResizeHandleEvent {
-  anchor: "nw" | "ne" | "sw" | "se";
-}
+export type EditorSurface_StartGesture = {
+  type: "surface/gesture/start";
+  gesture:
+    | Pick<GestureScale, "type" | "direction" | "selection">
+    | Pick<GestureRotate, "type" | "selection">
+    | Pick<GestureCornerRadius, "type" | "node_id">
+    | Pick<GestureCurve, "type" | "control" | "node_id" | "segment">
+    | Pick<GestureTranslateVertex, "type" | "node_id" | "vertex">;
+};
 
-/**
- * Payload when current node size is unknown and should change to known
- *
- * This payload is required when changing node sizing mode to auto => fixed
- */
-interface IHtmlCanvasEventTargetCalculatedNodeSize {
-  /**
-   * client width and height are required for non-numeric sized node.
-   *
-   * when resizing a node with `width: 100%`  resize delta
-   */
-  client_wh: grida.program.nodes.i.IFixedDimension;
-}
-
-export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayResizeHandleDragStart =
-  INodeID &
-    IHtmlCanvasEventTargetCalculatedNodeSize & {
-      type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-start";
-    };
-
-export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayResizeHandleDragEnd =
-  INodeID & {
-    type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-end";
-  };
-
-export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayResizeHandleDrag =
-  INodeID &
-    ICanvasEventTargetPointerEvent &
-    ICanvasEventTargetResizeHandleEvent & {
-      type: "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag";
-    };
-
-//
-export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayCornerRadiusHandleDragStart =
-  INodeID & {
-    type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-start";
-  };
-
-export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayCornerRadiusHandleDragEnd =
-  INodeID & {
-    type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-end";
-  };
-
-export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayCornerRadiusHandleDrag =
-  INodeID &
-    ICanvasEventTargetPointerEvent &
-    ICanvasEventTargetResizeHandleEvent & {
-      type: "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag";
-    };
-//
-
-export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDragStart =
-  INodeID & {
-    type: "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag-start";
-  };
-
-export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDragEnd =
-  INodeID & {
-    type: "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag-end";
-  };
-
-export type DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDrag =
-  INodeID &
-    ICanvasEventTargetPointerEvent &
-    ICanvasEventTargetResizeHandleEvent & {
-      type: "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag";
-    };
-
-//
+// #endregion surface action
 
 export interface DocumentEditorInsertNodeAction {
-  type: "document/insert";
+  type: "insert";
   prototype: grida.program.nodes.NodePrototype;
-}
-
-export interface DocumentEditorNodeSelectAction {
-  type: "document/node/select";
-  node_id?: string;
-}
-
-interface INodeID {
-  node_id: string;
 }
 
 interface ITemplateInstanceNodeID {
   template_instance_node_id: string;
 }
-
-export type DocumentEditorNodePointerEnterAction = INodeID & {
-  type: "document/node/on-pointer-enter";
-};
-
-export type DocumentEditorNodePointerLeaveAction = INodeID & {
-  type: "document/node/on-pointer-leave";
-};
 
 interface INodeChangeNameAction extends INodeID {
   name: string;
@@ -275,7 +447,7 @@ interface INodeChangeLockedAction extends INodeID {
 }
 
 interface INodeChangePositioningAction extends INodeID {
-  positioning: grida.program.nodes.i.IPositioning;
+  positioning: Partial<grida.program.nodes.i.IPositioning>;
 }
 
 interface INodeChangePositioningModeAction extends INodeID {
@@ -291,7 +463,7 @@ interface INodeChangeTextAction extends INodeID {
 }
 
 interface INodeChangeOpacityAction extends INodeID {
-  opacity: number;
+  opacity: TChange<number>;
 }
 
 interface INodeChangeSizeAction extends INodeID {
@@ -299,8 +471,18 @@ interface INodeChangeSizeAction extends INodeID {
   length: grida.program.css.Length | "auto";
 }
 
+export type TChange<T> =
+  | {
+      type: "set";
+      value: T;
+    }
+  | {
+      type: "delta";
+      value: NonNullable<T>;
+    };
+
 interface INodeChangeRotationAction extends INodeID {
-  rotation: grida.program.nodes.i.IRotation["rotation"];
+  rotation: TChange<grida.program.nodes.i.IRotation["rotation"]>;
 }
 
 interface INodeChangeCornerRadiusAction extends INodeID {
@@ -308,7 +490,19 @@ interface INodeChangeCornerRadiusAction extends INodeID {
 }
 
 interface INodeChangeFillAction extends INodeID {
-  fill: grida.program.cg.PaintWithoutID;
+  fill: grida.program.cg.PaintWithoutID | null;
+}
+
+interface INodeChangeStrokeAction extends INodeID {
+  stroke: grida.program.cg.PaintWithoutID | null;
+}
+
+interface INodeChangeStrokeWidthAction extends INodeID {
+  strokeWidth: TChange<number>;
+}
+
+interface INodeChangeStrokeCapAction extends INodeID {
+  strokeCap: grida.program.cg.StrokeCap;
 }
 
 interface INodeChangeBorderAction extends INodeID {
@@ -327,7 +521,7 @@ interface ITextNodeChangeFontWeightAction extends INodeID {
   fontWeight: grida.program.cg.NFontWeight;
 }
 interface ITextNodeChangeFontSizeAction extends INodeID {
-  fontSize: number;
+  fontSize: TChange<number>;
 }
 interface ITextNodeChangeTextAlignAction extends INodeID {
   textAlign: grida.program.cg.TextAlign;
@@ -338,11 +532,11 @@ interface ITextNodeChangeTextAlignVerticalAction extends INodeID {
 }
 
 interface ITextNodeChangeLineHeightAction extends INodeID {
-  lineHeight: grida.program.nodes.TextNode["lineHeight"];
+  lineHeight: TChange<grida.program.nodes.TextNode["lineHeight"]>;
 }
 
 interface ITextNodeChangeLetterSpacingAction extends INodeID {
-  letterSpacing: grida.program.nodes.TextNode["letterSpacing"];
+  letterSpacing: TChange<grida.program.nodes.TextNode["letterSpacing"]>;
 }
 
 interface ITextNodeChangeMaxlengthAction extends INodeID {
@@ -383,6 +577,10 @@ interface IFlexContainerNodeChangeCrossAxisGapAction extends INodeID {
   crossAxisGap: grida.program.nodes.i.IFlexContainer["crossAxisGap"];
 }
 
+interface INodeChangeMouseCursorAction extends INodeID {
+  cursor: grida.program.cg.SystemMouseCursor;
+}
+
 interface INodeChangeStyleAction extends INodeID {
   style: Partial<React.CSSProperties>;
 }
@@ -419,6 +617,9 @@ export type NodeChangeAction =
   | ({ type: "node/change/size" } & INodeChangeSizeAction)
   | ({ type: "node/change/cornerRadius" } & INodeChangeCornerRadiusAction)
   | ({ type: "node/change/fill" } & INodeChangeFillAction)
+  | ({ type: "node/change/stroke" } & INodeChangeStrokeAction)
+  | ({ type: "node/change/stroke-width" } & INodeChangeStrokeWidthAction)
+  | ({ type: "node/change/stroke-cap" } & INodeChangeStrokeCapAction)
   | ({ type: "node/change/border" } & INodeChangeBorderAction)
   | ({ type: "node/change/fit" } & INodeChangeFitAction)
   //
@@ -459,20 +660,18 @@ export type NodeChangeAction =
       type: "node/change/crossAxisGap";
     } & IFlexContainerNodeChangeCrossAxisGapAction)
   //
+  | ({ type: "node/change/mouse-cursor" } & INodeChangeMouseCursorAction)
   | ({ type: "node/change/style" } & INodeChangeStyleAction)
   | ({ type: "node/change/src" } & INodeChangeSrcAction)
   | ({ type: "node/change/href" } & INodeChangeHrefAction)
   | ({ type: "node/change/target" } & INodeChangeTargetAction)
   | ({ type: "node/change/props" } & INodeChangePropsAction);
 
-export type NodeOrderAction =
-  // | ({ type: "node/order/reorder" } & INodeID &)
-  | ({ type: "node/order/back" } & INodeID)
-  | ({ type: "node/order/front" } & INodeID);
-
-export type NodeToggleAction =
+export type NodeToggleBasePropertyAction =
   | ({ type: "node/toggle/active" } & INodeID)
   | ({ type: "node/toggle/locked" } & INodeID);
+
+export type NodeToggleBoldAction = { type: "node/toggle/bold" } & INodeID;
 
 export type TemplateNodeOverrideChangeAction = ITemplateInstanceNodeID & {
   type: "document/template/override/change/*";

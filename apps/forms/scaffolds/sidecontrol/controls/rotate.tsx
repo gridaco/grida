@@ -1,23 +1,18 @@
-import { Input } from "@/components/ui/input";
-import { WorkbenchUI } from "@/components/workbench";
+import type { TChange, TMixed } from "./utils/types";
+import { PropertyNumber } from "../ui";
 
 export function RotateControl({
   value,
   onValueChange,
 }: {
-  value?: number;
-  onValueChange?: (value: number) => void;
+  value?: TMixed<number>;
+  onValueChange?: (change: TChange<number>) => void;
 }) {
   return (
-    <Input
-      type="number"
+    <PropertyNumber
       placeholder="0deg"
-      className={WorkbenchUI.inputVariants({ size: "sm" })}
       value={value}
-      onChange={(e) => {
-        const value = parseFloat(e.target.value) || 0;
-        onValueChange?.(value);
-      }}
+      onValueChange={onValueChange}
     />
   );
 }

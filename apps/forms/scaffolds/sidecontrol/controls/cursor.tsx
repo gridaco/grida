@@ -8,20 +8,26 @@ import {
 import { cursors } from "./k/cursors";
 import Image from "next/image";
 import { WorkbenchUI } from "@/components/workbench";
+import React from "react";
+import { grida } from "@/grida";
+import { TMixed } from "./utils/types";
+
+type MouseCursor = grida.program.cg.SystemMouseCursor;
 
 export function CursorControl({
   value,
   onValueChange,
 }: {
-  value?: string;
-  onValueChange?: (value?: string) => void;
+  value?: TMixed<MouseCursor>;
+  onValueChange?: (value: MouseCursor) => void;
 }) {
-  const cursor = (cursors as any)[value || "default"];
+  const mixed = value === grida.mixed;
+  const cursor = (cursors as any)[value ?? "default"] || cursors["default"];
 
   return (
-    <Select value={value} onValueChange={onValueChange}>
-      <SelectTrigger className={WorkbenchUI.inputVariants({ size: "sm" })}>
-        <SelectValue placeholder="Select...">
+    <Select value={mixed ? undefined : value} onValueChange={onValueChange}>
+      <SelectTrigger className={WorkbenchUI.inputVariants({ size: "xs" })}>
+        <SelectValue placeholder={mixed ? "mixed" : "Select..."}>
           <div className="flex gap-1 items-center text-xs">
             <Image src={cursor.src} width={16} height={16} alt={cursor.label} />
             <span className="overflow-hidden text-ellipsis">

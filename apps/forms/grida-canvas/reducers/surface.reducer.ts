@@ -1,492 +1,257 @@
 import { produce, type Draft } from "immer";
 
-import type {
-  BuilderAction,
-  DocumentEditorCanvasEventTargetHtmlBackendKeyDown,
-  DocumentEditorCanvasEventTargetHtmlBackendKeyUp,
-  //
-  DocumentEditorCanvasEventTargetHtmlBackendPointerMove,
-  DocumentEditorCanvasEventTargetHtmlBackendPointerMoveRaycast,
-  DocumentEditorCanvasEventTargetHtmlBackendPointerDown,
-  DocumentEditorCanvasEventTargetHtmlBackendClick,
-  //
-  DocumentEditorCanvasEventTargetHtmlBackendDrag,
-  DocumentEditorCanvasEventTargetHtmlBackendDragStart,
-  DocumentEditorCanvasEventTargetHtmlBackendDragEnd,
-  //
-  DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDrag,
-  DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDragEnd,
-  DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDragStart,
-  //
-} from "../action";
-import type { IDocumentEditorState, SurfaceRaycastTargeting } from "../types";
-import { grida } from "@/grida";
-import { v4 } from "uuid";
-import { documentquery } from "../document-query";
-import nodeReducer from "./node.reducer";
-import nodeTransformReducer from "./node-transform.reducer";
-import initialNode from "./tools/initial-node";
+import type { SurfaceAction } from "../action";
+import type { CursorModeType, IDocumentEditorState } from "../state";
+import { document } from "../document-query";
+import { getInitialCurveGesture } from "./tools/gesture";
 import assert from "assert";
-import {
-  self_deleteNode,
-  self_insertNode,
-  self_updateSurfaceHoverState,
-} from "./methods";
-import { cmath } from "../math";
-
-const keyboard_key_bindings = {
-  r: "rectangle",
-  t: "text",
-  o: "ellipse",
-  f: "container",
-  a: "container",
-} as const;
+import { cmath } from "../cmath";
+import { domapi } from "../domapi";
+import { grida } from "@/grida";
+import { self_selectNode } from "./methods";
+import { createMinimalDocumentStateSnapshot } from "./tools/snapshot";
 
 export default function surfaceReducer<S extends IDocumentEditorState>(
   state: S,
-  action: BuilderAction
+  action: SurfaceAction
 ): S {
   switch (action.type) {
-    // #region [html backend] canvas event target
-    case "document/canvas/backend/html/event/on-key-down": {
-      const { key, altKey, metaKey, shiftKey } = <
-        DocumentEditorCanvasEventTargetHtmlBackendKeyDown
-      >action;
-      return produce(state, (draft) => {
-        // Meta key (meta only)
-        if (
-          metaKey && // Meta key is pressed
-          !altKey && // Alt key is not pressed
-          !shiftKey && // Shift key is not pressed
-          key === "Meta"
-        ) {
-          draft.surface_raycast_targeting.target = "deepest";
-          self_updateSurfaceHoverState(draft);
-        }
-        if (metaKey && key === "c") {
-          // Copy logic
-          if (draft.selected_node_id) {
-            const selectedNode = documentquery.__getNodeById(
-              draft,
-              draft.selected_node_id
-            );
-            draft.clipboard = JSON.parse(JSON.stringify(selectedNode)); // Deep copy the node
-          }
-        } else if (metaKey && key === "x") {
-          // Cut logic
-          if (draft.selected_node_id) {
-            const selectedNode = documentquery.__getNodeById(
-              draft,
-              draft.selected_node_id
-            );
-            draft.clipboard = JSON.parse(JSON.stringify(selectedNode)); // Deep copy the node
-            self_deleteNode(draft, draft.selected_node_id);
-          }
-        } else if (metaKey && key === "v") {
-          // Paste logic
-          if (draft.clipboard) {
-            const newNode = JSON.parse(JSON.stringify(draft.clipboard));
-            newNode.id = v4(); // Assign a new unique ID
-            const offset = 10; // Offset to avoid overlapping
-            if (newNode.left !== undefined) newNode.left += offset;
-            if (newNode.top !== undefined) newNode.top += offset;
-            self_insertNode(draft, draft.document.root_id, newNode);
-            // after
-            draft.cursor_mode = { type: "cursor" };
-            draft.selected_node_id = newNode.id; // Select the newly pasted node
-          }
-        }
+    // #region [universal backend] canvas event target
+    case "surface/content-edit-mode/try-enter": {
+      if (state.selection.length !== 1) break;
+      const node_id = state.selection[0];
+      const node = document.__getNodeById(state, node_id);
 
-        switch (key) {
-          case "v": {
-            draft.cursor_mode = { type: "cursor" };
-            break;
-          }
-          case "r":
-          case "t":
-          case "o":
-          case "f":
-          case "a": {
-            draft.cursor_mode = {
-              type: "insert",
-              node: keyboard_key_bindings[key],
+      return produce(state, (draft) => {
+        switch (node.type) {
+          case "text": {
+            // the text node should have a string literal value assigned (we don't support props editing via surface)
+            if (typeof node.text !== "string") return;
+
+            draft.content_edit_mode = {
+              type: "text",
+              node_id: node_id,
             };
             break;
           }
-          case "Backspace": {
-            if (draft.selected_node_id) {
-              if (draft.document.root_id !== draft.selected_node_id) {
-                self_deleteNode(draft, draft.selected_node_id);
-              }
-            }
+          case "vector":
+          case "path": {
+            draft.content_edit_mode = {
+              type: "path",
+              node_id: node_id,
+              selected_vertices: [],
+              a_point: null,
+              next_ta: null,
+              path_cursor_position: draft.cursor_position,
+            };
             break;
           }
+          // TODO: experimental - remove me
+          // case "rectangle":
+          // case "ellipse": {
+          //   if (node.fill?.type === "linear_gradient") {
+          //     draft.content_edit_mode = {
+          //       type: "gradient",
+          //       node_id: node_id,
+          //     };
+          //   }
+          //   //
+          // }
         }
       });
-    }
-    case "document/canvas/backend/html/event/on-key-up": {
-      const { key, altKey, metaKey, shiftKey } = <
-        DocumentEditorCanvasEventTargetHtmlBackendKeyUp
-      >action;
-      return produce(state, (draft) => {
-        if (key === "Meta") {
-          draft.surface_raycast_targeting.target = "shallowest";
-          self_updateSurfaceHoverState(draft);
-        }
-      });
-    }
-    case "document/canvas/backend/html/event/on-pointer-move": {
-      const {
-        position: { x, y },
-      } = <DocumentEditorCanvasEventTargetHtmlBackendPointerMove>action;
-      return produce(state, (draft) => {
-        draft.surface_cursor_position = [x, y];
-        draft.cursor_position = cmath.vector2.subtract(
-          draft.surface_cursor_position,
-          draft.translate ?? [0, 0]
-        );
-      });
-    }
-    case "document/canvas/backend/html/event/on-pointer-move-raycast": {
-      const { node_ids_from_point } = <
-        DocumentEditorCanvasEventTargetHtmlBackendPointerMoveRaycast
-      >action;
-      return produce(state, (draft) => {
-        draft.surface_raycast_detected_node_ids = node_ids_from_point;
-        self_updateSurfaceHoverState(draft);
-      });
-    }
-    case "document/canvas/backend/html/event/on-pointer-down": {
-      const { node_ids_from_point } = <
-        DocumentEditorCanvasEventTargetHtmlBackendPointerDown
-      >action;
-      return produce(state, (draft) => {
-        switch (draft.cursor_mode.type) {
-          case "cursor": {
-            draft.surface_raycast_detected_node_ids = node_ids_from_point;
-            const { hovered_node_id } = self_updateSurfaceHoverState(draft);
-            draft.selected_node_id = hovered_node_id;
-            break;
-          }
-          case "insert":
-            // ignore - insert mode will be handled via click or drag
-            break;
-        }
-      });
-    }
-    case "document/canvas/backend/html/event/on-pointer-up": {
-      return produce(state, (draft) => {
-        // clear all trasform state
-
-        draft.surface_content_edit_mode = false;
-        draft.is_gesture_node_drag_move = false;
-        draft.is_gesture_node_drag_resize = false;
-      });
-    }
-    case "document/canvas/backend/html/event/on-click": {
-      const { position } = <DocumentEditorCanvasEventTargetHtmlBackendClick>(
-        action
-      );
-      return produce(state, (draft) => {
-        switch (draft.cursor_mode.type) {
-          case "cursor": {
-            // ignore
-            break;
-          }
-          case "insert":
-            const nnode = initialNode(draft.cursor_mode.node, {
-              left: state.cursor_position[0],
-              top: state.cursor_position[1],
-            });
-
-            // center translate the new node.
-            try {
-              const _nnode = nnode as grida.program.nodes.RectangleNode;
-              _nnode.left! -= _nnode.width / 2;
-              _nnode.top! -= _nnode.height / 2;
-            } catch (e) {}
-
-            self_insertNode(draft, draft.document.root_id, nnode);
-            draft.cursor_mode = { type: "cursor" };
-            draft.selected_node_id = nnode.id;
-            break;
-        }
-      });
-    }
-    // #region drag event
-    case "document/canvas/backend/html/event/on-drag-start": {
-      const {} = <DocumentEditorCanvasEventTargetHtmlBackendDragStart>action;
-      return produce(state, (draft) => {
-        // clear all trasform state
-        draft.surface_content_edit_mode = false;
-        draft.is_gesture_node_drag_resize = false;
-
-        switch (draft.cursor_mode.type) {
-          case "cursor": {
-            if (!draft.selected_node_id) {
-              // marquee selection
-              draft.marquee = {
-                x1: draft.surface_cursor_position[0],
-                y1: draft.surface_cursor_position[1],
-                x2: draft.surface_cursor_position[0],
-                y2: draft.surface_cursor_position[1],
-              };
-            } else {
-              draft.is_gesture_node_drag_move = true;
-            }
-            break;
-          }
-          case "insert":
-            //
-            const nnode = initialNode(draft.cursor_mode.node, {
-              left: draft.cursor_position[0],
-              top: draft.cursor_position[1],
-              width: 1,
-              height: (draft.cursor_mode.node === "line" ? 0 : 1) as 0,
-            });
-            self_insertNode(draft, draft.document.root_id, nnode);
-            draft.cursor_mode = { type: "cursor" };
-            draft.selected_node_id = nnode.id;
-            draft.is_gesture_node_drag_resize = true;
-            // TODO: after inserting, refresh fonts registry
-            break;
-        }
-      });
-    }
-    case "document/canvas/backend/html/event/on-drag-end": {
-      const {} = <DocumentEditorCanvasEventTargetHtmlBackendDragEnd>action;
-      return produce(state, (draft) => {
-        draft.is_gesture_node_drag_move = false;
-        draft.marquee = undefined;
-      });
-    }
-    case "document/canvas/backend/html/event/on-drag": {
-      const {
-        event: { delta, distance },
-      } = <DocumentEditorCanvasEventTargetHtmlBackendDrag>action;
-      if (state.marquee) {
-        return produce(state, (draft) => {
-          draft.marquee!.x2 = draft.surface_cursor_position[0];
-          draft.marquee!.y2 = draft.surface_cursor_position[1];
-        });
-      } else {
-        //
-        if (state.is_gesture_node_drag_resize) {
-          return produce(state, (draft) => {
-            const node_id = state.selected_node_id!;
-            const node = documentquery.__getNodeById(draft, node_id);
-            const [dx, dy] = delta;
-
-            draft.document.nodes[node_id] = nodeTransformReducer(node, {
-              type: "resize",
-              anchor: "se",
-              dx: dx,
-              dy: dy,
-            });
-          });
-        }
-
-        if (state.is_gesture_node_drag_move) {
-          const nid = state.selected_node_id!;
-
-          const [dx, dy] = delta;
-
-          return produce(state, (draft) => {
-            const node = documentquery.__getNodeById(draft, nid);
-            draft.document.nodes[nid] = nodeTransformReducer(node, {
-              type: "move",
-              dx: dx,
-              dy: dy,
-            });
-            //
-          });
-        }
-      }
 
       break;
     }
-    // #endregion drag event
-    // #region resize handle event
-    case "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-start": {
-      const { node_id, client_wh } = action;
-      //
-
+    case "surface/content-edit-mode/try-exit": {
       return produce(state, (draft) => {
-        draft.surface_content_edit_mode = false;
-        draft.is_gesture_node_drag_resize = true;
-        draft.is_gesture_node_drag_move = false;
-        draft.hovered_node_id = undefined;
-
-        const node = documentquery.__getNodeById(draft, node_id);
-
-        // need to assign a fixed size if width or height is a variable length
-        (node as grida.program.nodes.i.ICSSDimension).width = client_wh.width;
-        // (node as grida.program.nodes.i.ICSSStylable).style.width = client_wh.width;
-        (node as grida.program.nodes.i.ICSSDimension).height = client_wh.height;
-        // (node as grida.program.nodes.i.ICSSStylable).style.height = client_wh.height;
+        draft.content_edit_mode = undefined;
       });
     }
-    case "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag-end": {
-      return produce(state, (draft) => {
-        draft.is_gesture_node_drag_resize = false;
-      });
-    }
-    case "document/canvas/backend/html/event/node-overlay/resize-handle/on-drag": {
-      const {
-        node_id,
-        anchor,
-        event: { delta, distance },
-      } = action;
-      const [dx, dy] = delta;
-
-      // cancel if invalid state
-      if (!state.is_gesture_node_drag_resize) return state;
-
-      return produce(state, (draft) => {
-        // once the node's measurement mode is set to fixed (from drag start), we may safely cast the width / height sa fixed number
-        const node = documentquery.__getNodeById(draft, node_id);
-
-        draft.document.nodes[node_id] = nodeTransformReducer(node, {
-          type: "resize",
-          anchor,
-          dx: dx,
-          dy: dy,
-        });
-      });
-      //
-      //
-    }
-    // #endregion resize handle event
-
-    case "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-start": {
-      const { node_id } = action;
-
-      return produce(state, (draft) => {
-        draft.selected_node_id = node_id;
-        draft.is_gesture_node_drag_corner_radius = true;
-      });
-    }
-    case "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag-end": {
-      return produce(state, (draft) => {
-        draft.is_gesture_node_drag_corner_radius = false;
-      });
-    }
-    case "document/canvas/backend/html/event/node-overlay/corner-radius-handle/on-drag": {
-      const {
-        node_id,
-        event: { delta, distance },
-      } = action;
-      const [dx, dy] = delta;
-      // cancel if invalid state
-      if (!state.is_gesture_node_drag_corner_radius) return state;
-
-      // const distance = Math.sqrt(dx * dx + dy * dy);
-      const d = -Math.round(dx);
-      return produce(state, (draft) => {
-        const node = documentquery.__getNodeById(draft, node_id);
-
-        if (!("cornerRadius" in node)) {
-          return;
-        }
-
-        // TODO: get accurate fixed width
-        // TODO: also handle by height
-        const fixed_width =
-          typeof node.width === "number" ? node.width : undefined;
-        const maxRaius = fixed_width ? fixed_width / 2 : undefined;
-
-        const nextRadius =
-          (typeof node.cornerRadius == "number" ? node.cornerRadius : 0) + d;
-
-        const nextRadiusClamped = Math.floor(
-          Math.min(maxRaius ?? Infinity, Math.max(0, nextRadius))
-        );
-        draft.document.nodes[node_id] = nodeReducer(node, {
-          type: "node/change/cornerRadius",
-          // TODO: resolve by anchor
-          cornerRadius: nextRadiusClamped,
-          node_id,
-        });
-      });
-      //
-    }
-
-    //
-    case "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag-start": {
-      const { node_id } = <
-        DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDragStart
-      >action;
-
-      return produce(state, (draft) => {
-        draft.selected_node_id = node_id;
-        draft.is_gesture_node_drag_rotation = true;
-      });
-    }
-    case "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag-end": {
-      const {} = <
-        DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDragEnd
-      >action;
-      return produce(state, (draft) => {
-        draft.is_gesture_node_drag_rotation = false;
-      });
-    }
-    case "document/canvas/backend/html/event/node-overlay/rotation-handle/on-drag": {
-      const {
-        node_id,
-        event: { delta, distance },
-      } = <
-        DocumentEditorCanvasEventTargetHtmlBackendNodeOverlayRotationHandleDrag
-      >action;
-
-      const [dx, dy] = delta;
-      // cancel if invalid state
-      if (!state.is_gesture_node_drag_rotation) return state;
-
-      const d = Math.round(dx);
-      return produce(state, (draft) => {
-        const node = documentquery.__getNodeById(draft, node_id);
-
-        draft.document.nodes[node_id] = nodeReducer(node, {
-          type: "node/change/rotation",
-          rotation:
-            ((node as grida.program.nodes.i.IRotation).rotation ?? 0) + d,
-          node_id,
-        });
-      });
-      //
-    }
-
-    // #endregion [html backend] canvas event target
-
-    // #region [universal backend] canvas event target
-    case "document/canvas/content-edit-mode/try-enter": {
-      if (!state.selected_node_id) return state;
-      const node = documentquery.__getNodeById(state, state.selected_node_id);
-
-      // only text node can enter the content edit mode
-      if (node.type !== "text") return state;
-
-      // the text node should have a string literal value assigned (we don't support props editing via surface)
-      if (typeof node.text !== "string") return state;
-
-      return produce(state, (draft) => {
-        draft.surface_content_edit_mode = "text";
-      });
-      break;
-    }
-    case "document/canvas/content-edit-mode/try-exit": {
-      return produce(state, (draft) => {
-        draft.surface_content_edit_mode = false;
-      });
-    }
-    case "document/canvas/cursor-mode": {
+    case "surface/cursor-mode": {
       const { cursor_mode } = action;
+      const path_edit_mode_valid_cursor_modes: CursorModeType[] = [
+        "cursor",
+        "path",
+      ];
+      const text_edit_mode_valid_cursor_modes: CursorModeType[] = ["cursor"];
       return produce(state, (draft) => {
+        // validate cursor mode
+        if (draft.content_edit_mode) {
+          switch (draft.content_edit_mode.type) {
+            case "path":
+              if (!path_edit_mode_valid_cursor_modes.includes(cursor_mode.type))
+                return;
+              break;
+            case "text":
+              if (!text_edit_mode_valid_cursor_modes.includes(cursor_mode.type))
+                return;
+              break;
+          }
+        }
+
         draft.cursor_mode = cursor_mode;
       });
+    }
+    case "surface/gesture/start": {
+      const { gesture } = action;
+      switch (gesture.type) {
+        case "curve": {
+          const { node_id, segment, control } = gesture;
+
+          assert(state.content_edit_mode?.type === "path");
+          assert(state.content_edit_mode?.node_id === node_id);
+
+          return produce(state, (draft) => {
+            draft.gesture = getInitialCurveGesture(state, {
+              node_id,
+              segment,
+              control,
+              invert: false,
+            });
+          });
+        }
+        case "scale": {
+          const { selection, direction } = gesture;
+          //
+
+          return produce(state, (draft) => {
+            draft.content_edit_mode = undefined;
+            draft.hovered_node_id = null;
+
+            self_start_gesture_scale(draft, {
+              selection: selection,
+              direction: direction,
+            });
+          });
+          //
+        }
+        case "corner-radius": {
+          const { node_id } = gesture;
+
+          return produce(state, (draft) => {
+            self_selectNode(draft, "reset", node_id);
+            draft.gesture = {
+              type: "corner-radius",
+              movement: cmath.vector2.zero,
+              initial_bounding_rectangle:
+                domapi.get_node_bounding_rect(node_id)!,
+              node_id: node_id,
+            };
+          });
+        }
+        case "rotate": {
+          const { selection } = gesture;
+
+          return produce(state, (draft) => {
+            self_selectNode(draft, "reset", selection);
+            self_start_gesture_rotate(draft, {
+              selection: selection,
+              initial_bounding_rectangle:
+                domapi.get_node_bounding_rect(selection)!,
+              // TODO: the offset of rotation handle relative to the center of the rectangle
+              offset: cmath.vector2.zero,
+            });
+          });
+          //
+        }
+        case "translate-vertex": {
+          return produce(state, (draft) => {
+            const { vertex: index } = gesture;
+
+            const { content_edit_mode } = draft;
+            assert(content_edit_mode && content_edit_mode.type === "path");
+            const { node_id } = content_edit_mode;
+            const node = document.__getNodeById(
+              draft,
+              node_id
+            ) as grida.program.nodes.PathNode;
+
+            const verticies = node.vectorNetwork.vertices.map((v) => v.p);
+
+            content_edit_mode.selected_vertices = [index];
+            content_edit_mode.a_point = index;
+
+            draft.gesture = {
+              type: "translate-vertex",
+              node_id: node_id,
+              initial_verticies: verticies,
+              vertex: index,
+              movement: cmath.vector2.zero,
+              initial_position: [node.left!, node.top!],
+            };
+          });
+          //
+        }
+      }
     }
     // #endregion
   }
   //
   return state;
+}
+
+function self_start_gesture_scale(
+  draft: Draft<IDocumentEditorState>,
+  {
+    selection,
+    direction,
+  }: {
+    selection: string[];
+    direction: cmath.CardinalDirection;
+  }
+) {
+  if (selection.length === 0) return;
+  const rects = selection.map(
+    (node_id) => domapi.get_node_bounding_rect(node_id)!
+  );
+
+  draft.gesture = {
+    type: "scale",
+    initial_snapshot: createMinimalDocumentStateSnapshot(draft),
+    initial_rects: rects,
+    movement: cmath.vector2.zero,
+    selection: selection,
+    direction: direction,
+  };
+
+  let i = 0;
+  for (const node_id of selection) {
+    const node = document.__getNodeById(draft, node_id);
+    const rect = rects[i++];
+
+    // once the node's measurement mode is set to fixed (from drag start), we may safely cast the width / height sa fixed number
+    // need to assign a fixed size if width or height is a variable length
+    const _node = node as grida.program.nodes.i.ICSSDimension;
+    if (typeof _node.width !== "number") {
+      _node.width = rect.width;
+    }
+    if (typeof _node.height !== "number") {
+      if (node.type === "line") {
+        _node.height = 0;
+      } else {
+        _node.height = rect.height;
+      }
+    }
+  }
+}
+
+function self_start_gesture_rotate(
+  draft: Draft<IDocumentEditorState>,
+  {
+    selection,
+    offset,
+    initial_bounding_rectangle,
+  }: {
+    selection: string;
+    initial_bounding_rectangle: cmath.Rectangle;
+    offset: cmath.Vector2;
+  }
+) {
+  draft.gesture = {
+    type: "rotate",
+    initial_bounding_rectangle: initial_bounding_rectangle,
+    offset: offset,
+    selection: selection,
+    movement: cmath.vector2.zero,
+  };
 }

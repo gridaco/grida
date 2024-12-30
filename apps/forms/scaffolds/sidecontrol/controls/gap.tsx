@@ -17,7 +17,7 @@ export function GapControl({
       value={value.mainAxisGap === value.crossAxisGap ? value.mainAxisGap : ""}
       placeholder="gap"
       step={1}
-      className={WorkbenchUI.inputVariants({ size: "sm" })}
+      className={WorkbenchUI.inputVariants({ size: "xs" })}
       onChange={(e) => {
         onValueChange?.(parseInt(e.target.value));
       }}

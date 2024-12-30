@@ -27,7 +27,7 @@ export function BoxShadowControl({
 
   return (
     <Select value={value?.boxShadow} onValueChange={onChange}>
-      <SelectTrigger className={WorkbenchUI.inputVariants({ size: "sm" })}>
+      <SelectTrigger className={WorkbenchUI.inputVariants({ size: "xs" })}>
         <SelectValue placeholder="Select..." />
       </SelectTrigger>
       <SelectContent>

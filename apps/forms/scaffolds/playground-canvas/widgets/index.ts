@@ -1,6 +1,6 @@
 import { grida } from "@/grida";
 
-export namespace widget_presets {
+export namespace prototypes {
   export const row = {
     type: "container",
     name: "row",
@@ -10,6 +10,7 @@ export namespace widget_presets {
     style: {},
     zIndex: 0,
     opacity: 1,
+    rotation: 0,
     cornerRadius: 0,
     layout: "flex",
     direction: "horizontal",
@@ -28,12 +29,15 @@ export namespace widget_presets {
         position: "relative",
         zIndex: 0,
         opacity: 1,
+        rotation: 0,
         cornerRadius: 0,
         fill: {
           type: "solid",
           color: { r: 0, g: 0, b: 0, a: 1 },
         },
         effects: [],
+        strokeWidth: 0,
+        strokeCap: "butt",
       },
       {
         type: "rectangle",
@@ -43,12 +47,15 @@ export namespace widget_presets {
         position: "relative",
         zIndex: 0,
         opacity: 1,
+        rotation: 0,
         cornerRadius: 0,
         fill: {
           type: "solid",
           color: { r: 0, g: 0, b: 0, a: 1 },
         },
         effects: [],
+        strokeWidth: 0,
+        strokeCap: "butt",
       },
       {
         type: "rectangle",
@@ -58,12 +65,15 @@ export namespace widget_presets {
         position: "relative",
         zIndex: 0,
         opacity: 1,
+        rotation: 0,
         cornerRadius: 0,
         fill: {
           type: "solid",
           color: { r: 0, g: 0, b: 0, a: 1 },
         },
         effects: [],
+        strokeWidth: 0,
+        strokeCap: "butt",
       },
     ],
   } satisfies grida.program.nodes.NodePrototype;
@@ -80,6 +90,7 @@ export namespace widget_presets {
     position: "relative",
     zIndex: 0,
     opacity: 1,
+    rotation: 0,
     text: "Hello, World!",
     style: {},
     fontSize: 16,
@@ -100,6 +111,7 @@ export namespace widget_presets {
     position: "relative",
     zIndex: 0,
     opacity: 1,
+    rotation: 0,
     cornerRadius: 0,
     style: {},
     fit: "cover",
@@ -113,6 +125,7 @@ export namespace widget_presets {
     position: "relative",
     zIndex: 0,
     opacity: 1,
+    rotation: 0,
     cornerRadius: 0,
     style: {},
     fit: "cover",
@@ -129,6 +142,7 @@ export namespace widget_presets {
     position: "relative",
     zIndex: 0,
     opacity: 1,
+    rotation: 0,
     cornerRadius: 16,
     style: {},
     layout: "flex",
@@ -152,6 +166,7 @@ export namespace widget_presets {
         position: "relative",
         zIndex: 0,
         opacity: 1,
+        rotation: 0,
         text: "Label",
         style: {},
         fontSize: 12,
@@ -178,6 +193,7 @@ export namespace widget_presets {
     position: "relative",
     zIndex: 0,
     opacity: 1,
+    rotation: 0,
     cornerRadius: 24,
     style: {
       overflow: "hidden",
@@ -204,6 +220,7 @@ export namespace widget_presets {
         position: "relative",
         zIndex: 0,
         opacity: 1,
+        rotation: 0,
         cornerRadius: 0,
         style: {},
         fit: "cover",
@@ -219,6 +236,7 @@ export namespace widget_presets {
     position: "relative",
     zIndex: 0,
     opacity: 1,
+    rotation: 0,
     cornerRadius: 0,
     style: {},
   } satisfies grida.program.nodes.NodePrototype;

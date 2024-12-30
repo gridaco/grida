@@ -1,23 +1,24 @@
 import { grida } from "@/grida";
 import { svg } from "@/grida/svg";
+import queryattributes from "./utils/attributes";
 
 /**
  * @deprecated - not ready - do not use in production
  * @returns
  */
 export function VectorWidget({
-  paths,
   width,
   height,
   fill,
   style,
+  paths,
   ...props
 }: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.VectorNode>) {
-  const { defs, fill: fillDef } = fill
-    ? svg.fill.fill_with_defs(fill)
+  const { defs, ref: fillDef } = fill
+    ? svg.paint.defs(fill)
     : {
         defs: undefined,
-        fill: "none",
+        ref: "none",
       };
 
   const style_without_size = {
@@ -34,7 +35,7 @@ export function VectorWidget({
 
   return (
     <svg
-      {...props}
+      {...queryattributes(props)}
       style={style_without_size}
       width={width}
       height={height || 1}
@@ -48,6 +49,7 @@ export function VectorWidget({
       {/* stroke paths */}
       {strokepaths.map(({ d, fillRule }, i) => (
         <path
+          key={i}
           kernelMatrix={i}
           d={d}
           // TODO:

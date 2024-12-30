@@ -47,7 +47,7 @@ import { grida } from "@/grida";
 import {
   IDocumentEditorState,
   initDocumentEditorState,
-} from "@/grida-canvas/types";
+} from "@/grida-canvas/state";
 
 export function reducer(state: EditorState, action: EditorAction): EditorState {
   switch (action.type) {
@@ -382,11 +382,12 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
           template_id: template_id,
           ...initDocumentEditorState({
             editable: true,
+            debug: false,
             document: {
               root_id: "page",
               nodes: {
                 ["page"]:
-                  grida.program.nodes.createTemplateInstanceNodeFromTemplateDefinition(
+                  grida.program.nodes.factory.createTemplateInstanceNodeDataFromTemplateDefinition(
                     "page",
                     startpage
                   ),

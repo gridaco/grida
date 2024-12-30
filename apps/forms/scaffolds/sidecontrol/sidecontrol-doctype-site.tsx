@@ -10,7 +10,7 @@ export function SideControlDoctypeSite() {
   const [state, dispatch] = useEditorState();
 
   assert(state.documents, "state.documents is required");
-  if (state.documents["site/dev-collection"]!.selected_node_id) {
+  if (state.documents["site/dev-collection"]!.selection.length === 1) {
     return <SelectedNodeProperties />;
   } else {
     return <SideControlGlobal />;

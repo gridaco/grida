@@ -1,18 +1,7 @@
 import { cn } from "@/utils";
-import { useEffect, useState } from "react";
-
-const keySymbolMap: Record<string, string> = {
-  Control: "Ctrl",
-  Shift: "Shift",
-  Alt: "Alt",
-  Meta: "⌘",
-  Enter: "↵",
-  Backspace: "⌫",
-  Escape: "⎋",
-  // Add more key mappings as needed
-};
-
-const modifierKeys = ["Meta", "Control", "Shift", "Alt"];
+import { useState } from "react";
+import { usePersistentHotkeys } from "../hotkey/hooks";
+import { keysymbols } from "./keysymbols";
 
 export default function KeyboardInputOverlay({
   className,
@@ -21,42 +10,13 @@ export default function KeyboardInputOverlay({
 }) {
   const [pressedKeys, setPressedKeys] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
-    const pressed = new Set<string>();
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      pressed.add(e.key);
-      setPressedKeys(new Set(pressed));
-    };
-
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if (modifierKeys.includes(e.key)) {
-        pressed.clear();
-        setPressedKeys(new Set(pressed));
-        return;
-      }
-      pressed.delete(e.key);
-      setPressedKeys(new Set(pressed));
-    };
-
-    const handleBlur = () => {
-      pressed.clear();
-      setPressedKeys(new Set());
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("keyup", handleKeyUp);
-    window.addEventListener("blur", handleBlur);
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("keyup", handleKeyUp);
-      window.removeEventListener("blur", handleBlur);
-    };
-  }, []);
+  usePersistentHotkeys({
+    onKeysChange: setPressedKeys,
+  });
 
   const displayedKeys = Array.from(pressedKeys)
-    .map((key) => keySymbolMap[key] || key.toUpperCase())
+    .filter(Boolean)
+    .map((key) => keysymbols[key.toLowerCase()] || key.toUpperCase())
     .join(" + ");
 
   return (

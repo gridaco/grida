@@ -68,11 +68,6 @@ export function __TMP_ComponentProperties() {
               <PlusIcon className="me-2" /> Add Property
             </Button>
           </PropertyLine>
-          {/* <PropsControl
-              properties={properties}
-              props={computed.props || {}}
-              onValueChange={selectedNode.value}
-              /> */}
         </SidebarMenuSectionContent>
       </SidebarSection>
       <div className="divide-y">
@@ -255,11 +250,8 @@ function NewPropertyString({
           </SidebarSectionHeaderItem>
           <SidebarMenuSectionContent className="space-y-2">
             <PropertyLine>
-              <UserDataControl
-                node_id="..."
-                value={undefined}
-                // onValueCommit={selectedNode.userdata}
-              />
+              {/* TODO: */}
+              <UserDataControl node_id="..." value={undefined} />
             </PropertyLine>
           </SidebarMenuSectionContent>
         </SidebarSection>

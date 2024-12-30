@@ -5,6 +5,8 @@ import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/utils";
 import { Cross2Icon } from "@radix-ui/react-icons";
 import * as SliderPrimitive from "@radix-ui/react-slider";
+import { PropertyNumber } from "../ui";
+import { cmath } from "@/grida-canvas/cmath";
 
 export function GradientControl({
   value,
@@ -28,7 +30,30 @@ export function GradientControl({
           onValueChange?.({ ...value, stops });
         }}
       />
-      <hr className="py-4 w-full" />
+      <hr className="my-4 w-full" />
+      <div>
+        <PropertyNumber
+          type="number"
+          placeholder="angle"
+          disableDelta
+          step={1}
+          value={
+            value.transform ? cmath.transform.angle(value.transform) : undefined
+          }
+          onValueChange={(change) => {
+            if (change.type === "set") {
+              const t = cmath.transform.computeRelativeLinearGradientTransform(
+                change.value
+              );
+              onValueChange?.({
+                ...value,
+                transform: t,
+              });
+            }
+          }}
+        />
+      </div>
+      <hr className="my-4 w-full" />
       <div className="flex flex-col gap-2">
         {stops.map((stop, index) => (
           <GradientStop
@@ -150,7 +175,7 @@ function GradientStop({
 
           onValueChange?.({ ...stop, offset: v });
         }}
-        className={cn("flex-1", WorkbenchUI.inputVariants({ size: "sm" }))}
+        className={cn("flex-1", WorkbenchUI.inputVariants({ size: "xs" }))}
       />
       <div className="flex-[2]">
         <RGBAColorControl

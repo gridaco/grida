@@ -1,3 +1,5 @@
+"use client";
+
 import FormStartPage000 from "@/theme/templates/formstart/default/page";
 import FormStartPage001 from "@/theme/templates/formstart/001/page";
 import FormStartPage002 from "@/theme/templates/formstart/002/page";
@@ -8,13 +10,15 @@ import FormStartPage006 from "@/theme/templates/formstart/006/page";
 import { CampaignMeta } from "@/types";
 import React, { useMemo } from "react";
 import { grida } from "@/grida";
+import { StandaloneDocumentContent } from "@/grida-canvas";
+import { FormCampaignStartPageContextProvider } from "../kit/campaign";
+import i18next from "i18next";
+import { I18nextProvider } from "react-i18next";
 
 export namespace FormStartPage {
   type ClientTemplateDefinition =
     grida.program.document.template.TemplateDocumentDefinition & {
-      component: React.ComponentType<
-        FormStartPage.CampaignTemplateProps<any, any>
-      >;
+      component: React.ComponentType<any>;
     };
 
   export const templates: ClientTemplateDefinition[] = [
@@ -26,38 +30,26 @@ export namespace FormStartPage {
       ...FormStartPage001.definition,
       component: FormStartPage001,
     },
-    // {
-    //   type: "template",
-    //   name: "002",
-    //   version: "0.0.0",
-    //   default: {},
-    //   properties: FormStartPage002.properties,
-    //   component: FormStartPage002,
-    // },
+    {
+      ...FormStartPage002.definition,
+      component: FormStartPage002,
+    },
     {
       ...FormStartPage003.definition,
       component: FormStartPage003,
     },
-    // {
-    //   type: "template",
-    //   name: "004",
-    //   version: "0.0.0",
-    //   default: {},
-    //   properties: FormStartPage004.properties,
-    //   component: FormStartPage004,
-    // },
+    {
+      ...FormStartPage004.definition,
+      component: FormStartPage004,
+    },
     {
       ...FormStartPage005.definition,
       component: FormStartPage005,
     },
-    // {
-    //   type: "template",
-    //   name: "006",
-    //   version: "0.0.0",
-    //   default: {},
-    //   properties: FormStartPage006.properties,
-    //   component: FormStartPage006,
-    // },
+    {
+      ...FormStartPage006.definition,
+      component: FormStartPage006,
+    },
   ];
 
   export function getTemplate(name: string) {
@@ -78,7 +70,7 @@ export namespace FormStartPage {
     [language: string]: ResourceLanguage;
   }
 
-  export interface CampaignTemplateProps<P, M extends Resource> {
+  interface CampaignTemplateProps<P, M extends Resource> {
     meta: CampaignMeta;
     // props: P;
     resources?: M;
@@ -90,11 +82,41 @@ export namespace FormStartPage {
     // props = {},
     meta,
     lang,
+    resources = {},
   }: {
     name: string;
   } & CampaignTemplateProps<any, Resource>) {
     const template = useMemo(() => FormStartPage.getTemplate(name), [name])!;
 
-    return <template.component meta={meta} lang={lang} />;
+    // return <template.component meta={meta} lang={lang} />;
+
+    const i18n = useMemo(() => {
+      return i18next.createInstance(
+        {
+          fallbackLng: "en",
+          resources: resources,
+          lng: lang,
+        },
+        (err, t) => {
+          if (err) return console.log("something went wrong loading", err);
+        }
+      );
+    }, [lang]);
+
+    return (
+      <FormCampaignStartPageContextProvider value={meta}>
+        <I18nextProvider
+          // @ts-expect-error
+          i18n={i18n}
+        >
+          <StandaloneDocumentContent
+            templates={{
+              [name]: template.component,
+            }}
+            className="w-full h-full"
+          />
+        </I18nextProvider>
+      </FormCampaignStartPageContextProvider>
+    );
   }
 }

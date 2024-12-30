@@ -14,7 +14,7 @@ export function HrefControl({
       value={value}
       onChange={(e) => onValueChange?.(e.target.value)}
       placeholder="https://example.com"
-      className={WorkbenchUI.inputVariants({ size: "sm" })}
+      className={WorkbenchUI.inputVariants({ size: "xs" })}
     />
   );
 }

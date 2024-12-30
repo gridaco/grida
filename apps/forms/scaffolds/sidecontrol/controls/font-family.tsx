@@ -8,6 +8,8 @@ import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/utils";
 import { CheckIcon } from "@radix-ui/react-icons";
 import React, { createContext } from "react";
+import { TMixed } from "./utils/types";
+import { grida } from "@/grida";
 
 interface FontFamilyInfo {
   family: string;
@@ -49,14 +51,17 @@ export function FontFamilyControl({
   value,
   onValueChange,
 }: {
-  value: string;
-  onValueChange: (value: string) => void;
+  value?: TMixed<string>;
+  onValueChange?: (value: string) => void;
 }) {
   const list = useFontFamilyList();
 
+  const mixed = value === grida.mixed;
+
   return (
     <VirtualizedCombobox
-      value={value}
+      value={mixed ? "" : value}
+      placeholder={mixed ? "mixed" : "Font"}
       onValueChange={onValueChange}
       renderer={Item}
       options={list.map((i) => i.family)}
@@ -65,7 +70,7 @@ export function FontFamilyControl({
       align="start"
       className={cn(
         "overflow-hidden",
-        WorkbenchUI.inputVariants({ size: "sm" })
+        WorkbenchUI.inputVariants({ size: "xs" })
       )}
     />
   );

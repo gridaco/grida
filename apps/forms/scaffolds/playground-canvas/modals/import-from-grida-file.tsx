@@ -74,7 +74,7 @@ export function ImportFromGridaFileJsonDialog({
         </div>
 
         <DialogFooter>
-          <DialogClose>
+          <DialogClose asChild>
             <Button variant="outline">Close</Button>
           </DialogClose>
           <Button

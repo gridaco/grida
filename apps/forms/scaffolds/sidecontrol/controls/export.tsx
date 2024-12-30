@@ -242,9 +242,11 @@ export function exportAsArchive(node_id: string) {
 export function ExportNodeControl({
   node_id,
   name,
+  disabled,
 }: {
   node_id: string;
   name: string;
+  disabled?: boolean;
 }) {
   const advancedExportDialog = useDialogState("advenced-export", {
     refreshkey: true,
@@ -265,6 +267,7 @@ export function ExportNodeControl({
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
+            disabled={disabled}
             variant="outline"
             size="xs"
             className="w-full overflow-hidden"

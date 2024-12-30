@@ -112,7 +112,7 @@ export function BrowseStartPageTemplatesDialog({
                     document: {
                       nodes: {
                         preview:
-                          grida.program.nodes.createTemplateInstanceNodeFromTemplateDefinition(
+                          grida.program.nodes.factory.createTemplateInstanceNodeDataFromTemplateDefinition(
                             "preview",
                             template
                           ),
@@ -121,10 +121,8 @@ export function BrowseStartPageTemplatesDialog({
                     },
                   }}
                 >
-                  <template.component
-                    // props={{
-                    //   title: "",
-                    // }}
+                  <FormStartPage.TemplateRenderer
+                    name={template.name}
                     meta={campaign}
                     lang={lang}
                   />

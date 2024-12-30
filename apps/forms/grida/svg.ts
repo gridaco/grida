@@ -1,9 +1,140 @@
-import { v4 } from "uuid";
-import { SVGPathData } from "svg-pathdata";
+import { SVGCommand, encodeSVGPath, SVGPathData } from "svg-pathdata";
 import type { grida } from "./index";
+import { cmath } from "@/grida-canvas/cmath";
+import { vn } from "./vn";
 
 export namespace svg {
+  export namespace network {
+    /**
+     * Converts a vector network to SVG path data.
+     *
+     * @param vn - Vector network to convert.
+     * @returns The SVG path data string representing the vector network.
+     */
+    export function fromVectorNetwork(vn: vn.VectorNetwork) {
+      const { vertices, segments } = vn;
+
+      // Prepare path commands
+      const commands: SVGCommand[] = [];
+
+      // Keep track of visited segments to avoid duplicates
+      const visitedSegments = new Set();
+
+      if (vertices.length === 0) {
+        return "";
+      }
+
+      // Move to the first vertex
+      commands.push({
+        type: SVGPathData.MOVE_TO,
+        x: vertices[0].p[0],
+        y: vertices[0].p[1],
+        relative: false,
+      });
+
+      segments.forEach((segment, i) => {
+        const { a, b, ta, tb } = segment;
+
+        // Skip if the segment is already visited
+        if (
+          visitedSegments.has(`${a}-${b}`) ||
+          visitedSegments.has(`${b}-${a}`)
+        ) {
+          return;
+        }
+
+        visitedSegments.add(`${a}-${b}`);
+
+        // if this segment is not sequential (using a new starting point), move to the starting point
+        const prev_b = segments[i - 1]?.b ?? 0;
+        if (prev_b !== a) {
+          commands.push(
+            {
+              type: SVGPathData.MOVE_TO,
+              x: vertices[a].p[0],
+              y: vertices[a].p[1],
+              relative: false,
+            } // Move to
+          );
+        }
+
+        // if ta and tb are 0, use line.
+        if (ta[0] === 0 && ta[1] === 0 && tb[0] === 0 && tb[1] === 0) {
+          commands.push(
+            {
+              type: SVGPathData.LINE_TO,
+              x: vertices[b].p[0],
+              y: vertices[b].p[1],
+              relative: false,
+            } // Line to
+          );
+          return;
+        }
+
+        const start = vertices[a].p;
+        const end = vertices[b].p;
+        const control1 = [start[0] + ta[0], start[1] + ta[1]];
+        const control2 = [end[0] + tb[0], end[1] + tb[1]];
+
+        commands.push(
+          {
+            type: SVGPathData.CURVE_TO,
+            x1: control1[0],
+            y1: control1[1],
+            x2: control2[0],
+            y2: control2[1],
+            x: end[0],
+            y: end[1],
+            relative: false,
+          } // Cubic Bezier curve
+        );
+      });
+
+      // Encode the path commands to SVG path data
+      return encodeSVGPath(commands);
+
+      //
+    }
+  }
   export namespace d {
+    export function encode(commands: SVGCommand[]) {
+      return encodeSVGPath(commands);
+    }
+
+    /**
+     * @param a M [x y] - starting point
+     * @param ta C [x1 y1] - control point 1 (relative to `a`)
+     * @param tb C [x2 y2] - control point 2 (relative to `b`)
+     * @param b C [x y] - ending point
+     */
+    export function curve(
+      a: cmath.Vector2,
+      ta: cmath.Vector2,
+      tb: cmath.Vector2,
+      b: cmath.Vector2
+    ): SVGCommand[] {
+      return [
+        // Move to the starting point
+        {
+          type: SVGPathData.MOVE_TO,
+          x: a[0],
+          y: a[1],
+          relative: false,
+        },
+        // Cubic Bezier curve command
+        {
+          type: SVGPathData.CURVE_TO,
+          x1: a[0] + ta[0],
+          y1: a[1] + ta[1],
+          x2: b[0] + tb[0],
+          y2: b[1] + tb[1],
+          x: b[0],
+          y: b[1],
+          relative: false,
+        },
+      ];
+    }
+
     /**
      * Generates an SVG path with rounded corners for a rectangle.
      *
@@ -60,12 +191,25 @@ export namespace svg {
     export function stringifyLinearGradient(
       paint: grida.program.cg.LinearGradientPaint
     ) {
-      const { id, stops } = paint;
+      const { id, stops, transform } = paint;
+
+      // De-structure the 2x3 transform matrix:
+      // [
+      //   [a, b, tx],
+      //   [c, d, ty]
+      // ]
+      // SVG expects "matrix(a c b d tx ty)" which means:
+      // x' = a*x + c*y + tx
+      // y' = b*x + d*y + ty
+      const [[a, b, tx], [c, d, ty]] = transform ?? cmath.transform.identity;
+      const gradientTransform = `matrix(${a} ${c} ${b} ${d} ${tx} ${ty})`;
 
       // Creating gradient stops
       const gradientStops = stops.map(stringifyGradientStop).join("\n");
 
-      return `<linearGradient id="${id}">${gradientStops}</linearGradient>`;
+      return `<linearGradient id="${id}" gradientTransform="${gradientTransform}">
+${gradientStops}
+  </linearGradient>`;
     }
 
     export function stringifyRadialGradient(
@@ -80,7 +224,7 @@ export namespace svg {
     }
   }
 
-  export namespace fill {
+  export namespace paint {
     /**
      * A fill data transformation function for when element `fill` cannot be inlined directly.
      *
@@ -96,14 +240,17 @@ export namespace svg {
      * );
      *
      */
-    export function fill_with_defs(paint: grida.program.cg.Paint) {
+    export function defs(paint: grida.program.cg.Paint): {
+      defs: string | undefined;
+      ref: string;
+    } {
       switch (paint.type) {
         case "linear_gradient": {
           const defs = `<defs>${gradient.stringifyLinearGradient(paint)}</defs>`;
 
           return {
             defs,
-            fill: `url(#${paint.id})`,
+            ref: `url(#${paint.id})`,
           };
         }
         case "radial_gradient": {
@@ -111,14 +258,14 @@ export namespace svg {
 
           return {
             defs,
-            fill: `url(#${paint.id})`,
+            ref: `url(#${paint.id})`,
           };
         }
         case "solid": {
           const { color } = paint;
           return {
             defs: undefined,
-            fill: `rgba(${color.r}, ${color.g}, ${color.b}, ${color.a})`,
+            ref: `rgba(${color.r}, ${color.g}, ${color.b}, ${color.a})`,
           };
         }
       }

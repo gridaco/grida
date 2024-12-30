@@ -20,6 +20,7 @@ function _1000_rects(): Array<grida.program.nodes.RectangleNode> {
       locked: false,
       opacity: 1,
       zIndex: 0,
+      rotation: 0,
       width: 200,
       height: 200,
       position: "absolute",
@@ -27,6 +28,8 @@ function _1000_rects(): Array<grida.program.nodes.RectangleNode> {
       left: 0 + i * 1,
       cornerRadius: 0,
       fill: { type: "solid", color: randcolor() },
+      strokeWidth: 0,
+      strokeCap: "butt",
       effects: [],
     } satisfies grida.program.nodes.RectangleNode);
   }
@@ -48,6 +51,7 @@ export default {
       expanded: true,
       opacity: 1,
       zIndex: 0,
+      rotation: 0,
       position: "relative",
       width: 960,
       height: 540,

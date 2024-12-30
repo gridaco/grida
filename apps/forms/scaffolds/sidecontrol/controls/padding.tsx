@@ -23,7 +23,7 @@ export function PaddingControl({
       placeholder="inherit"
       min={0}
       step={1}
-      className={WorkbenchUI.inputVariants({ size: "sm" })}
+      className={WorkbenchUI.inputVariants({ size: "xs" })}
       onChange={(e) => {
         onValueChange?.(parseInt(e.target.value));
       }}

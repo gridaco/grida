@@ -11,6 +11,7 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuShortcut,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import {
@@ -21,7 +22,6 @@ import {
   TextIcon,
   TransformIcon,
   CircleIcon,
-  LockOpen2Icon,
   LockClosedIcon,
   EyeOpenIcon,
   EyeClosedIcon,
@@ -31,8 +31,9 @@ import {
   Component1Icon,
 } from "@radix-ui/react-icons";
 import { grida } from "@/grida";
-import React from "react";
+import React, { useMemo } from "react";
 import { useNodeAction } from "@/grida-canvas/provider";
+import { document as dq } from "@/grida-canvas/document-query";
 
 function NodeHierarchyItemContextMenuWrapper({
   node_id,
@@ -48,11 +49,13 @@ function NodeHierarchyItemContextMenuWrapper({
       <ContextMenuContent>
         {/* <ContextMenuItem onSelect={() => {}}>Copy</ContextMenuItem> */}
         {/* <ContextMenuItem>Paste here</ContextMenuItem> */}
-        <ContextMenuItem onSelect={change.bringFront}>
+        <ContextMenuItem onSelect={() => change.order("front")}>
           Bring to front
+          <ContextMenuShortcut>{"]"}</ContextMenuShortcut>
         </ContextMenuItem>
-        <ContextMenuItem onSelect={change.pushBack}>
+        <ContextMenuItem onSelect={() => change.order("back")}>
           Send to back
+          <ContextMenuShortcut>{"["}</ContextMenuShortcut>
         </ContextMenuItem>
         <ContextMenuItem
           onSelect={() => {
@@ -65,9 +68,11 @@ function NodeHierarchyItemContextMenuWrapper({
         {/* <ContextMenuItem>Add Container</ContextMenuItem> */}
         <ContextMenuItem onSelect={change.toggleActive}>
           Set Active/Inactive
+          <ContextMenuShortcut>{"⌘⇧H"}</ContextMenuShortcut>
         </ContextMenuItem>
         <ContextMenuItem onSelect={change.toggleLocked}>
           Lock/Unlock
+          <ContextMenuShortcut>{"⌘⇧L"}</ContextMenuShortcut>
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
@@ -76,56 +81,63 @@ function NodeHierarchyItemContextMenuWrapper({
 
 export function NodeHierarchyList() {
   const {
-    state: { document, selected_node_id, hovered_node_id },
-    selectNode,
-    pointerEnterNode,
+    state: { document, document_ctx, selection, hovered_node_id },
+    select,
+    hoverNode,
     toggleNodeLocked,
     toggleNodeActive,
-    getNodeDepth,
   } = useDocument();
 
   // TODO: need nested nodes for templates
 
-  const ids = Object.keys(document.nodes);
+  const list = useMemo(() => {
+    return dq.hierarchy(document.root_id, document_ctx);
+  }, [document.root_id, document_ctx]);
+
+  // const ids = Object.keys(document.nodes);
+
   return (
     <>
-      {ids.map((id) => {
+      {list.map(({ id, depth }) => {
         const n = document.nodes[id];
-        const selected = selected_node_id === n.id;
-        const hovered = hovered_node_id === n.id;
-        const depth = getNodeDepth(n.id);
+        const selected = selection.includes(id);
+        const hovered = hovered_node_id === id;
         return (
-          <NodeHierarchyItemContextMenuWrapper key={n.id} node_id={n.id}>
+          <NodeHierarchyItemContextMenuWrapper key={id} node_id={id}>
             <SidebarMenuItem
               muted
               hovered={hovered}
               level={depth}
               selected={selected}
-              onSelect={() => {
-                selectNode(n.id);
+              onSelect={(e) => {
+                if (e.metaKey || e.ctrlKey) {
+                  select("selection", [id]);
+                } else {
+                  select([id]);
+                }
               }}
-              icon={<NodeHierarchyItemIcon node={n} className="w-4 h-4" />}
+              icon={<NodeHierarchyItemIcon node={n} className="w-3.5 h-3.5" />}
               onPointerEnter={() => {
-                pointerEnterNode(n.id);
+                hoverNode(id, "enter");
               }}
               onPointerLeave={() => {
-                pointerEnterNode(n.id);
+                hoverNode(id, "leave");
               }}
             >
-              <SidebarMenuItemLabel className="font-normal text-sm">
+              <SidebarMenuItemLabel className="font-normal text-xs">
                 {n.name}
               </SidebarMenuItemLabel>
               <SidebarMenuItemActions>
                 <SidebarMenuItemAction
                   onClick={() => {
-                    toggleNodeLocked(n.id);
+                    toggleNodeLocked(id);
                   }}
                 >
                   {n.locked ? <LockClosedIcon /> : <LockOpen1Icon />}
                 </SidebarMenuItemAction>
                 <SidebarMenuItemAction
                   onClick={() => {
-                    toggleNodeActive(n.id);
+                    toggleNodeActive(id);
                   }}
                 >
                   {n.active ? <EyeOpenIcon /> : <EyeClosedIcon />}
@@ -170,6 +182,8 @@ function NodeHierarchyItemIcon({
     case "ellipse":
       return <CircleIcon className={className} />;
     case "vector":
+    case "line":
+    case "path":
       return <TransformIcon className={className} />;
   }
   return <BoxIcon className={className} />;

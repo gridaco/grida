@@ -7,6 +7,14 @@ import { grida } from "@/grida";
 import { ReactNodeRenderers } from ".";
 import { useComputedNode, useDocument, useNode } from "../provider";
 import assert from "assert";
+import { useUserDocumentCustomRenderer } from "../renderer";
+
+class RendererNotFound extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RendererNotFound";
+  }
+}
 
 interface NodeElementProps<P extends Record<string, any>> {
   node_id: string;
@@ -34,35 +42,45 @@ export function NodeElement<P extends Record<string, any>>({
   fill: DEFAULT_FILL,
   style,
 }: React.PropsWithChildren<NodeElementProps<P>>) {
-  const { state: document, selected_node_id } = useDocument();
+  const user_registered_renderers = useUserDocumentCustomRenderer();
+  const { state: document, selection } = useDocument();
 
   const node = useNode(node_id);
   const computed = useComputedNode(node_id);
-  const selected = node_id === selected_node_id;
+  const selected = selection.includes(node_id);
   const hovered = node_id === document.hovered_node_id;
 
-  const { component_id, children } = node;
+  const { component_id, template_id, children } = node;
 
   const renderer = useMemo(() => {
     switch (node.type) {
       case "instance": {
-        return component_id
-          ? TemplateComponents.components[component_id]
-          : USER_COMPONENT;
+        throw new Error("instance node is not supported");
+        // const r = component_id
+        //   ? TemplateComponents.components[component_id]
+        //   : USER_COMPONENT;
       }
       case "template_instance": {
-        return USER_COMPONENT;
+        const r = USER_COMPONENT ?? user_registered_renderers[template_id!];
+        if (!r) {
+          throw new RendererNotFound(
+            `renderer not found for template_instance '${template_id}'`
+          );
+        }
+        return r;
       }
       case "container":
       case "image":
       case "video":
       case "text":
       case "vector":
+      case "path":
       case "line":
       case "rectangle":
       case "component":
       case "ellipse":
-      case "iframe": {
+      case "iframe":
+      case "richtext": {
         return ReactNodeRenderers[node.type];
       }
       default:
@@ -91,10 +109,12 @@ export function NodeElement<P extends Record<string, any>>({
     text: computed.text,
     props: computed.props,
     src: computed.src,
+    html: computed.html,
     loop: node.loop,
     muted: node.muted,
     autoplay: node.autoplay,
     paths: node.paths,
+    vectorNetwork: node.vectorNetwork,
     opacity: node.opacity,
     zIndex: DEFAULT_ZINDEX ?? node.zIndex,
     position: DEFAULT_POSITION ?? node.position,
@@ -103,6 +123,10 @@ export function NodeElement<P extends Record<string, any>>({
     width: DEFAULT_WIDTH ?? node.width,
     height: DEFAULT_HEIGHT ?? node.height,
     fill: DEFAULT_FILL ?? node.fill,
+    stroke: node.stroke,
+    strokeWidth: node.strokeWidth,
+    strokeCap: node.strokeCap,
+    cursor: node.cursor,
     style: {
       ...style,
       ...node.style,
@@ -126,13 +150,11 @@ export function NodeElement<P extends Record<string, any>>({
   return (
     <HrefWrapper href={computed.href} target={node.target}>
       {React.createElement<any>(
-        // TODO: double check
-        // @ts-expect-error
         renderer,
         {
-          id: node_id,
           ...props,
           ...({
+            id: node_id,
             ["data-grida-node-id"]: node_id,
             ["data-grida-node-locked"]: node.locked,
             ["data-grida-node-type"]: node.type,
@@ -147,11 +169,11 @@ export function NodeElement<P extends Record<string, any>>({
             // hard override user-select
             userSelect: document.editable ? "none" : undefined,
             // hide this node when in surface edit mode
-            visibility: selected
-              ? document.surface_content_edit_mode
+            visibility:
+              document.content_edit_mode?.type === "text" &&
+              document.content_edit_mode.node_id === node_id
                 ? "hidden"
-                : undefined
-              : undefined,
+                : undefined,
           } satisfies React.CSSProperties,
         } satisfies grida.program.document.IComputedNodeReactRenderProps<any>,
         computedchildren
@@ -165,14 +187,17 @@ const fillings = {
   container: "background",
   component: "background",
   iframe: "background",
+  richtext: "color",
   image: "background",
   video: "background",
-  vector: "none",
   rectangle: "none",
   ellipse: "none",
   template_instance: "none",
   instance: "none",
+  vector: "none",
   line: "none",
+  path: "none",
+  polyline: "none",
 } as const;
 
 function HrefWrapper({

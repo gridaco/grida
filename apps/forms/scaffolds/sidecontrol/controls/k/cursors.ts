@@ -30,4 +30,4 @@ export const cursors = {
   "w-resize": { src: "/assets/css-cursors-macos/w-resize.png", label: "West Resize" },
   "zoom-in": { src: "/assets/css-cursors-macos/zoom-in.png", label: "Zoom In" },
   "zoom-out": { src: "/assets/css-cursors-macos/zoom-out.png", label: "Zoom Out" },
-};
+} as const;

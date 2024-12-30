@@ -29,8 +29,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { FormFieldBlockMenuItems } from "../blocks-editor/blocks/field-block";
 import { renderMenuItems } from "./render";
-import { StandaloneDocumentEditor } from "@/grida-canvas";
-import { BuilderAction } from "@/grida-canvas/action";
+import { StandaloneDocumentEditor, type CanvasAction } from "@/grida-canvas";
 import { composeEditorDocumentAction } from "../editor/action";
 import { NodeHierarchyList } from "./sidebar-node-hierarchy-list";
 
@@ -72,7 +71,7 @@ function HierarchyView() {
   const { doctype, selected_page_id, documents } = state;
 
   const documentDispatch = useCallback(
-    (action: BuilderAction) => {
+    (action: CanvasAction) => {
       dispatch(
         composeEditorDocumentAction(
           // @ts-ignore

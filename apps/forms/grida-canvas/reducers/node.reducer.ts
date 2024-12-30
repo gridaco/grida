@@ -36,13 +36,16 @@ export default function nodeReducer<
       }
       case "node/change/positioning": {
         const { positioning } = action;
-        (draft as grida.program.nodes.i.IPositioning).left = positioning.left;
-        (draft as grida.program.nodes.i.IPositioning).top = positioning.top;
-        (draft as grida.program.nodes.i.IPositioning).right = positioning.right;
-        (draft as grida.program.nodes.i.IPositioning).bottom =
-          positioning.bottom;
-        (draft as grida.program.nodes.i.IPositioning).position =
-          positioning.position;
+        const pos = draft as grida.program.nodes.i.IPositioning;
+        if ("position" in positioning) {
+          if (positioning.position) {
+            pos.position = positioning.position;
+          }
+        }
+        if ("left" in positioning) pos.left = positioning.left;
+        if ("top" in positioning) pos.top = positioning.top;
+        if ("right" in positioning) pos.right = positioning.right;
+        if ("bottom" in positioning) pos.bottom = positioning.bottom;
         break;
       }
       case "node/change/positioning-mode": {
@@ -75,6 +78,10 @@ export default function nodeReducer<
         (draft as grida.program.nodes.i.IHrefable).target = action.target;
         break;
       }
+      case "node/change/mouse-cursor": {
+        (draft as grida.program.nodes.i.IMouseCursor).cursor = action.cursor;
+        break;
+      }
       case "node/change/component": {
         assert(draft.type === "instance");
         draft.component_id = action.component_id;
@@ -91,13 +98,27 @@ export default function nodeReducer<
         break;
       }
       case "node/change/opacity": {
-        (draft as Draft<grida.program.nodes.i.ICSSStylable>).opacity =
-          action.opacity;
+        const node = draft as Draft<grida.program.nodes.i.ICSSStylable>;
+        switch (action.opacity.type) {
+          case "set":
+            node.opacity = ranged(0, action.opacity.value, 1);
+            break;
+          case "delta":
+            node.opacity = ranged(0, node.opacity + action.opacity.value, 1);
+            break;
+        }
         break;
       }
       case "node/change/rotation": {
-        (draft as Draft<grida.program.nodes.i.ICSSStylable>).rotation =
-          action.rotation;
+        const node = draft as Draft<grida.program.nodes.i.ICSSStylable>;
+        switch (action.rotation.type) {
+          case "set":
+            node.rotation = action.rotation.value;
+            break;
+          case "delta":
+            node.rotation += action.rotation.value;
+            break;
+        }
         break;
       }
       case "node/change/cornerRadius": {
@@ -136,34 +157,90 @@ export default function nodeReducer<
       case "node/change/fill": {
         assert(
           draft.type === "vector" ||
+            draft.type === "path" ||
+            draft.type === "image" ||
             draft.type === "rectangle" ||
             draft.type === "ellipse" ||
             draft.type === "text" ||
+            draft.type === "richtext" ||
             draft.type === "container" ||
             draft.type === "component"
         );
+
+        if (action.fill === null) {
+          draft.fill = undefined;
+          break;
+        }
+
         switch (action.fill.type) {
           case "linear_gradient":
-            draft.fill = { ...action.fill, id: `gradient-${v4()}` };
-            break;
           case "radial_gradient":
             draft.fill = { ...action.fill, id: `gradient-${v4()}` };
             break;
           case "solid":
             draft.fill = action.fill;
         }
-
         break;
       }
       case "node/change/border": {
         assert(
-          // draft.type === "vector" ||
-          // draft.type === "rectangle" ||
-          // draft.type === "ellipse" ||
           // draft.type === "text" ||
-          draft.type === "container" || draft.type === "component"
+          draft.type === "image" ||
+            draft.type === "video" ||
+            draft.type === "container" ||
+            draft.type === "component"
         );
         draft.border = action.border;
+        break;
+      }
+      case "node/change/stroke":
+      case "node/change/stroke-width":
+      case "node/change/stroke-cap": {
+        assert(
+          draft.type === "path" ||
+            draft.type === "line" ||
+            draft.type === "rectangle" ||
+            draft.type === "ellipse"
+        );
+        switch (action.type) {
+          case "node/change/stroke": {
+            if (action.stroke === null) {
+              draft.stroke = undefined;
+              break;
+            }
+
+            switch (action.stroke.type) {
+              case "linear_gradient":
+              case "radial_gradient":
+                draft.stroke = { ...action.stroke, id: `gradient-${v4()}` };
+                break;
+              case "solid":
+                draft.stroke = action.stroke;
+            }
+            break;
+          }
+          case "node/change/stroke-width": {
+            switch (action.strokeWidth.type) {
+              case "set":
+                draft.strokeWidth = ranged(0, action.strokeWidth.value);
+                break;
+              case "delta":
+                if (draft.strokeWidth !== undefined) {
+                  draft.strokeWidth = ranged(
+                    0,
+                    draft.strokeWidth + action.strokeWidth.value
+                  );
+                }
+
+                break;
+            }
+            break;
+          }
+          case "node/change/stroke-cap": {
+            draft.strokeCap = action.strokeCap;
+            break;
+          }
+        }
         break;
       }
       case "node/change/fit": {
@@ -259,7 +336,19 @@ export default function nodeReducer<
       }
       case "node/change/fontSize": {
         assert(draft.type === "text");
-        draft.fontSize = action.fontSize;
+        switch (action.fontSize.type) {
+          case "set":
+            draft.fontSize = ranged(0, action.fontSize.value);
+            break;
+          case "delta":
+            if (draft.fontSize !== undefined) {
+              draft.fontSize = ranged(
+                0,
+                draft.fontSize + action.fontSize.value
+              );
+            }
+            break;
+        }
         break;
       }
       case "node/change/fontWeight": {
@@ -269,12 +358,30 @@ export default function nodeReducer<
       }
       case "node/change/letterSpacing": {
         assert(draft.type === "text");
-        draft.letterSpacing = action.letterSpacing;
+        switch (action.letterSpacing.type) {
+          case "set":
+            draft.letterSpacing = action.letterSpacing.value;
+            break;
+          case "delta":
+            if (draft.letterSpacing !== undefined) {
+              draft.letterSpacing += action.letterSpacing.value;
+            }
+            break;
+        }
         break;
       }
       case "node/change/lineHeight": {
         assert(draft.type === "text");
-        draft.lineHeight = action.lineHeight;
+        switch (action.lineHeight.type) {
+          case "set":
+            draft.lineHeight = action.lineHeight.value;
+            break;
+          case "delta":
+            if (draft.lineHeight !== undefined) {
+              draft.lineHeight += action.lineHeight.value;
+            }
+            break;
+        }
         break;
       }
       case "node/change/textAlign": {
@@ -301,3 +408,10 @@ export default function nodeReducer<
     }
   });
 }
+
+const ranged = (min: number, value: number, max?: number) => {
+  if (max === undefined) {
+    return Math.max(min, value);
+  }
+  return Math.min(Math.max(value, min), max);
+};

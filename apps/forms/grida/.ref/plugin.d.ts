@@ -13,26 +13,9 @@ interface PluginAPI {
   readonly apiVersion: "1.0.0";
   readonly command: string;
   readonly editorType: "figma" | "figjam" | "dev";
-  readonly mode:
-    | "default"
-    | "textreview"
-    | "inspect"
-    | "codegen"
-    | "linkpreview"
-    | "auth";
-  readonly pluginId?: string;
-  readonly widgetId?: string;
   readonly fileKey: string | undefined;
   skipInvisibleInstanceChildren: boolean;
-  readonly timer?: TimerAPI;
-  readonly viewport: ViewportAPI;
-  readonly currentUser: User | null;
-  readonly activeUsers: ActiveUser[];
-  readonly textreview?: TextReviewAPI;
-  readonly codegen: CodegenAPI;
-  readonly vscode?: VSCodeAPI;
   readonly devResources?: DevResourcesAPI;
-  readonly payments?: PaymentsAPI;
   closePlugin(message?: string): void;
   notify(message: string, options?: NotificationOptions): NotificationHandler;
   commitUndo(): void;
@@ -295,19 +278,7 @@ interface TeamLibraryAPI {
     libraryCollectionKey: string
   ): Promise<LibraryVariable[]>;
 }
-declare type PaymentStatus = {
-  type: "UNPAID" | "PAID" | "NOT_SUPPORTED";
-};
-interface PaymentsAPI {
-  readonly status: PaymentStatus;
-  setPaymentStatusInDevelopment(status: PaymentStatus): void;
-  getUserFirstRanSecondsAgo(): number;
-  initiateCheckoutAsync(options?: {
-    interstitial?: "PAID_FEATURE" | "TRIAL_ENDED" | "SKIP";
-  }): Promise<void>;
-  requestCheckout(): void;
-  getPluginPaymentTokenAsync(): Promise<string>;
-}
+
 interface ClientStorageAPI {
   getAsync(key: string): Promise<any | undefined>;
   setAsync(key: string, value: any): Promise<void>;
@@ -385,35 +356,7 @@ declare type CodegenEvent = {
   node: SceneNode;
   language: string;
 };
-declare type CodegenPreferences = {
-  readonly unit: "pixel" | "scaled";
-  readonly scaleFactor?: number;
-  readonly customSettings: Record<string, string>;
-};
-declare type CodegenPreferencesEvent = {
-  propertyName: string;
-};
-declare type CodegenResult = {
-  title: string;
-  code: string;
-  language:
-    | "TYPESCRIPT"
-    | "CPP"
-    | "RUBY"
-    | "CSS"
-    | "JAVASCRIPT"
-    | "HTML"
-    | "JSON"
-    | "GRAPHQL"
-    | "PYTHON"
-    | "GO"
-    | "SQL"
-    | "SWIFT"
-    | "KOTLIN"
-    | "RUST"
-    | "BASH"
-    | "PLAINTEXT";
-};
+
 interface CodegenAPI {}
 interface DevResource {}
 interface DevResourceWithNodeId extends DevResource {
@@ -441,7 +384,6 @@ declare type DevResourceOpenEvent = {
 declare type AuthResult = {
   type: "AUTH_SUCCESS";
 } | null;
-interface VSCodeAPI {}
 interface DevResourcesAPI {
   on(
     type: "linkpreview",
@@ -477,9 +419,6 @@ interface DevResourcesAPI {
   ): void;
   off(type: "open", callback: (event: DevResourceOpenEvent) => void): void;
 }
-interface TimerAPI {}
-interface ViewportAPI {}
-interface TextReviewAPI {}
 interface ParameterValues {
   [key: string]: any;
 }
@@ -2391,7 +2330,6 @@ interface StickyNode
 interface StampNode extends DefaultShapeMixin, ConstraintMixin, StickableMixin {
   readonly type: "STAMP";
   clone(): StampNode;
-  getAuthorAsync(): Promise<BaseUser | null>;
 }
 interface TableNode
   extends OpaqueNodeMixin,
@@ -2781,20 +2719,7 @@ interface Image {
 interface Video {
   readonly hash: string;
 }
-interface BaseUser {
-  readonly id: string | null;
-  readonly name: string;
-  readonly photoUrl: string | null;
-}
-interface User extends BaseUser {
-  readonly color: string;
-  readonly sessionId: number;
-}
-interface ActiveUser extends User {
-  readonly position: Vector | null;
-  readonly viewport: Rect;
-  readonly selection: string[];
-}
+
 interface FindAllCriteria<T extends NodeType[]> {
   types?: T;
   pluginData?: {

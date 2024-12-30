@@ -17,10 +17,8 @@ export function fontFamilyToId(fontFamily: string) {
  * @returns
  */
 export function csslink({ fontFamily }: { fontFamily: string }) {
-  return `https://fonts.googleapis.com/css2?family=${fontFamily!.replace(
-    " ",
-    "+"
-  )}&display=swap`;
+  const formattedFamily = fontFamily!.replace(/\s+/g, "+");
+  return `https://fonts.googleapis.com/css2?family=${formattedFamily}:wght@100;200;300;400;500;600;700;800;900&display=swap`;
 }
 
 export function svglink(id: string) {

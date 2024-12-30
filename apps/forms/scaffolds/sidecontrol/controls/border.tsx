@@ -9,14 +9,7 @@ import { grida } from "@/grida";
 import { cn } from "@/utils";
 import { RGBAChip } from "./utils/paint-chip";
 import { RGBAColorControl } from "./color";
-import { PropertyLine, PropertyLineLabel } from "../ui";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { PropertyEnum, PropertyLine, PropertyLineLabel } from "../ui";
 import { Label } from "@/components/ui/label";
 
 export function BorderControl({
@@ -48,7 +41,10 @@ export function BorderControl({
           <div
             className={cn(
               "flex items-center gap-2 border cursor-default",
-              WorkbenchUI.inputVariants({ size: "sm" })
+              WorkbenchUI.inputVariants({
+                size: "xs",
+                variant: "paint-container",
+              })
             )}
           >
             <RGBAChip rgba={value?.borderColor ?? { r: 0, g: 0, b: 0, a: 0 }} />
@@ -59,7 +55,10 @@ export function BorderControl({
           <div
             className={cn(
               "flex items-center gap-2 border cursor-default",
-              WorkbenchUI.inputVariants({ size: "sm" })
+              WorkbenchUI.inputVariants({
+                size: "xs",
+                variant: "paint-container",
+              })
             )}
             onClick={onAddBorder}
           >
@@ -97,7 +96,7 @@ export function BorderControl({
               {/* TODO: individual handling */}
               <Input
                 type="number"
-                className={WorkbenchUI.inputVariants({ size: "sm" })}
+                className={WorkbenchUI.inputVariants({ size: "xs" })}
                 min={0}
                 value={
                   typeof value?.borderWidth === "number"
@@ -109,35 +108,19 @@ export function BorderControl({
             </PropertyLine>
             <PropertyLine>
               <PropertyLineLabel>Style</PropertyLineLabel>
-              <Select
-                defaultValue={value.borderStyle}
-                onValueChange={(v: grida.program.css.Border["borderStyle"]) => {
+              <PropertyEnum<grida.program.css.Border["borderStyle"]>
+                enum={[
+                  { value: "solid", label: "Solid" },
+                  { value: "dashed", label: "Dashed" },
+                ]}
+                value={value.borderStyle}
+                onValueChange={(v) => {
                   onValueChange?.({
                     ...(value || {}),
                     borderStyle: v,
                   });
                 }}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem
-                    value={
-                      "solid" satisfies grida.program.css.Border["borderStyle"]
-                    }
-                  >
-                    Solid
-                  </SelectItem>
-                  <SelectItem
-                    value={
-                      "dashed" satisfies grida.program.css.Border["borderStyle"]
-                    }
-                  >
-                    Dashed
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+              />
             </PropertyLine>
           </div>
         )}

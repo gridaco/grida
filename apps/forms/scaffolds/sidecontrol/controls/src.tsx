@@ -89,7 +89,7 @@ export function SrcControl({
       onClick={openFilePicker}
       className={cn(
         "flex items-center border cursor-default",
-        WorkbenchUI.inputVariants({ size: "sm" })
+        WorkbenchUI.inputVariants({ size: "xs", variant: "paint-container" })
       )}
     >
       {value ? (
@@ -103,8 +103,9 @@ export function SrcControl({
               e.stopPropagation();
               onValueChange?.(undefined);
             }}
+            className="px-1 py-1 me-0.5 text-muted-foreground"
           >
-            <Cross2Icon className="w-3 h-3 text-muted-foreground" />
+            <Cross2Icon className="w-3.5 h-3.5" />
           </button>
         </>
       ) : (
@@ -126,7 +127,7 @@ function Thumb({ src }: { src: string }) {
       src={src}
       width={40}
       height={40}
-      className="object-cover w-6 h-6 overflow-hidden rounded border"
+      className="object-cover w-5 h-5 overflow-hidden rounded border"
       alt="thumb"
     />
   );
@@ -134,6 +135,6 @@ function Thumb({ src }: { src: string }) {
 
 function ThumbPlaceholder() {
   return (
-    <div className="w-6 h-6 overflow-hidden rounded border bg-secondary" />
+    <div className="w-5 h-5 overflow-hidden rounded border bg-secondary" />
   );
 }
