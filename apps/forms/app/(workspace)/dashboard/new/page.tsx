@@ -31,9 +31,9 @@ export default async function OnboardWithNewFormPage({
 
   const supabase = createServerComponentClient(cookieStore);
 
-  const { data } = await supabase.auth.getUser();
+  const { data: auth } = await supabase.auth.getUser();
   // if no auth, sign in, redirect back here
-  if (data.session === null || data.session.user === null) {
+  if (!auth.user) {
     const search = new URLSearchParams(searchParams).toString();
     const uri = encodeURIComponent("/dashboard/new?" + search);
     redirect("/sign-in?redirect_uri=" + uri);
