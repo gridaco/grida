@@ -7,7 +7,7 @@ import type {
   Option,
 } from "./types";
 import { toArrayOf, MaybeArray } from "./utility";
-import type { Tokens } from "@/ast";
+import type { tokens } from "@/ast";
 
 /**
  * used when representing a type in json following the schema.
@@ -29,13 +29,13 @@ type JSONOptionalDefineAsArrayAnnotation<T> = T | [T];
 type JSONBlock = JSONFieldBlock | JSONHeaderBlock;
 interface JSONFieldBlock {
   type: "field";
-  field: Tokens.JSONRef;
-  hidden?: Tokens.BooleanValueExpression;
+  field: tokens.JSONRef;
+  hidden?: tokens.BooleanValueExpression;
 }
 
 interface JSONHeaderBlock {
   type: "header";
-  hidden?: Tokens.BooleanValueExpression;
+  hidden?: tokens.BooleanValueExpression;
   title: string;
   description?: string;
 }
@@ -75,7 +75,7 @@ type _JSONField<T> = {
   options?: JSONOptionLike[];
   multiple?: boolean | null;
   autocomplete?: FormFieldAutocompleteType | FormFieldAutocompleteType[] | null;
-  value?: Tokens.TValueExpression;
+  value?: tokens.TValueExpression;
 };
 
 export type JSONFieldRaw = _JSONField<

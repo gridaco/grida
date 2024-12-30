@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/popover";
 import { useEditorState, useFormFields } from "@/scaffolds/editor";
 import { MixIcon } from "@radix-ui/react-icons";
-import { Tokens } from "@/ast";
+import { tokens } from "@/ast";
 import toast from "react-hot-toast";
 import { FormExpression } from "@/lib/forms/expression";
 import { PropertyLine, PropertyLineLabel } from "./ui";
@@ -64,7 +64,7 @@ function SelectedPageFormStart() {
  * NOTE - the type string represents a id, not a scalar for this component, atm.
  * TODO: support scalar types
  */
-type ConditionExpression = Tokens.ShorthandBooleanBinaryExpression;
+type ConditionExpression = tokens.ShorthandBooleanBinaryExpression;
 
 function SelectedFormBlockProperties() {
   //
@@ -92,7 +92,7 @@ function SelectedFormBlockProperties() {
       return;
     }
     //
-    const exp: Tokens.ShorthandBooleanBinaryExpression = [
+    const exp: tokens.ShorthandBooleanBinaryExpression = [
       FormExpression.create_field_property_json_ref(l as string, "value"),
       op,
       r,

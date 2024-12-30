@@ -1,7 +1,7 @@
-import type { Tokens } from "./tokens";
+import type { tokens } from "./tokens";
 
 export const binary_operator_labels: Record<
-  Tokens.BinaryOperator,
+  tokens.BinaryOperator,
   [string, string]
 > = {
   "==": ["is", "equal to"],

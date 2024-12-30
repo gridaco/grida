@@ -66,7 +66,7 @@ import { SupabaseFKReferenceSettings } from "./extensions/field-x-sb-reference-f
 import { SupabaseStorageSettings } from "./extensions/field-x-sb-storage-settings";
 import { XSupabaseFieldConnectionPolicyCheck } from "@/lib/x-supabase/check";
 import { FieldValueExpression } from "./extensions/field-value-expression";
-import { Tokens } from "@/ast";
+import { tokens } from "@/ast";
 import { TypeSelect } from "@/components/formfield-type-select";
 import type { Data } from "@/lib/data";
 
@@ -200,8 +200,8 @@ export function FieldEditPanel({
 
   // v_value
   const [v_value, set_v_value] = useState<
-    Tokens.TValueExpression | null | undefined
-  >(init?.v_value as Tokens.TValueExpression);
+    tokens.TValueExpression | null | undefined
+  >(init?.v_value as tokens.TValueExpression);
 
   // options
   const [{ options, optgroups }, dispatchoptions] = useReducer(

@@ -1,4 +1,4 @@
-import type { Tokens } from "@/ast";
+import type { tokens } from "@/ast";
 import type { grida } from "@/grida";
 import type {
   CursorMode,
@@ -459,7 +459,7 @@ interface INodeChangeComponentAction extends INodeID {
 }
 
 interface INodeChangeTextAction extends INodeID {
-  text?: Tokens.StringValueExpression;
+  text?: tokens.StringValueExpression;
 }
 
 interface INodeChangeOpacityAction extends INodeID {
@@ -586,7 +586,7 @@ interface INodeChangeStyleAction extends INodeID {
 }
 
 interface INodeChangeSrcAction extends INodeID {
-  src?: Tokens.StringValueExpression;
+  src?: tokens.StringValueExpression;
 }
 
 interface INodeChangeHrefAction extends INodeID {

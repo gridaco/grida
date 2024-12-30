@@ -1,14 +1,14 @@
 import { useMemo } from "react";
 import { useSelectValue, useValue } from "@/grida/react-runtime/data-context";
 import { TemplateValueProperties } from "../template-builder/with-template";
-import { Tokens, Factory } from "@/ast";
+import { tokens } from "@/ast";
 
 function extractAccessIdentifiersDependencyArrayFromProps<
   P extends Record<string, any>,
->(props?: TemplateValueProperties<P, Tokens.StringValueExpression>) {
+>(props?: TemplateValueProperties<P, tokens.StringValueExpression>) {
   return Object.entries(props || {})
     .map(([key, value]) => {
-      return Factory.getStringValueExpressionAccessIdentifiersDependencyArray(
+      return tokens.factory.getStringValueExpressionAccessIdentifiersDependencyArray(
         value
       );
     })
@@ -17,7 +17,7 @@ function extractAccessIdentifiersDependencyArrayFromProps<
 
 // TODO: needs optimization
 export function useComputed<P extends Record<string, any>>(
-  props?: TemplateValueProperties<P, Tokens.StringValueExpression>
+  props?: TemplateValueProperties<P, tokens.StringValueExpression>
 ): P {
   // list all data keys that are needed for selecting required values
   const datakeys = useMemo(
@@ -31,10 +31,13 @@ export function useComputed<P extends Record<string, any>>(
 
   const computed = Object.entries(props || {}).reduce(
     (acc: Record<string, any>, [key, value]) => {
-      if (Tokens.is.propertyAccessExpression(value)) {
-        acc[key] = Factory.renderPropertyAccessExpression(value, contextdata);
-      } else if (Tokens.is.templateExpression(value)) {
-        acc[key] = Factory.renderTemplateExpression(value, contextdata);
+      if (tokens.is.propertyAccessExpression(value)) {
+        acc[key] = tokens.factory.renderPropertyAccessExpression(
+          value,
+          contextdata
+        );
+      } else if (tokens.is.templateExpression(value)) {
+        acc[key] = tokens.factory.renderTemplateExpression(value, contextdata);
       } else {
         acc[key] = value;
       }

@@ -54,7 +54,7 @@ import { PhoneField } from "./phone-field";
 import { RichTextEditorField } from "./richtext-field";
 import { FieldProperties } from "@/k/supported_field_types";
 import "core-js/features/map/group-by";
-import { Tokens } from "@/ast";
+import { tokens } from "@/ast";
 import { useValue } from "@/lib/spock";
 
 /**
@@ -88,7 +88,7 @@ interface IInputField {
   data?: FormFieldDataSchema | null;
   fileupload?: FileUploadStrategy;
   fileresolve?: FileResolveStrategy;
-  v_value?: Tokens.TValueExpression | null;
+  v_value?: tokens.TValueExpression | null;
   onValueChange?: (value: string) => void;
   onRangeChange?: (value: number[]) => void;
   onCheckedChange?: (checked: boolean) => void;

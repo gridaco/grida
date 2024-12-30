@@ -1,6 +1,6 @@
 import { IpInfo } from "@/clients/ipinfo";
 import palettes from "@/theme/palettes";
-import type { Tokens } from "@/ast";
+import type { tokens } from "@/ast";
 import { grida } from "@/grida";
 
 type UUID = string;
@@ -196,7 +196,7 @@ export type FormFieldInit = {
   multiple?: boolean;
   storage?: FormFieldStorageSchema | {} | null;
   reference?: FormFieldReferenceSchema | {} | null;
-  v_value?: Tokens.TValueExpression | {} | null;
+  v_value?: tokens.TValueExpression | {} | null;
   // options_inventory?: { [option_id: string]: MutableInventoryStock };
 };
 
@@ -221,7 +221,7 @@ export interface IFormField {
   multiple?: boolean | null;
   storage?: FormFieldStorageSchema | {} | null;
   reference?: FormFieldReferenceSchema | {} | null;
-  v_value?: Tokens.TValueExpression | {} | null;
+  v_value?: tokens.TValueExpression | {} | null;
 }
 
 export interface FormFieldDefinition extends IFormField {
@@ -259,7 +259,7 @@ export interface IFormBlock<T = FormBlockType> {
   data: any;
   parent_id?: string | null;
   local_index: number;
-  v_hidden?: Tokens.BooleanValueExpression | null;
+  v_hidden?: tokens.BooleanValueExpression | null;
 }
 
 export interface FormBlock<T = FormBlockType> extends IFormBlock<T> {

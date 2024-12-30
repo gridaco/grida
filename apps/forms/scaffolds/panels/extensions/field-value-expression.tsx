@@ -11,7 +11,7 @@ import { TProperties, TProperty, TSchema } from "@/lib/spock";
 import { useEditorState, useFormFields } from "@/scaffolds/editor";
 import { FormExpression } from "@/lib/forms/expression";
 import toast from "react-hot-toast";
-import { Tokens } from "@/ast";
+import { tokens } from "@/ast";
 
 function useFormSchema() {
   const fields = useFormFields();
@@ -37,8 +37,8 @@ export function FieldValueExpression({
   expression,
   onChange,
 }: {
-  expression?: Tokens.TValueExpression;
-  onChange?: (expression: Tokens.TValueExpression) => void;
+  expression?: tokens.TValueExpression;
+  onChange?: (expression: tokens.TValueExpression) => void;
 }) {
   const fields = useFormFields();
   const schema = useFormSchema();

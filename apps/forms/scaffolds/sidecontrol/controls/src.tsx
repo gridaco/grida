@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useEffect } from "react";
-import { Tokens } from "@/ast";
+import { tokens } from "@/ast";
 import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/utils";
 import { Cross2Icon } from "@radix-ui/react-icons";
@@ -56,8 +56,8 @@ export function SrcControl({
   value = "",
   onValueChange,
 }: {
-  value?: Tokens.StringValueExpression;
-  onValueChange?: (value?: Tokens.StringValueExpression) => void;
+  value?: tokens.StringValueExpression;
+  onValueChange?: (value?: tokens.StringValueExpression) => void;
 }) {
   const { uploader } = useSrcUploader();
   const { openFilePicker, plainFiles, loading } = useFilePicker({

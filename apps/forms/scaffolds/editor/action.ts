@@ -19,7 +19,7 @@ import type {
   DataViewType,
   TableXSBMainTableConnection,
 } from "./state";
-import type { Tokens } from "@/ast";
+import type { tokens } from "@/ast";
 import type { DataQueryAction } from "../data-query";
 import type { CanvasAction } from "@/grida-canvas";
 import type { SYM_LOCALTZ } from "./symbols";
@@ -139,7 +139,7 @@ export interface FormsBlockCreateFielFromBlockdAction {
 export interface FormsBlockBlockVHiddenAction {
   type: "blocks/hidden";
   block_id: string;
-  v_hidden: Tokens.ShorthandBooleanBinaryExpression;
+  v_hidden: tokens.ShorthandBooleanBinaryExpression;
 }
 
 export interface FormsBlockHtmlBlockBodyAction {

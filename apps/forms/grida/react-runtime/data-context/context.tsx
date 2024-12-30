@@ -6,7 +6,7 @@ import React, {
   FC,
   useMemo,
 } from "react";
-import { Tokens } from "@/ast";
+import { tokens } from "@/ast";
 
 interface RootDataContextProps {
   rootData: Record<string, any>;
@@ -128,7 +128,7 @@ export const ScopedVariableContext = createContext<
 >(undefined);
 
 interface ScopedVariableContextProps {
-  variablePaths: Record<string, Tokens.Access.KeyPath<any>>;
+  variablePaths: Record<string, tokens.access.KeyPath<any>>;
 }
 
 /**
@@ -137,7 +137,7 @@ interface ScopedVariableContextProps {
  */
 export const ScopedVariableBoundary: FC<{
   identifier: string;
-  expression: Tokens.Access.KeyPath<any>;
+  expression: tokens.access.KeyPath<any>;
   children: ReactNode;
 }> = ({ identifier, expression, children }) => {
   const parentScopedContext = useContext(ScopedVariableContext);

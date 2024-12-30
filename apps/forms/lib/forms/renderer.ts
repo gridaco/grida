@@ -11,7 +11,7 @@ import { blockstree } from "./tree";
 import { FormBlockTree } from "./types";
 import { toArrayOf } from "@/types/utility";
 import { FieldSupports } from "@/k/supported_field_types";
-import type { Tokens } from "@/ast";
+import type { tokens } from "@/ast";
 
 export type ClientRenderBlock =
   | ClientFieldRenderBlock
@@ -72,7 +72,7 @@ export interface ClientFieldRenderBlock<T extends FormInputType = FormInputType>
     data?: FormFieldDataSchema | null;
     accept?: string;
     multiple?: boolean;
-    v_value?: Tokens.TValueExpression;
+    v_value?: tokens.TValueExpression;
   };
 }
 
@@ -439,7 +439,7 @@ export class FormRenderTree {
       step: field.step ?? undefined,
       min: field.min ?? undefined,
       max: field.max ?? undefined,
-      v_value: (field.v_value as Tokens.TValueExpression) ?? undefined,
+      v_value: (field.v_value as tokens.TValueExpression) ?? undefined,
     };
 
     if (FieldSupports.file_upload(field.type)) {

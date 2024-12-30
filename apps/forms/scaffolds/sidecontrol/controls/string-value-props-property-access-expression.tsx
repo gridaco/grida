@@ -1,5 +1,4 @@
-import { Tokens } from "@/ast";
-import { Factory } from "@/ast/factory";
+import { tokens } from "@/ast";
 import { grida } from "@/grida";
 import { PropertyEnum } from "../ui";
 
@@ -13,8 +12,8 @@ export function StringValuePropsPropertyAccessExpressionControl({
   schema: {
     properties: grida.program.schema.Properties;
   };
-  value?: Tokens.StringValueExpression | null;
-  onValueChange?: (value?: Tokens.StringValueExpression) => void;
+  value?: tokens.StringValueExpression | null;
+  onValueChange?: (value?: tokens.StringValueExpression) => void;
   placeholder?: string;
   disabled?: boolean;
 }) {
@@ -27,11 +26,11 @@ export function StringValuePropsPropertyAccessExpressionControl({
 
   const uivalue = value
     ? // TODO: remove props. token
-      Factory.strfy.stringValueExpression(value)
+      tokens.factory.strfy.stringValueExpression(value)
     : undefined;
 
   const _onValueChange = (key: string) => {
-    const exp = Factory.createPropertyAccessExpression(["props", key]);
+    const exp = tokens.factory.createPropertyAccessExpression(["props", key]);
     onValueChange?.(exp);
   };
 

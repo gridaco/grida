@@ -17,7 +17,7 @@ import {
   CursorMode,
   SurfaceRaycastTargeting,
 } from "./state";
-import type { Tokens } from "@/ast";
+import type { tokens } from "@/ast";
 import { grida } from "@/grida";
 import { useComputed } from "./nodes/use-computed";
 import {
@@ -79,7 +79,7 @@ export function StandaloneDocumentEditor({
           acc[key] = value.default;
           return acc;
         },
-        {} as Record<string, Tokens.StringValueExpression>
+        {} as Record<string, tokens.StringValueExpression>
       );
 
       return virtual_props_from_definition;
@@ -223,7 +223,7 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   );
 
   const changeNodeProps = useCallback(
-    (node_id: string, key: string, value?: Tokens.StringValueExpression) => {
+    (node_id: string, key: string, value?: tokens.StringValueExpression) => {
       dispatch({
         type: "node/change/props",
         node_id: node_id,
@@ -247,7 +247,7 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   );
 
   const changeNodeText = useCallback(
-    (node_id: string, text?: Tokens.StringValueExpression) => {
+    (node_id: string, text?: tokens.StringValueExpression) => {
       dispatch({
         type: "node/change/text",
         node_id: node_id,
@@ -327,7 +327,7 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   );
 
   const changeNodeSrc = useCallback(
-    (node_id: string, src?: Tokens.StringValueExpression) => {
+    (node_id: string, src?: tokens.StringValueExpression) => {
       dispatch({
         type: "node/change/src",
         node_id: node_id,
@@ -914,7 +914,7 @@ export function useNodeAction(node_id: string | undefined) {
       toggleBold: () => nodeActions.toggleNodeBold(node_id),
       component: (component_id: string) =>
         nodeActions.changeNodeComponent(node_id, component_id),
-      text: (text?: Tokens.StringValueExpression) =>
+      text: (text?: tokens.StringValueExpression) =>
         nodeActions.changeNodeText(node_id, text),
       style: (
         key: keyof grida.program.css.ExplicitlySupportedCSSProperties,
@@ -929,7 +929,7 @@ export function useNodeAction(node_id: string | undefined) {
         nodeActions.changeNodeActive(node_id, active),
       locked: (locked: boolean) =>
         nodeActions.changeNodeLocked(node_id, locked),
-      src: (src?: Tokens.StringValueExpression) =>
+      src: (src?: tokens.StringValueExpression) =>
         nodeActions.changeNodeSrc(node_id, src),
       href: (href?: grida.program.nodes.i.IHrefable["href"]) =>
         nodeActions.changeNodeHref(node_id, href),
