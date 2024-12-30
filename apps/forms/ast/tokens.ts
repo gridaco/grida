@@ -268,7 +268,8 @@ export namespace tokens {
   }
 }
 
-export namespace tokens.access {
+// NOTE: `tokens.access` some how fails to resolve in some compilers. - we use `tokens.Access` instead
+export namespace tokens.Access {
   export const a = "";
   /**
    * A type that represents a path as an array of strings that are valid keys of the object type T and its nested objects.
@@ -501,7 +502,7 @@ export namespace tokens.factory {
   }
 
   export function createPropertyAccessExpression<T = any>(
-    paths: tokens.access.KeyPath<T> | string[]
+    paths: tokens.Access.KeyPath<T> | string[]
   ): tokens.PropertyAccessExpression {
     return {
       kind: "PropertyAccessExpression",
@@ -617,7 +618,7 @@ export namespace tokens.factory {
     expression: tokens.PropertyAccessExpression,
     context: any
   ) {
-    return tokens.access.access(context, expression.expression as any);
+    return tokens.Access.access(context, expression.expression as any);
   }
 
   export function renderTemplateExpression(
@@ -632,7 +633,7 @@ export namespace tokens.factory {
           case "Identifier":
             return context[span.name]?.toString() || "";
           case "PropertyAccessExpression":
-            const value = tokens.access.access(context, span.expression as any);
+            const value = tokens.Access.access(context, span.expression as any);
             return value !== undefined ? value.toString() : "";
           default:
             return "";

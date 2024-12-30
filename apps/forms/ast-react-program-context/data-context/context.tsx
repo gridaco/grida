@@ -128,7 +128,7 @@ export const ScopedVariableContext = createContext<
 >(undefined);
 
 interface ScopedVariableContextProps {
-  variablePaths: Record<string, tokens.access.KeyPath<any>>;
+  variablePaths: Record<string, tokens.Access.KeyPath<any>>;
 }
 
 /**
@@ -137,7 +137,7 @@ interface ScopedVariableContextProps {
  */
 export const ScopedVariableBoundary: FC<{
   identifier: string;
-  expression: tokens.access.KeyPath<any>;
+  expression: tokens.Access.KeyPath<any>;
   children: ReactNode;
 }> = ({ identifier, expression, children }) => {
   const parentScopedContext = useContext(ScopedVariableContext);

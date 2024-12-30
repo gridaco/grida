@@ -71,7 +71,7 @@ function access(
   }
   if (tokens.is.jsonRef(exp)) {
     const path = resolveJsonRefPath(exp);
-    const value = tokens.access.access(data, path);
+    const value = tokens.Access.access(data, path);
     return value;
   }
   if (tokens.is.inferredShorthandBinaryExpression(exp)) {

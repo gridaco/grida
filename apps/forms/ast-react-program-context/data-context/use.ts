@@ -2,7 +2,7 @@ import { useContext, useMemo } from "react";
 import { DataContext, ScopedVariableContext } from "./context";
 import { tokens } from "@/ast";
 
-export const useValue = <T = any>(key?: tokens.access.KeyPath<T>): any => {
+export const useValue = <T = any>(key?: tokens.Access.KeyPath<T>): any => {
   const dataContext = useContext(DataContext);
   const scopedVariableContext = useContext(ScopedVariableContext);
 
@@ -18,7 +18,7 @@ export const useValue = <T = any>(key?: tokens.access.KeyPath<T>): any => {
   if (!key) {
     return data;
   }
-  return tokens.access.access(data, key as any, {
+  return tokens.Access.access(data, key as any, {
     scopedIdentifiers: variablePaths,
   });
 };
@@ -41,7 +41,7 @@ export const useSelectValue = <T>({
     : {};
 
   return useMemo(() => {
-    const selected = tokens.access.select(data, keys as any, {
+    const selected = tokens.Access.select(data, keys as any, {
       scopedIdentifiers: variablePaths,
     });
     // console.log(selected, data, keys, variablePaths);
