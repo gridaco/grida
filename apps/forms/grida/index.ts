@@ -2476,6 +2476,38 @@ export namespace grida.program.api {
                   },
                 });
                 return true;
+              case "opacity": {
+                context.dispatcher({
+                  type: "node/change/opacity",
+                  node_id: node.id,
+                  opacity: value,
+                });
+                return true;
+              }
+              case "rotation": {
+                context.dispatcher({
+                  type: "node/change/rotation",
+                  node_id: node.id,
+                  rotation: value,
+                });
+                return true;
+              }
+              case "fill": {
+                context.dispatcher({
+                  type: "node/change/fill",
+                  node_id: node.id,
+                  fill: value,
+                });
+                return true;
+              }
+              case "cornerRadius": {
+                context.dispatcher({
+                  type: "node/change/cornerRadius",
+                  node_id: node.id,
+                  cornerRadius: value,
+                });
+                return true;
+              }
               default:
                 console.error(`Unsupported property: ${prop.toString()}`);
             }

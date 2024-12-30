@@ -392,9 +392,9 @@ export default function CanvasPlayground() {
                         </Button>
                       </div>
 
-                      <div className="fixed bottom-20 left-10 flex items-center justify-center z-50 pointer-events-none">
+                      {/* <div className="fixed bottom-20 left-10 flex items-center justify-center z-50 pointer-events-none">
                         <KeyboardInputOverlay />
-                      </div>
+                      </div> */}
                     </>
                   )}
                   {!uiHidden && (
