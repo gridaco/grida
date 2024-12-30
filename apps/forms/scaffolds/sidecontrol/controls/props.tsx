@@ -1,7 +1,7 @@
 import { grida } from "@/grida";
 import { PropertyLine, PropertyLineLabel } from "../ui";
 import { StringValueControl } from "./string-value";
-import type { tokens } from "@/ast";
+import type { tokens } from "@grida/tokens";
 import { SrcControl } from "./src";
 import {
   Tooltip,

@@ -66,7 +66,7 @@ import { SupabaseFKReferenceSettings } from "./extensions/field-x-sb-reference-f
 import { SupabaseStorageSettings } from "./extensions/field-x-sb-storage-settings";
 import { XSupabaseFieldConnectionPolicyCheck } from "@/lib/x-supabase/check";
 import { FieldValueExpression } from "./extensions/field-value-expression";
-import { tokens } from "@/ast";
+import { tokens } from "@grida/tokens";
 import { TypeSelect } from "@/components/formfield-type-select";
 import type { Data } from "@/lib/data";
 

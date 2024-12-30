@@ -8,8 +8,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { tokens } from "@/ast";
-import { binary_operator_labels } from "@/ast/k";
+import { tokens } from "@grida/tokens";
+import { binary_operator_labels } from "@grida/tokens/k";
 import { Label } from "@/components/ui/label";
 import { ExpressionEditor } from "@/scaffolds/expression-editor";
 

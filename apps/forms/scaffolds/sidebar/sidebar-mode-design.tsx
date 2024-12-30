@@ -29,7 +29,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { FormFieldBlockMenuItems } from "../blocks-editor/blocks/field-block";
 import { renderMenuItems } from "./render";
-import { StandaloneDocumentEditor, type CanvasAction } from "@/grida-canvas";
+import {
+  StandaloneDocumentEditor,
+  type CanvasAction,
+} from "@/grida-react-canvas";
 import { composeEditorDocumentAction } from "../editor/action";
 import { NodeHierarchyList } from "./sidebar-node-hierarchy-list";
 

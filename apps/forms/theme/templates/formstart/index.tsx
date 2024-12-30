@@ -10,7 +10,7 @@ import FormStartPage006 from "@/theme/templates/formstart/006/page";
 import { CampaignMeta } from "@/types";
 import React, { useMemo } from "react";
 import { grida } from "@/grida";
-import { StandaloneDocumentContent } from "@/grida-canvas";
+import { StandaloneDocumentContent } from "@/grida-react-canvas";
 import { FormCampaignStartPageContextProvider } from "../kit/campaign";
 import i18next from "i18next";
 import { I18nextProvider } from "react-i18next";

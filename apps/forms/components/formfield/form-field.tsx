@@ -54,7 +54,7 @@ import { PhoneField } from "./phone-field";
 import { RichTextEditorField } from "./richtext-field";
 import { FieldProperties } from "@/k/supported_field_types";
 import "core-js/features/map/group-by";
-import { tokens } from "@/ast";
+import { tokens } from "@grida/tokens";
 import { useValue } from "@/lib/spock";
 
 /**

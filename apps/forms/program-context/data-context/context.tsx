@@ -6,7 +6,7 @@ import React, {
   FC,
   useMemo,
 } from "react";
-import { tokens } from "@/ast";
+import { tokens } from "@grida/tokens";
 
 interface RootDataContextProps {
   rootData: Record<string, any>;

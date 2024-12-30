@@ -11,7 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { WorkbenchUI } from "@/components/workbench";
 import { grida } from "@/grida";
-import { TChange } from "@/grida-canvas/action";
+import { TChange } from "@/grida-react-canvas/action";
 import { cn } from "@/utils";
 import { TMixed } from "../controls/utils/types";
 import { ToggleGroup, ToggleGroupItem } from "../controls/utils/toggle-group";

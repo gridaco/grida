@@ -11,7 +11,7 @@ import { TProperties, TProperty, TSchema } from "@/lib/spock";
 import { useEditorState, useFormFields } from "@/scaffolds/editor";
 import { FormExpression } from "@/lib/forms/expression";
 import toast from "react-hot-toast";
-import { tokens } from "@/ast";
+import { tokens } from "@grida/tokens";
 
 function useFormSchema() {
   const fields = useFormFields();

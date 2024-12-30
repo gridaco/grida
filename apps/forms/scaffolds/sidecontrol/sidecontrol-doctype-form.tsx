@@ -15,14 +15,14 @@ import {
 } from "@/components/ui/popover";
 import { useEditorState, useFormFields } from "@/scaffolds/editor";
 import { MixIcon } from "@radix-ui/react-icons";
-import { tokens } from "@/ast";
+import { tokens } from "@grida/tokens";
 import toast from "react-hot-toast";
 import { FormExpression } from "@/lib/forms/expression";
 import { PropertyLine, PropertyLineLabel } from "./ui";
 import { EditBinaryExpression } from "../panels/extensions/v-edit";
 import { PopoverClose } from "@radix-ui/react-popover";
 import { SelectedNodeProperties } from "./sidecontrol-selected-node";
-import { useDocument } from "@/grida-canvas/provider";
+import { useDocument } from "@/grida-react-canvas/provider";
 
 export function SideControlDoctypeForm() {
   const [state] = useEditorState();

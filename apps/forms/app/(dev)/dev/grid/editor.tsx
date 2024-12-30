@@ -5,7 +5,7 @@ import {
   GridContext,
   GridEditor,
   useGrid,
-} from "@/grida-canvas/experiments/grid-builder";
+} from "@/grida-react-canvas/experiments/grid-builder";
 import {
   GridaBlock,
   GridaBlockRenderer,

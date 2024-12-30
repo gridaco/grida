@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useEffect } from "react";
-import { tokens } from "@/ast";
+import { tokens } from "@grida/tokens";
 import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/utils";
 import { Cross2Icon } from "@radix-ui/react-icons";

@@ -1,4 +1,4 @@
-import { tokens } from "@/ast";
+import { tokens } from "@grida/tokens";
 import { grida } from "@/grida";
 import { PropertyEnum } from "../ui";
 

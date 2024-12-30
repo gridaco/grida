@@ -23,7 +23,7 @@ import type {
 } from "@/types";
 import type { ResourceTypeIconName } from "@/components/resource-type-icon";
 import type { Data } from "@/lib/data";
-import type { IDocumentEditorState } from "@/grida-canvas/state";
+import type { IDocumentEditorState } from "@/grida-react-canvas/state";
 import { SYM_LOCALTZ, EditorSymbols } from "./symbols";
 import { grida } from "@/grida";
 

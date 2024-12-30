@@ -26,7 +26,7 @@ import { Data } from "@/lib/data";
 import * as samples from "@/theme/templates/formcollection/samples";
 import { grida } from "@/grida";
 import { FormStartPage } from "@/theme/templates/formstart";
-import { initDocumentEditorState } from "@/grida-canvas";
+import { initDocumentEditorState } from "@/grida-react-canvas";
 
 export function initialEditorState(init: EditorInit): EditorState {
   switch (init.doctype) {

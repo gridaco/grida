@@ -1,8 +1,8 @@
-import type { tokens } from "@/ast";
+import type { tokens } from "@grida/tokens";
 import type { vn } from "./vn";
 
 // TODO: remove this dependency
-import type { DocumentDispatcher } from "@/grida-canvas";
+import type { DocumentDispatcher } from "@/grida-react-canvas";
 import { cmath } from "@grida/cmath";
 
 export namespace grida {

@@ -1,6 +1,6 @@
 import { useContext, useMemo } from "react";
 import { DataContext, ScopedVariableContext } from "./context";
-import { tokens } from "@/ast";
+import { tokens } from "@grida/tokens";
 
 export const useValue = <T = any>(key?: tokens.Access.KeyPath<T>): any => {
   const dataContext = useContext(DataContext);

@@ -17,7 +17,7 @@ import {
   ReloadIcon,
   TokensIcon,
 } from "@radix-ui/react-icons";
-import { tokens } from "@/ast";
+import { tokens } from "@grida/tokens";
 import { Badge } from "@/components/ui/badge";
 import PropertyAccessDropdownMenu from "./context/variable";
 import PropertyTypeIcon from "@/components/property-type-icon";

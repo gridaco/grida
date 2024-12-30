@@ -9,9 +9,9 @@ import {
   TextAlign,
 } from "@/theme/templates/kit/components";
 import type { grida } from "@/grida";
-import { NodeElement } from "@/grida-canvas/nodes/node";
+import { NodeElement } from "@/grida-react-canvas/nodes/node";
 import { useCTAContext } from "../../kit/contexts/cta.context";
-import { tokens } from "@/ast";
+import { tokens } from "@grida/tokens";
 
 const userprops = {
   title: { type: "string" },

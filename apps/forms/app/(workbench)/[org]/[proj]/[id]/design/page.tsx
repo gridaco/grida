@@ -10,9 +10,9 @@ import {
   StandaloneDocumentEditor,
   ViewportRoot,
   EditorSurface,
-} from "@/grida-canvas";
+} from "@/grida-react-canvas";
 import { composeEditorDocumentAction } from "@/scaffolds/editor/action";
-import { CanvasAction } from "@/grida-canvas";
+import { CanvasAction } from "@/grida-react-canvas";
 
 export default function SiteDeisngPage() {
   return (

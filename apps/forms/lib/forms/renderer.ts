@@ -11,7 +11,7 @@ import { blockstree } from "./tree";
 import { FormBlockTree } from "./types";
 import { toArrayOf } from "@/types/utility";
 import { FieldSupports } from "@/k/supported_field_types";
-import type { tokens } from "@/ast";
+import type { tokens } from "@grida/tokens";
 
 export type ClientRenderBlock =
   | ClientFieldRenderBlock

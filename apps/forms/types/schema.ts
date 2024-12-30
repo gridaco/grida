@@ -7,7 +7,7 @@ import type {
   Option,
 } from "./types";
 import { toArrayOf, MaybeArray } from "./utility";
-import type { tokens } from "@/ast";
+import type { tokens } from "@grida/tokens";
 
 /**
  * used when representing a type in json following the schema.

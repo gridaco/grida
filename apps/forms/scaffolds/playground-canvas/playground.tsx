@@ -23,7 +23,7 @@ import {
   standaloneDocumentReducer,
   initDocumentEditorState,
   useDocument,
-} from "@/grida-canvas";
+} from "@/grida-react-canvas";
 import {
   Select,
   SelectContent,
@@ -34,9 +34,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { GridaLogo } from "@/components/grida-logo";
-import { DevtoolsPanel } from "@/grida-canvas/devtools";
+import { DevtoolsPanel } from "@/grida-react-canvas/devtools";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
-import { useGoogleFontsList } from "@/grida-canvas/google.fonts";
+import { useGoogleFontsList } from "@/grida-react-canvas/google.fonts";
 import {
   ButtonIcon,
   DownloadIcon,
@@ -47,7 +47,7 @@ import {
   PlayIcon,
   PlusIcon,
 } from "@radix-ui/react-icons";
-import KeyboardInputOverlay from "@/grida-canvas/devtools/keyboard-input-overlay";
+import KeyboardInputOverlay from "@/grida-react-canvas/devtools/keyboard-input-overlay";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -94,12 +94,12 @@ import toast from "react-hot-toast";
 import {
   keybindings_sheet,
   useEditorHotKeys,
-} from "@/grida-canvas/viewport/hotkeys";
+} from "@/grida-react-canvas/viewport/hotkeys";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import ErrorBoundary from "./error-boundary";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { keysymbols } from "@/grida-canvas/devtools/keysymbols";
+import { keysymbols } from "@/grida-react-canvas/devtools/keysymbols";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 export default function CanvasPlayground() {
