@@ -1,4 +1,4 @@
-import { Access, Tokens } from "@/ast";
+import { tokens } from "@grida/tokens";
 import { useFormAgentState } from "@/lib/formstate";
 import assert from "assert";
 import { useMemo } from "react";
@@ -9,10 +9,10 @@ import { useMemo } from "react";
  */
 function op<T = any>(
   ...[l, o, r]:
-    | Tokens.ShorthandBinaryExpression<number, number>
-    | Tokens.ShorthandBooleanBinaryExpression<
-        Tokens.Primitive,
-        Tokens.Primitive
+    | tokens.ShorthandBinaryExpression<number, number>
+    | tokens.ShorthandBooleanBinaryExpression<
+        tokens.Primitive,
+        tokens.Primitive
       >
 ): T | undefined {
   switch (o) {
@@ -52,7 +52,7 @@ function op<T = any>(
   }
 }
 
-function resolveJsonRefPath(ref: Tokens.JSONRef): string[] {
+function resolveJsonRefPath(ref: tokens.JSONRef): string[] {
   // get rid of #/ prefix
   const path = ref.$ref?.startsWith("#/") ? ref.$ref.slice(2) : undefined;
   assert(path, "Invalid JSON Reference - Must start with #/");
@@ -62,19 +62,19 @@ function resolveJsonRefPath(ref: Tokens.JSONRef): string[] {
 
 function access(
   data: any,
-  exp?: Tokens.TValueExpression | undefined | null
-): Tokens.Primitive | undefined | null {
+  exp?: tokens.TValueExpression | undefined | null
+): tokens.Primitive | undefined | null {
   if (exp === undefined) return undefined;
   if (exp === null) return null;
-  if (Tokens.is.primitive(exp)) {
+  if (tokens.is.primitive(exp)) {
     return exp;
   }
-  if (Tokens.is.jsonRef(exp)) {
+  if (tokens.is.jsonRef(exp)) {
     const path = resolveJsonRefPath(exp);
-    const value = Access.access(data, path);
+    const value = tokens.Access.access(data, path);
     return value;
   }
-  if (Tokens.is.inferredShorthandBinaryExpression(exp)) {
+  if (tokens.is.inferredShorthandBinaryExpression(exp)) {
     const [l, o, r] = exp;
 
     const left: any = access(data, l);
@@ -94,7 +94,7 @@ function access(
  * @returns
  */
 export function useValue<O>(
-  exp?: Tokens.TValueExpression | undefined | null
+  exp?: tokens.TValueExpression | undefined | null
 ): O | undefined {
   const [state] = useFormAgentState();
   return useMemo(() => {

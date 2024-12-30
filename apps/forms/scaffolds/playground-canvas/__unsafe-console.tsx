@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as monaco from "monaco-editor";
 import toast from "react-hot-toast";
-import { useEditorApi } from "@/grida-canvas/provider";
+import { useEditorApi } from "@/grida-react-canvas/provider";
 import { AutoHeightThemedMonacoEditor } from "@/components/monaco";
 
 const IS_UNSAFE_SANDBOX =

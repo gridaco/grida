@@ -1,7 +1,7 @@
 import { grida } from "@/grida";
 import { PropertyLine, PropertyLineLabel } from "../ui";
 import { StringValueControl } from "./string-value";
-import type { Tokens } from "@/ast";
+import type { tokens } from "@grida/tokens";
 import { SrcControl } from "./src";
 import {
   Tooltip,
@@ -59,7 +59,7 @@ export function PropControl({
       return (
         <StringValueControl
           placeholder={placeholder}
-          value={value as Tokens.StringValueExpression}
+          value={value as tokens.StringValueExpression}
           onValueChange={onValueChange}
         />
       );
@@ -73,7 +73,7 @@ export function PropControl({
           <TooltipTrigger>
             <StringValueControl
               placeholder={placeholder}
-              value={value as Tokens.StringValueExpression}
+              value={value as tokens.StringValueExpression}
               disabled
             />
           </TooltipTrigger>

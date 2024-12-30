@@ -1,9 +1,9 @@
-import type { Tokens } from "@/ast";
+import type { tokens } from "@grida/tokens";
 import type { vn } from "./vn";
 
 // TODO: remove this dependency
-import type { DocumentDispatcher } from "@/grida-canvas";
-import { cmath } from "@/grida-canvas/cmath";
+import type { DocumentDispatcher } from "@/grida-react-canvas";
+import { cmath } from "@grida/cmath";
 
 export namespace grida {
   export const mixed: unique symbol = Symbol();
@@ -54,9 +54,9 @@ export namespace grida {
       };
 
       export type Value =
-        | Tokens.NumericValueExpression
-        | Tokens.StringValueExpression
-        | Tokens.StringValueExpression[]
+        | tokens.NumericValueExpression
+        | tokens.StringValueExpression
+        | tokens.StringValueExpression[]
         | { [key: string]: Value };
 
       export type Properties = { [name: string]: schema.PropertyDefinition };
@@ -72,9 +72,9 @@ export namespace grida {
       interface TypeScalarPropertyDefinition {
         type: "string" | "number" | "boolean";
         default?:
-          | Tokens.StringValueExpression
-          | Tokens.NumericValueExpression
-          | Tokens.BooleanValueExpression;
+          | tokens.StringValueExpression
+          | tokens.NumericValueExpression
+          | tokens.BooleanValueExpression;
         required?: boolean;
         //
       }
@@ -1373,17 +1373,17 @@ export namespace grida.program.nodes {
     /**
      * text value
      *
-     * - expression - {@link Tokens.StringValueExpression} - computed or literal
+     * - expression - {@link tokens.StringValueExpression} - computed or literal
      *   - literal - e.g. `"A text value"`
-     *   - property access - {@link Tokens.PropertyAccessExpression} - computed, , e.g. `userdata.title`
-     *   - identifier - {@link Tokens.Identifier} - computed, e.g. `title`
-     *   - others - all {@link Tokens.StringValueExpression} types
+     *   - property access - {@link tokens.PropertyAccessExpression} - computed, , e.g. `userdata.title`
+     *   - identifier - {@link tokens.Identifier} - computed, e.g. `title`
+     *   - others - all {@link tokens.StringValueExpression} types
      *
      * when used under a component / instance / template, the `props.` expression is reserved and refers to adjacent parent's props.
      * - by the standard implementation, the `props.[x]` is recommended to be referenced only once in a single node.
      * - by the standard implementation, within the visual editor context, when user attempts to updates the literal value (where it is a `props.[x]` and `props.[x] is literal`), it should actually update the `props.[x]` value, not this `text` literal value.
      */
-    type PropsTextValue = Tokens.StringValueExpression;
+    type PropsTextValue = tokens.StringValueExpression;
 
     export interface ITextValue {
       text: PropsTextValue | null;
@@ -1531,7 +1531,7 @@ export namespace grida.program.nodes {
     /**
      * required - when falsy, the image will not be rendered
      */
-    src?: Tokens.StringValueExpression;
+    src?: tokens.StringValueExpression;
     alt?: string;
   }
 
@@ -1566,11 +1566,11 @@ export namespace grida.program.nodes {
     /**
      * required - when falsy, the video will not be rendered
      */
-    src?: Tokens.StringValueExpression;
+    src?: tokens.StringValueExpression;
     /**
      * @see https://developer.mozilla.org/en-US/docs/Web/HTML/Element/video#poster
      */
-    poster?: Tokens.StringValueExpression;
+    poster?: tokens.StringValueExpression;
     loop: boolean;
     muted: boolean;
     autoplay: boolean;
@@ -1609,14 +1609,14 @@ export namespace grida.program.nodes {
      *
      * @see https://developer.mozilla.org/en-US/docs/Web/HTML/Element/iframe#src
      */
-    src?: Tokens.StringValueExpression;
+    src?: tokens.StringValueExpression;
 
     /**
      * Inline HTML to embed, overriding the src attribute.
      *
      * @see https://developer.mozilla.org/en-US/docs/Web/HTML/Element/iframe#srcdoc
      */
-    srcdoc?: Tokens.StringValueExpression;
+    srcdoc?: tokens.StringValueExpression;
   }
 
   /**

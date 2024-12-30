@@ -26,9 +26,9 @@ import { DataProvider, useData } from "../../kit/contexts/data.context";
 import { useCTAContext } from "../../kit/contexts/cta.context";
 import { FileIO } from "@/lib/file";
 import type { grida } from "@/grida";
-import { Factory } from "@/ast";
-import { NodeElement } from "@/grida-canvas/nodes/node";
-import { useComputed } from "@/grida-canvas/nodes/use-computed";
+import { NodeElement } from "@/grida-react-canvas/nodes/node";
+import { useComputed } from "@/grida-react-canvas/nodes/use-computed";
+import { tokens } from "@grida/tokens";
 
 type Messages = typeof _messages;
 
@@ -86,7 +86,7 @@ function Consumer() {
 
 function Media() {
   const props = useComputed({
-    media: Factory.createPropertyAccessExpression(["props", "media"]),
+    media: tokens.factory.createPropertyAccessExpression(["props", "media"]),
   });
 
   // TODO: fixme - wrong type
@@ -295,7 +295,7 @@ _005.definition = {
       textAlign: "left",
       textAlignVertical: "top",
       textDecoration: "none",
-      text: Factory.createPropertyAccessExpression(["props", "title"]),
+      text: tokens.factory.createPropertyAccessExpression(["props", "title"]),
       zIndex: 0,
     },
     "005.body": {
@@ -310,7 +310,7 @@ _005.definition = {
       style: {},
       width: "auto",
       height: "auto",
-      html: Factory.createPropertyAccessExpression(["props", "body"]),
+      html: tokens.factory.createPropertyAccessExpression(["props", "body"]),
       zIndex: 0,
     },
     // "005.media": {

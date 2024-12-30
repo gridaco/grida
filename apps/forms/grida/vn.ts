@@ -1,4 +1,4 @@
-import { cmath } from "@/grida-canvas/cmath";
+import { cmath } from "@grida/cmath";
 
 type Vector2 = [number, number];
 export namespace vn {

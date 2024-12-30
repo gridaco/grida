@@ -1,4 +1,4 @@
-import { TemplateComponents } from "@/grida-canvas/template-builder";
+import { TemplateComponents } from "@/grida-react-canvas/template-builder";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,7 +14,7 @@ import { cn } from "@/utils";
 import {
   DataProvider,
   ProgramDataContextHost,
-} from "@/grida/react-runtime/data-context";
+} from "@/program-context/data-context";
 
 export function TemplateControl({
   value,

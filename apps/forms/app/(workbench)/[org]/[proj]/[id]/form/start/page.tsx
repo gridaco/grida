@@ -57,10 +57,10 @@ import {
   EditorSurface,
   useDocument,
   useRootTemplateInstanceNode,
-} from "@/grida-canvas";
+} from "@/grida-react-canvas";
 import { composeEditorDocumentAction } from "@/scaffolds/editor/action";
-import { CanvasAction } from "@/grida-canvas";
-import { DevtoolsPanel } from "@/grida-canvas/devtools";
+import { CanvasAction } from "@/grida-react-canvas";
+import { DevtoolsPanel } from "@/grida-react-canvas/devtools";
 import { Badge } from "@/components/ui/badge";
 import { ArrowRightIcon } from "@radix-ui/react-icons";
 

@@ -3,22 +3,21 @@
 import React from "react";
 import { PoweredByGridaFooter } from "@/scaffolds/e/form/powered-by-brand-footer";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { NodeElement } from "@/grida-canvas/nodes/node";
+import { NodeElement } from "@/grida-react-canvas/nodes/node";
 import {
   Card_002,
   Card_003,
   Hero_002,
-} from "@/grida-canvas/template-builder/components/cards";
-import { Footer_001 } from "@/grida-canvas/template-builder/components/footers";
-import { Header_001 } from "@/grida-canvas/template-builder/components/headers";
+} from "@/grida-react-canvas/template-builder/components/cards";
+import { Footer_001 } from "@/grida-react-canvas/template-builder/components/footers";
+import { Header_001 } from "@/grida-react-canvas/template-builder/components/headers";
 import * as samples from "./samples";
 import {
   ProgramDataContextHost,
   DataProvider,
-} from "@/grida/react-runtime/data-context";
-import { Factory } from "@/ast/factory";
-import ArrayMap from "@/grida/react-runtime/data-context/array";
-import { useDocument } from "@/grida-canvas/provider";
+} from "@/program-context/data-context";
+import ArrayMap from "@/program-context/data-context/array";
+import { useDocument } from "@/grida-react-canvas/provider";
 import assert from "assert";
 
 type ISample = (typeof samples)[keyof typeof samples];

@@ -3,8 +3,7 @@
   "private": true,
   "license": "Apache 2.0",
   "scripts": {
-    "clean": "rimraf node_modules pnpm-lock.yaml",
-    "clean:install": "pnpm run clean && pnpm install"
+    "test": "pnpm -r --filter 'packages/*' run test"
   },
   "resolutions": {
     "@design-sdk/figma-node": "0.0.25",

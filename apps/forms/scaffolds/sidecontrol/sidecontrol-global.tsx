@@ -77,7 +77,7 @@ import {
   useDocument,
   useNode,
   useTemplateDefinition,
-} from "@/grida-canvas/provider";
+} from "@/grida-react-canvas/provider";
 import {
   AlertDialog,
   AlertDialogAction,

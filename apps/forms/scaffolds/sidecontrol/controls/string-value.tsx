@@ -17,9 +17,8 @@ import {
   ReloadIcon,
   TokensIcon,
 } from "@radix-ui/react-icons";
-import { Tokens } from "@/ast";
+import { tokens } from "@grida/tokens";
 import { Badge } from "@/components/ui/badge";
-import { Factory } from "@/ast/factory";
 import PropertyAccessDropdownMenu from "./context/variable";
 import PropertyTypeIcon from "@/components/property-type-icon";
 import { StringValuePropsPropertyAccessExpressionControl } from "./string-value-props-property-access-expression";
@@ -33,8 +32,8 @@ export function StringValueControl({
   disabled,
   schema,
 }: {
-  value?: Tokens.StringValueExpression | null;
-  onValueChange?: (value?: Tokens.StringValueExpression) => void;
+  value?: tokens.StringValueExpression | null;
+  onValueChange?: (value?: tokens.StringValueExpression) => void;
   placeholder?: string;
   maxlength?: number;
   disabled?: boolean;
@@ -95,7 +94,9 @@ export function StringValueControl({
             asSubmenu
             // schema={schema}
             onSelect={(path) => {
-              onValueChange?.(Factory.createPropertyAccessExpression(path));
+              onValueChange?.(
+                tokens.factory.createPropertyAccessExpression(path)
+              );
             }}
           >
             <PropertyTypeIcon type="object" className="me-2 w-4 h-4" />
@@ -191,15 +192,15 @@ function Control({
   maxLength,
   disabled,
 }: {
-  value?: Tokens.StringValueExpression;
-  onValueChange?: (value: Tokens.StringValueExpression) => void;
+  value?: tokens.StringValueExpression;
+  onValueChange?: (value: tokens.StringValueExpression) => void;
   placeholder?: string;
   maxLength?: number;
   disabled?: boolean;
 }) {
-  if (Tokens.is.templateExpression(value)) {
+  if (tokens.is.templateExpression(value)) {
     return <TemplateExpressionControl value={value} />;
-  } else if (Tokens.is.propertyAccessExpression(value)) {
+  } else if (tokens.is.propertyAccessExpression(value)) {
     return <PropertyAccessExpressionControl value={value} />;
   }
 
@@ -243,7 +244,7 @@ function StringLiteralControl({
 function PropertyAccessExpressionControl({
   value,
 }: {
-  value: Tokens.PropertyAccessExpression;
+  value: tokens.PropertyAccessExpression;
 }) {
   return (
     <div className="flex px-1 h-8 w-full rounded-md border border-input bg-transparent py-1 text-sm shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50">
@@ -260,7 +261,7 @@ function PropertyAccessExpressionControl({
 function TemplateExpressionControl({
   value,
 }: {
-  value: Tokens.TemplateExpression;
+  value: tokens.TemplateExpression;
 }) {
   return (
     <div className="flex h-8 w-full rounded-md border border-input bg-transparent py-1 text-sm shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50">

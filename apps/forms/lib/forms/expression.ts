@@ -1,12 +1,12 @@
 import { FormFieldDefinition } from "@/types";
 import { TProperty } from "@/lib/spock";
-import { Tokens } from "@/ast";
+import { tokens } from "@grida/tokens";
 
 export namespace FormExpression {
   export function create_field_property_json_ref(
     field_id: string,
     ...access: string[]
-  ): Tokens.JSONRef<"fields/"> {
+  ): tokens.JSONRef<"fields/"> {
     return {
       $ref: `#/fields/${field_id}/${access.join("/")}`,
     };

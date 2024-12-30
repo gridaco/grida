@@ -23,7 +23,7 @@ import {
   standaloneDocumentReducer,
   initDocumentEditorState,
   useDocument,
-} from "@/grida-canvas";
+} from "@/grida-react-canvas";
 import {
   Select,
   SelectContent,
@@ -34,9 +34,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { GridaLogo } from "@/components/grida-logo";
-import { DevtoolsPanel } from "@/grida-canvas/devtools";
+import { DevtoolsPanel } from "@/grida-react-canvas/devtools";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
-import { useGoogleFontsList } from "@/grida-canvas/google.fonts";
 import {
   ButtonIcon,
   DownloadIcon,
@@ -47,7 +46,7 @@ import {
   PlayIcon,
   PlusIcon,
 } from "@radix-ui/react-icons";
-import KeyboardInputOverlay from "@/grida-canvas/devtools/keyboard-input-overlay";
+import KeyboardInputOverlay from "@/grida-react-canvas/devtools/keyboard-input-overlay";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -61,7 +60,7 @@ import {
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { ImportFromFigmaDialog } from "@/scaffolds/playground-canvas/modals/import-from-figma";
-import { iofigma } from "@/grida/io-figma";
+import { iofigma } from "@/grida-io-figma";
 import { saveAs } from "file-saver";
 import { ImportFromGridaFileJsonDialog } from "@/scaffolds/playground-canvas/modals/import-from-grida-file";
 import { v4 } from "uuid";
@@ -94,13 +93,14 @@ import toast from "react-hot-toast";
 import {
   keybindings_sheet,
   useEditorHotKeys,
-} from "@/grida-canvas/viewport/hotkeys";
+} from "@/grida-react-canvas/viewport/hotkeys";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import ErrorBoundary from "./error-boundary";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { keysymbols } from "@/grida-canvas/devtools/keysymbols";
+import { keysymbols } from "@/grida-react-canvas/devtools/keysymbols";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { useGoogleFontsList } from "@/grida-fonts/react/hooks";
 
 export default function CanvasPlayground() {
   const [pref, setPref] = useState<Preferences>({ debug: false });
@@ -232,9 +232,12 @@ export default function CanvasPlayground() {
               key: res.document.id,
               state: initDocumentEditorState({
                 editable: true,
-                document: iofigma.restful.map.document(
+                document: iofigma.restful.factory.document(
                   res.document as any,
-                  res.images
+                  res.images,
+                  {
+                    gradient_id_generator: () => v4(),
+                  }
                 ),
               }),
             });

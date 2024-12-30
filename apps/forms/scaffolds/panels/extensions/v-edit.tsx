@@ -8,8 +8,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tokens } from "@/ast";
-import { binary_operator_labels } from "@/ast/k";
+import { tokens } from "@grida/tokens";
+import { binary_operator_labels } from "@grida/tokens/k";
 import { Label } from "@/components/ui/label";
 import { ExpressionEditor } from "@/scaffolds/expression-editor";
 
@@ -35,21 +35,21 @@ export function EditBinaryExpression<
   rightOptions: resolveRightOptions,
 }: {
   resolvedType: ResolvedType;
-  defaultValue?: Tokens.ShorthandBinaryExpression;
+  defaultValue?: tokens.ShorthandBinaryExpression;
   leftOptions: Array<PrimaryPropertyReferenceProps>;
   rightOptions: // | Array<PropertyReferenceProps>
   (
     left: Identifier,
-    op?: Tokens.BinaryOperator
+    op?: tokens.BinaryOperator
   ) => Array<PrimaryPropertyReferenceProps> | undefined;
   onValueChange?: (
     value: ResolvedType extends "boolean"
-      ? Tokens.ShorthandBooleanBinaryExpression
-      : Tokens.ShorthandBinaryExpression
+      ? tokens.ShorthandBooleanBinaryExpression
+      : tokens.ShorthandBinaryExpression
   ) => void;
 }) {
   const [lefthand, setLefthand] = useState<string>();
-  const [operator, setOperator] = useState<Tokens.BooleanBinaryOperator>();
+  const [operator, setOperator] = useState<tokens.BooleanBinaryOperator>();
   const [righthand, setRighthand] = useState<string>();
 
   const rightOptions = useMemo(() => {
@@ -88,14 +88,14 @@ export function EditBinaryExpression<
         disabled={!lefthand}
         value={operator}
         onValueChange={(v) => {
-          setOperator(v as Tokens.BooleanBinaryOperator);
+          setOperator(v as tokens.BooleanBinaryOperator);
         }}
       >
         <SelectTrigger>
           <SelectValue placeholder="Operator" />
         </SelectTrigger>
         <SelectContent>
-          {Tokens.BOOLEAN_BINARY_OPERATORS.map((op) => (
+          {tokens.BOOLEAN_BINARY_OPERATORS.map((op) => (
             <SelectItem key={op} value={op}>
               <code>{op}</code> {binary_operator_labels[op][0]}{" "}
               <small className="text-muted-foreground">
