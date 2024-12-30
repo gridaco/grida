@@ -1072,7 +1072,7 @@ export function useSelection() {
         __actions.changeNodeRotation(id, change);
       });
     },
-    [mixedProperties.rotation.ids]
+    [mixedProperties.rotation?.ids]
   );
 
   const opacity = useCallback(
@@ -1081,7 +1081,7 @@ export function useSelection() {
         __actions.changeNodeOpacity(id, change);
       });
     },
-    [mixedProperties.opacity.ids]
+    [mixedProperties.opacity?.ids]
   );
 
   const width = useCallback(
@@ -1090,7 +1090,7 @@ export function useSelection() {
         __actions.changeNodeSize(id, "width", value);
       });
     },
-    [mixedProperties.width.ids]
+    [mixedProperties.width?.ids]
   );
 
   const height = useCallback(
@@ -1099,7 +1099,7 @@ export function useSelection() {
         __actions.changeNodeSize(id, "height", value);
       });
     },
-    [mixedProperties.height.ids]
+    [mixedProperties.height?.ids]
   );
 
   const positioningMode = useCallback(
@@ -1108,7 +1108,7 @@ export function useSelection() {
         __actions.changeNodePositioningMode(id, position);
       });
     },
-    [mixedProperties.position.ids]
+    [mixedProperties.position?.ids]
   );
 
   const fontFamily = useCallback(
@@ -1334,7 +1334,7 @@ export function useSelection() {
 
   return useMemo(() => {
     return {
-      ids: selection,
+      selection,
       nodes: nodes,
       properties: mixedProperties,
       actions,

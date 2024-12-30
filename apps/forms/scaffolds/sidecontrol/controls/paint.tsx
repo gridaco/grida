@@ -18,6 +18,7 @@ import { PaintChip } from "./utils/paint-chip";
 import React, { useCallback } from "react";
 import HexValueInput from "./utils/hex";
 import { Cross2Icon } from "@radix-ui/react-icons";
+import { RgbaColorPicker } from "react-colorful";
 
 const transparent_paint: grida.program.cg.Paint = {
   type: "solid",
@@ -119,9 +120,9 @@ export function PaintControl({
               />
               <button
                 onClick={onRemovePaint}
-                className="px-1 py-1 text-muted-foreground"
+                className="px-1 py-1 me-0.5 text-muted-foreground"
               >
-                <Cross2Icon />
+                <Cross2Icon className="w-3.5 h-3.5" />
               </button>
             </PaintInputContainer>
           )}
@@ -159,9 +160,9 @@ export function PaintControl({
           </div>
         </PopoverTrigger>
       )}
-      <PopoverContent>
+      <PopoverContent align="start" side="right" sideOffset={8} className="p-0">
         <Tabs value={value?.type} onValueChange={onTabChange as any}>
-          <TabsList>
+          <TabsList className="m-2">
             <TabsTrigger value="solid">
               <SolidPaintIcon active={value?.type === "solid"} />
             </TabsTrigger>
@@ -176,22 +177,47 @@ export function PaintControl({
               />
             </TabsTrigger>
           </TabsList>
-          <TabsContent value="solid">
+          <TabsContent value="solid" className="p-0 m-0">
             {value?.type === "solid" && (
-              <RGBAColorControl
-                value={value.color}
-                onValueChange={(color) => {
-                  onValueChange({ type: "solid", color: color });
-                }}
-              />
+              <div>
+                <RgbaColorPicker
+                  color={value.color}
+                  className="!w-full"
+                  onChange={(color) => {
+                    onValueChange({
+                      type: "solid",
+                      color,
+                    });
+                  }}
+                />
+                <div className="p-2">
+                  <PaintInputContainer>
+                    <HexValueInput
+                      className="border-none outline-none w-full h-full ps-2 text-xs"
+                      value={{
+                        r: value.color.r,
+                        g: value.color.g,
+                        b: value.color.b,
+                        // ommit the alpha
+                      }}
+                      onValueChange={(color) => {
+                        onValueChange({
+                          type: "solid",
+                          color: { ...color, a: value.color.a },
+                        });
+                      }}
+                    />
+                  </PaintInputContainer>
+                </div>
+              </div>
             )}
           </TabsContent>
-          <TabsContent value="linear_gradient">
+          <TabsContent value="linear_gradient" className="p-2">
             {value?.type === "linear_gradient" && (
               <GradientControl value={value} onValueChange={onValueChange} />
             )}
           </TabsContent>
-          <TabsContent value="radial_gradient">
+          <TabsContent value="radial_gradient" className="p-2">
             {value?.type === "radial_gradient" && (
               <GradientControl value={value} onValueChange={onValueChange} />
             )}

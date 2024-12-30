@@ -1055,6 +1055,20 @@ export namespace grida {
       }
 
       /**
+       * @param hex #RRGGBB
+       * @returns
+       */
+      export function hex_to_rgba8888(hex: string): RGBA8888 {
+        const hexValue = parseInt(hex.replace("#", ""), 16);
+        return {
+          r: (hexValue >> 16) & 0xff,
+          g: (hexValue >> 8) & 0xff,
+          b: hexValue & 0xff,
+          a: 1,
+        };
+      }
+
+      /**
        * Defines a single path
        *
        * @see https://developer.mozilla.org/en-US/docs/Web/SVG/Element/path

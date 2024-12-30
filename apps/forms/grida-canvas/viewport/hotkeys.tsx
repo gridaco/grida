@@ -1,6 +1,7 @@
 import { useHotkeys } from "react-hotkeys-hook";
-import { useDocument, useEventTarget } from "../provider";
+import { useDocument, useEventTarget, useSelection } from "../provider";
 import toast from "react-hot-toast";
+import { grida } from "@/grida";
 
 export const keybindings_sheet = [
   {
@@ -156,6 +157,8 @@ export function useEditorHotKeys() {
     setOpacity,
   } = useDocument();
 
+  const { selection, actions } = useSelection();
+
   // always triggering. (alt, meta, ctrl, shift)
   useHotkeys(
     "*",
@@ -222,6 +225,57 @@ export function useEditorHotKeys() {
     },
     {
       preventDefault: true,
+      enableOnFormTags: false,
+      enableOnContentEditable: false,
+    }
+  );
+
+  // #region selection
+  useHotkeys(
+    "i",
+    () => {
+      if (window.EyeDropper) {
+        const eyeDropper = new window.EyeDropper();
+
+        eyeDropper
+          .open()
+          .then(
+            (result: {
+              /**
+               * A string representing the selected color, in hexadecimal sRGB format (#aabbcc).
+               * @see https://developer.mozilla.org/en-US/docs/Web/API/EyeDropper/open
+               */
+              sRGBHex: string;
+            }) => {
+              // set fill if selection
+              if (selection.length > 0) {
+                //
+                const rgba = grida.program.cg.hex_to_rgba8888(result.sRGBHex);
+                actions.fill({
+                  type: "solid",
+                  color: rgba,
+                });
+              }
+              // copy to clipboard if no selection
+              else {
+                window.navigator.clipboard
+                  .writeText(result.sRGBHex)
+                  .then(() => {
+                    toast.success(
+                      `Copied hex color to clipboard  ${result.sRGBHex}`
+                    );
+                  });
+              }
+              result.sRGBHex;
+            }
+          )
+          .catch((e: any) => {});
+        //
+      } else {
+        toast.error("EyeDropper is not available on this browser (use Chrome)");
+      }
+    },
+    {
       enableOnFormTags: false,
       enableOnContentEditable: false,
     }

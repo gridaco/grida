@@ -204,7 +204,7 @@ export function EditorSurface() {
       ref={eventTargetRef}
       {...bind()}
       tabIndex={0}
-      className="absolute inset-0 pointer-events-auto will-change-transform z-50"
+      className="absolute inset-0 pointer-events-auto will-change-transform z-50 select-none"
       style={{
         userSelect: "none",
         touchAction: "none",

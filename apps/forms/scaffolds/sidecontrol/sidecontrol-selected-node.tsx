@@ -85,7 +85,7 @@ export function SelectionMixedProperties() {
     document: { root_id },
   } = document;
 
-  const { ids, nodes, properties, actions: change } = useSelection();
+  const { selection: ids, nodes, properties, actions: change } = useSelection();
   const {
     id,
     name,
