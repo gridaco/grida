@@ -1,6 +1,7 @@
 import type {
   Appearance,
   AttributeDefinition,
+  CanvasDocumentSnapshotSchema,
   Customer,
   EndingPageI18nOverrides,
   EndingPageTemplateID,
@@ -60,10 +61,16 @@ export interface BaseDocumentEditorInit {
 export type EditorInit =
   | FormDocumentEditorInit
   | SiteDocumentEditorInit
-  | SchemaDocumentEditorInit;
+  | SchemaDocumentEditorInit
+  | CanvasDocumentEditorInit;
 
 export interface SiteDocumentEditorInit extends BaseDocumentEditorInit {
   doctype: "v0_site";
+}
+
+export interface CanvasDocumentEditorInit extends BaseDocumentEditorInit {
+  doctype: "v0_canvas";
+  canvas_one: CanvasDocumentSnapshotSchema;
 }
 
 export interface SchemaDocumentTableInit {
@@ -345,6 +352,7 @@ interface IEditorSidebarState {
   sidebar: {
     mode: "project" | "build" | "data" | "connect";
     mode_data: {
+      disabled: boolean;
       tables: TableMenuItem[];
       menus: MenuItem<GDocTableID>[];
     };
@@ -406,6 +414,7 @@ export interface BaseDocumentEditorState
   doctype: GDocumentType;
   documents: {
     ["site/dev-collection"]?: IDocumentEditorState;
+    ["canvas/one"]?: IDocumentEditorState;
     ["form/startpage"]?: IDocumentEditorState & { template_id: string };
     // [key: string]: ITemplateEditorState;
   };

@@ -20,6 +20,7 @@ import {
   LineChartIcon,
   BarChart3Icon,
   BarChartHorizontalIcon,
+  PenToolIcon,
 } from "lucide-react";
 import { SupabaseLogo } from "./logos";
 
@@ -50,6 +51,7 @@ export type ResourceTypeIconName =
   | "form-x-supabase"
   | "v0_form"
   | "v0_site"
+  | "v0_canvas"
   | "v0_schema";
 
 export function ResourceTypeIcon({
@@ -95,6 +97,8 @@ export function ResourceTypeIcon({
       return <PieChartIcon {...props} />;
     case "v0_site":
       return <AppWindowIcon {...props} />;
+    case "v0_canvas":
+      return <PenToolIcon {...props} />;
     case "form-x-supabase":
     case "supabase":
       return <SupabaseLogo {...props} />;

@@ -21,7 +21,7 @@ import { FormExpression } from "@/lib/forms/expression";
 import { PropertyLine, PropertyLineLabel } from "./ui";
 import { EditBinaryExpression } from "../panels/extensions/v-edit";
 import { PopoverClose } from "@radix-ui/react-popover";
-import { SelectedNodeProperties } from "./sidecontrol-selected-node";
+import { SelectionControl } from "./sidecontrol-selected-node";
 import { useDocument } from "@/grida-react-canvas/provider";
 
 export function SideControlDoctypeForm() {
@@ -53,10 +53,10 @@ function SelectedPageForm() {
 
 function SelectedPageFormStart() {
   const { selection } = useDocument();
-  if (selection.length === 1) {
-    return <SelectedNodeProperties />;
-  } else {
+  if (selection.length === 0) {
     return <SideControlGlobal />;
+  } else {
+    return <SelectionControl />;
   }
 }
 

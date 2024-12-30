@@ -4,6 +4,7 @@ import {
   SchemaDocumentSetupAssistantService,
   FormDocumentSetupAssistantService,
   SiteDocumentSetupAssistantService,
+  CanvasDocumentSetupAssistantService,
 } from "@/services/new";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
@@ -32,6 +33,11 @@ export type NewDocumentRequest =
   | {
       project_id: number;
       doctype: "v0_site";
+      title?: string;
+    }
+  | {
+      project_id: number;
+      doctype: "v0_canvas";
       title?: string;
     };
 
@@ -165,6 +171,24 @@ export async function POST(request: NextRequest) {
         return NextResponse.error();
       }
       break;
+    }
+    case "v0_canvas": {
+      const setup = new CanvasDocumentSetupAssistantService(project_id, {
+        title: data.title,
+      });
+      const { id } = await setup.createCanvasDocument();
+
+      return NextResponse.json({
+        data: {
+          document_id: id,
+          redirect: editorlink(".", {
+            proj: project_ref.name,
+            org: project_ref.organization!.name,
+            origin,
+            document_id: id,
+          }),
+        },
+      } satisfies NewDocumentResponse);
     }
     default: {
       console.error("unknown doctype");

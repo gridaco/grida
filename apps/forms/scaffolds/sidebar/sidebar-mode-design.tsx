@@ -44,7 +44,7 @@ export function ModeDesign() {
   const show_hierarchy =
     state.selected_page_id &&
     // TODO: need typing
-    ["form", "site/dev-collection", "form/startpage"].includes(
+    ["form", "site/dev-collection", "form/startpage", "canvas/one"].includes(
       state.selected_page_id
     );
 
@@ -103,7 +103,8 @@ function HierarchyView() {
           <SidebarMenuList>
             {selected_page_id === "form" && <FormBlockHierarchyList />}
             {(selected_page_id === "form/startpage" ||
-              selected_page_id === "site/dev-collection") &&
+              selected_page_id === "site/dev-collection" ||
+              "canvas/one") &&
               document && (
                 <StandaloneDocumentEditor
                   editable

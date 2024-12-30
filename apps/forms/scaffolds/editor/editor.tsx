@@ -14,6 +14,7 @@ import {
   EditorInit,
   FormDocumentEditorInit,
   SiteDocumentEditorInit,
+  CanvasDocumentEditorInit,
 } from "./state";
 import { initialEditorState } from "./init";
 import { FieldEditPanel, FieldSave } from "../panels/field-edit-panel";
@@ -53,12 +54,41 @@ export function EditorProvider({
           {children}
         </DatabaseDocumentEditorProvider>
       );
+    case "v0_canvas": {
+      return (
+        <CanvasDocumentEditorProvider initial={initial}>
+          {children}
+        </CanvasDocumentEditorProvider>
+      );
+    }
     default:
       throw new Error("unsupported doctype");
   }
 }
 
-export function DatabaseDocumentEditorProvider({
+function CanvasDocumentEditorProvider({
+  initial,
+  children,
+}: React.PropsWithChildren<{ initial: CanvasDocumentEditorInit }>) {
+  const [state, dispatch] = React.useReducer(
+    reducer,
+    initialEditorState(initial)
+  );
+  return (
+    <StateProvider state={state} dispatch={dispatch}>
+      <Multiplayer>
+        <TooltipProvider>
+          <MediaViewerProvider>
+            {/*  */}
+            {children}
+          </MediaViewerProvider>
+        </TooltipProvider>
+      </Multiplayer>
+    </StateProvider>
+  );
+}
+
+function DatabaseDocumentEditorProvider({
   initial,
   children,
 }: React.PropsWithChildren<{ initial: SchemaDocumentEditorInit }>) {
@@ -83,7 +113,7 @@ export function DatabaseDocumentEditorProvider({
   );
 }
 
-export function SiteDocumentEditorProvider({
+function SiteDocumentEditorProvider({
   initial,
   children,
 }: React.PropsWithChildren<{ initial: SiteDocumentEditorInit }>) {

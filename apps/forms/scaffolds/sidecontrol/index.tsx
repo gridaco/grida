@@ -9,6 +9,7 @@ import { SrcUploaderProvider } from "./controls/src";
 import { FontFamilyListProvider } from "./controls/font-family";
 import { useDocumentAssetUpload } from "../asset";
 import { useGoogleFontsList } from "@/grida-fonts/react/hooks";
+import { SelectionControl } from "./sidecontrol-selected-node";
 
 export function SideControl() {
   const fonts = useGoogleFontsList();
@@ -27,6 +28,7 @@ export function SideControl() {
           <div className="h-5" />
           {doctype === "v0_form" && <SideControlDoctypeForm />}
           {doctype === "v0_site" && <SideControlDoctypeSite />}
+          {doctype === "v0_canvas" && <SelectionControl />}
         </SrcUploaderProvider>
       </FontFamilyListProvider>
     </SidebarRoot>

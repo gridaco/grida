@@ -15,6 +15,7 @@ import type {
   TableXSBMainTableConnection,
   GDocSchemaTable,
   TableMenuItem,
+  CanvasDocumentEditorInit,
 } from "./state";
 import { blockstreeflat } from "@/lib/forms/tree";
 import { SYM_LOCALTZ, EditorSymbols } from "./symbols";
@@ -24,7 +25,6 @@ import { nanoid } from "nanoid";
 import { DataGridLocalPreferencesStorage } from "./storage/datagrid.storage";
 import { Data } from "@/lib/data";
 import * as samples from "@/theme/templates/formcollection/samples";
-import { grida } from "@/grida";
 import { FormStartPage } from "@/theme/templates/formstart";
 import { initDocumentEditorState } from "@/grida-react-canvas";
 
@@ -36,6 +36,8 @@ export function initialEditorState(init: EditorInit): EditorState {
       return initialSiteEditorState(init);
     case "v0_schema":
       return initialDatabaseEditorState(init);
+    case "v0_canvas":
+      return initialCanvasEditorState(init);
     default:
       throw new Error("unsupported doctype");
   }
@@ -205,6 +207,7 @@ function initialDatabaseEditorState(
     sidebar: {
       mode: initial_sidebar_mode[init.doctype],
       mode_data: {
+        disabled: false,
         tables: init.tables
           .map((t) =>
             table_to_sidebar_table_menu(t, {
@@ -300,7 +303,39 @@ function initialSiteEditorState(init: SiteDocumentEditorInit): EditorState {
     },
     sidebar: {
       mode: initial_sidebar_mode[init.doctype],
-      mode_data: { tables: [], menus: [] },
+      mode_data: {
+        disabled: false,
+        tables: [],
+        menus: [],
+      },
+    },
+    tables: [],
+  };
+}
+
+/**
+ * // FIXME: not ready
+ * @deprecated @beta
+ * @param init
+ * @returns
+ */
+function initialCanvasEditorState(init: CanvasDocumentEditorInit): EditorState {
+  const base = initialBaseDocumentEditorState(init);
+  // @ts-ignore
+  return {
+    ...base,
+    pages: [],
+    selected_page_id: "canvas/one",
+    documents: {
+      ["canvas/one"]: initDocumentEditorState({
+        editable: true,
+        debug: false,
+        document: init.canvas_one.pages.one,
+      }),
+    },
+    sidebar: {
+      mode: "build",
+      mode_data: { tables: [], menus: [], disabled: true },
     },
     tables: [],
   };
@@ -483,6 +518,7 @@ function initialFormEditorState(init: FormDocumentEditorInit): EditorState {
     sidebar: {
       mode: initial_sidebar_mode[init.doctype],
       mode_data: {
+        disabled: false,
         tables: tablemenus,
         menus: [
           {
