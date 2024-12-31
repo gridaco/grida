@@ -1,5 +1,10 @@
-import { grida_forms_client, workspaceclient } from "@/lib/supabase/server";
+import {
+  grida_forms_client,
+  grida_canvas_client,
+  workspaceclient,
+} from "@/lib/supabase/server";
 import type {
+  CanvasDocumentSnapshotSchema,
   FormResponseUnknownFieldHandlingStrategyType,
   GDocumentType,
 } from "@/types";
@@ -144,6 +149,74 @@ export class SiteDocumentSetupAssistantService extends DocumentSetupAssistantSer
     return this.createMasterDocument({
       title: this.seed.title ?? "Untitled Site",
     });
+  }
+}
+
+export class CanvasDocumentSetupAssistantService extends DocumentSetupAssistantService {
+  constructor(
+    readonly project_id: number,
+    private readonly seed: Partial<{ title: string }>
+  ) {
+    super(project_id, "v0_canvas");
+  }
+
+  async createCanvasDocument() {
+    const masterdoc_ref = await this.createMasterDocument({
+      title: this.seed.title ?? "Untitled Canvas",
+    });
+
+    const { data, error } = await grida_canvas_client
+      .from("canvas_document")
+      .insert({
+        id: masterdoc_ref.id,
+        data: {
+          __schema_version: "2024-12-31",
+          pages: {
+            one: {
+              nodes: {
+                root: {
+                  id: "root",
+                  name: "root",
+                  active: true,
+                  locked: false,
+                  type: "container",
+                  children: [],
+                  width: 500,
+                  height: 500,
+                  position: "relative",
+                  style: {},
+                  opacity: 1,
+                  zIndex: 0,
+                  rotation: 0,
+                  expanded: false,
+                  cornerRadius: 0,
+                  padding: 0,
+                  layout: "flow",
+                  direction: "horizontal",
+                  mainAxisAlignment: "start",
+                  crossAxisAlignment: "start",
+                  mainAxisGap: 0,
+                  crossAxisGap: 0,
+                },
+              },
+              root_id: "root",
+            },
+          },
+        } satisfies CanvasDocumentSnapshotSchema as {},
+      })
+      .select()
+      .single();
+
+    if (error) {
+      await this.rollback();
+      if (error.code === "23505") {
+        throw new Error("Schema name already exists");
+      }
+      console.error(error);
+      throw error;
+    }
+
+    return data;
   }
 }
 

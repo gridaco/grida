@@ -78,7 +78,16 @@ function AlignNodes() {
   );
 }
 
-export function SelectionMixedProperties() {
+export function SelectionControl() {
+  const { state: document } = useDocument();
+  if (document.selection.length === 1) {
+    return <SelectedNodeProperties />;
+  } else if (document.selection.length > 1) {
+    return <SelectionMixedProperties />;
+  }
+}
+
+function SelectionMixedProperties() {
   const { state: document } = useDocument();
 
   const {
@@ -540,7 +549,7 @@ export function SelectionMixedProperties() {
   );
 }
 
-export function SelectedNodeProperties() {
+function SelectedNodeProperties() {
   const { state: document } = useDocument();
 
   // - color - variables

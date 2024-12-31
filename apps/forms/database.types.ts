@@ -7,6 +7,40 @@ export type Json =
   | Json[]
 
 export type Database = {
+  grida_canvas: {
+    Tables: {
+      canvas_document: {
+        Row: {
+          created_at: string
+          data: Json
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          data: Json
+          id: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          id?: string
+        }
+        Relationships: []
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   grida_commerce: {
     Tables: {
       inventory_item: {
@@ -2481,7 +2515,7 @@ export type Database = {
       }
     }
     Enums: {
-      doctype: "v0_form" | "v0_site" | "v0_schema"
+      doctype: "v0_form" | "v0_site" | "v0_schema" | "v0_canvas"
       language_code:
         | "en"
         | "ko"

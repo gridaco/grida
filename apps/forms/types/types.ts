@@ -422,6 +422,13 @@ export type FormStartPageSchema = grida.program.document.IDocumentDefinition & {
   __schema_version: "2024-10-24";
 };
 
+export type CanvasDocumentSnapshotSchema = {
+  __schema_version: "2024-12-31";
+  pages: {
+    one: grida.program.document.IDocumentDefinition;
+  };
+};
+
 export type EndingPageTemplateID = "default" | "receipt01";
 
 export interface EndingPageI18nOverrides {
@@ -477,7 +484,7 @@ export interface Project {
   created_at: string;
 }
 
-export type GDocumentType = "v0_form" | "v0_site" | "v0_schema";
+export type GDocumentType = "v0_form" | "v0_site" | "v0_schema" | "v0_canvas";
 
 export interface GDocument {
   id: string;

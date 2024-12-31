@@ -28,7 +28,8 @@ class ErrorBoundary extends React.Component {
             Oops! Something went wrong
           </h1>
           <p className="text-xl mb-8 text-muted-foreground">
-            We're sorry, but an error occurred while processing your request.
+            We&apos;re sorry, but an error occurred while processing your
+            request.
           </p>
           <div className="flex space-x-4">
             <Button

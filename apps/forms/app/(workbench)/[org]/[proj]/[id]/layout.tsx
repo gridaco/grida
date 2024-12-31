@@ -6,6 +6,7 @@ import {
   createRouteHandlerXSBClient,
   createServerComponentClient,
   createServerComponentWorkspaceClient,
+  createServerComponentCanvasClient,
   grida_xsupabase_client,
 } from "@/lib/supabase/server";
 import { GridaLogo } from "@/components/grida-logo";
@@ -14,6 +15,7 @@ import { Sidebar } from "@/scaffolds/sidebar/sidebar";
 import { EditorProvider, FormDocumentEditorProvider } from "@/scaffolds/editor";
 import { GridaXSupabaseService } from "@/services/x-supabase";
 import type {
+  CanvasDocumentSnapshotSchema,
   EndingPageTemplateID,
   Form,
   FormBlock,
@@ -402,6 +404,54 @@ export default async function Layout({
                 lang: "en",
                 is_powered_by_branding_enabled: true,
               },
+            }}
+          >
+            <BaseLayout
+              docid={masterdoc_ref.id}
+              doctitle={masterdoc_ref.title}
+              org={org}
+              proj={proj}
+            >
+              {children}
+            </BaseLayout>
+          </EditorProvider>
+        </Html>
+      );
+    }
+    case "v0_canvas": {
+      const canvasclient = createServerComponentCanvasClient(cookieStore);
+
+      const { data, error } = await canvasclient
+        .from("canvas_document")
+        .select("*")
+        .eq("id", masterdoc_ref.id)
+        .single();
+
+      if (!data) {
+        console.error("editorinit", id, error);
+        return notFound();
+      }
+
+      return (
+        <Html>
+          <EditorProvider
+            initial={{
+              doctype: "v0_canvas",
+              project: { id: project_ref.id, name: project_ref.name },
+              organization: {
+                id: project_ref.organization!.id,
+                name: project_ref.organization!.name,
+              },
+              user_id: user.id,
+              document_id: masterdoc_ref.id,
+              document_title: masterdoc_ref.title,
+              theme: {
+                appearance: "system",
+                fontFamily: "inter",
+                lang: "en",
+                is_powered_by_branding_enabled: true,
+              },
+              canvas_one: data.data as unknown as CanvasDocumentSnapshotSchema,
             }}
           >
             <BaseLayout

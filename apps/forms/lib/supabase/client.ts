@@ -20,6 +20,16 @@ export const createClientCommerceClient = () =>
     isSingleton: false,
   });
 
+export const createClientCanvasClient = () =>
+  createClientComponentClient<Database, "grida_canvas">({
+    options: {
+      db: {
+        schema: "grida_canvas",
+      },
+    },
+    isSingleton: false,
+  });
+
 export const createClientWorkspaceClient = () =>
   createClientComponentClient<Database, "public">({
     options: {

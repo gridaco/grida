@@ -124,6 +124,31 @@ export function CreateNewDocumentButton({
     });
   };
 
+  const new_default_cavas = async () => {
+    const promise = create_new_document({
+      project_id: project_id,
+      doctype: "v0_canvas",
+    });
+
+    toast.promise(promise, {
+      loading: "Creating...",
+      error: "Failed to create canvas",
+      success: "Canvas created",
+    });
+
+    promise.then(({ data, error }) => {
+      if (error) {
+        console.error(error);
+        return;
+      }
+      if (data) {
+        // client side redirect
+        router.push(data.redirect);
+        toast.loading("Loading...");
+      }
+    });
+  };
+
   const new_formn_with_template = async (template: string) => {
     const res = await fetch(
       `/private/editor/new/template?project_id=${project_id}&template=${template}&doctype=v0_form`,
@@ -156,24 +181,6 @@ export function CreateNewDocumentButton({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" sideOffset={8}>
-          {/* TODO: alpha feature */}
-          <DropdownMenuGroup>
-            <DropdownMenuLabel>Sites</DropdownMenuLabel>
-            <DropdownMenuItem
-              disabled={IS_PRODUCTION}
-              onSelect={new_default_site}
-            >
-              <ResourceTypeIcon
-                type="v0_site"
-                className="w-4 h-4 me-2 align-middle"
-              />
-              Blank Site
-              <Badge variant="outline" className="ms-auto">
-                soon
-              </Badge>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-          </DropdownMenuGroup>
           <DropdownMenuGroup>
             <DropdownMenuLabel>Forms</DropdownMenuLabel>
             <DropdownMenuItem onSelect={new_default_form}>
@@ -236,6 +243,34 @@ export function CreateNewDocumentButton({
                 className="w-4 h-4 me-2 align-middle"
               />
               Store
+              <Badge variant="outline" className="ms-auto">
+                soon
+              </Badge>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </DropdownMenuGroup>
+          <DropdownMenuGroup>
+            <DropdownMenuLabel>Sites / Design</DropdownMenuLabel>
+            <DropdownMenuItem onSelect={new_default_cavas}>
+              <ResourceTypeIcon
+                type="v0_canvas"
+                className="w-4 h-4 me-2 align-middle"
+              />
+              Design
+              <Badge variant="outline" className="ms-auto">
+                beta
+              </Badge>
+            </DropdownMenuItem>
+            {/* TODO: alpha feature */}
+            <DropdownMenuItem
+              disabled={IS_PRODUCTION}
+              onSelect={new_default_site}
+            >
+              <ResourceTypeIcon
+                type="v0_site"
+                className="w-4 h-4 me-2 align-middle"
+              />
+              Blank Site
               <Badge variant="outline" className="ms-auto">
                 soon
               </Badge>

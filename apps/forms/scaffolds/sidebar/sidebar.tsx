@@ -68,7 +68,10 @@ export function Sidebar() {
             <TabsTrigger value="build" disabled={state.doctype === "v0_schema"}>
               <HammerIcon className="w-4 h-4" />
             </TabsTrigger>
-            <TabsTrigger value="data">
+            <TabsTrigger
+              value="data"
+              disabled={state.sidebar.mode_data.disabled}
+            >
               <DatabaseIcon className="w-4 h-4" />
             </TabsTrigger>
             <TabsTrigger value="connect">
@@ -101,7 +104,7 @@ function ModeProjectHiearchy() {
   const current_project_documents = documents.filter(
     (d) => d.project_id === project.id
   );
-  console.log("loading", loading);
+
   return (
     <>
       <SidebarSection>

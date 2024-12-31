@@ -9,10 +9,7 @@ import {
   SidebarSectionHeaderItem,
   SidebarSectionHeaderLabel,
 } from "@/components/sidebar";
-import {
-  SelectionMixedProperties,
-  SelectedNodeProperties,
-} from "@/scaffolds/sidecontrol/sidecontrol-selected-node";
+import { SelectionControl } from "@/scaffolds/sidecontrol/sidecontrol-selected-node";
 import { __TMP_ComponentProperties } from "@/scaffolds/sidecontrol/sidecontrol-component-properties";
 import { NodeHierarchyList } from "@/scaffolds/sidebar/sidebar-node-hierarchy-list";
 import {
@@ -395,9 +392,9 @@ export default function CanvasPlayground() {
                         </Button>
                       </div>
 
-                      <div className="fixed bottom-20 left-10 flex items-center justify-center z-50 pointer-events-none">
+                      {/* <div className="fixed bottom-20 left-10 flex items-center justify-center z-50 pointer-events-none">
                         <KeyboardInputOverlay />
-                      </div>
+                      </div> */}
                     </>
                   )}
                   {!uiHidden && (
@@ -425,12 +422,7 @@ export default function CanvasPlayground() {
                       {state.selection.length === 0 && (
                         <__TMP_ComponentProperties />
                       )}
-                      {state.selection.length === 1 && (
-                        <SelectedNodeProperties />
-                      )}
-                      {state.selection.length > 1 && (
-                        <SelectionMixedProperties />
-                      )}
+                      {state.selection.length >= 1 && <SelectionControl />}
                     </FontFamilyListProvider>
                   </SidebarRoot>
                 </aside>

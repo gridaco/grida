@@ -10,7 +10,7 @@ const config: Config = {
     "./theme/**/*.{js,ts,jsx,tsx,mdx}",
     "./kits/**/*.{js,ts,jsx,tsx,mdx}",
     "./scaffolds/**/*.{js,ts,jsx,tsx,mdx}",
-    "./grida-canvas/**/*.{js,ts,jsx,tsx,mdx}",
+    "./grida-react-canvas/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
     extend: {

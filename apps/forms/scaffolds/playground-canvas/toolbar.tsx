@@ -1,11 +1,7 @@
 "use client";
 
 import { generate } from "@/app/(dev)/canvas/actions";
-import {
-  useDocument,
-  useEventTarget,
-  type CursorMode,
-} from "@/grida-react-canvas";
+import { useDocument, useEventTarget } from "@/grida-react-canvas";
 import { OpenAILogo } from "@/components/logos/openai";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,23 +17,24 @@ import {
   SlashIcon,
   BoxIcon,
   Pencil1Icon,
-  ChatBubbleIcon,
   CircleIcon,
   CursorArrowIcon,
   FrameIcon,
   ImageIcon,
-  LightningBoltIcon,
-  MagicWandIcon,
   MixIcon,
-  PlusIcon,
   TextIcon,
 } from "@radix-ui/react-icons";
 import { PopoverClose } from "@radix-ui/react-popover";
 import { useLocalStorage } from "@uidotdev/usehooks";
 import { readStreamableValue } from "ai/rsc";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { CANVAS_PLAYGROUND_LOCALSTORAGE_PREFERENCES_BASE_AI_PROMPT_KEY } from "./k";
 import { PenToolIcon } from "lucide-react";
+import {
+  cursormode_to_toolbar_value,
+  toolbar_value_to_cursormode,
+  ToolbarToolType,
+} from "@/grida-react-canvas/toolbar";
 
 function useGenerate() {
   const streamGeneration = useCallback(
@@ -251,45 +248,3 @@ function Generate() {
 }
 
 const VerticalDivider = () => <div className="w-1 h-4 border-r" />;
-
-type ToolbarToolType =
-  | "cursor"
-  | "rectangle"
-  | "ellipse"
-  | "text"
-  | "container"
-  | "image"
-  | "line"
-  | "pencil"
-  | "path";
-
-function cursormode_to_toolbar_value(cm: CursorMode): ToolbarToolType {
-  switch (cm.type) {
-    case "cursor":
-      return "cursor";
-    case "insert":
-      return cm.node;
-    case "draw":
-      return cm.tool;
-    case "path":
-      return "path";
-  }
-}
-
-function toolbar_value_to_cursormode(tt: ToolbarToolType): CursorMode {
-  switch (tt) {
-    case "cursor":
-      return { type: "cursor" };
-    case "container":
-    case "ellipse":
-    case "image":
-    case "rectangle":
-    case "text":
-      return { type: "insert", node: tt };
-    case "line":
-    case "pencil":
-      return { type: "draw", tool: tt };
-    case "path":
-      return { type: "path" };
-  }
-}
