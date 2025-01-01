@@ -30,7 +30,7 @@ import { GoogleFontsManager } from "./components/google-fonts";
 import { domapi } from "./domapi";
 import { cmath } from "@grida/cmath";
 import type { TCanvasEventTargetDragGestureState, TChange } from "./action";
-import mixed from "@/grida/mixed";
+import mixed, { PropertyCompareFn } from "@/grida/mixed";
 import deepEqual from "deep-equal";
 
 const DocumentContext = createContext<IDocumentEditorState | null>(null);
@@ -1020,6 +1020,22 @@ export function useNodeAction(node_id: string | undefined) {
   }, [node_id, nodeActions]);
 }
 
+const compareProperty: PropertyCompareFn<grida.program.nodes.AnyNode> = (
+  key,
+  a,
+  b
+): boolean => {
+  switch (key) {
+    case "fill":
+    case "stroke":
+      // support gradient (as the id should be ignored)
+      const { id: __, ..._a } = (a ?? {}) as grida.program.cg.AnyPaint;
+      const { id: _, ..._b } = (b ?? {}) as grida.program.cg.AnyPaint;
+      return deepEqual(_a, _b);
+  }
+  return deepEqual(a, b);
+};
+
 export function useSelection() {
   const [state, dispatch] = __useInternal();
   const __actions = __useNodeActions(dispatch);
@@ -1038,6 +1054,7 @@ export function useSelection() {
         {
           idKey: "id",
           ignoredKey: ["id", "type", "userdata"],
+          compare: compareProperty,
           mixed: grida.mixed,
         }
       ),
@@ -1383,12 +1400,7 @@ export function useSelectionPaints() {
               // "stroke"
             ].includes(key);
           },
-          compare: (a, b) => {
-            // support gradient (as the id should be ignored)
-            const { id: __, ..._a } = (a ?? {}) as grida.program.cg.AnyPaint;
-            const { id: _, ..._b } = (b ?? {}) as grida.program.cg.AnyPaint;
-            return deepEqual(_a, _b);
-          },
+          compare: compareProperty,
           mixed: grida.mixed,
         }
       ),

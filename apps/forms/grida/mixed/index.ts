@@ -18,12 +18,17 @@ type MixedProperty<T, S> = {
 } & ({ value: T; mixed: false } | { value: S; mixed: true });
 
 type KeyIgnoreFn<T> = (key: keyof T | string) => boolean;
-type PropertyCompareFn<T> = (a: T, b: T) => boolean;
+type CompareFn<T = any> = (a: T, b: T) => boolean;
+export type PropertyCompareFn<T> = <K extends keyof T>(
+  key: K,
+  a: T[K],
+  b: T[K]
+) => boolean;
 
 type MixedOptions<T, S> = {
   idKey: keyof T;
   ignoredKey?: (keyof T)[] | KeyIgnoreFn<T>;
-  compare?: PropertyCompareFn<T[keyof T]>;
+  compare?: PropertyCompareFn<T>;
   mixed: S;
 };
 
@@ -98,7 +103,7 @@ export default function mixed<T extends Record<string, any>, S>(
   for (const key of allKeys) {
     const values = objects.map((obj) => obj[key]);
     const definedValues = values.filter((v) => v !== undefined);
-    const uniqueValues = unique(definedValues, compare);
+    const uniqueValues = unique(definedValues, (a, b) => compare(key, a, b));
 
     const type = getMixedPropertyType(definedValues[0]);
 
@@ -106,7 +111,7 @@ export default function mixed<T extends Record<string, any>, S>(
     const mappedValues = uniqueValues.map((val) => ({
       value: val,
       ids: objects
-        .filter((obj) => compare(obj[key], val))
+        .filter((obj) => compare(key, obj[key], val))
         .map((obj) => obj[idKey]),
     }));
 
@@ -134,7 +139,7 @@ function getMixedPropertyType(value: any): MixedPropertyType {
   return undefined as any;
 }
 
-function unique<T>(arr: T[], eq: PropertyCompareFn<T>): T[] {
+function unique<T>(arr: T[], eq: CompareFn<T>): T[] {
   const result: T[] = [];
   for (const item of arr) {
     if (!result.some((r) => eq(r, item))) {
