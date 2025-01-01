@@ -349,14 +349,23 @@ export namespace document {
    */
   export function getChildren(
     context: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext,
-    node_id: string
+    node_id: string,
+    recursive = false
   ): NodeID[] {
     const { __ctx_nid_to_parent_id } = context;
-
-    // Filter all nodes that have the input node as their parent
-    return Object.keys(__ctx_nid_to_parent_id).filter(
+    const directChildren = Object.keys(__ctx_nid_to_parent_id).filter(
       (id) => __ctx_nid_to_parent_id[id] === node_id
     );
+
+    if (!recursive) {
+      return directChildren;
+    }
+
+    const allChildren = [...directChildren];
+    for (const child of directChildren) {
+      allChildren.push(...getChildren(context, child, true));
+    }
+    return allChildren;
   }
 
   export function getParentId(

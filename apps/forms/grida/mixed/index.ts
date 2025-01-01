@@ -1,24 +1,45 @@
+import deepEqual from "deep-equal";
+
 type MixedProperties<T, S> = {
   [K in keyof T]: MixedProperty<T[K], S>;
 };
 
+type MixedPropertyType = "number" | "string" | "boolean" | "object";
+
 type MixedProperty<T, S> = {
-  type: "number" | "string" | "boolean";
+  type: MixedPropertyType;
   partial: boolean;
   ids: string[];
-} & (
-  | {
-      value: T;
-      mixed: false;
-    }
-  | { value: S; mixed: true }
-);
+  // multiple unique values mapped
+  values: {
+    value: T;
+    ids: string[];
+  }[];
+} & ({ value: T; mixed: false } | { value: S; mixed: true });
+
+type KeyIgnoreFn<T> = (key: keyof T | string) => boolean;
+type CompareFn<T = any> = (a: T, b: T) => boolean;
+export type PropertyCompareFn<T> = <K extends keyof T>(
+  key: K,
+  a: T[K],
+  b: T[K]
+) => boolean;
 
 type MixedOptions<T, S> = {
   idKey: keyof T;
-  ignoredKeys?: (keyof T)[];
+  ignoredKey?: (keyof T)[] | KeyIgnoreFn<T>;
+  compare?: PropertyCompareFn<T>;
   mixed: S;
 };
+
+function should_ignore_key<T>(
+  key: keyof T | string,
+  ignoredKeys: (keyof T)[] | KeyIgnoreFn<T>
+) {
+  return ignoredKeys instanceof Function
+    ? ignoredKeys(key)
+    : ignoredKeys.includes(key as keyof T);
+}
 
 /**
  * Analyzes an array of objects and produces a summary of their properties,
@@ -64,48 +85,66 @@ type MixedOptions<T, S> = {
  */
 export default function mixed<T extends Record<string, any>, S>(
   objects: T[],
-  options: MixedOptions<T, S>
+  {
+    idKey,
+    ignoredKey: ignoredKeys = [],
+    mixed: mixedIndicator,
+    compare = deepEqual,
+  }: MixedOptions<T, S>
 ): MixedProperties<T, S> {
-  const { idKey, ignoredKeys = [] } = options;
+  if (!objects.length) return {} as MixedProperties<T, S>;
 
-  const result: Record<string, MixedProperty<T, S>> = {};
-
-  if (objects.length === 0) {
-    return result as MixedProperties<T, S>;
-  }
-
-  // Get all unique keys from objects (excluding ignored keys).
   const allKeys = Array.from(
     new Set(objects.flatMap((obj) => Object.keys(obj)))
-  ).filter((key) => !ignoredKeys.includes(key) && key !== idKey);
+  ).filter((k) => k !== idKey && !should_ignore_key(k, ignoredKeys));
 
-  // Analyze each key.
+  const result: Record<string, MixedProperty<any, any>> = {};
+
   for (const key of allKeys) {
     const values = objects.map((obj) => obj[key]);
-    const definedValues = values.filter((value) => value !== undefined);
-    const uniqueValues = Array.from(new Set(definedValues));
+    const definedValues = values.filter((v) => v !== undefined);
+    const uniqueValues = unique(definedValues, (a, b) => compare(key, a, b));
 
-    const type =
-      typeof definedValues[0] === "string"
-        ? "string"
-        : typeof definedValues[0] === "number"
-          ? "number"
-          : typeof definedValues[0] === "boolean"
-            ? "boolean"
-            : undefined; // Default to undefined instead of null
+    const type = getMixedPropertyType(definedValues[0]);
 
-    const mixed = uniqueValues.length > 1;
+    const isMixed = uniqueValues.length > 1;
+    const mappedValues = uniqueValues.map((val) => ({
+      value: val,
+      ids: objects
+        .filter((obj) => compare(key, obj[key], val))
+        .map((obj) => obj[idKey]),
+    }));
 
     result[key] = {
-      type: type as MixedProperty<T, S>["type"],
-      value: mixed ? options.mixed : uniqueValues[0],
-      mixed: mixed,
+      type,
+      value: isMixed ? mixedIndicator : uniqueValues[0],
+      mixed: isMixed,
       partial: definedValues.length < objects.length,
       ids: objects
         .filter((obj) => obj[key] !== undefined)
         .map((obj) => obj[idKey]),
+      values: mappedValues,
     };
   }
 
   return result as MixedProperties<T, S>;
+}
+
+function getMixedPropertyType(value: any): MixedPropertyType {
+  if (typeof value === "string") return "string";
+  if (typeof value === "number") return "number";
+  if (typeof value === "boolean") return "boolean";
+  if (value && typeof value === "object" && !Array.isArray(value))
+    return "object";
+  return undefined as any;
+}
+
+function unique<T>(arr: T[], eq: CompareFn<T>): T[] {
+  const result: T[] = [];
+  for (const item of arr) {
+    if (!result.some((r) => eq(r, item))) {
+      result.push(item);
+    }
+  }
+  return result;
 }

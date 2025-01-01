@@ -29,9 +29,11 @@ const transparent_paint: grida.program.cg.Paint = {
 export function PaintControl({
   value,
   onValueChange,
+  removable,
 }: {
   value?: grida.program.cg.Paint;
-  onValueChange: (value: grida.program.cg.PaintWithoutID | null) => void;
+  onValueChange?: (value: grida.program.cg.PaintWithoutID | null) => void;
+  removable?: boolean;
 }) {
   const onTabChange = useCallback(
     (type: grida.program.cg.Paint["type"]) => {
@@ -42,7 +44,7 @@ export function PaintControl({
           switch (to) {
             case "linear_gradient":
             case "radial_gradient": {
-              onValueChange({
+              onValueChange?.({
                 type: to,
                 transform: cmath.transform.identity,
                 stops: [
@@ -67,7 +69,7 @@ export function PaintControl({
         case "radial_gradient": {
           switch (to) {
             case "solid": {
-              onValueChange({
+              onValueChange?.({
                 type: "solid",
                 color: value.stops[0].color,
               });
@@ -75,7 +77,7 @@ export function PaintControl({
             }
             case "linear_gradient":
             case "radial_gradient": {
-              onValueChange({
+              onValueChange?.({
                 type: to,
                 stops: value.stops,
                 transform: cmath.transform.identity,
@@ -98,6 +100,7 @@ export function PaintControl({
   };
 
   const onRemovePaint = () => {
+    if (!removable) return;
     onValueChange?.(null);
   };
 
@@ -119,18 +122,20 @@ export function PaintControl({
                   // ommit the alpha
                 }}
                 onValueChange={(color) => {
-                  onValueChange({
+                  onValueChange?.({
                     type: "solid",
                     color: { ...color, a: value.color.a },
                   });
                 }}
               />
-              <button
-                onClick={onRemovePaint}
-                className="px-1 py-1 me-0.5 text-muted-foreground"
-              >
-                <Cross2Icon className="w-3.5 h-3.5" />
-              </button>
+              {removable && (
+                <button
+                  onClick={onRemovePaint}
+                  className="px-1 py-1 me-0.5 text-muted-foreground"
+                >
+                  <Cross2Icon className="w-3.5 h-3.5" />
+                </button>
+              )}
             </PaintInputContainer>
           )}
           {value.type === "linear_gradient" && (
@@ -138,12 +143,14 @@ export function PaintControl({
               <PaintInputContainer>
                 <PaintChip paint={value} />
                 <span className="ms-2 text-start text-xs flex-1">Linear</span>
-                <button
-                  onClick={onRemovePaint}
-                  className="px-1 py-1 me-0.5 text-muted-foreground"
-                >
-                  <Cross2Icon className="w-3.5 h-3.5" />
-                </button>
+                {removable && (
+                  <button
+                    onClick={onRemovePaint}
+                    className="px-1 py-1 me-0.5 text-muted-foreground"
+                  >
+                    <Cross2Icon className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </PaintInputContainer>
             </PopoverTrigger>
           )}
@@ -152,12 +159,14 @@ export function PaintControl({
               <PaintInputContainer>
                 <PaintChip paint={value} />
                 <span className="ms-2 text-start text-xs flex-1">Radial</span>
-                <button
-                  onClick={onRemovePaint}
-                  className="px-1 py-1 me-0.5 text-muted-foreground"
-                >
-                  <Cross2Icon className="w-3.5 h-3.5" />
-                </button>
+                {removable && (
+                  <button
+                    onClick={onRemovePaint}
+                    className="px-1 py-1 me-0.5 text-muted-foreground"
+                  >
+                    <Cross2Icon className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </PaintInputContainer>
             </PopoverTrigger>
           )}
@@ -201,7 +210,7 @@ export function PaintControl({
               <ColorPicker
                 color={value.color}
                 onColorChange={(color) => {
-                  onValueChange({
+                  onValueChange?.({
                     type: "solid",
                     color,
                   });

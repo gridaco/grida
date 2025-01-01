@@ -43,7 +43,7 @@ describe("mixed function", () => {
 
     const result = mixed(objects, {
       idKey: "id",
-      ignoredKeys: ["id", "type"],
+      ignoredKey: ["id", "type"],
       mixed: null,
     });
 
@@ -54,6 +54,7 @@ describe("mixed function", () => {
         mixed: false,
         partial: false,
         ids: ["a", "b", "c"],
+        values: [{ value: false, ids: ["a", "b", "c"] }],
       },
       x: {
         type: "number",
@@ -61,6 +62,7 @@ describe("mixed function", () => {
         mixed: false,
         partial: true,
         ids: ["a", "c"],
+        values: [{ value: 10, ids: ["a", "c"] }],
       },
       y: {
         type: "number",
@@ -68,6 +70,7 @@ describe("mixed function", () => {
         mixed: false,
         partial: true,
         ids: ["a", "c"],
+        values: [{ value: 10, ids: ["a", "c"] }],
       },
       cx: {
         type: "number",
@@ -75,6 +78,7 @@ describe("mixed function", () => {
         mixed: false,
         partial: true,
         ids: ["b"],
+        values: [{ value: 50, ids: ["b"] }],
       },
       cy: {
         type: "number",
@@ -82,6 +86,7 @@ describe("mixed function", () => {
         mixed: false,
         partial: true,
         ids: ["b"],
+        values: [{ value: 50, ids: ["b"] }],
       },
       width: {
         type: "number",
@@ -89,6 +94,7 @@ describe("mixed function", () => {
         mixed: false,
         partial: true,
         ids: ["a"],
+        values: [{ value: 100, ids: ["a"] }],
       },
       height: {
         type: "number",
@@ -96,6 +102,7 @@ describe("mixed function", () => {
         mixed: false,
         partial: true,
         ids: ["a"],
+        values: [{ value: 100, ids: ["a"] }],
       },
       opacity: {
         type: "number",
@@ -103,6 +110,10 @@ describe("mixed function", () => {
         mixed: true,
         partial: false,
         ids: ["a", "b", "c"],
+        values: [
+          { value: 1, ids: ["a", "b"] },
+          { value: 0, ids: ["c"] },
+        ],
       },
       fill: {
         type: "string",
@@ -110,6 +121,11 @@ describe("mixed function", () => {
         mixed: true,
         partial: false,
         ids: ["a", "b", "c"],
+        values: [
+          { value: "red", ids: ["a"] },
+          { value: "blue", ids: ["b"] },
+          { value: "black", ids: ["c"] },
+        ],
       },
       stroke: {
         type: "string",
@@ -117,6 +133,7 @@ describe("mixed function", () => {
         mixed: false,
         partial: true,
         ids: ["a", "b"],
+        values: [{ value: "black", ids: ["a", "b"] }],
       },
       strokeWidth: {
         type: "number",
@@ -124,6 +141,7 @@ describe("mixed function", () => {
         mixed: false,
         partial: true,
         ids: ["a", "b"],
+        values: [{ value: 2, ids: ["a", "b"] }],
       },
       text: {
         type: "string",
@@ -131,6 +149,7 @@ describe("mixed function", () => {
         mixed: false,
         partial: true,
         ids: ["c"],
+        values: [{ value: "Hello World", ids: ["c"] }],
       },
       font: {
         type: "string",
@@ -138,6 +157,7 @@ describe("mixed function", () => {
         mixed: false,
         partial: true,
         ids: ["c"],
+        values: [{ value: "Arial", ids: ["c"] }],
       },
       r: {
         type: "number",
@@ -145,6 +165,7 @@ describe("mixed function", () => {
         mixed: false,
         partial: true,
         ids: ["b"],
+        values: [{ value: 50, ids: ["b"] }],
       },
     });
   });
@@ -161,7 +182,7 @@ describe("mixed function", () => {
     ];
     const result = mixed(objects, {
       idKey: "id",
-      ignoredKeys: ["id", "type", "x"],
+      ignoredKey: ["id", "type", "x"],
       mixed: null,
     });
     expect(result).toEqual({});
@@ -180,6 +201,10 @@ describe("mixed function", () => {
       mixed: true,
       partial: false,
       ids: ["a", "b"],
+      values: [
+        { value: ["red", "blue"], ids: ["a"] },
+        { value: ["green"], ids: ["b"] },
+      ],
     });
 
     expect(result.count).toEqual({
@@ -188,6 +213,7 @@ describe("mixed function", () => {
       mixed: false,
       partial: false,
       ids: ["a", "b"],
+      values: [{ value: 10, ids: ["a", "b"] }],
     });
   });
 });

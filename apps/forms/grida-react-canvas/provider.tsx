@@ -30,7 +30,8 @@ import { GoogleFontsManager } from "./components/google-fonts";
 import { domapi } from "./domapi";
 import { cmath } from "@grida/cmath";
 import type { TCanvasEventTargetDragGestureState, TChange } from "./action";
-import mixed from "@/grida/mixed";
+import mixed, { PropertyCompareFn } from "@/grida/mixed";
+import deepEqual from "deep-equal";
 
 const DocumentContext = createContext<IDocumentEditorState | null>(null);
 
@@ -1019,6 +1020,22 @@ export function useNodeAction(node_id: string | undefined) {
   }, [node_id, nodeActions]);
 }
 
+const compareProperty: PropertyCompareFn<grida.program.nodes.AnyNode> = (
+  key,
+  a,
+  b
+): boolean => {
+  switch (key) {
+    case "fill":
+    case "stroke":
+      // support gradient (as the id should be ignored)
+      const { id: __, ..._a } = (a ?? {}) as grida.program.cg.AnyPaint;
+      const { id: _, ..._b } = (b ?? {}) as grida.program.cg.AnyPaint;
+      return deepEqual(_a, _b);
+  }
+  return deepEqual(a, b);
+};
+
 export function useSelection() {
   const [state, dispatch] = __useInternal();
   const __actions = __useNodeActions(dispatch);
@@ -1030,14 +1047,19 @@ export function useSelection() {
     });
   }, [selection, state.document.nodes]);
 
-  const mixedProperties = mixed<
-    grida.program.nodes.AnyNode,
-    typeof grida.mixed
-  >(nodes as grida.program.nodes.AnyNode[], {
-    idKey: "id",
-    ignoredKeys: ["id", "type", "userdata"],
-    mixed: grida.mixed,
-  });
+  const mixedProperties = useMemo(
+    () =>
+      mixed<grida.program.nodes.AnyNode, typeof grida.mixed>(
+        nodes as grida.program.nodes.AnyNode[],
+        {
+          idKey: "id",
+          ignoredKey: ["id", "type", "userdata"],
+          compare: compareProperty,
+          mixed: grida.mixed,
+        }
+      ),
+    [nodes]
+  );
 
   const name = useCallback(
     (value: string) => {
@@ -1045,7 +1067,7 @@ export function useSelection() {
         __actions.changeNodeName(id, value);
       });
     },
-    [selection]
+    [selection, __actions]
   );
 
   const active = useCallback(
@@ -1054,7 +1076,7 @@ export function useSelection() {
         __actions.changeNodeActive(id, value);
       });
     },
-    [selection]
+    [selection, __actions]
   );
 
   const locked = useCallback(
@@ -1063,7 +1085,7 @@ export function useSelection() {
         __actions.changeNodeLocked(id, value);
       });
     },
-    [selection]
+    [selection, __actions]
   );
 
   const rotation = useCallback(
@@ -1072,7 +1094,7 @@ export function useSelection() {
         __actions.changeNodeRotation(id, change);
       });
     },
-    [mixedProperties.rotation?.ids]
+    [mixedProperties.rotation?.ids, __actions]
   );
 
   const opacity = useCallback(
@@ -1081,7 +1103,7 @@ export function useSelection() {
         __actions.changeNodeOpacity(id, change);
       });
     },
-    [mixedProperties.opacity?.ids]
+    [mixedProperties.opacity?.ids, __actions]
   );
 
   const width = useCallback(
@@ -1090,7 +1112,7 @@ export function useSelection() {
         __actions.changeNodeSize(id, "width", value);
       });
     },
-    [mixedProperties.width?.ids]
+    [mixedProperties.width?.ids, __actions]
   );
 
   const height = useCallback(
@@ -1099,7 +1121,7 @@ export function useSelection() {
         __actions.changeNodeSize(id, "height", value);
       });
     },
-    [mixedProperties.height?.ids]
+    [mixedProperties.height?.ids, __actions]
   );
 
   const positioningMode = useCallback(
@@ -1108,7 +1130,7 @@ export function useSelection() {
         __actions.changeNodePositioningMode(id, position);
       });
     },
-    [mixedProperties.position?.ids]
+    [mixedProperties.position?.ids, __actions]
   );
 
   const fontFamily = useCallback(
@@ -1117,7 +1139,7 @@ export function useSelection() {
         __actions.changeTextNodeFontFamily(id, value);
       });
     },
-    [mixedProperties.fontFamily?.ids]
+    [mixedProperties.fontFamily?.ids, __actions]
   );
 
   const fontWeight = useCallback(
@@ -1126,7 +1148,7 @@ export function useSelection() {
         __actions.changeTextNodeFontWeight(id, value);
       });
     },
-    [mixedProperties.fontWeight?.ids]
+    [mixedProperties.fontWeight?.ids, __actions]
   );
 
   const fontSize = useCallback(
@@ -1135,7 +1157,7 @@ export function useSelection() {
         __actions.changeTextNodeFontSize(id, change);
       });
     },
-    [mixedProperties.fontSize?.ids]
+    [mixedProperties.fontSize?.ids, __actions]
   );
 
   const lineHeight = useCallback(
@@ -1144,7 +1166,7 @@ export function useSelection() {
         __actions.changeTextNodeLineHeight(id, change);
       });
     },
-    [mixedProperties.lineHeight?.ids]
+    [mixedProperties.lineHeight?.ids, __actions]
   );
 
   const letterSpacing = useCallback(
@@ -1153,7 +1175,7 @@ export function useSelection() {
         __actions.changeTextNodeLetterSpacing(id, change);
       });
     },
-    [mixedProperties.letterSpacing?.ids]
+    [mixedProperties.letterSpacing?.ids, __actions]
   );
 
   const textAlign = useCallback(
@@ -1162,7 +1184,7 @@ export function useSelection() {
         __actions.changeTextNodeTextAlign(id, value);
       });
     },
-    [mixedProperties.textAlign?.ids]
+    [mixedProperties.textAlign?.ids, __actions]
   );
 
   const textAlignVertical = useCallback(
@@ -1171,7 +1193,7 @@ export function useSelection() {
         __actions.changeTextNodeTextAlignVertical(id, value);
       });
     },
-    [mixedProperties.textAlignVertical?.ids]
+    [mixedProperties.textAlignVertical?.ids, __actions]
   );
 
   const fit = useCallback(
@@ -1180,7 +1202,7 @@ export function useSelection() {
         __actions.changeNodeFit(id, value);
       });
     },
-    [mixedProperties.fit?.ids]
+    [mixedProperties.fit?.ids, __actions]
   );
 
   const fill = useCallback(
@@ -1189,7 +1211,7 @@ export function useSelection() {
         __actions.changeNodeFill(id, value);
       });
     },
-    [mixedProperties.fill?.ids]
+    [mixedProperties.fill?.ids, __actions]
   );
 
   const stroke = useCallback(
@@ -1198,7 +1220,7 @@ export function useSelection() {
         __actions.changeNodeStroke(id, value);
       });
     },
-    [mixedProperties.stroke?.ids]
+    [mixedProperties.stroke?.ids, __actions]
   );
 
   const strokeWidth = useCallback(
@@ -1207,7 +1229,7 @@ export function useSelection() {
         __actions.changeNodeStrokeWidth(id, change);
       });
     },
-    [mixedProperties.strokeWidth?.ids]
+    [mixedProperties.strokeWidth?.ids, __actions]
   );
 
   const strokeCap = useCallback(
@@ -1216,7 +1238,7 @@ export function useSelection() {
         __actions.changeNodeStrokeCap(id, value);
       });
     },
-    [mixedProperties.strokeCap?.ids]
+    [mixedProperties.strokeCap?.ids, __actions]
   );
 
   const layout = useCallback(
@@ -1225,7 +1247,7 @@ export function useSelection() {
         __actions.changeContainerNodeLayout(id, value);
       });
     },
-    [mixedProperties.layout?.ids]
+    [mixedProperties.layout?.ids, __actions]
   );
 
   const direction = useCallback(
@@ -1234,7 +1256,7 @@ export function useSelection() {
         __actions.changeFlexContainerNodeDirection(id, value);
       });
     },
-    [mixedProperties.direction?.ids]
+    [mixedProperties.direction?.ids, __actions]
   );
 
   const mainAxisAlignment = useCallback(
@@ -1243,7 +1265,7 @@ export function useSelection() {
         __actions.changeFlexContainerNodeMainAxisAlignment(id, value);
       });
     },
-    [mixedProperties.mainAxisAlignment?.ids]
+    [mixedProperties.mainAxisAlignment?.ids, __actions]
   );
 
   const crossAxisAlignment = useCallback(
@@ -1252,7 +1274,7 @@ export function useSelection() {
         __actions.changeFlexContainerNodeCrossAxisAlignment(id, value);
       });
     },
-    [mixedProperties.crossAxisAlignment?.ids]
+    [mixedProperties.crossAxisAlignment?.ids, __actions]
   );
 
   const cornerRadius = useCallback(
@@ -1261,7 +1283,7 @@ export function useSelection() {
         __actions.changeNodeCornerRadius(id, value);
       });
     },
-    [mixedProperties.cornerRadius?.ids]
+    [mixedProperties.cornerRadius?.ids, __actions]
   );
 
   const cursor = useCallback(
@@ -1270,7 +1292,7 @@ export function useSelection() {
         __actions.changeNodeMouseCursor(id, value);
       });
     },
-    [mixedProperties.cursor?.ids]
+    [mixedProperties.cursor?.ids, __actions]
   );
 
   const actions = useMemo(
@@ -1335,12 +1357,75 @@ export function useSelection() {
   return useMemo(() => {
     return {
       selection,
-      nodes: nodes,
+      nodes,
       properties: mixedProperties,
       actions,
     };
-  }, [selection, mixedProperties, actions]);
+  }, [selection, nodes, mixedProperties, actions]);
   //
+}
+
+export function useSelectionPaints() {
+  const [state, dispatch] = __useInternal();
+  const __actions = __useNodeActions(dispatch);
+  const selection = state.selection;
+
+  const ids = useMemo(
+    // selection & its recursive children
+    () => [
+      ...selection,
+      ...selection
+        .map((s) => document.getChildren(state.document_ctx, s, true))
+        .flat(),
+    ],
+    [selection, state.document_ctx]
+  );
+
+  const allnodes = useMemo(() => {
+    return ids.map((node_id) => {
+      return state.document.nodes[node_id];
+    });
+  }, [ids, state.document.nodes]);
+
+  const mixedProperties = useMemo(
+    () =>
+      mixed<grida.program.nodes.AnyNode, typeof grida.mixed>(
+        allnodes as grida.program.nodes.AnyNode[],
+        {
+          idKey: "id",
+          ignoredKey: (key) => {
+            return ![
+              "fill",
+              // TODO: support stroke
+              // "stroke"
+            ].includes(key);
+          },
+          compare: compareProperty,
+          mixed: grida.mixed,
+        }
+      ),
+    [allnodes]
+  );
+
+  const paints = mixedProperties.fill?.values ?? [];
+
+  const setPaint = useCallback(
+    (index: number, value: grida.program.cg.PaintWithoutID | null) => {
+      const group = paints[index];
+      group.ids.forEach((id) => {
+        __actions.changeNodeFill(id, value);
+      });
+    },
+    [paints, __actions]
+  );
+
+  return useMemo(() => {
+    return {
+      selection,
+      paints,
+      setPaint,
+    };
+  }, [selection, paints]);
 }
 
 export function useDocument() {

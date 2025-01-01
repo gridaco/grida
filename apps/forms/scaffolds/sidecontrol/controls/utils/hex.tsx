@@ -28,7 +28,7 @@ export default function HexValueInput<T extends RGB | RGBA>({
             .toString(16)
             .padStart(2, "0")
         : "";
-    return `${r}${g}${b}${a}`;
+    return `${r}${g}${b}${a}`.toUpperCase();
   };
 
   const hexToRgb = (hex: string): T | null => {

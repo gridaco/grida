@@ -9,7 +9,7 @@ import {
   SidebarSectionHeaderItem,
   SidebarSectionHeaderLabel,
 } from "@/components/sidebar";
-import { SelectionControl } from "@/scaffolds/sidecontrol/sidecontrol-selected-node";
+import { SelectionControl } from "@/scaffolds/sidecontrol/sidecontrol-node-selection";
 import { __TMP_ComponentProperties } from "@/scaffolds/sidecontrol/sidecontrol-component-properties";
 import { NodeHierarchyList } from "@/scaffolds/sidebar/sidebar-node-hierarchy-list";
 import {
