@@ -21,7 +21,7 @@ import { FormExpression } from "@/lib/forms/expression";
 import { PropertyLine, PropertyLineLabel } from "./ui";
 import { EditBinaryExpression } from "../panels/extensions/v-edit";
 import { PopoverClose } from "@radix-ui/react-popover";
-import { SelectionControl } from "./sidecontrol-selected-node";
+import { SelectionControl } from "./sidecontrol-node-selection";
 import { useDocument } from "@/grida-react-canvas/provider";
 
 export function SideControlDoctypeForm() {

@@ -9,7 +9,7 @@ import { SrcUploaderProvider } from "./controls/src";
 import { FontFamilyListProvider } from "./controls/font-family";
 import { useDocumentAssetUpload } from "../asset";
 import { useGoogleFontsList } from "@/grida-fonts/react/hooks";
-import { SelectionControl } from "./sidecontrol-selected-node";
+import { SelectionControl } from "./sidecontrol-node-selection";
 
 export function SideControl() {
   const fonts = useGoogleFontsList();

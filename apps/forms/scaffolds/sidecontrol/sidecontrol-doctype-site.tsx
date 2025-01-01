@@ -3,7 +3,7 @@
 import React from "react";
 import { useEditorState } from "../editor";
 import { SideControlGlobal } from "./sidecontrol-global";
-import { SelectionControl } from "./sidecontrol-selected-node";
+import { SelectionControl } from "./sidecontrol-node-selection";
 import assert from "assert";
 
 export function SideControlDoctypeSite() {
