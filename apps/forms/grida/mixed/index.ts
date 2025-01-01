@@ -1,11 +1,23 @@
+import deepEqual from "deep-equal";
+
 type MixedProperties<T, S> = {
   [K in keyof T]: MixedProperty<T[K], S>;
 };
 
+type MixedPropertyType = "number" | "string" | "boolean" | "object";
+
 type MixedProperty<T, S> = {
-  type: "number" | "string" | "boolean";
+  type: MixedPropertyType;
   partial: boolean;
   ids: string[];
+  // /**
+  //  * values mapped by unique values
+  //  * when mixed is false, this will have only one entry
+  //  */
+  // values: {
+  //   value: T;
+  //   ids: string[];
+  // }[];
 } & (
   | {
       value: T;
@@ -14,10 +26,22 @@ type MixedProperty<T, S> = {
   | { value: S; mixed: true }
 );
 
+type KeyIgnoreFn<T> = (key: keyof T | string) => boolean;
+
 type MixedOptions<T, S> = {
   idKey: keyof T;
-  ignoredKeys?: (keyof T)[];
+  ignoredKey?: (keyof T)[] | KeyIgnoreFn<T>;
   mixed: S;
+};
+
+const should_ignore_key = <T>(
+  key: keyof T | (string | {}),
+  { ignoredKeys }: { ignoredKeys: (keyof T)[] | KeyIgnoreFn<T> }
+) => {
+  if (ignoredKeys instanceof Function) {
+    return ignoredKeys(key as keyof T);
+  }
+  return ignoredKeys.includes(key as keyof T);
 };
 
 /**
@@ -66,7 +90,7 @@ export default function mixed<T extends Record<string, any>, S>(
   objects: T[],
   options: MixedOptions<T, S>
 ): MixedProperties<T, S> {
-  const { idKey, ignoredKeys = [] } = options;
+  const { idKey, ignoredKey: ignoredKeys = [] } = options;
 
   const result: Record<string, MixedProperty<T, S>> = {};
 
@@ -77,22 +101,38 @@ export default function mixed<T extends Record<string, any>, S>(
   // Get all unique keys from objects (excluding ignored keys).
   const allKeys = Array.from(
     new Set(objects.flatMap((obj) => Object.keys(obj)))
-  ).filter((key) => !ignoredKeys.includes(key) && key !== idKey);
+  ).filter((key) => key !== idKey && !should_ignore_key(key, { ignoredKeys }));
 
   // Analyze each key.
   for (const key of allKeys) {
     const values = objects.map((obj) => obj[key]);
     const definedValues = values.filter((value) => value !== undefined);
-    const uniqueValues = Array.from(new Set(definedValues));
+    const uniqueValues = unique(definedValues);
 
-    const type =
-      typeof definedValues[0] === "string"
-        ? "string"
-        : typeof definedValues[0] === "number"
-          ? "number"
-          : typeof definedValues[0] === "boolean"
-            ? "boolean"
-            : undefined; // Default to undefined instead of null
+    let type: MixedPropertyType | undefined;
+    switch (typeof definedValues[0]) {
+      case "string":
+        type = "string";
+        break;
+      case "number":
+        type = "number";
+        break;
+      case "boolean":
+        type = "boolean";
+        break;
+      case "object":
+        if (Array.isArray(definedValues[0])) {
+          type = undefined;
+          break;
+        }
+        type = "object";
+        break;
+
+      default:
+        // Default to undefined instead of null
+        type = undefined;
+        break;
+    }
 
     const mixed = uniqueValues.length > 1;
 
@@ -108,4 +148,19 @@ export default function mixed<T extends Record<string, any>, S>(
   }
 
   return result as MixedProperties<T, S>;
+}
+
+/**
+ *
+ * @param array of items
+ * @returns array of unique items
+ */
+function unique<T>(arr: T[], eq = deepEqual): T[] {
+  const result: T[] = [];
+  for (const item of arr) {
+    if (!result.some((r) => eq(r, item))) {
+      result.push(item);
+    }
+  }
+  return result;
 }

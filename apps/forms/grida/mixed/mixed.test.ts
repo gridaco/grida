@@ -43,7 +43,7 @@ describe("mixed function", () => {
 
     const result = mixed(objects, {
       idKey: "id",
-      ignoredKeys: ["id", "type"],
+      ignoredKey: ["id", "type"],
       mixed: null,
     });
 
@@ -161,7 +161,7 @@ describe("mixed function", () => {
     ];
     const result = mixed(objects, {
       idKey: "id",
-      ignoredKeys: ["id", "type", "x"],
+      ignoredKey: ["id", "type", "x"],
       mixed: null,
     });
     expect(result).toEqual({});
