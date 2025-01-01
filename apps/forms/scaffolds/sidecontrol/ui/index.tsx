@@ -28,7 +28,7 @@ export function PropertyLine({
     <div
       data-hidden={hidden}
       className={cn(
-        "flex items-start justify-between max-w-full data-[hidden='true']:hidden",
+        "group flex items-start justify-between max-w-full data-[hidden='true']:hidden",
         className
       )}
     >

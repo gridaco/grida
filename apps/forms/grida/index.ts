@@ -2334,6 +2334,12 @@ export namespace grida.program.cg {
     | "zoom-out";
 
   export type Paint = SolidPaint | LinearGradientPaint | RadialGradientPaint;
+  export type AnyPaint = Omit<
+    Partial<SolidPaint> &
+      Partial<LinearGradientPaint> &
+      Partial<RadialGradientPaint>,
+    "type"
+  > & { type: Paint["type"] };
 
   export type PaintWithoutID =
     | SolidPaint

@@ -47,17 +47,26 @@ import { LayoutControl } from "./controls/layout";
 import { AxisControl } from "./controls/axis";
 import { MaxlengthControl } from "./controls/maxlength";
 import { useComputedNode, useDocument, useNode } from "@/grida-react-canvas";
-import { LockClosedIcon, LockOpen1Icon } from "@radix-ui/react-icons";
+import {
+  Crosshair2Icon,
+  LockClosedIcon,
+  LockOpen1Icon,
+} from "@radix-ui/react-icons";
 import { supports } from "@/grida/utils/supports";
 import { StrokeWidthControl } from "./controls/stroke-width";
 import { PaintControl } from "./controls/paint";
 import { StrokeCapControl } from "./controls/stroke-cap";
 import { grida } from "@/grida";
 import assert from "assert";
-import { useNodeAction, useSelection } from "@/grida-react-canvas/provider";
+import {
+  useNodeAction,
+  useSelection,
+  useSelectionPaints,
+} from "@/grida-react-canvas/provider";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Toggle } from "@/components/ui/toggle";
 import { AlignControl } from "./controls/align";
+import { Button } from "@/components/ui/button";
 
 function AlignNodes() {
   const { state, align, distributeEvenly } = useDocument();
@@ -446,9 +455,17 @@ function SelectionMixedProperties() {
             <PropertyLine>
               <PropertyLineLabel>Fill</PropertyLineLabel>
               {fill?.mixed || fill?.partial ? (
-                <PaintControl value={undefined} onValueChange={change.fill} />
+                <PaintControl
+                  value={undefined}
+                  onValueChange={change.fill}
+                  removable
+                />
               ) : (
-                <PaintControl value={fill?.value} onValueChange={change.fill} />
+                <PaintControl
+                  value={fill?.value}
+                  onValueChange={change.fill}
+                  removable
+                />
               )}
             </PropertyLine>
             {/* <PropertyLine>
@@ -479,11 +496,13 @@ function SelectionMixedProperties() {
                   <PaintControl
                     value={undefined}
                     onValueChange={change.stroke}
+                    removable
                   />
                 ) : (
                   <PaintControl
                     value={stroke?.value}
                     onValueChange={change.stroke}
+                    removable
                   />
                 )}
               </PropertyLine>
@@ -524,6 +543,10 @@ function SelectionMixedProperties() {
             )}
           </SidebarMenuSectionContent>
         </SidebarSection> */}
+        {/* #region selection colors */}
+        <SelectionColors />
+
+        {/* #endregion selection colors */}
         <SidebarSection className="border-b pb-4">
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Developer</SidebarSectionHeaderLabel>
@@ -966,7 +989,7 @@ function SelectedNodeProperties() {
           )}
           <PropertyLine>
             <PropertyLineLabel>Fill</PropertyLineLabel>
-            <FillControl value={fill} onValueChange={actions.fill} />
+            <FillControl value={fill} onValueChange={actions.fill} removable />
           </PropertyLine>
           {/* <PropertyLine>
             <PropertyLineLabel>Ratio</PropertyLineLabel>
@@ -989,7 +1012,11 @@ function SelectedNodeProperties() {
           <SidebarMenuSectionContent className="space-y-2">
             <PropertyLine>
               <PropertyLineLabel>Color</PropertyLineLabel>
-              <PaintControl value={stroke} onValueChange={actions.stroke} />
+              <PaintControl
+                value={stroke}
+                onValueChange={actions.stroke}
+                removable
+              />
             </PropertyLine>
             <PropertyLine hidden={!stroke}>
               <PropertyLineLabel>Width</PropertyLineLabel>
@@ -1068,5 +1095,46 @@ function SelectedNodeProperties() {
         </SidebarMenuSectionContent>
       </SidebarSection>
     </div>
+  );
+}
+
+function SelectionColors() {
+  const { select } = useDocument();
+  const { paints, setPaint } = useSelectionPaints();
+
+  if (paints.length < 2) {
+    return <></>;
+  }
+
+  return (
+    <SidebarSection className="border-b pb-4">
+      <SidebarSectionHeaderItem>
+        <SidebarSectionHeaderLabel>Selection colors</SidebarSectionHeaderLabel>
+      </SidebarSectionHeaderItem>
+      <SidebarMenuSectionContent className="space-y-2">
+        {paints.map(({ value, ids }, index) => (
+          <PropertyLine key={index}>
+            <PaintControl
+              value={value}
+              onValueChange={(value) => {
+                setPaint(index, value);
+              }}
+            />
+            <div className="ms-1">
+              <Button
+                variant="ghost"
+                size="xs"
+                className="opacity-0 group-hover:opacity-100"
+                onClick={() => {
+                  select(ids);
+                }}
+              >
+                <Crosshair2Icon className="w-3 h-3" />
+              </Button>
+            </div>
+          </PropertyLine>
+        ))}
+      </SidebarMenuSectionContent>
+    </SidebarSection>
   );
 }
