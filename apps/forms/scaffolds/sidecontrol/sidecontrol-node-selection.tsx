@@ -545,7 +545,6 @@ function SelectionMixedProperties() {
         </SidebarSection> */}
         {/* #region selection colors */}
         <SelectionColors />
-
         {/* #endregion selection colors */}
         <SidebarSection className="border-b pb-4">
           <SidebarSectionHeaderItem>
@@ -1069,7 +1068,9 @@ function SelectedNodeProperties() {
           )}
         </SidebarMenuSectionContent>
       </SidebarSection>
-
+      {/* #region selection colors */}
+      <SelectionColors />
+      {/* #endregion selection colors */}
       <SidebarSection className="border-b pb-4">
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Developer</SidebarSectionHeaderLabel>

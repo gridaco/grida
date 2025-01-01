@@ -1353,16 +1353,27 @@ export function useSelectionPaints() {
   const __actions = __useNodeActions(dispatch);
   const selection = state.selection;
 
-  const nodes = useMemo(() => {
-    return selection.map((node_id) => {
+  const ids = useMemo(
+    // selection & its recursive children
+    () => [
+      ...selection,
+      ...selection
+        .map((s) => document.getChildren(state.document_ctx, s, true))
+        .flat(),
+    ],
+    [selection, state.document_ctx]
+  );
+
+  const allnodes = useMemo(() => {
+    return ids.map((node_id) => {
       return state.document.nodes[node_id];
     });
-  }, [selection, state.document.nodes]);
+  }, [ids, state.document.nodes]);
 
   const mixedProperties = useMemo(
     () =>
       mixed<grida.program.nodes.AnyNode, typeof grida.mixed>(
-        nodes as grida.program.nodes.AnyNode[],
+        allnodes as grida.program.nodes.AnyNode[],
         {
           idKey: "id",
           ignoredKey: (key) => {
@@ -1374,14 +1385,14 @@ export function useSelectionPaints() {
           },
           compare: (a, b) => {
             // support gradient (as the id should be ignored)
-            const { id: __, ..._a } = a as grida.program.cg.AnyPaint;
-            const { id: _, ..._b } = b as grida.program.cg.AnyPaint;
+            const { id: __, ..._a } = (a ?? {}) as grida.program.cg.AnyPaint;
+            const { id: _, ..._b } = (b ?? {}) as grida.program.cg.AnyPaint;
             return deepEqual(_a, _b);
           },
           mixed: grida.mixed,
         }
       ),
-    [nodes]
+    [allnodes]
   );
 
   const paints = mixedProperties.fill?.values ?? [];
