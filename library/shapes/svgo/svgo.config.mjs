@@ -1,4 +1,4 @@
-import currentcolor from "./currentcolor.plugin.js";
+import currentcolor from "./currentcolor.plugin.mjs";
 
 export default {
   plugins: [

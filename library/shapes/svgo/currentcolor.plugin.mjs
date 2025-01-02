@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   name: "currentcolor",
   params: {
     colorToReplace: "#FF00FF", // Default color to replace
