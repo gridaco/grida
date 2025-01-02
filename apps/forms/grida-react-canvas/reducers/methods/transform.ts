@@ -194,23 +194,36 @@ function __self_update_gesture_transform_translate(
     case "on": {
       // check if the cursor finds a new parent (if it escapes the current parent or enters a new parent)
       const hits = draft.surface_raycast_detected_node_ids.slice();
+
       // filter out the...
-      // 1. current selection (both original and cloned)
+      // 1. current selection (both original and cloned) and children of the current selection, recursive (both original and cloned)
       // 2. non-container nodes
-      // 3. children of the current selection (both original and cloned)
       // the current selection will always be hit as it moves with the cursor (unless not grouped - but does not matter)
       // both original and cloned nodes are considered as the same node, unless, the cloned node will instantly be moved to the original (if its a container) - this is not the case when clone modifier is turned on after the translate has started, but does not matter.
+
+      const hierarchy_ids = [
+        ...initial_selection,
+        ...initial_selection
+          .map((node_id) =>
+            document.getChildren(draft.document_ctx, node_id, true)
+          )
+          .flat(),
+        ...initial_clone_ids,
+        ...initial_clone_ids
+          .map((node_id) =>
+            document.getChildren(draft.document_ctx, node_id, true)
+          )
+          .flat(),
+      ];
+
       // TODO: room for performance improvement - use while loop and break when the first valid dropzone is found
       const possible_parents = hits.filter((node_id) => {
-        if (initial_selection.includes(node_id)) return false;
-        if (initial_clone_ids.includes(node_id)) return false;
+        // [1]
+        if (hierarchy_ids.includes(node_id)) return false;
 
         const node = document.__getNodeById(draft, node_id);
+        // [2]
         if (node.type !== "container") return false;
-
-        const parent_id = document.getParentId(draft.document_ctx, node_id)!;
-        if (current_selection.includes(parent_id)) return false;
-        if (initial_selection.includes(parent_id)) return false;
 
         return true;
       });
