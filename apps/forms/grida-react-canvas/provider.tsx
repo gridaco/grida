@@ -1422,10 +1422,11 @@ export function useSelectionPaints() {
   return useMemo(() => {
     return {
       selection,
+      ids,
       paints,
       setPaint,
     };
-  }, [selection, paints]);
+  }, [selection, paints, ids, setPaint]);
 }
 
 export function useDocument() {
