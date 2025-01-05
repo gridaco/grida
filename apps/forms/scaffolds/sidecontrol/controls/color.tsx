@@ -6,8 +6,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/utils";
-import { grida } from "@/grida";
 import { ColorPicker } from "./color-picker";
+import { css } from "@/grida/css";
 
 type RGBA = { r: number; g: number; b: number; a: number };
 
@@ -33,7 +33,7 @@ export function RGBAColorControl({
           )}
         >
           <RGBAChip rgba={value} />
-          <span className="ms-2">#{grida.program.css.rgbaToHex(value)}</span>
+          <span className="ms-2">#{css.rgbaToHex(value)}</span>
         </div>
       </PopoverTrigger>
       <PopoverContent

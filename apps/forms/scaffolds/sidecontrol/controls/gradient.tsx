@@ -7,6 +7,7 @@ import { Cross2Icon } from "@radix-ui/react-icons";
 import * as SliderPrimitive from "@radix-ui/react-slider";
 import { PropertyNumber } from "../ui";
 import { cmath } from "@grida/cmath";
+import { css } from "@/grida/css";
 
 export function GradientControl({
   value,
@@ -136,7 +137,7 @@ function GradientStopsSlider({
       <SliderPrimitive.Track
         className="relative h-2 w-full grow overflow-hidden rounded-full"
         style={{
-          background: `linear-gradient(to right, ${stops.map((stop) => `${grida.program.css.toRGBAString(stop.color)} ${stop.offset * 100}%`).join(", ")})`,
+          background: `linear-gradient(to right, ${stops.map((stop) => `${css.toRGBAString(stop.color)} ${stop.offset * 100}%`).join(", ")})`,
         }}
       ></SliderPrimitive.Track>
       {stops.map((stop, index) => (
@@ -144,7 +145,7 @@ function GradientStopsSlider({
           key={index}
           className="block h-4 w-4 rounded-full border-2 border-background outline outline-1 outline-workbench-accent-sky shadow transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
           style={{
-            background: grida.program.css.toRGBAString(stop.color),
+            background: css.toRGBAString(stop.color),
           }}
         />
       ))}

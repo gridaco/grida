@@ -6,6 +6,7 @@ import {
 import { useEffect, useRef } from "react";
 import { useNodeSurfaceTransfrom } from "../hooks/transform";
 import { grida } from "@/grida";
+import { css } from "@/grida/css";
 
 export function SurfaceTextEditor({ node_id }: { node_id: string }) {
   const inputref = useRef<HTMLTextAreaElement>(null);
@@ -67,9 +68,7 @@ export function SurfaceTextEditor({ node_id }: { node_id: string }) {
           className="m-0 p-0 border-none outline-none appearance-none bg-transparent h-full overflow-visible resize-none"
           style={{
             width: "calc(100% + 1px)",
-            ...grida.program.css.toReactTextStyle(
-              node as grida.program.nodes.TextNode
-            ),
+            ...css.toReactTextStyle(node as grida.program.nodes.TextNode),
           }}
         />
       </div>

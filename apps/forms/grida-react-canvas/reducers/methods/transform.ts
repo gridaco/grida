@@ -353,16 +353,6 @@ function __self_update_gesture_transform_scale(
     initial_rects,
   } = draft.gesture;
 
-  const snap_target_node_ids = getSnapTargets(selection, draft);
-
-  const snap_target_node_rects = snap_target_node_ids
-    .map((node_id: string) => {
-      const r = domapi.get_node_bounding_rect(node_id);
-      if (!r) reportError(`Node ${node_id} does not have a bounding rect`);
-      return r!;
-    })
-    .filter(Boolean);
-
   const initial_bounding_rectangle = cmath.rect.union(initial_rects);
 
   // get the origin point based on handle
@@ -377,6 +367,16 @@ function __self_update_gesture_transform_scale(
 
   /**
   // #region [snap]
+  const snap_target_node_ids = getSnapTargets(selection, draft);
+       
+  const snap_target_node_rects = snap_target_node_ids
+    .map((node_id: string) => {
+      const r = domapi.get_node_bounding_rect(node_id);
+      if (!r) reportError(`Node ${node_id} does not have a bounding rect`);
+      return r!;
+    })
+    .filter(Boolean);
+    
   // the actual handle position
   const anchorpos = cmath.rect.getCardinalPoint(
     initial_bounding_rectangle,

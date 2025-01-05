@@ -1,6 +1,7 @@
 import React from "react";
-import { grida } from "@/grida";
 import queryattributes from "./utils/attributes";
+import { grida } from "@/grida";
+import { css } from "@/grida/css";
 
 export const VideoWidget = ({
   src,
@@ -25,8 +26,8 @@ export const VideoWidget = ({
         <video
           src={src as string}
           poster={poster as string}
-          width={grida.program.css.toDimension(width)}
-          height={grida.program.css.toDimension(height)}
+          width={css.toDimension(width)}
+          height={css.toDimension(height)}
           loop={loop}
           muted={muted}
           autoPlay={autoplay}

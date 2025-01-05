@@ -2390,15 +2390,17 @@ export function useDropzoneEventTarget() {
       if (event.target instanceof HTMLTextAreaElement) return;
 
       const items = event.clipboardData.items;
+
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
         if (item.kind === "file") {
           const file = item.getAsFile();
-          if (file)
+          if (file) {
             insertFromFile(file, {
               clientX: window.innerWidth / 2,
               clientY: window.innerHeight / 2,
             });
+          }
         } else if (item.kind === "string" && item.type === "text/plain") {
           item.getAsString((data) => {
             insertText(data, {

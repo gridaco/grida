@@ -7,6 +7,7 @@ import { ReactNodeRenderers } from ".";
 import { useComputedNode, useDocument, useNode } from "../provider";
 import assert from "assert";
 import { useUserDocumentCustomRenderer } from "../renderer";
+import { css } from "@/grida/css";
 
 class RendererNotFound extends Error {
   constructor(message: string) {
@@ -162,7 +163,7 @@ export function NodeElement<P extends Record<string, any>>({
             ["data-dev-editor-hovered"]: hovered,
           } satisfies grida.program.document.INodeHtmlDocumentQueryDataAttributes),
           style: {
-            ...grida.program.css.toReactCSSProperties(node, {
+            ...css.toReactCSSProperties(node, {
               fill: fillings[node.type],
               hasTextStyle: node.type === "text",
             }),
