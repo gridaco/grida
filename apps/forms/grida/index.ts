@@ -976,30 +976,42 @@ export namespace grida.program.nodes {
    * Main difference between an actual node or node data is, a prototype is only required to have a partial node data, and it has its own hierarchy of children.
    */
   export type NodePrototype =
-    | __TPrototypeNode<Omit<TextNode, __base_scene_node_properties>>
-    | __TPrototypeNode<Omit<ImageNode, __base_scene_node_properties>>
-    | __TPrototypeNode<Omit<VideoNode, __base_scene_node_properties>>
+    | __TPrototypeNode<Omit<Partial<TextNode>, __base_scene_node_properties>>
+    | __TPrototypeNode<Omit<Partial<ImageNode>, __base_scene_node_properties>>
+    | __TPrototypeNode<Omit<Partial<VideoNode>, __base_scene_node_properties>>
     | __TPrototypeNode<
-        Omit<ContainerNode, __base_scene_node_properties | "children"> &
-          __IPrototypeNodeChildren
-      >
-    | __TPrototypeNode<Omit<HTMLIFrameNode, __base_scene_node_properties>>
-    | __TPrototypeNode<Omit<HTMLRichTextNode, __base_scene_node_properties>>
-    | __TPrototypeNode<Omit<VectorNode, __base_scene_node_properties>>
-    | __TPrototypeNode<Omit<PathNode, __base_scene_node_properties>>
-    | __TPrototypeNode<Omit<LineNode, __base_scene_node_properties>>
-    | __TPrototypeNode<Omit<RectangleNode, __base_scene_node_properties>>
-    | __TPrototypeNode<Omit<EllipseNode, __base_scene_node_properties>>
-    | __TPrototypeNode<
-        Omit<ComponentNode, __base_scene_node_properties | "children"> &
+        Omit<
+          Partial<ContainerNode>,
+          __base_scene_node_properties | "children"
+        > &
           __IPrototypeNodeChildren
       >
     | __TPrototypeNode<
-        Omit<InstanceNode, __base_scene_node_properties | "children"> &
+        Omit<Partial<HTMLIFrameNode>, __base_scene_node_properties>
+      >
+    | __TPrototypeNode<
+        Omit<Partial<HTMLRichTextNode>, __base_scene_node_properties>
+      >
+    | __TPrototypeNode<Omit<Partial<VectorNode>, __base_scene_node_properties>>
+    | __TPrototypeNode<Omit<Partial<PathNode>, __base_scene_node_properties>>
+    | __TPrototypeNode<Omit<Partial<LineNode>, __base_scene_node_properties>>
+    | __TPrototypeNode<
+        Omit<Partial<RectangleNode>, __base_scene_node_properties>
+      >
+    | __TPrototypeNode<Omit<Partial<EllipseNode>, __base_scene_node_properties>>
+    | __TPrototypeNode<
+        Omit<
+          Partial<ComponentNode>,
+          __base_scene_node_properties | "children"
+        > &
           __IPrototypeNodeChildren
       >
     | __TPrototypeNode<
-        Omit<TemplateInstanceNode, __base_scene_node_properties>
+        Omit<Partial<InstanceNode>, __base_scene_node_properties | "children"> &
+          __IPrototypeNodeChildren
+      >
+    | __TPrototypeNode<
+        Omit<Partial<TemplateInstanceNode>, __base_scene_node_properties>
       >;
 
   /**
@@ -1913,6 +1925,7 @@ export namespace grida.program.nodes {
             opacity: 1,
             zIndex: 0,
             rotation: 0,
+            position: "absolute",
             ...prototype,
             id: id,
           } as AnyNode;
@@ -2165,17 +2178,39 @@ export namespace grida.program.cg {
   }
 
   /**
-   * @param hex #RRGGBB
-   * @returns
+   * Converts a HEX color string to an RGBA8888 object.
+   *
+   * Supports both short (`#RGB`) and long (`#RRGGBB`) HEX formats.
+   *
+   * @param hex - The HEX color string to convert. Must start with `#` and be 3 or 6 characters long after the `#`.
+   * @returns An object containing `r`, `g`, `b`, and `a` properties.
+   *
+   * @throws {Error} If the input HEX string is invalid.
+   *
+   * @example
+   * ```typescript
+   * hex_to_rgba8888("#F80"); // { r: 255, g: 136, b: 0, a: 1 }
+   * hex_to_rgba8888("#FF8800"); // { r: 255, g: 136, b: 0, a: 1 }
+   * ```
    */
-  export function hex_to_rgba8888(hex: string): RGBA8888 {
-    const hexValue = parseInt(hex.replace("#", ""), 16);
-    return {
-      r: (hexValue >> 16) & 0xff,
-      g: (hexValue >> 8) & 0xff,
-      b: hexValue & 0xff,
-      a: 1,
-    };
+  export function hex_to_rgba8888(hex: string): cg.RGBA8888 {
+    const normalizedHex = hex.replace("#", "");
+    let r, g, b;
+
+    if (normalizedHex.length === 3) {
+      // Expand short hex to long hex
+      r = parseInt(normalizedHex[0] + normalizedHex[0], 16);
+      g = parseInt(normalizedHex[1] + normalizedHex[1], 16);
+      b = parseInt(normalizedHex[2] + normalizedHex[2], 16);
+    } else if (normalizedHex.length === 6) {
+      r = parseInt(normalizedHex.substring(0, 2), 16);
+      g = parseInt(normalizedHex.substring(2, 4), 16);
+      b = parseInt(normalizedHex.substring(4, 6), 16);
+    } else {
+      throw new Error("Invalid hex format. Expected #RGB or #RRGGBB.");
+    }
+
+    return { r, g, b, a: 1 };
   }
 
   /**

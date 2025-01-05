@@ -1,0 +1,474 @@
+{
+  "name": "svg",
+  "type": "element",
+  "value": "",
+  "parent": null,
+  "attributes": {
+    "xmlns": "http://www.w3.org/2000/svg",
+    "xmlns:xlink": "http://www.w3.org/1999/xlink",
+    "width": "800",
+    "height": "600",
+    "viewBox": "0 0 800 600",
+    "style": "background-color: #f9f9f9;"
+  },
+  "children": [
+    {
+      "name": "defs",
+      "type": "element",
+      "value": "",
+      "parent": null,
+      "attributes": {},
+      "children": [
+        {
+          "name": "linearGradient",
+          "type": "element",
+          "value": "",
+          "parent": null,
+          "attributes": {
+            "id": "linearGradient",
+            "x1": "0%",
+            "y1": "0%",
+            "x2": "100%",
+            "y2": "0%"
+          },
+          "children": [
+            {
+              "name": "stop",
+              "type": "element",
+              "value": "",
+              "parent": null,
+              "attributes": {
+                "offset": "0%",
+                "style": "stop-color: red;"
+              },
+              "children": []
+            },
+            {
+              "name": "stop",
+              "type": "element",
+              "value": "",
+              "parent": null,
+              "attributes": {
+                "offset": "100%",
+                "style": "stop-color: blue;"
+              },
+              "children": []
+            }
+          ]
+        },
+        {
+          "name": "radialGradient",
+          "type": "element",
+          "value": "",
+          "parent": null,
+          "attributes": {
+            "id": "radialGradient",
+            "cx": "50%",
+            "cy": "50%",
+            "r": "50%"
+          },
+          "children": [
+            {
+              "name": "stop",
+              "type": "element",
+              "value": "",
+              "parent": null,
+              "attributes": {
+                "offset": "0%",
+                "style": "stop-color: yellow;"
+              },
+              "children": []
+            },
+            {
+              "name": "stop",
+              "type": "element",
+              "value": "",
+              "parent": null,
+              "attributes": {
+                "offset": "100%",
+                "style": "stop-color: green;"
+              },
+              "children": []
+            }
+          ]
+        },
+        {
+          "name": "pattern",
+          "type": "element",
+          "value": "",
+          "parent": null,
+          "attributes": {
+            "id": "pattern",
+            "width": "10",
+            "height": "10",
+            "patternUnits": "userSpaceOnUse"
+          },
+          "children": [
+            {
+              "name": "circle",
+              "type": "element",
+              "value": "",
+              "parent": null,
+              "attributes": {
+                "cx": "5",
+                "cy": "5",
+                "r": "3",
+                "fill": "purple"
+              },
+              "children": []
+            }
+          ]
+        },
+        {
+          "name": "filter",
+          "type": "element",
+          "value": "",
+          "parent": null,
+          "attributes": {
+            "id": "blurFilter"
+          },
+          "children": [
+            {
+              "name": "feGaussianBlur",
+              "type": "element",
+              "value": "",
+              "parent": null,
+              "attributes": {
+                "in": "SourceGraphic",
+                "stdDeviation": "5"
+              },
+              "children": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rect",
+      "type": "element",
+      "value": "",
+      "parent": null,
+      "attributes": {
+        "x": "50",
+        "y": "50",
+        "width": "100",
+        "height": "50",
+        "fill": "url(#linearGradient)",
+        "stroke": "black"
+      },
+      "children": []
+    },
+    {
+      "name": "circle",
+      "type": "element",
+      "value": "",
+      "parent": null,
+      "attributes": {
+        "cx": "250",
+        "cy": "75",
+        "r": "50",
+        "fill": "url(#radialGradient)",
+        "stroke": "black"
+      },
+      "children": []
+    },
+    {
+      "name": "ellipse",
+      "type": "element",
+      "value": "",
+      "parent": null,
+      "attributes": {
+        "cx": "450",
+        "cy": "75",
+        "rx": "50",
+        "ry": "25",
+        "fill": "orange",
+        "stroke": "black"
+      },
+      "children": []
+    },
+    {
+      "name": "line",
+      "type": "element",
+      "value": "",
+      "parent": null,
+      "attributes": {
+        "x1": "50",
+        "y1": "150",
+        "x2": "150",
+        "y2": "150",
+        "stroke": "blue",
+        "stroke-width": "4"
+      },
+      "children": []
+    },
+    {
+      "name": "polygon",
+      "type": "element",
+      "value": "",
+      "parent": null,
+      "attributes": {
+        "points": "200,150 250,100 300,150",
+        "fill": "green",
+        "stroke": "black"
+      },
+      "children": []
+    },
+    {
+      "name": "polyline",
+      "type": "element",
+      "value": "",
+      "parent": null,
+      "attributes": {
+        "points": "350,150 400,100 450,150",
+        "fill": "none",
+        "stroke": "purple"
+      },
+      "children": []
+    },
+    {
+      "name": "path",
+      "type": "element",
+      "value": "",
+      "parent": null,
+      "attributes": {
+        "d": "M50 250 Q150 200 250 250 T450 250",
+        "fill": "none",
+        "stroke": "red",
+        "stroke-width": "2"
+      },
+      "children": []
+    },
+    {
+      "name": "text",
+      "type": "element",
+      "value": "",
+      "parent": null,
+      "attributes": {
+        "x": "50",
+        "y": "350",
+        "font-family": "Arial",
+        "font-size": "24",
+        "fill": "black",
+        "stroke": "none"
+      },
+      "children": [
+        {
+          "name": "",
+          "type": "text",
+          "value": "\n    SVG Text Example\n    ",
+          "parent": null,
+          "attributes": {},
+          "children": []
+        },
+        {
+          "name": "tspan",
+          "type": "element",
+          "value": "",
+          "parent": null,
+          "attributes": {
+            "x": "50",
+            "dy": "30",
+            "font-weight": "bold",
+            "fill": "blue"
+          },
+          "children": [
+            {
+              "name": "",
+              "type": "text",
+              "value": "TSpan Example",
+              "parent": null,
+              "attributes": {},
+              "children": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "symbol",
+      "type": "element",
+      "value": "",
+      "parent": null,
+      "attributes": {
+        "id": "star",
+        "viewBox": "0 0 100 100"
+      },
+      "children": [
+        {
+          "name": "polygon",
+          "type": "element",
+          "value": "",
+          "parent": null,
+          "attributes": {
+            "points": "50,5 61,39 98,39 68,59 79,91 50,71 21,91 32,59 2,39 39,39",
+            "fill": "gold"
+          },
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "use",
+      "type": "element",
+      "value": "",
+      "parent": null,
+      "attributes": {
+        "href": "#star",
+        "x": "600",
+        "y": "50",
+        "width": "50",
+        "height": "50"
+      },
+      "children": []
+    },
+    {
+      "name": "use",
+      "type": "element",
+      "value": "",
+      "parent": null,
+      "attributes": {
+        "href": "#star",
+        "x": "700",
+        "y": "50",
+        "width": "50",
+        "height": "50",
+        "transform": "rotate(45, 725, 75)"
+      },
+      "children": []
+    },
+    {
+      "name": "image",
+      "type": "element",
+      "value": "",
+      "parent": null,
+      "attributes": {
+        "x": "50",
+        "y": "400",
+        "width": "100",
+        "height": "100",
+        "xlink:href": "https://via.placeholder.com/100"
+      },
+      "children": []
+    },
+    {
+      "name": "clipPath",
+      "type": "element",
+      "value": "",
+      "parent": null,
+      "attributes": {
+        "id": "circleClip"
+      },
+      "children": [
+        {
+          "name": "circle",
+          "type": "element",
+          "value": "",
+          "parent": null,
+          "attributes": {
+            "cx": "600",
+            "cy": "400",
+            "r": "50"
+          },
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "rect",
+      "type": "element",
+      "value": "",
+      "parent": null,
+      "attributes": {
+        "x": "550",
+        "y": "350",
+        "width": "100",
+        "height": "100",
+        "fill": "url(#pattern)",
+        "clip-path": "url(#circleClip)"
+      },
+      "children": []
+    },
+    {
+      "name": "mask",
+      "type": "element",
+      "value": "",
+      "parent": null,
+      "attributes": {
+        "id": "mask"
+      },
+      "children": [
+        {
+          "name": "rect",
+          "type": "element",
+          "value": "",
+          "parent": null,
+          "attributes": {
+            "x": "0",
+            "y": "0",
+            "width": "100%",
+            "height": "100%",
+            "fill": "white"
+          },
+          "children": []
+        },
+        {
+          "name": "circle",
+          "type": "element",
+          "value": "",
+          "parent": null,
+          "attributes": {
+            "cx": "650",
+            "cy": "500",
+            "r": "50",
+            "fill": "black"
+          },
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "rect",
+      "type": "element",
+      "value": "",
+      "parent": null,
+      "attributes": {
+        "x": "550",
+        "y": "450",
+        "width": "200",
+        "height": "100",
+        "fill": "green",
+        "mask": "url(#mask)"
+      },
+      "children": []
+    },
+    {
+      "name": "circle",
+      "type": "element",
+      "value": "",
+      "parent": null,
+      "attributes": {
+        "cx": "150",
+        "cy": "500",
+        "r": "20",
+        "fill": "red"
+      },
+      "children": [
+        {
+          "name": "animate",
+          "type": "element",
+          "value": "",
+          "parent": null,
+          "attributes": {
+            "attributeName": "cx",
+            "from": "150",
+            "to": "450",
+            "dur": "2s",
+            "repeatCount": "indefinite"
+          },
+          "children": []
+        }
+      ]
+    }
+  ]
+}
