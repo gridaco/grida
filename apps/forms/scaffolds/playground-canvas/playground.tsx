@@ -647,7 +647,9 @@ function InsertNodePanelContent() {
   };
 
   const onInsertSvgSrc = (src: string) => {
-    const task = fetch(src).then((res) => {
+    const task = fetch(src, {
+      cache: "no-store",
+    }).then((res) => {
       // svg content
       res.text().then((svg) => {
         const optimized = iosvg.v0.optimize(svg).data;
