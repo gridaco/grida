@@ -2307,7 +2307,7 @@ export function useSurfacePathEditor() {
         },
       });
     },
-    [dispatch, node_id]
+    [cursor_mode.type, dispatch, node_id]
   );
 
   const onVertexHover = useCallback(

@@ -646,20 +646,25 @@ function InsertNodePanelContent() {
     insertNode(pre);
   };
 
-  const onInsertSvgSrc = (src: string) => {
+  const onInsertSvgSrc = (name: string, src: string) => {
     const task = fetch(src, {
       cache: "no-store",
     }).then((res) => {
       // svg content
       res.text().then((svg) => {
         const optimized = iosvg.v0.optimize(svg).data;
-        iosvg.v0.convert(optimized).then((result) => {
-          if (result) {
-            insertNode(result);
-          } else {
-            throw new Error("Failed to convert SVG");
-          }
-        });
+        iosvg.v0
+          .convert(optimized, {
+            name: name.split(".svg")[0],
+            currentColor: { r: 0, g: 0, b: 0, a: 1 },
+          })
+          .then((result) => {
+            if (result) {
+              insertNode(result);
+            } else {
+              throw new Error("Failed to convert SVG");
+            }
+          });
       });
     });
 
@@ -719,7 +724,7 @@ function InsertNodePanelContent() {
               return (
                 <SidebarMenuGridItem
                   key={name}
-                  onClick={() => onInsertSvgSrc(src)}
+                  onClick={() => onInsertSvgSrc(name, src)}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -744,7 +749,7 @@ function InsertNodePanelContent() {
               return (
                 <SidebarMenuGridItem
                   draggable
-                  onClick={() => onInsertSvgSrc(src)}
+                  onClick={() => onInsertSvgSrc(family, src)}
                   className="border rounded-md shadow-sm cursor-pointer text-foreground/50 hover:text-foreground"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}

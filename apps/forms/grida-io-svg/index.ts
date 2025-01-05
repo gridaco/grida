@@ -444,10 +444,14 @@ type SVGElementAttributes = {
   zoomAndPan: unknown;
 };
 
-type SVGFactoryContext = {
+interface SVGFactoryUserContext {
+  name: string;
   currentColor: grida.program.cg.RGBA8888;
-  currentFill?: grida.program.cg.Paint;
-};
+}
+
+interface SVGFactoryContext extends SVGFactoryUserContext {
+  depth: number;
+}
 
 export namespace iosvg {
   export namespace map {
@@ -533,6 +537,8 @@ export namespace iosvg {
     ): grida.program.nodes.NodePrototype[] | null {
       const { name, attributes: _attributes, children } = node;
 
+      const nodename = context.depth === 0 ? context.name : name;
+
       // Merge attributes
       const attributes = mergeAttributes(
         inheritedAttributes,
@@ -550,13 +556,16 @@ export namespace iosvg {
           return [
             {
               type: "container",
+              name: nodename,
               position: "absolute",
               left: 0,
               top: 0,
               width: width ? parseFloat(width as string) : vw,
               height: height ? parseFloat(height as string) : vh,
               children: children
-                .map((child) => mapnode(child, context))
+                .map((child) =>
+                  mapnode(child, { ...context, depth: context.depth + 1 })
+                )
                 .flat()
                 .filter(Boolean) as grida.program.nodes.NodePrototype[],
             } satisfies grida.program.nodes.NodePrototype,
@@ -566,7 +575,13 @@ export namespace iosvg {
         // [g] => ...
         case "g": {
           return children
-            .flatMap((child) => mapnode(child, context, attributes))
+            .flatMap((child) =>
+              mapnode(
+                child,
+                { ...context, depth: context.depth + 1 },
+                attributes
+              )
+            )
             .filter(Boolean) as grida.program.nodes.NodePrototype[];
         }
 
@@ -591,12 +606,15 @@ export namespace iosvg {
           return [
             {
               type: "path",
+              name: nodename,
               vectorNetwork: vectorNetwork,
               opacity: map.opacity(opacity as string),
               fill: map.fill(fill as string, context),
               stroke: map.stroke(stroke as string, context),
               width: bbox.width,
               height: bbox.height,
+              left: 0,
+              top: 0,
               fillRule: fillRule,
             } satisfies grida.program.nodes.NodePrototype,
           ];
@@ -632,6 +650,7 @@ export namespace iosvg {
           return [
             {
               type: "rectangle",
+              name: nodename,
               left: parseFloat(x as string),
               top: parseFloat(y as string),
               width: parseFloat(width as string),
@@ -662,6 +681,7 @@ export namespace iosvg {
           return [
             {
               type: "ellipse",
+              name: nodename,
               left: parseFloat(cx as string) - rx,
               top: parseFloat(cy as string) - ry,
               width: rx * 2,
@@ -785,15 +805,13 @@ export namespace iosvg {
 
     export async function convert(
       svgstr: string,
-      context: SVGFactoryContext = {
-        currentColor: { r: 0, g: 0, b: 0, a: 1 },
-      }
+      context: SVGFactoryUserContext
     ): Promise<grida.program.nodes.NodePrototype | null> {
       const node = await parse(svgstr);
 
       // console.log("iosvg.convert(node)", node);
 
-      return mapnode(node, context)?.[0] ?? null;
+      return mapnode(node, { ...context, depth: 0 })?.[0] ?? null;
     }
   }
 }

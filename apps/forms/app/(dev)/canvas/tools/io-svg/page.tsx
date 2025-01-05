@@ -94,7 +94,10 @@ export default function IOSVGPage() {
     }
 
     iosvg.v0
-      .convert(svgo)
+      .convert(svgo, {
+        name: "SVG",
+        currentColor: { r: 0, g: 0, b: 0, a: 1 },
+      })
       .then((result) => {
         if (result) {
           const doc =

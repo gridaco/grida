@@ -16,11 +16,11 @@ export function SurfacePathEditor({ node_id }: { node_id: string }) {
   const transform = useNodeSurfaceTransfrom(node_id);
 
   const a_point_is_last = a_point === vertices.length - 1;
-  // const lastseg = segments[segments.length - 1];
 
   return (
     <div id="path-editor-surface" className="fixed left-0 top-0 w-0 h-0 z-10">
       <div
+        data-debug={debug}
         style={{
           position: "absolute",
           ...transform,
@@ -29,6 +29,7 @@ export function SurfacePathEditor({ node_id }: { node_id: string }) {
           resize: "none",
           zIndex: 1,
         }}
+        className="border border-transparent data-[debug='true']:border-pink-500"
       >
         {vertices.map(({ p }, i) => (
           <VertexPoint key={i} point={p} index={i} />
