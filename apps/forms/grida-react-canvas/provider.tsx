@@ -1422,10 +1422,11 @@ export function useSelectionPaints() {
   return useMemo(() => {
     return {
       selection,
+      ids,
       paints,
       setPaint,
     };
-  }, [selection, paints]);
+  }, [selection, paints, ids, setPaint]);
 }
 
 export function useDocument() {
@@ -2306,7 +2307,7 @@ export function useSurfacePathEditor() {
         },
       });
     },
-    [dispatch, node_id]
+    [cursor_mode.type, dispatch, node_id]
   );
 
   const onVertexHover = useCallback(

@@ -1,0 +1,9 @@
+{
+  "name": "grida-standard-library-shapes-bundler",
+  "scripts": {
+    "bundle": "node ./bundle.mjs"
+  },
+  "dependencies": {
+    "svgo": "^3.3.2"
+  }
+}

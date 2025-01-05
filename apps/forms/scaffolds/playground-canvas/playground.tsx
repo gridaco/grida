@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useReducer, useState } from "react";
+import React, { useEffect, useMemo, useReducer, useState } from "react";
 import {
   SidebarMenuGrid,
   SidebarMenuGridItem,
@@ -8,6 +8,7 @@ import {
   SidebarSection,
   SidebarSectionHeaderItem,
   SidebarSectionHeaderLabel,
+  SidebarVirtualizedMenuGrid,
 } from "@/components/sidebar";
 import { SelectionControl } from "@/scaffolds/sidecontrol/sidecontrol-node-selection";
 import { __TMP_ComponentProperties } from "@/scaffolds/sidecontrol/sidecontrol-component-properties";
@@ -98,6 +99,7 @@ import { Label } from "@/components/ui/label";
 import { keysymbols } from "@/grida-react-canvas/devtools/keysymbols";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useGoogleFontsList } from "@/grida-fonts/react/hooks";
+import { iosvg } from "@/grida-io-svg";
 
 export default function CanvasPlayground() {
   const [pref, setPref] = useState<Preferences>({ debug: false });
@@ -323,12 +325,12 @@ export default function CanvasPlayground() {
                                       </DropdownMenuItem>
                                     </Link>
                                     <Link
-                                      href="/canvas/tools/io-pdf"
+                                      href="/canvas/tools/io-svg"
                                       target="_blank"
                                     >
                                       <DropdownMenuItem>
                                         <OpenInNewWindowIcon className="me-2" />
-                                        IO PDF
+                                        IO SVG
                                       </DropdownMenuItem>
                                     </Link>
                                     <Link
@@ -617,7 +619,23 @@ const widgets = [
 function InsertNodePanelContent() {
   const { insertNode } = useDocument();
 
-  const onInsert = (type: string) => {
+  const icons_data = useReflectIconsData();
+  const icons = useMemo(() => {
+    return (
+      Object.keys(icons_data).map((key) => {
+        const icondata = icons_data[key];
+        const src = reflect_icon_link(icondata);
+        return { ...icondata, src, key } satisfies ReflectUIIconData & {
+          src: string;
+          key: string;
+        };
+      }) as (ReflectUIIconData & { src: string; key: string })[]
+    ).filter((icon) => icon.host === "material");
+  }, [icons_data]);
+
+  const shapes = useGridaStdShapes();
+
+  const onInsertWidget = (type: string) => {
     const pre = (prototypes as any)[type];
     if (!pre) {
       toast.error("Widget not found");
@@ -628,43 +646,182 @@ function InsertNodePanelContent() {
     insertNode(pre);
   };
 
+  const onInsertSvgSrc = (name: string, src: string) => {
+    const task = fetch(src, {
+      cache: "no-store",
+    }).then((res) => {
+      // svg content
+      res.text().then((svg) => {
+        const optimized = iosvg.v0.optimize(svg).data;
+        iosvg.v0
+          .convert(optimized, {
+            name: name.split(".svg")[0],
+            currentColor: { r: 0, g: 0, b: 0, a: 1 },
+          })
+          .then((result) => {
+            if (result) {
+              insertNode(result);
+            } else {
+              throw new Error("Failed to convert SVG");
+            }
+          });
+      });
+    });
+
+    toast.promise(task, {
+      loading: "Inserting SVG",
+      success: "SVG inserted",
+      error: "Failed to insert SVG",
+    });
+  };
+
+  const [tab, setTab] = useLocalStorage(
+    "playground-insert-dialog-tab",
+    "widgets"
+  );
+
   return (
     <>
-      <SidebarSection className="mt-4"></SidebarSection>
-      <SidebarSection>
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>
-            <span>Widgets</span>
-          </SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuGrid>
-          {widgets.map((type) => {
-            return (
-              <HoverCard key={type} openDelay={100} closeDelay={100}>
-                {/*  */}
-                <HoverCardTrigger>
-                  <SidebarMenuGridItem
-                    draggable
-                    onClick={() => {
-                      onInsert(type);
-                    }}
-                    className="border rounded-md shadow-sm cursor-pointer text-foreground/50 hover:text-foreground"
-                  >
-                    {/* <BlockTypeIcon
+      <Tabs className="mx-2 my-4 h-full" value={tab} onValueChange={setTab}>
+        <TabsList>
+          <TabsTrigger value="widgets">Widgets</TabsTrigger>
+          <TabsTrigger value="shapes">Shapes</TabsTrigger>
+          <TabsTrigger value="icons">Icons</TabsTrigger>
+        </TabsList>
+        <TabsContent value="widgets" className="h-full overflow-y-scroll">
+          <SidebarMenuGrid>
+            {widgets.map((type) => {
+              return (
+                <HoverCard key={type} openDelay={100} closeDelay={100}>
+                  {/*  */}
+                  <HoverCardTrigger>
+                    <SidebarMenuGridItem
+                      draggable
+                      onClick={() => {
+                        onInsertWidget(type);
+                      }}
+                      className="border rounded-md shadow-sm cursor-pointer text-foreground/50 hover:text-foreground"
+                    >
+                      {/* <BlockTypeIcon
                   type={block_type}
                   className="p-2 w-8 h-8 rounded"
                 /> */}
-                    <ButtonIcon />
-                    <div className="mt-1 w-full text-xs break-words text-center overflow-hidden text-ellipsis">
-                      {type}
-                    </div>
-                  </SidebarMenuGridItem>
-                </HoverCardTrigger>
-              </HoverCard>
-            );
-          })}
-        </SidebarMenuGrid>
-      </SidebarSection>
+                      <ButtonIcon />
+                      <div className="mt-1 w-full text-xs break-words text-center overflow-hidden text-ellipsis">
+                        {type}
+                      </div>
+                    </SidebarMenuGridItem>
+                  </HoverCardTrigger>
+                </HoverCard>
+              );
+            })}
+          </SidebarMenuGrid>
+        </TabsContent>
+        <TabsContent value="shapes" className="h-full overflow-y-scroll">
+          <SidebarMenuGrid>
+            {/*  */}
+            {shapes.map(({ name, src }) => {
+              return (
+                <SidebarMenuGridItem
+                  key={name}
+                  onClick={() => onInsertSvgSrc(name, src)}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={src}
+                    alt={name}
+                    loading="lazy"
+                    className="w-10 h-auto dark:invert"
+                  />
+                </SidebarMenuGridItem>
+              );
+            })}
+          </SidebarMenuGrid>
+        </TabsContent>
+        <TabsContent value="icons" className="w-full h-full">
+          <SidebarVirtualizedMenuGrid
+            columnWidth={70}
+            rowHeight={70}
+            className="min-h-96"
+            gap={4}
+            renderItem={({ item }) => {
+              const { src, family } = item;
+              return (
+                <SidebarMenuGridItem
+                  draggable
+                  onClick={() => onInsertSvgSrc(family, src)}
+                  className="border rounded-md shadow-sm cursor-pointer text-foreground/50 hover:text-foreground"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={src}
+                    alt={family}
+                    title={family}
+                    loading="lazy"
+                    className="dark:invert"
+                  />
+                </SidebarMenuGridItem>
+              );
+            }}
+            items={icons}
+          />
+        </TabsContent>
+      </Tabs>
     </>
   );
+}
+
+type ReflectUIIconData = {
+  host: "material" | "ant-design" | "radix-ui" | "unicons" | (string | {});
+  family: string;
+  variant: "default" | (string | {});
+  default_size: number;
+};
+
+function useReflectIconsData() {
+  const json = "https://reflect-icons.s3.us-west-1.amazonaws.com/all.json";
+  const [icons, setIcons] = useState<{
+    [key: string]: ReflectUIIconData;
+  }>({});
+  useEffect(() => {
+    fetch(json).then((res) => {
+      res.json().then((data) => {
+        setIcons(data);
+      });
+    });
+  }, []);
+
+  return icons;
+}
+
+function reflect_icon_link(icon: ReflectUIIconData) {
+  const base = "https://reflect-icons.s3.us-west-1.amazonaws.com";
+  const ext = "svg";
+  const { host, family, variant } = icon;
+  if (variant === "default") {
+    return `${base}/${host}/${family}.${ext}`;
+  } else {
+    return `${base}/${host}/${family}_${variant}.${ext}`;
+  }
+}
+
+function useGridaStdShapes() {
+  const base = "https://grida-std.s3.us-west-1.amazonaws.com/shapes-basic";
+  const json = `${base}/info.json`;
+
+  const [shapes, setShapes] = useState<{ name: string; src: string }[]>([]);
+  useEffect(() => {
+    fetch(json).then((res) => {
+      res.json().then((data) => {
+        setShapes(
+          data.map(({ name }: { name: string }) => ({
+            name: name,
+            src: `${base}/${name}`,
+          }))
+        );
+      });
+    });
+  }, []);
+
+  return shapes;
 }

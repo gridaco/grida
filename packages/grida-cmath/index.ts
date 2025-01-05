@@ -4,6 +4,14 @@ import assert from "assert";
  * A canvas math module.
  */
 export namespace cmath {
+  export const PI = Math.PI;
+  export const abs = Math.abs;
+  export const sqrt = Math.sqrt;
+  export const cos = Math.cos;
+  export const sin = Math.sin;
+  export const asin = Math.asin;
+  export const tan = Math.tan;
+
   /**
    * Represents a single numerical value, often referred to as a scalar in mathematics and computer science.
    *
@@ -235,6 +243,43 @@ export namespace cmath.vector2 {
 
     // Normalize the angle to [0, 360)
     return (degrees + 360) % 360;
+  }
+
+  /**
+   * Rotates a 2D vector by a specified angle.
+   *
+   * This function applies a rotation transformation to a given vector `[x, y]`,
+   * rotating it counterclockwise around the origin by the specified angle in degrees.
+   *
+   * @param vector - The 2D vector to rotate, represented as `[x, y]`.
+   * @param angle - The rotation angle in degrees. Positive values indicate counterclockwise rotation.
+   * @returns A new vector `[rotatedX, rotatedY]` representing the rotated vector.
+   *
+   * @example
+   * // Rotate the vector [1, 0] by 90 degrees
+   * const vector: cmath.Vector2 = [1, 0];
+   * const rotated = cmath.vector2.rotate(vector, 90);
+   * console.log(rotated); // Outputs: [0, 1]
+   *
+   * @example
+   * // Rotate the vector [1, 1] by -45 degrees
+   * const vector: cmath.Vector2 = [1, 1];
+   * const rotated = cmath.vector2.rotate(vector, -45);
+   * console.log(rotated); // Outputs: [~1.414, 0]
+   *
+   * @remarks
+   * - The angle is converted from degrees to radians internally, as trigonometric functions in JavaScript operate in radians.
+   * - The rotation is performed around the origin `(0, 0)`.
+   * - If the angle is `0`, the input vector is returned unchanged.
+   */
+  export function rotate(vector: Vector2, angle: number): Vector2 {
+    const radians = (angle * Math.PI) / 180;
+    const [x, y] = vector;
+
+    return [
+      x * Math.cos(radians) - y * Math.sin(radians),
+      x * Math.sin(radians) + y * Math.cos(radians),
+    ];
   }
 
   /**
@@ -1227,17 +1272,67 @@ export namespace cmath.snap {
 
 export namespace cmath.bezier {
   /**
+   * Represents a cubic Bézier curve segment.
+   *
+   * A cubic Bézier curve is defined by a start point, an end point, and two control points.
+   * These control points determine the curvature of the segment.
+   *
+   * The parametric equation for a cubic Bézier curve is:
+   * \[
+   * B(t) = (1-t)^3 P_0 + 3(1-t)^2 t P_1 + 3(1-t) t^2 P_2 + t^3 P_3 \quad \text{where } t \in [0, 1]
+   * \]
+   *
+   * Where:
+   * - \( P_0 \): Start point of the curve.
+   * - \( P_1 \): First control point.
+   * - \( P_2 \): Second control point.
+   * - \( P_3 \): End point of the curve.
+   *
+   * @property x1 - The x-coordinate of the first control point (absolute).
+   * @property y1 - The y-coordinate of the first control point (absolute).
+   * @property x2 - The x-coordinate of the second control point (absolute).
+   * @property y2 - The y-coordinate of the second control point (absolute).
+   * @property x - The x-coordinate of the end point (absolute).
+   * @property y - The y-coordinate of the end point (absolute).
+   *
+   * @example
+   * ```typescript
+   * const bezier: CubicBezier = {
+   *   x1: 20, // First control point
+   *   y1: 40,
+   *   x2: 60, // Second control point
+   *   y2: 80,
+   *   x: 100, // End point
+   *   y: 120,
+   * };
+   * ```
+   *
+   * @remarks
+   * - Cubic Bézier curves are commonly used in vector graphics, animation, and UI design to create smooth transitions and shapes.
+   * - This structure assumes absolute positioning for all points.
+   */
+  export type CubicBezier = {
+    x1: number; // First control point (absolute)
+    y1: number;
+    x2: number; // Second control point (absolute)
+    y2: number;
+    x: number; // End point (absolute)
+    y: number;
+  };
+
+  /**
    * @property a - Position of the starting vertex.
    * @property b - Position of the ending vertex.
    * @property ta - Tangent at the starting vertex (relative to the vertex).
    * @property tb - Tangent at the ending vertex (relative to the vertex).
    */
-  type CubicBezierSegment = {
+  export type CubicBezierWithTangents = {
     a: Vector2;
     b: Vector2;
     ta: Vector2;
     tb: Vector2;
   };
+
   /**
    * Solves a quadratic equation \( a x^2 + b x + c = 0 \).
    * @param a - Quadratic coefficient \( a \).
@@ -1307,7 +1402,7 @@ export namespace cmath.bezier {
    * @param tb - The end tangent (relative to `b`).
    * @returns The bounding box \(\{ x, y, width, height \}\) that encloses the entire cubic.
    */
-  export function getBBox(segment: CubicBezierSegment): Rectangle {
+  export function getBBox(segment: CubicBezierWithTangents): Rectangle {
     const { a, b, ta, tb } = segment;
     if (ta[0] === 0 && ta[1] === 0 && tb[0] === 0 && tb[1] === 0) {
       return cmath.rect.fromPoints([a, b]);
@@ -1344,6 +1439,196 @@ export namespace cmath.bezier {
       width: maxX - minX,
       height: maxY - minY,
     };
+  }
+
+  /**
+   * Converts an SVG elliptical arc to one or more cubic Bézier curve segments.
+   *
+   * The `a2c` function transforms the parameters of an SVG elliptical arc into a series of cubic Bézier curves,
+   * which are widely used in vector graphics for their smoothness and compatibility with various rendering engines.
+   *
+   * This implementation is inspired by Snap.svg's `a2c` function and adheres to the SVG specification's
+   * [Arc Implementation Notes](https://www.w3.org/TR/SVG/implnote.html#ArcImplementationNotes).
+   *
+   * **Note:** The function does not include the start point (`x1`, `y1`) in its output. It is assumed that the
+   * start point is managed externally. The returned array consists of control points and end points for cubic Bézier curves.
+   *
+   * @param x1 - The x-coordinate of the starting point of the arc.
+   * @param y1 - The y-coordinate of the starting point of the arc.
+   * @param rx - The x-axis radius of the ellipse. Must be a non-negative number.
+   * @param ry - The y-axis radius of the ellipse. Must be a non-negative number.
+   * @param angle - The rotation angle of the ellipse in degrees, indicating how the ellipse is rotated relative to the x-axis.
+   * @param large_arc_flag - A flag indicating whether the arc spans greater than 180 degrees (`1`) or not (`0`).
+   * @param sweep_flag - A flag indicating the direction of the arc sweep. `1` for clockwise, `0` for counterclockwise.
+   * @param x2 - The x-coordinate of the ending point of the arc.
+   * @param y2 - The y-coordinate of the ending point of the arc.
+   * @param recursive - (Optional) Internal parameter used for recursive splitting of the arc into smaller segments.
+   *                    This parameter should not be provided by external callers.
+   *
+   * @returns An array of numbers representing one or more cubic Bézier curve segments.
+   * Each cubic Bézier segment is represented by six consecutive numbers in the format:
+   * `[c1x, c1y, c2x, c2y, x, y]`, where:
+   * - `c1x, c1y` are the coordinates of the first control point.
+   * - `c2x, c2y` are the coordinates of the second control point.
+   * - `x, y` are the coordinates of the end point of the curve.
+   *
+   * If the arc spans more than 120 degrees, the function splits it into multiple cubic Bézier segments to maintain accuracy.
+   *
+   * @example
+   * // Convert a simple arc to a single cubic Bézier curve
+   * const bezierSegments = a2c(0, 0, 50, 50, 0, 0, 1, 50, 50);
+   * console.log(bezierSegments);
+   * // Output: [27.614237491539665, 0, 50, 22.385762508460335, 50, 50]
+   *
+   * @example
+   * // Convert a large arc (270 degrees) into multiple cubic Bézier curves
+   * const bezierSegments = a2c(0, 0, 100, 100, 0, 1, 1, 100, 0);
+   * console.log(bezierSegments);
+   * // Output: [c1x, c1y, c2x, c2y, x, y, ...]
+   *
+   * @example
+   * // Handle a rotated ellipse arc
+   * const bezierSegments = a2c(0, 0, 50, 100, 45, 0, 1, 50, 100);
+   * console.log(bezierSegments);
+   * // Output: [rotated_c1x, rotated_c1y, rotated_c2x, rotated_c2y, rotated_x, rotated_y]
+   *
+   * @throws {Error} If either `rx` or `ry` is negative.
+   * @throws {Error} If non-numeric values are provided as inputs.
+   *
+   * @remarks
+   * - The function assumes that the input radii (`rx`, `ry`) are non-negative. Negative radii will cause the function to throw an error.
+   * - The rotation angle (`angle`) is measured in degrees and is converted internally to radians for calculations.
+   * - If the input arc spans more than 120 degrees, the function recursively splits it into smaller segments to ensure that each cubic Bézier curve accurately represents the arc.
+   * - The function handles cases where the arc needs to be adjusted based on the large arc and sweep flags, adhering to the SVG specification.
+   * - The `recursive` parameter is intended for internal use only and should not be supplied by external callers.
+   *
+   * @see [SVG 1.1 Implementation Notes - Elliptical Arcs](https://www.w3.org/TR/SVG/implnote.html#ArcImplementationNotes)
+   * @see [Snap.svg's a2c Function](https://github.com/adobe-webplatform/Snap.svg/blob/master/src/path.js#L752)
+   */
+  export function a2c(
+    x1: number,
+    y1: number,
+    rx: number,
+    ry: number,
+    angle: number,
+    large_arc_flag: 0 | 1,
+    sweep_flag: 0 | 1,
+    x2: number,
+    y2: number,
+    recursive?: [number, number, number, number]
+  ): number[] {
+    // for more information of where this math came from visit:
+    // http://www.w3.org/TR/SVG11/implnote.html#ArcImplementationNotes
+    var _120 = (cmath.PI * 120) / 180,
+      rad = (cmath.PI / 180) * (+angle || 0);
+
+    var res: number[] = [];
+
+    var xy: { x: number; y: number };
+
+    const rotate = function (x: number, y: number, rad: number) {
+      var X = x * cmath.cos(rad) - y * cmath.sin(rad),
+        Y = x * cmath.sin(rad) + y * cmath.cos(rad);
+      return { x: X, y: Y };
+    };
+
+    if (!rx || !ry) {
+      return [x1, y1, x2, y2, x2, y2];
+    }
+    if (!recursive) {
+      xy = rotate(x1, y1, -rad);
+      x1 = xy.x;
+      y1 = xy.y;
+      xy = rotate(x2, y2, -rad);
+      x2 = xy.x;
+      y2 = xy.y;
+      var x = (x1 - x2) / 2,
+        y = (y1 - y2) / 2;
+      var h = (x * x) / (rx * rx) + (y * y) / (ry * ry);
+      if (h > 1) {
+        h = cmath.sqrt(h);
+        rx = h * rx;
+        ry = h * ry;
+      }
+      var rx2 = rx * rx,
+        ry2 = ry * ry,
+        k =
+          (large_arc_flag == sweep_flag ? -1 : 1) *
+          cmath.sqrt(
+            cmath.abs(
+              (rx2 * ry2 - rx2 * y * y - ry2 * x * x) /
+                (rx2 * y * y + ry2 * x * x)
+            )
+          ),
+        cx = (k * rx * y) / ry + (x1 + x2) / 2,
+        cy = (k * -ry * x) / rx + (y1 + y2) / 2,
+        f1 =
+          // @ts-expect-error
+          cmath.asin(((y1 - cy) / ry).toFixed(9)),
+        f2 =
+          // @ts-expect-error
+          cmath.asin(((y2 - cy) / ry).toFixed(9));
+
+      f1 = x1 < cx ? cmath.PI - f1 : f1;
+      f2 = x2 < cx ? cmath.PI - f2 : f2;
+      f1 < 0 && (f1 = cmath.PI * 2 + f1);
+      f2 < 0 && (f2 = cmath.PI * 2 + f2);
+      if (sweep_flag && f1 > f2) {
+        f1 = f1 - cmath.PI * 2;
+      }
+      if (!sweep_flag && f2 > f1) {
+        f2 = f2 - cmath.PI * 2;
+      }
+    } else {
+      f1 = recursive[0];
+      f2 = recursive[1];
+      cx = recursive[2];
+      cy = recursive[3];
+    }
+    var df = f2 - f1;
+    if (cmath.abs(df) > _120) {
+      var f2old = f2,
+        x2old = x2,
+        y2old = y2;
+      f2 = f1 + _120 * (sweep_flag && f2 > f1 ? 1 : -1);
+      x2 = cx + rx * cmath.cos(f2);
+      y2 = cy + ry * cmath.sin(f2);
+      res = a2c(x2, y2, rx, ry, angle, 0, sweep_flag, x2old, y2old, [
+        f2,
+        f2old,
+        cx,
+        cy,
+      ]);
+    }
+    df = f2 - f1;
+    var c1 = cmath.cos(f1),
+      s1 = cmath.sin(f1),
+      c2 = cmath.cos(f2),
+      s2 = cmath.sin(f2),
+      t = cmath.tan(df / 4),
+      hx = (4 / 3) * rx * t,
+      hy = (4 / 3) * ry * t,
+      m1 = [x1, y1],
+      m2 = [x1 + hx * s1, y1 - hy * c1],
+      m3 = [x2 + hx * s2, y2 - hy * c2],
+      m4 = [x2, y2];
+    m2[0] = 2 * m1[0] - m2[0];
+    m2[1] = 2 * m1[1] - m2[1];
+    if (recursive) {
+      // @ts-ignore
+      return [m2, m3, m4].concat(res);
+    } else {
+      // @ts-ignore
+      res = [m2, m3, m4].concat(res).join().split(",");
+      var newres = [];
+      for (var i = 0, ii = res.length; i < ii; i++) {
+        newres[i] =
+          i % 2
+            ? rotate(res[i - 1], res[i], rad).y
+            : rotate(res[i], res[i + 1], rad).x;
+      }
+      return newres;
+    }
   }
 }
 

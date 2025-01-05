@@ -1101,9 +1101,15 @@ function SelectedNodeProperties() {
 
 function SelectionColors() {
   const { select } = useDocument();
-  const { paints, setPaint } = useSelectionPaints();
+  const { ids, paints, setPaint } = useSelectionPaints();
 
-  if (paints.length < 2) {
+  // this should show when,
+  // 1. paints are more than 1
+  // 2. paints is 1 but ids are more than 1
+  // (to be more accurate, it should be, paints is 1 and that paint is not from the root selection)
+  const should_display = ids.length > 1 || paints.length > 1;
+
+  if (!should_display) {
     return <></>;
   }
 
