@@ -1227,17 +1227,67 @@ export namespace cmath.snap {
 
 export namespace cmath.bezier {
   /**
+   * Represents a cubic Bézier curve segment.
+   *
+   * A cubic Bézier curve is defined by a start point, an end point, and two control points.
+   * These control points determine the curvature of the segment.
+   *
+   * The parametric equation for a cubic Bézier curve is:
+   * \[
+   * B(t) = (1-t)^3 P_0 + 3(1-t)^2 t P_1 + 3(1-t) t^2 P_2 + t^3 P_3 \quad \text{where } t \in [0, 1]
+   * \]
+   *
+   * Where:
+   * - \( P_0 \): Start point of the curve.
+   * - \( P_1 \): First control point.
+   * - \( P_2 \): Second control point.
+   * - \( P_3 \): End point of the curve.
+   *
+   * @property x1 - The x-coordinate of the first control point (absolute).
+   * @property y1 - The y-coordinate of the first control point (absolute).
+   * @property x2 - The x-coordinate of the second control point (absolute).
+   * @property y2 - The y-coordinate of the second control point (absolute).
+   * @property x - The x-coordinate of the end point (absolute).
+   * @property y - The y-coordinate of the end point (absolute).
+   *
+   * @example
+   * ```typescript
+   * const bezier: CubicBezier = {
+   *   x1: 20, // First control point
+   *   y1: 40,
+   *   x2: 60, // Second control point
+   *   y2: 80,
+   *   x: 100, // End point
+   *   y: 120,
+   * };
+   * ```
+   *
+   * @remarks
+   * - Cubic Bézier curves are commonly used in vector graphics, animation, and UI design to create smooth transitions and shapes.
+   * - This structure assumes absolute positioning for all points.
+   */
+  export type CubicBezier = {
+    x1: number; // First control point (absolute)
+    y1: number;
+    x2: number; // Second control point (absolute)
+    y2: number;
+    x: number; // End point (absolute)
+    y: number;
+  };
+
+  /**
    * @property a - Position of the starting vertex.
    * @property b - Position of the ending vertex.
    * @property ta - Tangent at the starting vertex (relative to the vertex).
    * @property tb - Tangent at the ending vertex (relative to the vertex).
    */
-  type CubicBezierSegment = {
+  export type CubicBezierWithTangents = {
     a: Vector2;
     b: Vector2;
     ta: Vector2;
     tb: Vector2;
   };
+
   /**
    * Solves a quadratic equation \( a x^2 + b x + c = 0 \).
    * @param a - Quadratic coefficient \( a \).
@@ -1307,7 +1357,7 @@ export namespace cmath.bezier {
    * @param tb - The end tangent (relative to `b`).
    * @returns The bounding box \(\{ x, y, width, height \}\) that encloses the entire cubic.
    */
-  export function getBBox(segment: CubicBezierSegment): Rectangle {
+  export function getBBox(segment: CubicBezierWithTangents): Rectangle {
     const { a, b, ta, tb } = segment;
     if (ta[0] === 0 && ta[1] === 0 && tb[0] === 0 && tb[1] === 0) {
       return cmath.rect.fromPoints([a, b]);
