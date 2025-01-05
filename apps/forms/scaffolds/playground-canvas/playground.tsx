@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useReducer, useState } from "react";
+import React, { useEffect, useMemo, useReducer, useState } from "react";
 import {
   SidebarMenuGrid,
   SidebarMenuGridItem,
@@ -618,7 +618,20 @@ const widgets = [
 function InsertNodePanelContent() {
   const { insertNode } = useDocument();
 
-  const icons = useReflectUIIconsList();
+  const icons_data = useReflectIconsData();
+  const icons = useMemo(() => {
+    return (
+      Object.keys(icons_data).map((key) => {
+        const icondata = icons_data[key];
+        const src = reflect_icon_link(icondata);
+        return { ...icondata, src, key } satisfies ReflectUIIconData & {
+          src: string;
+          key: string;
+        };
+      }) as (ReflectUIIconData & { src: string; key: string })[]
+    ).filter((icon) => icon.host === "material");
+  }, [icons_data]);
+
   const shapes = useGridaStdShapes();
 
   const onInsertWidget = (type: string) => {
@@ -654,9 +667,14 @@ function InsertNodePanelContent() {
     });
   };
 
+  const [tab, setTab] = useLocalStorage(
+    "playground-insert-dialog-tab",
+    "widgets"
+  );
+
   return (
     <>
-      <Tabs className="mx-2 my-4">
+      <Tabs className="mx-2 my-4" value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="widgets">Widgets</TabsTrigger>
           <TabsTrigger value="shapes">Shapes</TabsTrigger>
@@ -701,7 +719,12 @@ function InsertNodePanelContent() {
                   onClick={() => onInsertSvgSrc(src)}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={src} alt={name} className="w-10 h-auto" />
+                  <img
+                    src={src}
+                    alt={name}
+                    className="w-10 h-auto"
+                    loading="lazy"
+                  />
                 </SidebarMenuGridItem>
               );
             })}
@@ -709,9 +732,7 @@ function InsertNodePanelContent() {
         </TabsContent>
         <TabsContent value="icons">
           <SidebarMenuGrid>
-            {Object.keys(icons).map((key, i) => {
-              const icondata = icons[key];
-              const src = iconlink(icondata);
+            {icons.map(({ src, key, family }, i) => {
               return (
                 <SidebarMenuGridItem
                   key={key}
@@ -720,11 +741,7 @@ function InsertNodePanelContent() {
                   className="border rounded-md shadow-sm cursor-pointer text-foreground/50 hover:text-foreground"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={src}
-                    alt={icondata.family}
-                    title={icondata.family}
-                  />
+                  <img src={src} alt={family} title={family} loading="lazy" />
                 </SidebarMenuGridItem>
               );
             })}
@@ -742,7 +759,7 @@ type ReflectUIIconData = {
   default_size: number;
 };
 
-function useReflectUIIconsList() {
+function useReflectIconsData() {
   const json = "https://reflect-icons.s3.us-west-1.amazonaws.com/all.json";
   const [icons, setIcons] = useState<{
     [key: string]: ReflectUIIconData;
@@ -758,7 +775,7 @@ function useReflectUIIconsList() {
   return icons;
 }
 
-function iconlink(icon: ReflectUIIconData) {
+function reflect_icon_link(icon: ReflectUIIconData) {
   const base = "https://reflect-icons.s3.us-west-1.amazonaws.com";
   const ext = "svg";
   const { host, family, variant } = icon;
