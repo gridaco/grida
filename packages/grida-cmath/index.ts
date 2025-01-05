@@ -1516,7 +1516,7 @@ export namespace cmath.bezier {
     x2: number,
     y2: number,
     recursive?: [number, number, number, number]
-  ) {
+  ): number[] {
     // for more information of where this math came from visit:
     // http://www.w3.org/TR/SVG11/implnote.html#ArcImplementationNotes
     var _120 = (cmath.PI * 120) / 180,
@@ -1611,6 +1611,7 @@ export namespace cmath.bezier {
     m2[0] = 2 * m1[0] - m2[0];
     m2[1] = 2 * m1[1] - m2[1];
     if (recursive) {
+      // @ts-ignore
       return [m2, m3, m4].concat(res);
     } else {
       res = [m2, m3, m4].concat(res).join().split(",");
