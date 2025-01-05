@@ -1,12 +1,10 @@
 import { grida } from "@/grida";
 import { parse, type INode } from "svgson";
 import parseStyle, { type Declaration } from "inline-style-parser";
-import { SVGPathData } from "svg-pathdata";
 import { vn } from "@/grida/vn";
 // @ts-ignore
 import * as svgo from "svgo/dist/svgo.browser.js";
 import type { Config, Output } from "svgo";
-import { cmath } from "@grida/cmath";
 
 /**
  * @see https://github.com/bahamas10/css-color-names/blob/master/css-color-names.json
@@ -166,7 +164,7 @@ const namedcolors = {
 /**
  * @see https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute
  */
-type SVGAttributes = {
+type SVGElementAttributes = {
   // [A]
   "accent-height": unknown;
   accumulate: unknown;
@@ -451,133 +449,6 @@ type SVGFactoryContext = {
 };
 
 export namespace iosvg {
-  export namespace path {
-    export function d(d: string): vn.VectorNetwork {
-      const parsedPath = new SVGPathData(d).toAbs(); // Convert to absolute commands
-      const vertices: vn.VectorNetworkVertex[] = [];
-      const segments: vn.VectorNetworkSegment[] = [];
-
-      let lastPoint: [number, number] | null = null;
-      const commands = parsedPath.commands;
-      // console.log("d", d, commands);
-
-      for (const command of commands) {
-        const { type } = command;
-
-        switch (type) {
-          // M x y
-          case SVGPathData.MOVE_TO: {
-            const { x, y } = command;
-            lastPoint = [x, y];
-            vertices.push({ p: [x, y] });
-            break;
-          }
-
-          // L x y
-          case SVGPathData.LINE_TO: {
-            const { x, y } = command;
-            if (lastPoint) {
-              const currentIndex = vertices.length;
-              vertices.push({ p: [x, y] });
-
-              segments.push({
-                a: currentIndex - 1,
-                b: currentIndex,
-                ta: [0, 0],
-                tb: [0, 0],
-              });
-            }
-            lastPoint = [x, y];
-            break;
-          }
-
-          case SVGPathData.HORIZ_LINE_TO: {
-            const { x } = command;
-            if (lastPoint) {
-              const currentIndex = vertices.length;
-              vertices.push({ p: [x, lastPoint[1]] }); // Keep y-coordinate the same as the last point
-
-              segments.push({
-                a: currentIndex - 1,
-                b: currentIndex,
-                ta: [0, 0], // No tangents for straight lines
-                tb: [0, 0],
-              });
-            }
-            lastPoint = [x, lastPoint ? lastPoint[1] : 0]; // Update lastPoint to the new position
-            break;
-          }
-
-          case SVGPathData.VERT_LINE_TO: {
-            const { y } = command;
-            if (lastPoint) {
-              const currentIndex = vertices.length;
-              vertices.push({ p: [lastPoint[0], y] }); // Keep x-coordinate the same as the last point
-
-              segments.push({
-                a: currentIndex - 1,
-                b: currentIndex,
-                ta: [0, 0], // No tangents for straight lines
-                tb: [0, 0],
-              });
-            }
-            lastPoint = [lastPoint ? lastPoint[0] : 0, y]; // Update lastPoint to the new position
-            break;
-          }
-
-          // C x1 y1, x2 y2, x y
-          case SVGPathData.CURVE_TO: {
-            const { x, y } = command;
-            if (lastPoint) {
-              const currentIndex = vertices.length;
-              vertices.push({ p: [x, y] });
-
-              segments.push({
-                a: currentIndex - 1,
-                b: currentIndex,
-                ta: [command.x1 - lastPoint[0], command.y1 - lastPoint[1]],
-                tb: [command.x2 - x, command.y2 - y],
-              });
-            }
-            lastPoint = [x, y];
-            break;
-          }
-
-          case SVGPathData.SMOOTH_CURVE_TO: {
-            //
-          }
-          case SVGPathData.QUAD_TO: {
-            //
-          }
-          case SVGPathData.SMOOTH_QUAD_TO: {
-            //
-          }
-          case SVGPathData.ARC: {
-            //
-          }
-
-          // Z
-          case SVGPathData.CLOSE_PATH: {
-            if (vertices.length > 1) {
-              segments.push({
-                a: vertices.length - 1,
-                b: 0,
-                ta: [0, 0],
-                tb: [0, 0],
-              });
-            }
-            break;
-          }
-
-          default:
-            throw new Error(`Unsupported path command type: ${type}`);
-        }
-      }
-
-      return { vertices, segments };
-    }
-  }
-
   export namespace map {
     export function opacity(
       opacity: string | null | undefined
@@ -594,15 +465,32 @@ export namespace iosvg {
       return parsed;
     }
 
+    export function stroke(
+      stroke: string | undefined,
+      context: SVGFactoryContext
+    ): grida.program.cg.Paint | undefined {
+      return paint(stroke, context);
+    }
+
+    export function fill(
+      fill: string | undefined,
+      context: SVGFactoryContext
+    ): grida.program.cg.Paint | undefined {
+      if (paint === undefined) {
+        return { type: "solid", color: context.currentColor };
+      }
+      return paint(fill, context);
+    }
+
     export function paint(
-      paint: string | null | undefined,
+      paint: string | undefined,
       context: SVGFactoryContext
     ): grida.program.cg.Paint | undefined {
       switch (paint) {
         case undefined:
-        case null:
         case "none":
           return undefined;
+
         case "currentColor":
           return { type: "solid", color: context.currentColor };
         default:
@@ -634,7 +522,7 @@ export namespace iosvg {
       context: SVGFactoryContext
     ): grida.program.nodes.NodePrototype[] | null {
       const { name, attributes: _attributes, children } = node;
-      const attributes = _attributes as Partial<SVGAttributes>;
+      const attributes = _attributes as Partial<SVGElementAttributes>;
 
       switch (name) {
         // [svg] => container
@@ -671,24 +559,26 @@ export namespace iosvg {
 
         // [path] => path with vector network
         case "path": {
-          const { style, fill: _fill, stroke, opacity, d } = attributes;
-          const r = style ? parseStyle(style as string) : [];
-          const fillstyle: Declaration | undefined = r.find(
+          const { d } = attributes;
+
+          const { style: _style, fill: _fill, stroke, opacity } = attributes;
+          const style = _style ? parseStyle(_style as string) : [];
+          const fillstyle: Declaration | undefined = style.find(
             (d) => d.type === "declaration" && d.property === "fill"
           ) as Declaration | undefined;
           fillstyle?.value;
 
           const fill = _fill ?? fillstyle?.value;
 
-          const vectorNetwork = iosvg.path.d(d!);
+          const vectorNetwork = vn.fromSVGPathData(d!);
           const bbox = vn.getBBox(vectorNetwork);
           return [
             {
               type: "path",
               vectorNetwork: vectorNetwork,
               opacity: map.opacity(opacity as string),
-              fill: map.paint(fill as string, context),
-              stroke: map.paint(stroke as string, context),
+              fill: map.fill(fill as string, context),
+              stroke: map.stroke(stroke as string, context),
               width: bbox.width,
               height: bbox.height,
             } satisfies grida.program.nodes.NodePrototype,
@@ -704,14 +594,65 @@ export namespace iosvg {
 
         // [rect] => rectangle
         case "rect":
+          const {
+            x,
+            y,
+            width,
+            height,
+            rx,
+            ry, // not supported
+            pathLength, // not supported
+          } = attributes;
+
+          const { style: _style, fill: _fill, stroke, opacity } = attributes;
+          const style = _style ? parseStyle(_style as string) : [];
+          const fillstyle: Declaration | undefined = style.find(
+            (d) => d.type === "declaration" && d.property === "fill"
+          ) as Declaration | undefined;
+
+          const fill = _fill ?? fillstyle?.value;
+
+          return [
+            {
+              type: "rectangle",
+              left: parseFloat(x as string),
+              top: parseFloat(y as string),
+              width: parseFloat(width as string),
+              height: parseFloat(height as string),
+              cornerRadius: parseFloat(rx as string),
+              opacity: map.opacity(opacity as string),
+              fill: map.fill(fill as string, context),
+            } satisfies grida.program.nodes.NodePrototype,
+          ];
           break;
 
         // [circle, ellipse] => path via optimize
         case "circle":
         case "ellipse": {
-          throw new Error(
-            "circle and ellipse are not supported - make sure to run optimize first"
-          );
+          const { cx, cy, r, rx: _rx, ry: _ry } = attributes;
+
+          const rx = parseFloat((_rx ?? r) as string) ?? 0;
+          const ry = parseFloat((_ry ?? rx ?? r) as string) ?? 0;
+
+          const { style: _style, fill: _fill, stroke, opacity } = attributes;
+          const style = _style ? parseStyle(_style as string) : [];
+          const fillstyle: Declaration | undefined = style.find(
+            (d) => d.type === "declaration" && d.property === "fill"
+          ) as Declaration | undefined;
+
+          const fill = _fill ?? fillstyle?.value;
+
+          return [
+            {
+              type: "ellipse",
+              left: parseFloat(cx as string) - rx,
+              top: parseFloat(cy as string) - ry,
+              width: rx * 2,
+              height: ry * 2,
+              opacity: map.opacity(opacity as string),
+              fill: map.fill(fill as string, context),
+            } satisfies grida.program.nodes.NodePrototype,
+          ];
 
           break;
         }
@@ -719,6 +660,12 @@ export namespace iosvg {
         // [line] => line
         case "line": {
           const { style, fill, stroke, opacity, x1, y1, x2, y2 } = attributes;
+
+          // return [
+          //   {
+          //     type: 'line',
+          //   } satisfies grida.program.nodes.NodePrototype,
+          // ]
           break;
         }
 

@@ -1,6 +1,8 @@
 import { grida } from "@/grida";
 import { svg } from "@/grida/svg";
 import queryattributes from "./utils/attributes";
+import { vn } from "@/grida/vn";
+import { useMemo } from "react";
 
 /**
  * @deprecated - not ready - do not use in production
@@ -34,7 +36,7 @@ export function PathWidget({
         ref: "none",
       };
 
-  const d = svg.network.fromVectorNetwork(vectorNetwork);
+  const d = useMemo(() => vn.toSVGPathData(vectorNetwork), [vectorNetwork]);
 
   return (
     <svg
