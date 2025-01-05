@@ -151,6 +151,71 @@ describe("cmath.vector2", () => {
     });
   });
 
+  describe("rotate", () => {
+    it("should rotate a vector by 0 degrees", () => {
+      const vector: cmath.Vector2 = [1, 0];
+      const rotated = cmath.vector2.rotate(vector, 0);
+      expect(rotated[0]).toBeCloseTo(1);
+      expect(rotated[1]).toBeCloseTo(0);
+    });
+
+    it("should rotate a vector by 90 degrees", () => {
+      const vector: cmath.Vector2 = [1, 0];
+      const rotated = cmath.vector2.rotate(vector, 90);
+      expect(rotated[0]).toBeCloseTo(0);
+      expect(rotated[1]).toBeCloseTo(1);
+    });
+
+    it("should rotate a vector by 180 degrees", () => {
+      const vector: cmath.Vector2 = [1, 0];
+      const rotated = cmath.vector2.rotate(vector, 180);
+      expect(rotated[0]).toBeCloseTo(-1);
+      expect(rotated[1]).toBeCloseTo(0);
+    });
+
+    it("should rotate a vector by 270 degrees", () => {
+      const vector: cmath.Vector2 = [1, 0];
+      const rotated = cmath.vector2.rotate(vector, 270);
+      expect(rotated[0]).toBeCloseTo(0);
+      expect(rotated[1]).toBeCloseTo(-1);
+    });
+
+    it("should rotate a vector by 360 degrees", () => {
+      const vector: cmath.Vector2 = [1, 0];
+      const rotated = cmath.vector2.rotate(vector, 360);
+      expect(rotated[0]).toBeCloseTo(1);
+      expect(rotated[1]).toBeCloseTo(0);
+    });
+
+    it("should rotate a vector by -90 degrees", () => {
+      const vector: cmath.Vector2 = [1, 0];
+      const rotated = cmath.vector2.rotate(vector, -90);
+      expect(rotated[0]).toBeCloseTo(0);
+      expect(rotated[1]).toBeCloseTo(-1);
+    });
+
+    it("should rotate a diagonal vector by 45 degrees", () => {
+      const vector: cmath.Vector2 = [1, 1];
+      const rotated = cmath.vector2.rotate(vector, 45);
+      expect(rotated[0]).toBeCloseTo(0);
+      expect(rotated[1]).toBeCloseTo(Math.sqrt(2));
+    });
+
+    it("should rotate a vector with negative components", () => {
+      const vector: cmath.Vector2 = [-1, -1];
+      const rotated = cmath.vector2.rotate(vector, 90);
+      expect(rotated[0]).toBeCloseTo(1);
+      expect(rotated[1]).toBeCloseTo(-1);
+    });
+
+    it("should handle a vector with zero components", () => {
+      const vector: cmath.Vector2 = [0, 0];
+      const rotated = cmath.vector2.rotate(vector, 123); // Any angle
+      expect(rotated[0]).toBeCloseTo(0);
+      expect(rotated[1]).toBeCloseTo(0);
+    });
+  });
+
   describe("intersects", () => {
     it("should return true for overlapping segments", () => {
       const segmentA: cmath.Vector2 = [1, 5];

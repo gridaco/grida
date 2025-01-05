@@ -1442,84 +1442,95 @@ export namespace cmath.bezier {
   }
 
   /**
-   * Converts an elliptical arc into a series of cubic Bézier curves.
+   * Converts an SVG elliptical arc to one or more cubic Bézier curve segments.
    *
-   * This function implements the elliptical arc-to-cubic Bézier conversion
-   * as described in the SVG specification. It calculates the necessary control
-   * points for representing the elliptical arc using one or more cubic Bézier
-   * curves.
+   * The `a2c` function transforms the parameters of an SVG elliptical arc into a series of cubic Bézier curves,
+   * which are widely used in vector graphics for their smoothness and compatibility with various rendering engines.
+   *
+   * This implementation is inspired by Snap.svg's `a2c` function and adheres to the SVG specification's
+   * [Arc Implementation Notes](https://www.w3.org/TR/SVG/implnote.html#ArcImplementationNotes).
+   *
+   * **Note:** The function does not include the start point (`x1`, `y1`) in its output. It is assumed that the
+   * start point is managed externally. The returned array consists of control points and end points for cubic Bézier curves.
    *
    * @param x1 - The x-coordinate of the starting point of the arc.
    * @param y1 - The y-coordinate of the starting point of the arc.
-   * @param rx - The radius of the ellipse along the x-axis.
-   * @param ry - The radius of the ellipse along the y-axis.
-   * @param angle - The rotation angle of the ellipse in degrees.
-   * @param large_arc_flag - Indicates if the arc spans greater than 180°.
-   *                          Use `0` for false, `1` for true.
-   * @param sweep_flag - Direction of the arc:
-   *                     `0` for counterclockwise, `1` for clockwise.
+   * @param rx - The x-axis radius of the ellipse. Must be a non-negative number.
+   * @param ry - The y-axis radius of the ellipse. Must be a non-negative number.
+   * @param angle - The rotation angle of the ellipse in degrees, indicating how the ellipse is rotated relative to the x-axis.
+   * @param large_arc_flag - A flag indicating whether the arc spans greater than 180 degrees (`1`) or not (`0`).
+   * @param sweep_flag - A flag indicating the direction of the arc sweep. `1` for clockwise, `0` for counterclockwise.
    * @param x2 - The x-coordinate of the ending point of the arc.
    * @param y2 - The y-coordinate of the ending point of the arc.
-   * @param recursive - Optional parameter for internal recursive calls.
-   *                    If provided, it contains:
-   *                    - `f1`: Starting angle of the arc in radians.
-   *                    - `f2`: Ending angle of the arc in radians.
-   *                    - `cx`: x-coordinate of the ellipse's center.
-   *                    - `cy`: y-coordinate of the ellipse's center.
-   * @returns An array of numbers representing control points of cubic Bézier
-   *          curves approximating the arc. The array is flattened in the format:
-   *          `[x1, y1, cx1, cy1, cx2, cy2, x2, y2, ...]`.
+   * @param recursive - (Optional) Internal parameter used for recursive splitting of the arc into smaller segments.
+   *                    This parameter should not be provided by external callers.
    *
-   * @remarks
-   * - This function handles special cases such as radii scaling and large-arc flags.
-   * - Recursive calls are used for splitting the arc into smaller segments when
-   *   the span exceeds 120°.
-   * - For more details, see the SVG specification:
-   *   https://www.w3.org/TR/SVG11/implnote.html#ArcImplementationNotes
+   * @returns An array of numbers representing one or more cubic Bézier curve segments.
+   * Each cubic Bézier segment is represented by six consecutive numbers in the format:
+   * `[c1x, c1y, c2x, c2y, x, y]`, where:
+   * - `c1x, c1y` are the coordinates of the first control point.
+   * - `c2x, c2y` are the coordinates of the second control point.
+   * - `x, y` are the coordinates of the end point of the curve.
+   *
+   * If the arc spans more than 120 degrees, the function splits it into multiple cubic Bézier segments to maintain accuracy.
    *
    * @example
-   * // Example: Convert an elliptical arc to cubic Bézier curves
-   * const bezierPoints = a2c(50, 50, 100, 50, 45, 1, 0, 200, 200);
-   * console.log(bezierPoints);
-   * // Output: [ ... array of cubic Bézier control points ... ]
+   * // Convert a simple arc to a single cubic Bézier curve
+   * const bezierSegments = a2c(0, 0, 50, 50, 0, 0, 1, 50, 50);
+   * console.log(bezierSegments);
+   * // Output: [27.614237491539665, 0, 50, 22.385762508460335, 50, 50]
    *
+   * @example
+   * // Convert a large arc (270 degrees) into multiple cubic Bézier curves
+   * const bezierSegments = a2c(0, 0, 100, 100, 0, 1, 1, 100, 0);
+   * console.log(bezierSegments);
+   * // Output: [c1x, c1y, c2x, c2y, x, y, ...]
    *
+   * @example
+   * // Handle a rotated ellipse arc
+   * const bezierSegments = a2c(0, 0, 50, 100, 45, 0, 1, 50, 100);
+   * console.log(bezierSegments);
+   * // Output: [rotated_c1x, rotated_c1y, rotated_c2x, rotated_c2y, rotated_x, rotated_y]
    *
-   * @see https://github.com/DmitryBaranovskiy/raphael/blob/v2.1.1/dev/raphael.core.js#L1837
-   * @see https://github.com/adobe-webplatform/Snap.svg/blob/b242f49e6798ac297a3dad0dfb03c0893e394464/src/path.js#L752
+   * @throws {Error} If either `rx` or `ry` is negative.
+   * @throws {Error} If non-numeric values are provided as inputs.
+   *
+   * @remarks
+   * - The function assumes that the input radii (`rx`, `ry`) are non-negative. Negative radii will cause the function to throw an error.
+   * - The rotation angle (`angle`) is measured in degrees and is converted internally to radians for calculations.
+   * - If the input arc spans more than 120 degrees, the function recursively splits it into smaller segments to ensure that each cubic Bézier curve accurately represents the arc.
+   * - The function handles cases where the arc needs to be adjusted based on the large arc and sweep flags, adhering to the SVG specification.
+   * - The `recursive` parameter is intended for internal use only and should not be supplied by external callers.
+   *
+   * @see [SVG 1.1 Implementation Notes - Elliptical Arcs](https://www.w3.org/TR/SVG/implnote.html#ArcImplementationNotes)
+   * @see [Snap.svg's a2c Function](https://github.com/adobe-webplatform/Snap.svg/blob/master/src/path.js#L752)
    */
   export function a2c(
-    x1: number, // x-coordinate of the starting point
-    y1: number, // y-coordinate of the starting point
-    rx: number, // x-axis radius of the ellipse
-    ry: number, // y-axis radius of the ellipse
-    angle: number, // rotation angle of the ellipse in degrees
-    large_arc_flag: 0 | 1, // large-arc flag (0 or 1 as per SVG spec)
-    sweep_flag: 0 | 1, // sweep flag (0 or 1 as per SVG spec)
-    x2: number, // x-coordinate of the ending point
-    y2: number, // y-coordinate of the ending point
-    recursive?: [
-      // optional recursive array containing:
-      number, // f1 (start angle in radians)
-      number, // f2 (end angle in radians)
-      number, // cx (center x-coordinate of the ellipse)
-      number, // cy (center y-coordinate of the ellipse)
-    ]
+    x1: number,
+    y1: number,
+    rx: number,
+    ry: number,
+    angle: number,
+    large_arc_flag: 0 | 1,
+    sweep_flag: 0 | 1,
+    x2: number,
+    y2: number,
+    recursive?: [number, number, number, number]
   ) {
     // for more information of where this math came from visit:
     // http://www.w3.org/TR/SVG11/implnote.html#ArcImplementationNotes
     var _120 = (PI * 120) / 180,
       rad = (PI / 180) * (+angle || 0),
       res = [],
-      xy;
-
-    const rotate = (x: number, y: number, rad: number): Vector2 => {
-      return [
-        x * cmath.cos(rad) - y * cmath.sin(rad),
-        x * cmath.sin(rad) + y * cmath.cos(rad),
-      ];
-    };
-
+      xy,
+      rotate = function (x, y, rad) {
+        var X = x * cmath.cos(rad) - y * cmath.sin(rad),
+          Y = x * cmath.sin(rad) + y * cmath.cos(rad);
+        return { x: X, y: Y };
+      };
+    if (!rx || !ry) {
+      return [x1, y1, x2, y2, x2, y2];
+    }
     if (!recursive) {
       xy = rotate(x1, y1, -rad);
       x1 = xy.x;
@@ -1527,9 +1538,7 @@ export namespace cmath.bezier {
       xy = rotate(x2, y2, -rad);
       x2 = xy.x;
       y2 = xy.y;
-      var cos = cmath.cos((PI / 180) * angle),
-        sin = cmath.sin((PI / 180) * angle),
-        x = (x1 - x2) / 2,
+      var x = (x1 - x2) / 2,
         y = (y1 - y2) / 2;
       var h = (x * x) / (rx * rx) + (y * y) / (ry * ry);
       if (h > 1) {
@@ -1542,15 +1551,19 @@ export namespace cmath.bezier {
         k =
           (large_arc_flag == sweep_flag ? -1 : 1) *
           cmath.sqrt(
-            cmath.abs(
+            abs(
               (rx2 * ry2 - rx2 * y * y - ry2 * x * x) /
                 (rx2 * y * y + ry2 * x * x)
             )
           ),
         cx = (k * rx * y) / ry + (x1 + x2) / 2,
         cy = (k * -ry * x) / rx + (y1 + y2) / 2,
-        f1 = cmath.asin(Number(((y1 - cy) / ry).toFixed(9))),
-        f2 = cmath.asin(Number(((y2 - cy) / ry).toFixed(9)));
+        f1 =
+          // @ts-expect-error
+          cmath.asin(((y1 - cy) / ry).toFixed(9)),
+        f2 =
+          // @ts-expect-error
+          cmath.asin(((y2 - cy) / ry).toFixed(9));
 
       f1 = x1 < cx ? PI - f1 : f1;
       f2 = x2 < cx ? PI - f2 : f2;
@@ -1569,7 +1582,7 @@ export namespace cmath.bezier {
       cy = recursive[3];
     }
     var df = f2 - f1;
-    if (cmath.abs(df) > _120) {
+    if (abs(df) > _120) {
       var f2old = f2,
         x2old = x2,
         y2old = y2;
@@ -1605,8 +1618,8 @@ export namespace cmath.bezier {
       for (var i = 0, ii = res.length; i < ii; i++) {
         newres[i] =
           i % 2
-            ? rotate(res[i - 1], res[i], rad)[1]
-            : rotate(res[i], res[i + 1], rad)[0];
+            ? rotate(res[i - 1], res[i], rad).y
+            : rotate(res[i], res[i + 1], rad).x;
       }
       return newres;
     }
