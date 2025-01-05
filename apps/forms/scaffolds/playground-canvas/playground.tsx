@@ -8,6 +8,7 @@ import {
   SidebarSection,
   SidebarSectionHeaderItem,
   SidebarSectionHeaderLabel,
+  SidebarVirtualizedMenuGrid,
 } from "@/components/sidebar";
 import { SelectionControl } from "@/scaffolds/sidecontrol/sidecontrol-node-selection";
 import { __TMP_ComponentProperties } from "@/scaffolds/sidecontrol/sidecontrol-component-properties";
@@ -674,7 +675,11 @@ function InsertNodePanelContent() {
 
   return (
     <>
-      <Tabs className="mx-2 my-4" value={tab} onValueChange={setTab}>
+      <Tabs
+        className="mx-2 my-4 w-full h-full"
+        value={tab}
+        onValueChange={setTab}
+      >
         <TabsList>
           <TabsTrigger value="widgets">Widgets</TabsTrigger>
           <TabsTrigger value="shapes">Shapes</TabsTrigger>
@@ -730,12 +735,16 @@ function InsertNodePanelContent() {
             })}
           </SidebarMenuGrid>
         </TabsContent>
-        <TabsContent value="icons">
-          <SidebarMenuGrid>
-            {icons.map(({ src, key, family }, i) => {
+        <TabsContent value="icons" className="w-full h-full">
+          <SidebarVirtualizedMenuGrid
+            columnWidth={70}
+            rowHeight={70}
+            className="min-h-96"
+            gap={4}
+            renderItem={({ item }) => {
+              const { src, family } = item;
               return (
                 <SidebarMenuGridItem
-                  key={key}
                   draggable
                   onClick={() => onInsertSvgSrc(src)}
                   className="border rounded-md shadow-sm cursor-pointer text-foreground/50 hover:text-foreground"
@@ -744,8 +753,9 @@ function InsertNodePanelContent() {
                   <img src={src} alt={family} title={family} loading="lazy" />
                 </SidebarMenuGridItem>
               );
-            })}
-          </SidebarMenuGrid>
+            }}
+            items={icons}
+          />
         </TabsContent>
       </Tabs>
     </>

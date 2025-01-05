@@ -1,11 +1,13 @@
 "use client";
 
-import React from "react";
+import React, { ComponentType, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/utils";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { CaretDownIcon, CaretRightIcon } from "@radix-ui/react-icons";
+import { FixedSizeGrid, type GridChildComponentProps } from "react-window";
+import { useMeasure } from "@uidotdev/usehooks";
 
 export function SidebarRoot({
   side = "left",
@@ -60,13 +62,69 @@ export function SidebarMenuGrid({ children }: React.PropsWithChildren<{}>) {
   return <div className="grid grid-cols-3 gap-2">{children}</div>;
 }
 
-export function SidebarMenuSectionContent({
+export function SidebarVirtualizedMenuGrid<T>({
+  items,
+  cols = 3,
+  columnWidth,
+  rowHeight,
+  renderItem,
   className,
-  children,
-}: React.PropsWithChildren<{
+  gap = 8,
+}: {
+  items: T[];
+  cols?: number;
+  columnWidth: number;
+  rowHeight: number;
+  gap?: number;
+  renderItem: (data: {
+    item: T;
+    rowIndex: number;
+    columnIndex: number;
+  }) => React.ReactNode;
   className?: string;
-}>) {
-  return <div className={cn("w-full px-2 py-1", className)}>{children}</div>;
+}) {
+  const [containerRef, container] = useMeasure();
+
+  const rowCount = Math.ceil(items.length / cols);
+
+  const Cell: React.FC<GridChildComponentProps> = ({
+    columnIndex,
+    rowIndex,
+    style,
+  }) => {
+    const itemIndex = rowIndex * cols + columnIndex;
+
+    if (itemIndex >= items.length) return null;
+
+    const item = items[itemIndex];
+
+    const adjustedStyle = {
+      ...style,
+      width: (style.width as number) - gap,
+      height: (style.height as number) - gap,
+    };
+
+    return (
+      <div style={adjustedStyle}>
+        {renderItem({ item, rowIndex, columnIndex })}
+      </div>
+    );
+  };
+
+  return (
+    <div ref={containerRef} className={cn("w-full h-full", className)}>
+      <FixedSizeGrid
+        columnCount={cols}
+        rowCount={rowCount}
+        columnWidth={columnWidth + gap} // Include gap in the grid's column width
+        rowHeight={rowHeight + gap} // Include gap in the grid's row height
+        width={container.width ?? 0}
+        height={container.height ?? 0}
+      >
+        {Cell}
+      </FixedSizeGrid>
+    </div>
+  );
 }
 
 export function SidebarMenuGridItem({
@@ -233,6 +291,15 @@ export function SidebarSection({
       {children}
     </section>
   );
+}
+
+export function SidebarMenuSectionContent({
+  className,
+  children,
+}: React.PropsWithChildren<{
+  className?: string;
+}>) {
+  return <div className={cn("w-full px-2 py-1", className)}>{children}</div>;
 }
 
 export function SidebarSectionHeaderItem({
