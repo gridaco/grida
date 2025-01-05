@@ -1520,14 +1520,18 @@ export namespace cmath.bezier {
     // for more information of where this math came from visit:
     // http://www.w3.org/TR/SVG11/implnote.html#ArcImplementationNotes
     var _120 = (cmath.PI * 120) / 180,
-      rad = (cmath.PI / 180) * (+angle || 0),
-      res = [],
-      xy,
-      rotate = function (x, y, rad) {
-        var X = x * cmath.cos(rad) - y * cmath.sin(rad),
-          Y = x * cmath.sin(rad) + y * cmath.cos(rad);
-        return { x: X, y: Y };
-      };
+      rad = (cmath.PI / 180) * (+angle || 0);
+
+    var res: number[] = [];
+
+    var xy: { x: number; y: number };
+
+    const rotate = function (x: number, y: number, rad: number) {
+      var X = x * cmath.cos(rad) - y * cmath.sin(rad),
+        Y = x * cmath.sin(rad) + y * cmath.cos(rad);
+      return { x: X, y: Y };
+    };
+
     if (!rx || !ry) {
       return [x1, y1, x2, y2, x2, y2];
     }
@@ -1614,6 +1618,7 @@ export namespace cmath.bezier {
       // @ts-ignore
       return [m2, m3, m4].concat(res);
     } else {
+      // @ts-ignore
       res = [m2, m3, m4].concat(res).join().split(",");
       var newres = [];
       for (var i = 0, ii = res.length; i < ii; i++) {
