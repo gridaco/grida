@@ -20,8 +20,8 @@ import { Button } from "@/components/ui/button";
 import { useHotkeys } from "react-hotkeys-hook";
 
 export default function IOSVGPage() {
-  const [svg, setSvg] = useState<string>();
-  const [optimized, setOptimized] = useState<string>();
+  const [raw, setRaw] = useState<string>();
+  const [svgo, setSvgo] = useState<string>();
   const [result, setResult] = useState<any>();
   const [doc, setDoc] = useState<grida.program.document.IDocumentDefinition>();
   const { openFilePicker, filesContent } = useFilePicker({
@@ -76,25 +76,25 @@ export default function IOSVGPage() {
       return;
     }
     const svgstr = filesContent[0].content;
-    setSvg(svgstr);
+    setRaw(svgstr);
   }, [filesContent]);
 
   useEffect(() => {
-    if (!svg) {
+    if (!raw) {
       return;
     }
-    const optimized = iosvg.v0.optimize(svg);
-    setOptimized(optimized.data);
-  }, [svg]);
+    const optimized = iosvg.v0.optimize(raw);
+    setSvgo(optimized.data);
+  }, [raw]);
 
   useEffect(() => {
-    if (!optimized) {
+    if (!svgo) {
       setResult(undefined);
       return;
     }
 
     iosvg.v0
-      .convert(optimized)
+      .convert(svgo)
       .then((result) => {
         if (result) {
           const doc =
@@ -112,12 +112,11 @@ export default function IOSVGPage() {
             }),
           });
         }
-        console.log("result", result);
         setResult(result);
         //
       })
       .catch(console.error);
-  }, [optimized]);
+  }, [svgo]);
 
   return (
     <main className="w-dvw h-dvh overflow-hidden">
@@ -141,8 +140,8 @@ export default function IOSVGPage() {
                 width="100%"
                 height="100%"
                 language="xml"
-                value={svg ?? ""}
-                onChange={setSvg}
+                value={raw ?? ""}
+                onChange={setRaw}
                 options={{ readOnly: false }}
               />
             </div>
@@ -151,7 +150,8 @@ export default function IOSVGPage() {
                 width="100%"
                 height="100%"
                 language="xml"
-                value={optimized ?? ""}
+                value={svgo ?? ""}
+                onChange={setSvgo}
                 options={{ readOnly: false }}
               />
             </div>
@@ -189,14 +189,14 @@ export default function IOSVGPage() {
                   <div className="flex-1">
                     <div
                       dangerouslySetInnerHTML={{
-                        __html: svg ?? "",
+                        __html: raw ?? "",
                       }}
                     />
                   </div>
                   <div className="flex-1">
                     <div
                       dangerouslySetInnerHTML={{
-                        __html: optimized ?? "",
+                        __html: svgo ?? "",
                       }}
                     />
                   </div>

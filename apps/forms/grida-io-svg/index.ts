@@ -446,6 +446,7 @@ type SVGElementAttributes = {
 
 type SVGFactoryContext = {
   currentColor: grida.program.cg.RGBA8888;
+  currentFill?: grida.program.cg.Paint;
 };
 
 export namespace iosvg {
@@ -476,18 +477,19 @@ export namespace iosvg {
       fill: string | undefined,
       context: SVGFactoryContext
     ): grida.program.cg.Paint | undefined {
-      if (paint === undefined) {
-        return { type: "solid", color: context.currentColor };
-      }
-      return paint(fill, context);
+      return paint(fill, context, "currentColor");
     }
 
     export function paint(
       paint: string | undefined,
-      context: SVGFactoryContext
+      context: SVGFactoryContext,
+      /**
+       * fallback value when the paint is undefined
+       */
+      fallback: "none" | "currentColor" = "none"
     ): grida.program.cg.Paint | undefined {
+      paint = paint ?? fallback;
       switch (paint) {
-        case undefined:
         case "none":
           return undefined;
 
@@ -517,12 +519,25 @@ export namespace iosvg {
   }
 
   export namespace v0 {
+    function mergeAttributes(
+      parent: Partial<SVGElementAttributes>,
+      current: Partial<SVGElementAttributes>
+    ): Partial<SVGElementAttributes> {
+      return Object.assign({}, parent, current);
+    }
+
     function mapnode(
       node: INode,
-      context: SVGFactoryContext
+      context: SVGFactoryContext,
+      inheritedAttributes: Partial<SVGElementAttributes> = {}
     ): grida.program.nodes.NodePrototype[] | null {
       const { name, attributes: _attributes, children } = node;
-      const attributes = _attributes as Partial<SVGElementAttributes>;
+
+      // Merge attributes
+      const attributes = mergeAttributes(
+        inheritedAttributes,
+        _attributes
+      ) as Partial<SVGElementAttributes>;
 
       switch (name) {
         // [svg] => container
@@ -551,10 +566,8 @@ export namespace iosvg {
         // [g] => ...
         case "g": {
           return children
-            .map((child) => mapnode(child, context))
-            .flat()
+            .flatMap((child) => mapnode(child, context, attributes))
             .filter(Boolean) as grida.program.nodes.NodePrototype[];
-          break;
         }
 
         // [path] => path with vector network
@@ -570,6 +583,9 @@ export namespace iosvg {
 
           const fill = _fill ?? fillstyle?.value;
 
+          const fillRule =
+            (attributes["fill-rule"] as grida.program.cg.FillRule) ?? "nonzero";
+
           const vectorNetwork = vn.fromSVGPathData(d!);
           const bbox = vn.getBBox(vectorNetwork);
           return [
@@ -581,6 +597,7 @@ export namespace iosvg {
               stroke: map.stroke(stroke as string, context),
               width: bbox.width,
               height: bbox.height,
+              fillRule: fillRule,
             } satisfies grida.program.nodes.NodePrototype,
           ];
         }
@@ -774,7 +791,7 @@ export namespace iosvg {
     ): Promise<grida.program.nodes.NodePrototype | null> {
       const node = await parse(svgstr);
 
-      console.log("node", node);
+      // console.log("iosvg.convert(node)", node);
 
       return mapnode(node, context)?.[0] ?? null;
     }

@@ -1519,8 +1519,8 @@ export namespace cmath.bezier {
   ) {
     // for more information of where this math came from visit:
     // http://www.w3.org/TR/SVG11/implnote.html#ArcImplementationNotes
-    var _120 = (PI * 120) / 180,
-      rad = (PI / 180) * (+angle || 0),
+    var _120 = (cmath.PI * 120) / 180,
+      rad = (cmath.PI / 180) * (+angle || 0),
       res = [],
       xy,
       rotate = function (x, y, rad) {
@@ -1551,7 +1551,7 @@ export namespace cmath.bezier {
         k =
           (large_arc_flag == sweep_flag ? -1 : 1) *
           cmath.sqrt(
-            abs(
+            cmath.abs(
               (rx2 * ry2 - rx2 * y * y - ry2 * x * x) /
                 (rx2 * y * y + ry2 * x * x)
             )
@@ -1565,15 +1565,15 @@ export namespace cmath.bezier {
           // @ts-expect-error
           cmath.asin(((y2 - cy) / ry).toFixed(9));
 
-      f1 = x1 < cx ? PI - f1 : f1;
-      f2 = x2 < cx ? PI - f2 : f2;
-      f1 < 0 && (f1 = PI * 2 + f1);
-      f2 < 0 && (f2 = PI * 2 + f2);
+      f1 = x1 < cx ? cmath.PI - f1 : f1;
+      f2 = x2 < cx ? cmath.PI - f2 : f2;
+      f1 < 0 && (f1 = cmath.PI * 2 + f1);
+      f2 < 0 && (f2 = cmath.PI * 2 + f2);
       if (sweep_flag && f1 > f2) {
-        f1 = f1 - PI * 2;
+        f1 = f1 - cmath.PI * 2;
       }
       if (!sweep_flag && f2 > f1) {
-        f2 = f2 - PI * 2;
+        f2 = f2 - cmath.PI * 2;
       }
     } else {
       f1 = recursive[0];
@@ -1582,7 +1582,7 @@ export namespace cmath.bezier {
       cy = recursive[3];
     }
     var df = f2 - f1;
-    if (abs(df) > _120) {
+    if (cmath.abs(df) > _120) {
       var f2old = f2,
         x2old = x2,
         y2old = y2;

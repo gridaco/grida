@@ -1678,6 +1678,12 @@ export namespace grida.program.nodes {
 
     /**
      * @deprecated
+     * @default "nonzero"
+     */
+    fillRule?: cg.FillRule;
+
+    /**
+     * @deprecated
      * @todo
      */
     vectorNetwork: vn.VectorNetwork;

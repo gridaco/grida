@@ -325,12 +325,12 @@ export default function CanvasPlayground() {
                                       </DropdownMenuItem>
                                     </Link>
                                     <Link
-                                      href="/canvas/tools/io-pdf"
+                                      href="/canvas/tools/io-svg"
                                       target="_blank"
                                     >
                                       <DropdownMenuItem>
                                         <OpenInNewWindowIcon className="me-2" />
-                                        IO PDF
+                                        IO SVG
                                       </DropdownMenuItem>
                                     </Link>
                                     <Link
@@ -675,17 +675,13 @@ function InsertNodePanelContent() {
 
   return (
     <>
-      <Tabs
-        className="mx-2 my-4 w-full h-full"
-        value={tab}
-        onValueChange={setTab}
-      >
+      <Tabs className="mx-2 my-4 h-full" value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="widgets">Widgets</TabsTrigger>
           <TabsTrigger value="shapes">Shapes</TabsTrigger>
           <TabsTrigger value="icons">Icons</TabsTrigger>
         </TabsList>
-        <TabsContent value="widgets">
+        <TabsContent value="widgets" className="h-full overflow-y-scroll">
           <SidebarMenuGrid>
             {widgets.map((type) => {
               return (
@@ -714,7 +710,7 @@ function InsertNodePanelContent() {
             })}
           </SidebarMenuGrid>
         </TabsContent>
-        <TabsContent value="shapes">
+        <TabsContent value="shapes" className="h-full overflow-y-scroll">
           <SidebarMenuGrid>
             {/*  */}
             {shapes.map(({ name, src }) => {
@@ -727,8 +723,8 @@ function InsertNodePanelContent() {
                   <img
                     src={src}
                     alt={name}
-                    className="w-10 h-auto"
                     loading="lazy"
+                    className="w-10 h-auto dark:invert"
                   />
                 </SidebarMenuGridItem>
               );
@@ -750,7 +746,13 @@ function InsertNodePanelContent() {
                   className="border rounded-md shadow-sm cursor-pointer text-foreground/50 hover:text-foreground"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={src} alt={family} title={family} loading="lazy" />
+                  <img
+                    src={src}
+                    alt={family}
+                    title={family}
+                    loading="lazy"
+                    className="dark:invert"
+                  />
                 </SidebarMenuGridItem>
               );
             }}

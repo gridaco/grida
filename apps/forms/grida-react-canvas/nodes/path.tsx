@@ -17,6 +17,7 @@ export function PathWidget({
   strokeCap,
   style,
   vectorNetwork,
+  fillRule,
   ...props
 }: grida.program.document.IComputedNodeReactRenderProps<grida.program.nodes.PathNode>) {
   const width = Math.max(_width, 1);
@@ -54,6 +55,7 @@ export function PathWidget({
       <path
         d={d}
         fill={fillDef}
+        fillRule={fillRule}
         stroke={strokeDef}
         strokeWidth={strokeWidth}
         strokeLinecap={strokeCap}

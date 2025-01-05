@@ -524,10 +524,7 @@ export namespace vn {
     // start index of the current path (when closed, this is set to current + 1)
     let start = 0;
 
-    // console.log("d", d, commands);
-
     for (const command of commands) {
-      console.log("command", command);
       const { type } = command;
 
       switch (type) {
@@ -615,9 +612,52 @@ export namespace vn {
           //
         }
         case SVGPathData.ARC: {
-          const { rX, rY, xRot, x, y, lArcFlag, sweepFlag } = command;
-          throw new Error("ARC is not supported");
-          // ...
+          const { rX, rY, xRot, lArcFlag, sweepFlag, x, y } = command;
+
+          if (lastPoint) {
+            const [x1, y1] = lastPoint;
+
+            // Convert arc to cubic Bézier curves
+            const bezierCurves = cmath.bezier.a2c(
+              x1,
+              y1,
+              rX,
+              rY,
+              xRot,
+              lArcFlag,
+              sweepFlag,
+              x,
+              y
+            );
+
+            let previousIndex = vne.vertices.length - 1;
+
+            for (let i = 0; i < bezierCurves.length; i += 6) {
+              const [x1, y1, x2, y2, x3, y3] = bezierCurves.slice(i, i + 6);
+
+              const controlPoint1: Vector2 = [x1, y1];
+              const controlPoint2: Vector2 = [x2, y2];
+              const endPoint: Vector2 = [x3, y3];
+
+              // Add the end point as a new vertex
+              const endIndex = vne.addVertex(endPoint);
+
+              // Add a new segment with control points
+              vne.addSegment(
+                previousIndex,
+                endIndex,
+                [
+                  controlPoint1[0] - lastPoint[0],
+                  controlPoint1[1] - lastPoint[1],
+                ], // ta (relative to start)
+                [controlPoint2[0] - endPoint[0], controlPoint2[1] - endPoint[1]] // tb (relative to end)
+              );
+
+              // Update lastPoint and previousIndex for the next curve
+              lastPoint = endPoint;
+              previousIndex = endIndex;
+            }
+          }
           break;
         }
 
