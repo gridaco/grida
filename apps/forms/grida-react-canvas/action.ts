@@ -468,7 +468,7 @@ interface INodeChangeOpacityAction extends INodeID {
 
 interface INodeChangeSizeAction extends INodeID {
   axis: "width" | "height";
-  length: grida.program.css.Length | "auto";
+  value: grida.program.css.LengthPercentage | "auto";
 }
 
 export type TChange<T> =

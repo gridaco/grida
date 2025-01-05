@@ -42,7 +42,7 @@ import { LetterSpacingControl } from "./controls/letter-spacing";
 import { LineHeightControl } from "./controls/line-height";
 import { NameControl } from "./controls/name";
 import { UserDataControl } from "./controls/x-userdata";
-import { LengthControl } from "./controls/length";
+import { LengthPercentageControl } from "./controls/length-percentage";
 import { LayoutControl } from "./controls/layout";
 import { AxisControl } from "./controls/axis";
 import { MaxlengthControl } from "./controls/maxlength";
@@ -245,11 +245,14 @@ function SelectionMixedProperties() {
           <SidebarMenuSectionContent className="space-y-2">
             <PropertyLine>
               <PropertyLineLabel>Width</PropertyLineLabel>
-              <LengthControl value={width.value} onValueChange={change.width} />
+              <LengthPercentageControl
+                value={width.value}
+                onValueChange={change.width}
+              />
             </PropertyLine>
             <PropertyLine>
               <PropertyLineLabel>Height</PropertyLineLabel>
-              <LengthControl
+              <LengthPercentageControl
                 value={height.value}
                 onValueChange={change.height}
               />
@@ -764,11 +767,17 @@ function SelectedNodeProperties() {
         <SidebarMenuSectionContent className="space-y-2">
           <PropertyLine>
             <PropertyLineLabel>Width</PropertyLineLabel>
-            <LengthControl value={width} onValueChange={actions.width} />
+            <LengthPercentageControl
+              value={width}
+              onValueChange={actions.width}
+            />
           </PropertyLine>
           <PropertyLine>
             <PropertyLineLabel>Height</PropertyLineLabel>
-            <LengthControl value={height} onValueChange={actions.height} />
+            <LengthPercentageControl
+              value={height}
+              onValueChange={actions.height}
+            />
           </PropertyLine>
         </SidebarMenuSectionContent>
       </SidebarSection>

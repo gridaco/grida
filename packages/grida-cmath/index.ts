@@ -188,6 +188,13 @@ export namespace cmath.vector2 {
     return vectors.reduce((acc, [x, y]) => [acc[0] - x, acc[1] - y]);
   }
 
+  export function quantize(vector: Vector2, step: number | Vector2): Vector2 {
+    return [
+      cmath.quantize(vector[0], typeof step === "number" ? step : step[0]),
+      cmath.quantize(vector[1], typeof step === "number" ? step : step[1]),
+    ];
+  }
+
   export function multiply(...vectors: Vector2[]): Vector2 {
     // Ensure there is at least one vector
     if (vectors.length === 0) {

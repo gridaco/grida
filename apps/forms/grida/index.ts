@@ -2171,7 +2171,7 @@ export namespace grida.program.api {
                   type: "node/change/size",
                   axis: "width",
                   node_id: node.id,
-                  length: value,
+                  value: value,
                 });
                 return true;
               case "height":
@@ -2179,7 +2179,7 @@ export namespace grida.program.api {
                   type: "node/change/size",
                   axis: "height",
                   node_id: node.id,
-                  length: value,
+                  value: value,
                 });
                 return true;
               case "top":

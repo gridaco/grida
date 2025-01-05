@@ -120,7 +120,12 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             try {
               const _nnode = nnode as grida.program.nodes.AnyNode;
 
-              const { cursor_position } = state;
+              const { cursor_position: _cursor_position } = state;
+
+              const cursor_position = cmath.vector2.quantize(
+                _cursor_position,
+                1
+              );
 
               // center translate the new node - so it can be positioned centered to the cursor point (width / 2, height / 2)
               const center_translate_delta: cmath.Vector2 =

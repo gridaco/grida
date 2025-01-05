@@ -65,7 +65,7 @@ export default function nodeReducer<
         break;
       }
       case "node/change/size": {
-        const { axis, length } = action;
+        const { axis, value: length } = action;
         // TODO: check the sizing model (fixed or css)
         (draft as grida.program.nodes.i.ICSSDimension)[axis] = length;
         break;

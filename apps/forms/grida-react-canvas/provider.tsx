@@ -392,14 +392,14 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
     (
       node_id: string,
       axis: "width" | "height",
-      length: grida.program.css.Length | "auto"
+      value: grida.program.css.LengthPercentage | "auto"
     ) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "node/change/size",
           node_id: node_id,
           axis,
-          length,
+          value: value,
         });
       });
     },
@@ -963,9 +963,9 @@ export function useNodeAction(node_id: string | undefined) {
         nodeActions.changeNodeOpacity(node_id, change),
       rotation: (change: TChange<number>) =>
         nodeActions.changeNodeRotation(node_id, change),
-      width: (value: grida.program.css.Length | "auto") =>
+      width: (value: grida.program.css.LengthPercentage | "auto") =>
         nodeActions.changeNodeSize(node_id, "width", value),
-      height: (value: grida.program.css.Length | "auto") =>
+      height: (value: grida.program.css.LengthPercentage | "auto") =>
         nodeActions.changeNodeSize(node_id, "height", value),
 
       // text style
@@ -1109,7 +1109,7 @@ export function useSelection() {
   );
 
   const width = useCallback(
-    (value: grida.program.css.Length | "auto") => {
+    (value: grida.program.css.LengthPercentage | "auto") => {
       mixedProperties.width.ids.forEach((id) => {
         __actions.changeNodeSize(id, "width", value);
       });
@@ -1118,7 +1118,7 @@ export function useSelection() {
   );
 
   const height = useCallback(
-    (value: grida.program.css.Length | "auto") => {
+    (value: grida.program.css.LengthPercentage | "auto") => {
       mixedProperties.height.ids.forEach((id) => {
         __actions.changeNodeSize(id, "height", value);
       });
