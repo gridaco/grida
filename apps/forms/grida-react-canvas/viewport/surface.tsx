@@ -302,8 +302,8 @@ export function EditorSurfaceDropzone({
     const cb = (e: ClipboardEvent) => {
       onpaste(e);
     };
-    window.addEventListener("paste", cb, { capture: true });
-    return () => window.removeEventListener("paste", cb, { capture: true });
+    window.addEventListener("paste", cb);
+    return () => window.removeEventListener("paste", cb);
   }, [onpaste]);
 
   return (

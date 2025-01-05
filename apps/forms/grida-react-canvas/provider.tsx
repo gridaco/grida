@@ -2378,7 +2378,17 @@ export function useDropzoneEventTarget() {
 
   const onpaste = useCallback(
     (event: ClipboardEvent) => {
+      if (event.defaultPrevented) return;
       if (!event.clipboardData) return;
+      // cancel if on contenteditable / form element
+      if (
+        event.target instanceof HTMLElement &&
+        (event.target as HTMLElement).isContentEditable
+      )
+        return;
+      if (event.target instanceof HTMLInputElement) return;
+      if (event.target instanceof HTMLTextAreaElement) return;
+
       const items = event.clipboardData.items;
       for (let i = 0; i < items.length; i++) {
         const item = items[i];

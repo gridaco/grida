@@ -2,6 +2,7 @@ import { useHotkeys } from "react-hotkeys-hook";
 import { useDocument, useEventTarget, useSelection } from "../provider";
 import toast from "react-hot-toast";
 import { grida } from "@/grida";
+import { useEffect } from "react";
 
 export const keybindings_sheet = [
   {
@@ -158,6 +159,30 @@ export function useEditorHotKeys() {
   } = useDocument();
 
   const { selection, actions } = useSelection();
+
+  useEffect(() => {
+    const cb = (e: any) => {
+      configureSurfaceRaycastTargeting({ target: "auto" });
+      configureMeasurement("off");
+      configureTranslateWithCloneModifier("off");
+      configureTransformWithCenterOriginModifier("off");
+      configureTranslateWithAxisLockModifier("off");
+      configureTransformWithPreserveAspectRatioModifier("off");
+      configureRotateWithQuantizeModifier("off");
+    };
+    window.addEventListener("blur", cb);
+    return () => {
+      window.removeEventListener("blur", cb);
+    };
+  }, [
+    configureMeasurement,
+    configureRotateWithQuantizeModifier,
+    configureSurfaceRaycastTargeting,
+    configureTransformWithCenterOriginModifier,
+    configureTransformWithPreserveAspectRatioModifier,
+    configureTranslateWithAxisLockModifier,
+    configureTranslateWithCloneModifier,
+  ]);
 
   // always triggering. (alt, meta, ctrl, shift)
   useHotkeys(
