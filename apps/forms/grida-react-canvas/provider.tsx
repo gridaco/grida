@@ -32,6 +32,8 @@ import { cmath } from "@grida/cmath";
 import type { TCanvasEventTargetDragGestureState, TChange } from "./action";
 import mixed, { PropertyCompareFn } from "@/grida/mixed";
 import deepEqual from "deep-equal";
+import { iosvg } from "@/grida-io-svg";
+import toast from "react-hot-toast";
 
 const DocumentContext = createContext<IDocumentEditorState | null>(null);
 
@@ -1871,14 +1873,6 @@ function throttle<T extends (...args: any[]) => void>(
   } as T;
 }
 
-function debounce(func: (...args: any[]) => void, wait: number) {
-  let timeout: NodeJS.Timeout;
-  return (...args: any[]) => {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func(...args), wait);
-  };
-}
-
 export function useEventTargetCSSCursor() {
   const [state] = __useInternal();
 
@@ -2277,6 +2271,156 @@ export function useEventTarget() {
     multipleSelectionOverlayClick,
     //
   ]);
+}
+
+export function useDropzoneEventTarget() {
+  const [state, dispatch] = __useInternal();
+
+  const canvasXY = useCallback(
+    (xy: cmath.Vector2) =>
+      cmath.vector2.sub(xy, state.viewport_offset, state.content_offset),
+    [state.content_offset, state.viewport_offset]
+  );
+
+  const insertNode = useCallback(
+    (prototype: grida.program.nodes.NodePrototype) => {
+      dispatch({
+        type: "insert",
+        prototype,
+      });
+    },
+    [dispatch]
+  );
+
+  const insertText = useCallback(
+    (
+      text: string,
+      position?: {
+        clientX: number;
+        clientY: number;
+      }
+    ) => {
+      const [x, y] = canvasXY(
+        position ? [position.clientX, position.clientY] : [0, 0]
+      );
+
+      const node = {
+        type: "text",
+        text: text,
+        width: "auto",
+        height: "auto",
+        left: x,
+        top: y,
+      } satisfies grida.program.nodes.NodePrototype;
+      insertNode(node);
+    },
+    [insertNode, canvasXY]
+  );
+
+  const insertFromFile = useCallback(
+    (
+      file: File,
+      position?: {
+        clientX: number;
+        clientY: number;
+      }
+    ) => {
+      const type = file.type || file.name.split(".").pop() || file.name;
+      const is_svg = type === "image/svg+xml";
+      // const is_png = type === "image/png";
+      // const is_jpg = type === "image/jpeg";
+      // const is_gif = type === "image/gif";
+
+      if (is_svg) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const svgContent = e.target?.result as string;
+          const optimized = iosvg.v0.optimize(svgContent).data;
+          iosvg.v0
+            .convert(optimized, {
+              name: file.name.split(".svg")[0],
+              currentColor: { r: 0, g: 0, b: 0, a: 1 },
+            })
+            .then((result) => {
+              if (result) {
+                result = result as grida.program.nodes.i.IPositioning &
+                  grida.program.nodes.i.IFixedDimension;
+
+                const center_dx =
+                  typeof result.width === "number" ? result.width / 2 : 0;
+
+                const center_dy =
+                  typeof result.height === "number" ? result.height / 2 : 0;
+
+                const [x, y] = canvasXY(
+                  cmath.vector2.sub(
+                    position ? [position.clientX, position.clientY] : [0, 0],
+                    [center_dx, center_dy]
+                  )
+                );
+
+                result.left = x;
+                result.top = y;
+                insertNode(result);
+              } else {
+                throw new Error("Failed to convert SVG");
+              }
+            });
+        };
+        reader.readAsText(file);
+        return;
+      }
+
+      toast.error(`${type} is not supported`);
+    },
+    [canvasXY, insertNode]
+  );
+
+  const onpaste = useCallback(
+    (event: ClipboardEvent) => {
+      if (!event.clipboardData) return;
+      const items = event.clipboardData.items;
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.kind === "file") {
+          const file = item.getAsFile();
+          if (file)
+            insertFromFile(file, {
+              clientX: window.innerWidth / 2,
+              clientY: window.innerHeight / 2,
+            });
+        } else if (item.kind === "string" && item.type === "text/plain") {
+          item.getAsString((data) => {
+            insertText(data, {
+              clientX: window.innerWidth / 2,
+              clientY: window.innerHeight / 2,
+            });
+          });
+        }
+      }
+    },
+    [insertFromFile, insertText]
+  );
+
+  const ondragover = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+  };
+
+  const ondrop = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+
+      const files = event.dataTransfer.files;
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        insertFromFile(file, event);
+      }
+    },
+    [insertFromFile]
+  );
+  //
+
+  return { onpaste, ondragover, ondrop };
 }
 
 export function useSurfacePathEditor() {
