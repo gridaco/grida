@@ -137,7 +137,6 @@ export function useEditorHotKeys() {
     redo,
     cut,
     copy,
-    paste,
     duplicate,
     deleteNode,
     nudge,
@@ -428,11 +427,12 @@ export function useEditorHotKeys() {
     enableOnFormTags: false,
   });
 
-  useHotkeys("paste, meta+v, ctrl+v", () => paste(), {
-    preventDefault: false,
-    enableOnContentEditable: false,
-    enableOnFormTags: false,
-  });
+  // paste is handled via data transfer
+  // useHotkeys("paste, meta+v, ctrl+v", () => paste(), {
+  //   preventDefault: false,
+  //   enableOnContentEditable: false,
+  //   enableOnFormTags: false,
+  // });
 
   useHotkeys("backspace, delete", () => deleteNode("selection"), {
     preventDefault: true,

@@ -2305,6 +2305,12 @@ export function useDataTransferEventTarget() {
     [state.content_offset, state.viewport_offset]
   );
 
+  const paste = useCallback(() => {
+    dispatch({
+      type: "paste",
+    });
+  }, [dispatch]);
+
   const insertNode = useCallback(
     (prototype: grida.program.nodes.NodePrototype) => {
       dispatch({
@@ -2416,8 +2422,8 @@ export function useDataTransferEventTarget() {
 
   const onpaste = useCallback(
     (event: ClipboardEvent) => {
+      console.log("onpaste", event);
       if (event.defaultPrevented) return;
-      if (!event.clipboardData) return;
       // cancel if on contenteditable / form element
       if (
         event.target instanceof HTMLElement &&
@@ -2427,8 +2433,14 @@ export function useDataTransferEventTarget() {
       if (event.target instanceof HTMLInputElement) return;
       if (event.target instanceof HTMLTextAreaElement) return;
 
+      if (!event.clipboardData) {
+        paste();
+        return;
+      }
+
       const items = event.clipboardData.items;
 
+      let pasted_from_data_transfer = false;
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
         if (item.kind === "file") {
@@ -2438,8 +2450,10 @@ export function useDataTransferEventTarget() {
               clientX: window.innerWidth / 2,
               clientY: window.innerHeight / 2,
             });
+            pasted_from_data_transfer = true;
           }
         } else if (item.kind === "string" && item.type === "text/plain") {
+          pasted_from_data_transfer = true;
           item.getAsString((data) => {
             insertText(data, {
               clientX: window.innerWidth / 2,
@@ -2447,6 +2461,11 @@ export function useDataTransferEventTarget() {
             });
           });
         }
+      }
+
+      if (!pasted_from_data_transfer) {
+        event.preventDefault();
+        paste();
       }
     },
     [insertFromFile, insertText]
