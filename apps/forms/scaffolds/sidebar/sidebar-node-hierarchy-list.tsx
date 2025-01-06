@@ -11,6 +11,7 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuSeparator,
   ContextMenuShortcut,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
@@ -41,36 +42,54 @@ function NodeHierarchyItemContextMenuWrapper({
 }: React.PropsWithChildren<{
   node_id: string;
 }>) {
+  const { copy } = useDocument();
   const change = useNodeAction(node_id)!;
 
   return (
     <ContextMenu>
       <ContextMenuTrigger>{children}</ContextMenuTrigger>
       <ContextMenuContent>
-        {/* <ContextMenuItem onSelect={() => {}}>Copy</ContextMenuItem> */}
-        {/* <ContextMenuItem>Paste here</ContextMenuItem> */}
-        <ContextMenuItem onSelect={() => change.order("front")}>
-          Bring to front
-          <ContextMenuShortcut>{"]"}</ContextMenuShortcut>
-        </ContextMenuItem>
-        <ContextMenuItem onSelect={() => change.order("back")}>
-          Send to back
-          <ContextMenuShortcut>{"["}</ContextMenuShortcut>
+        <ContextMenuItem
+          onSelect={() => {
+            copy(node_id);
+          }}
+          className="text-xs"
+        >
+          Copy
         </ContextMenuItem>
         <ContextMenuItem
           onSelect={() => {
             const n = prompt("Rename");
             if (n) change.name(n);
           }}
+          className="text-xs"
         >
           Rename
         </ContextMenuItem>
+        <ContextMenuSeparator />
+        {/* <ContextMenuItem onSelect={() => {}}>Copy</ContextMenuItem> */}
+        {/* <ContextMenuItem>Paste here</ContextMenuItem> */}
+        <ContextMenuItem
+          onSelect={() => change.order("front")}
+          className="text-xs"
+        >
+          Bring to front
+          <ContextMenuShortcut>{"]"}</ContextMenuShortcut>
+        </ContextMenuItem>
+        <ContextMenuItem
+          onSelect={() => change.order("back")}
+          className="text-xs"
+        >
+          Send to back
+          <ContextMenuShortcut>{"["}</ContextMenuShortcut>
+        </ContextMenuItem>
+        <ContextMenuSeparator />
         {/* <ContextMenuItem>Add Container</ContextMenuItem> */}
-        <ContextMenuItem onSelect={change.toggleActive}>
+        <ContextMenuItem onSelect={change.toggleActive} className="text-xs">
           Set Active/Inactive
           <ContextMenuShortcut>{"⌘⇧H"}</ContextMenuShortcut>
         </ContextMenuItem>
-        <ContextMenuItem onSelect={change.toggleLocked}>
+        <ContextMenuItem onSelect={change.toggleLocked} className="text-xs">
           Lock/Unlock
           <ContextMenuShortcut>{"⌘⇧L"}</ContextMenuShortcut>
         </ContextMenuItem>
