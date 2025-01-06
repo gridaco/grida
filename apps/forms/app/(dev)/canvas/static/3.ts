@@ -58,9 +58,13 @@ export default {
       fill: { type: "solid", color: { r: 0, g: 0, b: 0, a: 1 } },
       cornerRadius: 0,
       padding: 0,
-      style: {
-        boxShadow: "0 0 10px rgba(0,0,0,0.1)",
+      boxShadow: {
+        color: { r: 0, g: 0, b: 0, a: 0.1 },
+        offset: [0, 0],
+        blur: 10,
+        spread: 0,
       },
+      style: {},
       children: rects.map((rect) => rect.id),
       layout: "flow",
       direction: "horizontal",

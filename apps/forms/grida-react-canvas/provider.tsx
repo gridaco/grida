@@ -630,6 +630,19 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
     [dispatch]
   );
 
+  const changeNodeBoxShadow = useCallback(
+    (node_id: string, boxShadow?: grida.program.cg.BoxShadow) => {
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/box-shadow",
+          node_id: node_id,
+          boxShadow,
+        });
+      });
+    },
+    [dispatch]
+  );
+
   const changeContainerNodeLayout = useCallback(
     (
       node_id: string,
@@ -780,6 +793,7 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
       changeTextNodeLetterSpacing,
       changeTextNodeMaxlength,
       changeContainerNodePadding,
+      changeNodeBoxShadow,
       changeContainerNodeLayout,
       changeFlexContainerNodeDirection,
       changeFlexContainerNodeMainAxisAlignment,
@@ -996,6 +1010,8 @@ export function useNodeAction(node_id: string | undefined) {
         nodeActions.changeContainerNodePadding(node_id, value),
       // margin: (value?: number) =>
       //   changeNodeStyle(node_id, "margin", value),
+      boxShadow: (value?: grida.program.cg.BoxShadow) =>
+        nodeActions.changeNodeBoxShadow(node_id, value),
 
       // layout
       layout: (value: grida.program.nodes.i.IFlexContainer["layout"]) =>
@@ -1014,8 +1030,6 @@ export function useNodeAction(node_id: string | undefined) {
       // css style
       aspectRatio: (value?: number) =>
         nodeActions.changeNodeStyle(node_id, "aspectRatio", value),
-      boxShadow: (value?: any) =>
-        nodeActions.changeNodeStyle(node_id, "boxShadow", value.boxShadow),
       cursor: (value: grida.program.cg.SystemMouseCursor) =>
         nodeActions.changeNodeMouseCursor(node_id, value),
     };

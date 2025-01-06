@@ -197,6 +197,7 @@ export namespace css {
       Partial<grida.program.nodes.i.IBoxFit> &
       Partial<grida.program.nodes.i.ITextNodeStyle> &
       Partial<grida.program.nodes.i.IPadding> &
+      Partial<grida.program.nodes.i.IBoxShadow> &
       Partial<grida.program.nodes.i.IFlexContainer>,
     config: {
       hasTextStyle: boolean;
@@ -221,6 +222,8 @@ export namespace css {
       border,
       //
       padding,
+      //
+      boxShadow,
       //
       layout,
       direction,
@@ -259,6 +262,8 @@ export namespace css {
         : undefined,
       //
       padding: padding ? paddingToPaddingCSS(padding) : undefined,
+      //
+      boxShadow: boxShadow ? boxShadowToCSS(boxShadow) : undefined,
       //
       cursor: cursor,
       ...(border ? toReactCSSBorder(border) : {}),
@@ -393,6 +398,12 @@ export namespace css {
       fontWeight: fontWeight,
       color: fill ? toFillString(fill) : undefined,
     };
+  }
+
+  function boxShadowToCSS(boxShadow: grida.program.cg.BoxShadow): string {
+    const { color, offset = [0, 0], blur = 0, spread = 0 } = boxShadow;
+
+    return `${offset[0]}px ${offset[1]}px ${blur}px ${spread}px ${toRGBAString(color)}`;
   }
 
   export function toFillString(paint: grida.program.cg.Paint): string {

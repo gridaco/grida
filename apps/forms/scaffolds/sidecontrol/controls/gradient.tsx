@@ -36,21 +36,17 @@ export function GradientControl({
         <PropertyNumber
           type="number"
           placeholder="angle"
-          disableDelta
+          mode="fixed"
           step={1}
           value={
             value.transform ? cmath.transform.angle(value.transform) : undefined
           }
-          onValueChange={(change) => {
-            if (change.type === "set") {
-              const t = cmath.transform.computeRelativeLinearGradientTransform(
-                change.value
-              );
-              onValueChange?.({
-                ...value,
-                transform: t,
-              });
-            }
+          onValueChange={(v) => {
+            const t = cmath.transform.computeRelativeLinearGradientTransform(v);
+            onValueChange?.({
+              ...value,
+              transform: t,
+            });
           }}
         />
       </div>

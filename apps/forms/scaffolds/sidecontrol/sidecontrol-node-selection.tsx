@@ -628,6 +628,7 @@ function SelectedNodeProperties() {
     border,
     //
     padding,
+    boxShadow,
 
     //
     layout,
@@ -660,7 +661,7 @@ function SelectedNodeProperties() {
 
   const {
     //
-    boxShadow,
+    // boxShadow,
     //
     // margin,
     // padding,
@@ -1043,7 +1044,10 @@ function SelectedNodeProperties() {
           </SidebarMenuSectionContent>
         </SidebarSection>
       )}
-      <SidebarSection hidden={!is_stylable} className="border-b pb-4">
+      <SidebarSection
+        hidden={!supports.boxShadow(type)}
+        className="border-b pb-4"
+      >
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Effects</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
@@ -1051,7 +1055,7 @@ function SelectedNodeProperties() {
           <PropertyLine>
             <PropertyLineLabel>Shadow</PropertyLineLabel>
             <BoxShadowControl
-              value={{ boxShadow }}
+              value={boxShadow}
               onValueChange={actions.boxShadow}
             />
           </PropertyLine>

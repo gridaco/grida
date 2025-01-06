@@ -523,6 +523,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
     case "node/change/stroke-cap":
     case "node/change/fit":
     case "node/change/padding":
+    case "node/change/box-shadow":
     case "node/change/layout":
     case "node/change/direction":
     case "node/change/mainAxisAlignment":

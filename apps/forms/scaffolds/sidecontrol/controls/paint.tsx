@@ -21,11 +21,6 @@ import { Cross2Icon } from "@radix-ui/react-icons";
 import { ColorPicker } from "./color-picker";
 import { cmath } from "@grida/cmath";
 
-const transparent_paint: grida.program.cg.Paint = {
-  type: "solid",
-  color: { r: 0, g: 0, b: 0, a: 0 },
-};
-
 export function PaintControl({
   value,
   onValueChange,
@@ -183,7 +178,7 @@ export function PaintControl({
             )}
             onClick={onAddPaint}
           >
-            <PaintChip paint={transparent_paint} />
+            <PaintChip paint={grida.program.cg.paints.transparent} />
             <span className="ms-2 text-xs">Add</span>
           </div>
         </PopoverTrigger>

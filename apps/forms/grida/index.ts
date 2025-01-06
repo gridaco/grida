@@ -612,7 +612,7 @@ export namespace grida.program.css {
     //
     // | "textTransform"
     //
-    | "boxShadow"
+    // | "boxShadow"
     //
     | "aspectRatio"
     //
@@ -928,6 +928,13 @@ export namespace grida.program.nodes {
     }
 
     /**
+     * Node that supports box-shadow
+     */
+    export interface IBoxShadow {
+      boxShadow?: cg.BoxShadow;
+    }
+
+    /**
      * Node that supports stroke with color - such as rectangle, ellipse, etc.
      *
      * - [Env:HTML] for html text, `-webkit-text-stroke` will be used
@@ -965,12 +972,13 @@ export namespace grida.program.nodes {
      */
     export interface ICSSStylable
       extends IStylable<css.ExplicitlySupportedCSSProperties>,
-        IPositioning,
-        ICSSDimension,
-        IFill,
         IOpacity,
         IRotation,
         IZIndex,
+        IPositioning,
+        ICSSDimension,
+        IFill,
+        IBoxShadow,
         ICSSBorder {
       /**
        * TODO: rename to css
@@ -2047,6 +2055,14 @@ export namespace grida.program.cg {
     | "zoom-out";
 
   export type Paint = SolidPaint | LinearGradientPaint | RadialGradientPaint;
+
+  export namespace paints {
+    export const transparent: grida.program.cg.Paint = {
+      type: "solid",
+      color: { r: 0, g: 0, b: 0, a: 0 },
+    };
+  }
+
   export type AnyPaint = Omit<
     Partial<SolidPaint> &
       Partial<LinearGradientPaint> &
@@ -2089,6 +2105,47 @@ export namespace grida.program.cg {
   };
   //
   //
+
+  /**
+   * Box shadow definition compatible with both CSS and advanced blur configurations.
+   *
+   * @see https://developer.mozilla.org/en-US/docs/Web/CSS/box-shadow
+   * @see https://api.flutter.dev/flutter/painting/BoxShadow-class.html
+   */
+  export type BoxShadow = {
+    /**
+     * The color of the shadow.
+     * Defaults to the current color if not provided.
+     */
+    color: RGBA8888;
+
+    /**
+     * The horizontal and vertical offset of the shadow.
+     * Example: `[x: number, y: number]` or for no shadow offset.
+     *
+     * @default [0, 0]
+     */
+    offset: Vector2;
+
+    /**
+     * The blur radius of the shadow.
+     * - Specifies the amount of blur applied to the shadow.
+     * - Must be >= 0.
+     *
+     * @default 0
+     */
+    blur: number;
+
+    /**
+     * The spread radius of the shadow.
+     * - Positive values expand the shadow.
+     * - Negative values shrink the shadow.
+     * - Defaults to 0.
+     *
+     * @default 0
+     */
+    spread: number;
+  };
 
   export type FilterEffects = FeDropShadow | FeGaussianBlur;
 

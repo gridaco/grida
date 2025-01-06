@@ -253,6 +253,11 @@ export default function nodeReducer<
         draft.padding = action.padding;
         break;
       }
+      case "node/change/box-shadow": {
+        assert(draft.type === "container" || draft.type === "component");
+        draft.boxShadow = action.boxShadow;
+        break;
+      }
       case "node/change/layout": {
         assert(draft.type === "container" || draft.type === "component");
         assert(action.layout, "layout is required");

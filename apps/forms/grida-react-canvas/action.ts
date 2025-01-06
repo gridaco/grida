@@ -548,6 +548,10 @@ interface INodeChangePaddingAction extends INodeID {
   padding: grida.program.nodes.i.IPadding["padding"];
 }
 
+interface INodeChangeBoxShadowAction extends INodeID {
+  boxShadow?: grida.program.nodes.i.IBoxShadow["boxShadow"];
+}
+
 // #region layout
 interface INodeChangeLayoutAction extends INodeID {
   layout: grida.program.nodes.i.IFlexContainer["layout"];
@@ -637,6 +641,9 @@ export type NodeChangeAction =
   | ({
       type: "node/change/padding";
     } & INodeChangePaddingAction)
+  | ({
+      type: "node/change/box-shadow";
+    } & INodeChangeBoxShadowAction)
   //
   | ({
       type: "node/change/layout";
