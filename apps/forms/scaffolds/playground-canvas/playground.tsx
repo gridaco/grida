@@ -102,6 +102,7 @@ import { useGoogleFontsList } from "@/grida-fonts/react/hooks";
 import { iosvg } from "@/grida-io-svg";
 import { EditorSurfaceDropzone } from "@/grida-react-canvas/viewport/surface-dropzone";
 import { EditorSurfaceContextMenu } from "@/grida-react-canvas/viewport/surface-context-menu";
+import { EditorSurfaceBrowserContext } from "@/grida-react-canvas/viewport/surface";
 
 export default function CanvasPlayground() {
   const [pref, setPref] = useState<Preferences>({ debug: false });
@@ -376,48 +377,50 @@ export default function CanvasPlayground() {
                   )}
                 </aside>
               )}
-              <EditorSurfaceDropzone>
-                <EditorSurfaceContextMenu>
-                  <div className="w-full h-full flex flex-col relative">
-                    <ViewportRoot className="relative w-full h-full no-scrollbar overflow-y-auto">
-                      <EditorSurface />
-                      <div className="w-full h-full flex items-center justify-center bg-black/5">
-                        <div className="shadow-lg rounded-xl border overflow-hidden">
-                          <StandaloneDocumentContent />
-                        </div>
-                      </div>
-
-                      {!uiHidden && (
-                        <>
-                          <div className="absolute top-4 left-4 z-50">
-                            <Button
-                              variant={
-                                insertDialog.open ? "default" : "outline"
-                              }
-                              className="w-8 h-8 rounded-full p-0"
-                              onClick={insertDialog.openDialog}
-                            >
-                              <PlusIcon className="w-4 h-4" />
-                            </Button>
+              <EditorSurfaceBrowserContext>
+                <EditorSurfaceDropzone>
+                  <EditorSurfaceContextMenu>
+                    <div className="w-full h-full flex flex-col relative">
+                      <ViewportRoot className="relative w-full h-full no-scrollbar overflow-y-auto">
+                        <EditorSurface />
+                        <div className="w-full h-full flex items-center justify-center bg-black/5">
+                          <div className="shadow-lg rounded-xl border overflow-hidden">
+                            <StandaloneDocumentContent />
                           </div>
+                        </div>
 
-                          {/* <div className="fixed bottom-20 left-10 flex items-center justify-center z-50 pointer-events-none">
+                        {!uiHidden && (
+                          <>
+                            <div className="absolute top-4 left-4 z-50">
+                              <Button
+                                variant={
+                                  insertDialog.open ? "default" : "outline"
+                                }
+                                className="w-8 h-8 rounded-full p-0"
+                                onClick={insertDialog.openDialog}
+                              >
+                                <PlusIcon className="w-4 h-4" />
+                              </Button>
+                            </div>
+
+                            {/* <div className="fixed bottom-20 left-10 flex items-center justify-center z-50 pointer-events-none">
                         <KeyboardInputOverlay />
                       </div> */}
-                        </>
-                      )}
-                      {!uiHidden && (
-                        <div className="absolute bottom-8 left-0 right-0 flex items-center justify-center z-50 pointer-events-none">
-                          <PlaygroundToolbar
-                            onAddButtonClick={insertDialog.openDialog}
-                          />
-                        </div>
-                      )}
-                    </ViewportRoot>
-                    <DevtoolsPanel />
-                  </div>
-                </EditorSurfaceContextMenu>
-              </EditorSurfaceDropzone>
+                          </>
+                        )}
+                        {!uiHidden && (
+                          <div className="absolute bottom-8 left-0 right-0 flex items-center justify-center z-50 pointer-events-none">
+                            <PlaygroundToolbar
+                              onAddButtonClick={insertDialog.openDialog}
+                            />
+                          </div>
+                        )}
+                      </ViewportRoot>
+                      <DevtoolsPanel />
+                    </div>
+                  </EditorSurfaceContextMenu>
+                </EditorSurfaceDropzone>
+              </EditorSurfaceBrowserContext>
               {!uiHidden && (
                 <aside className="h-full">
                   <SidebarRoot side="right">

@@ -31,11 +31,13 @@ export function LengthPercentageControl({
   onValueChange?: (value: LengthPercentage | "auto") => void;
 }) {
   const mode =
-    typeof value === "number"
-      ? "fixed"
-      : value === "auto"
-        ? "auto"
-        : "percentage";
+    value === grida.mixed
+      ? grida.mixed
+      : typeof value === "number"
+        ? "fixed"
+        : value === "auto"
+          ? "auto"
+          : "percentage";
 
   const onModeChange = (mode: Mode) => {
     switch (mode) {

@@ -2296,7 +2296,7 @@ export function useEventTarget() {
   ]);
 }
 
-export function useDropzoneEventTarget() {
+export function useDataTransferEventTarget() {
   const [state, dispatch] = __useInternal();
 
   const canvasXY = useCallback(
@@ -2455,7 +2455,34 @@ export function useDropzoneEventTarget() {
   );
   //
 
-  return { onpaste, ondragover, ondrop };
+  return { onpaste, ondragover, ondrop, insertText };
+}
+
+export function useClipboardSync() {
+  const { state } = useDocument();
+
+  useEffect(() => {
+    try {
+      if (state.user_clipboard) {
+        const serializedData = JSON.stringify(state.user_clipboard);
+        const htmltxt = `<meta>${serializedData}`;
+        const blob = new Blob([htmltxt], {
+          type: "text/html",
+        });
+
+        const clipboardItem = new ClipboardItem({
+          "text/html": blob,
+          // Optional: Add plain text for fallback
+          // TODO: copy content as texts. (if text)
+          // "text/plain": new Blob([serializedData], { type: "text/plain" }),
+        });
+        navigator.clipboard.write([clipboardItem]);
+      }
+    } catch (e) {
+      //
+    }
+  }, [state.user_clipboard]);
+  //
 }
 
 export function useSurfacePathEditor() {

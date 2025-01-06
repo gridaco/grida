@@ -6,12 +6,17 @@ import {
   ContextMenuShortcut,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import { useDocument, useSelection } from "../provider";
+import {
+  useDataTransferEventTarget,
+  useDocument,
+  useSelection,
+} from "../provider";
 
 export function EditorSurfaceContextMenu({
   children,
 }: React.PropsWithChildren<{}>) {
   const { selection, state, paste, order } = useDocument();
+  const { insertText } = useDataTransferEventTarget();
   const { actions } = useSelection();
 
   const has_selection = selection.length > 0;
@@ -22,6 +27,27 @@ export function EditorSurfaceContextMenu({
   const can_toggle_locked = has_selection;
   // TODO: valid ids (not locked, not active, not root)
   const can_select_layer = state.surface_raycast_detected_node_ids.length >= 2;
+
+  const handlePaste = async (e: Event) => {
+    try {
+      const clipboardItems = await navigator.clipboard.read();
+      if (clipboardItems.length > 0) {
+        for (const clipboardItem of clipboardItems) {
+          // only handles text/plain via navigator.clipboard
+          if (clipboardItem.types.includes("text/plain")) {
+            const blob = await clipboardItem.getType("text/plain");
+            const text = await blob.text();
+            insertText(text, {
+              clientX: window.innerWidth / 2,
+              clientY: window.innerHeight / 2,
+            });
+            return;
+          }
+        }
+      }
+      paste();
+    } catch (e) {}
+  };
 
   //
   return (
@@ -35,7 +61,7 @@ export function EditorSurfaceContextMenu({
         >
           Copy
         </ContextMenuItem>
-        <ContextMenuItem onSelect={paste} className="text-xs">
+        <ContextMenuItem onSelect={handlePaste} className="text-xs">
           Paste here
         </ContextMenuItem>
         <ContextMenuSeparator />

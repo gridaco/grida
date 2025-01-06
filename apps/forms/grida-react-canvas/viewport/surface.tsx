@@ -3,7 +3,12 @@
 import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useEventTarget } from "@/grida-react-canvas";
 import { useGesture as __useGesture } from "@use-gesture/react";
-import { useDocument, useEventTargetCSSCursor, useNode } from "../provider";
+import {
+  useClipboardSync,
+  useDocument,
+  useEventTargetCSSCursor,
+  useNode,
+} from "../provider";
 import { useIsWindowResizing } from "./hooks/window-resizing";
 import { supports } from "@/grida/utils/supports";
 import { Marquee } from "./ui/marquee";
@@ -275,6 +280,19 @@ export function EditorSurface() {
       </div>
     </div>
   );
+}
+
+/**
+ * Provides browser api compatibility
+ * - clipboard
+ * @returns
+ */
+export function EditorSurfaceBrowserContext({
+  children,
+}: React.PropsWithChildren<{}>) {
+  useClipboardSync();
+
+  return <>{children}</>;
 }
 
 function SelectionOverlay({

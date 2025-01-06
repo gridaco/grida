@@ -1,12 +1,12 @@
 import { useEffect } from "react";
-import { useDropzoneEventTarget } from "../provider";
+import { useDataTransferEventTarget } from "../provider";
 import { cn } from "@/utils";
 
 export function EditorSurfaceDropzone({
   className,
   children,
 }: React.PropsWithChildren<{ className?: string }>) {
-  const { ondragover, ondrop, onpaste } = useDropzoneEventTarget();
+  const { ondragover, ondrop, onpaste } = useDataTransferEventTarget();
 
   useEffect(() => {
     const cb = (e: ClipboardEvent) => {
