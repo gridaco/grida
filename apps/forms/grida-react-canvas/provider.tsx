@@ -2387,7 +2387,7 @@ export function useDataTransferEventTarget() {
           }
         });
     },
-    []
+    [insertNode, canvasXY]
   );
 
   const insertFromFile = useCallback(
@@ -2417,7 +2417,7 @@ export function useDataTransferEventTarget() {
 
       toast.error(`${type} is not supported`);
     },
-    [canvasXY, insertNode, insertSVG]
+    [insertNode, insertSVG]
   );
 
   const onpaste = useCallback(
