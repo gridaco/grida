@@ -102,7 +102,8 @@ import { useGoogleFontsList } from "@/grida-fonts/react/hooks";
 import { iosvg } from "@/grida-io-svg";
 import { EditorSurfaceDropzone } from "@/grida-react-canvas/viewport/surface-dropzone";
 import { EditorSurfaceContextMenu } from "@/grida-react-canvas/viewport/surface-context-menu";
-import { EditorSurfaceBrowserContext } from "@/grida-react-canvas/viewport/surface";
+import { EditorSurfaceClipboardSyncProvider } from "@/grida-react-canvas/viewport/surface";
+import { datatransfer } from "@/grida-react-canvas/viewport/data-transfer";
 
 export default function CanvasPlayground() {
   const [pref, setPref] = useState<Preferences>({ debug: false });
@@ -377,7 +378,7 @@ export default function CanvasPlayground() {
                   )}
                 </aside>
               )}
-              <EditorSurfaceBrowserContext>
+              <EditorSurfaceClipboardSyncProvider>
                 <EditorSurfaceDropzone>
                   <EditorSurfaceContextMenu>
                     <div className="w-full h-full flex flex-col relative">
@@ -420,7 +421,7 @@ export default function CanvasPlayground() {
                     </div>
                   </EditorSurfaceContextMenu>
                 </EditorSurfaceDropzone>
-              </EditorSurfaceBrowserContext>
+              </EditorSurfaceClipboardSyncProvider>
               {!uiHidden && (
                 <aside className="h-full">
                   <SidebarRoot side="right">
@@ -681,8 +682,8 @@ function InsertNodePanelContent() {
     });
 
     toast.promise(task, {
-      loading: "Inserting SVG",
-      success: "SVG inserted",
+      loading: "Loading...",
+      success: "Inserted",
       error: "Failed to insert SVG",
     });
   };
@@ -732,11 +733,23 @@ function InsertNodePanelContent() {
         <TabsContent value="shapes" className="h-full overflow-y-scroll">
           <SidebarMenuGrid>
             {/*  */}
-            {shapes.map(({ name, src }) => {
+            {shapes.map((item) => {
+              const { name, src } = item;
               return (
                 <SidebarMenuGridItem
                   key={name}
                   onClick={() => onInsertSvgSrc(name, src)}
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData(
+                      datatransfer.key,
+                      datatransfer.encode({
+                        type: "svg",
+                        name: name,
+                        src: src,
+                      })
+                    );
+                  }}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -760,9 +773,19 @@ function InsertNodePanelContent() {
               const { src, family } = item;
               return (
                 <SidebarMenuGridItem
-                  draggable
                   onClick={() => onInsertSvgSrc(family, src)}
                   className="border rounded-md shadow-sm cursor-pointer text-foreground/50 hover:text-foreground"
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData(
+                      datatransfer.key,
+                      datatransfer.encode({
+                        type: "svg",
+                        name: family,
+                        src: src,
+                      })
+                    );
+                  }}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img

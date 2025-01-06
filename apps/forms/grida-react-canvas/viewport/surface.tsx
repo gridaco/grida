@@ -283,11 +283,9 @@ export function EditorSurface() {
 }
 
 /**
- * Provides browser api compatibility
- * - clipboard
- * @returns
+ * Provides browser clipboard api compatibility
  */
-export function EditorSurfaceBrowserContext({
+export function EditorSurfaceClipboardSyncProvider({
   children,
 }: React.PropsWithChildren<{}>) {
   useClipboardSync();

@@ -62,7 +62,8 @@ export function EditorSurfaceContextMenu({
           Copy
         </ContextMenuItem>
         <ContextMenuItem onSelect={handlePaste} className="text-xs">
-          Paste here
+          Paste
+          {/* TODO: with cursor pos "Paste here" */}
         </ContextMenuItem>
         <ContextMenuSeparator />
         {/* <ContextMenuItem disabled={!can_select_layer}>

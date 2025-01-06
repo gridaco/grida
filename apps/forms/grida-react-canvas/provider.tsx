@@ -2340,6 +2340,50 @@ export function useDataTransferEventTarget() {
     [insertNode, canvasXY]
   );
 
+  const insertSVG = useCallback(
+    (
+      name: string,
+      svg: string,
+      position?: {
+        clientX: number;
+        clientY: number;
+      }
+    ) => {
+      const optimized = iosvg.v0.optimize(svg).data;
+      iosvg.v0
+        .convert(optimized, {
+          name: name,
+          currentColor: { r: 0, g: 0, b: 0, a: 1 },
+        })
+        .then((result) => {
+          if (result) {
+            result = result as grida.program.nodes.i.IPositioning &
+              grida.program.nodes.i.IFixedDimension;
+
+            const center_dx =
+              typeof result.width === "number" ? result.width / 2 : 0;
+
+            const center_dy =
+              typeof result.height === "number" ? result.height / 2 : 0;
+
+            const [x, y] = canvasXY(
+              cmath.vector2.sub(
+                position ? [position.clientX, position.clientY] : [0, 0],
+                [center_dx, center_dy]
+              )
+            );
+
+            result.left = x;
+            result.top = y;
+            insertNode(result);
+          } else {
+            throw new Error("Failed to convert SVG");
+          }
+        });
+    },
+    []
+  );
+
   const insertFromFile = useCallback(
     (
       file: File,
@@ -2358,37 +2402,8 @@ export function useDataTransferEventTarget() {
         const reader = new FileReader();
         reader.onload = (e) => {
           const svgContent = e.target?.result as string;
-          const optimized = iosvg.v0.optimize(svgContent).data;
-          iosvg.v0
-            .convert(optimized, {
-              name: file.name.split(".svg")[0],
-              currentColor: { r: 0, g: 0, b: 0, a: 1 },
-            })
-            .then((result) => {
-              if (result) {
-                result = result as grida.program.nodes.i.IPositioning &
-                  grida.program.nodes.i.IFixedDimension;
-
-                const center_dx =
-                  typeof result.width === "number" ? result.width / 2 : 0;
-
-                const center_dy =
-                  typeof result.height === "number" ? result.height / 2 : 0;
-
-                const [x, y] = canvasXY(
-                  cmath.vector2.sub(
-                    position ? [position.clientX, position.clientY] : [0, 0],
-                    [center_dx, center_dy]
-                  )
-                );
-
-                result.left = x;
-                result.top = y;
-                insertNode(result);
-              } else {
-                throw new Error("Failed to convert SVG");
-              }
-            });
+          const name = file.name.split(".svg")[0];
+          insertSVG(name, svgContent, position);
         };
         reader.readAsText(file);
         return;
@@ -2396,7 +2411,7 @@ export function useDataTransferEventTarget() {
 
       toast.error(`${type} is not supported`);
     },
-    [canvasXY, insertNode]
+    [canvasXY, insertNode, insertSVG]
   );
 
   const onpaste = useCallback(
@@ -2445,6 +2460,33 @@ export function useDataTransferEventTarget() {
     (event: React.DragEvent<HTMLDivElement>) => {
       event.preventDefault();
 
+      const knwondata = event.dataTransfer.getData("x-grida-data-transfer");
+      if (knwondata) {
+        const data = JSON.parse(knwondata);
+        switch (data.type) {
+          case "svg":
+            const { name, src } = data;
+            const task = fetch(src, {
+              cache: "no-store",
+            }).then((res) =>
+              res.text().then((text) => {
+                insertSVG(name, text, event);
+              })
+            );
+
+            toast.promise(task, {
+              loading: "Loading...",
+              success: "Inserted",
+              error: "Failed to insert SVG",
+            });
+            break;
+          default:
+            // unknown
+            break;
+        }
+        //
+        return;
+      }
       const files = event.dataTransfer.files;
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
