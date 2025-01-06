@@ -42,7 +42,7 @@ function NodeHierarchyItemContextMenuWrapper({
 }: React.PropsWithChildren<{
   node_id: string;
 }>) {
-  const { copy } = useDocument();
+  const { copy, deleteNode } = useDocument();
   const change = useNodeAction(node_id)!;
 
   return (
@@ -92,6 +92,16 @@ function NodeHierarchyItemContextMenuWrapper({
         <ContextMenuItem onSelect={change.toggleLocked} className="text-xs">
           Lock/Unlock
           <ContextMenuShortcut>{"⌘⇧L"}</ContextMenuShortcut>
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem
+          onSelect={() => {
+            deleteNode(node_id);
+          }}
+          className="text-xs"
+        >
+          Delete
+          <ContextMenuShortcut>{"⌫"}</ContextMenuShortcut>
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>

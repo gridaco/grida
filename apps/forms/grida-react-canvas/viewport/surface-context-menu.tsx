@@ -15,7 +15,7 @@ import {
 export function EditorSurfaceContextMenu({
   children,
 }: React.PropsWithChildren<{}>) {
-  const { selection, state, paste, order } = useDocument();
+  const { selection, state, paste, order, deleteNode } = useDocument();
   const { insertText } = useDataTransferEventTarget();
   const { actions } = useSelection();
 
@@ -90,7 +90,17 @@ export function EditorSurfaceContextMenu({
           Send to back
           <ContextMenuShortcut>{"["}</ContextMenuShortcut>
         </ContextMenuItem>
-        {/* <ContextMenuSeparator /> */}
+        <ContextMenuSeparator />
+        <ContextMenuItem
+          disabled={!has_selection}
+          onSelect={() => {
+            deleteNode("selection");
+          }}
+          className="text-xs"
+        >
+          Delete
+          <ContextMenuShortcut>{"⌫"}</ContextMenuShortcut>
+        </ContextMenuItem>
         {/* <ContextMenuItem
           disabled={!can_toggle_active}
           // onSelect={actions}
