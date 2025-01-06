@@ -100,6 +100,10 @@ import { keysymbols } from "@/grida-react-canvas/devtools/keysymbols";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useGoogleFontsList } from "@/grida-fonts/react/hooks";
 import { iosvg } from "@/grida-io-svg";
+import { EditorSurfaceDropzone } from "@/grida-react-canvas/viewport/surface-dropzone";
+import { EditorSurfaceContextMenu } from "@/grida-react-canvas/viewport/surface-context-menu";
+import { EditorSurfaceClipboardSyncProvider } from "@/grida-react-canvas/viewport/surface";
+import { datatransfer } from "@/grida-react-canvas/viewport/data-transfer";
 
 export default function CanvasPlayground() {
   const [pref, setPref] = useState<Preferences>({ debug: false });
@@ -374,41 +378,50 @@ export default function CanvasPlayground() {
                   )}
                 </aside>
               )}
-              <div className="w-full h-full flex flex-col relative">
-                <ViewportRoot className="relative w-full h-full no-scrollbar overflow-y-auto">
-                  <EditorSurface />
-                  <div className="w-full h-full flex items-center justify-center bg-black/5">
-                    <div className="shadow-lg rounded-xl border overflow-hidden">
-                      <StandaloneDocumentContent />
-                    </div>
-                  </div>
-                  {!uiHidden && (
-                    <>
-                      <div className="absolute top-4 left-4 z-50">
-                        <Button
-                          variant={insertDialog.open ? "default" : "outline"}
-                          className="w-8 h-8 rounded-full p-0"
-                          onClick={insertDialog.openDialog}
-                        >
-                          <PlusIcon className="w-4 h-4" />
-                        </Button>
-                      </div>
+              <EditorSurfaceClipboardSyncProvider>
+                <EditorSurfaceDropzone>
+                  <EditorSurfaceContextMenu>
+                    <div className="w-full h-full flex flex-col relative">
+                      <ViewportRoot className="relative w-full h-full no-scrollbar overflow-y-auto">
+                        <EditorSurface />
+                        <div className="w-full h-full flex items-center justify-center bg-black/5">
+                          <div className="shadow-lg rounded-xl border overflow-hidden">
+                            <StandaloneDocumentContent />
+                          </div>
+                        </div>
 
-                      {/* <div className="fixed bottom-20 left-10 flex items-center justify-center z-50 pointer-events-none">
+                        {!uiHidden && (
+                          <>
+                            <div className="absolute top-4 left-4 z-50">
+                              <Button
+                                variant={
+                                  insertDialog.open ? "default" : "outline"
+                                }
+                                className="w-8 h-8 rounded-full p-0"
+                                onClick={insertDialog.openDialog}
+                              >
+                                <PlusIcon className="w-4 h-4" />
+                              </Button>
+                            </div>
+
+                            {/* <div className="fixed bottom-20 left-10 flex items-center justify-center z-50 pointer-events-none">
                         <KeyboardInputOverlay />
                       </div> */}
-                    </>
-                  )}
-                  {!uiHidden && (
-                    <div className="absolute bottom-8 left-0 right-0 flex items-center justify-center z-50 pointer-events-none">
-                      <PlaygroundToolbar
-                        onAddButtonClick={insertDialog.openDialog}
-                      />
+                          </>
+                        )}
+                        {!uiHidden && (
+                          <div className="absolute bottom-8 left-0 right-0 flex items-center justify-center z-50 pointer-events-none">
+                            <PlaygroundToolbar
+                              onAddButtonClick={insertDialog.openDialog}
+                            />
+                          </div>
+                        )}
+                      </ViewportRoot>
+                      <DevtoolsPanel />
                     </div>
-                  )}
-                </ViewportRoot>
-                <DevtoolsPanel />
-              </div>
+                  </EditorSurfaceContextMenu>
+                </EditorSurfaceDropzone>
+              </EditorSurfaceClipboardSyncProvider>
               {!uiHidden && (
                 <aside className="h-full">
                   <SidebarRoot side="right">
@@ -669,8 +682,8 @@ function InsertNodePanelContent() {
     });
 
     toast.promise(task, {
-      loading: "Inserting SVG",
-      success: "SVG inserted",
+      loading: "Loading...",
+      success: "Inserted",
       error: "Failed to insert SVG",
     });
   };
@@ -720,11 +733,23 @@ function InsertNodePanelContent() {
         <TabsContent value="shapes" className="h-full overflow-y-scroll">
           <SidebarMenuGrid>
             {/*  */}
-            {shapes.map(({ name, src }) => {
+            {shapes.map((item) => {
+              const { name, src } = item;
               return (
                 <SidebarMenuGridItem
                   key={name}
                   onClick={() => onInsertSvgSrc(name, src)}
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData(
+                      datatransfer.key,
+                      datatransfer.encode({
+                        type: "svg",
+                        name: name,
+                        src: src,
+                      })
+                    );
+                  }}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -748,9 +773,19 @@ function InsertNodePanelContent() {
               const { src, family } = item;
               return (
                 <SidebarMenuGridItem
-                  draggable
                   onClick={() => onInsertSvgSrc(family, src)}
                   className="border rounded-md shadow-sm cursor-pointer text-foreground/50 hover:text-foreground"
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData(
+                      datatransfer.key,
+                      datatransfer.encode({
+                        type: "svg",
+                        name: family,
+                        src: src,
+                      })
+                    );
+                  }}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img

@@ -560,25 +560,6 @@ export namespace grida.program.css {
   };
 
   /**
-   *
-   * {@link cg.textAlignVertical} to CSS `align-content` mapping
-   *
-   * - `top`:`start`
-   * - `center`:`center`
-   * - `bottom`:`end`
-   *
-   * @see https://developer.mozilla.org/en-US/docs/Web/CSS/align-content
-   */
-  export const text_align_vertical_to_css_align_content: Record<
-    cg.TextAlignVertical,
-    React.CSSProperties["alignContent"]
-  > = {
-    top: "start",
-    center: "center",
-    bottom: "end",
-  };
-
-  /**
    * CSS properties that is supported via the standard editor
    *
    * (when using html backend, other css properties can also be dynamically applied, but not guaranteed)
@@ -631,7 +612,7 @@ export namespace grida.program.css {
     //
     // | "textTransform"
     //
-    | "boxShadow"
+    // | "boxShadow"
     //
     | "aspectRatio"
     //
@@ -641,315 +622,6 @@ export namespace grida.program.css {
     | "flexWrap"
     //
   >;
-
-  export function toReactCSSProperties(
-    styles: nodes.i.ICSSStylable &
-      Partial<nodes.i.IMouseCursor> &
-      Partial<nodes.i.IRectangleCorner> &
-      Partial<nodes.i.IBoxFit> &
-      Partial<nodes.i.ITextNodeStyle> &
-      Partial<nodes.i.IPadding> &
-      Partial<nodes.i.IFlexContainer>,
-    config: {
-      hasTextStyle: boolean;
-      fill: "color" | "background" | "fill" | "none";
-    }
-  ): React.CSSProperties {
-    const {
-      position,
-      top,
-      left,
-      bottom,
-      right,
-      width,
-      height,
-      zIndex,
-      opacity,
-      rotation,
-      fill,
-      fit,
-      cornerRadius,
-      //
-      border,
-      //
-      padding,
-      //
-      layout,
-      direction,
-      mainAxisAlignment,
-      crossAxisAlignment,
-      mainAxisGap,
-      crossAxisGap,
-      //
-      cursor,
-      //
-      style,
-    } = styles;
-
-    let result: React.CSSProperties = {
-      //
-      ...style,
-      //
-      position: position,
-      // FIXME: support both auto - max-content
-      // for texts, when auto, it will automatically break the line (to prevent this, we can use max-content) BUT, when max-content it will not respect the right: xxx (which in this case, it should break line)
-      // width: width === "auto" ? "max-content" : toDimension(width),
-      // height: height === "auto" ? "max-content" : toDimension(height),
-      width: toDimension(width),
-      height: toDimension(height),
-      top: top,
-      left: left,
-      right: right,
-      bottom: bottom,
-      zIndex: zIndex,
-      opacity: opacity,
-      objectFit: fit,
-      rotate: rotation ? `${rotation}deg` : undefined,
-      //
-      borderRadius: cornerRadius
-        ? cornerRadiusToBorderRadiusCSS(cornerRadius)
-        : undefined,
-      //
-      padding: padding ? paddingToPaddingCSS(padding) : undefined,
-      //
-      cursor: cursor,
-      ...(border ? toReactCSSBorder(border) : {}),
-    } satisfies React.CSSProperties;
-
-    if (layout === "flex") {
-      result["display"] = "flex";
-      result["flexDirection"] = axisToFlexDirection(direction!);
-      result["justifyContent"] = mainAxisAlignment;
-      result["alignItems"] = crossAxisAlignment;
-      result["gap"] =
-        direction === "horizontal"
-          ? `${mainAxisGap}px ${crossAxisGap}px`
-          : `${crossAxisGap}px ${mainAxisGap}px`;
-    }
-
-    switch (config.fill) {
-      case "color":
-        result["color"] = fill ? toFillString(fill) : undefined;
-        break;
-      case "background":
-        result["background"] = fill ? toFillString(fill) : undefined;
-        break;
-      case "fill":
-        result["fill"] = fill ? toFillString(fill) : undefined;
-        break;
-      case "none":
-        break;
-    }
-
-    if (config.hasTextStyle) {
-      const { textAlign, textAlignVertical } =
-        styles as Partial<nodes.i.ITextNodeStyle>;
-      const {
-        textDecoration,
-        fontFamily,
-        fontSize,
-        fontWeight,
-        letterSpacing,
-        lineHeight,
-      } = styles as nodes.i.ITextStyle;
-
-      result = {
-        ...result,
-        ...toReactTextStyle({
-          // text node style - can be undefined (need a better way to handle this - not pass it at all)
-          textAlign: textAlign ?? "left",
-          textAlignVertical: textAlignVertical ?? "top",
-          // text span style
-          textDecoration,
-          fontFamily,
-          fontSize,
-          fontWeight,
-          letterSpacing,
-          lineHeight,
-          fill: fill,
-        }),
-      };
-    }
-
-    return result;
-  }
-
-  export function toReactCSSBorder(
-    border: Border
-  ): Pick<React.CSSProperties, "borderStyle" | "borderColor" | "borderWidth"> {
-    return {
-      borderStyle: border.borderStyle,
-      borderColor: toRGBAString(border.borderColor),
-      borderWidth:
-        typeof border.borderWidth === "number"
-          ? border.borderWidth
-          : `${border.borderWidth.top}px ${border.borderWidth.right}px ${border.borderWidth.bottom}px ${border.borderWidth.left}px`,
-    };
-  }
-
-  export function toReactTextStyle(
-    style: grida.program.nodes.i.ITextNodeStyle
-  ): Pick<
-    React.CSSProperties,
-    | "textAlign"
-    | "alignContent"
-    | "textDecoration"
-    | "fontFamily"
-    | "fontSize"
-    | "fontWeight"
-    | "letterSpacing"
-    | "lineHeight"
-    | "color"
-  > {
-    const {
-      textAlign,
-      textAlignVertical,
-      textDecoration,
-      fontFamily,
-      fontSize,
-      fontWeight,
-      letterSpacing,
-      lineHeight,
-      fill,
-    } = style;
-
-    return {
-      textAlign: textAlign,
-      alignContent: textAlignVertical
-        ? css.text_align_vertical_to_css_align_content[textAlignVertical]
-        : undefined,
-      textDecoration: textDecoration,
-      fontFamily: fontFamily,
-      lineHeight: lineHeight ?? "normal",
-      letterSpacing: letterSpacing,
-      fontSize: fontSize,
-      fontWeight: fontWeight,
-      color: fill ? toFillString(fill) : undefined,
-    };
-  }
-
-  export function toFillString(paint: cg.Paint): string {
-    switch (paint.type) {
-      case "solid":
-        return toRGBAString(paint.color);
-      case "linear_gradient":
-        return toLinearGradientString(paint);
-      case "radial_gradient":
-        return toRadialGradientString(paint);
-    }
-  }
-
-  export function toRGBAString(rgba: cg.RGBA8888): string {
-    return `rgba(${rgba.r}, ${rgba.g}, ${rgba.b}, ${rgba.a})`;
-  }
-
-  /**
-   *
-   * @example
-   * `linear-gradient(to right, red, blue)`
-   *
-   * @param paint
-   * @returns
-   * @see https://developer.mozilla.org/en-US/docs/Web/CSS/linear-gradient
-   */
-  export function toLinearGradientString(
-    paint: Omit<cg.LinearGradientPaint, "id">
-  ): string {
-    const { stops, transform } = paint;
-
-    // the css linear-gradient does not support custom matrix transformation
-    const deg = cmath.transform.angle(transform ?? cmath.transform.identity);
-
-    const gradientStops = stops
-      .map((stop) => {
-        return `${toRGBAString(stop.color)} ${stop.offset * 100}%`;
-      })
-      .join(", ");
-
-    return `linear-gradient(${deg}deg, ${gradientStops})`;
-  }
-
-  /**
-   *
-   * @example
-   * `radial-gradient(circle, red, blue)`
-   *
-   * @param paint
-   * @returns
-   * @see https://developer.mozilla.org/en-US/docs/Web/CSS/radial-gradient
-   */
-  export function toRadialGradientString(
-    paint: Omit<cg.RadialGradientPaint, "id">
-  ): string {
-    const { stops } = paint;
-
-    const gradientStops = stops
-      .map((stop) => {
-        return `${toRGBAString(stop.color)} ${stop.offset * 100}%`;
-      })
-      .join(", ");
-
-    return `radial-gradient(${gradientStops})`;
-  }
-
-  export function toDimension(value: css.LengthPercentage | "auto"): string {
-    if (!value) return "";
-    if (value === "auto") return "auto";
-    if (typeof value === "number") {
-      return `${value}px`;
-    } else {
-      switch (value.type) {
-        case "length": {
-          return `${value.value}${value.unit}`;
-        }
-        case "percentage": {
-          return `${value.value}%`;
-        }
-      }
-    }
-  }
-
-  /**
-   *
-   * @param color
-   * @returns hex color string without the leading `#`
-   * @example `rgba_to_hex({ r: 255, g: 255, b: 255, a: 1 })` returns `"ffffff"`
-   *
-   */
-  export function rgbaToHex(color: grida.program.cg.RGBA8888): string {
-    return `${color.r.toString(16).padStart(2, "0")}${color.g.toString(16).padStart(2, "0")}${color.b.toString(16).padStart(2, "0")}`;
-  }
-
-  export function cornerRadiusToBorderRadiusCSS(
-    cr: nodes.i.IRectangleCorner["cornerRadius"]
-  ): string {
-    if (!cr) return "0";
-    if (typeof cr === "number") {
-      return `${cr}px`;
-    } else {
-      return `${cr[0]}px ${cr[1]}px ${cr[2]}px ${cr[3]}px`;
-    }
-  }
-
-  export function paddingToPaddingCSS(
-    padding: nodes.i.IPadding["padding"]
-  ): string {
-    if (!padding) return "0";
-    if (typeof padding === "number") {
-      return `${padding}px`;
-    } else {
-      return `${padding.paddingTop}px ${padding.paddingRight}px ${padding.paddingBottom}px ${padding.paddingLeft}px`;
-    }
-  }
-
-  export function axisToFlexDirection(axis: cg.Axis): "row" | "column" {
-    switch (axis) {
-      case "horizontal":
-        return "row";
-      case "vertical":
-        return "column";
-    }
-  }
 }
 export namespace grida.program.nodes {
   export type NodeID = string;
@@ -1256,6 +928,13 @@ export namespace grida.program.nodes {
     }
 
     /**
+     * Node that supports box-shadow
+     */
+    export interface IBoxShadow {
+      boxShadow?: cg.BoxShadow;
+    }
+
+    /**
      * Node that supports stroke with color - such as rectangle, ellipse, etc.
      *
      * - [Env:HTML] for html text, `-webkit-text-stroke` will be used
@@ -1293,12 +972,13 @@ export namespace grida.program.nodes {
      */
     export interface ICSSStylable
       extends IStylable<css.ExplicitlySupportedCSSProperties>,
-        IPositioning,
-        ICSSDimension,
-        IFill,
         IOpacity,
         IRotation,
         IZIndex,
+        IPositioning,
+        ICSSDimension,
+        IFill,
+        IBoxShadow,
         ICSSBorder {
       /**
        * TODO: rename to css
@@ -2291,7 +1971,7 @@ export namespace grida.program.cg {
   /**
    * Vertical text align modes
    *
-   * - [Env:css] in css, uses `align-content` {@link css.text_align_vertical_to_css_align_content}
+   * - [Env:css] in css, uses `align-content`
    *
    * @see https://developer.mozilla.org/en-US/docs/Web/CSS/align-content
    * @see https://konvajs.org/api/Konva.Text.html#verticalAlign
@@ -2375,6 +2055,14 @@ export namespace grida.program.cg {
     | "zoom-out";
 
   export type Paint = SolidPaint | LinearGradientPaint | RadialGradientPaint;
+
+  export namespace paints {
+    export const transparent: grida.program.cg.Paint = {
+      type: "solid",
+      color: { r: 0, g: 0, b: 0, a: 0 },
+    };
+  }
+
   export type AnyPaint = Omit<
     Partial<SolidPaint> &
       Partial<LinearGradientPaint> &
@@ -2417,6 +2105,47 @@ export namespace grida.program.cg {
   };
   //
   //
+
+  /**
+   * Box shadow definition compatible with both CSS and advanced blur configurations.
+   *
+   * @see https://developer.mozilla.org/en-US/docs/Web/CSS/box-shadow
+   * @see https://api.flutter.dev/flutter/painting/BoxShadow-class.html
+   */
+  export type BoxShadow = {
+    /**
+     * The color of the shadow.
+     * Defaults to the current color if not provided.
+     */
+    color: RGBA8888;
+
+    /**
+     * The horizontal and vertical offset of the shadow.
+     * Example: `[x: number, y: number]` or for no shadow offset.
+     *
+     * @default [0, 0]
+     */
+    offset: Vector2;
+
+    /**
+     * The blur radius of the shadow.
+     * - Specifies the amount of blur applied to the shadow.
+     * - Must be >= 0.
+     *
+     * @default 0
+     */
+    blur: number;
+
+    /**
+     * The spread radius of the shadow.
+     * - Positive values expand the shadow.
+     * - Negative values shrink the shadow.
+     * - Defaults to 0.
+     *
+     * @default 0
+     */
+    spread: number;
+  };
 
   export type FilterEffects = FeDropShadow | FeGaussianBlur;
 
@@ -2499,7 +2228,7 @@ export namespace grida.program.api {
                   type: "node/change/size",
                   axis: "width",
                   node_id: node.id,
-                  length: value,
+                  value: value,
                 });
                 return true;
               case "height":
@@ -2507,7 +2236,7 @@ export namespace grida.program.api {
                   type: "node/change/size",
                   axis: "height",
                   node_id: node.id,
-                  length: value,
+                  value: value,
                 });
                 return true;
               case "top":

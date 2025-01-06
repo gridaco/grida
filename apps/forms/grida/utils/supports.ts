@@ -14,6 +14,7 @@ const __supports: Record<string, ReadonlyArray<NodeType>> = {
   border: ["container", "component", "instance", "image", "video"],
   children: ["container", "component", "instance"],
   stroke: ["path", "line", "rectangle", "ellipse"],
+  boxShadow: ["container", "component", "instance"],
   /**
    * strokeCap value itself is supported by all istroke nodes, yet it should be visible to editor only for polyline and line nodes. (path-like nodes)
    */
@@ -29,4 +30,6 @@ export namespace supports {
   export const stroke = (type: NodeType) => __supports.stroke.includes(type);
   export const strokeCap = (type: NodeType) =>
     __supports.strokeCap.includes(type);
+  export const boxShadow = (type: NodeType) =>
+    __supports.boxShadow.includes(type);
 }

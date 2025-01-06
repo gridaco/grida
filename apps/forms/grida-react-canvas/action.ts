@@ -468,7 +468,7 @@ interface INodeChangeOpacityAction extends INodeID {
 
 interface INodeChangeSizeAction extends INodeID {
   axis: "width" | "height";
-  length: grida.program.css.Length | "auto";
+  value: grida.program.css.LengthPercentage | "auto";
 }
 
 export type TChange<T> =
@@ -546,6 +546,10 @@ interface ITextNodeChangeMaxlengthAction extends INodeID {
 //
 interface INodeChangePaddingAction extends INodeID {
   padding: grida.program.nodes.i.IPadding["padding"];
+}
+
+interface INodeChangeBoxShadowAction extends INodeID {
+  boxShadow?: grida.program.nodes.i.IBoxShadow["boxShadow"];
 }
 
 // #region layout
@@ -637,6 +641,9 @@ export type NodeChangeAction =
   | ({
       type: "node/change/padding";
     } & INodeChangePaddingAction)
+  | ({
+      type: "node/change/box-shadow";
+    } & INodeChangeBoxShadowAction)
   //
   | ({
       type: "node/change/layout";

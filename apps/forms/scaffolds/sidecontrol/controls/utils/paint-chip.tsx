@@ -1,4 +1,5 @@
 import { grida } from "@/grida";
+import { css } from "@/grida/css";
 import { TransparencyGridIcon } from "@radix-ui/react-icons";
 
 export function PaintChip({ paint }: { paint: grida.program.cg.Paint }) {
@@ -18,7 +19,7 @@ export function RGBAChip({ rgba }: { rgba: grida.program.cg.RGBA8888 }) {
       <div
         className="absolute w-full h-full"
         style={{
-          backgroundColor: grida.program.css.toRGBAString(rgba),
+          backgroundColor: css.toRGBAString(rgba),
         }}
       />
       <TransparencyGridIcon className="absolute w-full h-full -z-10" />
@@ -36,7 +37,7 @@ export function LinearGradientPaintChip({
       <div
         className="absolute w-full h-full"
         style={{
-          background: grida.program.css.toLinearGradientString(paint),
+          background: css.toLinearGradientString(paint),
         }}
       />
       <TransparencyGridIcon className="absolute w-full h-full -z-10" />
@@ -54,7 +55,7 @@ export function RadialGradientPaintChip({
       <div
         className="absolute w-full h-full"
         style={{
-          background: grida.program.css.toRadialGradientString(paint),
+          background: css.toRadialGradientString(paint),
         }}
       />
       <TransparencyGridIcon className="absolute w-full h-full -z-10" />

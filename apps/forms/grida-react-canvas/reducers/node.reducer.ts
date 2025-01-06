@@ -65,7 +65,7 @@ export default function nodeReducer<
         break;
       }
       case "node/change/size": {
-        const { axis, length } = action;
+        const { axis, value: length } = action;
         // TODO: check the sizing model (fixed or css)
         (draft as grida.program.nodes.i.ICSSDimension)[axis] = length;
         break;
@@ -251,6 +251,11 @@ export default function nodeReducer<
       case "node/change/padding": {
         assert(draft.type === "container" || draft.type === "component");
         draft.padding = action.padding;
+        break;
+      }
+      case "node/change/box-shadow": {
+        assert(draft.type === "container" || draft.type === "component");
+        draft.boxShadow = action.boxShadow;
         break;
       }
       case "node/change/layout": {

@@ -32,6 +32,8 @@ import { cmath } from "@grida/cmath";
 import type { TCanvasEventTargetDragGestureState, TChange } from "./action";
 import mixed, { PropertyCompareFn } from "@/grida/mixed";
 import deepEqual from "deep-equal";
+import { iosvg } from "@/grida-io-svg";
+import toast from "react-hot-toast";
 
 const DocumentContext = createContext<IDocumentEditorState | null>(null);
 
@@ -390,14 +392,14 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
     (
       node_id: string,
       axis: "width" | "height",
-      length: grida.program.css.Length | "auto"
+      value: grida.program.css.LengthPercentage | "auto"
     ) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "node/change/size",
           node_id: node_id,
           axis,
-          length,
+          value: value,
         });
       });
     },
@@ -628,6 +630,19 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
     [dispatch]
   );
 
+  const changeNodeBoxShadow = useCallback(
+    (node_id: string, boxShadow?: grida.program.cg.BoxShadow) => {
+      requestAnimationFrame(() => {
+        dispatch({
+          type: "node/change/box-shadow",
+          node_id: node_id,
+          boxShadow,
+        });
+      });
+    },
+    [dispatch]
+  );
+
   const changeContainerNodeLayout = useCallback(
     (
       node_id: string,
@@ -778,6 +793,7 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
       changeTextNodeLetterSpacing,
       changeTextNodeMaxlength,
       changeContainerNodePadding,
+      changeNodeBoxShadow,
       changeContainerNodeLayout,
       changeFlexContainerNodeDirection,
       changeFlexContainerNodeMainAxisAlignment,
@@ -961,9 +977,9 @@ export function useNodeAction(node_id: string | undefined) {
         nodeActions.changeNodeOpacity(node_id, change),
       rotation: (change: TChange<number>) =>
         nodeActions.changeNodeRotation(node_id, change),
-      width: (value: grida.program.css.Length | "auto") =>
+      width: (value: grida.program.css.LengthPercentage | "auto") =>
         nodeActions.changeNodeSize(node_id, "width", value),
-      height: (value: grida.program.css.Length | "auto") =>
+      height: (value: grida.program.css.LengthPercentage | "auto") =>
         nodeActions.changeNodeSize(node_id, "height", value),
 
       // text style
@@ -994,6 +1010,8 @@ export function useNodeAction(node_id: string | undefined) {
         nodeActions.changeContainerNodePadding(node_id, value),
       // margin: (value?: number) =>
       //   changeNodeStyle(node_id, "margin", value),
+      boxShadow: (value?: grida.program.cg.BoxShadow) =>
+        nodeActions.changeNodeBoxShadow(node_id, value),
 
       // layout
       layout: (value: grida.program.nodes.i.IFlexContainer["layout"]) =>
@@ -1012,8 +1030,6 @@ export function useNodeAction(node_id: string | undefined) {
       // css style
       aspectRatio: (value?: number) =>
         nodeActions.changeNodeStyle(node_id, "aspectRatio", value),
-      boxShadow: (value?: any) =>
-        nodeActions.changeNodeStyle(node_id, "boxShadow", value.boxShadow),
       cursor: (value: grida.program.cg.SystemMouseCursor) =>
         nodeActions.changeNodeMouseCursor(node_id, value),
     };
@@ -1070,6 +1086,13 @@ export function useSelection() {
     [selection, __actions]
   );
 
+  const copy = useCallback(() => {
+    dispatch({
+      type: "copy",
+      target: "selection",
+    });
+  }, [dispatch]);
+
   const active = useCallback(
     (value: boolean) => {
       selection.forEach((id) => {
@@ -1107,7 +1130,7 @@ export function useSelection() {
   );
 
   const width = useCallback(
-    (value: grida.program.css.Length | "auto") => {
+    (value: grida.program.css.LengthPercentage | "auto") => {
       mixedProperties.width.ids.forEach((id) => {
         __actions.changeNodeSize(id, "width", value);
       });
@@ -1116,7 +1139,7 @@ export function useSelection() {
   );
 
   const height = useCallback(
-    (value: grida.program.css.Length | "auto") => {
+    (value: grida.program.css.LengthPercentage | "auto") => {
       mixedProperties.height.ids.forEach((id) => {
         __actions.changeNodeSize(id, "height", value);
       });
@@ -1297,6 +1320,7 @@ export function useSelection() {
 
   const actions = useMemo(
     () => ({
+      copy,
       active,
       locked,
       name,
@@ -1325,6 +1349,7 @@ export function useSelection() {
       cursor,
     }),
     [
+      copy,
       active,
       locked,
       name,
@@ -1871,14 +1896,6 @@ function throttle<T extends (...args: any[]) => void>(
   } as T;
 }
 
-function debounce(func: (...args: any[]) => void, wait: number) {
-  let timeout: NodeJS.Timeout;
-  return (...args: any[]) => {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func(...args), wait);
-  };
-}
-
 export function useEventTargetCSSCursor() {
   const [state] = __useInternal();
 
@@ -2277,6 +2294,256 @@ export function useEventTarget() {
     multipleSelectionOverlayClick,
     //
   ]);
+}
+
+export function useDataTransferEventTarget() {
+  const [state, dispatch] = __useInternal();
+
+  const canvasXY = useCallback(
+    (xy: cmath.Vector2) =>
+      cmath.vector2.sub(xy, state.viewport_offset, state.content_offset),
+    [state.content_offset, state.viewport_offset]
+  );
+
+  const paste = useCallback(() => {
+    dispatch({
+      type: "paste",
+    });
+  }, [dispatch]);
+
+  const insertNode = useCallback(
+    (prototype: grida.program.nodes.NodePrototype) => {
+      dispatch({
+        type: "insert",
+        prototype,
+      });
+    },
+    [dispatch]
+  );
+
+  const insertText = useCallback(
+    (
+      text: string,
+      position?: {
+        clientX: number;
+        clientY: number;
+      }
+    ) => {
+      const [x, y] = canvasXY(
+        position ? [position.clientX, position.clientY] : [0, 0]
+      );
+
+      const node = {
+        type: "text",
+        text: text,
+        width: "auto",
+        height: "auto",
+        left: x,
+        top: y,
+      } satisfies grida.program.nodes.NodePrototype;
+      insertNode(node);
+    },
+    [insertNode, canvasXY]
+  );
+
+  const insertSVG = useCallback(
+    (
+      name: string,
+      svg: string,
+      position?: {
+        clientX: number;
+        clientY: number;
+      }
+    ) => {
+      const optimized = iosvg.v0.optimize(svg).data;
+      iosvg.v0
+        .convert(optimized, {
+          name: name,
+          currentColor: { r: 0, g: 0, b: 0, a: 1 },
+        })
+        .then((result) => {
+          if (result) {
+            result = result as grida.program.nodes.i.IPositioning &
+              grida.program.nodes.i.IFixedDimension;
+
+            const center_dx =
+              typeof result.width === "number" ? result.width / 2 : 0;
+
+            const center_dy =
+              typeof result.height === "number" ? result.height / 2 : 0;
+
+            const [x, y] = canvasXY(
+              cmath.vector2.sub(
+                position ? [position.clientX, position.clientY] : [0, 0],
+                [center_dx, center_dy]
+              )
+            );
+
+            result.left = x;
+            result.top = y;
+            insertNode(result);
+          } else {
+            throw new Error("Failed to convert SVG");
+          }
+        });
+    },
+    [insertNode, canvasXY]
+  );
+
+  const insertFromFile = useCallback(
+    (
+      file: File,
+      position?: {
+        clientX: number;
+        clientY: number;
+      }
+    ) => {
+      const type = file.type || file.name.split(".").pop() || file.name;
+      const is_svg = type === "image/svg+xml";
+      // const is_png = type === "image/png";
+      // const is_jpg = type === "image/jpeg";
+      // const is_gif = type === "image/gif";
+
+      if (is_svg) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const svgContent = e.target?.result as string;
+          const name = file.name.split(".svg")[0];
+          insertSVG(name, svgContent, position);
+        };
+        reader.readAsText(file);
+        return;
+      }
+
+      toast.error(`${type} is not supported`);
+    },
+    [insertNode, insertSVG]
+  );
+
+  const onpaste = useCallback(
+    (event: ClipboardEvent) => {
+      console.log("onpaste", event);
+      if (event.defaultPrevented) return;
+      // cancel if on contenteditable / form element
+      if (
+        event.target instanceof HTMLElement &&
+        (event.target as HTMLElement).isContentEditable
+      )
+        return;
+      if (event.target instanceof HTMLInputElement) return;
+      if (event.target instanceof HTMLTextAreaElement) return;
+
+      if (!event.clipboardData) {
+        paste();
+        return;
+      }
+
+      const items = event.clipboardData.items;
+
+      let pasted_from_data_transfer = false;
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.kind === "file") {
+          const file = item.getAsFile();
+          if (file) {
+            insertFromFile(file, {
+              clientX: window.innerWidth / 2,
+              clientY: window.innerHeight / 2,
+            });
+            pasted_from_data_transfer = true;
+          }
+        } else if (item.kind === "string" && item.type === "text/plain") {
+          pasted_from_data_transfer = true;
+          item.getAsString((data) => {
+            insertText(data, {
+              clientX: window.innerWidth / 2,
+              clientY: window.innerHeight / 2,
+            });
+          });
+        }
+      }
+
+      if (!pasted_from_data_transfer) {
+        event.preventDefault();
+        paste();
+      }
+    },
+    [insertFromFile, insertText]
+  );
+
+  const ondragover = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+  };
+
+  const ondrop = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+
+      const knwondata = event.dataTransfer.getData("x-grida-data-transfer");
+      if (knwondata) {
+        const data = JSON.parse(knwondata);
+        switch (data.type) {
+          case "svg":
+            const { name, src } = data;
+            const task = fetch(src, {
+              cache: "no-store",
+            }).then((res) =>
+              res.text().then((text) => {
+                insertSVG(name, text, event);
+              })
+            );
+
+            toast.promise(task, {
+              loading: "Loading...",
+              success: "Inserted",
+              error: "Failed to insert SVG",
+            });
+            break;
+          default:
+            // unknown
+            break;
+        }
+        //
+        return;
+      }
+      const files = event.dataTransfer.files;
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        insertFromFile(file, event);
+      }
+    },
+    [insertFromFile]
+  );
+  //
+
+  return { onpaste, ondragover, ondrop, insertText };
+}
+
+export function useClipboardSync() {
+  const { state } = useDocument();
+
+  useEffect(() => {
+    try {
+      if (state.user_clipboard) {
+        const serializedData = JSON.stringify(state.user_clipboard);
+        const htmltxt = `<meta>${serializedData}`;
+        const blob = new Blob([htmltxt], {
+          type: "text/html",
+        });
+
+        const clipboardItem = new ClipboardItem({
+          "text/html": blob,
+          // Optional: Add plain text for fallback
+          // TODO: copy content as texts. (if text)
+          // "text/plain": new Blob([serializedData], { type: "text/plain" }),
+        });
+        navigator.clipboard.write([clipboardItem]);
+      }
+    } catch (e) {
+      //
+    }
+  }, [state.user_clipboard]);
+  //
 }
 
 export function useSurfacePathEditor() {

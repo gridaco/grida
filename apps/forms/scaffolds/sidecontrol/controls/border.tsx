@@ -11,6 +11,7 @@ import { RGBAChip } from "./utils/paint-chip";
 import { RGBAColorControl } from "./color";
 import { PropertyEnum, PropertyLine, PropertyLineLabel } from "../ui";
 import { Label } from "@/components/ui/label";
+import { Cross2Icon } from "@radix-ui/react-icons";
 
 export function BorderControl({
   value,
@@ -34,6 +35,10 @@ export function BorderControl({
     });
   };
 
+  const onRemove = () => {
+    onValueChange?.(undefined);
+  };
+
   return (
     <Popover>
       <PopoverTrigger className="w-full">
@@ -50,6 +55,12 @@ export function BorderControl({
             <RGBAChip rgba={value?.borderColor ?? { r: 0, g: 0, b: 0, a: 0 }} />
             {value?.borderStyle === "solid" && <>Solid</>}
             {value?.borderStyle === "dashed" && <>Dashed</>}
+            <button
+              onClick={onRemove}
+              className="px-1 py-1 me-0.5 text-muted-foreground"
+            >
+              <Cross2Icon className="w-3.5 h-3.5" />
+            </button>
           </div>
         ) : (
           <div

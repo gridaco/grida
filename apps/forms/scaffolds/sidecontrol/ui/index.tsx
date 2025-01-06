@@ -172,26 +172,35 @@ export function PropertyEnumToggle<T extends string>({
   );
 }
 
-export function PropertyNumber({
-  type = "number",
-  placeholder,
-  value,
-  className,
-  onKeyDown,
-  disableDelta,
-  onValueChange,
-  step = 1,
-  ...props
-}: Omit<
+type NumericPropertyControlProps = Omit<
   React.InputHTMLAttributes<HTMLInputElement>,
   "type" | "onChange" | "value" | "step"
 > & {
   type?: "integer" | "number";
   value?: TMixed<number | "">;
   step?: number;
-  disableDelta?: boolean;
-  onValueChange?: (change: TChange<number>) => void;
-}) {
+} & (
+    | {
+        mode?: "auto";
+        onValueChange?: (change: TChange<number>) => void;
+      }
+    | {
+        mode?: "fixed";
+        onValueChange?: (value: number) => void;
+      }
+  );
+
+export function PropertyNumber({
+  type = "number",
+  placeholder,
+  value,
+  className,
+  onKeyDown,
+  mode = "auto",
+  onValueChange,
+  step = 1,
+  ...props
+}: NumericPropertyControlProps) {
   const mixed = value === grida.mixed;
 
   return (
@@ -206,21 +215,42 @@ export function PropertyNumber({
 
         if (e.defaultPrevented) return;
 
-        if (disableDelta) return;
-
         const multiplier = e.shiftKey ? 10 : 1;
-        if (e.key === "ArrowUp") {
-          onValueChange?.({ type: "delta", value: step * multiplier });
-          e.preventDefault();
-        } else if (e.key === "ArrowDown") {
-          onValueChange?.({ type: "delta", value: -step * multiplier });
-          e.preventDefault();
+
+        switch (mode) {
+          case "auto":
+            if (e.key === "ArrowUp") {
+              (onValueChange as (change: TChange<number>) => void)?.({
+                type: "delta",
+                value: step * multiplier,
+              });
+              e.preventDefault();
+            } else if (e.key === "ArrowDown") {
+              (onValueChange as (change: TChange<number>) => void)?.({
+                type: "delta",
+                value: -step * multiplier,
+              });
+              e.preventDefault();
+            }
+            break;
+          case "fixed":
+            break;
         }
       }}
       onChange={(e) => {
         const txt = e.target.value;
         const value = type === "integer" ? parseInt(txt) : parseFloat(txt) || 0;
-        onValueChange?.({ type: "set", value });
+        switch (mode) {
+          case "auto":
+            (onValueChange as (change: TChange<number>) => void)?.({
+              type: "set",
+              value,
+            });
+            break;
+          case "fixed":
+            (onValueChange as (change: number) => void)?.(value);
+            break;
+        }
       }}
     />
   );

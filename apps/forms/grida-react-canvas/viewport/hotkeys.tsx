@@ -2,6 +2,7 @@ import { useHotkeys } from "react-hotkeys-hook";
 import { useDocument, useEventTarget, useSelection } from "../provider";
 import toast from "react-hot-toast";
 import { grida } from "@/grida";
+import { useEffect } from "react";
 
 export const keybindings_sheet = [
   {
@@ -136,7 +137,6 @@ export function useEditorHotKeys() {
     redo,
     cut,
     copy,
-    paste,
     duplicate,
     deleteNode,
     nudge,
@@ -158,6 +158,30 @@ export function useEditorHotKeys() {
   } = useDocument();
 
   const { selection, actions } = useSelection();
+
+  useEffect(() => {
+    const cb = (e: any) => {
+      configureSurfaceRaycastTargeting({ target: "auto" });
+      configureMeasurement("off");
+      configureTranslateWithCloneModifier("off");
+      configureTransformWithCenterOriginModifier("off");
+      configureTranslateWithAxisLockModifier("off");
+      configureTransformWithPreserveAspectRatioModifier("off");
+      configureRotateWithQuantizeModifier("off");
+    };
+    window.addEventListener("blur", cb);
+    return () => {
+      window.removeEventListener("blur", cb);
+    };
+  }, [
+    configureMeasurement,
+    configureRotateWithQuantizeModifier,
+    configureSurfaceRaycastTargeting,
+    configureTransformWithCenterOriginModifier,
+    configureTransformWithPreserveAspectRatioModifier,
+    configureTranslateWithAxisLockModifier,
+    configureTranslateWithCloneModifier,
+  ]);
 
   // always triggering. (alt, meta, ctrl, shift)
   useHotkeys(
@@ -403,11 +427,12 @@ export function useEditorHotKeys() {
     enableOnFormTags: false,
   });
 
-  useHotkeys("paste, meta+v, ctrl+v", () => paste(), {
-    preventDefault: false,
-    enableOnContentEditable: false,
-    enableOnFormTags: false,
-  });
+  // paste is handled via data transfer
+  // useHotkeys("paste, meta+v, ctrl+v", () => paste(), {
+  //   preventDefault: false,
+  //   enableOnContentEditable: false,
+  //   enableOnFormTags: false,
+  // });
 
   useHotkeys("backspace, delete", () => deleteNode("selection"), {
     preventDefault: true,

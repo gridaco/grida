@@ -1,6 +1,7 @@
 import React from "react";
-import { grida } from "@/grida";
 import queryattributes from "./utils/attributes";
+import { grida } from "@/grida";
+import { css } from "@/grida/css";
 
 export const ImageWidget = ({
   src,
@@ -29,8 +30,8 @@ export const ImageWidget = ({
         // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
         <img
           src={src as string}
-          width={grida.program.css.toDimension(width)}
-          height={grida.program.css.toDimension(height)}
+          width={css.toDimension(width)}
+          height={css.toDimension(height)}
           alt={alt}
           style={{
             width: "100%",
