@@ -1,21 +1,9 @@
 "use client";
 
-import React, {
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useEventTarget } from "@/grida-react-canvas";
 import { useGesture as __useGesture } from "@use-gesture/react";
-import {
-  useDocument,
-  useDropzoneEventTarget,
-  useEventTargetCSSCursor,
-  useNode,
-} from "../provider";
+import { useDocument, useEventTargetCSSCursor, useNode } from "../provider";
 import { useIsWindowResizing } from "./hooks/window-resizing";
 import { supports } from "@/grida/utils/supports";
 import { Marquee } from "./ui/marquee";
@@ -36,9 +24,6 @@ import { SurfaceTextEditor } from "./ui/text-editor";
 import { SurfacePathEditor } from "./ui/path-editor";
 import { SizeMeterLabel } from "./ui/meter";
 import { SurfaceGradientEditor } from "./ui/gradient-editor";
-import { cn } from "@/utils";
-import toast from "react-hot-toast";
-import { iosvg } from "@/grida-io-svg";
 
 const DRAG_THRESHOLD = 2;
 
@@ -288,31 +273,6 @@ export function EditorSurface() {
           <NodeOverlay node_id={dropzone_node_id} readonly />
         )}
       </div>
-    </div>
-  );
-}
-
-export function EditorSurfaceDropzone({
-  className,
-  children,
-}: React.PropsWithChildren<{ className?: string }>) {
-  const { ondragover, ondrop, onpaste } = useDropzoneEventTarget();
-
-  useEffect(() => {
-    const cb = (e: ClipboardEvent) => {
-      onpaste(e);
-    };
-    window.addEventListener("paste", cb);
-    return () => window.removeEventListener("paste", cb);
-  }, [onpaste]);
-
-  return (
-    <div
-      onDropCapture={ondrop}
-      onDragOverCapture={ondragover}
-      className={cn("w-full h-full", className)}
-    >
-      {children}
     </div>
   );
 }

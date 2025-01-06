@@ -1086,6 +1086,13 @@ export function useSelection() {
     [selection, __actions]
   );
 
+  const copy = useCallback(() => {
+    dispatch({
+      type: "copy",
+      target: "selection",
+    });
+  }, [dispatch]);
+
   const active = useCallback(
     (value: boolean) => {
       selection.forEach((id) => {
@@ -1313,6 +1320,7 @@ export function useSelection() {
 
   const actions = useMemo(
     () => ({
+      copy,
       active,
       locked,
       name,
@@ -1341,6 +1349,7 @@ export function useSelection() {
       cursor,
     }),
     [
+      copy,
       active,
       locked,
       name,
