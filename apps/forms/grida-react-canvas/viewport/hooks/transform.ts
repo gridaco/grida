@@ -97,19 +97,23 @@ function useNodeSurfaceTransfrom_v1(node_id: string) {
  * TODO: Not tested with the performance
  */
 export function useNodeSurfaceTransfrom(node_id: string) {
-  const { content_offset, viewport_offset } = useEventTarget();
+  const { transform, content_offset, viewport_offset } = useEventTarget();
   const __rect_fallback = useMemo(() => new DOMRect(0, 0, 0, 0), []);
   const { getNodeAbsoluteRotation } = useDocument();
   const portal = useViewportSurfacePortal();
   const node_element = useNodeDomElement(node_id);
 
-  const [transform, setTransform] = useState({
+  const scale = transform.scale;
+
+  const [style, setStyle] = useState({
     top: 0,
     left: 0,
     transform: "",
     width: 0,
     height: 0,
   });
+
+  const [rect, setRect] = useState<cmath.Rectangle>();
 
   useEffect(() => {
     if (!node_element || !portal) return;
@@ -133,12 +137,19 @@ export function useNodeSurfaceTransfrom(node_id: string) {
 
       const absolute_rotation = getNodeAbsoluteRotation(node_id);
 
-      setTransform({
+      setRect({
+        x: node_element_bounding_rect.left,
+        y: node_element_bounding_rect.top,
+        width,
+        height,
+      });
+
+      setStyle({
         top: centerY,
         left: centerX,
         transform: `translate(-50%, -50%) rotate(${absolute_rotation ?? 0}deg)`,
-        width: width,
-        height: height,
+        width: width * scale,
+        height: height * scale,
       });
     };
 
@@ -159,11 +170,12 @@ export function useNodeSurfaceTransfrom(node_id: string) {
     node_id,
     __rect_fallback,
     // recompute when viewport changes
+    transform,
     content_offset,
     viewport_offset,
   ]);
 
-  return transform;
+  return { style, rect, scale };
 }
 
 /**

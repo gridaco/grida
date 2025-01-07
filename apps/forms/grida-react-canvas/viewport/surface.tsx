@@ -2,7 +2,7 @@
 
 import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useEventTarget } from "@/grida-react-canvas";
-import { useGesture as __useGesture } from "@use-gesture/react";
+import { useGesture as __useGesture, useGesture } from "@use-gesture/react";
 import {
   useClipboardSync,
   useDocument,
@@ -92,6 +92,9 @@ function SurfaceGroup({
 export function EditorSurface() {
   const isWindowResizing = useIsWindowResizing();
   const {
+    zoom,
+    pan,
+    transform,
     marquee,
     hovered_node_id,
     dropzone_node_id,
@@ -201,6 +204,48 @@ export function EditorSurface() {
         // disable drag gesture with arrow keys
         keyboardDisplacement: 0,
       },
+    }
+  );
+
+  // pinch & wheel gesture (zoom and panning)
+  useGesture(
+    {
+      onPinch: (state) => {
+        const {
+          event,
+          offset: [ox],
+          movement: [mx],
+          delta: [dx],
+        } = state;
+        // Note: make sure not to check `event.defaultPrevented` here, this is always true.
+        // if (event.defaultPrevented) return;
+        // console.log("pinch", ox, mx, dx, _dx);
+        // TODO: use mx instead of dx (dx gets stuck by the useGesture's default behaviours)
+        zoom(dx);
+      },
+      onWheel: (state) => {
+        const { event, delta, wheeling, ctrlKey } = state;
+        if (event.defaultPrevented) return;
+        // wheel also triggers when pinching, but when this happens, the ctrlKey is true
+        if (ctrlKey) return;
+
+        // console.log("wheel", x, y, wheeling, state);
+        pan(cmath.vector2.invert(delta));
+        event.preventDefault();
+      },
+    },
+    {
+      pinch: {
+        eventOptions: {
+          passive: true,
+        },
+      },
+      wheel: {
+        eventOptions: {
+          passive: false,
+        },
+      },
+      target: eventTargetRef,
     }
   );
 
@@ -403,7 +448,7 @@ function NodeOverlay({
   zIndex?: number;
   focused?: boolean;
 }) {
-  const transform = useNodeSurfaceTransfrom(node_id);
+  const { style, rect } = useNodeSurfaceTransfrom(node_id);
   const node = useNode(node_id);
 
   const { is_component_consumer } = node.meta;
@@ -412,7 +457,7 @@ function NodeOverlay({
   return (
     <LayerOverlay
       readonly={readonly}
-      transform={transform}
+      transform={style}
       zIndex={zIndex}
       isComponentConsumer={is_component_consumer}
     >
@@ -445,20 +490,12 @@ function NodeOverlay({
           <LayerOverlayRotationHandle anchor="se" node_id={node_id} />
         </>
       )}
-      {focused && !readonly && (
+      {focused && !readonly && rect && (
         <SizeMeterLabel
-          margin={6}
-          size={{
-            width: transform.width,
-            height: transform.height,
-          }}
-          rect={{
-            x: 0,
-            y: 0,
-            width: transform.width,
-            height: transform.height,
-          }}
           zoom={1}
+          margin={6}
+          size={rect}
+          rect={{ ...rect, x: 0, y: 0 }}
           className="bg-workbench-accent-sky"
         />
       )}

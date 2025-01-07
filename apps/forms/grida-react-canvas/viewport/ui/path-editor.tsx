@@ -13,7 +13,7 @@ export function SurfacePathEditor({ node_id }: { node_id: string }) {
   const { debug, cursor_mode, content_offset } = useEventTarget();
   const { offset, vertices, segments, path_cursor_position, a_point, next_ta } =
     useSurfacePathEditor();
-  const transform = useNodeSurfaceTransfrom(node_id);
+  const { style } = useNodeSurfaceTransfrom(node_id);
 
   const a_point_is_last = a_point === vertices.length - 1;
 
@@ -23,7 +23,7 @@ export function SurfacePathEditor({ node_id }: { node_id: string }) {
         data-debug={debug}
         style={{
           position: "absolute",
-          ...transform,
+          ...style,
           willChange: "transform",
           overflow: "visible",
           resize: "none",

@@ -8,7 +8,7 @@ import { cmath } from "@grida/cmath";
 export function SurfaceGradientEditor({ node_id }: { node_id: string }) {
   const { debug, cursor_mode, content_offset } = useEventTarget();
   const { transform, stops } = useSurfaceGradientEditor();
-  const nodeTransform = useNodeSurfaceTransfrom(node_id);
+  const { style } = useNodeSurfaceTransfrom(node_id);
   //
   //
 
@@ -20,7 +20,7 @@ export function SurfaceGradientEditor({ node_id }: { node_id: string }) {
       <div
         style={{
           position: "absolute",
-          ...nodeTransform,
+          ...style,
           willChange: "transform",
           overflow: "visible",
           resize: "none",

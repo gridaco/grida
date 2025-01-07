@@ -1457,9 +1457,21 @@ export function useSelectionPaints() {
 export function useDocument() {
   const [state, dispatch] = __useInternal();
 
-  const { selection } = state;
+  const { selection, transform } = state;
 
   const { order: _, ...nodeActions } = __useNodeActions(dispatch);
+
+  const scale = useCallback(
+    (value: number) =>
+      dispatch({
+        type: "camera/transform",
+        transform: {
+          ...transform,
+          scale: value,
+        },
+      }),
+    [dispatch]
+  );
 
   const select = useCallback(
     (...selectors: grida.program.document.Selector[]) =>
@@ -1801,6 +1813,8 @@ export function useDocument() {
     return {
       state,
       selection,
+      transform,
+      scale,
       //
       select,
       blur,
@@ -1842,6 +1856,8 @@ export function useDocument() {
   }, [
     state,
     selection,
+    transform,
+    scale,
     //
     select,
     blur,
@@ -1880,6 +1896,11 @@ export function useDocument() {
     schemaUpdateProperty,
     schemaDeleteProperty,
   ]);
+}
+
+export function useTransform() {
+  const [state] = __useInternal();
+  return useMemo(() => state.transform, [state.transform]);
 }
 
 function throttle<T extends (...args: any[]) => void>(
@@ -1929,6 +1950,7 @@ export function useEventTarget() {
   const [state, dispatch] = __useInternal();
 
   const {
+    transform,
     content_offset,
     viewport_offset,
     gesture,
@@ -1988,6 +2010,29 @@ export function useEventTarget() {
 
     return position;
   };
+
+  const zoom = useCallback(
+    (delta: number) => {
+      dispatch({
+        type: "camera/transform",
+        transform: { ...transform, scale: transform.scale + delta },
+      });
+    },
+    [dispatch, transform]
+  );
+
+  const pan = useCallback(
+    (delta: [dx: number, dy: number]) => {
+      dispatch({
+        type: "camera/transform",
+        transform: {
+          ...transform,
+          translate: cmath.vector2.add(transform.translate, delta),
+        },
+      });
+    },
+    [dispatch, transform]
+  );
 
   const pointerMove = useCallback(
     (event: PointerEvent) => {
@@ -2213,6 +2258,10 @@ export function useEventTarget() {
 
   return useMemo(() => {
     return {
+      zoom,
+      pan,
+      //
+      transform,
       debug,
       content_offset,
       viewport_offset,
@@ -2253,6 +2302,10 @@ export function useEventTarget() {
       //
     };
   }, [
+    zoom,
+    pan,
+    //
+    transform,
     debug,
     content_offset,
     viewport_offset,

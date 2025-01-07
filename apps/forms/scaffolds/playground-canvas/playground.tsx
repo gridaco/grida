@@ -44,7 +44,6 @@ import {
   PlayIcon,
   PlusIcon,
 } from "@radix-ui/react-icons";
-import KeyboardInputOverlay from "@/grida-react-canvas/devtools/keyboard-input-overlay";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -70,18 +69,12 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
-  DialogClose,
   DialogContent,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ThemedMonacoEditor } from "@/components/monaco";
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from "@/components/ui/hover-card";
+import { HoverCard, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLocalStorage } from "@uidotdev/usehooks";
 import { CANVAS_PLAYGROUND_LOCALSTORAGE_PREFERENCES_BASE_AI_PROMPT_KEY } from "./k";
@@ -104,8 +97,14 @@ import { EditorSurfaceDropzone } from "@/grida-react-canvas/viewport/surface-dro
 import { EditorSurfaceContextMenu } from "@/grida-react-canvas/viewport/surface-context-menu";
 import { EditorSurfaceClipboardSyncProvider } from "@/grida-react-canvas/viewport/surface";
 import { datatransfer } from "@/grida-react-canvas/viewport/data-transfer";
+import { ContentTransform } from "@/grida-react-canvas/renderer";
+import { WorkbenchUI } from "@/components/workbench";
+import { cn } from "@/utils";
+import useDisableSwipeBack from "@/grida-react-canvas/viewport/hooks/use-disable-browser-swipe-back";
 
 export default function CanvasPlayground() {
+  useDisableSwipeBack();
+
   const [pref, setPref] = useState<Preferences>({ debug: false });
   const [uiHidden, setUiHidden] = useState(false);
   const [exampleid, setExampleId] = useState<string>("blank.grida");
@@ -381,14 +380,16 @@ export default function CanvasPlayground() {
               <EditorSurfaceClipboardSyncProvider>
                 <EditorSurfaceDropzone>
                   <EditorSurfaceContextMenu>
-                    <div className="w-full h-full flex flex-col relative">
+                    <div className="w-full h-full flex flex-col relative bg-black/5">
                       <ViewportRoot className="relative w-full h-full no-scrollbar overflow-y-auto">
                         <EditorSurface />
-                        <div className="w-full h-full flex items-center justify-center bg-black/5">
-                          <div className="shadow-lg rounded-xl border overflow-hidden">
-                            <StandaloneDocumentContent />
+                        <ContentTransform>
+                          <div className="w-full h-full flex items-center justify-center">
+                            <div className="shadow-lg rounded-xl border overflow-hidden">
+                              <StandaloneDocumentContent />
+                            </div>
                           </div>
-                        </div>
+                        </ContentTransform>
 
                         {!uiHidden && (
                           <>
@@ -426,8 +427,13 @@ export default function CanvasPlayground() {
                 <aside className="h-full">
                   <SidebarRoot side="right">
                     <div className="p-2">
-                      <div className="flex justify-end">
-                        <Button variant="ghost" onClick={playDialog.openDialog}>
+                      <div className="flex items-center justify-end gap-2">
+                        <Zoom />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={playDialog.openDialog}
+                        >
                           <PlayIcon />
                         </Button>
                       </div>
@@ -449,6 +455,39 @@ export default function CanvasPlayground() {
       </main>
     </TooltipProvider>
   );
+}
+
+function Zoom() {
+  const {
+    state: { transform },
+    scale,
+  } = useDocument();
+
+  const options = useMemo(() => [10, 50, 100, 150, 200, 500], []);
+
+  const pct = Math.round(transform.scale * 100);
+  return (
+    <Select
+      value={undefined}
+      onValueChange={(v) => {
+        scale(parseInt(v) / 100);
+      }}
+    >
+      <SelectTrigger
+        className={cn(WorkbenchUI.inputVariants({ size: "xs" }), "w-min")}
+      >
+        <span className="text-xs text-muted-foreground">{pct + "%"}</span>
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((option) => (
+          <SelectItem value={option.toString()} key={option}>
+            {option + "%"}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+  //
 }
 
 function Hotkyes() {

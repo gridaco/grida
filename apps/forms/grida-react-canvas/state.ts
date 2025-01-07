@@ -124,6 +124,11 @@ interface IDocumentEditorClipboardState {
 }
 
 interface IDocumentEditorTransformState {
+  transform: {
+    scale: number;
+    translate: cmath.Vector2;
+  };
+
   /**
    * @private - internal use only
    *
@@ -590,6 +595,10 @@ export function initDocumentEditorState({
   const s = new document.DocumentState(init.document);
 
   return {
+    transform: {
+      scale: 1,
+      translate: [0, 0],
+    },
     debug: debug ?? false,
     selection: [],
     hovered_node_id: null,

@@ -48,6 +48,11 @@ export default function reducer<S extends IDocumentEditorState>(
         // draft.cursor_position =
       });
     }
+    case "camera/transform": {
+      return produce(state, (draft: Draft<S>) => {
+        draft.transform = action.transform;
+      });
+    }
     case "undo":
       if (state.history.past.length === 0) {
         return state;

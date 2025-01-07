@@ -13,6 +13,7 @@ import type {
 
 export type Action =
   | InternalAction
+  | EditorCameraAction
   | EditorAction
   | EditorUndoAction
   | EditorRedoAction;
@@ -308,6 +309,14 @@ interface IHtmlBackendCanvasEventTargetPointerEvent {
 interface ICanvasEventTargetDragEvent {
   event: TCanvasEventTargetDragGestureState;
 }
+
+export type EditorCameraAction = {
+  type: "camera/transform";
+  transform: {
+    scale: number;
+    translate: Vector2;
+  };
+};
 
 export type EventTargetAction =
   //

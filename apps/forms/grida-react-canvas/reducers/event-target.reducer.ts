@@ -42,6 +42,21 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
   state: S,
   action: EventTargetAction
 ): S {
+  // adjust the event by transform
+
+  // if ("event" in action) {
+  //   const scale = state.transform.scale;
+  //   const factor: cmath.Vector2 = [1 / scale, 1 / scale];
+  //   const original = { ...action.event };
+  //   const adj = {
+  //     ...original,
+  //     // only delta and movement are scaled
+  //     delta: cmath.vector2.multiply(action.event.delta, factor),
+  //     movement: cmath.vector2.multiply(action.event.movement, factor),
+  //   };
+  //   action.event = adj;
+  // }
+
   switch (action.type) {
     // #region [html backend] canvas event target
     case "event-target/event/on-pointer-move": {

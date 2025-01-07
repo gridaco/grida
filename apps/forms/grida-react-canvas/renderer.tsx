@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useContext, useLayoutEffect, useRef } from "react";
-import { useDocument, useResizeNotifier } from "./provider";
+import { useDocument, useResizeNotifier, useTransform } from "./provider";
 import { NodeElement } from "./nodes/node";
 import { domapi } from "./domapi";
 import { cmath } from "@grida/cmath";
@@ -106,7 +106,7 @@ export function StandaloneDocumentContent({
 }: React.HTMLAttributes<HTMLDivElement> & DocumentContentViewProps) {
   const ref = useRef<HTMLDivElement>(null);
   const {
-    state: { document, document_key },
+    state: { document, document_key, transform },
   } = useDocument();
   const { root_id } = document;
 
@@ -117,6 +117,21 @@ export function StandaloneDocumentContent({
       <UserDocumentCustomRendererContext.Provider value={templates ?? {}}>
         <NodeElement node_id={root_id} />
       </UserDocumentCustomRendererContext.Provider>
+    </div>
+  );
+}
+
+export function ContentTransform({ children }: React.PropsWithChildren<{}>) {
+  const transform = useTransform();
+
+  return (
+    <div
+      className="w-full h-full"
+      style={{
+        transform: `translate3d(${transform.translate[0]}px, ${transform.translate[1]}px, 0) scale3d(${transform.scale}, ${transform.scale}, 1)`,
+      }}
+    >
+      {children}
     </div>
   );
 }
