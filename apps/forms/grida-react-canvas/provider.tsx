@@ -140,21 +140,6 @@ function __useInternal() {
   return useMemo(() => [state, dispatch] as const, [state, dispatch]);
 }
 
-export function useResizeNotifier() {
-  const dispatch = __useDispatch();
-  const notifyResize = useCallback(
-    ({ viewport_offset }: { viewport_offset: cmath.Vector2 }) => {
-      dispatch({
-        type: "__internal/on-resize",
-        viewport_offset,
-      });
-    },
-    [dispatch]
-  );
-
-  return notifyResize;
-}
-
 function __useNodeActions(dispatch: DocumentDispatcher) {
   const order = useCallback(
     (node_id: string, order: "back" | "front" | number) => {
@@ -1944,7 +1929,6 @@ export function useEventTarget() {
 
   const {
     transform,
-    viewport_offset,
     gesture,
     hovered_node_id,
     dropzone_node_id,
@@ -2251,7 +2235,6 @@ export function useEventTarget() {
       //
       transform,
       debug,
-      viewport_offset,
       //
       marquee,
       cursor_mode,
@@ -2294,7 +2277,6 @@ export function useEventTarget() {
     //
     transform,
     debug,
-    viewport_offset,
     //
     marquee,
     cursor_mode,
@@ -2339,9 +2321,15 @@ export function useDataTransferEventTarget() {
   const [state, dispatch] = __useInternal();
 
   const canvasXY = useCallback(
-    (xy: cmath.Vector2) =>
-      cmath.vector2.sub(xy, state.viewport_offset, state.transform.translate),
-    [state.viewport_offset, state.transform]
+    (xy: cmath.Vector2) => {
+      const viewportdomrect = domapi.get_viewport_rect();
+      const viewport_pos: cmath.Vector2 = [
+        viewportdomrect.x,
+        viewportdomrect.y,
+      ];
+      return cmath.vector2.sub(xy, viewport_pos, state.transform.translate);
+    },
+    [state.transform]
   );
 
   const paste = useCallback(() => {

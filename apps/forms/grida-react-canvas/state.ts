@@ -128,14 +128,6 @@ interface IDocumentEditorTransformState {
     scale: number;
     translate: cmath.Vector2;
   };
-
-  /**
-   * @private - internal use only
-   *
-   * translate (offset) of the viewport (surface) relative to the window
-   * @deprecated
-   */
-  viewport_offset: cmath.Vector2;
 }
 
 export type GestureState =
@@ -597,7 +589,6 @@ export function initDocumentEditorState({
     selection: [],
     hovered_node_id: null,
     hovered_vertex_idx: null,
-    viewport_offset: [0, 0],
     cursor_position: [0, 0],
     surface_cursor_position: [0, 0],
     history: {

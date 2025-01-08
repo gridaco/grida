@@ -31,20 +31,9 @@ export default function reducer<S extends IDocumentEditorState>(
       const prev_state = state;
       return produce(_new_state, (draft) => {
         if (key) draft.document_key = key;
-        // even on reset, the following should be preserved
-        draft.viewport_offset = prev_state.viewport_offset;
         draft.cursor_position = prev_state.cursor_position;
         draft.surface_cursor_position = prev_state.surface_cursor_position;
       }) as S;
-    }
-    case "__internal/on-resize": {
-      return produce(state, (draft: Draft<S>) => {
-        draft.viewport_offset = action.viewport_offset;
-        // TODO: apply delta to cursor position
-        // const delta = cmath.vector2.subtract(...)
-        // draft.surface_cursor_position =
-        // draft.cursor_position =
-      });
     }
     case "camera/transform": {
       return produce(state, (draft: Draft<S>) => {

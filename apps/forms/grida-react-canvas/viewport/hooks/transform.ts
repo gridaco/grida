@@ -97,7 +97,7 @@ function useNodeSurfaceTransfrom_v1(node_id: string) {
  * TODO: Not tested with the performance
  */
 export function useNodeSurfaceTransfrom(node_id: string) {
-  const { transform, viewport_offset } = useEventTarget();
+  const { transform } = useEventTarget();
   const __rect_fallback = useMemo(() => new DOMRect(0, 0, 0, 0), []);
   const { getNodeAbsoluteRotation } = useDocument();
   const portal = useViewportSurfacePortal();
@@ -173,7 +173,6 @@ export function useNodeSurfaceTransfrom(node_id: string) {
     __rect_fallback,
     // recompute when viewport changes
     transform,
-    viewport_offset,
   ]);
 
   return { style, rect, scale };
@@ -215,7 +214,7 @@ function shallowEqual(arr1: string[], arr2: string[]): boolean {
  * Uses MutationObserver to observe position changes - expensive
  */
 export function useGroupSurfaceTransform(...node_ids: string[]) {
-  const { viewport_offset, transform } = useEventTarget();
+  const { transform } = useEventTarget();
   const __rect_fallback = useMemo(() => new DOMRect(0, 0, 0, 0), []);
   const portal = useViewportSurfacePortal();
 
@@ -302,7 +301,6 @@ export function useGroupSurfaceTransform(...node_ids: string[]) {
     __rect_fallback,
     // recompute when viewport changes
     transform,
-    viewport_offset,
   ]);
 
   return style;

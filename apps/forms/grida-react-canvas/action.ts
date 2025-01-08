@@ -18,9 +18,7 @@ export type Action =
   | EditorUndoAction
   | EditorRedoAction;
 
-export type InternalAction =
-  | __InternalSyncArtboardOffset
-  | __InternalResetAction;
+export type InternalAction = __InternalResetAction;
 
 export type EditorAction =
   | EditorConfigAction
@@ -100,12 +98,6 @@ export type TCanvasEventTargetDragGestureState = {
 interface ISelection {
   selection: NodeID[];
 }
-
-export type __InternalSyncArtboardOffset = {
-  type: "__internal/on-resize";
-} & {
-  viewport_offset: Vector2;
-};
 
 export interface __InternalResetAction {
   type: "__internal/reset";
