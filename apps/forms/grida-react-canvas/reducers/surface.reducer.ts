@@ -42,7 +42,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
               selected_vertices: [],
               a_point: null,
               next_ta: null,
-              path_cursor_position: draft.cursor_position,
+              path_cursor_position: draft.pointer.position,
             };
             break;
           }

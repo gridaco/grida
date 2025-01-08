@@ -8,6 +8,7 @@ import {
   useDocument,
   useEventTargetCSSCursor,
   useNode,
+  useTransform,
 } from "../provider";
 import { useIsWindowResizing } from "./hooks/window-resizing";
 import { supports } from "@/grida/utils/supports";
@@ -91,10 +92,10 @@ function SurfaceGroup({
 
 export function EditorSurface() {
   const isWindowResizing = useIsWindowResizing();
+  const { style } = useTransform();
   const {
     zoom,
     pan,
-    transform,
     marquee,
     hovered_node_id,
     dropzone_node_id,
@@ -266,14 +267,7 @@ export function EditorSurface() {
         cursor: cursor,
       }}
     >
-      <div className="w-full h-full" id="canvas-overlay-portal" ref={portalRef}>
-        <MeasurementGuide />
-        <div
-          data-transforming={is_node_transforming}
-          className="opacity-0 data-[transforming='true']:opacity-100 transition-colors"
-        >
-          <SnapGuide />
-        </div>
+      <div style={style}>
         {marquee && (
           <div id="marquee-container" className="absolute top-0 left-0 w-0 h-0">
             <Marquee
@@ -284,6 +278,16 @@ export function EditorSurface() {
             />
           </div>
         )}
+      </div>
+      <div className="w-full h-full" id="canvas-overlay-portal" ref={portalRef}>
+        <MeasurementGuide />
+        <div
+          data-transforming={is_node_transforming}
+          className="opacity-0 data-[transforming='true']:opacity-100 transition-colors"
+        >
+          <SnapGuide />
+        </div>
+
         <SurfaceGroup hidden={is_node_translating || isWindowResizing}>
           {content_edit_mode?.type === "text" && (
             <SurfaceTextEditor

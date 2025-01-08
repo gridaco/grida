@@ -65,13 +65,15 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       } = <EditorEventTarget_PointerMove>action;
       const c_surface_pos: cmath.Vector2 = [x, y];
       const c_content_pos = cmath.vector2.sub(
-        state.surface_cursor_position,
+        c_surface_pos,
         cmath.transform.getTranslate(state.transform)
       );
 
       return produce(state, (draft) => {
-        draft.surface_cursor_position = c_surface_pos;
-        draft.cursor_position = c_content_pos;
+        draft.pointer = {
+          position: c_content_pos,
+        };
+
         if (draft.content_edit_mode?.type === "path") {
           const { a_point, node_id } = draft.content_edit_mode;
           const { tarnslate_with_axis_lock } = state.gesture_modifiers;
@@ -135,13 +137,6 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             try {
               const _nnode = nnode as grida.program.nodes.AnyNode;
 
-              const { cursor_position: _cursor_position } = state;
-
-              const cursor_position = cmath.vector2.quantize(
-                _cursor_position,
-                1
-              );
-
               // center translate the new node - so it can be positioned centered to the cursor point (width / 2, height / 2)
               const center_translate_delta: cmath.Vector2 =
                 // (if width and height is fixed number) - can be 'auto' for text node
@@ -150,11 +145,14 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                   ? [_nnode.width / 2, _nnode.height / 2]
                   : [0, 0];
 
-              const nnode_relative_position = cmath.vector2.sub(
-                cursor_position,
-                // parent position relative to content space
-                [parent_rect.x, parent_rect.y],
-                center_translate_delta
+              const nnode_relative_position = cmath.vector2.quantize(
+                cmath.vector2.sub(
+                  state.pointer.position,
+                  // parent position relative to content space
+                  [parent_rect.x, parent_rect.y],
+                  center_translate_delta
+                ),
+                1
               );
 
               _nnode.position = "absolute";
@@ -326,7 +324,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                 },
               } satisfies grida.program.nodes.PathNode;
 
-              const pos = draft.cursor_position;
+              const pos = draft.pointer.position;
 
               vector.left = pos[0];
               vector.top = pos[1];
@@ -376,20 +374,20 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               } else {
                 // marquee selection
                 draft.marquee = {
-                  x1: draft.surface_cursor_position[0],
-                  y1: draft.surface_cursor_position[1],
-                  x2: draft.surface_cursor_position[0],
-                  y2: draft.surface_cursor_position[1],
+                  x1: draft.pointer.position[0],
+                  y1: draft.pointer.position[1],
+                  x2: draft.pointer.position[0],
+                  y2: draft.pointer.position[1],
                 };
               }
             } else {
               if (draft.selection.length === 0) {
                 // marquee selection
                 draft.marquee = {
-                  x1: draft.surface_cursor_position[0],
-                  y1: draft.surface_cursor_position[1],
-                  x2: draft.surface_cursor_position[0],
-                  y2: draft.surface_cursor_position[1],
+                  x1: draft.pointer.position[0],
+                  y1: draft.pointer.position[1],
+                  x2: draft.pointer.position[0],
+                  y2: draft.pointer.position[1],
                 };
               } else {
                 self_start_gesture_translate(draft);
@@ -405,13 +403,11 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             break;
           }
           case "insert": {
-            const { cursor_position } = state;
-
             const parent = __get_insert_target(draft);
 
             const initial_rect = {
-              x: cursor_position[0],
-              y: cursor_position[1],
+              x: state.pointer.position[0],
+              y: state.pointer.position[1],
               width: 1,
               height: 1,
             };
@@ -435,8 +431,6 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
           }
           case "draw": {
             const tool = draft.cursor_mode.tool;
-
-            const { cursor_position } = state;
 
             let vector:
               | grida.program.nodes.PathNode
@@ -494,10 +488,10 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
             // position relative to the parent
             const parent_rect = domapi.get_node_bounding_rect(parent)!;
-            const node_relative_pos = cmath.vector2.sub(cursor_position, [
-              parent_rect.x,
-              parent_rect.y,
-            ]);
+            const node_relative_pos = cmath.vector2.sub(
+              state.pointer.position,
+              [parent_rect.x, parent_rect.y]
+            );
             vector.left = node_relative_pos[0];
             vector.top = node_relative_pos[1];
 
@@ -617,8 +611,8 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       } = <EditorEventTarget_Drag>action;
       if (state.marquee) {
         return produce(state, (draft) => {
-          draft.marquee!.x2 = draft.surface_cursor_position[0];
-          draft.marquee!.y2 = draft.surface_cursor_position[1];
+          draft.marquee!.x2 = state.pointer.position[0];
+          draft.marquee!.y2 = state.pointer.position[1];
         });
       } else {
         return produce(state, (draft) => {

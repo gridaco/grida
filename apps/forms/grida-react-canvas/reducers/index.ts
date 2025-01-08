@@ -28,11 +28,8 @@ export default function reducer<S extends IDocumentEditorState>(
   switch (action.type) {
     case "__internal/reset": {
       const { state: _new_state, key } = action;
-      const prev_state = state;
       return produce(_new_state, (draft) => {
         if (key) draft.document_key = key;
-        draft.cursor_position = prev_state.cursor_position;
-        draft.surface_cursor_position = prev_state.surface_cursor_position;
       }) as S;
     }
     case "transform": {

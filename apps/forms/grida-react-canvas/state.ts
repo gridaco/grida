@@ -393,23 +393,28 @@ interface IDocumentEditorEventTargetState {
    */
   surface_raycast_detected_node_ids: string[];
 
-  /**
-   * @private - internal use only
-   *
-   * relative cursor position to the event target (position in viewport space)
-   *
-   * @default [0, 0]
-   */
-  surface_cursor_position: cmath.Vector2;
+  // /**
+  //  * @private - internal use only
+  //  *
+  //  * relative cursor position to the event target (position in viewport space)
+  //  *
+  //  * @default [0, 0]
+  //  */
+  // __surface_cursor_position: cmath.Vector2;
 
-  /**
-   * @private - internal use only
-   *
-   * relative cursor position to document root (position in artboard (document) space)
-   *
-   * @default [0, 0]
-   */
-  cursor_position: cmath.Vector2;
+  // /**
+  //  * @private - internal use only
+  //  *
+  //  * relative cursor position to document root (position in artboard (document) space)
+  //  *
+  //  * @default [0, 0]
+  //  */
+  // __cursor_position: cmath.Vector2;
+
+  pointer: {
+    position: cmath.Vector2;
+    // position_snap: cmath.Vector2;
+  };
 
   /**
    * @private - internal use only
@@ -428,7 +433,7 @@ interface IDocumentEditorEventTargetState {
   surface_measurement_targeting: "on" | "off";
 
   /**
-   * Marquee transform relative to viewport
+   * Marquee transform in canvas space
    */
   marquee?: Marquee;
 }
@@ -514,6 +519,8 @@ type PathContentEditMode = {
 
   /**
    * next points position
+   *
+   * @deprecated - remove me - use global sanp pointer
    */
   path_cursor_position: cmath.Vector2;
 };
@@ -594,8 +601,9 @@ export function initDocumentEditorState({
     selection: [],
     hovered_node_id: null,
     hovered_vertex_idx: null,
-    cursor_position: [0, 0],
-    surface_cursor_position: [0, 0],
+    pointer: {
+      position: cmath.vector2.zero,
+    },
     history: {
       future: [],
       past: [],

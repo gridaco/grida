@@ -1882,7 +1882,7 @@ export function useTransform() {
     const transform = state.transform;
     const matrix = `matrix(${transform[0][0]}, ${transform[1][0]}, ${transform[0][1]}, ${transform[1][1]}, ${transform[0][2]}, ${transform[1][2]})`;
     return {
-      style: { matrix } as React.CSSProperties,
+      style: { transform: matrix } as React.CSSProperties,
       transform: state.transform,
     };
   }, [state.transform]);
@@ -2131,9 +2131,6 @@ export function useEventTarget() {
 
         const [translateX, translateY] =
           cmath.transform.getTranslate(transform);
-
-        marqueerect.x = marqueerect.x - translateX;
-        marqueerect.y = marqueerect.y - translateY;
 
         els?.forEach((el) => {
           const eldomrect = el.getBoundingClientRect();
