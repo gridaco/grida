@@ -71,6 +71,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
       const { cursor_mode } = action;
       const path_edit_mode_valid_cursor_modes: CursorModeType[] = [
         "cursor",
+        "hand",
         "path",
       ];
       const text_edit_mode_valid_cursor_modes: CursorModeType[] = ["cursor"];

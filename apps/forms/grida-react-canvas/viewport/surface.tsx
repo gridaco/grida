@@ -364,7 +364,7 @@ function MultipleSelectionOverlay({
   readonly?: boolean;
 }) {
   const { multipleSelectionOverlayClick, cursor_mode } = useEventTarget();
-  const transform = useGroupSurfaceTransform(...selection);
+  const { style, rect } = useGroupSurfaceTransform(...selection);
 
   const enabled = !readonly && cursor_mode.type === "cursor";
 
@@ -398,7 +398,7 @@ function MultipleSelectionOverlay({
       <LayerOverlay
         {...bind()}
         readonly={readonly}
-        transform={transform}
+        transform={style}
         zIndex={10}
       >
         <LayerOverlayResizeHandle anchor="n" selection={selection} />
@@ -411,21 +411,20 @@ function MultipleSelectionOverlay({
         <LayerOverlayResizeHandle anchor="se" selection={selection} />
         {/*  */}
         <DistributeButton />
-        <SizeMeterLabel
-          margin={6}
-          size={{
-            width: transform.width,
-            height: transform.height,
-          }}
-          rect={{
-            x: 0,
-            y: 0,
-            width: transform.width,
-            height: transform.height,
-          }}
-          zoom={1}
-          className="bg-workbench-accent-sky"
-        />
+        {rect && (
+          <SizeMeterLabel
+            margin={6}
+            size={rect}
+            rect={{
+              x: 0,
+              y: 0,
+              width: rect.width,
+              height: rect.height,
+            }}
+            zoom={1}
+            className="bg-workbench-accent-sky"
+          />
+        )}
       </LayerOverlay>
       {
         // also hightlight the included nodes

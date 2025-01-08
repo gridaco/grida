@@ -121,10 +121,10 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       return produce(state, (draft) => {
         draft.surface_raycast_detected_node_ids = node_ids_from_point;
         switch (draft.cursor_mode.type) {
-          case "cursor": {
+          case "cursor":
+          case "hand":
             // ignore
             break;
-          }
           case "insert":
             const parent = __get_insert_target(draft);
 
@@ -397,6 +397,13 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             }
             break;
           }
+          case "hand": {
+            draft.gesture = {
+              type: "pan",
+              movement: cmath.vector2.zero,
+            };
+            break;
+          }
           case "insert": {
             const { cursor_position } = state;
 
@@ -569,15 +576,23 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       );
       return produce(state, (draft) => {
         self_maybe_end_gesture_translate(draft);
-        // reset the cursor mode (unless pencil mode)
-        if (
-          !(
-            (draft.cursor_mode.type === "draw" &&
-              draft.cursor_mode.tool === "pencil") ||
-            draft.cursor_mode.type === "path"
-          )
-        ) {
-          draft.cursor_mode = { type: "cursor" };
+        // reset the cursor mode if cancelable by drag end
+        switch (draft.cursor_mode.type) {
+          case "draw":
+            // keep if pencil mode
+            if (draft.cursor_mode.tool === "pencil") break;
+          case "path":
+            // keep
+            break;
+          case "hand":
+            // keep
+            break;
+          case "cursor":
+          case "insert":
+          default:
+            // cancel to default
+            draft.cursor_mode = { type: "cursor" };
+            break;
         }
 
         draft.gesture = { type: "idle" };
@@ -613,6 +628,14 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
           draft.gesture.movement = movement;
 
           switch (draft.gesture.type) {
+            case "pan": {
+              // move the viewport by delta
+              draft.transform = {
+                ...draft.transform,
+                translate: cmath.vector2.add(draft.transform.translate, delta),
+              };
+              break;
+            }
             // [insertion mode - resize after insertion]
             case "scale": {
               self_update_gesture_transform(draft);

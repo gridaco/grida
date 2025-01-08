@@ -223,6 +223,7 @@ export function useGroupSurfaceTransform(...node_ids: string[]) {
 
   const node_elements = useNodeDomElements(stableNodeIds);
 
+  const [rect, setRect] = useState<cmath.Rectangle>();
   const [style, setStyle] = useState({
     top: 0,
     left: 0,
@@ -257,6 +258,13 @@ export function useGroupSurfaceTransform(...node_ids: string[]) {
         boundingRect.x + boundingRect.width / 2 - portal_rect.left;
       const centerY =
         boundingRect.y + boundingRect.height / 2 - portal_rect.top;
+
+      setRect({
+        x: boundingRect.x * (1 / transform.scale),
+        y: boundingRect.y * (1 / transform.scale),
+        width: boundingRect.width * (1 / transform.scale),
+        height: boundingRect.height * (1 / transform.scale),
+      });
 
       // Rotation is ignored for groups
       const rotation = 0;
@@ -303,5 +311,5 @@ export function useGroupSurfaceTransform(...node_ids: string[]) {
     transform,
   ]);
 
-  return style;
+  return { style, rect };
 }

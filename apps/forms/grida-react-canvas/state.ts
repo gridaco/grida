@@ -12,6 +12,9 @@ export type CursorMode =
       type: "cursor";
     }
   | {
+      type: "hand";
+    }
+  | {
       type: "insert";
       node: "text" | "image" | "container" | "rectangle" | "ellipse";
     }
@@ -132,6 +135,7 @@ interface IDocumentEditorTransformState {
 
 export type GestureState =
   | GestureIdle
+  | GesturePan
   | GestureVirtualNudge
   | GestureTranslate
   | GestureScale
@@ -153,6 +157,13 @@ interface IGesture {
 
 export type GestureIdle = {
   type: "idle";
+};
+
+/**
+ * Pan the viewport - a.k.a hand tool
+ */
+export type GesturePan = IGesture & {
+  type: "pan";
 };
 
 /**

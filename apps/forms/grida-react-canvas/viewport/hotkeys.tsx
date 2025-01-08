@@ -2,7 +2,7 @@ import { useHotkeys } from "react-hotkeys-hook";
 import { useDocument, useEventTarget, useSelection } from "../provider";
 import toast from "react-hot-toast";
 import { grida } from "@/grida";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 export const keybindings_sheet = [
   {
@@ -128,8 +128,12 @@ export const keybindings_sheet = [
 ];
 
 export function useEditorHotKeys() {
-  const { setCursorMode, tryExitContentEditMode, tryToggleContentEditMode } =
-    useEventTarget();
+  const {
+    cursor_mode,
+    setCursorMode,
+    tryExitContentEditMode,
+    tryToggleContentEditMode,
+  } = useEventTarget();
   const {
     select,
     blur,
@@ -240,6 +244,37 @@ export function useEditorHotKeys() {
     }
   );
   //
+
+  const __hand_tool_triggered_by_hotkey = useRef(false);
+  useHotkeys(
+    "space",
+    (e) => {
+      // cancel if already in hand tool, but not triggered by hotkey
+      if (
+        cursor_mode.type === "hand" &&
+        !__hand_tool_triggered_by_hotkey.current
+      )
+        return;
+
+      // check if up or down
+      switch (e.type) {
+        case "keydown":
+          setCursorMode({ type: "hand" });
+          __hand_tool_triggered_by_hotkey.current = true;
+          break;
+        case "keyup":
+          setCursorMode({ type: "cursor" });
+          __hand_tool_triggered_by_hotkey.current = false;
+          break;
+      }
+    },
+    {
+      keydown: true,
+      keyup: true,
+      enableOnFormTags: false,
+      enableOnContentEditable: false,
+    }
+  );
 
   // #region selection
   useHotkeys(
@@ -506,6 +541,10 @@ export function useEditorHotKeys() {
 
   useHotkeys("v, escape", () => {
     setCursorMode({ type: "cursor" });
+  });
+
+  useHotkeys("h", () => {
+    setCursorMode({ type: "hand" });
   });
 
   useHotkeys("a, f", () => {

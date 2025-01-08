@@ -19,6 +19,7 @@ import {
   Pencil1Icon,
   CircleIcon,
   CursorArrowIcon,
+  HandIcon,
   FrameIcon,
   ImageIcon,
   MixIcon,
@@ -162,6 +163,9 @@ export function PlaygroundToolbar({
       >
         <ToggleGroupItem value={"cursor" satisfies ToolbarToolType}>
           <CursorArrowIcon />
+        </ToggleGroupItem>
+        <ToggleGroupItem value={"hand" satisfies ToolbarToolType}>
+          <HandIcon />
         </ToggleGroupItem>
         <VerticalDivider />
         <ToggleGroupItem value={"container" satisfies ToolbarToolType}>

@@ -1448,7 +1448,7 @@ export function useDocument() {
           scale: value,
         },
       }),
-    [dispatch]
+    [dispatch, transform]
   );
 
   const select = useCallback(
@@ -1902,9 +1902,10 @@ export function useEventTargetCSSCursor() {
 
   return useMemo(() => {
     switch (cursor_mode.type) {
-      case "cursor": {
+      case "cursor":
         return "default";
-      }
+      case "hand":
+        return "grab";
       case "insert": {
         switch (cursor_mode.node) {
           case "text":

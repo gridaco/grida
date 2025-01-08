@@ -2,6 +2,7 @@ import type { CursorMode } from "../state";
 
 export type ToolbarToolType =
   | "cursor"
+  | "hand"
   | "rectangle"
   | "ellipse"
   | "text"
@@ -15,6 +16,8 @@ export function cursormode_to_toolbar_value(cm: CursorMode): ToolbarToolType {
   switch (cm.type) {
     case "cursor":
       return "cursor";
+    case "hand":
+      return "hand";
     case "insert":
       return cm.node;
     case "draw":
@@ -28,6 +31,8 @@ export function toolbar_value_to_cursormode(tt: ToolbarToolType): CursorMode {
   switch (tt) {
     case "cursor":
       return { type: "cursor" };
+    case "hand":
+      return { type: "hand" };
     case "container":
     case "ellipse":
     case "image":
