@@ -37,6 +37,7 @@ import { getMarqueeSelection, getSurfaceRayTarget } from "./tools/target";
 import { vn } from "@/grida/vn";
 import { getInitialCurveGesture } from "./tools/gesture";
 import { createMinimalDocumentStateSnapshot } from "./tools/snapshot";
+import { toCanvasSpace } from "../utils/transform";
 
 export default function eventTargetReducer<S extends IDocumentEditorState>(
   state: S,
@@ -54,7 +55,12 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       delta: cmath.vector2.multiply(action.event.delta, factor),
       movement: cmath.vector2.multiply(action.event.movement, factor),
     };
-    action.event = adj;
+
+    // replace the action with adjusted event
+    action = {
+      ...action,
+      event: adj,
+    };
   }
 
   switch (action.type) {
@@ -63,15 +69,17 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       const {
         position: { x, y },
       } = <EditorEventTarget_PointerMove>action;
-      const c_surface_pos: cmath.Vector2 = [x, y];
-      const c_content_pos = cmath.vector2.sub(
-        c_surface_pos,
-        cmath.transform.getTranslate(state.transform)
+
+      const surface_space_pointer_position: cmath.Vector2 = [x, y];
+      const canvas_transform = state.transform;
+      const canvas_space_pointer_position = toCanvasSpace(
+        surface_space_pointer_position,
+        canvas_transform
       );
 
       return produce(state, (draft) => {
         draft.pointer = {
-          position: c_content_pos,
+          position: canvas_space_pointer_position,
         };
 
         if (draft.content_edit_mode?.type === "path") {
@@ -93,7 +101,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
             // mock the movement (movement = cursor pos - anchor pos)
             const movement = cmath.vector2.sub(
-              c_content_pos,
+              draft.pointer.position,
               cmath.vector2.add(n_offset, a.p)
             );
 
@@ -104,7 +112,8 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             const adj_pos = cmath.vector2.add(a.p, adj_movement, n_offset);
             draft.content_edit_mode.path_cursor_position = adj_pos;
           } else {
-            draft.content_edit_mode.path_cursor_position = c_content_pos;
+            draft.content_edit_mode.path_cursor_position =
+              canvas_space_pointer_position;
           }
         }
       });

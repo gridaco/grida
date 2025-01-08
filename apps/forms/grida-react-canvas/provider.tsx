@@ -1882,7 +1882,10 @@ export function useTransform() {
     const transform = state.transform;
     const matrix = `matrix(${transform[0][0]}, ${transform[1][0]}, ${transform[0][1]}, ${transform[1][1]}, ${transform[0][2]}, ${transform[1][2]})`;
     return {
-      style: { transform: matrix } as React.CSSProperties,
+      style: {
+        transformOrigin: "0 0",
+        transform: matrix,
+      } as React.CSSProperties,
       transform: state.transform,
     };
   }, [state.transform]);
@@ -1936,6 +1939,7 @@ export function useEventTarget() {
   const [state, dispatch] = __useInternal();
 
   const {
+    pointer,
     transform,
     gesture,
     hovered_node_id,
@@ -2240,6 +2244,7 @@ export function useEventTarget() {
       zoom,
       pan,
       //
+      pointer,
       transform,
       debug,
       //
@@ -2280,6 +2285,7 @@ export function useEventTarget() {
     zoom,
     pan,
     //
+    pointer,
     transform,
     debug,
     //

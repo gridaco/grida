@@ -127,6 +127,10 @@ interface IDocumentEditorClipboardState {
 }
 
 interface IDocumentEditorTransformState {
+  /**
+   * current transform of the canvas.
+   * where transform origin is 0,0
+   */
   transform: cmath.Transform;
 }
 

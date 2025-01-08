@@ -35,6 +35,10 @@ export default function reducer<S extends IDocumentEditorState>(
     case "transform": {
       return produce(state, (draft: Draft<S>) => {
         draft.transform = action.transform;
+        // TODO: update pointer as transforms
+        // draft.pointer = {
+        //   position: draft.pointer.position,
+        // };
       });
     }
     case "undo":

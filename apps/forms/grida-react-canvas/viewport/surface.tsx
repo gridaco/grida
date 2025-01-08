@@ -30,6 +30,8 @@ import { SurfaceTextEditor } from "./ui/text-editor";
 import { SurfacePathEditor } from "./ui/path-editor";
 import { SizeMeterLabel } from "./ui/meter";
 import { SurfaceGradientEditor } from "./ui/gradient-editor";
+import { DebugPointer } from "./ui/debug";
+import { toSurfaceSpace } from "../utils/transform";
 
 const DRAG_THRESHOLD = 2;
 
@@ -92,10 +94,11 @@ function SurfaceGroup({
 
 export function EditorSurface() {
   const isWindowResizing = useIsWindowResizing();
-  const { style } = useTransform();
+  const { transform } = useTransform();
   const {
     zoom,
     pan,
+    pointer,
     marquee,
     hovered_node_id,
     dropzone_node_id,
@@ -267,7 +270,12 @@ export function EditorSurface() {
         cursor: cursor,
       }}
     >
-      <div style={style}>
+      <div
+        style={{
+          position: "absolute",
+        }}
+      >
+        <DebugPointer position={toSurfaceSpace(pointer.position, transform)} />
         {marquee && (
           <div id="marquee-container" className="absolute top-0 left-0 w-0 h-0">
             <Marquee
