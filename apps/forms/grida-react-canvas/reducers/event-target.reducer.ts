@@ -383,20 +383,16 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               } else {
                 // marquee selection
                 draft.marquee = {
-                  x1: draft.pointer.position[0],
-                  y1: draft.pointer.position[1],
-                  x2: draft.pointer.position[0],
-                  y2: draft.pointer.position[1],
+                  a: state.pointer.position,
+                  b: state.pointer.position,
                 };
               }
             } else {
               if (draft.selection.length === 0) {
                 // marquee selection
                 draft.marquee = {
-                  x1: draft.pointer.position[0],
-                  y1: draft.pointer.position[1],
-                  x2: draft.pointer.position[0],
-                  y2: draft.pointer.position[1],
+                  a: state.pointer.position,
+                  b: state.pointer.position,
                 };
               } else {
                 self_start_gesture_translate(draft);
@@ -620,8 +616,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       } = <EditorEventTarget_Drag>action;
       if (state.marquee) {
         return produce(state, (draft) => {
-          draft.marquee!.x2 = state.pointer.position[0];
-          draft.marquee!.y2 = state.pointer.position[1];
+          draft.marquee!.b = state.pointer.position;
         });
       } else {
         return produce(state, (draft) => {

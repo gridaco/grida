@@ -4,6 +4,7 @@ import React, { useContext, useRef } from "react";
 import { useDocument, useTransform } from "./provider";
 import { NodeElement } from "./nodes/node";
 import { domapi } from "./domapi";
+// import { DebugPointer } from "./viewport/ui/debug";
 
 const UserDocumentCustomRendererContext = React.createContext<
   Record<string, CustomReactRenderer>
@@ -28,12 +29,13 @@ export function StandaloneDocumentContent({
 }: React.HTMLAttributes<HTMLDivElement> & DocumentContentViewProps) {
   const ref = useRef<HTMLDivElement>(null);
   const {
-    state: { document },
+    state: { document, pointer },
   } = useDocument();
   const { root_id } = document;
 
   return (
     <div id={domapi.k.EDITOR_CONTENT_ELEMENT_ID} ref={ref} {...props}>
+      {/* <DebugPointer position={pointer.position} /> */}
       <UserDocumentCustomRendererContext.Provider value={templates ?? {}}>
         <NodeElement node_id={root_id} />
       </UserDocumentCustomRendererContext.Provider>

@@ -2128,10 +2128,7 @@ export function useEventTarget() {
         const viewportdomrect = domapi.get_viewport_rect();
         const viewport_pos = [viewportdomrect.x, viewportdomrect.y];
 
-        const marqueerect = cmath.rect.fromPoints([
-          [marquee.x1, marquee.y1],
-          [marquee.x2, marquee.y2],
-        ]);
+        const marqueerect = cmath.rect.fromPoints([marquee.a, marquee.b]);
 
         const [translateX, translateY] =
           cmath.transform.getTranslate(transform);

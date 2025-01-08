@@ -26,11 +26,14 @@ export type CursorMode =
       type: "path";
     };
 
+/**
+ * A marquee is a area where it takes two points, where it uses the min point as min and max point as max.
+ * - a: [x1, y1]
+ * - b: [x2, y2]
+ */
 export type Marquee = {
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
+  a: cmath.Vector2;
+  b: cmath.Vector2;
 };
 
 const DEFAULT_RAY_TARGETING: SurfaceRaycastTargeting = {

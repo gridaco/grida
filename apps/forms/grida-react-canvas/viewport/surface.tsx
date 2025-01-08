@@ -214,39 +214,22 @@ export function EditorSurface() {
   // pinch & wheel gesture (zoom and panning)
   useGesture(
     {
-      onPinch: (state) => {
-        const {
-          event,
-          offset: [ox],
-          movement: [mx],
-          delta: [dx],
-        } = state;
-        // Note: make sure not to check `event.defaultPrevented` here, this is always true.
-        // if (event.defaultPrevented) return;
-        // console.log("pinch", ox, mx, dx, _dx);
-        // TODO: use mx instead of dx (dx gets stuck by the useGesture's default behaviours)
-        zoom(dx);
-      },
-      onPinchEnd: (state) => {
-        state.cancel();
-      },
       onWheel: (state) => {
-        const { event, delta, wheeling, ctrlKey } = state;
+        const { event, delta, ctrlKey, metaKey } = state;
         if (event.defaultPrevented) return;
-        // wheel also triggers when pinching, but when this happens, the ctrlKey is true
-        if (ctrlKey) return;
+        // when pinching (on mac os, ctrlKey is set true even when no key pressed), this is true.
+        if (ctrlKey || metaKey) {
+          // zoom
+          const d = delta[1];
+          zoom(-d / 100);
+        } else {
+          pan(cmath.vector2.invert(delta));
+        }
 
-        // console.log("wheel", x, y, wheeling, state);
-        pan(cmath.vector2.invert(delta));
         event.preventDefault();
       },
     },
     {
-      pinch: {
-        eventOptions: {
-          passive: true,
-        },
-      },
       wheel: {
         eventOptions: {
           passive: false,
@@ -279,10 +262,8 @@ export function EditorSurface() {
         {marquee && (
           <div id="marquee-container" className="absolute top-0 left-0 w-0 h-0">
             <Marquee
-              x1={marquee.x1}
-              y1={marquee.y1}
-              x2={marquee.x2}
-              y2={marquee.y2}
+              a={toSurfaceSpace(marquee.a, transform)}
+              b={toSurfaceSpace(marquee.b, transform)}
             />
           </div>
         )}
