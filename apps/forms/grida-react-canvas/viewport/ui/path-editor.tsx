@@ -10,7 +10,7 @@ import { cn } from "@/utils";
 import { svg } from "@/grida/svg";
 
 export function SurfacePathEditor({ node_id }: { node_id: string }) {
-  const { debug, cursor_mode, content_offset } = useEventTarget();
+  const { debug, cursor_mode, transform } = useEventTarget();
   const { offset, vertices, segments, path_cursor_position, a_point, next_ta } =
     useSurfacePathEditor();
   const { style } = useNodeSurfaceTransfrom(node_id);
@@ -61,8 +61,12 @@ export function SurfacePathEditor({ node_id }: { node_id: string }) {
         <>
           {/* next segment */}
           <Extension
-            a={cmath.vector2.add(offset, content_offset, vertices[a_point].p)}
-            b={cmath.vector2.add(path_cursor_position, content_offset)}
+            a={cmath.vector2.add(
+              offset,
+              transform.translate,
+              vertices[a_point].p
+            )}
+            b={cmath.vector2.add(path_cursor_position, transform.translate)}
             ta={next_ta ? next_ta : undefined}
           />
         </>
@@ -75,7 +79,7 @@ export function SurfacePathEditor({ node_id }: { node_id: string }) {
         const is_neighbouring = a_point === s.a || a_point === s.b;
         if (!is_neighbouring) return <></>;
 
-        const d = cmath.vector2.add(offset, content_offset);
+        const d = cmath.vector2.add(offset, transform.translate);
 
         return (
           <React.Fragment key={i}>

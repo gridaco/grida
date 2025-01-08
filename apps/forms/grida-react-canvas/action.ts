@@ -104,7 +104,6 @@ interface ISelection {
 export type __InternalSyncArtboardOffset = {
   type: "__internal/on-resize";
 } & {
-  content_offset: Vector2;
   viewport_offset: Vector2;
 };
 

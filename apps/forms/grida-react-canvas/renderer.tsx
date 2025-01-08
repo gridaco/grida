@@ -18,15 +18,8 @@ function __useEditorContentOffsetNotifyEffect(
   const notify = useResizeNotifier();
 
   const syncoffset = useCallback(
-    ({
-      content_offset,
-      viewport_offset,
-    }: {
-      content_offset: cmath.Vector2;
-      viewport_offset: cmath.Vector2;
-    }) => {
+    ({ viewport_offset }: { viewport_offset: cmath.Vector2 }) => {
       notify({
-        content_offset: content_offset,
         viewport_offset: viewport_offset,
       });
     },
@@ -45,22 +38,12 @@ function __useEditorContentOffsetNotifyEffect(
     function updateOffset() {
       if (!viewportElement || !contentElement) return;
       const viewport_rect = viewportElement.getBoundingClientRect();
-      const content_rect = contentElement.getBoundingClientRect();
       const viewport_position: cmath.Vector2 = [
         viewport_rect.x,
         viewport_rect.y,
       ];
-      const content_position: cmath.Vector2 = [content_rect.x, content_rect.y];
 
-      const content_offset = cmath.vector2.sub(
-        content_position,
-        viewport_position
-      );
-
-      // Notify the editor engine (placeholder logic)
-      if (content_offset) {
-        syncoffset({ content_offset, viewport_offset: viewport_position });
-      }
+      syncoffset({ viewport_offset: viewport_position });
     }
 
     // Initial offset update (once and after 50ms)

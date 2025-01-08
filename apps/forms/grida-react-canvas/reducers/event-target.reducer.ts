@@ -66,7 +66,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       const c_surface_pos: cmath.Vector2 = [x, y];
       const c_content_pos = cmath.vector2.sub(
         state.surface_cursor_position,
-        state.content_offset ?? cmath.vector2.zero
+        state.transform.translate
       );
 
       return produce(state, (draft) => {

@@ -97,7 +97,7 @@ function useNodeSurfaceTransfrom_v1(node_id: string) {
  * TODO: Not tested with the performance
  */
 export function useNodeSurfaceTransfrom(node_id: string) {
-  const { transform, content_offset, viewport_offset } = useEventTarget();
+  const { transform, viewport_offset } = useEventTarget();
   const __rect_fallback = useMemo(() => new DOMRect(0, 0, 0, 0), []);
   const { getNodeAbsoluteRotation } = useDocument();
   const portal = useViewportSurfacePortal();
@@ -117,6 +117,8 @@ export function useNodeSurfaceTransfrom(node_id: string) {
 
   useEffect(() => {
     if (!node_element || !portal) return;
+
+    const scale = transform.scale;
 
     const updateTransform = () => {
       const portal_rect = portal.getBoundingClientRect();
@@ -171,7 +173,6 @@ export function useNodeSurfaceTransfrom(node_id: string) {
     __rect_fallback,
     // recompute when viewport changes
     transform,
-    content_offset,
     viewport_offset,
   ]);
 
@@ -214,7 +215,7 @@ function shallowEqual(arr1: string[], arr2: string[]): boolean {
  * Uses MutationObserver to observe position changes - expensive
  */
 export function useGroupSurfaceTransform(...node_ids: string[]) {
-  const { content_offset, viewport_offset } = useEventTarget();
+  const { viewport_offset, transform } = useEventTarget();
   const __rect_fallback = useMemo(() => new DOMRect(0, 0, 0, 0), []);
   const portal = useViewportSurfacePortal();
 
@@ -223,7 +224,7 @@ export function useGroupSurfaceTransform(...node_ids: string[]) {
 
   const node_elements = useNodeDomElements(stableNodeIds);
 
-  const [transform, setTransform] = useState({
+  const [style, setStyle] = useState({
     top: 0,
     left: 0,
     transform: "",
@@ -261,7 +262,7 @@ export function useGroupSurfaceTransform(...node_ids: string[]) {
       // Rotation is ignored for groups
       const rotation = 0;
 
-      setTransform({
+      setStyle({
         top: centerY,
         left: centerX,
         transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
@@ -300,9 +301,9 @@ export function useGroupSurfaceTransform(...node_ids: string[]) {
     portal,
     __rect_fallback,
     // recompute when viewport changes
-    content_offset,
+    transform,
     viewport_offset,
   ]);
 
-  return transform;
+  return style;
 }

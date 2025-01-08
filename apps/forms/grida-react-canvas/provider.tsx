@@ -143,16 +143,9 @@ function __useInternal() {
 export function useResizeNotifier() {
   const dispatch = __useDispatch();
   const notifyResize = useCallback(
-    ({
-      content_offset,
-      viewport_offset,
-    }: {
-      content_offset: cmath.Vector2;
-      viewport_offset: cmath.Vector2;
-    }) => {
+    ({ viewport_offset }: { viewport_offset: cmath.Vector2 }) => {
       dispatch({
         type: "__internal/on-resize",
-        content_offset,
         viewport_offset,
       });
     },
@@ -1951,7 +1944,6 @@ export function useEventTarget() {
 
   const {
     transform,
-    content_offset,
     viewport_offset,
     gesture,
     hovered_node_id,
@@ -2141,23 +2133,19 @@ export function useEventTarget() {
         const els = domapi.get_grida_node_elements();
         const viewportdomrect = domapi.get_viewport_rect();
         const viewport_pos = [viewportdomrect.x, viewportdomrect.y];
-        const translate: [number, number] = [
-          state.content_offset ? state.content_offset[0] : 0,
-          state.content_offset ? state.content_offset[1] : 0,
-        ];
 
         const marqueerect = cmath.rect.fromPoints([
           [marquee.x1, marquee.y1],
           [marquee.x2, marquee.y2],
         ]);
-        marqueerect.x = marqueerect.x - translate[0];
-        marqueerect.y = marqueerect.y - translate[1];
+        marqueerect.x = marqueerect.x - transform.translate[0];
+        marqueerect.y = marqueerect.y - transform.translate[1];
 
         els?.forEach((el) => {
           const eldomrect = el.getBoundingClientRect();
           const elrect = {
-            x: eldomrect.x - translate[0] - viewport_pos[0],
-            y: eldomrect.y - translate[1] - viewport_pos[1],
+            x: eldomrect.x - transform.translate[0] - viewport_pos[0],
+            y: eldomrect.y - transform.translate[1] - viewport_pos[1],
             width: eldomrect.width,
             height: eldomrect.height,
           };
@@ -2179,7 +2167,7 @@ export function useEventTarget() {
         shiftKey: event.shiftKey,
       });
     },
-    [dispatch, marquee, state.content_offset]
+    [dispatch, marquee, transform]
   );
 
   const drag = useCallback(
@@ -2263,7 +2251,6 @@ export function useEventTarget() {
       //
       transform,
       debug,
-      content_offset,
       viewport_offset,
       //
       marquee,
@@ -2307,7 +2294,6 @@ export function useEventTarget() {
     //
     transform,
     debug,
-    content_offset,
     viewport_offset,
     //
     marquee,
@@ -2354,8 +2340,8 @@ export function useDataTransferEventTarget() {
 
   const canvasXY = useCallback(
     (xy: cmath.Vector2) =>
-      cmath.vector2.sub(xy, state.viewport_offset, state.content_offset),
-    [state.content_offset, state.viewport_offset]
+      cmath.vector2.sub(xy, state.viewport_offset, state.transform.translate),
+    [state.viewport_offset, state.transform]
   );
 
   const paste = useCallback(() => {

@@ -132,14 +132,8 @@ interface IDocumentEditorTransformState {
   /**
    * @private - internal use only
    *
-   * translate (offset) of the content (stage) relative to surface (viewport, not window)
-   */
-  content_offset: cmath.Vector2;
-
-  /**
-   * @private - internal use only
-   *
    * translate (offset) of the viewport (surface) relative to the window
+   * @deprecated
    */
   viewport_offset: cmath.Vector2;
 }
@@ -603,7 +597,6 @@ export function initDocumentEditorState({
     selection: [],
     hovered_node_id: null,
     hovered_vertex_idx: null,
-    content_offset: [0, 0],
     viewport_offset: [0, 0],
     cursor_position: [0, 0],
     surface_cursor_position: [0, 0],

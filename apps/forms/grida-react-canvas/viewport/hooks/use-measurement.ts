@@ -3,12 +3,13 @@
 import { useLayoutEffect, useState } from "react";
 import { domapi } from "@/grida-react-canvas/domapi";
 import { cmath } from "@grida/cmath";
-import { useDocument } from "@/grida-react-canvas/provider";
+import { useDocument, useTransform } from "@/grida-react-canvas/provider";
 import { measure, Measurement } from "@grida/cmath/_measurement";
 
 export default function useMeasurement() {
   const { state, selection } = useDocument();
-  const { content_offset: translate, surface_measurement_target } = state;
+  const { surface_measurement_target } = state;
+  const { translate } = useTransform();
 
   const [measurement, setMeasurement] = useState<Measurement>();
 

@@ -1,11 +1,12 @@
 "use client";
 
 import { cmath } from "@grida/cmath";
-import { useDocument } from "@/grida-react-canvas/provider";
+import { useDocument, useTransform } from "@/grida-react-canvas/provider";
 
 export default function useSnapGuide() {
   const { state } = useDocument();
-  const { gesture, content_offset: translate } = state;
+  const { gesture } = state;
+  const { translate } = useTransform();
 
   if (
     (gesture.type === "translate" ||

@@ -384,11 +384,11 @@ export default function CanvasPlayground() {
                       <ViewportRoot className="relative w-full h-full no-scrollbar overflow-y-auto">
                         <EditorSurface />
                         <ContentTransform>
-                          <div className="w-full h-full flex items-center justify-center">
-                            <div className="shadow-lg rounded-xl border overflow-hidden">
-                              <StandaloneDocumentContent />
-                            </div>
-                          </div>
+                          {/* <div className="w-full h-full flex items-center justify-center"> */}
+                          {/* <div className="shadow-lg rounded-xl border overflow-hidden"> */}
+                          <StandaloneDocumentContent />
+                          {/* </div> */}
+                          {/* </div> */}
                         </ContentTransform>
 
                         {!uiHidden && (

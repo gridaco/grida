@@ -6,7 +6,6 @@ import { useNodeSurfaceTransfrom } from "../hooks/transform";
 import { cmath } from "@grida/cmath";
 
 export function SurfaceGradientEditor({ node_id }: { node_id: string }) {
-  const { debug, cursor_mode, content_offset } = useEventTarget();
   const { transform, stops } = useSurfaceGradientEditor();
   const { style } = useNodeSurfaceTransfrom(node_id);
   //
