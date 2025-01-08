@@ -44,11 +44,13 @@ export function StandaloneDocumentContent({
 export function ContentTransform({ children }: React.PropsWithChildren<{}>) {
   const transform = useTransform();
 
+  const matrix = `matrix(${transform[0][0]}, ${transform[1][0]}, ${transform[0][1]}, ${transform[1][1]}, ${transform[0][2]}, ${transform[1][2]})`;
+
   return (
     <div
       className="w-full h-full"
       style={{
-        transform: `translate3d(${transform.translate[0]}px, ${transform.translate[1]}px, 0) scale3d(${transform.scale}, ${transform.scale}, 1)`,
+        transform: matrix,
       }}
     >
       {children}

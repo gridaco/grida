@@ -10,6 +10,7 @@ import type {
   IDocumentEditorState,
   SurfaceRaycastTargeting,
 } from "./state";
+import { cmath } from "@grida/cmath";
 
 export type Action =
   | InternalAction
@@ -302,11 +303,8 @@ interface ICanvasEventTargetDragEvent {
 }
 
 export type EditorCameraAction = {
-  type: "camera/transform";
-  transform: {
-    scale: number;
-    translate: Vector2;
-  };
+  type: "transform";
+  transform: cmath.Transform;
 };
 
 export type EventTargetAction =

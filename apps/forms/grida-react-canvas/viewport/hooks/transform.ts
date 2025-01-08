@@ -103,8 +103,6 @@ export function useNodeSurfaceTransfrom(node_id: string) {
   const portal = useViewportSurfacePortal();
   const node_element = useNodeDomElement(node_id);
 
-  const scale = transform.scale;
-
   const [style, setStyle] = useState({
     top: 0,
     left: 0,
@@ -118,7 +116,7 @@ export function useNodeSurfaceTransfrom(node_id: string) {
   useEffect(() => {
     if (!node_element || !portal) return;
 
-    const scale = transform.scale;
+    const scale = cmath.transform.getScale(transform);
 
     const updateTransform = () => {
       const portal_rect = portal.getBoundingClientRect();
@@ -150,8 +148,8 @@ export function useNodeSurfaceTransfrom(node_id: string) {
         top: centerY,
         left: centerX,
         transform: `translate(-50%, -50%) rotate(${absolute_rotation ?? 0}deg)`,
-        width: width * scale,
-        height: height * scale,
+        width: width * scale[0],
+        height: height * scale[1],
       });
     };
 
@@ -175,7 +173,7 @@ export function useNodeSurfaceTransfrom(node_id: string) {
     transform,
   ]);
 
-  return { style, rect, scale };
+  return { style, rect };
 }
 
 /**
@@ -235,6 +233,8 @@ export function useGroupSurfaceTransform(...node_ids: string[]) {
   useEffect(() => {
     if (!portal || !node_elements?.length) return;
 
+    const scale = cmath.transform.getScale(transform);
+
     const updateTransform = () => {
       const portal_rect = portal.getBoundingClientRect();
 
@@ -260,10 +260,10 @@ export function useGroupSurfaceTransform(...node_ids: string[]) {
         boundingRect.y + boundingRect.height / 2 - portal_rect.top;
 
       setRect({
-        x: boundingRect.x * (1 / transform.scale),
-        y: boundingRect.y * (1 / transform.scale),
-        width: boundingRect.width * (1 / transform.scale),
-        height: boundingRect.height * (1 / transform.scale),
+        x: boundingRect.x * (1 / scale[0]),
+        y: boundingRect.y * (1 / scale[1]),
+        width: boundingRect.width * (1 / scale[0]),
+        height: boundingRect.height * (1 / scale[1]),
       });
 
       // Rotation is ignored for groups

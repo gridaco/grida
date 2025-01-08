@@ -17,6 +17,8 @@ export function SurfacePathEditor({ node_id }: { node_id: string }) {
 
   const a_point_is_last = a_point === vertices.length - 1;
 
+  const translate = cmath.transform.getTranslate(transform);
+
   return (
     <div id="path-editor-surface" className="fixed left-0 top-0 w-0 h-0 z-10">
       <div
@@ -61,12 +63,8 @@ export function SurfacePathEditor({ node_id }: { node_id: string }) {
         <>
           {/* next segment */}
           <Extension
-            a={cmath.vector2.add(
-              offset,
-              transform.translate,
-              vertices[a_point].p
-            )}
-            b={cmath.vector2.add(path_cursor_position, transform.translate)}
+            a={cmath.vector2.add(offset, translate, vertices[a_point].p)}
+            b={cmath.vector2.add(path_cursor_position, translate)}
             ta={next_ta ? next_ta : undefined}
           />
         </>
@@ -79,7 +77,7 @@ export function SurfacePathEditor({ node_id }: { node_id: string }) {
         const is_neighbouring = a_point === s.a || a_point === s.b;
         if (!is_neighbouring) return <></>;
 
-        const d = cmath.vector2.add(offset, transform.translate);
+        const d = cmath.vector2.add(offset, translate);
 
         return (
           <React.Fragment key={i}>

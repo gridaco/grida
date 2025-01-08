@@ -3,7 +3,6 @@ import {
   useSurfaceGradientEditor,
 } from "@/grida-react-canvas/provider";
 import { useNodeSurfaceTransfrom } from "../hooks/transform";
-import { cmath } from "@grida/cmath";
 
 export function SurfaceGradientEditor({ node_id }: { node_id: string }) {
   const { transform, stops } = useSurfaceGradientEditor();

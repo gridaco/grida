@@ -1662,6 +1662,151 @@ export namespace cmath.transform {
   }
 
   /**
+   * Applies a scaling transformation to a 2D transform matrix, with an origin
+   * defined in normalized coordinates `[0, 0] ~ [1, 1]`.
+   *
+   * @param scale - The scaling factor. Can be a single number (uniform scaling) or a `Vector2` for non-uniform scaling.
+   * @param transform - The original 2D transform matrix to be scaled.
+   * @param origin - A normalized origin in the range `[0, 0] ~ [1, 1]`, relative to the element's size.
+   *                 Defaults to `[0.5, 0.5]` (center of the element).
+   * @param size - The size of the element being transformed, as `[width, height]`.
+   *               Used to compute the absolute origin based on the normalized coordinates.
+   * @returns A new transform matrix with the scaling applied.
+   *
+   * @example
+   * // Apply uniform scaling to an element with a width of 100 and height of 200
+   * const transform: cmath.Transform = [
+   *   [1, 0, 10], // ScaleX, ShearY, TranslateX
+   *   [0, 1, 20], // ShearX, ScaleY, TranslateY
+   * ];
+   * const scaled = cmath.transform.applyScale(2, transform, [0.5, 0.5], [100, 200]);
+   * console.log(scaled);
+   * // Output: [
+   * //   [2, 0, 10],
+   * //   [0, 2, 20],
+   * // ]
+   *
+   * @remarks
+   * - The normalized origin `[0, 0]` represents the top-left corner, and `[1, 1]` represents the bottom-right corner.
+   * - `[0.5, 0.5]` is the default and represents the center of the element.
+   * - The function is purely mathematical, with no assumptions about the environment or context.
+   */
+  export function scale(
+    scale: number | cmath.Vector2,
+    transform: Transform,
+    origin: cmath.Vector2 = [0.5, 0.5],
+    size: cmath.Vector2
+  ): Transform {
+    const [width, height] = size;
+    const [normX, normY] = origin;
+
+    // Convert normalized origin to absolute coordinates
+    const originX = normX * width;
+    const originY = normY * height;
+
+    const [scaleX, scaleY] = typeof scale === "number" ? [scale, scale] : scale;
+
+    // Translate to origin
+    const translateToOrigin: Transform = [
+      [1, 0, -originX],
+      [0, 1, -originY],
+    ];
+
+    // Apply scaling
+    const scalingMatrix: Transform = [
+      [scaleX, 0, 0],
+      [0, scaleY, 0],
+    ];
+
+    // Translate back from origin
+    const translateBack: Transform = [
+      [1, 0, originX],
+      [0, 1, originY],
+    ];
+
+    // Combine: Translate to origin -> Scale -> Translate back
+    const scaledTransform = multiply(
+      translateBack,
+      multiply(scalingMatrix, translateToOrigin)
+    );
+
+    // Apply scaling to the existing transform
+    return multiply(scaledTransform, transform);
+  }
+
+  /**
+   * Extracts the scaling factors from a 2D transformation matrix.
+   *
+   * @param transform - The transformation matrix to extract the scale from.
+   * @returns A `Vector2` containing the scaling factors `[scaleX, scaleY]`.
+   *
+   * @example
+   * const transform: cmath.Transform = [
+   *   [2, 0, 10], // ScaleX, ShearY, TranslateX
+   *   [0, 3, 20], // ShearX, ScaleY, TranslateY
+   * ];
+   * const scale = cmath.transform.getScale(transform);
+   * console.log(scale); // Output: [2, 3]
+   */
+  export function getScale(transform: cmath.Transform): cmath.Vector2 {
+    const scaleX = Math.sqrt(transform[0][0] ** 2 + transform[0][1] ** 2);
+    const scaleY = Math.sqrt(transform[1][0] ** 2 + transform[1][1] ** 2);
+
+    return [scaleX, scaleY];
+  }
+
+  /**
+   * Extracts the translation components (translateX, translateY) from a 2D transformation matrix.
+   *
+   * @param transform - The transformation matrix to extract the translation from.
+   * @returns A `Vector2` containing the translation `[translateX, translateY]`.
+   *
+   * @example
+   * const transform: cmath.Transform = [
+   *   [1, 0, 10], // ScaleX, ShearY, TranslateX
+   *   [0, 1, 20], // ShearX, ScaleY, TranslateY
+   * ];
+   * const translate = cmath.transform.getTranslate(transform);
+   * console.log(translate); // Output: [10, 20]
+   */
+  export function getTranslate(transform: cmath.Transform): cmath.Vector2 {
+    return [transform[0][2], transform[1][2]];
+  }
+
+  /**
+   * Applies a translation to a 2D transform matrix.
+   *
+   * @param transform - The original 2D transform matrix.
+   * @param delta - The translation vector `[deltaX, deltaY]` to apply.
+   * @returns A new transform matrix with the translation applied.
+   *
+   * @example
+   * const transform: cmath.Transform = [
+   *   [1, 0, 10], // ScaleX, ShearY, TranslateX
+   *   [0, 1, 20], // ShearX, ScaleY, TranslateY
+   * ];
+   * const delta: cmath.Vector2 = [5, -10];
+   * const translated = cmath.transform.translate(transform, delta);
+   * console.log(translated);
+   * // Output:
+   * // [
+   * //   [1, 0, 15], // TranslateX becomes 10 + 5 = 15
+   * //   [0, 1, 10], // TranslateY becomes 20 - 10 = 10
+   * // ]
+   */
+  export function translate(
+    transform: Transform,
+    delta: cmath.Vector2
+  ): Transform {
+    const [deltaX, deltaY] = delta;
+
+    return [
+      [transform[0][0], transform[0][1], transform[0][2] + deltaX],
+      [transform[1][0], transform[1][1], transform[1][2] + deltaY],
+    ];
+  }
+
+  /**
    * Produces a relative 2D transform matrix for a linear gradient at `deg` degrees
    * in a normalized 1x1 space (Figma-like behavior).
    */

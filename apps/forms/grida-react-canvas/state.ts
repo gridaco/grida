@@ -127,10 +127,7 @@ interface IDocumentEditorClipboardState {
 }
 
 interface IDocumentEditorTransformState {
-  transform: {
-    scale: number;
-    translate: cmath.Vector2;
-  };
+  transform: cmath.Transform;
 }
 
 export type GestureState =
@@ -592,10 +589,7 @@ export function initDocumentEditorState({
   const s = new document.DocumentState(init.document);
 
   return {
-    transform: {
-      scale: 1,
-      translate: [0, 0],
-    },
+    transform: cmath.transform.identity,
     debug: debug ?? false,
     selection: [],
     hovered_node_id: null,

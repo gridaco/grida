@@ -101,6 +101,7 @@ import { ContentTransform } from "@/grida-react-canvas/renderer";
 import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/utils";
 import useDisableSwipeBack from "@/grida-react-canvas/viewport/hooks/use-disable-browser-swipe-back";
+import { cmath } from "@grida/cmath";
 
 export default function CanvasPlayground() {
   useDisableSwipeBack();
@@ -465,7 +466,9 @@ function Zoom() {
 
   const options = useMemo(() => [10, 50, 100, 150, 200, 500], []);
 
-  const pct = Math.round(transform.scale * 100);
+  const [scaleX, scaleY] = cmath.transform.getScale(transform);
+
+  const pct = Math.round(scaleX * 100);
   return (
     <Select
       value={undefined}

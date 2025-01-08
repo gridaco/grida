@@ -44,18 +44,18 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 ): S {
   // adjust the event by transform
 
-  // if ("event" in action) {
-  //   const scale = state.transform.scale;
-  //   const factor: cmath.Vector2 = [1 / scale, 1 / scale];
-  //   const original = { ...action.event };
-  //   const adj = {
-  //     ...original,
-  //     // only delta and movement are scaled
-  //     delta: cmath.vector2.multiply(action.event.delta, factor),
-  //     movement: cmath.vector2.multiply(action.event.movement, factor),
-  //   };
-  //   action.event = adj;
-  // }
+  if ("event" in action) {
+    const [scaleX, scaleY] = cmath.transform.getScale(state.transform);
+    const factor: cmath.Vector2 = [1 / scaleX, 1 / scaleY];
+    const original = { ...action.event };
+    const adj = {
+      ...original,
+      // only delta and movement are scaled
+      delta: cmath.vector2.multiply(action.event.delta, factor),
+      movement: cmath.vector2.multiply(action.event.movement, factor),
+    };
+    action.event = adj;
+  }
 
   switch (action.type) {
     // #region [html backend] canvas event target
@@ -66,7 +66,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       const c_surface_pos: cmath.Vector2 = [x, y];
       const c_content_pos = cmath.vector2.sub(
         state.surface_cursor_position,
-        state.transform.translate
+        cmath.transform.getTranslate(state.transform)
       );
 
       return produce(state, (draft) => {
@@ -630,10 +630,10 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
           switch (draft.gesture.type) {
             case "pan": {
               // move the viewport by delta
-              draft.transform = {
-                ...draft.transform,
-                translate: cmath.vector2.add(draft.transform.translate, delta),
-              };
+              draft.transform = cmath.transform.translate(
+                draft.transform,
+                delta
+              );
               break;
             }
             // [insertion mode - resize after insertion]

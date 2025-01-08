@@ -223,6 +223,9 @@ export function EditorSurface() {
         // TODO: use mx instead of dx (dx gets stuck by the useGesture's default behaviours)
         zoom(dx);
       },
+      onPinchEnd: (state) => {
+        state.cancel();
+      },
       onWheel: (state) => {
         const { event, delta, wheeling, ctrlKey } = state;
         if (event.defaultPrevented) return;

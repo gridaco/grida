@@ -1442,11 +1442,11 @@ export function useDocument() {
   const scale = useCallback(
     (value: number) =>
       dispatch({
-        type: "camera/transform",
-        transform: {
-          ...transform,
-          scale: value,
-        },
+        type: "transform",
+        transform: [
+          [value, transform[0][1], transform[0][2]],
+          [transform[1][0], value, transform[1][2]],
+        ],
       }),
     [dispatch, transform]
   );
@@ -1991,8 +1991,11 @@ export function useEventTarget() {
   const zoom = useCallback(
     (delta: number) => {
       dispatch({
-        type: "camera/transform",
-        transform: { ...transform, scale: transform.scale + delta },
+        type: "transform",
+        transform: [
+          [transform[0][0] + delta, transform[0][1], transform[0][2]],
+          [transform[1][0], transform[1][1] + delta, transform[1][2]],
+        ],
       });
     },
     [dispatch, transform]
@@ -2001,11 +2004,8 @@ export function useEventTarget() {
   const pan = useCallback(
     (delta: [dx: number, dy: number]) => {
       dispatch({
-        type: "camera/transform",
-        transform: {
-          ...transform,
-          translate: cmath.vector2.add(transform.translate, delta),
-        },
+        type: "transform",
+        transform: cmath.transform.translate(transform, delta),
       });
     },
     [dispatch, transform]
@@ -2123,14 +2123,18 @@ export function useEventTarget() {
           [marquee.x1, marquee.y1],
           [marquee.x2, marquee.y2],
         ]);
-        marqueerect.x = marqueerect.x - transform.translate[0];
-        marqueerect.y = marqueerect.y - transform.translate[1];
+
+        const [translateX, translateY] =
+          cmath.transform.getTranslate(transform);
+
+        marqueerect.x = marqueerect.x - translateX;
+        marqueerect.y = marqueerect.y - translateY;
 
         els?.forEach((el) => {
           const eldomrect = el.getBoundingClientRect();
           const elrect = {
-            x: eldomrect.x - transform.translate[0] - viewport_pos[0],
-            y: eldomrect.y - transform.translate[1] - viewport_pos[1],
+            x: eldomrect.x - translateX - viewport_pos[0],
+            y: eldomrect.y - translateY - viewport_pos[1],
             width: eldomrect.width,
             height: eldomrect.height,
           };
@@ -2328,7 +2332,8 @@ export function useDataTransferEventTarget() {
         viewportdomrect.x,
         viewportdomrect.y,
       ];
-      return cmath.vector2.sub(xy, viewport_pos, state.transform.translate);
+      const translate = cmath.transform.getTranslate(state.transform);
+      return cmath.vector2.sub(xy, viewport_pos, translate);
     },
     [state.transform]
   );

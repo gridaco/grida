@@ -35,7 +35,7 @@ export default function reducer<S extends IDocumentEditorState>(
         draft.surface_cursor_position = prev_state.surface_cursor_position;
       }) as S;
     }
-    case "camera/transform": {
+    case "transform": {
       return produce(state, (draft: Draft<S>) => {
         draft.transform = action.transform;
       });

@@ -6,7 +6,8 @@ import { useDocument, useTransform } from "@/grida-react-canvas/provider";
 export default function useSnapGuide() {
   const { state } = useDocument();
   const { gesture } = state;
-  const { translate } = useTransform();
+  const transform = useTransform();
+  const translate = cmath.transform.getTranslate(transform);
 
   if (
     (gesture.type === "translate" ||
