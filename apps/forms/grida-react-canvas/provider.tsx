@@ -1878,7 +1878,14 @@ export function useDocument() {
 
 export function useTransform() {
   const [state] = __useInternal();
-  return useMemo(() => state.transform, [state.transform]);
+  return useMemo(() => {
+    const transform = state.transform;
+    const matrix = `matrix(${transform[0][0]}, ${transform[1][0]}, ${transform[0][1]}, ${transform[1][1]}, ${transform[0][2]}, ${transform[1][2]})`;
+    return {
+      style: { matrix } as React.CSSProperties,
+      transform: state.transform,
+    };
+  }, [state.transform]);
 }
 
 function throttle<T extends (...args: any[]) => void>(
@@ -1936,8 +1943,6 @@ export function useEventTarget() {
     selection,
     content_edit_mode,
     cursor_mode,
-    cursor_position,
-    surface_cursor_position,
     marquee,
     debug,
   } = state;
@@ -2243,8 +2248,6 @@ export function useEventTarget() {
       //
       marquee,
       cursor_mode,
-      cursor_position,
-      surface_cursor_position,
       setCursorMode,
       //
       hovered_node_id,
@@ -2285,8 +2288,6 @@ export function useEventTarget() {
     //
     marquee,
     cursor_mode,
-    cursor_position,
-    surface_cursor_position,
     setCursorMode,
     //
     hovered_node_id,

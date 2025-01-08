@@ -9,7 +9,7 @@ import { measure, Measurement } from "@grida/cmath/_measurement";
 export default function useMeasurement() {
   const { state, selection } = useDocument();
   const { surface_measurement_target } = state;
-  const transform = useTransform();
+  const { transform } = useTransform();
 
   const translate = cmath.transform.getTranslate(transform);
 

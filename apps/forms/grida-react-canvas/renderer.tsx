@@ -42,17 +42,10 @@ export function StandaloneDocumentContent({
 }
 
 export function ContentTransform({ children }: React.PropsWithChildren<{}>) {
-  const transform = useTransform();
-
-  const matrix = `matrix(${transform[0][0]}, ${transform[1][0]}, ${transform[0][1]}, ${transform[1][1]}, ${transform[0][2]}, ${transform[1][2]})`;
+  const { style } = useTransform();
 
   return (
-    <div
-      className="w-full h-full"
-      style={{
-        transform: matrix,
-      }}
-    >
+    <div className="w-full h-full" style={style}>
       {children}
     </div>
   );
