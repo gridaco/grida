@@ -344,6 +344,62 @@ export namespace cmath.vector2 {
       [-Infinity, -Infinity] as Vector2
     );
   }
+
+  /**
+   * Applies a 2D transformation matrix to a vector.
+   *
+   * This function takes a 2D vector `[x, y]` and applies an affine transformation
+   * using the provided transformation matrix. The transformation includes
+   * scaling, rotation, and translation.
+   *
+   * The transformation matrix is in the format:
+   * ```
+   * [[a, b, tx],
+   *  [c, d, ty]]
+   * ```
+   * where:
+   * - `a` and `d` represent scaling along the x-axis and y-axis, respectively.
+   * - `b` and `c` represent rotation.
+   * - `tx` and `ty` represent translation along the x-axis and y-axis.
+   *
+   * @param vector - The input 2D vector `[x, y]` to transform.
+   * @param transform - The 2D transformation matrix.
+   * @returns The transformed vector `[x', y']` after applying the transformation.
+   *
+   * @example
+   * // Rotate a vector [1, 0] by 90 degrees and translate by [2, 3]
+   * const vector: cmath.Vector2 = [1, 0];
+   * const transform: cmath.Transform = [
+   *   [0, -1, 2],
+   *   [1, 0, 3],
+   * ];
+   * const result = cmath.vector2.transform(vector, transform);
+   * console.log(result); // [2, 4]
+   *
+   * @example
+   * // Apply scaling transformation
+   * const vector: cmath.Vector2 = [2, 3];
+   * const transform: cmath.Transform = [
+   *   [2, 0, 0],
+   *   [0, 3, 0],
+   * ];
+   * const result = cmath.vector2.transform(vector, transform);
+   * console.log(result); // [4, 9]
+   *
+   * @remarks
+   * - This function is useful in computer graphics, physics simulations, and other
+   *   mathematical computations where 2D transformations are required.
+   * - The transformation matrix must be well-formed; otherwise, the behavior is undefined.
+   */
+  export function transform(
+    vector: Vector2,
+    transform: cmath.Transform
+  ): Vector2 {
+    const [[a, b, tx], [c, d, ty]] = transform;
+    const [x, y] = vector;
+
+    return [a * x + b * y + tx, c * x + d * y + ty];
+  }
 }
 
 export namespace cmath.rect {
