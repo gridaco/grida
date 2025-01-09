@@ -10,11 +10,68 @@ export namespace domapi {
     return window.document.getElementById(node_id);
   }
 
+  export class CanvasDOM {
+    readonly scale: cmath.Vector2;
+    constructor(readonly transform: cmath.Transform) {
+      this.scale = cmath.transform.getScale(transform);
+    }
+
+    getNodesIntersectsArea(area: cmath.Rectangle): string[] {
+      const contained: string[] = [];
+      const all_els = domapi.get_grida_node_elements();
+
+      all_els?.forEach((el) => {
+        const rect = this.getNodeBoundingRect(el.id);
+        if (!rect) return;
+        if (cmath.rect.intersects(rect, area)) {
+          contained.push(el.id);
+        }
+      });
+
+      return contained;
+    }
+
+    /**
+     * returns a bounding rect of the node in canvas space (consistant with the transform)
+     * @param node_id
+     * @returns
+     */
+    getNodeBoundingRect(node_id: string): cmath.Rectangle | null {
+      const contentrect = get_content_element()?.getBoundingClientRect();
+      const noderect = get_node_element(node_id)?.getBoundingClientRect();
+
+      if (!contentrect) {
+        throw new Error("renderer missing - content element rect is null");
+      }
+
+      if (!noderect) {
+        return null;
+      }
+
+      const domrect = {
+        x: noderect.x - contentrect.x,
+        y: noderect.y - contentrect.y,
+        width: noderect.width,
+        height: noderect.height,
+      } satisfies cmath.Rectangle;
+
+      const rect = cmath.rect.scale(
+        domrect,
+        [0, 0],
+        [1 / this.scale[0], 1 / this.scale[1]]
+      );
+
+      return rect;
+    }
+  }
+
   /**
-   * returns a bounding Rectangle of the node element in the content (renderer) space
+   * returns a bounding Rectangle of the node element in window space, relative to viewport
    * @returns
+   *
+   * @deprecated
    */
-  export function get_node_bounding_rect(node_id: string) {
+  export function get_node_bounding_client_rect(node_id: string) {
     const contentrect = get_content_element()?.getBoundingClientRect();
     const noderect = get_node_element(node_id)?.getBoundingClientRect();
 
@@ -26,12 +83,14 @@ export namespace domapi {
       return null;
     }
 
-    return {
+    const domrect = {
       x: noderect.x - contentrect.x,
       y: noderect.y - contentrect.y,
       width: noderect.width,
       height: noderect.height,
     } satisfies cmath.Rectangle;
+
+    return domrect;
   }
 
   export function get_content_element() {

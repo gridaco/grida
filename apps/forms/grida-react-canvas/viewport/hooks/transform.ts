@@ -56,44 +56,6 @@ export function useNodeDomElements(node_ids: string[]) {
 
 /**
  * returns the relative transform of the node surface relative to the portal
- */
-function useNodeSurfaceTransfrom_v1(node_id: string) {
-  const __rect_fallback = useMemo(() => new DOMRect(0, 0, 0, 0), []);
-  const { getNodeAbsoluteRotation } = useDocument();
-  const portal = useViewportSurfacePortal();
-  const node_element = useNodeDomElement(node_id);
-  const portal_rect = portal?.getBoundingClientRect() ?? __rect_fallback;
-  const node_element_bounding_rect =
-    node_element?.getBoundingClientRect() ?? __rect_fallback;
-
-  // Calculate the center position relative to the portal
-  const centerX =
-    node_element_bounding_rect.left +
-    node_element_bounding_rect.width / 2 -
-    portal_rect.left;
-  const centerY =
-    node_element_bounding_rect.top +
-    node_element_bounding_rect.height / 2 -
-    portal_rect.top;
-
-  // Calculate the position of the target relative to the portal
-  const width = node_element?.clientWidth;
-  const height = node_element?.clientHeight;
-
-  // absolute rotation => accumulated rotation to the root
-  const absolute_rotation = getNodeAbsoluteRotation(node_id);
-
-  return {
-    top: centerY,
-    left: centerX,
-    transform: `translate(-50%, -50%) rotate(${absolute_rotation ?? 0}deg)`,
-    width: width,
-    height: height,
-  };
-}
-
-/**
- * returns the relative transform of the node surface relative to the portal
  * TODO: Not tested with the performance
  */
 export function useNodeSurfaceTransfrom(node_id: string) {

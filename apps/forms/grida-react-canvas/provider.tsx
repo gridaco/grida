@@ -2122,29 +2122,11 @@ export function useEventTarget() {
   const dragEnd = useCallback(
     (event: PointerEvent) => {
       if (marquee) {
-        const contained: string[] = [];
+        // test area in canvas space
+        const area = cmath.rect.fromPoints([marquee.a, marquee.b]);
 
-        const els = domapi.get_grida_node_elements();
-        const viewportdomrect = domapi.get_viewport_rect();
-        const viewport_pos = [viewportdomrect.x, viewportdomrect.y];
-
-        const marqueerect = cmath.rect.fromPoints([marquee.a, marquee.b]);
-
-        const [translateX, translateY] =
-          cmath.transform.getTranslate(transform);
-
-        els?.forEach((el) => {
-          const eldomrect = el.getBoundingClientRect();
-          const elrect = {
-            x: eldomrect.x - translateX - viewport_pos[0],
-            y: eldomrect.y - translateY - viewport_pos[1],
-            width: eldomrect.width,
-            height: eldomrect.height,
-          };
-          if (cmath.rect.intersects(elrect, marqueerect)) {
-            contained.push(el.id);
-          }
-        });
+        const cdom = new domapi.CanvasDOM(transform);
+        const contained = cdom.getNodesIntersectsArea(area);
 
         dispatch({
           type: "event-target/event/on-drag-end",

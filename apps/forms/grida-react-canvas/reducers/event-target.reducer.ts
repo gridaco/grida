@@ -141,7 +141,8 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
             const nnode = initialNode(draft.cursor_mode.node);
 
-            const parent_rect = domapi.get_node_bounding_rect(parent)!;
+            const cdom = new domapi.CanvasDOM(draft.transform);
+            const parent_rect = cdom.getNodeBoundingRect(parent)!;
 
             try {
               const _nnode = nnode as grida.program.nodes.AnyNode;
@@ -491,8 +492,9 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             const parent = __get_insert_target(draft);
             self_insertNode(draft, parent, vector);
 
+            const cdom = new domapi.CanvasDOM(draft.transform);
             // position relative to the parent
-            const parent_rect = domapi.get_node_bounding_rect(parent)!;
+            const parent_rect = cdom.getNodeBoundingRect(parent)!;
             const node_relative_pos = cmath.vector2.sub(
               state.pointer.position,
               [parent_rect.x, parent_rect.y]
@@ -915,8 +917,11 @@ function self_start_gesture_scale_draw_new_node(
 function self_start_gesture_translate(draft: Draft<IDocumentEditorState>) {
   const selection = draft.selection;
   if (selection.length === 0) return;
+
+  const cdom = new domapi.CanvasDOM(draft.transform);
+
   const rects = draft.selection.map(
-    (node_id) => domapi.get_node_bounding_rect(node_id)!
+    (node_id) => cdom.getNodeBoundingRect(node_id)!
   );
 
   draft.gesture = {

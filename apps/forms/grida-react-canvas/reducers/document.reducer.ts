@@ -261,12 +261,14 @@ export default function documentReducer<S extends IDocumentEditorState>(
       return produce(state, (draft) => {
         // for nudge, gesture is not required, but only for surface ux.
         if (draft.gesture.type === "nudge") {
+          const cdpm = new domapi.CanvasDOM(state.transform);
+
           const snap_target_node_ids = getSnapTargets(state.selection, state);
           const snap_target_node_rects = snap_target_node_ids.map(
-            (node_id) => domapi.get_node_bounding_rect(node_id)!
+            (node_id) => cdpm.getNodeBoundingRect(node_id)!
           );
           const origin_rects = target_node_ids.map(
-            (node_id) => domapi.get_node_bounding_rect(node_id)!
+            (node_id) => cdpm.getNodeBoundingRect(node_id)!
           );
           const { snapping } = snapObjectsTranslation(
             origin_rects,
@@ -334,9 +336,9 @@ export default function documentReducer<S extends IDocumentEditorState>(
         //
       }
 
-      const rects = bounding_node_ids.map((node_id) =>
-        // TODO: do not use domapi in reducer
-        domapi.get_node_element(node_id)!.getBoundingClientRect()
+      const cdom = new domapi.CanvasDOM(state.transform);
+      const rects = bounding_node_ids.map(
+        (node_id) => cdom.getNodeBoundingRect(node_id)!
       );
 
       //
@@ -369,9 +371,9 @@ export default function documentReducer<S extends IDocumentEditorState>(
       const { target, axis } = action;
       const target_node_ids = target === "selection" ? state.selection : target;
 
-      const rects = target_node_ids.map((node_id) =>
-        // TODO: do not use domapi in reducer
-        domapi.get_node_element(node_id)!.getBoundingClientRect()
+      const cdom = new domapi.CanvasDOM(state.transform);
+      const rects = target_node_ids.map(
+        (node_id) => cdom.getNodeBoundingRect(node_id)!
       );
 
       // Only allow distribute-evenly of 3 or more nodes

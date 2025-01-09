@@ -97,7 +97,6 @@ import { EditorSurfaceDropzone } from "@/grida-react-canvas/viewport/surface-dro
 import { EditorSurfaceContextMenu } from "@/grida-react-canvas/viewport/surface-context-menu";
 import { EditorSurfaceClipboardSyncProvider } from "@/grida-react-canvas/viewport/surface";
 import { datatransfer } from "@/grida-react-canvas/viewport/data-transfer";
-import { ContentTransform } from "@/grida-react-canvas/renderer";
 import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/utils";
 import useDisableSwipeBack from "@/grida-react-canvas/viewport/hooks/use-disable-browser-swipe-back";
@@ -384,13 +383,11 @@ export default function CanvasPlayground() {
                     <div className="w-full h-full flex flex-col relative bg-black/5">
                       <ViewportRoot className="relative w-full h-full no-scrollbar overflow-y-auto">
                         <EditorSurface />
-                        <ContentTransform>
-                          {/* <div className="w-full h-full flex items-center justify-center"> */}
-                          {/* <div className="shadow-lg rounded-xl border overflow-hidden"> */}
-                          <StandaloneDocumentContent />
-                          {/* </div> */}
-                          {/* </div> */}
-                        </ContentTransform>
+                        {/* <div className="w-full h-full flex items-center justify-center"> */}
+                        {/* <div className="shadow-lg rounded-xl border overflow-hidden"> */}
+                        <StandaloneDocumentContent />
+                        {/* </div> */}
+                        {/* </div> */}
 
                         {!uiHidden && (
                           <>

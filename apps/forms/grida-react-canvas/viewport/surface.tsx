@@ -637,7 +637,7 @@ function usePrefferedDistributionAxis() {
     );
 
     const rects = activeSelection.map(
-      (node_id) => domapi.get_node_bounding_rect(node_id)!
+      (node_id) => domapi.get_node_bounding_client_rect(node_id)!
     );
 
     if (rects.length > 2) {

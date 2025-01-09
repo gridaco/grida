@@ -1,15 +1,11 @@
 import type { Draft } from "immer";
 import type { IDocumentEditorState } from "../../state";
-import { self_insertNode, self_insertSubDocument } from "./insert";
+import { self_insertSubDocument } from "./insert";
 import { self_deleteNode } from "./delete";
 import { document } from "../../document-query";
 import { cmath } from "@grida/cmath";
 import { domapi } from "../../domapi";
-import {
-  getSnapTargets,
-  snapMovement,
-  snapObjectsTranslation,
-} from "../tools/snap";
+import { getSnapTargets, snapObjectsTranslation } from "../tools/snap";
 import nodeTransformReducer from "../node-transform.reducer";
 import nodeReducer from "../node.reducer";
 import assert from "assert";
@@ -275,9 +271,11 @@ function __self_update_gesture_transform_translate(
 
   const snap_target_node_ids = getSnapTargets(current_selection, draft);
 
+  const cdom = new domapi.CanvasDOM(draft.transform);
+
   const snap_target_node_rects = snap_target_node_ids
     .map((node_id: string) => {
-      const r = domapi.get_node_bounding_rect(node_id);
+      const r = cdom.getNodeBoundingRect(node_id);
       if (!r) reportError(`Node ${node_id} does not have a bounding rect`);
       return r!;
     })
@@ -300,7 +298,7 @@ function __self_update_gesture_transform_translate(
       const r = translated[i++];
 
       const parent_id = document.getParentId(draft.document_ctx, node_id)!;
-      const parent_rect = domapi.get_node_bounding_rect(parent_id)!;
+      const parent_rect = cdom.getNodeBoundingRect(parent_id)!;
 
       if (!parent_rect) {
         console.error("below error is caused by");
@@ -421,8 +419,9 @@ function __self_update_gesture_transform_scale(
         preserveAspectRatio: transform_with_preserve_aspect_ratio === "on",
       });
     } else {
+      const cdom = new domapi.CanvasDOM(draft.transform);
       const parent_id = document.getParentId(draft.document_ctx, node_id)!;
-      const parent_rect = domapi.get_node_bounding_rect(parent_id)!;
+      const parent_rect = cdom.getNodeBoundingRect(parent_id)!;
 
       assert(
         parent_rect,

@@ -34,21 +34,19 @@ export function StandaloneDocumentContent({
   const { root_id } = document;
 
   return (
-    <div id={domapi.k.EDITOR_CONTENT_ELEMENT_ID} ref={ref} {...props}>
-      {/* <DebugPointer position={pointer.position} /> */}
-      <UserDocumentCustomRendererContext.Provider value={templates ?? {}}>
-        <NodeElement node_id={root_id} />
-      </UserDocumentCustomRendererContext.Provider>
-    </div>
+    <Transform>
+      <div id={domapi.k.EDITOR_CONTENT_ELEMENT_ID} ref={ref} {...props}>
+        {/* <DebugPointer position={pointer.position} /> */}
+        <UserDocumentCustomRendererContext.Provider value={templates ?? {}}>
+          <NodeElement node_id={root_id} />
+        </UserDocumentCustomRendererContext.Provider>
+      </div>
+    </Transform>
   );
 }
 
-export function ContentTransform({ children }: React.PropsWithChildren<{}>) {
+function Transform({ children }: React.PropsWithChildren<{}>) {
   const { style } = useTransform();
 
-  return (
-    <div className="w-full h-full" style={style}>
-      {children}
-    </div>
-  );
+  return <div style={style}>{children}</div>;
 }

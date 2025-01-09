@@ -659,45 +659,19 @@ function SelectedNodeProperties() {
   const is_flex_container = is_container && layout === "flex";
   const is_stylable = type !== "template_instance";
 
-  const {
-    //
-    // boxShadow,
-    //
-    // margin,
-    // padding,
-    //
-    // aspectRatio,
-    //
-    // flexWrap,
-    // gap,
-    //
-  } = {
-    // ...selected_node_default_style,
-    ...(style || {}),
-  } satisfies grida.program.css.ExplicitlySupportedCSSProperties;
+  // const {
+  //   // boxShadow,
+  //   // margin,
+  //   // aspectRatio,
+  //   // flexWrap,
+  //   // gap,
+  // } = {
+  //   ...(style || {}),
+  // } satisfies grida.program.css.ExplicitlySupportedCSSProperties;
 
   return (
     <div key={node_id} className="mt-4 mb-10">
       <AlignNodes />
-      {/* {debug && (
-        <SidebarSection className="border-b pb-4">
-          <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>Debug</SidebarSectionHeaderLabel>
-          </SidebarSectionHeaderItem>
-          <DebugControls />
-        </SidebarSection>
-      )} */}
-      {/* <SidebarSection className="border-b">
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel className="w-full flex justify-between items-center">
-            <div>
-              <div className="capitalize">{type}</div>
-              <br />
-              <small className="font-mono">{id}</small>
-            </div>
-          </SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-      </SidebarSection> */}
       <SidebarSection className="border-b pb-4">
         <SidebarMenuSectionContent className="space-y-2">
           <PropertyLine className="items-center gap-1">

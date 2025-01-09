@@ -95,6 +95,9 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
     }
     case "surface/gesture/start": {
       const { gesture } = action;
+
+      const cdom = new domapi.CanvasDOM(state.transform);
+
       switch (gesture.type) {
         case "curve": {
           const { node_id, segment, control } = gesture;
@@ -122,6 +125,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
             self_start_gesture_scale(draft, {
               selection: selection,
               direction: direction,
+              cdom,
             });
           });
           //
@@ -134,8 +138,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
             draft.gesture = {
               type: "corner-radius",
               movement: cmath.vector2.zero,
-              initial_bounding_rectangle:
-                domapi.get_node_bounding_rect(node_id)!,
+              initial_bounding_rectangle: cdom.getNodeBoundingRect(node_id)!,
               node_id: node_id,
             };
           });
@@ -147,8 +150,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
             self_selectNode(draft, "reset", selection);
             self_start_gesture_rotate(draft, {
               selection: selection,
-              initial_bounding_rectangle:
-                domapi.get_node_bounding_rect(selection)!,
+              initial_bounding_rectangle: cdom.getNodeBoundingRect(selection)!,
               // TODO: the offset of rotation handle relative to the center of the rectangle
               offset: cmath.vector2.zero,
             });
@@ -196,15 +198,15 @@ function self_start_gesture_scale(
   {
     selection,
     direction,
+    cdom,
   }: {
     selection: string[];
     direction: cmath.CardinalDirection;
+    cdom: domapi.CanvasDOM;
   }
 ) {
   if (selection.length === 0) return;
-  const rects = selection.map(
-    (node_id) => domapi.get_node_bounding_rect(node_id)!
-  );
+  const rects = selection.map((node_id) => cdom.getNodeBoundingRect(node_id)!);
 
   draft.gesture = {
     type: "scale",
