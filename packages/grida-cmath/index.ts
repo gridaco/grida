@@ -101,6 +101,10 @@ export namespace cmath {
     return Math.round(value * factor) / factor;
   }
 
+  export function clamp(value: Scalar, min: Scalar, max: Scalar): Scalar {
+    return Math.min(Math.max(value, min), max);
+  }
+
   /**
    * Finds the nearest value to a given number from a list of target numbers.
    *

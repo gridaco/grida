@@ -135,6 +135,7 @@ export function useEditorHotKeys() {
     tryToggleContentEditMode,
   } = useEventTarget();
   const {
+    scale,
     select,
     blur,
     undo,
@@ -580,6 +581,11 @@ export function useEditorHotKeys() {
     const o = i / 10;
     setOpacity("selection", o);
     toast.success(`opacity: ${o}`);
+  });
+
+  useHotkeys("shift+0", (e) => {
+    scale(1, "center");
+    toast.success(`Zoom to 100%`);
   });
 
   useHotkeys("]", (e) => {

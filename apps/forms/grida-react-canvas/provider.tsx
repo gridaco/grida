@@ -35,7 +35,8 @@ import deepEqual from "deep-equal";
 import { iosvg } from "@/grida-io-svg";
 import toast from "react-hot-toast";
 
-const CANVAS_MIN_ZOOM = 0.02;
+const CONFIG_CANVAS_TRANSFORM_SCALE_MIN = 0.02;
+const CONFIG_CANVAS_TRANSFORM_SCALE_MAX = 256;
 
 const DocumentContext = createContext<IDocumentEditorState | null>(null);
 
@@ -1442,14 +1443,54 @@ export function useDocument() {
   const { order: _, ...nodeActions } = __useNodeActions(dispatch);
 
   const scale = useCallback(
-    (value: number) =>
+    (
+      factor: number | cmath.Vector2,
+      origin: cmath.Vector2 | "center" = "center"
+    ) => {
+      const [fx, fy] = typeof factor === "number" ? [factor, factor] : factor;
+      const _scale = transform[0][0];
+      let ox, oy: number;
+      if (origin === "center") {
+        // Canvas size (you need to know or pass this)
+        const { width, height } = domapi.get_viewport_rect();
+
+        // Calculate the absolute transform origin
+        ox = width / 2;
+        oy = height / 2;
+      } else {
+        [ox, oy] = origin;
+      }
+
+      const sx = cmath.clamp(
+        fx,
+        CONFIG_CANVAS_TRANSFORM_SCALE_MIN,
+        CONFIG_CANVAS_TRANSFORM_SCALE_MAX
+      );
+
+      const sy = cmath.clamp(
+        fy,
+        CONFIG_CANVAS_TRANSFORM_SCALE_MIN,
+        CONFIG_CANVAS_TRANSFORM_SCALE_MAX
+      );
+
+      const [tx, ty] = cmath.transform.getTranslate(transform);
+
+      // calculate the offset that should be applied with scale with css transform.
+      const [newx, newy] = [
+        ox - (ox - tx) * (sx / _scale),
+        oy - (oy - ty) * (sy / _scale),
+      ];
+
+      const next: cmath.Transform = [
+        [sx, transform[0][1], newx],
+        [transform[1][0], sy, newy],
+      ];
+
       dispatch({
         type: "transform",
-        transform: [
-          [value, transform[0][1], transform[0][2]],
-          [transform[1][0], value, transform[1][2]],
-        ],
-      }),
+        transform: next,
+      });
+    },
     [dispatch, transform]
   );
 
@@ -1999,34 +2040,26 @@ export function useEventTarget() {
     return position;
   };
 
-  // const zoom = useCallback(
-  //   (delta: number, event: MouseEvent) => {
-  //     dispatch({
-  //       type: "transform",
-  //       transform: [
-  //         [transform[0][0] + delta, transform[0][1], transform[0][2]],
-  //         [transform[1][0], transform[1][1] + delta, transform[1][2]],
-  //       ],
-  //     });
-  //   },
-  //   [dispatch, transform]
-  // );
-
-  // Zoom so that the pointer stays anchored on the same canvas-space location.
-
   const zoom = useCallback(
     (delta: number, origin: cmath.Vector2) => {
-      const scale = transform[0][0];
-      // the origin point of the zooming point in x, y
+      const _scale = transform[0][0];
+      // the origin point of the zooming point in x, y (surface space)
       const [ox, oy] = origin;
 
-      const newscale = Math.max(scale + delta, CANVAS_MIN_ZOOM);
+      // Apply proportional zooming
+      const scale = _scale + _scale * delta;
+
+      const newscale = cmath.clamp(
+        scale,
+        CONFIG_CANVAS_TRANSFORM_SCALE_MIN,
+        CONFIG_CANVAS_TRANSFORM_SCALE_MAX
+      );
       const [tx, ty] = cmath.transform.getTranslate(transform);
 
       // calculate the offset that should be applied with scale with css transform.
       const [newx, newy] = [
-        ox - (ox - tx) * (newscale / scale),
-        oy - (oy - ty) * (newscale / scale),
+        ox - (ox - tx) * (newscale / _scale),
+        oy - (oy - ty) * (newscale / _scale),
       ];
 
       const next: cmath.Transform = [

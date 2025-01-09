@@ -31,6 +31,7 @@ import { SurfacePathEditor } from "./ui/path-editor";
 import { SizeMeterLabel } from "./ui/meter";
 import { SurfaceGradientEditor } from "./ui/gradient-editor";
 import { pointToSurfaceSpace } from "../utils/transform";
+import PixelGrid from "./pixelgrid";
 
 const DRAG_THRESHOLD = 2;
 
@@ -274,6 +275,11 @@ export function EditorSurface() {
         cursor: cursor,
       }}
     >
+      {/* <div className="absolute w-full h-full z-50">
+        {transform[0][0] > 4 && (
+          <PixelGrid zoomLevel={transform[0][0]} cellSize={1} />
+        )}
+      </div> */}
       <div
         style={{
           position: "absolute",

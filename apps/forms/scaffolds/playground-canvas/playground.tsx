@@ -470,7 +470,7 @@ function Zoom() {
     <Select
       value={undefined}
       onValueChange={(v) => {
-        scale(parseInt(v) / 100);
+        scale(parseInt(v) / 100, "center");
       }}
     >
       <SelectTrigger
