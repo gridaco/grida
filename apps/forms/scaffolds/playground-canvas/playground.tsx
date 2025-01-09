@@ -468,7 +468,7 @@ function Zoom() {
   const pct = Math.round(scaleX * 100);
   return (
     <Select
-      value={undefined}
+      value={scaleX * 100 + ""}
       onValueChange={(v) => {
         scale(parseInt(v) / 100, "center");
       }}
