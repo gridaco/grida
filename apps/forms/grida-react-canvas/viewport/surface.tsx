@@ -237,9 +237,7 @@ export function EditorSurface() {
         // when pinching (on mac os, ctrlKey is set true even when no key pressed), this is true.
         if (ctrlKey || metaKey) {
           // zoom
-          const targetRect = (
-            event.target as HTMLElement
-          ).getBoundingClientRect();
+          const targetRect = eventTargetRef.current!.getBoundingClientRect();
           const ox = event.clientX - targetRect.left;
           const oy = event.clientY - targetRect.top;
           const origin: [number, number] = [ox, oy];
