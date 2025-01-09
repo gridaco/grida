@@ -191,54 +191,6 @@ async function exportWithP666(
   });
 }
 
-/**
- * exports node as archive - used for testing and custom rendering. e.g. PDF, PPTX.
- * TODO:
- */
-export function exportAsArchive(node_id: string) {
-  const domnode = document.getElementById(node_id);
-
-  // recursively collect all the nodes with position and size
-  // Recursive function to collect node data
-  function collectNodeData(node: HTMLElement): any {
-    const boundingRect = node.getBoundingClientRect();
-
-    return {
-      id: node.getAttribute("id") || null,
-      tag: node.tagName.toLowerCase(),
-      styles: getComputedStyle(node),
-      attributes: Array.from(node.attributes).reduce(
-        (acc, attr) => {
-          acc[attr.name] = attr.value;
-          return acc;
-        },
-        {} as Record<string, string>
-      ),
-      position: {
-        x: boundingRect.left,
-        y: boundingRect.top,
-      },
-      size: {
-        width: boundingRect.width,
-        height: boundingRect.height,
-      },
-      children: Array.from(node.children)
-        .filter((child) => child instanceof HTMLElement)
-        .map((child) => collectNodeData(child as HTMLElement)),
-    };
-  }
-
-  // Collect all data starting from the root node
-  const nodeData = collectNodeData(domnode!);
-  //
-
-  saveAs(
-    new Blob([JSON.stringify(nodeData, null, 2)], { type: "application/json" }),
-    "node-data.json"
-  );
-  //
-}
-
 export function ExportNodeControl({
   node_id,
   name,
@@ -315,14 +267,12 @@ function AdvancedExportDialog({
   defaultName: string;
 }) {
   const [backend, setBackend] = React.useState<"canvas" | "p666">("canvas");
-  const [format, setFormat] = React.useState<"png" | "svg" | "archive" | "pdf">(
-    "png"
-  );
+  const [format, setFormat] = React.useState<"png" | "svg" | "pdf">("png");
   const [name, setName] = React.useState<string>(defaultName);
   const [xpath, setXPath] = React.useState<string>("");
 
   const options = {
-    canvas: ["png", "svg", "archive"],
+    canvas: ["png", "svg"],
     p666: ["png", "pdf"],
   };
 
@@ -334,9 +284,6 @@ function AdvancedExportDialog({
           filename: name + "." + format,
           xpath,
         });
-        break;
-      case "archive":
-        exportAsArchive(node_id);
         break;
       case "pdf":
         exportWithP666(node_id, format, {
@@ -415,12 +362,6 @@ function AdvancedExportDialog({
                   disabled={!options[backend].includes("pdf")}
                 >
                   PDF
-                </SelectItem>
-                <SelectItem
-                  value="archive"
-                  disabled={!options[backend].includes("archive")}
-                >
-                  Archive - for testing & custom rendering
                 </SelectItem>
               </SelectContent>
             </Select>
