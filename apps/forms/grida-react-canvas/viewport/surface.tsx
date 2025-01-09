@@ -30,7 +30,6 @@ import { SurfaceTextEditor } from "./ui/text-editor";
 import { SurfacePathEditor } from "./ui/path-editor";
 import { SizeMeterLabel } from "./ui/meter";
 import { SurfaceGradientEditor } from "./ui/gradient-editor";
-import { DebugPointer } from "./ui/debug";
 import { pointToSurfaceSpace } from "../utils/transform";
 
 const DRAG_THRESHOLD = 2;
@@ -382,7 +381,7 @@ function MultipleSelectionOverlay({
   readonly?: boolean;
 }) {
   const { multipleSelectionOverlayClick, cursor_mode } = useEventTarget();
-  const { style, rect } = useGroupSurfaceTransform(...selection);
+  const { style, rect, size } = useGroupSurfaceTransform(...selection);
 
   const enabled = !readonly && cursor_mode.type === "cursor";
 
@@ -432,14 +431,8 @@ function MultipleSelectionOverlay({
         {rect && (
           <SizeMeterLabel
             margin={6}
-            size={rect}
-            rect={{
-              x: 0,
-              y: 0,
-              width: rect.width,
-              height: rect.height,
-            }}
-            zoom={1}
+            size={size}
+            rect={{ ...rect, x: 0, y: 0 }}
             className="bg-workbench-accent-sky"
           />
         )}
@@ -465,7 +458,7 @@ function NodeOverlay({
   zIndex?: number;
   focused?: boolean;
 }) {
-  const { style, rect } = useNodeSurfaceTransfrom(node_id);
+  const { style, rect, size } = useNodeSurfaceTransfrom(node_id);
   const node = useNode(node_id);
 
   const { is_component_consumer } = node.meta;
@@ -509,9 +502,8 @@ function NodeOverlay({
       )}
       {focused && !readonly && rect && (
         <SizeMeterLabel
-          zoom={1}
           margin={6}
-          size={rect}
+          size={size}
           rect={{ ...rect, x: 0, y: 0 }}
           className="bg-workbench-accent-sky"
         />

@@ -10,7 +10,7 @@ import {
 import { ViewportSurfaceContext } from "../context";
 import { cmath } from "@grida/cmath";
 
-export function useViewportSurfacePortal() {
+function useViewportSurfacePortal() {
   const context = useContext(ViewportSurfaceContext);
   if (!context) {
     throw new Error(
@@ -20,7 +20,7 @@ export function useViewportSurfacePortal() {
   return context.portal;
 }
 
-export function useNodeDomElement(node_id: string) {
+function useNodeDomElement(node_id: string) {
   const [nodeElement, setNodeElement] = useState<HTMLElement | null>(null);
 
   useLayoutEffect(() => {
@@ -36,7 +36,7 @@ export function useNodeDomElement(node_id: string) {
   return nodeElement;
 }
 
-export function useNodeDomElements(node_ids: string[]) {
+function useNodeDomElements(node_ids: string[]) {
   const [nodeElement, setNodeElement] = useState<HTMLElement[] | null>(null);
 
   useLayoutEffect(() => {
@@ -65,6 +65,8 @@ export function useNodeSurfaceTransfrom(node_id: string) {
   const portal = useViewportSurfacePortal();
   const node_element = useNodeDomElement(node_id);
 
+  const [rect, setRect] = useState<cmath.Rectangle>();
+  const [size, setSize] = useState<cmath.Vector2>([0, 0]);
   const [style, setStyle] = useState({
     top: 0,
     left: 0,
@@ -72,8 +74,6 @@ export function useNodeSurfaceTransfrom(node_id: string) {
     width: 0,
     height: 0,
   });
-
-  const [rect, setRect] = useState<cmath.Rectangle>();
 
   useEffect(() => {
     if (!node_element || !portal) return;
@@ -102,9 +102,11 @@ export function useNodeSurfaceTransfrom(node_id: string) {
       setRect({
         x: node_element_bounding_rect.left,
         y: node_element_bounding_rect.top,
-        width,
-        height,
+        width: width * scale[0],
+        height: height * scale[1],
       });
+
+      setSize([width, height]);
 
       setStyle({
         top: centerY,
@@ -135,7 +137,7 @@ export function useNodeSurfaceTransfrom(node_id: string) {
     transform,
   ]);
 
-  return { style, rect };
+  return { style, rect, size };
 }
 
 /**
@@ -184,6 +186,7 @@ export function useGroupSurfaceTransform(...node_ids: string[]) {
   const node_elements = useNodeDomElements(stableNodeIds);
 
   const [rect, setRect] = useState<cmath.Rectangle>();
+  const [size, setSize] = useState<cmath.Vector2>([0, 0]);
   const [style, setStyle] = useState({
     top: 0,
     left: 0,
@@ -222,11 +225,16 @@ export function useGroupSurfaceTransform(...node_ids: string[]) {
         boundingRect.y + boundingRect.height / 2 - portal_rect.top;
 
       setRect({
-        x: boundingRect.x * (1 / scale[0]),
-        y: boundingRect.y * (1 / scale[1]),
-        width: boundingRect.width * (1 / scale[0]),
-        height: boundingRect.height * (1 / scale[1]),
+        x: boundingRect.x,
+        y: boundingRect.y,
+        width: boundingRect.width,
+        height: boundingRect.height,
       });
+
+      setSize([
+        boundingRect.width * (1 / scale[0]),
+        boundingRect.height * (1 / scale[1]),
+      ]);
 
       // Rotation is ignored for groups
       const rotation = 0;
@@ -273,5 +281,5 @@ export function useGroupSurfaceTransform(...node_ids: string[]) {
     transform,
   ]);
 
-  return { style, rect };
+  return { style, rect, size };
 }

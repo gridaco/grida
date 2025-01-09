@@ -69,34 +69,6 @@ export namespace domapi {
     }
   }
 
-  /**
-   * returns a bounding Rectangle of the node element in window space, relative to viewport
-   * @returns
-   *
-   * @deprecated
-   */
-  export function get_node_bounding_client_rect(node_id: string) {
-    const contentrect = get_content_element()?.getBoundingClientRect();
-    const noderect = get_node_element(node_id)?.getBoundingClientRect();
-
-    if (!contentrect) {
-      throw new Error("renderer missing - content element rect is null");
-    }
-
-    if (!noderect) {
-      return null;
-    }
-
-    const domrect = {
-      x: noderect.x - contentrect.x,
-      y: noderect.y - contentrect.y,
-      width: noderect.width,
-      height: noderect.height,
-    } satisfies cmath.Rectangle;
-
-    return domrect;
-  }
-
   function get_content_element() {
     return window.document.getElementById(k.EDITOR_CONTENT_ELEMENT_ID);
   }
