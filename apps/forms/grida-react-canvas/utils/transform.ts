@@ -23,7 +23,7 @@ export function toCanvasSpace(
   return [xCanvas, yCanvas];
 }
 
-export function toSurfaceSpace(
+export function pointToSurfaceSpace(
   point: [number, number],
   transform: [[number, number, number], [number, number, number]]
 ): [number, number] {
@@ -35,4 +35,17 @@ export function toSurfaceSpace(
   const yViewport = c * x + d * y + ty;
 
   return [xViewport, yViewport];
+}
+
+export function rectToSurfaceSpace(
+  rect: cmath.Rectangle,
+  transform: [[number, number, number], [number, number, number]]
+): cmath.Rectangle {
+  const min: cmath.Vector2 = [rect.x, rect.y];
+  const max: cmath.Vector2 = [rect.x + rect.width, rect.y + rect.height];
+
+  const tmin = pointToSurfaceSpace(min, transform);
+  const tmax = pointToSurfaceSpace(max, transform);
+
+  return cmath.rect.fromPoints([tmin, tmax]);
 }

@@ -2,7 +2,7 @@ import React from "react";
 import { Crosshair } from "./crosshair";
 import { useDocument, useTransform } from "@/grida-react-canvas/provider";
 import { cmath } from "@grida/cmath";
-import { toSurfaceSpace } from "@/grida-react-canvas/utils/transform";
+import { pointToSurfaceSpace } from "@/grida-react-canvas/utils/transform";
 
 function useSnapGuide() {
   const { state } = useDocument();
@@ -32,7 +32,7 @@ export function SnapGuide() {
   return (
     <div>
       {guide.x?.map((snap, i) => {
-        const p = toSurfaceSpace(snap, transform);
+        const p = pointToSurfaceSpace(snap, transform);
         return (
           <React.Fragment key={i}>
             <div
@@ -52,7 +52,7 @@ export function SnapGuide() {
         );
       })}
       {guide.y?.map((snap, i) => {
-        const p = toSurfaceSpace(snap, transform);
+        const p = pointToSurfaceSpace(snap, transform);
         return (
           <React.Fragment key={i}>
             <div

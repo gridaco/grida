@@ -31,7 +31,7 @@ import { SurfacePathEditor } from "./ui/path-editor";
 import { SizeMeterLabel } from "./ui/meter";
 import { SurfaceGradientEditor } from "./ui/gradient-editor";
 import { DebugPointer } from "./ui/debug";
-import { toSurfaceSpace } from "../utils/transform";
+import { pointToSurfaceSpace } from "../utils/transform";
 
 const DRAG_THRESHOLD = 2;
 
@@ -280,12 +280,12 @@ export function EditorSurface() {
           position: "absolute",
         }}
       >
-        <DebugPointer position={toSurfaceSpace(pointer.position, transform)} />
+        {/* <DebugPointer position={toSurfaceSpace(pointer.position, transform)} /> */}
         {marquee && (
           <div id="marquee-container" className="absolute top-0 left-0 w-0 h-0">
             <Marquee
-              a={toSurfaceSpace(marquee.a, transform)}
-              b={toSurfaceSpace(marquee.b, transform)}
+              a={pointToSurfaceSpace(marquee.a, transform)}
+              b={pointToSurfaceSpace(marquee.b, transform)}
             />
           </div>
         )}
@@ -649,17 +649,19 @@ function LayerOverlayResizeHandle({
 }
 
 function usePrefferedDistributionAxis() {
-  const { selection, state } = useDocument();
+  const { transform, selection, state } = useDocument();
 
   const [axis, setAxis] = useState<"x" | "y">();
 
   useEffect(() => {
+    const cdom = new domapi.CanvasDOM(transform);
+
     const activeSelection = selection.filter(
       (node_id) => state.document.nodes[node_id].active
     );
 
     const rects = activeSelection.map(
-      (node_id) => domapi.get_node_bounding_client_rect(node_id)!
+      (node_id) => cdom.getNodeBoundingRect(node_id)!
     );
 
     if (rects.length > 2) {
@@ -683,7 +685,7 @@ function usePrefferedDistributionAxis() {
     }
 
     setAxis(undefined);
-  }, [selection, state.document.nodes]);
+  }, [selection, state.document.nodes, transform]);
 
   return axis;
 }
