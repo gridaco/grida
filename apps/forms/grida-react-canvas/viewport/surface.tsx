@@ -35,6 +35,23 @@ import { toSurfaceSpace } from "../utils/transform";
 
 const DRAG_THRESHOLD = 2;
 
+/*
+const SURFACE_TRANSFORM_CONTEXT = React.createContext<cmath.Transform>(
+  cmath.transform.identity
+);
+
+function SurfaceTransformContextProvider({
+  children,
+}: React.PropsWithChildren<{}>) {
+  const { transform } = useTransform();
+  return (
+    <SURFACE_TRANSFORM_CONTEXT.Provider value={transform}>
+      {children}
+    </SURFACE_TRANSFORM_CONTEXT.Provider>
+  );
+}
+ */
+
 function useSurfaceGesture(
   {
     onClick,
@@ -220,8 +237,15 @@ export function EditorSurface() {
         // when pinching (on mac os, ctrlKey is set true even when no key pressed), this is true.
         if (ctrlKey || metaKey) {
           // zoom
+          const targetRect = (
+            event.target as HTMLElement
+          ).getBoundingClientRect();
+          const ox = event.clientX - targetRect.left;
+          const oy = event.clientY - targetRect.top;
+          const origin: [number, number] = [ox, oy];
           const d = delta[1];
-          zoom(-d / 100);
+          const zoom_delta = d * 0.01;
+          zoom(zoom_delta, origin);
         } else {
           pan(cmath.vector2.invert(delta));
         }

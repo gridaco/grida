@@ -35,6 +35,8 @@ import deepEqual from "deep-equal";
 import { iosvg } from "@/grida-io-svg";
 import toast from "react-hot-toast";
 
+const CANVAS_MIN_ZOOM = 0.02;
+
 const DocumentContext = createContext<IDocumentEditorState | null>(null);
 
 const __noop: DocumentDispatcher = () => void 0;
@@ -1997,17 +1999,47 @@ export function useEventTarget() {
     return position;
   };
 
+  // const zoom = useCallback(
+  //   (delta: number, event: MouseEvent) => {
+  //     dispatch({
+  //       type: "transform",
+  //       transform: [
+  //         [transform[0][0] + delta, transform[0][1], transform[0][2]],
+  //         [transform[1][0], transform[1][1] + delta, transform[1][2]],
+  //       ],
+  //     });
+  //   },
+  //   [dispatch, transform]
+  // );
+
+  // Zoom so that the pointer stays anchored on the same canvas-space location.
+
   const zoom = useCallback(
-    (delta: number) => {
+    (delta: number, origin: cmath.Vector2) => {
+      const scale = transform[0][0];
+      // the origin point of the zooming point in x, y
+      const [ox, oy] = origin;
+
+      const newscale = Math.max(scale + delta, CANVAS_MIN_ZOOM);
+      const [tx, ty] = cmath.transform.getTranslate(transform);
+
+      // calculate the offset that should be applied with scale with css transform.
+      const [newx, newy] = [
+        ox - (ox - tx) * (newscale / scale),
+        oy - (oy - ty) * (newscale / scale),
+      ];
+
+      const next: cmath.Transform = [
+        [newscale, transform[0][1], newx],
+        [transform[1][0], newscale, newy],
+      ];
+
       dispatch({
         type: "transform",
-        transform: [
-          [transform[0][0] + delta, transform[0][1], transform[0][2]],
-          [transform[1][0], transform[1][1] + delta, transform[1][2]],
-        ],
+        transform: next,
       });
     },
-    [dispatch, transform]
+    [transform, dispatch]
   );
 
   const pan = useCallback(
