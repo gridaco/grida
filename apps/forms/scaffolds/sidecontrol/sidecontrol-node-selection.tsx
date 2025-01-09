@@ -69,8 +69,8 @@ import { AlignControl } from "./controls/align";
 import { Button } from "@/components/ui/button";
 
 function AlignNodes() {
-  const { state, align, distributeEvenly } = useDocument();
-  const has_selection = state.selection.length >= 1;
+  const { selection, align, distributeEvenly } = useDocument();
+  const has_selection = selection.length >= 1;
 
   return (
     <SidebarSection className="mt-2 flex justify-center">
@@ -974,13 +974,6 @@ function SelectedNodeProperties() {
             <PropertyLineLabel>Fill</PropertyLineLabel>
             <FillControl value={fill} onValueChange={actions.fill} removable />
           </PropertyLine>
-          {/* <PropertyLine>
-            <PropertyLineLabel>Ratio</PropertyLineLabel>
-            <AspectRatioControl
-              value={aspectRatio as any}
-              onValueChange={actions.aspectRatio}
-            />
-          </PropertyLine> */}
           <PropertyLine>
             <PropertyLineLabel>Cursor</PropertyLineLabel>
             <CursorControl value={cursor} onValueChange={actions.cursor} />

@@ -284,8 +284,10 @@ export function SidebarMenuItemLabel({
 export function SidebarSection({
   children,
   className,
+  hidden,
   ...props
 }: React.PropsWithChildren<React.HtmlHTMLAttributes<HTMLDivElement>>) {
+  if (hidden) return null;
   return (
     <section className={cn("mx-2 mb-2", className)} {...props}>
       {children}
