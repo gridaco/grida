@@ -2080,3 +2080,63 @@ export namespace cmath.ext.movement {
     }
   }
 }
+
+export namespace cmath.ext.viewport {
+  /**
+   * Opinionated transform-to-fit for a single canvas zoom.
+   * Supports uniform or per-side margin, using the smaller scale to fully fit.
+   *
+   * @param viewport - The viewport rectangle: { x, y, width, height }
+   * @param target - The bounding box of the contents: { x, y, width, height }
+   * @param margin - Margin can be a single number (uniform) or [top, right, bottom, left].
+   * @returns A 2D transform matrix [[scale, 0, tx], [0, scale, ty]] that fits `target` into `viewport`.
+   *
+   * @example
+   * const viewport = { x: 0, y: 0, width: 800, height: 600 };
+   * const target = { x: 100, y: 50, width: 400, height: 400 };
+   * const t = transformToFit(viewport, target, [50, 20, 50, 20]);
+   * // => e.g. [
+   * //    [0.75, 0, 60],
+   * //    [0, 0.75, 40],
+   * // ]
+   */
+  export function transformToFit(
+    viewport: cmath.Rectangle,
+    target: cmath.Rectangle,
+    margin: number | [number, number, number, number] = 0
+  ): cmath.Transform {
+    const [mt, mr, mb, ml] =
+      typeof margin === "number" ? [margin, margin, margin, margin] : margin;
+
+    // Effective viewport with margins subtracted
+    const vW = viewport.width - ml - mr;
+    const vH = viewport.height - mt - mb;
+    if (vW <= 0 || vH <= 0 || target.width === 0 || target.height === 0) {
+      // Degenerate, no transform
+      return [
+        [1, 0, viewport.x],
+        [0, 1, viewport.y],
+      ];
+    }
+
+    // Pick the smaller scale so the target fully fits
+    const scale = Math.min(vW / target.width, vH / target.height);
+
+    // Center of the "effective" viewport
+    const vx = viewport.x + ml + vW / 2;
+    const vy = viewport.y + mt + vH / 2;
+
+    // Center of the target
+    const tx = target.x + target.width / 2;
+    const ty = target.y + target.height / 2;
+
+    // Translate so that target center goes to viewport center
+    const translateX = vx - tx * scale;
+    const translateY = vy - ty * scale;
+
+    return [
+      [scale, 0, translateX],
+      [0, scale, translateY],
+    ];
+  }
+}

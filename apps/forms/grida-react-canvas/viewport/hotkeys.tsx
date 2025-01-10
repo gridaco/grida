@@ -136,6 +136,7 @@ export function useEditorHotKeys() {
   } = useEventTarget();
   const {
     scale,
+    fit,
     select,
     blur,
     undo,
@@ -586,6 +587,11 @@ export function useEditorHotKeys() {
   useHotkeys("shift+0", (e) => {
     scale(1, "center");
     toast.success(`Zoom to 100%`);
+  });
+
+  useHotkeys("shift+1, shift+9", (e) => {
+    fit(64);
+    toast.success(`Zoom to fit`);
   });
 
   useHotkeys("]", (e) => {

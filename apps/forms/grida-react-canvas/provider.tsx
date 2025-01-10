@@ -1494,6 +1494,33 @@ export function useDocument() {
     [dispatch, transform]
   );
 
+  /**
+   * Transform to fit
+   */
+  const fit = useCallback(
+    (margin: number | [number, number, number, number] = 0) => {
+      const ids = Object.keys(state.document.nodes);
+      const cdom = new domapi.CanvasDOM(state.transform);
+
+      const area = cmath.rect.union(
+        ids
+          .map((id) => cdom.getNodeBoundingRect(id))
+          .filter((r) => r) as cmath.Rectangle[]
+      );
+
+      const _view = domapi.get_viewport_rect();
+      const view = { x: 0, y: 0, width: _view.width, height: _view.height };
+
+      const transform = cmath.ext.viewport.transformToFit(view, area, margin);
+
+      dispatch({
+        type: "transform",
+        transform: transform,
+      });
+    },
+    [dispatch, state.document.nodes, state.transform]
+  );
+
   const select = useCallback(
     (...selectors: grida.program.document.Selector[]) =>
       dispatch({
@@ -1836,6 +1863,7 @@ export function useDocument() {
       selection,
       transform,
       scale,
+      fit,
       //
       select,
       blur,
@@ -1879,6 +1907,7 @@ export function useDocument() {
     selection,
     transform,
     scale,
+    fit,
     //
     select,
     blur,

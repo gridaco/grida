@@ -20,6 +20,10 @@ export namespace domapi {
       this.scale = cmath.transform.getScale(transform);
     }
 
+    getAllNodeElements(): NodeListOf<Element> | undefined {
+      return get_grida_node_elements();
+    }
+
     getNodesIntersectsArea(area: cmath.Rectangle): string[] {
       const contained: string[] = [];
       const all_els = get_grida_node_elements();
