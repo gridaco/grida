@@ -586,6 +586,135 @@ export namespace cmath.rect {
   }
 
   /**
+   * Computes the 2D transform matrix that maps rectangle `a` onto rectangle `b`.
+   *
+   * Essentially, we want a transform `T` such that:
+   * `point_in_b = T * point_in_a`
+   *
+   * The result is an affine transform (2×3 matrix) that:
+   * 1. Translates `a` to the origin,
+   * 2. Scales it by the ratio of widths and heights of `b` / `a`,
+   * 3. Translates it to the position of `b`.
+   *
+   * @param a - The source rectangle.
+   * @param b - The target rectangle.
+   *
+   * @returns A 2D transform matrix in the format:
+   *   ```
+   *   [
+   *     [scaleX, 0, translateX],
+   *     [0, scaleY, translateY],
+   *   ]
+   *   ```
+   *
+   * @example
+   * ```ts
+   * const a = { x: 0, y: 0, width: 100, height: 50 };
+   * const b = { x: 200, y: 300, width: 400, height: 200 };
+   *
+   * const t = cmath.rect.getRelativeTransform(a, b);
+   * const result = cmath.rect.transform(a, t);
+   *
+   * // Now `result` should be identical to `b`.
+   * console.log(result);
+   * // => { x: 200, y: 300, width: 400, height: 200 }
+   * ```
+   */
+  export function getRelativeTransform(
+    a: cmath.Rectangle,
+    b: cmath.Rectangle
+  ): cmath.Transform {
+    // If A has zero dimension, prevent division by zero by treating scale as 1.
+    const scaleX = a.width === 0 ? 1 : b.width / a.width;
+    const scaleY = a.height === 0 ? 1 : b.height / a.height;
+
+    // Step 1: Translate A so its origin is at (0,0).
+    const T1: cmath.Transform = [
+      [1, 0, -a.x],
+      [0, 1, -a.y],
+    ];
+
+    // Step 2: Scale by (scaleX, scaleY).
+    const T2: cmath.Transform = [
+      [scaleX, 0, 0],
+      [0, scaleY, 0],
+    ];
+
+    // Step 3: Finally translate to B’s (x, y).
+    const T3: cmath.Transform = [
+      [1, 0, b.x],
+      [0, 1, b.y],
+    ];
+
+    // Compose final: T3 * T2 * T1
+    const step1 = cmath.transform.multiply(T2, T1);
+    return cmath.transform.multiply(T3, step1);
+  }
+
+  /**
+   * Applies a general 2D affine transform (including translate, scale, rotate, and skew)
+   * to each corner of a rectangle, then returns the bounding box of the transformed corners.
+   *
+   * @param rect - The source rectangle `{ x, y, width, height }`.
+   * @param transform - The 2D transform matrix:
+   *   ```
+   *   [
+   *     [a, b, tx],
+   *     [c, d, ty],
+   *   ]
+   *   ```
+   * @returns A new rectangle representing the bounding box of the transformed corners.
+   *
+   * @example
+   * const rect: cmath.Rectangle = { x: 10, y: 20, width: 30, height: 40 };
+   * // Affine transform matrix with skew
+   * const t: cmath.Transform = [
+   *   [1, 0.2, 100],
+   *   [0.3, 1, 50],
+   * ];
+   * const result = cmath.rect.transform(rect, t);
+   * console.log(result);
+   * // Example => { x: 110, y: 73, width: 42, height: 53 }
+   */
+  export function transform(
+    rect: cmath.Rectangle,
+    transform: cmath.Transform
+  ): cmath.Rectangle {
+    const [[a, b, tx], [c, d, ty]] = transform;
+    const { x, y, width, height } = rect;
+
+    // All 4 corners of the rectangle
+    const corners: cmath.Vector2[] = [
+      [x, y], // Top-left
+      [x + width, y], // Top-right
+      [x, y + height], // Bottom-left
+      [x + width, y + height], // Bottom-right
+    ];
+
+    // Transform each corner
+    const transformedCorners = corners.map(([cx, cy]) => {
+      const xNew = a * cx + b * cy + tx;
+      const yNew = c * cx + d * cy + ty;
+      return [xNew, yNew] as cmath.Vector2;
+    });
+
+    // Compute bounding box
+    const xs = transformedCorners.map(([X]) => X);
+    const ys = transformedCorners.map(([_, Y]) => Y);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+
+    return {
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY,
+    };
+  }
+
+  /**
    * Rotates a rectangle and computes the bounding box of the rotated rectangle.
    *
    * @param rect - The rectangle to rotate.
