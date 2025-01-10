@@ -268,6 +268,7 @@ function ToolsGroup({
           <DropdownMenuContent side="top" sideOffset={16}>
             {options.map((option) => (
               <DropdownMenuItem
+                key={option.value}
                 onSelect={() => {
                   setPrimary(option.value);
                   onValueChange?.(option.value);

@@ -433,7 +433,7 @@ export default function CanvasPlayground() {
                   <SidebarRoot side="right">
                     <div className="p-2">
                       <div className="flex items-center justify-end gap-2">
-                        <Zoom />
+                        <ZoomMenu />
                         <Button
                           variant="ghost"
                           size="icon"
@@ -462,7 +462,7 @@ export default function CanvasPlayground() {
   );
 }
 
-function Zoom() {
+function ZoomMenu() {
   const { transform, scale, fit, zoomIn, zoomOut } = useTransform();
 
   const options = useMemo(() => [10, 50, 100, 150, 200, 500], []);
@@ -477,7 +477,7 @@ function Zoom() {
         <span className="text-xs text-muted-foreground">{pct + "%"}</span>
         <CaretDownIcon className="ms-1" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent side="bottom" align="end">
+      <DropdownMenuContent side="bottom" align="end" className="min-w-36">
         <Input
           type="number"
           value={pct + ""}

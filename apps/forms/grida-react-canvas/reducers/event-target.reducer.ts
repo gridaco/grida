@@ -629,10 +629,15 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
           switch (draft.gesture.type) {
             case "pan": {
+              // for panning, exceptionaly use the unscaled delta.
+              const original_delta = cmath.vector2.multiply(
+                action.event.delta,
+                cmath.transform.getScale(state.transform)
+              );
               // move the viewport by delta
               draft.transform = cmath.transform.translate(
                 draft.transform,
-                delta
+                original_delta
               );
               break;
             }

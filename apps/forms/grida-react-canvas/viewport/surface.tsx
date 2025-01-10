@@ -242,10 +242,16 @@ export function EditorSurface() {
           const oy = event.clientY - targetRect.top;
           const origin: [number, number] = [ox, oy];
           const d = delta[1];
-          const zoom_delta = -d * 0.01;
+          const sensitivity = 0.01;
+          const zoom_delta = -d * sensitivity;
           zoom(zoom_delta, origin);
         } else {
-          pan(cmath.vector2.invert(delta));
+          const sensitivity = 2;
+          pan(
+            cmath.vector2.invert(
+              cmath.vector2.multiply(delta, [sensitivity, sensitivity])
+            )
+          );
         }
 
         event.preventDefault();
