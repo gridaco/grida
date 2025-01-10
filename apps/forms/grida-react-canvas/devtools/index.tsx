@@ -40,7 +40,10 @@ export function DevtoolsPanel() {
   };
 
   return (
-    <Collapsible {...expandable.props} className="bg-background">
+    <Collapsible
+      {...expandable.props}
+      className="hidden md:block bg-background"
+    >
       <Tabs defaultValue="document" className="border w-full h-full">
         <div
           onClick={expandable.toggleOpen}

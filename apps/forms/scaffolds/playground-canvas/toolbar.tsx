@@ -24,11 +24,12 @@ import {
   ImageIcon,
   MixIcon,
   TextIcon,
+  CaretDownIcon,
 } from "@radix-ui/react-icons";
 import { PopoverClose } from "@radix-ui/react-popover";
 import { useLocalStorage } from "@uidotdev/usehooks";
 import { readStreamableValue } from "ai/rsc";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { CANVAS_PLAYGROUND_LOCALSTORAGE_PREFERENCES_BASE_AI_PROMPT_KEY } from "./k";
 import { PenToolIcon } from "lucide-react";
 import {
@@ -36,6 +37,13 @@ import {
   toolbar_value_to_cursormode,
   ToolbarToolType,
 } from "@/grida-react-canvas/toolbar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuShortcut,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 function useGenerate() {
   const streamGeneration = useCallback(
@@ -147,8 +155,10 @@ export function PlaygroundToolbar({
 }) {
   const { setCursorMode, cursor_mode } = useEventTarget();
 
+  const value = cursormode_to_toolbar_value(cursor_mode);
+
   return (
-    <div className="rounded-full flex gap-4 border bg-background shadow px-4 py-2 pointer-events-auto">
+    <div className="rounded-full flex gap-4 border bg-background shadow px-4 py-2 pointer-events-auto select-none">
       <ToggleGroup
         onValueChange={(v) => {
           setCursorMode(
@@ -157,41 +167,50 @@ export function PlaygroundToolbar({
               : { type: "cursor" }
           );
         }}
-        value={cursormode_to_toolbar_value(cursor_mode)}
+        value={value}
         defaultValue="cursor"
         type="single"
       >
-        <ToggleGroupItem value={"cursor" satisfies ToolbarToolType}>
-          <CursorArrowIcon />
-        </ToggleGroupItem>
-        <ToggleGroupItem value={"hand" satisfies ToolbarToolType}>
-          <HandIcon />
-        </ToggleGroupItem>
+        <ToolsGroup
+          value={value}
+          options={[
+            { value: "cursor", label: "Cursor", shortcut: "V" },
+            { value: "hand", label: "Hand tool", shortcut: "H" },
+          ]}
+          onValueChange={(v) => {
+            setCursorMode(toolbar_value_to_cursormode(v as ToolbarToolType));
+          }}
+        />
         <VerticalDivider />
         <ToggleGroupItem value={"container" satisfies ToolbarToolType}>
           <FrameIcon />
         </ToggleGroupItem>
         <ToggleGroupItem value={"text" satisfies ToolbarToolType}>
-          <TextIcon />
+          <ToolIcon type="text" />
         </ToggleGroupItem>
-        <ToggleGroupItem value={"rectangle" satisfies ToolbarToolType}>
-          <BoxIcon />
-        </ToggleGroupItem>
-        <ToggleGroupItem value={"ellipse" satisfies ToolbarToolType}>
-          <CircleIcon />
-        </ToggleGroupItem>
-        <ToggleGroupItem value={"line" satisfies ToolbarToolType}>
-          <SlashIcon />
-        </ToggleGroupItem>
-        <ToggleGroupItem value={"pencil" satisfies ToolbarToolType}>
-          <Pencil1Icon />
-        </ToggleGroupItem>
-        <ToggleGroupItem value={"path" satisfies ToolbarToolType}>
-          <PenToolIcon className="w-3.5 h-3.5" />
-        </ToggleGroupItem>
-        <ToggleGroupItem value={"image" satisfies ToolbarToolType}>
-          <ImageIcon />
-        </ToggleGroupItem>
+        <ToolsGroup
+          value={value}
+          options={[
+            { value: "rectangle", label: "Rectangle", shortcut: "R" },
+            { value: "ellipse", label: "Ellipse", shortcut: "O" },
+            { value: "line", label: "Line", shortcut: "L" },
+            { value: "image", label: "Image" },
+          ]}
+          onValueChange={(v) => {
+            setCursorMode(toolbar_value_to_cursormode(v as ToolbarToolType));
+          }}
+        />
+        <ToolsGroup
+          value={value}
+          options={[
+            { value: "pencil", label: "Pencil tool", shortcut: "⇧+P" },
+            { value: "path", label: "Path tool", shortcut: "P" },
+          ]}
+          onValueChange={(v) => {
+            setCursorMode(toolbar_value_to_cursormode(v as ToolbarToolType));
+          }}
+        />
+
         <VerticalDivider />
         <Popover>
           <PopoverTrigger asChild>
@@ -214,6 +233,93 @@ export function PlaygroundToolbar({
       </ToggleGroup>
     </div>
   );
+}
+
+function ToolsGroup({
+  value,
+  options,
+  onValueChange,
+}: {
+  value: ToolbarToolType;
+  options: Array<{ value: ToolbarToolType; label: string; shortcut?: string }>;
+  onValueChange?: (value: ToolbarToolType) => void;
+}) {
+  const [primary, setPrimary] = useState<ToolbarToolType>(
+    options.find((o) => o.value === value)?.value ?? options[0].value
+  );
+
+  useEffect(() => {
+    const v = options.find((o) => o.value === value)?.value;
+    if (v) {
+      setPrimary(v);
+    }
+  }, [value, options]);
+
+  return (
+    <>
+      <ToggleGroupItem value={primary}>
+        <ToolIcon type={primary} className="w-4 h-4" />
+      </ToggleGroupItem>
+      {options.length > 1 && (
+        <DropdownMenu modal>
+          <DropdownMenuTrigger>
+            <CaretDownIcon />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="top" sideOffset={16}>
+            {options.map((option) => (
+              <DropdownMenuItem
+                onSelect={() => {
+                  setPrimary(option.value);
+                  onValueChange?.(option.value);
+                }}
+                asChild
+              >
+                <button className="w-full flex items-center gap-2">
+                  <ToolIcon type={option.value} className="w-4 h-4" />
+                  <span>{option.label}</span>
+                  {option.shortcut && (
+                    <DropdownMenuShortcut>
+                      {option.shortcut}
+                    </DropdownMenuShortcut>
+                  )}
+                </button>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+    </>
+  );
+}
+
+function ToolIcon({
+  type,
+  ...props
+}: { type: ToolbarToolType } & React.ComponentProps<typeof CursorArrowIcon>) {
+  switch (type) {
+    case "cursor":
+      return <CursorArrowIcon {...props} />;
+    case "hand":
+      return <HandIcon {...props} />;
+    case "container":
+      return <FrameIcon {...props} />;
+    case "text":
+      return <TextIcon {...props} />;
+    case "rectangle":
+      return <BoxIcon {...props} />;
+    case "ellipse":
+      return <CircleIcon {...props} />;
+    case "line":
+      return <SlashIcon {...props} />;
+    case "pencil":
+      return <Pencil1Icon {...props} />;
+    case "path":
+      return <PenToolIcon {...props} />;
+    case "image":
+      return <ImageIcon {...props} />;
+    default:
+      return null;
+  }
 }
 
 function Generate() {

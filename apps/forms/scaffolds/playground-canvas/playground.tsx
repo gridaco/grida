@@ -101,6 +101,7 @@ import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/utils";
 import useDisableSwipeBack from "@/grida-react-canvas/viewport/hooks/use-disable-browser-swipe-back";
 import { cmath } from "@grida/cmath";
+import { Transformer } from "@/grida-react-canvas/renderer";
 
 export default function CanvasPlayground() {
   useDisableSwipeBack();
@@ -385,7 +386,9 @@ export default function CanvasPlayground() {
                         <EditorSurface />
                         {/* <div className="w-full h-full flex items-center justify-center"> */}
                         {/* <div className="shadow-lg rounded-xl border overflow-hidden"> */}
-                        <StandaloneDocumentContent />
+                        <Transformer>
+                          <StandaloneDocumentContent />
+                        </Transformer>
                         {/* </div> */}
                         {/* </div> */}
 
