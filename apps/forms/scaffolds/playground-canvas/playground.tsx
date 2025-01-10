@@ -99,13 +99,8 @@ import { EditorSurfaceDropzone } from "@/grida-react-canvas/viewport/surface-dro
 import { EditorSurfaceContextMenu } from "@/grida-react-canvas/viewport/surface-context-menu";
 import { EditorSurfaceClipboardSyncProvider } from "@/grida-react-canvas/viewport/surface";
 import { datatransfer } from "@/grida-react-canvas/viewport/data-transfer";
-import { WorkbenchUI } from "@/components/workbench";
-import { cn } from "@/utils";
 import useDisableSwipeBack from "@/grida-react-canvas/viewport/hooks/use-disable-browser-swipe-back";
-import { cmath } from "@grida/cmath";
-import { Transformer } from "@/grida-react-canvas/renderer";
-import { Input } from "@/components/ui/input";
-import { useTransform } from "@/grida-react-canvas/provider";
+import { AutoInitialFitTransformer } from "@/grida-react-canvas/renderer";
 
 export default function CanvasPlayground() {
   useDisableSwipeBack();
@@ -386,15 +381,11 @@ export default function CanvasPlayground() {
                 <EditorSurfaceDropzone>
                   <EditorSurfaceContextMenu>
                     <div className="w-full h-full flex flex-col relative bg-black/5">
-                      <ViewportRoot className="relative w-full h-full no-scrollbar overflow-y-auto">
+                      <ViewportRoot className="relative w-full h-full overflow-hidden">
                         <EditorSurface />
-                        {/* <div className="w-full h-full flex items-center justify-center"> */}
-                        {/* <div className="shadow-lg rounded-xl border overflow-hidden"> */}
-                        <Transformer>
+                        <AutoInitialFitTransformer>
                           <StandaloneDocumentContent />
-                        </Transformer>
-                        {/* </div> */}
-                        {/* </div> */}
+                        </AutoInitialFitTransformer>
 
                         {!uiHidden && (
                           <>
@@ -433,7 +424,6 @@ export default function CanvasPlayground() {
                   <SidebarRoot side="right">
                     <div className="p-2">
                       <div className="flex items-center justify-end gap-2">
-                        <ZoomMenu />
                         <Button
                           variant="ghost"
                           size="icon"
@@ -460,93 +450,6 @@ export default function CanvasPlayground() {
       </main>
     </TooltipProvider>
   );
-}
-
-function ZoomMenu() {
-  const { transform, scale, fit, zoomIn, zoomOut } = useTransform();
-
-  const options = useMemo(() => [10, 50, 100, 150, 200, 500], []);
-
-  const [scaleX, scaleY] = cmath.transform.getScale(transform);
-
-  const pct = Math.round(scaleX * 100);
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger className="flex items-center">
-        <span className="text-xs text-muted-foreground">{pct + "%"}</span>
-        <CaretDownIcon className="ms-1" />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent side="bottom" align="end" className="min-w-36">
-        <Input
-          type="number"
-          value={pct + ""}
-          min={2}
-          step={1}
-          max={256}
-          onChange={(e) => {
-            const v = parseInt(e.target.value) / 100;
-            if (v) scale(v, "center");
-          }}
-          className={WorkbenchUI.inputVariants({ size: "sm" })}
-        />
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={zoomIn} className="text-xs">
-          Zoom in
-          <DropdownMenuShortcut>⌘+</DropdownMenuShortcut>
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={zoomOut} className="text-xs">
-          Zoom out
-          <DropdownMenuShortcut>⌘-</DropdownMenuShortcut>
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => fit()} className="text-xs">
-          Zoom to fit
-          <DropdownMenuShortcut>⇧1</DropdownMenuShortcut>
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onSelect={() => scale(0.5, "center")}
-          className="text-xs"
-        >
-          Zoom to 50%
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onSelect={() => scale(1, "center")}
-          className="text-xs"
-        >
-          Zoom to 100%
-          <DropdownMenuShortcut className="text-xs">⇧0</DropdownMenuShortcut>
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onSelect={() => scale(2, "center")}
-          className="text-xs"
-        >
-          Zoom to 200%
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-  return (
-    <Select
-      value={scaleX * 100 + ""}
-      onValueChange={(v) => {
-        scale(parseInt(v) / 100, "center");
-      }}
-    >
-      <SelectTrigger
-        className={cn(WorkbenchUI.inputVariants({ size: "xs" }), "w-min")}
-      >
-        <span className="text-xs text-muted-foreground">{pct + "%"}</span>
-      </SelectTrigger>
-      <SelectContent>
-        {options.map((option) => (
-          <SelectItem value={option.toString()} key={option}>
-            {option + "%"}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-  //
 }
 
 function Hotkyes() {

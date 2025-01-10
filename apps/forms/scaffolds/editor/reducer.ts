@@ -42,7 +42,6 @@ import blockReducer from "./reducers/block.reducer";
 import datagridQueryReducer from "../data-query/data-query.reducer";
 import builderReducer from "@/grida-react-canvas/reducers";
 import assert from "assert";
-import React from "react";
 import { grida } from "@/grida";
 import {
   IDocumentEditorState,

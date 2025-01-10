@@ -28,17 +28,16 @@ export default function reducer<S extends IDocumentEditorState>(
   switch (action.type) {
     case "__internal/reset": {
       const { state: _new_state, key } = action;
+      const prev_state = state;
       return produce(_new_state, (draft) => {
         if (key) draft.document_key = key;
+        // preserve the transform state
+        draft.transform = prev_state.transform;
       }) as S;
     }
     case "transform": {
       return produce(state, (draft: Draft<S>) => {
         draft.transform = action.transform;
-        // TODO: update pointer as transforms
-        // draft.pointer = {
-        //   position: draft.pointer.position,
-        // };
       });
     }
     case "undo":

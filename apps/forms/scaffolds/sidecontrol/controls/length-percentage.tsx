@@ -20,7 +20,7 @@ function val(value: TMixed<LengthPercentage | "auto">): {
   if (typeof value === "number") {
     return { type: "number", value };
   }
-  return { type: "number", value: value.value };
+  return { type: "number", value: value?.value };
 }
 
 export function LengthPercentageControl({

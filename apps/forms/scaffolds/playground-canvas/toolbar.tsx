@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { generate } from "@/app/(dev)/canvas/actions";
 import { useDocument, useEventTarget } from "@/grida-react-canvas";
 import { OpenAILogo } from "@/components/logos/openai";
@@ -13,37 +14,20 @@ import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { grida } from "@/grida";
 import { useMetaEnter } from "@/hooks/use-meta-enter";
-import {
-  SlashIcon,
-  BoxIcon,
-  Pencil1Icon,
-  CircleIcon,
-  CursorArrowIcon,
-  HandIcon,
-  FrameIcon,
-  ImageIcon,
-  MixIcon,
-  TextIcon,
-  CaretDownIcon,
-} from "@radix-ui/react-icons";
+import { FrameIcon, MixIcon } from "@radix-ui/react-icons";
 import { PopoverClose } from "@radix-ui/react-popover";
 import { useLocalStorage } from "@uidotdev/usehooks";
 import { readStreamableValue } from "ai/rsc";
-import { useCallback, useEffect, useMemo, useState } from "react";
 import { CANVAS_PLAYGROUND_LOCALSTORAGE_PREFERENCES_BASE_AI_PROMPT_KEY } from "./k";
-import { PenToolIcon } from "lucide-react";
 import {
   cursormode_to_toolbar_value,
   toolbar_value_to_cursormode,
   ToolbarToolType,
 } from "@/grida-react-canvas/toolbar";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuShortcut,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  ToolIcon,
+  ToolsGroup,
+} from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
 
 function useGenerate() {
   const streamGeneration = useCallback(
@@ -233,94 +217,6 @@ export function PlaygroundToolbar({
       </ToggleGroup>
     </div>
   );
-}
-
-function ToolsGroup({
-  value,
-  options,
-  onValueChange,
-}: {
-  value: ToolbarToolType;
-  options: Array<{ value: ToolbarToolType; label: string; shortcut?: string }>;
-  onValueChange?: (value: ToolbarToolType) => void;
-}) {
-  const [primary, setPrimary] = useState<ToolbarToolType>(
-    options.find((o) => o.value === value)?.value ?? options[0].value
-  );
-
-  useEffect(() => {
-    const v = options.find((o) => o.value === value)?.value;
-    if (v) {
-      setPrimary(v);
-    }
-  }, [value, options]);
-
-  return (
-    <>
-      <ToggleGroupItem value={primary}>
-        <ToolIcon type={primary} className="w-4 h-4" />
-      </ToggleGroupItem>
-      {options.length > 1 && (
-        <DropdownMenu modal>
-          <DropdownMenuTrigger>
-            <CaretDownIcon />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent side="top" sideOffset={16}>
-            {options.map((option) => (
-              <DropdownMenuItem
-                key={option.value}
-                onSelect={() => {
-                  setPrimary(option.value);
-                  onValueChange?.(option.value);
-                }}
-                asChild
-              >
-                <button className="w-full flex items-center gap-2">
-                  <ToolIcon type={option.value} className="w-4 h-4" />
-                  <span>{option.label}</span>
-                  {option.shortcut && (
-                    <DropdownMenuShortcut>
-                      {option.shortcut}
-                    </DropdownMenuShortcut>
-                  )}
-                </button>
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )}
-    </>
-  );
-}
-
-function ToolIcon({
-  type,
-  ...props
-}: { type: ToolbarToolType } & React.ComponentProps<typeof CursorArrowIcon>) {
-  switch (type) {
-    case "cursor":
-      return <CursorArrowIcon {...props} />;
-    case "hand":
-      return <HandIcon {...props} />;
-    case "container":
-      return <FrameIcon {...props} />;
-    case "text":
-      return <TextIcon {...props} />;
-    case "rectangle":
-      return <BoxIcon {...props} />;
-    case "ellipse":
-      return <CircleIcon {...props} />;
-    case "line":
-      return <SlashIcon {...props} />;
-    case "pencil":
-      return <Pencil1Icon {...props} />;
-    case "path":
-      return <PenToolIcon {...props} />;
-    case "image":
-      return <ImageIcon {...props} />;
-    default:
-      return null;
-  }
 }
 
 function Generate() {

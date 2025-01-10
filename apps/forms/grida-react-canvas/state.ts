@@ -602,6 +602,8 @@ export function initDocumentEditorState({
 }): IDocumentEditorState {
   const s = new document.DocumentState(init.document);
 
+  // console.log("i", init["transform"]);
+
   return {
     transform: cmath.transform.identity,
     debug: debug ?? false,

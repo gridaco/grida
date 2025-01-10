@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useContext, useRef } from "react";
+import React, { useContext, useEffect, useLayoutEffect, useRef } from "react";
 import { useDocument, useTransform } from "./provider";
 import { NodeElement } from "./nodes/node";
 import { domapi } from "./domapi";
+import { cmath } from "@grida/cmath";
 // import { DebugPointer } from "./viewport/ui/debug";
 
 const UserDocumentCustomRendererContext = React.createContext<
@@ -45,6 +46,51 @@ export function StandaloneDocumentContent({
 
 export function Transformer({ children }: React.PropsWithChildren<{}>) {
   const { style } = useTransform();
+
+  return (
+    <div
+      style={{
+        ...style,
+        position: "absolute",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+export function AutoInitialFitTransformer({
+  children,
+}: React.PropsWithChildren<{}>) {
+  const {
+    state: {
+      document: { root_id },
+      document_key,
+    },
+  } = useDocument();
+  const { transform, style, setTransform } = useTransform();
+
+  const applied_initial_transform_key = useRef<string | undefined>("__noop__");
+  useLayoutEffect(() => {
+    if (applied_initial_transform_key.current === document_key) return;
+
+    const retransform = () => {
+      const cdom = new domapi.CanvasDOM(transform);
+      const rect = cdom.getNodeBoundingRect(root_id);
+      const _vrect = domapi.get_viewport_rect();
+      const vrect = {
+        x: 0,
+        y: 0,
+        width: _vrect.width,
+        height: _vrect.height,
+      };
+      const t = cmath.ext.viewport.transformToFit(vrect, rect!, 64);
+      setTransform(t);
+    };
+
+    retransform();
+    applied_initial_transform_key.current = document_key;
+  }, [document_key, root_id]);
 
   return (
     <div

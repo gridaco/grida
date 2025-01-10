@@ -67,6 +67,19 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Toggle } from "@/components/ui/toggle";
 import { AlignControl } from "./controls/align";
 import { Button } from "@/components/ui/button";
+import { CaretDownIcon } from "@radix-ui/react-icons";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { WorkbenchUI } from "@/components/workbench";
+import { cmath } from "@grida/cmath";
+import { Input } from "@/components/ui/input";
+import { useTransform } from "@/grida-react-canvas/provider";
 
 function AlignNodes() {
   const { selection, align, distributeEvenly } = useDocument();
@@ -87,13 +100,86 @@ function AlignNodes() {
   );
 }
 
+export function ZoomControl() {
+  const { transform, scale, fit, zoomIn, zoomOut } = useTransform();
+
+  const [scaleX, scaleY] = cmath.transform.getScale(transform);
+
+  const pct = Math.round(scaleX * 100);
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger className="flex items-center">
+        <span className="text-xs text-muted-foreground">{pct + "%"}</span>
+        <CaretDownIcon className="ms-1" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent side="bottom" align="end" className="min-w-36">
+        <Input
+          type="number"
+          value={pct + ""}
+          min={2}
+          step={1}
+          max={256}
+          onChange={(e) => {
+            const v = parseInt(e.target.value) / 100;
+            if (v) scale(v, "center");
+          }}
+          className={WorkbenchUI.inputVariants({ size: "sm" })}
+        />
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={zoomIn} className="text-xs">
+          Zoom in
+          <DropdownMenuShortcut>⌘+</DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={zoomOut} className="text-xs">
+          Zoom out
+          <DropdownMenuShortcut>⌘-</DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => fit()} className="text-xs">
+          Zoom to fit
+          <DropdownMenuShortcut>⇧1</DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onSelect={() => scale(0.5, "center")}
+          className="text-xs"
+        >
+          Zoom to 50%
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onSelect={() => scale(1, "center")}
+          className="text-xs"
+        >
+          Zoom to 100%
+          <DropdownMenuShortcut className="text-xs">⇧0</DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onSelect={() => scale(2, "center")}
+          className="text-xs"
+        >
+          Zoom to 200%
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 export function SelectionControl() {
   const { state: document } = useDocument();
-  if (document.selection.length === 1) {
-    return <SelectedNodeProperties />;
-  } else if (document.selection.length > 1) {
-    return <SelectionMixedProperties />;
-  }
+
+  const selection_length = document.selection.length;
+
+  return (
+    <div>
+      <div className="p-2">
+        <div className="flex items-center justify-end gap-2">
+          <ZoomControl />
+        </div>
+      </div>
+      <hr />
+      {selection_length === 1 && <SelectedNodeProperties />}
+      {selection_length > 1 && <SelectionMixedProperties />}
+    </div>
+  );
 }
 
 function SelectionMixedProperties() {
@@ -658,16 +744,6 @@ function SelectedNodeProperties() {
   const is_root = node_id === root_id;
   const is_flex_container = is_container && layout === "flex";
   const is_stylable = type !== "template_instance";
-
-  // const {
-  //   // boxShadow,
-  //   // margin,
-  //   // aspectRatio,
-  //   // flexWrap,
-  //   // gap,
-  // } = {
-  //   ...(style || {}),
-  // } satisfies grida.program.css.ExplicitlySupportedCSSProperties;
 
   return (
     <div key={node_id} className="mt-4 mb-10">

@@ -1868,7 +1868,7 @@ export function useDocument() {
 export function useTransform() {
   const [state, dispatch] = __useInternal();
 
-  const transform = state.transform;
+  const { transform } = state;
 
   const scale = useCallback(
     (
@@ -1966,21 +1966,32 @@ export function useTransform() {
     //
   }, [dispatch, scale, transform]);
 
+  const setTransform = useCallback(
+    (transform: cmath.Transform) => {
+      dispatch({
+        type: "transform",
+        transform,
+      });
+    },
+    [dispatch]
+  );
+
   return useMemo(() => {
     const transform = state.transform;
     const matrix = `matrix(${transform[0][0]}, ${transform[1][0]}, ${transform[0][1]}, ${transform[1][1]}, ${transform[0][2]}, ${transform[1][2]})`;
     return {
+      transform,
       style: {
         transformOrigin: "0 0",
         transform: matrix,
       } as React.CSSProperties,
-      transform: state.transform,
+      setTransform,
       scale,
       fit,
       zoomIn,
       zoomOut,
     };
-  }, [state.transform, scale, fit, zoomIn, zoomOut]);
+  }, [transform, setTransform, scale, fit, zoomIn, zoomOut]);
 }
 
 function throttle<T extends (...args: any[]) => void>(
