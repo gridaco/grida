@@ -111,7 +111,7 @@ export default function CanvasPlayground() {
   const playDialog = useDialogState("play", {
     refreshkey: true,
   });
-  const insertDialog = useDialogState("insert");
+  const libraryDialog = useDialogState("library");
   const settingsDialog = useDialogState("settings");
   const importFromFigmaDialog = useDialogState("import-from-figma");
   const importFromJson = useDialogState("import-from-json", {
@@ -267,12 +267,12 @@ export default function CanvasPlayground() {
             <div className="flex w-full h-full">
               {!uiHidden && (
                 <aside>
-                  {insertDialog.open ? (
+                  {libraryDialog.open ? (
                     <>
-                      <DialogPrimitive.Root {...insertDialog.props}>
+                      <DialogPrimitive.Root {...libraryDialog.props}>
                         <DialogPrimitive.Content className="h-full">
                           <SidebarRoot>
-                            <InsertNodePanelContent />
+                            <LibraryContent />
                           </SidebarRoot>
                         </DialogPrimitive.Content>
                       </DialogPrimitive.Root>
@@ -392,10 +392,10 @@ export default function CanvasPlayground() {
                             <div className="absolute top-4 left-4 z-50">
                               <Button
                                 variant={
-                                  insertDialog.open ? "default" : "outline"
+                                  libraryDialog.open ? "default" : "outline"
                                 }
                                 className="w-8 h-8 rounded-full p-0"
-                                onClick={insertDialog.openDialog}
+                                onClick={libraryDialog.openDialog}
                               >
                                 <PlusIcon className="w-4 h-4" />
                               </Button>
@@ -409,7 +409,7 @@ export default function CanvasPlayground() {
                         {!uiHidden && (
                           <div className="absolute bottom-8 left-0 right-0 flex items-center justify-center z-50 pointer-events-none">
                             <PlaygroundToolbar
-                              onAddButtonClick={insertDialog.openDialog}
+                              onAddButtonClick={libraryDialog.openDialog}
                             />
                           </div>
                         )}
@@ -630,7 +630,7 @@ const widgets = [
   "separator",
 ];
 
-function InsertNodePanelContent() {
+function LibraryContent() {
   const { insertNode } = useDocument();
 
   const icons_data = useReflectIconsData();

@@ -14,7 +14,7 @@ import { useEditorState } from "@/scaffolds/editor";
 import { composeEditorDocumentAction } from "@/scaffolds/editor/action";
 import { SideControl } from "@/scaffolds/sidecontrol";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { FrameIcon } from "@radix-ui/react-icons";
+import { FrameIcon, PlusIcon } from "@radix-ui/react-icons";
 import {
   cursormode_to_toolbar_value,
   toolbar_value_to_cursormode,
@@ -30,6 +30,10 @@ import {
   ToolIcon,
   ToolsGroup,
 } from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
+import { Button } from "@/components/ui/button";
+import { EditorSurfaceClipboardSyncProvider } from "@/grida-react-canvas/viewport/surface";
+import { EditorSurfaceDropzone } from "@/grida-react-canvas/viewport/surface-dropzone";
+import { EditorSurfaceContextMenu } from "@/grida-react-canvas/viewport/surface-context-menu";
 
 function useSync(
   document: grida.program.document.IDocumentDefinition | undefined
@@ -101,17 +105,23 @@ export default function CanvasPage() {
       >
         <Hotkyes />
         <div className="flex w-full h-full">
-          <div className="w-full h-full flex flex-col relative bg-black/5">
-            <ViewportRoot className="relative w-full h-full no-scrollbar overflow-y-auto">
-              <EditorSurface />
-              <AutoInitialFitTransformer>
-                <StandaloneDocumentContent />
-              </AutoInitialFitTransformer>
-              <div className="absolute bottom-8 left-0 right-0 flex items-center justify-center z-50 pointer-events-none">
-                <Toolbar />
-              </div>
-            </ViewportRoot>
-          </div>
+          <EditorSurfaceClipboardSyncProvider>
+            <EditorSurfaceDropzone>
+              <EditorSurfaceContextMenu>
+                <div className="w-full h-full flex flex-col relative bg-black/5">
+                  <ViewportRoot className="relative w-full h-full no-scrollbar overflow-y-auto">
+                    <EditorSurface />
+                    <AutoInitialFitTransformer>
+                      <StandaloneDocumentContent />
+                    </AutoInitialFitTransformer>
+                    <div className="absolute bottom-8 left-0 right-0 flex items-center justify-center z-50 pointer-events-none">
+                      <Toolbar />
+                    </div>
+                  </ViewportRoot>
+                </div>
+              </EditorSurfaceContextMenu>
+            </EditorSurfaceDropzone>
+          </EditorSurfaceClipboardSyncProvider>
           <aside className="hidden lg:flex h-full">
             <SideControl />
           </aside>
