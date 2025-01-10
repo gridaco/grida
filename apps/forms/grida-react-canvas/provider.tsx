@@ -1442,85 +1442,6 @@ export function useDocument() {
 
   const { order: _, ...nodeActions } = __useNodeActions(dispatch);
 
-  const scale = useCallback(
-    (
-      factor: number | cmath.Vector2,
-      origin: cmath.Vector2 | "center" = "center"
-    ) => {
-      const [fx, fy] = typeof factor === "number" ? [factor, factor] : factor;
-      const _scale = transform[0][0];
-      let ox, oy: number;
-      if (origin === "center") {
-        // Canvas size (you need to know or pass this)
-        const { width, height } = domapi.get_viewport_rect();
-
-        // Calculate the absolute transform origin
-        ox = width / 2;
-        oy = height / 2;
-      } else {
-        [ox, oy] = origin;
-      }
-
-      const sx = cmath.clamp(
-        fx,
-        CONFIG_CANVAS_TRANSFORM_SCALE_MIN,
-        CONFIG_CANVAS_TRANSFORM_SCALE_MAX
-      );
-
-      const sy = cmath.clamp(
-        fy,
-        CONFIG_CANVAS_TRANSFORM_SCALE_MIN,
-        CONFIG_CANVAS_TRANSFORM_SCALE_MAX
-      );
-
-      const [tx, ty] = cmath.transform.getTranslate(transform);
-
-      // calculate the offset that should be applied with scale with css transform.
-      const [newx, newy] = [
-        ox - (ox - tx) * (sx / _scale),
-        oy - (oy - ty) * (sy / _scale),
-      ];
-
-      const next: cmath.Transform = [
-        [sx, transform[0][1], newx],
-        [transform[1][0], sy, newy],
-      ];
-
-      dispatch({
-        type: "transform",
-        transform: next,
-      });
-    },
-    [dispatch, transform]
-  );
-
-  /**
-   * Transform to fit
-   */
-  const fit = useCallback(
-    (margin: number | [number, number, number, number] = 0) => {
-      const ids = Object.keys(state.document.nodes);
-      const cdom = new domapi.CanvasDOM(state.transform);
-
-      const area = cmath.rect.union(
-        ids
-          .map((id) => cdom.getNodeBoundingRect(id))
-          .filter((r) => r) as cmath.Rectangle[]
-      );
-
-      const _view = domapi.get_viewport_rect();
-      const view = { x: 0, y: 0, width: _view.width, height: _view.height };
-
-      const transform = cmath.ext.viewport.transformToFit(view, area, margin);
-
-      dispatch({
-        type: "transform",
-        transform: transform,
-      });
-    },
-    [dispatch, state.document.nodes, state.transform]
-  );
-
   const select = useCallback(
     (...selectors: grida.program.document.Selector[]) =>
       dispatch({
@@ -1862,8 +1783,6 @@ export function useDocument() {
       state,
       selection,
       transform,
-      scale,
-      fit,
       //
       select,
       blur,
@@ -1906,8 +1825,6 @@ export function useDocument() {
     state,
     selection,
     transform,
-    scale,
-    fit,
     //
     select,
     blur,
@@ -1949,7 +1866,106 @@ export function useDocument() {
 }
 
 export function useTransform() {
-  const [state] = __useInternal();
+  const [state, dispatch] = __useInternal();
+
+  const transform = state.transform;
+
+  const scale = useCallback(
+    (
+      factor: number | cmath.Vector2,
+      origin: cmath.Vector2 | "center" = "center"
+    ) => {
+      const [fx, fy] = typeof factor === "number" ? [factor, factor] : factor;
+      const _scale = transform[0][0];
+      let ox, oy: number;
+      if (origin === "center") {
+        // Canvas size (you need to know or pass this)
+        const { width, height } = domapi.get_viewport_rect();
+
+        // Calculate the absolute transform origin
+        ox = width / 2;
+        oy = height / 2;
+      } else {
+        [ox, oy] = origin;
+      }
+
+      const sx = cmath.clamp(
+        fx,
+        CONFIG_CANVAS_TRANSFORM_SCALE_MIN,
+        CONFIG_CANVAS_TRANSFORM_SCALE_MAX
+      );
+
+      const sy = cmath.clamp(
+        fy,
+        CONFIG_CANVAS_TRANSFORM_SCALE_MIN,
+        CONFIG_CANVAS_TRANSFORM_SCALE_MAX
+      );
+
+      const [tx, ty] = cmath.transform.getTranslate(transform);
+
+      // calculate the offset that should be applied with scale with css transform.
+      const [newx, newy] = [
+        ox - (ox - tx) * (sx / _scale),
+        oy - (oy - ty) * (sy / _scale),
+      ];
+
+      const next: cmath.Transform = [
+        [sx, transform[0][1], newx],
+        [transform[1][0], sy, newy],
+      ];
+
+      dispatch({
+        type: "transform",
+        transform: next,
+      });
+    },
+    [dispatch, transform]
+  );
+
+  /**
+   * Transform to fit
+   */
+  const fit = useCallback(
+    (margin: number | [number, number, number, number] = 64) => {
+      // this part needs to be updated when we support multiple roots
+      const ids = [state.document.root_id];
+      const cdom = new domapi.CanvasDOM(state.transform);
+
+      const area = cmath.rect.union(
+        ids
+          .map((id) => cdom.getNodeBoundingRect(id))
+          .filter((r) => r) as cmath.Rectangle[]
+      );
+
+      const _view = domapi.get_viewport_rect();
+      const view = { x: 0, y: 0, width: _view.width, height: _view.height };
+
+      const transform = cmath.ext.viewport.transformToFit(view, area, margin);
+
+      dispatch({
+        type: "transform",
+        transform: transform,
+      });
+    },
+    [dispatch, state.transform]
+  );
+
+  const zoomIn = useCallback(() => {
+    const prevscale = transform[0][0];
+    const nextscale = cmath.quantize(prevscale * 2, 0.01);
+
+    scale(nextscale);
+    //
+  }, [dispatch, scale, transform]);
+
+  const zoomOut = useCallback(() => {
+    const prevscale = transform[0][0];
+    const nextscale = cmath.quantize(prevscale / 2, 0.01);
+
+    scale(nextscale);
+    //
+  }, [dispatch, scale, transform]);
+
   return useMemo(() => {
     const transform = state.transform;
     const matrix = `matrix(${transform[0][0]}, ${transform[1][0]}, ${transform[0][1]}, ${transform[1][1]}, ${transform[0][2]}, ${transform[1][2]})`;
@@ -1959,8 +1975,12 @@ export function useTransform() {
         transform: matrix,
       } as React.CSSProperties,
       transform: state.transform,
+      scale,
+      fit,
+      zoomIn,
+      zoomOut,
     };
-  }, [state.transform]);
+  }, [state.transform, scale, fit, zoomIn, zoomOut]);
 }
 
 function throttle<T extends (...args: any[]) => void>(

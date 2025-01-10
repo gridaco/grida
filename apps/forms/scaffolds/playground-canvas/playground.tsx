@@ -36,6 +36,7 @@ import { DevtoolsPanel } from "@/grida-react-canvas/devtools";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
 import {
   ButtonIcon,
+  CaretDownIcon,
   DownloadIcon,
   FigmaLogoIcon,
   FileIcon,
@@ -49,6 +50,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuShortcut,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
@@ -102,6 +104,8 @@ import { cn } from "@/utils";
 import useDisableSwipeBack from "@/grida-react-canvas/viewport/hooks/use-disable-browser-swipe-back";
 import { cmath } from "@grida/cmath";
 import { Transformer } from "@/grida-react-canvas/renderer";
+import { Input } from "@/components/ui/input";
+import { useTransform } from "@/grida-react-canvas/provider";
 
 export default function CanvasPlayground() {
   useDisableSwipeBack();
@@ -459,16 +463,68 @@ export default function CanvasPlayground() {
 }
 
 function Zoom() {
-  const {
-    state: { transform },
-    scale,
-  } = useDocument();
+  const { transform, scale, fit, zoomIn, zoomOut } = useTransform();
 
   const options = useMemo(() => [10, 50, 100, 150, 200, 500], []);
 
   const [scaleX, scaleY] = cmath.transform.getScale(transform);
 
   const pct = Math.round(scaleX * 100);
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger className="flex items-center">
+        <span className="text-xs text-muted-foreground">{pct + "%"}</span>
+        <CaretDownIcon className="ms-1" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent side="bottom" align="end">
+        <Input
+          type="number"
+          value={pct + ""}
+          min={2}
+          step={1}
+          max={256}
+          onChange={(e) => {
+            const v = parseInt(e.target.value) / 100;
+            if (v) scale(v, "center");
+          }}
+          className={WorkbenchUI.inputVariants({ size: "sm" })}
+        />
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={zoomIn} className="text-xs">
+          Zoom in
+          <DropdownMenuShortcut>⌘+</DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={zoomOut} className="text-xs">
+          Zoom out
+          <DropdownMenuShortcut>⌘-</DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => fit()} className="text-xs">
+          Zoom to fit
+          <DropdownMenuShortcut>⇧1</DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onSelect={() => scale(0.5, "center")}
+          className="text-xs"
+        >
+          Zoom to 50%
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onSelect={() => scale(1, "center")}
+          className="text-xs"
+        >
+          Zoom to 100%
+          <DropdownMenuShortcut className="text-xs">⇧0</DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onSelect={() => scale(2, "center")}
+          className="text-xs"
+        >
+          Zoom to 200%
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
   return (
     <Select
       value={scaleX * 100 + ""}

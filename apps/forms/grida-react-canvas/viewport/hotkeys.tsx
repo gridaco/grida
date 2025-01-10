@@ -1,5 +1,10 @@
 import { useHotkeys } from "react-hotkeys-hook";
-import { useDocument, useEventTarget, useSelection } from "../provider";
+import {
+  useDocument,
+  useEventTarget,
+  useSelection,
+  useTransform,
+} from "../provider";
 import toast from "react-hot-toast";
 import { grida } from "@/grida";
 import { useEffect, useRef } from "react";
@@ -134,9 +139,8 @@ export function useEditorHotKeys() {
     tryExitContentEditMode,
     tryToggleContentEditMode,
   } = useEventTarget();
+  const { scale, fit, zoomIn, zoomOut } = useTransform();
   const {
-    scale,
-    fit,
     select,
     blur,
     undo,
@@ -593,6 +597,22 @@ export function useEditorHotKeys() {
     fit(64);
     toast.success(`Zoom to fit`);
   });
+
+  useHotkeys(
+    "meta+=, ctrl+=, meta+plus, ctrl+plus",
+    () => {
+      zoomIn();
+    },
+    { preventDefault: true }
+  );
+
+  useHotkeys(
+    "meta+minus, ctrl+minus",
+    () => {
+      zoomOut();
+    },
+    { preventDefault: true }
+  );
 
   useHotkeys("]", (e) => {
     order("selection", "front");
