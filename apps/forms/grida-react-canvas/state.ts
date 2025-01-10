@@ -15,6 +15,9 @@ export type CursorMode =
       type: "hand";
     }
   | {
+      type: "zoom";
+    }
+  | {
       type: "insert";
       node: "text" | "image" | "container" | "rectangle" | "ellipse";
     }

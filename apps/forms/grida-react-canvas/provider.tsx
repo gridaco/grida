@@ -2019,6 +2019,8 @@ export function useEventTargetCSSCursor() {
         return "default";
       case "hand":
         return "grab";
+      case "zoom":
+        return "zoom-in";
       case "insert": {
         switch (cursor_mode.node) {
           case "text":

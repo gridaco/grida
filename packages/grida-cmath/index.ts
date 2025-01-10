@@ -1851,54 +1851,49 @@ export namespace cmath.transform {
   }
 
   /**
-   * Applies a scaling transformation to a 2D transform matrix, with an origin
-   * defined in normalized coordinates `[0, 0] ~ [1, 1]`.
+   * Applies a scaling transformation to a 2D transform matrix around a specified absolute origin.
+   *
+   * This function adjusts the scaling of an existing transformation matrix
+   * by translating to a defined `transformOrigin`, applying the scaling, and then translating back.
    *
    * @param scale - The scaling factor. Can be a single number (uniform scaling) or a `Vector2` for non-uniform scaling.
-   * @param transform - The original 2D transform matrix to be scaled.
-   * @param origin - A normalized origin in the range `[0, 0] ~ [1, 1]`, relative to the element's size.
-   *                 Defaults to `[0.5, 0.5]` (center of the element).
-   * @param size - The size of the element being transformed, as `[width, height]`.
-   *               Used to compute the absolute origin based on the normalized coordinates.
-   * @returns A new transform matrix with the scaling applied.
+   * @param transform - The original 2D transform matrix to which the scaling will be applied.
+   * @param transformOrigin - The absolute origin `[originX, originY]` around which the scaling is performed.
+   * @returns A new transform matrix with the scaling applied around the specified `transformOrigin`.
    *
-   * @example
-   * // Apply uniform scaling to an element with a width of 100 and height of 200
+   * ### Example
+   * ```typescript
    * const transform: cmath.Transform = [
    *   [1, 0, 10], // ScaleX, ShearY, TranslateX
    *   [0, 1, 20], // ShearX, ScaleY, TranslateY
    * ];
-   * const scaled = cmath.transform.applyScale(2, transform, [0.5, 0.5], [100, 200]);
+   * const scaleFactor: number = 2;
+   * const transformOrigin: cmath.Vector2 = [50, 50];
+   *
+   * const scaled = cmath.transform.scale(scaleFactor, transform, transformOrigin);
    * console.log(scaled);
    * // Output: [
-   * //   [2, 0, 10],
-   * //   [0, 2, 20],
+   * //   [2, 0, -40], // Adjusted scaling and translation
+   * //   [0, 2, -80],
    * // ]
+   * ```
    *
-   * @remarks
-   * - The normalized origin `[0, 0]` represents the top-left corner, and `[1, 1]` represents the bottom-right corner.
-   * - `[0.5, 0.5]` is the default and represents the center of the element.
-   * - The function is purely mathematical, with no assumptions about the environment or context.
+   * ### Remarks
+   * - The `transformOrigin` is provided in absolute coordinates.
+   * - The function ensures the scaling operation is performed relative to the specified origin.
+   * - Uniform scaling is applied if `scale` is a single number; otherwise, non-uniform scaling is applied.
    */
   export function scale(
     scale: number | cmath.Vector2,
     transform: Transform,
-    origin: cmath.Vector2 = [0.5, 0.5],
-    size: cmath.Vector2
+    transformOrigin: cmath.Vector2
   ): Transform {
-    const [width, height] = size;
-    const [normX, normY] = origin;
-
-    // Convert normalized origin to absolute coordinates
-    const originX = normX * width;
-    const originY = normY * height;
-
     const [scaleX, scaleY] = typeof scale === "number" ? [scale, scale] : scale;
 
     // Translate to origin
     const translateToOrigin: Transform = [
-      [1, 0, -originX],
-      [0, 1, -originY],
+      [1, 0, -transformOrigin[0]],
+      [0, 1, -transformOrigin[1]],
     ];
 
     // Apply scaling
@@ -1909,8 +1904,8 @@ export namespace cmath.transform {
 
     // Translate back from origin
     const translateBack: Transform = [
-      [1, 0, originX],
-      [0, 1, originY],
+      [1, 0, transformOrigin[0]],
+      [0, 1, transformOrigin[1]],
     ];
 
     // Combine: Translate to origin -> Scale -> Translate back
@@ -1922,7 +1917,6 @@ export namespace cmath.transform {
     // Apply scaling to the existing transform
     return multiply(scaledTransform, transform);
   }
-
   /**
    * Extracts the scaling factors from a 2D transformation matrix.
    *

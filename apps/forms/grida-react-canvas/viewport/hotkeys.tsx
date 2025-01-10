@@ -282,6 +282,37 @@ export function useEditorHotKeys() {
     }
   );
 
+  const __zoom_tool_triggered_by_hotkey = useRef(false);
+  useHotkeys(
+    "z",
+    (e) => {
+      // cancel if already in zoom tool, but not triggered by hotkey
+      if (
+        cursor_mode.type === "zoom" &&
+        !__zoom_tool_triggered_by_hotkey.current
+      )
+        return;
+
+      // check if up or down
+      switch (e.type) {
+        case "keydown":
+          setCursorMode({ type: "zoom" });
+          __zoom_tool_triggered_by_hotkey.current = true;
+          break;
+        case "keyup":
+          setCursorMode({ type: "cursor" });
+          __zoom_tool_triggered_by_hotkey.current = false;
+          break;
+      }
+    },
+    {
+      keydown: true,
+      keyup: true,
+      enableOnFormTags: false,
+      enableOnContentEditable: false,
+    }
+  );
+
   // #region selection
   useHotkeys(
     "meta+a, ctrl+a",

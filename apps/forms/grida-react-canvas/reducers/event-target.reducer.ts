@@ -37,7 +37,7 @@ import { getMarqueeSelection, getSurfaceRayTarget } from "./tools/target";
 import { vn } from "@/grida/vn";
 import { getInitialCurveGesture } from "./tools/gesture";
 import { createMinimalDocumentStateSnapshot } from "./tools/snapshot";
-import { toCanvasSpace } from "../utils/transform";
+import { pointToSurfaceSpace, toCanvasSpace } from "../utils/transform";
 
 export default function eventTargetReducer<S extends IDocumentEditorState>(
   state: S,
@@ -135,6 +135,15 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
           case "cursor":
           case "hand":
             // ignore
+            break;
+          case "zoom":
+            // TODO: also support zoom out (with alt key modifier) - needs to be handled separately
+            draft.transform = cmath.transform.scale(
+              2,
+              draft.transform,
+              // map the cursor position back to surface space
+              pointToSurfaceSpace(draft.pointer.position, draft.transform)
+            );
             break;
           case "insert":
             const parent = __get_insert_target(draft);

@@ -15,6 +15,7 @@ export type ToolbarToolType =
 export function cursormode_to_toolbar_value(cm: CursorMode): ToolbarToolType {
   switch (cm.type) {
     case "cursor":
+    case "zoom":
       return "cursor";
     case "hand":
       return "hand";
@@ -44,5 +45,7 @@ export function toolbar_value_to_cursormode(tt: ToolbarToolType): CursorMode {
       return { type: "draw", tool: tt };
     case "path":
       return { type: "path" };
+    default:
+      return { type: "cursor" };
   }
 }
