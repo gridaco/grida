@@ -130,6 +130,101 @@ export const keybindings_sheet = [
     description: "Distribute selection evenly vertically",
     keys: ["alt+ctrl+h"],
   },
+  {
+    name: "zoom to fit",
+    description: "Zoom to fit the content",
+    keys: ["shift+1", "shift+9"],
+  },
+  {
+    name: "zoom to selection",
+    description: "Zoom to the current selection",
+    keys: ["shift+2"],
+  },
+  {
+    name: "zoom to 100%",
+    description: "Zoom to 100%",
+    keys: ["shift+0"],
+  },
+  {
+    name: "zoom in",
+    description: "Zoom in",
+    keys: ["meta+=, ctrl+=", "meta+plus, ctrl+plus"],
+  },
+  {
+    name: "zoom out",
+    description: "Zoom out",
+    keys: ["meta+minus, ctrl+minus"],
+  },
+  {
+    name: "move to front",
+    description: "Move the selection to the front",
+    keys: ["]"],
+  },
+  {
+    name: "move to back",
+    description: "Move the selection to the back",
+    keys: ["["],
+  },
+  {
+    name: "eye dropper",
+    description: "Use eye dropper to pick color",
+    keys: ["i"],
+  },
+  {
+    name: "hand tool",
+    description: "Use hand tool to pan the canvas",
+    keys: ["space"],
+  },
+  {
+    name: "zoom tool",
+    description: "Use zoom tool to zoom the canvas",
+    keys: ["z"],
+  },
+  {
+    name: "cursor",
+    description: "Select tool",
+    keys: ["v"],
+  },
+  {
+    name: "hand",
+    description: "Hand tool",
+    keys: ["h"],
+  },
+  {
+    name: "rectangle",
+    description: "Rectangle tool",
+    keys: ["r"],
+  },
+  {
+    name: "ellipse",
+    description: "Ellipse tool",
+    keys: ["o"],
+  },
+  {
+    name: "text",
+    description: "Text tool",
+    keys: ["t"],
+  },
+  {
+    name: "line",
+    description: "Line tool",
+    keys: ["l"],
+  },
+  {
+    name: "pencil",
+    description: "Pencil tool",
+    keys: ["shift+p"],
+  },
+  {
+    name: "path",
+    description: "Path tool",
+    keys: ["p"],
+  },
+  {
+    name: "container",
+    description: "Container tool",
+    keys: ["a", "f"],
+  },
 ];
 
 export function useEditorHotKeys() {
