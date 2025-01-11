@@ -13,6 +13,7 @@ import {
   standaloneDocumentReducer,
   ViewportRoot,
 } from "@/grida-react-canvas";
+import { AutoInitialFitTransformer } from "@/grida-react-canvas/renderer";
 import { grida } from "@/grida";
 import { v4 } from "uuid";
 import { useFilePicker } from "use-file-picker";
@@ -182,7 +183,9 @@ export default function IOSVGPage() {
                     >
                       <ViewportRoot className="relative w-full h-full p-4">
                         <EditorSurface />
-                        <StandaloneDocumentContent className="w-full h-full" />
+                        <AutoInitialFitTransformer>
+                          <StandaloneDocumentContent className="w-full h-full" />
+                        </AutoInitialFitTransformer>
                       </ViewportRoot>
                     </StandaloneDocumentEditor>
                   )}
