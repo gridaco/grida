@@ -244,7 +244,7 @@ export function useEditorHotKeys() {
     copy,
     duplicate,
     deleteNode,
-    nudge,
+    a11yarrow,
     nudgeResize,
     align,
     order,
@@ -612,19 +612,18 @@ export function useEditorHotKeys() {
     "arrowright, arrowleft, arrowup, arrowdown",
     (e) => {
       e.preventDefault();
-      const mod = e.shiftKey ? 10 : 1;
       switch (e.key) {
         case "ArrowRight":
-          nudge("selection", "x", mod);
+          a11yarrow("selection", "right", e.shiftKey);
           break;
         case "ArrowLeft":
-          nudge("selection", "x", -mod);
+          a11yarrow("selection", "left", e.shiftKey);
           break;
         case "ArrowUp":
-          nudge("selection", "y", -mod);
+          a11yarrow("selection", "up", e.shiftKey);
           break;
         case "ArrowDown":
-          nudge("selection", "y", mod);
+          a11yarrow("selection", "down", e.shiftKey);
           break;
       }
     },

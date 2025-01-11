@@ -830,74 +830,6 @@ function __useGestureNudgeState(dispatch: DocumentDispatcher) {
   return __gesture_nudge_debounced;
 }
 
-function __useNudgeActions(dispatch: DocumentDispatcher) {
-  const __gesture_nudge = useCallback(
-    (state: "on" | "off") => {
-      dispatch({
-        type: "gesture/nudge",
-        state,
-      });
-    },
-    [dispatch]
-  );
-
-  const __gesture_nudge_debounced = __useGestureNudgeState(dispatch);
-
-  const nudge = useCallback(
-    (
-      target: "selection" | (string & {}) = "selection",
-      axis: "x" | "y",
-      delta: number = 1,
-      config: NudgeUXConfig = {
-        delay: 500,
-        gesture: true,
-      }
-    ) => {
-      const { gesture = true, delay = 500 } = config;
-
-      if (gesture) {
-        // Trigger gesture
-        __gesture_nudge("on");
-
-        // Debounce to turn off gesture
-        __gesture_nudge_debounced("off", delay);
-      }
-
-      dispatch({
-        type: "nudge",
-        delta,
-        axis,
-        target,
-      });
-    },
-    [dispatch]
-  );
-
-  const nudgeResize = useCallback(
-    (
-      target: "selection" | (string & {}) = "selection",
-      axis: "x" | "y",
-      delta: number = 1
-    ) => {
-      dispatch({
-        type: "nudge-resize",
-        delta,
-        axis,
-        target,
-      });
-    },
-    [dispatch]
-  );
-
-  return useMemo(
-    () => ({
-      nudge,
-      nudgeResize,
-    }),
-    [dispatch]
-  );
-}
-
 export function useNodeAction(node_id: string | undefined) {
   const dispatch = __useDispatch();
   const nodeActions = __useNodeActions(dispatch);
@@ -1517,7 +1449,100 @@ export function useDocument() {
     [dispatch]
   );
 
-  const { nudge, nudgeResize } = __useNudgeActions(dispatch);
+  const __gesture_nudge = useCallback(
+    (state: "on" | "off") => {
+      dispatch({
+        type: "gesture/nudge",
+        state,
+      });
+    },
+    [dispatch]
+  );
+
+  const __gesture_nudge_debounced = __useGestureNudgeState(dispatch);
+
+  const nudge = useCallback(
+    (
+      target: "selection" | (string & {}) = "selection",
+      axis: "x" | "y",
+      delta: number = 1,
+      config: NudgeUXConfig = {
+        delay: 500,
+        gesture: true,
+      }
+    ) => {
+      const { gesture = true, delay = 500 } = config;
+
+      if (gesture) {
+        // Trigger gesture
+        __gesture_nudge("on");
+
+        // Debounce to turn off gesture
+        __gesture_nudge_debounced("off", delay);
+      }
+
+      dispatch({
+        type: "nudge",
+        delta,
+        axis,
+        target,
+      });
+    },
+    [dispatch]
+  );
+
+  const nudgeResize = useCallback(
+    (
+      target: "selection" | (string & {}) = "selection",
+      axis: "x" | "y",
+      delta: number = 1
+    ) => {
+      dispatch({
+        type: "nudge-resize",
+        delta,
+        axis,
+        target,
+      });
+    },
+    [dispatch]
+  );
+
+  const a11yarrow = useCallback(
+    (
+      target: "selection" | (string & {}) = "selection",
+      direction: "up" | "down" | "left" | "right",
+      shiftKey: boolean = false,
+      config: NudgeUXConfig = {
+        delay: 500,
+        gesture: true,
+      }
+    ) => {
+      const { gesture = true, delay = 500 } = config;
+
+      const a11ytypes = {
+        up: "a11y/up",
+        down: "a11y/down",
+        left: "a11y/left",
+        right: "a11y/right",
+      } as const;
+
+      if (gesture) {
+        console.log("on");
+        // Trigger gesture
+        __gesture_nudge("on");
+
+        // Debounce to turn off gesture
+        __gesture_nudge_debounced("off", delay);
+      }
+
+      dispatch({
+        type: a11ytypes[direction],
+        target,
+        shiftKey,
+      });
+    },
+    [dispatch]
+  );
 
   const align = useCallback(
     (
@@ -1795,6 +1820,7 @@ export function useDocument() {
       deleteNode,
       nudge,
       nudgeResize,
+      a11yarrow,
       align,
       order,
       distributeEvenly,
@@ -1837,6 +1863,7 @@ export function useDocument() {
     deleteNode,
     nudge,
     nudgeResize,
+    a11yarrow,
     align,
     order,
     distributeEvenly,

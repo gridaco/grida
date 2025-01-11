@@ -37,6 +37,7 @@ export type DocumentAction =
   | EditorPathAction
   | EditorNudgeAction
   | EditorNudgeResizeAction
+  | EditorA11yArrowAction
   | EditorAlignAction
   | EditorDistributeEvenlyAction
   | DocumentEditorInsertNodeAction
@@ -215,6 +216,20 @@ export interface EditorNudgeResizeAction {
   target: NodeID | "selection";
   axis: "x" | "y";
   delta: number;
+}
+
+/**
+ * [A11yArrowAction]
+ *
+ * This binds to keyboard arrow keys for accessibility.
+ *
+ * - For fixed positioning, this will trigger nudge (translate) action.
+ * - For non-fixed positioning, this will trigger order action. (e.g. item in a flex container)
+ */
+export interface EditorA11yArrowAction {
+  type: "a11y/up" | "a11y/down" | "a11y/left" | "a11y/right";
+  target: NodeID | "selection";
+  shiftKey?: boolean;
 }
 
 export interface EditorAlignAction {

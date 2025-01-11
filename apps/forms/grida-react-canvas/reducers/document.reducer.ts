@@ -211,41 +211,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
 
       return produce(state, (draft) => {
         for (const node_id of target_node_ids) {
-          const parent_id = document.getParentId(draft.document_ctx, node_id);
-          if (!parent_id) return; // root node case
-          const parent_node: Draft<grida.program.nodes.i.IChildrenReference> =
-            document.__getNodeById(
-              draft,
-              parent_id
-            ) as grida.program.nodes.i.IChildrenReference;
-
-          const childIndex = parent_node.children.indexOf(node_id);
-          assert(childIndex !== -1, "node not found in children");
-
-          const before = [...parent_node.children];
-          const reordered = [...before];
-          switch (order) {
-            case "back": {
-              // change the children id order - move the node_id to the first (first is the back)
-              reordered.splice(childIndex, 1);
-              reordered.unshift(node_id);
-              break;
-            }
-            case "front": {
-              // change the children id order - move the node_id to the last (last is the front)
-              reordered.splice(childIndex, 1);
-              reordered.push(node_id);
-              break;
-            }
-            default: {
-              // shift order
-              reordered.splice(childIndex, 1);
-              reordered.splice(order, 0, node_id);
-            }
-          }
-
-          parent_node.children = reordered;
-          draft.document_ctx.__ctx_nid_to_children_ids[parent_id] = reordered;
+          self_order(draft, node_id, order);
         }
       });
       break;
@@ -259,35 +225,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
 
       if (target_node_ids.length === 0) return state;
       return produce(state, (draft) => {
-        // for nudge, gesture is not required, but only for surface ux.
-        if (draft.gesture.type === "nudge") {
-          const cdpm = new domapi.CanvasDOM(state.transform);
-
-          const snap_target_node_ids = getSnapTargets(state.selection, state);
-          const snap_target_node_rects = snap_target_node_ids.map(
-            (node_id) => cdpm.getNodeBoundingRect(node_id)!
-          );
-          const origin_rects = target_node_ids.map(
-            (node_id) => cdpm.getNodeBoundingRect(node_id)!
-          );
-          const { snapping } = snapObjectsTranslation(
-            origin_rects,
-            snap_target_node_rects,
-            [dx, dy],
-            [0.1, 0.1]
-          );
-          draft.gesture.surface_snapping = snapping;
-        }
-
-        for (const node_id of target_node_ids) {
-          const node = document.__getNodeById(draft, node_id);
-
-          draft.document.nodes[node_id] = nodeTransformReducer(node, {
-            type: "translate",
-            dx: dx,
-            dy: dy,
-          });
-        }
+        self_nudge(draft, target_node_ids, dx, dy);
       });
     }
     case "nudge-resize": {
@@ -307,6 +245,56 @@ export default function documentReducer<S extends IDocumentEditorState>(
           });
         }
       });
+    }
+    case "a11y/up":
+    case "a11y/right":
+    case "a11y/down":
+    case "a11y/left": {
+      const { type: direction, target, shiftKey } = action;
+
+      const nudge_mod = shiftKey ? 10 : 1;
+
+      const target_node_ids =
+        target === "selection" ? state.selection : [target];
+
+      const nodes = target_node_ids.map((node_id) =>
+        document.__getNodeById(state, node_id)
+      );
+
+      const in_flow_node_ids = nodes
+        .filter((node) => {
+          if ("position" in node) {
+            return (
+              node.position === "relative" &&
+              node.top === undefined &&
+              node.right === undefined &&
+              node.bottom === undefined &&
+              node.left === undefined
+            );
+          }
+        })
+        .map((node) => node.id);
+
+      const out_flow_node_ids = nodes
+        .filter((node) => {
+          return !in_flow_node_ids.includes(node.id);
+        })
+        .map((node) => node.id);
+
+      return produce(state, (draft) => {
+        for (const node_id of in_flow_node_ids) {
+          self_order(draft, node_id, a11y_direction_to_order[direction]);
+        }
+
+        if (out_flow_node_ids.length > 0) {
+          const nudge_dx = nudge_mod * a11y_direction_to_vector[direction][0];
+          const nudge_dy = nudge_mod * a11y_direction_to_vector[direction][1];
+          self_nudge(draft, out_flow_node_ids, nudge_dx, nudge_dy);
+        }
+      });
+      //
+      //
+      break;
     }
     case "align": {
       const {
@@ -671,4 +659,111 @@ export default function documentReducer<S extends IDocumentEditorState>(
   }
 
   return state;
+}
+
+const a11y_direction_to_order = {
+  "a11y/up": "backward",
+  "a11y/right": "forward",
+  "a11y/down": "forward",
+  "a11y/left": "backward",
+} as const;
+
+const a11y_direction_to_vector = {
+  "a11y/up": [0, -1],
+  "a11y/right": [1, 0],
+  "a11y/down": [0, 1],
+  "a11y/left": [-1, 0],
+} as const;
+
+function self_order(
+  draft: Draft<IDocumentEditorState>,
+  node_id: string,
+  order: "back" | "front" | "backward" | "forward" | number
+) {
+  const parent_id = document.getParentId(draft.document_ctx, node_id);
+  if (!parent_id) return; // root node case
+  const parent_node: Draft<grida.program.nodes.i.IChildrenReference> =
+    document.__getNodeById(
+      draft,
+      parent_id
+    ) as grida.program.nodes.i.IChildrenReference;
+
+  const childIndex = parent_node.children.indexOf(node_id);
+  assert(childIndex !== -1, "node not found in children");
+
+  const before = [...parent_node.children];
+  const reordered = [...before];
+  switch (order) {
+    case "back": {
+      // change the children id order - move the node_id to the first (first is the back)
+      reordered.splice(childIndex, 1);
+      reordered.unshift(node_id);
+      break;
+    }
+    case "backward": {
+      // change the children id order - move the node_id to the previous
+      if (childIndex === 0) return;
+      reordered.splice(childIndex, 1);
+      reordered.splice(childIndex - 1, 0, node_id);
+      break;
+    }
+    case "front": {
+      // change the children id order - move the node_id to the last (last is the front)
+      reordered.splice(childIndex, 1);
+      reordered.push(node_id);
+      break;
+    }
+    case "forward": {
+      // change the children id order - move the node_id to the next
+      if (childIndex === parent_node.children.length - 1) return;
+      reordered.splice(childIndex, 1);
+      reordered.splice(childIndex + 1, 0, node_id);
+      break;
+    }
+    default: {
+      // shift order
+      reordered.splice(childIndex, 1);
+      reordered.splice(order, 0, node_id);
+    }
+  }
+
+  parent_node.children = reordered;
+  draft.document_ctx.__ctx_nid_to_children_ids[parent_id] = reordered;
+}
+
+function self_nudge(
+  draft: Draft<IDocumentEditorState>,
+  targets: string[],
+  dx: number,
+  dy: number
+) {
+  // for nudge, gesture is not required, but only for surface ux.
+  if (draft.gesture.type === "nudge") {
+    const cdpm = new domapi.CanvasDOM(draft.transform);
+
+    const snap_target_node_ids = getSnapTargets(draft.selection, draft);
+    const snap_target_node_rects = snap_target_node_ids.map(
+      (node_id) => cdpm.getNodeBoundingRect(node_id)!
+    );
+    const origin_rects = targets.map(
+      (node_id) => cdpm.getNodeBoundingRect(node_id)!
+    );
+    const { snapping } = snapObjectsTranslation(
+      origin_rects,
+      snap_target_node_rects,
+      [dx, dy],
+      [0.1, 0.1]
+    );
+    draft.gesture.surface_snapping = snapping;
+  }
+
+  for (const node_id of targets) {
+    const node = document.__getNodeById(draft, node_id);
+
+    draft.document.nodes[node_id] = nodeTransformReducer(node, {
+      type: "translate",
+      dx: dx,
+      dy: dy,
+    });
+  }
 }
