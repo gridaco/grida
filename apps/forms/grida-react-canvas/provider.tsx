@@ -1926,9 +1926,20 @@ export function useTransform() {
    * Transform to fit
    */
   const fit = useCallback(
-    (margin: number | [number, number, number, number] = 64) => {
-      // this part needs to be updated when we support multiple roots
-      const ids = [state.document.root_id];
+    (
+      selector: grida.program.document.Selector,
+      margin: number | [number, number, number, number] = 64
+    ) => {
+      const ids = document.querySelector(
+        state.document_ctx,
+        state.selection,
+        selector
+      );
+
+      if (ids.length === 0) {
+        return;
+      }
+
       const cdom = new domapi.CanvasDOM(state.transform);
 
       const area = cmath.rect.union(
@@ -1947,7 +1958,13 @@ export function useTransform() {
         transform: transform,
       });
     },
-    [dispatch, state.transform]
+    [
+      dispatch,
+      state.transform,
+      state.document_ctx,
+      state.document.root_id,
+      state.selection,
+    ]
   );
 
   const zoomIn = useCallback(() => {

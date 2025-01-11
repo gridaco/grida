@@ -135,7 +135,7 @@ export function ZoomControl() {
           Zoom out
           <DropdownMenuShortcut>⌘-</DropdownMenuShortcut>
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => fit()} className="text-xs">
+        <DropdownMenuItem onSelect={() => fit("*")} className="text-xs">
           Zoom to fit
           <DropdownMenuShortcut>⇧1</DropdownMenuShortcut>
         </DropdownMenuItem>

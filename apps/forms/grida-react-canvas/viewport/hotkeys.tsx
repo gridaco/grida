@@ -625,8 +625,13 @@ export function useEditorHotKeys() {
   });
 
   useHotkeys("shift+1, shift+9", (e) => {
-    fit(64);
+    fit("*", 64);
     toast.success(`Zoom to fit`);
+  });
+
+  useHotkeys("shift+2", (e) => {
+    fit("selection", 64);
+    toast.success(`Zoom to selection`);
   });
 
   useHotkeys(
