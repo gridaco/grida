@@ -1,28 +1,78 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useCallback, useMemo } from "react";
 
+interface TransformProps {
+  a: number; // Scale X
+  b: number; // Skew Y
+  c: number; // Skew X
+  d: number; // Scale Y
+  e: number; // Translate X
+  f: number; // Translate Y
+}
+
+// Component props interface defining all possible configuration options
 interface PixelGridProps {
   cellSize?: number;
   zoomLevel?: number;
+  enabled?: boolean;
+
+  backgroundColor?: string;
+  gridColor?: string;
+  opacity?: number;
+
+  minZoomLevel?: number;
+  transform?: TransformProps;
 }
+
+// Utility function to determine if a color is light or dark
+// Uses perceived luminance formula from WCAG 2.0
+const isLightColor = (color: string): boolean => {
+  const hex = color.replace("#", "");
+  const r = parseInt(hex.substr(0, 2), 16);
+  const g = parseInt(hex.substr(2, 2), 16);
+  const b = parseInt(hex.substr(4, 2), 16);
+
+  // Calculate perceived brightness using RGB coefficients
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.5;
+};
+
+// Determine grid color based on background for optimal contrast
+const determineGridColor = (backgroundColor: string): string => {
+  return isLightColor(backgroundColor) ? "#000000" : "#ffffff";
+};
 
 const PixelGrid: React.FC<PixelGridProps> = ({
   cellSize = 1,
   zoomLevel = 1,
+  enabled = true,
+  backgroundColor = "#ffffff",
+  gridColor,
+  opacity = 0.1,
+  minZoomLevel = 4,
+  transform = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 },
 }) => {
+  // Refs for DOM elements and animation frame
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const animationFrameRef = useRef<number>();
 
-  useEffect(() => {
+  // Memoized grid color calculation
+  const computedGridColor = useMemo(() => {
+    return gridColor || determineGridColor(backgroundColor);
+  }, [gridColor, backgroundColor]);
+
+  // Main rendering function
+  const renderGrid = useCallback(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
-    if (!canvas || !container) return;
+    if (!canvas || !container || !enabled || zoomLevel < minZoomLevel) return;
 
-    // Match canvas size to container size
+    // Get container dimensions and device pixel ratio
     const width = container.offsetWidth;
     const height = container.offsetHeight;
-
-    // Handle device pixel ratio for crisp lines
     const dpr = window.devicePixelRatio || 1;
+
+    // Set canvas size accounting for device pixel ratio
     canvas.width = width * dpr;
     canvas.height = height * dpr;
     canvas.style.width = `${width}px`;
@@ -30,28 +80,79 @@ const PixelGrid: React.FC<PixelGridProps> = ({
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+
+    // Clear previous render
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Apply device pixel ratio scaling
     ctx.scale(dpr, dpr);
 
-    // Draw square cells by using the same step in both x and y
-    const step = cellSize * zoomLevel;
-    ctx.clearRect(0, 0, width, height);
-    ctx.strokeStyle = "rgba(0, 0, 0, 0.025)";
-    ctx.lineWidth = 1;
+    // Apply editor's transform matrix
+    ctx.setTransform(
+      transform.a * dpr,
+      transform.b,
+      transform.c,
+      transform.d * dpr,
+      transform.e * dpr,
+      transform.f * dpr
+    );
 
-    for (let x = 0; x <= width; x += step) {
+    ctx.strokeStyle = computedGridColor;
+    ctx.globalAlpha = opacity;
+    ctx.lineWidth = 1 / zoomLevel;
+
+    const effectiveCellSize = cellSize * zoomLevel;
+
+    const startX =
+      Math.floor(-transform.e / effectiveCellSize) * effectiveCellSize;
+    const startY =
+      Math.floor(-transform.f / effectiveCellSize) * effectiveCellSize;
+    const endX = width + Math.abs(transform.e);
+    const endY = height + Math.abs(transform.f);
+
+    for (let x = startX; x <= endX; x += effectiveCellSize) {
       ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, height);
+      ctx.moveTo(x, startY);
+      ctx.lineTo(x, endY);
       ctx.stroke();
     }
 
-    for (let y = 0; y <= height; y += step) {
+    for (let y = startY; y <= endY; y += effectiveCellSize) {
       ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(width, y);
+      ctx.moveTo(startX, y);
+      ctx.lineTo(endX, y);
       ctx.stroke();
     }
-  }, [cellSize, zoomLevel]);
+  }, [
+    enabled,
+    zoomLevel,
+    minZoomLevel,
+    cellSize,
+    computedGridColor,
+    opacity,
+    transform,
+  ]);
+
+  // Handle window resize and component cleanup
+  useEffect(() => {
+    const handleResize = () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+      animationFrameRef.current = requestAnimationFrame(renderGrid);
+    };
+
+    // Add resize listener and initial render
+    window.addEventListener("resize", handleResize);
+    renderGrid();
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [renderGrid]);
 
   return (
     <div
@@ -60,9 +161,19 @@ const PixelGrid: React.FC<PixelGridProps> = ({
         width: "100%",
         height: "100%",
         position: "relative",
+        pointerEvents: "none",
       }}
     >
-      <canvas ref={canvasRef} />
+      <canvas
+        ref={canvasRef}
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+        }}
+      />
     </div>
   );
 };
