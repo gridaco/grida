@@ -53,6 +53,10 @@ export function ZoomControl({ className }: { className?: string }) {
           Zoom to fit
           <DropdownMenuShortcut>⇧1</DropdownMenuShortcut>
         </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => fit("selection")} className="text-xs">
+          Zoom to selection
+          <DropdownMenuShortcut>⇧2</DropdownMenuShortcut>
+        </DropdownMenuItem>
         <DropdownMenuItem
           onSelect={() => scale(0.5, "center")}
           className="text-xs"
