@@ -1527,7 +1527,6 @@ export function useDocument() {
       } as const;
 
       if (gesture) {
-        console.log("on");
         // Trigger gesture
         __gesture_nudge("on");
 

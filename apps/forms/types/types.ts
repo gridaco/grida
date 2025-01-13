@@ -108,7 +108,8 @@ export type FormInputType =
   | "signature"
   | "range"
   | "search"
-  | "json";
+  | "json"
+  | "canvas";
 
 export type FormFieldAutocompleteType =
   | "off"
