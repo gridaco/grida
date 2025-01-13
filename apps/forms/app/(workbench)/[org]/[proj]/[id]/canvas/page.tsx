@@ -14,17 +14,7 @@ import { useEditorState } from "@/scaffolds/editor";
 import { composeEditorDocumentAction } from "@/scaffolds/editor/action";
 import { SideControl } from "@/scaffolds/sidecontrol";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import {
-  SlashIcon,
-  BoxIcon,
-  Pencil1Icon,
-  CircleIcon,
-  CursorArrowIcon,
-  FrameIcon,
-  ImageIcon,
-  TextIcon,
-} from "@radix-ui/react-icons";
-import { PenToolIcon } from "lucide-react";
+import { FrameIcon, PlusIcon } from "@radix-ui/react-icons";
 import {
   cursormode_to_toolbar_value,
   toolbar_value_to_cursormode,
@@ -35,6 +25,14 @@ import { useDebounce, usePrevious } from "@uidotdev/usehooks";
 import type { CanvasDocumentSnapshotSchema } from "@/types";
 import equal from "deep-equal";
 import { grida } from "@/grida";
+import { AutoInitialFitTransformer } from "@/grida-react-canvas/renderer";
+import {
+  ToolIcon,
+  ToolsGroup,
+} from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
+import { EditorSurfaceClipboardSyncProvider } from "@/grida-react-canvas/viewport/surface";
+import { EditorSurfaceDropzone } from "@/grida-react-canvas/viewport/surface-dropzone";
+import { EditorSurfaceContextMenu } from "@/grida-react-canvas/viewport/surface-context-menu";
 
 function useSync(
   document: grida.program.document.IDocumentDefinition | undefined
@@ -106,19 +104,23 @@ export default function CanvasPage() {
       >
         <Hotkyes />
         <div className="flex w-full h-full">
-          <div className="w-full h-full flex flex-col relative">
-            <ViewportRoot className="relative w-full h-full no-scrollbar overflow-y-auto">
-              <EditorSurface />
-              <div className="w-full h-full flex items-center justify-center bg-black/5">
-                <div className="shadow-lg rounded-xl border overflow-hidden">
-                  <StandaloneDocumentContent />
+          <EditorSurfaceClipboardSyncProvider>
+            <EditorSurfaceDropzone>
+              <EditorSurfaceContextMenu>
+                <div className="w-full h-full flex flex-col relative bg-black/5">
+                  <ViewportRoot className="relative w-full h-full no-scrollbar overflow-y-auto">
+                    <EditorSurface />
+                    <AutoInitialFitTransformer>
+                      <StandaloneDocumentContent />
+                    </AutoInitialFitTransformer>
+                    <div className="absolute bottom-8 left-0 right-0 flex items-center justify-center z-50 pointer-events-none">
+                      <Toolbar />
+                    </div>
+                  </ViewportRoot>
                 </div>
-              </div>
-              <div className="absolute bottom-8 left-0 right-0 flex items-center justify-center z-50 pointer-events-none">
-                <Toolbar />
-              </div>
-            </ViewportRoot>
-          </div>
+              </EditorSurfaceContextMenu>
+            </EditorSurfaceDropzone>
+          </EditorSurfaceClipboardSyncProvider>
           <aside className="hidden lg:flex h-full">
             <SideControl />
           </aside>
@@ -136,6 +138,7 @@ function Hotkyes() {
 
 function Toolbar() {
   const { setCursorMode, cursor_mode } = useEventTarget();
+  const value = cursormode_to_toolbar_value(cursor_mode);
 
   return (
     <div className="rounded-full flex gap-4 border bg-background shadow px-4 py-2 pointer-events-auto">
@@ -147,39 +150,49 @@ function Toolbar() {
               : { type: "cursor" }
           );
         }}
-        value={cursormode_to_toolbar_value(cursor_mode)}
+        value={value}
         defaultValue="cursor"
         type="single"
       >
-        <ToggleGroupItem value={"cursor" satisfies ToolbarToolType}>
-          <CursorArrowIcon />
-        </ToggleGroupItem>
+        <ToolsGroup
+          value={value}
+          options={[
+            { value: "cursor", label: "Cursor", shortcut: "V" },
+            { value: "hand", label: "Hand tool", shortcut: "H" },
+          ]}
+          onValueChange={(v) => {
+            setCursorMode(toolbar_value_to_cursormode(v as ToolbarToolType));
+          }}
+        />
         <VerticalDivider />
         <ToggleGroupItem value={"container" satisfies ToolbarToolType}>
           <FrameIcon />
         </ToggleGroupItem>
         <ToggleGroupItem value={"text" satisfies ToolbarToolType}>
-          <TextIcon />
+          <ToolIcon type="text" />
         </ToggleGroupItem>
-        <ToggleGroupItem value={"rectangle" satisfies ToolbarToolType}>
-          <BoxIcon />
-        </ToggleGroupItem>
-        <ToggleGroupItem value={"ellipse" satisfies ToolbarToolType}>
-          <CircleIcon />
-        </ToggleGroupItem>
-        <ToggleGroupItem value={"line" satisfies ToolbarToolType}>
-          <SlashIcon />
-        </ToggleGroupItem>
-        <ToggleGroupItem value={"pencil" satisfies ToolbarToolType}>
-          <Pencil1Icon />
-        </ToggleGroupItem>
-        <ToggleGroupItem value={"path" satisfies ToolbarToolType}>
-          <PenToolIcon className="w-3.5 h-3.5" />
-        </ToggleGroupItem>
-        <ToggleGroupItem value={"image" satisfies ToolbarToolType}>
-          <ImageIcon />
-        </ToggleGroupItem>
-        <VerticalDivider />
+        <ToolsGroup
+          value={value}
+          options={[
+            { value: "rectangle", label: "Rectangle", shortcut: "R" },
+            { value: "ellipse", label: "Ellipse", shortcut: "O" },
+            { value: "line", label: "Line", shortcut: "L" },
+            { value: "image", label: "Image" },
+          ]}
+          onValueChange={(v) => {
+            setCursorMode(toolbar_value_to_cursormode(v as ToolbarToolType));
+          }}
+        />
+        <ToolsGroup
+          value={value}
+          options={[
+            { value: "pencil", label: "Pencil tool", shortcut: "⇧+P" },
+            { value: "path", label: "Path tool", shortcut: "P" },
+          ]}
+          onValueChange={(v) => {
+            setCursorMode(toolbar_value_to_cursormode(v as ToolbarToolType));
+          }}
+        />
       </ToggleGroup>
     </div>
   );

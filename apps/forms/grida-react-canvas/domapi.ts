@@ -1,5 +1,9 @@
 import { grida } from "@/grida";
 import { cmath } from "@grida/cmath";
+
+/**
+ * A dom api for the canvas html backend.
+ */
 export namespace domapi {
   export namespace k {
     export const VIEWPORT_ELEMENT_ID = "grida-canvas-sdk-viewport";
@@ -10,35 +14,70 @@ export namespace domapi {
     return window.document.getElementById(node_id);
   }
 
-  /**
-   * returns a bounding Rectangle of the node element in the content (renderer) space
-   * @returns
-   */
-  export function get_node_bounding_rect(node_id: string) {
-    const contentrect = get_content_element()?.getBoundingClientRect();
-    const noderect = get_node_element(node_id)?.getBoundingClientRect();
-
-    if (!contentrect) {
-      throw new Error("renderer missing - content element rect is null");
+  export class CanvasDOM {
+    readonly scale: cmath.Vector2;
+    constructor(readonly transform: cmath.Transform) {
+      this.scale = cmath.transform.getScale(transform);
     }
 
-    if (!noderect) {
-      return null;
+    getAllNodeElements(): NodeListOf<Element> | undefined {
+      return get_grida_node_elements();
     }
 
-    return {
-      x: noderect.x - contentrect.x,
-      y: noderect.y - contentrect.y,
-      width: noderect.width,
-      height: noderect.height,
-    } satisfies cmath.Rectangle;
+    getNodesIntersectsArea(area: cmath.Rectangle): string[] {
+      const contained: string[] = [];
+      const all_els = get_grida_node_elements();
+
+      all_els?.forEach((el) => {
+        const rect = this.getNodeBoundingRect(el.id);
+        if (!rect) return;
+        if (cmath.rect.intersects(rect, area)) {
+          contained.push(el.id);
+        }
+      });
+
+      return contained;
+    }
+
+    /**
+     * returns a bounding rect of the node in canvas space (consistant with the transform)
+     * @param node_id
+     * @returns
+     */
+    getNodeBoundingRect(node_id: string): cmath.Rectangle | null {
+      const contentrect = get_content_element()?.getBoundingClientRect();
+      const noderect = get_node_element(node_id)?.getBoundingClientRect();
+
+      if (!contentrect) {
+        throw new Error("renderer missing - content element rect is null");
+      }
+
+      if (!noderect) {
+        return null;
+      }
+
+      const domrect = {
+        x: noderect.x - contentrect.x,
+        y: noderect.y - contentrect.y,
+        width: noderect.width,
+        height: noderect.height,
+      } satisfies cmath.Rectangle;
+
+      const rect = cmath.rect.scale(
+        domrect,
+        [0, 0],
+        [1 / this.scale[0], 1 / this.scale[1]]
+      );
+
+      return rect;
+    }
   }
 
-  export function get_content_element() {
+  function get_content_element() {
     return window.document.getElementById(k.EDITOR_CONTENT_ELEMENT_ID);
   }
 
-  export function get_viewport_element() {
+  function get_viewport_element() {
     return window.document.getElementById(k.VIEWPORT_ELEMENT_ID);
   }
 
@@ -51,7 +90,7 @@ export namespace domapi {
    * All elements with the `data-grida-node-id` attribute.
    * @deprecated Expensive
    */
-  export function get_grida_node_elements(): NodeListOf<Element> | undefined {
+  function get_grida_node_elements(): NodeListOf<Element> | undefined {
     const content = get_content_element();
     return content?.querySelectorAll(
       `[${grida.program.document.k.HTML_ELEMET_DATA_ATTRIBUTE_GRIDA_NODE_ID_KEY}]`
@@ -74,31 +113,5 @@ export namespace domapi {
     );
 
     return node_elements;
-  }
-
-  /**
-   * Utility function to calculate the displacement (offset) of one element (`b`) relative to another (`a`).
-   *
-   * The offset is calculated as a Vector2 using the `getBoundingClientRect` method of the DOM elements.
-   * If either element is `null`, the function returns `null`.
-   *
-   * @param a - The reference to the parent `HTMLElement` or `null`. This is the element relative to which the offset is calculated.
-   * @param b - The reference to the child `HTMLElement` or `null`. This is the element whose offset is being calculated relative to `a`.
-   *
-   * @returns A `Vector2` containing the offset `[dx, dy]` if both elements are provided, or `null` if either is `null`.
-   */
-  export function get_displacement_between(
-    a: HTMLElement | null,
-    b: HTMLElement | null
-  ): cmath.Vector2 | null {
-    if (!a || !b) {
-      return null; // Return null if either element is not provided
-    }
-
-    const aRect = a.getBoundingClientRect();
-    const bRect = b.getBoundingClientRect();
-
-    // Calculate the displacement as a Vector2
-    return cmath.vector2.sub([bRect.left, bRect.top], [aRect.left, aRect.top]);
   }
 }

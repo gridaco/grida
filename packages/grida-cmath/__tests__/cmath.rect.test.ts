@@ -448,4 +448,131 @@ describe("cmath.rect", () => {
       ]);
     });
   });
+
+  describe("transform", () => {
+    it("should translate a rectangle", () => {
+      const rect = { x: 10, y: 20, width: 30, height: 40 };
+      const t: cmath.Transform = [
+        [1, 0, 100], // move +100 on x
+        [0, 1, 50], // move +50 on y
+      ];
+      const result = cmath.rect.transform(rect, t);
+      // Expect bounding box to also shift by [100, 50]
+      expect(result).toEqual({ x: 110, y: 70, width: 30, height: 40 });
+    });
+
+    it("should scale a rectangle around the origin (0,0)", () => {
+      const rect = { x: 10, y: 20, width: 10, height: 20 };
+      const t: cmath.Transform = [
+        [2, 0, 0], // scale x by 2
+        [0, 3, 0], // scale y by 3
+      ];
+      const result = cmath.rect.transform(rect, t);
+      // (10,20) -> (20,60), (20,40) -> (40,120)
+      // so bounding box: x=20, y=60, w=20, h=60
+      expect(result).toEqual({ x: 20, y: 60, width: 20, height: 60 });
+    });
+
+    it("should handle skew transformations (nonzero b, c)", () => {
+      const rect = { x: 0, y: 0, width: 10, height: 10 };
+      const t: cmath.Transform = [
+        [1, 0.5, 0], // skew x
+        [0.3, 1, 0], // skew y
+      ];
+      const result = cmath.rect.transform(rect, t);
+      // Corners:
+      //   (0,0)   -> (0,0)
+      //   (10,0)  -> (10*1 + 0*0.5, 10*0.3 + 0*1) = (10, 3)
+      //   (0,10)  -> (0*1 + 10*0.5, 0*0.3 + 10*1) = (5, 10)
+      //   (10,10) -> (10 + 5, 3 + 10) = (15, 13)
+      // bounding box => x=0, y=0, width=15, height=13
+      expect(result).toEqual({ x: 0, y: 0, width: 15, height: 13 });
+    });
+
+    it("should combine translation, scale, and skew", () => {
+      const rect = { x: 2, y: 2, width: 4, height: 4 };
+      const t: cmath.Transform = [
+        [2, 1, 5], // scale x by 2, skew x by 1, translate x by 5
+        [0.5, 2, 10], // skew y by 0.5, scale y by 2, translate y by 10
+      ];
+      const result = cmath.rect.transform(rect, t);
+      // Check bounding box logically:
+      // corners (2,2), (6,2), (2,6), (6,6)
+      // transform each, then find bounding box
+      expect(result.x).toBeCloseTo(2 * 2 + 2 * 1 + 5); // = 4 + 2 + 5 = 11
+      expect(result.y).toBeCloseTo(2 * 0.5 + 2 * 2 + 10); // = 1 + 4 + 10 = 15
+      // The other corners produce max bounds
+      expect(result.width).toBeGreaterThan(0);
+      expect(result.height).toBeGreaterThan(0);
+    });
+  });
+
+  describe("getRelativeTransform", () => {
+    it("maps rect A corners onto rect B corners", () => {
+      const a = { x: 0, y: 0, width: 100, height: 50 };
+      const b = { x: 200, y: 300, width: 400, height: 200 };
+      const t = cmath.rect.getRelativeTransform(a, b);
+
+      // Top-left corner
+      expect(cmath.vector2.transform([0, 0], t)).toEqual([200, 300]);
+      // Top-right corner
+      expect(cmath.vector2.transform([100, 0], t)).toEqual([600, 300]);
+      // Bottom-left corner
+      expect(cmath.vector2.transform([0, 50], t)).toEqual([200, 500]);
+      // Bottom-right corner
+      expect(cmath.vector2.transform([100, 50], t)).toEqual([600, 500]);
+    });
+
+    it("handles a smaller rect (A) mapped onto a larger rect (B)", () => {
+      const a = { x: 50, y: 50, width: 50, height: 50 };
+      const b = { x: 100, y: 100, width: 500, height: 300 };
+      const t = cmath.rect.getRelativeTransform(a, b);
+
+      // Top-left
+      expect(cmath.vector2.transform([50, 50], t)).toEqual([100, 100]);
+      // Bottom-right
+      expect(cmath.vector2.transform([100, 100], t)).toEqual([600, 400]);
+    });
+
+    it("handles negative coordinates for rect A", () => {
+      const a = { x: -100, y: -50, width: 200, height: 100 };
+      const b = { x: 0, y: 0, width: 100, height: 50 };
+      const t = cmath.rect.getRelativeTransform(a, b);
+
+      // A’s top-left → B’s top-left
+      expect(cmath.vector2.transform([-100, -50], t)).toEqual([0, 0]);
+      // A’s bottom-right → B’s bottom-right
+      expect(cmath.vector2.transform([100, 50], t)).toEqual([100, 50]);
+    });
+
+    it("maps a zero-dimension rect A onto B", () => {
+      const a = { x: 10, y: 10, width: 0, height: 0 };
+      const b = { x: 50, y: 50, width: 100, height: 50 };
+      const t = cmath.rect.getRelativeTransform(a, b);
+
+      // Even though A has zero size, its 'point' still maps to B's top-left
+      expect(cmath.vector2.transform([10, 10], t)).toEqual([50, 50]);
+    });
+
+    it("handles rect A partially overlapped with B (still maps corners correctly)", () => {
+      const a = { x: 20, y: 20, width: 80, height: 60 };
+      const b = { x: 50, y: 30, width: 160, height: 120 };
+      const t = cmath.rect.getRelativeTransform(a, b);
+
+      // Top-left corner
+      expect(cmath.vector2.transform([20, 20], t)).toEqual([50, 30]);
+      // Bottom-right corner
+      expect(cmath.vector2.transform([100, 80], t)).toEqual([210, 150]);
+    });
+
+    it("should transform rect A into rect B", () => {
+      const a = { x: 0, y: 0, width: 100, height: 50 };
+      const b = { x: 200, y: 300, width: 400, height: 200 };
+
+      const t = cmath.rect.getRelativeTransform(a, b);
+      const aTransformed = cmath.rect.transform(a, t);
+
+      expect(aTransformed).toEqual(b);
+    });
+  });
 });

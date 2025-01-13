@@ -5,16 +5,79 @@ import {
 import { MeterLabel } from "./meter";
 import { cn } from "@/utils";
 import { cmath } from "@grida/cmath";
-import useMeasurement from "../hooks/use-measurement";
+import { useTransform } from "@/grida-react-canvas/provider";
+import { useLayoutEffect, useState } from "react";
+import { domapi } from "@/grida-react-canvas/domapi";
+import { useDocument } from "@/grida-react-canvas/provider";
+import { measure, Measurement } from "@grida/cmath/_measurement";
+import { rectToSurfaceSpace } from "@/grida-react-canvas/utils/transform";
+
+function useMeasurement() {
+  const { transform, state, selection } = useDocument();
+  const { surface_measurement_target } = state;
+
+  const [measurement, setMeasurement] = useState<Measurement>();
+
+  useLayoutEffect(() => {
+    try {
+      const b = surface_measurement_target;
+
+      if (!(selection.length > 0) || !b) {
+        setMeasurement(undefined);
+        return;
+      }
+
+      const cdom = new domapi.CanvasDOM(transform);
+
+      const a_rect = cmath.rect.union(
+        selection.map((id) => cdom.getNodeBoundingRect(id)!)
+      );
+
+      const b_rect = cmath.rect.union(
+        surface_measurement_target.map((id) => cdom.getNodeBoundingRect(id)!)
+      );
+
+      const measurement = measure(a_rect, b_rect);
+      if (measurement)
+        setMeasurement({
+          a: a_rect,
+          b: b_rect,
+          distance: measurement.distance,
+          box: measurement.box,
+        });
+    } catch (e) {
+      console.error("useMeasurement", e);
+    }
+  }, [state.document, selection, surface_measurement_target, transform]);
+
+  return measurement;
+}
 
 export function MeasurementGuide() {
   const measurement = useMeasurement();
+  const { transform } = useTransform();
 
   if (!measurement) return <></>;
 
-  const { distance, box, a, b } = measurement;
+  const { distance, box: _box, a: _a, b: _b } = measurement;
 
-  const [st, sr, sb, sl] = distance;
+  const [_st, _sr, _sb, _sl] = distance;
+
+  const msx = transform[0][0];
+  const msy = transform[1][1];
+  const st = _st * msy;
+  const sr = _sr * msx;
+  const sb = _sb * msy;
+  const sl = _sl * msx;
+
+  const label_st = Math.round(_st * 10) / 10;
+  const label_sr = Math.round(_sr * 10) / 10;
+  const label_sb = Math.round(_sb * 10) / 10;
+  const label_sl = Math.round(_sl * 10) / 10;
+
+  const box = rectToSurfaceSpace(_box, transform);
+  const a = rectToSurfaceSpace(_a, transform);
+  const b = rectToSurfaceSpace(_b, transform);
 
   const [tx, ty, tx2, ty2, tl, tr] = guide_line_xylr(box, "top", st);
   const [rx, ry, rx2, ry2, rl, rr] = guide_line_xylr(box, "right", sr);
@@ -40,32 +103,32 @@ export function MeasurementGuide() {
         <Rectangle rect={b} />
       </>
       <Conditional length={st}>
-        <SpacingGuideLine x={tx} y={ty} length={tl} rotation={tr} />
+        <SpacingGuideLine point={[tx, ty]} length={tl} rotation={tr} />
         <Conditional length={tal}>
-          <AuxiliaryLine x={tax} y={tay} length={tal} rotation={tar} />
+          <AuxiliaryLine point={[tax, tay]} length={tal} rotation={tar} />
         </Conditional>
-        <SpacingMeterLabel length={st} side="t" rect={box} />
+        <SpacingMeterLabel length={st} value={label_st} side="t" rect={box} />
       </Conditional>
       <Conditional length={sr}>
-        <SpacingGuideLine x={rx} y={ry} length={rl} rotation={rr} />
+        <SpacingGuideLine point={[rx, ry]} length={rl} rotation={rr} />
         <Conditional length={ral}>
-          <AuxiliaryLine x={rax} y={ray} length={ral} rotation={rar} />
+          <AuxiliaryLine point={[rax, ray]} length={ral} rotation={rar} />
         </Conditional>
-        <SpacingMeterLabel length={sr} side="r" rect={box} />
+        <SpacingMeterLabel length={sr} value={label_sr} side="r" rect={box} />
       </Conditional>
       <Conditional length={sb}>
-        <SpacingGuideLine x={bx} y={by} length={bl} rotation={br} />
+        <SpacingGuideLine point={[bx, by]} length={bl} rotation={br} />
         <Conditional length={bal}>
-          <AuxiliaryLine x={bax} y={bay} length={bal} rotation={bar} />
+          <AuxiliaryLine point={[bax, bay]} length={bal} rotation={bar} />
         </Conditional>
-        <SpacingMeterLabel length={sb} side="b" rect={box} />
+        <SpacingMeterLabel length={sb} value={label_sb} side="b" rect={box} />
       </Conditional>
       <Conditional length={sl}>
-        <SpacingGuideLine x={lx} y={ly} length={ll} rotation={lr} />
+        <SpacingGuideLine point={[lx, ly]} length={ll} rotation={lr} />
         <Conditional length={lal}>
-          <AuxiliaryLine x={lax} y={lay} length={lal} rotation={lar} />
+          <AuxiliaryLine point={[lax, lay]} length={lal} rotation={lar} />
         </Conditional>
-        <SpacingMeterLabel length={sl} side="l" rect={box} />
+        <SpacingMeterLabel length={sl} value={label_sl} side="l" rect={box} />
       </Conditional>
     </div>
   );
@@ -117,14 +180,18 @@ function Conditional({
 function SpacingMeterLabel({
   side,
   length,
+  value,
   rect,
   zoom = 1,
 }: {
   side: Side;
   length: number;
+  value?: string | number;
   rect: { x: number; y: number; width: number; height: number };
   zoom?: number;
 }) {
+  value = value || Math.round(length * 10) / 10;
+
   const { x, y, width, height } = rect;
 
   let tx = x + width / 2; // Center X
@@ -146,7 +213,7 @@ function SpacingMeterLabel({
 
   return (
     <MeterLabel
-      label={(Math.round(length * 10) / 10).toString()}
+      label={value.toString()}
       className="bg-workbench-accent-orange"
       x={tx}
       y={ty}
@@ -168,8 +235,7 @@ const __label_anchor_map = {
 type Side = "t" | "r" | "b" | "l";
 
 interface GuideLineProps {
-  x: number;
-  y: number;
+  point: cmath.Vector2;
   zoom: number;
   length: number;
   direction: "n" | "s" | "e" | "w" | number;
@@ -179,8 +245,7 @@ interface GuideLineProps {
 }
 
 function GuideLine({
-  x,
-  y,
+  point: [x, y],
   zoom,
   direction,
   length,
@@ -223,21 +288,18 @@ const __line_rotation_by_direction_map = {
 
 function SpacingGuideLine({
   length,
-  x,
-  y,
+  point,
   rotation,
   zoom = 1,
 }: {
-  x: number;
-  y: number;
+  point: cmath.Vector2;
   length: number;
   rotation: number;
   zoom?: number;
 }) {
   return (
     <GuideLine
-      x={x}
-      y={y}
+      point={point}
       zoom={zoom}
       length={length}
       direction={rotation}
@@ -249,21 +311,18 @@ function SpacingGuideLine({
 
 function AuxiliaryLine({
   length,
-  x,
-  y,
+  point,
   rotation,
   zoom = 1,
 }: {
-  x: number;
-  y: number;
+  point: cmath.Vector2;
   length: number;
   rotation: number;
   zoom?: number;
 }) {
   return (
     <GuideLine
-      x={x}
-      y={y}
+      point={point}
       zoom={zoom}
       length={length}
       direction={rotation}

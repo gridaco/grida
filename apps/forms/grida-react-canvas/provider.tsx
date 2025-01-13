@@ -35,6 +35,9 @@ import deepEqual from "deep-equal";
 import { iosvg } from "@/grida-io-svg";
 import toast from "react-hot-toast";
 
+const CONFIG_CANVAS_TRANSFORM_SCALE_MIN = 0.02;
+const CONFIG_CANVAS_TRANSFORM_SCALE_MAX = 256;
+
 const DocumentContext = createContext<IDocumentEditorState | null>(null);
 
 const __noop: DocumentDispatcher = () => void 0;
@@ -138,28 +141,6 @@ function __useInternal() {
   const dispatch = __useDispatch();
 
   return useMemo(() => [state, dispatch] as const, [state, dispatch]);
-}
-
-export function useResizeNotifier() {
-  const dispatch = __useDispatch();
-  const notifyResize = useCallback(
-    ({
-      content_offset,
-      viewport_offset,
-    }: {
-      content_offset: cmath.Vector2;
-      viewport_offset: cmath.Vector2;
-    }) => {
-      dispatch({
-        type: "__internal/on-resize",
-        content_offset,
-        viewport_offset,
-      });
-    },
-    [dispatch]
-  );
-
-  return notifyResize;
 }
 
 function __useNodeActions(dispatch: DocumentDispatcher) {
@@ -849,74 +830,6 @@ function __useGestureNudgeState(dispatch: DocumentDispatcher) {
   return __gesture_nudge_debounced;
 }
 
-function __useNudgeActions(dispatch: DocumentDispatcher) {
-  const __gesture_nudge = useCallback(
-    (state: "on" | "off") => {
-      dispatch({
-        type: "gesture/nudge",
-        state,
-      });
-    },
-    [dispatch]
-  );
-
-  const __gesture_nudge_debounced = __useGestureNudgeState(dispatch);
-
-  const nudge = useCallback(
-    (
-      target: "selection" | (string & {}) = "selection",
-      axis: "x" | "y",
-      delta: number = 1,
-      config: NudgeUXConfig = {
-        delay: 500,
-        gesture: true,
-      }
-    ) => {
-      const { gesture = true, delay = 500 } = config;
-
-      if (gesture) {
-        // Trigger gesture
-        __gesture_nudge("on");
-
-        // Debounce to turn off gesture
-        __gesture_nudge_debounced("off", delay);
-      }
-
-      dispatch({
-        type: "nudge",
-        delta,
-        axis,
-        target,
-      });
-    },
-    [dispatch]
-  );
-
-  const nudgeResize = useCallback(
-    (
-      target: "selection" | (string & {}) = "selection",
-      axis: "x" | "y",
-      delta: number = 1
-    ) => {
-      dispatch({
-        type: "nudge-resize",
-        delta,
-        axis,
-        target,
-      });
-    },
-    [dispatch]
-  );
-
-  return useMemo(
-    () => ({
-      nudge,
-      nudgeResize,
-    }),
-    [dispatch]
-  );
-}
-
 export function useNodeAction(node_id: string | undefined) {
   const dispatch = __useDispatch();
   const nodeActions = __useNodeActions(dispatch);
@@ -1457,7 +1370,7 @@ export function useSelectionPaints() {
 export function useDocument() {
   const [state, dispatch] = __useInternal();
 
-  const { selection } = state;
+  const { selection, transform } = state;
 
   const { order: _, ...nodeActions } = __useNodeActions(dispatch);
 
@@ -1536,7 +1449,100 @@ export function useDocument() {
     [dispatch]
   );
 
-  const { nudge, nudgeResize } = __useNudgeActions(dispatch);
+  const __gesture_nudge = useCallback(
+    (state: "on" | "off") => {
+      dispatch({
+        type: "gesture/nudge",
+        state,
+      });
+    },
+    [dispatch]
+  );
+
+  const __gesture_nudge_debounced = __useGestureNudgeState(dispatch);
+
+  const nudge = useCallback(
+    (
+      target: "selection" | (string & {}) = "selection",
+      axis: "x" | "y",
+      delta: number = 1,
+      config: NudgeUXConfig = {
+        delay: 500,
+        gesture: true,
+      }
+    ) => {
+      const { gesture = true, delay = 500 } = config;
+
+      if (gesture) {
+        // Trigger gesture
+        __gesture_nudge("on");
+
+        // Debounce to turn off gesture
+        __gesture_nudge_debounced("off", delay);
+      }
+
+      dispatch({
+        type: "nudge",
+        delta,
+        axis,
+        target,
+      });
+    },
+    [dispatch]
+  );
+
+  const nudgeResize = useCallback(
+    (
+      target: "selection" | (string & {}) = "selection",
+      axis: "x" | "y",
+      delta: number = 1
+    ) => {
+      dispatch({
+        type: "nudge-resize",
+        delta,
+        axis,
+        target,
+      });
+    },
+    [dispatch]
+  );
+
+  const a11yarrow = useCallback(
+    (
+      target: "selection" | (string & {}) = "selection",
+      direction: "up" | "down" | "left" | "right",
+      shiftKey: boolean = false,
+      config: NudgeUXConfig = {
+        delay: 500,
+        gesture: true,
+      }
+    ) => {
+      const { gesture = true, delay = 500 } = config;
+
+      const a11ytypes = {
+        up: "a11y/up",
+        down: "a11y/down",
+        left: "a11y/left",
+        right: "a11y/right",
+      } as const;
+
+      if (gesture) {
+        console.log("on");
+        // Trigger gesture
+        __gesture_nudge("on");
+
+        // Debounce to turn off gesture
+        __gesture_nudge_debounced("off", delay);
+      }
+
+      dispatch({
+        type: a11ytypes[direction],
+        target,
+        shiftKey,
+      });
+    },
+    [dispatch]
+  );
 
   const align = useCallback(
     (
@@ -1801,6 +1807,7 @@ export function useDocument() {
     return {
       state,
       selection,
+      transform,
       //
       select,
       blur,
@@ -1813,6 +1820,7 @@ export function useDocument() {
       deleteNode,
       nudge,
       nudgeResize,
+      a11yarrow,
       align,
       order,
       distributeEvenly,
@@ -1842,6 +1850,7 @@ export function useDocument() {
   }, [
     state,
     selection,
+    transform,
     //
     select,
     blur,
@@ -1854,6 +1863,7 @@ export function useDocument() {
     deleteNode,
     nudge,
     nudgeResize,
+    a11yarrow,
     align,
     order,
     distributeEvenly,
@@ -1882,6 +1892,152 @@ export function useDocument() {
   ]);
 }
 
+export function useTransform() {
+  const [state, dispatch] = __useInternal();
+
+  const { transform } = state;
+
+  const scale = useCallback(
+    (
+      factor: number | cmath.Vector2,
+      origin: cmath.Vector2 | "center" = "center"
+    ) => {
+      const [fx, fy] = typeof factor === "number" ? [factor, factor] : factor;
+      const _scale = transform[0][0];
+      let ox, oy: number;
+      if (origin === "center") {
+        // Canvas size (you need to know or pass this)
+        const { width, height } = domapi.get_viewport_rect();
+
+        // Calculate the absolute transform origin
+        ox = width / 2;
+        oy = height / 2;
+      } else {
+        [ox, oy] = origin;
+      }
+
+      const sx = cmath.clamp(
+        fx,
+        CONFIG_CANVAS_TRANSFORM_SCALE_MIN,
+        CONFIG_CANVAS_TRANSFORM_SCALE_MAX
+      );
+
+      const sy = cmath.clamp(
+        fy,
+        CONFIG_CANVAS_TRANSFORM_SCALE_MIN,
+        CONFIG_CANVAS_TRANSFORM_SCALE_MAX
+      );
+
+      const [tx, ty] = cmath.transform.getTranslate(transform);
+
+      // calculate the offset that should be applied with scale with css transform.
+      const [newx, newy] = [
+        ox - (ox - tx) * (sx / _scale),
+        oy - (oy - ty) * (sy / _scale),
+      ];
+
+      const next: cmath.Transform = [
+        [sx, transform[0][1], newx],
+        [transform[1][0], sy, newy],
+      ];
+
+      dispatch({
+        type: "transform",
+        transform: next,
+      });
+    },
+    [dispatch, transform]
+  );
+
+  /**
+   * Transform to fit
+   */
+  const fit = useCallback(
+    (
+      selector: grida.program.document.Selector,
+      margin: number | [number, number, number, number] = 64
+    ) => {
+      const ids = document.querySelector(
+        state.document_ctx,
+        state.selection,
+        selector
+      );
+
+      if (ids.length === 0) {
+        return;
+      }
+
+      const cdom = new domapi.CanvasDOM(state.transform);
+
+      const area = cmath.rect.union(
+        ids
+          .map((id) => cdom.getNodeBoundingRect(id))
+          .filter((r) => r) as cmath.Rectangle[]
+      );
+
+      const _view = domapi.get_viewport_rect();
+      const view = { x: 0, y: 0, width: _view.width, height: _view.height };
+
+      const transform = cmath.ext.viewport.transformToFit(view, area, margin);
+
+      dispatch({
+        type: "transform",
+        transform: transform,
+      });
+    },
+    [
+      dispatch,
+      state.transform,
+      state.document_ctx,
+      state.document.root_id,
+      state.selection,
+    ]
+  );
+
+  const zoomIn = useCallback(() => {
+    const prevscale = transform[0][0];
+    const nextscale = cmath.quantize(prevscale * 2, 0.01);
+
+    scale(nextscale);
+    //
+  }, [dispatch, scale, transform]);
+
+  const zoomOut = useCallback(() => {
+    const prevscale = transform[0][0];
+    const nextscale = cmath.quantize(prevscale / 2, 0.01);
+
+    scale(nextscale);
+    //
+  }, [dispatch, scale, transform]);
+
+  const setTransform = useCallback(
+    (transform: cmath.Transform) => {
+      dispatch({
+        type: "transform",
+        transform,
+      });
+    },
+    [dispatch]
+  );
+
+  return useMemo(() => {
+    const transform = state.transform;
+    const matrix = `matrix(${transform[0][0]}, ${transform[1][0]}, ${transform[0][1]}, ${transform[1][1]}, ${transform[0][2]}, ${transform[1][2]})`;
+    return {
+      transform,
+      style: {
+        transformOrigin: "0 0",
+        transform: matrix,
+      } as React.CSSProperties,
+      setTransform,
+      scale,
+      fit,
+      zoomIn,
+      zoomOut,
+    };
+  }, [transform, setTransform, scale, fit, zoomIn, zoomOut]);
+}
+
 function throttle<T extends (...args: any[]) => void>(
   func: T,
   limit: number
@@ -1903,9 +2059,12 @@ export function useEventTargetCSSCursor() {
 
   return useMemo(() => {
     switch (cursor_mode.type) {
-      case "cursor": {
+      case "cursor":
         return "default";
-      }
+      case "hand":
+        return "grab";
+      case "zoom":
+        return "zoom-in";
       case "insert": {
         switch (cursor_mode.node) {
           case "text":
@@ -1929,16 +2088,14 @@ export function useEventTarget() {
   const [state, dispatch] = __useInternal();
 
   const {
-    content_offset,
-    viewport_offset,
+    pointer,
+    transform,
     gesture,
     hovered_node_id,
     dropzone_node_id,
     selection,
     content_edit_mode,
     cursor_mode,
-    cursor_position,
-    surface_cursor_position,
     marquee,
     debug,
   } = state;
@@ -1988,6 +2145,51 @@ export function useEventTarget() {
 
     return position;
   };
+
+  const zoom = useCallback(
+    (delta: number, origin: cmath.Vector2) => {
+      const _scale = transform[0][0];
+      // the origin point of the zooming point in x, y (surface space)
+      const [ox, oy] = origin;
+
+      // Apply proportional zooming
+      const scale = _scale + _scale * delta;
+
+      const newscale = cmath.clamp(
+        scale,
+        CONFIG_CANVAS_TRANSFORM_SCALE_MIN,
+        CONFIG_CANVAS_TRANSFORM_SCALE_MAX
+      );
+      const [tx, ty] = cmath.transform.getTranslate(transform);
+
+      // calculate the offset that should be applied with scale with css transform.
+      const [newx, newy] = [
+        ox - (ox - tx) * (newscale / _scale),
+        oy - (oy - ty) * (newscale / _scale),
+      ];
+
+      const next: cmath.Transform = [
+        [newscale, transform[0][1], newx],
+        [transform[1][0], newscale, newy],
+      ];
+
+      dispatch({
+        type: "transform",
+        transform: next,
+      });
+    },
+    [transform, dispatch]
+  );
+
+  const pan = useCallback(
+    (delta: [dx: number, dy: number]) => {
+      dispatch({
+        type: "transform",
+        transform: cmath.transform.translate(transform, delta),
+      });
+    },
+    [dispatch, transform]
+  );
 
   const pointerMove = useCallback(
     (event: PointerEvent) => {
@@ -2091,35 +2293,11 @@ export function useEventTarget() {
   const dragEnd = useCallback(
     (event: PointerEvent) => {
       if (marquee) {
-        const contained: string[] = [];
+        // test area in canvas space
+        const area = cmath.rect.fromPoints([marquee.a, marquee.b]);
 
-        const els = domapi.get_grida_node_elements();
-        const viewportdomrect = domapi.get_viewport_rect();
-        const viewport_pos = [viewportdomrect.x, viewportdomrect.y];
-        const translate: [number, number] = [
-          state.content_offset ? state.content_offset[0] : 0,
-          state.content_offset ? state.content_offset[1] : 0,
-        ];
-
-        const marqueerect = cmath.rect.fromPoints([
-          [marquee.x1, marquee.y1],
-          [marquee.x2, marquee.y2],
-        ]);
-        marqueerect.x = marqueerect.x - translate[0];
-        marqueerect.y = marqueerect.y - translate[1];
-
-        els?.forEach((el) => {
-          const eldomrect = el.getBoundingClientRect();
-          const elrect = {
-            x: eldomrect.x - translate[0] - viewport_pos[0],
-            y: eldomrect.y - translate[1] - viewport_pos[1],
-            width: eldomrect.width,
-            height: eldomrect.height,
-          };
-          if (cmath.rect.intersects(elrect, marqueerect)) {
-            contained.push(el.id);
-          }
-        });
+        const cdom = new domapi.CanvasDOM(transform);
+        const contained = cdom.getNodesIntersectsArea(area);
 
         dispatch({
           type: "event-target/event/on-drag-end",
@@ -2134,7 +2312,7 @@ export function useEventTarget() {
         shiftKey: event.shiftKey,
       });
     },
-    [dispatch, marquee, state.content_offset]
+    [dispatch, marquee, transform]
   );
 
   const drag = useCallback(
@@ -2213,14 +2391,15 @@ export function useEventTarget() {
 
   return useMemo(() => {
     return {
+      zoom,
+      pan,
+      //
+      pointer,
+      transform,
       debug,
-      content_offset,
-      viewport_offset,
       //
       marquee,
       cursor_mode,
-      cursor_position,
-      surface_cursor_position,
       setCursorMode,
       //
       hovered_node_id,
@@ -2253,14 +2432,15 @@ export function useEventTarget() {
       //
     };
   }, [
+    zoom,
+    pan,
+    //
+    pointer,
+    transform,
     debug,
-    content_offset,
-    viewport_offset,
     //
     marquee,
     cursor_mode,
-    cursor_position,
-    surface_cursor_position,
     setCursorMode,
     //
     hovered_node_id,
@@ -2300,9 +2480,16 @@ export function useDataTransferEventTarget() {
   const [state, dispatch] = __useInternal();
 
   const canvasXY = useCallback(
-    (xy: cmath.Vector2) =>
-      cmath.vector2.sub(xy, state.viewport_offset, state.content_offset),
-    [state.content_offset, state.viewport_offset]
+    (xy: cmath.Vector2) => {
+      const viewportdomrect = domapi.get_viewport_rect();
+      const viewport_pos: cmath.Vector2 = [
+        viewportdomrect.x,
+        viewportdomrect.y,
+      ];
+      const translate = cmath.transform.getTranslate(state.transform);
+      return cmath.vector2.sub(xy, viewport_pos, translate);
+    },
+    [state.transform]
   );
 
   const paste = useCallback(() => {

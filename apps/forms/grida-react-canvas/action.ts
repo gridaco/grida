@@ -10,16 +10,16 @@ import type {
   IDocumentEditorState,
   SurfaceRaycastTargeting,
 } from "./state";
+import { cmath } from "@grida/cmath";
 
 export type Action =
   | InternalAction
+  | EditorCameraAction
   | EditorAction
   | EditorUndoAction
   | EditorRedoAction;
 
-export type InternalAction =
-  | __InternalSyncArtboardOffset
-  | __InternalResetAction;
+export type InternalAction = __InternalResetAction;
 
 export type EditorAction =
   | EditorConfigAction
@@ -37,6 +37,7 @@ export type DocumentAction =
   | EditorPathAction
   | EditorNudgeAction
   | EditorNudgeResizeAction
+  | EditorA11yArrowAction
   | EditorAlignAction
   | EditorDistributeEvenlyAction
   | DocumentEditorInsertNodeAction
@@ -99,13 +100,6 @@ export type TCanvasEventTargetDragGestureState = {
 interface ISelection {
   selection: NodeID[];
 }
-
-export type __InternalSyncArtboardOffset = {
-  type: "__internal/on-resize";
-} & {
-  content_offset: Vector2;
-  viewport_offset: Vector2;
-};
 
 export interface __InternalResetAction {
   type: "__internal/reset";
@@ -224,6 +218,20 @@ export interface EditorNudgeResizeAction {
   delta: number;
 }
 
+/**
+ * [A11yArrowAction]
+ *
+ * This binds to keyboard arrow keys for accessibility.
+ *
+ * - For fixed positioning, this will trigger nudge (translate) action.
+ * - For non-fixed positioning, this will trigger order action. (e.g. item in a flex container)
+ */
+export interface EditorA11yArrowAction {
+  type: "a11y/up" | "a11y/down" | "a11y/left" | "a11y/right";
+  target: NodeID | "selection";
+  shiftKey?: boolean;
+}
+
 export interface EditorAlignAction {
   type: "align";
   target: NodeID | "selection";
@@ -308,6 +316,11 @@ interface IHtmlBackendCanvasEventTargetPointerEvent {
 interface ICanvasEventTargetDragEvent {
   event: TCanvasEventTargetDragGestureState;
 }
+
+export type EditorCameraAction = {
+  type: "transform";
+  transform: cmath.Transform;
+};
 
 export type EventTargetAction =
   //

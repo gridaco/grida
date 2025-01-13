@@ -2,12 +2,13 @@
 
 import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useEventTarget } from "@/grida-react-canvas";
-import { useGesture as __useGesture } from "@use-gesture/react";
+import { useGesture as __useGesture, useGesture } from "@use-gesture/react";
 import {
   useClipboardSync,
   useDocument,
   useEventTargetCSSCursor,
   useNode,
+  useTransform,
 } from "../provider";
 import { useIsWindowResizing } from "./hooks/window-resizing";
 import { supports } from "@/grida/utils/supports";
@@ -29,8 +30,27 @@ import { SurfaceTextEditor } from "./ui/text-editor";
 import { SurfacePathEditor } from "./ui/path-editor";
 import { SizeMeterLabel } from "./ui/meter";
 import { SurfaceGradientEditor } from "./ui/gradient-editor";
+import { pointToSurfaceSpace } from "../utils/transform";
+import PixelGrid from "./pixelgrid";
 
 const DRAG_THRESHOLD = 2;
+
+/*
+const SURFACE_TRANSFORM_CONTEXT = React.createContext<cmath.Transform>(
+  cmath.transform.identity
+);
+
+function SurfaceTransformContextProvider({
+  children,
+}: React.PropsWithChildren<{}>) {
+  const { transform } = useTransform();
+  return (
+    <SURFACE_TRANSFORM_CONTEXT.Provider value={transform}>
+      {children}
+    </SURFACE_TRANSFORM_CONTEXT.Provider>
+  );
+}
+ */
 
 function useSurfaceGesture(
   {
@@ -91,7 +111,11 @@ function SurfaceGroup({
 
 export function EditorSurface() {
   const isWindowResizing = useIsWindowResizing();
+  const { transform } = useTransform();
   const {
+    zoom,
+    pan,
+    pointer,
     marquee,
     hovered_node_id,
     dropzone_node_id,
@@ -204,6 +228,45 @@ export function EditorSurface() {
     }
   );
 
+  // pinch & wheel gesture (zoom and panning)
+  useGesture(
+    {
+      onWheel: (state) => {
+        const { event, delta, ctrlKey, metaKey } = state;
+        if (event.defaultPrevented) return;
+        // when pinching (on mac os, ctrlKey is set true even when no key pressed), this is true.
+        if (ctrlKey || metaKey) {
+          // zoom
+          const targetRect = eventTargetRef.current!.getBoundingClientRect();
+          const ox = event.clientX - targetRect.left;
+          const oy = event.clientY - targetRect.top;
+          const origin: [number, number] = [ox, oy];
+          const d = delta[1];
+          const sensitivity = 0.01;
+          const zoom_delta = -d * sensitivity;
+          zoom(zoom_delta, origin);
+        } else {
+          const sensitivity = 2;
+          pan(
+            cmath.vector2.invert(
+              cmath.vector2.multiply(delta, [sensitivity, sensitivity])
+            )
+          );
+        }
+
+        event.preventDefault();
+      },
+    },
+    {
+      wheel: {
+        eventOptions: {
+          passive: false,
+        },
+      },
+      target: eventTargetRef,
+    }
+  );
+
   return (
     <div
       id="event-target"
@@ -218,6 +281,26 @@ export function EditorSurface() {
         cursor: cursor,
       }}
     >
+      {/* <div className="absolute w-full h-full z-50">
+        {transform[0][0] > 4 && (
+          <PixelGrid zoomLevel={transform[0][0]} cellSize={1} />
+        )}
+      </div> */}
+      <div
+        style={{
+          position: "absolute",
+        }}
+      >
+        {/* <DebugPointer position={toSurfaceSpace(pointer.position, transform)} /> */}
+        {marquee && (
+          <div id="marquee-container" className="absolute top-0 left-0 w-0 h-0">
+            <Marquee
+              a={pointToSurfaceSpace(marquee.a, transform)}
+              b={pointToSurfaceSpace(marquee.b, transform)}
+            />
+          </div>
+        )}
+      </div>
       <div className="w-full h-full" id="canvas-overlay-portal" ref={portalRef}>
         <MeasurementGuide />
         <div
@@ -226,16 +309,7 @@ export function EditorSurface() {
         >
           <SnapGuide />
         </div>
-        {marquee && (
-          <div id="marquee-container" className="absolute top-0 left-0 w-0 h-0">
-            <Marquee
-              x1={marquee.x1}
-              y1={marquee.y1}
-              x2={marquee.x2}
-              y2={marquee.y2}
-            />
-          </div>
-        )}
+
         <SurfaceGroup hidden={is_node_translating || isWindowResizing}>
           {content_edit_mode?.type === "text" && (
             <SurfaceTextEditor
@@ -319,7 +393,7 @@ function MultipleSelectionOverlay({
   readonly?: boolean;
 }) {
   const { multipleSelectionOverlayClick, cursor_mode } = useEventTarget();
-  const transform = useGroupSurfaceTransform(...selection);
+  const { style, rect, size } = useGroupSurfaceTransform(...selection);
 
   const enabled = !readonly && cursor_mode.type === "cursor";
 
@@ -353,7 +427,7 @@ function MultipleSelectionOverlay({
       <LayerOverlay
         {...bind()}
         readonly={readonly}
-        transform={transform}
+        transform={style}
         zIndex={10}
       >
         <LayerOverlayResizeHandle anchor="n" selection={selection} />
@@ -366,21 +440,14 @@ function MultipleSelectionOverlay({
         <LayerOverlayResizeHandle anchor="se" selection={selection} />
         {/*  */}
         <DistributeButton />
-        <SizeMeterLabel
-          margin={6}
-          size={{
-            width: transform.width,
-            height: transform.height,
-          }}
-          rect={{
-            x: 0,
-            y: 0,
-            width: transform.width,
-            height: transform.height,
-          }}
-          zoom={1}
-          className="bg-workbench-accent-sky"
-        />
+        {rect && (
+          <SizeMeterLabel
+            margin={6}
+            size={size}
+            rect={{ ...rect, x: 0, y: 0 }}
+            className="bg-workbench-accent-sky"
+          />
+        )}
       </LayerOverlay>
       {
         // also hightlight the included nodes
@@ -403,7 +470,7 @@ function NodeOverlay({
   zIndex?: number;
   focused?: boolean;
 }) {
-  const transform = useNodeSurfaceTransfrom(node_id);
+  const { style, rect, size } = useNodeSurfaceTransfrom(node_id);
   const node = useNode(node_id);
 
   const { is_component_consumer } = node.meta;
@@ -412,7 +479,7 @@ function NodeOverlay({
   return (
     <LayerOverlay
       readonly={readonly}
-      transform={transform}
+      transform={style}
       zIndex={zIndex}
       isComponentConsumer={is_component_consumer}
     >
@@ -445,20 +512,11 @@ function NodeOverlay({
           <LayerOverlayRotationHandle anchor="se" node_id={node_id} />
         </>
       )}
-      {focused && !readonly && (
+      {focused && !readonly && rect && (
         <SizeMeterLabel
           margin={6}
-          size={{
-            width: transform.width,
-            height: transform.height,
-          }}
-          rect={{
-            x: 0,
-            y: 0,
-            width: transform.width,
-            height: transform.height,
-          }}
-          zoom={1}
+          size={size}
+          rect={{ ...rect, x: 0, y: 0 }}
           className="bg-workbench-accent-sky"
         />
       )}
@@ -595,17 +653,19 @@ function LayerOverlayResizeHandle({
 }
 
 function usePrefferedDistributionAxis() {
-  const { selection, state } = useDocument();
+  const { transform, selection, state } = useDocument();
 
   const [axis, setAxis] = useState<"x" | "y">();
 
   useEffect(() => {
+    const cdom = new domapi.CanvasDOM(transform);
+
     const activeSelection = selection.filter(
       (node_id) => state.document.nodes[node_id].active
     );
 
     const rects = activeSelection.map(
-      (node_id) => domapi.get_node_bounding_rect(node_id)!
+      (node_id) => cdom.getNodeBoundingRect(node_id)!
     );
 
     if (rects.length > 2) {
@@ -629,7 +689,7 @@ function usePrefferedDistributionAxis() {
     }
 
     setAxis(undefined);
-  }, [selection, state.document.nodes]);
+  }, [selection, state.document.nodes, transform]);
 
   return axis;
 }

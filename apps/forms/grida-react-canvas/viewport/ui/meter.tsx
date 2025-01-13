@@ -9,21 +9,21 @@ export function SizeMeterLabel({
   size,
   margin = 0,
   rect,
-  zoom,
+  zoom = 1,
   className,
 }: {
-  size: { width: number; height: number };
+  size: cmath.Vector2;
   margin?: number;
 } & {
   rect: cmath.Rectangle;
-  zoom: number;
+  zoom?: number;
   className?: string;
 }) {
   const { x, y, width, height } = rect;
   const bottomY = y + height;
   const centerX = x + width / 2;
 
-  const text = `${+size.width.toFixed(2)} x ${+size.height.toFixed(2)}`;
+  const text = `${+size[0].toFixed(2)} x ${+size[1].toFixed(2)}`;
 
   return (
     <MeterLabel

@@ -37,26 +37,51 @@ import { getMarqueeSelection, getSurfaceRayTarget } from "./tools/target";
 import { vn } from "@/grida/vn";
 import { getInitialCurveGesture } from "./tools/gesture";
 import { createMinimalDocumentStateSnapshot } from "./tools/snapshot";
+import { pointToSurfaceSpace, toCanvasSpace } from "../utils/transform";
 
 export default function eventTargetReducer<S extends IDocumentEditorState>(
   state: S,
   action: EventTargetAction
 ): S {
+  // adjust the event by transform
+
+  if ("event" in action) {
+    const [scaleX, scaleY] = cmath.transform.getScale(state.transform);
+    const factor: cmath.Vector2 = [1 / scaleX, 1 / scaleY];
+    const original = { ...action.event };
+    const adj = {
+      ...original,
+      // only delta and movement are scaled
+      delta: cmath.vector2.multiply(action.event.delta, factor),
+      movement: cmath.vector2.multiply(action.event.movement, factor),
+    };
+
+    // replace the action with adjusted event
+    action = {
+      ...action,
+      event: adj,
+    };
+  }
+
   switch (action.type) {
     // #region [html backend] canvas event target
     case "event-target/event/on-pointer-move": {
       const {
         position: { x, y },
       } = <EditorEventTarget_PointerMove>action;
-      const c_surface_pos: cmath.Vector2 = [x, y];
-      const c_content_pos = cmath.vector2.sub(
-        state.surface_cursor_position,
-        state.content_offset ?? cmath.vector2.zero
+
+      const surface_space_pointer_position: cmath.Vector2 = [x, y];
+      const canvas_transform = state.transform;
+      const canvas_space_pointer_position = toCanvasSpace(
+        surface_space_pointer_position,
+        canvas_transform
       );
 
       return produce(state, (draft) => {
-        draft.surface_cursor_position = c_surface_pos;
-        draft.cursor_position = c_content_pos;
+        draft.pointer = {
+          position: canvas_space_pointer_position,
+        };
+
         if (draft.content_edit_mode?.type === "path") {
           const { a_point, node_id } = draft.content_edit_mode;
           const { tarnslate_with_axis_lock } = state.gesture_modifiers;
@@ -76,7 +101,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
 
             // mock the movement (movement = cursor pos - anchor pos)
             const movement = cmath.vector2.sub(
-              c_content_pos,
+              draft.pointer.position,
               cmath.vector2.add(n_offset, a.p)
             );
 
@@ -87,7 +112,8 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             const adj_pos = cmath.vector2.add(a.p, adj_movement, n_offset);
             draft.content_edit_mode.path_cursor_position = adj_pos;
           } else {
-            draft.content_edit_mode.path_cursor_position = c_content_pos;
+            draft.content_edit_mode.path_cursor_position =
+              canvas_space_pointer_position;
           }
         }
       });
@@ -106,26 +132,29 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       return produce(state, (draft) => {
         draft.surface_raycast_detected_node_ids = node_ids_from_point;
         switch (draft.cursor_mode.type) {
-          case "cursor": {
+          case "cursor":
+          case "hand":
             // ignore
             break;
-          }
+          case "zoom":
+            // TODO: also support zoom out (with alt key modifier) - needs to be handled separately
+            draft.transform = cmath.transform.scale(
+              2,
+              draft.transform,
+              // map the cursor position back to surface space
+              pointToSurfaceSpace(draft.pointer.position, draft.transform)
+            );
+            break;
           case "insert":
             const parent = __get_insert_target(draft);
 
             const nnode = initialNode(draft.cursor_mode.node);
 
-            const parent_rect = domapi.get_node_bounding_rect(parent)!;
+            const cdom = new domapi.CanvasDOM(draft.transform);
+            const parent_rect = cdom.getNodeBoundingRect(parent)!;
 
             try {
               const _nnode = nnode as grida.program.nodes.AnyNode;
-
-              const { cursor_position: _cursor_position } = state;
-
-              const cursor_position = cmath.vector2.quantize(
-                _cursor_position,
-                1
-              );
 
               // center translate the new node - so it can be positioned centered to the cursor point (width / 2, height / 2)
               const center_translate_delta: cmath.Vector2 =
@@ -135,11 +164,14 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                   ? [_nnode.width / 2, _nnode.height / 2]
                   : [0, 0];
 
-              const nnode_relative_position = cmath.vector2.sub(
-                cursor_position,
-                // parent position relative to content space
-                [parent_rect.x, parent_rect.y],
-                center_translate_delta
+              const nnode_relative_position = cmath.vector2.quantize(
+                cmath.vector2.sub(
+                  state.pointer.position,
+                  // parent position relative to content space
+                  [parent_rect.x, parent_rect.y],
+                  center_translate_delta
+                ),
+                1
               );
 
               _nnode.position = "absolute";
@@ -311,7 +343,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                 },
               } satisfies grida.program.nodes.PathNode;
 
-              const pos = draft.cursor_position;
+              const pos = draft.pointer.position;
 
               vector.left = pos[0];
               vector.top = pos[1];
@@ -361,20 +393,16 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               } else {
                 // marquee selection
                 draft.marquee = {
-                  x1: draft.surface_cursor_position[0],
-                  y1: draft.surface_cursor_position[1],
-                  x2: draft.surface_cursor_position[0],
-                  y2: draft.surface_cursor_position[1],
+                  a: state.pointer.position,
+                  b: state.pointer.position,
                 };
               }
             } else {
               if (draft.selection.length === 0) {
                 // marquee selection
                 draft.marquee = {
-                  x1: draft.surface_cursor_position[0],
-                  y1: draft.surface_cursor_position[1],
-                  x2: draft.surface_cursor_position[0],
-                  y2: draft.surface_cursor_position[1],
+                  a: state.pointer.position,
+                  b: state.pointer.position,
                 };
               } else {
                 self_start_gesture_translate(draft);
@@ -382,14 +410,27 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             }
             break;
           }
+          case "zoom": {
+            // marquee zoom
+            draft.marquee = {
+              a: state.pointer.position,
+              b: state.pointer.position,
+            };
+            break;
+          }
+          case "hand": {
+            draft.gesture = {
+              type: "pan",
+              movement: cmath.vector2.zero,
+            };
+            break;
+          }
           case "insert": {
-            const { cursor_position } = state;
-
             const parent = __get_insert_target(draft);
 
             const initial_rect = {
-              x: cursor_position[0],
-              y: cursor_position[1],
+              x: state.pointer.position[0],
+              y: state.pointer.position[1],
               width: 1,
               height: 1,
             };
@@ -413,8 +454,6 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
           }
           case "draw": {
             const tool = draft.cursor_mode.tool;
-
-            const { cursor_position } = state;
 
             let vector:
               | grida.program.nodes.PathNode
@@ -470,12 +509,13 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             const parent = __get_insert_target(draft);
             self_insertNode(draft, parent, vector);
 
+            const cdom = new domapi.CanvasDOM(draft.transform);
             // position relative to the parent
-            const parent_rect = domapi.get_node_bounding_rect(parent)!;
-            const node_relative_pos = cmath.vector2.sub(cursor_position, [
-              parent_rect.x,
-              parent_rect.y,
-            ]);
+            const parent_rect = cdom.getNodeBoundingRect(parent)!;
+            const node_relative_pos = cmath.vector2.sub(
+              state.pointer.position,
+              [parent_rect.x, parent_rect.y]
+            );
             vector.left = node_relative_pos[0];
             vector.top = node_relative_pos[1];
 
@@ -553,32 +593,64 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         action
       );
       return produce(state, (draft) => {
-        self_maybe_end_gesture_translate(draft);
-        // reset the cursor mode (unless pencil mode)
-        if (
-          !(
-            (draft.cursor_mode.type === "draw" &&
-              draft.cursor_mode.tool === "pencil") ||
-            draft.cursor_mode.type === "path"
-          )
-        ) {
-          draft.cursor_mode = { type: "cursor" };
+        switch (draft.cursor_mode.type) {
+          case "draw":
+            // keep if pencil mode
+            if (draft.cursor_mode.tool === "pencil") break;
+          case "path":
+          case "hand":
+            // keep
+            break;
+          case "zoom": {
+            if (state.marquee) {
+              // update zoom
+              const _vrect = domapi.get_viewport_rect();
+              const vrect = {
+                x: 0,
+                y: 0,
+                width: _vrect.width,
+                height: _vrect.height,
+              };
+              const mrect = cmath.rect.fromPoints([
+                state.marquee.a,
+                state.marquee.b,
+              ]);
+              const t = cmath.ext.viewport.transformToFit(vrect, mrect);
+              draft.transform = t;
+            }
+
+            // cancel to default
+            draft.cursor_mode = { type: "cursor" };
+            break;
+          }
+          case "cursor": {
+            if (node_ids_from_area) {
+              const target_node_ids = getMarqueeSelection(
+                state,
+                node_ids_from_area
+              );
+
+              self_selectNode(
+                draft,
+                shiftKey ? "toggle" : "reset",
+                ...target_node_ids
+              );
+            }
+
+            // cancel to default
+            draft.cursor_mode = { type: "cursor" };
+            break;
+          }
+          case "insert":
+          default:
+            // cancel to default
+            draft.cursor_mode = { type: "cursor" };
+            break;
         }
 
+        self_maybe_end_gesture_translate(draft);
         draft.gesture = { type: "idle" };
         draft.marquee = undefined;
-        if (node_ids_from_area) {
-          const target_node_ids = getMarqueeSelection(
-            state,
-            node_ids_from_area
-          );
-
-          self_selectNode(
-            draft,
-            shiftKey ? "toggle" : "reset",
-            ...target_node_ids
-          );
-        }
       });
     }
     case "event-target/event/on-drag": {
@@ -587,8 +659,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       } = <EditorEventTarget_Drag>action;
       if (state.marquee) {
         return produce(state, (draft) => {
-          draft.marquee!.x2 = draft.surface_cursor_position[0];
-          draft.marquee!.y2 = draft.surface_cursor_position[1];
+          draft.marquee!.b = state.pointer.position;
         });
       } else {
         return produce(state, (draft) => {
@@ -598,6 +669,19 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
           draft.gesture.movement = movement;
 
           switch (draft.gesture.type) {
+            case "pan": {
+              // for panning, exceptionaly use the unscaled delta.
+              const original_delta = cmath.vector2.multiply(
+                action.event.delta,
+                cmath.transform.getScale(state.transform)
+              );
+              // move the viewport by delta
+              draft.transform = cmath.transform.translate(
+                draft.transform,
+                original_delta
+              );
+              break;
+            }
             // [insertion mode - resize after insertion]
             case "scale": {
               self_update_gesture_transform(draft);
@@ -879,8 +963,11 @@ function self_start_gesture_scale_draw_new_node(
 function self_start_gesture_translate(draft: Draft<IDocumentEditorState>) {
   const selection = draft.selection;
   if (selection.length === 0) return;
+
+  const cdom = new domapi.CanvasDOM(draft.transform);
+
   const rects = draft.selection.map(
-    (node_id) => domapi.get_node_bounding_rect(node_id)!
+    (node_id) => cdom.getNodeBoundingRect(node_id)!
   );
 
   draft.gesture = {

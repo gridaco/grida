@@ -12,6 +12,12 @@ export type CursorMode =
       type: "cursor";
     }
   | {
+      type: "hand";
+    }
+  | {
+      type: "zoom";
+    }
+  | {
       type: "insert";
       node: "text" | "image" | "container" | "rectangle" | "ellipse";
     }
@@ -23,11 +29,14 @@ export type CursorMode =
       type: "path";
     };
 
+/**
+ * A marquee is a area where it takes two points, where it uses the min point as min and max point as max.
+ * - a: [x1, y1]
+ * - b: [x2, y2]
+ */
 export type Marquee = {
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
+  a: cmath.Vector2;
+  b: cmath.Vector2;
 };
 
 const DEFAULT_RAY_TARGETING: SurfaceRaycastTargeting = {
@@ -125,22 +134,15 @@ interface IDocumentEditorClipboardState {
 
 interface IDocumentEditorTransformState {
   /**
-   * @private - internal use only
-   *
-   * translate (offset) of the content (stage) relative to surface (viewport, not window)
+   * current transform of the canvas.
+   * where transform origin is 0,0
    */
-  content_offset: cmath.Vector2;
-
-  /**
-   * @private - internal use only
-   *
-   * translate (offset) of the viewport (surface) relative to the window
-   */
-  viewport_offset: cmath.Vector2;
+  transform: cmath.Transform;
 }
 
 export type GestureState =
   | GestureIdle
+  | GesturePan
   | GestureVirtualNudge
   | GestureTranslate
   | GestureScale
@@ -162,6 +164,13 @@ interface IGesture {
 
 export type GestureIdle = {
   type: "idle";
+};
+
+/**
+ * Pan the viewport - a.k.a hand tool
+ */
+export type GesturePan = IGesture & {
+  type: "pan";
 };
 
 /**
@@ -394,23 +403,28 @@ interface IDocumentEditorEventTargetState {
    */
   surface_raycast_detected_node_ids: string[];
 
-  /**
-   * @private - internal use only
-   *
-   * relative cursor position to the event target (position in viewport space)
-   *
-   * @default [0, 0]
-   */
-  surface_cursor_position: cmath.Vector2;
+  // /**
+  //  * @private - internal use only
+  //  *
+  //  * relative cursor position to the event target (position in viewport space)
+  //  *
+  //  * @default [0, 0]
+  //  */
+  // __surface_cursor_position: cmath.Vector2;
 
-  /**
-   * @private - internal use only
-   *
-   * relative cursor position to document root (position in artboard (document) space)
-   *
-   * @default [0, 0]
-   */
-  cursor_position: cmath.Vector2;
+  // /**
+  //  * @private - internal use only
+  //  *
+  //  * relative cursor position to document root (position in artboard (document) space)
+  //  *
+  //  * @default [0, 0]
+  //  */
+  // __cursor_position: cmath.Vector2;
+
+  pointer: {
+    position: cmath.Vector2;
+    // position_snap: cmath.Vector2;
+  };
 
   /**
    * @private - internal use only
@@ -429,7 +443,7 @@ interface IDocumentEditorEventTargetState {
   surface_measurement_targeting: "on" | "off";
 
   /**
-   * Marquee transform relative to viewport
+   * Marquee transform in canvas space
    */
   marquee?: Marquee;
 }
@@ -515,6 +529,8 @@ type PathContentEditMode = {
 
   /**
    * next points position
+   *
+   * @deprecated - remove me - use global sanp pointer
    */
   path_cursor_position: cmath.Vector2;
 };
@@ -589,15 +605,17 @@ export function initDocumentEditorState({
 }): IDocumentEditorState {
   const s = new document.DocumentState(init.document);
 
+  // console.log("i", init["transform"]);
+
   return {
+    transform: cmath.transform.identity,
     debug: debug ?? false,
     selection: [],
     hovered_node_id: null,
     hovered_vertex_idx: null,
-    content_offset: [0, 0],
-    viewport_offset: [0, 0],
-    cursor_position: [0, 0],
-    surface_cursor_position: [0, 0],
+    pointer: {
+      position: cmath.vector2.zero,
+    },
     history: {
       future: [],
       past: [],

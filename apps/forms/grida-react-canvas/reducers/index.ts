@@ -31,21 +31,13 @@ export default function reducer<S extends IDocumentEditorState>(
       const prev_state = state;
       return produce(_new_state, (draft) => {
         if (key) draft.document_key = key;
-        // even on reset, the following should be preserved
-        draft.viewport_offset = prev_state.viewport_offset;
-        draft.content_offset = prev_state.content_offset;
-        draft.cursor_position = prev_state.cursor_position;
-        draft.surface_cursor_position = prev_state.surface_cursor_position;
+        // preserve the transform state
+        draft.transform = prev_state.transform;
       }) as S;
     }
-    case "__internal/on-resize": {
+    case "transform": {
       return produce(state, (draft: Draft<S>) => {
-        draft.viewport_offset = action.viewport_offset;
-        draft.content_offset = action.content_offset;
-        // TODO: apply delta to cursor position
-        // const delta = cmath.vector2.subtract(...)
-        // draft.surface_cursor_position =
-        // draft.cursor_position =
+        draft.transform = action.transform;
       });
     }
     case "undo":

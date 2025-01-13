@@ -3,17 +3,26 @@ import {
   useEventTarget,
   useSurfacePathEditor,
 } from "@/grida-react-canvas/provider";
-import { useNodeSurfaceTransfrom } from "../hooks/transform";
 import { cmath } from "@grida/cmath";
 import { useGesture } from "@use-gesture/react";
 import { cn } from "@/utils";
 import { svg } from "@/grida/svg";
+import { pointToSurfaceSpace } from "@/grida-react-canvas/utils/transform";
+import assert from "assert";
 
-export function SurfacePathEditor({ node_id }: { node_id: string }) {
-  const { debug, cursor_mode, content_offset } = useEventTarget();
-  const { offset, vertices, segments, path_cursor_position, a_point, next_ta } =
-    useSurfacePathEditor();
-  const transform = useNodeSurfaceTransfrom(node_id);
+export function SurfacePathEditor({ node_id: _node_id }: { node_id: string }) {
+  const { debug, cursor_mode, transform } = useEventTarget();
+  const {
+    node_id,
+    offset,
+    vertices,
+    segments,
+    path_cursor_position,
+    a_point,
+    next_ta,
+  } = useSurfacePathEditor();
+
+  assert(node_id === _node_id);
 
   const a_point_is_last = a_point === vertices.length - 1;
 
@@ -23,7 +32,6 @@ export function SurfacePathEditor({ node_id }: { node_id: string }) {
         data-debug={debug}
         style={{
           position: "absolute",
-          ...transform,
           willChange: "transform",
           overflow: "visible",
           resize: "none",
@@ -32,7 +40,11 @@ export function SurfacePathEditor({ node_id }: { node_id: string }) {
         className="border border-transparent data-[debug='true']:border-pink-500"
       >
         {vertices.map(({ p }, i) => (
-          <VertexPoint key={i} point={p} index={i} />
+          <VertexPoint
+            key={i}
+            point={pointToSurfaceSpace(cmath.vector2.add(offset, p), transform)}
+            index={i}
+          />
         ))}
         {debug && (
           <svg
@@ -61,8 +73,11 @@ export function SurfacePathEditor({ node_id }: { node_id: string }) {
         <>
           {/* next segment */}
           <Extension
-            a={cmath.vector2.add(offset, content_offset, vertices[a_point].p)}
-            b={cmath.vector2.add(path_cursor_position, content_offset)}
+            a={pointToSurfaceSpace(
+              cmath.vector2.add(offset, vertices[a_point].p),
+              transform
+            )}
+            b={pointToSurfaceSpace(path_cursor_position, transform)}
             ta={next_ta ? next_ta : undefined}
           />
         </>
@@ -75,38 +90,52 @@ export function SurfacePathEditor({ node_id }: { node_id: string }) {
         const is_neighbouring = a_point === s.a || a_point === s.b;
         if (!is_neighbouring) return <></>;
 
-        const d = cmath.vector2.add(offset, content_offset);
-
         return (
           <React.Fragment key={i}>
             <div
               style={{
                 position: "absolute",
-                left: d[0],
-                top: d[1],
               }}
             >
               {!cmath.vector2.isZero(ta) && (
                 <CurveControlExtension
                   segment={i}
                   control="ta"
-                  a={a}
-                  b={cmath.vector2.add(a, ta)}
+                  a={pointToSurfaceSpace(
+                    cmath.vector2.add(a, offset),
+                    transform
+                  )}
+                  b={pointToSurfaceSpace(
+                    cmath.vector2.add(a, offset, ta),
+                    transform
+                  )}
                 />
               )}
               {!cmath.vector2.isZero(tb) && (
                 <CurveControlExtension
                   segment={i}
                   control="tb"
-                  a={b}
-                  b={cmath.vector2.add(b, tb)}
+                  a={pointToSurfaceSpace(
+                    cmath.vector2.add(b, offset),
+                    transform
+                  )}
+                  b={pointToSurfaceSpace(
+                    cmath.vector2.add(b, offset, tb),
+                    transform
+                  )}
                 />
               )}
               {/* preview the next ta - cannot be edited */}
               {a_point_is_last && (
                 <Extension
-                  a={b}
-                  b={cmath.vector2.add(b, cmath.vector2.invert(tb))}
+                  a={pointToSurfaceSpace(
+                    cmath.vector2.add(b, offset),
+                    transform
+                  )}
+                  b={pointToSurfaceSpace(
+                    cmath.vector2.add(b, offset, cmath.vector2.invert(tb)),
+                    transform
+                  )}
                 />
               )}
             </div>

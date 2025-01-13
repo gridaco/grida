@@ -1,14 +1,9 @@
-export function Marquee({
-  x1,
-  y1,
-  x2,
-  y2,
-}: {
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
-}) {
+import { cmath } from "@grida/cmath";
+
+export function Marquee({ a, b }: { a: cmath.Vector2; b: cmath.Vector2 }) {
+  const [x1, y1] = a;
+  const [x2, y2] = b;
+
   return (
     <div
       className="absolute border border-workbench-accent-sky bg-workbench-accent-sky/20 pointer-events-none"

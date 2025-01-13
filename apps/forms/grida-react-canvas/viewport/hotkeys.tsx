@@ -1,8 +1,13 @@
 import { useHotkeys } from "react-hotkeys-hook";
-import { useDocument, useEventTarget, useSelection } from "../provider";
+import {
+  useDocument,
+  useEventTarget,
+  useSelection,
+  useTransform,
+} from "../provider";
 import toast from "react-hot-toast";
 import { grida } from "@/grida";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 export const keybindings_sheet = [
   {
@@ -125,11 +130,111 @@ export const keybindings_sheet = [
     description: "Distribute selection evenly vertically",
     keys: ["alt+ctrl+h"],
   },
+  {
+    name: "zoom to fit",
+    description: "Zoom to fit the content",
+    keys: ["shift+1", "shift+9"],
+  },
+  {
+    name: "zoom to selection",
+    description: "Zoom to the current selection",
+    keys: ["shift+2"],
+  },
+  {
+    name: "zoom to 100%",
+    description: "Zoom to 100%",
+    keys: ["shift+0"],
+  },
+  {
+    name: "zoom in",
+    description: "Zoom in",
+    keys: ["meta+=, ctrl+=", "meta+plus, ctrl+plus"],
+  },
+  {
+    name: "zoom out",
+    description: "Zoom out",
+    keys: ["meta+minus, ctrl+minus"],
+  },
+  {
+    name: "move to front",
+    description: "Move the selection to the front",
+    keys: ["]"],
+  },
+  {
+    name: "move to back",
+    description: "Move the selection to the back",
+    keys: ["["],
+  },
+  {
+    name: "eye dropper",
+    description: "Use eye dropper to pick color",
+    keys: ["i"],
+  },
+  {
+    name: "hand tool",
+    description: "Use hand tool to pan the canvas",
+    keys: ["space"],
+  },
+  {
+    name: "zoom tool",
+    description: "Use zoom tool to zoom the canvas",
+    keys: ["z"],
+  },
+  {
+    name: "cursor",
+    description: "Select tool",
+    keys: ["v"],
+  },
+  {
+    name: "hand",
+    description: "Hand tool",
+    keys: ["h"],
+  },
+  {
+    name: "rectangle",
+    description: "Rectangle tool",
+    keys: ["r"],
+  },
+  {
+    name: "ellipse",
+    description: "Ellipse tool",
+    keys: ["o"],
+  },
+  {
+    name: "text",
+    description: "Text tool",
+    keys: ["t"],
+  },
+  {
+    name: "line",
+    description: "Line tool",
+    keys: ["l"],
+  },
+  {
+    name: "pencil",
+    description: "Pencil tool",
+    keys: ["shift+p"],
+  },
+  {
+    name: "path",
+    description: "Path tool",
+    keys: ["p"],
+  },
+  {
+    name: "container",
+    description: "Container tool",
+    keys: ["a", "f"],
+  },
 ];
 
 export function useEditorHotKeys() {
-  const { setCursorMode, tryExitContentEditMode, tryToggleContentEditMode } =
-    useEventTarget();
+  const {
+    cursor_mode,
+    setCursorMode,
+    tryExitContentEditMode,
+    tryToggleContentEditMode,
+  } = useEventTarget();
+  const { scale, fit, zoomIn, zoomOut } = useTransform();
   const {
     select,
     blur,
@@ -139,7 +244,7 @@ export function useEditorHotKeys() {
     copy,
     duplicate,
     deleteNode,
-    nudge,
+    a11yarrow,
     nudgeResize,
     align,
     order,
@@ -240,6 +345,68 @@ export function useEditorHotKeys() {
     }
   );
   //
+
+  const __hand_tool_triggered_by_hotkey = useRef(false);
+  useHotkeys(
+    "space",
+    (e) => {
+      // cancel if already in hand tool, but not triggered by hotkey
+      if (
+        cursor_mode.type === "hand" &&
+        !__hand_tool_triggered_by_hotkey.current
+      )
+        return;
+
+      // check if up or down
+      switch (e.type) {
+        case "keydown":
+          setCursorMode({ type: "hand" });
+          __hand_tool_triggered_by_hotkey.current = true;
+          break;
+        case "keyup":
+          setCursorMode({ type: "cursor" });
+          __hand_tool_triggered_by_hotkey.current = false;
+          break;
+      }
+    },
+    {
+      keydown: true,
+      keyup: true,
+      enableOnFormTags: false,
+      enableOnContentEditable: false,
+    }
+  );
+
+  const __zoom_tool_triggered_by_hotkey = useRef(false);
+  useHotkeys(
+    "z",
+    (e) => {
+      // cancel if already in zoom tool, but not triggered by hotkey
+      if (
+        cursor_mode.type === "zoom" &&
+        !__zoom_tool_triggered_by_hotkey.current
+      )
+        return;
+
+      // check if up or down
+      switch (e.type) {
+        case "keydown":
+          setCursorMode({ type: "zoom" });
+          __zoom_tool_triggered_by_hotkey.current = true;
+          break;
+        case "keyup":
+          setCursorMode({ type: "cursor" });
+          __zoom_tool_triggered_by_hotkey.current = false;
+          break;
+      }
+    },
+    {
+      keydown: true,
+      keyup: true,
+      enableOnFormTags: false,
+      enableOnContentEditable: false,
+    }
+  );
 
   // #region selection
   useHotkeys(
@@ -445,19 +612,18 @@ export function useEditorHotKeys() {
     "arrowright, arrowleft, arrowup, arrowdown",
     (e) => {
       e.preventDefault();
-      const mod = e.shiftKey ? 10 : 1;
       switch (e.key) {
         case "ArrowRight":
-          nudge("selection", "x", mod);
+          a11yarrow("selection", "right", e.shiftKey);
           break;
         case "ArrowLeft":
-          nudge("selection", "x", -mod);
+          a11yarrow("selection", "left", e.shiftKey);
           break;
         case "ArrowUp":
-          nudge("selection", "y", -mod);
+          a11yarrow("selection", "up", e.shiftKey);
           break;
         case "ArrowDown":
-          nudge("selection", "y", mod);
+          a11yarrow("selection", "down", e.shiftKey);
           break;
       }
     },
@@ -508,6 +674,10 @@ export function useEditorHotKeys() {
     setCursorMode({ type: "cursor" });
   });
 
+  useHotkeys("h", () => {
+    setCursorMode({ type: "hand" });
+  });
+
   useHotkeys("a, f", () => {
     setCursorMode({ type: "insert", node: "container" });
   });
@@ -542,6 +712,37 @@ export function useEditorHotKeys() {
     setOpacity("selection", o);
     toast.success(`opacity: ${o}`);
   });
+
+  useHotkeys("shift+0", (e) => {
+    scale(1, "center");
+    toast.success(`Zoom to 100%`);
+  });
+
+  useHotkeys("shift+1, shift+9", (e) => {
+    fit("*", 64);
+    toast.success(`Zoom to fit`);
+  });
+
+  useHotkeys("shift+2", (e) => {
+    fit("selection", 64);
+    toast.success(`Zoom to selection`);
+  });
+
+  useHotkeys(
+    "meta+=, ctrl+=, meta+plus, ctrl+plus",
+    () => {
+      zoomIn();
+    },
+    { preventDefault: true }
+  );
+
+  useHotkeys(
+    "meta+minus, ctrl+minus",
+    () => {
+      zoomOut();
+    },
+    { preventDefault: true }
+  );
 
   useHotkeys("]", (e) => {
     order("selection", "front");

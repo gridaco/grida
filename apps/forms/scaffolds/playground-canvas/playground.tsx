@@ -10,7 +10,11 @@ import {
   SidebarSectionHeaderLabel,
   SidebarVirtualizedMenuGrid,
 } from "@/components/sidebar";
-import { SelectionControl } from "@/scaffolds/sidecontrol/sidecontrol-node-selection";
+import {
+  Align,
+  Selection,
+  Zoom,
+} from "@/scaffolds/sidecontrol/sidecontrol-node-selection";
 import { __TMP_ComponentProperties } from "@/scaffolds/sidecontrol/sidecontrol-component-properties";
 import { NodeHierarchyList } from "@/scaffolds/sidebar/sidebar-node-hierarchy-list";
 import {
@@ -36,6 +40,7 @@ import { DevtoolsPanel } from "@/grida-react-canvas/devtools";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
 import {
   ButtonIcon,
+  CaretDownIcon,
   DownloadIcon,
   FigmaLogoIcon,
   FileIcon,
@@ -44,12 +49,12 @@ import {
   PlayIcon,
   PlusIcon,
 } from "@radix-ui/react-icons";
-import KeyboardInputOverlay from "@/grida-react-canvas/devtools/keyboard-input-overlay";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuShortcut,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
@@ -70,18 +75,12 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
-  DialogClose,
   DialogContent,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ThemedMonacoEditor } from "@/components/monaco";
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from "@/components/ui/hover-card";
+import { HoverCard, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLocalStorage } from "@uidotdev/usehooks";
 import { CANVAS_PLAYGROUND_LOCALSTORAGE_PREFERENCES_BASE_AI_PROMPT_KEY } from "./k";
@@ -104,15 +103,21 @@ import { EditorSurfaceDropzone } from "@/grida-react-canvas/viewport/surface-dro
 import { EditorSurfaceContextMenu } from "@/grida-react-canvas/viewport/surface-context-menu";
 import { EditorSurfaceClipboardSyncProvider } from "@/grida-react-canvas/viewport/surface";
 import { datatransfer } from "@/grida-react-canvas/viewport/data-transfer";
+import useDisableSwipeBack from "@/grida-react-canvas/viewport/hooks/use-disable-browser-swipe-back";
+import { AutoInitialFitTransformer } from "@/grida-react-canvas/renderer";
+import { WorkbenchUI } from "@/components/workbench";
+import { cn } from "@/utils";
 
 export default function CanvasPlayground() {
+  useDisableSwipeBack();
+
   const [pref, setPref] = useState<Preferences>({ debug: false });
   const [uiHidden, setUiHidden] = useState(false);
   const [exampleid, setExampleId] = useState<string>("blank.grida");
   const playDialog = useDialogState("play", {
     refreshkey: true,
   });
-  const insertDialog = useDialogState("insert");
+  const libraryDialog = useDialogState("library");
   const settingsDialog = useDialogState("settings");
   const importFromFigmaDialog = useDialogState("import-from-figma");
   const importFromJson = useDialogState("import-from-json", {
@@ -268,12 +273,12 @@ export default function CanvasPlayground() {
             <div className="flex w-full h-full">
               {!uiHidden && (
                 <aside>
-                  {insertDialog.open ? (
+                  {libraryDialog.open ? (
                     <>
-                      <DialogPrimitive.Root {...insertDialog.props}>
+                      <DialogPrimitive.Root {...libraryDialog.props}>
                         <DialogPrimitive.Content className="h-full">
                           <SidebarRoot>
-                            <InsertNodePanelContent />
+                            <LibraryContent />
                           </SidebarRoot>
                         </DialogPrimitive.Content>
                       </DialogPrimitive.Root>
@@ -381,24 +386,22 @@ export default function CanvasPlayground() {
               <EditorSurfaceClipboardSyncProvider>
                 <EditorSurfaceDropzone>
                   <EditorSurfaceContextMenu>
-                    <div className="w-full h-full flex flex-col relative">
-                      <ViewportRoot className="relative w-full h-full no-scrollbar overflow-y-auto">
+                    <div className="w-full h-full flex flex-col relative bg-black/5">
+                      <ViewportRoot className="relative w-full h-full overflow-hidden">
                         <EditorSurface />
-                        <div className="w-full h-full flex items-center justify-center bg-black/5">
-                          <div className="shadow-lg rounded-xl border overflow-hidden">
-                            <StandaloneDocumentContent />
-                          </div>
-                        </div>
+                        <AutoInitialFitTransformer>
+                          <StandaloneDocumentContent />
+                        </AutoInitialFitTransformer>
 
                         {!uiHidden && (
                           <>
                             <div className="absolute top-4 left-4 z-50">
                               <Button
                                 variant={
-                                  insertDialog.open ? "default" : "outline"
+                                  libraryDialog.open ? "default" : "outline"
                                 }
                                 className="w-8 h-8 rounded-full p-0"
-                                onClick={insertDialog.openDialog}
+                                onClick={libraryDialog.openDialog}
                               >
                                 <PlusIcon className="w-4 h-4" />
                               </Button>
@@ -412,7 +415,7 @@ export default function CanvasPlayground() {
                         {!uiHidden && (
                           <div className="absolute bottom-8 left-0 right-0 flex items-center justify-center z-50 pointer-events-none">
                             <PlaygroundToolbar
-                              onAddButtonClick={insertDialog.openDialog}
+                              onAddButtonClick={libraryDialog.openDialog}
                             />
                           </div>
                         )}
@@ -426,18 +429,30 @@ export default function CanvasPlayground() {
                 <aside className="h-full">
                   <SidebarRoot side="right">
                     <div className="p-2">
-                      <div className="flex justify-end">
-                        <Button variant="ghost" onClick={playDialog.openDialog}>
+                      <div className="flex items-center justify-end gap-2">
+                        <Zoom
+                          className={cn(
+                            WorkbenchUI.inputVariants({
+                              variant: "input",
+                              size: "xs",
+                            }),
+                            "w-auto"
+                          )}
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={playDialog.openDialog}
+                        >
                           <PlayIcon />
                         </Button>
                       </div>
                     </div>
                     <hr />
                     <FontFamilyListProvider fonts={fonts}>
-                      {state.selection.length === 0 && (
-                        <__TMP_ComponentProperties />
-                      )}
-                      {state.selection.length >= 1 && <SelectionControl />}
+                      <Align />
+                      <hr />
+                      <Selection empty={<__TMP_ComponentProperties />} />
                     </FontFamilyListProvider>
                   </SidebarRoot>
                 </aside>
@@ -629,7 +644,7 @@ const widgets = [
   "separator",
 ];
 
-function InsertNodePanelContent() {
+function LibraryContent() {
   const { insertNode } = useDocument();
 
   const icons_data = useReflectIconsData();

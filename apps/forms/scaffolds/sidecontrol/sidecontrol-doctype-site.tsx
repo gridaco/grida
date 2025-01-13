@@ -3,7 +3,7 @@
 import React from "react";
 import { useEditorState } from "../editor";
 import { SideControlGlobal } from "./sidecontrol-global";
-import { SelectionControl } from "./sidecontrol-node-selection";
+import { Align, Selection } from "./sidecontrol-node-selection";
 import assert from "assert";
 
 export function SideControlDoctypeSite() {
@@ -13,6 +13,12 @@ export function SideControlDoctypeSite() {
   if (state.documents["site/dev-collection"]!.selection.length === 0) {
     return <SideControlGlobal />;
   } else {
-    return <SelectionControl />;
+    return (
+      <>
+        <Align />
+        <hr />
+        <Selection />
+      </>
+    );
   }
 }

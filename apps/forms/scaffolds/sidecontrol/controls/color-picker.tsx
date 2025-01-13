@@ -7,6 +7,7 @@ import { cn } from "@/utils";
 import { PipetteIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEyeDropper } from "./utils/eyedropper";
+import "./color-picker.css";
 
 export function ColorPicker({
   color,
@@ -18,11 +19,13 @@ export function ColorPicker({
   const { isSupported, open } = useEyeDropper();
   return (
     <div>
-      <RgbaColorPicker
-        color={color}
-        className="!w-full"
-        onChange={onColorChange}
-      />
+      <div className="cusom">
+        <RgbaColorPicker
+          color={color}
+          className="!w-full"
+          onChange={onColorChange}
+        />
+      </div>
 
       <div className="p-2">
         <div className="flex items-center gap-2">

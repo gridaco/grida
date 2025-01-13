@@ -101,6 +101,10 @@ export namespace cmath {
     return Math.round(value * factor) / factor;
   }
 
+  export function clamp(value: Scalar, min: Scalar, max: Scalar): Scalar {
+    return Math.min(Math.max(value, min), max);
+  }
+
   /**
    * Finds the nearest value to a given number from a list of target numbers.
    *
@@ -344,6 +348,62 @@ export namespace cmath.vector2 {
       [-Infinity, -Infinity] as Vector2
     );
   }
+
+  /**
+   * Applies a 2D transformation matrix to a vector.
+   *
+   * This function takes a 2D vector `[x, y]` and applies an affine transformation
+   * using the provided transformation matrix. The transformation includes
+   * scaling, rotation, and translation.
+   *
+   * The transformation matrix is in the format:
+   * ```
+   * [[a, b, tx],
+   *  [c, d, ty]]
+   * ```
+   * where:
+   * - `a` and `d` represent scaling along the x-axis and y-axis, respectively.
+   * - `b` and `c` represent rotation.
+   * - `tx` and `ty` represent translation along the x-axis and y-axis.
+   *
+   * @param vector - The input 2D vector `[x, y]` to transform.
+   * @param transform - The 2D transformation matrix.
+   * @returns The transformed vector `[x', y']` after applying the transformation.
+   *
+   * @example
+   * // Rotate a vector [1, 0] by 90 degrees and translate by [2, 3]
+   * const vector: cmath.Vector2 = [1, 0];
+   * const transform: cmath.Transform = [
+   *   [0, -1, 2],
+   *   [1, 0, 3],
+   * ];
+   * const result = cmath.vector2.transform(vector, transform);
+   * console.log(result); // [2, 4]
+   *
+   * @example
+   * // Apply scaling transformation
+   * const vector: cmath.Vector2 = [2, 3];
+   * const transform: cmath.Transform = [
+   *   [2, 0, 0],
+   *   [0, 3, 0],
+   * ];
+   * const result = cmath.vector2.transform(vector, transform);
+   * console.log(result); // [4, 9]
+   *
+   * @remarks
+   * - This function is useful in computer graphics, physics simulations, and other
+   *   mathematical computations where 2D transformations are required.
+   * - The transformation matrix must be well-formed; otherwise, the behavior is undefined.
+   */
+  export function transform(
+    vector: Vector2,
+    transform: cmath.Transform
+  ): Vector2 {
+    const [[a, b, tx], [c, d, ty]] = transform;
+    const [x, y] = vector;
+
+    return [a * x + b * y + tx, c * x + d * y + ty];
+  }
 }
 
 export namespace cmath.rect {
@@ -523,6 +583,135 @@ export namespace cmath.rect {
     const scaleY = b.height / a.height;
 
     return [scaleX, scaleY];
+  }
+
+  /**
+   * Computes the 2D transform matrix that maps rectangle `a` onto rectangle `b`.
+   *
+   * Essentially, we want a transform `T` such that:
+   * `point_in_b = T * point_in_a`
+   *
+   * The result is an affine transform (2×3 matrix) that:
+   * 1. Translates `a` to the origin,
+   * 2. Scales it by the ratio of widths and heights of `b` / `a`,
+   * 3. Translates it to the position of `b`.
+   *
+   * @param a - The source rectangle.
+   * @param b - The target rectangle.
+   *
+   * @returns A 2D transform matrix in the format:
+   *   ```
+   *   [
+   *     [scaleX, 0, translateX],
+   *     [0, scaleY, translateY],
+   *   ]
+   *   ```
+   *
+   * @example
+   * ```ts
+   * const a = { x: 0, y: 0, width: 100, height: 50 };
+   * const b = { x: 200, y: 300, width: 400, height: 200 };
+   *
+   * const t = cmath.rect.getRelativeTransform(a, b);
+   * const result = cmath.rect.transform(a, t);
+   *
+   * // Now `result` should be identical to `b`.
+   * console.log(result);
+   * // => { x: 200, y: 300, width: 400, height: 200 }
+   * ```
+   */
+  export function getRelativeTransform(
+    a: cmath.Rectangle,
+    b: cmath.Rectangle
+  ): cmath.Transform {
+    // If A has zero dimension, prevent division by zero by treating scale as 1.
+    const scaleX = a.width === 0 ? 1 : b.width / a.width;
+    const scaleY = a.height === 0 ? 1 : b.height / a.height;
+
+    // Step 1: Translate A so its origin is at (0,0).
+    const T1: cmath.Transform = [
+      [1, 0, -a.x],
+      [0, 1, -a.y],
+    ];
+
+    // Step 2: Scale by (scaleX, scaleY).
+    const T2: cmath.Transform = [
+      [scaleX, 0, 0],
+      [0, scaleY, 0],
+    ];
+
+    // Step 3: Finally translate to B’s (x, y).
+    const T3: cmath.Transform = [
+      [1, 0, b.x],
+      [0, 1, b.y],
+    ];
+
+    // Compose final: T3 * T2 * T1
+    const step1 = cmath.transform.multiply(T2, T1);
+    return cmath.transform.multiply(T3, step1);
+  }
+
+  /**
+   * Applies a general 2D affine transform (including translate, scale, rotate, and skew)
+   * to each corner of a rectangle, then returns the bounding box of the transformed corners.
+   *
+   * @param rect - The source rectangle `{ x, y, width, height }`.
+   * @param transform - The 2D transform matrix:
+   *   ```
+   *   [
+   *     [a, b, tx],
+   *     [c, d, ty],
+   *   ]
+   *   ```
+   * @returns A new rectangle representing the bounding box of the transformed corners.
+   *
+   * @example
+   * const rect: cmath.Rectangle = { x: 10, y: 20, width: 30, height: 40 };
+   * // Affine transform matrix with skew
+   * const t: cmath.Transform = [
+   *   [1, 0.2, 100],
+   *   [0.3, 1, 50],
+   * ];
+   * const result = cmath.rect.transform(rect, t);
+   * console.log(result);
+   * // Example => { x: 110, y: 73, width: 42, height: 53 }
+   */
+  export function transform(
+    rect: cmath.Rectangle,
+    transform: cmath.Transform
+  ): cmath.Rectangle {
+    const [[a, b, tx], [c, d, ty]] = transform;
+    const { x, y, width, height } = rect;
+
+    // All 4 corners of the rectangle
+    const corners: cmath.Vector2[] = [
+      [x, y], // Top-left
+      [x + width, y], // Top-right
+      [x, y + height], // Bottom-left
+      [x + width, y + height], // Bottom-right
+    ];
+
+    // Transform each corner
+    const transformedCorners = corners.map(([cx, cy]) => {
+      const xNew = a * cx + b * cy + tx;
+      const yNew = c * cx + d * cy + ty;
+      return [xNew, yNew] as cmath.Vector2;
+    });
+
+    // Compute bounding box
+    const xs = transformedCorners.map(([X]) => X);
+    const ys = transformedCorners.map(([_, Y]) => Y);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+
+    return {
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY,
+    };
   }
 
   /**
@@ -1662,6 +1851,145 @@ export namespace cmath.transform {
   }
 
   /**
+   * Applies a scaling transformation to a 2D transform matrix around a specified absolute origin.
+   *
+   * This function adjusts the scaling of an existing transformation matrix
+   * by translating to a defined `transformOrigin`, applying the scaling, and then translating back.
+   *
+   * @param scale - The scaling factor. Can be a single number (uniform scaling) or a `Vector2` for non-uniform scaling.
+   * @param transform - The original 2D transform matrix to which the scaling will be applied.
+   * @param transformOrigin - The absolute origin `[originX, originY]` around which the scaling is performed.
+   * @returns A new transform matrix with the scaling applied around the specified `transformOrigin`.
+   *
+   * ### Example
+   * ```typescript
+   * const transform: cmath.Transform = [
+   *   [1, 0, 10], // ScaleX, ShearY, TranslateX
+   *   [0, 1, 20], // ShearX, ScaleY, TranslateY
+   * ];
+   * const scaleFactor: number = 2;
+   * const transformOrigin: cmath.Vector2 = [50, 50];
+   *
+   * const scaled = cmath.transform.scale(scaleFactor, transform, transformOrigin);
+   * console.log(scaled);
+   * // Output: [
+   * //   [2, 0, -40], // Adjusted scaling and translation
+   * //   [0, 2, -80],
+   * // ]
+   * ```
+   *
+   * ### Remarks
+   * - The `transformOrigin` is provided in absolute coordinates.
+   * - The function ensures the scaling operation is performed relative to the specified origin.
+   * - Uniform scaling is applied if `scale` is a single number; otherwise, non-uniform scaling is applied.
+   */
+  export function scale(
+    scale: number | cmath.Vector2,
+    transform: Transform,
+    transformOrigin: cmath.Vector2
+  ): Transform {
+    const [scaleX, scaleY] = typeof scale === "number" ? [scale, scale] : scale;
+
+    // Translate to origin
+    const translateToOrigin: Transform = [
+      [1, 0, -transformOrigin[0]],
+      [0, 1, -transformOrigin[1]],
+    ];
+
+    // Apply scaling
+    const scalingMatrix: Transform = [
+      [scaleX, 0, 0],
+      [0, scaleY, 0],
+    ];
+
+    // Translate back from origin
+    const translateBack: Transform = [
+      [1, 0, transformOrigin[0]],
+      [0, 1, transformOrigin[1]],
+    ];
+
+    // Combine: Translate to origin -> Scale -> Translate back
+    const scaledTransform = multiply(
+      translateBack,
+      multiply(scalingMatrix, translateToOrigin)
+    );
+
+    // Apply scaling to the existing transform
+    return multiply(scaledTransform, transform);
+  }
+  /**
+   * Extracts the scaling factors from a 2D transformation matrix.
+   *
+   * @param transform - The transformation matrix to extract the scale from.
+   * @returns A `Vector2` containing the scaling factors `[scaleX, scaleY]`.
+   *
+   * @example
+   * const transform: cmath.Transform = [
+   *   [2, 0, 10], // ScaleX, ShearY, TranslateX
+   *   [0, 3, 20], // ShearX, ScaleY, TranslateY
+   * ];
+   * const scale = cmath.transform.getScale(transform);
+   * console.log(scale); // Output: [2, 3]
+   */
+  export function getScale(transform: cmath.Transform): cmath.Vector2 {
+    const scaleX = Math.sqrt(transform[0][0] ** 2 + transform[0][1] ** 2);
+    const scaleY = Math.sqrt(transform[1][0] ** 2 + transform[1][1] ** 2);
+
+    return [scaleX, scaleY];
+  }
+
+  /**
+   * Extracts the translation components (translateX, translateY) from a 2D transformation matrix.
+   *
+   * @param transform - The transformation matrix to extract the translation from.
+   * @returns A `Vector2` containing the translation `[translateX, translateY]`.
+   *
+   * @example
+   * const transform: cmath.Transform = [
+   *   [1, 0, 10], // ScaleX, ShearY, TranslateX
+   *   [0, 1, 20], // ShearX, ScaleY, TranslateY
+   * ];
+   * const translate = cmath.transform.getTranslate(transform);
+   * console.log(translate); // Output: [10, 20]
+   */
+  export function getTranslate(transform: cmath.Transform): cmath.Vector2 {
+    return [transform[0][2], transform[1][2]];
+  }
+
+  /**
+   * Applies a translation to a 2D transform matrix.
+   *
+   * @param transform - The original 2D transform matrix.
+   * @param delta - The translation vector `[deltaX, deltaY]` to apply.
+   * @returns A new transform matrix with the translation applied.
+   *
+   * @example
+   * const transform: cmath.Transform = [
+   *   [1, 0, 10], // ScaleX, ShearY, TranslateX
+   *   [0, 1, 20], // ShearX, ScaleY, TranslateY
+   * ];
+   * const delta: cmath.Vector2 = [5, -10];
+   * const translated = cmath.transform.translate(transform, delta);
+   * console.log(translated);
+   * // Output:
+   * // [
+   * //   [1, 0, 15], // TranslateX becomes 10 + 5 = 15
+   * //   [0, 1, 10], // TranslateY becomes 20 - 10 = 10
+   * // ]
+   */
+  export function translate(
+    transform: Transform,
+    delta: cmath.Vector2
+  ): Transform {
+    const [deltaX, deltaY] = delta;
+
+    return [
+      [transform[0][0], transform[0][1], transform[0][2] + deltaX],
+      [transform[1][0], transform[1][1], transform[1][2] + deltaY],
+    ];
+  }
+
+  /**
    * Produces a relative 2D transform matrix for a linear gradient at `deg` degrees
    * in a normalized 1x1 space (Figma-like behavior).
    */
@@ -1744,5 +2072,65 @@ export namespace cmath.ext.movement {
     } else {
       return [0, y];
     }
+  }
+}
+
+export namespace cmath.ext.viewport {
+  /**
+   * Opinionated transform-to-fit for a single canvas zoom.
+   * Supports uniform or per-side margin, using the smaller scale to fully fit.
+   *
+   * @param viewport - The viewport rectangle: { x, y, width, height }
+   * @param target - The bounding box of the contents: { x, y, width, height }
+   * @param margin - Margin can be a single number (uniform) or [top, right, bottom, left].
+   * @returns A 2D transform matrix [[scale, 0, tx], [0, scale, ty]] that fits `target` into `viewport`.
+   *
+   * @example
+   * const viewport = { x: 0, y: 0, width: 800, height: 600 };
+   * const target = { x: 100, y: 50, width: 400, height: 400 };
+   * const t = transformToFit(viewport, target, [50, 20, 50, 20]);
+   * // => e.g. [
+   * //    [0.75, 0, 60],
+   * //    [0, 0.75, 40],
+   * // ]
+   */
+  export function transformToFit(
+    viewport: cmath.Rectangle,
+    target: cmath.Rectangle,
+    margin: number | [number, number, number, number] = 0
+  ): cmath.Transform {
+    const [mt, mr, mb, ml] =
+      typeof margin === "number" ? [margin, margin, margin, margin] : margin;
+
+    // Effective viewport with margins subtracted
+    const vW = viewport.width - ml - mr;
+    const vH = viewport.height - mt - mb;
+    if (vW <= 0 || vH <= 0 || target.width === 0 || target.height === 0) {
+      // Degenerate, no transform
+      return [
+        [1, 0, viewport.x],
+        [0, 1, viewport.y],
+      ];
+    }
+
+    // Pick the smaller scale so the target fully fits
+    const scale = Math.min(vW / target.width, vH / target.height);
+
+    // Center of the "effective" viewport
+    const vx = viewport.x + ml + vW / 2;
+    const vy = viewport.y + mt + vH / 2;
+
+    // Center of the target
+    const tx = target.x + target.width / 2;
+    const ty = target.y + target.height / 2;
+
+    // Translate so that target center goes to viewport center
+    const translateX = vx - tx * scale;
+    const translateY = vy - ty * scale;
+
+    return [
+      [scale, 0, translateX],
+      [0, scale, translateY],
+    ];
   }
 }

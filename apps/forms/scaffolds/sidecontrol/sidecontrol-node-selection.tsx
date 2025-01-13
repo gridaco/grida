@@ -65,16 +65,17 @@ import {
 } from "@/grida-react-canvas/provider";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Toggle } from "@/components/ui/toggle";
-import { AlignControl } from "./controls/align";
+import { AlignControl as _AlignControl } from "./controls/ext-align";
 import { Button } from "@/components/ui/button";
+import { ZoomControl } from "./controls/ext-zoom";
 
-function AlignNodes() {
-  const { state, align, distributeEvenly } = useDocument();
-  const has_selection = state.selection.length >= 1;
+export function Align() {
+  const { selection, align, distributeEvenly } = useDocument();
+  const has_selection = selection.length >= 1;
 
   return (
     <SidebarSection className="mt-2 flex justify-center">
-      <AlignControl
+      <_AlignControl
         disabled={!has_selection}
         onAlign={(alignment) => {
           align("selection", alignment);
@@ -87,13 +88,20 @@ function AlignNodes() {
   );
 }
 
-export function SelectionControl() {
+export const Zoom = ZoomControl;
+
+export function Selection({ empty }: { empty?: React.ReactNode }) {
   const { state: document } = useDocument();
-  if (document.selection.length === 1) {
-    return <SelectedNodeProperties />;
-  } else if (document.selection.length > 1) {
-    return <SelectionMixedProperties />;
-  }
+
+  const selection_length = document.selection.length;
+
+  return (
+    <div>
+      {selection_length === 0 && empty && empty}
+      {selection_length === 1 && <SelectedNodeProperties />}
+      {selection_length > 1 && <SelectionMixedProperties />}
+    </div>
+  );
 }
 
 function SelectionMixedProperties() {
@@ -171,7 +179,6 @@ function SelectionMixedProperties() {
   return (
     <>
       <div key={sid} className="mt-4 mb-10">
-        <AlignNodes />
         <SidebarSection className="border-b pb-4">
           <SidebarMenuSectionContent className="space-y-2">
             <PropertyLine className="items-center gap-1">
@@ -659,45 +666,8 @@ function SelectedNodeProperties() {
   const is_flex_container = is_container && layout === "flex";
   const is_stylable = type !== "template_instance";
 
-  const {
-    //
-    // boxShadow,
-    //
-    // margin,
-    // padding,
-    //
-    // aspectRatio,
-    //
-    // flexWrap,
-    // gap,
-    //
-  } = {
-    // ...selected_node_default_style,
-    ...(style || {}),
-  } satisfies grida.program.css.ExplicitlySupportedCSSProperties;
-
   return (
     <div key={node_id} className="mt-4 mb-10">
-      <AlignNodes />
-      {/* {debug && (
-        <SidebarSection className="border-b pb-4">
-          <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>Debug</SidebarSectionHeaderLabel>
-          </SidebarSectionHeaderItem>
-          <DebugControls />
-        </SidebarSection>
-      )} */}
-      {/* <SidebarSection className="border-b">
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel className="w-full flex justify-between items-center">
-            <div>
-              <div className="capitalize">{type}</div>
-              <br />
-              <small className="font-mono">{id}</small>
-            </div>
-          </SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-      </SidebarSection> */}
       <SidebarSection className="border-b pb-4">
         <SidebarMenuSectionContent className="space-y-2">
           <PropertyLine className="items-center gap-1">
@@ -1000,13 +970,6 @@ function SelectedNodeProperties() {
             <PropertyLineLabel>Fill</PropertyLineLabel>
             <FillControl value={fill} onValueChange={actions.fill} removable />
           </PropertyLine>
-          {/* <PropertyLine>
-            <PropertyLineLabel>Ratio</PropertyLineLabel>
-            <AspectRatioControl
-              value={aspectRatio as any}
-              onValueChange={actions.aspectRatio}
-            />
-          </PropertyLine> */}
           <PropertyLine>
             <PropertyLineLabel>Cursor</PropertyLineLabel>
             <CursorControl value={cursor} onValueChange={actions.cursor} />
