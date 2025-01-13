@@ -427,7 +427,7 @@ export type EditorSurface_StartGesture = {
   gesture:
     | Pick<GestureScale, "type" | "direction" | "selection">
     | Pick<GestureRotate, "type" | "selection">
-    | Pick<GestureCornerRadius, "type" | "node_id">
+    | Pick<GestureCornerRadius, "type" | "node_id" | "direction">
     | Pick<GestureCurve, "type" | "control" | "node_id" | "segment">
     | Pick<GestureTranslateVertex, "type" | "node_id" | "vertex">;
 };

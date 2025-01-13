@@ -131,7 +131,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
           //
         }
         case "corner-radius": {
-          const { node_id } = gesture;
+          const { node_id, direction } = gesture;
 
           return produce(state, (draft) => {
             self_selectNode(draft, "reset", node_id);
@@ -140,6 +140,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
               movement: cmath.vector2.zero,
               initial_bounding_rectangle: cdom.getNodeBoundingRect(node_id)!,
               node_id: node_id,
+              direction,
             };
           });
         }

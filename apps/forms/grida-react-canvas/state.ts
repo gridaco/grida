@@ -241,6 +241,7 @@ export type GestureCornerRadius = IGesture & {
   type: "corner-radius";
   node_id: string;
   initial_bounding_rectangle: cmath.Rectangle | null;
+  direction: cmath.CardinalDirection;
 };
 
 export type GestureDraw = IGesture & {

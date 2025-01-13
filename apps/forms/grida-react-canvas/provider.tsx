@@ -2363,12 +2363,13 @@ export function useEventTarget() {
 
   // #region drag resize handle
   const startCornerRadiusGesture = useCallback(
-    (selection: string) => {
+    (selection: string, direction: cmath.CardinalDirection) => {
       dispatch({
         type: "surface/gesture/start",
         gesture: {
           type: "corner-radius",
           node_id: selection,
+          direction,
         },
       });
     },

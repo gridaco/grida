@@ -504,7 +504,12 @@ function NodeOverlay({
           )}
           {supports.cornerRadius(node.type) &&
             !supports.children(node.type) && (
-              <NodeOverlayCornerRadiusHandle anchor="se" node_id={node_id} />
+              <>
+                <NodeOverlayCornerRadiusHandle anchor="ne" node_id={node_id} />
+                <NodeOverlayCornerRadiusHandle anchor="se" node_id={node_id} />
+                <NodeOverlayCornerRadiusHandle anchor="sw" node_id={node_id} />
+                <NodeOverlayCornerRadiusHandle anchor="nw" node_id={node_id} />
+              </>
             )}
           <LayerOverlayRotationHandle anchor="nw" node_id={node_id} />
           <LayerOverlayRotationHandle anchor="ne" node_id={node_id} />
@@ -540,7 +545,7 @@ function NodeOverlayCornerRadiusHandle({
   const bind = useSurfaceGesture({
     onDragStart: ({ event }) => {
       event.preventDefault();
-      startCornerRadiusGesture(node_id);
+      startCornerRadiusGesture(node_id, anchor);
     },
   });
 

@@ -873,27 +873,27 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               break;
             }
             case "corner-radius": {
-              const { node_id } = draft.gesture;
+              const { node_id, direction } = draft.gesture;
               const [dx, dy] = delta;
-              const d = -Math.round(dx);
+              const d = (direction.includes("e") ? -1 : 1 ) * Math.round(dx);
               const node = document.__getNodeById(draft, node_id);
 
               if (!("cornerRadius" in node)) {
                 return;
               }
 
-              // TODO: get accurate fixed width
-              // TODO: also handle by height
               const fixed_width =
-                typeof node.width === "number" ? node.width : undefined;
-              const maxRaius = fixed_width ? fixed_width / 2 : undefined;
+                typeof node.width === "number" ? node.width : 0;
+              const fixed_height =
+                typeof node.height === "number" ? node.height : 0;
+              const maxRadius = Math.min(fixed_width, fixed_height) / 2;
 
               const nextRadius =
                 (typeof node.cornerRadius == "number" ? node.cornerRadius : 0) +
                 d;
 
               const nextRadiusClamped = Math.floor(
-                Math.min(maxRaius ?? Infinity, Math.max(0, nextRadius))
+                Math.min(maxRadius ?? Infinity, Math.max(0, nextRadius))
               );
               draft.document.nodes[node_id] = nodeReducer(node, {
                 type: "node/change/cornerRadius",
