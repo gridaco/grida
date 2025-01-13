@@ -30,7 +30,6 @@ import {
   ToolIcon,
   ToolsGroup,
 } from "@/grida-react-canvas-starter-kit/starterkit-toolbar";
-import { Button } from "@/components/ui/button";
 import { EditorSurfaceClipboardSyncProvider } from "@/grida-react-canvas/viewport/surface";
 import { EditorSurfaceDropzone } from "@/grida-react-canvas/viewport/surface-dropzone";
 import { EditorSurfaceContextMenu } from "@/grida-react-canvas/viewport/surface-context-menu";

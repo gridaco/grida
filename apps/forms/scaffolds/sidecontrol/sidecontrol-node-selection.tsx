@@ -65,29 +65,17 @@ import {
 } from "@/grida-react-canvas/provider";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Toggle } from "@/components/ui/toggle";
-import { AlignControl } from "./controls/align";
+import { AlignControl as _AlignControl } from "./controls/ext-align";
 import { Button } from "@/components/ui/button";
-import { CaretDownIcon } from "@radix-ui/react-icons";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuShortcut,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { WorkbenchUI } from "@/components/workbench";
-import { cmath } from "@grida/cmath";
-import { Input } from "@/components/ui/input";
-import { useTransform } from "@/grida-react-canvas/provider";
+import { ZoomControl } from "./controls/ext-zoom";
 
-function AlignNodes() {
+export function Align() {
   const { selection, align, distributeEvenly } = useDocument();
   const has_selection = selection.length >= 1;
 
   return (
     <SidebarSection className="mt-2 flex justify-center">
-      <AlignControl
+      <_AlignControl
         disabled={!has_selection}
         onAlign={(alignment) => {
           align("selection", alignment);
@@ -100,82 +88,16 @@ function AlignNodes() {
   );
 }
 
-export function ZoomControl() {
-  const { transform, scale, fit, zoomIn, zoomOut } = useTransform();
+export const Zoom = ZoomControl;
 
-  const [scaleX, scaleY] = cmath.transform.getScale(transform);
-
-  const pct = Math.round(scaleX * 100);
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger className="flex items-center">
-        <span className="text-xs text-muted-foreground">{pct + "%"}</span>
-        <CaretDownIcon className="ms-1" />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent side="bottom" align="end" className="min-w-36">
-        <Input
-          type="number"
-          value={pct + ""}
-          min={2}
-          step={1}
-          max={256}
-          onChange={(e) => {
-            const v = parseInt(e.target.value) / 100;
-            if (v) scale(v, "center");
-          }}
-          className={WorkbenchUI.inputVariants({ size: "sm" })}
-        />
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={zoomIn} className="text-xs">
-          Zoom in
-          <DropdownMenuShortcut>⌘+</DropdownMenuShortcut>
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={zoomOut} className="text-xs">
-          Zoom out
-          <DropdownMenuShortcut>⌘-</DropdownMenuShortcut>
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => fit("*")} className="text-xs">
-          Zoom to fit
-          <DropdownMenuShortcut>⇧1</DropdownMenuShortcut>
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onSelect={() => scale(0.5, "center")}
-          className="text-xs"
-        >
-          Zoom to 50%
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onSelect={() => scale(1, "center")}
-          className="text-xs"
-        >
-          Zoom to 100%
-          <DropdownMenuShortcut className="text-xs">⇧0</DropdownMenuShortcut>
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onSelect={() => scale(2, "center")}
-          className="text-xs"
-        >
-          Zoom to 200%
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
-export function SelectionControl() {
+export function Selection({ empty }: { empty?: React.ReactNode }) {
   const { state: document } = useDocument();
 
   const selection_length = document.selection.length;
 
   return (
     <div>
-      <div className="p-2">
-        <div className="flex items-center justify-end gap-2">
-          <ZoomControl />
-        </div>
-      </div>
-      <hr />
+      {selection_length === 0 && empty && empty}
       {selection_length === 1 && <SelectedNodeProperties />}
       {selection_length > 1 && <SelectionMixedProperties />}
     </div>
@@ -257,7 +179,6 @@ function SelectionMixedProperties() {
   return (
     <>
       <div key={sid} className="mt-4 mb-10">
-        <AlignNodes />
         <SidebarSection className="border-b pb-4">
           <SidebarMenuSectionContent className="space-y-2">
             <PropertyLine className="items-center gap-1">
@@ -747,7 +668,6 @@ function SelectedNodeProperties() {
 
   return (
     <div key={node_id} className="mt-4 mb-10">
-      <AlignNodes />
       <SidebarSection className="border-b pb-4">
         <SidebarMenuSectionContent className="space-y-2">
           <PropertyLine className="items-center gap-1">

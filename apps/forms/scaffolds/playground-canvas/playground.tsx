@@ -10,7 +10,11 @@ import {
   SidebarSectionHeaderLabel,
   SidebarVirtualizedMenuGrid,
 } from "@/components/sidebar";
-import { SelectionControl } from "@/scaffolds/sidecontrol/sidecontrol-node-selection";
+import {
+  Align,
+  Selection,
+  Zoom,
+} from "@/scaffolds/sidecontrol/sidecontrol-node-selection";
 import { __TMP_ComponentProperties } from "@/scaffolds/sidecontrol/sidecontrol-component-properties";
 import { NodeHierarchyList } from "@/scaffolds/sidebar/sidebar-node-hierarchy-list";
 import {
@@ -101,6 +105,8 @@ import { EditorSurfaceClipboardSyncProvider } from "@/grida-react-canvas/viewpor
 import { datatransfer } from "@/grida-react-canvas/viewport/data-transfer";
 import useDisableSwipeBack from "@/grida-react-canvas/viewport/hooks/use-disable-browser-swipe-back";
 import { AutoInitialFitTransformer } from "@/grida-react-canvas/renderer";
+import { WorkbenchUI } from "@/components/workbench";
+import { cn } from "@/utils";
 
 export default function CanvasPlayground() {
   useDisableSwipeBack();
@@ -424,6 +430,15 @@ export default function CanvasPlayground() {
                   <SidebarRoot side="right">
                     <div className="p-2">
                       <div className="flex items-center justify-end gap-2">
+                        <Zoom
+                          className={cn(
+                            WorkbenchUI.inputVariants({
+                              variant: "input",
+                              size: "xs",
+                            }),
+                            "w-auto"
+                          )}
+                        />
                         <Button
                           variant="ghost"
                           size="icon"
@@ -435,10 +450,9 @@ export default function CanvasPlayground() {
                     </div>
                     <hr />
                     <FontFamilyListProvider fonts={fonts}>
-                      {state.selection.length === 0 && (
-                        <__TMP_ComponentProperties />
-                      )}
-                      {state.selection.length >= 1 && <SelectionControl />}
+                      <Align />
+                      <hr />
+                      <Selection empty={<__TMP_ComponentProperties />} />
                     </FontFamilyListProvider>
                   </SidebarRoot>
                 </aside>
