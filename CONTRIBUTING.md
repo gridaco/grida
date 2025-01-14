@@ -6,16 +6,32 @@ Otherwise, you can officially join our team by [joining our slack channel](https
 
 ---
 
-First, run the development server:
+First, clone the repo with git submodules
+
+```
+git clone --recurse-submodules https://github.com/gridaco/grida
+cd grida
+```
+
+**Tip**
+
+If you are not familiar with git submodules, you can simply use the Github Desktop app to clone the repo and it will automatically clone the submodules for you.
+
+Then, install the dependencies and run the development server:
 
 ```bash
 pnpm install
+cd /path/to/package
 pnpm dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-## Supabase Types
+## Insiders
+
+Currently, our backend, supabase is not configured to run locally, it's not possible for you to properly run the project that requires the backend. - For further information, please contact us via Slack.
+
+### Supabase Types
 
 ```bash
 npx supabase gen types --lang=typescript \
