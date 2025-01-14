@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
   SidebarMenuSectionContent,
   SidebarSection,
@@ -15,7 +14,7 @@ import {
   PropertyTextarea,
 } from "./ui";
 import { Button } from "@/components/ui/button";
-import { CubeIcon, PlusIcon, TrashIcon } from "@radix-ui/react-icons";
+import { CubeIcon, GearIcon, PlusIcon, TrashIcon } from "@radix-ui/react-icons";
 import { Checkbox } from "@/components/ui/checkbox";
 import { UserDataControl } from "./controls/x-userdata";
 import {
@@ -25,9 +24,19 @@ import {
 } from "@/components/ui/collapsible";
 import { useDocument, useNode } from "@/grida-react-canvas";
 import { grida } from "@/grida";
+import { RGBAColorControl } from "./controls/color";
 import toast from "react-hot-toast";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
-export function __TMP_ComponentProperties() {
+export function __TMP_ComponentProperties({
+  className,
+}: {
+  className?: string;
+}) {
   const {
     state: {
       document: { root_id },
@@ -52,29 +61,27 @@ export function __TMP_ComponentProperties() {
   };
 
   return (
-    <div className="mt-4 mb-10">
+    <div className={className}>
       <SidebarSection className="border-b pb-4">
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Properties</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine>
+          <SidebarSectionHeaderActions className="visible">
             <Button
-              variant="outline"
+              variant="ghost"
               size="xs"
-              className="w-full"
               onClick={addProperty}
+              className="w-4 h-4 p-0"
             >
-              <PlusIcon className="me-2" /> Add Property
+              <PlusIcon />
             </Button>
-          </PropertyLine>
-        </SidebarMenuSectionContent>
+          </SidebarSectionHeaderActions>
+        </SidebarSectionHeaderItem>
       </SidebarSection>
       <div className="divide-y">
         {keys.map((key, i) => {
           const property = properties![key];
           return (
-            <NewPropertyString
+            <PropertyDefinitionBlock
               key={i}
               definition={property}
               name={key}
@@ -114,7 +121,7 @@ export function __TMP_ComponentProperties() {
   );
 }
 
-function NewPropertyString({
+function PropertyDefinitionBlock({
   name,
   definition,
   onRemove,
@@ -170,10 +177,33 @@ function NewPropertyString({
                 </>
               )}
             </SidebarSectionHeaderLabel>
-            <SidebarSectionHeaderActions>
+            <SidebarSectionHeaderActions className="gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="xs" className="w-4 h-4 p-0">
+                    <GearIcon />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <SidebarSection>
+                    <SidebarSectionHeaderItem>
+                      <SidebarSectionHeaderLabel>
+                        Extra
+                      </SidebarSectionHeaderLabel>
+                    </SidebarSectionHeaderItem>
+                    <SidebarMenuSectionContent className="space-y-2">
+                      <PropertyLine>
+                        {/* TODO: */}
+                        <UserDataControl node_id="..." value={undefined} />
+                      </PropertyLine>
+                    </SidebarMenuSectionContent>
+                  </SidebarSection>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button
                 variant="ghost"
                 size="xs"
+                className="w-4 h-4 p-0"
                 onClick={(e) => {
                   e.stopPropagation();
                   onRemove?.();
@@ -194,8 +224,13 @@ function NewPropertyString({
                 value={type}
                 onValueChange={(v) => {
                   onDefinitionLineChange("type", v);
+                  onDefinitionChange?.({
+                    ...definition,
+                    type: v,
+                    default: (initial_values as any)[v],
+                  } as grida.program.schema.PropertyDefinition);
                 }}
-                enum={["string", "number", "boolean", "image", "color"]}
+                enum={["string", "number", "boolean", "image", "rgba"]}
               />
             </PropertyLine>
             <PropertyLine>
@@ -217,19 +252,22 @@ function NewPropertyString({
               <Checkbox defaultChecked />
             </PropertyLine>
             <PropertySeparator />
-            <PropertyLine className="grid">
+            <PropertyLine className="grid w-full">
               <PropertyLineLabel>Default</PropertyLineLabel>
-              <PropertyTextarea
-                value={defaultValue}
-                onChange={(e) => {
-                  onDefinitionLineChange("default", e.target.value);
-                }}
-                placeholder="Enter Default Value"
-              />
+              <div className="w-full">
+                <PropertyDefinitionValueInput
+                  definition={definition}
+                  value={defaultValue}
+                  onValueChange={(value) => {
+                    onDefinitionLineChange("default", value);
+                  }}
+                  placeholder="Enter Default Value"
+                />
+              </div>
             </PropertyLine>
           </SidebarMenuSectionContent>
         </SidebarSection>
-        <SidebarSection className="border-b pb-4">
+        <SidebarSection hidden={type !== "string"} className="border-b pb-4">
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Length</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
@@ -244,18 +282,97 @@ function NewPropertyString({
             </PropertyLine>
           </SidebarMenuSectionContent>
         </SidebarSection>
-        <SidebarSection>
+        <SidebarSection hidden={type !== "number"} className="border-b pb-4">
           <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>Extra</SidebarSectionHeaderLabel>
+            <SidebarSectionHeaderLabel>Range</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
           <SidebarMenuSectionContent className="space-y-2">
             <PropertyLine>
-              {/* TODO: */}
-              <UserDataControl node_id="..." value={undefined} />
+              <PropertyLineLabel>Minimum</PropertyLineLabel>
+              <PropertyInput type="number" placeholder="minimum" />
+            </PropertyLine>
+            <PropertyLine>
+              <PropertyLineLabel>Maximum</PropertyLineLabel>
+              <PropertyInput type="number" placeholder="maximum" />
             </PropertyLine>
           </SidebarMenuSectionContent>
         </SidebarSection>
       </CollapsibleContent>
     </Collapsible>
   );
+}
+
+const initial_values = {
+  string: "",
+  number: 0,
+  boolean: false,
+  rgba: { type: "rgba", r: 0, g: 0, b: 0, a: 1 },
+  object: {
+    type: "object",
+    properties: {},
+  },
+} as const;
+
+function PropertyDefinitionValueInput<T = unknown>({
+  definition,
+  value,
+  onValueChange,
+  placeholder,
+}: {
+  definition: grida.program.schema.PropertyDefinition;
+  value: T;
+  onValueChange: (value: T) => void;
+  placeholder?: string;
+}) {
+  switch (definition.type) {
+    case "string":
+      return (
+        <PropertyTextarea
+          value={value as string}
+          onChange={(e) => {
+            onValueChange(e.target.value as T);
+          }}
+          placeholder={placeholder}
+        />
+      );
+    case "number":
+      return (
+        <PropertyInput
+          type="number"
+          value={value as number}
+          onChange={(e) => onValueChange(e.target.value as unknown as T)}
+          placeholder={placeholder}
+        />
+      );
+    case "boolean":
+      return (
+        <PropertyEnum<"true" | "false">
+          value={(value as boolean).toString() as "true" | "false"}
+          placeholder={placeholder}
+          onValueChange={(v) => {
+            v === "true"
+              ? onValueChange(true as unknown as T)
+              : onValueChange(false as unknown as T);
+          }}
+          enum={[
+            {
+              label: "true",
+              value: "true",
+            },
+            {
+              label: "false",
+              value: "false",
+            },
+          ]}
+        />
+      );
+    case "rgba":
+      return (
+        <RGBAColorControl
+          value={value as grida.program.cg.RGBA8888}
+          onValueChange={(v) => onValueChange(v as unknown as T)}
+        />
+      );
+    //
+  }
 }

@@ -120,13 +120,22 @@ export namespace grida {
         youtube: YoutubeVideoSource;
         vimeo: VimeoVideoSource;
         facebook: FacebookVideoSource;
+        rgba: RGBA;
       };
 
-      export type Object = Richtext | Source | VideoPlayerSource;
+      export type Object = Richtext | RGBA | Source | VideoPlayerSource;
 
       export type Richtext = {
         type: "richtext";
         html: string;
+      };
+
+      export type RGBA = {
+        type: "rgba";
+        r: number;
+        g: number;
+        b: number;
+        a: number;
       };
 
       export type Source = ImageSource | VideoSource | AudioSource;
@@ -2060,6 +2069,16 @@ export namespace grida.program.cg {
     export const transparent: grida.program.cg.Paint = {
       type: "solid",
       color: { r: 0, g: 0, b: 0, a: 0 },
+    };
+
+    export const black: grida.program.cg.Paint = {
+      type: "solid",
+      color: { r: 0, g: 0, b: 0, a: 1 },
+    };
+
+    export const white: grida.program.cg.Paint = {
+      type: "solid",
+      color: { r: 255, g: 255, b: 255, a: 1 },
     };
   }
 

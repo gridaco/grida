@@ -22,7 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import PropertyAccessDropdownMenu from "./context/variable";
 import PropertyTypeIcon from "@/components/property-type-icon";
 import { StringValuePropsPropertyAccessExpressionControl } from "./string-value-props-property-access-expression";
-import { grida } from "@/grida";
+import { useSchema } from "../schema";
 
 export function StringValueControl({
   value,
@@ -30,17 +30,14 @@ export function StringValueControl({
   placeholder = "Value",
   maxlength,
   disabled,
-  schema,
 }: {
   value?: tokens.StringValueExpression | null;
   onValueChange?: (value?: tokens.StringValueExpression) => void;
   placeholder?: string;
   maxlength?: number;
   disabled?: boolean;
-  schema?: {
-    properties: grida.program.schema.Properties;
-  };
 }) {
+  const schema = useSchema();
   // const schema = useMemo(
   //   () =>
   //     selected_node_context
@@ -90,7 +87,7 @@ export function StringValueControl({
             </DropdownMenuSub>
           )}
           {/* TODO: */}
-          <PropertyAccessDropdownMenu
+          {/* <PropertyAccessDropdownMenu
             asSubmenu
             // schema={schema}
             onSelect={(path) => {
@@ -101,8 +98,8 @@ export function StringValueControl({
           >
             <PropertyTypeIcon type="object" className="me-2 w-4 h-4" />
             Page
-          </PropertyAccessDropdownMenu>
-          <DropdownMenuSub>
+          </PropertyAccessDropdownMenu> */}
+          {/* <DropdownMenuSub>
             <DropdownMenuSubTrigger>
               <TokensIcon className="me-2 w-4 h-4" />
               Item (in list)
@@ -127,7 +124,7 @@ export function StringValueControl({
                 </DropdownMenuItem>
               </DropdownMenuSubContent>
             </DropdownMenuPortal>
-          </DropdownMenuSub>
+          </DropdownMenuSub> */}
           {/* <DropdownMenuSub>
             <DropdownMenuSubTrigger>
               <CookieIcon className="me-2 w-4 h-4" />

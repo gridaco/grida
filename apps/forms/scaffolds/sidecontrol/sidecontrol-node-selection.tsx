@@ -68,6 +68,7 @@ import { Toggle } from "@/components/ui/toggle";
 import { AlignControl as _AlignControl } from "./controls/ext-align";
 import { Button } from "@/components/ui/button";
 import { ZoomControl } from "./controls/ext-zoom";
+import { SchemaProvider } from "./schema";
 
 export function Align() {
   const { selection, align, distributeEvenly } = useDocument();
@@ -177,7 +178,7 @@ function SelectionMixedProperties() {
     has_container && nodes.some((n) => "layout" in n && n.layout === "flex");
 
   return (
-    <>
+    <SchemaProvider schema={undefined}>
       <div key={sid} className="mt-4 mb-10">
         <SidebarSection className="border-b pb-4">
           <SidebarMenuSectionContent className="space-y-2">
@@ -577,7 +578,7 @@ function SelectionMixedProperties() {
           </SidebarMenuSectionContent>
         </SidebarSection>
       </div>
-    </>
+    </SchemaProvider>
   );
 }
 
@@ -667,411 +668,423 @@ function SelectedNodeProperties() {
   const is_stylable = type !== "template_instance";
 
   return (
-    <div key={node_id} className="mt-4 mb-10">
-      <SidebarSection className="border-b pb-4">
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine className="items-center gap-1">
-            <Checkbox
-              checked={active}
-              onCheckedChange={actions.active}
-              className="me-1"
-            />
-            <NameControl value={name} onValueChange={actions.name} />
-            <Toggle
-              variant="outline"
-              size="sm"
-              pressed={locked}
-              onPressedChange={actions.locked}
-              className="w-6 h-6 p-0.5 aspect-square"
-            >
-              {locked ? (
-                <LockOpen1Icon className="w-3 h-3" />
-              ) : (
-                <LockClosedIcon className="w-3 h-3" />
-              )}
-            </Toggle>
-          </PropertyLine>
-
-          {debug && (
-            <PropertyLine className="items-center gap-1">
-              <PropertyLineLabel>id</PropertyLineLabel>
-              <small className="ms-2 font-mono">{id}</small>
-            </PropertyLine>
-          )}
-        </SidebarMenuSectionContent>
-      </SidebarSection>
-      <SidebarSection hidden={is_root} className="border-b pb-4">
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Position</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine>
-            <PositioningConstraintsControl
-              value={{
-                position,
-                top,
-                left,
-                right,
-                bottom,
-              }}
-              onValueChange={actions.positioning}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Mode</PropertyLineLabel>
-            <PositioningModeControl
-              value={position}
-              //
-              onValueChange={actions.positioningMode}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Rotate</PropertyLineLabel>
-            <RotateControl value={rotation} onValueChange={actions.rotation} />
-          </PropertyLine>
-        </SidebarMenuSectionContent>
-      </SidebarSection>
-      <SidebarSection className="border-b pb-4">
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Size</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine>
-            <PropertyLineLabel>Width</PropertyLineLabel>
-            <LengthPercentageControl
-              value={width}
-              onValueChange={actions.width}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Height</PropertyLineLabel>
-            <LengthPercentageControl
-              value={height}
-              onValueChange={actions.height}
-            />
-          </PropertyLine>
-        </SidebarMenuSectionContent>
-      </SidebarSection>
-      <SidebarSection hidden={!is_templateinstance} className="border-b pb-4">
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Template</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent>
-          <TemplateControl
-            value={component_id}
-            onValueChange={actions.component}
-          />
-        </SidebarMenuSectionContent>
-      </SidebarSection>
-      <SidebarSection hidden={!is_templateinstance} className="border-b pb-4">
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Props</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-
-        {properties && (
-          <SidebarMenuSectionContent className="space-y-2">
-            <PropsControl
-              properties={properties}
-              props={computed.props || {}}
-              onValueChange={actions.value}
-            />
-          </SidebarMenuSectionContent>
-        )}
-      </SidebarSection>
-
-      <SidebarSection hidden={!is_text} className="border-b pb-4">
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Text</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine>
-            <PropertyLineLabel>Value</PropertyLineLabel>
-            <StringValueControl
-              value={node.text}
-              maxlength={maxLength}
-              onValueChange={actions.text}
-              schema={
-                root_properties
-                  ? {
-                      properties: root_properties,
-                    }
-                  : undefined
-              }
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Font</PropertyLineLabel>
-            <FontFamilyControl
-              value={fontFamily}
-              onValueChange={actions.fontFamily}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Weight</PropertyLineLabel>
-            <FontWeightControl
-              value={fontWeight}
-              onValueChange={actions.fontWeight}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Size</PropertyLineLabel>
-            <FontSizeControl
-              value={fontSize}
-              onValueChange={actions.fontSize}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Line</PropertyLineLabel>
-            <LineHeightControl
-              value={lineHeight}
-              onValueChange={actions.lineHeight}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Letter</PropertyLineLabel>
-            <LetterSpacingControl
-              value={letterSpacing}
-              onValueChange={actions.letterSpacing}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Align</PropertyLineLabel>
-            <TextAlignControl
-              value={textAlign}
-              onValueChange={actions.textAlign}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel></PropertyLineLabel>
-            <TextAlignVerticalControl
-              value={textAlignVertical}
-              onValueChange={actions.textAlignVertical}
-            />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Max Length</PropertyLineLabel>
-            <MaxlengthControl
-              value={maxLength}
-              placeholder={(computed.text as any as string)?.length?.toString()}
-              onValueChange={actions.maxLength}
-            />
-          </PropertyLine>
-        </SidebarMenuSectionContent>
-      </SidebarSection>
-      <SidebarSection hidden={!is_image} className="border-b pb-4">
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Image</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine>
-            <PropertyLineLabel>Source</PropertyLineLabel>
-            <SrcControl value={node.src} onValueChange={actions.src} />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Fit</PropertyLineLabel>
-            <BoxFitControl value={fit} onValueChange={actions.fit} />
-          </PropertyLine>
-        </SidebarMenuSectionContent>
-      </SidebarSection>
-      {is_container && (
+    <SchemaProvider
+      schema={
+        root_properties
+          ? {
+              properties: root_properties,
+            }
+          : undefined
+      }
+    >
+      <div key={node_id} className="mt-4 mb-10">
         <SidebarSection className="border-b pb-4">
+          <SidebarMenuSectionContent className="space-y-2">
+            <PropertyLine className="items-center gap-1">
+              <Checkbox
+                checked={active}
+                onCheckedChange={actions.active}
+                className="me-1"
+              />
+              <NameControl value={name} onValueChange={actions.name} />
+              <Toggle
+                variant="outline"
+                size="sm"
+                pressed={locked}
+                onPressedChange={actions.locked}
+                className="w-6 h-6 p-0.5 aspect-square"
+              >
+                {locked ? (
+                  <LockOpen1Icon className="w-3 h-3" />
+                ) : (
+                  <LockClosedIcon className="w-3 h-3" />
+                )}
+              </Toggle>
+            </PropertyLine>
+
+            {debug && (
+              <PropertyLine className="items-center gap-1">
+                <PropertyLineLabel>id</PropertyLineLabel>
+                <small className="ms-2 font-mono">{id}</small>
+              </PropertyLine>
+            )}
+          </SidebarMenuSectionContent>
+        </SidebarSection>
+        <SidebarSection hidden={is_root} className="border-b pb-4">
           <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>Layout</SidebarSectionHeaderLabel>
+            <SidebarSectionHeaderLabel>Position</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
           <SidebarMenuSectionContent className="space-y-2">
             <PropertyLine>
-              <PropertyLineLabel>Type</PropertyLineLabel>
-              <LayoutControl value={layout!} onValueChange={actions.layout} />
-            </PropertyLine>
-            <PropertyLine hidden={!is_flex_container}>
-              <PropertyLineLabel>Direction</PropertyLineLabel>
-              <AxisControl
-                value={direction!}
-                onValueChange={actions.direction}
+              <PositioningConstraintsControl
+                value={{
+                  position,
+                  top,
+                  left,
+                  right,
+                  bottom,
+                }}
+                onValueChange={actions.positioning}
               />
             </PropertyLine>
-            {/* <PropertyLine>
+            <PropertyLine>
+              <PropertyLineLabel>Mode</PropertyLineLabel>
+              <PositioningModeControl
+                value={position}
+                //
+                onValueChange={actions.positioningMode}
+              />
+            </PropertyLine>
+            <PropertyLine>
+              <PropertyLineLabel>Rotate</PropertyLineLabel>
+              <RotateControl
+                value={rotation}
+                onValueChange={actions.rotation}
+              />
+            </PropertyLine>
+          </SidebarMenuSectionContent>
+        </SidebarSection>
+        <SidebarSection className="border-b pb-4">
+          <SidebarSectionHeaderItem>
+            <SidebarSectionHeaderLabel>Size</SidebarSectionHeaderLabel>
+          </SidebarSectionHeaderItem>
+          <SidebarMenuSectionContent className="space-y-2">
+            <PropertyLine>
+              <PropertyLineLabel>Width</PropertyLineLabel>
+              <LengthPercentageControl
+                value={width}
+                onValueChange={actions.width}
+              />
+            </PropertyLine>
+            <PropertyLine>
+              <PropertyLineLabel>Height</PropertyLineLabel>
+              <LengthPercentageControl
+                value={height}
+                onValueChange={actions.height}
+              />
+            </PropertyLine>
+          </SidebarMenuSectionContent>
+        </SidebarSection>
+        <SidebarSection hidden={!is_templateinstance} className="border-b pb-4">
+          <SidebarSectionHeaderItem>
+            <SidebarSectionHeaderLabel>Template</SidebarSectionHeaderLabel>
+          </SidebarSectionHeaderItem>
+          <SidebarMenuSectionContent>
+            <TemplateControl
+              value={component_id}
+              onValueChange={actions.component}
+            />
+          </SidebarMenuSectionContent>
+        </SidebarSection>
+        <SidebarSection hidden={!is_templateinstance} className="border-b pb-4">
+          <SidebarSectionHeaderItem>
+            <SidebarSectionHeaderLabel>Props</SidebarSectionHeaderLabel>
+          </SidebarSectionHeaderItem>
+
+          {properties && (
+            <SidebarMenuSectionContent className="space-y-2">
+              <PropsControl
+                properties={properties}
+                props={computed.props || {}}
+                onValueChange={actions.value}
+              />
+            </SidebarMenuSectionContent>
+          )}
+        </SidebarSection>
+
+        <SidebarSection hidden={!is_text} className="border-b pb-4">
+          <SidebarSectionHeaderItem>
+            <SidebarSectionHeaderLabel>Text</SidebarSectionHeaderLabel>
+          </SidebarSectionHeaderItem>
+          <SidebarMenuSectionContent className="space-y-2">
+            <PropertyLine>
+              <PropertyLineLabel>Value</PropertyLineLabel>
+              <StringValueControl
+                value={node.text}
+                maxlength={maxLength}
+                onValueChange={actions.text}
+              />
+            </PropertyLine>
+            <PropertyLine>
+              <PropertyLineLabel>Font</PropertyLineLabel>
+              <FontFamilyControl
+                value={fontFamily}
+                onValueChange={actions.fontFamily}
+              />
+            </PropertyLine>
+            <PropertyLine>
+              <PropertyLineLabel>Weight</PropertyLineLabel>
+              <FontWeightControl
+                value={fontWeight}
+                onValueChange={actions.fontWeight}
+              />
+            </PropertyLine>
+            <PropertyLine>
+              <PropertyLineLabel>Size</PropertyLineLabel>
+              <FontSizeControl
+                value={fontSize}
+                onValueChange={actions.fontSize}
+              />
+            </PropertyLine>
+            <PropertyLine>
+              <PropertyLineLabel>Line</PropertyLineLabel>
+              <LineHeightControl
+                value={lineHeight}
+                onValueChange={actions.lineHeight}
+              />
+            </PropertyLine>
+            <PropertyLine>
+              <PropertyLineLabel>Letter</PropertyLineLabel>
+              <LetterSpacingControl
+                value={letterSpacing}
+                onValueChange={actions.letterSpacing}
+              />
+            </PropertyLine>
+            <PropertyLine>
+              <PropertyLineLabel>Align</PropertyLineLabel>
+              <TextAlignControl
+                value={textAlign}
+                onValueChange={actions.textAlign}
+              />
+            </PropertyLine>
+            <PropertyLine>
+              <PropertyLineLabel></PropertyLineLabel>
+              <TextAlignVerticalControl
+                value={textAlignVertical}
+                onValueChange={actions.textAlignVertical}
+              />
+            </PropertyLine>
+            <PropertyLine>
+              <PropertyLineLabel>Max Length</PropertyLineLabel>
+              <MaxlengthControl
+                value={maxLength}
+                placeholder={(
+                  computed.text as any as string
+                )?.length?.toString()}
+                onValueChange={actions.maxLength}
+              />
+            </PropertyLine>
+          </SidebarMenuSectionContent>
+        </SidebarSection>
+        <SidebarSection hidden={!is_image} className="border-b pb-4">
+          <SidebarSectionHeaderItem>
+            <SidebarSectionHeaderLabel>Image</SidebarSectionHeaderLabel>
+          </SidebarSectionHeaderItem>
+          <SidebarMenuSectionContent className="space-y-2">
+            <PropertyLine>
+              <PropertyLineLabel>Source</PropertyLineLabel>
+              <SrcControl value={node.src} onValueChange={actions.src} />
+            </PropertyLine>
+            <PropertyLine>
+              <PropertyLineLabel>Fit</PropertyLineLabel>
+              <BoxFitControl value={fit} onValueChange={actions.fit} />
+            </PropertyLine>
+          </SidebarMenuSectionContent>
+        </SidebarSection>
+        {is_container && (
+          <SidebarSection className="border-b pb-4">
+            <SidebarSectionHeaderItem>
+              <SidebarSectionHeaderLabel>Layout</SidebarSectionHeaderLabel>
+            </SidebarSectionHeaderItem>
+            <SidebarMenuSectionContent className="space-y-2">
+              <PropertyLine>
+                <PropertyLineLabel>Type</PropertyLineLabel>
+                <LayoutControl value={layout!} onValueChange={actions.layout} />
+              </PropertyLine>
+              <PropertyLine hidden={!is_flex_container}>
+                <PropertyLineLabel>Direction</PropertyLineLabel>
+                <AxisControl
+                  value={direction!}
+                  onValueChange={actions.direction}
+                />
+              </PropertyLine>
+              {/* <PropertyLine>
               <PropertyLineLabel>Wrap</PropertyLineLabel>
               <FlexWrapControl
                 value={flexWrap as any}
                 onValueChange={actions.flexWrap}
               />
             </PropertyLine> */}
-            <PropertyLine hidden={!is_flex_container}>
-              <PropertyLineLabel>Distribute</PropertyLineLabel>
-              <MainAxisAlignmentControl
-                value={mainAxisAlignment!}
-                onValueChange={actions.mainAxisAlignment}
-              />
-            </PropertyLine>
-            <PropertyLine hidden={!is_flex_container}>
-              <PropertyLineLabel>Align</PropertyLineLabel>
-              <CrossAxisAlignmentControl
-                value={crossAxisAlignment!}
-                direction={direction}
-                onValueChange={actions.crossAxisAlignment}
-              />
-            </PropertyLine>
-            <PropertyLine hidden={!is_flex_container}>
-              <PropertyLineLabel>Gap</PropertyLineLabel>
-              <GapControl
-                value={{
-                  mainAxisGap: mainAxisGap!,
-                  crossAxisGap: crossAxisGap!,
-                }}
-                onValueChange={actions.gap}
-              />
-            </PropertyLine>
-            {/* <PropertyLine hidden={!is_flex_container}>
+              <PropertyLine hidden={!is_flex_container}>
+                <PropertyLineLabel>Distribute</PropertyLineLabel>
+                <MainAxisAlignmentControl
+                  value={mainAxisAlignment!}
+                  onValueChange={actions.mainAxisAlignment}
+                />
+              </PropertyLine>
+              <PropertyLine hidden={!is_flex_container}>
+                <PropertyLineLabel>Align</PropertyLineLabel>
+                <CrossAxisAlignmentControl
+                  value={crossAxisAlignment!}
+                  direction={direction}
+                  onValueChange={actions.crossAxisAlignment}
+                />
+              </PropertyLine>
+              <PropertyLine hidden={!is_flex_container}>
+                <PropertyLineLabel>Gap</PropertyLineLabel>
+                <GapControl
+                  value={{
+                    mainAxisGap: mainAxisGap!,
+                    crossAxisGap: crossAxisGap!,
+                  }}
+                  onValueChange={actions.gap}
+                />
+              </PropertyLine>
+              {/* <PropertyLine hidden={!is_flex_container}>
               <PropertyLineLabel>Margin</PropertyLineLabel>
               <MarginControl
                 value={margin as any}
                 onValueChange={actions.margin}
               />
             </PropertyLine> */}
-            <PropertyLine hidden={!is_flex_container}>
-              <PropertyLineLabel>Padding</PropertyLineLabel>
-              <PaddingControl
-                value={padding!}
-                onValueChange={actions.padding}
-              />
-            </PropertyLine>
-          </SidebarMenuSectionContent>
-        </SidebarSection>
-      )}
-      <SidebarSection hidden={!is_stylable} className="border-b pb-4">
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Styles</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine>
-            <PropertyLineLabel>Opacity</PropertyLineLabel>
-            <OpacityControl
-              value={opacity as any}
-              onValueChange={actions.opacity}
-            />
-          </PropertyLine>
-          {supports.cornerRadius(node.type) && (
-            <PropertyLine>
-              <PropertyLineLabel>Radius</PropertyLineLabel>
-              <CornerRadiusControl
-                value={cornerRadius}
-                onValueChange={actions.cornerRadius}
-              />
-            </PropertyLine>
-          )}
-          {supports.border(node.type) && (
-            <PropertyLine>
-              <PropertyLineLabel>Border</PropertyLineLabel>
-              <BorderControl value={border} onValueChange={actions.border} />
-            </PropertyLine>
-          )}
-          <PropertyLine>
-            <PropertyLineLabel>Fill</PropertyLineLabel>
-            <FillControl value={fill} onValueChange={actions.fill} removable />
-          </PropertyLine>
-          <PropertyLine>
-            <PropertyLineLabel>Cursor</PropertyLineLabel>
-            <CursorControl value={cursor} onValueChange={actions.cursor} />
-          </PropertyLine>
-        </SidebarMenuSectionContent>
-      </SidebarSection>
-      {supports.stroke(node.type) && (
-        <SidebarSection className="border-b pb-4">
+              <PropertyLine hidden={!is_flex_container}>
+                <PropertyLineLabel>Padding</PropertyLineLabel>
+                <PaddingControl
+                  value={padding!}
+                  onValueChange={actions.padding}
+                />
+              </PropertyLine>
+            </SidebarMenuSectionContent>
+          </SidebarSection>
+        )}
+        <SidebarSection hidden={!is_stylable} className="border-b pb-4">
           <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>Stroke</SidebarSectionHeaderLabel>
+            <SidebarSectionHeaderLabel>Styles</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
           <SidebarMenuSectionContent className="space-y-2">
             <PropertyLine>
-              <PropertyLineLabel>Color</PropertyLineLabel>
-              <PaintControl
-                value={stroke}
-                onValueChange={actions.stroke}
+              <PropertyLineLabel>Opacity</PropertyLineLabel>
+              <OpacityControl
+                value={opacity as any}
+                onValueChange={actions.opacity}
+              />
+            </PropertyLine>
+            {supports.cornerRadius(node.type) && (
+              <PropertyLine>
+                <PropertyLineLabel>Radius</PropertyLineLabel>
+                <CornerRadiusControl
+                  value={cornerRadius}
+                  onValueChange={actions.cornerRadius}
+                />
+              </PropertyLine>
+            )}
+            {supports.border(node.type) && (
+              <PropertyLine>
+                <PropertyLineLabel>Border</PropertyLineLabel>
+                <BorderControl value={border} onValueChange={actions.border} />
+              </PropertyLine>
+            )}
+            <PropertyLine>
+              <PropertyLineLabel>Fill</PropertyLineLabel>
+              <FillControl
+                value={fill}
+                onValueChange={actions.fill}
                 removable
               />
             </PropertyLine>
-            <PropertyLine hidden={!stroke}>
-              <PropertyLineLabel>Width</PropertyLineLabel>
-              <StrokeWidthControl
-                value={strokeWidth}
-                onValueChange={actions.strokeWidth}
-              />
+            <PropertyLine>
+              <PropertyLineLabel>Cursor</PropertyLineLabel>
+              <CursorControl value={cursor} onValueChange={actions.cursor} />
             </PropertyLine>
-            <PropertyLine hidden={!supports.strokeCap(node.type)}>
-              <PropertyLineLabel>Cap</PropertyLineLabel>
-              <StrokeCapControl
-                value={strokeCap}
-                onValueChange={actions.strokeCap}
+          </SidebarMenuSectionContent>
+        </SidebarSection>
+        {supports.stroke(node.type) && (
+          <SidebarSection className="border-b pb-4">
+            <SidebarSectionHeaderItem>
+              <SidebarSectionHeaderLabel>Stroke</SidebarSectionHeaderLabel>
+            </SidebarSectionHeaderItem>
+            <SidebarMenuSectionContent className="space-y-2">
+              <PropertyLine>
+                <PropertyLineLabel>Color</PropertyLineLabel>
+                <PaintControl
+                  value={stroke}
+                  onValueChange={actions.stroke}
+                  removable
+                />
+              </PropertyLine>
+              <PropertyLine hidden={!stroke}>
+                <PropertyLineLabel>Width</PropertyLineLabel>
+                <StrokeWidthControl
+                  value={strokeWidth}
+                  onValueChange={actions.strokeWidth}
+                />
+              </PropertyLine>
+              <PropertyLine hidden={!supports.strokeCap(node.type)}>
+                <PropertyLineLabel>Cap</PropertyLineLabel>
+                <StrokeCapControl
+                  value={strokeCap}
+                  onValueChange={actions.strokeCap}
+                />
+              </PropertyLine>
+            </SidebarMenuSectionContent>
+          </SidebarSection>
+        )}
+        <SidebarSection
+          hidden={!supports.boxShadow(type)}
+          className="border-b pb-4"
+        >
+          <SidebarSectionHeaderItem>
+            <SidebarSectionHeaderLabel>Effects</SidebarSectionHeaderLabel>
+          </SidebarSectionHeaderItem>
+          <SidebarMenuSectionContent className="space-y-2">
+            <PropertyLine>
+              <PropertyLineLabel>Shadow</PropertyLineLabel>
+              <BoxShadowControl
+                value={boxShadow}
+                onValueChange={actions.boxShadow}
               />
             </PropertyLine>
           </SidebarMenuSectionContent>
         </SidebarSection>
-      )}
-      <SidebarSection
-        hidden={!supports.boxShadow(type)}
-        className="border-b pb-4"
-      >
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Effects</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine>
-            <PropertyLineLabel>Shadow</PropertyLineLabel>
-            <BoxShadowControl
-              value={boxShadow}
-              onValueChange={actions.boxShadow}
-            />
-          </PropertyLine>
-        </SidebarMenuSectionContent>
-      </SidebarSection>
-      <SidebarSection className="border-b pb-4">
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Link</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine>
-            <PropertyLineLabel>Link To</PropertyLineLabel>
-            <HrefControl value={href} onValueChange={actions.href} />
-          </PropertyLine>
-          {href && (
+        <SidebarSection className="border-b pb-4">
+          <SidebarSectionHeaderItem>
+            <SidebarSectionHeaderLabel>Link</SidebarSectionHeaderLabel>
+          </SidebarSectionHeaderItem>
+          <SidebarMenuSectionContent className="space-y-2">
             <PropertyLine>
-              <PropertyLineLabel>New Tab</PropertyLineLabel>
-              <TargetBlankControl
-                value={target}
-                onValueChange={actions.target}
+              <PropertyLineLabel>Link To</PropertyLineLabel>
+              <HrefControl value={href} onValueChange={actions.href} />
+            </PropertyLine>
+            {href && (
+              <PropertyLine>
+                <PropertyLineLabel>New Tab</PropertyLineLabel>
+                <TargetBlankControl
+                  value={target}
+                  onValueChange={actions.target}
+                />
+              </PropertyLine>
+            )}
+          </SidebarMenuSectionContent>
+        </SidebarSection>
+        {/* #region selection colors */}
+        <SelectionColors />
+        {/* #endregion selection colors */}
+        <SidebarSection className="border-b pb-4">
+          <SidebarSectionHeaderItem>
+            <SidebarSectionHeaderLabel>Developer</SidebarSectionHeaderLabel>
+          </SidebarSectionHeaderItem>
+          <SidebarMenuSectionContent className="space-y-2">
+            <PropertyLine>
+              <UserDataControl
+                node_id={id}
+                value={userdata}
+                onValueCommit={actions.userdata}
               />
             </PropertyLine>
-          )}
-        </SidebarMenuSectionContent>
-      </SidebarSection>
-      {/* #region selection colors */}
-      <SelectionColors />
-      {/* #endregion selection colors */}
-      <SidebarSection className="border-b pb-4">
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Developer</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine>
-            <UserDataControl
-              node_id={id}
-              value={userdata}
-              onValueCommit={actions.userdata}
-            />
-          </PropertyLine>
-        </SidebarMenuSectionContent>
-      </SidebarSection>
-      <SidebarSection className="pb-4">
-        <SidebarSectionHeaderItem>
-          <SidebarSectionHeaderLabel>Export</SidebarSectionHeaderLabel>
-        </SidebarSectionHeaderItem>
-        <SidebarMenuSectionContent className="space-y-2">
-          <PropertyLine>
-            <ExportNodeControl node_id={id} name={name} />
-          </PropertyLine>
-        </SidebarMenuSectionContent>
-      </SidebarSection>
-    </div>
+          </SidebarMenuSectionContent>
+        </SidebarSection>
+        <SidebarSection className="pb-4">
+          <SidebarSectionHeaderItem>
+            <SidebarSectionHeaderLabel>Export</SidebarSectionHeaderLabel>
+          </SidebarSectionHeaderItem>
+          <SidebarMenuSectionContent className="space-y-2">
+            <PropertyLine>
+              <ExportNodeControl node_id={id} name={name} />
+            </PropertyLine>
+          </SidebarMenuSectionContent>
+        </SidebarSection>
+      </div>
+    </SchemaProvider>
   );
 }
 

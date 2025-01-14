@@ -452,7 +452,13 @@ export default function CanvasPlayground() {
                     <FontFamilyListProvider fonts={fonts}>
                       <Align />
                       <hr />
-                      <Selection empty={<__TMP_ComponentProperties />} />
+                      <Selection
+                        empty={
+                          <div className="mt-4 mb-10">
+                            <__TMP_ComponentProperties />
+                          </div>
+                        }
+                      />
                     </FontFamilyListProvider>
                   </SidebarRoot>
                 </aside>

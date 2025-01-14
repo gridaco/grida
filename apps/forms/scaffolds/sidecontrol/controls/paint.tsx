@@ -20,6 +20,8 @@ import HexValueInput from "./utils/hex";
 import { Cross2Icon } from "@radix-ui/react-icons";
 import { ColorPicker } from "./color-picker";
 import { cmath } from "@grida/cmath";
+import { Button } from "@/components/ui/button";
+import { useSchema } from "../schema";
 
 export function PaintControl({
   value,
@@ -30,7 +32,7 @@ export function PaintControl({
   onValueChange?: (value: grida.program.cg.PaintWithoutID | null) => void;
   removable?: boolean;
 }) {
-  const onTabChange = useCallback(
+  const onTypeChange = useCallback(
     (type: grida.program.cg.Paint["type"]) => {
       const to = type;
 
@@ -184,7 +186,7 @@ export function PaintControl({
         </PopoverTrigger>
       )}
       <PopoverContent align="start" side="right" sideOffset={8} className="p-0">
-        <Tabs value={value?.type} onValueChange={onTabChange as any}>
+        <Tabs value={value?.type} onValueChange={onTypeChange as any}>
           <TabsList className="m-2">
             <TabsTrigger value="solid">
               <SolidPaintIcon active={value?.type === "solid"} />
@@ -202,15 +204,18 @@ export function PaintControl({
           </TabsList>
           <TabsContent value="solid" className="p-0 m-0">
             {value?.type === "solid" && (
-              <ColorPicker
-                color={value.color}
-                onColorChange={(color) => {
-                  onValueChange?.({
-                    type: "solid",
-                    color,
-                  });
-                }}
-              />
+              <>
+                <ColorPicker
+                  color={value.color}
+                  onColorChange={(color) => {
+                    onValueChange?.({
+                      type: "solid",
+                      color,
+                    });
+                  }}
+                />
+                <ColorVariablesList />
+              </>
             )}
           </TabsContent>
           <TabsContent value="linear_gradient" className="p-2">
@@ -241,6 +246,31 @@ function PaintInputContainer({ children }: React.PropsWithChildren<{}>) {
       )}
     >
       {children}
+    </div>
+  );
+}
+
+function ColorVariablesList() {
+  const schema = useSchema();
+  const colors = Object.entries(schema?.properties ?? {}).filter(
+    ([key, def]) => {
+      return def.type === "rgba";
+    }
+  );
+
+  return (
+    <div className="space-y-1">
+      {colors.map(([key, def]) => (
+        <Button
+          key={key}
+          variant="ghost"
+          size="xs"
+          className="flex items-center justify-start gap-1 px-1 py-0.5 w-full"
+        >
+          <PaintChip paint={{ type: "solid", color: def.default }} />
+          <span className="text-xs">{key}</span>
+        </Button>
+      ))}
     </div>
   );
 }
