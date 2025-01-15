@@ -73,36 +73,45 @@ export function StandaloneDocumentEditor({
     [initial, editable, debug]
   );
 
-  const rootnode = initial.document.nodes[initial.document.root_id];
-  assert(rootnode, "root node is not found");
-  const shallowRootProps = useMemo(() => {
-    if (rootnode.type === "component") {
-      // transform property definitions to props with default values
-      const virtual_props_from_definition = Object.entries(
-        rootnode.properties
-      ).reduce(
-        (acc, [key, value]) => {
-          acc[key] = value.default;
-          return acc;
-        },
-        {} as Record<string, tokens.StringValueExpression>
-      );
+  // TODO:
+  // const rootnode = initial.document.nodes[initial.document.root_id];
+  // assert(rootnode, "root node is not found");
+  // const shallowRootProps = useMemo(() => {
+  //   if (rootnode.type === "component") {
+  //     // transform property definitions to props with default values
+  //     const virtual_props_from_definition = Object.entries(
+  //       rootnode.properties
+  //     ).reduce(
+  //       (acc, [key, value]) => {
+  //         acc[key] = value.default;
+  //         return acc;
+  //       },
+  //       {} as Record<string, tokens.StringValueExpression>
+  //     );
 
-      return virtual_props_from_definition;
-    }
-    if (rootnode.type === "template_instance") {
-      const defaultProps = initial.templates![rootnode.template_id].default;
-      return Object.assign({}, defaultProps, rootnode.props);
-    } else {
-      return {};
-    }
-  }, [rootnode]);
+  //     return virtual_props_from_definition;
+  //   }
+  //   if (rootnode.type === "template_instance") {
+  //     const defaultProps = initial.templates![rootnode.template_id].default;
+  //     return Object.assign({}, defaultProps, rootnode.props);
+  //   } else {
+  //     return {};
+  //   }
+  // }, [rootnode]);
+
+  const props = Object.entries(state.document.properties).reduce(
+    (acc, [key, value]) => {
+      acc[key] = value.default;
+      return acc;
+    },
+    {} as Record<string, tokens.StringValueExpression>
+  );
 
   return (
     <DocumentContext.Provider value={state}>
       <DocumentDispatcherContext.Provider value={__dispatch}>
         <ProgramDataContextHost>
-          <DataProvider data={{ props: shallowRootProps }}>
+          <DataProvider data={{ props: props }}>
             <EditorGoogleFontsManager>
               {/*  */}
               {children}
@@ -1766,8 +1775,8 @@ export function useDocument() {
   const schemaDefineProperty = useCallback(
     (name?: string, definition?: grida.program.schema.PropertyDefinition) => {
       dispatch({
-        type: "document/schema/property/define",
-        name: name,
+        type: "document/properties/define",
+        key: name,
         definition: definition,
       });
     },
@@ -1777,9 +1786,9 @@ export function useDocument() {
   const schemaRenameProperty = useCallback(
     (name: string, newName: string) => {
       dispatch({
-        type: "document/schema/property/rename",
-        name,
-        newName,
+        type: "document/properties/rename",
+        key: name,
+        newKey: newName,
       });
     },
     [dispatch]
@@ -1788,8 +1797,8 @@ export function useDocument() {
   const schemaUpdateProperty = useCallback(
     (name: string, definition: grida.program.schema.PropertyDefinition) => {
       dispatch({
-        type: "document/schema/property/update",
-        name: name,
+        type: "document/properties/update",
+        key: name,
         definition: definition,
       });
     },
@@ -1798,7 +1807,7 @@ export function useDocument() {
 
   const schemaDeleteProperty = useCallback(
     (name: string) => {
-      dispatch({ type: "document/schema/property/delete", name: name });
+      dispatch({ type: "document/properties/delete", key: name });
     },
     [dispatch]
   );
@@ -3014,13 +3023,16 @@ export function useNode(node_id: string): grida.program.nodes.AnyNode & {
 
 export function useComputedNode(node_id: string) {
   const node = useNode(node_id);
-  const { active, style, component_id, props, text, html, src, href } = node;
+  const { active, style, component_id, props, text, html, src, href, fill } =
+    node;
+
   const computed = useComputed({
-    text: text,
-    html: html,
-    src: src,
-    href: href,
-    props: props,
+    text,
+    html,
+    src,
+    href,
+    props,
+    fill,
   });
 
   return computed;

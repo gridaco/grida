@@ -110,6 +110,7 @@ export function BrowseStartPageTemplatesDialog({
                       [template.name]: FormStartPage.getTemplate(template.name),
                     },
                     document: {
+                      root_id: "preview",
                       nodes: {
                         preview:
                           grida.program.nodes.factory.createTemplateInstanceNodeDataFromTemplateDefinition(
@@ -117,7 +118,7 @@ export function BrowseStartPageTemplatesDialog({
                             template
                           ),
                       },
-                      root_id: "preview",
+                      properties: {},
                     },
                   }}
                 >

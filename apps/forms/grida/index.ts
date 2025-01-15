@@ -226,6 +226,16 @@ export namespace grida.program.document {
   }
 
   /**
+   * general purpose cascading document properties for envs, styles, constants, etc.
+   */
+  export interface IDocumentProperties {
+    /**
+     * document level properties / variables
+     */
+    properties: schema.Properties;
+  }
+
+  /**
    * contains all original template definition under this defined document in k:v pair
    */
   export interface IDocumentTemplatesRepository {
@@ -309,7 +319,9 @@ export namespace grida.program.document {
    * }
    * ```
    */
-  export interface IDocumentDefinition extends IDocumentNodesRepository {
+  export interface IDocumentDefinition
+    extends IDocumentNodesRepository,
+      IDocumentProperties {
     /**
      * root node id. must be defined in {@link IDocumentDefinition.nodes}
      */
@@ -1644,8 +1656,9 @@ export namespace grida.program.nodes {
       nid: FactoryNodeIdGenerator<D | Partial<NodePrototype>>
     ): document.IDocumentDefinition {
       const document: document.IDocumentDefinition = {
-        nodes: {},
         root_id: "",
+        nodes: {},
+        properties: {},
       };
 
       function processNode(

@@ -25,7 +25,6 @@ import {
 import { useDocument, useNode } from "@/grida-react-canvas";
 import { grida } from "@/grida";
 import { RGBAColorControl } from "./controls/color";
-import toast from "react-hot-toast";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,24 +38,18 @@ export function __TMP_ComponentProperties({
 }) {
   const {
     state: {
-      document: { root_id },
+      document: { properties },
     },
     schemaDefineProperty,
     schemaRenameProperty,
     schemaDeleteProperty,
     schemaUpdateProperty,
   } = useDocument();
-  const root = useNode(root_id);
-  const { properties } = root;
+
   const keys = Object.keys(properties ?? {});
   // const [properties, setProperties] = useState<any[]>([]);
 
   const addProperty = () => {
-    if (root.type !== "component") {
-      toast.error("Only component can have properties");
-      return;
-    }
-    // setProperties([...properties, {}]);
     schemaDefineProperty();
   };
 

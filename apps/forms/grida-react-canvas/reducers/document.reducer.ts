@@ -29,6 +29,7 @@ import { domapi } from "../domapi";
 import { getSnapTargets, snapObjectsTranslation } from "./tools/snap";
 import nid from "./tools/id";
 import { vn } from "@/grida/vn";
+import schemaReducer from "./schema.reducer";
 
 export default function documentReducer<S extends IDocumentEditorState>(
   state: S,
@@ -606,48 +607,19 @@ export default function documentReducer<S extends IDocumentEditorState>(
     //
     //
     //
-    case "document/schema/property/define": {
+    case "document/properties/define":
+    case "document/properties/rename":
+    case "document/properties/update":
+    case "document/properties/delete": {
       return produce(state, (draft) => {
-        const root_node = document.__getNodeById(draft, draft.document.root_id);
-        assert(root_node.type === "component");
-
-        const property_name =
-          action.name ??
-          "new_property_" + Object.keys(root_node.properties).length + 1;
-        root_node.properties[property_name] = action.definition ?? {
-          type: "string",
-        };
-      });
-    }
-    case "document/schema/property/rename": {
-      const { name, newName } = action;
-      return produce(state, (draft) => {
-        const root_node = document.__getNodeById(draft, draft.document.root_id);
-        assert(root_node.type === "component");
-
-        // check for conflict
-        if (root_node.properties[newName]) {
-          return;
-        }
-
-        root_node.properties[newName] = root_node.properties[name];
-        delete root_node.properties[name];
-      });
-    }
-    case "document/schema/property/update": {
-      return produce(state, (draft) => {
-        const root_node = document.__getNodeById(draft, draft.document.root_id);
-        assert(root_node.type === "component");
-
-        root_node.properties[action.name] = action.definition;
-      });
-    }
-    case "document/schema/property/delete": {
-      return produce(state, (draft) => {
-        const root_node = document.__getNodeById(draft, draft.document.root_id);
-        assert(root_node.type === "component");
-
-        delete root_node.properties[action.name];
+        // TODO:
+        // const root_node = document.__getNodeById(draft, draft.document.root_id);
+        // assert(root_node.type === "component");
+        draft.document.properties = schemaReducer(
+          state.document.properties,
+          action
+        );
+        //
       });
     }
 

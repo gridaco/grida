@@ -1,4 +1,4 @@
-import { grida } from "@/grida";
+import { grida } from "../../../index";
 
 // eslint-disable-next-line import/no-anonymous-default-export
 export default {
@@ -93,4 +93,5 @@ export default {
       style: {},
     },
   },
+  globals: {},
 } satisfies grida.program.document.IDocumentDefinition;

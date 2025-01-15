@@ -130,6 +130,7 @@ export default function CanvasPlayground() {
       editable: true,
       debug: pref.debug,
       document: {
+        root_id: "root",
         nodes: {
           root: {
             id: "root",
@@ -156,7 +157,7 @@ export default function CanvasPlayground() {
             crossAxisGap: 0,
           },
         },
-        root_id: "root",
+        properties: {},
       },
     })
   );
@@ -496,6 +497,7 @@ function ExampleSwitch({
     "event-page-01.grida",
     "component-01.grida",
     "layout-01.grida",
+    "globals-01.grida",
   ];
   return (
     <Select defaultValue={value} onValueChange={onValueChange}>

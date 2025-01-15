@@ -583,14 +583,14 @@ function SelectionMixedProperties() {
 }
 
 function SelectedNodeProperties() {
-  const { state: document } = useDocument();
+  const { state } = useDocument();
 
   // - color - variables
   const {
     selection,
     document: { root_id },
     debug,
-  } = document;
+  } = state;
 
   assert(selection.length === 1);
   const node_id = selection[0];
@@ -607,7 +607,6 @@ function SelectedNodeProperties() {
     component_id,
     style,
     type,
-    properties,
     opacity,
     cornerRadius,
     rotation,
@@ -655,7 +654,9 @@ function SelectedNodeProperties() {
     userdata,
   } = node;
 
-  const { properties: root_properties } = root;
+  const document_properties = state.document.properties;
+  const properties = node.properties;
+  const root_properties = root.properties;
 
   // const istemplate = type?.startsWith("templates/");
   const is_instance = type === "instance";
@@ -669,13 +670,9 @@ function SelectedNodeProperties() {
 
   return (
     <SchemaProvider
-      schema={
-        root_properties
-          ? {
-              properties: root_properties,
-            }
-          : undefined
-      }
+      schema={{
+        properties: document_properties,
+      }}
     >
       <div key={node_id} className="mt-4 mb-10">
         <SidebarSection className="border-b pb-4">
