@@ -207,6 +207,57 @@ export namespace tokens {
   // #endregion
 
   export namespace is {
+    /**
+     * Recursively checks if a value is tokenized (an expression).
+     *
+     * A value is considered tokenized if it matches one of the `Token` types defined in `tokens.Token`.
+     *
+     * @template T - The type of the value being checked.
+     * @param value - The value to check.
+     * @returns `true` if the value is a tokenized expression, otherwise `false`.
+     *
+     * @example
+     * const value: tokens.Token = { kind: "Identifier", name: "myVariable" };
+     * console.log(tokens.is.tokenized(value)); // Output: true
+     *
+     * const plainValue = 42;
+     * console.log(tokens.is.tokenized(plainValue)); // Output: false
+     */
+    export function tokenized<T = any>(value: T): boolean {
+      if (value == null) {
+        return false; // Null or undefined is not tokenized
+      }
+
+      if (is.primitive(value)) {
+        return false; // Primitive types are not tokenized
+      }
+
+      if (typeof value === "object") {
+        // Check if the value itself is a recognized token
+        if (
+          tokens.is.templateExpression(value) ||
+          tokens.is.propertyAccessExpression(value) ||
+          tokens.is.jsonRef(value) ||
+          tokens.is.inferredShorthandBinaryExpression(value)
+        ) {
+          return true;
+        }
+
+        // Recursively check nested objects or arrays
+        if (Array.isArray(value)) {
+          return value.some((item) => tokenized(item)); // Check if any array element is tokenized
+        }
+
+        for (const key in value) {
+          if (tokenized((value as Record<string, unknown>)[key])) {
+            return true; // Check if any property in the object is tokenized
+          }
+        }
+      }
+
+      return false; // If no conditions match, the value is not tokenized
+    }
+
     export function primitive(
       value?: any,
       checknull = true
@@ -221,9 +272,14 @@ export namespace tokens {
       );
     }
 
-    export function jsonRef(exp?: tokens.Token): exp is tokens.JSONRef {
+    export function jsonRef(
+      exp?: tokens.Token | unknown
+    ): exp is tokens.JSONRef {
       return (
-        typeof exp === "object" && "$ref" in exp && exp.$ref.startsWith("#/")
+        typeof exp === "object" &&
+        exp !== null &&
+        "$ref" in exp &&
+        (exp as tokens.JSONRef).$ref?.startsWith("#/")
       );
     }
 
@@ -253,14 +309,14 @@ export namespace tokens {
      * can't be trusted 100%. use this in the safe context.
      */
     export function inferredShorthandBinaryExpression(
-      exp: tokens.Token
+      exp: tokens.Token | unknown
     ): exp is
       | tokens.ShorthandBooleanBinaryExpression
       | tokens.ShorthandBinaryExpression {
       const is_array_constructed_well = Array.isArray(exp) && exp.length === 3;
       if (is_array_constructed_well) {
         const [l, op, r] = exp;
-        if (typeof op === "string" && BINARY_OPERATORS.includes(op)) {
+        if (typeof op === "string" && BINARY_OPERATORS.includes(op as any)) {
           return true;
         }
       }
@@ -670,4 +726,59 @@ export namespace tokens.render {
       return value;
     }
   }
+}
+
+/**
+ * Utility types
+ */
+export namespace tokens.utils {
+  /**
+   * Utility type to create a new type from `T` where:
+   * - Properties specified in the keys `K` retain their original types from `T`.
+   * - All other properties are replaced with the `tokens.Token` type.
+   *
+   * This is useful for scenarios where certain properties in an object should remain fixed,
+   * while others can be dynamic or "tokenizable."
+   *
+   * @template T - The base object type.
+   * @template K - The keys in `T` that should retain their original types.
+   *
+   * @example
+   * // Example 1: Basic Usage
+   * type Original = {
+   *   type: "static";
+   *   value: number;
+   *   description: string;
+   * };
+   *
+   * type Tokenized = TokenizableExcept<Original, "type">;
+   * // Resulting type:
+   * // {
+   * //   type: "static";        // Retained original type
+   * //   value: tokens.Token;   // Tokenized
+   * //   description: tokens.Token; // Tokenized
+   * // }
+   *
+   * @example
+   * // Example 2: Union Types
+   * type UnionType =
+   *   | { kind: "a"; data: string }
+   *   | { kind: "b"; data: number };
+   *
+   * type TokenizedUnion = TokenizableExcept<UnionType, "kind">;
+   * // Resulting type:
+   * // {
+   * //   kind: "a"; // Retained
+   * //   data: tokens.Token; // Tokenized
+   * // } | {
+   * //   kind: "b"; // Retained
+   * //   data: tokens.Token; // Tokenized
+   * // }
+   *
+   * @note
+   * This utility only operates at the top level. It does not recursively tokenize nested properties.
+   */
+  export type TokenizableExcept<T extends object, K extends keyof T> = {
+    [P in keyof T]: P extends K ? T[P] : tokens.Token;
+  };
 }

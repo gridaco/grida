@@ -101,6 +101,11 @@ export function PaintControl({
     onValueChange?.(null);
   };
 
+  if (tokens.is.tokenized(value)) {
+    //
+    return <>TOKENIZED</>;
+  }
+
   return (
     <Popover>
       {value ? (

@@ -958,7 +958,7 @@ export function useNodeAction(node_id: string | undefined) {
   }, [node_id, nodeActions]);
 }
 
-const compareProperty: PropertyCompareFn<grida.program.nodes.AnyNode> = (
+const compareProperty: PropertyCompareFn<grida.program.nodes.UnknwonNode> = (
   key,
   a,
   b
@@ -987,8 +987,8 @@ export function useSelection() {
 
   const mixedProperties = useMemo(
     () =>
-      mixed<grida.program.nodes.AnyNode, typeof grida.mixed>(
-        nodes as grida.program.nodes.AnyNode[],
+      mixed<grida.program.nodes.UnknwonNode, typeof grida.mixed>(
+        nodes as grida.program.nodes.UnknwonNode[],
         {
           idKey: "id",
           ignoredKey: ["id", "type", "userdata"],
@@ -1035,7 +1035,7 @@ export function useSelection() {
 
   const rotation = useCallback(
     (change: TChange<number>) => {
-      mixedProperties.rotation.ids.forEach((id) => {
+      mixedProperties.rotation?.ids.forEach((id) => {
         __actions.changeNodeRotation(id, change);
       });
     },
@@ -1044,7 +1044,7 @@ export function useSelection() {
 
   const opacity = useCallback(
     (change: TChange<number>) => {
-      mixedProperties.opacity.ids.forEach((id) => {
+      mixedProperties.opacity?.ids.forEach((id) => {
         __actions.changeNodeOpacity(id, change);
       });
     },
@@ -1053,7 +1053,7 @@ export function useSelection() {
 
   const width = useCallback(
     (value: grida.program.css.LengthPercentage | "auto") => {
-      mixedProperties.width.ids.forEach((id) => {
+      mixedProperties.width?.ids.forEach((id) => {
         __actions.changeNodeSize(id, "width", value);
       });
     },
@@ -1062,7 +1062,7 @@ export function useSelection() {
 
   const height = useCallback(
     (value: grida.program.css.LengthPercentage | "auto") => {
-      mixedProperties.height.ids.forEach((id) => {
+      mixedProperties.height?.ids.forEach((id) => {
         __actions.changeNodeSize(id, "height", value);
       });
     },
@@ -1071,7 +1071,7 @@ export function useSelection() {
 
   const positioningMode = useCallback(
     (position: grida.program.nodes.i.IPositioning["position"]) => {
-      mixedProperties.position.ids.forEach((id) => {
+      mixedProperties.position?.ids.forEach((id) => {
         __actions.changeNodePositioningMode(id, position);
       });
     },
@@ -1336,8 +1336,8 @@ export function useSelectionPaints() {
 
   const mixedProperties = useMemo(
     () =>
-      mixed<grida.program.nodes.AnyNode, typeof grida.mixed>(
-        allnodes as grida.program.nodes.AnyNode[],
+      mixed<grida.program.nodes.UnknwonNode, typeof grida.mixed>(
+        allnodes as grida.program.nodes.UnknwonNode[],
         {
           idKey: "id",
           ignoredKey: (key) => {
@@ -2867,28 +2867,6 @@ export function useSurfacePathEditor() {
 }
 
 /**
- * @deprecated - WIP
- * @returns
- */
-export function useSurfaceGradientEditor() {
-  const [state, dispatch] = __useInternal();
-  assert(
-    state.content_edit_mode && state.content_edit_mode.type === "gradient"
-  );
-
-  const node = state.document.nodes[
-    state.content_edit_mode.node_id
-  ] as grida.program.nodes.i.IFill;
-  const fill = node.fill;
-  assert(fill?.type === "linear_gradient");
-
-  const { transform, stops } = fill;
-
-  //
-  return useMemo(() => ({ transform, stops }), [transform, stops]);
-}
-
-/**
  * Must be used when root node is {@link grida.program.nodes.TemplateInstanceNode} node
  */
 export function useRootTemplateInstanceNode() {
@@ -2939,7 +2917,7 @@ class EditorConsumerError extends Error {
   }
 }
 
-export function useNode(node_id: string): grida.program.nodes.AnyNode & {
+export function useNode(node_id: string): grida.program.nodes.UnknwonNode & {
   meta: {
     is_component_consumer: boolean;
   };
@@ -3000,12 +2978,12 @@ export function useNode(node_id: string): grida.program.nodes.AnyNode & {
     node_definition = templates[template_id].nodes[node_id];
   }
 
-  const node: grida.program.nodes.AnyNode = useMemo(() => {
+  const node: grida.program.nodes.UnknwonNode = useMemo(() => {
     return Object.assign(
       {},
       node_definition,
       node_change || {}
-    ) as grida.program.nodes.AnyNode;
+    ) as grida.program.nodes.UnknwonNode;
   }, [node_definition, node_change]);
 
   const is_component_consumer =
@@ -3021,7 +2999,9 @@ export function useNode(node_id: string): grida.program.nodes.AnyNode & {
   };
 }
 
-export function useComputedNode(node_id: string) {
+export function useComputedNode(
+  node_id: string
+): grida.program.nodes.UnknwonComputedNode {
   const node = useNode(node_id);
   const { active, style, component_id, props, text, html, src, href, fill } =
     node;
@@ -3038,7 +3018,7 @@ export function useComputedNode(node_id: string) {
     true
   );
 
-  return computed;
+  return computed as grida.program.nodes.UnknownNodeProperties as grida.program.nodes.UnknwonComputedNode;
 }
 
 export function useTemplateDefinition(template_id: string) {

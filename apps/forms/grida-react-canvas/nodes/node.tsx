@@ -143,7 +143,7 @@ export function NodeElement<P extends Record<string, any>>({
     // @ts-ignore
   } satisfies
     | grida.program.document.template.IUserDefinedTemplateNodeReactComponentRenderProps<P>
-    | grida.program.nodes.AnyNode;
+    | grida.program.nodes.UnknwonComputedNode;
 
   if (!node.active) return <></>;
 
@@ -158,16 +158,19 @@ export function NodeElement<P extends Record<string, any>>({
           ...({
             id: node_id,
             ["data-grida-node-id"]: node_id,
-            ["data-grida-node-locked"]: node.locked,
+            ["data-grida-node-locked"]: node.locked!,
             ["data-grida-node-type"]: node.type,
             ["data-dev-editor-selected"]: selected,
             ["data-dev-editor-hovered"]: hovered,
           } satisfies grida.program.document.INodeHtmlDocumentQueryDataAttributes),
           style: {
-            ...css.toReactCSSProperties(renderprops, {
-              fill: fillings[node.type],
-              hasTextStyle: node.type === "text",
-            }),
+            ...css.toReactCSSProperties(
+              renderprops as grida.program.nodes.i.ICSSStylable,
+              {
+                fill: fillings[node.type],
+                hasTextStyle: node.type === "text",
+              }
+            ),
             // hard override user-select
             userSelect: document.editable ? "none" : undefined,
             // hide this node when in surface edit mode

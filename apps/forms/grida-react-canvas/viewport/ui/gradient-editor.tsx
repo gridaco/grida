@@ -1,11 +1,7 @@
-import {
-  useEventTarget,
-  useSurfaceGradientEditor,
-} from "@/grida-react-canvas/provider";
 import { useNodeSurfaceTransfrom } from "../hooks/transform";
 
 export function SurfaceGradientEditor({ node_id }: { node_id: string }) {
-  const { transform, stops } = useSurfaceGradientEditor();
+  // const { transform, stops } = useSurfaceGradientEditor();
   const { style } = useNodeSurfaceTransfrom(node_id);
   //
   //
@@ -25,8 +21,8 @@ export function SurfaceGradientEditor({ node_id }: { node_id: string }) {
           zIndex: 1,
         }}
       >
-        <GradientLine
-          transform={transform}
+        {/* <GradientLine
+          // transform={transform}
           // test
           rect={{
             x: 0,
@@ -34,7 +30,7 @@ export function SurfaceGradientEditor({ node_id }: { node_id: string }) {
             width: 100,
             height: 100,
           }}
-        />
+        /> */}
       </div>
     </div>
   );

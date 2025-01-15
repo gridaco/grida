@@ -233,14 +233,14 @@ function SelectionMixedProperties() {
             <PropertyLine>
               <PropertyLineLabel>Mode</PropertyLineLabel>
               <PositioningModeControl
-                value={position.value}
+                value={position!.value}
                 onValueChange={change.positioningMode}
               />
             </PropertyLine>
             <PropertyLine>
               <PropertyLineLabel>Rotate</PropertyLineLabel>
               <RotateControl
-                value={rotation.value}
+                value={rotation!.value}
                 onValueChange={change.rotation}
               />
             </PropertyLine>
@@ -254,14 +254,14 @@ function SelectionMixedProperties() {
             <PropertyLine>
               <PropertyLineLabel>Width</PropertyLineLabel>
               <LengthPercentageControl
-                value={width.value}
+                value={width!.value}
                 onValueChange={change.width}
               />
             </PropertyLine>
             <PropertyLine>
               <PropertyLineLabel>Height</PropertyLineLabel>
               <LengthPercentageControl
-                value={height.value}
+                value={height!.value}
                 onValueChange={change.height}
               />
             </PropertyLine>
@@ -440,7 +440,7 @@ function SelectionMixedProperties() {
             <PropertyLine>
               <PropertyLineLabel>Opacity</PropertyLineLabel>
               <OpacityControl
-                value={opacity.value}
+                value={opacity!.value}
                 onValueChange={change.opacity}
               />
             </PropertyLine>
@@ -715,7 +715,7 @@ function SelectedNodeProperties() {
             <PropertyLine>
               <PositioningConstraintsControl
                 value={{
-                  position,
+                  position: position!,
                   top,
                   left,
                   right,
