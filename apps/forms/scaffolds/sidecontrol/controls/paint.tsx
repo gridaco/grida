@@ -110,7 +110,7 @@ export function PaintControl({
               <PopoverTrigger>
                 <PaintChip paint={value} />
               </PopoverTrigger>
-              <HexValueInput
+              {/* <HexValueInput
                 className="border-none outline-none w-full h-full ps-2 text-xs"
                 value={{
                   r: value.color.r,
@@ -124,7 +124,7 @@ export function PaintControl({
                     color: { ...color, a: value.color.a },
                   });
                 }}
-              />
+              /> */}
               {removable && (
                 <button
                   onClick={onRemovePaint}
@@ -205,7 +205,7 @@ export function PaintControl({
           <TabsContent value="solid" className="p-0 m-0">
             {value?.type === "solid" && (
               <>
-                <ColorPicker
+                {/* <ColorPicker
                   color={value.color}
                   onColorChange={(color) => {
                     onValueChange?.({
@@ -213,8 +213,16 @@ export function PaintControl({
                       color,
                     });
                   }}
+                /> */}
+                <ContextVariableColors
+                  onSelect={(token) => {
+                    onValueChange?.({
+                      type: "solid",
+                      // @ts-ignore
+                      color: token,
+                    });
+                  }}
                 />
-                <ColorVariablesList />
               </>
             )}
           </TabsContent>
@@ -250,7 +258,13 @@ function PaintInputContainer({ children }: React.PropsWithChildren<{}>) {
   );
 }
 
-function ColorVariablesList() {
+import { tokens } from "@grida/tokens";
+
+function ContextVariableColors({
+  onSelect,
+}: {
+  onSelect?: (token: tokens.StringValueExpression) => void;
+}) {
   const schema = useSchema();
   const colors = Object.entries(schema?.properties ?? {}).filter(
     ([key, def]) => {
@@ -266,6 +280,13 @@ function ColorVariablesList() {
           variant="ghost"
           size="xs"
           className="flex items-center justify-start gap-1 px-1 py-0.5 w-full"
+          onClick={() => {
+            const exp = tokens.factory.createPropertyAccessExpression([
+              "props",
+              key,
+            ]);
+            onSelect?.(exp);
+          }}
         >
           <PaintChip paint={{ type: "solid", color: def.default }} />
           <span className="text-xs">{key}</span>

@@ -99,7 +99,7 @@ export function StandaloneDocumentEditor({
   //   }
   // }, [rootnode]);
 
-  const props = Object.entries(state.document.properties).reduce(
+  const props = Object.entries(state.document.properties ?? {}).reduce(
     (acc, [key, value]) => {
       acc[key] = value.default;
       return acc;
@@ -3026,14 +3026,17 @@ export function useComputedNode(node_id: string) {
   const { active, style, component_id, props, text, html, src, href, fill } =
     node;
 
-  const computed = useComputed({
-    text,
-    html,
-    src,
-    href,
-    props,
-    fill,
-  });
+  const computed = useComputed(
+    {
+      text,
+      html,
+      src,
+      href,
+      props,
+      fill,
+    },
+    true
+  );
 
   return computed;
 }

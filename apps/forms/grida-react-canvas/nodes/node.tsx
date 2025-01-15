@@ -106,6 +106,7 @@ export function NodeElement<P extends Record<string, any>>({
   }, [USER_CHILDREN, children]);
 
   const renderprops = {
+    ...node,
     text: computed.text,
     props: computed.props,
     src: computed.src,
@@ -163,7 +164,7 @@ export function NodeElement<P extends Record<string, any>>({
             ["data-dev-editor-hovered"]: hovered,
           } satisfies grida.program.document.INodeHtmlDocumentQueryDataAttributes),
           style: {
-            ...css.toReactCSSProperties(node, {
+            ...css.toReactCSSProperties(renderprops, {
               fill: fillings[node.type],
               hasTextStyle: node.type === "text",
             }),

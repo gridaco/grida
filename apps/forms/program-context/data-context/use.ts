@@ -2,15 +2,18 @@ import { useContext, useMemo } from "react";
 import { DataContext, ScopedVariableContext } from "./context";
 import { tokens } from "@grida/tokens";
 
-export const useValue = <T = any>(key?: tokens.Access.KeyPath<T>): any => {
+export function useData() {
   const dataContext = useContext(DataContext);
+  if (!dataContext) {
+    throw new Error("useData must be used within a DataProvider");
+  }
+  return dataContext.data;
+}
+
+export const useValue = <T = any>(key?: tokens.Access.KeyPath<T>): any => {
+  const data = useData();
   const scopedVariableContext = useContext(ScopedVariableContext);
 
-  if (!dataContext) {
-    throw new Error("useValue must be used within a DataProvider");
-  }
-
-  const { data } = dataContext;
   const variablePaths = scopedVariableContext
     ? scopedVariableContext.variablePaths
     : {};
@@ -28,14 +31,9 @@ export const useSelectValue = <T>({
 }: {
   keys: Array<Array<string>>;
 }): Record<string, any> => {
-  const dataContext = useContext(DataContext);
+  const data = useData();
   const scopedVariableContext = useContext(ScopedVariableContext);
 
-  if (!dataContext) {
-    throw new Error("useSelectValue must be used within a DataProvider");
-  }
-
-  const { data } = dataContext;
   const variablePaths = scopedVariableContext
     ? scopedVariableContext.variablePaths
     : {};

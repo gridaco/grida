@@ -179,6 +179,10 @@ export default function nodeReducer<
             break;
           case "solid":
             draft.fill = action.fill;
+            break;
+          default:
+            draft.fill = action.fill;
+            break;
         }
         break;
       }

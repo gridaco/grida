@@ -228,20 +228,22 @@ export namespace tokens {
     }
 
     export function propertyAccessExpression(
-      value?: tokens.Token
+      value?: tokens.Token | unknown
     ): value is tokens.PropertyAccessExpression {
       return (
         typeof value === "object" &&
+        value !== null &&
         "kind" in value &&
         value.kind === "PropertyAccessExpression"
       );
     }
 
     export function templateExpression(
-      value?: tokens.StringValueExpression
+      value?: tokens.StringValueExpression | unknown
     ): value is tokens.TemplateExpression {
       return (
         typeof value === "object" &&
+        value !== null &&
         "kind" in value &&
         value.kind === "TemplateExpression"
       );
@@ -612,15 +614,17 @@ export namespace tokens.factory {
       return [];
     }
   }
+}
 
-  export function renderPropertyAccessExpression(
+export namespace tokens.render {
+  export function propertyAccessExpression(
     expression: tokens.PropertyAccessExpression,
     context: any
   ) {
     return tokens.Access.access(context, expression.expression as any);
   }
 
-  export function renderTemplateExpression(
+  export function templateExpression(
     expression: tokens.TemplateExpression,
     context: any
   ) {
@@ -639,5 +643,31 @@ export namespace tokens.factory {
         }
       })
       .join("");
+  }
+
+  export function any<T = any>(
+    value: T,
+    contextdata: Record<string, any>,
+    recursive: boolean
+  ): any {
+    if (tokens.is.propertyAccessExpression(value)) {
+      return tokens.render.propertyAccessExpression(value, contextdata);
+    } else if (tokens.is.templateExpression(value)) {
+      return tokens.render.templateExpression(value, contextdata);
+    } else if (recursive && typeof value === "object" && value !== null) {
+      // Recursively compute for nested objects/arrays
+      if (Array.isArray(value)) {
+        return value.map((item) => any(item, contextdata, recursive));
+      }
+      return Object.entries(value).reduce(
+        (acc, [key, nestedValue]) => {
+          acc[key] = any(nestedValue, contextdata, recursive);
+          return acc;
+        },
+        {} as Record<string, any>
+      );
+    } else {
+      return value;
+    }
   }
 }

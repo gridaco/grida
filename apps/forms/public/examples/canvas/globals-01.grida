@@ -69,7 +69,7 @@
     },
     "properties": {
       "background": {
-        "type": "grida.program.objects.RGBA",
+        "type": "rgba",
         "description": "background color rgba",
         "default": {
           "type": "rgba",
