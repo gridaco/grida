@@ -31,11 +31,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-export function __TMP_ComponentProperties({
-  className,
-}: {
-  className?: string;
-}) {
+export function DocumentProperties({ className }: { className?: string }) {
   const {
     state: {
       document: { properties },

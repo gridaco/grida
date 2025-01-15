@@ -110,7 +110,7 @@ export function PaintControl({
               <PopoverTrigger>
                 <PaintChip paint={value} />
               </PopoverTrigger>
-              {/* <HexValueInput
+              <HexValueInput
                 className="border-none outline-none w-full h-full ps-2 text-xs"
                 value={{
                   r: value.color.r,
@@ -124,7 +124,7 @@ export function PaintControl({
                     color: { ...color, a: value.color.a },
                   });
                 }}
-              /> */}
+              />
               {removable && (
                 <button
                   onClick={onRemovePaint}
@@ -205,7 +205,7 @@ export function PaintControl({
           <TabsContent value="solid" className="p-0 m-0">
             {value?.type === "solid" && (
               <>
-                {/* <ColorPicker
+                <ColorPicker
                   color={value.color}
                   onColorChange={(color) => {
                     onValueChange?.({
@@ -213,7 +213,7 @@ export function PaintControl({
                       color,
                     });
                   }}
-                /> */}
+                />
                 <ContextVariableColors
                   onSelect={(token) => {
                     onValueChange?.({

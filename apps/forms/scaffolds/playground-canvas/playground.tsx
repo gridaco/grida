@@ -15,7 +15,7 @@ import {
   Selection,
   Zoom,
 } from "@/scaffolds/sidecontrol/sidecontrol-node-selection";
-import { __TMP_ComponentProperties } from "@/scaffolds/sidecontrol/sidecontrol-component-properties";
+import { DocumentProperties } from "@/scaffolds/sidecontrol/sidecontrol-document-properties";
 import { NodeHierarchyList } from "@/scaffolds/sidebar/sidebar-node-hierarchy-list";
 import {
   StandaloneDocumentEditor,
@@ -456,7 +456,7 @@ export default function CanvasPlayground() {
                       <Selection
                         empty={
                           <div className="mt-4 mb-10">
-                            <__TMP_ComponentProperties />
+                            <DocumentProperties />
                           </div>
                         }
                       />
