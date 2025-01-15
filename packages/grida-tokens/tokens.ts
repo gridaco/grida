@@ -519,7 +519,7 @@ export namespace tokens.Access {
 export namespace tokens.factory {
   export namespace strfy {
     export function stringValueExpression(
-      exp: tokens.StringValueExpression
+      exp: tokens.PropertyAccessExpression | tokens.StringValueExpression
     ): string {
       if (typeof exp === "string") {
         return exp;

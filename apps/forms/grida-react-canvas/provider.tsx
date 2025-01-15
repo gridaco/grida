@@ -397,7 +397,13 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   );
 
   const changeNodeFill = useCallback(
-    (node_id: string, fill: grida.program.cg.PaintWithoutID | null) => {
+    (
+      node_id: string,
+      fill:
+        | grida.program.nodes.i.props.SolidPaintToken
+        | grida.program.cg.PaintWithoutID
+        | null
+    ) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "node/change/fill",
@@ -410,7 +416,13 @@ function __useNodeActions(dispatch: DocumentDispatcher) {
   );
 
   const changeNodeStroke = useCallback(
-    (node_id: string, stroke: grida.program.cg.PaintWithoutID | null) => {
+    (
+      node_id: string,
+      stroke:
+        | grida.program.nodes.i.props.SolidPaintToken
+        | grida.program.cg.PaintWithoutID
+        | null
+    ) => {
       requestAnimationFrame(() => {
         dispatch({
           type: "node/change/stroke",
@@ -884,10 +896,18 @@ export function useNodeAction(node_id: string | undefined) {
       cornerRadius: (
         value: grida.program.nodes.i.IRectangleCorner["cornerRadius"]
       ) => nodeActions.changeNodeCornerRadius(node_id, value),
-      fill: (value: grida.program.cg.PaintWithoutID | null) =>
-        nodeActions.changeNodeFill(node_id, value),
-      stroke: (value: grida.program.cg.PaintWithoutID | null) =>
-        nodeActions.changeNodeStroke(node_id, value),
+      fill: (
+        value:
+          | grida.program.nodes.i.props.SolidPaintToken
+          | grida.program.cg.PaintWithoutID
+          | null
+      ) => nodeActions.changeNodeFill(node_id, value),
+      stroke: (
+        value:
+          | grida.program.nodes.i.props.SolidPaintToken
+          | grida.program.cg.PaintWithoutID
+          | null
+      ) => nodeActions.changeNodeStroke(node_id, value),
       strokeWidth: (change: TChange<number>) =>
         nodeActions.changeNodeStrokeWidth(node_id, change),
       strokeCap: (value: grida.program.cg.StrokeCap) =>
@@ -1151,7 +1171,12 @@ export function useSelection() {
   );
 
   const fill = useCallback(
-    (value: grida.program.cg.PaintWithoutID | null) => {
+    (
+      value:
+        | grida.program.nodes.i.props.SolidPaintToken
+        | grida.program.cg.PaintWithoutID
+        | null
+    ) => {
       mixedProperties.fill?.ids.forEach((id) => {
         __actions.changeNodeFill(id, value);
       });
@@ -1160,7 +1185,12 @@ export function useSelection() {
   );
 
   const stroke = useCallback(
-    (value: grida.program.cg.PaintWithoutID | null) => {
+    (
+      value:
+        | grida.program.nodes.i.props.SolidPaintToken
+        | grida.program.cg.PaintWithoutID
+        | null
+    ) => {
       mixedProperties.stroke?.ids.forEach((id) => {
         __actions.changeNodeStroke(id, value);
       });
@@ -1357,7 +1387,14 @@ export function useSelectionPaints() {
   const paints = mixedProperties.fill?.values ?? [];
 
   const setPaint = useCallback(
-    (index: number, value: grida.program.cg.PaintWithoutID | null) => {
+    (
+      index: number,
+      value:
+        | grida.program.nodes.i.props.SolidPaintToken
+        | grida.program.cg.PaintWithoutID
+        | null
+        | null
+    ) => {
       const group = paints[index];
       group.ids.forEach((id) => {
         __actions.changeNodeFill(id, value);

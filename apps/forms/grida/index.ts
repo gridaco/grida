@@ -835,24 +835,29 @@ export namespace grida.program.nodes {
       locked: boolean;
     }
 
-    /**
-     * text value
-     *
-     * - expression - {@link tokens.StringValueExpression} - computed or literal
-     *   - literal - e.g. `"A text value"`
-     *   - property access - {@link tokens.PropertyAccessExpression} - computed, , e.g. `userdata.title`
-     *   - identifier - {@link tokens.Identifier} - computed, e.g. `title`
-     *   - others - all {@link tokens.StringValueExpression} types
-     *
-     * when used under a component / instance / template, the `props.` expression is reserved and refers to adjacent parent's props.
-     * - by the standard implementation, the `props.[x]` is recommended to be referenced only once in a single node.
-     * - by the standard implementation, within the visual editor context, when user attempts to updates the literal value (where it is a `props.[x]` and `props.[x] is literal`), it should actually update the `props.[x]` value, not this `text` literal value.
-     */
-    type PropsTextValue = tokens.StringValueExpression;
+    export namespace props {
+      /**
+       * text value
+       *
+       * - expression - {@link tokens.StringValueExpression} - computed or literal
+       *   - literal - e.g. `"A text value"`
+       *   - property access - {@link tokens.PropertyAccessExpression} - computed, , e.g. `userdata.title`
+       *   - identifier - {@link tokens.Identifier} - computed, e.g. `title`
+       *   - others - all {@link tokens.StringValueExpression} types
+       *
+       * when used under a component / instance / template, the `props.` expression is reserved and refers to adjacent parent's props.
+       * - by the standard implementation, the `props.[x]` is recommended to be referenced only once in a single node.
+       * - by the standard implementation, within the visual editor context, when user attempts to updates the literal value (where it is a `props.[x]` and `props.[x] is literal`), it should actually update the `props.[x]` value, not this `text` literal value.
+       */
+      export type PropsTextValue = tokens.StringValueExpression;
 
-    type PropsPaintValue =
-      | tokens.utils.TokenizableExcept<cg.Paint, "type">
-      | cg.Paint;
+      export type SolidPaintToken = tokens.utils.TokenizableExcept<
+        cg.SolidPaint,
+        "type"
+      >;
+
+      export type PropsPaintValue = cg.Paint | SolidPaintToken;
+    }
 
     export interface IOpacity {
       /**
@@ -1060,7 +1065,7 @@ export namespace grida.program.nodes {
         IZIndex,
         IPositioning,
         ICSSDimension,
-        IFill<PropsPaintValue>,
+        IFill<props.PropsPaintValue>,
         IBoxShadow,
         ICSSBorder {
       /**
@@ -1076,7 +1081,7 @@ export namespace grida.program.nodes {
     export interface IComputedCSSStylable
       extends __ReplaceSubset<
         ICSSStylable,
-        IFill<PropsPaintValue>,
+        IFill<props.PropsPaintValue>,
         { fill: cg.Paint }
       > {}
 
@@ -1142,7 +1147,9 @@ export namespace grida.program.nodes {
      *
      * a set of properties that can be applied to a text node, but not to a textspan
      */
-    export interface ITextNodeStyle extends ITextStyle, IFill<PropsPaintValue> {
+    export interface ITextNodeStyle
+      extends ITextStyle,
+        IFill<props.PropsPaintValue> {
       /**
        * @default "left"
        */
@@ -1156,12 +1163,12 @@ export namespace grida.program.nodes {
     export interface IComputedTextNodeStyle
       extends __ReplaceSubset<
         ITextNodeStyle,
-        IFill<PropsPaintValue>,
+        IFill<props.PropsPaintValue>,
         { fill: cg.Paint }
       > {}
 
     export interface ITextValue {
-      text: PropsTextValue | null;
+      text: props.PropsTextValue | null;
 
       /**
        * set max length of the text value
@@ -1198,7 +1205,7 @@ export namespace grida.program.nodes {
     }
 
     export interface IHTMLRichTextValue {
-      html: PropsTextValue | null;
+      html: props.PropsTextValue | null;
     }
 
     export interface IProperties {

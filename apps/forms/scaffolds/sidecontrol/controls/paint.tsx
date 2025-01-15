@@ -22,14 +22,48 @@ import { ColorPicker } from "./color-picker";
 import { cmath } from "@grida/cmath";
 import { Button } from "@/components/ui/button";
 import { useSchema } from "../schema";
+import { tokens } from "@grida/tokens";
+import { useComputed } from "@/grida-react-canvas/nodes/use-computed";
 
 export function PaintControl({
   value,
   onValueChange,
   removable,
 }: {
-  value?: grida.program.cg.Paint;
-  onValueChange?: (value: grida.program.cg.PaintWithoutID | null) => void;
+  value?: grida.program.nodes.i.props.PropsPaintValue;
+  onValueChange?: (
+    value: ComputedPaintWithoutID | TokenizedPaint | null
+  ) => void;
+  removable?: boolean;
+}) {
+  if (tokens.is.tokenized(value)) {
+    return (
+      <TokenizedPaintControl
+        value={value as TokenizedPaint}
+        onValueChange={onValueChange}
+      />
+    );
+  } else {
+    return (
+      <ComputedPaintControl
+        value={value as ComputedPaint}
+        onValueChange={onValueChange}
+      />
+    );
+  }
+}
+
+type ComputedPaint = grida.program.cg.Paint;
+type ComputedPaintWithoutID = grida.program.cg.PaintWithoutID;
+type TokenizedPaint = grida.program.nodes.i.props.SolidPaintToken;
+
+function ComputedPaintControl({
+  value,
+  onValueChange,
+  removable,
+}: {
+  value?: ComputedPaint;
+  onValueChange?: (value: ComputedPaintWithoutID | null) => void;
   removable?: boolean;
 }) {
   const onTypeChange = useCallback(
@@ -100,11 +134,6 @@ export function PaintControl({
     if (!removable) return;
     onValueChange?.(null);
   };
-
-  if (tokens.is.tokenized(value)) {
-    //
-    return <>TOKENIZED</>;
-  }
 
   return (
     <Popover>
@@ -247,28 +276,62 @@ export function PaintControl({
   );
 }
 
-function PaintInputContainer({ children }: React.PropsWithChildren<{}>) {
+function TokenizedPaintControl({
+  value,
+  removable,
+  onValueChange,
+}: {
+  value: TokenizedPaint;
+  removable?: boolean;
+  onValueChange?: (value: TokenizedPaint | null) => void;
+}) {
+  const computed = useComputed(
+    {
+      value,
+    },
+    true
+  );
+
+  const identifier = value.color;
+
   return (
-    <div
-      className={cn(
-        "flex items-center border cursor-default",
-        WorkbenchUI.inputVariants({
-          size: "xs",
-          variant: "paint-container",
-        })
-      )}
-    >
-      {children}
-    </div>
+    <Popover>
+      <PopoverTrigger>
+        <PaintInputContainer>
+          <PaintChip paint={computed.value as any as ComputedPaint} />
+          <span className="text-xs text-muted-foreground ms-2">
+            {tokens.factory.strfy.stringValueExpression(
+              identifier as tokens.PropertyAccessExpression
+            )}
+          </span>
+          {/* {removable && (
+          <button
+            onClick={onRemovePaint}
+            className="px-1 py-1 me-0.5 text-muted-foreground"
+          >
+            <Cross2Icon className="w-3.5 h-3.5" />
+          </button>
+        )} */}
+        </PaintInputContainer>
+      </PopoverTrigger>
+      <PopoverContent>
+        <ContextVariableColors
+          onSelect={(token) => {
+            onValueChange?.({
+              type: "solid",
+              color: token,
+            });
+          }}
+        />
+      </PopoverContent>
+    </Popover>
   );
 }
-
-import { tokens } from "@grida/tokens";
 
 function ContextVariableColors({
   onSelect,
 }: {
-  onSelect?: (token: tokens.StringValueExpression) => void;
+  onSelect?: (token: tokens.PropertyAccessExpression) => void;
 }) {
   const schema = useSchema();
   const colors = Object.entries(schema?.properties ?? {}).filter(
@@ -297,6 +360,22 @@ function ContextVariableColors({
           <span className="text-xs">{key}</span>
         </Button>
       ))}
+    </div>
+  );
+}
+
+function PaintInputContainer({ children }: React.PropsWithChildren<{}>) {
+  return (
+    <div
+      className={cn(
+        "flex items-center border cursor-default",
+        WorkbenchUI.inputVariants({
+          size: "xs",
+          variant: "paint-container",
+        })
+      )}
+    >
+      {children}
     </div>
   );
 }

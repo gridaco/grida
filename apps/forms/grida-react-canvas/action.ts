@@ -503,11 +503,11 @@ interface INodeChangeCornerRadiusAction extends INodeID {
 }
 
 interface INodeChangeFillAction extends INodeID {
-  fill: grida.program.cg.PaintWithoutID | null;
+  fill: Omit<grida.program.nodes.i.props.PropsPaintValue, "id"> | null;
 }
 
 interface INodeChangeStrokeAction extends INodeID {
-  stroke: grida.program.cg.PaintWithoutID | null;
+  stroke: Omit<grida.program.nodes.i.props.PropsPaintValue, "id"> | null;
 }
 
 interface INodeChangeStrokeWidthAction extends INodeID {
