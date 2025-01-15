@@ -850,7 +850,9 @@ export namespace grida.program.nodes {
      */
     type PropsTextValue = tokens.StringValueExpression;
 
-    type PropsPaintValue = tokens.utils.TokenizableExcept<cg.Paint, "type">;
+    type PropsPaintValue =
+      | tokens.utils.TokenizableExcept<cg.Paint, "type">
+      | cg.Paint;
 
     export interface IOpacity {
       /**
@@ -1058,7 +1060,7 @@ export namespace grida.program.nodes {
         IZIndex,
         IPositioning,
         ICSSDimension,
-        IFill<cg.Paint>,
+        IFill<PropsPaintValue>,
         IBoxShadow,
         ICSSBorder {
       /**
@@ -1067,6 +1069,16 @@ export namespace grida.program.nodes {
        */
       style: css.ExplicitlySupportedCSSProperties;
     }
+
+    /**
+     * @deprecated
+     */
+    export interface IComputedCSSStylable
+      extends __ReplaceSubset<
+        ICSSStylable,
+        IFill<PropsPaintValue>,
+        { fill: cg.Paint }
+      > {}
 
     export interface IMouseCursor {
       cursor?: cg.SystemMouseCursor;
@@ -1130,7 +1142,7 @@ export namespace grida.program.nodes {
      *
      * a set of properties that can be applied to a text node, but not to a textspan
      */
-    export interface ITextNodeStyle extends ITextStyle, IFill<cg.Paint> {
+    export interface ITextNodeStyle extends ITextStyle, IFill<PropsPaintValue> {
       /**
        * @default "left"
        */
@@ -1140,6 +1152,13 @@ export namespace grida.program.nodes {
        */
       textAlignVertical: cg.TextAlignVertical;
     }
+
+    export interface IComputedTextNodeStyle
+      extends __ReplaceSubset<
+        ITextNodeStyle,
+        IFill<PropsPaintValue>,
+        { fill: cg.Paint }
+      > {}
 
     export interface ITextValue {
       text: PropsTextValue | null;
@@ -1153,6 +1172,10 @@ export namespace grida.program.nodes {
        * @deprecated - not standard
        */
       maxLength?: number;
+    }
+
+    export interface IComputedTextValue {
+      text: string | null;
     }
 
     export interface ISourceValue {
@@ -1194,83 +1217,6 @@ export namespace grida.program.nodes {
     }
   }
 
-  export namespace properties {
-    export const ibase: ReadonlyArray<keyof i.IBaseNode> = ["id", "name"];
-    export const iscene: ReadonlyArray<keyof i.ISceneNode> = [
-      "active",
-      "locked",
-    ];
-    export const iexpandable: ReadonlyArray<keyof i.IExpandable> = ["expanded"];
-    export const iexportable: ReadonlyArray<keyof i.IExportable> = [];
-    export const iopacity: ReadonlyArray<keyof i.IOpacity> = ["opacity"];
-    export const izindex: ReadonlyArray<keyof i.IZIndex> = ["zIndex"];
-    export const ihrefable: ReadonlyArray<keyof i.IHrefable> = [
-      "href",
-      "target",
-    ];
-    export const irectanglecorner: ReadonlyArray<keyof i.IRectangleCorner> = [
-      "cornerRadius",
-    ];
-    export const ifill: ReadonlyArray<keyof i.IFill<cg.Paint>> = ["fill"];
-    export const ieffects: ReadonlyArray<keyof i.IEffects> = ["effects"];
-    export const icssstylable: ReadonlyArray<keyof i.ICSSStylable> = ["style"];
-
-    // nodes
-    export const image: ReadonlyArray<keyof ImageNode> = [
-      ...ibase,
-      ...iscene,
-      ...iopacity,
-      ...izindex,
-      ...ihrefable,
-      ...ifill,
-      "src",
-      "alt",
-    ];
-    export const rectangle: ReadonlyArray<keyof RectangleNode> = [
-      ...ibase,
-      ...iscene,
-      ...iopacity,
-      ...izindex,
-      ...ihrefable,
-      ...ifill,
-      ...ieffects,
-      ...irectanglecorner,
-      "width",
-      "height",
-    ];
-    export const ellipse: ReadonlyArray<keyof EllipseNode> = [
-      ...ibase,
-      ...iscene,
-      ...iopacity,
-      ...izindex,
-      ...ihrefable,
-      ...ifill,
-      ...ieffects,
-      "width",
-      "height",
-    ];
-
-    export const text: ReadonlyArray<keyof TextNode> = [
-      ...ibase,
-      ...iscene,
-      ...iopacity,
-      ...izindex,
-      ...ihrefable,
-      ...ifill,
-      "text",
-    ];
-
-    export const container: ReadonlyArray<keyof ContainerNode> = [
-      ...ibase,
-      ...iscene,
-      ...iopacity,
-      ...izindex,
-      ...ihrefable,
-      ...ifill,
-      ...irectanglecorner,
-    ];
-  }
-
   type __ReplaceSubset<T, TSubset extends Partial<T>, TNew> = Omit<
     T,
     keyof TSubset
@@ -1301,7 +1247,11 @@ export namespace grida.program.nodes {
   }
 
   export interface ComputedTextNode
-    extends __ReplaceSubset<TextNode, i.ITextValue, { text: string | null }> {
+    extends __ReplaceSubset<
+      TextNode,
+      i.ITextValue & i.ITextStyle,
+      i.IComputedTextValue & i.IComputedTextNodeStyle
+    > {
     readonly type: "text";
   }
 

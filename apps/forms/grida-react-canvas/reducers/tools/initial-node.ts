@@ -162,6 +162,7 @@ export default function initialNode(
         effects: [],
         strokeWidth: 0,
         strokeCap: "butt",
+        fill: gray,
         ...seed,
       } satisfies grida.program.nodes.EllipseNode;
     }
@@ -177,6 +178,7 @@ export default function initialNode(
         effects: [],
         strokeWidth: 0,
         strokeCap: "butt",
+        fill: gray,
         ...seed,
       } satisfies grida.program.nodes.RectangleNode;
     }

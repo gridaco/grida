@@ -191,11 +191,21 @@ export namespace css {
   };
 
   export function toReactCSSProperties(
-    styles: grida.program.nodes.i.ICSSStylable &
+    styles: Partial<
+      grida.program.nodes.i.IStylable<grida.program.css.ExplicitlySupportedCSSProperties>
+    > &
+      Partial<grida.program.nodes.i.IOpacity> &
+      Partial<grida.program.nodes.i.IRotation> &
+      Partial<grida.program.nodes.i.IZIndex> &
+      Partial<grida.program.nodes.i.IPositioning> &
+      Partial<grida.program.nodes.i.ICSSDimension> &
+      Partial<grida.program.nodes.i.IFill<grida.program.cg.Paint>> &
+      Partial<grida.program.nodes.i.IBoxShadow> &
+      Partial<grida.program.nodes.i.ICSSBorder> &
       Partial<grida.program.nodes.i.IMouseCursor> &
       Partial<grida.program.nodes.i.IRectangleCorner> &
       Partial<grida.program.nodes.i.IBoxFit> &
-      Partial<grida.program.nodes.i.ITextNodeStyle> &
+      Partial<grida.program.nodes.i.IComputedTextNodeStyle> &
       Partial<grida.program.nodes.i.IPadding> &
       Partial<grida.program.nodes.i.IBoxShadow> &
       Partial<grida.program.nodes.i.IFlexContainer>,
@@ -246,8 +256,8 @@ export namespace css {
       // for texts, when auto, it will automatically break the line (to prevent this, we can use max-content) BUT, when max-content it will not respect the right: xxx (which in this case, it should break line)
       // width: width === "auto" ? "max-content" : toDimension(width),
       // height: height === "auto" ? "max-content" : toDimension(height),
-      width: toDimension(width),
-      height: toDimension(height),
+      width: width ? toDimension(width) : undefined,
+      height: height ? toDimension(height) : undefined,
       top: top,
       left: left,
       right: right,
@@ -319,7 +329,7 @@ export namespace css {
           fontWeight,
           letterSpacing,
           lineHeight,
-          fill: fill,
+          fill: fill!,
         }),
       };
     }
@@ -360,7 +370,7 @@ export namespace css {
   }
 
   export function toReactTextStyle(
-    style: grida.program.nodes.i.ITextNodeStyle
+    style: grida.program.nodes.i.IComputedTextNodeStyle
   ): Pick<
     React.CSSProperties,
     | "textAlign"

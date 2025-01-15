@@ -165,7 +165,7 @@ export function NodeElement<P extends Record<string, any>>({
           } satisfies grida.program.document.INodeHtmlDocumentQueryDataAttributes),
           style: {
             ...css.toReactCSSProperties(
-              renderprops as grida.program.nodes.i.ICSSStylable,
+              renderprops as grida.program.nodes.i.IComputedCSSStylable,
               {
                 fill: fillings[node.type],
                 hasTextStyle: node.type === "text",
