@@ -1,9 +1,5 @@
 ## Running Locally
 
-> Note: this project may not work locally without the necessary environment variables and 3rd party service configurations (supabase for instance) (we do not have a docker image yet, so If you wish to contribute, please contact us or open an issue)
-
-Otherwise, you can officially join our team by [joining our slack channel](https://grida.co/join-slack)
-
 ---
 
 First, clone the repo with git submodules
@@ -27,9 +23,15 @@ pnpm dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-## Insiders
+## Running backend (supabase) locally
 
-Currently, our backend, supabase is not configured to run locally, it's not possible for you to properly run the project that requires the backend. - For further information, please contact us via Slack.
+- follow this [guide](https://supabase.io/docs/guides/local-development) to run supabase locally
+  - supabase cli required (brew install supabase)
+  - [docker desktop](https://docker.com) required
+
+```bash
+supabase start
+```
 
 ### Supabase Types
 
@@ -46,3 +48,9 @@ npx supabase gen types --lang=typescript \
   --schema grida_forms \
   > database.types.ts
 ```
+
+## Support
+
+If you have any problem running the project locally or for any further information, please contact us via Slack.
+
+- [joining our slack channel](https://grida.co/join-slack)
