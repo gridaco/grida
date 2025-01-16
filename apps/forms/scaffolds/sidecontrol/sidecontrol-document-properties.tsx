@@ -58,7 +58,6 @@ export function DocumentProperties({ className }: { className?: string }) {
   } = useDocument();
 
   const keys = Object.keys(properties ?? {});
-  // const [properties, setProperties] = useState<any[]>([]);
 
   const addProperty = () => {
     schemaDefineProperty();
@@ -66,7 +65,7 @@ export function DocumentProperties({ className }: { className?: string }) {
 
   return (
     <div className={className}>
-      <SidebarSection>
+      <SidebarSection className="pb-2">
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Document</SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
@@ -75,7 +74,7 @@ export function DocumentProperties({ className }: { className?: string }) {
         </SidebarMenuSectionContent>
       </SidebarSection>
       <hr />
-      <SidebarSection className="border-b pb-4">
+      <SidebarSection className="pt-2 border-b">
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Properties</SidebarSectionHeaderLabel>
           <SidebarSectionHeaderActions className="visible">
@@ -89,47 +88,28 @@ export function DocumentProperties({ className }: { className?: string }) {
             </Button>
           </SidebarSectionHeaderActions>
         </SidebarSectionHeaderItem>
+        <SidebarMenuSectionContent className="divide-y m-0 p-0">
+          {keys.map((key, i) => {
+            const property = properties![key];
+            return (
+              <PropertyDefinitionBlock
+                key={i}
+                definition={property}
+                name={key}
+                onNameChange={(newName) => {
+                  schemaRenameProperty(key, newName);
+                }}
+                onDefinitionChange={(value) => {
+                  schemaUpdateProperty(key, value);
+                }}
+                onRemove={() => {
+                  schemaDeleteProperty(key);
+                }}
+              />
+            );
+          })}
+        </SidebarMenuSectionContent>
       </SidebarSection>
-      <div className="divide-y">
-        {keys.map((key, i) => {
-          const property = properties![key];
-          return (
-            <PropertyDefinitionBlock
-              key={i}
-              definition={property}
-              name={key}
-              onNameChange={(newName) => {
-                schemaRenameProperty(key, newName);
-              }}
-              onDefinitionChange={(value) => {
-                schemaUpdateProperty(key, value);
-              }}
-              onRemove={() => {
-                schemaDeleteProperty(key);
-              }}
-            />
-          );
-        })}
-        {/* {properties?.map((property, i) => (
-          <NewPropertyString
-            key={i}
-            onRemove={() => {
-              setProperties(properties.filter((_, index) => index !== i));
-            }}
-          />
-        ))} */}
-      </div>
-      {keys.length > 0 && (
-        <>
-          <hr />
-          <SidebarSection className="flex justify-end items-center gap-2 py-4">
-            <Button variant="outline" size="sm">
-              Cancel
-            </Button>
-            <Button size="sm">Save</Button>
-          </SidebarSection>
-        </>
-      )}
     </div>
   );
 }
@@ -172,115 +152,115 @@ function PropertyDefinitionBlock({
   // - userdata: object
 
   return (
-    <Collapsible>
-      <SidebarSection className="mt-2">
-        <CollapsibleTrigger className="w-full">
-          <SidebarSectionHeaderItem>
-            <SidebarSectionHeaderLabel>
-              <span className="overflow-hidden text-ellipsis w-full">
-                <CubeIcon className="me-1.5 inline align-middle" />
-                {name ? name : "New Property"} (Draft)
-              </span>
-              {type && (
-                <>
-                  <br />
-                  <div className="text-xs text-workbench-accent-orange font-mono">
-                    {type}
-                  </div>
-                </>
-              )}
-            </SidebarSectionHeaderLabel>
-            <SidebarSectionHeaderActions className="gap-2">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="xs" className="w-4 h-4 p-0">
-                    <GearIcon />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <SidebarSection>
-                    <SidebarSectionHeaderItem>
-                      <SidebarSectionHeaderLabel>
-                        Extra
-                      </SidebarSectionHeaderLabel>
-                    </SidebarSectionHeaderItem>
-                    <SidebarMenuSectionContent className="space-y-2">
-                      <PropertyLine>
-                        {/* TODO: */}
-                        <UserDataControl node_id="..." value={undefined} />
-                      </PropertyLine>
-                    </SidebarMenuSectionContent>
-                  </SidebarSection>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <Button
-                variant="ghost"
-                size="xs"
-                className="w-4 h-4 p-0"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onRemove?.();
+    <Collapsible className="mt-2">
+      <CollapsibleTrigger className="w-full">
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>
+            <span className="overflow-hidden text-ellipsis w-full">
+              <CubeIcon className="me-1.5 inline align-middle" />
+              {name ? name : "New Property"}
+            </span>
+            {type && (
+              <>
+                <br />
+                <div className="text-xs text-workbench-accent-orange font-mono">
+                  {type}
+                </div>
+              </>
+            )}
+          </SidebarSectionHeaderLabel>
+          <SidebarSectionHeaderActions className="gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="xs" className="w-4 h-4 p-0">
+                  <GearIcon />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <SidebarSection>
+                  <SidebarSectionHeaderItem>
+                    <SidebarSectionHeaderLabel>Extra</SidebarSectionHeaderLabel>
+                  </SidebarSectionHeaderItem>
+                  <SidebarMenuSectionContent className="space-y-2">
+                    <PropertyLine>
+                      {/* TODO: */}
+                      <UserDataControl node_id="..." value={undefined} />
+                    </PropertyLine>
+                  </SidebarMenuSectionContent>
+                </SidebarSection>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button
+              variant="ghost"
+              size="xs"
+              className="w-4 h-4 p-0"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemove?.();
+              }}
+            >
+              <TrashIcon />
+            </Button>
+          </SidebarSectionHeaderActions>
+        </SidebarSectionHeaderItem>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="space-y-2">
+        <SidebarSection
+          hidden={type !== "string"}
+          className="border-b pb-4 space-y-2"
+        >
+          <PropertyLine>
+            <PropertyLineLabel>Type *</PropertyLineLabel>
+            <PropertyEnum
+              value={type}
+              onValueChange={(v) => {
+                onDefinitionLineChange("type", v);
+                onDefinitionChange?.({
+                  ...definition,
+                  type: v,
+                  default: (initial_values as any)[v],
+                } as grida.program.schema.PropertyDefinition);
+              }}
+              enum={["string", "number", "boolean", "image", "rgba"]}
+            />
+          </PropertyLine>
+          <PropertyLine>
+            <PropertyLineLabel>Name *</PropertyLineLabel>
+            <PropertyInput
+              required
+              autoFocus
+              value={name}
+              pattern="^[a-zA-Z_$][a-zA-Z0-9_$]*$"
+              onChange={(e) => setName(e.target.value)}
+            />
+          </PropertyLine>
+          <PropertyLine>
+            <PropertyLineLabel>Description</PropertyLineLabel>
+            <PropertyInput />
+          </PropertyLine>
+          <PropertyLine className="flex items-center">
+            <PropertyLineLabel>Required</PropertyLineLabel>
+            <Checkbox defaultChecked />
+          </PropertyLine>
+          <PropertySeparator />
+          <PropertyLine className="grid w-full">
+            <PropertyLineLabel>Default</PropertyLineLabel>
+            <div className="w-full">
+              <PropertyDefinitionValueInput
+                definition={definition}
+                value={defaultValue}
+                onValueChange={(value) => {
+                  onDefinitionLineChange("default", value);
                 }}
-              >
-                <TrashIcon />
-              </Button>
-            </SidebarSectionHeaderActions>
-          </SidebarSectionHeaderItem>
-        </CollapsibleTrigger>
-      </SidebarSection>
-      <CollapsibleContent>
-        <SidebarSection className="border-b pb-4">
-          <SidebarMenuSectionContent className="space-y-2">
-            <PropertyLine>
-              <PropertyLineLabel>Type *</PropertyLineLabel>
-              <PropertyEnum
-                value={type}
-                onValueChange={(v) => {
-                  onDefinitionLineChange("type", v);
-                  onDefinitionChange?.({
-                    ...definition,
-                    type: v,
-                    default: (initial_values as any)[v],
-                  } as grida.program.schema.PropertyDefinition);
-                }}
-                enum={["string", "number", "boolean", "image", "rgba"]}
+                placeholder="Enter Default Value"
               />
-            </PropertyLine>
-            <PropertyLine>
-              <PropertyLineLabel>Name *</PropertyLineLabel>
-              <PropertyInput
-                required
-                autoFocus
-                value={name}
-                pattern="^[a-zA-Z_$][a-zA-Z0-9_$]*$"
-                onChange={(e) => setName(e.target.value)}
-              />
-            </PropertyLine>
-            <PropertyLine>
-              <PropertyLineLabel>Description</PropertyLineLabel>
-              <PropertyInput />
-            </PropertyLine>
-            <PropertyLine className="flex items-center">
-              <PropertyLineLabel>Required</PropertyLineLabel>
-              <Checkbox defaultChecked />
-            </PropertyLine>
-            <PropertySeparator />
-            <PropertyLine className="grid w-full">
-              <PropertyLineLabel>Default</PropertyLineLabel>
-              <div className="w-full">
-                <PropertyDefinitionValueInput
-                  definition={definition}
-                  value={defaultValue}
-                  onValueChange={(value) => {
-                    onDefinitionLineChange("default", value);
-                  }}
-                  placeholder="Enter Default Value"
-                />
-              </div>
-            </PropertyLine>
-          </SidebarMenuSectionContent>
+            </div>
+          </PropertyLine>
         </SidebarSection>
-        <SidebarSection hidden={type !== "string"} className="border-b pb-4">
+        <SidebarSection
+          hidden={type !== "string"}
+          className="border-b pb-4 m-0"
+        >
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Length</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
@@ -295,7 +275,10 @@ function PropertyDefinitionBlock({
             </PropertyLine>
           </SidebarMenuSectionContent>
         </SidebarSection>
-        <SidebarSection hidden={type !== "number"} className="border-b pb-4">
+        <SidebarSection
+          hidden={type !== "number"}
+          className="border-b pb-4 m-0"
+        >
           <SidebarSectionHeaderItem>
             <SidebarSectionHeaderLabel>Range</SidebarSectionHeaderLabel>
           </SidebarSectionHeaderItem>
