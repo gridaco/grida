@@ -111,6 +111,8 @@ import {
 import { WorkbenchUI } from "@/components/workbench";
 import { cn } from "@/utils";
 
+const CANVAS_BG_COLOR = { r: 200, g: 200, b: 200, a: 1 };
+
 export default function CanvasPlayground() {
   useDisableSwipeBack();
 
@@ -161,6 +163,7 @@ export default function CanvasPlayground() {
           },
         },
         properties: {},
+        backgroundColor: CANVAS_BG_COLOR,
       },
     })
   );

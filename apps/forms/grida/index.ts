@@ -242,7 +242,7 @@ export namespace grida.program.document {
     /**
      * This property may not be handled, or fallback to white #FFFFFF depending on the rendering context.
      */
-    background?: cg.RGBA8888 | null | undefined | "";
+    backgroundColor?: cg.RGBA8888 | null | undefined | "";
   }
 
   /**

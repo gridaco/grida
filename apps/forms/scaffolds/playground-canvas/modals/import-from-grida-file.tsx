@@ -37,6 +37,7 @@ export function ImportFromGridaFileJsonDialog({
             root_id: parsed.document.root_id!,
             nodes: parsed.document.nodes!,
             properties: parsed.document.properties ?? {},
+            backgroundColor: parsed.document.backgroundColor,
           },
         } satisfies grida.io.DocumentFileModel;
         onImport?.(verified);

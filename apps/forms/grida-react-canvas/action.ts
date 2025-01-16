@@ -109,8 +109,8 @@ export interface __InternalResetAction {
 }
 
 export interface DocumentBackgroundAction {
-  type: "background";
-  background: grida.program.document.IDocumentBackground["background"];
+  type: "background-color";
+  backgroundColor: grida.program.document.IDocumentBackground["backgroundColor"];
 }
 
 export interface EditorSelectAction {
