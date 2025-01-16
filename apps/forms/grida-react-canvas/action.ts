@@ -28,6 +28,7 @@ export type EditorAction =
   | DocumentAction;
 
 export type DocumentAction =
+  | DocumentBackgroundAction
   | EditorSelectAction
   | EditorHoverAction
   | EditorBlurAction
@@ -105,6 +106,11 @@ export interface __InternalResetAction {
   type: "__internal/reset";
   key?: string;
   state: IDocumentEditorState;
+}
+
+export interface DocumentBackgroundAction {
+  type: "background";
+  background: grida.program.document.IDocumentBackground["background"];
 }
 
 export interface EditorSelectAction {

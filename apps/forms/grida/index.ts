@@ -236,6 +236,16 @@ export namespace grida.program.document {
   }
 
   /**
+   * background color of the document
+   */
+  export interface IDocumentBackground {
+    /**
+     * This property may not be handled, or fallback to white #FFFFFF depending on the rendering context.
+     */
+    background?: cg.RGBA8888 | null | undefined | "";
+  }
+
+  /**
    * contains all original template definition under this defined document in k:v pair
    */
   export interface IDocumentTemplatesRepository {
@@ -321,7 +331,8 @@ export namespace grida.program.document {
    */
   export interface IDocumentDefinition
     extends IDocumentNodesRepository,
-      IDocumentProperties {
+      IDocumentProperties,
+      IDocumentBackground {
     /**
      * root node id. must be defined in {@link IDocumentDefinition.nodes}
      */

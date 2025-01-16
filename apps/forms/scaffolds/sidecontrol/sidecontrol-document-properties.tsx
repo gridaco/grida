@@ -31,6 +31,21 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+function DocumentBackgroundPropertyLine() {
+  const { background, setBackground } = useDocument();
+
+  return (
+    <PropertyLine>
+      <RGBAColorControl
+        value={background ? background : undefined}
+        onValueChange={(color) => {
+          setBackground(color);
+        }}
+      />
+    </PropertyLine>
+  );
+}
+
 export function DocumentProperties({ className }: { className?: string }) {
   const {
     state: {
@@ -51,6 +66,15 @@ export function DocumentProperties({ className }: { className?: string }) {
 
   return (
     <div className={className}>
+      <SidebarSection>
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>Document</SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuSectionContent>
+          <DocumentBackgroundPropertyLine />
+        </SidebarMenuSectionContent>
+      </SidebarSection>
+      <hr />
       <SidebarSection className="border-b pb-4">
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>Properties</SidebarSectionHeaderLabel>

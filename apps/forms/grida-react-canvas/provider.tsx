@@ -1420,6 +1420,17 @@ export function useDocument() {
 
   const { order: _, ...nodeActions } = __useNodeActions(dispatch);
 
+  const background = state.document.background;
+  const setBackground = useCallback(
+    (background: grida.program.document.IDocumentBackground["background"]) => {
+      dispatch({
+        type: "background",
+        background,
+      });
+    },
+    [dispatch]
+  );
+
   const select = useCallback(
     (...selectors: grida.program.document.Selector[]) =>
       dispatch({
@@ -1855,6 +1866,9 @@ export function useDocument() {
       selection,
       transform,
       //
+      background,
+      setBackground,
+      //
       select,
       blur,
       undo,
@@ -1897,6 +1911,9 @@ export function useDocument() {
     state,
     selection,
     transform,
+    //
+    background,
+    setBackground,
     //
     select,
     blur,

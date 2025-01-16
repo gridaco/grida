@@ -35,6 +35,11 @@ export default function reducer<S extends IDocumentEditorState>(
         draft.transform = prev_state.transform;
       }) as S;
     }
+    case "background": {
+      return produce(state, (draft: Draft<S>) => {
+        draft.document.background = action.background;
+      });
+    }
     case "transform": {
       return produce(state, (draft: Draft<S>) => {
         draft.transform = action.transform;

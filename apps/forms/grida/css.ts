@@ -168,7 +168,9 @@ export namespace css {
    *
    */
   export function rgbaToHex(color: grida.program.cg.RGBA8888): string {
-    return `${color.r.toString(16).padStart(2, "0")}${color.g.toString(16).padStart(2, "0")}${color.b.toString(16).padStart(2, "0")}`;
+    const a = Math.round(color.a * 255);
+
+    return `${color.r.toString(16).padStart(2, "0")}${color.g.toString(16).padStart(2, "0")}${color.b.toString(16).padStart(2, "0")}${a.toString(16).padStart(2, "0")}`;
   }
 
   /**
