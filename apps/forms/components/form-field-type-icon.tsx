@@ -27,6 +27,7 @@ import {
   ClockIcon,
   PhoneIcon,
   BracesIcon,
+  PenToolIcon,
 } from "lucide-react";
 
 export function FormFieldTypeIcon({
@@ -99,6 +100,8 @@ export function FormFieldTypeIcon({
       return <GlobeIcon {...props} />;
     case "json":
       return <BracesIcon {...props} />;
+    case "canvas":
+      return <PenToolIcon {...props} />;
     default:
       return <TextIcon {...props} />;
   }

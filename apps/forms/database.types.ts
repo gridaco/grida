@@ -1627,6 +1627,7 @@ export type Database = {
         | "audio"
         | "video"
         | "json"
+        | "canvas"
       form_method: "post" | "get" | "dialog"
       form_response_unknown_field_handling_strategy_type:
         | "ignore"

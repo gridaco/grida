@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   SlashIcon,
   BoxIcon,
@@ -8,7 +8,6 @@ import {
   HandIcon,
   FrameIcon,
   ImageIcon,
-  MixIcon,
   TextIcon,
   CaretDownIcon,
 } from "@radix-ui/react-icons";
@@ -20,8 +19,76 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ToolbarToolType } from "@/grida-react-canvas/toolbar";
-import { ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+  cursormode_to_toolbar_value,
+  toolbar_value_to_cursormode,
+  ToolbarToolType,
+} from "@/grida-react-canvas/toolbar";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useEventTarget } from "@/grida-react-canvas/provider";
+
+export default function Toolbar() {
+  const { setCursorMode, cursor_mode } = useEventTarget();
+  const value = cursormode_to_toolbar_value(cursor_mode);
+
+  return (
+    <div className="rounded-full flex gap-4 border bg-background shadow px-4 py-2 pointer-events-auto">
+      <ToggleGroup
+        onValueChange={(v) => {
+          setCursorMode(
+            v
+              ? toolbar_value_to_cursormode(v as ToolbarToolType)
+              : { type: "cursor" }
+          );
+        }}
+        value={value}
+        defaultValue="cursor"
+        type="single"
+      >
+        <ToolsGroup
+          value={value}
+          options={[
+            { value: "cursor", label: "Cursor", shortcut: "V" },
+            { value: "hand", label: "Hand tool", shortcut: "H" },
+          ]}
+          onValueChange={(v) => {
+            setCursorMode(toolbar_value_to_cursormode(v as ToolbarToolType));
+          }}
+        />
+        <VerticalDivider />
+        <ToggleGroupItem value={"container" satisfies ToolbarToolType}>
+          <ToolIcon type="container" />
+        </ToggleGroupItem>
+        <ToggleGroupItem value={"text" satisfies ToolbarToolType}>
+          <ToolIcon type="text" />
+        </ToggleGroupItem>
+        <ToolsGroup
+          value={value}
+          options={[
+            { value: "rectangle", label: "Rectangle", shortcut: "R" },
+            { value: "ellipse", label: "Ellipse", shortcut: "O" },
+            { value: "line", label: "Line", shortcut: "L" },
+            { value: "image", label: "Image" },
+          ]}
+          onValueChange={(v) => {
+            setCursorMode(toolbar_value_to_cursormode(v as ToolbarToolType));
+          }}
+        />
+        <ToolsGroup
+          value={value}
+          options={[
+            { value: "pencil", label: "Pencil tool", shortcut: "⇧+P" },
+            { value: "path", label: "Path tool", shortcut: "P" },
+          ]}
+          onValueChange={(v) => {
+            setCursorMode(toolbar_value_to_cursormode(v as ToolbarToolType));
+          }}
+        />
+      </ToggleGroup>
+    </div>
+  );
+}
+const VerticalDivider = () => <div className="w-1 h-4 border-r" />;
 
 export function ToolsGroup({
   value,

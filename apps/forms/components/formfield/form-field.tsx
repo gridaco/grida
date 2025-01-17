@@ -56,6 +56,7 @@ import { FieldProperties } from "@/k/supported_field_types";
 import "core-js/features/map/group-by";
 import { tokens } from "@grida/tokens";
 import { useValue } from "@/lib/spock";
+import { GridaCanvasFormField } from "./grida-canvas";
 
 /**
  * this disables the auto zoom in input text tag safari on iphone by setting font-size to 16px
@@ -530,6 +531,9 @@ function MonoFormField({
             {...(sharedInputProps as React.ComponentProps<"input">)}
           />
         );
+      }
+      case "canvas": {
+        return <GridaCanvasFormField />;
       }
       case "search": {
         if (preview) {
