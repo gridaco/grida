@@ -18,7 +18,7 @@ import {
   zoomToFit,
 } from "../math";
 import q from "@design-sdk/query";
-import { LazyFrame } from "@code-editor/canvas/lazy-frame";
+import { LazyFrame } from "../lazy-frame";
 import { DisplayNodeMeta, HudCustomRenderers, HudSurface } from "../hud";
 import type { Box, XY, CanvasTransform, XYWH, XYWHR, X1Y1X2Y2 } from "../types";
 import type { FrameOptimizationFactors } from "../frame";
@@ -261,9 +261,8 @@ export function Canvas<T extends TCanvasNode>({
   }, [...focus, focusRefreshKey, viewboundmeasured]);
 
   const [cursor, setCursor] = useState<Cursor>(_cursor);
-  const [transformIntitialized, setTransformInitialized] = useState(
-    !!initialTransform
-  );
+  const [transformIntitialized, setTransformInitialized] =
+    useState(!!initialTransform);
   const [zoom, setZoom] = useState(initialTransform?.scale || 1);
   const [isZooming, setIsZooming] = useState(false);
   const [offset, setOffset] = useState<[number, number]>(
@@ -300,8 +299,9 @@ export function Canvas<T extends TCanvasNode>({
     ? ({ node: node(highlightedLayer), reason: "external" } as HovringNode)
     : null;
 
-  const [hoveringLayer, setHoveringLayer] =
-    useState<HovringNode | null>(wshighlight);
+  const [hoveringLayer, setHoveringLayer] = useState<HovringNode | null>(
+    wshighlight
+  );
 
   useEffect(() => {
     setHoveringLayer(wshighlight);

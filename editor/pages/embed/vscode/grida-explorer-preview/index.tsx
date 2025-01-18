@@ -124,7 +124,7 @@ function PreviewState({
         margin={0}
         borderRadius={0}
         origin_size={size}
-        type="scaling"
+        type="responsive"
       />
     </>
   );
