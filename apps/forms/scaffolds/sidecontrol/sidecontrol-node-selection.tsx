@@ -68,7 +68,26 @@ import { Toggle } from "@/components/ui/toggle";
 import { AlignControl as _AlignControl } from "./controls/ext-align";
 import { Button } from "@/components/ui/button";
 import { ZoomControl } from "./controls/ext-zoom";
-import { SchemaProvider } from "./schema";
+import { SchemaProvider, useSchema } from "./schema";
+import { BoltIcon } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { PropertyAccessExpressionControl } from "./controls/props-property-access-expression";
 
 export function Align() {
   const { selection, align, distributeEvenly } = useDocument();
@@ -678,11 +697,17 @@ function SelectedNodeProperties() {
         <SidebarSection className="border-b pb-4">
           <SidebarMenuSectionContent className="space-y-2">
             <PropertyLine className="items-center gap-1">
-              <Checkbox
-                checked={active}
-                onCheckedChange={actions.active}
-                className="me-1"
-              />
+              <ConfigurableProperty
+                propertyName="active"
+                propertyType="boolean"
+              >
+                <Checkbox
+                  className="me-1"
+                  checked={active}
+                  onCheckedChange={actions.active}
+                />
+              </ConfigurableProperty>
+
               <NameControl value={name} onValueChange={actions.name} />
               <Toggle
                 variant="outline"
@@ -1129,5 +1154,53 @@ function SelectionColors() {
         ))}
       </SidebarMenuSectionContent>
     </SidebarSection>
+  );
+}
+
+function ConfigurableProperty({
+  propertyName,
+  propertyType,
+  children,
+}: React.PropsWithChildren<{
+  propertyName?: string;
+  propertyType?: grida.program.schema.PropertyDefinitionType;
+}>) {
+  const schema = useSchema();
+
+  const [open, setOpen] = React.useState(false);
+  return (
+    <DropdownMenu open={open} onOpenChange={setOpen} modal>
+      <Tooltip delayDuration={50}>
+        <DropdownMenuTrigger
+          onContextMenu={(e) => {
+            e.preventDefault();
+            setOpen(true);
+          }}
+          asChild
+        >
+          <TooltipTrigger asChild>{children}</TooltipTrigger>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <DropdownMenuItem>Configure</DropdownMenuItem>
+          {schema && (
+            <PropertyAccessExpressionControl
+              schema={schema}
+              propertyType={propertyType}
+            />
+          )}
+        </DropdownMenuContent>
+        <TooltipContent>
+          <div className="flex items-center gap-1">
+            <span>{propertyName}</span>
+            <BoltIcon
+              onClick={() => {
+                setOpen(true);
+              }}
+              className="w-3 h-3"
+            />
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    </DropdownMenu>
   );
 }

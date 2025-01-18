@@ -21,7 +21,7 @@ import { tokens } from "@grida/tokens";
 import { Badge } from "@/components/ui/badge";
 import PropertyAccessDropdownMenu from "./context/variable";
 import PropertyTypeIcon from "@/components/property-type-icon";
-import { StringValuePropsPropertyAccessExpressionControl } from "./string-value-props-property-access-expression";
+import { PropertyAccessExpressionControl } from "./props-property-access-expression";
 import { useSchema } from "../schema";
 
 export function StringValueControl({
@@ -77,11 +77,13 @@ export function StringValueControl({
               </DropdownMenuSubTrigger>
               <DropdownMenuPortal>
                 <DropdownMenuSubContent>
-                  <StringValuePropsPropertyAccessExpressionControl
-                    value={value}
-                    onValueChange={onValueChange}
-                    schema={schema}
-                  />
+                  {tokens.is.propertyAccessExpression(value) && (
+                    <PropertyAccessExpressionControl
+                      value={value}
+                      onValueChange={onValueChange}
+                      schema={schema}
+                    />
+                  )}
                 </DropdownMenuSubContent>
               </DropdownMenuPortal>
             </DropdownMenuSub>
@@ -196,9 +198,9 @@ function Control({
   disabled?: boolean;
 }) {
   if (tokens.is.templateExpression(value)) {
-    return <TemplateExpressionControl value={value} />;
+    return <TemplateExpressionValue value={value} />;
   } else if (tokens.is.propertyAccessExpression(value)) {
-    return <PropertyAccessExpressionControl value={value} />;
+    return <PropertyAccessExpressionValue value={value} />;
   }
 
   return (
@@ -238,7 +240,7 @@ function StringLiteralControl({
   );
 }
 
-function PropertyAccessExpressionControl({
+function PropertyAccessExpressionValue({
   value,
 }: {
   value: tokens.PropertyAccessExpression;
@@ -255,7 +257,7 @@ function PropertyAccessExpressionControl({
   );
 }
 
-function TemplateExpressionControl({
+function TemplateExpressionValue({
   value,
 }: {
   value: tokens.TemplateExpression;

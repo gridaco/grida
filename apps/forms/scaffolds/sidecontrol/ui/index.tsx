@@ -96,6 +96,7 @@ type EnumItem<T extends string> =
       icon?: React.ReactNode;
       label?: string;
       value: T;
+      disabled?: boolean;
     };
 
 export function PropertyEnum<T extends string>({
@@ -121,8 +122,9 @@ export function PropertyEnum<T extends string>({
           const value = typeof e === "string" ? e : e.value;
           const label = typeof e === "string" ? e : e.label;
           const icon = typeof e === "string" ? undefined : e.icon;
+          const disabled = typeof e === "string" ? false : e.disabled;
           return (
-            <SelectItem key={value} value={value}>
+            <SelectItem key={value} value={value} disabled={disabled}>
               {hasIcon && icon && <div className="me-2">{icon}</div>}
               {label ?? value}
             </SelectItem>

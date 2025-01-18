@@ -205,10 +205,7 @@ function PropertyDefinitionBlock({
         </SidebarSectionHeaderItem>
       </CollapsibleTrigger>
       <CollapsibleContent className="space-y-2">
-        <SidebarSection
-          hidden={type !== "string"}
-          className="border-b pb-4 space-y-2"
-        >
+        <SidebarSection className="border-b pb-4 space-y-2">
           <PropertyLine>
             <PropertyLineLabel>Type *</PropertyLineLabel>
             <PropertyEnum

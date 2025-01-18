@@ -2,13 +2,11 @@
 import React from "react";
 import { grida } from "@/grida";
 
-const SchemaContext = React.createContext<
-  | {
-      properties: grida.program.schema.Properties;
-    }
-  | null
-  | undefined
->(null);
+type Schema = {
+  properties: grida.program.schema.Properties;
+};
+
+const SchemaContext = React.createContext<Schema | null | undefined>(null);
 
 export function SchemaProvider({
   schema,
@@ -23,7 +21,7 @@ export function SchemaProvider({
   );
 }
 
-export function useSchema() {
+export function useSchema(): Schema | undefined {
   const schema = React.useContext(SchemaContext);
   if (schema === null) {
     throw new Error("useSchema must be used within SchemaProvider");

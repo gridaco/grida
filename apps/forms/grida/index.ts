@@ -63,6 +63,8 @@ export namespace grida {
 
       export type Props = { [name: string]: Value };
 
+      export type PropertyDefinitionType = PropertyDefinition["type"];
+
       export type PropertyDefinition =
         | TypeScalarPropertyDefinition
         | TypeArrayPropertyDefinition<any[]>
