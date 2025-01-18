@@ -3,11 +3,17 @@ import React, { useRef, useEffect } from "react";
 interface PixelGridProps {
   cellSize?: number;
   zoomLevel?: number;
+  isEnabled?: boolean;
+  transform?: { translateX: number; translateY: number; scale: number };
+  backgroundIsDark?: boolean;
 }
 
 const PixelGrid: React.FC<PixelGridProps> = ({
-  cellSize = 1,
+  cellSize = 10,
   zoomLevel = 1,
+  isEnabled = true,
+  transform = { translateX: 0, translateY: 0, scale: 1 },
+  backgroundIsDark = false,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -15,7 +21,7 @@ const PixelGrid: React.FC<PixelGridProps> = ({
   useEffect(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
-    if (!canvas || !container) return;
+    if (!canvas || !container || !isEnabled || zoomLevel < 4) return; // Grid is rendered only if enabled and zoomLevel >= 4
 
     // Match canvas size to container size
     const width = container.offsetWidth;
@@ -32,11 +38,17 @@ const PixelGrid: React.FC<PixelGridProps> = ({
     if (!ctx) return;
     ctx.scale(dpr, dpr);
 
-    // Draw square cells by using the same step in both x and y
-    const step = cellSize * zoomLevel;
+    const step = cellSize * zoomLevel * transform.scale;
+
     ctx.clearRect(0, 0, width, height);
-    ctx.strokeStyle = "rgba(0, 0, 0, 0.025)";
+
+    // Set stroke style for grid lines with dynamic contrast
+    ctx.strokeStyle = backgroundIsDark ? "rgba(255, 255, 255, 0.1)" : "#ccc";
     ctx.lineWidth = 1;
+
+    // Translate the grid based on the transformation
+    ctx.save();
+    ctx.translate(transform.translateX % step, transform.translateY % step);
 
     for (let x = 0; x <= width; x += step) {
       ctx.beginPath();
@@ -51,7 +63,9 @@ const PixelGrid: React.FC<PixelGridProps> = ({
       ctx.lineTo(width, y);
       ctx.stroke();
     }
-  }, [cellSize, zoomLevel]);
+
+    ctx.restore();
+  }, [cellSize, zoomLevel, isEnabled, transform, backgroundIsDark]);
 
   return (
     <div
@@ -60,6 +74,7 @@ const PixelGrid: React.FC<PixelGridProps> = ({
         width: "100%",
         height: "100%",
         position: "relative",
+        background: backgroundIsDark ? "#333" : "#fff", // Optional: Set a default background for better contrast
       }}
     >
       <canvas ref={canvasRef} />

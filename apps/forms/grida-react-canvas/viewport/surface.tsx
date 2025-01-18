@@ -281,11 +281,11 @@ export function EditorSurface() {
         cursor: cursor,
       }}
     >
-      {/* <div className="absolute w-full h-full z-50">
-        {transform[0][0] > 4 && (
-          <PixelGrid zoomLevel={transform[0][0]} cellSize={1} />
+      <div className="absolute w-full h-full z-50">
+        {transform[0][0] > 3.5 && (
+          <PixelGrid zoomLevel={transform[0][0]} cellSize={2} />
         )}
-      </div> */}
+      </div>
       <div
         style={{
           position: "absolute",
