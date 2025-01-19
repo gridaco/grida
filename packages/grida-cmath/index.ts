@@ -350,6 +350,34 @@ export namespace cmath.vector2 {
   }
 
   /**
+   * Calculates the Euclidean distance between two 2D vectors.
+   *
+   * The Euclidean distance is the straight-line distance between two points in a 2D space.
+   * It is computed using the formula:
+   * \[
+   * d = \sqrt{(x_2 - x_1)^2 + (y_2 - y_1)^2}
+   * \]
+   *
+   * @param a - The first 2D vector `[x1, y1]`.
+   * @param b - The second 2D vector `[x2, y2]`.
+   * @returns The Euclidean distance as a number.
+   *
+   * @example
+   * // Distance between two points
+   * const a: cmath.Vector2 = [3, 4];
+   * const b: cmath.Vector2 = [6, 8];
+   * const dist = cmath.vector2.distance(a, b);
+   * console.log(dist); // Outputs: 5
+   *
+   * @remarks
+   * - Uses `Math.hypot` for precision and efficiency.
+   * - The distance is always a non-negative scalar value.
+   */
+  export function distance(a: Vector2, b: Vector2): number {
+    return Math.hypot(b[0] - a[0], b[1] - a[1]);
+  }
+
+  /**
    * Applies a 2D transformation matrix to a vector.
    *
    * This function takes a 2D vector `[x, y]` and applies an affine transformation
@@ -1401,35 +1429,24 @@ export namespace cmath.snap {
    * @param targets - An array of existing scalar values to snap to.
    * @param threshold - The maximum allowed distance for snapping. Must be non-negative.
    *
-   * @returns A tuple `[value, distance, indicies]`:
-   * - `value`: The closest scalar value from the targets within the threshold, or the original scalar if no snapping occurs.
-   * - `distance`: The signed distance between the input scalar and the snapped target. Returns `Infinity` if no target is within the threshold.
-   * - `indicies`: An array of indices of the targets that are within the threshold.
+   * @returns `[value, distance, indices]` where:
+   * - `value`: is the nearest scalar (if within threshold) or the original `point` (if not).
+   * - `distance`: is the signed distance `point - value` to that nearest scalar.
+   * - `indices` are all target indices whose distance matches the minimum distance exactly.
+   *
+   * @throws If `threshold` is negative or if `targets` is empty.
    *
    * @example
-   * // Snap to the nearest value within a threshold
-   * const [snapped, distance, indicies] = cmath.snap.scalar(15, [10, 20, 25], 6);
-   * console.log(snapped); // 10
-   * console.log(distance); // 5
-   * console.log(indicies); // [0]
+   * ```ts
+   * // Suppose we have targets [10, 20, 20, 40], and point=22 with threshold=5.
+   * // The minimal distance is 2 (to '20'), and note there are two '20's.
+   * // So the function returns value=20, distance=2 (signed=22 - 20), indices=[1,2].
    *
-   * // No snapping occurs as no target is within the threshold
-   * const [snapped, distance, indicies] = cmath.snap.scalar(15, [1, 2, 3], 5);
-   * console.log(snapped); // 15
-   * console.log(distance); // Infinity
-   * console.log(indicies); // []
-   *
-   * // Snap to an exact match if it exists in the targets
-   * const [snapped, distance, indicies] = cmath.snap.scalar(15, [10, 15, 20], 5);
-   * console.log(snapped); // 15
-   * console.log(distance); // 0
-   * console.log(indicies); // [1]
-   *
-   * @remarks
-   * - The `distance` value is signed, indicating the direction of the difference between the input scalar and the snapped value.
-   * - If `targets` is empty, the function returns the original scalar and `Infinity` for the distance.
-   * - If `threshold` is 0, snapping will only occur for exact matches.
-   * - Negative threshold values are not allowed and will throw an error.
+   * const [value, dist, indices] = cmath.snap.scalar(22, [10, 20, 20, 40], 5);
+   * console.log(value);   // 20
+   * console.log(dist);    // 2
+   * console.log(indices); // [1, 2]
+   * ```
    */
   export function scalar(
     point: Scalar,
@@ -1437,32 +1454,113 @@ export namespace cmath.snap {
     threshold: number
   ): [value: Scalar, distance: number, indicies: number[]] {
     assert(threshold >= 0, "Threshold must be a non-negative number.");
-    if (targets.length === 0) return [point, Infinity, []];
+    assert(targets.length > 0, "At least one target is required.");
 
-    let nearest: cmath.Scalar | null = null;
-    let min_d = Infinity;
-    let signedDistance = 0;
-    const indicies: number[] = [];
+    // 1) Find the absolute minimum distance among all targets
+    let minAbsDistance = Infinity;
+    let bestSignedDistance = 0;
+    let bestValue: number | null = null;
 
-    let i = 0;
-    for (const target of targets) {
-      const distance = point - target; // Signed distance
-      const absDistance = Math.abs(distance); // Absolute distance for comparison
+    // We also gather all indices that match this minimum distance
+    const bestIndices: number[] = [];
 
-      if (absDistance <= threshold) {
-        indicies.push(i);
-        if (absDistance < min_d) {
-          min_d = absDistance;
-          nearest = target;
-          signedDistance = distance; // Keep the signed distance
-        }
+    for (let i = 0; i < targets.length; i++) {
+      const target = targets[i];
+      const signedDist = point - target;
+      const absDist = Math.abs(signedDist);
+
+      if (absDist < minAbsDistance) {
+        // Found a strictly closer target
+        minAbsDistance = absDist;
+        bestValue = target;
+        bestSignedDistance = signedDist;
+        bestIndices.length = 0; // clear out any previous indices
+        bestIndices.push(i);
+      } else if (absDist === minAbsDistance) {
+        // This target is equally close as the min
+        bestIndices.push(i);
       }
-      i++;
     }
 
-    return nearest !== null
-      ? [nearest, signedDistance, indicies]
-      : [point, Infinity, indicies];
+    // 2) Check threshold
+    // If the min distance is greater than threshold, do NOT snap
+    if (minAbsDistance > threshold) {
+      return [point, Infinity, []];
+    }
+
+    // 3) Return the snapped scalar + signed distance + all equally-close indices
+    return [bestValue!, bestSignedDistance, bestIndices];
+  }
+
+  /**
+   * Snaps a 2D vector to the nearest vector(s) from an array of targets if it is within a specified threshold.
+   *
+   * This function is useful for aligning 2D points (e.g., grid or object snapping),
+   * ensuring that snapping only occurs if the distance to the target is within a given threshold.
+   *
+   * @param point - The 2D vector `[x, y]` to snap.
+   * @param targets - An array of 2D vectors to which the point might snap.
+   * @param threshold - The maximum allowed Euclidean distance for snapping. Must be non-negative.
+   * @returns A tuple `[value, distance, indices]` where:
+   *   - `value`: The nearest target vector if within threshold, otherwise the original `point`.
+   *   - `distance`: The Euclidean distance `dist(point, value)` if snapping occurs; otherwise `Infinity`.
+   *   - `indices`: **All** target indices whose distance from `point` is exactly equal to the minimum distance (ties).
+   *
+   * @throws If `threshold` is negative or if `targets` is empty.
+   *
+   * @example
+   * // Suppose we have multiple points at the same nearest distance:
+   * //   targets = [[0, 0], [5, 5], [5, 5], [10, 10]]
+   * //   point = [6, 6], threshold = 3
+   * // The minimal distance (~1.414) is to both [5, 5] entries (indices 1 and 2).
+   * //
+   * // The function returns:
+   * //   value   = [5, 5]
+   * //   distance = ~1.414
+   * //   indices  = [1, 2]
+   *
+   * const [snappedVec, dist, tiedIndices] = cmath.snap.vector2([6, 6], [[0,0],[5,5],[5,5],[10,10]], 3);
+   * console.log(snappedVec);   // [5, 5]
+   * console.log(dist);         // ~1.41421356237
+   * console.log(tiedIndices);  // [1, 2]
+   */
+  export function vector2(
+    point: cmath.Vector2,
+    targets: cmath.Vector2[],
+    threshold: number
+  ): [value: cmath.Vector2, distance: number, indices: number[]] {
+    assert(threshold >= 0, "Threshold must be a non-negative number.");
+    assert(targets.length > 0, "At least one target is required.");
+
+    let minDistance = Infinity;
+    let bestValue: cmath.Vector2 | null = null;
+    const bestIndices: number[] = [];
+
+    // 1) Find absolute minimum distance among all targets
+    for (let i = 0; i < targets.length; i++) {
+      const target = targets[i];
+      const dist = cmath.vector2.distance(point, target);
+
+      if (dist < minDistance) {
+        // Found a strictly closer target
+        minDistance = dist;
+        bestValue = target;
+        bestIndices.length = 0; // Reset
+        bestIndices.push(i);
+      } else if (dist === minDistance) {
+        // This target ties for closest
+        bestIndices.push(i);
+      }
+    }
+
+    // 2) Check threshold
+    if (minDistance > threshold) {
+      // Return original point if no target is within threshold
+      return [point, Infinity, []];
+    }
+
+    // 3) Return the snapped vector, distance, and all equally-close indices
+    return [bestValue!, minDistance, bestIndices];
   }
 }
 
