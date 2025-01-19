@@ -707,10 +707,12 @@ export function useEditorHotKeys() {
   });
 
   useHotkeys("0, 1, 2, 3, 4, 5, 6, 7, 8, 9", (e) => {
-    const i = parseInt(e.key);
-    const o = i / 10;
-    setOpacity("selection", o);
-    toast.success(`opacity: ${o}`);
+    if (selection.length) {
+      const i = parseInt(e.key);
+      const o = i / 10;
+      setOpacity("selection", o);
+      toast.success(`opacity: ${o}`);
+    }
   });
 
   useHotkeys("shift+0", (e) => {
