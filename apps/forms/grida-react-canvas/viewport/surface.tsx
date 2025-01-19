@@ -724,13 +724,39 @@ function DistributionOverlay() {
                   boundingRect.x,
               }}
             >
-              <RedDotHandle />
+              <DistributeTranslateArrangeRedDotHandle
+                node_id={item.id}
+                // TODO:
+                axis="x"
+              />
             </div>
           );
         })}
       </div>
     </>
   );
+}
+
+function DistributeTranslateArrangeRedDotHandle({
+  node_id,
+  axis,
+}: {
+  node_id: string;
+  axis: "x" | "y";
+}) {
+  const { selection } = useSurfaceSelectionGroup();
+  const { startTranslate1DArrangeGesture } = useEventTarget();
+  const bind = useSurfaceGesture({
+    onPointerDown: ({ event }) => {
+      event.preventDefault();
+    },
+    onDragStart: ({ event }) => {
+      event.preventDefault();
+      startTranslate1DArrangeGesture(selection, node_id, axis);
+    },
+  });
+
+  return <RedDotHandle {...bind()} />;
 }
 
 function DistributeButton() {

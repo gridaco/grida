@@ -1,7 +1,11 @@
 import { produce, type Draft } from "immer";
 
 import type { SurfaceAction } from "../action";
-import type { CursorModeType, IDocumentEditorState } from "../state";
+import type {
+  CursorModeType,
+  IDocumentEditorState,
+  LayoutSnapshot,
+} from "../state";
 import { document } from "../document-query";
 import { getInitialCurveGesture } from "./tools/gesture";
 import assert from "assert";
@@ -185,12 +189,47 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
           });
           //
         }
+        case "translate-1d-arrange": {
+          const { layout, selection, axis } = gesture;
+          return produce(state, (draft) => {
+            draft.gesture = {
+              type: "translate-1d-arrange",
+              selection: selection,
+              axis: axis,
+              layout: createLayoutSnapshot(state, layout),
+              movement: cmath.vector2.zero,
+            };
+          });
+        }
       }
     }
     // #endregion
   }
   //
   return state;
+}
+
+function createLayoutSnapshot(
+  state: IDocumentEditorState,
+  group: string[]
+): LayoutSnapshot {
+  const cdom = new domapi.CanvasDOM(state.transform);
+
+  const nodes = group.map((node_id) => {
+    const rect = cdom.getNodeBoundingRect(node_id)!;
+
+    return {
+      id: node_id,
+      rect,
+    };
+  });
+
+  const boundingRect = cmath.rect.union(nodes.map((it) => it.rect));
+
+  return {
+    nodes,
+    boundingRect,
+  };
 }
 
 function self_start_gesture_scale(

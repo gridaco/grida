@@ -2361,6 +2361,21 @@ export function useEventTarget() {
     [dispatch]
   );
 
+  const startTranslate1DArrangeGesture = useCallback(
+    (layout: string[], selection: string, axis: "x" | "y") => {
+      dispatch({
+        type: "surface/gesture/start",
+        gesture: {
+          type: "translate-1d-arrange",
+          layout: layout,
+          selection: selection,
+          axis: axis,
+        },
+      });
+    },
+    [dispatch]
+  );
+
   // #region drag resize handle
   const startCornerRadiusGesture = useCallback(
     (selection: string) => {
@@ -2411,6 +2426,7 @@ export function useEventTarget() {
       content_edit_mode,
       //
       startScaleGesture,
+      startTranslate1DArrangeGesture,
       startCornerRadiusGesture,
       startRotateGesture,
       //
@@ -2454,6 +2470,7 @@ export function useEventTarget() {
     content_edit_mode,
     //
     startScaleGesture,
+    startTranslate1DArrangeGesture,
     startCornerRadiusGesture,
     startRotateGesture,
     //

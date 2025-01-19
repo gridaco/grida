@@ -63,6 +63,9 @@ export function self_update_gesture_transform<S extends IDocumentEditorState>(
     case "translate": {
       return __self_update_gesture_transform_translate(draft);
     }
+    case "translate-1d-arrange": {
+      return __self_update_gesture_transform_translate_1d_arrange(draft);
+    }
     case "scale": {
       return __self_update_gesture_transform_scale(draft);
     }
@@ -334,6 +337,21 @@ function __self_update_gesture_transform_translate(
     // this can happen since using unsafe domapi.
     reportError(e);
   }
+}
+
+function __self_update_gesture_transform_translate_1d_arrange(
+  draft: Draft<IDocumentEditorState>
+) {
+  assert(
+    draft.gesture.type === "translate-1d-arrange",
+    "Gesture type must be translate-1d-arrange"
+  );
+
+  const { movement } = draft.gesture;
+
+  // draft.document.nodes[draft.gesture.selection].left += delta[0];
+
+  //
 }
 
 function __self_update_gesture_transform_scale(

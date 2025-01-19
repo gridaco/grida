@@ -145,6 +145,7 @@ export type GestureState =
   | GesturePan
   | GestureVirtualNudge
   | GestureTranslate
+  | GestureTranslate1DArrange
   | GestureScale
   | GestureRotate
   | GestureCornerRadius
@@ -210,6 +211,32 @@ export type GestureTranslate = IGesture & {
    * surface snap guides - result of snap while translate (move) gesture
    */
   surface_snapping?: SnapResult;
+};
+
+/**
+ * Sanpshot used for arrangement.
+ *
+ * Contains collection of nodes' bounding rect.
+ */
+export interface LayoutSnapshot {
+  nodes: {
+    id: string;
+    rect: cmath.Rectangle;
+  }[];
+  boundingRect: cmath.Rectangle;
+}
+
+/**
+ * Translate withing 1D axis, within the valid selection
+ */
+export type GestureTranslate1DArrange = IGesture & {
+  type: "translate-1d-arrange";
+  axis: "x" | "y";
+  /**
+   * selection of the moving nodes (this is different from the document's selection)
+   */
+  selection: string;
+  layout: LayoutSnapshot;
 };
 
 export type GestureScale = IGesture & {

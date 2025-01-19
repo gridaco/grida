@@ -692,6 +692,10 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               self_update_gesture_transform(draft);
               break;
             }
+            case "translate-1d-arrange": {
+              self_update_gesture_transform(draft);
+              break;
+            }
             case "rotate": {
               self_update_gesture_transform(draft);
               break;
