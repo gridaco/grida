@@ -9,6 +9,7 @@ import {
 } from "react";
 import { ViewportSurfaceContext } from "../context";
 import { cmath } from "@grida/cmath";
+import { SelectionItem, SurfaceSelectionGroup } from "../core";
 
 function useViewportSurfacePortal() {
   const context = useContext(ViewportSurfaceContext);
@@ -175,9 +176,10 @@ function shallowEqual(arr1: string[], arr2: string[]): boolean {
  *
  * Uses MutationObserver to observe position changes - expensive
  */
-export function useGroupSurfaceTransform(...node_ids: string[]) {
+export function useGroupSurfaceTransform(
+  ...node_ids: string[]
+): SurfaceSelectionGroup {
   const { transform } = useEventTarget();
-  const __rect_fallback = useMemo(() => new DOMRect(0, 0, 0, 0), []);
   const portal = useViewportSurfacePortal();
 
   // Use stable node IDs to avoid unnecessary re-renders
@@ -185,18 +187,19 @@ export function useGroupSurfaceTransform(...node_ids: string[]) {
 
   const node_elements = useNodeDomElements(stableNodeIds);
 
-  const [rect, setRect] = useState<cmath.Rectangle>();
-  const [size, setSize] = useState<cmath.Vector2>([0, 0]);
-  const [style, setStyle] = useState({
-    top: 0,
-    left: 0,
-    transform: "",
-    width: 0,
-    height: 0,
+  const [data, setData] = useState<SurfaceSelectionGroup>({
+    selection: [],
+    size: [0, 0],
+    boundingRect: { x: 0, y: 0, width: 0, height: 0 },
+    style: { top: 0, left: 0, transform: "", width: 0, height: 0 },
+    items: [],
   });
 
   useEffect(() => {
     if (!portal || !node_elements?.length) return;
+
+    // Rotation is ignored for groups
+    const rotation = 0;
 
     const scale = cmath.transform.getScale(transform);
 
@@ -204,19 +207,21 @@ export function useGroupSurfaceTransform(...node_ids: string[]) {
       const portal_rect = portal.getBoundingClientRect();
 
       // Collect bounding rectangles for all node elements
-      const node_rects = node_elements.map(
-        (el) => el?.getBoundingClientRect() ?? __rect_fallback
-      );
+      const items: SelectionItem[] = node_elements.map((el) => {
+        const cr = el.getBoundingClientRect();
+        return {
+          id: el.id,
+          boundingRect: {
+            x: cr.x,
+            y: cr.y,
+            width: cr.width,
+            height: cr.height,
+          },
+        };
+      });
 
       // Calculate the bounding rectangle that encloses all node elements
-      const boundingRect = cmath.rect.union(
-        node_rects.map((rect) => ({
-          x: rect.left,
-          y: rect.top,
-          width: rect.width,
-          height: rect.height,
-        }))
-      );
+      const boundingRect = cmath.rect.union(items.map((it) => it.boundingRect));
 
       // Center of the bounding rect relative to the portal
       const centerX =
@@ -224,27 +229,21 @@ export function useGroupSurfaceTransform(...node_ids: string[]) {
       const centerY =
         boundingRect.y + boundingRect.height / 2 - portal_rect.top;
 
-      setRect({
-        x: boundingRect.x,
-        y: boundingRect.y,
-        width: boundingRect.width,
-        height: boundingRect.height,
-      });
-
-      setSize([
-        boundingRect.width * (1 / scale[0]),
-        boundingRect.height * (1 / scale[1]),
-      ]);
-
-      // Rotation is ignored for groups
-      const rotation = 0;
-
-      setStyle({
-        top: centerY,
-        left: centerX,
-        transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
-        width: boundingRect.width,
-        height: boundingRect.height,
+      setData({
+        selection: stableNodeIds,
+        boundingRect: boundingRect,
+        size: [
+          boundingRect.width * (1 / scale[0]),
+          boundingRect.height * (1 / scale[1]),
+        ],
+        style: {
+          top: centerY,
+          left: centerX,
+          transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
+          width: boundingRect.width,
+          height: boundingRect.height,
+        },
+        items,
       });
     };
 
@@ -276,10 +275,9 @@ export function useGroupSurfaceTransform(...node_ids: string[]) {
     stableNodeIds,
     node_elements,
     portal,
-    __rect_fallback,
     // recompute when viewport changes
     transform,
   ]);
 
-  return { style, rect, size };
+  return data;
 }

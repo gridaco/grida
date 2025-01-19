@@ -32,6 +32,12 @@ import { SizeMeterLabel } from "./ui/meter";
 import { SurfaceGradientEditor } from "./ui/gradient-editor";
 import { pointToSurfaceSpace } from "../utils/transform";
 import PixelGrid from "./pixelgrid";
+import { RedDotHandle } from "./ui/reddot";
+import {
+  SurfaceSelectionGroup,
+  SurfaceSelectionGroupProvider,
+  useSurfaceSelectionGroup,
+} from "./core";
 
 const DRAG_THRESHOLD = 2;
 
@@ -393,7 +399,7 @@ function MultipleSelectionOverlay({
   readonly?: boolean;
 }) {
   const { multipleSelectionOverlayClick, cursor_mode } = useEventTarget();
-  const { style, rect, size } = useGroupSurfaceTransform(...selection);
+  const selectiondata = useGroupSurfaceTransform(...selection);
 
   const enabled = !readonly && cursor_mode.type === "cursor";
 
@@ -422,8 +428,10 @@ function MultipleSelectionOverlay({
     }
   );
 
+  const { style, boundingRect, size } = selectiondata;
+
   return (
-    <>
+    <SurfaceSelectionGroupProvider value={selectiondata}>
       <LayerOverlay
         {...bind()}
         readonly={readonly}
@@ -439,12 +447,12 @@ function MultipleSelectionOverlay({
         <LayerOverlayResizeHandle anchor="sw" selection={selection} />
         <LayerOverlayResizeHandle anchor="se" selection={selection} />
         {/*  */}
-        <DistributeButton />
-        {rect && (
+        <DistributionOverlay />
+        {boundingRect && (
           <SizeMeterLabel
             margin={6}
             size={size}
-            rect={{ ...rect, x: 0, y: 0 }}
+            rect={{ ...boundingRect, x: 0, y: 0 }}
             className="bg-workbench-accent-sky"
           />
         )}
@@ -455,7 +463,7 @@ function MultipleSelectionOverlay({
           <NodeOverlay key={node_id} node_id={node_id} readonly zIndex={1} />
         ))
       }
-    </>
+    </SurfaceSelectionGroupProvider>
   );
 }
 
@@ -692,6 +700,37 @@ function usePrefferedDistributionAxis() {
   }, [selection, state.document.nodes, transform]);
 
   return axis;
+}
+
+function DistributionOverlay() {
+  const { items, boundingRect } = useSurfaceSelectionGroup();
+  return (
+    <>
+      <DistributeButton />
+      <div>
+        {items.map((item) => {
+          return (
+            <div
+              key={item.id}
+              style={{
+                position: "absolute",
+                top:
+                  item.boundingRect.y +
+                  item.boundingRect.height / 2 -
+                  boundingRect.y,
+                left:
+                  item.boundingRect.x +
+                  item.boundingRect.width / 2 -
+                  boundingRect.x,
+              }}
+            >
+              <RedDotHandle />
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
 }
 
 function DistributeButton() {
