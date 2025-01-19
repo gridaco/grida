@@ -98,7 +98,6 @@ function Media() {
       <CarouselContent className="m-0">
         {media?.length > 0 &&
           media?.map((it, index) => {
-            console.log("it", it);
             return (
               <CarouselItem key={index} className="p-0">
                 <img

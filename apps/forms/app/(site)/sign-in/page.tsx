@@ -5,8 +5,12 @@ import abstract_photo from "../../../public/images/abstract-placeholder.jpg";
 import { GridaLogo } from "@/components/grida-logo";
 import { ContinueWithGoogleButton } from "@/scaffolds/auth/continue-with-google-button";
 import { Suspense } from "react";
+import { redirect } from "next/navigation";
 
 export default function SigninPage() {
+  if (process.env.NEXT_PUBLIC_GRIDA_USE_INSIDERS_AUTH === "1") {
+    return redirect("/insiders/auth/basic");
+  }
   return (
     <div className="min-h-screen flex flex-col">
       <div className="flex flex-col flex-1 bg-alternative">

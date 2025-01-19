@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { SidebarRoot } from "@/components/sidebar";
+import { SidebarRoot, SidebarSection } from "@/components/sidebar";
 import { useEditorState } from "../editor";
 import { SideControlDoctypeForm } from "./sidecontrol-doctype-form";
 import { SideControlDoctypeSite } from "./sidecontrol-doctype-site";
@@ -9,7 +9,7 @@ import { SrcUploaderProvider } from "./controls/src";
 import { FontFamilyListProvider } from "./controls/font-family";
 import { useDocumentAssetUpload } from "../asset";
 import { useGoogleFontsList } from "@/grida-fonts/react/hooks";
-import { SelectionControl } from "./sidecontrol-node-selection";
+import { Align, Selection, Zoom } from "./sidecontrol-node-selection";
 
 export function SideControl() {
   const fonts = useGoogleFontsList();
@@ -28,7 +28,16 @@ export function SideControl() {
           <div className="h-5" />
           {doctype === "v0_form" && <SideControlDoctypeForm />}
           {doctype === "v0_site" && <SideControlDoctypeSite />}
-          {doctype === "v0_canvas" && <SelectionControl />}
+          {doctype === "v0_canvas" && (
+            <>
+              <SidebarSection className="mb-4 px-2 flex justify-end">
+                <Zoom />
+              </SidebarSection>
+              <Align />
+              <hr />
+              <Selection />
+            </>
+          )}
         </SrcUploaderProvider>
       </FontFamilyListProvider>
     </SidebarRoot>

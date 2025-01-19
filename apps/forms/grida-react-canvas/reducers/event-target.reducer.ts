@@ -410,6 +410,14 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             }
             break;
           }
+          case "zoom": {
+            // marquee zoom
+            draft.marquee = {
+              a: state.pointer.position,
+              b: state.pointer.position,
+            };
+            break;
+          }
           case "hand": {
             draft.gesture = {
               type: "pan",
@@ -585,19 +593,54 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         action
       );
       return produce(state, (draft) => {
-        self_maybe_end_gesture_translate(draft);
-        // reset the cursor mode if cancelable by drag end
         switch (draft.cursor_mode.type) {
           case "draw":
             // keep if pencil mode
             if (draft.cursor_mode.tool === "pencil") break;
           case "path":
-            // keep
-            break;
           case "hand":
             // keep
             break;
-          case "cursor":
+          case "zoom": {
+            if (state.marquee) {
+              // update zoom
+              const _vrect = domapi.get_viewport_rect();
+              const vrect = {
+                x: 0,
+                y: 0,
+                width: _vrect.width,
+                height: _vrect.height,
+              };
+              const mrect = cmath.rect.fromPoints([
+                state.marquee.a,
+                state.marquee.b,
+              ]);
+              const t = cmath.ext.viewport.transformToFit(vrect, mrect);
+              draft.transform = t;
+            }
+
+            // cancel to default
+            draft.cursor_mode = { type: "cursor" };
+            break;
+          }
+          case "cursor": {
+            if (node_ids_from_area) {
+              const target_node_ids = getMarqueeSelection(
+                state,
+                node_ids_from_area
+              );
+
+              self_selectNode(
+                draft,
+                shiftKey ? "toggle" : "reset",
+                ...target_node_ids
+              );
+            }
+
+            // cancel to default
+            draft.cursor_mode = { type: "cursor" };
+            break;
+          }
           case "insert":
           default:
             // cancel to default
@@ -605,20 +648,9 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             break;
         }
 
+        self_maybe_end_gesture_translate(draft);
         draft.gesture = { type: "idle" };
         draft.marquee = undefined;
-        if (node_ids_from_area) {
-          const target_node_ids = getMarqueeSelection(
-            state,
-            node_ids_from_area
-          );
-
-          self_selectNode(
-            draft,
-            shiftKey ? "toggle" : "reset",
-            ...target_node_ids
-          );
-        }
       });
     }
     case "event-target/event/on-drag": {

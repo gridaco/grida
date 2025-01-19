@@ -6,6 +6,7 @@ import FormStartPage002 from "@/theme/templates/formstart/002/page";
 import FormStartPage003 from "@/theme/templates/formstart/003/page";
 import FormStartPage004 from "@/theme/templates/formstart/004/page";
 import FormStartPage005 from "@/theme/templates/formstart/005/page";
+import FormStartPage005_RES from "@/theme/templates/formstart/005/messages.json";
 import FormStartPage006 from "@/theme/templates/formstart/006/page";
 import { CampaignMeta } from "@/types";
 import React, { useMemo } from "react";
@@ -19,6 +20,7 @@ export namespace FormStartPage {
   type ClientTemplateDefinition =
     grida.program.document.template.TemplateDocumentDefinition & {
       component: React.ComponentType<any>;
+      resources: Resource;
     };
 
   export const templates: ClientTemplateDefinition[] = [
@@ -26,30 +28,32 @@ export namespace FormStartPage {
     //   ...FormStartPage000.definition,
     //   component: FormStartPage000,
     // },
-    {
-      ...FormStartPage001.definition,
-      component: FormStartPage001,
-    },
-    {
-      ...FormStartPage002.definition,
-      component: FormStartPage002,
-    },
+    // {
+    //   ...FormStartPage001.definition,
+    //   component: FormStartPage001,
+    // },
+    // {
+    //   ...FormStartPage002.definition,
+    //   component: FormStartPage002,
+    // },
     {
       ...FormStartPage003.definition,
       component: FormStartPage003,
+      resources: {},
     },
-    {
-      ...FormStartPage004.definition,
-      component: FormStartPage004,
-    },
+    // {
+    //   ...FormStartPage004.definition,
+    //   component: FormStartPage004,
+    // },
     {
       ...FormStartPage005.definition,
       component: FormStartPage005,
+      resources: FormStartPage005_RES,
     },
-    {
-      ...FormStartPage006.definition,
-      component: FormStartPage006,
-    },
+    // {
+    //   ...FormStartPage006.definition,
+    //   component: FormStartPage006,
+    // },
   ];
 
   export function getTemplate(name: string) {
@@ -70,22 +74,21 @@ export namespace FormStartPage {
     [language: string]: ResourceLanguage;
   }
 
-  interface CampaignTemplateProps<P, M extends Resource> {
+  interface CampaignTemplateProps {
     meta: CampaignMeta;
     // props: P;
-    resources?: M;
+    // resources?: M;
     lang: string;
   }
 
   export function TemplateRenderer({
     name,
-    // props = {},
     meta,
     lang,
-    resources = {},
+    // resources = {},
   }: {
     name: string;
-  } & CampaignTemplateProps<any, Resource>) {
+  } & CampaignTemplateProps) {
     const template = useMemo(() => FormStartPage.getTemplate(name), [name])!;
 
     // return <template.component meta={meta} lang={lang} />;
@@ -94,7 +97,7 @@ export namespace FormStartPage {
       return i18next.createInstance(
         {
           fallbackLng: "en",
-          resources: resources,
+          resources: template.resources,
           lng: lang,
         },
         (err, t) => {
