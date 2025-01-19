@@ -14,12 +14,12 @@
     "react-json-tree": "^0.15.0"
   },
   "peerDependencies": {
-    "@code-editor/ui": "*",
+    "@code-editor/ui": "workspace:*",
     "@design-sdk/figma": "^0.0.53",
     "@design-sdk/figma-node": "^0.0.53",
     "@emotion/styled": "^11.11.0",
     "@reflect-ui/core": "^0.0.9",
-    "@web-builder/core": "*",
+    "@web-builder/core": "workspace:*",
     "react": "^18"
   },
   "devDependencies": {
