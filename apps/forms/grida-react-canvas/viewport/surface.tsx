@@ -281,9 +281,19 @@ export function EditorSurface() {
         cursor: cursor,
       }}
     >
-      <div className="absolute w-full h-full z-50">
+      <div className="absolute w-full h-full z-40">
         {transform[0][0] > 3.5 && (
-          <PixelGrid zoomLevel={transform[0][0]} cellSize={2} />
+          <PixelGrid
+            zoomLevel={transform[0][0]}
+            cellSize={1}
+            isEnabled={true}
+            transform={{
+              translateX: transform[1][0],
+              translateY: transform[1][1],
+              scale: transform[0][0],
+            }}
+            backgroundIsDark={true}
+          />
         )}
       </div>
       <div

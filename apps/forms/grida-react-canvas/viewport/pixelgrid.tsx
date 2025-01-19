@@ -21,46 +21,68 @@ const PixelGrid: React.FC<PixelGridProps> = ({
   useEffect(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
-    if (!canvas || !container || !isEnabled || zoomLevel < 4) return; // Grid is rendered only if enabled and zoomLevel >= 4
+    if (!canvas || !container || !isEnabled || zoomLevel < 4) return;
 
-    // Match canvas size to container size
-    const width = container.offsetWidth;
-    const height = container.offsetHeight;
+    // Set up canvas size with a buffer zone for smooth panning
+    const width = container.offsetWidth * 1.5;
+    const height = container.offsetHeight * 1.5;
 
-    // Handle device pixel ratio for crisp lines
     const dpr = window.devicePixelRatio || 1;
     canvas.width = width * dpr;
     canvas.height = height * dpr;
+
+    // Position canvas with negative margins to center the buffer zone
+    const offsetX = (width - container.offsetWidth) / 2;
+    const offsetY = (height - container.offsetHeight) / 2;
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
+    canvas.style.marginLeft = `-${offsetX}px`;
+    canvas.style.marginTop = `-${offsetY}px`;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+
+    // Scale context for device pixel ratio
     ctx.scale(dpr, dpr);
 
-    const step = cellSize * zoomLevel * transform.scale;
+    // Calculate grid step size
+    const step = cellSize * transform.scale;
 
+    // Clear canvas
     ctx.clearRect(0, 0, width, height);
 
-    // Set stroke style for grid lines with dynamic contrast
-    ctx.strokeStyle = backgroundIsDark ? "rgba(255, 255, 255, 0.1)" : "#ccc";
-    ctx.lineWidth = 1;
+    // Set grid style
+    ctx.strokeStyle = backgroundIsDark
+      ? "rgba(255, 255, 255, 0.1)"
+      : "rgb(204, 204, 204)";
+    ctx.lineWidth = backgroundIsDark ? 0.75 : 0.5;
 
-    // Translate the grid based on the transformation
+    // Calculate grid boundaries with buffer
+    const startX = Math.floor((-transform.translateX - width) / step) * step;
+    const endX = Math.ceil((-transform.translateX + width * 2) / step) * step;
+    const startY = Math.floor((-transform.translateY - height) / step) * step;
+    const endY = Math.ceil((-transform.translateY + height * 2) / step) * step;
+
+    // Apply transform
     ctx.save();
-    ctx.translate(transform.translateX % step, transform.translateY % step);
+    ctx.translate(
+      transform.translateX + offsetX,
+      transform.translateY + offsetY
+    );
 
-    for (let x = 0; x <= width; x += step) {
+    // Draw vertical lines
+    for (let x = startX; x <= endX; x += step) {
       ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, height);
+      ctx.moveTo(x, startY);
+      ctx.lineTo(x, endY);
       ctx.stroke();
     }
 
-    for (let y = 0; y <= height; y += step) {
+    // Draw horizontal lines
+    for (let y = startY; y <= endY; y += step) {
       ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(width, y);
+      ctx.moveTo(startX, y);
+      ctx.lineTo(endX, y);
       ctx.stroke();
     }
 
@@ -73,11 +95,18 @@ const PixelGrid: React.FC<PixelGridProps> = ({
       style={{
         width: "100%",
         height: "100%",
-        position: "relative",
-        background: backgroundIsDark ? "#333" : "#fff", // Optional: Set a default background for better contrast
+        position: "absolute",
+        overflow: "hidden",
+        pointerEvents: "none",
       }}
     >
-      <canvas ref={canvasRef} />
+      <canvas
+        ref={canvasRef}
+        style={{
+          position: "absolute",
+          pointerEvents: "none",
+        }}
+      />
     </div>
   );
 };
