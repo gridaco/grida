@@ -350,16 +350,19 @@ function __self_update_gesture_transform_translate_1d_arrange(
     "Gesture type must be translate-1d-arrange"
   );
 
-  const { layout, movement, selection, willbe } = draft.gesture;
+  const { layout, movement, selection } = draft.gesture;
 
   const initial = layout.nodes.find((n) => n.id === selection)!;
 
-  const node = document.__getNodeById(
+  const selection_node = document.__getNodeById(
     draft,
     selection
   ) as grida.program.nodes.i.IPositioning; // TODO: don't cast
 
-  const cdom = new domapi.CanvasDOM(draft.transform);
+  // const cdom = new domapi.CanvasDOM(draft.transform);
+  // const r = cdom.getNodeBoundingRect(selection)!;
+
+  const selection_index = layout.nodes.findIndex((n) => n.id === selection);
 
   const virtually_translated: cmath.Rectangle = {
     x: initial.rect.x + movement[0],
@@ -373,19 +376,30 @@ function __self_update_gesture_transform_translate_1d_arrange(
     layout.nodes.map((n) => n.rect)
   );
 
-  console.log("dnd_target_index", {
-    dnd_target_index,
-    distance,
-  });
+  // console.log("dnd_target_index", {
+  //   dnd_target_index,
+  //   distance,
+  // });
 
-  // const r = cdom.getNodeBoundingRect(selection)!;
+  if (dnd_target_index !== selection_index) {
+    // re-arrange (swap)
+    const dnd_target_node_id = layout.nodes[dnd_target_index].id;
+    const dnd_target_node = document.__getNodeById(
+      draft,
+      dnd_target_node_id
+    ) as grida.program.nodes.i.IPositioning; // TODO: don't cast
+    dnd_target_node.left = initial.rect.x;
+    dnd_target_node.top = initial.rect.y;
+  }
 
-  node.left = initial.rect.x + movement[0];
-  node.top = initial.rect.y + movement[1];
+  selection_node.left = initial.rect.x + movement[0];
+  selection_node.top = initial.rect.y + movement[1];
 
+  const dropzonerect = layout.nodes[dnd_target_index].rect;
+  draft.gesture.willbe = [dropzonerect.x, dropzonerect.y];
   draft.dropzone = {
     type: "rect",
-    rect: layout.nodes[dnd_target_index].rect,
+    rect: dropzonerect,
   };
 }
 

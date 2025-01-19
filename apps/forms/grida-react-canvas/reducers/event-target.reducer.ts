@@ -648,7 +648,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             break;
         }
 
-        self_maybe_end_gesture_translate(draft);
+        self_maybe_end_gesture(draft);
         draft.gesture = { type: "idle" };
         draft.marquee = undefined;
       });
@@ -986,14 +986,28 @@ function self_start_gesture_translate(draft: Draft<IDocumentEditorState>) {
   };
 }
 
-function self_maybe_end_gesture_translate(draft: Draft<IDocumentEditorState>) {
-  if (draft.gesture.type !== "translate") return;
-  if (draft.gesture.is_currently_cloned) {
-    // update the selection as the cloned nodes
-    self_selectNode(draft, "reset", ...draft.gesture.selection);
+function self_maybe_end_gesture(draft: Draft<IDocumentEditorState>) {
+  switch (draft.gesture.type) {
+    case "translate": {
+      if (draft.gesture.is_currently_cloned) {
+        // update the selection as the cloned nodes
+        self_selectNode(draft, "reset", ...draft.gesture.selection);
+      }
+      draft.surface_measurement_targeting_locked = false;
+      break;
+    }
+    case "translate-1d-arrange": {
+      const pos = draft.gesture.willbe;
+      const node = draft.document.nodes[
+        draft.gesture.selection
+      ] as grida.program.nodes.i.IPositioning;
+      node.left = pos[0];
+      node.top = pos[1];
+
+      break;
+    }
   }
 
-  draft.surface_measurement_targeting_locked = false;
   draft.gesture = { type: "idle" };
   draft.dropzone = undefined;
 }
