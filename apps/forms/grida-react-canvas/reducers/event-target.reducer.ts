@@ -995,7 +995,7 @@ function self_maybe_end_gesture_translate(draft: Draft<IDocumentEditorState>) {
 
   draft.surface_measurement_targeting_locked = false;
   draft.gesture = { type: "idle" };
-  draft.dropzone_node_id = undefined;
+  draft.dropzone = undefined;
 }
 
 /**

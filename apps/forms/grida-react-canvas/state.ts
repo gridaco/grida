@@ -236,6 +236,10 @@ export type GestureTranslate1DArrange = IGesture & {
    * selection of the moving nodes (this is different from the document's selection)
    */
   selection: string;
+  /**
+   * the selection will be at this position (when dropped)
+   */
+  willbe: cmath.Vector2;
   layout: LayoutSnapshot;
 };
 
@@ -385,6 +389,22 @@ export type GestureCurveA = IGesture & {
 };
 
 /**
+ * Indication of the dropzone
+ *
+ * - type: "node" - dropzone is a node
+ * - type: "rect" - dropzone is a rect (in canvas space)
+ */
+export type DropzoneIndication =
+  | {
+      type: "node";
+      node_id: string;
+    }
+  | {
+      type: "rect";
+      rect: cmath.Rectangle;
+    };
+
+/**
  * [Surface Support State]
  *
  * this support state is not part of the document state and does not get saved or recorded as history
@@ -416,7 +436,7 @@ interface IDocumentEditorEventTargetState {
   /**
    * special hover state - when a node is a target of certain gesture, and ux needs to show the target node
    */
-  dropzone_node_id?: string;
+  dropzone?: DropzoneIndication;
 
   /**
    * the config of how the surface raycast targeting should be

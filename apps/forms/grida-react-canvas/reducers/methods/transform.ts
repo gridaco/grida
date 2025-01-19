@@ -4,6 +4,7 @@ import { self_insertSubDocument } from "./insert";
 import { self_deleteNode } from "./delete";
 import { document } from "../../document-query";
 import { cmath } from "@grida/cmath";
+import { dnd } from "@grida/cmath/_dnd";
 import { domapi } from "../../domapi";
 import { getSnapTargets, snapObjectsTranslation } from "../tools/snap";
 import nodeTransformReducer from "../node-transform.reducer";
@@ -261,12 +262,14 @@ function __self_update_gesture_transform_translate(
         draft.document_ctx = document.Context.from(draft.document).snapshot();
       });
 
-      if (is_parent_changed) draft.dropzone_node_id = new_parent_id;
+      if (is_parent_changed) {
+        draft.dropzone = { type: "node", node_id: new_parent_id };
+      }
 
       break;
     }
     case "off": {
-      draft.dropzone_node_id = undefined;
+      draft.dropzone = undefined;
       break;
     }
   }
@@ -347,11 +350,43 @@ function __self_update_gesture_transform_translate_1d_arrange(
     "Gesture type must be translate-1d-arrange"
   );
 
-  const { movement } = draft.gesture;
+  const { layout, movement, selection, willbe } = draft.gesture;
 
-  // draft.document.nodes[draft.gesture.selection].left += delta[0];
+  const initial = layout.nodes.find((n) => n.id === selection)!;
 
-  //
+  const node = document.__getNodeById(
+    draft,
+    selection
+  ) as grida.program.nodes.i.IPositioning; // TODO: don't cast
+
+  const cdom = new domapi.CanvasDOM(draft.transform);
+
+  const virtually_translated: cmath.Rectangle = {
+    x: initial.rect.x + movement[0],
+    y: initial.rect.y + movement[1],
+    width: initial.rect.width,
+    height: initial.rect.height,
+  };
+
+  const { index: dnd_target_index, distance } = dnd.test(
+    virtually_translated,
+    layout.nodes.map((n) => n.rect)
+  );
+
+  console.log("dnd_target_index", {
+    dnd_target_index,
+    distance,
+  });
+
+  // const r = cdom.getNodeBoundingRect(selection)!;
+
+  node.left = initial.rect.x + movement[0];
+  node.top = initial.rect.y + movement[1];
+
+  draft.dropzone = {
+    type: "rect",
+    rect: layout.nodes[dnd_target_index].rect,
+  };
 }
 
 function __self_update_gesture_transform_scale(

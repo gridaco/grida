@@ -2092,7 +2092,7 @@ export function useEventTarget() {
     transform,
     gesture,
     hovered_node_id,
-    dropzone_node_id,
+    dropzone,
     selection,
     content_edit_mode,
     cursor_mode,
@@ -2101,7 +2101,8 @@ export function useEventTarget() {
   } = state;
 
   const is_node_transforming = gesture.type !== "idle";
-  const is_node_translating = gesture.type === "translate";
+  const is_node_translating =
+    gesture.type === "translate" || gesture.type === "translate-1d-arrange";
   const is_node_scaling = gesture.type === "scale";
 
   const setCursorMode = useCallback(
@@ -2418,7 +2419,7 @@ export function useEventTarget() {
       setCursorMode,
       //
       hovered_node_id,
-      dropzone_node_id,
+      dropzone,
       selection,
       is_node_transforming,
       is_node_translating,
@@ -2460,7 +2461,7 @@ export function useEventTarget() {
     setCursorMode,
     //
     hovered_node_id,
-    dropzone_node_id,
+    dropzone,
     selection,
     //
     is_node_transforming,

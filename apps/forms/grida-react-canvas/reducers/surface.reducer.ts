@@ -190,13 +190,18 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
           //
         }
         case "translate-1d-arrange": {
-          const { layout, selection, axis } = gesture;
+          const { layout: gruop, selection, axis } = gesture;
           return produce(state, (draft) => {
+            const layout = createLayoutSnapshot(state, gruop);
+            const initial_willbe = layout.nodes.find(
+              (it) => it.id === selection
+            )!.rect;
             draft.gesture = {
               type: "translate-1d-arrange",
               selection: selection,
               axis: axis,
-              layout: createLayoutSnapshot(state, layout),
+              layout: layout,
+              willbe: [initial_willbe.x, initial_willbe.y],
               movement: cmath.vector2.zero,
             };
           });

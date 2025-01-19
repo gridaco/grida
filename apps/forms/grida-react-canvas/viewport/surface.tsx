@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
-import { useEventTarget } from "@/grida-react-canvas";
+import { DropzoneIndication, useEventTarget } from "@/grida-react-canvas";
 import { useGesture as __useGesture, useGesture } from "@use-gesture/react";
 import {
   useClipboardSync,
@@ -30,7 +30,7 @@ import { SurfaceTextEditor } from "./ui/text-editor";
 import { SurfacePathEditor } from "./ui/path-editor";
 import { SizeMeterLabel } from "./ui/meter";
 import { SurfaceGradientEditor } from "./ui/gradient-editor";
-import { pointToSurfaceSpace } from "../utils/transform";
+import { pointToSurfaceSpace, rectToSurfaceSpace } from "../utils/transform";
 import PixelGrid from "./pixelgrid";
 import { RedDotHandle } from "./ui/reddot";
 import {
@@ -124,7 +124,7 @@ export function EditorSurface() {
     pointer,
     marquee,
     hovered_node_id,
-    dropzone_node_id,
+    dropzone,
     selection,
     cursor_mode,
     is_node_transforming,
@@ -354,12 +354,31 @@ export function EditorSurface() {
             )}
           </SurfaceGroup>
         </SurfaceGroup>
-        {dropzone_node_id && (
-          <NodeOverlay node_id={dropzone_node_id} readonly />
-        )}
+        {dropzone && <DropzoneOverlay {...dropzone} />}
       </div>
     </div>
   );
+}
+
+function DropzoneOverlay(props: DropzoneIndication) {
+  const { transform } = useTransform();
+  switch (props.type) {
+    case "node":
+      return <NodeOverlay node_id={props.node_id} readonly />;
+    case "rect":
+      const r = rectToSurfaceSpace(props.rect, transform);
+      return (
+        <LayerOverlay
+          transform={{
+            top: r.y,
+            left: r.x,
+            width: r.width,
+            height: r.height,
+          }}
+          readonly
+        />
+      );
+  }
 }
 
 /**
