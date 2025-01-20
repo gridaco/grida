@@ -9,11 +9,10 @@
     "react-in-viewport": "^1.0.0-alpha.20"
   },
   "peerDependencies": {
-    "@code-editor/canvas": "*",
-    "@editor-ui/hooks": "*",
+    "@editor-ui/hooks": "workspace:*",
     "@design-sdk/figma-node": "^0.0.53",
     "@design-sdk/query": "^0.0.53",
-    "@editor-ui/context-menu": "*",
+    "@editor-ui/context-menu": "workspace:^",
     "@emotion/styled": "^11.11.0",
     "@use-gesture/react": "*",
     "react": "^18",
