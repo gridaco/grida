@@ -189,19 +189,23 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
           });
           //
         }
-        case "translate-1d-arrange": {
-          const { layout: gruop, selection, axis } = gesture;
+        case "translate-swap": {
+          const { selection, node_id } = gesture;
           return produce(state, (draft) => {
-            const layout = createLayoutSnapshot(state, gruop);
-            const initial_willbe = layout.nodes.find(
-              (it) => it.id === selection
-            )!.rect;
+            const layout = createLayoutSnapshot(state, selection);
+            const initial_index = layout.nodes.findIndex(
+              (it) => it.id === node_id
+            );
+            const initial_placement = {
+              index: initial_index,
+              rect: layout.nodes[initial_index].rect,
+            };
             draft.gesture = {
-              type: "translate-1d-arrange",
+              type: "translate-swap",
               selection: selection,
-              axis: axis,
+              node_id: node_id,
               layout: layout,
-              willbe: [initial_willbe.x, initial_willbe.y],
+              placement: initial_placement,
               movement: cmath.vector2.zero,
             };
           });

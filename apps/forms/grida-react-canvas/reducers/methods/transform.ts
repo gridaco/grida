@@ -64,8 +64,8 @@ export function self_update_gesture_transform<S extends IDocumentEditorState>(
     case "translate": {
       return __self_update_gesture_transform_translate(draft);
     }
-    case "translate-1d-arrange": {
-      return __self_update_gesture_transform_translate_1d_arrange(draft);
+    case "translate-swap": {
+      return __self_update_gesture_transform_translate_swap(draft);
     }
     case "scale": {
       return __self_update_gesture_transform_scale(draft);
@@ -342,27 +342,22 @@ function __self_update_gesture_transform_translate(
   }
 }
 
-function __self_update_gesture_transform_translate_1d_arrange(
+function __self_update_gesture_transform_translate_swap(
   draft: Draft<IDocumentEditorState>
 ) {
   assert(
-    draft.gesture.type === "translate-1d-arrange",
-    "Gesture type must be translate-1d-arrange"
+    draft.gesture.type === "translate-swap",
+    "Gesture type must be translate-swap"
   );
 
-  const { layout, movement, selection } = draft.gesture;
+  const { layout, movement, node_id, placement } = draft.gesture;
 
-  const initial = layout.nodes.find((n) => n.id === selection)!;
+  const initial = layout.nodes.find((n) => n.id === node_id)!;
 
   const selection_node = document.__getNodeById(
     draft,
-    selection
+    node_id
   ) as grida.program.nodes.i.IPositioning; // TODO: don't cast
-
-  // const cdom = new domapi.CanvasDOM(draft.transform);
-  // const r = cdom.getNodeBoundingRect(selection)!;
-
-  const selection_index = layout.nodes.findIndex((n) => n.id === selection);
 
   const virtually_translated: cmath.Rectangle = {
     x: initial.rect.x + movement[0],
@@ -371,36 +366,65 @@ function __self_update_gesture_transform_translate_1d_arrange(
     height: initial.rect.height,
   };
 
-  const { index: dnd_target_index, distance } = dnd.test(
+  // apply position for preview
+  selection_node.left = initial.rect.x + movement[0];
+  selection_node.top = initial.rect.y + movement[1];
+
+  const { index: dnd_target_index } = dnd.test(
     virtually_translated,
     layout.nodes.map((n) => n.rect)
   );
 
-  // console.log("dnd_target_index", {
-  //   dnd_target_index,
-  //   distance,
-  // });
+  const __dnd_target_rect = layout.nodes[dnd_target_index].rect;
+  const __dnd_target_rect_center = cmath.rect.center(__dnd_target_rect);
+  // center-aligned next placement position
+  const __placement_position = cmath.vector2.quantize(
+    cmath.vector2.sub(__dnd_target_rect_center, [
+      initial.rect.width / 2,
+      initial.rect.height / 2,
+    ]),
+    1
+  );
 
-  if (dnd_target_index !== selection_index) {
-    // re-arrange (swap)
-    const dnd_target_node_id = layout.nodes[dnd_target_index].id;
-    const dnd_target_node = document.__getNodeById(
-      draft,
-      dnd_target_node_id
-    ) as grida.program.nodes.i.IPositioning; // TODO: don't cast
-    dnd_target_node.left = initial.rect.x;
-    dnd_target_node.top = initial.rect.y;
-  }
+  const placement_rect = {
+    x: __placement_position[0],
+    y: __placement_position[1],
+    width: initial.rect.width,
+    height: initial.rect.height,
+  };
 
-  selection_node.left = initial.rect.x + movement[0];
-  selection_node.top = initial.rect.y + movement[1];
+  draft.gesture.placement = {
+    rect: placement_rect,
+    index: dnd_target_index,
+  };
 
-  const dropzonerect = layout.nodes[dnd_target_index].rect;
-  draft.gesture.willbe = [dropzonerect.x, dropzonerect.y];
   draft.dropzone = {
     type: "rect",
-    rect: dropzonerect,
+    rect: placement_rect,
   };
+
+  if (placement.index !== dnd_target_index) {
+    // re-arrange (swap)
+    // set the next target node's position to the current
+    const { id, rect } = layout.nodes[dnd_target_index];
+    const dnd_target_node = document.__getNodeById(
+      draft,
+      id
+    ) as grida.program.nodes.i.IPositioning; // TODO: don't cast
+
+    const __placement_rect_center = cmath.rect.center(placement.rect);
+    // center-aligned next placement position
+    const __placement_position = cmath.vector2.quantize(
+      cmath.vector2.sub(__placement_rect_center, [
+        rect.width / 2,
+        rect.height / 2,
+      ]),
+      1
+    );
+
+    dnd_target_node.left = __placement_position[0];
+    dnd_target_node.top = __placement_position[1];
+  }
 }
 
 function __self_update_gesture_transform_scale(

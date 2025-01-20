@@ -145,7 +145,8 @@ export type GestureState =
   | GesturePan
   | GestureVirtualNudge
   | GestureTranslate
-  | GestureTranslate1DArrange
+  | GestureTranslateSwap
+  // | GestureTranslate1DArrange
   | GestureScale
   | GestureRotate
   | GestureCornerRadius
@@ -227,21 +228,51 @@ export interface LayoutSnapshot {
 }
 
 /**
- * Translate withing 1D axis, within the valid selection
+ * swap position of 2 items, swapping the position of those two. - only valid when selection is 2.
  */
-export type GestureTranslate1DArrange = IGesture & {
-  type: "translate-1d-arrange";
-  axis: "x" | "y";
+export type GestureTranslateSwap = IGesture & {
+  type: "translate-swap";
+
   /**
-   * selection of the moving nodes (this is different from the document's selection)
+   * 2 selected node ids
    */
-  selection: string;
+  selection: [string, string];
+
+  /**
+   * the current moving node id of this gesture
+   */
+  node_id: string;
+
   /**
    * the selection will be at this position (when dropped)
    */
-  willbe: cmath.Vector2;
+  placement: {
+    rect: cmath.Rectangle;
+    index: number;
+  };
+
   layout: LayoutSnapshot;
 };
+
+/**
+ * Translate within 1D axis, within the valid selection
+ */
+// export type GestureTranslate1DArrange = IGesture & {
+//   type: "translate-1d-arrange";
+//   axis: "x" | "y";
+//   /**
+//    * selection of the moving nodes (this is different from the document's selection)
+//    */
+//   selection: string;
+//   /**
+//    * the selection will be at this position (when dropped)
+//    */
+//   placement: {
+//     rect: cmath.Rectangle;
+//     index: number;
+//   };
+//   layout: LayoutSnapshot;
+// };
 
 export type GestureScale = IGesture & {
   // scale (resize)

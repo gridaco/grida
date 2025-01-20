@@ -38,6 +38,7 @@ import {
   SurfaceSelectionGroupProvider,
   useSurfaceSelectionGroup,
 } from "./core";
+import assert from "assert";
 
 const DRAG_THRESHOLD = 2;
 
@@ -727,51 +728,50 @@ function DistributionOverlay() {
     <>
       <DistributeButton />
       <div>
-        {items.map((item) => {
-          return (
-            <div
-              key={item.id}
-              style={{
-                position: "absolute",
-                top:
-                  item.boundingRect.y +
-                  item.boundingRect.height / 2 -
-                  boundingRect.y,
-                left:
-                  item.boundingRect.x +
-                  item.boundingRect.width / 2 -
-                  boundingRect.x,
-              }}
-            >
-              <DistributeTranslateArrangeRedDotHandle
-                node_id={item.id}
-                // TODO:
-                axis="x"
-              />
-            </div>
-          );
-        })}
+        {items.length === 2 && (
+          <>
+            {items.map((item) => {
+              return (
+                <div
+                  key={item.id}
+                  style={{
+                    position: "absolute",
+                    top:
+                      item.boundingRect.y +
+                      item.boundingRect.height / 2 -
+                      boundingRect.y,
+                    left:
+                      item.boundingRect.x +
+                      item.boundingRect.width / 2 -
+                      boundingRect.x,
+                  }}
+                >
+                  <DistributeRedDotHandle_TranslateSwap node_id={item.id} />
+                </div>
+              );
+            })}
+          </>
+        )}
       </div>
     </>
   );
 }
 
-function DistributeTranslateArrangeRedDotHandle({
+function DistributeRedDotHandle_TranslateSwap({
   node_id,
-  axis,
 }: {
   node_id: string;
-  axis: "x" | "y";
 }) {
   const { selection } = useSurfaceSelectionGroup();
-  const { startTranslate1DArrangeGesture } = useEventTarget();
+  assert(selection.length === 2);
+  const { startTranslateSwapGesture } = useEventTarget();
   const bind = useSurfaceGesture({
     onPointerDown: ({ event }) => {
       event.preventDefault();
     },
     onDragStart: ({ event }) => {
       event.preventDefault();
-      startTranslate1DArrangeGesture(selection, node_id, axis);
+      startTranslateSwapGesture([selection[0], selection[1]], node_id);
     },
   });
 

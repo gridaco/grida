@@ -383,6 +383,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
       return produce(state, (draft) => {
         // clear all trasform state
         draft.marquee = undefined;
+        draft.dropzone = undefined;
 
         switch (draft.cursor_mode.type) {
           case "cursor": {
@@ -692,7 +693,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               self_update_gesture_transform(draft);
               break;
             }
-            case "translate-1d-arrange": {
+            case "translate-swap": {
               self_update_gesture_transform(draft);
               break;
             }
@@ -996,13 +997,13 @@ function self_maybe_end_gesture(draft: Draft<IDocumentEditorState>) {
       draft.surface_measurement_targeting_locked = false;
       break;
     }
-    case "translate-1d-arrange": {
-      const pos = draft.gesture.willbe;
+    case "translate-swap": {
+      const { placement } = draft.gesture;
       const node = draft.document.nodes[
-        draft.gesture.selection
+        draft.gesture.node_id
       ] as grida.program.nodes.i.IPositioning;
-      node.left = pos[0];
-      node.top = pos[1];
+      node.left = placement.rect.x;
+      node.top = placement.rect.y;
 
       break;
     }

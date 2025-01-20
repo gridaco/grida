@@ -2102,7 +2102,7 @@ export function useEventTarget() {
 
   const is_node_transforming = gesture.type !== "idle";
   const is_node_translating =
-    gesture.type === "translate" || gesture.type === "translate-1d-arrange";
+    gesture.type === "translate" || gesture.type === "translate-swap";
   const is_node_scaling = gesture.type === "scale";
 
   const setCursorMode = useCallback(
@@ -2362,15 +2362,14 @@ export function useEventTarget() {
     [dispatch]
   );
 
-  const startTranslate1DArrangeGesture = useCallback(
-    (layout: string[], selection: string, axis: "x" | "y") => {
+  const startTranslateSwapGesture = useCallback(
+    (selection: [string, string], node_id: string) => {
       dispatch({
         type: "surface/gesture/start",
         gesture: {
-          type: "translate-1d-arrange",
-          layout: layout,
+          type: "translate-swap",
           selection: selection,
-          axis: axis,
+          node_id,
         },
       });
     },
@@ -2427,7 +2426,7 @@ export function useEventTarget() {
       content_edit_mode,
       //
       startScaleGesture,
-      startTranslate1DArrangeGesture,
+      startTranslateSwapGesture,
       startCornerRadiusGesture,
       startRotateGesture,
       //
@@ -2471,7 +2470,7 @@ export function useEventTarget() {
     content_edit_mode,
     //
     startScaleGesture,
-    startTranslate1DArrangeGesture,
+    startTranslateSwapGesture,
     startCornerRadiusGesture,
     startRotateGesture,
     //
