@@ -1283,6 +1283,62 @@ export namespace cmath.rect {
   }
 
   /**
+   * Aligns rectangle `a` relative to rectangle `b` along a specified axis.
+   *
+   * @param a the rectangle to align
+   * @param b the rectangle to align to
+   * @param alignment - The alignment type of each axis (horizontal and vertical).
+   */
+  export function alignA(
+    a: Rectangle,
+    b: Rectangle,
+    alignment: {
+      horizontal?: "none" | "min" | "max" | "center";
+      vertical?: "none" | "min" | "max" | "center";
+    }
+  ): Rectangle {
+    let newX = a.x;
+    let newY = a.y;
+
+    // Horizontal alignment
+    if (alignment.horizontal) {
+      switch (alignment.horizontal) {
+        case "min":
+          newX = b.x;
+          break;
+        case "max":
+          newX = b.x + b.width - a.width;
+          break;
+        case "center":
+          newX = b.x + (b.width - a.width) / 2;
+          break;
+      }
+    }
+
+    // Vertical alignment
+    if (alignment.vertical) {
+      switch (alignment.vertical) {
+        case "min":
+          newY = b.y;
+          break;
+        case "max":
+          newY = b.y + b.height - a.height;
+          break;
+        case "center":
+          newY = b.y + (b.height - a.height) / 2;
+          break;
+      }
+    }
+
+    return {
+      x: newX,
+      y: newY,
+      width: a.width,
+      height: a.height,
+    };
+  }
+
+  /**
    * Calculates the gaps (spaces) between adjacent rectangles along a specified axis.
    *
    * @param rectangles - An array of rectangles to calculate the gaps for.

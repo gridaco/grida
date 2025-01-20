@@ -354,7 +354,7 @@ function __self_update_gesture_transform_translate_swap(
 
   const initial = layout.nodes.find((n) => n.id === node_id)!;
 
-  const selection_node = document.__getNodeById(
+  const moving_node = document.__getNodeById(
     draft,
     node_id
   ) as grida.program.nodes.i.IPositioning; // TODO: don't cast
@@ -367,22 +367,48 @@ function __self_update_gesture_transform_translate_swap(
   };
 
   // apply position for preview
-  selection_node.left = initial.rect.x + movement[0];
-  selection_node.top = initial.rect.y + movement[1];
+  moving_node.left = initial.rect.x + movement[0];
+  moving_node.top = initial.rect.y + movement[1];
 
   const { index: dnd_target_index } = dnd.test(
     virtually_translated,
     layout.nodes.map((n) => n.rect)
   );
 
+  if (dnd_target_index !== placement.index) {
+    // re-arrange (swap)
+    // set the next target node's position to the current
+    const { id, rect } = layout.nodes[dnd_target_index];
+    const dnd_target_node = document.__getNodeById(
+      draft,
+      id
+    ) as grida.program.nodes.i.IPositioning; // TODO: don't cast
+
+    // center-aligned next placement position
+    const __aligned = cmath.rect.alignA(rect, placement.rect, {
+      horizontal: "center",
+      vertical: "center",
+    });
+
+    const __placement_position = cmath.vector2.quantize(
+      [__aligned.x, __aligned.y],
+      1
+    );
+
+    dnd_target_node.left = __placement_position[0];
+    dnd_target_node.top = __placement_position[1];
+  }
+
   const __dnd_target_rect = layout.nodes[dnd_target_index].rect;
-  const __dnd_target_rect_center = cmath.rect.center(__dnd_target_rect);
+
   // center-aligned next placement position
+  const __aligned = cmath.rect.alignA(initial.rect, __dnd_target_rect, {
+    horizontal: "center",
+    vertical: "center",
+  });
+
   const __placement_position = cmath.vector2.quantize(
-    cmath.vector2.sub(__dnd_target_rect_center, [
-      initial.rect.width / 2,
-      initial.rect.height / 2,
-    ]),
+    [__aligned.x, __aligned.y],
     1
   );
 
@@ -402,29 +428,6 @@ function __self_update_gesture_transform_translate_swap(
     type: "rect",
     rect: placement_rect,
   };
-
-  if (placement.index !== dnd_target_index) {
-    // re-arrange (swap)
-    // set the next target node's position to the current
-    const { id, rect } = layout.nodes[dnd_target_index];
-    const dnd_target_node = document.__getNodeById(
-      draft,
-      id
-    ) as grida.program.nodes.i.IPositioning; // TODO: don't cast
-
-    const __placement_rect_center = cmath.rect.center(placement.rect);
-    // center-aligned next placement position
-    const __placement_position = cmath.vector2.quantize(
-      cmath.vector2.sub(__placement_rect_center, [
-        rect.width / 2,
-        rect.height / 2,
-      ]),
-      1
-    );
-
-    dnd_target_node.left = __placement_position[0];
-    dnd_target_node.top = __placement_position[1];
-  }
 }
 
 function __self_update_gesture_transform_scale(
