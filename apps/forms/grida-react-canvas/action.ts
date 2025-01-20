@@ -429,7 +429,7 @@ export type EditorSurface_StartGesture = {
   gesture:
     | Pick<GestureScale, "type" | "direction" | "selection">
     | Pick<GestureRotate, "type" | "selection">
-    | Pick<GestureTranslateSwap, "type" | "selection" | "node_id">
+    | (Pick<GestureTranslateSwap, "type" | "node_id"> & { selection: string[] })
     | Pick<GestureCornerRadius, "type" | "node_id">
     | Pick<GestureCurve, "type" | "control" | "node_id" | "segment">
     | Pick<GestureTranslateVertex, "type" | "node_id" | "vertex">;

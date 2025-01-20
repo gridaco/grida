@@ -389,6 +389,7 @@ function __self_update_gesture_transform_translate_swap(
     return { ...next_rect, id: obj.id };
   });
 
+  // TODO: currently, the index is always identical to initial placement index, we need to update the entire logic, for this index to change, and layout order not to change.
   const next_placement_index = layout.objects.findIndex(
     (obj) => obj.id === node_id
   );

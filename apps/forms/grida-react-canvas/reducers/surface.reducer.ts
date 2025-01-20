@@ -203,7 +203,6 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
 
             draft.gesture = {
               type: "translate-swap",
-              selection: selection,
               node_id: node_id,
               node_initial_rect: layout.objects[initial_index],
               layout: layout,

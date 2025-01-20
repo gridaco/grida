@@ -230,11 +230,6 @@ export type GestureTranslateSwap = IGesture & {
   type: "translate-swap";
 
   /**
-   * 2 selected node ids
-   */
-  selection: [string, string];
-
-  /**
    * the current moving node id of this gesture
    */
   node_id: string;
