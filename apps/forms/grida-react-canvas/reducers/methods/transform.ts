@@ -64,8 +64,8 @@ export function self_update_gesture_transform<S extends IDocumentEditorState>(
     case "translate": {
       return __self_update_gesture_transform_translate(draft);
     }
-    case "translate-swap": {
-      return __self_update_gesture_transform_translate_swap(draft);
+    case "sort": {
+      return __self_update_gesture_transform_translate_sort(draft);
     }
     case "scale": {
       return __self_update_gesture_transform_scale(draft);
@@ -342,13 +342,10 @@ function __self_update_gesture_transform_translate(
   }
 }
 
-function __self_update_gesture_transform_translate_swap(
+function __self_update_gesture_transform_translate_sort(
   draft: Draft<IDocumentEditorState>
 ) {
-  assert(
-    draft.gesture.type === "translate-swap",
-    "Gesture type must be translate-swap"
-  );
+  assert(draft.gesture.type === "sort", "Gesture type must be translate-swap");
 
   const { layout, movement, node_id, node_initial_rect, placement } =
     draft.gesture;

@@ -8,7 +8,15 @@ export const RedDotHandle = React.forwardRef(
     return (
       <button
         ref={forwaredRef}
-        className="absolute w-0.5 h-0.5 group-hover:w-2 group-hover:h-2 rounded-full border border-pink-500 hover:bg-pink-500"
+        className="
+          absolute
+          w-0.5 h-0.5 
+          group-hover:w-2 group-hover:h-2
+          rounded-full
+          border border-pink-500
+          hover:bg-pink-500
+          ring-1 ring-white
+        "
         style={{
           transform: "translate(-50%, -50%)",
           touchAction: "none",

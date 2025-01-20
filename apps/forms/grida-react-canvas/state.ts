@@ -145,8 +145,7 @@ export type GestureState =
   | GesturePan
   | GestureVirtualNudge
   | GestureTranslate
-  | GestureTranslateSwap
-  // | GestureTranslate1DArrange
+  | GestureSort
   | GestureScale
   | GestureRotate
   | GestureCornerRadius
@@ -165,14 +164,14 @@ interface IGesture {
 }
 
 export type GestureIdle = {
-  type: "idle";
+  readonly type: "idle";
 };
 
 /**
  * Pan the viewport - a.k.a hand tool
  */
 export type GesturePan = IGesture & {
-  type: "pan";
+  readonly type: "pan";
 };
 
 /**
@@ -183,7 +182,7 @@ export type GesturePan = IGesture & {
  * this is required to tell the surface that it is nudging, thus, show snaps & related ux
  */
 export type GestureVirtualNudge = {
-  type: "nudge";
+  readonly type: "nudge";
   /**
    * surface snap guides - result of snap while translate (move) gesture
    */
@@ -192,16 +191,16 @@ export type GestureVirtualNudge = {
 
 export type GestureTranslate = IGesture & {
   // translate (move)
-  type: "translate";
+  readonly type: "translate";
   selection: string[];
 
   /**
    * initial selection of the nodes - the original node ids
    */
-  initial_selection: string[];
-  initial_snapshot: IMinimalDocumentState;
-  initial_clone_ids: string[];
-  initial_rects: cmath.Rectangle[];
+  readonly initial_selection: string[];
+  readonly initial_snapshot: IMinimalDocumentState;
+  readonly initial_clone_ids: string[];
+  readonly initial_rects: cmath.Rectangle[];
 
   /**
    * indicator between gesture events to ensure if the current selection is cloned ones or not
@@ -224,20 +223,20 @@ export interface LayoutSnapshot {
 }
 
 /**
- * swap position of 2 items, swapping the position of those two. - only valid when selection is 2.
+ * Sort the node within the layout (re-order)
  */
-export type GestureTranslateSwap = IGesture & {
-  type: "translate-swap";
+export type GestureSort = IGesture & {
+  readonly type: "sort";
 
   /**
    * the current moving node id of this gesture
    */
-  node_id: string;
+  readonly node_id: string;
 
   /**
-   * initial position of moving node {@link GestureTranslateSwap.node_id}
+   * initial position of moving node {@link GestureSort.node_id}
    */
-  node_initial_rect: cmath.Rectangle;
+  readonly node_initial_rect: cmath.Rectangle;
 
   /**
    * the current layout - this changes as the movement changes
@@ -261,33 +260,13 @@ export type GestureTranslateSwap = IGesture & {
   };
 };
 
-/**
- * Translate within 1D axis, within the valid selection
- */
-// export type GestureTranslate1DArrange = IGesture & {
-//   type: "translate-1d-arrange";
-//   axis: "x" | "y";
-//   /**
-//    * selection of the moving nodes (this is different from the document's selection)
-//    */
-//   selection: string;
-//   /**
-//    * the selection will be at this position (when dropped)
-//    */
-//   placement: {
-//     rect: cmath.Rectangle;
-//     index: number;
-//   };
-//   layout: LayoutSnapshot;
-// };
-
 export type GestureScale = IGesture & {
   // scale (resize)
-  type: "scale";
-  selection: string[];
-  initial_snapshot: IMinimalDocumentState;
-  initial_rects: cmath.Rectangle[];
-  direction: cmath.CardinalDirection;
+  readonly type: "scale";
+  readonly selection: string[];
+  readonly initial_snapshot: IMinimalDocumentState;
+  readonly initial_rects: cmath.Rectangle[];
+  readonly direction: cmath.CardinalDirection;
 
   /**
    * surface snap guides - result of snap while translate (move) gesture
@@ -296,33 +275,33 @@ export type GestureScale = IGesture & {
 };
 
 export type GestureRotate = IGesture & {
-  type: "rotate";
-  initial_bounding_rectangle: cmath.Rectangle | null;
+  readonly type: "rotate";
+  readonly initial_bounding_rectangle: cmath.Rectangle | null;
   // TODO: support multiple selection
-  selection: string;
-  offset: cmath.Vector2;
+  readonly selection: string;
+  readonly offset: cmath.Vector2;
 };
 
 export type GestureCornerRadius = IGesture & {
   /**
    * - corner-radius
    */
-  type: "corner-radius";
-  node_id: string;
-  initial_bounding_rectangle: cmath.Rectangle | null;
+  readonly type: "corner-radius";
+  readonly node_id: string;
+  readonly initial_bounding_rectangle: cmath.Rectangle | null;
 };
 
 export type GestureDraw = IGesture & {
   /**
    * - draw points
    */
-  type: "draw";
-  mode: "line" | "pencil";
+  readonly type: "draw";
+  readonly mode: "line" | "pencil";
 
   /**
    * origin point - relative to content space
    */
-  origin: cmath.Vector2;
+  readonly origin: cmath.Vector2;
 
   /**
    * record of points (movements)
@@ -330,7 +309,7 @@ export type GestureDraw = IGesture & {
    */
   points: cmath.Vector2[];
 
-  node_id: string;
+  readonly node_id: string;
 };
 
 /**
@@ -345,51 +324,51 @@ export type GestureTranslateVertex = IGesture & {
   /**
    * initial (snapshot) value of the points
    */
-  initial_verticies: cmath.Vector2[];
+  readonly initial_verticies: cmath.Vector2[];
 
   /**
    * index of the vertex
    */
-  vertex: number;
+  readonly vertex: number;
 
-  node_id: string;
+  readonly node_id: string;
 
   /**
    * initial position of node
    */
-  initial_position: cmath.Vector2;
+  readonly initial_position: cmath.Vector2;
 };
 
 /**
  * curves the existing segment
  */
 export type GestureCurve = IGesture & {
-  type: "curve";
+  readonly type: "curve";
 
   /**
    * selected path node id
    */
-  node_id: string;
+  readonly node_id: string;
 
   /**
    * segment index
    */
-  segment: number;
+  readonly segment: number;
 
   /**
    * control point
    */
-  control: "ta" | "tb";
+  readonly control: "ta" | "tb";
 
   /**
    * initial position of the control point
    */
-  initial: cmath.Vector2;
+  readonly initial: cmath.Vector2;
 
   /**
    * rather to invert the movement
    */
-  invert: boolean;
+  readonly invert: boolean;
 };
 
 /**
@@ -398,32 +377,32 @@ export type GestureCurve = IGesture & {
  * This is used when user creates a new vertex point without connection, yet dragging to first configure the `ta` of the next segment
  */
 export type GestureCurveA = IGesture & {
-  type: "curve-a";
+  readonly type: "curve-a";
 
   /**
    * selected path node id
    */
-  node_id: string;
+  readonly node_id: string;
 
   /**
    * vertex index
    */
-  vertex: number;
+  readonly vertex: number;
 
   /**
    * control point - always `ta`
    */
-  control: "ta";
+  readonly control: "ta";
 
   /**
    * initial position of the control point - always `zero`
    */
-  initial: cmath.Vector2;
+  readonly initial: cmath.Vector2;
 
   /**
    * rather to invert the movement
    */
-  invert: boolean;
+  readonly invert: boolean;
 };
 
 /**

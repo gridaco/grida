@@ -693,7 +693,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               self_update_gesture_transform(draft);
               break;
             }
-            case "translate-swap": {
+            case "sort": {
               self_update_gesture_transform(draft);
               break;
             }
@@ -997,7 +997,7 @@ function self_maybe_end_gesture(draft: Draft<IDocumentEditorState>) {
       draft.surface_measurement_targeting_locked = false;
       break;
     }
-    case "translate-swap": {
+    case "sort": {
       const { placement } = draft.gesture;
       const node = draft.document.nodes[
         draft.gesture.node_id

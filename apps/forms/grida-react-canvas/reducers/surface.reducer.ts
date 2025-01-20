@@ -189,7 +189,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
           });
           //
         }
-        case "translate-swap": {
+        case "sort": {
           const { selection, node_id } = gesture;
           return produce(state, (draft) => {
             const layout = createLayoutSnapshot(state, selection);
@@ -202,7 +202,7 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
             };
 
             draft.gesture = {
-              type: "translate-swap",
+              type: "sort",
               node_id: node_id,
               node_initial_rect: layout.objects[initial_index],
               layout: layout,

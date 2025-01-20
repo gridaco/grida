@@ -728,7 +728,7 @@ function DistributionOverlay() {
     <>
       <DistributeButton />
       <div>
-        {items.length === 2 && (
+        {items.length >= 2 && (
           <>
             {items.map((item) => {
               return (
@@ -746,7 +746,7 @@ function DistributionOverlay() {
                       boundingRect.x,
                   }}
                 >
-                  <DistributeRedDotHandle_TranslateSwap node_id={item.id} />
+                  <RedDotSortHandle node_id={item.id} />
                 </div>
               );
             })}
@@ -757,21 +757,16 @@ function DistributionOverlay() {
   );
 }
 
-function DistributeRedDotHandle_TranslateSwap({
-  node_id,
-}: {
-  node_id: string;
-}) {
+function RedDotSortHandle({ node_id }: { node_id: string }) {
   const { selection } = useSurfaceSelectionGroup();
-  assert(selection.length === 2);
-  const { startTranslateSwapGesture } = useEventTarget();
+  const { startSortGesture } = useEventTarget();
   const bind = useSurfaceGesture({
     onPointerDown: ({ event }) => {
       event.preventDefault();
     },
     onDragStart: ({ event }) => {
       event.preventDefault();
-      startTranslateSwapGesture([selection[0], selection[1]], node_id);
+      startSortGesture(selection, node_id);
     },
   });
 
