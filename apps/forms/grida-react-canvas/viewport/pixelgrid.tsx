@@ -49,13 +49,14 @@ const PixelGrid: React.FC<PixelGridProps> = ({
     const step = cellSize * transform.scale;
 
     // Clear canvas
+    ctx.fillStyle = backgroundIsDark ? "#333" : "#fff";
     ctx.clearRect(0, 0, width, height);
 
     // Set grid style
     ctx.strokeStyle = backgroundIsDark
-      ? "rgba(255, 255, 255, 0.1)"
-      : "rgb(204, 204, 204)";
-    ctx.lineWidth = backgroundIsDark ? 0.75 : 0.5;
+      ? "rgba(255, 255, 255, 0.3)"
+      : "rgba(128, 128, 128, 0.4)";
+    ctx.lineWidth = 0.75;
 
     // Calculate grid boundaries with buffer
     const startX = Math.floor((-transform.translateX - width) / step) * step;
@@ -97,7 +98,7 @@ const PixelGrid: React.FC<PixelGridProps> = ({
         height: "100%",
         position: "absolute",
         overflow: "hidden",
-        pointerEvents: "none",
+        pointerEvents: "all",
       }}
     >
       <canvas

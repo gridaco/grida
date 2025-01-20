@@ -292,7 +292,7 @@ export function EditorSurface() {
               translateY: transform[1][1],
               scale: transform[0][0],
             }}
-            backgroundIsDark={true}
+            backgroundIsDark={false}
           />
         )}
       </div>
