@@ -220,11 +220,7 @@ export type GestureTranslate = IGesture & {
  * Contains collection of nodes' bounding rect.
  */
 export interface LayoutSnapshot {
-  nodes: {
-    id: string;
-    rect: cmath.Rectangle;
-  }[];
-  boundingRect: cmath.Rectangle;
+  objects: Array<cmath.Rectangle & { id: string }>;
 }
 
 /**
@@ -244,14 +240,30 @@ export type GestureTranslateSwap = IGesture & {
   node_id: string;
 
   /**
+   * initial position of moving node {@link GestureTranslateSwap.node_id}
+   */
+  node_initial_rect: cmath.Rectangle;
+
+  /**
+   * the current layout - this changes as the movement changes
+   */
+  layout: LayoutSnapshot;
+
+  /**
    * the selection will be at this position (when dropped)
    */
   placement: {
+    /**
+     * the current rect (placed) of the moving node.
+     * this should be identical to layout.objects[index]
+     */
     rect: cmath.Rectangle;
+
+    /**
+     * index of the node's rect within the current layout snapshot
+     */
     index: number;
   };
-
-  layout: LayoutSnapshot;
 };
 
 /**

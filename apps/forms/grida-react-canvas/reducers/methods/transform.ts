@@ -350,84 +350,73 @@ function __self_update_gesture_transform_translate_swap(
     "Gesture type must be translate-swap"
   );
 
-  const { layout, movement, node_id, placement } = draft.gesture;
+  const { layout, movement, node_id, node_initial_rect, placement } =
+    draft.gesture;
 
-  const initial = layout.nodes.find((n) => n.id === node_id)!;
-
+  // [moving node]
+  // apply movement as-is to moving node
+  const moving_rect = cmath.rect.translate(node_initial_rect, movement);
   const moving_node = document.__getNodeById(
     draft,
     node_id
-  ) as grida.program.nodes.i.IPositioning; // TODO: don't cast
+  ) as grida.program.nodes.i.IPositioning;
+  moving_node.left = moving_rect.x;
+  moving_node.top = moving_rect.y;
 
-  const virtually_translated: cmath.Rectangle = {
-    x: initial.rect.x + movement[0],
-    y: initial.rect.y + movement[1],
-    width: initial.rect.width,
-    height: initial.rect.height,
-  };
+  // [dnd testing]
+  const { index: dnd_target_index } = dnd.test(moving_rect, layout.objects);
 
-  // apply position for preview
-  moving_node.left = initial.rect.x + movement[0];
-  moving_node.top = initial.rect.y + movement[1];
+  // if no change, return
+  if (dnd_target_index === placement.index) return;
 
-  const { index: dnd_target_index } = dnd.test(
-    virtually_translated,
-    layout.nodes.map((n) => n.rect)
+  // recalculate the layout following the index change
+  // while keeping the order of the objects, re-assign the rect.
+  const __moved = cmath.arrayMove(
+    layout.objects,
+    placement.index,
+    dnd_target_index
   );
 
-  if (dnd_target_index !== placement.index) {
-    // re-arrange (swap)
-    // set the next target node's position to the current
-    const { id, rect } = layout.nodes[dnd_target_index];
-    const dnd_target_node = document.__getNodeById(
-      draft,
-      id
-    ) as grida.program.nodes.i.IPositioning; // TODO: don't cast
-
-    // center-aligned next placement position
-    const __aligned = cmath.rect.alignA(rect, placement.rect, {
+  // update the layout
+  draft.gesture.layout.objects = layout.objects.map((obj, i) => {
+    const next_rect_ref = __moved[i];
+    // this center-aligns the object to the next rect, while keeping the size.
+    const next_rect = cmath.rect.alignA(obj, next_rect_ref, {
       horizontal: "center",
       vertical: "center",
     });
 
-    const __placement_position = cmath.vector2.quantize(
-      [__aligned.x, __aligned.y],
-      1
-    );
-
-    dnd_target_node.left = __placement_position[0];
-    dnd_target_node.top = __placement_position[1];
-  }
-
-  const __dnd_target_rect = layout.nodes[dnd_target_index].rect;
-
-  // center-aligned next placement position
-  const __aligned = cmath.rect.alignA(initial.rect, __dnd_target_rect, {
-    horizontal: "center",
-    vertical: "center",
+    return { ...next_rect, id: obj.id };
   });
 
-  const __placement_position = cmath.vector2.quantize(
-    [__aligned.x, __aligned.y],
-    1
+  const next_placement_index = layout.objects.findIndex(
+    (obj) => obj.id === node_id
   );
 
-  const placement_rect = {
-    x: __placement_position[0],
-    y: __placement_position[1],
-    width: initial.rect.width,
-    height: initial.rect.height,
-  };
+  const next_placement_rect = layout.objects[next_placement_index];
 
+  // // update the placement
   draft.gesture.placement = {
-    rect: placement_rect,
-    index: dnd_target_index,
+    index: next_placement_index,
+    rect: next_placement_rect,
   };
 
+  // // update the dropzone
   draft.dropzone = {
     type: "rect",
-    rect: placement_rect,
+    rect: next_placement_rect,
   };
+
+  // update the position of the real nodes (except the moving node)
+  layout.objects.forEach((obj, i) => {
+    if (obj.id === node_id) return;
+    const node = document.__getNodeById(
+      draft,
+      obj.id
+    ) as grida.program.nodes.i.IPositioning;
+    node.left = obj.x;
+    node.top = obj.y;
+  });
 }
 
 function __self_update_gesture_transform_scale(

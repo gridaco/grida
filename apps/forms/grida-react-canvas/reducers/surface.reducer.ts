@@ -193,20 +193,27 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
           const { selection, node_id } = gesture;
           return produce(state, (draft) => {
             const layout = createLayoutSnapshot(state, selection);
-            const initial_index = layout.nodes.findIndex(
+            const initial_index = layout.objects.findIndex(
               (it) => it.id === node_id
             );
             const initial_placement = {
               index: initial_index,
-              rect: layout.nodes[initial_index].rect,
+              rect: layout.objects[initial_index],
             };
+
             draft.gesture = {
               type: "translate-swap",
               selection: selection,
               node_id: node_id,
+              node_initial_rect: layout.objects[initial_index],
               layout: layout,
               placement: initial_placement,
               movement: cmath.vector2.zero,
+            };
+
+            draft.dropzone = {
+              type: "rect",
+              rect: initial_placement.rect,
             };
           });
         }
@@ -224,20 +231,17 @@ function createLayoutSnapshot(
 ): LayoutSnapshot {
   const cdom = new domapi.CanvasDOM(state.transform);
 
-  const nodes = group.map((node_id) => {
+  const objects: LayoutSnapshot["objects"] = group.map((node_id) => {
     const rect = cdom.getNodeBoundingRect(node_id)!;
 
     return {
+      ...rect,
       id: node_id,
-      rect,
     };
   });
 
-  const boundingRect = cmath.rect.union(nodes.map((it) => it.rect));
-
   return {
-    nodes,
-    boundingRect,
+    objects,
   };
 }
 
