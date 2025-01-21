@@ -795,5 +795,14 @@ function DistributeButton() {
   );
 }
 
-const gapsAreAligned = (arr: number[], tolerance = 0.1) =>
+/**
+ * The tolerance for the gap alignment, if each gap is within this tolerance, it is considered aligned.
+ *
+ * It's 1 because, we quantize the position to 1px, so each gap diff on aligned nodes is not guaranteed to be exactly 0.
+ *
+ * 1.001 because the surface measurement is can get slighly off due to the transform matrix calculation.
+ */
+const GAP_ALIGNMENT_TOLERANCE = 1 + 1e-3;
+
+const gapsAreAligned = (arr: number[], tolerance = GAP_ALIGNMENT_TOLERANCE) =>
   arr.every((v) => Math.abs(v - arr[0]) <= tolerance);
