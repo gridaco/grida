@@ -16,6 +16,7 @@ export const RedDotHandle = React.forwardRef(
           border border-pink-500
           hover:bg-pink-500
           ring-1 ring-white
+          pointer-events-auto
         "
         style={{
           transform: "translate(-50%, -50%)",

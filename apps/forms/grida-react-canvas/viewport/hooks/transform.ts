@@ -10,6 +10,7 @@ import {
 import { ViewportSurfaceContext } from "../context";
 import { cmath } from "@grida/cmath";
 import { SelectionItem, SurfaceSelectionGroup } from "../core";
+import { analyzeDistribution } from "../ui/distribution";
 
 function useViewportSurfacePortal() {
   const context = useContext(ViewportSurfaceContext);
@@ -192,6 +193,12 @@ export function useGroupSurfaceTransform(
     size: [0, 0],
     boundingRect: { x: 0, y: 0, width: 0, height: 0 },
     style: { top: 0, left: 0, transform: "", width: 0, height: 0 },
+    distribution: {
+      rects: [],
+      x: undefined,
+      y: undefined,
+      preferredDistributeEvenlyActionAxis: undefined,
+    },
     items: [],
   });
 
@@ -229,6 +236,17 @@ export function useGroupSurfaceTransform(
       const centerY =
         boundingRect.y + boundingRect.height / 2 - portal_rect.top;
 
+      const distribution = analyzeDistribution(
+        items.map((it) => it.boundingRect)
+      );
+
+      const preferredDistributeEvenlyActionAxis: "x" | "y" | undefined =
+        distribution.x && distribution.x.gap === undefined
+          ? "x"
+          : distribution.y && distribution.y.gap === undefined
+            ? "y"
+            : undefined;
+
       setData({
         selection: stableNodeIds,
         boundingRect: boundingRect,
@@ -244,6 +262,10 @@ export function useGroupSurfaceTransform(
           width: boundingRect.width,
           height: boundingRect.height,
           willChange: "transform",
+        },
+        distribution: {
+          ...distribution,
+          preferredDistributeEvenlyActionAxis,
         },
         items,
       });

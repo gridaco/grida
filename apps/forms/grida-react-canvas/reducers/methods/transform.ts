@@ -59,6 +59,7 @@ export function self_update_gesture_transform<S extends IDocumentEditorState>(
   if (draft.gesture.type === "nudge") return; // nudge is not a transform gesture - only a virtual gesture
   if (draft.gesture.type === "translate-vertex") return;
   if (draft.gesture.type === "curve") return;
+  if (draft.gesture.type === "gap") return;
 
   switch (draft.gesture.type) {
     case "translate": {

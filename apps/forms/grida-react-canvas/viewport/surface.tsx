@@ -1,8 +1,7 @@
 "use client";
 
-import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
+import React, { useContext, useEffect, useMemo, useRef } from "react";
 import {
-  DEFAULT_GAP_ALIGNMENT_TOLERANCE,
   DropzoneIndication,
   GestureState,
   useEventTarget,
@@ -17,8 +16,7 @@ import {
 } from "../provider";
 import { useIsWindowResizing } from "./hooks/window-resizing";
 import { supports } from "@/grida/utils/supports";
-import { MarqueeArea, Vector4Area } from "./ui/marquee";
-import { domapi } from "../domapi";
+import { MarqueeArea } from "./ui/marquee";
 import { LayerOverlay } from "./ui/layer";
 import { ViewportSurfaceContext } from "./context";
 import {
@@ -36,14 +34,11 @@ import { SurfacePathEditor } from "./ui/path-editor";
 import { SizeMeterLabel } from "./ui/meter";
 import { SurfaceGradientEditor } from "./ui/gradient-editor";
 import { pointToSurfaceSpace, rectToSurfaceSpace } from "../utils/transform";
-import PixelGrid from "./pixelgrid";
 import { RedDotHandle } from "./ui/reddot";
 import {
-  SurfaceSelectionGroup,
   SurfaceSelectionGroupProvider,
   useSurfaceSelectionGroup,
 } from "./core";
-import assert from "assert";
 
 const DRAG_THRESHOLD = 2;
 
@@ -152,17 +147,13 @@ export function EditorSurface() {
   const context = useContext(ViewportSurfaceContext);
 
   useEffect(() => {
-    if (context?.setPortalRef) {
-      context.setPortalRef(portalRef.current);
-    }
+    context?.setPortalRef?.(portalRef.current);
 
     // Clean up when component unmounts
     return () => {
-      if (context?.setPortalRef) {
-        context.setPortalRef(null);
-      }
+      context?.setPortalRef?.(null);
     };
-  }, [context]);
+  }, [context, portalRef]);
 
   //
   // hook for pointer move event.
@@ -737,92 +728,21 @@ function LayerOverlayResizeHandle({
   return <Knob size={size} {...bind()} anchor={anchor} />;
 }
 
-interface AxisAlignedObjectsDistribution {
-  tolerance: number;
-  gap: number | undefined;
-  gaps: number[];
-}
-
-interface ObjectsDistributionAnalysis {
-  rects: cmath.Rectangle[];
-  x: AxisAlignedObjectsDistribution | undefined;
-  y: AxisAlignedObjectsDistribution | undefined;
-}
-
-function useDistributionAnalysis(): ObjectsDistributionAnalysis {
-  const { transform, selection, state } = useDocument();
-
-  // const [axis, setAxis] = useState<"x" | "y">();
-  const [result, setResult] = useState<ObjectsDistributionAnalysis>({
-    rects: [],
-    x: undefined,
-    y: undefined,
-  });
-
-  useEffect(() => {
-    const cdom = new domapi.CanvasDOM(transform);
-
-    const activeSelection = selection.filter(
-      (node_id) => state.document.nodes[node_id].active
-    );
-
-    const rects = activeSelection.map(
-      (node_id) => cdom.getNodeBoundingRect(node_id)!
-    );
-
-    if (rects.length > 1) {
-      const x_distribute = cmath.rect.axisProjectionIntersection(rects, "x");
-      const y_distribute = cmath.rect.axisProjectionIntersection(rects, "y");
-      let x: AxisAlignedObjectsDistribution | undefined = undefined;
-      let y: AxisAlignedObjectsDistribution | undefined = undefined;
-      if (x_distribute) {
-        const [gap, gaps] = cmath.rect.getUniformGap(
-          rects,
-          "x",
-          DEFAULT_GAP_ALIGNMENT_TOLERANCE
-        );
-        x = {
-          gap,
-          gaps,
-          tolerance: DEFAULT_GAP_ALIGNMENT_TOLERANCE,
-        };
-      }
-
-      if (y_distribute) {
-        const [gap] = cmath.rect.getUniformGap(
-          rects,
-          "y",
-          DEFAULT_GAP_ALIGNMENT_TOLERANCE
-        );
-        y = {
-          gap,
-          gaps: [],
-          tolerance: DEFAULT_GAP_ALIGNMENT_TOLERANCE,
-        };
-      }
-
-      setResult({
-        rects,
-        x,
-        y,
-      });
-      return;
-    }
-
-    setResult({ rects, x: undefined, y: undefined });
-  }, [selection, state.document.nodes, transform]);
-
-  return result;
-}
-
 function DistributionOverlay() {
-  const { items, boundingRect, style } = useSurfaceSelectionGroup();
-  const { scaleX } = useTransform();
-  const { x, y } = useDistributionAnalysis();
+  const { distributeEvenly } = useDocument();
+
+  const { items, boundingRect, distribution } = useSurfaceSelectionGroup();
+
+  const { x, y, preferredDistributeEvenlyActionAxis } = distribution;
 
   return (
     <>
-      <DistributeButton />
+      <DistributeButton
+        axis={preferredDistributeEvenlyActionAxis}
+        onClick={(axis) => {
+          distributeEvenly("selection", axis);
+        }}
+      />
       <div>
         {items.length >= 2 && (
           <>
@@ -850,6 +770,25 @@ function DistributionOverlay() {
               <>
                 {Array.from({ length: x.gaps.length }).map((_, i) => {
                   const axis = "x";
+                  const a = items[i];
+                  const b = items[i + 1];
+
+                  return (
+                    <Gap
+                      key={i}
+                      a={a.boundingRect}
+                      b={b.boundingRect}
+                      axis={axis}
+                      offset={[boundingRect.x, boundingRect.y]}
+                    />
+                  );
+                })}
+              </>
+            )}
+            {y && y.gap !== undefined && (
+              <>
+                {Array.from({ length: y.gaps.length }).map((_, i) => {
+                  const axis = "y";
                   const a = items[i];
                   const b = items[i + 1];
 
@@ -904,15 +843,28 @@ function Gap({
   const r = useMemo(() => {
     const intersection = cmath.rect.axisProjectionIntersection([a, b], axis)!;
 
-    const x1 = a.x + a.width;
-    const y1 = intersection[0];
-    const x2 = b.x;
-    const y2 = intersection[1];
+    let rect: cmath.Rectangle;
+    if (axis === "x") {
+      const x1 = a.x + a.width;
+      const y1 = intersection[0];
+      const x2 = b.x;
+      const y2 = intersection[1];
 
-    let rect = cmath.rect.fromPoints([
-      [x1, y1],
-      [x2, y2],
-    ]);
+      rect = cmath.rect.fromPoints([
+        [x1, y1],
+        [x2, y2],
+      ]);
+    } else {
+      const x1 = intersection[0];
+      const y1 = a.y + a.height;
+      const x2 = intersection[1];
+      const y2 = b.y;
+
+      rect = cmath.rect.fromPoints([
+        [x1, y1],
+        [x2, y2],
+      ]);
+    }
 
     return cmath.rect.translate(rect, cmath.vector2.invert(offset));
   }, [a, b, axis, offset]);
@@ -920,29 +872,31 @@ function Gap({
   const is_gesture = gesture.type === "gap";
 
   return (
-    <div
-      style={{
-        position: "absolute",
-        top: r.y,
-        left: r.x,
-        width: r.width,
-        height: r.height,
-      }}
-      data-is-gesture={is_gesture}
-      className="pointer-events-none bg-transparent data-[is-gesture='true']:bg-workbench-accent-red/20"
-    >
+    <>
       <div
-        data-is-gesture={is_gesture}
         style={{
           position: "absolute",
-          top: "50%",
-          left: "50%",
+          top: r.y,
+          left: r.x,
+          width: r.width,
+          height: r.height,
         }}
-        className="visible data-[is-gesture='true']:invisible"
+        data-is-gesture={is_gesture}
+        className="pointer-events-none bg-transparent data-[is-gesture='true']:bg-workbench-accent-red/20"
       >
-        <GapHandle axis={axis} />
+        <div
+          data-is-gesture={is_gesture}
+          style={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+          }}
+          className="opacity-100 data-[is-gesture='true']:opacity-0"
+        >
+          <GapHandle axis={axis} />
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -972,7 +926,8 @@ function GapHandle({ axis }: { axis: cmath.Axis }) {
         pointer-events-auto
       "
       style={{
-        transform: "translate(-50%, -50%)",
+        transform:
+          "translate(-50%, -50%) " + (axis === "y" ? "rotate(90deg)" : ""),
         touchAction: "none",
         cursor: axis === "x" ? "ew-resize" : "ns-resize",
       }}
@@ -980,24 +935,24 @@ function GapHandle({ axis }: { axis: cmath.Axis }) {
   );
 }
 
-function DistributeButton() {
-  const { distributeEvenly } = useDocument();
-  const { rects, x, y } = useDistributionAnalysis();
-
-  const axis: "x" | "y" | undefined =
-    x && x.gap === undefined ? "x" : y && y.gap === undefined ? "y" : undefined;
-
-  if (!axis || rects.length < 2) {
+function DistributeButton({
+  axis,
+  onClick,
+}: {
+  axis: cmath.Axis | undefined;
+  onClick?: (axis: cmath.Axis) => void;
+}) {
+  if (!axis) {
     return <></>;
   }
 
   return (
-    <div className="absolute hidden group-hover:block bottom-1 right-1 z-50">
+    <div className="absolute hidden group-hover:block bottom-1 right-1 z-50 pointer-events-auto">
       <button
         className="p-1 bg-workbench-accent-sky text-white rounded"
         onClick={(e) => {
           e.stopPropagation();
-          distributeEvenly("selection", axis);
+          onClick?.(axis);
         }}
       >
         {axis === "x" ? <ColumnsIcon /> : <RowsIcon />}

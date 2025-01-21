@@ -1,5 +1,6 @@
 import React from "react";
 import type { cmath } from "@grida/cmath";
+import type { ObjectsDistributionAnalysis } from "./ui/distribution";
 
 export interface SelectionItem {
   id: string;
@@ -11,6 +12,9 @@ export interface SurfaceSelectionGroup {
   size: cmath.Vector2;
   boundingRect: cmath.Rectangle;
   items: SelectionItem[];
+  distribution: ObjectsDistributionAnalysis & {
+    preferredDistributeEvenlyActionAxis: cmath.Axis | undefined;
+  };
   style: React.CSSProperties;
 }
 
