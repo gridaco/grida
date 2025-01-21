@@ -337,6 +337,76 @@ describe("cmath.rect", () => {
     });
   });
 
+  describe("getUniformGap", () => {
+    it("should return [undefined, []] if fewer than 2 rectangles", () => {
+      const rects = [{ x: 10, y: 20, width: 30, height: 40 }];
+      const [gap, gaps] = cmath.rect.getUniformGap(rects, "x", 0);
+      expect(gap).toBeUndefined();
+      expect(gaps).toEqual([]);
+    });
+
+    it("should return [gap, [gap]] when exactly 2 rectangles have the same gap", () => {
+      const rects = [
+        { x: 10, y: 10, width: 20, height: 20 },
+        { x: 40, y: 10, width: 20, height: 20 },
+      ];
+      const [gap, gaps] = cmath.rect.getUniformGap(rects, "x", 0);
+      expect(gap).toBe(10); // only one gap => 40 - (10 + 20) = 10
+      expect(gaps).toEqual([10]);
+    });
+
+    it("should return [mode, gaps] if all gaps are uniform within tolerance", () => {
+      const rects = [
+        { x: 0, y: 0, width: 10, height: 10 },
+        { x: 15, y: 0, width: 10, height: 10 },
+        { x: 30, y: 0, width: 10, height: 10 },
+      ];
+      // Actual gaps: [5, 5]
+      const [uniformGap, gaps] = cmath.rect.getUniformGap(rects, "x", 0.1);
+      expect(uniformGap).toBe(5);
+      expect(gaps).toEqual([5, 5]);
+    });
+
+    it("should return [undefined, gaps] if gaps are not uniform", () => {
+      const rects = [
+        { x: 0, y: 0, width: 10, height: 10 },
+        { x: 15, y: 0, width: 10, height: 10 },
+        { x: 28, y: 0, width: 10, height: 10 },
+      ];
+      // Actual gaps: [5, 3]
+      const [uniformGap, gaps] = cmath.rect.getUniformGap(rects, "x", 0);
+      expect(uniformGap).toBeUndefined();
+      expect(gaps).toEqual([5, 3]);
+    });
+
+    it("should consider tolerance when deciding if gaps are uniform", () => {
+      const rects = [
+        { x: 0, y: 0, width: 10, height: 10 },
+        { x: 14, y: 0, width: 10, height: 10 },
+        { x: 28, y: 0, width: 10, height: 10 },
+      ];
+      // Actual gaps: [4, 4], but let's say tolerance=1 => uniform enough
+      const [uniformGap, gaps] = cmath.rect.getUniformGap(rects, "x", 1);
+      expect(uniformGap).toBe(4);
+      expect(gaps).toEqual([4, 4]);
+    });
+
+    it("should return the mode if multiple gap values are all within tolerance", () => {
+      // Gaps: [5, 5, 6, 5] => all within tolerance=1.
+      // mode is 5
+      const rects = [
+        { x: 0, y: 0, width: 10, height: 10 },
+        { x: 15, y: 0, width: 10, height: 10 },
+        { x: 30, y: 0, width: 10, height: 10 },
+        { x: 46, y: 0, width: 10, height: 10 },
+        { x: 61, y: 0, width: 10, height: 10 },
+      ];
+      const [uniformGap, gaps] = cmath.rect.getUniformGap(rects, "x", 1);
+      expect(gaps).toEqual([5, 5, 6, 5]);
+      expect(uniformGap).toBe(5);
+    });
+  });
+
   describe("translate", () => {
     it("should translate a rectangle by a positive vector", () => {
       const rect: cmath.Rectangle = { x: 10, y: 20, width: 30, height: 40 };

@@ -680,6 +680,15 @@ function LayerOverlayResizeHandle({
   return <Knob size={size} {...bind()} anchor={anchor} />;
 }
 
+/**
+ * The tolerance for the gap alignment, if each gap is within this tolerance, it is considered aligned.
+ *
+ * It's 1 because, we quantize the position to 1px, so each gap diff on aligned nodes is not guaranteed to be exactly 0.
+ *
+ * 1.001 because the surface measurement is can get slighly off due to the transform matrix calculation.
+ */
+const GAP_ALIGNMENT_TOLERANCE = 1 + 1e-3;
+
 function usePrefferedDistributionAxis() {
   const { transform, selection, state } = useDocument();
 
@@ -699,8 +708,12 @@ function usePrefferedDistributionAxis() {
     if (rects.length > 2) {
       const x_distribute = cmath.rect.axisProjectionIntersection(rects, "x");
       if (x_distribute) {
-        const dist = cmath.rect.getGaps(rects, "x");
-        if (!gapsAreAligned(dist)) {
+        const [gap] = cmath.rect.getUniformGap(
+          rects,
+          "x",
+          GAP_ALIGNMENT_TOLERANCE
+        );
+        if (gap === undefined) {
           setAxis("x");
           return;
         }
@@ -708,8 +721,12 @@ function usePrefferedDistributionAxis() {
 
       const y_distribute = cmath.rect.axisProjectionIntersection(rects, "y");
       if (y_distribute) {
-        const dist = cmath.rect.getGaps(rects, "y");
-        if (!gapsAreAligned(dist)) {
+        const [gap] = cmath.rect.getUniformGap(
+          rects,
+          "y",
+          GAP_ALIGNMENT_TOLERANCE
+        );
+        if (gap === undefined) {
           setAxis("y");
           return;
         }
@@ -794,15 +811,3 @@ function DistributeButton() {
     </div>
   );
 }
-
-/**
- * The tolerance for the gap alignment, if each gap is within this tolerance, it is considered aligned.
- *
- * It's 1 because, we quantize the position to 1px, so each gap diff on aligned nodes is not guaranteed to be exactly 0.
- *
- * 1.001 because the surface measurement is can get slighly off due to the transform matrix calculation.
- */
-const GAP_ALIGNMENT_TOLERANCE = 1 + 1e-3;
-
-const gapsAreAligned = (arr: number[], tolerance = GAP_ALIGNMENT_TOLERANCE) =>
-  arr.every((v) => Math.abs(v - arr[0]) <= tolerance);

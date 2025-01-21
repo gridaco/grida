@@ -178,6 +178,76 @@ export namespace cmath {
 
     return newArray;
   }
+
+  /**
+   * Checks if all elements in an array are equal, with optional tolerance.
+   *
+   * @param arr - The array of numbers to check.
+   * @param tolerance - The allowable difference for values to be considered equal. Defaults to 0 (strict equality).
+   * @returns `true` if all elements in the array are equal within the given tolerance, otherwise `false`.
+   *
+   * @example
+   * isUniform([1, 1, 1]); // true
+   * isUniform([1.001, 1.002, 1.0009], 0.01); // true
+   * isUniform([1, 2, 3]); // false
+   */
+  export function isUniform(arr: number[], tolerance: number = 0): boolean {
+    if (arr.length <= 1) return true;
+
+    const first = arr[0];
+
+    if (tolerance === 0) {
+      return arr.every((value) => value === first);
+    } else {
+      return arr.every((value) => Math.abs(value - first) <= tolerance);
+    }
+  }
+
+  /**
+   * Finds the mode (most frequent value) in an array of numbers.
+   *
+   * The mode is the value that appears most often in the array. If the array is empty, `undefined` is returned.
+   *
+   * @param arr - An array of numbers to find the mode from.
+   * @returns The most frequent number in the array, or `undefined` if the array is empty.
+   *
+   * @example
+   * // Single mode
+   * const result1 = mode([1, 2, 2, 3]);
+   * console.log(result1); // 2
+   *
+   * @example
+   * // Multiple modes (returns the first encountered)
+   * const result2 = mode([1, 2, 2, 3, 3]);
+   * console.log(result2); // 2 or 3
+   *
+   * @example
+   * // Empty array
+   * const result3 = mode([]);
+   * console.log(result3); // undefined
+   *
+   * @remarks
+   * - The function uses a frequency map to count occurrences and identifies the most frequent value.
+   * - In the case of ties (multiple numbers with the same highest frequency), the first number encountered is returned.
+   */
+  export function mode(arr: number[]): number | undefined {
+    const frequency: Record<number, number> = {};
+    arr.forEach((num) => {
+      frequency[num] = (frequency[num] || 0) + 1;
+    });
+
+    let mostFrequent: [number, number] = [undefined as any, 0];
+
+    for (const key in frequency) {
+      const count = frequency[key];
+      const value = Number(key); // Convert the string key to a number
+      if (count > mostFrequent[1]) {
+        mostFrequent = [value, count];
+      }
+    }
+
+    return mostFrequent[0];
+  }
 }
 
 /**
@@ -1395,6 +1465,42 @@ export namespace cmath.rect {
     }
 
     return gaps;
+  }
+
+  /**
+   * Calculates the uniform gap between adjacent rectangles along a specified axis.
+   *
+   * @param rectangles - An array of rectangles to calculate the uniform gap for.
+   * @param axis - The axis to calculate the gap along ("x" or "y").
+   * @param tolerance - The maximum allowed deviation from a uniform gap.
+   *
+   * @returns `[unfiorm, gaps]` A tuple containing the uniform gap (if found, most present or biggest) and an array of gaps between adjacent rectangles.
+   *
+   */
+  export function getUniformGap(
+    rectangles: cmath.Rectangle[],
+    axis: "x" | "y",
+    tolerance: number = 0
+  ): [unfiorm: number | undefined, gaps: number[]] {
+    // Calculate the gaps between rectangles along the specified axis
+    const gaps = getGaps(rectangles, axis);
+
+    if (gaps.length === 0) {
+      return [undefined, []]; // No gaps if fewer than 2 rectangles
+    }
+
+    // Check if all gaps are uniform within the specified tolerance
+    const is_uniform = isUniform(gaps, tolerance);
+    if (is_uniform) {
+      const most = mode(gaps);
+      if (most !== undefined) {
+        return [most, gaps];
+      } else {
+        return [Math.max(...gaps), gaps];
+      }
+    } else {
+      return [undefined, gaps];
+    }
   }
 
   /**
