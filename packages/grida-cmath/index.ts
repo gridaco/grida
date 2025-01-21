@@ -13,6 +13,13 @@ export namespace cmath {
   export const tan = Math.tan;
 
   /**
+   * Represents a single axis in 2D space.
+   *
+   * Also known as horizontal (x-axis) or vertical (y-axis) direction.
+   */
+  export type Axis = "x" | "y";
+
+  /**
    * Represents a single numerical value, often referred to as a scalar in mathematics and computer science.
    *
    * Scalars are used to denote quantities without direction, such as magnitude, intensity, or single-dimensional values.
@@ -35,6 +42,77 @@ export namespace cmath {
    */
   export type Vector2 = [number, number];
 
+  /**
+   * A 4-dimensional vector. (commonly used for areas, colors, etc.)
+   */
+  export type Vector4 = [number, number, number, number];
+
+  /**
+   * Represents a 2D affine transformation matrix.
+   *
+   * A 2D affine transform is used to perform linear transformations (e.g., scaling, rotation, skewing)
+   * and translations (shifting position) in 2D space. The matrix is represented as a 2x3 matrix:
+   *
+   * ```
+   * [ a, b, tx ]
+   * [ c, d, ty ]
+   * ```
+   *
+   * Where:
+   * - `a` and `d` are scaling factors along the x and y axes, respectively.
+   * - `b` and `c` are the skewing (shearing) factors.
+   * - `tx` and `ty` are translation (movement) along the x and y axes, respectively.
+   *
+   * ### Mathematical Formulation
+   * When applied to a vector `[x, y]`, the transform produces a new vector `[x', y']` as follows:
+   *
+   * ```
+   * x' = a * x + b * y + tx
+   * y' = c * x + d * y + ty
+   * ```
+   *
+   * ### Example Transformations
+   * - **Translation**:
+   *   ```
+   *   [ 1, 0, tx ]
+   *   [ 0, 1, ty ]
+   *   ```
+   *   Moves a point by `tx` along the x-axis and `ty` along the y-axis.
+   *
+   * - **Scaling**:
+   *   ```
+   *   [ sx, 0, 0 ]
+   *   [ 0, sy, 0 ]
+   *   ```
+   *   Scales a point by `sx` along the x-axis and `sy` along the y-axis.
+   *
+   * - **Rotation (θ degrees)**:
+   *   ```
+   *   [ cos(θ), -sin(θ), 0 ]
+   *   [ sin(θ),  cos(θ), 0 ]
+   *   ```
+   *   Rotates a point counterclockwise by `θ` degrees about the origin.
+   *
+   * - **Skewing**:
+   *   ```
+   *   [ 1, tan(α), 0 ]
+   *   [ tan(β), 1, 0 ]
+   *   ```
+   *   Skews a point horizontally by angle `α` and vertically by angle `β`.
+   *
+   * ### Common Use Cases
+   * - Transforming shapes or points in 2D graphics.
+   * - Applying geometric transformations in computer graphics or simulations.
+   * - Modeling affine transformations in coordinate systems.
+   *
+   * @example
+   * // Rotate a vector [1, 0] by 90 degrees and translate by [2, 3]
+   * const transform: Transform = [
+   *   [0, -1, 2], // Rotation and translation
+   *   [1,  0, 3],
+   * ];
+   * ```
+   */
   export type Transform = [[number, number, number], [number, number, number]];
 
   /**
@@ -56,6 +134,7 @@ export namespace cmath {
   };
 
   export type RectangleSide = "top" | "right" | "bottom" | "left";
+  export type RectangleDimension = "width" | "height";
 
   export type CardinalDirection =
     | "n"
@@ -519,6 +598,17 @@ export namespace cmath.vector2 {
 }
 
 export namespace cmath.rect {
+  const __axis_map = {
+    dimension: {
+      x: "width",
+      y: "height",
+    },
+  } as const;
+
+  export function getAxisDimension(rect: Rectangle, axis: Axis): number {
+    return rect[__axis_map.dimension[axis]];
+  }
+
   /**
    * Translates a rectangle by a given vector.
    *
@@ -1196,7 +1286,7 @@ export namespace cmath.rect {
    */
   export function axisProjectionIntersection(
     rectangles: cmath.Rectangle[],
-    projectionAxis: "x" | "y"
+    projectionAxis: Axis
   ): cmath.Vector2 | null {
     if (rectangles.length < 2) {
       throw new Error(
@@ -1438,10 +1528,7 @@ export namespace cmath.rect {
    * const gaps = getDistribution(rectangles, "x");
    * console.log(gaps); // [10, 10]
    */
-  export function getGaps(
-    rectangles: cmath.Rectangle[],
-    axis: "x" | "y"
-  ): number[] {
+  export function getGaps(rectangles: cmath.Rectangle[], axis: Axis): number[] {
     if (rectangles.length < 2) {
       return [];
     }
@@ -1479,7 +1566,7 @@ export namespace cmath.rect {
    */
   export function getUniformGap(
     rectangles: cmath.Rectangle[],
-    axis: "x" | "y",
+    axis: Axis,
     tolerance: number = 0
   ): [unfiorm: number | undefined, gaps: number[]] {
     // Calculate the gaps between rectangles along the specified axis
@@ -1545,7 +1632,7 @@ export namespace cmath.rect {
    */
   export function distributeEvenly(
     rectangles: cmath.Rectangle[],
-    axis: "x" | "y"
+    axis: Axis
   ): cmath.Rectangle[] {
     if (rectangles.length < 2) return rectangles;
 
