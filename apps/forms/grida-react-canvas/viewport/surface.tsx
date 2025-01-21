@@ -436,10 +436,13 @@ function FloatingCursorTooltip() {
 function get_cursor_tooltip_value(gesture: GestureState) {
   switch (gesture.type) {
     case "gap":
-      return gesture.gap.toFixed(1);
+      return cmath.debug.formatNumber(gesture.gap, 1);
     case "rotate":
-      // TODO: return angle
-      return gesture.movement[0].toFixed(1);
+      return cmath.debug.formatNumber(
+        // TODO: return angle
+        gesture.movement[0],
+        1
+      );
     case "translate":
     case "scale":
     case "sort":
@@ -741,6 +744,7 @@ interface AxisAlignedObjectsDistribution {
 }
 
 interface ObjectsDistributionAnalysis {
+  rects: cmath.Rectangle[];
   x: AxisAlignedObjectsDistribution | undefined;
   y: AxisAlignedObjectsDistribution | undefined;
 }
@@ -750,6 +754,7 @@ function useDistributionAnalysis(): ObjectsDistributionAnalysis {
 
   // const [axis, setAxis] = useState<"x" | "y">();
   const [result, setResult] = useState<ObjectsDistributionAnalysis>({
+    rects: [],
     x: undefined,
     y: undefined,
   });
@@ -765,7 +770,7 @@ function useDistributionAnalysis(): ObjectsDistributionAnalysis {
       (node_id) => cdom.getNodeBoundingRect(node_id)!
     );
 
-    if (rects.length > 2) {
+    if (rects.length > 1) {
       const x_distribute = cmath.rect.axisProjectionIntersection(rects, "x");
       const y_distribute = cmath.rect.axisProjectionIntersection(rects, "y");
       let x: AxisAlignedObjectsDistribution | undefined = undefined;
@@ -797,13 +802,14 @@ function useDistributionAnalysis(): ObjectsDistributionAnalysis {
       }
 
       setResult({
+        rects,
         x,
         y,
       });
       return;
     }
 
-    setResult({ x: undefined, y: undefined });
+    setResult({ rects, x: undefined, y: undefined });
   }, [selection, state.document.nodes, transform]);
 
   return result;
@@ -818,8 +824,28 @@ function DistributionOverlay() {
     <>
       <DistributeButton />
       <div>
-        {items.length >= 3 && (
+        {items.length >= 2 && (
           <>
+            {items.map((item) => {
+              return (
+                <div
+                  key={item.id}
+                  style={{
+                    position: "absolute",
+                    top:
+                      item.boundingRect.y +
+                      item.boundingRect.height / 2 -
+                      boundingRect.y,
+                    left:
+                      item.boundingRect.x +
+                      item.boundingRect.width / 2 -
+                      boundingRect.x,
+                  }}
+                >
+                  <RedDotSortHandle node_id={item.id} />
+                </div>
+              );
+            })}
             {x && x.gap !== undefined && (
               <>
                 {Array.from({ length: x.gaps.length }).map((_, i) => {
@@ -854,32 +880,6 @@ function DistributionOverlay() {
                 })}
               </>
             )}
-            {/*  */}
-            {/*  */}
-          </>
-        )}
-        {items.length >= 2 && (
-          <>
-            {items.map((item) => {
-              return (
-                <div
-                  key={item.id}
-                  style={{
-                    position: "absolute",
-                    top:
-                      item.boundingRect.y +
-                      item.boundingRect.height / 2 -
-                      boundingRect.y,
-                    left:
-                      item.boundingRect.x +
-                      item.boundingRect.width / 2 -
-                      boundingRect.x,
-                  }}
-                >
-                  <RedDotSortHandle node_id={item.id} />
-                </div>
-              );
-            })}
           </>
         )}
       </div>
@@ -929,6 +929,7 @@ function GapHandle({ axis }: { axis: "x" | "y" }) {
       "
       style={{
         transform: "translate(-50%, -50%)",
+        touchAction: "none",
       }}
     />
   );
@@ -936,12 +937,12 @@ function GapHandle({ axis }: { axis: "x" | "y" }) {
 
 function DistributeButton() {
   const { distributeEvenly } = useDocument();
-  const { x, y } = useDistributionAnalysis();
+  const { rects, x, y } = useDistributionAnalysis();
 
   const axis: "x" | "y" | undefined =
     x && x.gap === undefined ? "x" : y && y.gap === undefined ? "y" : undefined;
 
-  if (!axis) {
+  if (!axis || rects.length < 2) {
     return <></>;
   }
 

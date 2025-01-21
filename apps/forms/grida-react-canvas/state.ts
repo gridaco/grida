@@ -278,6 +278,8 @@ export type GestureGap = IGesture & {
 
   axis: "x" | "y";
 
+  min_gap: number;
+  initial_gap: number;
   gap: number;
 
   /**

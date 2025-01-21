@@ -911,38 +911,44 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               //
             }
             case "gap": {
-              const { layout, axis, gap } = draft.gesture;
+              const { layout, axis, initial_gap, min_gap } = draft.gesture;
+              const delta = movement[axis === "x" ? 0 : 1];
+              const side: "left" | "top" = axis === "x" ? "left" : "top";
+              const dim: "width" | "height" = axis === "x" ? "width" : "height";
 
-              const prevgap = gap;
-              const d = delta[axis === "x" ? 0 : 1] * 2;
-              const nextgap = prevgap + d;
+              const sorted = layout.objects
+                .slice()
+                .sort((a, b) => a[axis] - b[axis]);
 
-              layout.objects
-                .sort((a, b) => {
-                  return a[axis] - b[axis];
-                })
-                .forEach((obj, i) => {
-                  const node = document.__getNodeById(
-                    draft,
-                    obj.id
-                  ) as grida.program.nodes.i.IPositioning;
+              const gap = cmath.quantize(
+                Math.max(initial_gap + delta, min_gap),
+                1
+              );
 
-                  const a = obj[axis];
-                  const d = nextgap * i;
-                  const p = a + d;
+              // start from the first sorted object's position.
+              let currentPos = sorted[0][axis];
 
-                  switch (axis) {
-                    case "x":
-                      node.left = p;
-                      break;
-                    case "y":
-                      node.top = p;
-                      break;
-                  }
-                  //
-                });
+              // Calculate new positions considering each rect's dimension.
+              const transformed = sorted.map((obj) => {
+                const next = { ...obj };
+                next[axis] = currentPos;
+                currentPos += next[dim] + gap;
+                return next;
+              });
 
-              draft.gesture.gap = nextgap;
+              // Update layout objects with new positions.
+              draft.gesture.layout.objects = transformed;
+              draft.gesture.gap = gap;
+
+              // Apply transform to the actual nodes.
+              transformed.forEach((obj) => {
+                const node = document.__getNodeById(
+                  draft,
+                  obj.id
+                ) as grida.program.nodes.i.IPositioning;
+
+                node[side] = obj[axis];
+              });
 
               break;
             }

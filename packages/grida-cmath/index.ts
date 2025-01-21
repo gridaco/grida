@@ -2408,3 +2408,34 @@ export namespace cmath.ext.viewport {
     ];
   }
 }
+
+export namespace cmath.debug {
+  /**
+   * Formats a number to the specified precision only when needed.
+   *
+   * If the number, after rounding, is an integer (i.e. no meaningful fractional part remains),
+   * the function returns the integer as a string without trailing zeros. Otherwise, it formats the
+   * number to the provided decimal precision using `toFixed()`.
+   *
+   * @param num - The number to format.
+   * @param precision - The number of decimal places to round to.
+   * @returns The formatted number as a string. For example:
+   * - `formatNumber(1, 1)` returns `"1"`.
+   * - `formatNumber(1.2222, 1)` returns `"1.2"`.
+   * - `formatNumber(9.0001, 2)` returns `"9"`.
+   *
+   * @example
+   * // Returns "1" because 9.0001 rounds to 9 with 2 decimal precision and no fractional part remains.
+   * formatNumber(9.0001, 2);
+   *
+   * @example
+   * // Returns "9.12" because the rounded value has a non-zero fractional part.
+   * formatNumber(9.1234, 2);
+   */
+  export function formatNumber(num: number, precision: number): string {
+    const factor = 10 ** precision;
+    const rounded = Math.round(num * factor) / factor;
+    // If no decimal part remains, return integer form; otherwise use toFixed
+    return rounded % 1 === 0 ? String(rounded) : rounded.toFixed(precision);
+  }
+}

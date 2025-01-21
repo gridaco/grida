@@ -221,6 +221,8 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
           const { selection, axis } = gesture;
           return produce(state, (draft) => {
             const layout = createLayoutSnapshot(state, selection);
+            layout.objects.sort((a, b) => a[axis] - b[axis]);
+
             const [gap] = cmath.rect.getUniformGap(
               layout.objects,
               axis,
@@ -232,7 +234,10 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
               type: "gap",
               axis,
               layout,
-              gap,
+              // TODO: the negaive size of the smallet object or the first sorted object's size
+              min_gap: 0,
+              initial_gap: gap,
+              gap: gap,
               movement: cmath.vector2.zero,
             };
           });
