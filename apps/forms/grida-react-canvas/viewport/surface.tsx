@@ -770,8 +770,11 @@ function DistributionOverlay() {
               <>
                 {Array.from({ length: x.gaps.length }).map((_, i) => {
                   const axis = "x";
-                  const a = items[i];
-                  const b = items[i + 1];
+                  const x_sorted = items.sort(
+                    (a, b) => a.boundingRect.x - b.boundingRect.x
+                  );
+                  const a = x_sorted[i];
+                  const b = x_sorted[i + 1];
 
                   return (
                     <Gap
@@ -789,8 +792,11 @@ function DistributionOverlay() {
               <>
                 {Array.from({ length: y.gaps.length }).map((_, i) => {
                   const axis = "y";
-                  const a = items[i];
-                  const b = items[i + 1];
+                  const y_sorted = items.sort(
+                    (a, b) => a.boundingRect.y - b.boundingRect.y
+                  );
+                  const a = y_sorted[i];
+                  const b = y_sorted[i + 1];
 
                   return (
                     <Gap
@@ -917,21 +923,25 @@ function GapHandle({ axis }: { axis: cmath.Axis }) {
   return (
     <button
       {...bind()}
-      className="
-        w-0.5 h-4 invisible
-        group-hover:visible
-        border border-pink-500
-        hover:bg-pink-500
-        ring-1 ring-white
-        pointer-events-auto
-      "
+      className="p-1 pointer-events-auto"
       style={{
         transform:
           "translate(-50%, -50%) " + (axis === "y" ? "rotate(90deg)" : ""),
         touchAction: "none",
         cursor: axis === "x" ? "ew-resize" : "ns-resize",
       }}
-    />
+    >
+      <div
+        className="
+      w-0.5 h-4 invisible
+      group-hover:visible
+      border border-pink-500
+      hover:bg-pink-500
+      ring-1 ring-white
+      pointer-events-auto
+      "
+      />
+    </button>
   );
 }
 

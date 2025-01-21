@@ -2,8 +2,19 @@ import { DEFAULT_GAP_ALIGNMENT_TOLERANCE } from "@/grida-react-canvas/state";
 import { cmath } from "@grida/cmath";
 
 export interface AxisAlignedObjectsDistribution {
+  /**
+   * tolerance for alignment - used for deciding uniform gap
+   */
   tolerance: number;
+
+  /**
+   * uniform gap between objects
+   */
   gap: number | undefined;
+
+  /**
+   * gaps between objects, as-is
+   */
   gaps: number[];
 }
 
