@@ -9,8 +9,10 @@ import {
 } from "react";
 import { ViewportSurfaceContext } from "../context";
 import { cmath } from "@grida/cmath";
-import { SelectionItem, SurfaceSelectionGroup } from "../core";
+import { SurfaceNodeObject, SurfaceSelectionGroup } from "../core";
 import { analyzeDistribution } from "../ui/distribution";
+import { domapi } from "@/grida-react-canvas/domapi";
+import { rectToSurfaceSpace } from "@/grida-react-canvas/utils/transform";
 
 function useViewportSurfacePortal() {
   const context = useContext(ViewportSurfaceContext);
@@ -191,7 +193,7 @@ export function useGroupSurfaceTransform(
   const [data, setData] = useState<SurfaceSelectionGroup>({
     selection: [],
     size: [0, 0],
-    boundingRect: { x: 0, y: 0, width: 0, height: 0 },
+    boundingSurfaceRect: { x: 0, y: 0, width: 0, height: 0 },
     style: { top: 0, left: 0, transform: "", width: 0, height: 0 },
     distribution: {
       rects: [],
@@ -199,45 +201,45 @@ export function useGroupSurfaceTransform(
       y: undefined,
       preferredDistributeEvenlyActionAxis: undefined,
     },
-    items: [],
+    objects: [],
   });
 
   useEffect(() => {
     if (!portal || !node_elements?.length) return;
 
-    // Rotation is ignored for groups
-    const rotation = 0;
-
-    const scale = cmath.transform.getScale(transform);
-
     const updateTransform = () => {
-      const portal_rect = portal.getBoundingClientRect();
+      // const portal_rect = portal.getBoundingClientRect();
+      const cdom = new domapi.CanvasDOM(transform);
 
       // Collect bounding rectangles for all node elements
-      const items: SelectionItem[] = node_elements.map((el) => {
-        const cr = el.getBoundingClientRect();
+      const objects: SurfaceNodeObject[] = node_elements.map((el) => {
+        const br = cdom.getNodeBoundingRect(el.id)!;
+        const bsr = rectToSurfaceSpace(br, transform);
         return {
           id: el.id,
           boundingRect: {
-            x: cr.x,
-            y: cr.y,
-            width: cr.width,
-            height: cr.height,
+            x: br.x,
+            y: br.y,
+            width: br.width,
+            height: br.height,
+          },
+          boundingSurfaceRect: {
+            x: bsr.x,
+            y: bsr.y,
+            width: bsr.width,
+            height: bsr.height,
           },
         };
       });
 
-      // Calculate the bounding rectangle that encloses all node elements
-      const boundingRect = cmath.rect.union(items.map((it) => it.boundingRect));
+      const boundingRect = cmath.rect.union(
+        objects.map((it) => it.boundingRect)
+      );
 
-      // Center of the bounding rect relative to the portal
-      const centerX =
-        boundingRect.x + boundingRect.width / 2 - portal_rect.left;
-      const centerY =
-        boundingRect.y + boundingRect.height / 2 - portal_rect.top;
+      const surfaceBoundingRect = rectToSurfaceSpace(boundingRect, transform);
 
       const distribution = analyzeDistribution(
-        items.map((it) => it.boundingRect)
+        objects.map((it) => it.boundingRect)
       );
 
       const preferredDistributeEvenlyActionAxis: "x" | "y" | undefined =
@@ -249,25 +251,22 @@ export function useGroupSurfaceTransform(
 
       setData({
         selection: stableNodeIds,
-        boundingRect: boundingRect,
-        size: [
-          boundingRect.width * (1 / scale[0]),
-          boundingRect.height * (1 / scale[1]),
-        ],
+        boundingSurfaceRect: surfaceBoundingRect,
+        size: [boundingRect.width, boundingRect.height],
         style: {
           position: "absolute",
-          top: centerY,
-          left: centerX,
-          transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
-          width: boundingRect.width,
-          height: boundingRect.height,
+          top: surfaceBoundingRect.y,
+          left: surfaceBoundingRect.x,
+          // transform: `translate(-50%, -50%)`,
+          width: surfaceBoundingRect.width,
+          height: surfaceBoundingRect.height,
           willChange: "transform",
         },
         distribution: {
           ...distribution,
           preferredDistributeEvenlyActionAxis,
         },
-        items,
+        objects: objects,
       });
     };
 

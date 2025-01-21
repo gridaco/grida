@@ -930,7 +930,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               // Calculate new positions considering each rect's dimension.
               const transformed = sorted.map((obj) => {
                 const next = { ...obj };
-                next[axis] = currentPos;
+                next[axis] = cmath.quantize(currentPos, 1);
                 currentPos += cmath.rect.getAxisDimension(next, axis) + gap;
                 return next;
               });

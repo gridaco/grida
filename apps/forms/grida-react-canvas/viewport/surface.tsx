@@ -345,17 +345,23 @@ export function EditorSurface() {
             )}
           </SurfaceGroup>
           <SurfaceGroup
-            hidden={
-              is_node_translating ||
-              isWindowResizing ||
-              content_edit_mode?.type === "path"
-            }
+            hidden={isWindowResizing || content_edit_mode?.type === "path"}
           >
             <SelectionOverlay
               selection={selection}
               readonly={!!content_edit_mode}
             />
-            <SurfaceGroup hidden={!!marquee || cursor_mode.type !== "cursor"}>
+          </SurfaceGroup>
+          <SurfaceGroup
+            hidden={isWindowResizing || content_edit_mode?.type === "path"}
+          >
+            <SurfaceGroup
+              hidden={
+                !!marquee ||
+                cursor_mode.type !== "cursor" ||
+                is_node_transforming
+              }
+            >
               {hovered_node_id && (
                 // general hover
                 <NodeOverlay node_id={hovered_node_id} readonly />
@@ -445,13 +451,21 @@ function SelectionOverlay({
   readonly?: boolean;
   selection?: string[];
 }) {
+  const { is_node_translating, gesture } = useEventTarget();
+
   if (!selection || selection.length === 0) {
     return <></>;
   } else if (selection.length === 1) {
     return <NodeOverlay node_id={selection[0]} readonly={readonly} focused />;
   } else {
     return (
-      <MultipleSelectionOverlay selection={selection} readonly={readonly} />
+      <div className="group">
+        {(gesture.type === "idle" || gesture.type === "gap") && <GapOverlay />}
+        <SurfaceGroup hidden={is_node_translating}>
+          <SortOverlay />
+          <MultipleSelectionOverlay selection={selection} readonly={readonly} />
+        </SurfaceGroup>
+      </div>
     );
   }
 }
@@ -464,6 +478,17 @@ function MultipleSelectionOverlay({
   readonly?: boolean;
 }) {
   const { multipleSelectionOverlayClick, cursor_mode } = useEventTarget();
+
+  const { distributeEvenly } = useDocument();
+
+  const {
+    style,
+    boundingSurfaceRect: boundingRect,
+    size,
+    distribution,
+  } = useSurfaceSelectionGroup();
+
+  const { preferredDistributeEvenlyActionAxis } = distribution;
 
   const enabled = !readonly && cursor_mode.type === "cursor";
 
@@ -492,8 +517,6 @@ function MultipleSelectionOverlay({
     }
   );
 
-  const { style, boundingRect, size } = useSurfaceSelectionGroup();
-
   return (
     <>
       <LayerOverlay
@@ -511,7 +534,12 @@ function MultipleSelectionOverlay({
         <LayerOverlayResizeHandle anchor="sw" selection={selection} />
         <LayerOverlayResizeHandle anchor="se" selection={selection} />
         {/*  */}
-        <DistributionOverlay />
+        <DistributeButton
+          axis={preferredDistributeEvenlyActionAxis}
+          onClick={(axis) => {
+            distributeEvenly("selection", axis);
+          }}
+        />
         {boundingRect && (
           <SizeMeterLabel
             margin={6}
@@ -724,92 +752,36 @@ function LayerOverlayResizeHandle({
   return <Knob size={size} {...bind()} anchor={anchor} />;
 }
 
-function DistributionOverlay() {
-  const { distributeEvenly } = useDocument();
-
-  const { items, boundingRect, distribution } = useSurfaceSelectionGroup();
-
-  const { x, y, preferredDistributeEvenlyActionAxis } = distribution;
+function SortOverlay() {
+  const {
+    objects: items,
+    boundingSurfaceRect: boundingClientRect,
+    style,
+  } = useSurfaceSelectionGroup();
 
   return (
-    <>
-      <DistributeButton
-        axis={preferredDistributeEvenlyActionAxis}
-        onClick={(axis) => {
-          distributeEvenly("selection", axis);
-        }}
-      />
-      <div>
-        {items.length >= 2 && (
-          <>
-            {items.map((item) => {
-              return (
-                <div
-                  key={item.id}
-                  style={{
-                    position: "absolute",
-                    top:
-                      item.boundingRect.y +
-                      item.boundingRect.height / 2 -
-                      boundingRect.y,
-                    left:
-                      item.boundingRect.x +
-                      item.boundingRect.width / 2 -
-                      boundingRect.x,
-                  }}
-                >
-                  <RedDotSortHandle node_id={item.id} />
-                </div>
-              );
-            })}
-            {x && x.gap !== undefined && (
-              <>
-                {Array.from({ length: x.gaps.length }).map((_, i) => {
-                  const axis = "x";
-                  const x_sorted = items.sort(
-                    (a, b) => a.boundingRect.x - b.boundingRect.x
-                  );
-                  const a = x_sorted[i];
-                  const b = x_sorted[i + 1];
-
-                  return (
-                    <Gap
-                      key={i}
-                      a={a.boundingRect}
-                      b={b.boundingRect}
-                      axis={axis}
-                      offset={[boundingRect.x, boundingRect.y]}
-                    />
-                  );
-                })}
-              </>
-            )}
-            {y && y.gap !== undefined && (
-              <>
-                {Array.from({ length: y.gaps.length }).map((_, i) => {
-                  const axis = "y";
-                  const y_sorted = items.sort(
-                    (a, b) => a.boundingRect.y - b.boundingRect.y
-                  );
-                  const a = y_sorted[i];
-                  const b = y_sorted[i + 1];
-
-                  return (
-                    <Gap
-                      key={i}
-                      a={a.boundingRect}
-                      b={b.boundingRect}
-                      axis={axis}
-                      offset={[boundingRect.x, boundingRect.y]}
-                    />
-                  );
-                })}
-              </>
-            )}
-          </>
-        )}
-      </div>
-    </>
+    <div style={style} className="pointer-events-none z-50">
+      {items.map((item) => {
+        return (
+          <div
+            key={item.id}
+            style={{
+              position: "absolute",
+              top:
+                item.boundingSurfaceRect.y +
+                item.boundingSurfaceRect.height / 2 -
+                boundingClientRect.y,
+              left:
+                item.boundingSurfaceRect.x +
+                item.boundingSurfaceRect.width / 2 -
+                boundingClientRect.x,
+            }}
+          >
+            <RedDotSortHandle node_id={item.id} />
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -827,6 +799,72 @@ function RedDotSortHandle({ node_id }: { node_id: string }) {
   });
 
   return <RedDotHandle {...bind()} />;
+}
+
+function GapOverlay() {
+  const {
+    objects: items,
+    boundingSurfaceRect,
+    distribution,
+    style,
+  } = useSurfaceSelectionGroup();
+
+  const { x, y } = distribution;
+
+  return (
+    <div style={style} className="pointer-events-none z-50">
+      <div>
+        {items.length >= 2 && (
+          <>
+            {x && x.gap !== undefined && (
+              <>
+                {Array.from({ length: x.gaps.length }).map((_, i) => {
+                  const axis = "x";
+                  const x_sorted = items.sort(
+                    (a, b) => a.boundingSurfaceRect.x - b.boundingSurfaceRect.x
+                  );
+                  const a = x_sorted[i];
+                  const b = x_sorted[i + 1];
+
+                  return (
+                    <Gap
+                      key={i}
+                      a={a.boundingSurfaceRect}
+                      b={b.boundingSurfaceRect}
+                      axis={axis}
+                      offset={[boundingSurfaceRect.x, boundingSurfaceRect.y]}
+                    />
+                  );
+                })}
+              </>
+            )}
+            {y && y.gap !== undefined && (
+              <>
+                {Array.from({ length: y.gaps.length }).map((_, i) => {
+                  const axis = "y";
+                  const y_sorted = items.sort(
+                    (a, b) => a.boundingSurfaceRect.y - b.boundingSurfaceRect.y
+                  );
+                  const a = y_sorted[i];
+                  const b = y_sorted[i + 1];
+
+                  return (
+                    <Gap
+                      key={i}
+                      a={a.boundingSurfaceRect}
+                      b={b.boundingSurfaceRect}
+                      axis={axis}
+                      offset={[boundingSurfaceRect.x, boundingSurfaceRect.y]}
+                    />
+                  );
+                })}
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function Gap({
@@ -955,7 +993,7 @@ function DistributeButton({
   return (
     <div className="absolute hidden group-hover:block bottom-1 right-1 z-50 pointer-events-auto">
       <button
-        className="p-1 bg-workbench-accent-sky text-white rounded"
+        className="p-1 bg-workbench-accent-sky text-white rounded pointer-events-auto"
         onClick={(e) => {
           e.stopPropagation();
           onClick?.(axis);

@@ -50,9 +50,9 @@ const DEFAULT_RAY_TARGETING: SurfaceRaycastTargeting = {
  *
  * It's 1 because, we quantize the position to 1px, so each gap diff on aligned nodes is not guaranteed to be exactly 0.
  *
- * 1.1 because the surface measurement is can get slighly off due to the transform matrix calculation.
+ * 1.001 because the surface measurement is can get slighly off due to the transform matrix calculation.
  */
-export const DEFAULT_GAP_ALIGNMENT_TOLERANCE = 1.1;
+export const DEFAULT_GAP_ALIGNMENT_TOLERANCE = 1.01;
 
 export type SurfaceRaycastTargeting = {
   /**

@@ -2,16 +2,17 @@ import React from "react";
 import type { cmath } from "@grida/cmath";
 import type { ObjectsDistributionAnalysis } from "./ui/distribution";
 
-export interface SelectionItem {
+export interface SurfaceNodeObject {
   id: string;
   boundingRect: cmath.Rectangle;
+  boundingSurfaceRect: cmath.Rectangle;
 }
 
 export interface SurfaceSelectionGroup {
   selection: string[];
   size: cmath.Vector2;
-  boundingRect: cmath.Rectangle;
-  items: SelectionItem[];
+  boundingSurfaceRect: cmath.Rectangle;
+  objects: SurfaceNodeObject[];
   distribution: ObjectsDistributionAnalysis & {
     preferredDistributeEvenlyActionAxis: cmath.Axis | undefined;
   };

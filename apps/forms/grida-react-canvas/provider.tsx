@@ -2106,7 +2106,8 @@ export function useEventTarget() {
   const is_node_translating =
     gesture.type === "translate" ||
     gesture.type === "sort" ||
-    gesture.type === "nudge";
+    gesture.type === "nudge" ||
+    gesture.type === "gap";
   const is_node_scaling = gesture.type === "scale";
 
   const setCursorMode = useCallback(
