@@ -20,18 +20,18 @@ export default function Hero() {
             systems, it’s built for efficiency and scalability.
             <br /> Design smarter, manage seamlessly, and create without limits.
           </p>
-          <div className="flex gap-4">
-            <Link href="/dashboard">
-              <Button className="mt-16 flex gap-2 group">
-                <p>Start your project</p>
-                <ArrowRight className="h-5 w-5 hidden group-hover:inline-block transition-all duration-500"></ArrowRight>
-              </Button>
-            </Link>
-            <Link href="/dashboard">
-              <Button variant="outline" className="mt-16">
-                <p>Try to demo</p>
-              </Button>
-            </Link>
+          <div className="flex gap-4 mt-16">
+            <Button className="px-8 py-6 border-2 border-black flex gap-2 group text-lg font-normal">
+              Start your project
+              <ArrowRight className="h-5 w-5 hidden group-hover:inline-block transition-all duration-500"></ArrowRight>
+            </Button>
+
+            <Button
+              variant="outline"
+              className="px-8 py-6 border-2 border-black bg-none text-lg font-normal"
+            >
+              Try to demo
+            </Button>
           </div>
         </div>
       </div>

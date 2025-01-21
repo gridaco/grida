@@ -41,7 +41,9 @@ export function NavigationMenuDemo() {
     <NavigationMenu>
       <NavigationMenuList>
         <NavigationMenuItem>
-          <NavigationMenuTrigger>Products</NavigationMenuTrigger>
+          <NavigationMenuTrigger className="px-8 py-6 text-lg font-normal">
+            Products
+          </NavigationMenuTrigger>
           <NavigationMenuContent>
             <ul className="flex flex-col w-[300px] gap-3 p-4 lg:w-[400px] ">
               {components.map((component) => (
@@ -58,15 +60,19 @@ export function NavigationMenuDemo() {
         </NavigationMenuItem>
         <NavigationMenuItem>
           <Link href="/docs" legacyBehavior passHref>
-            <NavigationMenuLink className={navigationMenuTriggerStyle()}>
-              Docs
+            <NavigationMenuLink
+              className={`${navigationMenuTriggerStyle()} px-8 py-6`}
+            >
+              <p className="text-lg font-normal">Docs</p>
             </NavigationMenuLink>
           </Link>
         </NavigationMenuItem>
         <NavigationMenuItem>
           <Link href="/pricing" legacyBehavior passHref>
-            <NavigationMenuLink className={navigationMenuTriggerStyle()}>
-              Pricing
+            <NavigationMenuLink
+              className={`${navigationMenuTriggerStyle()} px-8 py-6`}
+            >
+              <p className="text-lg font-normal">Pricing </p>
             </NavigationMenuLink>
           </Link>
         </NavigationMenuItem>
@@ -90,8 +96,8 @@ const ListItem = React.forwardRef<
           )}
           {...props}
         >
-          <div className="text-sm font-semibold leading-none">{title}</div>
-          <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
+          <div className="text-lg font-medium leading-none">{title}</div>
+          <p className="line-clamp-2 leading-snug text-muted-foreground">
             {children}
           </p>
         </a>
