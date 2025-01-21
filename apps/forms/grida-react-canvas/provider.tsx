@@ -2022,9 +2022,11 @@ export function useTransform() {
 
   return useMemo(() => {
     const transform = state.transform;
+    const scaleX = transform[0][0];
     const matrix = `matrix(${transform[0][0]}, ${transform[1][0]}, ${transform[0][1]}, ${transform[1][1]}, ${transform[0][2]}, ${transform[1][2]})`;
     return {
       transform,
+      scaleX,
       style: {
         transformOrigin: "0 0",
         transform: matrix,
@@ -2102,7 +2104,10 @@ export function useEventTarget() {
 
   const is_node_transforming = gesture.type !== "idle";
   const is_node_translating =
-    gesture.type === "translate" || gesture.type === "sort";
+    gesture.type === "translate" ||
+    gesture.type === "sort" ||
+    gesture.type === "nudge" ||
+    gesture.type === "gap";
   const is_node_scaling = gesture.type === "scale";
 
   const setCursorMode = useCallback(
@@ -2376,6 +2381,20 @@ export function useEventTarget() {
     [dispatch]
   );
 
+  const startGapGesture = useCallback(
+    (selection: string | string[], axis: "x" | "y") => {
+      dispatch({
+        type: "surface/gesture/start",
+        gesture: {
+          type: "gap",
+          selection: Array.isArray(selection) ? selection : [selection],
+          axis,
+        },
+      });
+    },
+    [dispatch]
+  );
+
   // #region drag resize handle
   const startCornerRadiusGesture = useCallback(
     (selection: string) => {
@@ -2412,6 +2431,7 @@ export function useEventTarget() {
       pointer,
       transform,
       debug,
+      gesture,
       //
       marquee,
       cursor_mode,
@@ -2427,6 +2447,7 @@ export function useEventTarget() {
       //
       startScaleGesture,
       startSortGesture,
+      startGapGesture,
       startCornerRadiusGesture,
       startRotateGesture,
       //
@@ -2454,6 +2475,7 @@ export function useEventTarget() {
     pointer,
     transform,
     debug,
+    gesture,
     //
     marquee,
     cursor_mode,
@@ -2471,6 +2493,7 @@ export function useEventTarget() {
     //
     startScaleGesture,
     startSortGesture,
+    startGapGesture,
     startCornerRadiusGesture,
     startRotateGesture,
     //

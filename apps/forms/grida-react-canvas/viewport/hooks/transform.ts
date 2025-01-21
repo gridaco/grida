@@ -237,11 +237,13 @@ export function useGroupSurfaceTransform(
           boundingRect.height * (1 / scale[1]),
         ],
         style: {
+          position: "absolute",
           top: centerY,
           left: centerX,
           transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
           width: boundingRect.width,
           height: boundingRect.height,
+          willChange: "transform",
         },
         items,
       });

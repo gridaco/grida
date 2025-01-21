@@ -910,6 +910,42 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               break;
               //
             }
+            case "gap": {
+              const { layout, axis, gap } = draft.gesture;
+
+              const prevgap = gap;
+              const d = delta[axis === "x" ? 0 : 1] * 2;
+              const nextgap = prevgap + d;
+
+              layout.objects
+                .sort((a, b) => {
+                  return a[axis] - b[axis];
+                })
+                .forEach((obj, i) => {
+                  const node = document.__getNodeById(
+                    draft,
+                    obj.id
+                  ) as grida.program.nodes.i.IPositioning;
+
+                  const a = obj[axis];
+                  const d = nextgap * i;
+                  const p = a + d;
+
+                  switch (axis) {
+                    case "x":
+                      node.left = p;
+                      break;
+                    case "y":
+                      node.top = p;
+                      break;
+                  }
+                  //
+                });
+
+              draft.gesture.gap = nextgap;
+
+              break;
+            }
           }
         });
       }

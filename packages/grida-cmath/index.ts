@@ -1490,9 +1490,9 @@ export namespace cmath.rect {
     }
 
     // Check if all gaps are uniform within the specified tolerance
-    const is_uniform = isUniform(gaps, tolerance);
+    const is_uniform = cmath.isUniform(gaps, tolerance);
     if (is_uniform) {
-      const most = mode(gaps);
+      const most = cmath.mode(gaps);
       if (most !== undefined) {
         return [most, gaps];
       } else {

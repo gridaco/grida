@@ -1,10 +1,11 @@
 import { produce, type Draft } from "immer";
 
 import type { SurfaceAction } from "../action";
-import type {
-  CursorModeType,
-  IDocumentEditorState,
-  LayoutSnapshot,
+import {
+  DEFAULT_GAP_ALIGNMENT_TOLERANCE,
+  type CursorModeType,
+  type IDocumentEditorState,
+  type LayoutSnapshot,
 } from "../state";
 import { document } from "../document-query";
 import { getInitialCurveGesture } from "./tools/gesture";
@@ -213,6 +214,26 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
             draft.dropzone = {
               type: "rect",
               rect: initial_placement.rect,
+            };
+          });
+        }
+        case "gap": {
+          const { selection, axis } = gesture;
+          return produce(state, (draft) => {
+            const layout = createLayoutSnapshot(state, selection);
+            const [gap] = cmath.rect.getUniformGap(
+              layout.objects,
+              axis,
+              DEFAULT_GAP_ALIGNMENT_TOLERANCE
+            );
+            assert(gap !== undefined, "gap is not uniform");
+
+            draft.gesture = {
+              type: "gap",
+              axis,
+              layout,
+              gap,
+              movement: cmath.vector2.zero,
             };
           });
         }

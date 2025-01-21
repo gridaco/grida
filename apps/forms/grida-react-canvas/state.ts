@@ -45,6 +45,15 @@ const DEFAULT_RAY_TARGETING: SurfaceRaycastTargeting = {
   ignores_locked: true,
 };
 
+/**
+ * The tolerance for the gap alignment, if each gap is within this tolerance, it is considered aligned.
+ *
+ * It's 1 because, we quantize the position to 1px, so each gap diff on aligned nodes is not guaranteed to be exactly 0.
+ *
+ * 1.001 because the surface measurement is can get slighly off due to the transform matrix calculation.
+ */
+export const DEFAULT_GAP_ALIGNMENT_TOLERANCE = 1 + 1e-3;
+
 export type SurfaceRaycastTargeting = {
   /**
    * Determines how the target node is selected:
@@ -146,6 +155,7 @@ export type GestureState =
   | GestureVirtualNudge
   | GestureTranslate
   | GestureSort
+  | GestureGap
   | GestureScale
   | GestureRotate
   | GestureCornerRadius
@@ -258,6 +268,22 @@ export type GestureSort = IGesture & {
      */
     index: number;
   };
+};
+
+/**
+ * Sort the node within the layout (re-order)
+ */
+export type GestureGap = IGesture & {
+  readonly type: "gap";
+
+  axis: "x" | "y";
+
+  gap: number;
+
+  /**
+   * the current layout - this changes as the movement changes
+   */
+  layout: LayoutSnapshot;
 };
 
 export type GestureScale = IGesture & {
