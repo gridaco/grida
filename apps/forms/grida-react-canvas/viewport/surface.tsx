@@ -429,11 +429,7 @@ function get_cursor_tooltip_value(gesture: GestureState) {
     case "gap":
       return cmath.debug.formatNumber(gesture.gap, 1);
     case "rotate":
-      return cmath.debug.formatNumber(
-        // TODO: return angle
-        gesture.movement[0],
-        1
-      );
+      return cmath.debug.formatNumber(gesture.rotation, 1) + "°";
     case "translate":
     case "scale":
     case "sort":

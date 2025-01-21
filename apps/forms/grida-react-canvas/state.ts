@@ -308,6 +308,11 @@ export type GestureRotate = IGesture & {
   // TODO: support multiple selection
   readonly selection: string;
   readonly offset: cmath.Vector2;
+
+  /**
+   * the current rotation of the selection
+   */
+  rotation: number;
 };
 
 export type GestureCornerRadius = IGesture & {

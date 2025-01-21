@@ -335,11 +335,17 @@ function self_start_gesture_rotate(
     offset: cmath.Vector2;
   }
 ) {
+  const { rotation } = document.__getNodeById(
+    draft,
+    selection
+  ) as grida.program.nodes.i.IRotation;
+
   draft.gesture = {
     type: "rotate",
     initial_bounding_rectangle: initial_bounding_rectangle,
     offset: offset,
     selection: selection,
+    rotation: rotation,
     movement: cmath.vector2.zero,
   };
 }

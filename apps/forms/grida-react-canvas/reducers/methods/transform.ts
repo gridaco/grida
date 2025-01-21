@@ -576,6 +576,7 @@ function __self_update_gesture_transform_rotate(
 
   const node = document.__getNodeById(draft, selection);
 
+  draft.gesture.rotation = angle;
   draft.document.nodes[selection] = nodeReducer(node, {
     type: "node/change/rotation",
     rotation: { type: "set", value: angle },
