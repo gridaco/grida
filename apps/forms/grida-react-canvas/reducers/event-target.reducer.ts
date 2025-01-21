@@ -914,7 +914,6 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               const { layout, axis, initial_gap, min_gap } = draft.gesture;
               const delta = movement[axis === "x" ? 0 : 1];
               const side: "left" | "top" = axis === "x" ? "left" : "top";
-              const dim: "width" | "height" = axis === "x" ? "width" : "height";
 
               const sorted = layout.objects
                 .slice()
@@ -932,7 +931,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               const transformed = sorted.map((obj) => {
                 const next = { ...obj };
                 next[axis] = currentPos;
-                currentPos += next[dim] + gap;
+                currentPos += cmath.rect.getAxisDimension(next, axis) + gap;
                 return next;
               });
 

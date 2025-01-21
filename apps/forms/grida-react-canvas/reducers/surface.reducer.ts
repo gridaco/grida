@@ -228,14 +228,22 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
               axis,
               DEFAULT_GAP_ALIGNMENT_TOLERANCE
             );
+
             assert(gap !== undefined, "gap is not uniform");
+
+            // the negaive size of the smallet object or the first sorted object's size (+1)
+            const min_gap =
+              -Math.min(
+                ...layout.objects.map((it) =>
+                  cmath.rect.getAxisDimension(it, axis)
+                )
+              ) + 1;
 
             draft.gesture = {
               type: "gap",
               axis,
               layout,
-              // TODO: the negaive size of the smallet object or the first sorted object's size
-              min_gap: 0,
+              min_gap: min_gap,
               initial_gap: gap,
               gap: gap,
               movement: cmath.vector2.zero,

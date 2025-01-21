@@ -17,7 +17,7 @@ import {
 } from "../provider";
 import { useIsWindowResizing } from "./hooks/window-resizing";
 import { supports } from "@/grida/utils/supports";
-import { Marquee } from "./ui/marquee";
+import { MarqueeArea, Vector4Area } from "./ui/marquee";
 import { domapi } from "../domapi";
 import { LayerOverlay } from "./ui/layer";
 import { ViewportSurfaceContext } from "./context";
@@ -313,7 +313,7 @@ export function EditorSurface() {
               id="marquee-container"
               className="absolute top-0 left-0 w-0 h-0"
             >
-              <Marquee
+              <MarqueeArea
                 a={pointToSurfaceSpace(marquee.a, transform)}
                 b={pointToSurfaceSpace(marquee.b, transform)}
               />
@@ -849,33 +849,18 @@ function DistributionOverlay() {
             {x && x.gap !== undefined && (
               <>
                 {Array.from({ length: x.gaps.length }).map((_, i) => {
-                  const prev = items[i];
-                  const xpos = prev.boundingRect.x + prev.boundingRect.width;
-                  // (x.gap! / 2) * scaleX
-                  const ypos = prev.boundingRect.y;
+                  const axis = "x";
+                  const a = items[i];
+                  const b = items[i + 1];
 
                   return (
-                    <div
+                    <Gap
                       key={i}
-                      style={{
-                        position: "absolute",
-                        top: ypos - boundingRect.y,
-                        left: xpos - boundingRect.x,
-                        width: x.gap! * scaleX,
-                        height: prev.boundingRect.height,
-                        background: "rgba(255, 0, 0, 0.5)",
-                      }}
-                    >
-                      <div
-                        style={{
-                          position: "relative",
-                          top: "50%",
-                          left: "50%",
-                        }}
-                      >
-                        <GapHandle axis="x" />
-                      </div>
-                    </div>
+                      a={a.boundingRect}
+                      b={b.boundingRect}
+                      axis={axis}
+                      offset={[boundingRect.x, boundingRect.y]}
+                    />
                   );
                 })}
               </>
@@ -903,7 +888,65 @@ function RedDotSortHandle({ node_id }: { node_id: string }) {
   return <RedDotHandle {...bind()} />;
 }
 
-function GapHandle({ axis }: { axis: "x" | "y" }) {
+function Gap({
+  a,
+  b,
+  axis,
+  offset = cmath.vector2.zero,
+}: {
+  a: cmath.Rectangle;
+  b: cmath.Rectangle;
+  axis: cmath.Axis;
+  offset?: cmath.Vector2;
+}) {
+  const { gesture } = useEventTarget();
+
+  const r = useMemo(() => {
+    const intersection = cmath.rect.axisProjectionIntersection([a, b], axis)!;
+
+    const x1 = a.x + a.width;
+    const y1 = intersection[0];
+    const x2 = b.x;
+    const y2 = intersection[1];
+
+    let rect = cmath.rect.fromPoints([
+      [x1, y1],
+      [x2, y2],
+    ]);
+
+    return cmath.rect.translate(rect, cmath.vector2.invert(offset));
+  }, [a, b, axis, offset]);
+
+  const is_gesture = gesture.type === "gap";
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: r.y,
+        left: r.x,
+        width: r.width,
+        height: r.height,
+      }}
+      data-is-gesture={is_gesture}
+      className="pointer-events-none bg-transparent data-[is-gesture='true']:bg-workbench-accent-red/20"
+    >
+      <div
+        data-is-gesture={is_gesture}
+        style={{
+          position: "absolute",
+          top: "50%",
+          left: "50%",
+        }}
+        className="visible data-[is-gesture='true']:invisible"
+      >
+        <GapHandle axis={axis} />
+      </div>
+    </div>
+  );
+}
+
+function GapHandle({ axis }: { axis: cmath.Axis }) {
   const { selection } = useSurfaceSelectionGroup();
   const { startGapGesture } = useEventTarget();
 
@@ -926,10 +969,12 @@ function GapHandle({ axis }: { axis: "x" | "y" }) {
         border border-pink-500
         hover:bg-pink-500
         ring-1 ring-white
+        pointer-events-auto
       "
       style={{
         transform: "translate(-50%, -50%)",
         touchAction: "none",
+        cursor: axis === "x" ? "ew-resize" : "ns-resize",
       }}
     />
   );
