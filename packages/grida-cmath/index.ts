@@ -1353,6 +1353,32 @@ export namespace cmath.rect {
   }
 
   /**
+   * Checks if all rectangles in the given array are uniform (identical in position and dimensions).
+   *
+   * Two rectangles are considered uniform if their `x`, `y`, `width`, and `height`
+   * properties are exactly the same.
+   *
+   * @param rects - An array of rectangles to check.
+   * @returns `true` if all rectangles are uniform, or if the array contains zero or one rectangle. Otherwise, `false`.
+   *
+   * @example
+   * const rect1 = { x: 10, y: 20, width: 30, height: 40 };
+   * const rect2 = { x: 10, y: 20, width: 30, height: 40 };
+   * const rect3 = { x: 15, y: 25, width: 35, height: 45 };
+   *
+   * isUniform(rect1, rect2); // true
+   * isUniform(rect1, rect2, rect3); // false
+   * isUniform(); // true (empty input is considered uniform)
+   */
+  export function isUniform(...rects: cmath.Rectangle[]): boolean {
+    if (rects.length <= 1) return true;
+
+    const [first, ...rest] = rects;
+
+    return rest.every((rect) => cmath.rect.identical(first, rect));
+  }
+
+  /**
    * Computes the bounding rectangle that fully encloses an array of rectangles.
    *
    * @param rectangles - An array of rectangles to compute the bounding box for.
