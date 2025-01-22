@@ -4,6 +4,35 @@ import { document } from "./document-query";
 import { cmath } from "@grida/cmath";
 import type { SnapResult } from "@grida/cmath/_snap";
 
+// #region config
+
+/**
+ * The tolerance for the gap alignment, if each gap is within this tolerance, it is considered aligned.
+ *
+ * It's 1 because, we quantize the position to 1px, so each gap diff on aligned nodes is not guaranteed to be exactly 0.
+ *
+ * 1.001 because the surface measurement is can get slighly off due to the transform matrix calculation.
+ */
+export const DEFAULT_GAP_ALIGNMENT_TOLERANCE = 1.01;
+
+/**
+ * snap threshold applyed when movement (real gesture) is applied
+ */
+export const DEFAULT_SNAP_MOVEMNT_THRESHOLD: cmath.Vector2 = [4, 4];
+
+/**
+ * snap threshold applyed when nudge (fake gesture) is applied
+ */
+export const DEFAULT_SNAP_NUDGE_THRESHOLD: cmath.Vector2 = [0.1, 0.1];
+
+const DEFAULT_RAY_TARGETING: SurfaceRaycastTargeting = {
+  target: "auto",
+  ignores_root: true,
+  ignores_locked: true,
+};
+
+// #endregion config
+
 export type DocumentDispatcher = (action: Action) => void;
 
 export type CursorModeType = CursorMode["type"];
@@ -38,21 +67,6 @@ export type Marquee = {
   a: cmath.Vector2;
   b: cmath.Vector2;
 };
-
-const DEFAULT_RAY_TARGETING: SurfaceRaycastTargeting = {
-  target: "auto",
-  ignores_root: true,
-  ignores_locked: true,
-};
-
-/**
- * The tolerance for the gap alignment, if each gap is within this tolerance, it is considered aligned.
- *
- * It's 1 because, we quantize the position to 1px, so each gap diff on aligned nodes is not guaranteed to be exactly 0.
- *
- * 1.001 because the surface measurement is can get slighly off due to the transform matrix calculation.
- */
-export const DEFAULT_GAP_ALIGNMENT_TOLERANCE = 1.01;
 
 export type SurfaceRaycastTargeting = {
   /**

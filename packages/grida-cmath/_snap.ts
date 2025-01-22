@@ -8,17 +8,6 @@ export type SnapResult = {
 };
 
 /**
- * Snaps an array of points to the nearest target point while maintaining relative positions.
- * The entire set of points is translated to align with the nearest target.
- *
- * @param points - An array of 2D points (Vector2) to snap.
- * @param targets - An array of existing 2D points to snap to.
- * @param threshold - The maximum allowed single-axis distance for snapping.
- * @returns The snapped points and the translation applied:
- *          - `value`: The translated points.
- *          - `distance`: The distance vector to the nearest target.
- */
-/**
  * Snaps an array of points to the nearest target point along each axis independently.
  * The snapping delta is computed for each axis separately and applied to all points.
  *

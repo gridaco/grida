@@ -597,6 +597,66 @@ export namespace cmath.vector2 {
   }
 }
 
+export namespace cmath.compass {
+  /**
+   * Inverted cardinal directions `nw -> se, ne -> sw` and so on
+   *
+   * @internal
+   */
+  const __inverted_cardinal_directions = {
+    nw: "se",
+    ne: "sw",
+    sw: "ne",
+    se: "nw",
+    n: "s",
+    e: "w",
+    s: "n",
+    w: "e",
+  } as const;
+
+  /**
+   * Inverts a cardinal direction to its opposite.
+   *
+   * This function takes a cardinal direction (e.g., "n", "e", "nw") and returns
+   * its opposite direction (e.g., "n" becomes "s", "ne" becomes "sw").
+   *
+   * @param direction - The cardinal direction to invert. Must be one of the following:
+   *   - `"n"`: North
+   *   - `"e"`: East
+   *   - `"s"`: South
+   *   - `"w"`: West
+   *   - `"ne"`: North-East
+   *   - `"se"`: South-East
+   *   - `"sw"`: South-West
+   *   - `"nw"`: North-West
+   * @returns The inverted cardinal direction, as follows:
+   *   - `"n"` -> `"s"`
+   *   - `"e"` -> `"w"`
+   *   - `"s"` -> `"n"`
+   *   - `"w"` -> `"e"`
+   *   - `"ne"` -> `"sw"`
+   *   - `"se"` -> `"nw"`
+   *   - `"sw"` -> `"ne"`
+   *   - `"nw"` -> `"se"`
+   *
+   * @example
+   * const inverted = cmath.invertCardinalDirection("n");
+   * console.log(inverted); // "s"
+   *
+   * const invertedDiagonal = cmath.invertCardinalDirection("ne");
+   * console.log(invertedDiagonal); // "sw"
+   *
+   * @remarks
+   * - This function is useful for geometric computations or UI layouts where
+   *   directional relationships need to be reversed.
+   */
+  export function invertDirection(
+    direction: CardinalDirection
+  ): CardinalDirection {
+    return __inverted_cardinal_directions[direction];
+  }
+}
+
 export namespace cmath.rect {
   const __axis_map = {
     dimension: {

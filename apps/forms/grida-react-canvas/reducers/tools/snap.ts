@@ -3,22 +3,6 @@ import { cmath } from "@grida/cmath";
 import { document } from "@/grida-react-canvas/document-query";
 import { axisAligned } from "@grida/cmath/_snap";
 
-export function snapMovement(
-  origin: cmath.Vector2,
-  references: cmath.Vector2[],
-  movement: cmath.Vector2,
-  threshold: cmath.Vector2
-) {
-  const virtually_moved = cmath.vector2.add(origin, movement);
-
-  const result = axisAligned([virtually_moved], references, threshold);
-
-  return {
-    movement: result.value[0],
-    snapping: result,
-  };
-}
-
 export function snapObjectsTranslation(
   objects: cmath.Rectangle[],
   references: cmath.Rectangle[],
@@ -63,7 +47,7 @@ export function getSnapTargets(
   }: {
     document_ctx: grida.program.document.internal.IDocumentDefinitionRuntimeHierarchyContext;
   }
-) {
+): string[] {
   // set of each sibling and parent of selection
   const snap_target_node_ids = Array.from(
     new Set(

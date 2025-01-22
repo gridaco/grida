@@ -1,5 +1,8 @@
 import type { Draft } from "immer";
-import type { IDocumentEditorState } from "../../state";
+import {
+  DEFAULT_SNAP_MOVEMNT_THRESHOLD,
+  type IDocumentEditorState,
+} from "../../state";
 import { self_insertSubDocument } from "./insert";
 import { self_deleteNode } from "./delete";
 import { document } from "../../document-query";
@@ -13,22 +16,6 @@ import assert from "assert";
 import { grida } from "@/grida";
 import { vn } from "@/grida/vn";
 import nid from "../tools/id";
-
-const SNAP: cmath.Vector2 = [4, 4];
-
-/**
- * Inverted cardinal directions `nw -> se, ne -> sw` and so on
- */
-const inverted_cardinal_directions = {
-  nw: "se",
-  ne: "sw",
-  sw: "ne",
-  se: "nw",
-  n: "s",
-  e: "w",
-  s: "n",
-  w: "e",
-} as const;
 
 /**
  * Cardinal direction vector
@@ -276,10 +263,8 @@ function __self_update_gesture_transform_translate(
   }
   // #endregion
 
-  const snap_target_node_ids = getSnapTargets(current_selection, draft);
-
   const cdom = new domapi.CanvasDOM(draft.transform);
-
+  const snap_target_node_ids = getSnapTargets(current_selection, draft);
   const snap_target_node_rects = snap_target_node_ids
     .map((node_id: string) => {
       const r = cdom.getNodeBoundingRect(node_id);
@@ -292,7 +277,7 @@ function __self_update_gesture_transform_translate(
     initial_rects,
     snap_target_node_rects,
     adj_movement,
-    SNAP
+    DEFAULT_SNAP_MOVEMNT_THRESHOLD
   );
 
   draft.gesture.surface_snapping = snapping;
@@ -442,7 +427,7 @@ function __self_update_gesture_transform_scale(
       : cmath.rect.getCardinalPoint(
           initial_bounding_rectangle,
           // maps the resize handle (direction) to the transform origin point (inverse)
-          inverted_cardinal_directions[direction]
+          cmath.compass.invertDirection(direction)
         );
 
   /**
