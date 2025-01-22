@@ -327,6 +327,54 @@ export namespace cmath {
 
     return mostFrequent[0];
   }
+
+  /**
+   * Generates all combinations of size `k` from the given array.
+   *
+   * @param arr - The input array.
+   * @param k - The size of each combination.
+   * @returns An array of combinations (each combination is an array).
+   *
+   * @see https://en.wikipedia.org/wiki/Combination
+   */
+  export function combinations<T>(arr: T[], k: number): T[][] {
+    if (k === 0) return [[]];
+    if (arr.length === 0) return [];
+
+    const [first, ...rest] = arr;
+
+    // Include the first element in the combination
+    const includeFirst = combinations(rest, k - 1).map((combo) => [
+      first,
+      ...combo,
+    ]);
+
+    // Exclude the first element from the combination
+    const excludeFirst = combinations(rest, k);
+
+    return [...includeFirst, ...excludeFirst];
+  }
+
+  /**
+   * Generates all permutations of size `k` from the given array.
+   *
+   * @param arr - The input array.
+   * @param k - The size of each permutation.
+   * @returns An array of permutations (each permutation is an array).
+   *
+   * @see https://en.wikipedia.org/wiki/Permutation
+   */
+  export function permutations<T>(arr: T[], k: number): T[][] {
+    if (k === 0) return [[]];
+    if (arr.length === 0) return [];
+
+    return arr.flatMap((item, index) =>
+      permutations(
+        [...arr.slice(0, index), ...arr.slice(index + 1)],
+        k - 1
+      ).map((perm) => [item, ...perm])
+    );
+  }
 }
 
 /**
@@ -594,6 +642,10 @@ export namespace cmath.vector2 {
     const [x, y] = vector;
 
     return [a * x + b * y + tx, c * x + d * y + ty];
+  }
+
+  export function identical(a: Vector2, b: Vector2): boolean {
+    return a[0] === b[0] && a[1] === b[1];
   }
 }
 
