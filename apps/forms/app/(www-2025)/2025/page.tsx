@@ -16,7 +16,7 @@ export default function WWW() {
       <Header></Header>
       <Hero></Hero>
       <section>
-        <div className="my-60">
+        <div className="my-60 relative">
           <FeatureSection
             badge={"Canvas"}
             title={"Design editor tool with customizable templates."}
@@ -25,8 +25,33 @@ export default function WWW() {
             }
             button={"Open your Canvas"}
           />
-          <Demo1 />
+          <div className="relative">
+            <div className="absolute inset-0 -z-10 flex justify-center items-center">
+              <svg
+                width="1400px"
+                height="1400px"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <defs>
+                  <radialGradient
+                    id="blueCircle"
+                    cx="50%"
+                    cy="50%"
+                    r="50%"
+                    fx="50%"
+                    fy="50%"
+                  >
+                    <stop offset="0%" stopColor="rgba(135, 206, 250, 0.5)" />
+                    <stop offset="100%" stopColor="rgba(135, 206, 250, 0)" />
+                  </radialGradient>
+                </defs>
+                <circle cx="700" cy="700" r="700" fill="url(#blueCircle)" />
+              </svg>
+            </div>
+            <Demo1 />
+          </div>
         </div>
+
         <div className="my-60">
           <FeatureSection
             badge={"CMS"}

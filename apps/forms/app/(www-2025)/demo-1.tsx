@@ -43,7 +43,7 @@ export function Demo1() {
               className={`inline-flex items-center justify-center whitespace-nowrap rounded-full px-4 py-1 text-lg font-normal transition-all ${
                 activeTabIndex === index
                   ? "bg-black text-white dark:invert"
-                  : "hover:text-slate-200"
+                  : "hover:text-slate-300"
               }`}
               onClick={() => setActiveTabIndex(index)} // Update active tab index
             >
