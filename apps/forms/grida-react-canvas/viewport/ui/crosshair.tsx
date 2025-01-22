@@ -8,34 +8,30 @@ export function Crosshair({
   color?: string;
 }) {
   return (
-    <div style={{ position: "relative", width: size, height: size }}>
+    <svg
+      width={size}
+      height={size}
+      style={{ position: "relative", display: "block" }}
+      xmlns="http://www.w3.org/2000/svg"
+    >
       {/* Diagonal line from top-left to bottom-right */}
-      <div
-        style={{
-          position: "absolute",
-          width: "100%",
-          height: width,
-          backgroundColor: color,
-          transform: "rotate(45deg)",
-          top: "50%",
-          left: "0",
-          transformOrigin: "center",
-        }}
+      <line
+        x1={0}
+        y1={0}
+        x2={size}
+        y2={size}
+        stroke={color}
+        strokeWidth={width}
       />
-
       {/* Diagonal line from top-right to bottom-left */}
-      <div
-        style={{
-          position: "absolute",
-          width: "100%",
-          height: width,
-          backgroundColor: color,
-          transform: "rotate(-45deg)",
-          top: "50%",
-          left: "0",
-          transformOrigin: "center",
-        }}
+      <line
+        x1={size}
+        y1={0}
+        x2={0}
+        y2={size}
+        stroke={color}
+        strokeWidth={width}
       />
-    </div>
+    </svg>
   );
 }

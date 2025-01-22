@@ -3,8 +3,10 @@ import { Crosshair } from "./crosshair";
 import { useDocument, useTransform } from "@/grida-react-canvas/provider";
 import { cmath } from "@grida/cmath";
 import { pointToSurfaceSpace } from "@/grida-react-canvas/utils/transform";
+import { surface } from "./types";
+import { Rule } from "./rule";
 
-function useSnapGuide() {
+function useSnapGuide(): surface.SnapGuide | undefined {
   const { state } = useDocument();
   const { gesture } = state;
 
@@ -72,30 +74,5 @@ export function SnapGuide() {
         );
       })}
     </div>
-  );
-}
-
-function Rule({
-  axis,
-  offset,
-  width = 1,
-}: {
-  axis: "x" | "y";
-  offset: number;
-  width?: number;
-}) {
-  return (
-    <div
-      style={{
-        opacity: 0.5,
-        position: "absolute",
-        transform:
-          axis === "x" ? `translateY(${offset}px)` : `translateX(${offset}px)`,
-        width: axis === "x" ? "100%" : width,
-        height: axis === "y" ? "100%" : width,
-        background: "red",
-        willChange: "transform",
-      }}
-    />
   );
 }

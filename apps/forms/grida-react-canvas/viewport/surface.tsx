@@ -456,7 +456,11 @@ function SelectionOverlay({
   if (!selection || selection.length === 0) {
     return <></>;
   } else if (selection.length === 1) {
-    return <NodeOverlay node_id={selection[0]} readonly={readonly} focused />;
+    return (
+      <SurfaceGroup hidden={is_node_translating}>
+        <NodeOverlay node_id={selection[0]} readonly={readonly} focused />
+      </SurfaceGroup>
+    );
   } else {
     return (
       <div className="group">
