@@ -99,6 +99,78 @@ export function axisAligned(
   };
 }
 
+/**
+ * Snaps an array of scalar points to the nearest target points within a specified threshold.
+ *
+ * @param points - An array of scalar points to snap.
+ * @param targets - An array of existing scalar points to snap to.
+ * @param threshold - The maximum allowed distance for snapping.
+ * @returns The snapped points and the delta applied:
+ *          - `value`: The translated points.
+ *          - `distance`: The snapping delta applied to align the points.
+ *          - `anchors`: The target points that were used for snapping.
+ */
+export function snap1D(
+  points: number[],
+  targets: number[],
+  threshold: number
+): {
+  value: number[];
+  distance: number;
+  anchors: number[];
+} {
+  if (targets.length === 0) {
+    return {
+      value: points,
+      distance: 0,
+      anchors: [],
+    };
+  }
+
+  if (threshold < 0) {
+    throw new Error("Threshold must be a non-negative number.");
+  }
+
+  let minDelta = Infinity;
+  let signedDelta = 0;
+  const anchors: number[] = [];
+
+  for (const point of points) {
+    // Find the closest snapping target
+    const [snap, delta] = cmath.snap.scalar(point, targets, threshold);
+    const signedDeltaForPoint = snap - point;
+
+    if (Math.abs(delta) <= threshold) {
+      if (minDelta === Infinity || signedDeltaForPoint === signedDelta) {
+        anchors.push(point); // Add the point as an anchor
+        minDelta = delta; // Update minimum delta
+        signedDelta = signedDeltaForPoint; // Update the snapping translation
+      }
+    }
+  }
+
+  // If no snapping occurs, return the original points
+  if (minDelta === Infinity) {
+    return {
+      value: points,
+      distance: 0,
+      anchors: [],
+    };
+  }
+
+  // Compute the final snapping delta
+  const delta = minDelta === Infinity ? 0 : signedDelta;
+
+  // Apply the delta to all points
+  const snappedPoints = points.map((p) => p + delta);
+
+  return {
+    value: snappedPoints,
+    distance: delta,
+    anchors,
+  };
+}
+
 export namespace snap {
   //
 
