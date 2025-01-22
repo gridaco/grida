@@ -171,52 +171,62 @@ function shallowEqual(arr1: string[], arr2: string[]): boolean {
   );
 }
 
+const __initial_surface_selection_group: SurfaceSelectionGroup = {
+  selection: [],
+  size: [0, 0],
+  boundingSurfaceRect: { x: 0, y: 0, width: 0, height: 0 },
+  style: { top: 0, left: 0, transform: "", width: 0, height: 0 },
+  distribution: {
+    rects: [],
+    x: undefined,
+    y: undefined,
+    preferredDistributeEvenlyActionAxis: undefined,
+  },
+  objects: [],
+};
+
 /**
  * returns the relative transform of the group surface relative to the portal
  * The group surface will not have rotation - each children rotation is applied to calculate the group bounding rect
- *
- * TODO: Not tested with the performance
- *
- * Uses MutationObserver to observe position changes - expensive
  */
 export function useGroupSurfaceTransform(
   ...node_ids: string[]
 ): SurfaceSelectionGroup {
+  const {
+    state: { document },
+  } = useDocument();
   const { transform } = useEventTarget();
   const portal = useViewportSurfacePortal();
 
   // Use stable node IDs to avoid unnecessary re-renders
-  const stableNodeIds = useStableNodeIds(node_ids);
+  const __node_ids = useStableNodeIds(node_ids);
+  const selection = useMemo(
+    () =>
+      __node_ids.map((id) => document.nodes[id]).filter((n) => n && n.active),
+    [document.nodes, __node_ids]
+  );
 
-  const node_elements = useNodeDomElements(stableNodeIds);
+  const [data, setData] = useState<SurfaceSelectionGroup>(
+    __initial_surface_selection_group
+  );
 
-  const [data, setData] = useState<SurfaceSelectionGroup>({
-    selection: [],
-    size: [0, 0],
-    boundingSurfaceRect: { x: 0, y: 0, width: 0, height: 0 },
-    style: { top: 0, left: 0, transform: "", width: 0, height: 0 },
-    distribution: {
-      rects: [],
-      x: undefined,
-      y: undefined,
-      preferredDistributeEvenlyActionAxis: undefined,
-    },
-    objects: [],
-  });
-
-  useEffect(() => {
-    if (!portal || !node_elements?.length) return;
+  useLayoutEffect(() => {
+    if (!portal) return;
+    if (!selection.length) {
+      setData(__initial_surface_selection_group);
+      return;
+    }
 
     const updateTransform = () => {
       // const portal_rect = portal.getBoundingClientRect();
       const cdom = new domapi.CanvasDOM(transform);
 
       // Collect bounding rectangles for all node elements
-      const objects: SurfaceNodeObject[] = node_elements.map((el) => {
-        const br = cdom.getNodeBoundingRect(el.id)!;
+      const objects: SurfaceNodeObject[] = selection.map(({ id }) => {
+        const br = cdom.getNodeBoundingRect(id)!;
         const bsr = rectToSurfaceSpace(br, transform);
         return {
-          id: el.id,
+          id: id,
           boundingRect: {
             x: br.x,
             y: br.y,
@@ -250,14 +260,13 @@ export function useGroupSurfaceTransform(
             : undefined;
 
       setData({
-        selection: stableNodeIds,
+        selection: selection.map((it) => it.id),
         boundingSurfaceRect: surfaceBoundingRect,
         size: [boundingRect.width, boundingRect.height],
         style: {
           position: "absolute",
           top: surfaceBoundingRect.y,
           left: surfaceBoundingRect.x,
-          // transform: `translate(-50%, -50%)`,
           width: surfaceBoundingRect.width,
           height: surfaceBoundingRect.height,
           willChange: "transform",
@@ -270,37 +279,8 @@ export function useGroupSurfaceTransform(
       });
     };
 
-    // Observe size changes using ResizeObserver
-    const resizeObservers = node_elements.map((el) => {
-      const observer = new ResizeObserver(() => updateTransform());
-      el && observer.observe(el);
-      return observer;
-    });
-
-    // Observe position changes using MutationObserver
-    const mutationObserver = new MutationObserver(() => updateTransform());
-    node_elements.forEach((el) => {
-      if (el)
-        mutationObserver.observe(el, {
-          attributes: true,
-          attributeFilter: ["style", "transform"],
-        });
-    });
-
-    // Trigger initial update
     updateTransform();
-
-    return () => {
-      resizeObservers.forEach((observer) => observer.disconnect());
-      mutationObserver.disconnect();
-    };
-  }, [
-    stableNodeIds,
-    node_elements,
-    portal,
-    // recompute when viewport changes
-    transform,
-  ]);
+  }, [selection, transform]);
 
   return data;
 }

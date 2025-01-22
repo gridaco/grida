@@ -158,14 +158,16 @@ export function NodeHierarchyList() {
               </SidebarMenuItemLabel>
               <SidebarMenuItemActions>
                 <SidebarMenuItemAction
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     toggleNodeLocked(id);
                   }}
                 >
                   {n.locked ? <LockClosedIcon /> : <LockOpen1Icon />}
                 </SidebarMenuItemAction>
                 <SidebarMenuItemAction
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     toggleNodeActive(id);
                   }}
                 >
