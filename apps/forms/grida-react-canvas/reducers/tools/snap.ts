@@ -1,7 +1,12 @@
 import { grida } from "@/grida";
 import { cmath } from "@grida/cmath";
 import { document } from "@/grida-react-canvas/document-query";
-import { axisAligned } from "@grida/cmath/_snap";
+import {
+  AxisAlignedSnapPoint,
+  snap2DAxisAlignedV1,
+  snap2DAxisAligned,
+  snap,
+} from "@grida/cmath/_snap";
 
 export function snapObjectsTranslation(
   objects: cmath.Rectangle[],
@@ -17,12 +22,38 @@ export function snapObjectsTranslation(
     cmath.rect.to9Points(_virtually_moved_rect)
   );
 
-  const target_points = references
-    .map((r) => Object.values(cmath.rect.to9Points(r)))
-    .flat();
+  const target_points: AxisAlignedSnapPoint[] = [];
 
-  const result = axisAligned(origin_points, target_points, threshold);
+  target_points.push(
+    ...references.map((r) => Object.values(cmath.rect.to9Points(r))).flat()
+  );
+
+  // // #region repeated-space projected points
+  // const y_range: snap.spacing.Range = [
+  //   bounding_rect.y,
+  //   bounding_rect.y + bounding_rect.height,
+  // ];
+
+  // // x-aligned uses y range comparison
+  // const x_aligned = references.filter((r) => {
+  //   const this_y_range: snap.spacing.Range = [r.y, r.y + r.height];
+  //   return cmath.vector2.intersects(y_range, this_y_range);
+  // });
+  // const x_ranges = x_aligned.map(
+  //   (r) => [r.x, r.x + r.width] as snap.spacing.Range
+  // );
+
+  // const repeated = snap.spacing.repeatedpoints(x_ranges);
+  // const x_points = repeated.a.flat();
+  // target_points.push(...x_points.map((x) => [x, null] as AxisAlignedSnapPoint));
+  // // console.log("x_aligned", x_ranges, repeated);
+  // // #endregion
+
+  // const result = snap2DAxisAlignedV1(origin_points, target_points, threshold);
+  const result = snap2DAxisAligned(origin_points, target_points, threshold, 0);
   const { value: points } = result;
+
+  // console.log("result", result.anchors.y[1]);
 
   // top left point of the bounding box
   const bounding_box_snapped_xy = points[0];

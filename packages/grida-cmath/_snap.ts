@@ -8,6 +8,18 @@ export type SnapResult = {
 };
 
 /**
+ * A Vector2 that can take null values for each axis.
+ *
+ * This is for representing snap points that is infinity (or ignore) in counter axis.
+ *
+ * E.g. for 2D snapping, but where each axis are snapped independently.
+ */
+export type AxisAlignedSnapPoint =
+  | [number, number]
+  | [number, null]
+  | [null, number];
+
+/**
  * Snaps an array of points to the nearest target point along each axis independently.
  * The snapping delta is computed for each axis separately and applied to all points.
  *
@@ -18,133 +30,128 @@ export type SnapResult = {
  *          - `value`: The translated points.
  *          - `distance`: The delta vector applied to align the points.
  */
-export function axisAligned(
+export function snap2DAxisAligned(
   points: cmath.Vector2[],
-  targets: cmath.Vector2[],
-  threshold: cmath.Vector2
+  targets: AxisAlignedSnapPoint[],
+  threshold: cmath.Vector2,
+  epsilon = 0
 ): SnapResult {
-  if (targets.length === 0)
+  if (targets.length === 0) {
     return {
       value: points,
       distance: [0, 0],
       anchors: { x: [], y: [] },
     };
+  }
+
   assert(threshold[0] >= 0, "Threshold must be a non-negative number.");
   assert(threshold[1] >= 0, "Threshold must be a non-negative number.");
 
   // Separate target points into x and y components
-  const targetXs = targets.map(([x]) => x);
-  const targetYs = targets.map(([_, y]) => y);
+  const xTargets = targets
+    .map(([x]) => x)
+    .filter((x): x is number => x !== null);
+  const yTargets = targets
+    .map(([_, y]) => y)
+    .filter((y): y is number => y !== null);
 
-  // Initialize variables to store anchors and deltas
-  const xAnchors: cmath.Vector2[] = [];
-  const yAnchors: cmath.Vector2[] = [];
-  let minDeltaX = Infinity;
-  let minDeltaY = Infinity;
-  let signedDeltaX = 0;
-  let signedDeltaY = 0;
+  // Separate the scalar points for each axis
+  const xPoints = points.map(([x]) => x);
+  const yPoints = points.map(([_, y]) => y);
 
-  // Find the closest snapping target and determine anchors for X and Y axes
-  for (const point of points) {
-    // Find the closest snapping target for X-axis
-    const [snapX, deltaX] = cmath.snap.scalar(point[0], targetXs, threshold[0]);
-    const signedDeltaForX = snapX - point[0];
+  // Snap each axis using snap1D
+  const xSnap = snap1D(xPoints, xTargets, threshold[0], epsilon);
+  const ySnap = snap1D(yPoints, yTargets, threshold[1], epsilon);
 
-    if (Math.abs(deltaX) <= threshold[0]) {
-      if (minDeltaX === Infinity || signedDeltaForX === signedDeltaX) {
-        xAnchors.push(point); // Add points with identical deltas
-        minDeltaX = deltaX; // Keep track of the smallest delta
-        signedDeltaX = signedDeltaForX; // Track the snapping translation
-      }
-    }
+  // Determine the final delta for each axis
+  const deltaX = xSnap.distance;
+  const deltaY = ySnap.distance;
 
-    // Find the closest snapping target for Y-axis
-    const [snapY, deltaY] = cmath.snap.scalar(point[1], targetYs, threshold[1]);
-    const signedDeltaForY = snapY - point[1];
-
-    if (Math.abs(deltaY) <= threshold[1]) {
-      if (minDeltaY === Infinity || signedDeltaForY === signedDeltaY) {
-        yAnchors.push(point); // Add points with identical deltas
-        minDeltaY = deltaY; // Keep track of the smallest delta
-        signedDeltaY = signedDeltaForY; // Track the snapping translation
-      }
-    }
-  }
-
-  // If no snapping occurs, return original points
-  if (minDeltaX === Infinity && minDeltaY === Infinity) {
-    return {
-      value: points,
-      distance: [0, 0],
-      anchors: { x: [], y: [] },
-    };
-  }
-
-  // Compute the final translation delta (signed values)
-  const delta: cmath.Vector2 = [
-    minDeltaX === Infinity ? 0 : signedDeltaX,
-    minDeltaY === Infinity ? 0 : signedDeltaY,
-  ];
+  const xAnchors = xSnap.snapped_origin_indicies.map((i) => points[i]);
+  const yAnchors = ySnap.snapped_origin_indicies.map((i) => points[i]);
 
   // Apply translation to all points
   const snappedPoints: cmath.Vector2[] = points.map(([x, y]) => [
-    x + delta[0],
-    y + delta[1],
+    x + deltaX,
+    y + deltaY,
   ]);
 
   return {
     value: snappedPoints,
-    distance: delta,
-    anchors: { x: xAnchors, y: yAnchors },
+    distance: [deltaX, deltaY],
+    anchors: {
+      x: xAnchors,
+      y: yAnchors,
+    },
   };
 }
 
 /**
  * Snaps an array of scalar points to the nearest target points within a specified threshold.
  *
- * @param points - An array of scalar points to snap.
+ * @param origins - An array of scalar points to snap.
  * @param targets - An array of existing scalar points to snap to.
  * @param threshold - The maximum allowed distance for snapping.
- * @returns The snapped points and the delta applied:
- *          - `value`: The translated points.
- *          - `distance`: The snapping delta applied to align the points.
- *          - `anchors`: The target points that were used for snapping.
+ * @param epsilon - The tolerance for delta matching.
+ * @returns An object containing:
+ *          - `translated`: The snapped points.
+ *          - `distance`: The delta applied.
+ *          - `snapped_origin_indicies`: Indices of origins that were snapped.
+ *          - `snapped_target_indicies`: Indices of targets that were snapped to.
  */
 export function snap1D(
-  points: number[],
+  origins: number[],
   targets: number[],
-  threshold: number
+  threshold: number,
+  epsilon = 0
 ): {
-  value: number[];
+  translated: number[];
   distance: number;
-  anchors: number[];
+  snapped_origin_indicies: number[];
+  snapped_target_indicies: number[];
 } {
   if (targets.length === 0) {
     return {
-      value: points,
+      translated: origins,
       distance: 0,
-      anchors: [],
+      snapped_origin_indicies: [],
+      snapped_target_indicies: [],
     };
   }
 
-  if (threshold < 0) {
-    throw new Error("Threshold must be a non-negative number.");
-  }
+  assert(threshold >= 0, "Threshold must be a non-negative number.");
+  assert(epsilon >= 0, "Epsilon must be a non-negative number.");
 
   let minDelta = Infinity;
   let signedDelta = 0;
-  const anchors: number[] = [];
+  const snapped_origin_indicies: number[] = [];
+  const snapped_target_indicies = new Set<number>();
 
-  for (const point of points) {
+  // Iterate through each origin to find the minimal delta
+  for (let i = 0; i < origins.length; i++) {
+    const point = origins[i];
     // Find the closest snapping target
-    const [snap, delta] = cmath.snap.scalar(point, targets, threshold);
+    const [snap, delta, indicies] = cmath.snap.scalar(
+      point,
+      targets,
+      threshold
+    );
+
     const signedDeltaForPoint = snap - point;
 
     if (Math.abs(delta) <= threshold) {
-      if (minDelta === Infinity || signedDeltaForPoint === signedDelta) {
-        anchors.push(point); // Add the point as an anchor
-        minDelta = delta; // Update minimum delta
-        signedDelta = signedDeltaForPoint; // Update the snapping translation
+      if (
+        minDelta === Infinity ||
+        Math.abs(signedDeltaForPoint - signedDelta) <= epsilon
+      ) {
+        snapped_origin_indicies.push(i);
+        indicies.forEach((idx) => snapped_target_indicies.add(idx));
+
+        // Update minDelta and signedDelta if a smaller delta is found
+        if (Math.abs(delta) < Math.abs(minDelta)) {
+          minDelta = delta;
+          signedDelta = signedDeltaForPoint;
+        }
       }
     }
   }
@@ -152,22 +159,24 @@ export function snap1D(
   // If no snapping occurs, return the original points
   if (minDelta === Infinity) {
     return {
-      value: points,
+      translated: origins,
       distance: 0,
-      anchors: [],
+      snapped_origin_indicies: [],
+      snapped_target_indicies: [],
     };
   }
 
   // Compute the final snapping delta
-  const delta = minDelta === Infinity ? 0 : signedDelta;
+  const delta = signedDelta;
 
   // Apply the delta to all points
-  const snappedPoints = points.map((p) => p + delta);
+  const translated = origins.map((p) => p + delta);
 
   return {
-    value: snappedPoints,
+    translated,
     distance: delta,
-    anchors,
+    snapped_origin_indicies,
+    snapped_target_indicies: Array.from(snapped_target_indicies),
   };
 }
 
