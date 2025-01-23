@@ -7,7 +7,9 @@ export namespace surface {
   };
 
   export type SnapGuide = {
-    x: cmath.ext.snap.AxisAlignedPoint[];
-    y: cmath.ext.snap.AxisAlignedPoint[];
+    x_points: cmath.Vector2[];
+    x_offsets: number[];
+    y_points: cmath.Vector2[];
+    y_offsets: number[];
   };
 }
