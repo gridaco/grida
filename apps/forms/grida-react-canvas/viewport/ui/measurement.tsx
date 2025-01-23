@@ -70,10 +70,10 @@ export function MeasurementGuide() {
   const sb = _sb * msy;
   const sl = _sl * msx;
 
-  const label_st = Math.round(_st * 10) / 10;
-  const label_sr = Math.round(_sr * 10) / 10;
-  const label_sb = Math.round(_sb * 10) / 10;
-  const label_sl = Math.round(_sl * 10) / 10;
+  const label_st = cmath.debug.formatNumber(_st, 1);
+  const label_sr = cmath.debug.formatNumber(_sr, 1);
+  const label_sb = cmath.debug.formatNumber(_sb, 1);
+  const label_sl = cmath.debug.formatNumber(_sl, 1);
 
   const box = rectToSurfaceSpace(_box, transform);
   const a = rectToSurfaceSpace(_a, transform);
@@ -99,8 +99,8 @@ export function MeasurementGuide() {
     >
       {/* box */}
       <>
-        <Rectangle rect={a} />
-        <Rectangle rect={b} />
+        <Rectangle rect={a} className="border-workbench-accent-orange" />
+        <Rectangle rect={b} className="border-workbench-accent-orange" />
       </>
       <Conditional length={st}>
         <SpacingGuideLine point={[tx, ty]} length={tl} rotation={tr} />
@@ -147,7 +147,7 @@ function Rectangle({
     <div
       {...props}
       className={cn(
-        "relative group pointer-events-auto select-none border-[1px] border-workbench-accent-orange",
+        "relative group pointer-events-auto select-none border-[1px]",
         className
       )}
       style={{

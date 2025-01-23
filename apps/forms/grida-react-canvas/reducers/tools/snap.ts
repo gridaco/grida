@@ -1,65 +1,35 @@
 import { grida } from "@/grida";
 import { cmath } from "@grida/cmath";
 import { document } from "@/grida-react-canvas/document-query";
-import {
-  AxisAlignedSnapPoint,
-  snap2DAxisAlignedV1,
-  snap2DAxisAligned,
-  snap,
-} from "@grida/cmath/_snap";
+import { SnapToObjectsResult, snapToObjects } from "@grida/cmath/_snap";
 
 export function snapObjectsTranslation(
-  objects: cmath.Rectangle[],
-  references: cmath.Rectangle[],
+  agents: cmath.Rectangle[],
+  anchors: cmath.Rectangle[],
   movement: cmath.Vector2,
   threshold: cmath.Vector2
-) {
-  const bounding_rect = cmath.rect.union(objects);
+): {
+  translated: { position: cmath.Vector2 }[];
+  snapping: SnapToObjectsResult | undefined;
+} {
+  const bounding_rect = cmath.rect.union(agents);
 
   const _virtually_moved_rect = cmath.rect.translate(bounding_rect, movement);
 
-  const origin_points = Object.values(
-    cmath.rect.to9Points(_virtually_moved_rect)
-  );
-
-  const target_points: AxisAlignedSnapPoint[] = [];
+  const target_points: cmath.ext.snap.AxisAlignedPoint[] = [];
 
   target_points.push(
-    ...references.map((r) => Object.values(cmath.rect.to9Points(r))).flat()
+    ...anchors.map((r) => Object.values(cmath.rect.to9Points(r))).flat()
   );
 
-  // // #region repeated-space projected points
-  // const y_range: snap.spacing.Range = [
-  //   bounding_rect.y,
-  //   bounding_rect.y + bounding_rect.height,
-  // ];
-
-  // // x-aligned uses y range comparison
-  // const x_aligned = references.filter((r) => {
-  //   const this_y_range: snap.spacing.Range = [r.y, r.y + r.height];
-  //   return cmath.vector2.intersects(y_range, this_y_range);
-  // });
-  // const x_ranges = x_aligned.map(
-  //   (r) => [r.x, r.x + r.width] as snap.spacing.Range
-  // );
-
-  // const repeated = snap.spacing.repeatedpoints(x_ranges);
-  // const x_points = repeated.a.flat();
-  // target_points.push(...x_points.map((x) => [x, null] as AxisAlignedSnapPoint));
-  // // console.log("x_aligned", x_ranges, repeated);
-  // // #endregion
-
-  // const result = snap2DAxisAlignedV1(origin_points, target_points, threshold);
-  const result = snap2DAxisAligned(origin_points, target_points, threshold, 0);
-  const { value: points } = result;
-
-  // console.log("result", result.anchors.y[1]);
+  const result = snapToObjects(_virtually_moved_rect, anchors, threshold, 0);
+  const { translated: _translated } = result;
 
   // top left point of the bounding box
-  const bounding_box_snapped_xy = points[0];
+  const bounding_box_snapped_xy: cmath.Vector2 = [_translated.x, _translated.y];
 
   // return each xy point of input selection relative to the snapped bounding box
-  const translated = objects.map((r) => {
+  const translated = agents.map((r) => {
     const offset = cmath.vector2.sub(
       [r.x, r.y],
       [bounding_rect.x, bounding_rect.y]

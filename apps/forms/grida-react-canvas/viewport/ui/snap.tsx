@@ -1,7 +1,6 @@
 import React from "react";
 import { Crosshair } from "./crosshair";
 import { useDocument, useTransform } from "@/grida-react-canvas/provider";
-import { cmath } from "@grida/cmath";
 import { pointToSurfaceSpace } from "@/grida-react-canvas/utils/transform";
 import { surface } from "./types";
 import { Rule } from "./rule";
@@ -16,11 +15,11 @@ function useSnapGuide(): surface.SnapGuide | undefined {
       gesture.type === "scale") &&
     gesture.surface_snapping
   ) {
-    const { anchors, distance } = gesture.surface_snapping;
+    const { points } = gesture.surface_snapping;
 
     return {
-      x: anchors.x.map((x) => cmath.vector2.add(x, distance)),
-      y: anchors.y.map((y) => cmath.vector2.add(y, distance)),
+      x: points.x,
+      y: points.y,
     };
   }
 }
@@ -34,7 +33,7 @@ export function SnapGuide() {
   return (
     <div>
       {guide.x?.map((snap, i) => {
-        const p = pointToSurfaceSpace(snap, transform);
+        const p = pointToSurfaceSpace([snap[0] ?? 0, snap[1] ?? 0], transform);
         return (
           <React.Fragment key={i}>
             <div
@@ -54,7 +53,7 @@ export function SnapGuide() {
         );
       })}
       {guide.y?.map((snap, i) => {
-        const p = pointToSurfaceSpace(snap, transform);
+        const p = pointToSurfaceSpace([snap[0] ?? 0, snap[1] ?? 0], transform);
         return (
           <React.Fragment key={i}>
             <div

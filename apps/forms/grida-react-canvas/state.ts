@@ -2,7 +2,7 @@ import type { Action, EditorAction } from "./action";
 import { grida } from "@/grida";
 import { document } from "./document-query";
 import { cmath } from "@grida/cmath";
-import type { SnapResult } from "@grida/cmath/_snap";
+import type { SnapToObjectsResult } from "@grida/cmath/_snap";
 
 // #region config
 
@@ -210,7 +210,7 @@ export type GestureVirtualNudge = {
   /**
    * surface snap guides - result of snap while translate (move) gesture
    */
-  surface_snapping?: SnapResult;
+  surface_snapping?: SnapToObjectsResult;
 };
 
 export type GestureTranslate = IGesture & {
@@ -234,7 +234,7 @@ export type GestureTranslate = IGesture & {
   /**
    * surface snap guides - result of snap while translate (move) gesture
    */
-  surface_snapping?: SnapResult;
+  surface_snapping?: SnapToObjectsResult;
 };
 
 /**
@@ -313,7 +313,7 @@ export type GestureScale = IGesture & {
   /**
    * surface snap guides - result of snap while translate (move) gesture
    */
-  surface_snapping?: SnapResult;
+  surface_snapping?: SnapToObjectsResult;
 };
 
 export type GestureRotate = IGesture & {

@@ -48,7 +48,7 @@ export namespace cmath {
    * - [a] start
    * - [b] end
    * - [length] b - a
-   * - [center] (a + length / 2)
+   * - [center] (a + b / 2) or (a + length / 2) = mean of a and b
    */
   export type Range = [number, number];
 
@@ -336,6 +336,30 @@ export namespace cmath {
     }
 
     return mostFrequent[0];
+  }
+
+  /**
+   * Calculates the mean (average) of an array of numbers.
+   *
+   * The mean is computed by summing all elements in the array and dividing by the number of elements.
+   *
+   * @param values - An array of numbers for which the mean is to be calculated.
+   * @returns The mean (average) of the provided numbers.
+   *
+   * @throws {Error} If the input array is empty.
+   *
+   * @example
+   * ```typescript
+   * const data = [5, 10, 15, 20];
+   * const avg = cmath.stats.mean(data);
+   * console.log(avg); // Outputs: 12.5
+   * ```
+   */
+  export function mean(...values: cmath.Scalar[]): cmath.Scalar {
+    assert(values.length > 0, "Cannot compute mean of an empty array.");
+
+    const sum = values.reduce((acc, val) => acc + val, 0);
+    return sum / values.length;
   }
 
   /**
@@ -2556,47 +2580,61 @@ export namespace cmath.transform {
   }
 }
 
-// export namespace cmath.measure {}
-// export namespace cmath.auxiliary_line {}
-// export namespace cmath.auxiliary_line.rectangular {
-//   // fromPointToVector
-//   // sideToPoint
-// }
-
-/**
- * A practical, opinioned snapping utility
- */
 export namespace cmath.ext.snap {
+  /**
+   * A Vector2 that can take null values for each axis.
+   *
+   * This is for representing snap points that is infinity (or ignore) in counter axis.
+   *
+   * E.g. for 2D snapping, but where each axis are snapped independently.
+   */
+  export type AxisAlignedPoint =
+    | [number, number]
+    | [number, null]
+    | [null, number];
+
+  export type Snap1DResult = {
+    /**
+     * the translated agents with the distance applied.
+     */
+    translated: Scalar[];
+    /**
+     * the distance applied to the agents to snap within the threshold.
+     */
+    distance: Scalar;
+
+    /**
+     * the indices of the agents that satisfied the snap.
+     */
+    hit_agent_indicies: Scalar[];
+
+    /**
+     * the indices of the anchors that the agents snapped to.
+     */
+    hit_anchor_indicies: Scalar[];
+  };
+
   /**
    * Snaps an array of scalar points to the nearest target points within a specified threshold.
    *
-   * @param origins - An array of scalar points to snap.
-   * @param targets - An array of existing scalar points to snap to.
+   * @param agents - An array of scalar points to snap.
+   * @param anchors - An array of existing scalar points to snap to.
    * @param threshold - The maximum allowed distance for snapping.
    * @param epsilon - The tolerance for delta matching.
-   * @returns An object containing:
-   *          - `translated`: The snapped points.
-   *          - `distance`: The delta applied.
-   *          - `snapped_origin_indicies`: Indices of origins that were snapped.
-   *          - `snapped_target_indicies`: Indices of targets that were snapped to.
+   * @returns {Snap1DResult} The result of the snapping operation.
    */
   export function snap1D(
-    origins: Scalar[],
-    targets: Scalar[],
+    agents: Scalar[],
+    anchors: Scalar[],
     threshold: Scalar,
     epsilon = 0
-  ): {
-    translated: Scalar[];
-    distance: Scalar;
-    snapped_origin_indicies: Scalar[];
-    snapped_target_indicies: Scalar[];
-  } {
-    if (targets.length === 0) {
+  ): Snap1DResult {
+    if (anchors.length === 0) {
       return {
-        translated: origins,
+        translated: agents,
         distance: 0,
-        snapped_origin_indicies: [],
-        snapped_target_indicies: [],
+        hit_agent_indicies: [],
+        hit_anchor_indicies: [],
       };
     }
 
@@ -2605,16 +2643,16 @@ export namespace cmath.ext.snap {
 
     let minDelta = Infinity;
     let signedDelta = 0;
-    const snapped_origin_indicies: number[] = [];
-    const snapped_target_indicies = new Set<number>();
+    const hit_agent_indicies: number[] = [];
+    const hit_anchor_indicies = new Set<number>();
 
     // Iterate through each origin to find the minimal delta
-    for (let i = 0; i < origins.length; i++) {
-      const point = origins[i];
+    for (let i = 0; i < agents.length; i++) {
+      const point = agents[i];
       // Find the closest snapping target
       const [snap, delta, indicies] = cmath.align.scalar(
         point,
-        targets,
+        anchors,
         threshold
       );
 
@@ -2625,8 +2663,8 @@ export namespace cmath.ext.snap {
           minDelta === Infinity ||
           Math.abs(signedDeltaForPoint - signedDelta) <= epsilon
         ) {
-          snapped_origin_indicies.push(i);
-          indicies.forEach((idx) => snapped_target_indicies.add(idx));
+          hit_agent_indicies.push(i);
+          indicies.forEach((idx) => hit_anchor_indicies.add(idx));
 
           // Update minDelta and signedDelta if a smaller delta is found
           if (Math.abs(delta) < Math.abs(minDelta)) {
@@ -2640,10 +2678,10 @@ export namespace cmath.ext.snap {
     // If no snapping occurs, return the original points
     if (minDelta === Infinity) {
       return {
-        translated: origins,
+        translated: agents,
         distance: 0,
-        snapped_origin_indicies: [],
-        snapped_target_indicies: [],
+        hit_agent_indicies: [],
+        hit_anchor_indicies: [],
       };
     }
 
@@ -2651,13 +2689,13 @@ export namespace cmath.ext.snap {
     const delta = signedDelta;
 
     // Apply the delta to all points
-    const translated = origins.map((p) => p + delta);
+    const translated = agents.map((p) => p + delta);
 
     return {
       translated,
       distance: delta,
-      snapped_origin_indicies,
-      snapped_target_indicies: Array.from(snapped_target_indicies),
+      hit_agent_indicies: hit_agent_indicies,
+      hit_anchor_indicies: Array.from(hit_anchor_indicies),
     };
   }
 
@@ -2709,7 +2747,7 @@ export namespace cmath.ext.snap {
      * @remarks
      * - ignores the combination if overlaps (to ensure positive space)
      */
-    export function repeatedpoints(segments: cmath.Range[]): {
+    export function repeatRangeProjections(segments: cmath.Range[]): {
       /**
        * combinations of segments (overlapping ignored)
        */
@@ -2726,10 +2764,6 @@ export namespace cmath.ext.snap {
        * index-aligned projections of `b` points
        */
       b: number[][];
-      /**
-       * index-aligned projections of `c` points
-       */
-      c: number[][];
     } {
       // map all possible 1:1 combination set (with index)
       const indexes = Array.from({ length: segments.length }, (_, i) => i);
@@ -2770,7 +2804,6 @@ export namespace cmath.ext.snap {
 
         const pa = b2 + space;
         const pb = a1 - space;
-        const pc = b1 + space / 2;
 
         const _a = new Set<number>();
         const _b = new Set<number>();
@@ -2778,7 +2811,6 @@ export namespace cmath.ext.snap {
 
         _a.add(pa);
         _b.add(pb);
-        _c.add(pc);
 
         // TODO: apply space that is only to the same direction (need extra query)
         // // extended space (from others)
@@ -2789,7 +2821,6 @@ export namespace cmath.ext.snap {
 
         a.push(Array.from(_a));
         b.push(Array.from(_b));
-        c.push(Array.from(_c));
       }
 
       return {
@@ -2797,7 +2828,6 @@ export namespace cmath.ext.snap {
         spaces,
         a,
         b,
-        c,
       };
     }
   }
@@ -2914,3 +2944,10 @@ export namespace cmath.debug {
     return rounded % 1 === 0 ? String(rounded) : rounded.toFixed(precision);
   }
 }
+
+// export namespace cmath.measure {}
+// export namespace cmath.auxiliary_line {}
+// export namespace cmath.auxiliary_line.rectangular {
+//   // fromPointToVector
+//   // sideToPoint
+// }
