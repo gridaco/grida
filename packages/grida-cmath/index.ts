@@ -1813,24 +1813,24 @@ export namespace cmath.rect {
 }
 
 /**
- * Math utilities for "snapping" features.
+ * Alignment utilities for mathematical and graphical computations.
  *
  * @example
- * - snap to pixel grid - snap by `1`
- * - snap to objects
+ * - Align scalar values to a grid
+ * - Align 2D vectors to the nearest target positions
  */
-export namespace cmath.snap {
+export namespace cmath.align {
   /**
-   * Snaps a scalar value to the nearest value in an array of scalars if it is within a specified threshold.
+   * Aligns a scalar value to the nearest value in an array of scalars if it is within a specified threshold.
    *
-   * This function is useful for aligning scalar values (e.g., positions, sizes, or grid snapping) to a discrete set of
-   * target values while ensuring the snap occurs only within a defined threshold.
+   * This function is useful for aligning scalar values (e.g., positions, sizes, or grid alignment) to a discrete set of
+   * target values while ensuring the alignment occurs only within a defined threshold.
    *
-   * @param point - The scalar value to snap.
-   * @param targets - An array of existing scalar values to snap to.
-   * @param threshold - The maximum allowed distance for snapping. Must be non-negative.
+   * @param point - The scalar value to align.
+   * @param targets - An array of existing scalar values to align to.
+   * @param threshold - The maximum allowed distance for alignment. Must be non-negative.
    *
-   * @returns `[value, distance, indices]` where:
+   * @returns A tuple `[value, distance, indices]` where:
    * - `value`: is the nearest scalar (if within threshold) or the original `point` (if not).
    * - `distance`: is the signed distance `point - value` to that nearest scalar.
    * - `indices` are all target indices whose distance matches the minimum distance exactly.
@@ -1843,7 +1843,7 @@ export namespace cmath.snap {
    * // The minimal distance is 2 (to '20'), and note there are two '20's.
    * // So the function returns value=20, distance=2 (signed=22 - 20), indices=[1,2].
    *
-   * const [value, dist, indices] = cmath.snap.scalar(22, [10, 20, 20, 40], 5);
+   * const [value, dist, indices] = cmath.align.scalar(22, [10, 20, 20, 40], 5);
    * console.log(value);   // 20
    * console.log(dist);    // 2
    * console.log(indices); // [1, 2]
@@ -1894,17 +1894,17 @@ export namespace cmath.snap {
   }
 
   /**
-   * Snaps a 2D vector to the nearest vector(s) from an array of targets if it is within a specified threshold.
+   * Aligns a 2D vector to the nearest vector(s) from an array of target vectors if it is within a specified threshold.
    *
-   * This function is useful for aligning 2D points (e.g., grid or object snapping),
-   * ensuring that snapping only occurs if the distance to the target is within a given threshold.
+   * This function is useful for aligning 2D points (e.g., grid or object alignment),
+   * ensuring that alignment only occurs if the distance to the target is within a given threshold.
    *
-   * @param point - The 2D vector `[x, y]` to snap.
-   * @param targets - An array of 2D vectors to which the point might snap.
-   * @param threshold - The maximum allowed Euclidean distance for snapping. Must be non-negative.
+   * @param point - The 2D vector `[x, y]` to align.
+   * @param targets - An array of 2D vectors to which the point might align.
+   * @param threshold - The maximum allowed Euclidean distance for alignment. Must be non-negative.
    * @returns A tuple `[value, distance, indices]` where:
    *   - `value`: The nearest target vector if within threshold, otherwise the original `point`.
-   *   - `distance`: The Euclidean distance `dist(point, value)` if snapping occurs; otherwise `Infinity`.
+   *   - `distance`: The Euclidean distance `dist(point, value)` if alignment occurs; otherwise `Infinity`.
    *   - `indices`: **All** target indices whose distance from `point` is exactly equal to the minimum distance (ties).
    *
    * @throws If `threshold` is negative or if `targets` is empty.
@@ -1917,10 +1917,10 @@ export namespace cmath.snap {
    * //
    * // The function returns:
    * //   value   = [5, 5]
-   * //   distance = ~1.414
+   * //   distance = ~1.41421356237
    * //   indices  = [1, 2]
    *
-   * const [snappedVec, dist, tiedIndices] = cmath.snap.vector2([6, 6], [[0,0],[5,5],[5,5],[10,10]], 3);
+   * const [snappedVec, dist, tiedIndices] = cmath.align.vector2([6, 6], [[0,0],[5,5],[5,5],[10,10]], 3);
    * console.log(snappedVec);   // [5, 5]
    * console.log(dist);         // ~1.41421356237
    * console.log(tiedIndices);  // [1, 2]

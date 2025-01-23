@@ -48,12 +48,8 @@ export function snap2DAxisAligned(
   assert(threshold[1] >= 0, "Threshold must be a non-negative number.");
 
   // Separate target points into x and y components
-  const xTargets = targets
-    .map(([x]) => x)
-    .filter((x): x is number => x !== null);
-  const yTargets = targets
-    .map(([_, y]) => y)
-    .filter((y): y is number => y !== null);
+  const xTargets = targets.map(([x]) => x).filter((x) => x !== null);
+  const yTargets = targets.map(([_, y]) => y).filter((y) => y !== null);
 
   // Separate the scalar points for each axis
   const xPoints = points.map(([x]) => x);
@@ -131,7 +127,7 @@ export function snap1D(
   for (let i = 0; i < origins.length; i++) {
     const point = origins[i];
     // Find the closest snapping target
-    const [snap, delta, indicies] = cmath.snap.scalar(
+    const [snap, delta, indicies] = cmath.align.scalar(
       point,
       targets,
       threshold

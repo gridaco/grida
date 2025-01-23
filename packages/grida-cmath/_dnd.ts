@@ -7,7 +7,7 @@ export namespace dnd {
     const t_point = cmath.rect.center(t);
 
     // Use cmath.snap.vector2 to find the closest target point
-    const [_, distance, [_i]] = cmath.snap.vector2(t_point, points, Infinity);
+    const [_, distance, [_i]] = cmath.align.vector2(t_point, points, Infinity);
 
     // Determine the object and point index
 
