@@ -39,6 +39,23 @@ describe("cmath.rect", () => {
   });
 
   describe("toPoints", () => {
+    it("[chunk] should return an 9-length array with 9 points with the exact index", () => {
+      const rect: cmath.Rectangle = { x: 10, y: 20, width: 30, height: 40 };
+      const points = cmath.rect.to9PointsChunk(rect);
+
+      expect(points).toEqual([
+        [10, 20], // topLeft
+        [40, 20], // topRight
+        [40, 60], // bottomRight
+        [10, 60], // bottomLeft
+        [25, 20], // topCenter
+        [40, 40], // rightCenter
+        [25, 60], // bottomCenter
+        [10, 40], // leftCenter
+        [25, 40], // center
+      ]);
+    });
+
     it("should return an object with 9 named control points", () => {
       const rect: cmath.Rectangle = { x: 10, y: 20, width: 30, height: 40 };
       const points = cmath.rect.to9Points(rect);
@@ -46,12 +63,12 @@ describe("cmath.rect", () => {
       expect(points).toEqual({
         topLeft: [10, 20],
         topRight: [40, 20],
-        bottomLeft: [10, 60],
         bottomRight: [40, 60],
+        bottomLeft: [10, 60],
         topCenter: [25, 20],
-        leftCenter: [10, 40],
         rightCenter: [40, 40],
         bottomCenter: [25, 60],
+        leftCenter: [10, 40],
         center: [25, 40],
       });
     });
@@ -63,12 +80,12 @@ describe("cmath.rect", () => {
       expect(points).toEqual({
         topLeft: [10, 20],
         topRight: [10, 20], // Same as topLeft
-        bottomLeft: [10, 60],
         bottomRight: [10, 60], // Same as bottomLeft
+        bottomLeft: [10, 60],
         topCenter: [10, 20], // Same as topLeft
-        leftCenter: [10, 40],
         rightCenter: [10, 40], // Same as leftCenter
         bottomCenter: [10, 60], // Same as bottomLeft
+        leftCenter: [10, 40],
         center: [10, 40],
       });
     });
@@ -80,12 +97,12 @@ describe("cmath.rect", () => {
       expect(points).toEqual({
         topLeft: [10, 20],
         topRight: [-20, 20],
-        bottomLeft: [10, -20],
         bottomRight: [-20, -20],
+        bottomLeft: [10, -20],
         topCenter: [-5, 20],
-        leftCenter: [10, 0],
         rightCenter: [-20, 0],
         bottomCenter: [-5, -20],
+        leftCenter: [10, 0],
         center: [-5, 0],
       });
     });

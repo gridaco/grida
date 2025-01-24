@@ -19,6 +19,11 @@ export namespace cmath {
    */
   export type Axis = "x" | "y";
 
+  export const counterAxis = {
+    x: "y",
+    y: "x",
+  } as const;
+
   /**
    * Represents a single numerical value, often referred to as a scalar in mathematics and computer science.
    *
@@ -1155,6 +1160,18 @@ export namespace cmath.rect {
     };
   }
 
+  export type Rectangle9Points = {
+    topLeft: Vector2;
+    topRight: Vector2;
+    bottomRight: Vector2;
+    bottomLeft: Vector2;
+    topCenter: Vector2;
+    rightCenter: Vector2;
+    bottomCenter: Vector2;
+    leftCenter: Vector2;
+    center: Vector2;
+  };
+
   /**
    * Returns an object containing 9 control points of a rectangle: 4 corners, 4 midpoints, and the center.
    *
@@ -1169,40 +1186,58 @@ export namespace cmath.rect {
    * // {
    * //   topLeft: [10, 20],
    * //   topRight: [40, 20],
-   * //   bottomLeft: [10, 60],
    * //   bottomRight: [40, 60],
+   * //   bottomLeft: [10, 60],
    * //   topCenter: [25, 20],
-   * //   leftCenter: [10, 40],
    * //   rightCenter: [40, 40],
    * //   bottomCenter: [25, 60],
+   * //   leftCenter: [10, 40],
    * //   center: [25, 40],
    * // }
    */
-  export function to9Points(rect: Rectangle): {
-    topLeft: Vector2;
-    topRight: Vector2;
-    bottomLeft: Vector2;
-    bottomRight: Vector2;
-    topCenter: Vector2;
-    leftCenter: Vector2;
-    rightCenter: Vector2;
-    bottomCenter: Vector2;
-    center: Vector2;
-  } {
+  export function to9Points(rect: Rectangle): Rectangle9Points {
     const { x, y, width, height } = rect;
 
     // Compute the points
     return {
       topLeft: [x, y],
       topRight: [x + width, y],
-      bottomLeft: [x, y + height],
       bottomRight: [x + width, y + height],
+      bottomLeft: [x, y + height],
       topCenter: [x + width / 2, y],
-      leftCenter: [x, y + height / 2],
       rightCenter: [x + width, y + height / 2],
       bottomCenter: [x + width / 2, y + height],
+      leftCenter: [x, y + height / 2],
       center: [x + width / 2, y + height / 2],
     };
+  }
+
+  /**
+   * A chunk array of 9 control points of a rectangle, with the exact order:
+   *
+   * `[topLeft, topRight, bottomRight, bottomLeft, topCenter, rightCenter, bottomCenter, leftCenter, center]`
+   */
+  export type TRectangle9PointsChunk<T> = [
+    T, // topLeft
+    T, // topRight
+    T, // bottomRight
+    T, // bottomLeft
+    T, // topCenter
+    T, // rightCenter
+    T, // bottomCenter
+    T, // leftCenter
+    T, // center
+  ];
+
+  export function to9PointsChunk(
+    r: cmath.Rectangle
+  ): TRectangle9PointsChunk<cmath.Vector2> {
+    // prettier-ignore
+    //      0        1         2            3           4          5            6             7           8
+    const { topLeft, topRight, bottomRight, bottomLeft, topCenter, rightCenter, bottomCenter, leftCenter, center } = cmath.rect.to9Points(r)
+    // prettier-ignore
+    //      0        1         2            3           4          5            6             7           8
+    return [topLeft, topRight, bottomRight, bottomLeft, topCenter, rightCenter, bottomCenter, leftCenter, center];
   }
 
   export function getCardinalPoint(
@@ -1383,7 +1418,7 @@ export namespace cmath.rect {
    *
    * @param rectangles - An array of rectangles to project.
    * @param projectionAxis - The axis to calculate projections on ("x" for comparing vertical ranges, "y" for comparing horizontal ranges).
-   * @returns A `Vector2` representing the overlapping range of projections along the counter-axis, or `null` if the rectangles do not overlap.
+   * @returns {Range} representing the overlapping range of projections along the counter-axis, or `null` if the rectangles do not overlap.
    *
    *
    * ### Visual Explanation
@@ -1433,7 +1468,7 @@ export namespace cmath.rect {
   export function axisProjectionIntersection(
     rectangles: cmath.Rectangle[],
     projectionAxis: Axis
-  ): cmath.Vector2 | null {
+  ): Range | null {
     if (rectangles.length < 2) {
       throw new Error(
         "At least two rectangles are required to compute axis-aligned projection."
@@ -1866,7 +1901,7 @@ export namespace cmath.align {
    *
    * @returns A tuple `[value, distance, indices]` where:
    * - `value`: is the nearest scalar (if within threshold) or the original `point` (if not).
-   * - `distance`: is the signed distance `point - value` to that nearest scalar.
+   * - `distance`: is the signed distance `point - value` to that nearest scalar. (or `Infinity` if not aligned).
    * - `indices` are all target indices whose distance matches the minimum distance exactly.
    *
    * @throws If `threshold` is negative or if `targets` is empty.
@@ -2595,23 +2630,23 @@ export namespace cmath.ext.snap {
 
   export type Snap1DResult = {
     /**
-     * the translated agents with the distance applied.
-     */
-    translated: Scalar[];
-    /**
-     * the distance applied to the agents to snap within the threshold.
+     * the distance (delta) needs to be applied to the agents to snap within the threshold.
+     *
+     * @example
+     *
+     * const translated = agents.map((p) => p + distance);
      */
     distance: Scalar;
 
     /**
      * the indices of the agents that satisfied the snap.
      */
-    hit_agent_indicies: Scalar[];
+    hit_agent_indices: Scalar[];
 
     /**
      * the indices of the anchors that the agents snapped to.
      */
-    hit_anchor_indicies: Scalar[];
+    hit_anchor_indices: Scalar[];
   };
 
   /**
@@ -2631,10 +2666,9 @@ export namespace cmath.ext.snap {
   ): Snap1DResult {
     if (anchors.length === 0) {
       return {
-        translated: agents,
         distance: 0,
-        hit_agent_indicies: [],
-        hit_anchor_indicies: [],
+        hit_agent_indices: [],
+        hit_anchor_indices: [],
       };
     }
 
@@ -2678,24 +2712,19 @@ export namespace cmath.ext.snap {
     // If no snapping occurs, return the original points
     if (minDelta === Infinity) {
       return {
-        translated: agents,
         distance: 0,
-        hit_agent_indicies: [],
-        hit_anchor_indicies: [],
+        hit_agent_indices: [],
+        hit_anchor_indices: [],
       };
     }
 
     // Compute the final snapping delta
     const delta = signedDelta;
 
-    // Apply the delta to all points
-    const translated = agents.map((p) => p + delta);
-
     return {
-      translated,
       distance: delta,
-      hit_agent_indicies: hit_agent_indicies,
-      hit_anchor_indicies: Array.from(hit_anchor_indicies),
+      hit_agent_indices: hit_agent_indicies,
+      hit_anchor_indices: Array.from(hit_anchor_indicies),
     };
   }
 
@@ -2704,6 +2733,23 @@ export namespace cmath.ext.snap {
    *
    * This module provides utilities for working with 1D ranges, calculating spaces between them,
    * and projecting new ranges based on existing ones.
+   *
+   * **Definitions & Design**
+   * - loops
+   *    - are aligned ranges with identical gaps (2 or more ranges). but for simplicity, we do this by combinations of ranges (exactly 2 ranges)
+   * - each loop has a projected snap extension, `next` (`a`) and `center` (virtually a, b, and center, where b being mirror of a)
+   *    - a projected loop data will contain multiple delta (space)
+   *      - one is from ‘this’ loop, others from other loops’ space, but within the same direction.
+   *    - the delta can be interpreted as ...
+   *      - a = loop[-1] + delta (the a point is last loop item (biggest) plus delta.
+   *      - b = loop[0] - delta (b is mirrored a)
+   *      - center = mean(loop[0].a, loop[-1].b)
+   * - the hit test of the range will take direction 1 or -1 (mirrored)
+   *    - the `a` testing is used for testing hit between `a` and input’s `a`
+   *    - the mirrored testing is used for testing hit between `b` (mirrored a) and input’s `b`
+   * - how to tell why it’s snapped
+   *    - when input’s a, b or c is hit, it will contain to which loop it’s hit. and the space (except c).
+   *    - since the space can be originated from other loops, and multiple loops can have identical spaces, we can return all loops that contains that delta as original space, plus the hit one’s loop
    *
    *
    * ```
@@ -2738,52 +2784,73 @@ export namespace cmath.ext.snap {
    * This way, we can provide additional ux-friendly snapping points for the user.
    */
   export namespace spacing {
+    export type RangeLoopProjections = {
+      /**
+       * combinations of ranges (overlapping ignored)
+       * @example
+       * ```
+       * ranges = [[0, 10], [20, 30], [40, 50]];
+       * loops = [[0, 1], [0, 2], [1, 2]];
+       * ```
+       */
+      loops: [index: number, index: number][];
+
+      /**
+       * index-aligned gaps of each loops
+       *
+       * @example
+       *
+       * ```
+       * // gaps[0] is the gap between loops[0][0] and loops[0][1]
+       * ranges = [[0, 10], [20, 30], [40, 50]];
+       * loops = [[0, 1], [0, 2], [1, 2]];
+       * gaps = [10, 30, 10];
+       * ```
+       */
+      gaps: number[];
+
+      /**
+       * index-aligned projections of `a` points
+       */
+      a: number[][];
+
+      /**
+       * index-aligned projections of `b` points
+       */
+      b: number[][];
+    };
+
     /**
      * calculates the space between two ranges, returns a set of projections of the next range for each combination.
      *
-     * @param segments
+     * @param ranges
      *
      *
      * @remarks
      * - ignores the combination if overlaps (to ensure positive space)
      */
-    export function repeatRangeProjections(segments: cmath.Range[]): {
-      /**
-       * combinations of segments (overlapping ignored)
-       */
-      combinations: [number, number][];
-      /**
-       * index-aligned spaces of each combination
-       */
-      spaces: number[];
-      /**
-       * index-aligned projections of `a` points
-       */
-      a: number[][];
-      /**
-       * index-aligned projections of `b` points
-       */
-      b: number[][];
-    } {
+    export function repeatRangeProjections(
+      ranges: cmath.Range[]
+    ): RangeLoopProjections {
       // map all possible 1:1 combination set (with index)
-      const indexes = Array.from({ length: segments.length }, (_, i) => i);
-      const indicies_combinations: [number, number][] = cmath
+      const indexes = Array.from({ length: ranges.length }, (_, i) => i);
+      const loops: [number, number][] = cmath
         .combinations(indexes, 2)
         // filter out the intersecting combination
         .filter(([i, j]) => {
-          return !cmath.vector2.intersects(segments[i], segments[j]);
+          return !cmath.vector2.intersects(ranges[i], ranges[j]);
         })
         // Sort the combinations based on segment starting positions
         .map(([i, j]) =>
           // sort the segments by `a`
-          [i, j].sort((a, b) => segments[a][0] - segments[b][0])
+          [i, j].sort((a, b) => ranges[a][0] - ranges[b][0])
         ) as [number, number][];
 
       // spaces of each combination
       const spaces: number[] = [];
-      for (const [i, j] of indicies_combinations) {
-        const [a1, b1] = segments[i];
-        const [a2, b2] = segments[j];
+      for (const [i, j] of loops) {
+        const [a1, b1] = ranges[i];
+        const [a2, b2] = ranges[j];
 
         // calculate the space between the two ranges
         const space = a2 - b1;
@@ -2795,9 +2862,9 @@ export namespace cmath.ext.snap {
       const b: number[][] = [];
       const c: number[][] = [];
 
-      for (const [i, j] of indicies_combinations) {
-        const [a1, b1] = segments[i];
-        const [a2, b2] = segments[j];
+      for (const [i, j] of loops) {
+        const [a1, b1] = ranges[i];
+        const [a2, b2] = ranges[j];
 
         // calculate the space between the two ranges
         const space = a2 - b1;
@@ -2824,8 +2891,8 @@ export namespace cmath.ext.snap {
       }
 
       return {
-        combinations: indicies_combinations,
-        spaces,
+        loops,
+        gaps: spaces,
         a,
         b,
       };

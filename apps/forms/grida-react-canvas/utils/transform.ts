@@ -23,9 +23,19 @@ export function toCanvasSpace(
   return [xCanvas, yCanvas];
 }
 
+export function offsetToSurfaceSpace(
+  offset: number,
+  axis: cmath.Axis,
+  transform: cmath.Transform
+) {
+  const [x, y] = axis === "x" ? [offset, 0] : [0, offset];
+  const [xViewport, yViewport] = pointToSurfaceSpace([x, y], transform);
+  return axis === "x" ? xViewport : yViewport;
+}
+
 export function pointToSurfaceSpace(
   point: [number, number],
-  transform: [[number, number, number], [number, number, number]]
+  transform: cmath.Transform
 ): [number, number] {
   const [[a, b, tx], [c, d, ty]] = transform;
   const [x, y] = point;
@@ -39,7 +49,7 @@ export function pointToSurfaceSpace(
 
 export function rectToSurfaceSpace(
   rect: cmath.Rectangle,
-  transform: [[number, number, number], [number, number, number]]
+  transform: cmath.Transform
 ): cmath.Rectangle {
   const min: cmath.Vector2 = [rect.x, rect.y];
   const max: cmath.Vector2 = [rect.x + rect.width, rect.y + rect.height];

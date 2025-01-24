@@ -16,12 +16,6 @@ export function snapObjectsTranslation(
 
   const _virtually_moved_rect = cmath.rect.translate(bounding_rect, movement);
 
-  const target_points: cmath.ext.snap.AxisAlignedPoint[] = [];
-
-  target_points.push(
-    ...anchors.map((r) => Object.values(cmath.rect.to9Points(r))).flat()
-  );
-
   const result = snapToObjects(_virtually_moved_rect, anchors, threshold, 0);
   const { translated: _translated } = result;
 

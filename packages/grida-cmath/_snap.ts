@@ -2,12 +2,35 @@ import assert from "assert";
 import { cmath } from ".";
 
 export type SnapToObjectsResult = {
+  /**
+   * The translated rectangle after snapping.
+   *
+   * Returns the original agent when not snapped (delta 0)
+   */
   translated: cmath.Rectangle;
+  /**
+   * The original anchors that were used as references for snapping.
+   */
+  anchors: cmath.Rectangle[];
+
+  /**
+   * The calculated delta for snapping
+   */
   delta: cmath.Vector2;
-  points: {
-    x: cmath.ext.snap.AxisAlignedPoint[];
-    y: cmath.ext.snap.AxisAlignedPoint[];
+
+  by_geometry: {
+    hit_points: {
+      agent: ObjectGeometryHitResult;
+      anchors: ObjectGeometryHitResult[];
+    };
   };
+  by_spacing: {
+    x_aligned_anchors_idx: number[];
+    y_aligned_anchors_idx: number[];
+    x: Snap1DRangesDirectionAlignedResult;
+    y: Snap1DRangesDirectionAlignedResult;
+  };
+  by_ruler: {};
 };
 
 export function snapToObjects(
@@ -20,34 +43,61 @@ export function snapToObjects(
   assert(anchors.length > 0, "Anchors must contain at least one rectangle.");
 
   const snap_geo = snapToObjectsGeometry(agent, anchors, threshold, epsilon);
-  // const snap_spc = snapToObjectsSpace(agent, anchors, threshold, epsilon);
+  const snap_spc = snapToObjectsSpace(agent, anchors, threshold, epsilon);
+  const x = bestAxisAlignedDistance(snap_geo.x, snap_spc.x);
+  const y = bestAxisAlignedDistance(snap_geo.y, snap_spc.y);
 
   // Determine the final delta for each axis
-  const x_delta = snap_geo.x.distance;
-  const y_delta = snap_geo.y.distance;
-
-  // Apply translation to all points
-  const translated_agent_points: cmath.Vector2[] = snap_geo.agent_points.map(
-    ([x, y]) => [x + x_delta, y + y_delta]
-  );
+  const x_delta = x.distance;
+  const y_delta = y.distance;
 
   const translated_agent = cmath.rect.translate(agent, [x_delta, y_delta]);
 
   return {
     translated: translated_agent,
-    delta: [x_delta, y_delta],
-    points: {
-      x: [
-        ...snap_geo.x.hit_agent_indicies.map((i) => translated_agent_points[i]),
-        ...snap_geo.x.hit_anchor_indicies.map((i) => snap_geo.anchor_points[i]),
-      ],
-      y: [
-        ...snap_geo.y.hit_agent_indicies.map((i) => translated_agent_points[i]),
-        ...snap_geo.y.hit_anchor_indicies.map((i) => snap_geo.anchor_points[i]),
-      ],
+    anchors,
+    by_geometry: {
+      hit_points: {
+        agent: snap_geo.agent_hits,
+        anchors: snap_geo.anchor_hits,
+      },
     },
+    by_spacing: snap_spc,
+    by_ruler: {},
+    delta: [x_delta, y_delta],
   };
 }
+
+interface IDistance {
+  distance: number;
+}
+
+function bestAxisAlignedDistance(...results: IDistance[]): IDistance {
+  let min_distance = Infinity;
+  let min_index = -1;
+
+  for (let i = 0; i < results.length; i++) {
+    const result = results[i];
+    if (result.distance === 0) {
+      continue;
+    } else if (result.distance < min_distance) {
+      min_distance = result.distance;
+      min_index = i;
+    } else if (result.distance === min_distance) {
+      // TODO: support multiple results, merge them if the distance is the same (or within epsilon)
+    }
+  }
+
+  if (min_index === -1) {
+    return results[0];
+  }
+
+  return results[min_index];
+}
+
+type ObjectGeometryHitResult = cmath.rect.TRectangle9PointsChunk<
+  [boolean, boolean]
+>;
 
 function snapToObjectsGeometry(
   agent: cmath.Rectangle,
@@ -55,13 +105,16 @@ function snapToObjectsGeometry(
   threshold: cmath.Vector2,
   epsilon = 0
 ): Sanp2DAxisAlignedResult & {
+  agent_hits: ObjectGeometryHitResult;
+  anchor_hits: ObjectGeometryHitResult[];
   agent_points: cmath.Vector2[];
   anchor_points: cmath.ext.snap.AxisAlignedPoint[];
 } {
+  const geometry_chunk_size = 9;
   // 1) snap to objects 9 points (each corner (4), center (1), and midpoints (4))
-  const agent_points = Object.values(cmath.rect.to9Points(agent));
+  const agent_points = cmath.rect.to9PointsChunk(agent);
   const anchor_points: cmath.ext.snap.AxisAlignedPoint[] = anchors
-    .map((r) => Object.values(cmath.rect.to9Points(r)))
+    .map((r) => cmath.rect.to9PointsChunk(r))
     .flat();
 
   const snap = snap2DAxisAligned(
@@ -71,7 +124,29 @@ function snapToObjectsGeometry(
     epsilon
   );
 
+  const agent_hits: ObjectGeometryHitResult = agent_points.map(
+    (point, index) => {
+      const xHit = snap.x.hit_agent_indices.includes(index);
+      const yHit = snap.y.hit_agent_indices.includes(index);
+      return [xHit, yHit] satisfies [boolean, boolean];
+    }
+  ) as ObjectGeometryHitResult;
+
+  const anchor_hits: ObjectGeometryHitResult[] = [];
+  for (let i = 0; i < anchor_points.length; i += geometry_chunk_size) {
+    const chunk = anchor_points.slice(i, i + geometry_chunk_size);
+    const hitResult = chunk.map((point, index) => {
+      const pointIndex = i + index;
+      const xHit = snap.x.hit_anchor_indices.includes(pointIndex);
+      const yHit = snap.y.hit_anchor_indices.includes(pointIndex);
+      return [xHit, yHit];
+    });
+    anchor_hits.push(hitResult as ObjectGeometryHitResult);
+  }
+
   return {
+    agent_hits,
+    anchor_hits,
     agent_points,
     anchor_points,
     x: snap.x,
@@ -84,57 +159,124 @@ function snapToObjectsSpace(
   anchors: cmath.Rectangle[],
   threshold: cmath.Vector2,
   epsilon = 0
-): Sanp2DAxisAlignedResult {
-  const [x_threshold, y_threshold] = threshold;
-
-  // #region repeated-space projected points
+) {
+  // Define the agent's ranges on both axes
   const x_range: cmath.Range = [agent.x, agent.x + agent.width];
   const y_range: cmath.Range = [agent.y, agent.y + agent.height];
 
-  // x-aligned uses y range comparison
-  const x_aligned_anchors = anchors.filter((a) => {
+  // Filter anchors that overlap with the agent's ranges
+  // store them as a index so we can locate the original anchor (rectangle) later
+  const x_aligned_anchors_idx = anchors.reduce((acc, a, index) => {
     const a_y_range: cmath.Range = [a.y, a.y + a.height];
-    return cmath.vector2.intersects(y_range, a_y_range);
+    if (cmath.vector2.intersects(y_range, a_y_range)) acc.push(index);
+    return acc;
+  }, [] as number[]);
+
+  const y_aligned_anchors_idx = anchors.reduce((acc, a, index) => {
+    const a_x_range: cmath.Range = [a.x, a.x + a.width];
+    if (cmath.vector2.intersects(x_range, a_x_range)) acc.push(index);
+    return acc;
+  }, [] as number[]);
+
+  // Extract ranges for snapping
+  const x_aligned_anchor_ranges = x_aligned_anchors_idx.map((idx) => {
+    const r = anchors[idx];
+    return [r.x, r.x + r.width] satisfies cmath.Range;
   });
 
-  const x_aligned_anchor_ranges = x_aligned_anchors.map(
-    (r) => [r.x, r.x + r.width] as cmath.Range
+  const y_aligned_anchor_ranges = x_aligned_anchors_idx.map((idx) => {
+    const r = anchors[idx];
+    return [r.y, r.y + r.height] satisfies cmath.Range;
+  });
+
+  const x = snap1DRangesDirectionAlignedWithProjection(
+    x_range,
+    x_aligned_anchor_ranges,
+    threshold[0],
+    epsilon
   );
 
-  const x_repeated_anchors = cmath.ext.snap.spacing.repeatRangeProjections(
-    x_aligned_anchor_ranges
+  const y = snap1DRangesDirectionAlignedWithProjection(
+    y_range,
+    y_aligned_anchor_ranges,
+    threshold[1],
+    epsilon
   );
-
-  const x_a_anchors = x_repeated_anchors.a.flat();
-  const x_b_anchors = x_repeated_anchors.b.flat();
-  // const x_c_anchor_points = x_repeated_anchors.c.flat();
-
-  const a_snap = cmath.ext.snap.snap1D([x_range[0]], x_a_anchors, x_threshold);
-  const b_snap = cmath.ext.snap.snap1D([x_range[1]], x_b_anchors, x_threshold);
 
   return {
-    x: a_snap,
-    y: b_snap,
+    x_aligned_anchors_idx,
+    y_aligned_anchors_idx,
+    x,
+    y,
   };
 }
 
-// export function snap1DRanges(
-//   agents: cmath.Range[],
-//   anchors: cmath.Range[],
-//   threshold: number
-// ) {
-//   const a_agents = agents.map(([a, _]) => a);
-//   const b_agents = agents.map(([_, b]) => b);
-//   const c_agents = agents.map(([a, b]) => cmath.mean(a, b));
+type Snap1DRangesDirectionAlignedResult =
+  cmath.ext.snap.spacing.RangeLoopProjections & {
+    distance: number;
+    a_snap: cmath.ext.snap.Snap1DResult;
+    b_snap: cmath.ext.snap.Snap1DResult;
+    a_hit_loops_idx: number[];
+    b_hit_loops_idx: number[];
+  };
 
-//   const a_anchors = anchors.map(([a, _]) => a);
-//   const b_anchors = anchors.map(([_, b]) => b);
-//   const c_anchors = anchors.map(([a, b]) => cmath.mean(a, b));
+function snap1DRangesDirectionAlignedWithProjection(
+  agent: cmath.Range,
+  anchors: cmath.Range[],
+  threshold: number,
+  epsilon = 0
+): Snap1DRangesDirectionAlignedResult {
+  // project the anchor ranges
+  const projection = cmath.ext.snap.spacing.repeatRangeProjections(anchors);
 
-//   const a_snap = cmath.ext.snap.snap1D(a_agents, a_anchors, threshold);
-//   const b_snap = cmath.ext.snap.snap1D(b_agents, b_anchors, threshold);
-//   const c_snap = cmath.ext.snap.snap1D(c_agents, c_anchors, threshold);
-// }
+  const { a, b, loops, gaps } = projection;
+
+  // anchors
+  const a_flat: number[] = [];
+  const a_flat_loop_idx: number[] = [];
+  const b_flat: number[] = [];
+  const b_flat_loop_idx: number[] = [];
+
+  a.forEach((loop, i) => {
+    loop.forEach((value, j) => {
+      a_flat.push(value);
+      a_flat_loop_idx.push(i);
+    });
+  });
+
+  b.forEach((loop, i) => {
+    loop.forEach((value, j) => {
+      b_flat.push(value);
+      b_flat_loop_idx.push(i);
+    });
+  });
+
+  // Perform snapping on each side of the agent's ranges
+  const a_snap = cmath.ext.snap.snap1D([agent[0]], a_flat, threshold, epsilon);
+
+  const b_snap = cmath.ext.snap.snap1D([agent[1]], b_flat, threshold, epsilon);
+
+  // get the origianl loop index based on anchors index.
+  const a_hit_loops_idx = a_snap.hit_anchor_indices.map(
+    (index) => a_flat_loop_idx[index]
+  );
+
+  const b_hit_loops_idx = b_snap.hit_anchor_indices.map(
+    (index) => b_flat_loop_idx[index]
+  );
+
+  return {
+    distance: Math.min(a_snap.distance, b_snap.distance),
+    loops,
+    gaps,
+    a,
+    b,
+    a_snap,
+    b_snap,
+    a_hit_loops_idx,
+    b_hit_loops_idx,
+  };
+}
 
 type Sanp2DAxisAlignedResult = {
   x: cmath.ext.snap.Snap1DResult;
