@@ -414,6 +414,43 @@ export namespace cmath {
       ).map((perm) => [item, ...perm])
     );
   }
+
+  /**
+   * Generates the power set of a given array.
+   *
+   * The power set is the set of all subsets of the input array, including
+   * the empty set and the array itself. The function uses combinations of
+   * all possible lengths to generate the power set.
+   *
+   * @param arr - The input array for which the power set is to be generated.
+   * @returns An array of arrays representing all subsets of the input array.
+   *
+   * @example
+   * ```typescript
+   * const result = cmath.powerset([1, 2, 3]);
+   * console.log(result);
+   * // Output:
+   * // [
+   * //   [],        // Empty set
+   * //   [1], [2], [3],  // Subsets of size 1
+   * //   [1, 2], [1, 3], [2, 3], // Subsets of size 2
+   * //   [1, 2, 3]  // Subset of size 3
+   * // ]
+   * ```
+   *
+   * @remarks
+   * - The number of subsets in the power set is `2^n`, where `n` is the length of the input array.
+   * - This function uses the `cmath.combinations` function internally to generate subsets of specific lengths.
+   *
+   * @see https://en.wikipedia.org/wiki/Power_set
+   */
+  export function powerset<T>(arr: T[]): T[][] {
+    const result: T[][] = [[]]; // Start with the empty set
+    for (let size = 1; size <= arr.length; size++) {
+      result.push(...cmath.combinations(arr, size));
+    }
+    return result;
+  }
 }
 
 /**
@@ -2612,6 +2649,113 @@ export namespace cmath.transform {
     const radians = Math.atan2(c, a); // typical for rotation matrix: a = cosθ, c = sinθ
     const degrees = radians * (180 / Math.PI);
     return degrees;
+  }
+}
+
+export namespace cmath.range {
+  /**
+   * Groups ranges by their uniform gaps.
+   *
+   * This function identifies subsets of ranges where the gaps between consecutive ranges
+   * are consistent within a specified tolerance. Gaps are calculated as the distance
+   * between the end of one range and the start of the next. Overlapping ranges result
+   * in a gap of `0`.
+   *
+   * @param ranges - An array of numerical ranges, each represented as a `[start, end]` tuple.
+   * @param tolerance - The allowable deviation for gaps to be considered uniform. Defaults to `0`.
+   * @returns An array of grouped ranges with uniform gaps. Each group contains:
+   *   - `loop`: The indices of the ranges in the group.
+   *   - `min`: The minimum start value among the grouped ranges.
+   *   - `max`: The maximum end value among the grouped ranges.
+   *   - `gap`: The uniform gap between consecutive ranges (always non-negative).
+   *
+   * @example
+   * ```typescript
+   * const ranges: cmath.Range[] = [
+   *   [0, 10],
+   *   [15, 25],
+   *   [30, 40],
+   * ];
+   * const result = cmath.range.groupRangesByUniformGap(ranges);
+   * console.log(result);
+   * // Output:
+   * // [
+   * //   { loop: [0, 1, 2], min: 0, max: 40, gap: 5 },
+   * //   { loop: [0, 1], min: 0, max: 25, gap: 5 },
+   * //   { loop: [1, 2], min: 15, max: 40, gap: 5 },
+   * // ]
+   * ```
+   *
+   * @remarks
+   * - The function uses the power set approach, which has exponential time complexity. It's recommended to use it with a reasonable number of ranges.
+   * - Overlapping ranges are allowed as long as the gaps between their end and start points are consistent.
+   * - The `tolerance` parameter allows for slight variations in gaps, which is useful in scenarios with floating-point precision issues.
+   */
+  export function groupRangesByUniformGap(
+    ranges: Range[],
+    tolerance: number = 0
+  ): {
+    loop: number[];
+    min: number;
+    max: number;
+    gap: number;
+  }[] {
+    // Generate all possible subsets of the input ranges
+    const subsets = powerset(ranges);
+
+    const result: {
+      loop: number[];
+      min: number;
+      max: number;
+      gap: number;
+    }[] = [];
+
+    // Iterate through each subset to check for consistent gaps
+    main: for (const subset of subsets) {
+      if (subset.length < 2) continue; // Skip subsets with fewer than 2 ranges
+
+      // Get the indices of the subset ranges
+      const subsetIndices = ranges
+        .map((range, index) => (subset.includes(range) ? index : -1))
+        .filter((index) => index !== -1) as number[];
+
+      // Sort the subset ranges by their start values
+      const sortedSubset = subsetIndices
+        .slice()
+        .sort((a, b) => ranges[a][0] - ranges[b][0]);
+
+      // Calculate gaps between consecutive ranges
+      const distances: number[] = [];
+      for (let i = 1; i < sortedSubset.length; i++) {
+        const prevRange = ranges[sortedSubset[i - 1]];
+        const currentRange = ranges[sortedSubset[i]];
+        const distance = currentRange[0] - prevRange[1];
+        if (distance < 0) continue main;
+        distances.push(distance);
+      }
+
+      // Check if all gaps are uniform within the specified tolerance
+      if (isUniform(distances, tolerance)) {
+        // Calculate min and max
+        const starts = sortedSubset.map((index) => ranges[index][0]);
+        const ends = sortedSubset.map((index) => ranges[index][1]);
+        const min = Math.min(...starts);
+        const max = Math.max(...ends);
+
+        // The gap is consistent; take the first gap as representative
+        const representativeGap = distances[0];
+
+        // Add to the result
+        result.push({
+          loop: sortedSubset,
+          min,
+          max,
+          gap: representativeGap,
+        });
+      }
+    }
+
+    return result;
   }
 }
 
