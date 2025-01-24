@@ -416,40 +416,64 @@ export namespace cmath {
   }
 
   /**
-   * Generates the power set of a given array.
+   * Generates the power set or subsets of a given array.
    *
-   * The power set is the set of all subsets of the input array, including
-   * the empty set and the array itself. The function uses combinations of
-   * all possible lengths to generate the power set.
+   * If `k` is not specified, the function returns the full power set, which includes all subsets
+   * of all possible sizes (from 0 to `n`, where `n` is the length of the input array).
+   * If `k` is specified, the function returns only the subsets of size `k`.
    *
-   * @param arr - The input array for which the power set is to be generated.
-   * @returns An array of arrays representing all subsets of the input array.
+   * @param arr - The input array for which the subsets are to be generated.
+   * @param k - (Optional) The size of subsets to generate. If omitted, all subsets are generated.
+   * @returns An array of arrays representing the subsets of the input array.
+   *          - If `k` is omitted, returns the full power set.
+   *          - If `k` is specified, returns only the subsets of size `k`.
    *
    * @example
    * ```typescript
-   * const result = cmath.powerset([1, 2, 3]);
-   * console.log(result);
+   * // Generate the full power set
+   * const powerSet = cmath.powerset([1, 2, 3]);
+   * console.log(powerSet);
    * // Output:
    * // [
-   * //   [],        // Empty set
-   * //   [1], [2], [3],  // Subsets of size 1
-   * //   [1, 2], [1, 3], [2, 3], // Subsets of size 2
-   * //   [1, 2, 3]  // Subset of size 3
+   * //   [],
+   * //   [1], [2], [3],
+   * //   [1, 2], [1, 3], [2, 3],
+   * //   [1, 2, 3]
    * // ]
    * ```
    *
+   * @example
+   * ```typescript
+   * // Generate all subsets of size 2
+   * const subsetsOfSize2 = cmath.powerset([1, 2, 3], 2);
+   * console.log(subsetsOfSize2);
+   * // Output:
+   * // [ [1, 2], [1, 3], [2, 3] ]
+   * ```
+   *
    * @remarks
-   * - The number of subsets in the power set is `2^n`, where `n` is the length of the input array.
-   * - This function uses the `cmath.combinations` function internally to generate subsets of specific lengths.
+   * - If `k` is negative or greater than the length of the array, an empty array is returned.
+   * - The number of subsets returned when `k` is specified is \( \binom{n}{k} \), where \( n \) is the length of the input array.
+   * - This function utilizes the `cmath.combinations` function internally to generate subsets of specific sizes.
    *
    * @see https://en.wikipedia.org/wiki/Power_set
    */
-  export function powerset<T>(arr: T[]): T[][] {
-    const result: T[][] = [[]]; // Start with the empty set
-    for (let size = 1; size <= arr.length; size++) {
-      result.push(...cmath.combinations(arr, size));
+  export function powerset<T>(arr: T[], k?: number): T[][] {
+    if (k === undefined) {
+      // Generate the full power set
+      const result: T[][] = [[]]; // Start with the empty set
+      for (let size = 1; size <= arr.length; size++) {
+        result.push(...cmath.combinations(arr, size));
+      }
+      return result;
+    } else {
+      // Validate the `k` parameter
+      if (k < 0 || k > arr.length) {
+        return []; // No subsets possible for invalid `k`
+      }
+      // Generate subsets of size `k`
+      return cmath.combinations(arr, k);
     }
-    return result;
   }
 }
 
@@ -2693,6 +2717,7 @@ export namespace cmath.range {
    */
   export function groupRangesByUniformGap(
     ranges: Range[],
+    k: number = undefined,
     tolerance: number = 0
   ): {
     loop: number[];
@@ -2701,7 +2726,7 @@ export namespace cmath.range {
     gap: number;
   }[] {
     // Generate all possible subsets of the input ranges
-    const subsets = powerset(ranges);
+    const subsets = powerset(ranges, k);
 
     const result: {
       loop: number[];

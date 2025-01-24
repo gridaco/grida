@@ -105,7 +105,11 @@ describe("cmath.range", () => {
         [11.5, 13.5],
       ];
       const tolerance = 0.2;
-      const result = cmath.range.groupRangesByUniformGap(ranges, tolerance);
+      const result = cmath.range.groupRangesByUniformGap(
+        ranges,
+        undefined,
+        tolerance
+      );
       expect(result).toEqual(
         expect.arrayContaining([
           { loop: [0, 1], gap: 1.5, max: 6.5, min: 0.5 },
@@ -224,5 +228,36 @@ describe("cmath.range", () => {
       const result = cmath.range.groupRangesByUniformGap(ranges);
       expect(result).toEqual([]);
     });
+  });
+
+  test("should group ranges with a consistent gap and fixed k size (k=2) for a large set of ranges", () => {
+    const ranges: cmath.Range[] = [
+      [0, 10],
+      [15, 25],
+      [30, 40],
+      [45, 55],
+      [60, 70],
+    ];
+
+    const k = 2; // Fixed subset size
+    const tolerance = 0; // No tolerance; gaps must be exactly uniform
+
+    const result = cmath.range.groupRangesByUniformGap(ranges, k, tolerance);
+
+    const expectedGroupings = [
+      { gap: 5, loop: [0, 1], max: 25, min: 0 },
+      { gap: 20, loop: [0, 2], max: 40, min: 0 },
+      { gap: 35, loop: [0, 3], max: 55, min: 0 },
+      { gap: 50, loop: [0, 4], max: 70, min: 0 },
+      { gap: 5, loop: [1, 2], max: 40, min: 15 },
+      { gap: 20, loop: [1, 3], max: 55, min: 15 },
+      { gap: 35, loop: [1, 4], max: 70, min: 15 },
+      { gap: 5, loop: [2, 3], max: 55, min: 30 },
+      { gap: 20, loop: [2, 4], max: 70, min: 30 },
+      { gap: 5, loop: [3, 4], max: 70, min: 45 },
+    ];
+
+    expect(result).toEqual(expect.arrayContaining(expectedGroupings));
+    expect(result.length).toBe(expectedGroupings.length);
   });
 });
