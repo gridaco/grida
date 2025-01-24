@@ -22,8 +22,8 @@ export function Demo2() {
   }, [activeTabIndex]);
 
   return (
-    <div className="w-full mx-0 my-40">
-      <div className="flex flex-col items-center justify-center my-16 gap-10">
+    <div className="w-full mx-0">
+      <div className="flex flex-col items-center justify-center my-16 gap-10 py-20">
         {/* Tabs List with Sliding Underline */}
         <div className="relative flex flex-wrap bg-transparent h-9 items-center content-center gap-3 justify-center text-slate-400">
           {/* Sliding Underline */}

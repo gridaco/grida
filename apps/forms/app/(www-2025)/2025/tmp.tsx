@@ -41,7 +41,7 @@ export function NavigationMenuDemo() {
     <NavigationMenu>
       <NavigationMenuList>
         <NavigationMenuItem>
-          <NavigationMenuTrigger className="px-8 py-6 text-lg font-normal">
+          <NavigationMenuTrigger className="lg:px-8 lg:py-6 lg:text-lg text-base font-normal">
             Products
           </NavigationMenuTrigger>
           <NavigationMenuContent>
@@ -61,18 +61,18 @@ export function NavigationMenuDemo() {
         <NavigationMenuItem>
           <Link href="/docs" legacyBehavior passHref>
             <NavigationMenuLink
-              className={`${navigationMenuTriggerStyle()} px-8 py-6`}
+              className={`${navigationMenuTriggerStyle()} lg:px-8 lg:py-6`}
             >
-              <p className="text-lg font-normal">Docs</p>
+              <p className="text-base lg:text-lg font-normal">Docs</p>
             </NavigationMenuLink>
           </Link>
         </NavigationMenuItem>
         <NavigationMenuItem>
           <Link href="/pricing" legacyBehavior passHref>
             <NavigationMenuLink
-              className={`${navigationMenuTriggerStyle()} px-8 py-6`}
+              className={`${navigationMenuTriggerStyle()} lg:px-8 lg:py-6`}
             >
-              <p className="text-lg font-normal">Pricing </p>
+              <p className=" text-base lg:text-lg font-normal">Pricing </p>
             </NavigationMenuLink>
           </Link>
         </NavigationMenuItem>

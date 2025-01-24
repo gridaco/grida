@@ -9,6 +9,7 @@ import Footer from "@/app/(www-2025)/footer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
+import Demo from "@/app/(www-2025)/demo";
 
 export default function WWW() {
   return (
@@ -16,6 +17,9 @@ export default function WWW() {
       <Header></Header>
       <Hero></Hero>
       <section>
+        <div className="my-40">
+          <Demo />
+        </div>
         <div className="my-60 relative">
           <FeatureSection
             badge={"Canvas"}
@@ -51,7 +55,6 @@ export default function WWW() {
             <Demo1 />
           </div>
         </div>
-
         <div className="my-60">
           <FeatureSection
             badge={"CMS"}
@@ -104,7 +107,7 @@ export default function WWW() {
             />
           </div>
         </div>
-        <div>
+        <div className="my-60 relative">
           <FeatureSection
             badge={"Forms"}
             title={"Design editor tool with customizable templates."}
@@ -113,7 +116,35 @@ export default function WWW() {
             }
             button={"Open your Canvas"}
           />
-          <Demo2 />
+          <div className="">
+            {/* <div className="absolute inset-0 -z-10 flex justify-center items-center">
+              <svg
+                width="1400px"
+                height="1400px"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <defs>
+                  <linearGradient
+                    id="horizontalGradient"
+                    x1="0%"
+                    y1="100%"
+                    x2="0%"
+                    y2="0%"
+                  >
+                    <stop offset="0%" stopColor="rgba(166, 152, 255, 0.9)" />
+                    <stop offset="100%" stopColor="rgba(250, 255, 229, 0)" />
+                  </linearGradient>
+                </defs>
+                <rect
+                  width="1400"
+                  height="1400"
+                  fill="url(horizontalGradient)"
+                />
+              </svg>
+            </div> */}
+
+            <Demo2 />
+          </div>
         </div>
         <CtaSection />
         <Footer />
@@ -142,7 +173,9 @@ function FeatureSection({
         {badge}
       </Badge>
       <div className="flex flex-col gap-5">
-        <span className="text-6xl font-bold py-10 text-center">{title}</span>
+        <span className="text-5xl lg:text-6xl font-bold py-10 text-center">
+          {title}
+        </span>
         <p className=" text-lg opacity-80 text-center">{excerpt}</p>
       </div>
       <Button variant="link" className="text-lg mt-20">
@@ -188,9 +221,9 @@ function CmsCard({
 
 function CtaSection() {
   return (
-    <div className="container mx-xl flex justify-between mt-80 mb-60">
+    <div className="container mx-xl flex flex-col-reverse gap-16 md:flex md:flex-row justify-between mt-80 mb-60">
       <div className="flex flex-col">
-        <p className="text-left text-6xl font-semibold">
+        <p className="text-left text-5xl lg:text-6xl font-semibold">
           Design editor tool with customizable templates.
         </p>
         <div className="flex gap-4 mt-20">
@@ -208,6 +241,7 @@ function CtaSection() {
         alt="illust"
         width={900}
         height={900}
+        className="max-h-[300px] max-w-[300px] lg:max-h-[500px] lg:max-w-[500px]"
       />
     </div>
   );

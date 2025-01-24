@@ -9,7 +9,7 @@ export default function Hero() {
     <section className="relative flex flex-col h-screen overflow-hidden items-center justify-center">
       <div className="text-black dark:text-white">
         <div className="flex flex-col items-center text-center">
-          <h1 className="text-6xl font-bold py-10 text-center">
+          <h1 className="text-5xl lg:text-6xl font-bold py-10 text-center">
             The editor to craft, customize,
             <br /> and create seamlessly.
           </h1>

@@ -19,16 +19,19 @@ export default function Header() {
           </Link>
         </span>
       </div>
-      <div className="flex gap-12 items-center">
+      <div className="flex gap-4 lg:gap-12 items-center">
         <NavigationMenuDemo />
         <div className="flex gap-2">
           <Link href="/sign-in" className="hidden md:block">
-            <Button variant="ghost" className="px-8 py-6 text-lg font-normal">
+            <Button
+              variant="ghost"
+              className="lg:px-8 lg:py-6 lg:text-lg text-base font-normal"
+            >
               Sign in
             </Button>
           </Link>
           <Link href="/dashboard/new?plan=free">
-            <Button className="px-8 py-6 flex gap-2 group text-lg font-normal">
+            <Button className="lg:px-8 lg:py-6 flex gap-2 group lg:text-lg text-base font-normal">
               Get Started
             </Button>
           </Link>
