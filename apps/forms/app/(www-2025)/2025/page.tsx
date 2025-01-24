@@ -9,7 +9,28 @@ import Footer from "@/app/(www-2025)/footer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
-import Demo from "@/app/(www-2025)/demo";
+import { motion } from "framer-motion";
+import { Card } from "@/components/ui/card";
+
+function Demo() {
+  return (
+    <motion.div
+      className="hidden md:block z-10 -mt-40 mb-32"
+      initial={{ opacity: 1, y: 100, scale: 1 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{
+        delay: 0.2,
+        duration: 0.3,
+        type: "spring",
+        damping: 20,
+      }}
+    >
+      <Card className="mx-auto max-w-screen-lg 2xl:max-w-screen-2xl aspect-video overflow-hidden">
+        <iframe src="/canvas" className="w-full h-full" />
+      </Card>
+    </motion.div>
+  );
+}
 
 export default function WWW() {
   return (
