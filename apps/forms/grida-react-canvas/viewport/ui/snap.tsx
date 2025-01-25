@@ -15,35 +15,102 @@ import {
 
 function __surface_snap_guide_by_geometry(context: SnapToObjectsResult) {
   const { by_geometry, translated, anchors } = context;
-
+  const lines: surface.Line[] = [];
   const points: cmath.Vector2[] = [];
-  const x_ray_offsets: number[] = [];
-  const y_ray_offsets: number[] = [];
 
-  by_geometry.hit_points.anchors.map((a, i) => {
-    const _anchor9 = cmath.rect.to9PointsChunk(anchors[i]);
+  // Separate x-hit and y-hit points
+  const xPoints: cmath.Vector2[] = [];
+  const yPoints: cmath.Vector2[] = [];
 
-    a.forEach(([xhit, yhit], j) => {
-      const p = _anchor9[j];
-      if (xhit || yhit) points.push(p);
-      if (xhit) x_ray_offsets.push(p[0]);
-      if (yhit) y_ray_offsets.push(p[1]);
+  by_geometry.hit_points.anchors.forEach((hit, i) => {
+    const anchor9 = cmath.rect.to9PointsChunk(anchors[i]);
+    hit.forEach(([xhit, yhit], j) => {
+      if (xhit) xPoints.push(anchor9[j]);
+      if (yhit) yPoints.push(anchor9[j]);
+      if (xhit || yhit) points.push(anchor9[j]);
     });
   });
 
-  const _agent9 = cmath.rect.to9PointsChunk(translated);
+  const agent9 = cmath.rect.to9PointsChunk(translated);
   by_geometry.hit_points.agent.forEach(([xhit, yhit], i) => {
-    const p = _agent9[i];
-    if (xhit || yhit) points.push(p);
-    if (xhit) x_ray_offsets.push(p[0]);
-    if (yhit) y_ray_offsets.push(p[1]);
+    if (xhit) xPoints.push(agent9[i]);
+    if (yhit) yPoints.push(agent9[i]);
+    if (xhit || yhit) points.push(agent9[i]);
   });
 
+  // Vertical lines from xPoints
+  const xs = new Map<number, number[]>();
+  xPoints.forEach(([x, y]) => {
+    if (!xs.has(x)) xs.set(x, []);
+    xs.get(x)!.push(y);
+  });
+  xs.forEach((arrY, x) => {
+    if (arrY.length > 1) {
+      lines.push({ a: [x, Math.min(...arrY)], b: [x, Math.max(...arrY)] });
+    }
+  });
+
+  // Horizontal lines from yPoints
+  const ys = new Map<number, number[]>();
+  yPoints.forEach(([x, y]) => {
+    if (!ys.has(y)) ys.set(y, []);
+    ys.get(y)!.push(x);
+  });
+  ys.forEach((arrX, y) => {
+    if (arrX.length > 1) {
+      lines.push({ a: [Math.min(...arrX), y], b: [Math.max(...arrX), y] });
+    }
+  });
+
+  return { points, lines };
+}
+function __calc_loop_gap_line(
+  idx: number,
+  context: {
+    axis: cmath.Axis;
+    loops: [number, number][];
+    gaps: number[];
+    aligned_anchors: cmath.Rectangle[];
+    aligned_anchors_idx: number[];
+  }
+) {
+  const loop = context.loops[idx];
+  const gap = context.gaps[idx];
+  const [rai1, rai2] = loop;
+  const origianl_rect_1 =
+    context.aligned_anchors[context.aligned_anchors_idx[rai1]];
+  const origianl_rect_2 =
+    context.aligned_anchors[context.aligned_anchors_idx[rai2]];
+
+  const gap_label_str = cmath.debug.formatNumber(gap, 1);
+
+  const axis = context.axis;
+  const counterAxis = cmath.counterAxis[axis];
+
+  const loop_gap_counter_axis_pos = cmath.range.mean(
+    cmath.range.fromRectangle(origianl_rect_1, counterAxis),
+    cmath.range.fromRectangle(origianl_rect_2, counterAxis)
+  );
+  // r.x + r.width
+  const loop_gap_main_axis_a = cmath.range.fromRectangle(
+    origianl_rect_1,
+    axis
+  )[1];
+  const loop_gap_main_axis_b = loop_gap_main_axis_a + gap;
+
   return {
-    points,
-    x_ray_offsets,
-    y_ray_offsets,
-  };
+    label: gap_label_str,
+    a: cmath.vector2.axisOriented(
+      loop_gap_main_axis_a,
+      loop_gap_counter_axis_pos,
+      axis
+    ),
+    b: cmath.vector2.axisOriented(
+      loop_gap_main_axis_b,
+      loop_gap_counter_axis_pos,
+      axis
+    ),
+  } satisfies surface.Line;
 }
 
 function __surface_snap_guide_by_spacing(context: SnapToObjectsResult) {
@@ -54,61 +121,7 @@ function __surface_snap_guide_by_spacing(context: SnapToObjectsResult) {
     delta: [deltaX, deltaY],
   } = context;
 
-  function calc_loop_gap_line(
-    idx: number,
-    context: {
-      axis: "x" | "y";
-      loops: [number, number][];
-      gaps: number[];
-      aligned_anchors: cmath.Rectangle[];
-      aligned_anchors_idx: number[];
-    }
-  ) {
-    const loop = context.loops[idx];
-    const gap = context.gaps[idx];
-    const [rai1, rai2] = loop;
-    const origianl_rect_1 =
-      context.aligned_anchors[context.aligned_anchors_idx[rai1]];
-    const origianl_rect_2 =
-      context.aligned_anchors[context.aligned_anchors_idx[rai2]];
-
-    const gap_label_str = cmath.debug.formatNumber(gap, 1);
-
-    //
-
-    const axis = context.axis;
-    const counterAxis = cmath.counterAxis[axis];
-
-    const loop_gap_counter_axis_pos = cmath.range.mean(
-      cmath.range.fromRectangle(origianl_rect_1, counterAxis),
-      cmath.range.fromRectangle(origianl_rect_2, counterAxis)
-    );
-    // r.x + r.width
-    const loop_gap_main_axis_a = cmath.range.fromRectangle(
-      origianl_rect_1,
-      axis
-    )[1];
-    const loop_gap_main_axis_b = loop_gap_main_axis_a + gap;
-
-    if (context.axis === "x") {
-      return {
-        label: gap_label_str,
-        a: [loop_gap_main_axis_a, loop_gap_counter_axis_pos],
-        b: [loop_gap_main_axis_b, loop_gap_counter_axis_pos],
-      } satisfies surface.Line;
-    } else {
-      return {
-        label: gap_label_str,
-        a: [loop_gap_counter_axis_pos, loop_gap_main_axis_a],
-        b: [loop_gap_counter_axis_pos, loop_gap_main_axis_b],
-      } satisfies surface.Line;
-    }
-  }
-
   const { x_aligned_anchors_idx, y_aligned_anchors_idx, x, y } = by_spacing;
-
-  const x_anchors = x_aligned_anchors_idx.map((i) => main_anchors[i]);
-  const y_anchors = y_aligned_anchors_idx.map((i) => main_anchors[i]);
 
   const lines: surface.Line[] = [];
 
@@ -128,60 +141,62 @@ function __surface_snap_guide_by_spacing(context: SnapToObjectsResult) {
   }) {
     a_hit_loops_idx.forEach((loop_idx, i) => {
       const a_hit_loop = loops[loop_idx];
-      const [ri1, ri2] = a_hit_loop; // index of range
-      const gap = gaps[loop_idx];
+      const ri_first = a_hit_loop[0];
+      const ri_last = a_hit_loop[a_hit_loop.length - 1];
+      const gap = gaps[loop_idx]; // TODO: don't use this
+      const a_points = a[loop_idx];
+      // const a_hits = a_snap.hit_anchor_indices.map((i) => a_points[i]);
+      // const hitgaps = a_hits.map(([_, gap]) => gap);
+      // console.log("a_hits", a_hits, hitgaps);
 
       // query loops with same gap.
       const surface_epsilon = 0.01;
-      const uniform_gap_loops_idx = gaps.reduce((acc, gap, i) => {
-        if (Math.abs(gap - gaps[loop_idx]) < surface_epsilon) acc.push(i);
+      const uniform_gap_loops_idx = gaps.reduce((acc, testgap, i) => {
+        if (Math.abs(testgap - gap) < surface_epsilon) acc.push(i);
         return acc;
       }, [] as number[]);
 
-      // const r1 = x_aligned_anchor_ranges[ri1];
-      // const r2 = x_aligned_anchor_ranges[ri2];
       // Map loop index to original anchor index
-      const original_anchor_rect_1_idx = aligned_anchors_idx[ri1];
-      const original_anchor_rect_2_idx = aligned_anchors_idx[ri2];
-      const origianl_rect_1 = anchors[original_anchor_rect_1_idx];
-      const origianl_rect_2 = anchors[original_anchor_rect_2_idx];
+      const original_anchor_rect_first_idx = aligned_anchors_idx[ri_first];
+      const original_anchor_rect_last_idx = aligned_anchors_idx[ri_last];
+      // const origianl_rect_first = anchors[original_anchor_rect_first_idx];
+      const origianl_rect_last = anchors[original_anchor_rect_last_idx];
 
       const counterAxis = cmath.counterAxis[axis];
       // [counter axis] r.x(y) + r.width(height) / 2;
       const agent_gap_counter_axis_pos = cmath.range.mean(
-        cmath.range.fromRectangle(origianl_rect_2, counterAxis)
+        cmath.range.fromRectangle(origianl_rect_last, counterAxis)
       );
       // [main axis] r.x(y) + r.width(height)
       const agent_gap_main_axis_a = cmath.range.fromRectangle(
-        origianl_rect_2,
+        origianl_rect_last,
         axis
       )[1];
       const agent_gap_main_axis_b = agent_gap_main_axis_a + gap;
 
       const gap_label_str = cmath.debug.formatNumber(gap, 1);
 
-      if (axis === "x") {
-        lines.push({
-          label: gap_label_str,
-          a: [agent_gap_main_axis_a, agent_gap_counter_axis_pos],
-          b: [agent_gap_main_axis_b, agent_gap_counter_axis_pos],
-        });
-      } else {
-        lines.push({
-          label: gap_label_str,
-          a: [agent_gap_counter_axis_pos, agent_gap_main_axis_a],
-          b: [agent_gap_counter_axis_pos, agent_gap_main_axis_b],
-        });
-      }
+      lines.push({
+        label: gap_label_str,
+        a: cmath.vector2.axisOriented(
+          agent_gap_main_axis_a,
+          agent_gap_counter_axis_pos,
+          axis
+        ),
+        b: cmath.vector2.axisOriented(
+          agent_gap_main_axis_b,
+          agent_gap_counter_axis_pos,
+          axis
+        ),
+      });
       //
 
       const uniform_loop_gap_lines = uniform_gap_loops_idx
         .map((loop_idx) => {
-          return calc_loop_gap_line(loop_idx, {
+          return __calc_loop_gap_line(loop_idx, {
             axis: axis,
             loops: loops,
             gaps: gaps,
-            // TODO:
             aligned_anchors: anchors,
             aligned_anchors_idx: aligned_anchors_idx,
           });
@@ -196,7 +211,7 @@ function __surface_snap_guide_by_spacing(context: SnapToObjectsResult) {
     handle_axis({
       ...x,
       aligned_anchors_idx: x_aligned_anchors_idx,
-      anchors: x_anchors,
+      anchors: main_anchors,
       axis: "x",
     });
   }
@@ -205,7 +220,7 @@ function __surface_snap_guide_by_spacing(context: SnapToObjectsResult) {
     handle_axis({
       ...y,
       aligned_anchors_idx: y_aligned_anchors_idx,
-      anchors: y_anchors,
+      anchors: main_anchors,
       axis: "y",
     });
   }
@@ -234,8 +249,9 @@ function useSnapGuide(): surface.SnapGuide | undefined {
     const by_geometry = __surface_snap_guide_by_geometry(surface_snapping);
 
     points.push(...by_geometry.points);
-    x_ray_offsets.push(...by_geometry.x_ray_offsets);
-    y_ray_offsets.push(...by_geometry.y_ray_offsets);
+    lines.push(...by_geometry.lines);
+    // x_ray_offsets.push(...by_geometry.x_ray_offsets);
+    // y_ray_offsets.push(...by_geometry.y_ray_offsets);
     // #endregion by_geometry
 
     // #region by_spacing

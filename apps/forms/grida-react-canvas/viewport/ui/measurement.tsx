@@ -29,12 +29,16 @@ function useMeasurement() {
 
       const cdom = new domapi.CanvasDOM(transform);
 
-      const a_rect = cmath.rect.union(
-        selection.map((id) => cdom.getNodeBoundingRect(id)!)
+      const a_rect = cmath.rect.quantize(
+        cmath.rect.union(selection.map((id) => cdom.getNodeBoundingRect(id)!)),
+        0.01
       );
 
-      const b_rect = cmath.rect.union(
-        surface_measurement_target.map((id) => cdom.getNodeBoundingRect(id)!)
+      const b_rect = cmath.rect.quantize(
+        cmath.rect.union(
+          surface_measurement_target.map((id) => cdom.getNodeBoundingRect(id)!)
+        ),
+        0.01
       );
 
       const measurement = measure(a_rect, b_rect);
@@ -99,8 +103,8 @@ export function MeasurementGuide() {
     >
       {/* box */}
       <>
-        <Rectangle rect={a} className="border-workbench-accent-orange" />
-        <Rectangle rect={b} className="border-workbench-accent-orange" />
+        <Rectangle rect={a} className="border-workbench-accent-red" />
+        <Rectangle rect={b} className="border-workbench-accent-red" />
       </>
       <Conditional length={st}>
         <SpacingGuideLine point={[tx, ty]} length={tl} rotation={tr} />
@@ -214,7 +218,7 @@ function SpacingMeterLabel({
   return (
     <MeterLabel
       label={value.toString()}
-      className="bg-workbench-accent-orange"
+      className="bg-workbench-accent-red"
       x={tx}
       y={ty}
       weight={"bolder"}
@@ -240,8 +244,9 @@ interface GuideLineProps {
   length: number;
   direction: "n" | "s" | "e" | "w" | number;
   width?: number;
-  color: React.CSSProperties["color"];
+  color?: React.CSSProperties["color"];
   dashed?: boolean;
+  className?: string;
 }
 
 function GuideLine({
@@ -250,7 +255,8 @@ function GuideLine({
   direction,
   length,
   width,
-  color = "darkorange",
+  color,
+  className,
   dashed,
 }: GuideLineProps) {
   const tl = length * zoom;
@@ -272,9 +278,11 @@ function GuideLine({
         willChange: "transform",
         transformOrigin: "0px 0px",
         transform: `translate3d(${tx}px, ${ty}px, 0) rotate(${tr}deg)`,
-        borderLeft: `${width}px ${dashed ? "dashed" : "solid"} ${color}`,
+        borderLeft: `${width}px ${dashed ? "dashed" : "solid"}`,
+        borderColor: color,
         zIndex: 99,
       }}
+      className={className}
     />
   );
 }
@@ -304,7 +312,7 @@ function SpacingGuideLine({
       length={length}
       direction={rotation}
       width={1}
-      color={"darkorange"}
+      className="border-workbench-accent-red"
     />
   );
 }
@@ -328,7 +336,7 @@ function AuxiliaryLine({
       direction={rotation}
       width={1}
       dashed
-      color={"darkorange"}
+      className="border-workbench-accent-red"
     />
   );
 }

@@ -189,14 +189,14 @@ function snapToObjectsSpace(
     return [r.y, r.y + r.height] satisfies cmath.Range;
   });
 
-  const x = snap1DRangesDirectionAlignedWithProjection(
+  const x = snap1DRangesDirectionAlignedWithDistributionGeometry(
     x_range,
     x_aligned_anchor_ranges,
     threshold[0],
     epsilon
   );
 
-  const y = snap1DRangesDirectionAlignedWithProjection(
+  const y = snap1DRangesDirectionAlignedWithDistributionGeometry(
     y_range,
     y_aligned_anchor_ranges,
     threshold[1],
@@ -212,7 +212,7 @@ function snapToObjectsSpace(
 }
 
 export type Snap1DRangesDirectionAlignedResult =
-  cmath.ext.snap.spacing.RangeLoopProjections & {
+  cmath.ext.snap.spacing.DistributionGeometry1D & {
     distance: number;
     a_snap: cmath.ext.snap.Snap1DResult;
     b_snap: cmath.ext.snap.Snap1DResult;
@@ -220,16 +220,16 @@ export type Snap1DRangesDirectionAlignedResult =
     b_hit_loops_idx: number[];
   };
 
-function snap1DRangesDirectionAlignedWithProjection(
+function snap1DRangesDirectionAlignedWithDistributionGeometry(
   agent: cmath.Range,
   anchors: cmath.Range[],
   threshold: number,
   epsilon = 0
 ): Snap1DRangesDirectionAlignedResult {
   // project the anchor ranges
-  const projection = cmath.ext.snap.spacing.plotAB(agent, anchors);
+  const plots = cmath.ext.snap.spacing.plotDistributionGeometry(agent, anchors);
 
-  const { a, b, loops, gaps } = projection;
+  const { a, b, loops, gaps, ranges } = plots;
 
   // anchors
   const a_flat: number[] = [];
@@ -238,14 +238,14 @@ function snap1DRangesDirectionAlignedWithProjection(
   const b_flat_loop_idx: number[] = [];
 
   a.forEach((loop, i) => {
-    loop.forEach((value, j) => {
+    loop.forEach(([value], j) => {
       a_flat.push(value);
       a_flat_loop_idx.push(i);
     });
   });
 
   b.forEach((loop, i) => {
-    loop.forEach((value, j) => {
+    loop.forEach(([value], j) => {
       b_flat.push(value);
       b_flat_loop_idx.push(i);
     });
@@ -266,6 +266,8 @@ function snap1DRangesDirectionAlignedWithProjection(
   );
 
   return {
+    agent,
+    ranges,
     distance: Math.min(a_snap.distance, b_snap.distance),
     loops,
     gaps,

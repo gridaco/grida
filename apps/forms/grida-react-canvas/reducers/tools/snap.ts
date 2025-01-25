@@ -3,6 +3,8 @@ import { cmath } from "@grida/cmath";
 import { document } from "@/grida-react-canvas/document-query";
 import { SnapToObjectsResult, snapToObjects } from "@grida/cmath/_snap";
 
+const q = 1;
+
 export function snapObjectsTranslation(
   agents: cmath.Rectangle[],
   anchors: cmath.Rectangle[],
@@ -12,9 +14,15 @@ export function snapObjectsTranslation(
   translated: { position: cmath.Vector2 }[];
   snapping: SnapToObjectsResult | undefined;
 } {
+  agents = agents.map((r) => cmath.rect.quantize(r, q));
+  anchors = anchors.map((r) => cmath.rect.quantize(r, q));
+
   const bounding_rect = cmath.rect.union(agents);
 
-  const _virtually_moved_rect = cmath.rect.translate(bounding_rect, movement);
+  const _virtually_moved_rect = cmath.rect.quantize(
+    cmath.rect.translate(bounding_rect, movement),
+    q
+  );
 
   const result = snapToObjects(_virtually_moved_rect, anchors, threshold, 0);
   const { translated: _translated } = result;
