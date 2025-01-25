@@ -33,7 +33,7 @@ import { SurfaceTextEditor } from "./ui/text-editor";
 import { SurfacePathEditor } from "./ui/path-editor";
 import { SizeMeterLabel } from "./ui/meter";
 import { SurfaceGradientEditor } from "./ui/gradient-editor";
-import { pointToSurfaceSpace, rectToSurfaceSpace } from "../utils/transform";
+import { vector2ToSurfaceSpace, rectToSurfaceSpace } from "../utils/transform";
 import { RedDotHandle } from "./ui/reddot";
 import {
   SurfaceSelectionGroupProvider,
@@ -305,8 +305,8 @@ export function EditorSurface() {
               className="absolute top-0 left-0 w-0 h-0"
             >
               <MarqueeArea
-                a={pointToSurfaceSpace(marquee.a, transform)}
-                b={pointToSurfaceSpace(marquee.b, transform)}
+                a={vector2ToSurfaceSpace(marquee.a, transform)}
+                b={vector2ToSurfaceSpace(marquee.b, transform)}
               />
             </div>
           )}
@@ -404,13 +404,14 @@ export function EditorSurfaceClipboardSyncProvider({
 
 function FloatingCursorTooltip() {
   const { gesture, pointer, transform } = useEventTarget();
-  const pos = pointToSurfaceSpace(pointer.position, transform);
+  const pos = vector2ToSurfaceSpace(pointer.position, transform);
   const value = get_cursor_tooltip_value(gesture);
   if (value) {
     return (
       <div
-        className="absolute z-50 pointer-events-none transform-gpu"
+        className="absolute pointer-events-none transform-gpu"
         style={{
+          zIndex: 99,
           top: pos[1],
           left: pos[0],
           // align to top right
@@ -428,9 +429,9 @@ function FloatingCursorTooltip() {
 function get_cursor_tooltip_value(gesture: GestureState) {
   switch (gesture.type) {
     case "gap":
-      return cmath.debug.formatNumber(gesture.gap, 1);
+      return cmath.ui.formatNumber(gesture.gap, 1);
     case "rotate":
-      return cmath.debug.formatNumber(gesture.rotation, 1) + "°";
+      return cmath.ui.formatNumber(gesture.rotation, 1) + "°";
     case "translate":
     case "scale":
     case "sort":
@@ -541,10 +542,10 @@ function MultipleSelectionOverlay({
         />
         {boundingRect && (
           <SizeMeterLabel
-            margin={6}
+            offset={16}
             size={size}
             rect={{ ...boundingRect, x: 0, y: 0 }}
-            className="bg-workbench-accent-sky"
+            className="bg-workbench-accent-sky text-white"
           />
         )}
       </LayerOverlay>
@@ -613,10 +614,10 @@ function NodeOverlay({
       )}
       {focused && !readonly && rect && (
         <SizeMeterLabel
-          margin={6}
+          offset={16}
           size={size}
           rect={{ ...rect, x: 0, y: 0 }}
-          className="bg-workbench-accent-sky"
+          className="bg-workbench-accent-sky text-white"
         />
       )}
     </LayerOverlay>

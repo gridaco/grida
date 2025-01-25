@@ -29,16 +29,36 @@ export function offsetToSurfaceSpace(
   transform: cmath.Transform
 ) {
   const [x, y] = axis === "x" ? [offset, 0] : [0, offset];
-  const [xViewport, yViewport] = pointToSurfaceSpace([x, y], transform);
+  const [xViewport, yViewport] = vector2ToSurfaceSpace([x, y], transform);
   return axis === "x" ? xViewport : yViewport;
 }
 
+export function lineToSurfaceSpace(
+  line: cmath.ui.Line,
+  transform: cmath.Transform
+): cmath.ui.Line {
+  return {
+    ...line,
+    x1: offsetToSurfaceSpace(line.x1, "x", transform),
+    y1: offsetToSurfaceSpace(line.y1, "y", transform),
+    x2: offsetToSurfaceSpace(line.x2, "x", transform),
+    y2: offsetToSurfaceSpace(line.y2, "y", transform),
+  };
+}
+
 export function pointToSurfaceSpace(
-  point: [number, number],
+  point: cmath.ui.Point,
+  transform: cmath.Transform
+): cmath.ui.Point {
+  return { ...point, ...vector2ToSurfaceSpace([point.x, point.y], transform) };
+}
+
+export function vector2ToSurfaceSpace(
+  vec: [number, number],
   transform: cmath.Transform
 ): [number, number] {
   const [[a, b, tx], [c, d, ty]] = transform;
-  const [x, y] = point;
+  const [x, y] = vec;
 
   // Forward transform: multiply the (x, y) by the matrix
   const xViewport = a * x + b * y + tx;
@@ -54,8 +74,8 @@ export function rectToSurfaceSpace(
   const min: cmath.Vector2 = [rect.x, rect.y];
   const max: cmath.Vector2 = [rect.x + rect.width, rect.y + rect.height];
 
-  const tmin = pointToSurfaceSpace(min, transform);
-  const tmax = pointToSurfaceSpace(max, transform);
+  const tmin = vector2ToSurfaceSpace(min, transform);
+  const tmax = vector2ToSurfaceSpace(max, transform);
 
   return cmath.rect.fromPoints([tmin, tmax]);
 }

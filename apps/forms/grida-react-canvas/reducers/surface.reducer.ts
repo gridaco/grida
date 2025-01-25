@@ -103,27 +103,28 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
 
       const cdom = new domapi.CanvasDOM(state.transform);
 
-      switch (gesture.type) {
-        case "curve": {
-          const { node_id, segment, control } = gesture;
+      return produce(state, (draft) => {
+        draft.surface_snapping = undefined;
 
-          assert(state.content_edit_mode?.type === "path");
-          assert(state.content_edit_mode?.node_id === node_id);
+        switch (gesture.type) {
+          case "curve": {
+            const { node_id, segment, control } = gesture;
 
-          return produce(state, (draft) => {
+            assert(state.content_edit_mode?.type === "path");
+            assert(state.content_edit_mode?.node_id === node_id);
+
             draft.gesture = getInitialCurveGesture(state, {
               node_id,
               segment,
               control,
               invert: false,
             });
-          });
-        }
-        case "scale": {
-          const { selection, direction } = gesture;
-          //
+            break;
+          }
+          case "scale": {
+            const { selection, direction } = gesture;
+            //
 
-          return produce(state, (draft) => {
             draft.content_edit_mode = undefined;
             draft.hovered_node_id = null;
 
@@ -132,13 +133,12 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
               direction: direction,
               cdom,
             });
-          });
-          //
-        }
-        case "corner-radius": {
-          const { node_id } = gesture;
+            //
+            break;
+          }
+          case "corner-radius": {
+            const { node_id } = gesture;
 
-          return produce(state, (draft) => {
             self_selectNode(draft, "reset", node_id);
             draft.gesture = {
               type: "corner-radius",
@@ -146,12 +146,11 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
               initial_bounding_rectangle: cdom.getNodeBoundingRect(node_id)!,
               node_id: node_id,
             };
-          });
-        }
-        case "rotate": {
-          const { selection } = gesture;
+            break;
+          }
+          case "rotate": {
+            const { selection } = gesture;
 
-          return produce(state, (draft) => {
             self_selectNode(draft, "reset", selection);
             self_start_gesture_rotate(draft, {
               selection: selection,
@@ -159,11 +158,10 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
               // TODO: the offset of rotation handle relative to the center of the rectangle
               offset: cmath.vector2.zero,
             });
-          });
-          //
-        }
-        case "translate-vertex": {
-          return produce(state, (draft) => {
+            //
+            break;
+          }
+          case "translate-vertex": {
             const { vertex: index } = gesture;
 
             const { content_edit_mode } = draft;
@@ -187,12 +185,11 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
               movement: cmath.vector2.zero,
               initial_position: [node.left!, node.top!],
             };
-          });
-          //
-        }
-        case "sort": {
-          const { selection, node_id } = gesture;
-          return produce(state, (draft) => {
+            break;
+            //
+          }
+          case "sort": {
+            const { selection, node_id } = gesture;
             const layout = createLayoutSnapshot(state, selection);
             const initial_index = layout.objects.findIndex(
               (it) => it.id === node_id
@@ -215,11 +212,10 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
               type: "rect",
               rect: initial_placement.rect,
             };
-          });
-        }
-        case "gap": {
-          const { selection, axis } = gesture;
-          return produce(state, (draft) => {
+            break;
+          }
+          case "gap": {
+            const { selection, axis } = gesture;
             const layout = createLayoutSnapshot(state, selection);
             layout.objects.sort((a, b) => a[axis] - b[axis]);
 
@@ -231,13 +227,12 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
 
             assert(gap !== undefined, "gap is not uniform");
 
-            // the negaive size of the smallet object or the first sorted object's size (+1)
-            const min_gap =
-              -Math.min(
-                ...layout.objects.map((it) =>
-                  cmath.rect.getAxisDimension(it, axis)
-                )
-              ) + 1;
+            // the negaive size of the smallet object or the first sorted object's size
+            const min_gap = -Math.min(
+              ...layout.objects.map((it) =>
+                cmath.rect.getAxisDimension(it, axis)
+              )
+            );
 
             draft.gesture = {
               type: "gap",
@@ -248,9 +243,10 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
               gap: gap,
               movement: cmath.vector2.zero,
             };
-          });
+            break;
+          }
         }
-      }
+      });
     }
     // #endregion
   }

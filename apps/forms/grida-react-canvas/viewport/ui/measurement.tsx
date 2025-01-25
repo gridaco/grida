@@ -74,10 +74,10 @@ export function MeasurementGuide() {
   const sb = _sb * msy;
   const sl = _sl * msx;
 
-  const label_st = cmath.debug.formatNumber(_st, 1);
-  const label_sr = cmath.debug.formatNumber(_sr, 1);
-  const label_sb = cmath.debug.formatNumber(_sb, 1);
-  const label_sl = cmath.debug.formatNumber(_sl, 1);
+  const label_st = cmath.ui.formatNumber(_st, 1);
+  const label_sr = cmath.ui.formatNumber(_sr, 1);
+  const label_sb = cmath.ui.formatNumber(_sb, 1);
+  const label_sl = cmath.ui.formatNumber(_sl, 1);
 
   const box = rectToSurfaceSpace(_box, transform);
   const a = rectToSurfaceSpace(_a, transform);
@@ -186,13 +186,11 @@ function SpacingMeterLabel({
   length,
   value,
   rect,
-  zoom = 1,
 }: {
   side: Side;
   length: number;
   value?: string | number;
   rect: { x: number; y: number; width: number; height: number };
-  zoom?: number;
 }) {
   value = value || Math.round(length * 10) / 10;
 
@@ -218,22 +216,20 @@ function SpacingMeterLabel({
   return (
     <MeterLabel
       label={value.toString()}
-      className="bg-workbench-accent-red"
+      className="bg-workbench-accent-red text-white z-10"
       x={tx}
       y={ty}
-      weight={"bolder"}
-      margin={4}
-      anchor={__label_anchor_map[side]}
-      zoom={zoom}
+      sideOffset={16}
+      side={__label_anchor_map[side]}
     />
   );
 }
 
 const __label_anchor_map = {
-  t: "e",
-  r: "s",
-  b: "e",
-  l: "s",
+  t: "right",
+  r: "bottom",
+  b: "right",
+  l: "bottom",
 } as const;
 
 type Side = "t" | "r" | "b" | "l";
@@ -280,7 +276,7 @@ function GuideLine({
         transform: `translate3d(${tx}px, ${ty}px, 0) rotate(${tr}deg)`,
         borderLeft: `${width}px ${dashed ? "dashed" : "solid"}`,
         borderColor: color,
-        zIndex: 99,
+        zIndex: 10,
       }}
       className={className}
     />

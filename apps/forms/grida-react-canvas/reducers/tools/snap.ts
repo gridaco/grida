@@ -24,7 +24,7 @@ export function snapObjectsTranslation(
     q
   );
 
-  const result = snapToObjects(_virtually_moved_rect, anchors, threshold, 0);
+  const result = snapToObjects(_virtually_moved_rect, anchors, threshold);
   const { translated: _translated } = result;
 
   // top left point of the bounding box
