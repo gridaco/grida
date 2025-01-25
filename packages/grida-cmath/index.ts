@@ -453,6 +453,7 @@ export namespace cmath {
    *
    * @remarks
    * - If `k` is negative or greater than the length of the array, an empty array is returned.
+   * - Includes the empty set ([]), which is part of the standard mathematical definition of a powerset.
    * - The number of subsets returned when `k` is specified is \( \binom{n}{k} \), where \( n \) is the length of the input array.
    * - This function utilizes the `cmath.combinations` function internally to generate subsets of specific sizes.
    *
@@ -852,8 +853,48 @@ export namespace cmath.rect {
     },
   } as const;
 
+  /**
+   * get size of the rectangle in the given axis
+   *
+   * - `x` -> `width`
+   * - `y` -> `height`
+   *
+   * @param rect
+   * @param axis
+   * @returns size of the rectangle in the given axis
+   */
   export function getAxisDimension(rect: Rectangle, axis: Axis): number {
     return rect[__axis_map.dimension[axis]];
+  }
+
+  /**
+   * Quantizes the position and size of a rectangle by snapping its coordinates and dimensions
+   * to the nearest multiples of the given step.
+   *
+   * @remarks
+   * This function may lose precision and distort the rectangle's original geometry
+   * because it applies quantization to each property individually.
+   *
+   * @param rect - The rectangle to quantize.
+   * @param step - A single step value or a 2D vector ([xStep, yStep]).
+   * @returns A new rectangle with quantized `x`, `y`, `width`, and `height`.
+   */
+  export function quantize(rect: Rectangle, step: Scalar | Vector2): Rectangle {
+    if (typeof step === "number") {
+      return {
+        x: cmath.quantize(rect.x, step),
+        y: cmath.quantize(rect.y, step),
+        width: cmath.quantize(rect.width, step),
+        height: cmath.quantize(rect.height, step),
+      };
+    } else {
+      return {
+        x: cmath.quantize(rect.x, step[0]),
+        y: cmath.quantize(rect.y, step[1]),
+        width: cmath.quantize(rect.width, step[0]),
+        height: cmath.quantize(rect.height, step[1]),
+      };
+    }
   }
 
   /**
