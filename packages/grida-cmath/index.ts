@@ -3113,7 +3113,7 @@ export namespace cmath.ext.snap {
       agent: cmath.Range,
       ranges: cmath.Range[]
     ): DistributionGeometry1D {
-      const grouped = cmath.range.groupRangesByUniformGap(ranges);
+      const grouped = cmath.range.groupRangesByUniformGap(ranges, 2);
 
       const loops: [number, number][] = [];
       const gaps: number[] = [];
@@ -3121,43 +3121,52 @@ export namespace cmath.ext.snap {
       const b: [pos: number, gap: number][][] = [];
 
       grouped.forEach((group, i) => {
-        const { loop, gap } = group;
+        const { loop, gap, min, max } = group;
 
         const _a: [pos: number, gap: number][] = [];
         const _b: [pos: number, gap: number][] = [];
 
-        const [a1, b1] = ranges[loop[0]];
-        const [a2, b2] = ranges[loop[loop.length - 1]];
-
         if (gap > 0) {
-          const pa = b2 + gap;
-          const pb = a1 - gap;
-
+          // [default gap extensions]
           // default a b points
           loops.push(loop as [number, number]);
           gaps.push(gap);
-          _a.push([pa, gap]);
-          _b.push([pb, gap]);
+          _a.push([max + gap, gap]);
+          _b.push([min - gap, gap]);
 
-          // center a b points
-          // if the agent is smaller than the gap, we can also plot the a b based on center.
-          const length = cmath.range.length(agent);
-          if (length < gap) {
-            const cgap = (gap - length) / 2; // gap that will be applied on each side
+          // [center extensions]
+          if (loop.length === 2) {
+            // center a b points
+            // if the agent is smaller than the gap, we can also plot the a b based on center.
+            const length = cmath.range.length(agent);
+            if (length < gap) {
+              const center = (min + max) / 2;
+              const egap = (gap - length) / 2; // gap that will be applied on each side
+              const cpa = center - length / 2;
+              const cpb = center + length / 2;
 
-            const cpa = b1 + cgap;
-            const cpb = a2 - cgap;
-
-            _a.push([cpa, cgap]);
-            _b.push([cpb, cgap]);
+              _a.push([cpa, egap]);
+              _b.push([cpb, egap]);
+            }
           }
         }
 
+        // [forwarded gaps]
         // extended a b points with gap of the other loops where it is in the same direction
         // Compare with other loops to extend projections
-        grouped.forEach((testgroup, j) => {
+        grouped.forEach((test, j) => {
           // skip self
           if (i === j) return;
+          if (test.gap <= 0) return;
+
+          // normal direction
+          if (test.max < group.max) {
+            _a.push([group.max + test.gap, test.gap]);
+          }
+
+          if (test.min > group.min) {
+            _b.push([group.min - test.gap, test.gap]);
+          }
         });
 
         // add to the result
