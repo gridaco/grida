@@ -486,6 +486,41 @@ export namespace cmath.vector2 {
    */
   export const zero: Vector2 = [0, 0];
 
+  /**
+   * Constructs a 2D vector where one of the components (`a` or `b`) is assigned to the main axis (`x` or `y`).
+   *
+   * This function allows flexible assignment of scalar values to specific axes in 2D space
+   * based on the specified main axis.
+   *
+   * @param a - The scalar value to assign to the main axis.
+   * @param b - The scalar value to assign to the counter axis.
+   * @param mainAxis - The primary axis (`"x"` or `"y"`) to which `a` should be assigned.
+   *
+   * @returns A 2D vector `[a, b]` if `mainAxis` is `"x"`, or `[b, a]` if `mainAxis` is `"y"`.
+   *
+   * @example
+   * ```typescript
+   * // Assign 5 to the x-axis and 10 to the y-axis
+   * const vector1 = cmath.vector2.withMainAxis(5, 10, "x");
+   * console.log(vector1); // [5, 10]
+   *
+   * // Assign 5 to the y-axis and 10 to the x-axis
+   * const vector2 = cmath.vector2.withMainAxis(5, 10, "y");
+   * console.log(vector2); // [10, 5]
+   * ```
+   *
+   * @remarks
+   * This is particularly useful in scenarios where the primary axis needs to be specified dynamically,
+   * such as when configuring flexible layouts or computations in 2D space.
+   */
+  export function axisOriented(a: Scalar, b: Scalar, mainAxis: Axis): Vector2 {
+    if (mainAxis === "x") {
+      return [a, b];
+    } else {
+      return [b, a];
+    }
+  }
+
   export function isZero(vector: Vector2): boolean {
     return vector[0] === 0 && vector[1] === 0;
   }
@@ -2981,7 +3016,17 @@ export namespace cmath.ext.snap {
    * This way, we can provide additional ux-friendly snapping points for the user.
    */
   export namespace spacing {
-    export type RangeLoopProjections = {
+    export type DistributionGeometry1D = {
+      /**
+       * the size of this agent will be used for plotting center-originated points. (if the agent fits into the gap)
+       */
+      agent: cmath.Range;
+
+      /**
+       * the ranges to calculate the space from
+       */
+      ranges: cmath.Range[];
+
       /**
        * combinations of ranges (overlapping ignored)
        * @example
@@ -3007,35 +3052,39 @@ export namespace cmath.ext.snap {
       gaps: number[];
 
       /**
-       * index-aligned projections of `a` points
+       * index-aligned projections of `a` points and the gap value applied to this point
+       *
+       * The gap can differ from the `gaps[i]`, since the gap can be applied from other loops, or center gaps with givven agent.
        */
-      a: number[][];
+      a: [pos: number, gap: number][][];
 
       /**
        * index-aligned projections of `b` points
+       *
+       * The gap can differ from the `gaps[i]`, since the gap can be applied from other loops, or center gaps with givven agent.
        */
-      b: number[][];
+      b: [pos: number, gap: number][][];
     };
 
     /**
      * calculates the space between two ranges, returns a set of projections of the next range for each combination.
      *
-     * @param anchors
-     *
+     * @param agent the size of this agent will be used for plotting center-originated points. (if the agent fits into the gap)
+     * @param ranges the ranges to calculate the space from
      *
      * @remarks
      * - ignores the combination if overlaps (to ensure positive space)
      */
-    export function plotAB(
+    export function plotDistributionGeometry(
       agent: cmath.Range,
-      anchors: cmath.Range[]
-    ): RangeLoopProjections {
-      const grouped = cmath.range.groupRangesByUniformGap(anchors, 2);
+      ranges: cmath.Range[]
+    ): DistributionGeometry1D {
+      const grouped = cmath.range.groupRangesByUniformGap(ranges, 2);
 
       const loops: [number, number][] = [];
       const gaps: number[] = [];
-      const a: number[][] = [];
-      const b: number[][] = [];
+      const a: [pos: number, gap: number][][] = [];
+      const b: [pos: number, gap: number][][] = [];
 
       grouped.forEach((group, i) => {
         const { loop, gap } = group;
@@ -3043,11 +3092,11 @@ export namespace cmath.ext.snap {
         // groupRangesByUniformGap can return 0 gap, which is nullish for spacing
         if (gap === 0) return;
 
-        const _a = new Set<number>();
-        const _b = new Set<number>();
+        const _a: [pos: number, gap: number][] = [];
+        const _b: [pos: number, gap: number][] = [];
 
-        const [a1, b1] = anchors[loop[0]];
-        const [a2, b2] = anchors[loop[1]];
+        const [a1, b1] = ranges[loop[0]];
+        const [a2, b2] = ranges[loop[1]];
 
         const pa = b2 + gap;
         const pb = a1 - gap;
@@ -3055,8 +3104,8 @@ export namespace cmath.ext.snap {
         // default a b points
         loops.push(loop as [number, number]);
         gaps.push(gap);
-        _a.add(pa);
-        _b.add(pb);
+        _a.push([pa, gap]);
+        _b.push([pb, gap]);
 
         // center a b points
         // if the agent is smaller than the gap, we can also plot the a b based on center.
@@ -3067,8 +3116,8 @@ export namespace cmath.ext.snap {
           const cpa = b1 + cgap;
           const cpb = a2 - cgap;
 
-          _a.add(cpa);
-          _b.add(cpb);
+          _a.push([cpa, cgap]);
+          _b.push([cpb, cgap]);
         }
 
         // extended a b points with gap of the other loops where it is in the same direction
@@ -3083,6 +3132,8 @@ export namespace cmath.ext.snap {
       });
 
       return {
+        agent,
+        ranges,
         loops,
         gaps,
         a,
