@@ -2091,6 +2091,7 @@ export function useEventTarget() {
   const {
     pointer,
     transform,
+    surface_snapping,
     gesture,
     hovered_node_id,
     dropzone,
@@ -2431,6 +2432,7 @@ export function useEventTarget() {
       transform,
       debug,
       gesture,
+      surface_snapping,
       //
       marquee,
       cursor_mode,
@@ -2475,6 +2477,7 @@ export function useEventTarget() {
     transform,
     debug,
     gesture,
+    surface_snapping,
     //
     marquee,
     cursor_mode,

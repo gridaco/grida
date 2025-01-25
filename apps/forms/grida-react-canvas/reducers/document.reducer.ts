@@ -757,7 +757,7 @@ function self_nudge(
       [dx, dy],
       DEFAULT_SNAP_NUDGE_THRESHOLD
     );
-    draft.gesture.surface_snapping = snapping;
+    draft.surface_snapping = snapping;
   }
 
   for (const node_id of targets) {

@@ -317,12 +317,7 @@ export function EditorSurface() {
           ref={portalRef}
         >
           <MeasurementGuide />
-          <div
-            data-transforming={is_node_transforming}
-            className="opacity-0 data-[transforming='true']:opacity-100 transition-colors"
-          >
-            <SnapGuide />
-          </div>
+          <SnapGuide />
 
           <SurfaceGroup hidden={is_node_translating || isWindowResizing}>
             {content_edit_mode?.type === "text" && (

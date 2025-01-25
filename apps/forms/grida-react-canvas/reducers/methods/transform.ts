@@ -280,7 +280,7 @@ function __self_update_gesture_transform_translate(
     DEFAULT_SNAP_MOVEMNT_THRESHOLD
   );
 
-  draft.gesture.surface_snapping = snapping;
+  draft.surface_snapping = snapping;
 
   try {
     let i = 0;
@@ -460,7 +460,7 @@ function __self_update_gesture_transform_scale(
     SNAP
   );
 
-  draft.gesture.surface_snapping = snapping;
+  draft.surface_snapping = snapping;
   // #endregion
    */
 

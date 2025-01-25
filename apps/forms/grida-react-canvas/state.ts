@@ -207,10 +207,6 @@ export type GesturePan = IGesture & {
  */
 export type GestureVirtualNudge = {
   readonly type: "nudge";
-  /**
-   * surface snap guides - result of snap while translate (move) gesture
-   */
-  surface_snapping?: SnapToObjectsResult;
 };
 
 export type GestureTranslate = IGesture & {
@@ -230,11 +226,6 @@ export type GestureTranslate = IGesture & {
    * indicator between gesture events to ensure if the current selection is cloned ones or not
    */
   is_currently_cloned: boolean;
-
-  /**
-   * surface snap guides - result of snap while translate (move) gesture
-   */
-  surface_snapping?: SnapToObjectsResult;
 };
 
 /**
@@ -309,11 +300,6 @@ export type GestureScale = IGesture & {
   readonly initial_snapshot: IMinimalDocumentState;
   readonly initial_rects: cmath.Rectangle[];
   readonly direction: cmath.CardinalDirection;
-
-  /**
-   * surface snap guides - result of snap while translate (move) gesture
-   */
-  surface_snapping?: SnapToObjectsResult;
 };
 
 export type GestureRotate = IGesture & {
@@ -477,6 +463,11 @@ interface IDocumentEditorEventTargetState {
   gesture: GestureState;
 
   gesture_modifiers: GestureModifiers;
+
+  /**
+   * the latest snap result from the gesture
+   */
+  surface_snapping?: SnapToObjectsResult;
 
   // =============
 

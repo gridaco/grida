@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Crosshair } from "./crosshair";
-import { useDocument } from "@/grida-react-canvas/provider";
+import { useEventTarget } from "@/grida-react-canvas/provider";
 import {
   offsetToSurfaceSpace,
   pointToSurfaceSpace,
@@ -217,14 +217,13 @@ function __surface_snap_guide_by_spacing(context: SnapToObjectsResult) {
 }
 
 function useSnapGuide(): surface.SnapGuide | undefined {
-  const { state, transform } = useDocument();
-  const { gesture } = state;
+  const { gesture, transform, surface_snapping } = useEventTarget();
 
   if (
     (gesture.type === "translate" ||
       gesture.type === "nudge" ||
       gesture.type === "scale") &&
-    gesture.surface_snapping
+    surface_snapping
   ) {
     const lines: surface.Line[] = [];
     const points: cmath.Vector2[] = [];
@@ -232,9 +231,7 @@ function useSnapGuide(): surface.SnapGuide | undefined {
     const y_ray_offsets: number[] = [];
 
     // #region by_geometry
-    const by_geometry = __surface_snap_guide_by_geometry(
-      gesture.surface_snapping
-    );
+    const by_geometry = __surface_snap_guide_by_geometry(surface_snapping);
 
     points.push(...by_geometry.points);
     x_ray_offsets.push(...by_geometry.x_ray_offsets);
@@ -242,9 +239,7 @@ function useSnapGuide(): surface.SnapGuide | undefined {
     // #endregion by_geometry
 
     // #region by_spacing
-    const by_spacing = __surface_snap_guide_by_spacing(
-      gesture.surface_snapping
-    );
+    const by_spacing = __surface_snap_guide_by_spacing(surface_snapping);
     lines.push(...by_spacing.lines);
     // #endregion by_spacing
 
