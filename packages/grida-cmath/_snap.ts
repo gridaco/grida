@@ -24,6 +24,7 @@ export type SnapToObjectsResult = {
       anchors: ObjectGeometryHitResult[];
     };
   };
+
   by_spacing: {
     x_aligned_anchors_idx: number[];
     y_aligned_anchors_idx: number[];
@@ -37,19 +38,19 @@ export function snapToObjects(
   agent: cmath.Rectangle,
   anchors: cmath.Rectangle[],
   threshold: cmath.Vector2,
-  epsilon = 0
+  tolerance = 0
 ): SnapToObjectsResult {
   assert(agent, "Agent must be a valid rectangle.");
   assert(anchors.length > 0, "Anchors must contain at least one rectangle.");
 
-  const snap_geo = snapToObjectsGeometry(agent, anchors, threshold, epsilon);
-  const snap_spc = snapToObjectsSpace(agent, anchors, threshold, epsilon);
+  const snap_geo = snapToObjectsGeometry(agent, anchors, threshold, tolerance);
+  const snap_spc = snapToObjectsSpace(agent, anchors, threshold, tolerance);
   const x = bestAxisAlignedDistance(snap_geo.x, snap_spc.x);
   const y = bestAxisAlignedDistance(snap_geo.y, snap_spc.y);
 
   // Determine the final delta for each axis
-  const x_delta = x.distance;
-  const y_delta = y.distance;
+  const x_delta = x.distance === Infinity ? 0 : x.distance;
+  const y_delta = y.distance === Infinity ? 0 : y.distance;
 
   const translated_agent = cmath.rect.translate(agent, [x_delta, y_delta]);
 
@@ -78,14 +79,12 @@ function bestAxisAlignedDistance(...results: IDistance[]): IDistance {
 
   for (let i = 0; i < results.length; i++) {
     const result = results[i];
-    if (result.distance === 0) {
-      continue;
-    } else if (result.distance < min_distance) {
+    if (Math.abs(result.distance) < Math.abs(min_distance)) {
       min_distance = result.distance;
       min_index = i;
-    } else if (result.distance === min_distance) {
-      // TODO: support multiple results, merge them if the distance is the same (or within epsilon)
     }
+    // TODO: support multiple results, merge them if the distance is the same (or within epsilon)
+    // else if (result.distance === min_distance) { }
   }
 
   if (min_index === -1) {
@@ -103,7 +102,7 @@ function snapToObjectsGeometry(
   agent: cmath.Rectangle,
   anchors: cmath.Rectangle[],
   threshold: cmath.Vector2,
-  epsilon = 0
+  tolerance = 0
 ): Sanp2DAxisAlignedResult & {
   agent_hits: ObjectGeometryHitResult;
   anchor_hits: ObjectGeometryHitResult[];
@@ -121,7 +120,7 @@ function snapToObjectsGeometry(
     agent_points,
     anchor_points,
     threshold,
-    epsilon
+    tolerance
   );
 
   const agent_hits: ObjectGeometryHitResult = agent_points.map(
@@ -227,7 +226,11 @@ function snap1DRangesDirectionAlignedWithDistributionGeometry(
   epsilon = 0
 ): Snap1DRangesDirectionAlignedResult {
   // project the anchor ranges
-  const plots = cmath.ext.snap.spacing.plotDistributionGeometry(agent, anchors);
+  const agentLength = cmath.range.length(agent);
+  const plots = cmath.ext.snap.spacing.plotDistributionGeometry(
+    anchors,
+    agentLength
+  );
 
   const { a, b, loops, gaps, ranges } = plots;
 
@@ -266,7 +269,6 @@ function snap1DRangesDirectionAlignedWithDistributionGeometry(
   );
 
   return {
-    agent,
     ranges,
     distance: Math.min(a_snap.distance, b_snap.distance),
     loops,
@@ -300,7 +302,7 @@ export function snap2DAxisAligned(
   agents: cmath.Vector2[],
   anchors: cmath.ext.snap.AxisAlignedPoint[],
   threshold: cmath.Vector2,
-  epsilon = 0
+  tolerance = 0
 ): Sanp2DAxisAlignedResult {
   assert(agents.length > 0, "Agents must contain at least one point.");
   assert(anchors.length > 0, "Anchors must contain at least one point.");
@@ -324,14 +326,14 @@ export function snap2DAxisAligned(
     x_agent_points,
     x_anchor_points,
     threshold[0],
-    epsilon
+    tolerance
   );
 
   const y_snap = cmath.ext.snap.snap1D(
     y_agent_points,
     y_anchor_points,
     threshold[1],
-    epsilon
+    tolerance
   );
 
   return {

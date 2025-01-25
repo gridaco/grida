@@ -2898,6 +2898,8 @@ export namespace cmath.ext.snap {
     /**
      * the distance (delta) needs to be applied to the agents to snap within the threshold.
      *
+     * `Infinity` if no snap.
+     *
      * @example
      *
      * const translated = agents.map((p) => p + distance);
@@ -2921,25 +2923,25 @@ export namespace cmath.ext.snap {
    * @param agents - An array of scalar points to snap.
    * @param anchors - An array of existing scalar points to snap to.
    * @param threshold - The maximum allowed distance for snapping.
-   * @param epsilon - The tolerance for delta matching.
+   * @param tolerance - The tolerance for delta matching.
    * @returns {Snap1DResult} The result of the snapping operation.
    */
   export function snap1D(
     agents: Scalar[],
     anchors: Scalar[],
     threshold: Scalar,
-    epsilon = 0
+    tolerance = 0
   ): Snap1DResult {
     if (anchors.length === 0) {
       return {
-        distance: 0,
+        distance: Infinity,
         hit_agent_indices: [],
         hit_anchor_indices: [],
       };
     }
 
     assert(threshold >= 0, "Threshold must be a non-negative number.");
-    assert(epsilon >= 0, "Epsilon must be a non-negative number.");
+    assert(tolerance >= 0, "Epsilon must be a non-negative number.");
 
     let minDelta = Infinity;
     let signedDelta = 0;
@@ -2961,7 +2963,7 @@ export namespace cmath.ext.snap {
       if (Math.abs(delta) <= threshold) {
         if (
           minDelta === Infinity ||
-          Math.abs(signedDeltaForPoint - signedDelta) <= epsilon
+          Math.abs(signedDeltaForPoint - signedDelta) <= tolerance
         ) {
           hit_agent_indicies.push(i);
           indicies.forEach((idx) => hit_anchor_indicies.add(idx));
@@ -2975,10 +2977,10 @@ export namespace cmath.ext.snap {
       }
     }
 
-    // If no snapping occurs, return the original points
+    // If no snapping occurs
     if (minDelta === Infinity) {
       return {
-        distance: 0,
+        distance: Infinity,
         hit_agent_indices: [],
         hit_anchor_indices: [],
       };
@@ -3052,11 +3054,6 @@ export namespace cmath.ext.snap {
   export namespace spacing {
     export type DistributionGeometry1D = {
       /**
-       * the size of this agent will be used for plotting center-originated points. (if the agent fits into the gap)
-       */
-      agent: cmath.Range;
-
-      /**
        * the ranges to calculate the space from
        */
       ranges: cmath.Range[];
@@ -3103,15 +3100,15 @@ export namespace cmath.ext.snap {
     /**
      * calculates the space between two ranges, returns a set of projections of the next range for each combination.
      *
-     * @param agent the size of this agent will be used for plotting center-originated points. (if the agent fits into the gap)
      * @param ranges the ranges to calculate the space from
+     * @param agentLength optional agent input. the size of this agent will be used for plotting center-originated points. (if the agent fits into the gap)
      *
      * @remarks
      * - ignores the combination if overlaps (to ensure positive space)
      */
     export function plotDistributionGeometry(
-      agent: cmath.Range,
-      ranges: cmath.Range[]
+      ranges: cmath.Range[],
+      agentLength?: Scalar
     ): DistributionGeometry1D {
       const grouped = cmath.range.groupRangesByUniformGap(ranges, 2);
 
@@ -3135,18 +3132,19 @@ export namespace cmath.ext.snap {
           _b.push([min - gap, gap]);
 
           // [center extensions]
-          if (loop.length === 2) {
-            // center a b points
-            // if the agent is smaller than the gap, we can also plot the a b based on center.
-            const length = cmath.range.length(agent);
-            if (length < gap) {
-              const center = (min + max) / 2;
-              const egap = (gap - length) / 2; // gap that will be applied on each side
-              const cpa = center - length / 2;
-              const cpb = center + length / 2;
+          if (agentLength) {
+            if (loop.length === 2) {
+              // center a b points
+              // if the agent is smaller than the gap, we can also plot the a b based on center.
+              if (agentLength < gap) {
+                const center = (min + max) / 2;
+                const egap = (gap - agentLength) / 2; // gap that will be applied on each side
+                const cpa = center - agentLength / 2;
+                const cpb = center + agentLength / 2;
 
-              _a.push([cpa, egap]);
-              _b.push([cpb, egap]);
+                _a.push([cpa, egap]);
+                _b.push([cpb, egap]);
+              }
             }
           }
         }
@@ -3175,7 +3173,6 @@ export namespace cmath.ext.snap {
       });
 
       return {
-        agent,
         ranges,
         loops,
         gaps,
@@ -3267,7 +3264,26 @@ export namespace cmath.ext.viewport {
   }
 }
 
-export namespace cmath.debug {
+export namespace cmath.ui {
+  /**
+   * `['x', 100]` will draw a y-axis line at x=100
+   */
+  export type Rule = [axis: "x" | "y", offset: number];
+
+  export type Point = {
+    label?: string;
+    x: number;
+    y: number;
+  };
+
+  export type Line = {
+    label?: string;
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+  };
+
   /**
    * Formats a number to the specified precision only when needed.
    *
