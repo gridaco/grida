@@ -1,5 +1,5 @@
 export function Crosshair({
-  size = 5,
+  size = 4,
   width = 0.5,
   color = "red",
 }: {

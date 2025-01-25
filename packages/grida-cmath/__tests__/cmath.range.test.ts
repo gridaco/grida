@@ -47,6 +47,18 @@ describe("cmath.range", () => {
       const result = cmath.range.groupRangesByUniformGap(ranges);
       expect(result).toEqual([
         {
+          loop: [0],
+          min: 10,
+          max: 20,
+          gap: 0,
+        },
+        {
+          loop: [1],
+          min: 30,
+          max: 40,
+          gap: 0,
+        },
+        {
           loop: [0, 1],
           min: 10,
           max: 40,
@@ -219,14 +231,33 @@ describe("cmath.range", () => {
       );
     });
 
-    test("should not handle completely overlapping ranges with", () => {
+    test("should not handle completely overlapping ranges", () => {
       const ranges: cmath.Range[] = [
         [0, 10],
         [0, 10],
         [0, 10],
       ];
       const result = cmath.range.groupRangesByUniformGap(ranges);
-      expect(result).toEqual([]);
+      expect(result).toEqual([
+        {
+          loop: [0],
+          min: 0,
+          max: 10,
+          gap: 0,
+        },
+        {
+          loop: [1],
+          min: 0,
+          max: 10,
+          gap: 0,
+        },
+        {
+          loop: [2],
+          min: 0,
+          max: 10,
+          gap: 0,
+        },
+      ]);
     });
   });
 

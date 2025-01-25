@@ -2786,8 +2786,7 @@ export namespace cmath.range {
    *
    * This function identifies subsets of ranges where the gaps between consecutive ranges
    * are consistent within a specified tolerance. Gaps are calculated as the distance
-   * between the end of one range and the start of the next. Overlapping ranges result
-   * in a gap of `0`.
+   * between the end of one range and the start of the next. Overlapping ranges are ignored.
    *
    * @param ranges - An array of numerical ranges, each represented as a `[start, end]` tuple.
    * @param tolerance - The allowable deviation for gaps to be considered uniform. Defaults to `0`.
@@ -2795,7 +2794,7 @@ export namespace cmath.range {
    *   - `loop`: The indices of the ranges in the group.
    *   - `min`: The minimum start value among the grouped ranges.
    *   - `max`: The maximum end value among the grouped ranges.
-   *   - `gap`: The uniform gap between consecutive ranges (always non-negative).
+   *   - `gap`: The uniform gap between consecutive ranges (always non-negative). 0 when only one range is present.
    *
    * @example
    * ```typescript
@@ -2808,9 +2807,13 @@ export namespace cmath.range {
    * console.log(result);
    * // Output:
    * // [
-   * //   { loop: [0, 1, 2], min: 0, max: 40, gap: 5 },
+   * //   { loop: [0], min: 0, max: 10, gap: 0 },
+   * //   { loop: [1], min: 15, max: 25, gap: 0 },
+   * //   { loop: [2], min: 30, max: 40, gap: 0 },
    * //   { loop: [0, 1], min: 0, max: 25, gap: 5 },
+   * //   { loop: [0, 2], min: 0, max: 40, gap: 20 },
    * //   { loop: [1, 2], min: 15, max: 40, gap: 5 },
+   * //   { loop: [0, 1, 2], min: 0, max: 40, gap: 5 },
    * // ]
    * ```
    *
@@ -2829,9 +2832,7 @@ export namespace cmath.range {
     max: number;
     gap: number;
   }[] {
-    // Generate all possible subsets of the input ranges
     const subsets = cmath.powerset(ranges, k);
-
     const result: {
       loop: number[];
       min: number;
@@ -2839,51 +2840,43 @@ export namespace cmath.range {
       gap: number;
     }[] = [];
 
-    // Iterate through each subset to check for consistent gaps
     main: for (const subset of subsets) {
-      if (subset.length < 2) continue; // Skip subsets with fewer than 2 ranges
+      if (subset.length === 0) continue;
 
-      // Get the indices of the subset ranges
+      if (subset.length === 1) {
+        const idx = ranges.indexOf(subset[0]);
+        const [start, end] = subset[0];
+        result.push({ loop: [idx], min: start, max: end, gap: 0 });
+        continue;
+      }
+
       const subsetIndices = ranges
-        .map((range, index) => (subset.includes(range) ? index : -1))
-        .filter((index) => index !== -1) as number[];
+        .map((r, i) => (subset.includes(r) ? i : -1))
+        .filter((i) => i !== -1);
 
-      // Sort the subset ranges by their start values
-      const sortedSubset = subsetIndices
+      const sorted = subsetIndices
         .slice()
         .sort((a, b) => ranges[a][0] - ranges[b][0]);
 
-      // Calculate gaps between consecutive ranges
       const distances: number[] = [];
-      for (let i = 1; i < sortedSubset.length; i++) {
-        const prevRange = ranges[sortedSubset[i - 1]];
-        const currentRange = ranges[sortedSubset[i]];
-        const distance = currentRange[0] - prevRange[1];
-        if (distance < 0) continue main;
-        distances.push(distance);
+      for (let i = 1; i < sorted.length; i++) {
+        const [p0, p1] = [ranges[sorted[i - 1]], ranges[sorted[i]]];
+        const dist = p1[0] - p0[1];
+        if (dist < 0) continue main;
+        distances.push(dist);
       }
 
-      // Check if all gaps are uniform within the specified tolerance
       if (cmath.isUniform(distances, tolerance)) {
-        // Calculate min and max
-        const starts = sortedSubset.map((index) => ranges[index][0]);
-        const ends = sortedSubset.map((index) => ranges[index][1]);
-        const min = Math.min(...starts);
-        const max = Math.max(...ends);
-
-        // The gap is consistent; take the first gap as representative
-        const representativeGap = distances[0];
-
-        // Add to the result
+        const starts = sorted.map((i) => ranges[i][0]);
+        const ends = sorted.map((i) => ranges[i][1]);
         result.push({
-          loop: sortedSubset,
-          min,
-          max,
-          gap: representativeGap,
+          loop: sorted,
+          min: Math.min(...starts),
+          max: Math.max(...ends),
+          gap: distances[0] ?? 0,
         });
       }
     }
-
     return result;
   }
 }
@@ -3076,7 +3069,7 @@ export namespace cmath.ext.snap {
        * loops = [[0, 1], [0, 2], [1, 2]];
        * ```
        */
-      loops: [index: number, index: number][];
+      loops: number[][];
 
       /**
        * index-aligned gaps of each loops
@@ -3120,7 +3113,7 @@ export namespace cmath.ext.snap {
       agent: cmath.Range,
       ranges: cmath.Range[]
     ): DistributionGeometry1D {
-      const grouped = cmath.range.groupRangesByUniformGap(ranges, 2);
+      const grouped = cmath.range.groupRangesByUniformGap(ranges);
 
       const loops: [number, number][] = [];
       const gaps: number[] = [];
@@ -3130,42 +3123,42 @@ export namespace cmath.ext.snap {
       grouped.forEach((group, i) => {
         const { loop, gap } = group;
 
-        // groupRangesByUniformGap can return 0 gap, which is nullish for spacing
-        if (gap === 0) return;
-
         const _a: [pos: number, gap: number][] = [];
         const _b: [pos: number, gap: number][] = [];
 
         const [a1, b1] = ranges[loop[0]];
-        const [a2, b2] = ranges[loop[1]];
+        const [a2, b2] = ranges[loop[loop.length - 1]];
 
-        const pa = b2 + gap;
-        const pb = a1 - gap;
+        if (gap > 0) {
+          const pa = b2 + gap;
+          const pb = a1 - gap;
 
-        // default a b points
-        loops.push(loop as [number, number]);
-        gaps.push(gap);
-        _a.push([pa, gap]);
-        _b.push([pb, gap]);
+          // default a b points
+          loops.push(loop as [number, number]);
+          gaps.push(gap);
+          _a.push([pa, gap]);
+          _b.push([pb, gap]);
 
-        // center a b points
-        // if the agent is smaller than the gap, we can also plot the a b based on center.
-        const length = cmath.range.length(agent);
-        if (length < gap) {
-          const cgap = (gap - length) / 2; // gap that will be applied on each side
+          // center a b points
+          // if the agent is smaller than the gap, we can also plot the a b based on center.
+          const length = cmath.range.length(agent);
+          if (length < gap) {
+            const cgap = (gap - length) / 2; // gap that will be applied on each side
 
-          const cpa = b1 + cgap;
-          const cpb = a2 - cgap;
+            const cpa = b1 + cgap;
+            const cpb = a2 - cgap;
 
-          _a.push([cpa, cgap]);
-          _b.push([cpb, cgap]);
+            _a.push([cpa, cgap]);
+            _b.push([cpb, cgap]);
+          }
         }
 
         // extended a b points with gap of the other loops where it is in the same direction
         // Compare with other loops to extend projections
-        // TODO: turns out, the loop with one range can also be extended with test gaps. - we'll handle this later.
-        // grouped.forEach((testgroup, j) => {
-        // });
+        grouped.forEach((testgroup, j) => {
+          // skip self
+          if (i === j) return;
+        });
 
         // add to the result
         a.push(Array.from(_a));

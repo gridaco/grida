@@ -68,7 +68,7 @@ function __calc_loop_gap_line(
   idx: number,
   context: {
     axis: cmath.Axis;
-    loops: [number, number][];
+    loops: number[][];
     gaps: number[];
     aligned_anchors: cmath.Rectangle[];
     aligned_anchors_idx: number[];
