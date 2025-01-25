@@ -423,7 +423,7 @@ export namespace cmath {
    * If `k` is specified, the function returns only the subsets of size `k`.
    *
    * @param arr - The input array for which the subsets are to be generated.
-   * @param k - (Optional) The size of subsets to generate. If omitted, all subsets are generated.
+   * @param k - (Optional) The size of subsets to generate. If -1, all subsets are generated.
    * @returns An array of arrays representing the subsets of the input array.
    *          - If `k` is omitted, returns the full power set.
    *          - If `k` is specified, returns only the subsets of size `k`.
@@ -458,8 +458,8 @@ export namespace cmath {
    *
    * @see https://en.wikipedia.org/wiki/Power_set
    */
-  export function powerset<T>(arr: T[], k?: number): T[][] {
-    if (k === undefined) {
+  export function powerset<T>(arr: T[], k: number = -1): T[][] {
+    if (k === -1) {
       // Generate the full power set
       const result: T[][] = [[]]; // Start with the empty set
       for (let size = 1; size <= arr.length; size++) {
@@ -2678,6 +2678,34 @@ export namespace cmath.transform {
 
 export namespace cmath.range {
   /**
+   * Calculates the mean (average center) of multiple numerical ranges.
+   *
+   * @param ranges - A variable number of ranges, each represented as a `[start, end]` tuple.
+   * @returns The mean center as a single number.
+   *
+   * @example
+   * ```typescript
+   * const meanCenter = cmath.range.mean([0, 10], [20, 30], [40, 50]);
+   * console.log(meanCenter); // Output: 25
+   * ```
+   */
+  export function mean(...ranges: Range[]): number {
+    return (
+      ranges
+        .map(([start, end]) => (start + end) / 2)
+        .reduce((sum, midpoint) => sum + midpoint, 0) / ranges.length
+    );
+  }
+
+  export function fromRectangle(rect: Rectangle, axis: cmath.Axis): Range {
+    return [rect[axis], rect[axis] + cmath.rect.getAxisDimension(rect, axis)];
+  }
+
+  export function length(range: Range): number {
+    return range[1] - range[0];
+  }
+
+  /**
    * Groups ranges by their uniform gaps.
    *
    * This function identifies subsets of ranges where the gaps between consecutive ranges
@@ -2717,7 +2745,7 @@ export namespace cmath.range {
    */
   export function groupRangesByUniformGap(
     ranges: Range[],
-    k: number = undefined,
+    k: number = -1,
     tolerance: number = 0
   ): {
     loop: number[];
@@ -2726,7 +2754,7 @@ export namespace cmath.range {
     gap: number;
   }[] {
     // Generate all possible subsets of the input ranges
-    const subsets = powerset(ranges, k);
+    const subsets = cmath.powerset(ranges, k);
 
     const result: {
       loop: number[];
@@ -2760,7 +2788,7 @@ export namespace cmath.range {
       }
 
       // Check if all gaps are uniform within the specified tolerance
-      if (isUniform(distances, tolerance)) {
+      if (cmath.isUniform(distances, tolerance)) {
         // Calculate min and max
         const starts = sortedSubset.map((index) => ranges[index][0]);
         const ends = sortedSubset.map((index) => ranges[index][1]);
@@ -2992,76 +3020,71 @@ export namespace cmath.ext.snap {
     /**
      * calculates the space between two ranges, returns a set of projections of the next range for each combination.
      *
-     * @param ranges
+     * @param anchors
      *
      *
      * @remarks
      * - ignores the combination if overlaps (to ensure positive space)
      */
-    export function repeatRangeProjections(
-      ranges: cmath.Range[]
+    export function plotAB(
+      agent: cmath.Range,
+      anchors: cmath.Range[]
     ): RangeLoopProjections {
-      // map all possible 1:1 combination set (with index)
-      const indexes = Array.from({ length: ranges.length }, (_, i) => i);
-      const loops: [number, number][] = cmath
-        .combinations(indexes, 2)
-        // filter out the intersecting combination
-        .filter(([i, j]) => {
-          return !cmath.vector2.intersects(ranges[i], ranges[j]);
-        })
-        // Sort the combinations based on segment starting positions
-        .map(([i, j]) =>
-          // sort the segments by `a`
-          [i, j].sort((a, b) => ranges[a][0] - ranges[b][0])
-        ) as [number, number][];
+      const grouped = cmath.range.groupRangesByUniformGap(anchors, 2);
 
-      // spaces of each combination
-      const spaces: number[] = [];
-      for (const [i, j] of loops) {
-        const [a1, b1] = ranges[i];
-        const [a2, b2] = ranges[j];
-
-        // calculate the space between the two ranges
-        const space = a2 - b1;
-
-        spaces.push(space);
-      }
-
+      const loops: [number, number][] = [];
+      const gaps: number[] = [];
       const a: number[][] = [];
       const b: number[][] = [];
-      const c: number[][] = [];
 
-      for (const [i, j] of loops) {
-        const [a1, b1] = ranges[i];
-        const [a2, b2] = ranges[j];
+      grouped.forEach((group, i) => {
+        const { loop, gap } = group;
 
-        // calculate the space between the two ranges
-        const space = a2 - b1;
-
-        const pa = b2 + space;
-        const pb = a1 - space;
+        // groupRangesByUniformGap can return 0 gap, which is nullish for spacing
+        if (gap === 0) return;
 
         const _a = new Set<number>();
         const _b = new Set<number>();
-        const _c = new Set<number>();
 
+        const [a1, b1] = anchors[loop[0]];
+        const [a2, b2] = anchors[loop[1]];
+
+        const pa = b2 + gap;
+        const pb = a1 - gap;
+
+        // default a b points
+        loops.push(loop as [number, number]);
+        gaps.push(gap);
         _a.add(pa);
         _b.add(pb);
 
-        // TODO: apply space that is only to the same direction (need extra query)
-        // // extended space (from others)
-        // for (const space of spaces) {
-        //   _a.add(b2 + space);
-        //   _b.add(a1 - space);
-        // }
+        // center a b points
+        // if the agent is smaller than the gap, we can also plot the a b based on center.
+        const length = cmath.range.length(agent);
+        if (length < gap) {
+          const cgap = (gap - length) / 2; // gap that will be applied on each side
 
+          const cpa = b1 + cgap;
+          const cpb = a2 - cgap;
+
+          _a.add(cpa);
+          _b.add(cpb);
+        }
+
+        // extended a b points with gap of the other loops where it is in the same direction
+        // Compare with other loops to extend projections
+        // TODO: turns out, the loop with one range can also be extended with test gaps. - we'll handle this later.
+        // grouped.forEach((testgroup, j) => {
+        // });
+
+        // add to the result
         a.push(Array.from(_a));
         b.push(Array.from(_b));
-      }
+      });
 
       return {
         loops,
-        gaps: spaces,
+        gaps,
         a,
         b,
       };

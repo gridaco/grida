@@ -184,7 +184,7 @@ function snapToObjectsSpace(
     return [r.x, r.x + r.width] satisfies cmath.Range;
   });
 
-  const y_aligned_anchor_ranges = x_aligned_anchors_idx.map((idx) => {
+  const y_aligned_anchor_ranges = y_aligned_anchors_idx.map((idx) => {
     const r = anchors[idx];
     return [r.y, r.y + r.height] satisfies cmath.Range;
   });
@@ -211,7 +211,7 @@ function snapToObjectsSpace(
   };
 }
 
-type Snap1DRangesDirectionAlignedResult =
+export type Snap1DRangesDirectionAlignedResult =
   cmath.ext.snap.spacing.RangeLoopProjections & {
     distance: number;
     a_snap: cmath.ext.snap.Snap1DResult;
@@ -227,7 +227,7 @@ function snap1DRangesDirectionAlignedWithProjection(
   epsilon = 0
 ): Snap1DRangesDirectionAlignedResult {
   // project the anchor ranges
-  const projection = cmath.ext.snap.spacing.repeatRangeProjections(anchors);
+  const projection = cmath.ext.snap.spacing.plotAB(agent, anchors);
 
   const { a, b, loops, gaps } = projection;
 
