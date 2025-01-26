@@ -83,7 +83,7 @@ function bestAxisAlignedDistance(...results: IDistance[]): IDistance {
       min_distance = result.distance;
       min_index = i;
     }
-    // TODO: support multiple results, merge them if the distance is the same (or within epsilon)
+    // TODO: support multiple results, merge them if the distance is the same (or within tolerance)
     // else if (result.distance === min_distance) { }
   }
 
@@ -157,7 +157,7 @@ function snapToObjectsSpace(
   agent: cmath.Rectangle,
   anchors: cmath.Rectangle[],
   threshold: cmath.Vector2,
-  epsilon = 0
+  tolerance = 0
 ) {
   // Define the agent's ranges on both axes
   const x_range: cmath.Range = [agent.x, agent.x + agent.width];
@@ -192,14 +192,14 @@ function snapToObjectsSpace(
     x_range,
     x_aligned_anchor_ranges,
     threshold[0],
-    epsilon
+    tolerance
   );
 
   const y = snap1DRangesDirectionAlignedWithDistributionGeometry(
     y_range,
     y_aligned_anchor_ranges,
     threshold[1],
-    epsilon
+    tolerance
   );
 
   return {
@@ -223,7 +223,7 @@ function snap1DRangesDirectionAlignedWithDistributionGeometry(
   agent: cmath.Range,
   anchors: cmath.Range[],
   threshold: number,
-  epsilon = 0
+  tolerance = 0
 ): Snap1DRangesDirectionAlignedResult {
   // project the anchor ranges
   const agentLength = cmath.range.length(agent);
@@ -232,49 +232,55 @@ function snap1DRangesDirectionAlignedWithDistributionGeometry(
     agentLength
   );
 
-  const { a, b, loops, gaps, ranges } = plots;
+  const { a, b } = plots;
 
   // anchors
   const a_flat: number[] = [];
-  const a_flat_loop_idx: number[] = [];
+  const a_flat_loops_idx: number[] = [];
   const b_flat: number[] = [];
-  const b_flat_loop_idx: number[] = [];
+  const b_flat_loops_idx: number[] = [];
 
   a.forEach((loop, i) => {
     loop.forEach(([value], j) => {
       a_flat.push(value);
-      a_flat_loop_idx.push(i);
+      a_flat_loops_idx.push(i);
     });
   });
 
   b.forEach((loop, i) => {
     loop.forEach(([value], j) => {
       b_flat.push(value);
-      b_flat_loop_idx.push(i);
+      b_flat_loops_idx.push(i);
     });
   });
 
   // Perform snapping on each side of the agent's ranges
-  const a_snap = cmath.ext.snap.snap1D([agent[0]], a_flat, threshold, epsilon);
+  const a_snap = cmath.ext.snap.snap1D(
+    [agent[0]],
+    a_flat,
+    threshold,
+    tolerance
+  );
 
-  const b_snap = cmath.ext.snap.snap1D([agent[1]], b_flat, threshold, epsilon);
+  const b_snap = cmath.ext.snap.snap1D(
+    [agent[1]],
+    b_flat,
+    threshold,
+    tolerance
+  );
 
   // get the origianl loop index based on anchors index.
   const a_hit_loops_idx = a_snap.hit_anchor_indices.map(
-    (index) => a_flat_loop_idx[index]
+    (index) => a_flat_loops_idx[index]
   );
 
   const b_hit_loops_idx = b_snap.hit_anchor_indices.map(
-    (index) => b_flat_loop_idx[index]
+    (index) => b_flat_loops_idx[index]
   );
 
   return {
-    ranges,
+    ...plots,
     distance: Math.min(a_snap.distance, b_snap.distance),
-    loops,
-    gaps,
-    a,
-    b,
     a_snap,
     b_snap,
     a_hit_loops_idx,

@@ -3085,16 +3085,30 @@ export namespace cmath.ext.snap {
       /**
        * index-aligned projections of `a` points and the gap value applied to this point
        *
-       * The gap can differ from the `gaps[i]`, since the gap can be applied from other loops, or center gaps with givven agent.
+       * this is not conidered as a "range" since [0] and [1] is not ensured to be in the same direction. ([1] can be smaller than [0])
+       *
+       * from [1] anchor, the delta is applied, resulting in the [0] point.
        */
-      a: [pos: number, gap: number][][];
+      a: [pos: number, anchor: number][][];
 
       /**
        * index-aligned projections of `b` points
        *
-       * The gap can differ from the `gaps[i]`, since the gap can be applied from other loops, or center gaps with givven agent.
+       * this is not conidered as a "range" since [0] and [1] is not ensured to be in the same direction. ([1] can be smaller than [0])
+       *
+       * from [1] anchor, the delta is applied, resulting in the [0] point.
        */
-      b: [pos: number, gap: number][][];
+      b: [pos: number, anchor: number][][];
+
+      /**
+       * index-aligned index of the forwarded gaps, from other loops
+       */
+      a_forwarded_gaps_idx: number[][];
+
+      /**
+       * index-aligned index of the forwarded gaps, from other loops
+       */
+      b_forwarded_gaps_idx: number[][];
     };
 
     /**
@@ -3114,22 +3128,26 @@ export namespace cmath.ext.snap {
 
       const loops: [number, number][] = [];
       const gaps: number[] = [];
-      const a: [pos: number, gap: number][][] = [];
-      const b: [pos: number, gap: number][][] = [];
+      const a_forwarded_gaps_idx: number[][] = [];
+      const b_forwarded_gaps_idx: number[][] = [];
+      const a: [pos: number, anchor: number][][] = [];
+      const b: [pos: number, anchor: number][][] = [];
 
       grouped.forEach((group, i) => {
         const { loop, gap, min, max } = group;
 
-        const _a: [pos: number, gap: number][] = [];
-        const _b: [pos: number, gap: number][] = [];
+        const _a: [pos: number, anchor: number][] = [];
+        const _b: [pos: number, anchor: number][] = [];
+        const _a_forwarded_gaps_idx: number[] = [];
+        const _b_forwarded_gaps_idx: number[] = [];
 
         if (gap > 0) {
           // [default gap extensions]
           // default a b points
           loops.push(loop as [number, number]);
           gaps.push(gap);
-          _a.push([max + gap, gap]);
-          _b.push([min - gap, gap]);
+          _a.push([max + gap, max]);
+          _b.push([min - gap, min]);
 
           // [center extensions]
           if (agentLength) {
@@ -3137,13 +3155,15 @@ export namespace cmath.ext.snap {
               // center a b points
               // if the agent is smaller than the gap, we can also plot the a b based on center.
               if (agentLength < gap) {
+                // | (gap) |a|  |c|  |b| (gap) |
+                // |       [-----------] < agent
                 const center = (min + max) / 2;
                 const egap = (gap - agentLength) / 2; // gap that will be applied on each side
                 const cpa = center - agentLength / 2;
                 const cpb = center + agentLength / 2;
 
-                _a.push([cpa, egap]);
-                _b.push([cpb, egap]);
+                _a.push([cpa, cpa - egap]);
+                _b.push([cpb, cpb + egap]);
               }
             }
           }
@@ -3159,17 +3179,21 @@ export namespace cmath.ext.snap {
 
           // normal direction
           if (test.max < group.max) {
-            _a.push([group.max + test.gap, test.gap]);
+            _a.push([group.max + test.gap, group.max]);
+            _a_forwarded_gaps_idx.push(j);
           }
 
           if (test.min > group.min) {
-            _b.push([group.min - test.gap, test.gap]);
+            _b.push([group.min - test.gap, group.min]);
+            _b_forwarded_gaps_idx.push(j);
           }
         });
 
         // add to the result
         a.push(Array.from(_a));
         b.push(Array.from(_b));
+        a_forwarded_gaps_idx.push(Array.from(_a_forwarded_gaps_idx));
+        b_forwarded_gaps_idx.push(Array.from(_b_forwarded_gaps_idx));
       });
 
       return {
@@ -3178,6 +3202,8 @@ export namespace cmath.ext.snap {
         gaps,
         a,
         b,
+        a_forwarded_gaps_idx,
+        b_forwarded_gaps_idx,
       };
     }
   }
