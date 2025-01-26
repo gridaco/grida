@@ -3075,9 +3075,20 @@ export namespace cmath.ext.snap {
     };
   }
 
+  export type AxisAlignedSnapConfig = {
+    /**
+     * false: no snap, otherwise threshold value.
+     */
+    x: false | number;
+    /**
+     * false: no snap, otherwise threshold value.
+     */
+    y: false | number;
+  };
+
   export type Sanp2DAxisAlignedResult = {
-    x: cmath.ext.snap.Snap1DResult;
-    y: cmath.ext.snap.Snap1DResult;
+    x: cmath.ext.snap.Snap1DResult | null;
+    y: cmath.ext.snap.Snap1DResult | null;
   };
 
   /**
@@ -3094,13 +3105,11 @@ export namespace cmath.ext.snap {
   export function snap2DAxisAligned(
     agents: cmath.Vector2[],
     anchors: cmath.ext.snap.AxisAlignedPoint[],
-    threshold: cmath.Vector2,
+    config: AxisAlignedSnapConfig,
     tolerance = 0
   ): Sanp2DAxisAlignedResult {
     assert(agents.length > 0, "Agents must contain at least one point.");
     assert(anchors.length > 0, "Anchors must contain at least one point.");
-    assert(threshold[0] >= 0, "Threshold must be a non-negative number.");
-    assert(threshold[1] >= 0, "Threshold must be a non-negative number.");
 
     // Separate the scalar points for each axis
     const x_agent_points = agents.map(([x]) => x);
@@ -3115,19 +3124,27 @@ export namespace cmath.ext.snap {
       .filter((y): y is number => y !== null);
 
     // snap each axis
-    const x_snap = cmath.ext.snap.snap1D(
-      x_agent_points,
-      x_anchor_points,
-      threshold[0],
-      tolerance
-    );
+    let x_snap: cmath.ext.snap.Snap1DResult | null = null;
+    if (config.x) {
+      assert(config.x > 0, "Threshold must be a non-negative number.");
+      x_snap = cmath.ext.snap.snap1D(
+        x_agent_points,
+        x_anchor_points,
+        config.x,
+        tolerance
+      );
+    }
 
-    const y_snap = cmath.ext.snap.snap1D(
-      y_agent_points,
-      y_anchor_points,
-      threshold[1],
-      tolerance
-    );
+    let y_snap: cmath.ext.snap.Snap1DResult | null = null;
+    if (config.y) {
+      assert(config.y > 0, "Threshold must be a non-negative number.");
+      y_snap = cmath.ext.snap.snap1D(
+        y_agent_points,
+        y_anchor_points,
+        config.y,
+        tolerance
+      );
+    }
 
     return {
       x: x_snap,

@@ -23,7 +23,7 @@ export const DEFAULT_SNAP_MOVEMNT_THRESHOLD: cmath.Vector2 = [4, 4];
 /**
  * snap threshold applyed when nudge (fake gesture) is applied
  */
-export const DEFAULT_SNAP_NUDGE_THRESHOLD: cmath.Vector2 = [0.1, 0.1];
+export const DEFAULT_SNAP_NUDGE_THRESHOLD: cmath.Vector2 = [1, 1];
 
 const DEFAULT_RAY_TARGETING: SurfaceRaycastTargeting = {
   target: "auto",
