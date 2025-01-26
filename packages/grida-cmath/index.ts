@@ -3075,6 +3075,66 @@ export namespace cmath.ext.snap {
     };
   }
 
+  export type Sanp2DAxisAlignedResult = {
+    x: cmath.ext.snap.Snap1DResult;
+    y: cmath.ext.snap.Snap1DResult;
+  };
+
+  /**
+   * Snaps an array of points to the nearest target point along each axis independently.
+   * The snapping delta is computed for each axis separately and applied to all points.
+   *
+   * @param agents - An array of 2D points (Vector2) to snap.
+   * @param anchors - An array of existing 2D points to snap to.
+   * @param threshold - The maximum allowed single-axis distance for snapping.
+   * @returns The snapped points and the delta applied:
+   *          - `value`: The translated points.
+   *          - `distance`: The delta vector applied to align the points.
+   */
+  export function snap2DAxisAligned(
+    agents: cmath.Vector2[],
+    anchors: cmath.ext.snap.AxisAlignedPoint[],
+    threshold: cmath.Vector2,
+    tolerance = 0
+  ): Sanp2DAxisAlignedResult {
+    assert(agents.length > 0, "Agents must contain at least one point.");
+    assert(anchors.length > 0, "Anchors must contain at least one point.");
+    assert(threshold[0] >= 0, "Threshold must be a non-negative number.");
+    assert(threshold[1] >= 0, "Threshold must be a non-negative number.");
+
+    // Separate the scalar points for each axis
+    const x_agent_points = agents.map(([x]) => x);
+    const y_agent_points = agents.map(([_, y]) => y);
+
+    // Separate anchor points into x and y components
+    const x_anchor_points = anchors
+      .map(([x]) => x)
+      .filter((x): x is number => x !== null);
+    const y_anchor_points = anchors
+      .map(([_, y]) => y)
+      .filter((y): y is number => y !== null);
+
+    // snap each axis
+    const x_snap = cmath.ext.snap.snap1D(
+      x_agent_points,
+      x_anchor_points,
+      threshold[0],
+      tolerance
+    );
+
+    const y_snap = cmath.ext.snap.snap1D(
+      y_agent_points,
+      y_anchor_points,
+      threshold[1],
+      tolerance
+    );
+
+    return {
+      x: x_snap,
+      y: y_snap,
+    };
+  }
+
   /**
    * Namespace for spacing-related snapping and range calculations.
    *
