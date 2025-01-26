@@ -3288,8 +3288,7 @@ export namespace cmath.ext.snap {
         if (gap > 0) {
           // [default gap extensions]
           // default a b points
-          loops.push(loop as [number, number]);
-          gaps.push(gap);
+
           _a.push({ p: max + gap, o: max, fwd: i });
           _b.push({ p: min - gap, o: min, fwd: i });
 
@@ -3336,6 +3335,8 @@ export namespace cmath.ext.snap {
         });
 
         // add to the result
+        loops.push(loop as [number, number]);
+        gaps.push(gap);
         a.push(Array.from(_a));
         b.push(Array.from(_b));
       });

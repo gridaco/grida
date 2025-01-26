@@ -79,4 +79,36 @@ describe("spacing.plotDistributionGeometry", () => {
     expect(result.a[0]).toHaveLength(1);
     expect(result.b[0]).toHaveLength(1);
   });
+
+  it("should ensure that sizes of a, b, and loops match for complex inputs", () => {
+    const ranges: cmath.Range[] = [
+      [0, 15],
+      [10, 25],
+      [25, 30],
+      [40, 55],
+      [50, 65],
+      [80, 95],
+      [150, 165],
+    ];
+
+    const agentLength = 10; // Arbitrary agent length for projections
+
+    const result = cmath.ext.snap.spacing.plotDistributionGeometry(
+      ranges,
+      agentLength
+    );
+
+    // Ensure the number of loops matches the sizes of a and b
+    expect(result.loops.length).toBe(result.a.length);
+    expect(result.loops.length).toBe(result.b.length);
+
+    // Additional check: ensure the projections in a and b align with loops
+    result.loops.forEach((loop, i) => {
+      expect(result.a[i]).toBeDefined();
+      expect(result.b[i]).toBeDefined();
+    });
+
+    // Check if all loops have corresponding gaps
+    expect(result.loops.length).toBe(result.gaps.length);
+  });
 });
