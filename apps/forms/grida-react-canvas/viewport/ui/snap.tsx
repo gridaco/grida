@@ -8,10 +8,10 @@ import {
 } from "@/grida-react-canvas/utils/transform";
 import { Rule } from "./rule";
 import { cmath } from "@grida/cmath";
-import { guide, type SnapGuide } from "@grida/cmath/_snap";
+import { guide } from "@grida/cmath/_snap";
 import { Line } from "./line";
 
-function useSnapGuide(): SnapGuide | undefined {
+function useSnapGuide(): guide.SnapGuide | undefined {
   const { gesture, transform, surface_snapping } = useEventTarget();
 
   return useMemo(() => {
@@ -21,7 +21,7 @@ function useSnapGuide(): SnapGuide | undefined {
         gesture.type === "scale") &&
       surface_snapping
     ) {
-      const { lines, points, rules: rays } = guide(surface_snapping);
+      const { lines, points, rules: rays } = guide.plot(surface_snapping);
       // finally, map the vectors to the surface space
       return {
         lines: lines.map((l) => lineToSurfaceSpace(l, transform)),
@@ -30,7 +30,7 @@ function useSnapGuide(): SnapGuide | undefined {
           const axis = r[0];
           return [axis, offsetToSurfaceSpace(r[1], axis, transform)];
         }),
-      } satisfies SnapGuide;
+      } satisfies guide.SnapGuide;
     }
   }, [gesture, transform, surface_snapping]);
 }
