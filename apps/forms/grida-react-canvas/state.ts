@@ -18,12 +18,12 @@ export const DEFAULT_GAP_ALIGNMENT_TOLERANCE = 1.01;
 /**
  * snap threshold applyed when movement (real gesture) is applied
  */
-export const DEFAULT_SNAP_MOVEMNT_THRESHOLD: cmath.Vector2 = [4, 4];
+export const DEFAULT_SNAP_MOVEMNT_THRESHOLD = 4;
 
 /**
  * snap threshold applyed when nudge (fake gesture) is applied
  */
-export const DEFAULT_SNAP_NUDGE_THRESHOLD: cmath.Vector2 = [1, 1];
+export const DEFAULT_SNAP_NUDGE_THRESHOLD = 0.5;
 
 const DEFAULT_RAY_TARGETING: SurfaceRaycastTargeting = {
   target: "auto",

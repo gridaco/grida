@@ -8,8 +8,8 @@ const q = 1;
 export function snapObjectsTranslation(
   agents: cmath.Rectangle[],
   anchors: cmath.Rectangle[],
-  movement: cmath.Vector2,
-  threshold: cmath.Vector2
+  movement: cmath.ext.movement.Movement,
+  threshold: number
 ): {
   translated: { position: cmath.Vector2 }[];
   snapping: SnapToObjectsResult | undefined;
@@ -20,13 +20,13 @@ export function snapObjectsTranslation(
   const bounding_rect = cmath.rect.union(agents);
 
   const _virtually_moved_rect = cmath.rect.quantize(
-    cmath.rect.translate(bounding_rect, movement),
+    cmath.rect.translate(bounding_rect, cmath.ext.movement.normalize(movement)),
     q
   );
 
   const result = snapToObjects(_virtually_moved_rect, anchors, {
-    x: movement[0] === 0 ? false : threshold[0],
-    y: movement[1] === 0 ? false : threshold[1],
+    x: movement[0] === null ? false : threshold,
+    y: movement[1] === null ? false : threshold,
   });
 
   const { translated: _translated } = result;

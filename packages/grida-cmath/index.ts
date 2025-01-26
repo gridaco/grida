@@ -3075,7 +3075,7 @@ export namespace cmath.ext.snap {
     };
   }
 
-  export type AxisAlignedSnapConfig = {
+  export type Snap2DAxisonfig = {
     /**
      * false: no snap, otherwise threshold value.
      */
@@ -3105,7 +3105,7 @@ export namespace cmath.ext.snap {
   export function snap2DAxisAligned(
     agents: cmath.Vector2[],
     anchors: cmath.ext.snap.AxisAlignedPoint[],
-    config: AxisAlignedSnapConfig,
+    config: Snap2DAxisonfig,
     tolerance = 0
   ): Sanp2DAxisAlignedResult {
     assert(agents.length > 0, "Agents must contain at least one point.");
@@ -3370,22 +3370,40 @@ export namespace cmath.ext.snap {
 }
 
 export namespace cmath.ext.movement {
-  type Movement = Vector2;
+  /**
+   * indicates a movement within 2D space.
+   *
+   * each can be null, when null, it treated as 0 or ignored depending on the context.
+   *
+   * this is to indicate the context of the movement vector, where 0 means no movement, but null means to ignore that axis.
+   */
+  export type Movement = [number | null, number | null];
+
+  /**
+   * normalizes the movement vector. null is treated as 0.
+   * @returns a signed {@link Vector2}
+   */
+  export function normalize(m: Movement): Vector2 {
+    return [m[0] ?? 0, m[1] ?? 0];
+  }
 
   /**
    * returns a new movement vector with single axis locked by dominance.
+   *
+   * the other axis will be null.
+   *
    * @param m
    * @returns
    */
   export function axisLockedByDominance(m: Movement): Movement {
     const [x, y] = m;
-    const abs_x = Math.abs(x);
-    const abs_y = Math.abs(y);
+    const abs_x = Math.abs(x ?? 0);
+    const abs_y = Math.abs(y ?? 0);
 
     if (abs_x > abs_y) {
-      return [x, 0];
+      return [x, null];
     } else {
-      return [0, y];
+      return [null, y];
     }
   }
 }

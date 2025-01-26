@@ -77,7 +77,7 @@ const dist2delta = (dist: number | undefined) =>
 export function snapToObjects(
   agent: cmath.Rectangle,
   anchors: cmath.Rectangle[],
-  config: cmath.ext.snap.AxisAlignedSnapConfig,
+  config: cmath.ext.snap.Snap2DAxisonfig,
   tolerance = 0
 ): SnapToObjectsResult {
   assert(agent, "Agent must be a valid rectangle.");
@@ -136,7 +136,7 @@ type Object9PointGeometryHitResult = cmath.rect.TRectangle9PointsChunk<
 function snapToObjects9PointsGeometry(
   agent: cmath.Rectangle,
   anchors: cmath.Rectangle[],
-  config: cmath.ext.snap.AxisAlignedSnapConfig,
+  config: cmath.ext.snap.Snap2DAxisonfig,
   tolerance = 0
 ): {
   x: cmath.ext.snap.Snap1DResult | null;
@@ -202,7 +202,7 @@ function snapToObjectsSpace(
   intersectionTest: cmath.Rectangle,
   agent: cmath.Rectangle,
   anchors: cmath.Rectangle[],
-  config: cmath.ext.snap.AxisAlignedSnapConfig,
+  config: cmath.ext.snap.Snap2DAxisonfig,
   tolerance = 0
 ) {
   // Define the agent's ranges on both axes

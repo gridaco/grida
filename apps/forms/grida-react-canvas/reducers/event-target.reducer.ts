@@ -109,7 +109,11 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
             const adj_movement =
               cmath.ext.movement.axisLockedByDominance(movement);
 
-            const adj_pos = cmath.vector2.add(a.p, adj_movement, n_offset);
+            const adj_pos = cmath.vector2.add(
+              a.p,
+              cmath.ext.movement.normalize(adj_movement),
+              n_offset
+            );
             draft.content_edit_mode.path_cursor_position = adj_pos;
           } else {
             draft.content_edit_mode.path_cursor_position =
@@ -724,7 +728,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
                   ? cmath.ext.movement.axisLockedByDominance(movement)
                   : movement;
 
-              const point = adj_movement;
+              const point = cmath.ext.movement.normalize(adj_movement);
 
               const vne = new vn.VectorNetworkEditor({
                 vertices: points.map((p) => ({ p })),
@@ -854,7 +858,10 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
               const bb_a = vne.getBBox();
 
               for (const i of content_edit_mode.selected_vertices) {
-                vne.translateVertex(i, adj_movement);
+                vne.translateVertex(
+                  i,
+                  cmath.ext.movement.normalize(adj_movement)
+                );
               }
 
               const bb_b = vne.getBBox();
