@@ -20,6 +20,8 @@ export type SnapToObjectsResult = {
   delta: cmath.Vector2;
 
   by_geometry: {
+    x: cmath.ext.snap.Snap1DResult | null;
+    y: cmath.ext.snap.Snap1DResult | null;
     hit_points: {
       agent: ObjectGeometryHitResult;
       anchors: ObjectGeometryHitResult[];
@@ -61,7 +63,8 @@ export function snapToObjects(
     translated: translated_agent,
     anchors,
     by_geometry: {
-      // TODO: split x, y compare distance, return null
+      x: snap_geo.x.distance === x.distance ? snap_geo.x : null,
+      y: snap_geo.y.distance === y.distance ? snap_geo.y : null,
       hit_points: {
         agent: snap_geo.agent_hits,
         anchors: snap_geo.anchor_hits,
@@ -110,7 +113,9 @@ function snapToObjectsGeometry(
   anchors: cmath.Rectangle[],
   threshold: cmath.Vector2,
   tolerance = 0
-): Sanp2DAxisAlignedResult & {
+): {
+  x: cmath.ext.snap.Snap1DResult;
+  y: cmath.ext.snap.Snap1DResult;
   agent_hits: ObjectGeometryHitResult;
   anchor_hits: ObjectGeometryHitResult[];
   agent_points: cmath.Vector2[];

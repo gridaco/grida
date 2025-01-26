@@ -384,6 +384,7 @@ export default function eventTargetReducer<S extends IDocumentEditorState>(
         // clear all trasform state
         draft.marquee = undefined;
         draft.dropzone = undefined;
+        draft.surface_snapping = undefined;
 
         switch (draft.cursor_mode.type) {
           case "cursor": {

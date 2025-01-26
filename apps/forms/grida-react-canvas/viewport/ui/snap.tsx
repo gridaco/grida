@@ -18,6 +18,8 @@ import { Line } from "./line";
 function __surface_snap_guide_by_geometry(context: SnapToObjectsResult) {
   const { by_geometry, translated, anchors, delta } = context;
 
+  const { x, y } = by_geometry;
+
   const lines: cmath.ui.Line[] = [];
   const points: cmath.Vector2[] = [];
 
@@ -28,17 +30,17 @@ function __surface_snap_guide_by_geometry(context: SnapToObjectsResult) {
   by_geometry.hit_points.anchors.forEach((hit, i) => {
     const anchor9 = cmath.rect.to9PointsChunk(anchors[i]);
     hit.forEach(([xhit, yhit], j) => {
-      if (xhit) xPoints.push(anchor9[j]);
-      if (yhit) yPoints.push(anchor9[j]);
-      if (xhit || yhit) points.push(anchor9[j]);
+      if (x && xhit) xPoints.push(anchor9[j]);
+      if (y && yhit) yPoints.push(anchor9[j]);
+      if ((x && xhit) || (y && yhit)) points.push(anchor9[j]);
     });
   });
 
   const agent9 = cmath.rect.to9PointsChunk(translated);
   by_geometry.hit_points.agent.forEach(([xhit, yhit], i) => {
-    if (xhit) xPoints.push(agent9[i]);
-    if (yhit) yPoints.push(agent9[i]);
-    if (xhit || yhit) points.push(agent9[i]);
+    if (x && xhit) xPoints.push(agent9[i]);
+    if (y && yhit) yPoints.push(agent9[i]);
+    if ((x && xhit) || (y && yhit)) points.push(agent9[i]);
   });
 
   // Vertical lines from xPoints

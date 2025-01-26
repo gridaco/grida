@@ -3241,7 +3241,11 @@ export namespace cmath.ext.snap {
               if (agentLength < gap) {
                 // | (gap) |a|  |c|  |b| (gap) |
                 // |       [-----------] < agent
-                const center = (min + max) / 2;
+
+                const center_range = [ranges[loop[0]][1], ranges[loop[1]][0]];
+                const center = cmath.mean(...center_range);
+
+                // const center = (min + max) / 2;
                 const egap = (gap - agentLength) / 2; // gap that will be applied on each side
                 const cpa = center - agentLength / 2;
                 const cpb = center + agentLength / 2;
