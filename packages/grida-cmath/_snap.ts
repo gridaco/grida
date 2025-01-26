@@ -8,6 +8,7 @@ export type SnapToObjectsResult = {
    * Returns the original agent when not snapped (delta 0)
    */
   translated: cmath.Rectangle;
+
   /**
    * The original anchors that were used as references for snapping.
    */
@@ -26,10 +27,12 @@ export type SnapToObjectsResult = {
   };
 
   by_spacing: {
-    x_aligned_anchors_idx: number[];
-    y_aligned_anchors_idx: number[];
-    x: Snap1DRangesDirectionAlignedResult;
-    y: Snap1DRangesDirectionAlignedResult;
+    x:
+      | (Snap1DRangesDirectionAlignedResult & { aligned_anchors_idx: number[] })
+      | null;
+    y:
+      | (Snap1DRangesDirectionAlignedResult & { aligned_anchors_idx: number[] })
+      | null;
   };
   by_ruler: {};
 };
@@ -58,12 +61,16 @@ export function snapToObjects(
     translated: translated_agent,
     anchors,
     by_geometry: {
+      // TODO: split x, y compare distance, return null
       hit_points: {
         agent: snap_geo.agent_hits,
         anchors: snap_geo.anchor_hits,
       },
     },
-    by_spacing: snap_spc,
+    by_spacing: {
+      x: snap_spc.x.distance === x.distance ? snap_spc.x : null,
+      y: snap_spc.y.distance === y.distance ? snap_spc.y : null,
+    },
     by_ruler: {},
     delta: [x_delta, y_delta],
   };
@@ -203,10 +210,8 @@ function snapToObjectsSpace(
   );
 
   return {
-    x_aligned_anchors_idx,
-    y_aligned_anchors_idx,
-    x,
-    y,
+    x: { ...x, aligned_anchors_idx: x_aligned_anchors_idx },
+    y: { ...y, aligned_anchors_idx: y_aligned_anchors_idx },
   };
 }
 
@@ -217,6 +222,12 @@ export type Snap1DRangesDirectionAlignedResult =
     b_snap: cmath.ext.snap.Snap1DResult;
     a_hit_loops_idx: number[];
     b_hit_loops_idx: number[];
+
+    // newly added for using anchor in the guide
+    a_flat: Array<cmath.ext.snap.spacing.ProjectionPoint>;
+    b_flat: Array<cmath.ext.snap.spacing.ProjectionPoint>;
+    a_flat_loops_idx: number[];
+    b_flat_loops_idx: number[];
   };
 
 function snap1DRangesDirectionAlignedWithDistributionGeometry(
@@ -234,57 +245,59 @@ function snap1DRangesDirectionAlignedWithDistributionGeometry(
 
   const { a, b } = plots;
 
-  // anchors
-  const a_flat: number[] = [];
+  // Flatten BOTH pos & anchor for 'a'
+  const a_flat: Array<cmath.ext.snap.spacing.ProjectionPoint> = [];
   const a_flat_loops_idx: number[] = [];
-  const b_flat: number[] = [];
+
+  a.forEach((loop, loopIdx) => {
+    loop.forEach((pair) => {
+      a_flat.push(pair);
+      a_flat_loops_idx.push(loopIdx);
+    });
+  });
+
+  // Flatten BOTH pos & anchor for 'b'
+  const b_flat: Array<cmath.ext.snap.spacing.ProjectionPoint> = [];
   const b_flat_loops_idx: number[] = [];
 
-  a.forEach((loop, i) => {
-    loop.forEach(([value], j) => {
-      a_flat.push(value);
-      a_flat_loops_idx.push(i);
+  b.forEach((loop, loopIdx) => {
+    loop.forEach((pair) => {
+      b_flat.push(pair);
+      b_flat_loops_idx.push(loopIdx);
     });
   });
 
-  b.forEach((loop, i) => {
-    loop.forEach(([value], j) => {
-      b_flat.push(value);
-      b_flat_loops_idx.push(i);
-    });
-  });
+  // We only give snap1D the pos dimension
+  const a_pos = a_flat.map((a) => a.p);
+  const b_pos = b_flat.map((b) => b.p);
 
   // Perform snapping on each side of the agent's ranges
-  const a_snap = cmath.ext.snap.snap1D(
-    [agent[0]],
-    a_flat,
-    threshold,
-    tolerance
-  );
+  const a_snap = cmath.ext.snap.snap1D([agent[0]], a_pos, threshold, tolerance);
+  const b_snap = cmath.ext.snap.snap1D([agent[1]], b_pos, threshold, tolerance);
 
-  const b_snap = cmath.ext.snap.snap1D(
-    [agent[1]],
-    b_flat,
-    threshold,
-    tolerance
-  );
-
-  // get the origianl loop index based on anchors index.
+  // get the original loop index from the flattened arrays
   const a_hit_loops_idx = a_snap.hit_anchor_indices.map(
-    (index) => a_flat_loops_idx[index]
+    (idx) => a_flat_loops_idx[idx]
   );
-
   const b_hit_loops_idx = b_snap.hit_anchor_indices.map(
-    (index) => b_flat_loops_idx[index]
+    (idx) => b_flat_loops_idx[idx]
   );
 
   return {
     ...plots,
     distance: Math.min(a_snap.distance, b_snap.distance),
+
+    // keep the snap results and helpful context
     a_snap,
     b_snap,
     a_hit_loops_idx,
     b_hit_loops_idx,
+
+    // for usage in spacing‐guide rendering:
+    a_flat, // now we can see the [pos, anchor] pairs
+    b_flat,
+    a_flat_loops_idx,
+    b_flat_loops_idx,
   };
 }
 

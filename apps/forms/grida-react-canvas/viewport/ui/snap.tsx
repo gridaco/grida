@@ -1,10 +1,9 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useMemo } from "react";
 import { Crosshair } from "./crosshair";
 import { useEventTarget } from "@/grida-react-canvas/provider";
 import {
   lineToSurfaceSpace,
   offsetToSurfaceSpace,
-  pointToSurfaceSpace,
   vector2ToSurfaceSpace,
 } from "@/grida-react-canvas/utils/transform";
 import { Rule } from "./rule";
@@ -14,6 +13,7 @@ import {
   SnapToObjectsResult,
 } from "@grida/cmath/_snap";
 import { MeterLabel } from "./meter";
+import { Line } from "./line";
 
 function __surface_snap_guide_by_geometry(context: SnapToObjectsResult) {
   const { by_geometry, translated, anchors, delta } = context;
@@ -78,36 +78,29 @@ function __surface_snap_guide_by_geometry(context: SnapToObjectsResult) {
   return { points, lines };
 }
 
-function __calc_loop_gap_line(
-  idx: number,
-  context: {
-    axis: cmath.Axis;
-    loops: number[][];
-    gaps: number[];
-    aligned_anchors: cmath.Rectangle[];
-    aligned_anchors_idx: number[];
-  }
-) {
-  const loop = context.loops[idx];
-  const gap = context.gaps[idx];
-  const [rai1, rai2] = loop;
-  const origianl_rect_1 =
-    context.aligned_anchors[context.aligned_anchors_idx[rai1]];
-  const origianl_rect_2 =
-    context.aligned_anchors[context.aligned_anchors_idx[rai2]];
+function __calc_loop_gap_line({
+  loop,
+  gap,
+  axis,
+}: {
+  loop: cmath.Rectangle[];
+  gap: number;
+  axis: cmath.Axis;
+}) {
+  const origianl_rect_first = loop[0];
+  const origianl_rect_last = loop[loop.length - 1];
 
-  const gap_label_str = cmath.ui.formatNumber(gap, 1);
+  const label = cmath.ui.formatNumber(gap, 1);
 
-  const axis = context.axis;
   const counterAxis = cmath.counterAxis[axis];
 
   const loop_gap_counter_axis_pos = cmath.range.mean(
-    cmath.range.fromRectangle(origianl_rect_1, counterAxis),
-    cmath.range.fromRectangle(origianl_rect_2, counterAxis)
+    cmath.range.fromRectangle(origianl_rect_first, counterAxis),
+    cmath.range.fromRectangle(origianl_rect_last, counterAxis)
   );
   // r.x + r.width
   const loop_gap_main_axis_a = cmath.range.fromRectangle(
-    origianl_rect_1,
+    origianl_rect_first,
     axis
   )[1];
   const loop_gap_main_axis_b = loop_gap_main_axis_a + gap;
@@ -124,127 +117,158 @@ function __calc_loop_gap_line(
     axis
   );
 
-  return {
-    label: gap_label_str,
+  return cmath.ui.normalizeLine({
+    label: label,
     x1: a[0],
     y1: a[1],
     x2: b[0],
     y2: b[1],
-  } satisfies cmath.ui.Line;
+  } satisfies cmath.ui.Line);
+}
+
+function __calc_agent_gap_line({
+  p,
+  axis,
+  anchor,
+}: {
+  p: cmath.ext.snap.spacing.ProjectionPoint;
+  axis: cmath.Axis;
+  anchor: cmath.Rectangle;
+}) {
+  const lines: cmath.ui.Line[] = [];
+  const { p: pos, o: origin } = p;
+
+  // We'll pick a "counterAxis" coordinate (like the mid Y for axis="x", or mid X for axis="y")
+  const counterAxis = cmath.counterAxis[axis];
+  const anchorRectMid = cmath.range.mean(
+    cmath.range.fromRectangle(anchor, counterAxis)
+  );
+
+  // Convert anchor -> pos into a 2D line
+  // "anchor" is the point from which "pos" was derived,
+  // and they are both 1D along `axis`. So we pick anchorRectMid for the other coordinate
+  const anchorPt = cmath.vector2.axisOriented(origin, anchorRectMid, axis);
+  const posPt = cmath.vector2.axisOriented(pos, anchorRectMid, axis);
+  const gap = Math.abs(pos - origin);
+
+  const label = cmath.ui.formatNumber(gap, 1);
+
+  lines.push({
+    label: label,
+    x1: anchorPt[0],
+    y1: anchorPt[1],
+    x2: posPt[0],
+    y2: posPt[1],
+  });
+
+  return lines;
 }
 
 function __surface_snap_guide_by_spacing(context: SnapToObjectsResult) {
-  const {
-    by_spacing,
-    translated,
-    anchors: main_anchors,
-    delta: [deltaX, deltaY],
-  } = context;
+  const { by_spacing, anchors: main_anchors } = context;
 
-  const { x_aligned_anchors_idx, y_aligned_anchors_idx, x, y } = by_spacing;
-
+  const { x, y } = by_spacing;
   const lines: cmath.ui.Line[] = [];
 
   function handle_axis({
-    a,
-    a_hit_loops_idx,
+    a_flat, // flattened [pos, anchor]
+    a_flat_loops_idx, // flattened -> loop index
     a_snap,
+    b_flat,
+    b_flat_loops_idx,
+    b_snap,
     loops,
     gaps,
     aligned_anchors_idx,
     anchors,
     axis,
+    distance,
   }: Snap1DRangesDirectionAlignedResult & {
     aligned_anchors_idx: number[];
     anchors: cmath.Rectangle[];
     axis: cmath.Axis;
   }) {
-    a_hit_loops_idx.forEach((loop_idx, i) => {
-      const a_hit_loop = loops[loop_idx];
-      // console.log("a_hit_loop", loops, loop_idx, a_hit_loop);
-      const ri_first = a_hit_loop[0];
-      const ri_last = a_hit_loop[a_hit_loop.length - 1];
-      const gap = gaps[loop_idx]; // TODO: don't use this
-      // const a_points = a[loop_idx];
-      // const a_hits = a_snap.hit_anchor_indices.map((i) => a_points[i]);
-      // const hitgaps = a_hits.map(([_, gap]) => gap);
-      // console.log("a_hits", a_hits, hitgaps);
+    // If we actually snapped via the "a" side
+    if (a_snap.distance === distance) {
+      // Each anchor index we actually snapped to
+      a_snap.hit_anchor_indices.forEach((hitIdx) => {
+        const p = a_flat[hitIdx];
+        const loop_idx = a_flat_loops_idx[hitIdx];
+        const loop = loops[loop_idx];
+        const anchor_rect_idx = aligned_anchors_idx[loop[loop.length - 1]];
+        const anchor = anchors[anchor_rect_idx];
 
-      // query loops with same gap.
-      const surface_epsilon = 0.01;
-      const uniform_gap_loops_idx = gaps.reduce((acc, testgap, i) => {
-        if (Math.abs(testgap - gap) < surface_epsilon) acc.push(i);
-        return acc;
-      }, [] as number[]);
+        // the main line for the agent.
+        lines.push(...__calc_agent_gap_line({ p, axis, anchor }));
 
-      // Map loop index to original anchor index
-      const original_anchor_rect_first_idx = aligned_anchors_idx[ri_first];
-      const original_anchor_rect_last_idx = aligned_anchors_idx[ri_last];
-      // const origianl_rect_first = anchors[original_anchor_rect_first_idx];
-      const origianl_rect_last = anchors[original_anchor_rect_last_idx];
+        // lines for uniform gap loops (including self)
+        const { fwd } = p;
+        if (fwd !== -1) {
+          const loop = loops[fwd];
+          const gap = gaps[fwd];
+          const loop_rect = loop.map(
+            (idx) => anchors[aligned_anchors_idx[idx]]
+          );
 
-      const counterAxis = cmath.counterAxis[axis];
-      // [counter axis] r.x(y) + r.width(height) / 2;
-      const agent_gap_counter_axis_pos = cmath.range.mean(
-        cmath.range.fromRectangle(origianl_rect_last, counterAxis)
-      );
-      // [main axis] r.x(y) + r.width(height)
-      const agent_gap_main_axis_a = cmath.range.fromRectangle(
-        origianl_rect_last,
-        axis
-      )[1];
-      const agent_gap_main_axis_b = agent_gap_main_axis_a + gap;
-
-      const gap_label_str = cmath.ui.formatNumber(gap, 1);
-
-      const _1 = cmath.vector2.axisOriented(
-        agent_gap_main_axis_a,
-        agent_gap_counter_axis_pos,
-        axis
-      );
-      const _2 = cmath.vector2.axisOriented(
-        agent_gap_main_axis_b,
-        agent_gap_counter_axis_pos,
-        axis
-      );
-      lines.push({
-        label: gap_label_str,
-        x1: _1[0],
-        y1: _1[1],
-        x2: _2[0],
-        y2: _2[1],
+          lines.push(
+            __calc_loop_gap_line({
+              axis,
+              loop: loop_rect,
+              gap: gap,
+            })
+          );
+        }
       });
-      //
+    }
 
-      const uniform_loop_gap_lines = uniform_gap_loops_idx
-        .map((loop_idx) => {
-          return __calc_loop_gap_line(loop_idx, {
-            axis: axis,
-            loops: loops,
-            gaps: gaps,
-            aligned_anchors: anchors,
-            aligned_anchors_idx: aligned_anchors_idx,
-          });
-        })
-        .filter((l) => l) as cmath.ui.Line[];
+    // If we actually snapped via the "b" side
+    if (b_snap.distance === distance) {
+      // Each anchor index we actually snapped to
+      b_snap.hit_anchor_indices.forEach((hitIdx) => {
+        const p = b_flat[hitIdx];
+        const loop_idx = b_flat_loops_idx[hitIdx];
+        const loop = loops[loop_idx];
+        const anchor_rect_idx = aligned_anchors_idx[loop[0]];
+        const anchor = anchors[anchor_rect_idx];
 
-      lines.push(...uniform_loop_gap_lines);
-    });
+        // the main line for the agent.
+        lines.push(...__calc_agent_gap_line({ p, axis, anchor }));
+
+        // lines for uniform gap loops (including self)
+        const { fwd } = p;
+        if (fwd !== -1) {
+          const loop = loops[fwd];
+          const gap = gaps[fwd];
+          const loop_rect = loop.map(
+            (idx) => anchors[aligned_anchors_idx[idx]]
+          );
+
+          lines.push(
+            __calc_loop_gap_line({
+              axis,
+              loop: loop_rect,
+              gap: gap,
+            })
+          );
+        }
+      });
+    }
   }
 
-  if (deltaX === x.distance) {
+  // Only draw for whichever axis actually caused the snap
+  if (x) {
     handle_axis({
       ...x,
-      aligned_anchors_idx: x_aligned_anchors_idx,
+      aligned_anchors_idx: x.aligned_anchors_idx,
       anchors: main_anchors,
       axis: "x",
     });
   }
 
-  if (deltaY === y.distance) {
+  if (y) {
     handle_axis({
       ...y,
-      aligned_anchors_idx: y_aligned_anchors_idx,
+      aligned_anchors_idx: y.aligned_anchors_idx,
       anchors: main_anchors,
       axis: "y",
     });
@@ -253,7 +277,6 @@ function __surface_snap_guide_by_spacing(context: SnapToObjectsResult) {
   return {
     lines,
   };
-  //
 }
 
 function guide(
@@ -316,10 +339,6 @@ type SnapGuide = {
   points: cmath.Vector2[];
   rays: cmath.ui.Rule[];
   lines: cmath.ui.Line[];
-  // x_points: cmath.Vector2[];
-  // x_offsets: number[];
-  // y_points: cmath.Vector2[];
-  // y_offsets: number[];
 };
 
 export function SnapGuide() {
@@ -352,67 +371,5 @@ export function SnapGuide() {
         );
       })}
     </div>
-  );
-}
-
-function Line({ x1, y1, x2, y2, label }: cmath.ui.Line) {
-  const angle = cmath.vector2.angle([x1, y1], [x2, y2]);
-  const side = angle === 0 ? "bottom" : angle === 90 ? "right" : "right";
-  const midX = (x1 + x2) / 2;
-  const midY = (y1 + y2) / 2;
-  const offset = 16;
-  // offset the text box by angle 0 and 90
-  const offX = angle === 90 ? offset : 0;
-  const offY = angle === 0 ? offset : 0;
-
-  return (
-    <>
-      <svg
-        style={{
-          position: "absolute",
-          width: "100%",
-          height: "100%",
-          pointerEvents: "none",
-          cursor: "none",
-          willChange: "transform",
-          zIndex: 10,
-        }}
-        className="stroke-workbench-accent-red text-workbench-accent-red"
-      >
-        <line
-          x1={x1}
-          y1={y1}
-          x2={x2}
-          y2={y2}
-          stroke="currentColor"
-          strokeWidth={0.5}
-        />
-      </svg>
-      {label && (
-        <MeterLabel
-          className="bg-workbench-accent-red text-white"
-          side={side}
-          sideOffset={16}
-          label={label}
-          x={midX}
-          y={midY}
-        />
-        // <div
-
-        //   style={{
-        //     position: "absolute",
-        //     left: midX + offX,
-        //     top: midY + offY,
-        //     transform: "translate(-50%, -50%)",
-        //     padding: "2px 4px",
-        //     fontSize: 10,
-        //     borderRadius: 4,
-        //     pointerEvents: "none",
-        //   }}
-        // >
-        //   {label}
-        // </div>
-      )}
-    </>
   );
 }

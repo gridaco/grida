@@ -1,206 +1,82 @@
 import { cmath } from "..";
 
-const sortnum = (a: number, b: number) => a - b;
+describe("spacing.plotDistributionGeometry", () => {
+  it("should return empty loops if no valid gaps exist", () => {
+    const ranges: cmath.Range[] = [
+      [0, 10],
+      [5, 15], // Overlap => no positive gap
+    ];
+    const result = cmath.ext.snap.spacing.plotDistributionGeometry(ranges);
+    expect(result.loops).toEqual([]);
+    expect(result.gaps).toEqual([]);
+    expect(result.a).toEqual([]);
+    expect(result.b).toEqual([]);
+  });
 
-describe("snap.spacing.projection", () => {
-  it("should calculate projections for non-overlapping ranges", () => {
+  it("should compute single gap with 2 non-overlapping ranges", () => {
     const ranges: cmath.Range[] = [
       [0, 10],
       [20, 30],
     ];
-
-    const result = cmath.ext.snap.spacing.repeatRangeProjections(ranges);
-
-    expect(result.a.flat()).toEqual([40]); // Projection based on b2 + space
-    expect(result.b.flat()).toEqual([-10]); // Projection based on a1 - space
-  });
-
-  it("should return empty projections for overlapping ranges", () => {
-    const ranges: cmath.Range[] = [
-      [0, 10],
-      [5, 15],
-    ];
-
-    const result = cmath.ext.snap.spacing.repeatRangeProjections(ranges);
-
-    expect(result.a.flat()).toEqual([]); // No valid projections
-    expect(result.b.flat()).toEqual([]); // No valid projections
-  });
-
-  it("should handle multiple non-overlapping ranges", () => {
-    const ranges: cmath.Range[] = [
-      [0, 10], // 1
-      [20, 30], // 2
-      [40, 50], // 3
-    ];
-
-    const result = cmath.ext.snap.spacing.repeatRangeProjections(ranges);
-
-    expect(result.a).toEqual([
-      [40], // 1_2
-      [80], // 1_3
-      [60], // 2_3
+    const result = cmath.ext.snap.spacing.plotDistributionGeometry(ranges);
+    expect(result.loops).toEqual([[0, 1]]);
+    expect(result.gaps).toEqual([10]); // single gap = 20 - 10
+    expect(result.a[0]).toEqual([
+      { p: 30 + 10, o: 30, fwd: 0 }, // default forward extension
     ]);
-    expect(result.b.flat().sort(sortnum)).toEqual([-30, -10, 10]);
+    expect(result.b[0]).toEqual([
+      { p: 0 - 10, o: 0, fwd: 0 }, // default backward extension
+    ]);
   });
 
-  it("should handle a single range (no combinations possible)", () => {
-    const ranges: cmath.Range[] = [[0, 10]];
-
-    const result = cmath.ext.snap.spacing.repeatRangeProjections(ranges);
-
-    expect(result.a.flat()).toEqual([]); // No combinations possible
-    expect(result.b.flat()).toEqual([]); // No combinations possible
+  it("should compute multiple loops and gaps for more than 2 ranges", () => {
+    const ranges: cmath.Range[] = [
+      [0, 10], // gap=10
+      [20, 30], // gap=10
+      [40, 50], // gap=10
+    ];
+    const result = cmath.ext.snap.spacing.plotDistributionGeometry(ranges);
+    // loops: (0,1), (1,2), (0,2)
+    expect(result.loops).toHaveLength(3);
+    expect(result.gaps).toHaveLength(3);
+    // a & b arrays for each loop
+    expect(result.a.length).toBe(3);
+    expect(result.b.length).toBe(3);
   });
 
-  it("should handle empty input", () => {
-    const ranges: cmath.Range[] = [];
-
-    const result = cmath.ext.snap.spacing.repeatRangeProjections(ranges);
-
-    expect(result.a.flat()).toEqual([]);
-    expect(result.b.flat()).toEqual([]);
-  });
-
-  it("should ignore invalid combinations (negative space)", () => {
+  it("should include center-based points when agentLength < gap", () => {
     const ranges: cmath.Range[] = [
       [0, 10],
-      [5, 15], // Overlapping range
       [20, 30],
     ];
-
-    const result = cmath.ext.snap.spacing.repeatRangeProjections(ranges);
-
-    expect(result.a.flat().sort(sortnum)).toEqual([35, 40]); // Only valid projection
-    expect(result.b.flat().sort(sortnum)).toEqual([-10, 0]); // Only valid projection
+    const agentLength = 5; // smaller than gap=10
+    const result = cmath.ext.snap.spacing.plotDistributionGeometry(
+      ranges,
+      agentLength
+    );
+    // "a" and "b" arrays for the single loop (0,1)
+    // default: a => [ { p: 30+10 } ], plus center-based
+    expect(result.a[0]).toHaveLength(2);
+    expect(result.b[0]).toHaveLength(2);
+    // second items in a/b should be from center-based logic
+    const centerA = result.a[0][1];
+    const centerB = result.b[0][1];
+    expect(centerA).toMatchObject({ fwd: -1 }); // indicates center-based
+    expect(centerB).toMatchObject({ fwd: -1 });
   });
 
-  it("should handle multiple ranges with 5 inputs", () => {
+  it("should skip center-based points when agentLength >= gap", () => {
     const ranges: cmath.Range[] = [
-      [0, 10], // First range
-      [15, 25], // Second range
-      [30, 40], // Third range
-      [50, 60], // Fourth range
-      [70, 80], // Fifth range
+      [0, 10],
+      [20, 30],
     ];
-
-    const result = cmath.ext.snap.spacing.repeatRangeProjections(ranges);
-
-    const sortnum = (a: number, b: number) => a - b;
-
-    expect(result.a.flat().sort(sortnum)).toEqual([
-      30, 45, 60, 70, 85, 90, 100, 110, 125, 140,
-    ]);
-    expect(result.b.flat().sort(sortnum)).toEqual([
-      -60, -40, -30, -20, -10, -5, 0, 10, 20, 40,
-    ]);
+    const agentLength = 10; // same as gap=10 => skip center-based
+    const result = cmath.ext.snap.spacing.plotDistributionGeometry(
+      ranges,
+      agentLength
+    );
+    // only default forward/back points in a[0]/b[0]
+    expect(result.a[0]).toHaveLength(1);
+    expect(result.b[0]).toHaveLength(1);
   });
 });
-
-// describe("axisAligned", () => {
-//   it("should snap to the nearest point within the threshold for both axes", () => {
-//     const point: cmath.Vector2 = [12, 15];
-//     const points: cmath.Vector2[] = [
-//       [10, 14],
-//       [12, 14],
-//       [20, 20],
-//     ];
-//     const threshold: cmath.Vector2 = [2, 2];
-
-//     const [snappedPoint] = cmath.snap.axisAligned(point, points, threshold);
-//     expect(snappedPoint).toEqual([12, 14]);
-//   });
-
-//   it("should return the original point if no points are within the threshold", () => {
-//     const point: cmath.Vector2 = [12, 15];
-//     const points: cmath.Vector2[] = [
-//       [10, 10],
-//       [20, 20],
-//     ];
-//     const threshold: cmath.Vector2 = [1, 1];
-
-//     const [snappedPoint] = cmath.snap.axisAligned(point, points, threshold);
-//     expect(snappedPoint).toEqual(point);
-//   });
-
-//   it("should snap independently for x and y axes", () => {
-//     const point: cmath.Vector2 = [12, 15];
-//     const points: cmath.Vector2[] = [
-//       [12, 14],
-//       [13, 15],
-//     ];
-//     const threshold: cmath.Vector2 = [2, 2];
-
-//     const [snappedPoint] = cmath.snap.axisAligned(point, points, threshold);
-//     expect(snappedPoint).toEqual([12, 15]);
-//   });
-
-//   it("should snap to a point with exact match", () => {
-//     const point: cmath.Vector2 = [12, 15];
-//     const points: cmath.Vector2[] = [
-//       [12, 15],
-//       [10, 14],
-//       [20, 20],
-//     ];
-//     const threshold: cmath.Vector2 = [5, 5];
-
-//     const [snappedPoint] = cmath.snap.axisAligned(point, points, threshold);
-//     expect(snappedPoint).toEqual([12, 15]);
-//   });
-
-//   it("should handle negative coordinates", () => {
-//     const point: cmath.Vector2 = [-10, -15];
-//     const points: cmath.Vector2[] = [
-//       [-10, -14], // Snap y
-//       [-12, -15], // Snap x
-//     ];
-//     const threshold: cmath.Vector2 = [2, 2];
-
-//     const [snappedPoint] = cmath.snap.axisAligned(point, points, threshold);
-//     expect(snappedPoint).toEqual([-10, -15]);
-//   });
-
-//   it("should not snap if the threshold for any axis is 0", () => {
-//     const point: cmath.Vector2 = [12, 15];
-//     const points: cmath.Vector2[] = [
-//       [12, 14],
-//       [13, 15],
-//     ];
-//     const threshold: cmath.Vector2 = [0, 0];
-
-//     const [snappedPoint] = cmath.snap.axisAligned(point, points, threshold);
-//     expect(snappedPoint).toEqual(point);
-//   });
-
-//   it("should handle an empty list of points", () => {
-//     const point: cmath.Vector2 = [12, 15];
-//     const points: cmath.Vector2[] = [];
-//     const threshold: cmath.Vector2 = [2, 2];
-
-//     const [snappedPoint] = cmath.snap.axisAligned(point, points, threshold);
-//     expect(snappedPoint).toEqual(point);
-//   });
-
-//   it("should snap correctly for points exactly at the threshold boundary", () => {
-//     const point: cmath.Vector2 = [12, 15];
-//     const points: cmath.Vector2[] = [
-//       [14, 15], // x-axis threshold match
-//       [12, 17], // y-axis threshold match
-//     ];
-//     const threshold: cmath.Vector2 = [2, 2];
-
-//     const [snappedPointX] = cmath.snap.axisAligned(
-//       point,
-//       [points[0]],
-//       threshold
-//     );
-//     const [snappedPointY] = cmath.snap.axisAligned(
-//       point,
-//       [points[1]],
-//       threshold
-//     );
-
-//     expect(snappedPointX).toEqual([14, 15]);
-//     expect(snappedPointY).toEqual([12, 17]);
-//   });
-// });

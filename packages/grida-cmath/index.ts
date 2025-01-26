@@ -260,6 +260,41 @@ export namespace cmath {
   }
 
   /**
+   * Determines whether an angle (in degrees) is closer to the x-axis (horizontal)
+   * or the y-axis (vertical).
+   *
+   * - "x" if the angle is closer to 0° or 180°
+   * - "y" if the angle is closer to 90° or 270°
+   *
+   * @param angle - The angle in degrees (can be any real number).
+   * @returns `"x"` if closer to horizontal, `"y"` if closer to vertical.
+   *
+   * @example
+   * closestAxis(10);   // "x"
+   * closestAxis(85);   // "y"
+   * closestAxis(179);  // "x"
+   * closestAxis(270);  // "y"
+   */
+  export function angleToAxis(angle: number): Axis {
+    // 1) Normalize to [0, 360)
+    const a = ((angle % 360) + 360) % 360;
+
+    // 2) Distances from canonical horizontal angles (0° & 180°)
+    //    (360° is effectively the same as 0°, so you don't need to include both)
+    const distHorizontal = Math.min(
+      Math.abs(a - 0),
+      Math.abs(a - 180),
+      Math.abs(a - 360)
+    );
+
+    // 3) Distances from canonical vertical angles (90° & 270°)
+    const distVertical = Math.min(Math.abs(a - 90), Math.abs(a - 270));
+
+    // 4) Compare the two distances
+    return distHorizontal <= distVertical ? "x" : "y";
+  }
+
+  /**
    * Move an array item to a different position. Returns a new array with the item moved to the new position.
    */
   export function arrayMove<T>(array: T[], from: number, to: number): T[] {
@@ -842,6 +877,50 @@ export namespace cmath.compass {
     direction: CardinalDirection
   ): CardinalDirection {
     return __inverted_cardinal_directions[direction];
+  }
+
+  /**
+   * Converts a strictly orthogonal cardinal direction (n, e, s, w) to the corresponding
+   * rectangle side (top, right, bottom, left).
+   *
+   * Diagonal directions (ne, nw, se, sw) return `undefined`.
+   *
+   * @param direction - The cardinal direction to convert, one of:
+   *   - `"n"` (north)
+   *   - `"e"` (east)
+   *   - `"s"` (south)
+   *   - `"w"` (west)
+   *   - or a diagonal (e.g. `"ne"`) which yields `undefined`.
+   *
+   * @returns The corresponding `RectangleSide` ("top", "right", "bottom", "left")
+   *          if the direction is orthogonal, otherwise `undefined`.
+   *
+   * @example
+   * ```
+   * const side1 = toRectangleSide("n");
+   * // side1 === "top"
+   *
+   * const side2 = toRectangleSide("ne");
+   * // side2 === undefined
+   * ```
+   *
+   * @remarks
+   * This is often used for translating a directional label (`"n"`, `"s"`, etc.)
+   * to an actual rectangle edge in UI layouts or alignment logic.
+   */
+  export function toRectangleSide(
+    direction: CardinalDirection
+  ): RectangleSide | undefined {
+    switch (direction) {
+      case "n":
+        return "top";
+      case "e":
+        return "right";
+      case "s":
+        return "bottom";
+      case "w":
+        return "left";
+    }
   }
 }
 
@@ -3052,6 +3131,25 @@ export namespace cmath.ext.snap {
    * This way, we can provide additional ux-friendly snapping points for the user.
    */
   export namespace spacing {
+    export type ProjectionPoint = {
+      /**
+       * position
+       */
+      p: number;
+
+      /**
+       * origin position
+       */
+      o: number;
+
+      /**
+       * forwared loop (gap) index (including self)
+       *
+       * -1 if not forwarded
+       */
+      fwd: number;
+    };
+
     export type DistributionGeometry1D = {
       /**
        * the ranges to calculate the space from
@@ -3089,7 +3187,7 @@ export namespace cmath.ext.snap {
        *
        * from [1] anchor, the delta is applied, resulting in the [0] point.
        */
-      a: [pos: number, anchor: number][][];
+      a: ProjectionPoint[][];
 
       /**
        * index-aligned projections of `b` points
@@ -3098,17 +3196,7 @@ export namespace cmath.ext.snap {
        *
        * from [1] anchor, the delta is applied, resulting in the [0] point.
        */
-      b: [pos: number, anchor: number][][];
-
-      /**
-       * index-aligned index of the forwarded gaps, from other loops
-       */
-      a_forwarded_gaps_idx: number[][];
-
-      /**
-       * index-aligned index of the forwarded gaps, from other loops
-       */
-      b_forwarded_gaps_idx: number[][];
+      b: ProjectionPoint[][];
     };
 
     /**
@@ -3128,26 +3216,22 @@ export namespace cmath.ext.snap {
 
       const loops: [number, number][] = [];
       const gaps: number[] = [];
-      const a_forwarded_gaps_idx: number[][] = [];
-      const b_forwarded_gaps_idx: number[][] = [];
-      const a: [pos: number, anchor: number][][] = [];
-      const b: [pos: number, anchor: number][][] = [];
+      const a: ProjectionPoint[][] = [];
+      const b: ProjectionPoint[][] = [];
 
       grouped.forEach((group, i) => {
         const { loop, gap, min, max } = group;
 
-        const _a: [pos: number, anchor: number][] = [];
-        const _b: [pos: number, anchor: number][] = [];
-        const _a_forwarded_gaps_idx: number[] = [];
-        const _b_forwarded_gaps_idx: number[] = [];
+        const _a: ProjectionPoint[] = [];
+        const _b: ProjectionPoint[] = [];
 
         if (gap > 0) {
           // [default gap extensions]
           // default a b points
           loops.push(loop as [number, number]);
           gaps.push(gap);
-          _a.push([max + gap, max]);
-          _b.push([min - gap, min]);
+          _a.push({ p: max + gap, o: max, fwd: i });
+          _b.push({ p: min - gap, o: min, fwd: i });
 
           // [center extensions]
           if (agentLength) {
@@ -3162,8 +3246,8 @@ export namespace cmath.ext.snap {
                 const cpa = center - agentLength / 2;
                 const cpb = center + agentLength / 2;
 
-                _a.push([cpa, cpa - egap]);
-                _b.push([cpb, cpb + egap]);
+                _a.push({ p: cpa, o: cpa - egap, fwd: -1 });
+                _b.push({ p: cpb, o: cpb + egap, fwd: -1 });
               }
             }
           }
@@ -3179,21 +3263,17 @@ export namespace cmath.ext.snap {
 
           // normal direction
           if (test.max < group.max) {
-            _a.push([group.max + test.gap, group.max]);
-            _a_forwarded_gaps_idx.push(j);
+            _a.push({ p: group.max + test.gap, o: group.max, fwd: j });
           }
 
           if (test.min > group.min) {
-            _b.push([group.min - test.gap, group.min]);
-            _b_forwarded_gaps_idx.push(j);
+            _b.push({ p: group.min - test.gap, o: group.min, fwd: j });
           }
         });
 
         // add to the result
         a.push(Array.from(_a));
         b.push(Array.from(_b));
-        a_forwarded_gaps_idx.push(Array.from(_a_forwarded_gaps_idx));
-        b_forwarded_gaps_idx.push(Array.from(_b_forwarded_gaps_idx));
       });
 
       return {
@@ -3202,8 +3282,6 @@ export namespace cmath.ext.snap {
         gaps,
         a,
         b,
-        a_forwarded_gaps_idx,
-        b_forwarded_gaps_idx,
       };
     }
   }
@@ -3309,6 +3387,50 @@ export namespace cmath.ui {
     x2: number;
     y2: number;
   };
+
+  /**
+   * Ensures that (x1, y1) <= (x2, y2) in a canonical way.
+   *
+   * - If `line.x1 > line.x2`, swaps the endpoints.
+   * - If `line.x1 === line.x2` but `y1 > y2`, swaps the endpoints.
+   *
+   * This is often useful so that two line segments describing the
+   * “same” geometric positions will have identical (x1, y1, x2, y2).
+   *
+   * @param line - The line to be normalized, e.g. `{ x1, y1, x2, y2, label? }`.
+   * @returns A new `Line` object with possibly swapped endpoints, ensuring
+   *          `(x1 < x2)` or `(x1 === x2 && y1 <= y2)`.
+   */
+  export function normalizeLine<
+    T extends {
+      x1: number;
+      y1: number;
+      x2: number;
+      y2: number;
+      label?: string;
+    },
+  >(line: T): T {
+    let { x1, y1, x2, y2 } = line;
+
+    // If the line is “backwards” in x, or has the same x but backwards in y, swap:
+    if (x1 > x2 || (x1 === x2 && y1 > y2)) {
+      const tempX = x1;
+      const tempY = y1;
+      x1 = x2;
+      y1 = y2;
+      x2 = tempX;
+      y2 = tempY;
+    }
+
+    // Return a new line object in the same shape:
+    return {
+      ...line,
+      x1,
+      y1,
+      x2,
+      y2,
+    };
+  }
 
   /**
    * Formats a number to the specified precision only when needed.
