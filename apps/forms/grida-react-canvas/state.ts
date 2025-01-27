@@ -541,6 +541,9 @@ interface IDocumentEditorEventTargetState {
  *      - as long as the history (change) is made within the clone, it kept valid.
  *    - as history changes backward, reset. (accumulated duplicate related states are reset (set null) as history goes backward)
  *    - as the focus (selection) changes, reset.
+ *
+ * **Note:** currently we simply reset whenever selection is changed.
+ * => this is enough for now, but as we support api access, we'll actually need to track the change.
  */
 export interface ActiveDuplication {
   origins: grida.program.nodes.NodeID[];

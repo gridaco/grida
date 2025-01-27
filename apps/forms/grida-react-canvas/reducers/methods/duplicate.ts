@@ -62,14 +62,14 @@ export function self_duplicateNode<S extends IDocumentEditorState>(
     clones.push(clone_id);
   }
 
-  // set the active duplication
+  // after
+  self_selectNode(draft, "reset", ...clones);
+
+  // after selection, finally set the active duplication
   draft.active_duplication = {
     origins: origins,
     clones: clones,
   };
-
-  // after
-  self_selectNode(draft, "reset", ...clones);
 }
 
 function get_repeating_translation_delta(
@@ -101,11 +101,11 @@ function get_repeating_translation_delta(
     const a_pos: cmath.Vector2 = [a_rect.x, a_rect.y];
     const b_pos: cmath.Vector2 = [b_rect.x, b_rect.y];
 
-    // assert(
-    //   Math.abs(a_rect.width - b_rect.width) < 0.01 &&
-    //     Math.abs(a_rect.height - b_rect.height) < 0.01,
-    //   "the active duplication is invalid and modified"
-    // );
+    assert(
+      Math.abs(a_rect.width - b_rect.width) < 0.01 &&
+        Math.abs(a_rect.height - b_rect.height) < 0.01,
+      "the active duplication is invalid and modified"
+    );
 
     const diff = cmath.vector2.sub(b_pos, a_pos);
 
@@ -114,20 +114,3 @@ function get_repeating_translation_delta(
 
   return null;
 }
-
-// accumulated duplicate
-// [set]
-// - as clone / duplicate happens, we save each id of original and duplicated.
-// [reset]
-// - as history changes backward, reset. (accumulated duplicate related states are reset (set null) as history goes backward)
-// - as the focus (selection) changes, reset.
-// 1. save & get the comparison a-group and b-group
-// 2. calculate the transform diff based on group's bounding box
-// 3. apply the diff the the next, c-group
-
-/**
- * last movement of translate (move) gesture
- *
- * this is saved and used when "repeat duplicate"
- */
-// last_translate_movement?: cmath.Vector2;
