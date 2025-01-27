@@ -29,12 +29,16 @@ function useMeasurement() {
 
       const cdom = new domapi.CanvasDOM(transform);
 
-      const a_rect = cmath.rect.union(
-        selection.map((id) => cdom.getNodeBoundingRect(id)!)
+      const a_rect = cmath.rect.quantize(
+        cmath.rect.union(selection.map((id) => cdom.getNodeBoundingRect(id)!)),
+        0.01
       );
 
-      const b_rect = cmath.rect.union(
-        surface_measurement_target.map((id) => cdom.getNodeBoundingRect(id)!)
+      const b_rect = cmath.rect.quantize(
+        cmath.rect.union(
+          surface_measurement_target.map((id) => cdom.getNodeBoundingRect(id)!)
+        ),
+        0.01
       );
 
       const measurement = measure(a_rect, b_rect);
@@ -70,10 +74,10 @@ export function MeasurementGuide() {
   const sb = _sb * msy;
   const sl = _sl * msx;
 
-  const label_st = Math.round(_st * 10) / 10;
-  const label_sr = Math.round(_sr * 10) / 10;
-  const label_sb = Math.round(_sb * 10) / 10;
-  const label_sl = Math.round(_sl * 10) / 10;
+  const label_st = cmath.ui.formatNumber(_st, 1);
+  const label_sr = cmath.ui.formatNumber(_sr, 1);
+  const label_sb = cmath.ui.formatNumber(_sb, 1);
+  const label_sl = cmath.ui.formatNumber(_sl, 1);
 
   const box = rectToSurfaceSpace(_box, transform);
   const a = rectToSurfaceSpace(_a, transform);
@@ -99,8 +103,8 @@ export function MeasurementGuide() {
     >
       {/* box */}
       <>
-        <Rectangle rect={a} />
-        <Rectangle rect={b} />
+        <Rectangle rect={a} className="border-workbench-accent-red" />
+        <Rectangle rect={b} className="border-workbench-accent-red" />
       </>
       <Conditional length={st}>
         <SpacingGuideLine point={[tx, ty]} length={tl} rotation={tr} />
@@ -147,7 +151,7 @@ function Rectangle({
     <div
       {...props}
       className={cn(
-        "relative group pointer-events-auto select-none border-[1px] border-workbench-accent-orange",
+        "relative group pointer-events-auto select-none border-[1px]",
         className
       )}
       style={{
@@ -182,13 +186,11 @@ function SpacingMeterLabel({
   length,
   value,
   rect,
-  zoom = 1,
 }: {
   side: Side;
   length: number;
   value?: string | number;
   rect: { x: number; y: number; width: number; height: number };
-  zoom?: number;
 }) {
   value = value || Math.round(length * 10) / 10;
 
@@ -214,22 +216,20 @@ function SpacingMeterLabel({
   return (
     <MeterLabel
       label={value.toString()}
-      className="bg-workbench-accent-orange"
+      className="bg-workbench-accent-red text-white z-10"
       x={tx}
       y={ty}
-      weight={"bolder"}
-      margin={4}
-      anchor={__label_anchor_map[side]}
-      zoom={zoom}
+      sideOffset={16}
+      side={__label_anchor_map[side]}
     />
   );
 }
 
 const __label_anchor_map = {
-  t: "e",
-  r: "s",
-  b: "e",
-  l: "s",
+  t: "right",
+  r: "bottom",
+  b: "right",
+  l: "bottom",
 } as const;
 
 type Side = "t" | "r" | "b" | "l";
@@ -240,8 +240,9 @@ interface GuideLineProps {
   length: number;
   direction: "n" | "s" | "e" | "w" | number;
   width?: number;
-  color: React.CSSProperties["color"];
+  color?: React.CSSProperties["color"];
   dashed?: boolean;
+  className?: string;
 }
 
 function GuideLine({
@@ -250,7 +251,8 @@ function GuideLine({
   direction,
   length,
   width,
-  color = "darkorange",
+  color,
+  className,
   dashed,
 }: GuideLineProps) {
   const tl = length * zoom;
@@ -272,9 +274,11 @@ function GuideLine({
         willChange: "transform",
         transformOrigin: "0px 0px",
         transform: `translate3d(${tx}px, ${ty}px, 0) rotate(${tr}deg)`,
-        borderLeft: `${width}px ${dashed ? "dashed" : "solid"} ${color}`,
-        zIndex: 99,
+        borderLeft: `${width}px ${dashed ? "dashed" : "solid"}`,
+        borderColor: color,
+        zIndex: 10,
       }}
+      className={className}
     />
   );
 }
@@ -304,7 +308,7 @@ function SpacingGuideLine({
       length={length}
       direction={rotation}
       width={1}
-      color={"darkorange"}
+      className="border-workbench-accent-red"
     />
   );
 }
@@ -328,7 +332,7 @@ function AuxiliaryLine({
       direction={rotation}
       width={1}
       dashed
-      color={"darkorange"}
+      className="border-workbench-accent-red"
     />
   );
 }
