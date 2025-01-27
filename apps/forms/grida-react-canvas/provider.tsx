@@ -1586,7 +1586,6 @@ export function useDocument() {
       } as const;
 
       if (gesture) {
-        console.log("on");
         // Trigger gesture
         __gesture_nudge("on");
 
@@ -2087,9 +2086,11 @@ export function useTransform() {
 
   return useMemo(() => {
     const transform = state.transform;
+    const scaleX = transform[0][0];
     const matrix = `matrix(${transform[0][0]}, ${transform[1][0]}, ${transform[0][1]}, ${transform[1][1]}, ${transform[0][2]}, ${transform[1][2]})`;
     return {
       transform,
+      scaleX,
       style: {
         transformOrigin: "0 0",
         transform: matrix,
@@ -2155,9 +2156,10 @@ export function useEventTarget() {
   const {
     pointer,
     transform,
+    surface_snapping,
     gesture,
     hovered_node_id,
-    dropzone_node_id,
+    dropzone,
     selection,
     content_edit_mode,
     cursor_mode,
@@ -2166,7 +2168,11 @@ export function useEventTarget() {
   } = state;
 
   const is_node_transforming = gesture.type !== "idle";
-  const is_node_translating = gesture.type === "translate";
+  const is_node_translating =
+    gesture.type === "translate" ||
+    gesture.type === "sort" ||
+    gesture.type === "nudge" ||
+    gesture.type === "gap";
   const is_node_scaling = gesture.type === "scale";
 
   const setCursorMode = useCallback(
@@ -2426,6 +2432,34 @@ export function useEventTarget() {
     [dispatch]
   );
 
+  const startSortGesture = useCallback(
+    (selection: string | string[], node_id: string) => {
+      dispatch({
+        type: "surface/gesture/start",
+        gesture: {
+          type: "sort",
+          selection: Array.isArray(selection) ? selection : [selection],
+          node_id,
+        },
+      });
+    },
+    [dispatch]
+  );
+
+  const startGapGesture = useCallback(
+    (selection: string | string[], axis: "x" | "y") => {
+      dispatch({
+        type: "surface/gesture/start",
+        gesture: {
+          type: "gap",
+          selection: Array.isArray(selection) ? selection : [selection],
+          axis,
+        },
+      });
+    },
+    [dispatch]
+  );
+
   // #region drag resize handle
   const startCornerRadiusGesture = useCallback(
     (selection: string) => {
@@ -2462,13 +2496,15 @@ export function useEventTarget() {
       pointer,
       transform,
       debug,
+      gesture,
+      surface_snapping,
       //
       marquee,
       cursor_mode,
       setCursorMode,
       //
       hovered_node_id,
-      dropzone_node_id,
+      dropzone,
       selection,
       is_node_transforming,
       is_node_translating,
@@ -2476,6 +2512,8 @@ export function useEventTarget() {
       content_edit_mode,
       //
       startScaleGesture,
+      startSortGesture,
+      startGapGesture,
       startCornerRadiusGesture,
       startRotateGesture,
       //
@@ -2503,13 +2541,15 @@ export function useEventTarget() {
     pointer,
     transform,
     debug,
+    gesture,
+    surface_snapping,
     //
     marquee,
     cursor_mode,
     setCursorMode,
     //
     hovered_node_id,
-    dropzone_node_id,
+    dropzone,
     selection,
     //
     is_node_transforming,
@@ -2519,6 +2559,8 @@ export function useEventTarget() {
     content_edit_mode,
     //
     startScaleGesture,
+    startSortGesture,
+    startGapGesture,
     startCornerRadiusGesture,
     startRotateGesture,
     //

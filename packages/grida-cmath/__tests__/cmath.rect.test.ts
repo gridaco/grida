@@ -39,6 +39,23 @@ describe("cmath.rect", () => {
   });
 
   describe("toPoints", () => {
+    it("[chunk] should return an 9-length array with 9 points with the exact index", () => {
+      const rect: cmath.Rectangle = { x: 10, y: 20, width: 30, height: 40 };
+      const points = cmath.rect.to9PointsChunk(rect);
+
+      expect(points).toEqual([
+        [10, 20], // topLeft
+        [40, 20], // topRight
+        [40, 60], // bottomRight
+        [10, 60], // bottomLeft
+        [25, 20], // topCenter
+        [40, 40], // rightCenter
+        [25, 60], // bottomCenter
+        [10, 40], // leftCenter
+        [25, 40], // center
+      ]);
+    });
+
     it("should return an object with 9 named control points", () => {
       const rect: cmath.Rectangle = { x: 10, y: 20, width: 30, height: 40 };
       const points = cmath.rect.to9Points(rect);
@@ -46,12 +63,12 @@ describe("cmath.rect", () => {
       expect(points).toEqual({
         topLeft: [10, 20],
         topRight: [40, 20],
-        bottomLeft: [10, 60],
         bottomRight: [40, 60],
+        bottomLeft: [10, 60],
         topCenter: [25, 20],
-        leftCenter: [10, 40],
         rightCenter: [40, 40],
         bottomCenter: [25, 60],
+        leftCenter: [10, 40],
         center: [25, 40],
       });
     });
@@ -63,12 +80,12 @@ describe("cmath.rect", () => {
       expect(points).toEqual({
         topLeft: [10, 20],
         topRight: [10, 20], // Same as topLeft
-        bottomLeft: [10, 60],
         bottomRight: [10, 60], // Same as bottomLeft
+        bottomLeft: [10, 60],
         topCenter: [10, 20], // Same as topLeft
-        leftCenter: [10, 40],
         rightCenter: [10, 40], // Same as leftCenter
         bottomCenter: [10, 60], // Same as bottomLeft
+        leftCenter: [10, 40],
         center: [10, 40],
       });
     });
@@ -80,12 +97,12 @@ describe("cmath.rect", () => {
       expect(points).toEqual({
         topLeft: [10, 20],
         topRight: [-20, 20],
-        bottomLeft: [10, -20],
         bottomRight: [-20, -20],
+        bottomLeft: [10, -20],
         topCenter: [-5, 20],
-        leftCenter: [10, 0],
         rightCenter: [-20, 0],
         bottomCenter: [-5, -20],
+        leftCenter: [10, 0],
         center: [-5, 0],
       });
     });
@@ -334,6 +351,76 @@ describe("cmath.rect", () => {
         vertical: "none",
       });
       expect(aligned).toEqual(rectangles);
+    });
+  });
+
+  describe("getUniformGap", () => {
+    it("should return [undefined, []] if fewer than 2 rectangles", () => {
+      const rects = [{ x: 10, y: 20, width: 30, height: 40 }];
+      const [gap, gaps] = cmath.rect.getUniformGap(rects, "x", 0);
+      expect(gap).toBeUndefined();
+      expect(gaps).toEqual([]);
+    });
+
+    it("should return [gap, [gap]] when exactly 2 rectangles have the same gap", () => {
+      const rects = [
+        { x: 10, y: 10, width: 20, height: 20 },
+        { x: 40, y: 10, width: 20, height: 20 },
+      ];
+      const [gap, gaps] = cmath.rect.getUniformGap(rects, "x", 0);
+      expect(gap).toBe(10); // only one gap => 40 - (10 + 20) = 10
+      expect(gaps).toEqual([10]);
+    });
+
+    it("should return [mode, gaps] if all gaps are uniform within tolerance", () => {
+      const rects = [
+        { x: 0, y: 0, width: 10, height: 10 },
+        { x: 15, y: 0, width: 10, height: 10 },
+        { x: 30, y: 0, width: 10, height: 10 },
+      ];
+      // Actual gaps: [5, 5]
+      const [uniformGap, gaps] = cmath.rect.getUniformGap(rects, "x", 0.1);
+      expect(uniformGap).toBe(5);
+      expect(gaps).toEqual([5, 5]);
+    });
+
+    it("should return [undefined, gaps] if gaps are not uniform", () => {
+      const rects = [
+        { x: 0, y: 0, width: 10, height: 10 },
+        { x: 15, y: 0, width: 10, height: 10 },
+        { x: 28, y: 0, width: 10, height: 10 },
+      ];
+      // Actual gaps: [5, 3]
+      const [uniformGap, gaps] = cmath.rect.getUniformGap(rects, "x", 0);
+      expect(uniformGap).toBeUndefined();
+      expect(gaps).toEqual([5, 3]);
+    });
+
+    it("should consider tolerance when deciding if gaps are uniform", () => {
+      const rects = [
+        { x: 0, y: 0, width: 10, height: 10 },
+        { x: 14, y: 0, width: 10, height: 10 },
+        { x: 28, y: 0, width: 10, height: 10 },
+      ];
+      // Actual gaps: [4, 4], but let's say tolerance=1 => uniform enough
+      const [uniformGap, gaps] = cmath.rect.getUniformGap(rects, "x", 1);
+      expect(uniformGap).toBe(4);
+      expect(gaps).toEqual([4, 4]);
+    });
+
+    it("should return the mode if multiple gap values are all within tolerance", () => {
+      // Gaps: [5, 5, 6, 5] => all within tolerance=1.
+      // mode is 5
+      const rects = [
+        { x: 0, y: 0, width: 10, height: 10 },
+        { x: 15, y: 0, width: 10, height: 10 },
+        { x: 30, y: 0, width: 10, height: 10 },
+        { x: 46, y: 0, width: 10, height: 10 },
+        { x: 61, y: 0, width: 10, height: 10 },
+      ];
+      const [uniformGap, gaps] = cmath.rect.getUniformGap(rects, "x", 1);
+      expect(gaps).toEqual([5, 5, 6, 5]);
+      expect(uniformGap).toBe(5);
     });
   });
 

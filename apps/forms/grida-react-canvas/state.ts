@@ -2,7 +2,36 @@ import type { Action, EditorAction } from "./action";
 import { grida } from "@/grida";
 import { document } from "./document-query";
 import { cmath } from "@grida/cmath";
-import type { SnapResult } from "@grida/cmath/_snap";
+import type { SnapToObjectsResult } from "@grida/cmath/_snap";
+
+// #region config
+
+/**
+ * The tolerance for the gap alignment, if each gap is within this tolerance, it is considered aligned.
+ *
+ * It's 1 because, we quantize the position to 1px, so each gap diff on aligned nodes is not guaranteed to be exactly 0.
+ *
+ * 1.001 because the surface measurement is can get slighly off due to the transform matrix calculation.
+ */
+export const DEFAULT_GAP_ALIGNMENT_TOLERANCE = 1.01;
+
+/**
+ * snap threshold applyed when movement (real gesture) is applied
+ */
+export const DEFAULT_SNAP_MOVEMNT_THRESHOLD = 4;
+
+/**
+ * snap threshold applyed when nudge (fake gesture) is applied
+ */
+export const DEFAULT_SNAP_NUDGE_THRESHOLD = 0.5;
+
+const DEFAULT_RAY_TARGETING: SurfaceRaycastTargeting = {
+  target: "auto",
+  ignores_root: true,
+  ignores_locked: true,
+};
+
+// #endregion config
 
 export type DocumentDispatcher = (action: Action) => void;
 
@@ -37,12 +66,6 @@ export type CursorMode =
 export type Marquee = {
   a: cmath.Vector2;
   b: cmath.Vector2;
-};
-
-const DEFAULT_RAY_TARGETING: SurfaceRaycastTargeting = {
-  target: "auto",
-  ignores_root: true,
-  ignores_locked: true,
 };
 
 export type SurfaceRaycastTargeting = {
@@ -145,6 +168,8 @@ export type GestureState =
   | GesturePan
   | GestureVirtualNudge
   | GestureTranslate
+  | GestureSort
+  | GestureGap
   | GestureScale
   | GestureRotate
   | GestureCornerRadius
@@ -163,14 +188,14 @@ interface IGesture {
 }
 
 export type GestureIdle = {
-  type: "idle";
+  readonly type: "idle";
 };
 
 /**
  * Pan the viewport - a.k.a hand tool
  */
 export type GesturePan = IGesture & {
-  type: "pan";
+  readonly type: "pan";
 };
 
 /**
@@ -181,79 +206,135 @@ export type GesturePan = IGesture & {
  * this is required to tell the surface that it is nudging, thus, show snaps & related ux
  */
 export type GestureVirtualNudge = {
-  type: "nudge";
-  /**
-   * surface snap guides - result of snap while translate (move) gesture
-   */
-  surface_snapping?: SnapResult;
+  readonly type: "nudge";
 };
 
 export type GestureTranslate = IGesture & {
   // translate (move)
-  type: "translate";
+  readonly type: "translate";
   selection: string[];
 
   /**
    * initial selection of the nodes - the original node ids
    */
-  initial_selection: string[];
-  initial_snapshot: IMinimalDocumentState;
-  initial_clone_ids: string[];
-  initial_rects: cmath.Rectangle[];
+  readonly initial_selection: string[];
+  readonly initial_snapshot: IMinimalDocumentState;
+  readonly initial_clone_ids: string[];
+  readonly initial_rects: cmath.Rectangle[];
 
   /**
    * indicator between gesture events to ensure if the current selection is cloned ones or not
    */
   is_currently_cloned: boolean;
+};
+
+/**
+ * Sanpshot used for arrangement.
+ *
+ * Contains collection of nodes' bounding rect.
+ */
+export interface LayoutSnapshot {
+  objects: Array<cmath.Rectangle & { id: string }>;
+}
+
+/**
+ * Sort the node within the layout (re-order)
+ */
+export type GestureSort = IGesture & {
+  readonly type: "sort";
 
   /**
-   * surface snap guides - result of snap while translate (move) gesture
+   * the current moving node id of this gesture
    */
-  surface_snapping?: SnapResult;
+  readonly node_id: string;
+
+  /**
+   * initial position of moving node {@link GestureSort.node_id}
+   */
+  readonly node_initial_rect: cmath.Rectangle;
+
+  /**
+   * the current layout - this changes as the movement changes
+   */
+  layout: LayoutSnapshot;
+
+  /**
+   * the selection will be at this position (when dropped)
+   */
+  placement: {
+    /**
+     * the current rect (placed) of the moving node.
+     * this should be identical to layout.objects[index]
+     */
+    rect: cmath.Rectangle;
+
+    /**
+     * index of the node's rect within the current layout snapshot
+     */
+    index: number;
+  };
+};
+
+/**
+ * Sort the node within the layout (re-order)
+ */
+export type GestureGap = IGesture & {
+  readonly type: "gap";
+
+  axis: "x" | "y";
+
+  min_gap: number;
+  initial_gap: number;
+  gap: number;
+
+  /**
+   * the current layout - this changes as the movement changes
+   */
+  layout: LayoutSnapshot;
 };
 
 export type GestureScale = IGesture & {
   // scale (resize)
-  type: "scale";
-  selection: string[];
-  initial_snapshot: IMinimalDocumentState;
-  initial_rects: cmath.Rectangle[];
-  direction: cmath.CardinalDirection;
-
-  /**
-   * surface snap guides - result of snap while translate (move) gesture
-   */
-  surface_snapping?: SnapResult;
+  readonly type: "scale";
+  readonly selection: string[];
+  readonly initial_snapshot: IMinimalDocumentState;
+  readonly initial_rects: cmath.Rectangle[];
+  readonly direction: cmath.CardinalDirection;
 };
 
 export type GestureRotate = IGesture & {
-  type: "rotate";
-  initial_bounding_rectangle: cmath.Rectangle | null;
+  readonly type: "rotate";
+  readonly initial_bounding_rectangle: cmath.Rectangle | null;
   // TODO: support multiple selection
-  selection: string;
-  offset: cmath.Vector2;
+  readonly selection: string;
+  readonly offset: cmath.Vector2;
+
+  /**
+   * the current rotation of the selection
+   */
+  rotation: number;
 };
 
 export type GestureCornerRadius = IGesture & {
   /**
    * - corner-radius
    */
-  type: "corner-radius";
-  node_id: string;
-  initial_bounding_rectangle: cmath.Rectangle | null;
+  readonly type: "corner-radius";
+  readonly node_id: string;
+  readonly initial_bounding_rectangle: cmath.Rectangle | null;
 };
 
 export type GestureDraw = IGesture & {
   /**
    * - draw points
    */
-  type: "draw";
-  mode: "line" | "pencil";
+  readonly type: "draw";
+  readonly mode: "line" | "pencil";
 
   /**
    * origin point - relative to content space
    */
-  origin: cmath.Vector2;
+  readonly origin: cmath.Vector2;
 
   /**
    * record of points (movements)
@@ -261,7 +342,7 @@ export type GestureDraw = IGesture & {
    */
   points: cmath.Vector2[];
 
-  node_id: string;
+  readonly node_id: string;
 };
 
 /**
@@ -276,51 +357,51 @@ export type GestureTranslateVertex = IGesture & {
   /**
    * initial (snapshot) value of the points
    */
-  initial_verticies: cmath.Vector2[];
+  readonly initial_verticies: cmath.Vector2[];
 
   /**
    * index of the vertex
    */
-  vertex: number;
+  readonly vertex: number;
 
-  node_id: string;
+  readonly node_id: string;
 
   /**
    * initial position of node
    */
-  initial_position: cmath.Vector2;
+  readonly initial_position: cmath.Vector2;
 };
 
 /**
  * curves the existing segment
  */
 export type GestureCurve = IGesture & {
-  type: "curve";
+  readonly type: "curve";
 
   /**
    * selected path node id
    */
-  node_id: string;
+  readonly node_id: string;
 
   /**
    * segment index
    */
-  segment: number;
+  readonly segment: number;
 
   /**
    * control point
    */
-  control: "ta" | "tb";
+  readonly control: "ta" | "tb";
 
   /**
    * initial position of the control point
    */
-  initial: cmath.Vector2;
+  readonly initial: cmath.Vector2;
 
   /**
    * rather to invert the movement
    */
-  invert: boolean;
+  readonly invert: boolean;
 };
 
 /**
@@ -329,33 +410,49 @@ export type GestureCurve = IGesture & {
  * This is used when user creates a new vertex point without connection, yet dragging to first configure the `ta` of the next segment
  */
 export type GestureCurveA = IGesture & {
-  type: "curve-a";
+  readonly type: "curve-a";
 
   /**
    * selected path node id
    */
-  node_id: string;
+  readonly node_id: string;
 
   /**
    * vertex index
    */
-  vertex: number;
+  readonly vertex: number;
 
   /**
    * control point - always `ta`
    */
-  control: "ta";
+  readonly control: "ta";
 
   /**
    * initial position of the control point - always `zero`
    */
-  initial: cmath.Vector2;
+  readonly initial: cmath.Vector2;
 
   /**
    * rather to invert the movement
    */
-  invert: boolean;
+  readonly invert: boolean;
 };
+
+/**
+ * Indication of the dropzone
+ *
+ * - type: "node" - dropzone is a node
+ * - type: "rect" - dropzone is a rect (in canvas space)
+ */
+export type DropzoneIndication =
+  | {
+      type: "node";
+      node_id: string;
+    }
+  | {
+      type: "rect";
+      rect: cmath.Rectangle;
+    };
 
 /**
  * [Surface Support State]
@@ -366,6 +463,11 @@ interface IDocumentEditorEventTargetState {
   gesture: GestureState;
 
   gesture_modifiers: GestureModifiers;
+
+  /**
+   * the latest snap result from the gesture
+   */
+  surface_snapping?: SnapToObjectsResult;
 
   // =============
 
@@ -389,7 +491,7 @@ interface IDocumentEditorEventTargetState {
   /**
    * special hover state - when a node is a target of certain gesture, and ux needs to show the target node
    */
-  dropzone_node_id?: string;
+  dropzone?: DropzoneIndication;
 
   /**
    * the config of how the surface raycast targeting should be

@@ -10,7 +10,10 @@ import type {
   TemplateNodeOverrideChangeAction,
   NodeToggleBoldAction,
 } from "../action";
-import type { IDocumentEditorState } from "../state";
+import {
+  DEFAULT_SNAP_NUDGE_THRESHOLD,
+  type IDocumentEditorState,
+} from "../state";
 import { grida } from "@/grida";
 import assert from "assert";
 import { document } from "../document-query";
@@ -724,9 +727,9 @@ function self_nudge(
       origin_rects,
       snap_target_node_rects,
       [dx, dy],
-      [0.1, 0.1]
+      DEFAULT_SNAP_NUDGE_THRESHOLD
     );
-    draft.gesture.surface_snapping = snapping;
+    draft.surface_snapping = snapping;
   }
 
   for (const node_id of targets) {
