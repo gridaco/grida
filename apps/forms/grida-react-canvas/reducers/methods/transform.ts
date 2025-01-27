@@ -144,6 +144,10 @@ function __self_update_gesture_transform_translate(
 
       // set the flag
       draft.gesture.is_currently_cloned = true;
+      draft.active_duplication = {
+        origins: initial_selection,
+        clones: initial_clone_ids,
+      };
 
       break;
     }
@@ -161,6 +165,7 @@ function __self_update_gesture_transform_translate(
       draft.selection = initial_selection;
       draft.surface_measurement_target = undefined;
       draft.surface_measurement_targeting_locked = false;
+      draft.active_duplication = null;
       break;
     }
   }

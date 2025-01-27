@@ -163,7 +163,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
       return produce(state, (draft) => {
         const target_node_ids =
           target === "selection" ? state.selection : [target];
-        self_duplicateNode(draft, ...target_node_ids);
+        self_duplicateNode(draft, new Set(target_node_ids));
       });
       break;
     }

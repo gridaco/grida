@@ -10,9 +10,9 @@ import assert from "assert";
 export function self_selectNode<S extends IDocumentEditorState>(
   draft: Draft<S>,
   mode: "reset" | "add" | "toggle",
-  ...__node_ids: string[]
+  ...node_ids: string[]
 ) {
-  for (const node_id of __node_ids) {
+  for (const node_id of node_ids) {
     assert(node_id, "Node ID must be provided");
     assert(
       document.__getNodeById(draft, node_id),
@@ -22,7 +22,7 @@ export function self_selectNode<S extends IDocumentEditorState>(
 
   switch (mode) {
     case "add": {
-      const set = new Set([...draft.selection, ...__node_ids]);
+      const set = new Set([...draft.selection, ...node_ids]);
       const pruned = document.pruneNestedNodes(
         draft.document_ctx,
         Array.from(set)
@@ -32,7 +32,7 @@ export function self_selectNode<S extends IDocumentEditorState>(
     }
     case "toggle": {
       const set = new Set(draft.selection);
-      for (const node_id of __node_ids) {
+      for (const node_id of node_ids) {
         if (set.has(node_id)) {
           set.delete(node_id);
         } else {
@@ -47,8 +47,14 @@ export function self_selectNode<S extends IDocumentEditorState>(
       break;
     }
     case "reset": {
-      const pruned = document.pruneNestedNodes(draft.document_ctx, __node_ids);
-      draft.selection = pruned;
+      // only apply if actually changed
+      if (JSON.stringify(node_ids) !== JSON.stringify(draft.selection)) {
+        const pruned = document.pruneNestedNodes(draft.document_ctx, node_ids);
+        draft.selection = pruned;
+
+        // reset the active duplication as selection changed. see ActiveDuplication's note
+        draft.active_duplication = null;
+      }
       break;
     }
   }
