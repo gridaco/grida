@@ -469,15 +469,6 @@ interface IDocumentEditorEventTargetState {
    */
   surface_snapping?: SnapToObjectsResult;
 
-  // =============
-
-  /**
-   * last movement of translate (move) gesture
-   *
-   * this is saved and used when "repeat duplicate"
-   */
-  // last_translate_movement?: cmath.Vector2;
-
   /**
    * general hover state
    */
@@ -505,24 +496,6 @@ interface IDocumentEditorEventTargetState {
    */
   surface_raycast_detected_node_ids: string[];
 
-  // /**
-  //  * @private - internal use only
-  //  *
-  //  * relative cursor position to the event target (position in viewport space)
-  //  *
-  //  * @default [0, 0]
-  //  */
-  // __surface_cursor_position: cmath.Vector2;
-
-  // /**
-  //  * @private - internal use only
-  //  *
-  //  * relative cursor position to document root (position in artboard (document) space)
-  //  *
-  //  * @default [0, 0]
-  //  */
-  // __cursor_position: cmath.Vector2;
-
   pointer: {
     position: cmath.Vector2;
     // position_snap: cmath.Vector2;
@@ -548,6 +521,30 @@ interface IDocumentEditorEventTargetState {
    * Marquee transform in canvas space
    */
   marquee?: Marquee;
+
+  /**
+   * active, repeatable duplication state
+   */
+  active_duplication: ActiveDuplication | null;
+}
+
+/**
+ * used for "repeated duplicate", where accumulating the delta between the original and the clone, forwarding that delta to the next clone.
+ *
+ * [accumulated duplicate]
+ * - [set]
+ *    - as clone / duplicate happens, we save each id of original and duplicated.
+ * - [reset]
+ *    - whenever the active clone is considered no longer valid, e.g. when origianl is deleted. (to detect this easily we use a strict diff of the selection change)
+ *    - the current history change shall only contain the diff of the clone, otherwise, reset.
+ *      - this includes the selection change.
+ *      - as long as the history (change) is made within the clone, it kept valid.
+ *    - as history changes backward, reset. (accumulated duplicate related states are reset (set null) as history goes backward)
+ *    - as the focus (selection) changes, reset.
+ */
+export interface ActiveDuplication {
+  origins: grida.program.nodes.NodeID[];
+  clones: grida.program.nodes.NodeID[];
 }
 
 interface IDocumentEditorConfig {
@@ -731,6 +728,7 @@ export function initDocumentEditorState({
       transform_with_preserve_aspect_ratio: "off",
       rotate_with_quantize: "off",
     },
+    active_duplication: null,
     document_ctx: document.Context.from(init.document).snapshot(),
     // history: initialHistoryState(init),
     surface_raycast_targeting: DEFAULT_RAY_TARGETING,
