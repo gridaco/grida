@@ -422,7 +422,9 @@ export default function documentReducer<S extends IDocumentEditorState>(
         const rects = g
           .map((node_id) => cdom.getNodeBoundingRect(node_id)!)
           // make the rects relative to the parent
-          .map((rect) => cmath.rect.translate(rect, [-parent_rect.x, -parent_rect.y]))
+          .map((rect) =>
+            cmath.rect.translate(rect, [-parent_rect.x, -parent_rect.y])
+          )
           .map((rect) => cmath.rect.quantize(rect, 1));
 
         // guess the layout
@@ -441,9 +443,9 @@ export default function documentReducer<S extends IDocumentEditorState>(
           const container_prototype: grida.program.nodes.NodePrototype = {
             type: "container",
             // layout
-            layout: 'flex',
-            width: 'auto',
-            height: 'auto',
+            layout: "flex",
+            width: "auto",
+            height: "auto",
             top: cmath.quantize(layout.union.y, 1),
             left: cmath.quantize(layout.union.x, 1),
             direction: layout.direction,
@@ -470,13 +472,15 @@ export default function documentReducer<S extends IDocumentEditorState>(
           // [move children to container]
           children = layout.orders.map((i) => children[i]);
           children.forEach((child_id) => {
-            self_moveNode(draft, child_id, container_id)
+            self_moveNode(draft, child_id, container_id);
           });
 
           // [reset children position]
           children.forEach((child_id) => {
             const child = document.__getNodeById(draft, child_id);
-            (draft.document.nodes[child_id] as grida.program.nodes.i.IPositioning) = {
+            (draft.document.nodes[
+              child_id
+            ] as grida.program.nodes.i.IPositioning) = {
               ...child,
               position: "relative",
               top: undefined,
@@ -489,9 +493,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
           insertions.push(container_id);
         });
 
-
         self_selectNode(draft, "reset", ...insertions);
-
       });
 
       break;
@@ -684,7 +686,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
     case "document/template/override/change/*": {
       const { template_instance_node_id, action: __action } = <
         TemplateNodeOverrideChangeAction
-        >action;
+      >action;
 
       return produce(state, (draft) => {
         const { node_id } = __action;
@@ -695,7 +697,7 @@ export default function documentReducer<S extends IDocumentEditorState>(
 
         assert(
           template_instance_node &&
-          template_instance_node.type === "template_instance"
+            template_instance_node.type === "template_instance"
         );
 
         const nodedata = template_instance_node.overrides[node_id] || {};
@@ -839,6 +841,9 @@ function self_nudge(
   dx: number,
   dy: number
 ) {
+  // clear the previous surface snapping
+  draft.surface_snapping = undefined;
+
   // for nudge, gesture is not required, but only for surface ux.
   if (draft.gesture.type === "nudge") {
     const cdpm = new domapi.CanvasDOM(draft.transform);
