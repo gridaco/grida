@@ -1585,6 +1585,16 @@ export function useDocument() {
     [dispatch]
   );
 
+  const autoLayout = useCallback(
+    (target: "selection" | string[] = "selection") => {
+      dispatch({
+        type: "autolayout",
+        target,
+      });
+    },
+    [dispatch]
+  );
+
   const configureSurfaceRaycastTargeting = useCallback(
     (config: Partial<SurfaceRaycastTargeting>) => {
       dispatch({
@@ -1823,6 +1833,7 @@ export function useDocument() {
       align,
       order,
       distributeEvenly,
+      autoLayout,
       configureSurfaceRaycastTargeting,
       configureMeasurement,
       configureTranslateWithCloneModifier,
@@ -1866,6 +1877,7 @@ export function useDocument() {
     align,
     order,
     distributeEvenly,
+    autoLayout,
     configureSurfaceRaycastTargeting,
     configureMeasurement,
     configureTranslateWithCloneModifier,

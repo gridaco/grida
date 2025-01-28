@@ -249,6 +249,7 @@ export function useEditorHotKeys() {
     align,
     order,
     distributeEvenly,
+    autoLayout,
     configureSurfaceRaycastTargeting,
     configureMeasurement,
     configureTranslateWithCloneModifier,
@@ -799,9 +800,19 @@ export function useEditorHotKeys() {
   });
 
   useHotkeys("shift+a", (e) => {
-    // TODO:
-    toast.error("[container layout] is not implemented yet");
+    autoLayout("selection");
   });
+
+  useHotkeys(
+    "ctrl+g, meta+g",
+    () => {
+      // TODO:
+      toast.error("grouping is not implemented yet");
+    },
+    {
+      preventDefault: true,
+    }
+  );
 
   useHotkeys("alt+meta+k, alt+ctrl+k", (e) => {
     // TODO:

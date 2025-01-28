@@ -428,7 +428,7 @@ function __self_update_gesture_transform_scale(
   // get the origin point based on handle
   const origin =
     transform_with_center_origin === "on"
-      ? cmath.rect.center(initial_bounding_rectangle)
+      ? cmath.rect.getCenter(initial_bounding_rectangle)
       : cmath.rect.getCardinalPoint(
           initial_bounding_rectangle,
           // maps the resize handle (direction) to the transform origin point (inverse)
