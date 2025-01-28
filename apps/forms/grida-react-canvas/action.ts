@@ -44,6 +44,7 @@ export type DocumentAction =
   | EditorAlignAction
   | EditorDistributeEvenlyAction
   | EditorAutoLayoutAction
+  | EditorContainAction
   | DocumentEditorInsertNodeAction
   //
   | SurfaceAction
@@ -253,6 +254,11 @@ export interface EditorDistributeEvenlyAction {
 
 export interface EditorAutoLayoutAction {
   type: "autolayout";
+  target: NodeID[] | "selection";
+}
+
+export interface EditorContainAction {
+  type: "contain";
   target: NodeID[] | "selection";
 }
 

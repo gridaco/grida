@@ -64,7 +64,7 @@ export function StandaloneDocumentEditor({
   }, [editable, dispatch]);
 
   const __dispatch = useMemo(
-    () => (editable ? dispatch ?? __noop : __noop),
+    () => (editable ? (dispatch ?? __noop) : __noop),
     [editable]
   );
 
@@ -1595,6 +1595,16 @@ export function useDocument() {
     [dispatch]
   );
 
+  const contain = useCallback(
+    (target: "selection" | string[] = "selection") => {
+      dispatch({
+        type: "contain",
+        target,
+      });
+    },
+    [dispatch]
+  );
+
   const configureSurfaceRaycastTargeting = useCallback(
     (config: Partial<SurfaceRaycastTargeting>) => {
       dispatch({
@@ -1834,6 +1844,7 @@ export function useDocument() {
       order,
       distributeEvenly,
       autoLayout,
+      contain,
       configureSurfaceRaycastTargeting,
       configureMeasurement,
       configureTranslateWithCloneModifier,
@@ -1878,6 +1889,7 @@ export function useDocument() {
     order,
     distributeEvenly,
     autoLayout,
+    contain,
     configureSurfaceRaycastTargeting,
     configureMeasurement,
     configureTranslateWithCloneModifier,

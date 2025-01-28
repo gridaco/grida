@@ -250,6 +250,7 @@ export function useEditorHotKeys() {
     order,
     distributeEvenly,
     autoLayout,
+    contain,
     configureSurfaceRaycastTargeting,
     configureMeasurement,
     configureTranslateWithCloneModifier,
@@ -807,12 +808,16 @@ export function useEditorHotKeys() {
     "ctrl+g, meta+g",
     () => {
       // TODO:
-      toast.error("grouping is not implemented yet");
+      toast("use ctrl+alt+g, meta+alt+g for grouping");
     },
     {
       preventDefault: true,
     }
   );
+
+  useHotkeys("ctrl+alt+g, meta+alt+g", () => {
+    contain("selection");
+  });
 
   useHotkeys("alt+meta+k, alt+ctrl+k", (e) => {
     // TODO:

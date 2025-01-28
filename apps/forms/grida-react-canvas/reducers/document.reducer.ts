@@ -498,6 +498,80 @@ export default function documentReducer<S extends IDocumentEditorState>(
 
       break;
     }
+    case "contain": {
+      const { target } = action;
+      const target_node_ids = target === "selection" ? state.selection : target;
+
+      // group by parent
+      const groups = Object.groupBy(
+        // omit root node
+        target_node_ids.filter((id) => id !== state.document.root_id),
+        (node_id) => {
+          return document.getParentId(state.document_ctx, node_id)!;
+        }
+      );
+
+      return produce(state, (draft) => {
+        const insertions: grida.program.nodes.NodeID[] = [];
+        Object.keys(groups).forEach((parent_id) => {
+          const g = groups[parent_id]!;
+          const cdom = new domapi.CanvasDOM(state.transform);
+
+          const parent_rect = cdom.getNodeBoundingRect(parent_id)!;
+
+          const rects = g
+            .map((node_id) => cdom.getNodeBoundingRect(node_id)!)
+            // make the rects relative to the parent
+            .map((rect) =>
+              cmath.rect.translate(rect, [-parent_rect.x, -parent_rect.y])
+            )
+            .map((rect) => cmath.rect.quantize(rect, 1));
+
+          const union = cmath.rect.union(rects);
+
+          const container_prototype: grida.program.nodes.NodePrototype = {
+            type: "container",
+            // layout
+            top: cmath.quantize(union.y, 1),
+            left: cmath.quantize(union.x, 1),
+            width: union.width,
+            height: union.height,
+            // children (empty when init)
+            children: [],
+            // position
+            position: "absolute",
+          };
+
+          const container_id = self_insertSubDocument(
+            draft,
+            parent_id,
+            grida.program.nodes.factory.createSubDocumentDefinitionFromPrototype(
+              container_prototype,
+              nid
+            )
+          );
+
+          // [move children to container]
+          g.forEach((id) => {
+            self_moveNode(draft, id, container_id);
+          });
+
+          // [adjust children position]
+          g.forEach((id) => {
+            const child = document.__getNodeById(draft, id);
+            if ("left" in child && typeof child.left === "number")
+              child.left -= union.x;
+            if ("top" in child && typeof child.top === "number")
+              child.top -= union.y;
+          });
+
+          insertions.push(container_id);
+        });
+
+        self_selectNode(draft, "reset", ...insertions);
+      });
+      break;
+    }
     //
     case "delete-vertex":
     case "select-vertex":
