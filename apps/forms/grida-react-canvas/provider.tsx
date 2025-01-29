@@ -2046,10 +2046,12 @@ export function useTransform() {
   return useMemo(() => {
     const transform = state.transform;
     const scaleX = transform[0][0];
+    const scaleY = transform[1][1];
     const matrix = `matrix(${transform[0][0]}, ${transform[1][0]}, ${transform[0][1]}, ${transform[1][1]}, ${transform[0][2]}, ${transform[1][2]})`;
     return {
       transform,
       scaleX,
+      scaleY,
       style: {
         transformOrigin: "0 0",
         transform: matrix,

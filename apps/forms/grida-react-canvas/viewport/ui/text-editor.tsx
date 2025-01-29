@@ -5,7 +5,7 @@ import {
   useTransform,
 } from "@/grida-react-canvas/provider";
 import { useEffect, useRef } from "react";
-import { __useNodeSurfaceTransfrom } from "../surface-hooks";
+import { useNodeSurfaceTransfrom } from "../surface-hooks";
 import { grida } from "@/grida";
 import { css } from "@/grida/css";
 import { cmath } from "@grida/cmath";
@@ -14,7 +14,7 @@ export function SurfaceTextEditor({ node_id }: { node_id: string }) {
   const inputref = useRef<HTMLTextAreaElement>(null);
   const change = useNodeAction(node_id)!;
   const { transform } = useTransform();
-  const { style } = __useNodeSurfaceTransfrom(node_id);
+  const data = useNodeSurfaceTransfrom(node_id);
   const node = useNode(node_id!);
   const { tryExitContentEditMode } = useEventTarget();
 
@@ -29,6 +29,8 @@ export function SurfaceTextEditor({ node_id }: { node_id: string }) {
     e.stopPropagation();
   };
 
+  if (!data) return <></>;
+
   return (
     <div
       id="richtext-editor-surface"
@@ -37,7 +39,7 @@ export function SurfaceTextEditor({ node_id }: { node_id: string }) {
       <div
         style={{
           position: "absolute",
-          ...style,
+          ...data.style,
           willChange: "transform",
           overflow: "hidden",
           resize: "none",

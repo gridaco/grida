@@ -24,7 +24,7 @@ import {
   SurfaceSelectionGroupProvider,
   useSurfaceSelectionGroups,
   useSelectionGroups,
-  __useNodeSurfaceTransfrom,
+  useNodeSurfaceTransfrom,
 } from "./surface-hooks";
 import { MeasurementGuide } from "./ui/measurement";
 import { SnapGuide } from "./ui/snap";
@@ -487,15 +487,7 @@ function SelectionGroupOverlay({
 
   const { distributeEvenly } = useDocument();
 
-  const {
-    style,
-    selection,
-    boundingSurfaceRect: boundingRect,
-    size,
-    distribution,
-  } = groupdata;
-
-  const { preferredDistributeEvenlyActionAxis } = distribution;
+  const { style, ids, boundingSurfaceRect, size, distribution } = groupdata;
 
   const enabled = !readonly && cursor_mode.type === "cursor";
 
@@ -510,7 +502,7 @@ function SelectionGroupOverlay({
         }
       },
       onClick: (e) => {
-        multipleSelectionOverlayClick(selection, e.event);
+        multipleSelectionOverlayClick(ids, e.event);
         e.event.stopPropagation();
       },
     },
@@ -524,6 +516,10 @@ function SelectionGroupOverlay({
     }
   );
 
+  if (!distribution) return <></>;
+
+  const { preferredDistributeEvenlyActionAxis } = distribution;
+
   return (
     <>
       <LayerOverlay
@@ -532,14 +528,14 @@ function SelectionGroupOverlay({
         transform={style}
         zIndex={10}
       >
-        <LayerOverlayResizeHandle anchor="n" selection={selection} />
-        <LayerOverlayResizeHandle anchor="s" selection={selection} />
-        <LayerOverlayResizeHandle anchor="e" selection={selection} />
-        <LayerOverlayResizeHandle anchor="w" selection={selection} />
-        <LayerOverlayResizeHandle anchor="nw" selection={selection} />
-        <LayerOverlayResizeHandle anchor="ne" selection={selection} />
-        <LayerOverlayResizeHandle anchor="sw" selection={selection} />
-        <LayerOverlayResizeHandle anchor="se" selection={selection} />
+        <LayerOverlayResizeHandle anchor="n" selection={ids} />
+        <LayerOverlayResizeHandle anchor="s" selection={ids} />
+        <LayerOverlayResizeHandle anchor="e" selection={ids} />
+        <LayerOverlayResizeHandle anchor="w" selection={ids} />
+        <LayerOverlayResizeHandle anchor="nw" selection={ids} />
+        <LayerOverlayResizeHandle anchor="ne" selection={ids} />
+        <LayerOverlayResizeHandle anchor="sw" selection={ids} />
+        <LayerOverlayResizeHandle anchor="se" selection={ids} />
         {/*  */}
         <DistributeButton
           axis={preferredDistributeEvenlyActionAxis}
@@ -547,18 +543,18 @@ function SelectionGroupOverlay({
             distributeEvenly("selection", axis);
           }}
         />
-        {boundingRect && (
+        {boundingSurfaceRect && (
           <SizeMeterLabel
             offset={16}
             size={size}
-            rect={{ ...boundingRect, x: 0, y: 0 }}
+            rect={{ ...boundingSurfaceRect, x: 0, y: 0 }}
             className="bg-workbench-accent-sky text-white"
           />
         )}
       </LayerOverlay>
       {
         // also hightlight the included nodes
-        selection.map((node_id) => (
+        ids.map((node_id) => (
           <NodeOverlay key={node_id} node_id={node_id} readonly zIndex={1} />
         ))
       }
@@ -577,8 +573,21 @@ function NodeOverlay({
   zIndex?: number;
   focused?: boolean;
 }) {
-  const { style, rect, size } = __useNodeSurfaceTransfrom(node_id);
+  const { scaleX, scaleY } = useTransform();
+
+  const data = useNodeSurfaceTransfrom(node_id);
   const node = useNode(node_id);
+
+  if (!data) return <></>;
+
+  const { style, size } = data;
+
+  const rect = {
+    x: 0,
+    y: 0,
+    width: size[0] * scaleX,
+    height: size[1] * scaleY,
+  };
 
   const { is_component_consumer } = node.meta;
   readonly = readonly || is_component_consumer;
@@ -620,7 +629,7 @@ function NodeOverlay({
           <LayerOverlayRotationHandle anchor="se" node_id={node_id} />
         </>
       )}
-      {focused && !readonly && rect && (
+      {focused && !readonly && (
         <SizeMeterLabel
           offset={16}
           size={size}
@@ -762,7 +771,7 @@ function LayerOverlayResizeHandle({
 
 function SortOverlay(props: SurfaceSelectionGroup) {
   const {
-    selection,
+    ids,
     objects: items,
     boundingSurfaceRect: boundingClientRect,
     style,
@@ -786,7 +795,7 @@ function SortOverlay(props: SurfaceSelectionGroup) {
                 boundingClientRect.x,
             }}
           >
-            <RedDotSortHandle selection={selection} node_id={item.id} />
+            <RedDotSortHandle selection={ids} node_id={item.id} />
           </div>
         );
       })}
@@ -817,12 +826,14 @@ function RedDotSortHandle({
 
 function GapOverlay(props: SurfaceSelectionGroup) {
   const {
-    group,
+    group: group,
     objects: items,
     boundingSurfaceRect,
     distribution,
     style,
   } = props;
+
+  if (!distribution) return <></>;
 
   const { x, y } = distribution;
 

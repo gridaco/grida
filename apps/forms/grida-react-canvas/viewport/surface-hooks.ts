@@ -21,41 +21,89 @@ export interface SurfaceNodeObject {
   boundingSurfaceRect: cmath.Rectangle;
 }
 
-export interface SurfaceSelectionGroup {
-  /**
-   * the id of the group - the shared parent of the selection. if root, it's `""` empty.
-   */
-  group: string;
+type SurfaceSelection = SurfaceSingleSelection | SurfaceSelectionGroup;
+
+interface SurfaceSingleSelection {
+  type: "single";
 
   /**
-   * ids of the selection, within the group (same parent)
+   * the selection, within the group (same parent) - surface overlay objects
    */
-  selection: string[];
+  object: SurfaceNodeObject;
 
   /**
-   * the measured size of the group, in canvas space.
+   * id of object
+   */
+  id: string;
+
+  /**
+   * the measured size of the group, in canvas space, non rotated
    */
   size: cmath.Vector2;
 
   /**
-   * surface-space bounding rect of the group, used for displaying the overlay.
+   * surface-space bounding rect of the group
    */
   boundingSurfaceRect: cmath.Rectangle;
 
   /**
-   * surface overlay objects
+   * the absolute rotation of the group, used for displaying overlay
+   * only present if single item. otherwise, it's 0
+   */
+  rotation: number;
+
+  /**
+   * style of the surface overlay, as-is. final computed.
+   */
+  style: React.CSSProperties;
+}
+
+export interface SurfaceSelectionGroup {
+  type: "multiple";
+  /**
+   * the id of the group
+   *
+   * - the shared parent of the selection. if root, it's `""` empty.
+   */
+  group: string;
+
+  /**
+   * the selection, within the group (same parent) - surface overlay objects
    */
   objects: SurfaceNodeObject[];
 
   /**
-   * the calculated distribution of the objects
+   * ids of objects
    */
-  distribution: ObjectsDistributionAnalysis & {
+  ids: string[];
+
+  /**
+   * the measured size of the group, in canvas space, non rotated
+   */
+  size: cmath.Vector2;
+
+  /**
+   * surface-space bounding rect of the group
+   */
+  boundingSurfaceRect: cmath.Rectangle;
+
+  /**
+   * the absolute rotation of the group, used for displaying overlay
+   * only present if single item. otherwise, it's 0
+   */
+  rotation: number;
+
+  /**
+   * the calculated distribution of the objects
+   *
+   * if single, it's `undefined`
+   */
+  distribution?: ObjectsDistributionAnalysis & {
     preferredDistributeEvenlyActionAxis: cmath.Axis | undefined;
   };
 
   /**
-   * style of the overlay
+   * style of the surface overlay, as-is. final computed.
    */
   style: React.CSSProperties;
 }
@@ -162,10 +210,12 @@ function computeSurfaceSelectionGroup({
         : undefined;
 
   const data: SurfaceSelectionGroup = {
+    type: "multiple",
     group: group,
-    selection: items,
+    ids: items,
     boundingSurfaceRect: surfaceBoundingRect,
     size: [boundingRect.width, boundingRect.height],
+    rotation: 0,
     style: {
       position: "absolute",
       top: surfaceBoundingRect.y,
@@ -193,15 +243,8 @@ export function useSelectionGroups(
 ): SurfaceSelectionGroup[] {
   const { transform, state } = useDocument();
 
-  const portal = useViewportSurfacePortal();
-
   // Use stable node IDs to avoid unnecessary re-renders
   const __node_ids = useStableNodeIds(node_ids);
-  // const selection = useMemo(
-  //   () =>
-  //     ,
-  //   [document.nodes, __node_ids]
-  // );
 
   const [groups, setGroups] = useState<SurfaceSelectionGroup[]>([]);
 
@@ -216,7 +259,6 @@ export function useSelectionGroups(
   }, [state.document.nodes, state.document_ctx, __node_ids]);
 
   useLayoutEffect(() => {
-    if (!portal) return;
     const groupkeys = Object.keys(grouped);
     if (groupkeys.length === 0) {
       setGroups([]);
@@ -234,7 +276,7 @@ export function useSelectionGroups(
     });
 
     setGroups(groups);
-  }, [portal, grouped, transform]);
+  }, [grouped, transform]);
 
   return groups;
 }
@@ -260,66 +302,75 @@ function __useNodeDomElement(node_id: string) {
 
 /**
  * returns the relative transform of the node surface relative to the portal
- * TODO: Not tested with the performance
- *
- * @deprecated
  */
-export function __useNodeSurfaceTransfrom(node_id: string) {
+export function useNodeSurfaceTransfrom(
+  node_id: string
+): SurfaceSingleSelection | undefined {
   const { transform } = useEventTarget();
-  const __rect_fallback = useMemo(() => new DOMRect(0, 0, 0, 0), []);
   const { getNodeAbsoluteRotation } = useDocument();
-  const portal = useViewportSurfacePortal();
   const node_element = __useNodeDomElement(node_id);
 
-  const [rect, setRect] = useState<cmath.Rectangle>();
-  const [size, setSize] = useState<cmath.Vector2>([0, 0]);
-  const [style, setStyle] = useState({
-    top: 0,
-    left: 0,
-    transform: "",
-    width: 0,
-    height: 0,
-  });
+  const [data, setData] = useState<SurfaceSingleSelection | undefined>(
+    undefined
+  );
 
   useEffect(() => {
-    if (!node_element || !portal) return;
+    if (!node_element) return;
 
     const scale = cmath.transform.getScale(transform);
+    const cdom = new domapi.CanvasDOM(transform);
 
     const updateTransform = () => {
-      const portal_rect = portal.getBoundingClientRect();
-      const node_element_bounding_rect =
-        node_element.getBoundingClientRect() ?? __rect_fallback;
+      // Collect bounding rectangle
+      const br = cdom.getNodeBoundingRect(node_id)!;
+      const bsr = rectToSurfaceSpace(br, transform);
+      const object: SurfaceNodeObject = {
+        id: node_id,
+        boundingRect: {
+          x: br.x,
+          y: br.y,
+          width: br.width,
+          height: br.height,
+        },
+        boundingSurfaceRect: {
+          x: bsr.x,
+          y: bsr.y,
+          width: bsr.width,
+          height: bsr.height,
+        },
+      };
 
-      const centerX =
-        node_element_bounding_rect.left +
-        node_element_bounding_rect.width / 2 -
-        portal_rect.left;
-      const centerY =
-        node_element_bounding_rect.top +
-        node_element_bounding_rect.height / 2 -
-        portal_rect.top;
+      const boundingSurfaceRect = rectToSurfaceSpace(
+        object.boundingRect,
+        transform
+      );
 
       const width = node_element.clientWidth;
       const height = node_element.clientHeight;
-
+      const size: cmath.Vector2 = [width, height];
       const absolute_rotation = getNodeAbsoluteRotation(node_id);
 
-      setRect({
-        x: node_element_bounding_rect.left,
-        y: node_element_bounding_rect.top,
-        width: width * scale[0],
-        height: height * scale[1],
-      });
+      const centerX = boundingSurfaceRect.x + boundingSurfaceRect.width / 2;
+      const centerY = boundingSurfaceRect.y + boundingSurfaceRect.height / 2;
 
-      setSize([width, height]);
-
-      setStyle({
+      const style: React.CSSProperties = {
+        position: "absolute",
         top: centerY,
         left: centerX,
-        transform: `translate(-50%, -50%) rotate(${absolute_rotation ?? 0}deg)`,
         width: width * scale[0],
         height: height * scale[1],
+        transform: `translate(-50%, -50%) rotate(${absolute_rotation ?? 0}deg)`,
+        willChange: "transform",
+      };
+
+      setData({
+        type: "single",
+        id: node_id,
+        object,
+        rotation: absolute_rotation,
+        size: size,
+        style: style,
+        boundingSurfaceRect: boundingSurfaceRect,
       });
     };
 
@@ -333,15 +384,7 @@ export function __useNodeSurfaceTransfrom(node_id: string) {
     return () => {
       resizeObserver.disconnect();
     };
-  }, [
-    node_element,
-    portal,
-    getNodeAbsoluteRotation,
-    node_id,
-    __rect_fallback,
-    // recompute when viewport changes
-    transform,
-  ]);
+  }, [node_element, getNodeAbsoluteRotation, node_id, transform]);
 
-  return { style, rect, size };
+  return data;
 }
