@@ -443,7 +443,7 @@ export type EditorSurface_StartGesture = {
     | Pick<GestureScale, "type" | "direction" | "selection">
     | Pick<GestureRotate, "type" | "selection">
     | (Pick<GestureSort, "type" | "node_id"> & { selection: string[] })
-    | (Pick<GestureGap, "type" | "axis"> & { selection: string[] })
+    | (Pick<GestureGap, "type" | "axis"> & { selection: string | string[] })
     | Pick<GestureCornerRadius, "type" | "node_id">
     | Pick<GestureCurve, "type" | "control" | "node_id" | "segment">
     | Pick<GestureTranslateVertex, "type" | "node_id" | "vertex">;

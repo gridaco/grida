@@ -2413,7 +2413,7 @@ export function useEventTarget() {
         type: "surface/gesture/start",
         gesture: {
           type: "gap",
-          selection: Array.isArray(selection) ? selection : [selection],
+          selection: selection,
           axis,
         },
       });

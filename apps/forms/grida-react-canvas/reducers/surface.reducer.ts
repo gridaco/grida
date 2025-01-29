@@ -230,48 +230,82 @@ export default function surfaceReducer<S extends IDocumentEditorState>(
           case "gap": {
             const { selection, axis } = gesture;
 
-            // assure the selection shares the same parent
-            const parent_id = document.getParentId(
-              state.document_ctx,
-              selection[0]
-            );
-            if (
-              !selection.every(
-                (it) =>
-                  document.getParentId(state.document_ctx, it) === parent_id
-              )
-            ) {
-              return;
+            // [gap gesture]
+            // mode 1: gap (distribute) the group of selection
+            // mode 2: update the gap the flex container (parent)
+
+            if (Array.isArray(selection)) {
+              // assure the selection shares the same parent
+              const parent_id = document.getParentId(
+                state.document_ctx,
+                selection[0]
+              );
+              if (
+                !selection.every(
+                  (it) =>
+                    document.getParentId(state.document_ctx, it) === parent_id
+                )
+              ) {
+                return;
+              }
+
+              const layout = createLayoutSnapshot(state, parent_id!, selection);
+              layout.objects.sort((a, b) => a[axis] - b[axis]);
+
+              const [gap] = cmath.rect.getUniformGap(
+                layout.objects,
+                axis,
+                DEFAULT_GAP_ALIGNMENT_TOLERANCE
+              );
+
+              assert(gap !== undefined, "gap is not uniform");
+
+              // the negaive size of the smallet object or the first sorted object's size (+1)
+              const min_gap =
+                -Math.min(
+                  ...layout.objects.map((it) =>
+                    cmath.rect.getAxisDimension(it, axis)
+                  )
+                ) + 1;
+
+              draft.gesture = {
+                type: "gap",
+                axis,
+                layout,
+                min_gap: min_gap,
+                initial_gap: gap,
+                gap: gap,
+                movement: cmath.vector2.zero,
+              };
+            } else {
+              // assert the selection to be a flex container
+              const node = document.__getNodeById(state, selection);
+              assert(
+                node.type === "container" && node.layout === "flex",
+                "the selection is not a flex container"
+              );
+              // (we only support main axis gap for now) - ignoring the input axis.
+              const { direction, mainAxisGap } = node;
+
+              const children = document.getChildren(
+                state.document_ctx,
+                selection
+              );
+
+              const layout = createLayoutSnapshot(state, selection, children);
+
+              draft.gesture = {
+                type: "gap",
+                axis: direction === "horizontal" ? "x" : "y",
+                layout,
+                min_gap: 0,
+                initial_gap: mainAxisGap,
+                gap: mainAxisGap,
+                movement: cmath.vector2.zero,
+              };
+              //
             }
 
-            const layout = createLayoutSnapshot(state, parent_id!, selection);
-            layout.objects.sort((a, b) => a[axis] - b[axis]);
-
-            const [gap] = cmath.rect.getUniformGap(
-              layout.objects,
-              axis,
-              DEFAULT_GAP_ALIGNMENT_TOLERANCE
-            );
-
-            assert(gap !== undefined, "gap is not uniform");
-
-            // the negaive size of the smallet object or the first sorted object's size (+1)
-            const min_gap =
-              -Math.min(
-                ...layout.objects.map((it) =>
-                  cmath.rect.getAxisDimension(it, axis)
-                )
-              ) + 1;
-
-            draft.gesture = {
-              type: "gap",
-              axis,
-              layout,
-              min_gap: min_gap,
-              initial_gap: gap,
-              gap: gap,
-              movement: cmath.vector2.zero,
-            };
             break;
           }
         }
@@ -290,6 +324,7 @@ function createLayoutSnapshot(
 ): LayoutSnapshot {
   const cdom = new domapi.CanvasDOM(state.transform);
 
+  const parent = document.__getNodeById(state, group);
   const parent_rect = cdom.getNodeBoundingRect(group)!;
   const objects: LayoutSnapshot["objects"] = items.map((node_id) => {
     const abs_rect = cdom.getNodeBoundingRect(node_id)!;
@@ -304,7 +339,11 @@ function createLayoutSnapshot(
     };
   });
 
+  const is_group_flex_container =
+    parent.type === "container" && parent.layout === "flex";
+
   return {
+    type: is_group_flex_container ? "flex" : "group",
     group,
     objects,
   };
