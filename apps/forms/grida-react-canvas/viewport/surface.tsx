@@ -19,7 +19,13 @@ import { supports } from "@/grida/utils/supports";
 import { MarqueeArea } from "./ui/marquee";
 import { LayerOverlay } from "./ui/layer";
 import { ViewportSurfaceContext } from "./context";
-import { useSelectionGroups, useNodeSurfaceTransfrom } from "./surface-hooks";
+import {
+  SurfaceSelectionGroup,
+  SurfaceSelectionGroupProvider,
+  useSurfaceSelectionGroups,
+  useSelectionGroups,
+  __useNodeSurfaceTransfrom,
+} from "./surface-hooks";
 import { MeasurementGuide } from "./ui/measurement";
 import { SnapGuide } from "./ui/snap";
 import { Knob } from "./ui/knob";
@@ -32,10 +38,6 @@ import { SizeMeterLabel } from "./ui/meter";
 import { SurfaceGradientEditor } from "./ui/gradient-editor";
 import { vector2ToSurfaceSpace, rectToSurfaceSpace } from "../utils/transform";
 import { RedDotHandle } from "./ui/reddot";
-import {
-  SurfaceSelectionGroupProvider,
-  useSurfaceSelectionGroup,
-} from "./core";
 
 const DRAG_THRESHOLD = 2;
 
@@ -446,6 +448,8 @@ function SelectionOverlay({
 }) {
   const { is_node_translating, gesture } = useEventTarget();
 
+  const groups = useSurfaceSelectionGroups();
+
   if (!selection || selection.length === 0) {
     return <></>;
   } else if (selection.length === 1) {
@@ -456,22 +460,27 @@ function SelectionOverlay({
     );
   } else {
     return (
-      <div className="group">
-        {(gesture.type === "idle" || gesture.type === "gap") && <GapOverlay />}
-        <SurfaceGroup hidden={is_node_translating}>
-          <SortOverlay />
-          <MultipleSelectionOverlay selection={selection} readonly={readonly} />
-        </SurfaceGroup>
-      </div>
+      <>
+        {groups.map((g) => (
+          <div key={g.group} className="group">
+            {(gesture.type === "idle" || gesture.type === "gap") && (
+              <GapOverlay {...g} />
+            )}
+            <SurfaceGroup hidden={is_node_translating}>
+              <SortOverlay {...g} />
+              <SelectionGroupOverlay {...g} readonly={readonly} />
+            </SurfaceGroup>
+          </div>
+        ))}
+      </>
     );
   }
 }
 
-function MultipleSelectionOverlay({
-  selection,
+function SelectionGroupOverlay({
   readonly,
-}: {
-  selection: string[];
+  ...groupdata
+}: SurfaceSelectionGroup & {
   readonly?: boolean;
 }) {
   const { multipleSelectionOverlayClick, cursor_mode } = useEventTarget();
@@ -480,10 +489,11 @@ function MultipleSelectionOverlay({
 
   const {
     style,
+    selection,
     boundingSurfaceRect: boundingRect,
     size,
     distribution,
-  } = useSurfaceSelectionGroup();
+  } = groupdata;
 
   const { preferredDistributeEvenlyActionAxis } = distribution;
 
@@ -567,7 +577,7 @@ function NodeOverlay({
   zIndex?: number;
   focused?: boolean;
 }) {
-  const { style, rect, size } = useNodeSurfaceTransfrom(node_id);
+  const { style, rect, size } = __useNodeSurfaceTransfrom(node_id);
   const node = useNode(node_id);
 
   const { is_component_consumer } = node.meta;
@@ -750,12 +760,13 @@ function LayerOverlayResizeHandle({
   return <Knob size={size} {...bind()} anchor={anchor} />;
 }
 
-function SortOverlay() {
+function SortOverlay(props: SurfaceSelectionGroup) {
   const {
+    selection,
     objects: items,
     boundingSurfaceRect: boundingClientRect,
     style,
-  } = useSurfaceSelectionGroup();
+  } = props;
 
   return (
     <div style={style} className="pointer-events-none z-50">
@@ -775,7 +786,7 @@ function SortOverlay() {
                 boundingClientRect.x,
             }}
           >
-            <RedDotSortHandle node_id={item.id} />
+            <RedDotSortHandle selection={selection} node_id={item.id} />
           </div>
         );
       })}
@@ -783,8 +794,13 @@ function SortOverlay() {
   );
 }
 
-function RedDotSortHandle({ node_id }: { node_id: string }) {
-  const { selection } = useSurfaceSelectionGroup();
+function RedDotSortHandle({
+  selection,
+  node_id,
+}: {
+  node_id: string;
+  selection: string[];
+}) {
   const { startSortGesture } = useEventTarget();
   const bind = useSurfaceGesture({
     onPointerDown: ({ event }) => {
@@ -799,13 +815,14 @@ function RedDotSortHandle({ node_id }: { node_id: string }) {
   return <RedDotHandle {...bind()} />;
 }
 
-function GapOverlay() {
+function GapOverlay(props: SurfaceSelectionGroup) {
   const {
+    group,
     objects: items,
     boundingSurfaceRect,
     distribution,
     style,
-  } = useSurfaceSelectionGroup();
+  } = props;
 
   const { x, y } = distribution;
 
@@ -831,6 +848,10 @@ function GapOverlay() {
                       b={b.boundingSurfaceRect}
                       axis={axis}
                       offset={[boundingSurfaceRect.x, boundingSurfaceRect.y]}
+                      layout={{
+                        group: group,
+                        objects: items.map((it) => it.id),
+                      }}
                     />
                   );
                 })}
@@ -853,6 +874,10 @@ function GapOverlay() {
                       b={b.boundingSurfaceRect}
                       axis={axis}
                       offset={[boundingSurfaceRect.x, boundingSurfaceRect.y]}
+                      layout={{
+                        group: group,
+                        objects: items.map((it) => it.id),
+                      }}
                     />
                   );
                 })}
@@ -870,11 +895,16 @@ function Gap({
   b,
   axis,
   offset = cmath.vector2.zero,
+  layout,
 }: {
   a: cmath.Rectangle;
   b: cmath.Rectangle;
   axis: cmath.Axis;
   offset?: cmath.Vector2;
+  layout: {
+    group: string;
+    objects: string[];
+  };
 }) {
   const { gesture } = useEventTarget();
 
@@ -931,15 +961,20 @@ function Gap({
           }}
           className="opacity-100 data-[is-gesture='true']:opacity-0"
         >
-          <GapHandle axis={axis} />
+          <GapHandle selection={layout.objects} axis={axis} />
         </div>
       </div>
     </>
   );
 }
 
-function GapHandle({ axis }: { axis: cmath.Axis }) {
-  const { selection } = useSurfaceSelectionGroup();
+function GapHandle({
+  selection,
+  axis,
+}: {
+  selection: string[];
+  axis: cmath.Axis;
+}) {
   const { startGapGesture } = useEventTarget();
 
   const bind = useSurfaceGesture({

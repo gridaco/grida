@@ -5,7 +5,7 @@ import {
   useTransform,
 } from "@/grida-react-canvas/provider";
 import { useEffect, useRef } from "react";
-import { useNodeSurfaceTransfrom } from "../surface-hooks";
+import { __useNodeSurfaceTransfrom } from "../surface-hooks";
 import { grida } from "@/grida";
 import { css } from "@/grida/css";
 import { cmath } from "@grida/cmath";
@@ -14,7 +14,7 @@ export function SurfaceTextEditor({ node_id }: { node_id: string }) {
   const inputref = useRef<HTMLTextAreaElement>(null);
   const change = useNodeAction(node_id)!;
   const { transform } = useTransform();
-  const { style } = useNodeSurfaceTransfrom(node_id);
+  const { style } = __useNodeSurfaceTransfrom(node_id);
   const node = useNode(node_id!);
   const { tryExitContentEditMode } = useEventTarget();
 

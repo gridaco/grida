@@ -1,5 +1,4 @@
-import { useDocument, useEventTarget } from "@/grida-react-canvas";
-import {
+import React, {
   useContext,
   useEffect,
   useLayoutEffect,
@@ -7,12 +6,76 @@ import {
   useRef,
   useState,
 } from "react";
+import { useDocument, useEventTarget } from "@/grida-react-canvas";
 import { ViewportSurfaceContext } from "./context";
-import { cmath } from "@grida/cmath";
-import { SurfaceNodeObject, SurfaceSelectionGroup } from "./core";
 import { analyzeDistribution } from "./ui/distribution";
 import { domapi } from "@/grida-react-canvas/domapi";
+import { document } from "@/grida-react-canvas/document-query";
 import { rectToSurfaceSpace } from "@/grida-react-canvas/utils/transform";
+import { cmath } from "@grida/cmath";
+import type { ObjectsDistributionAnalysis } from "./ui/distribution";
+
+export interface SurfaceNodeObject {
+  id: string;
+  boundingRect: cmath.Rectangle;
+  boundingSurfaceRect: cmath.Rectangle;
+}
+
+export interface SurfaceSelectionGroup {
+  /**
+   * the id of the group - the shared parent of the selection. if root, it's `""` empty.
+   */
+  group: string;
+
+  /**
+   * ids of the selection, within the group (same parent)
+   */
+  selection: string[];
+
+  /**
+   * the measured size of the group, in canvas space.
+   */
+  size: cmath.Vector2;
+
+  /**
+   * surface-space bounding rect of the group, used for displaying the overlay.
+   */
+  boundingSurfaceRect: cmath.Rectangle;
+
+  /**
+   * surface overlay objects
+   */
+  objects: SurfaceNodeObject[];
+
+  /**
+   * the calculated distribution of the objects
+   */
+  distribution: ObjectsDistributionAnalysis & {
+    preferredDistributeEvenlyActionAxis: cmath.Axis | undefined;
+  };
+
+  /**
+   * style of the overlay
+   */
+  style: React.CSSProperties;
+}
+
+const SurfaceSelectionGroupsContext = React.createContext<
+  SurfaceSelectionGroup[] | null
+>(null);
+
+export const SurfaceSelectionGroupProvider =
+  SurfaceSelectionGroupsContext.Provider;
+
+export const useSurfaceSelectionGroups = () => {
+  const context = React.useContext(SurfaceSelectionGroupsContext);
+  if (!context) {
+    throw new Error(
+      "useSurfaceSelectionGroup must be used within a SurfaceSelectionGroupProvider"
+    );
+  }
+  return context;
+};
 
 function useViewportSurfacePortal() {
   const context = useContext(ViewportSurfaceContext);
@@ -24,7 +87,162 @@ function useViewportSurfacePortal() {
   return context.portal;
 }
 
-function useNodeDomElement(node_id: string) {
+/**
+ * Custom hook to memoize an array based on its contents
+ */
+function useStableNodeIds(node_ids: string[]): string[] {
+  const prevRef = useRef<string[]>(node_ids);
+  const stableNodeIds = useMemo(() => {
+    if (
+      prevRef.current.length !== node_ids.length ||
+      !shallowEqual(prevRef.current, node_ids)
+    ) {
+      prevRef.current = node_ids;
+    }
+    return prevRef.current;
+  }, [node_ids]);
+  return stableNodeIds;
+}
+
+/**
+ * Helper function to perform shallow comparison of arrays
+ */
+function shallowEqual(arr1: string[], arr2: string[]): boolean {
+  return (
+    arr1.length === arr2.length &&
+    arr1.every((item, index) => item === arr2[index])
+  );
+}
+
+function computeSurfaceSelectionGroup({
+  group,
+  items,
+  transform,
+}: {
+  group: string;
+  items: string[];
+  transform: cmath.Transform;
+}): SurfaceSelectionGroup {
+  const cdom = new domapi.CanvasDOM(transform);
+
+  // Collect bounding rectangles for all node elements
+  const objects: SurfaceNodeObject[] = items.map((id) => {
+    const br = cdom.getNodeBoundingRect(id)!;
+    const bsr = rectToSurfaceSpace(br, transform);
+    return {
+      id: id,
+      boundingRect: {
+        x: br.x,
+        y: br.y,
+        width: br.width,
+        height: br.height,
+      },
+      boundingSurfaceRect: {
+        x: bsr.x,
+        y: bsr.y,
+        width: bsr.width,
+        height: bsr.height,
+      },
+    };
+  });
+
+  const boundingRect = cmath.rect.union(objects.map((it) => it.boundingRect));
+
+  const surfaceBoundingRect = rectToSurfaceSpace(boundingRect, transform);
+
+  const distribution = analyzeDistribution(
+    objects.map((it) => it.boundingRect)
+  );
+
+  const preferredDistributeEvenlyActionAxis: "x" | "y" | undefined =
+    distribution.x && distribution.x.gap === undefined
+      ? "x"
+      : distribution.y && distribution.y.gap === undefined
+        ? "y"
+        : undefined;
+
+  const data: SurfaceSelectionGroup = {
+    group: group,
+    selection: items,
+    boundingSurfaceRect: surfaceBoundingRect,
+    size: [boundingRect.width, boundingRect.height],
+    style: {
+      position: "absolute",
+      top: surfaceBoundingRect.y,
+      left: surfaceBoundingRect.x,
+      width: surfaceBoundingRect.width,
+      height: surfaceBoundingRect.height,
+      willChange: "transform",
+    },
+    distribution: {
+      ...distribution,
+      preferredDistributeEvenlyActionAxis,
+    },
+    objects: objects,
+  };
+
+  return data;
+}
+
+/**
+ * returns the relative transform of the group surface relative to the portal
+ * The group surface will not have rotation - each children rotation is applied to calculate the group bounding rect
+ */
+export function useSelectionGroups(
+  ...node_ids: string[]
+): SurfaceSelectionGroup[] {
+  const { transform, state } = useDocument();
+
+  const portal = useViewportSurfacePortal();
+
+  // Use stable node IDs to avoid unnecessary re-renders
+  const __node_ids = useStableNodeIds(node_ids);
+  // const selection = useMemo(
+  //   () =>
+  //     ,
+  //   [document.nodes, __node_ids]
+  // );
+
+  const [groups, setGroups] = useState<SurfaceSelectionGroup[]>([]);
+
+  const grouped = useMemo(() => {
+    const activenodes = __node_ids
+      .map((id) => state.document.nodes[id])
+      .filter((n) => n && n.active);
+    return Object.groupBy(
+      activenodes,
+      (it) => document.getParentId(state.document_ctx, it.id) ?? ""
+    );
+  }, [state.document.nodes, state.document_ctx, __node_ids]);
+
+  useLayoutEffect(() => {
+    if (!portal) return;
+    const groupkeys = Object.keys(grouped);
+    if (groupkeys.length === 0) {
+      setGroups([]);
+      return;
+    }
+
+    const groups = groupkeys.map((key) => {
+      const items = grouped[key]!;
+      const group = computeSurfaceSelectionGroup({
+        group: key,
+        items: items.map((it) => it.id),
+        transform,
+      });
+      return group;
+    });
+
+    setGroups(groups);
+  }, [portal, grouped, transform]);
+
+  return groups;
+}
+
+/**
+ * @deprecated
+ */
+function __useNodeDomElement(node_id: string) {
   const [nodeElement, setNodeElement] = useState<HTMLElement | null>(null);
 
   useLayoutEffect(() => {
@@ -33,7 +251,7 @@ function useNodeDomElement(node_id: string) {
       return;
     }
 
-    const element = document.getElementById(node_id);
+    const element = window.document.getElementById(node_id);
     setNodeElement(element);
   }, [node_id]);
 
@@ -43,13 +261,15 @@ function useNodeDomElement(node_id: string) {
 /**
  * returns the relative transform of the node surface relative to the portal
  * TODO: Not tested with the performance
+ *
+ * @deprecated
  */
-export function useNodeSurfaceTransfrom(node_id: string) {
+export function __useNodeSurfaceTransfrom(node_id: string) {
   const { transform } = useEventTarget();
   const __rect_fallback = useMemo(() => new DOMRect(0, 0, 0, 0), []);
   const { getNodeAbsoluteRotation } = useDocument();
   const portal = useViewportSurfacePortal();
-  const node_element = useNodeDomElement(node_id);
+  const node_element = __useNodeDomElement(node_id);
 
   const [rect, setRect] = useState<cmath.Rectangle>();
   const [size, setSize] = useState<cmath.Vector2>([0, 0]);
@@ -124,145 +344,4 @@ export function useNodeSurfaceTransfrom(node_id: string) {
   ]);
 
   return { style, rect, size };
-}
-
-/**
- * Custom hook to memoize an array based on its contents
- */
-function useStableNodeIds(node_ids: string[]): string[] {
-  const prevRef = useRef<string[]>(node_ids);
-  const stableNodeIds = useMemo(() => {
-    if (
-      prevRef.current.length !== node_ids.length ||
-      !shallowEqual(prevRef.current, node_ids)
-    ) {
-      prevRef.current = node_ids;
-    }
-    return prevRef.current;
-  }, [node_ids]);
-  return stableNodeIds;
-}
-
-/**
- * Helper function to perform shallow comparison of arrays
- */
-function shallowEqual(arr1: string[], arr2: string[]): boolean {
-  return (
-    arr1.length === arr2.length &&
-    arr1.every((item, index) => item === arr2[index])
-  );
-}
-
-const __initial_surface_selection_group: SurfaceSelectionGroup = {
-  selection: [],
-  size: [0, 0],
-  boundingSurfaceRect: { x: 0, y: 0, width: 0, height: 0 },
-  style: { top: 0, left: 0, transform: "", width: 0, height: 0 },
-  distribution: {
-    rects: [],
-    x: undefined,
-    y: undefined,
-    preferredDistributeEvenlyActionAxis: undefined,
-  },
-  objects: [],
-};
-
-/**
- * returns the relative transform of the group surface relative to the portal
- * The group surface will not have rotation - each children rotation is applied to calculate the group bounding rect
- */
-export function useSelectionGroups(
-  ...node_ids: string[]
-): SurfaceSelectionGroup {
-  const {
-    state: { document },
-  } = useDocument();
-  const { transform } = useEventTarget();
-  const portal = useViewportSurfacePortal();
-
-  // Use stable node IDs to avoid unnecessary re-renders
-  const __node_ids = useStableNodeIds(node_ids);
-  const selection = useMemo(
-    () =>
-      __node_ids.map((id) => document.nodes[id]).filter((n) => n && n.active),
-    [document.nodes, __node_ids]
-  );
-
-  const [data, setData] = useState<SurfaceSelectionGroup>(
-    __initial_surface_selection_group
-  );
-
-  useLayoutEffect(() => {
-    if (!portal) return;
-    if (!selection.length) {
-      setData(__initial_surface_selection_group);
-      return;
-    }
-
-    const updateTransform = () => {
-      // const portal_rect = portal.getBoundingClientRect();
-      const cdom = new domapi.CanvasDOM(transform);
-
-      // Collect bounding rectangles for all node elements
-      const objects: SurfaceNodeObject[] = selection.map(({ id }) => {
-        const br = cdom.getNodeBoundingRect(id)!;
-        const bsr = rectToSurfaceSpace(br, transform);
-        return {
-          id: id,
-          boundingRect: {
-            x: br.x,
-            y: br.y,
-            width: br.width,
-            height: br.height,
-          },
-          boundingSurfaceRect: {
-            x: bsr.x,
-            y: bsr.y,
-            width: bsr.width,
-            height: bsr.height,
-          },
-        };
-      });
-
-      const boundingRect = cmath.rect.union(
-        objects.map((it) => it.boundingRect)
-      );
-
-      const surfaceBoundingRect = rectToSurfaceSpace(boundingRect, transform);
-
-      const distribution = analyzeDistribution(
-        objects.map((it) => it.boundingRect)
-      );
-
-      const preferredDistributeEvenlyActionAxis: "x" | "y" | undefined =
-        distribution.x && distribution.x.gap === undefined
-          ? "x"
-          : distribution.y && distribution.y.gap === undefined
-            ? "y"
-            : undefined;
-
-      setData({
-        selection: selection.map((it) => it.id),
-        boundingSurfaceRect: surfaceBoundingRect,
-        size: [boundingRect.width, boundingRect.height],
-        style: {
-          position: "absolute",
-          top: surfaceBoundingRect.y,
-          left: surfaceBoundingRect.x,
-          width: surfaceBoundingRect.width,
-          height: surfaceBoundingRect.height,
-          willChange: "transform",
-        },
-        distribution: {
-          ...distribution,
-          preferredDistributeEvenlyActionAxis,
-        },
-        objects: objects,
-      });
-    };
-
-    updateTransform();
-  }, [portal, selection, transform]);
-
-  return data;
 }
