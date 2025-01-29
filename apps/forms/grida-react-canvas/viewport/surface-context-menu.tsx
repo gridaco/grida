@@ -15,7 +15,7 @@ import {
 export function EditorSurfaceContextMenu({
   children,
 }: React.PropsWithChildren<{}>) {
-  const { selection, state, paste, order, autoLayout, deleteNode } =
+  const { selection, state, paste, order, autoLayout, contain, deleteNode } =
     useDocument();
   const { insertText } = useDataTransferEventTarget();
   const { actions } = useSelection();
@@ -54,6 +54,7 @@ export function EditorSurfaceContextMenu({
   return (
     <ContextMenu>
       <ContextMenuTrigger>{children}</ContextMenuTrigger>
+      {/* TODO: disable events via portal, so the canvas won't be pannable while context menu is open */}
       <ContextMenuContent className="min-w-52">
         <ContextMenuItem
           disabled={!can_copy}
@@ -93,9 +94,9 @@ export function EditorSurfaceContextMenu({
         </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem
-          disabled={!can_bring_to_front}
+          disabled={!has_selection}
           onSelect={() => {
-            autoLayout("selection");
+            contain("selection");
           }}
           className="text-xs"
         >
@@ -103,7 +104,7 @@ export function EditorSurfaceContextMenu({
           <ContextMenuShortcut>{"⌥⌘G"}</ContextMenuShortcut>
         </ContextMenuItem>
         <ContextMenuItem
-          disabled={!can_bring_to_front}
+          disabled={!has_selection}
           onSelect={() => {
             autoLayout("selection");
           }}

@@ -2998,11 +2998,14 @@ class EditorConsumerError extends Error {
   }
 }
 
-export function useNode(node_id: string): grida.program.nodes.AnyNode & {
+export type NodeWithMeta = grida.program.nodes.AnyNode & {
   meta: {
     is_component_consumer: boolean;
+    is_flex_parent: boolean;
   };
-} {
+};
+
+export function useNode(node_id: string): NodeWithMeta {
   const { state } = useDocument();
 
   const {
@@ -3072,10 +3075,13 @@ export function useNode(node_id: string): grida.program.nodes.AnyNode & {
     root.type === "instance" ||
     root.type === "template_instance";
 
+  const is_flex_parent = node.type === "container" && node.layout === "flex";
+
   return {
     ...node,
     meta: {
-      is_component_consumer: is_component_consumer,
+      is_component_consumer,
+      is_flex_parent,
     },
   };
 }

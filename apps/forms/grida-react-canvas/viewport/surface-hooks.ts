@@ -1,11 +1,13 @@
 import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useDocument } from "@/grida-react-canvas";
+import { useDocument, useNode } from "@/grida-react-canvas";
 import { analyzeDistribution } from "./ui/distribution";
 import { domapi } from "@/grida-react-canvas/domapi";
 import { document } from "@/grida-react-canvas/document-query";
 import { rectToSurfaceSpace } from "@/grida-react-canvas/utils/transform";
 import { cmath } from "@grida/cmath";
 import type { ObjectsDistributionAnalysis } from "./ui/distribution";
+import { grida } from "@/grida";
+import { NodeWithMeta } from "../provider";
 
 export interface SurfaceNodeObject {
   id: string;
@@ -29,6 +31,11 @@ interface SurfaceSingleSelection {
   id: string;
 
   /**
+   * the node.
+   */
+  node: NodeWithMeta;
+
+  /**
    * the measured size of the group, in canvas space, non rotated
    */
   size: cmath.Vector2;
@@ -48,6 +55,11 @@ interface SurfaceSingleSelection {
    * style of the surface overlay, as-is. final computed.
    */
   style: React.CSSProperties;
+
+  /**
+   * the calculated distribution of the flex container, if the selection is a flex container
+   */
+  distribution?: ObjectsDistributionAnalysis;
 }
 
 export interface SurfaceSelectionGroup {
@@ -267,7 +279,12 @@ export function useSelectionGroups(
  * returns the relative transform of the node surface relative to the portal
  */
 export function useSingleSelection(
-  node_id: string
+  node_id: string,
+  {
+    enabled,
+  }: {
+    enabled: boolean;
+  } = { enabled: true }
 ): SurfaceSingleSelection | undefined {
   const { transform, getNodeAbsoluteRotation, state } = useDocument();
   const node = state.document.nodes[node_id];
@@ -277,6 +294,8 @@ export function useSingleSelection(
   );
 
   useLayoutEffect(() => {
+    if (!enabled) return;
+
     const element = window.document.getElementById(node_id);
     if (!element) {
       setData(undefined);
@@ -328,6 +347,34 @@ export function useSingleSelection(
       willChange: "transform",
     };
 
+    let distribution: ObjectsDistributionAnalysis | undefined = undefined;
+    const is_flex_parent = node.type === "container" && node.layout === "flex";
+    if (is_flex_parent) {
+      distribution = {
+        rects: [],
+        x: undefined,
+        y: undefined,
+      };
+
+      const container = node as grida.program.nodes.ContainerNode;
+      const { direction, mainAxisGap, crossAxisGap } = container;
+      const axis = direction === "horizontal" ? "x" : "y";
+      const children = document.getChildren(state.document_ctx, node_id);
+      const children_rects = children
+        .map((id) => cdom.getNodeBoundingRect(id))
+        .filter((it): it is cmath.Rectangle => !!it);
+
+      distribution.rects = children_rects;
+      distribution[axis] = {
+        gap: mainAxisGap,
+        tolerance: 0,
+        gaps: Array.from(
+          { length: children_rects.length - 1 },
+          () => mainAxisGap
+        ),
+      };
+    }
+
     setData({
       type: "single",
       id: node_id,
@@ -336,8 +383,17 @@ export function useSingleSelection(
       size: size,
       style: style,
       boundingSurfaceRect: boundingSurfaceRect,
+      distribution: distribution,
+      node: {
+        ...(node as grida.program.nodes.AnyNode),
+        meta: {
+          is_flex_parent,
+          // TODO:
+          is_component_consumer: false,
+        },
+      },
     });
-  }, [getNodeAbsoluteRotation, node, node_id, transform]);
+  }, [getNodeAbsoluteRotation, node, node_id, transform, enabled]);
 
   return data;
 }

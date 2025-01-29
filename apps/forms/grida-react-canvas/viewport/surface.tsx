@@ -38,6 +38,7 @@ import { SizeMeterLabel } from "./ui/meter";
 import { SurfaceGradientEditor } from "./ui/gradient-editor";
 import { vector2ToSurfaceSpace, rectToSurfaceSpace } from "../utils/transform";
 import { RedDotHandle } from "./ui/reddot";
+import { ObjectsDistributionAnalysis } from "./ui/distribution";
 
 const DRAG_THRESHOLD = 2;
 
@@ -446,35 +447,86 @@ function SelectionOverlay({
   readonly?: boolean;
   selection?: string[];
 }) {
-  const { is_node_translating, gesture } = useEventTarget();
-
-  const groups = useSurfaceSelectionGroups();
-
   if (!selection || selection.length === 0) {
     return <></>;
   } else if (selection.length === 1) {
     return (
-      <SurfaceGroup hidden={is_node_translating}>
-        <NodeOverlay node_id={selection[0]} readonly={readonly} focused />
-      </SurfaceGroup>
+      <SingleSelectionOverlay node_id={selection[0]} readonly={readonly} />
     );
   } else {
-    return (
-      <>
-        {groups.map((g) => (
-          <div key={g.group} className="group">
-            {(gesture.type === "idle" || gesture.type === "gap") && (
-              <GapOverlay {...g} />
-            )}
-            <SurfaceGroup hidden={is_node_translating}>
-              <SortOverlay {...g} />
-              <SelectionGroupOverlay {...g} readonly={readonly} />
-            </SurfaceGroup>
-          </div>
-        ))}
-      </>
-    );
+    return <MultpleSelectionGroupsOverlay readonly={readonly} />;
   }
+}
+
+function SingleSelectionOverlay({
+  node_id,
+  readonly,
+}: {
+  node_id: string;
+  readonly?: boolean;
+}) {
+  const { is_node_translating, gesture, startGapGesture } = useEventTarget();
+  const data = useSingleSelection(node_id, { enabled: !is_node_translating });
+  if (!data) return <></>;
+
+  const { node, distribution, rotation, style, boundingSurfaceRect } = data;
+
+  return (
+    <>
+      <div className="group">
+        {node.meta.is_flex_parent &&
+          distribution &&
+          (gesture.type === "idle" || gesture.type === "gap") &&
+          // TODO: support rotated surface
+          rotation === 0 && (
+            <>
+              <GapOverlay
+                offset={[boundingSurfaceRect.x, boundingSurfaceRect.y]}
+                distribution={distribution}
+                style={style}
+                onGapGestureStart={(axis) => {
+                  //
+                  // startGapGesture([node_id], axis);
+                }}
+              />
+            </>
+          )}
+        <SurfaceGroup hidden={is_node_translating}>
+          <NodeOverlay node_id={node_id} readonly={readonly} focused />
+        </SurfaceGroup>
+      </div>
+    </>
+  );
+}
+
+function MultpleSelectionGroupsOverlay({ readonly }: { readonly?: boolean }) {
+  const { is_node_translating, gesture, startGapGesture } = useEventTarget();
+  const groups = useSurfaceSelectionGroups();
+
+  return (
+    <>
+      {groups.map((g: SurfaceSelectionGroup) => (
+        <div key={g.group} className="group">
+          {(gesture.type === "idle" || gesture.type === "gap") &&
+            g.distribution && (
+              <GapOverlay
+                offset={[g.boundingSurfaceRect.x, g.boundingSurfaceRect.y]}
+                distribution={g.distribution}
+                style={g.style}
+                onGapGestureStart={(axis) => {
+                  startGapGesture(g.ids, axis);
+                }}
+              />
+            )}
+          <SurfaceGroup hidden={is_node_translating}>
+            <SortOverlay {...g} />
+            <SelectionGroupOverlay {...g} readonly={readonly} />
+          </SurfaceGroup>
+        </div>
+      ))}
+    </>
+  );
+  //
 }
 
 function SelectionGroupOverlay({
@@ -576,68 +628,68 @@ function NodeOverlay({
   const { scaleX, scaleY } = useTransform();
 
   const data = useSingleSelection(node_id);
-  const node = useNode(node_id);
 
   if (!data) return <></>;
 
-  const { style, size } = data;
+  const { node, style, size } = data;
 
-  const rect = {
+  const { is_component_consumer, is_flex_parent } = node.meta;
+  readonly = readonly || is_component_consumer;
+
+  const measurement_rect = {
     x: 0,
     y: 0,
     width: size[0] * scaleX,
     height: size[1] * scaleY,
   };
 
-  const { is_component_consumer } = node.meta;
-  readonly = readonly || is_component_consumer;
-  const is_flex = node.type === "container" && node.layout === "flex";
-
   return (
-    <LayerOverlay
-      readonly={readonly}
-      transform={style}
-      zIndex={zIndex}
-      isComponentConsumer={is_component_consumer}
-    >
-      {focused && !readonly && (
-        <>
-          {node.type === "line" ? (
-            <>
-              <LayerOverlayResizeHandle anchor="e" selection={node_id} />
-              <LayerOverlayResizeHandle anchor="w" selection={node_id} />
-            </>
-          ) : (
-            <>
-              <LayerOverlayResizeHandle anchor="n" selection={node_id} />
-              <LayerOverlayResizeHandle anchor="s" selection={node_id} />
-              <LayerOverlayResizeHandle anchor="e" selection={node_id} />
-              <LayerOverlayResizeHandle anchor="w" selection={node_id} />
-              <LayerOverlayResizeHandle anchor="nw" selection={node_id} />
-              <LayerOverlayResizeHandle anchor="ne" selection={node_id} />
-              <LayerOverlayResizeHandle anchor="sw" selection={node_id} />
-              <LayerOverlayResizeHandle anchor="se" selection={node_id} />
-            </>
-          )}
-          {supports.cornerRadius(node.type) &&
-            !supports.children(node.type) && (
-              <NodeOverlayCornerRadiusHandle anchor="se" node_id={node_id} />
+    <>
+      <LayerOverlay
+        readonly={readonly}
+        transform={style}
+        zIndex={zIndex}
+        isComponentConsumer={is_component_consumer}
+      >
+        {focused && !readonly && (
+          <>
+            {node.type === "line" ? (
+              <>
+                <LayerOverlayResizeHandle anchor="e" selection={node_id} />
+                <LayerOverlayResizeHandle anchor="w" selection={node_id} />
+              </>
+            ) : (
+              <>
+                <LayerOverlayResizeHandle anchor="n" selection={node_id} />
+                <LayerOverlayResizeHandle anchor="s" selection={node_id} />
+                <LayerOverlayResizeHandle anchor="e" selection={node_id} />
+                <LayerOverlayResizeHandle anchor="w" selection={node_id} />
+                <LayerOverlayResizeHandle anchor="nw" selection={node_id} />
+                <LayerOverlayResizeHandle anchor="ne" selection={node_id} />
+                <LayerOverlayResizeHandle anchor="sw" selection={node_id} />
+                <LayerOverlayResizeHandle anchor="se" selection={node_id} />
+              </>
             )}
-          <LayerOverlayRotationHandle anchor="nw" node_id={node_id} />
-          <LayerOverlayRotationHandle anchor="ne" node_id={node_id} />
-          <LayerOverlayRotationHandle anchor="sw" node_id={node_id} />
-          <LayerOverlayRotationHandle anchor="se" node_id={node_id} />
-        </>
-      )}
-      {focused && !readonly && (
-        <SizeMeterLabel
-          offset={16}
-          size={size}
-          rect={{ ...rect, x: 0, y: 0 }}
-          className="bg-workbench-accent-sky text-white"
-        />
-      )}
-    </LayerOverlay>
+            {supports.cornerRadius(node.type) &&
+              !supports.children(node.type) && (
+                <NodeOverlayCornerRadiusHandle anchor="se" node_id={node_id} />
+              )}
+            <LayerOverlayRotationHandle anchor="nw" node_id={node_id} />
+            <LayerOverlayRotationHandle anchor="ne" node_id={node_id} />
+            <LayerOverlayRotationHandle anchor="sw" node_id={node_id} />
+            <LayerOverlayRotationHandle anchor="se" node_id={node_id} />
+          </>
+        )}
+        {focused && !readonly && (
+          <SizeMeterLabel
+            offset={16}
+            size={size}
+            rect={{ ...measurement_rect, x: 0, y: 0 }}
+            className="bg-workbench-accent-sky text-white"
+          />
+        )}
+      </LayerOverlay>
+    </>
   );
 }
 
@@ -824,45 +876,49 @@ function RedDotSortHandle({
   return <RedDotHandle {...bind()} />;
 }
 
-function GapOverlay(props: SurfaceSelectionGroup) {
-  const {
-    group: group,
-    objects: items,
-    boundingSurfaceRect,
-    distribution,
-    style,
-  } = props;
+function GapOverlay({
+  onGapGestureStart,
+  offset,
+  style,
+  distribution,
+}: {
+  distribution: ObjectsDistributionAnalysis;
+  offset?: cmath.Vector2;
+  style?: React.CSSProperties;
+} & {
+  onGapGestureStart?: (axis: cmath.Axis) => void;
+}) {
+  const { transform } = useTransform();
 
-  if (!distribution) return <></>;
+  const { x, y, rects: _rects } = distribution;
 
-  const { x, y } = distribution;
+  // rects in surface space
+  const rects = useMemo(
+    () => _rects.map((r) => rectToSurfaceSpace(r, transform)),
+    [_rects, transform]
+  );
 
   return (
     <div style={style} className="pointer-events-none z-50">
       <div>
-        {items.length >= 2 && (
+        {_rects.length >= 2 && (
           <>
             {x && x.gap !== undefined && (
               <>
                 {Array.from({ length: x.gaps.length }).map((_, i) => {
                   const axis = "x";
-                  const x_sorted = items.sort(
-                    (a, b) => a.boundingSurfaceRect.x - b.boundingSurfaceRect.x
-                  );
+                  const x_sorted = rects.sort((a, b) => a.x - b.x);
                   const a = x_sorted[i];
                   const b = x_sorted[i + 1];
 
                   return (
-                    <Gap
+                    <GapWithHandle
                       key={i}
-                      a={a.boundingSurfaceRect}
-                      b={b.boundingSurfaceRect}
+                      a={a}
+                      b={b}
                       axis={axis}
-                      offset={[boundingSurfaceRect.x, boundingSurfaceRect.y]}
-                      layout={{
-                        group: group,
-                        objects: items.map((it) => it.id),
-                      }}
+                      offset={offset}
+                      onGapGestureStart={onGapGestureStart}
                     />
                   );
                 })}
@@ -872,23 +928,18 @@ function GapOverlay(props: SurfaceSelectionGroup) {
               <>
                 {Array.from({ length: y.gaps.length }).map((_, i) => {
                   const axis = "y";
-                  const y_sorted = items.sort(
-                    (a, b) => a.boundingSurfaceRect.y - b.boundingSurfaceRect.y
-                  );
+                  const y_sorted = rects.sort((a, b) => a.y - b.y);
                   const a = y_sorted[i];
                   const b = y_sorted[i + 1];
 
                   return (
-                    <Gap
+                    <GapWithHandle
                       key={i}
-                      a={a.boundingSurfaceRect}
-                      b={b.boundingSurfaceRect}
+                      a={a}
+                      b={b}
                       axis={axis}
-                      offset={[boundingSurfaceRect.x, boundingSurfaceRect.y]}
-                      layout={{
-                        group: group,
-                        objects: items.map((it) => it.id),
-                      }}
+                      offset={offset}
+                      onGapGestureStart={onGapGestureStart}
                     />
                   );
                 })}
@@ -901,21 +952,18 @@ function GapOverlay(props: SurfaceSelectionGroup) {
   );
 }
 
-function Gap({
+function GapWithHandle({
   a,
   b,
   axis,
   offset = cmath.vector2.zero,
-  layout,
+  onGapGestureStart,
 }: {
   a: cmath.Rectangle;
   b: cmath.Rectangle;
   axis: cmath.Axis;
   offset?: cmath.Vector2;
-  layout: {
-    group: string;
-    objects: string[];
-  };
+  onGapGestureStart?: (axis: cmath.Axis) => void;
 }) {
   const { gesture } = useEventTarget();
 
@@ -972,7 +1020,7 @@ function Gap({
           }}
           className="opacity-100 data-[is-gesture='true']:opacity-0"
         >
-          <GapHandle selection={layout.objects} axis={axis} />
+          <GapHandle axis={axis} onGapGestureStart={onGapGestureStart} />
         </div>
       </div>
     </>
@@ -980,21 +1028,19 @@ function Gap({
 }
 
 function GapHandle({
-  selection,
   axis,
+  onGapGestureStart,
 }: {
-  selection: string[];
   axis: cmath.Axis;
+  onGapGestureStart?: (axis: cmath.Axis) => void;
 }) {
-  const { startGapGesture } = useEventTarget();
-
   const bind = useSurfaceGesture({
     onPointerDown: ({ event }) => {
       event.preventDefault();
     },
     onDragStart: ({ event }) => {
       event.preventDefault();
-      startGapGesture(selection, axis);
+      onGapGestureStart?.(axis);
     },
   });
 

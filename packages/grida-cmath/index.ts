@@ -19,10 +19,9 @@ export namespace cmath {
    */
   export type Axis = "x" | "y";
 
-  export const counterAxis = {
-    x: "y",
-    y: "x",
-  } as const;
+  export const counterAxis = (axis: Axis) => {
+    return axis === "x" ? "y" : "x";
+  };
 
   /**
    * Represents a single numerical value, often referred to as a scalar in mathematics and computer science.
