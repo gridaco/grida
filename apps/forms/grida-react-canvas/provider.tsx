@@ -2413,7 +2413,7 @@ export function useEventTarget() {
         type: "surface/gesture/start",
         gesture: {
           type: "gap",
-          selection: Array.isArray(selection) ? selection : [selection],
+          selection: selection,
           axis,
         },
       });
@@ -2677,7 +2677,6 @@ export function useDataTransferEventTarget() {
 
   const onpaste = useCallback(
     (event: ClipboardEvent) => {
-      console.log("onpaste", event);
       if (event.defaultPrevented) return;
       // cancel if on contenteditable / form element
       if (

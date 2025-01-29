@@ -235,6 +235,11 @@ export type GestureTranslate = IGesture & {
  */
 export interface LayoutSnapshot {
   /**
+   * the type of the layout
+   */
+  type: "flex" | "group";
+
+  /**
    * the grouping parent id
    */
   group: string;
@@ -289,10 +294,11 @@ export type GestureSort = IGesture & {
 export type GestureGap = IGesture & {
   readonly type: "gap";
 
-  axis: "x" | "y";
+  readonly axis: "x" | "y";
 
-  min_gap: number;
-  initial_gap: number;
+  readonly min_gap: number;
+  readonly initial_gap: number;
+
   gap: number;
 
   /**

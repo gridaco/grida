@@ -466,7 +466,7 @@ function SingleSelectionOverlay({
   readonly?: boolean;
 }) {
   const { is_node_translating, gesture, startGapGesture } = useEventTarget();
-  const data = useSingleSelection(node_id, { enabled: !is_node_translating });
+  const data = useSingleSelection(node_id);
   if (!data) return <></>;
 
   const { node, distribution, rotation, style, boundingSurfaceRect } = data;
@@ -485,8 +485,7 @@ function SingleSelectionOverlay({
                 distribution={distribution}
                 style={style}
                 onGapGestureStart={(axis) => {
-                  //
-                  // startGapGesture([node_id], axis);
+                  startGapGesture(node_id, axis);
                 }}
               />
             </>
