@@ -1,13 +1,5 @@
-import React, {
-  useContext,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import { useDocument, useEventTarget } from "@/grida-react-canvas";
-import { ViewportSurfaceContext } from "./context";
+import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useDocument } from "@/grida-react-canvas";
 import { analyzeDistribution } from "./ui/distribution";
 import { domapi } from "@/grida-react-canvas/domapi";
 import { document } from "@/grida-react-canvas/document-query";
@@ -21,7 +13,7 @@ export interface SurfaceNodeObject {
   boundingSurfaceRect: cmath.Rectangle;
 }
 
-type SurfaceSelection = SurfaceSingleSelection | SurfaceSelectionGroup;
+// type SurfaceSelection = SurfaceSingleSelection | SurfaceSelectionGroup;
 
 interface SurfaceSingleSelection {
   type: "single";
@@ -124,16 +116,6 @@ export const useSurfaceSelectionGroups = () => {
   }
   return context;
 };
-
-function useViewportSurfacePortal() {
-  const context = useContext(ViewportSurfaceContext);
-  if (!context) {
-    throw new Error(
-      "useCanvasOverlay must be used within a CanvasEventTarget."
-    );
-  }
-  return context.portal;
-}
 
 /**
  * Custom hook to memoize an array based on its contents
@@ -282,109 +264,80 @@ export function useSelectionGroups(
 }
 
 /**
- * @deprecated
- */
-function __useNodeDomElement(node_id: string) {
-  const [nodeElement, setNodeElement] = useState<HTMLElement | null>(null);
-
-  useLayoutEffect(() => {
-    if (!node_id) {
-      setNodeElement(null);
-      return;
-    }
-
-    const element = window.document.getElementById(node_id);
-    setNodeElement(element);
-  }, [node_id]);
-
-  return nodeElement;
-}
-
-/**
  * returns the relative transform of the node surface relative to the portal
  */
-export function useNodeSurfaceTransfrom(
+export function useSingleSelection(
   node_id: string
 ): SurfaceSingleSelection | undefined {
-  const { transform } = useEventTarget();
-  const { getNodeAbsoluteRotation } = useDocument();
-  const node_element = __useNodeDomElement(node_id);
+  const { transform, getNodeAbsoluteRotation, state } = useDocument();
+  const node = state.document.nodes[node_id];
 
   const [data, setData] = useState<SurfaceSingleSelection | undefined>(
     undefined
   );
 
-  useEffect(() => {
-    if (!node_element) return;
+  useLayoutEffect(() => {
+    const element = window.document.getElementById(node_id);
+    if (!element) {
+      setData(undefined);
+      return;
+    }
 
     const scale = cmath.transform.getScale(transform);
     const cdom = new domapi.CanvasDOM(transform);
 
-    const updateTransform = () => {
-      // Collect bounding rectangle
-      const br = cdom.getNodeBoundingRect(node_id)!;
-      const bsr = rectToSurfaceSpace(br, transform);
-      const object: SurfaceNodeObject = {
-        id: node_id,
-        boundingRect: {
-          x: br.x,
-          y: br.y,
-          width: br.width,
-          height: br.height,
-        },
-        boundingSurfaceRect: {
-          x: bsr.x,
-          y: bsr.y,
-          width: bsr.width,
-          height: bsr.height,
-        },
-      };
-
-      const boundingSurfaceRect = rectToSurfaceSpace(
-        object.boundingRect,
-        transform
-      );
-
-      const width = node_element.clientWidth;
-      const height = node_element.clientHeight;
-      const size: cmath.Vector2 = [width, height];
-      const absolute_rotation = getNodeAbsoluteRotation(node_id);
-
-      const centerX = boundingSurfaceRect.x + boundingSurfaceRect.width / 2;
-      const centerY = boundingSurfaceRect.y + boundingSurfaceRect.height / 2;
-
-      const style: React.CSSProperties = {
-        position: "absolute",
-        top: centerY,
-        left: centerX,
-        width: width * scale[0],
-        height: height * scale[1],
-        transform: `translate(-50%, -50%) rotate(${absolute_rotation ?? 0}deg)`,
-        willChange: "transform",
-      };
-
-      setData({
-        type: "single",
-        id: node_id,
-        object,
-        rotation: absolute_rotation,
-        size: size,
-        style: style,
-        boundingSurfaceRect: boundingSurfaceRect,
-      });
+    // Collect bounding rectangle
+    const br = cdom.getNodeBoundingRect(node_id)!;
+    const bsr = rectToSurfaceSpace(br, transform);
+    const object: SurfaceNodeObject = {
+      id: node_id,
+      boundingRect: {
+        x: br.x,
+        y: br.y,
+        width: br.width,
+        height: br.height,
+      },
+      boundingSurfaceRect: {
+        x: bsr.x,
+        y: bsr.y,
+        width: bsr.width,
+        height: bsr.height,
+      },
     };
 
-    // Observe size changes
-    const resizeObserver = new ResizeObserver(() => updateTransform());
-    resizeObserver.observe(node_element);
+    const boundingSurfaceRect = rectToSurfaceSpace(
+      object.boundingRect,
+      transform
+    );
 
-    // Trigger initial update
-    updateTransform();
+    const width = element.clientWidth;
+    const height = element.clientHeight;
+    const size: cmath.Vector2 = [width, height];
+    const absolute_rotation = getNodeAbsoluteRotation(node_id);
 
-    return () => {
-      resizeObserver.disconnect();
+    const centerX = boundingSurfaceRect.x + boundingSurfaceRect.width / 2;
+    const centerY = boundingSurfaceRect.y + boundingSurfaceRect.height / 2;
+
+    const style: React.CSSProperties = {
+      position: "absolute",
+      top: centerY,
+      left: centerX,
+      width: width * scale[0],
+      height: height * scale[1],
+      transform: `translate(-50%, -50%) rotate(${absolute_rotation ?? 0}deg)`,
+      willChange: "transform",
     };
-  }, [node_element, getNodeAbsoluteRotation, node_id, transform]);
+
+    setData({
+      type: "single",
+      id: node_id,
+      object,
+      rotation: absolute_rotation,
+      size: size,
+      style: style,
+      boundingSurfaceRect: boundingSurfaceRect,
+    });
+  }, [getNodeAbsoluteRotation, node, node_id, transform]);
 
   return data;
 }

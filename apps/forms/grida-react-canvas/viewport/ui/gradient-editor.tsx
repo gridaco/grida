@@ -1,9 +1,9 @@
 import { useSurfaceGradientEditor } from "@/grida-react-canvas/provider";
-import { useNodeSurfaceTransfrom } from "../surface-hooks";
+import { useSingleSelection } from "../surface-hooks";
 
 export function SurfaceGradientEditor({ node_id }: { node_id: string }) {
   const { transform, stops } = useSurfaceGradientEditor();
-  const data = useNodeSurfaceTransfrom(node_id);
+  const data = useSingleSelection(node_id);
   if (!data) return <></>;
 
   return (

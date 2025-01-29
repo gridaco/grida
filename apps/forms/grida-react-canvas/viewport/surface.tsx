@@ -24,7 +24,7 @@ import {
   SurfaceSelectionGroupProvider,
   useSurfaceSelectionGroups,
   useSelectionGroups,
-  useNodeSurfaceTransfrom,
+  useSingleSelection,
 } from "./surface-hooks";
 import { MeasurementGuide } from "./ui/measurement";
 import { SnapGuide } from "./ui/snap";
@@ -575,7 +575,7 @@ function NodeOverlay({
 }) {
   const { scaleX, scaleY } = useTransform();
 
-  const data = useNodeSurfaceTransfrom(node_id);
+  const data = useSingleSelection(node_id);
   const node = useNode(node_id);
 
   if (!data) return <></>;
